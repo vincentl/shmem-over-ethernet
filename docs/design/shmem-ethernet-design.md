@@ -221,7 +221,7 @@ This restores "can never fill" for both rings and puts both asserts at init. The
 cost is a few hundred KB of CQEs — irrelevant beside the buffer ring itself, and
 cheap for deleting an error path.
 
-**Verified** by `tools/probe.c` on 6.12 aarch64: a multishot recv over TCP
+**Verified** by `tools/probe` on 6.12 aarch64: a multishot recv over TCP
 loopback with an 8-entry buffer ring and no replenishment produced exactly 8 data
 CQEs carrying `IORING_CQE_F_MORE`, then one terminal `-ENOBUFS`. One completion
 per provided buffer plus one terminal completion per armed recv — the shape of
@@ -948,7 +948,7 @@ local PE storing through the shared heap.
 
 An earlier draft had the waiter futex directly on the `ivar`. That works only for
 32-bit types: **the kernel implements only 32-bit futexes.** `futex_wait` with
-`FUTEX2_SIZE_U64` returns `EINVAL` — verified on 6.12 aarch64 by `tools/probe.c`
+`FUTEX2_SIZE_U64` returns `EINVAL` — verified on 6.12 aarch64 by `tools/probe`
 — and OpenSHMEM's wait types include 64-bit ones. Futexing on the low half of a
 64-bit `ivar` is not a fix: an update that changes only the high bits between the
 waiter's load and its wait passes the kernel's compare, and the wake is lost.
@@ -1555,12 +1555,38 @@ from the repository root starts in the same directory inside the VM, and every
 path in a build tree or `compile_commands.json` is valid on both sides, so an
 editor on the host can use the VM's build output.
 
+**Build directories.** Every CMake preset builds under `build/<preset>` in the
+repository — `debug`, `release`, `asan`, `tsan` — and `/build/` is ignored by
+git. Four properties are deliberate:
+
+- **In the repository, on the shared mount, not VM-local disk.** Object files
+  cross virtiofs, which is slower than VM-local disk, but the build tree is then
+  visible from the host: `build/debug/compile_commands.json` is what an editor on
+  macOS points clangd at, and the same-path mount keeps its paths valid there.
+  If build time on the mount ever hurts, a VM-local `binaryDir` preset is a
+  one-line addition; nothing else changes.
+- **One tree per preset, never shared.** Sanitizer flags change every object
+  file, so `asan` and `tsan` builds cannot reuse `debug` objects, and switching
+  presets never triggers a full rebuild of the others.
+- **Configured only on Linux.** The presets carry a host-system condition, so on
+  macOS they are hidden and refuse to run, and the top-level `CMakeLists.txt`
+  stops any non-preset configure with a pointer to the VM. This matters because
+  `build/` is shared: a host-side configure would write a macOS compiler into a
+  cache the VM then reuses.
+- **No in-source builds.** Refused at configure time; the two files CMake writes
+  before the refusal can run are ignored.
+
+`cmake --workflow --preset <name>` configures, builds, and runs the tests in one
+step. Tests carry ctest labels: `env` for `tools/probe`, and tier labels
+(`tier1`, …, §8.2) as the suites arrive, so `ctest --preset debug -L tier1` runs
+what CI can run anywhere.
+
 **Page size.** The VM runs 4K pages; Raspberry Pi OS on a Pi 5 defaults to 16K.
 Nothing may hardcode 4096 — including the §4.3 linker script, which aligns to
 `CONSTANT(MAXPAGESIZE)`. If page-size bugs surface before a Pi is available, a
 16K kernel boots in the VM (Apple Silicon supports 4K and 16K granules, not 64K).
 
-**`tools/probe.c`** checks every kernel assumption this document makes and prints
+**`tools/probe`** checks every kernel assumption this document makes and prints
 a pass/fail line for each: single-issuer rings with an explicit CQ size,
 `IORING_OP_FUTEX_WAIT` returning `-EAGAIN` on a stale value, multishot recv
 producing one CQE per provided buffer plus a terminal `-ENOBUFS`, cross-process
@@ -1636,10 +1662,10 @@ Recorded rather than deleted, so they are not reopened from memory.
 | PMIx on the actual nodes | **Moot.** Nothing links against PMIx or PMI-2 on the default path (§6) |
 | `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7) |
 | How a PE blocks in `wait_until` | **Watch table plus a 32-bit futex sequence word per slot** (§4.9). Futexing on the `ivar` itself was withdrawn: 64-bit futexes do not exist |
-| io_uring ring bound | **Two bounds, two rings.** CQ is sized from the provided-buffer ring (§3.3). Verified by `tools/probe.c` |
+| io_uring ring bound | **Two bounds, two rings.** CQ is sized from the provided-buffer ring (§3.3). Verified by `tools/probe` |
 | Reduction `dest` versus 1.6 change #17 | **Not a conflict** — same arrays means same symmetric offset. The surrounding text exposed three real bugs, fixed by a single-writer lead that leaves last (§5.5) |
 | Collective epoch identification | **Cumulative 32-bit counters with equality waits** (§5.4). Sense reversal retired |
-| 64-bit futex support | **Not implemented.** `EINVAL` on 6.12 aarch64 (`tools/probe.c`) |
+| 64-bit futex support | **Not implemented.** `EINVAL` on 6.12 aarch64 (`tools/probe`) |
 | Development environment | **Lima + Debian 13 on Apple Silicon**; x86 and ARM in CI; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
 | Build tool | **CMake ≥ 3.25** (§1) |

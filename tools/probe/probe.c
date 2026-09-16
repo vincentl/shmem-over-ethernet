@@ -6,9 +6,10 @@
  * buffer ring, cross-process futexes, and 64-bit futex support.
  * Run it first on any new machine.
  *
- *   gcc -O2 -Wall -Wextra -std=gnu11 -o probe tools/probe.c -luring && ./probe
+ *   cmake --workflow --preset debug        (runs it as the env.probe test)
+ *   build/debug/tools/probe/probe          (runs it directly)
  *
- * Requires Linux 6.7+ and liburing. Exits nonzero if any check fails.
+ * Requires Linux 6.7+ and liburing 2.6+. Exits nonzero if any check fails.
  */
 #define _GNU_SOURCE
 #include <errno.h>

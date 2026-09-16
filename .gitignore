@@ -1,6 +1,10 @@
 # Build trees: every CMake preset builds under build/<preset> (see CMakePresets.json)
 /build/
 
+# Left behind by a rejected in-source configure (CMakeLists.txt refuses it)
+/CMakeCache.txt
+/CMakeFiles/
+
 # Specification PDFs are freely downloadable and not redistributed here
 /docs/reference/*.pdf
 
