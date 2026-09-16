@@ -1670,7 +1670,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Development environment | **Lima + Debian 13 on Apple Silicon**; x86 and ARM in CI; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
 | Build tool | **CMake ≥ 3.25** (§1) |
-| Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`; internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
+| Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 
 ### Still open — blocking

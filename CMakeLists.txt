@@ -18,6 +18,8 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
     "build/<preset>:  cmake --workflow --preset debug")
 endif()
 
+option(BUILD_SHARED_LIBS "Build libosoe as a shared library" ON)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
@@ -38,4 +40,5 @@ if(NOT LIBURING_FOUND)
     "Older OS releases are not supported.")
 endif()
 
+add_subdirectory(shmem)
 add_subdirectory(tools)
