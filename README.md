@@ -1,6 +1,6 @@
-# eoshmem
+# osoe
 
-An implementation of OpenSHMEM 1.6 for commodity Ethernet, built on io_uring and
+OpenSHMEM Over Ethernet: an implementation of OpenSHMEM 1.6 for commodity Ethernet, built on io_uring and
 designed to build entirely from a Linux distribution's own packages — no fabric
 libraries.
 
@@ -29,7 +29,7 @@ Presets: `debug`, `release` (optimized, with debug info), `asan`
 (AddressSanitizer and UndefinedBehaviorSanitizer), and `tsan` (ThreadSanitizer).
 
 The `env.probe` test checks that the running kernel provides every io_uring and
-futex facility eoshmem relies on. If it fails, nothing else will work on that
+futex facility osoe relies on. If it fails, nothing else will work on that
 machine.
 
 ### Developing on macOS
@@ -39,8 +39,8 @@ this repository. The presets are disabled on macOS and refuse to run there.
 
 ```sh
 brew install lima
-dev/lima/create.sh                                    # Debian 13 VM named eoshmem
-limactl shell eoshmem cmake --workflow --preset debug # run from the repository root
+dev/lima/create.sh                                 # Debian 13 VM named osoe
+limactl shell osoe cmake --workflow --preset debug # run from the repository root
 ```
 
 The VM mounts the repository at the same path it has on the Mac, so commands run

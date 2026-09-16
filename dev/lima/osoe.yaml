@@ -1,4 +1,4 @@
-# eoshmem development VM: Debian 13 on Apple Silicon (design notes §8.5).
+# osoe development VM: Debian 13 on Apple Silicon (design notes §8.5).
 #
 # Create it with dev/lima/create.sh, which replaces the template's default
 # read-only home mount with a single writable mount of this repository. The

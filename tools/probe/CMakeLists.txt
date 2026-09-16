@@ -1,6 +1,6 @@
 add_executable(probe probe.c)
 target_link_libraries(probe PRIVATE PkgConfig::LIBURING)
-eoshmem_warnings(probe)
+osoe_warnings(probe)
 
 # Registered as a test so that `ctest` on a machine whose kernel lacks a
 # required facility fails immediately, before any library test runs.

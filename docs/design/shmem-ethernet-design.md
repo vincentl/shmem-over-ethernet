@@ -3,7 +3,8 @@
 **Status:** Path-finding. No implementation. Decisions recorded with rationale so
 that they are not silently reversed.
 
-**Project:** eoshmem — installs `libeoshmem` and the spec's `shmem.h`.
+**Project:** osoe (OpenSHMEM Over Ethernet) — installs `libosoe` and the spec's
+`shmem.h`.
 
 **Target:** OpenSHMEM 1.6 (1st November 2024). Section references of the form
 §9.x.y are to the specification; §N.M without a leading 9 are to this document.
@@ -1547,10 +1548,10 @@ native-ARM concurrency that makes the VM worth having. Docker and other
 containers — the default seccomp profile blocks io_uring, and the kernel is the
 container VM's anyway.
 
-**The VM is defined in the repository.** `dev/lima/eoshmem.yaml` fixes the
+**The VM is defined in the repository.** `dev/lima/osoe.yaml` fixes the
 image, resources, and provisioned packages; `dev/lima/create.sh` mounts the
 repository writable **at the same absolute path it has on the host**. That one
-choice is what makes the rest of the workflow work: `limactl shell eoshmem …` run
+choice is what makes the rest of the workflow work: `limactl shell osoe …` run
 from the repository root starts in the same directory inside the VM, and every
 path in a build tree or `compile_commands.json` is valid on both sides, so an
 editor on the host can use the VM's build output.
@@ -1669,6 +1670,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Development environment | **Lima + Debian 13 on Apple Silicon**; x86 and ARM in CI; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
 | Build tool | **CMake ≥ 3.25** (§1) |
+| Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`; internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 
 ### Still open — blocking
@@ -1708,7 +1710,3 @@ Recorded rather than deleted, so they are not reopened from memory.
 - **License.** None chosen. The repository carries no `LICENSE` file, and the
   README states that no rights are granted until one is added. Nothing should be
   published or accept outside contributions before this is settled.
-- **Final name.** `eoshmem` is the working name: the library installs as
-  `libeoshmem`, and internal non-static symbols take an `eoshmem_` prefix so they
-  cannot collide with application symbols. Note that it sits one letter from
-  Open MPI's `oshmem`, which installs `liboshmem`.

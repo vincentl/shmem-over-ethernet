@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(eoshmem
+project(osoe
   VERSION 0.0.0
   DESCRIPTION "OpenSHMEM 1.6 over Ethernet with io_uring"
   LANGUAGES C)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR
-    "eoshmem requires Linux (io_uring and futex2). On macOS, build inside the "
+    "osoe requires Linux (io_uring and futex2). On macOS, build inside the "
     "development VM: see dev/lima/create.sh and docs/design, section 8.5.")
 endif()
 
@@ -25,7 +25,7 @@ set(CMAKE_C_EXTENSIONS ON)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(GNUInstallDirs)
 include(CTest)
-include(EoshmemWarnings)
+include(OsoeWarnings)
 
 # liburing comes from the distribution; older releases are unsupported rather
 # than accommodated with a bundled copy (design notes, section 1).
