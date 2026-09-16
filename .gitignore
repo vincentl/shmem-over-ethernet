@@ -1,0 +1,8 @@
+# Build trees: every CMake preset builds under build/<preset> (see CMakePresets.json)
+/build/
+
+# Specification PDFs are freely downloadable and not redistributed here
+/docs/reference/*.pdf
+
+# macOS
+.DS_Store
