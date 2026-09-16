@@ -3,6 +3,8 @@
 **Status:** Path-finding. No implementation. Decisions recorded with rationale so
 that they are not silently reversed.
 
+**Project:** eoshmem — installs `libeoshmem` and the spec's `shmem.h`.
+
 **Target:** OpenSHMEM 1.6 (1st November 2024). Section references of the form
 §9.x.y are to the specification; §N.M without a leading 9 are to this document.
 
@@ -11,7 +13,8 @@ that they are not silently reversed.
 ## 1. Goals and Constraints
 
 - Implement OpenSHMEM 1.6 over commodity Ethernet with no fabric offload.
-- **Build with a C compiler and nothing else.** Primary goal, not a preference.
+- **Build entirely from the distribution's own packages.** Primary goal, not a
+  preference.
 - Correctness first, reasonable performance second.
 - Two-level structure: intranode shared memory, internode node-to-node paths
   shared by all PEs on a node. Nothing may scale with PE count where it can
@@ -40,19 +43,42 @@ contact with commodity aarch64.
 This is not a side benefit of the design. It is the reason the project exists,
 and it settles questions the rest of this document then treats as closed.
 
-> **Dependency budget: libc and a vendored liburing. Nothing else links.**
+> **Dependency budget.** Link time: libc and liburing ≥ 2.6. Build time: a C11
+> compiler, CMake ≥ 3.25, and pkg-config. All from the distribution. Nothing is
+> bundled.
 
-liburing is small and has no dependencies of its own. It is vendored (submodule
-or in-tree source), not taken from the distribution — and vendoring is the
-point, not laziness: Bookworm's liburing predates the futex operations §3.10
-depends on, so a system liburing either fails to build or silently loses the
-wakeup path on older nodes. A user needs a C compiler and a 6.7+ kernel. No
-package manager, no `pkg-config`, no version probing.
+**Require a new enough OS rather than bundling.** Most of liburing's API is
+inline functions in `liburing.h`, so the features available are fixed by the
+headers present at *build* time, independently of the running kernel.
+`io_uring_prep_futex_wait` (§3.10) first appeared in liburing 2.6. Debian 13
+ships 2.9; Debian 12 ships 2.3.
 
-*(Rejected: raw `io_uring_setup`/`io_uring_enter` with hand-mmapped rings, for
-true zero-dependency. The subset used here is small enough that this is
-tempting, but it hands you liburing's kernel-feature probing to own, and
-vendoring already removes the distribution from the picture.)*
+An earlier draft vendored liburing to cover systems whose kernel is new enough
+but whose userland is not — Raspberry Pi OS Bookworm, with a newer kernel over
+Bookworm's liburing, is the likely case. **That case is deliberately
+unsupported.** Bundling would solve it at the price of a submodule, a second
+build system (liburing's own configure), and an embedded library the
+distribution cannot patch — too much for an OS generation already being
+replaced. The supported floor is an OS that ships both a 6.7+ kernel and
+liburing 2.6+: Debian 13 and Raspberry Pi OS Trixie.
+
+**Two checks, two failure times.** CMake requires `liburing >= 2.6` through
+pkg-config and stops at configure time, saying why. At startup the library checks
+that the *running kernel* supports what it needs — the `tools/probe` checks,
+moved into init — and aborts loudly otherwise. The first catches old headers; the
+second catches an old kernel under new headers.
+
+**CMake is a build tool, not a dependency chain.** What this project exists to
+avoid is a dependency tree that does not build on the target hardware, not the
+need for a build tool. CMake 3.25 is in Debian 12 and 13 and in Raspberry Pi OS,
+and it provides presets for the build variants, ctest labels for the test tiers
+(§8.2), install rules, and `compile_commands.json`.
+
+*(Rejected: bundling liburing, above. Raw `io_uring_setup`/`io_uring_enter` with
+hand-mmapped rings — the subset used is small enough to tempt, but it hands over
+liburing's kernel-feature handling to own. Plain Makefiles — dependency
+tracking, install, sanitizer variants, and test tiers all hand-written. Meson —
+cleaner, but Python and Ninja are two build dependencies where CMake is one.)*
 
 The same constraint removes the bootstrap's link dependency — see §6.
 
@@ -1570,7 +1596,7 @@ Each is independently breakable, and each failure appears far from its cause.
 14. **The application layer owns coalescing; `TCP_NODELAY` is always set.**
     (§3.3) Nagle plus delayed ACK holds submitted segments, which `quiet` cannot
     see and the safety sweep does not catch.
-15. **Nothing links but libc and the vendored liburing.** (§1) Not a style rule:
+15. **Nothing links but libc and the distribution's liburing.** (§1) Not a style rule:
     it is the project's reason for existing, and each dependency added is one the
     target hardware may not be able to build.
 16. **Before release, the local lead is the only writer of its `dest`, and it
@@ -1607,6 +1633,9 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Collective epoch identification | **Cumulative 32-bit counters with equality waits** (§5.4). Sense reversal retired |
 | 64-bit futex support | **Not implemented.** `EINVAL` on 6.12 aarch64 (`tools/probe.c`) |
 | Development environment | **Lima + Debian 13 on Apple Silicon**; x86 and ARM in CI; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
+| Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
+| Build tool | **CMake ≥ 3.25** (§1) |
+| Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 
 ### Still open — blocking
 
@@ -1639,3 +1668,13 @@ Recorded rather than deleted, so they are not reopened from memory.
   The empty-table check is one branch; the one-entry case is plausibly the
   common one in real codes and might justify a cached last-inserted slot.
   Measure before adding.
+
+### Still open — project
+
+- **License.** None chosen. The repository carries no `LICENSE` file, and the
+  README states that no rights are granted until one is added. Nothing should be
+  published or accept outside contributions before this is settled.
+- **Final name.** `eoshmem` is the working name: the library installs as
+  `libeoshmem`, and internal non-static symbols take an `eoshmem_` prefix so they
+  cannot collide with application symbols. Note that it sits one letter from
+  Open MPI's `oshmem`, which installs `liboshmem`.
