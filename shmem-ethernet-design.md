@@ -195,6 +195,12 @@ This restores "can never fill" for both rings and puts both asserts at init. The
 cost is a few hundred KB of CQEs — irrelevant beside the buffer ring itself, and
 cheap for deleting an error path.
 
+**Verified** by `tools/probe.c` on 6.12 aarch64: a multishot recv over TCP
+loopback with an 8-entry buffer ring and no replenishment produced exactly 8 data
+CQEs carrying `IORING_CQE_F_MORE`, then one terminal `-ENOBUFS`. One completion
+per provided buffer plus one terminal completion per armed recv — the shape of
+the formula exactly.
+
 *(Rejected: a small CQ relying on `IORING_FEAT_NODROP` to spill into the kernel
 overflow list. No completions are lost, but it is a slow path entered exactly
 under load and observable only through a counter someone must think to add.
@@ -304,7 +310,7 @@ a hot path. Revisit only if measurement demands it.
 > **A handler may enqueue, but never reserve.**
 
 This is the load-bearing invariant. It is stronger and cleaner than the
-request/reply framing, because collective forwarding (§5.4) is a handler issuing
+request/reply framing, because collective forwarding (§3.8) is a handler issuing
 a *request*, not a reply.
 
 #### The self-deadlock this prevents
@@ -460,6 +466,15 @@ per PE to avoid one futex word).
 anything sealed regardless of signalling. This converts a class of hangs into a
 class of latency spikes with a findable counter. The wakeup mechanism must
 affect only *how soon* a sealed buffer is submitted, never *whether*.
+
+**Two timeout conventions in one codebase.** The `IORING_ENTER_EXT_ARG` timeout
+here is *relative*. The `futex_wait` syscall used for PE-side waits (§4.9, §5.4)
+takes an *absolute* deadline on a named clock. A relative value passed there
+does not hang: it names an instant shortly after boot, so every wait returns
+`ETIMEDOUT` at once and the waiter silently becomes a busy loop. The environment
+probe made exactly this mistake on its first run. Wrap each call once, expose
+only a deadline-computing helper, and count timeouts — a busy loop disguised as a
+wait shows up as a timeout rate orders of magnitude above normal.
 
 ### 3.11 Waiter fairness
 
@@ -632,7 +647,7 @@ Phase 2 needs no macro. The wrapper knows which objects it compiled from user
 source and emits a fragment naming them:
 
 ```
-.shmem_statics : ALIGN(4096) {
+.shmem_statics : ALIGN(CONSTANT(MAXPAGESIZE)) {
     __shmem_statics_start = .;
     user1.o(.data .data.* .bss .bss.*)
     user2.o(.data .data.* .bss .bss.*)
@@ -640,7 +655,8 @@ source and emits a fragment naming them:
 }
 ```
 
-Mapped over with `MAP_FIXED` at init.
+Mapped over with `MAP_FIXED` at init. Aligned to the linker's maximum page size,
+not 4096: a Pi 5 running Raspberry Pi OS defaults to 16K pages (§8.5).
 
 **Rejected:** runtime discovery of the whole data segment via `/proc/self/maps`
 or `__bss_start`/`_end`. The main executable's data segment also holds the GOT
@@ -901,28 +917,45 @@ of **how a PE blocks without starving progress**. The answer has to hold when
 the writer is the progress thread applying a remote AMO *and* when it is another
 local PE storing through the shared heap.
 
-> **Watch table for the wake decision; futex on the `ivar` itself for the wait.**
+> **Watch table for the wake decision; a 32-bit sequence word in the watch slot
+> for the wait.**
 
-The `ivar` is a symmetric heap word in a shared mapping, so a cross-process
-futex on that address works directly — no proxy word, no copy, and the value the
-waiter compares is the value the waker wrote.
+An earlier draft had the waiter futex directly on the `ivar`. That works only for
+32-bit types: **the kernel implements only 32-bit futexes.** `futex_wait` with
+`FUTEX2_SIZE_U64` returns `EINVAL` — verified on 6.12 aarch64 by `tools/probe.c`
+— and OpenSHMEM's wait types include 64-bit ones. Futexing on the low half of a
+64-bit `ivar` is not a fix: an update that changes only the high bits between the
+waiter's load and its wait passes the kernel's compare, and the wake is lost.
+
+The slot's sequence word is library-owned, always 32-bit, always aligned, and
+bumped on every update to the watched address, so the kernel's compare-and-wait
+sees every change whatever the `ivar`'s width.
 
 ```c
 /* waiter */
-watch_insert(node->watch, ivar);              /* BEFORE the first check */
+slot = watch_insert(node->watch, ivar);          /* BEFORE the first check */
 for (;;) {
-    uint64_t v = atomic_load_explicit(ivar, memory_order_acquire);
-    if (predicate(v, cmp, value)) break;
-    futex_wait(ivar, v, SAFETY_SWEEP_MS);     /* -EAGAIN if changed: loop */
+    uint32_t seq = atomic_load_explicit(&slot->seq, memory_order_acquire);
+    if (predicate(load_ivar(ivar), cmp, value)) break;
+    futex_wait(&slot->seq, seq, deadline);       /* -EAGAIN if bumped: loop */
 }
-watch_remove(node->watch, ivar);
+watch_remove(node->watch, slot);
 ```
 
 ```c
-/* progress thread, having applied an update to the heap */
-if (watch_nonempty(node->watch) && watch_contains(node->watch, addr))
-    futex_wake(addr, INT_MAX);
+/* progress thread or local PE, having stored to addr */
+if (watch_nonempty(node->watch) && (slot = watch_find(node->watch, addr))) {
+    atomic_fetch_add_explicit(&slot->seq, 1, memory_order_release);
+    futex_wake(&slot->seq, INT_MAX);
+}
 ```
+
+**Load `seq` before the `ivar`; store the `ivar` before bumping `seq`.** Any
+update the waiter's predicate misses is then followed by a bump the kernel's
+compare catches. Reversing either order reopens the lost-wake window.
+
+The slot lives in the shared node segment, so the wait is a shared (not
+`FUTEX2_PRIVATE`) futex on a shared mapping — also verified by the probe.
 
 **The table is a set, not a registry.** It answers exactly one question — is
 anyone waiting on this address — so it needs no PE list, no ownership, and
@@ -938,17 +971,12 @@ load of a count and a branch — hence the `watch_nonempty` guard first.
 wake that lands in the window. This is the one ordering rule in the section that
 is easy to get backwards and impossible to see in testing.
 
-**Memory ordering** is the §3.5 discipline again: release on the waker's store,
-acquire on the waiter's load. On aarch64 these are `stlr`/`ldar`.
+**Memory ordering** is the §3.5 discipline again: release on the waker's stores,
+acquire on the waiter's loads. On aarch64 these are `stlr`/`ldar`.
 
-**Use `futex2`, not `FUTEX_WAIT`.** `FUTEX_WAIT` compares 32 bits, and
-OpenSHMEM's wait types include 64-bit ones. The `futex2` interface with
-`FUTEX2_SIZE_U64` covers both and is available on the same 6.7+ kernel §3.10
-already requires. The §3.4 8-byte alignment rule applies to the `ivar` as well:
-an unaligned 64-bit futex word fails on aarch64.
-
-**Pass the safety-sweep timeout**, for the same reason §3.10 does: a missed wake
-becomes a latency spike with a counter rather than a hang. **Count
+**Pass a safety-sweep deadline**, for the same reason §3.10 does: a missed wake
+becomes a latency spike with a counter rather than a hang. It is an **absolute**
+deadline — see §3.10 on the two timeout conventions. **Count
 timeout-wakes.** A nonzero count in production means the watch table has a bug,
 and that counter is the only thing that will ever tell you.
 
@@ -993,68 +1021,179 @@ Computed once at team creation, stored in the private team descriptor:
 - **Node participation** — the internode tree spans only nodes with at least one
   member. Topology is per team.
 - **Local lead** — lowest team rank among local members. Must be a member, since
-  its `dest` is the accumulator.
+  its `dest` is the accumulator and it is the only PE that writes that `dest`
+  before release (§5.5).
 
 ### 5.3 Intranode phase
 
 **Flat counter to start.**
 
-> At `L` local members all performing `fetch_sub` on one cache line, the line
+> At `L` local members all performing `fetch_add` on one cache line, the line
 > ping-pongs between cores and arrival cost is roughly `L` serialized cache-line
 > transfers. Negligible at four. At 64 or 256 it dominates the intranode phase
 > entirely. Fix: two-level intranode tree with fanout near core-cluster size,
 > chosen at init from local member count.
 
-The counter must be **alone on its cache line** regardless — false sharing with
-the sense flag or team descriptor hurts even at four PEs, and one alignment
+Each §5.4 counter must be **alone on its cache line** — false sharing between
+counters, or with the team descriptor, hurts even at four PEs, and one alignment
 attribute prevents it.
 
-**Arrival does not wait for a designated PE.** Whichever local member decrements
-to zero enqueues the internode arrival AM and returns to waiting. One comparison
-on the decrement result; no dependency on the lead being scheduled.
+**Barrier and sync: arrival does not wait for a designated PE.** Whichever local
+member's increment reaches the epoch's arrival target enqueues the internode
+arrival AM and returns to waiting. One comparison on the `fetch_add` result; no
+dependency on the lead being scheduled.
 
-**Release** arrives at the progress thread, which flips the sense flag. The
-progress thread never touches member `dest` buffers, so it does no
+**Data-carrying collectives do wait for the lead**, which combines every local
+contribution itself (§5.5). That dependency is the price of a single writer, and
+the lead is blocked in the same call regardless.
+
+**Release** arrives at the progress thread, which advances the team's `released`
+counter and wakes all local waiters — a divisible event, so wake-many per §3.11.
+The progress thread never touches non-lead `dest` buffers, so it does no
 `O(members × count)` copying while other connections wait.
 
-### 5.4 Slot reuse
+### 5.4 Epochs and slot reuse
 
-**Sense reversal, one slot per team** for counter-and-flag collectives.
+> Blocking constrains each PE individually and says nothing about *skew*. A
+> non-lead can copy out of epoch *k*, return, and re-enter at *k+1* while the
+> lead is still in *k* waiting for the remaining copy-outs. Any per-team state
+> that is *reset* between epochs, and any flag that only says "released,"
+> confuses the two.
 
-> Blocking constrains each PE individually and says nothing about *skew*. PE 0
-> can return from a barrier and re-enter while PEs 1–3 have not yet observed the
-> release. Resetting the counter corrupts the slot. With sense reversal the flag
-> is never reset, only flipped; a PE from epoch N and one from N+1 look for
-> opposite values.
+**Three cumulative 32-bit counters per team per node. Never reset.**
 
-Cost: one private boolean per PE per team.
+```c
+_Atomic uint32_t arrived;    /* all local members, every collective     */
+_Atomic uint32_t released;   /* epochs released; progress thread only   */
+_Atomic uint32_t copied;     /* non-lead copy-outs, data collectives    */
+```
 
-**Two alternating slots by epoch parity** for data-carrying collectives, since
-the data must be consumed before the next epoch overwrites it. Skew is bounded
-at one epoch because a PE two epochs behind would have had to pass the
-intervening barrier.
+Each PE keeps two private counts per team: `k`, collectives completed on the
+team, and `d`, data-carrying collectives completed. Every member agrees on both,
+because members call collectives in the same order. The targets for the current
+epoch follow directly:
 
-**Sense reversal assumes a PE participates in every epoch.** Guaranteed for
-blocking collectives. Nonblocking collectives would break it — record the
-assumption explicitly.
+| Counter | Target | Who waits |
+|---|---|---|
+| `arrived` | `(k+1)·L` | Lead, in data-carrying collectives; nobody in barrier/sync |
+| `released` | `k+1` | Every member |
+| `copied` | `(d+1)·(L−1)` | Lead only |
+
+`copied` is indexed by `d`, not `k`, because barrier and sync have nothing to
+copy out and never touch it. With `L == 1` its target is zero and the lead's wait
+returns immediately — no special case.
+
+**Waits are equality, not `>=`.** `wait_eq(&counter, target)` loads, compares,
+and `futex_wait`s on the counter itself with the loaded value.
+
+Equality is sound because skew is bounded, so no counter can move *past* a value
+someone is waiting on. Only the lead waits on `arrived` and `copied`, and no
+member can reach the next epoch's copy-out without the lead having finished the
+current one. A member waiting on `released == k+1` must see *k+1* before *k+2*,
+because *k+2* needs this member's own arrival. So 32-bit wraparound is harmless,
+and each counter is directly a futex word — which matters, because the kernel
+implements only 32-bit futexes (§4.9).
+
+**The race, walked through.** Non-lead P1 copies out of *k* and re-enters. Its
+arrival moves `arrived` past `(k+1)·L` toward a target nobody is watching yet.
+It waits for `released == k+2`; `released` is *k+1*; it sleeps. It cannot copy
+out or touch `copied` until the lead has left *k*, re-entered, and *k+1* has
+been released. A plain `released` flag would still read "set" from *k*: P1 would
+copy stale data and bump `copied`, corrupting the lead's count.
+
+**Rejected:**
+
+- *Sense reversal plus parity-slotted counters.* The previous design. Sense
+  reversal fixes the release flag but not the counters: if the lead resets
+  `arrived` at *k+1*, P1's early arrival is lost. Fixing that needs a second
+  counter set selected by parity — double the state, reasoning in parity, and no
+  path to nonblocking collectives.
+- *64-bit counters, `>=` predicates, and a separate 32-bit wake word.* Correct
+  under unbounded skew, at one extra word and one extra store per transition.
+  **This is the upgrade path** for nonblocking collectives: equality is the one
+  assumption they break.
+
+**Give the counter a type that is not a bare integer**, whose only comparison is
+`wait_eq`. A contributor adding `shmem_*_nbi` collectives should meet the
+equality assumption at compile time, not as a hang.
 
 ### 5.5 Reduction destination
 
-**Accumulate into the local lead's `dest`.** Local members combine into it, the
-progress thread exchanges it internode, the final value lands there, and each
-member copies out after observing the release.
+**Accumulate into the local lead's `dest`, with the lead as its only writer
+before release, and the lead leaving last.**
+
+```c
+/* every member */
+if (atomic_fetch_add(&t->arrived, 1) + 1 == (k+1)*L && !is_lead)
+    futex_wake(&t->arrived, 1);
+
+/* lead only: sole writer of dest before release */
+wait_eq(&t->arrived, (k+1)*L);
+if (source != dest) memcpy(dest, source, n);     /* in-place: already there */
+for (m in local members, m != lead)
+    combine(dest, source_of(m), n);
+enqueue_internode_arrival(team, k, dest);        /* epoch on the wire; assert on receipt */
+
+/* every member */
+wait_eq(&t->released, k+1);                      /* result is in the lead's dest */
+
+/* non-lead */
+memcpy(my_dest, lead_dest, n);
+if (atomic_fetch_add(&t->copied, 1) + 1 == (d+1)*(L-1))
+    futex_wake(&t->copied, 1);
+
+/* lead: leaves last, so its dest stays valid for every copy-out */
+wait_eq(&t->copied, (d+1)*(L-1));
+```
 
 Legal because `dest` is undefined until the collective returns, so intermediate
-values are unobservable by any conforming program. Handles the in-place case
-naturally.
+values are unobservable by any conforming program. The epoch number travels in
+the internode AM and is asserted on receipt — the collective analogue of §3.13's
+handler-table checksum.
 
-This eliminates the scratch-sizing problem entirely — no chunking loop, no
-high-water allocation, no per-team data area. The team's shared footprint
-reduces to a counter and a flag, ~128 bytes regardless of reduction size.
+**Why a single writer.** An earlier draft had local members combine into the
+lead's `dest` as they arrived. That fails three ways:
 
-Contention on the lead's `dest` is identical to what shared scratch would have
-had, so nothing is lost; at high local member counts both want the same tree
-treatment as the counter.
+1. **Lost updates.** Concurrent `dest[i] = op(dest[i], src[i])` from several
+   processes is a read-modify-write race.
+2. **In-place corruption.** With `source == dest`, the lead's `dest` *is* its
+   source, and the spec guarantees it is ready only once the lead itself has
+   called. A member combining earlier races the application still preparing the
+   buffer.
+3. **Epoch clobber.** There is exactly one application `dest`, so the old
+   two-slot parity scheme cannot apply. A lead that returned early could seed the
+   next epoch while members were still copying out of this one.
+
+The lead is blocked in the call regardless, so doing the combine costs nothing
+in availability, and parallel combines would ping-pong the same cache lines
+anyway (§5.3). At high local member counts the §5.3 tree applies unchanged: each
+sub-lead is the single writer of its own `dest`.
+
+**Push, never pull — for every data-carrying collective.** 1.6 §9.10.5 and
+§9.10.7–§9.10.10 all state that "the application does not need to synchronize
+to ensure that the source array is ready across all PEs prior to calling this
+routine." A PE may read another PE's `source` only after that PE has called. The
+lead reading members' sources *after they have arrived* satisfies this; an early
+arrival pulling from a peer that has not yet called does not. A pull-based
+collect or alltoall — the obvious implementation — is **non-conforming**, not
+merely slow.
+
+**Symmetric addresses are the precondition, not a threat.** §9.10.9 (1.6 change
+#17): "The same source and dest arrays must be passed by all PEs." Identical
+offsets (§4.2, §4.4) make that the same symmetric object in every process, which
+is what guarantees the lead's `dest` is the right size and place to accumulate
+into. Source and dest must be fully overlapping or fully disjoint; both cases
+are the single `memcpy` line above.
+
+**Requires `dest` and every `source` in a shared mapping.** Always true for the
+symmetric heap. For symmetric statics, only from §4.3 phase 2: under phase 1.5's
+CMA the lead would read each member's source with `process_vm_readv` — correct,
+but a syscall per member per collective. Phase 1 rejects statics, so this is a
+sequencing note, not a blocker.
+
+This still eliminates scratch sizing — no chunking loop, no high-water
+allocation, no per-team data area. The team's shared footprint is **three
+counters on three cache lines**, regardless of reduction size.
 
 *(Fallback for cases where `dest` cannot serve: chunk through fixed scratch. The
 loop costs nothing on small reductions and adds pipelining on large ones.)*
@@ -1244,6 +1383,11 @@ Retrofitting either parameter later touches every function written.
 Full type/operation cross product, strided transfers, nonblocking variants,
 broadcast/reduce/collect/alltoall, locks.
 
+The collectives are mechanical *given* §5.5's rules, which they must inherit: the
+local lead is the single writer before release and leaves last, and a peer's
+`source` is read only after that peer has called. A pull-based collect or
+alltoall is non-conforming.
+
 ### Deferred 1.6 additions
 
 | Routine | Why it waits |
@@ -1326,13 +1470,16 @@ acquire load in the buffer protocol passes on x86 and fails on aarch64, and
 those bugs appear under load months later. Given how much rests on the
 `head`/`filled`/state protocol, **do not defer aarch64 validation.**
 
-Options: a cloud ARM instance (Graviton, Ampere) as a per-commit CI target;
+Options considered: a cloud ARM instance (Graviton, Ampere) as a per-commit CI target;
 Apple Silicon under a Linux VM; or a single Pi, which covers intranode plus
 loopback logical nodes though not a real fabric. ThreadSanitizer on x86 catches
 a useful subset but models the C11 memory model rather than the hardware.
 
-**Sequencing:** iterate on x86, run the full suite on one ARM target per commit,
-defer the cluster until the AM suite passes on both.
+The choice is recorded in §8.5.
+
+**Sequencing:** iterate on aarch64 in the development VM (§8.5), run the full
+suite on x86 and ARM CI per commit, and defer the cluster until the AM suite
+passes on both.
 
 ### 8.4 Floor harness
 
@@ -1357,6 +1504,35 @@ that stops being an assumption.
 **Pin the constants after the first run, then treat regressions as failures.**
 Ratios, not absolute times, so the thresholds survive a hardware change.
 
+### 8.5 Development environment
+
+Development happens on an Apple Silicon Mac, which has neither io_uring nor
+futex2. The environment is chosen so the daily loop is still native aarch64:
+
+| Environment | Role |
+|---|---|
+| **Lima VM, Debian 13** (`vz`, repository mounted over virtiofs) | Daily build and test loop. Kernel 6.12, the same line as Raspberry Pi OS Trixie. Native aarch64, so weak memory ordering is exercised on every run. Tiers 1–3 fit: network namespaces, veth pairs and `sch_netem` all verified in the cloud kernel image |
+| GitHub Actions `ubuntu-24.04` and `ubuntu-24.04-arm`, directly on the runner | Per-commit CI, and the only x86 leg — the case §8.3 calls adversarial for performance constants |
+| One physical Pi over SSH | The Pi kernel fork, the real NIC and driver path, and — on a Pi 5 — 16K pages |
+
+**Rejected:** QEMU's `raspi4b` board model — no Ethernet controller, no PCIe
+root port, no Pi 5 model, and TCG-only, which destroys both timing and the
+native-ARM concurrency that makes the VM worth having. Docker and other
+containers — the default seccomp profile blocks io_uring, and the kernel is the
+container VM's anyway.
+
+**Page size.** The VM runs 4K pages; Raspberry Pi OS on a Pi 5 defaults to 16K.
+Nothing may hardcode 4096 — including the §4.3 linker script, which aligns to
+`CONSTANT(MAXPAGESIZE)`. If page-size bugs surface before a Pi is available, a
+16K kernel boots in the VM (Apple Silicon supports 4K and 16K granules, not 64K).
+
+**`tools/probe.c`** checks every kernel assumption this document makes and prints
+a pass/fail line for each: single-issuer rings with an explicit CQ size,
+`IORING_OP_FUTEX_WAIT` returning `-EAGAIN` on a stale value, multishot recv
+producing one CQE per provided buffer plus a terminal `-ENOBUFS`, cross-process
+futexes on a shared mapping, and the absence of 64-bit futexes. **Run it first on
+any new machine**, before debugging anything else there.
+
 ---
 
 ## 9. Load-Bearing Invariants
@@ -1380,8 +1556,9 @@ Each is independently breakable, and each failure appears far from its cause.
    never whether.** (§3.10)
 9. **Barrier queue bounds rest on collectives being blocking.** (§3.8) A future
    `shmem_barrier_nbi` dissolves the argument.
-10. **Sense reversal assumes participation in every epoch.** (§5.4) Same
-    caveat.
+10. **Collective epoch counters are compared for equality, which assumes bounded
+    skew.** (§5.4) Guaranteed by blocking collectives. Nonblocking collectives
+    break it and must move to 64-bit `>=` predicates with a separate wake word.
 11. **AMO result descriptors carry values; get descriptors carry references.**
     (§3.8) Unifying them reorders AMOs.
 12. **The completion queue is sized from the provided-buffer ring, not from the
@@ -1396,6 +1573,14 @@ Each is independently breakable, and each failure appears far from its cause.
 15. **Nothing links but libc and the vendored liburing.** (§1) Not a style rule:
     it is the project's reason for existing, and each dependency added is one the
     target hardware may not be able to build.
+16. **Before release, the local lead is the only writer of its `dest`, and it
+    leaves the collective last.** (§5.5) Concurrent combines lose updates; a lead
+    that leaves early lets the next epoch clobber a result still being copied out.
+17. **A data-carrying collective reads a peer's `source` only after that peer has
+    called.** (§5.5) Pulling before arrival is non-conforming under 1.6 §9.10.
+18. **Futex words are 32-bit, and `futex_wait` deadlines are absolute.** (§3.10,
+    §4.9) The first is a kernel limit (`FUTEX2_SIZE_U64` returns `EINVAL`); the
+    second fails silently, as a busy loop.
 
 Assert what can be asserted. Instrument the rest.
 
@@ -1416,17 +1601,19 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Team-based allocation | **Does not exist through 1.6.** 1.6 change #10 states malloc and friends are world-team collective (§4.5) |
 | PMIx on the actual nodes | **Moot.** Nothing links against PMIx or PMI-2 on the default path (§6) |
 | `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7) |
-| How a PE blocks in `wait_until` | **Watch table plus `futex2` on the `ivar`** (§4.9) |
-| io_uring ring bound | **Two bounds, two rings.** CQ is sized from the provided-buffer ring (§3.3) |
+| How a PE blocks in `wait_until` | **Watch table plus a 32-bit futex sequence word per slot** (§4.9). Futexing on the `ivar` itself was withdrawn: 64-bit futexes do not exist |
+| io_uring ring bound | **Two bounds, two rings.** CQ is sized from the provided-buffer ring (§3.3). Verified by `tools/probe.c` |
+| Reduction `dest` versus 1.6 change #17 | **Not a conflict** — same arrays means same symmetric offset. The surrounding text exposed three real bugs, fixed by a single-writer lead that leaves last (§5.5) |
+| Collective epoch identification | **Cumulative 32-bit counters with equality waits** (§5.4). Sense reversal retired |
+| 64-bit futex support | **Not implemented.** `EINVAL` on 6.12 aarch64 (`tools/probe.c`) |
+| Development environment | **Lima + Debian 13 on Apple Silicon**; x86 and ARM in CI; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
 
 ### Still open — blocking
 
 - **Thorough 1.6 spec read.** The targeted questions above are answered; the
   sweep is not done. Specifically still unchecked: whether any team query must
-  return remotely accessible memory; the exact semantics of the 1.6 session
-  routines if they are ever more than no-ops; and §9.10.9's clarification that
-  source and dest arrays must match across PEs in reductions (1.6 change #17),
-  which may constrain §5.5's accumulate-into-lead's-`dest` scheme.
+  return remotely accessible memory; and the exact semantics of the 1.6 session
+  routines if they are ever more than no-ops.
 
 ### Still open — measurement, once hardware exists
 
