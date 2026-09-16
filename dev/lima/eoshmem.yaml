@@ -1,0 +1,24 @@
+# eoshmem development VM: Debian 13 on Apple Silicon (design notes §8.5).
+#
+# Create it with dev/lima/create.sh, which replaces the template's default
+# read-only home mount with a single writable mount of this repository. The
+# mount is not listed here because its path depends on where the repository is
+# cloned, and a mounts list here would be merged with the default, not replace it.
+
+base: template:debian-13
+
+vmType: vz
+cpus: 4
+memory: 8GiB
+disk: 30GiB
+
+mountType: virtiofs
+
+provision:
+- mode: system
+  script: |
+    #!/bin/sh
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y build-essential cmake pkgconf liburing-dev iproute2

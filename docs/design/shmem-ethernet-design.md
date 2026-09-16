@@ -1537,7 +1537,7 @@ futex2. The environment is chosen so the daily loop is still native aarch64:
 
 | Environment | Role |
 |---|---|
-| **Lima VM, Debian 13** (`vz`, repository mounted over virtiofs) | Daily build and test loop. Kernel 6.12, the same line as Raspberry Pi OS Trixie. Native aarch64, so weak memory ordering is exercised on every run. Tiers 1–3 fit: network namespaces, veth pairs and `sch_netem` all verified in the cloud kernel image |
+| **Lima VM, Debian 13** (`vz`, repository mounted over virtiofs; `dev/lima/create.sh`) | Daily build and test loop. Kernel 6.12, the same line as Raspberry Pi OS Trixie. Native aarch64, so weak memory ordering is exercised on every run. Tiers 1–3 fit: network namespaces, veth pairs and `sch_netem` all verified in the cloud kernel image |
 | GitHub Actions `ubuntu-24.04` and `ubuntu-24.04-arm`, directly on the runner | Per-commit CI, and the only x86 leg — the case §8.3 calls adversarial for performance constants |
 | One physical Pi over SSH | The Pi kernel fork, the real NIC and driver path, and — on a Pi 5 — 16K pages |
 
@@ -1546,6 +1546,14 @@ root port, no Pi 5 model, and TCG-only, which destroys both timing and the
 native-ARM concurrency that makes the VM worth having. Docker and other
 containers — the default seccomp profile blocks io_uring, and the kernel is the
 container VM's anyway.
+
+**The VM is defined in the repository.** `dev/lima/eoshmem.yaml` fixes the
+image, resources, and provisioned packages; `dev/lima/create.sh` mounts the
+repository writable **at the same absolute path it has on the host**. That one
+choice is what makes the rest of the workflow work: `limactl shell eoshmem …` run
+from the repository root starts in the same directory inside the VM, and every
+path in a build tree or `compile_commands.json` is valid on both sides, so an
+editor on the host can use the VM's build output.
 
 **Page size.** The VM runs 4K pages; Raspberry Pi OS on a Pi 5 defaults to 16K.
 Nothing may hardcode 4096 — including the §4.3 linker script, which aligns to
