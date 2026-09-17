@@ -4,7 +4,8 @@ OpenSHMEM Over Ethernet: an implementation of OpenSHMEM 1.6 for commodity Ethern
 designed to build entirely from a Linux distribution's own packages — no fabric
 libraries.
 
-**Status:** design and environment work. There is no usable library yet.
+**Status:** phase 1 in progress. A single node works: init and finalize, barrier,
+`shmem_malloc`/`shmem_free`, `shmem_putmem`/`shmem_getmem`, and `shmem_ptr`.
 
 ## Requirements
 
@@ -46,6 +47,62 @@ limactl shell osoe cmake --workflow --preset debug # run from the repository roo
 The VM mounts the repository at the same path it has on the Mac, so commands run
 from the repository root start in the same directory inside the VM, and
 `build/debug/compile_commands.json` works with an editor on the Mac.
+
+## Running a program
+
+**Status:** one node only. A job whose environment describes more than one node
+fails at `shmem_init` with a message saying so, as does a Slurm launch.
+
+### With `osoe-launch` (development and tests)
+
+`build/<preset>/tools/launch/osoe-launch` starts L processes of a one-node job and
+sets every bootstrap variable for them:
+
+```sh
+build/debug/tools/launch/osoe-launch -n 4 -- ./my_program
+```
+
+It fails if any process fails, if the timeout (`-t SECONDS`, default 60)
+expires, or if the job leaves shared memory behind. `-e RANK:NAME=VALUE` sets a
+variable for one rank only.
+
+### Without a launcher
+
+Start one process per PE yourself, with these variables set in each. A program
+started with none of them fails at `shmem_init` with "no launcher environment".
+There is no single-PE default.
+
+| Variable | Required | Value for a one-node job of N PEs |
+|---|---|---|
+| `OSOE_PROCID` | yes | This PE's rank, `0` … `N-1` |
+| `OSOE_STEP_NUM_TASKS` | yes | `N` |
+| `OSOE_NODEID` | yes | `0` |
+| `OSOE_LOCALID` | yes | This PE's position in `OSOE_GTIDS`; `0` is the local lead |
+| `OSOE_GTIDS` | yes | The ranks on this node, comma-separated: `0,1,…,N-1` |
+| `OSOE_JOB_ID` | yes | A number unique among jobs running on this machine at once |
+| `OSOE_STEP_ID` | yes | A number; `0` is fine |
+| `SHMEM_SYMMETRIC_SIZE` | no | Heap size per PE, e.g. `64m` or `2g`; default 256 MiB. Must agree across PEs |
+| `OSOE_BOOTSTRAP_TIMEOUT` | no | Seconds to wait for the other PEs at init; default 60 |
+| `OSOE_HEAP_BASE` | no | Address for each PE's own heap, e.g. `0x100000000000`, if the defaults are taken |
+
+Rules:
+- The job id and step id name the job's shared memory
+  (`/dev/shm/osoe.<job>.<step>.…`). Two jobs running at once with the same pair
+  collide, and the second fails at init.
+- `OSOE_GTIDS[OSOE_LOCALID]` must equal `OSOE_PROCID`.
+- The names mirror Slurm's `SLURM_PROCID`, `SLURM_GTIDS`, and so on (design §6.1, §6.2).
+
+For example, two PEs from a shell:
+
+```sh
+export OSOE_STEP_NUM_TASKS=2 OSOE_NODEID=0 OSOE_GTIDS=0,1 OSOE_JOB_ID=$$ OSOE_STEP_ID=0
+OSOE_PROCID=0 OSOE_LOCALID=0 ./my_program &
+OSOE_PROCID=1 OSOE_LOCALID=1 ./my_program
+wait
+```
+
+A job that crashes can leave `/dev/shm/osoe.<job>.*` behind. Remove it before
+reusing the same job id.
 
 ## Documentation
 

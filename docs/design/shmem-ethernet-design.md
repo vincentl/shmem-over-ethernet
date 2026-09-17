@@ -2355,7 +2355,14 @@ the bootstrap runs in every test rather than only on a cluster. The names mirror
 | `OSOE_STEP_ID` | `SLURM_STEP_ID` | Yes, in segment names |
 
 The rule is the `SLURM_` name with the prefix replaced, including `STEP_` where
-Slurm has it, so nobody has to remember a second vocabulary. `OSOE_NODE_MAP`
+Slurm has it, so nobody has to remember a second vocabulary.
+
+**A program started with no bootstrap variables fails at init** ("no launcher
+environment"). It does not run as a single PE. Silently becoming one PE is how a
+mis-launched job ends up as N independent jobs, each succeeding. Every variable
+marked "Yes" above is required, and the README shows how to launch a one-node job
+by hand. *(Rejected: singleton launch when the variables are absent, as some
+implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)* `OSOE_NODE_MAP`
 (§8.1) and `OSOE_BOOTSTRAP_TIMEOUT` (above) are osoe's own.
 
 The test launcher, `tools/launch/osoe-launch`, starts L processes of a one-node
