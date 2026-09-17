@@ -917,9 +917,9 @@ explicitly makes AMOs concurrent with ordinary loads and stores undefined. The
 shared mapping gives real CPU-level atomicity across that whole set for nothing.
 
 Two consequences: the §4.8 `shmem_ptr` warning has spec text behind it and
-should cite §3.2 item 4 rather than argue from first principles; and if
-`SHMEM_TEAM_SHARED` is ever implemented — which the §8.1 node map nearly hands
-over — note that the spec defines it as a **separate atomicity domain** from
+should cite §3.2 item 4 rather than argue from first principles; and
+`SHMEM_TEAM_SHARED`, a required predefined team (§7) equal to the set of local PEs
+`shmem_ptr` can reach, is defined by the spec as a **separate atomicity domain** from
 `SHMEM_TEAM_WORLD`, so AMOs from the two are mutually undefined by the standard
 even though this implementation would make them exclusive anyway.
 
@@ -1019,9 +1019,22 @@ computes the same answer independently, **there is no cross-process allocator
 lock at all.**
 
 **Debug consistency check:** hash operation and size at each allocation, fold
-into a running checksum, compare at the barrier the call already performs.
+into a running checksum, and compare it across PEs at the call's barrier.
 Mismatched sizes across PEs are undefined behaviour and will silently
-desynchronize heaps; this catches it at the causing call.
+desynchronize heaps; this catches it at the causing call. The §5.3 barrier carries
+no data, so debug builds extend its arrival with one 64-bit word, compared by each
+local lead and again at the root.
+
+**Edge semantics (§9.3), easy to get wrong:**
+
+- `shmem_malloc`, `shmem_align`, `shmem_calloc`, and `shmem_realloc` barrier on
+  **exit**; `shmem_free` barriers on **entry**.
+- A size of 0 (for `calloc`, a count or size of 0) returns a null pointer **without
+  a barrier**. Every PE must make the same call, so none waits.
+- `shmem_calloc` treats `count × size` overflow as a failed allocation.
+- `SHMEM_SYMMETRIC_SIZE` accepts the §8 grammar — a non-negative integer or
+  floating-point prefix with an optional scaling character — and must agree across
+  PEs, checked at rendezvous (§6.2).
 
 `shmem_malloc_with_hints` is an alias for `shmem_malloc`. SOS itself added the
 routine supporting no hint values.
@@ -1062,8 +1075,9 @@ Two completion domains that cannot be collapsed:
 
 | Domain | Complete when | Evidence |
 |---|---|---|
-| Requests (put, signalled put, non-fetching AMO) | Applied at target | Peer's cumulative segment acknowledgement |
-| Get replies | Delivered locally | Bytes landed in the destination |
+| Requests (put, signalled put, non-fetching AMO) | Applied at target | Peer's cumulative acknowledgement of applied segments (§3.4) |
+| Get replies | Delivered locally | Bytes landed in the landing zone, or directly in a symmetric `dest` (§3.12) |
+| Memory stores by the calling thread | Visible to other cores | A serializing store in the calling thread (below) |
 
 The peer's acknowledgement of the segment containing a get *request* says only
 that the descriptor was enqueued. The reply may not have been sent.
@@ -1079,7 +1093,32 @@ signalled puts, and non-fetching AMOs. Gets are a quiet-only concern.
 nothing but a sequence-number space: per-context ordering is the weakest thing
 the spec asks for, and a per-context dirty set delivers it directly.
 
+#### Memory stores
+
+Table 14 (§9.12) places **memory stores under both fence and quiet**, and §9.10.1
+says `barrier_all` "ensures completion of all previously issued memory stores". An
+earlier draft of §4.8 said the opposite. The spec limits the guarantee to stores
+made by the calling thread (§9.12.1 and §9.12.2 Notes), and contexts created with
+`SHMEM_CTX_NOSTORE` are exempt. Two rules deliver it:
+
+1. **`shmem_ptr` returns `NULL` for any target reached over the network** —
+   including a local PE when §8.1's force-remote flag sends intranode traffic over
+   TCP. A thread's store can then never race that same thread's queued put to the
+   same object: either both are local and ordered by the thread itself, or no
+   pointer exists.
+2. **`fence`, `quiet`, `pe_quiet`, and the barriers begin with one `seq_cst` store in
+   the calling thread** (§3.16). It forces that thread's earlier plain stores to
+   become visible to other cores before the routine proceeds.
+
+In normal mode `barrier_all` already happened to conform, because its arrival
+`fetch_add` is a locked instruction. The rule makes that deliberate.
+
 #### Data structures
+
+**Thread level.** Phase 1 provides `SHMEM_THREAD_SINGLE`; §9.2.1 lets
+`shmem_init_thread` provide less than requested. The structures below assume it
+and are marked where `MULTIPLE` would change them: under `MULTIPLE` the
+equality wait below can starve, and clearing the dirty set races.
 
 **Get completion — two cumulative counters per PE, no per-operation state:**
 
@@ -1090,8 +1129,20 @@ uint64_t bytes_landed;   /* progress thread adds as chunks land  */
 
 `quiet` waits for equality. This is exactly as expressive as the spec requires,
 because `_nbi` completion is defined only at `quiet` — there is no
-per-operation wait call. Cost: 16 bytes per PE. Byte-based accounting means the
-responder may fragment replies freely.
+per-operation wait call. Cost: 16 bytes per PE, in the node segment because the
+progress thread runs in another process. Byte-based accounting means the responder
+may fragment replies freely.
+
+**Waiting on 64-bit counters.** The counters cannot be futexed (§4.9), so each
+waitable counter has a companion 32-bit wake word. The progress thread adds landed
+bytes, then bumps the wake word, then wakes; the waiter loads the wake word, then
+compares the counters, then waits on the wake word. The per-connection `acked`
+value that `quiet` waits on follows the same pattern.
+
+**Blocking gets and fetching AMOs** do need per-operation completion: the caller
+waits for *its* reply, not for a byte count. Under `SINGLE` a PE has at most one
+such operation outstanding, so its landing zone holds one completion slot with its
+own wake word.
 
 **Peer scan — dirty set.** Each PE keeps the node indices it has touched since
 its last `quiet`, plus its highest segment per node. Cost tracks the
@@ -1105,16 +1156,18 @@ the entire job.)*
 
 ```c
 void shmem_quiet(void) {
-    seal_and_submit_dirty_buffers();
+    serializing_store();                          /* memory stores (above) */
+    request_flush(pe->dirty, pe->ndirty, ACK_REQUESTED);   /* the lead seals (§3.12) */
     for (i = 0; i < pe->ndirty; i++)
         wait_until(acked[pe->dirty[i]] >= pe->high_seg[pe->dirty[i]]);
     wait_until(pe->bytes_landed == pe->bytes_issued);
+    copy_out_completed_gets();                    /* landing zone -> private dest */
     pe->ndirty = 0;
 }
 
 void shmem_fence(void) {
-    for (i = 0; i < pe->ndirty; i++)
-        seal_and_submit(pe->dirty[i]);
+    serializing_store();
+    request_flush(pe->dirty, pe->ndirty, ACK_REQUESTED);
     /* does NOT clear the dirty set — those operations remain unacknowledged */
 }
 ```
@@ -1137,9 +1190,9 @@ This is the dirty set with a caller-supplied peer list substituted for the
 accumulated one, so it is close to free here:
 
 ```c
-void shmem_pe_quiet(shmem_ctx_t ctx, const int *target_pes, int npes) {
-    /* intersect target node set with the dirty set; seal and wait on that */
-}
+void shmem_pe_quiet(const int *target_pes, size_t npes);
+void shmem_ctx_pe_quiet(shmem_ctx_t ctx, const int *target_pes, size_t npes);
+/* intersect the targets' node set with the dirty set; flush and wait on that */
 ```
 
 Worth implementing in phase 1 despite being small, because it *validates the
@@ -1162,10 +1215,12 @@ operations; an implementation that fails a loop of ten thousand
 `shmem_get_nbi` calls before one `quiet` is broken.
 
 A cap that causes **blocking** rather than failure is legal. Express it as a
-**resource**, not an operation count: a per-connection descriptor pool sized in
-bytes; exhaustion blocks the PE. Same bound, honest failure mode, with a counter
-showing stall frequency. Size it large enough to be irrelevant to real codes —
-16-byte descriptors make a pool of thousands cost megabytes.
+**resource**, not an operation count: the per-connection reply credit `C` of §3.8,
+taken by the origin's lead and returned when the reply lands; exhaustion blocks the
+issuing PE. Same bound, honest failure mode, with a counter showing stall
+frequency. Size it large enough to be irrelevant to real codes: at 48 bytes per
+descriptor, `C = 1,000` across 500 connections is 24 MB in the target's node-wide
+pool.
 
 #### Deferred-sampling hazard (documented, not fixed)
 
@@ -1226,16 +1281,21 @@ return `NULL` across logical nodes too.
 - Returns `NULL` when direct access is not possible. **Returning `NULL`
   unconditionally is conforming.** The intranode case is essentially free from
   the shared heap.
-- Accesses through the returned pointer are **ordinary loads and stores, not
-  OpenSHMEM operations.** `fence` and `quiet` do not order them. Completion
-  routines do not apply. The application supplies its own synchronization,
-  subject only to the architecture's memory model.
+- `shmem_ptr` returns `NULL` for any target reached over the network, including a
+  local PE under §8.1's force-remote flag (§4.6).
+- Accesses through the returned pointer are ordinary loads and stores, which the
+  spec calls **memory stores**. Table 14 puts memory stores under `fence` and
+  `quiet`, for the calling thread only; §4.6 describes how that is met. An earlier
+  draft said `fence` and `quiet` do not order them, which contradicts the spec.
+  Beyond that guarantee, the application supplies its own synchronization, subject
+  to the architecture's memory model.
 - Providing the returned address to a routine requiring a symmetric address is
   undefined.
 
-**Design constraint:** a local store via `shmem_ptr` and a remote put to the same
-location have no ordering relationship. Aggregation must not assume all writes
-to the symmetric heap pass through the descriptor path.
+**Design constraint:** a store via `shmem_ptr` by one thread and a put to the same
+location issued by a *different* thread or PE have no ordering relationship.
+Aggregation must not assume all writes to a symmetric heap pass through the
+descriptor path.
 
 **Document prominently:** code developed on x86 that omits barriers around
 `shmem_ptr` access will fail on aarch64 under weak ordering. It is the
@@ -1249,8 +1309,13 @@ of **how a PE blocks without starving progress**. The answer has to hold when
 the writer is the progress thread applying a remote AMO *and* when it is another
 local PE storing through the shared heap.
 
-> **Watch table for the wake decision; a 32-bit sequence word in the watch slot
-> for the wait.**
+> **One watch slot per local PE for the wake decision; a 32-bit sequence word in
+> the slot for the wait.**
+
+A wait is always on the *caller's own* symmetric variable, so a writer that stores
+to `(PE, offset)` only ever needs to look at that one PE's slot. Under
+`SHMEM_THREAD_SINGLE` (§4.6) a PE waits on at most one variable at a time, so one
+slot per PE is enough: no hash table, no probing, and no slot deletion.
 
 An earlier draft had the waiter futex directly on the `ivar`. That works only for
 32-bit types: **the kernel implements only 32-bit futexes.** `futex_wait` with
@@ -1264,20 +1329,24 @@ bumped on every update to the watched address, so the kernel's compare-and-wait
 sees every change whatever the `ivar`'s width.
 
 ```c
-/* waiter */
-slot = watch_insert(node->watch, me, offset_of(ivar));   /* BEFORE the first check */
+/* waiter: PE `me`, waiting on its own ivar */
+struct watch_slot *slot = &node->watch[me];
+atomic_store_explicit(&slot->watched, offset_of(ivar) + 1,  /* 0 means none */
+                      memory_order_seq_cst);                /* BEFORE the first check */
 for (;;) {
     uint32_t seq = atomic_load_explicit(&slot->seq, memory_order_acquire);
     if (predicate(load_ivar(ivar), cmp, value)) break;
-    futex_wait(&slot->seq, seq, deadline);       /* -EAGAIN if bumped: loop */
+    futex_wait(&slot->seq, seq, deadline);        /* -EAGAIN if bumped: loop */
 }
-watch_remove(node->watch, slot);
+atomic_store_explicit(&slot->watched, 0, memory_order_seq_cst);
 ```
 
 ```c
-/* progress thread or local PE, having stored to (pe, offset) */
-if (watch_nonempty(node->watch) && (slot = watch_find(node->watch, pe, offset))) {
-    atomic_fetch_add_explicit(&slot->seq, 1, memory_order_release);
+/* progress thread or local PE, having stored to (pe, offset) with a seq_cst
+ * store or a locked AMO (§3.16) */
+struct watch_slot *slot = &node->watch[pe];
+if (atomic_load_explicit(&slot->watched, memory_order_acquire) == offset + 1) {
+    atomic_fetch_add_explicit(&slot->seq, 1, memory_order_seq_cst);
     futex_wake(&slot->seq, INT_MAX);
 }
 ```
@@ -1289,24 +1358,32 @@ compare catches. Reversing either order reopens the lost-wake window.
 The slot lives in the shared node segment, so the wait is a shared (not
 `FUTEX2_PRIVATE`) futex on a shared mapping — also verified by the probe.
 
-**The table is a set, not a registry, keyed by `(PE, offset)` — never by
-address**, because a PE's heap sits at a different address in each sibling
-process (§4.1). It answers exactly one question — is anyone waiting on this
-location — so it needs no PE list, no ownership, and
-nothing beyond a small per-slot counter for concurrent waiters on one address. A
-fixed open-addressed table of cache-line-padded slots, sized from local PE count
-at init. Membership is the entire interface, which is why it stays cheap.
+**Slots are keyed by `(PE, offset)` — never by address**, because a PE's heap
+sits at a different address in each sibling process (§4.1). Slots are
+cache-line padded with `_Alignas` and live in the node segment.
 
-**Cost is one lookup per applied operation on the target side**, and only for
-operations that write the heap. In the common case of an empty table it is one
-load of a count and a branch — hence the `watch_nonempty` guard first.
+**Cost is one load per applied operation on the target side**, and only for
+operations that write a heap: the target PE's `watched` word, compared with the
+offset just written.
+
+**Under `MULTIPLE`**, several threads of one PE can wait on different variables,
+so a slot becomes a small per-PE list. The review found that the obvious list
+designs lose wakes — a naive reference count, and linear-probe deletion even with
+one waiter per key — and model-checked rules that do not
+(`docs/reviews/evidence/semantics/`). Adopt those rules, or re-run the model,
+before adding `MULTIPLE`.
 
 **Insert before the first predicate check.** Checking and then inserting loses a
 wake that lands in the window. This is the one ordering rule in the section that
 is easy to get backwards and impossible to see in testing.
 
-**Memory ordering** is the §3.5 discipline again: release on the waker's stores,
-acquire on the waiter's loads. On aarch64 these are `stlr`/`ldar`.
+**Memory ordering: this is a two-sided protocol** (§3.16). The waiter stores
+`watched` and then loads the `ivar`; the writer stores the `ivar` and then loads
+`watched`. Both stores must be `seq_cst` or locked, or on x86 each side can miss
+the other's store and the wake is lost. AMOs that are CAS or `fetch_add` are
+locked already; a set-style AMO, and `shmem_signal_set`, must use a `seq_cst`
+store. An earlier draft applied §3.5's single-writer rule here, which is not
+enough.
 
 **Pass a safety-sweep deadline**, for the same reason §3.10 does: a missed wake
 becomes a latency spike with a counter rather than a hang. It is an **absolute**
@@ -1314,9 +1391,10 @@ deadline — see §3.10 on the two timeout conventions. **Count
 timeout-wakes.** A nonzero count in production means the watch table has a bug,
 and that counter is the only thing that will ever tell you.
 
-**`shmem_test` never blocks** — predicate check, no table interaction at all.
-Likewise `shmem_test_all` and friends, which 1.6 change #19 clarifies return 1
-on an empty test set.
+**`shmem_test` never blocks** — predicate check, no slot interaction at all.
+Likewise the multiple-element tests. On an empty test set, `shmem_test_all` and
+`shmem_test_all_vector` return 1 (1.6 change #19), `shmem_test_any` returns
+`SIZE_MAX`, and `shmem_test_some` returns 0.
 
 **Spec constraints, both satisfied for free.** `ivar` must be updated using
 OpenSHMEM AMOs (1.5 change #17), and §3.2 makes a wait or test on a location
