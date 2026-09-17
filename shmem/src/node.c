@@ -382,6 +382,23 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t ses
     }
 }
 
+/*
+ * Two-step publication: the rank and status first, then the flag that makes
+ * them readable. A reader loads the flag with acquire before it reads either,
+ * so it never prints a rank from a half-written abort. Single-writer
+ * publication (§3.16) - there is no protocol here, only a word a poller reads,
+ * so no wake can be lost: a waiter that misses the store sees it one sweep
+ * later, which is the whole cost.
+ */
+void osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status)
+{
+    if (!n->hdr)
+        return;
+    atomic_store_explicit(&n->hdr->abort_pe, pe, memory_order_release);
+    atomic_store_explicit(&n->hdr->abort_status, status, memory_order_release);
+    atomic_store_explicit(&n->hdr->aborting, 1, memory_order_release);
+}
+
 void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b)
 {
     struct osoe_pe_slot *me = &n->slots[b->local_id];

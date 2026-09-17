@@ -25,7 +25,7 @@
 #include "boot.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 2
+#define OSOE_NODE_LAYOUT 3
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -47,7 +47,7 @@ struct osoe_pe_slot {
     _Alignas(OSOE_CACHELINE) _Atomic uint64_t watch_block;
     _Atomic uint32_t watch_seq;
     uint32_t rank;
-    int32_t pid;
+    int32_t pid;                    /* this PE's process id, for the watchdog (§3.15) */
     uint64_t symmetric_size;        /* SHMEM_SYMMETRIC_SIZE as this PE parsed it */
     uint64_t heap_bytes;            /* mapped length of the heap object */
     char heap_name[OSOE_HEAP_NAME_MAX];
@@ -84,6 +84,15 @@ struct osoe_node_header {
     _Atomic uint32_t finalized;     /* PEs whose last finalize has run */
     _Atomic uint32_t failed;        /* nonzero once any PE has failed rendezvous */
 
+    /* The abort word (§3.15). Nonzero means the job is over and no wait can
+     * finish; every library wait reads it at its next safety-sweep deadline
+     * (base/sweep.h). Phase 1 step 1 sets it only from the development
+     * watchdog; shmem_global_exit and the AM abort flood set it in step 4. */
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint32_t aborting;      /* 0, or 1 once any PE has declared the job over */
+    _Atomic uint32_t abort_pe;      /* the world rank the abort names */
+    _Atomic int32_t abort_status;   /* the status to exit with (§9.1.6) */
+
     /* SHMEM_TEAM_WORLD's epoch counters (§5.4), each on its own line. */
     struct osoe_epoch world_arrived;
     struct osoe_epoch world_released;
@@ -108,5 +117,9 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t ses
 /* Unmap everything; the PE whose finalize is the node's last removes the
  * control segment's name. */
 void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b);
+
+/* Declare the job over: publish the abort word so every other local PE stops at
+ * its next safety sweep. Does not itself terminate the caller. */
+void osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status);
 
 #endif /* OSOE_NODE_H */

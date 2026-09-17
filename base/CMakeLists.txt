@@ -6,7 +6,8 @@ add_library(osoe_base STATIC
   epoch.c
   futex.c
   order.c
-  size.c)
+  size.c
+  sweep.c)
 target_include_directories(osoe_base PUBLIC ${PROJECT_SOURCE_DIR})
 set_target_properties(osoe_base PROPERTIES
   POSITION_INDEPENDENT_CODE ON

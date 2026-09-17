@@ -42,6 +42,51 @@ osoe_tier2_test(amo)
 osoe_tier2_test(wait)
 osoe_tier2_test(signal)
 
+# The development watchdog (§3.15). Not an osoe_tier2_test: it needs -k, so the
+# launcher leaves the survivors to the library, and it asserts on output rather
+# than on an exit status. A PASS_REGULAR_EXPRESSION test ignores the exit code,
+# which is what these need: the job is meant to fail.
+add_executable(shmem_test_watchdog test_watchdog.c)
+target_link_libraries(shmem_test_watchdog PRIVATE osoe)
+osoe_warnings(shmem_test_watchdog)
+
+foreach(count 2 4)
+  foreach(where barrier wait_until)
+    add_test(NAME shmem.watchdog.${where}.L${count}
+      COMMAND osoe-launch -n ${count} -t 20 -k
+              -e 0:OSOE_TEST_WAIT=${where} -e 1:OSOE_TEST_WAIT=${where}
+              -e 2:OSOE_TEST_WAIT=${where} -e 3:OSOE_TEST_WAIT=${where}
+              -e 0:OSOE_WATCHDOG=1 -e 1:OSOE_WATCHDOG=1
+              -e 2:OSOE_WATCHDOG=1 -e 3:OSOE_WATCHDOG=1
+              -- $<TARGET_FILE:shmem_test_watchdog>)
+    set_tests_properties(shmem.watchdog.${where}.L${count} PROPERTIES
+      LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "has died; this PE would wait for it forever")
+  endforeach()
+endforeach()
+
+# Turned off, the same job hangs until the launcher's timeout: this is what the
+# watchdog replaces, kept as a test so the difference stays demonstrated.
+add_test(NAME shmem.watchdog.off
+  COMMAND osoe-launch -n 2 -t 3 -k -e 0:OSOE_WATCHDOG=0 -e 1:OSOE_WATCHDOG=0
+          -- $<TARGET_FILE:shmem_test_watchdog>)
+set_tests_properties(shmem.watchdog.off PROPERTIES
+  LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 3 s")
+
+# With nothing set, the default must follow the preset: on in debug, asan and
+# tsan, off in release (§3.15).
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(osoe_watchdog_default_expect "has died; this PE would wait for it forever")
+else()
+  set(osoe_watchdog_default_expect "osoe-launch: timeout after 3 s")
+endif()
+add_test(NAME shmem.watchdog.default
+  COMMAND osoe-launch -n 2 -t 3 -k -- $<TARGET_FILE:shmem_test_watchdog>)
+set_tests_properties(shmem.watchdog.default PROPERTIES
+  LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "${osoe_watchdog_default_expect}")
+
 # Init must refuse what it cannot run, saying why.
 add_test(NAME shmem.refuse.no_launcher
   COMMAND ${CMAKE_COMMAND} -E env --unset=OSOE_PROCID --unset=SLURM_JOB_ID

@@ -16,6 +16,7 @@
 #include <shmem.h>
 
 #include "base/deadline.h"
+#include "base/sweep.h"
 #include "export.h"
 #include "fatal.h"
 #include "sym.h"
@@ -51,7 +52,8 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
         if (satisfied(cmp, have, want, routine))
             break;
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-        osoe_tp_watch_wait(w, seq, &sweep);
+        if (!osoe_tp_watch_wait(w, seq, &sweep))
+            osoe_sweep_expired(routine);        /* only here, never on a wake */
     }
     osoe_tp_unwatch(w);
     return have;

@@ -2,7 +2,7 @@
  * osoe-launch - start L processes of one job on this machine, the way a Slurm
  * step would, for tests. Not installed.
  *
- *   osoe-launch -n L [-t SECONDS] [-e RANK:NAME=VALUE]... -- PROGRAM [ARGS]...
+ *   osoe-launch -n L [-t SECONDS] [-k] [-e RANK:NAME=VALUE]... -- PROGRAM [ARGS]...
  *
  * Each process gets the OSOE_ bootstrap variables of design §6.2 for a job with
  * one node and L tasks: rank i is local id i. The job id is this launcher's pid,
@@ -16,7 +16,10 @@
  * (§6.2), so a clean job leaves none. Leftovers are removed in every case.
  * After the first failure the remaining processes get SIGTERM, then SIGKILL
  * two seconds later, since they are usually blocked waiting for the one that
- * failed.
+ * failed. -k leaves them alone instead, so that what ends the job is the
+ * library's own reaction to a dead PE rather than the launcher's; the timeout
+ * still applies. It is the launcher's counterpart to Slurm's KillOnBadExit
+ * (design §3.15).
  */
 #define _GNU_SOURCE
 #include <dirent.h>
@@ -40,8 +43,8 @@ struct override {
 
 static void usage(void)
 {
-    fprintf(stderr, "usage: osoe-launch -n L [-t SECONDS] [-e RANK:NAME=VALUE]... "
-                    "-- PROGRAM [ARGS]...\n");
+    fprintf(stderr, "usage: osoe-launch -n L [-t SECONDS] [-k] "
+                    "[-e RANK:NAME=VALUE]... -- PROGRAM [ARGS]...\n");
     exit(2);
 }
 
@@ -136,17 +139,21 @@ int main(int argc, char **argv)
 {
     long n = 0;
     long timeout = 60;
+    bool keep = false;          /* -k: do not terminate the others on a failure */
     struct override ov[MAX_OVERRIDES];
     int nov = 0;
 
     int opt;
-    while ((opt = getopt(argc, argv, "+n:t:e:")) != -1) {
+    while ((opt = getopt(argc, argv, "+n:t:ke:")) != -1) {
         switch (opt) {
         case 'n':
             n = parse_long(optarg, 1, MAX_PROCS, "process count");
             break;
         case 't':
             timeout = parse_long(optarg, 1, 86400, "timeout");
+            break;
+        case 'k':
+            keep = true;
             break;
         case 'e': {
             char *colon = strchr(optarg, ':');
@@ -217,10 +224,12 @@ int main(int argc, char **argv)
                             WEXITSTATUS(status));
                 if (!failed) {
                     failed = true;
-                    for (long j = 0; j < n; j++)
-                        if (!done[j])
-                            kill(pids[j], SIGTERM);
-                    kill_at = now() + 2.0;
+                    if (!keep) {
+                        for (long j = 0; j < n; j++)
+                            if (!done[j])
+                                kill(pids[j], SIGTERM);
+                        kill_at = now() + 2.0;
+                    }
                 }
             }
         }

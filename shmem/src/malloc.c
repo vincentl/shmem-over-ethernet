@@ -30,7 +30,7 @@ OSOE_API void *shmem_malloc(size_t size)
         /* Failing on some PEs and not others would desynchronize the heaps. */
         osoe_fatal("shmem_malloc: out of private memory for heap metadata");
     }
-    osoe_barrier_all();
+    osoe_barrier_all("shmem_malloc");
     return p;
 }
 
@@ -40,7 +40,7 @@ OSOE_API void shmem_free(void *ptr)
 {
     if (!ptr)
         return;
-    osoe_barrier_all();
+    osoe_barrier_all("shmem_free");
     uint64_t offset;
     if (!osoe_sym_heap_offset(ptr, 0, &offset) || osoe_alloc_give(&osoe.alloc, offset) != 0)
         osoe_fatal("shmem_free: %p is not the address of a block allocated from the "

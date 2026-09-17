@@ -23,6 +23,7 @@ struct osoe_boot {
     uint64_t symmetric_size;    /* SHMEM_SYMMETRIC_SIZE, or the default */
     uint64_t timeout_ns;        /* OSOE_BOOTSTRAP_TIMEOUT, seconds in the environment */
     uint64_t heap_base;         /* OSOE_HEAP_BASE, 0 if unset */
+    bool watchdog;              /* OSOE_WATCHDOG, or the build default (§3.15) */
 };
 
 /* The default SHMEM_SYMMETRIC_SIZE: 256 MiB (§4.4). */

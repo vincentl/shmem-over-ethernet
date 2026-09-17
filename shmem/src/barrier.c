@@ -17,7 +17,7 @@
  * multi-node team would send the internode arrival AM instead. Every member
  * then waits for `released` to equal k + 1 (§5.4: equality, bounded skew).
  */
-static void sync_world(void)
+static void sync_world(const char *routine)
 {
     struct osoe_node_header *h = osoe.node.hdr;
     uint32_t members = osoe.boot.local_count;
@@ -29,20 +29,20 @@ static void sync_world(void)
                        "numbers of collectives", k + 1);
         osoe_epoch_wake_all(&h->world_released);
     }
-    osoe_epoch_wait_eq(&h->world_released, k + 1);
+    osoe_epoch_wait_eq(&h->world_released, k + 1, routine);
     osoe.world_epoch = k + 1;
 }
 
 /* §5.6: barrier_all is a quiet on the default context followed by a sync on
  * the world team (spec §9.10.1 Notes). The wait begins with the serializing
  * store, which makes the calling thread's memory stores visible (§4.6). */
-void osoe_barrier_all(void)
+void osoe_barrier_all(const char *routine)
 {
     osoe_tp_wait(osoe_tp_ctx_default(), NULL, 0);
-    sync_world();
+    sync_world(routine);
 }
 
 OSOE_API void shmem_barrier_all(void)
 {
-    osoe_barrier_all();
+    osoe_barrier_all("shmem_barrier_all");
 }

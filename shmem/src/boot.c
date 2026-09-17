@@ -4,6 +4,7 @@
 #include "base/size.h"
 #include "boot.h"
 #include "fatal.h"
+#include "watchdog.h"
 
 static uint32_t need_u32(const char *name)
 {
@@ -90,6 +91,11 @@ void osoe_boot_read(struct osoe_boot *b)
         osoe_fatal("OSOE_BOOTSTRAP_TIMEOUT='%s' is not a positive number of seconds",
                    getenv("OSOE_BOOTSTRAP_TIMEOUT"));
     b->timeout_ns = (uint64_t)timeout_s * UINT64_C(1000000000);
+
+    uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
+    if (osoe_env_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENV_INVALID || watchdog > 1)
+        osoe_fatal("OSOE_WATCHDOG='%s' is not 0 or 1", getenv("OSOE_WATCHDOG"));
+    b->watchdog = watchdog != 0;
 
     const char *base = getenv("OSOE_HEAP_BASE");
     if (base) {

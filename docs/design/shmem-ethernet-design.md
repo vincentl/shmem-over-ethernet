@@ -989,6 +989,47 @@ The policy is right; an earlier draft lacked **detection and propagation**:
   itself stop the others. Document `srun -K1`. The spec does not define crash
   behaviour, so this is operability, not conformance.
 
+#### The development watchdog
+
+> **A development aid, not the release path: on in the `debug`, `asan` and `tsan`
+> presets and off in `release`, with `OSOE_WATCHDOG` forcing either way.**
+
+Everything above is the production answer, and none of it exists before §7.1
+step 4. Until then a PE blocked in `wait_until` or a barrier whose sibling has
+died waits for the launcher's timeout, which on a development machine means
+minutes of nothing. The watchdog gives the developer a loud failure instead:
+
+- **An abort word in the control segment header**, plus a liveness check of the
+  local PEs' recorded pids, **run only when a library wait's safety-sweep
+  deadline expires** (§3.10). Never on the wake path, so a healthy wait pays
+  nothing at all for it — no load, no branch — and a wait that is merely slow
+  pays one pass over the local slots per sweep.
+- **On a dead PE or a set abort word, abort loudly**, naming the PE, the routine
+  the caller is inside, and the control segment to point `osoe-stat` at (§3.14).
+  The PE that notices sets the abort word first, so its siblings stop at their
+  own next sweep instead of each rediscovering the same corpse.
+- **Liveness is `kill(pid, 0)`**, using the pid each PE publishes in its slot
+  before the release store of its phase. `ESRCH` is unambiguous: no process holds
+  that pid. A recycled pid can only make a dead PE look alive, which is the hang
+  this replaces — never a false abort on a healthy job.
+
+**The scoping is the point.** Production must not come to depend on it, because
+it is strictly weaker than what step 4 brings and is absent from the build that
+ships. Off in `release` is what keeps that honest. What it deliberately does not
+do:
+
+- **No pidfd polling.** Detection is a poll at a sweep, so it is up to one sweep
+  late, and it cannot see a PE that is alive but wedged. The lead's ring holding
+  a pidfd per local PE is step 4's answer.
+- **No cross-node detection.** One node's PEs check one node's pids. A vanished
+  peer node is TCP keepalive's business, and there is no TCP yet.
+- **No `shmem_global_exit` and no abort flood.** The abort word is written and
+  read within one node by whichever PE noticed. `global_exit` (§9.1.6) needs the
+  agent-calls-`exit` path above and an AM to carry the abort between nodes.
+- **Not during rendezvous.** The bootstrap waits already carry
+  `OSOE_BOOTSTRAP_TIMEOUT` and a `failed` word, and run before the slots a
+  liveness check would read are all published.
+
 ### 3.16 Memory-order discipline
 
 > **ISO C11 `<stdatomic.h>` only, with a named memory order at every access to a

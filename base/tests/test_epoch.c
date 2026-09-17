@@ -23,7 +23,7 @@ static void *member(void *arg)
             CHECK(osoe_epoch_bump_eq(&released, k + 1));
             osoe_epoch_wake_all(&released);
         }
-        osoe_epoch_wait_eq(&released, k + 1);
+        osoe_epoch_wait_eq(&released, k + 1, "test_epoch");
         atomic_store_explicit(&reached[me], k + 1, memory_order_release);
     }
     return NULL;
@@ -47,7 +47,7 @@ int main(void)
     osoe_epoch_init(&e);
     CHECK(!osoe_epoch_bump_eq(&e, 2));
     CHECK(osoe_epoch_bump_eq(&e, 2));
-    osoe_epoch_wait_eq(&e, 2);              /* already equal: returns */
+    osoe_epoch_wait_eq(&e, 2, "test_epoch");              /* already equal: returns */
 
     /* Wraparound: equality holds across 2^32. */
     struct osoe_epoch w;
@@ -59,7 +59,7 @@ int main(void)
     osoe_epoch_init(&slow);
     pthread_t t;
     CHECK(pthread_create(&t, NULL, late_bumper, &slow) == 0);
-    osoe_epoch_wait_eq(&slow, 3);
+    osoe_epoch_wait_eq(&slow, 3, "test_epoch");
     pthread_join(t, NULL);
 
     /* Many barrier epochs across threads with skew between them. */

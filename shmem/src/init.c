@@ -75,7 +75,7 @@ OSOE_API void shmem_finalize(void)
     /* Every finalize is a barrier (spec §9.1.4, invariant 26): a non-last one
      * only that, the last one before tearing down. Skipping it would let the
      * world team's epoch counts diverge across PEs. */
-    osoe_barrier_all();
+    osoe_barrier_all("shmem_finalize");
     refcount--;
     if (refcount == 0) {
         session_end();
