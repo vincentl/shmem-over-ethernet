@@ -1530,7 +1530,10 @@ Equality is sound because skew is bounded, so no counter can move *past* a value
 someone is waiting on. Only the lead waits on `arrived` and `copied`, and no
 member can reach the next epoch's copy-out without the lead having finished the
 current one. A member waiting on `released == k+1` must see *k+1* before *k+2*,
-because *k+2* needs this member's own arrival. So 32-bit wraparound is harmless,
+because *k+2* needs this member's own arrival. A counter can run ahead of the
+value someone waits on by at most `L − 1` (next-epoch arrivals), so wraparound is
+harmless whenever the modulus `M ≥ L` — for 32-bit counters, always. The review's
+model checked moduli down to that boundary. So wraparound is harmless,
 and each counter is directly a futex word — which matters, because the kernel
 implements only 32-bit futexes (§4.9).
 
@@ -1619,7 +1622,8 @@ collect or alltoall — the obvious implementation — is **non-conforming**, no
 merely slow.
 
 **Symmetric addresses are the precondition, not a threat.** §9.10.9 (1.6 change
-#17): "The same source and dest arrays must be passed by all PEs." Identical
+#17): "The same source and dest arrays must be passed by all PEs that participate
+in the collective." Identical
 offsets (§4.2, §4.4) make that the same symmetric object in every process, which
 is what guarantees the lead's `dest` is the right size and place to accumulate
 into. Source and dest must be fully overlapping or fully disjoint; both cases
@@ -1631,9 +1635,39 @@ CMA the lead would read each member's source with `process_vm_readv` — correct
 but a syscall per member per collective. Phase 1 rejects statics, so this is a
 sequencing note, not a blocker.
 
-This still eliminates scratch sizing — no chunking loop, no high-water
-allocation, no per-team data area. The team's shared footprint is **three
-counters on three cache lines**, regardless of reduction size.
+**Release ordering and downward forwards.** State these, because the exhaustive
+model assumes them and cannot show what breaks without them:
+
+- **A child node's partial result is merged only after the local lead has enqueued
+  its own arrival**, which is after its local combine. Merging earlier races the
+  combine and loses updates.
+- **Write the final `dest`, then bump `released`** — never the reverse, or members
+  copy out a partial result. For a team that spans a single node, the lead's own
+  arrival triggers the release locally, with no internode message.
+- **A result forwarded down the internode tree by reference** reads the lead's
+  `dest` when the forward drains (§3.8). If that drain happens after `released` is
+  bumped, the lead can see every local copy-out complete, leave, and let the
+  application overwrite `dest` before the forward is sent — the review's model
+  shows exactly this (`docs/reviews/evidence/collectives/`, forwarding after the
+  bump). Either count each downward forward in `copied`, or finish the forwards
+  before bumping `released`. This arrives with reductions, not with barrier.
+
+**Scope of this scheme.** Accumulating into the lead's `dest` works for barrier,
+sync, reductions, and broadcast, where every member ends with the same value. It
+does **not** generalize:
+
+- **alltoall and alltoalls** send a distinct block from every PE to every PE, so
+  there is nothing to accumulate;
+- **scans** give each PE a different result that depends on team rank order, which
+  is wrong to combine node-locally when a node's members are not contiguous in
+  rank;
+- **collect** with a different `nelems` per PE needs per-PE sizes and offsets.
+
+Each needs its own design before it is implemented (§7).
+
+For the collectives it covers, this still eliminates scratch sizing — no chunking
+loop, no high-water allocation, no per-team data area. Their shared footprint is
+**three counters on three cache lines**, regardless of reduction size.
 
 *(Fallback for cases where `dest` cannot serve: chunk through fixed scratch. The
 loop costs nothing on small reductions and adds pipelining on large ones.)*
@@ -1665,6 +1699,20 @@ so it cannot perform a world-collective allocation.
 allocator. Three constraints resolve against one number — one thing to document,
 one place to fail loudly.
 
+**It counts teams in existence job-wide at once, including the predefined teams —
+not teams per PE.** The control-queue bound is per connection: the number of
+distinct teams whose trees use that node pair. `shmem_team_split_2d` can put `L`
+different teams on one node pair while each PE belongs to only two, so a per-PE
+count makes the §3.8 assert fire on conforming programs (review C10). Teams per
+edge never exceed teams job-wide, so the job-wide count is a safe bound, and the
+node-wide pool (§3.8) keeps it from costing memory per connection.
+
+**Open: the team range allocator and the split protocol are not yet designed.**
+This section refers to "team ranges" without defining them, and nothing yet says
+how PEs agree on a new team's identifier or claim its counter blocks during
+`shmem_team_split_strided` and `shmem_team_split_2d`. Phase 1 has no team creation,
+but this becomes blocking when team creation lands (§10).
+
 Runtime rather than build-time, despite the init-ordering cost: the pool cannot
 be sized until the bootstrap has supplied local PE count, so team-pool sizing
 must happen after §6 completes and before anything that allocates node-level
@@ -1676,14 +1724,15 @@ would be simpler, but forcing a rebuild to raise a limit is exactly the friction
 every structure statically sized. Rejected because the ceiling reintroduces the
 rebuild, which is the whole objection.)*
 
-**Team ranges leak until `finalize`**, with a counter. `shmem_team_destroy` is
-described in 1.6 §9.4.8 only as "a collective operation that destroys the team
-referenced by team" — **the spec never names the scope it is collective over.**
-The natural reading is over the team being destroyed, in which case parent PEs
-outside the child cannot observe it and ranges cannot be reclaimed without
-divergence. Since the ambiguity is in the standard rather than in our reading of
-it, leaking is the only safe choice, and it costs nothing: teams are typically
-created once during setup.
+**Team ranges leak until `finalize`**, with a counter. §9.4.8 calls
+`shmem_team_destroy` "a collective operation that destroys the team referenced by
+team" without naming a scope in the routine text, but the rest of the spec fixes
+it: a parent-team PE that is not in a new team "will receive a value of
+SHMEM_TEAM_INVALID" (§9.4), and destroying `SHMEM_TEAM_INVALID` is a no-op. So
+destroy is collective over the team's members. An earlier draft called the scope
+ambiguous; it is not. The conclusion stands anyway: parent PEs outside the child
+cannot observe the destroy, so ranges cannot be reclaimed without divergence, and
+leaking costs nothing because teams are typically created once during setup.
 
 Two related requirements from the same section: destroy also destroys every
 **shareable** context created from the team, while **`SHMEM_CTX_PRIVATE`**
@@ -1889,8 +1938,8 @@ alltoall is non-conforming.
 | Routine | Why it waits |
 |---|---|
 | `shmem_ctx_session_start` / `_stop` (§9.9) | Hints only. A conforming implementation may ignore them entirely, so the no-op is the whole phase-1 implementation |
-| `shmem_sum_inscan`, `shmem_sum_exscan` (§9.10.10) | New collective *pattern*, but it inherits the §5.1 two-level skeleton; nothing architectural once barrier exists |
-| `shmem_ibget`, `shmem_ibput` (§9.6.1.4, §9.6.1.8) | Interleaved block transfer — an addressing pattern above the chunking layer, mechanical given `(region, offset, length)` chunks |
+| `shmem_sum_inscan`, `shmem_sum_exscan` (§9.10.10) | Inherits the §5.1 two-level skeleton, but **not** §5.5's accumulator: each PE's result depends on team rank order, so it needs its own design |
+| `shmem_ibput`, `shmem_ibget` (§9.6.1.4, §9.6.1.8) | Interleaved block transfer — an addressing pattern above the chunking layer, mechanical given `(region, offset, length)` chunks |
 
 Session routines are worth stubbing early precisely *because* they are ignorable:
 an empty implementation is conforming, and having the entry points present stops
