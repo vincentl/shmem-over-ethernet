@@ -12,6 +12,8 @@ add_library(osoe
   src/malloc.c
   src/node.c
   src/rma.c
+  src/signal.c
+  src/sym.c
   src/transport_local.c
   src/wait.c
   src/watch.c)

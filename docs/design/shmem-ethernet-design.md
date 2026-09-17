@@ -1698,6 +1698,28 @@ exclusive with AMOs on that location of the same datatype. The progress thread
 applies a remote AMO as an ordinary CPU atomic on the shared mapping (§4.1) —
 the same instruction a local PE would issue — so both hold without further work.
 
+**The signal routines are the same wait, on a `uint64_t`.** A signal data object
+is a symmetric `uint64_t` (spec §9.8.1), every update to it is a boundary rmw,
+and `shmem_signal_wait_until` is `wait_until` on it. Two spec requirements are
+worth naming because they are satisfied by the structure rather than by code:
+
+- §9.11.15 requires that `shmem_signal_wait_until` **not return before the update
+  of the memory indicated by `sig_addr` is fully complete**, and §9.11.1 and
+  §9.11.8–§9.11.14 say the same of every wait and test. Here the predicate's value
+  comes from the boundary's `load`, which is exclusive against rmw on that word
+  (§4.10), so a half-applied update is not a value a predicate can ever see. The
+  same sentence is why the predicate may not read the variable directly: on a
+  backend whose NIC applies remote atomics out of the CPU's sight, an ordinary
+  load could return a value the update had not finished producing. This is the
+  gap `load` was added to close.
+- §9.11.15 also returns *the value that satisfied the condition*. The wait loop
+  therefore keeps the value its last predicate check loaded rather than re-reading
+  the variable after the loop: a re-read can see a later update, and would return
+  a value that never satisfied the condition the caller asked about.
+
+`shmem_signal_set` is a set-style update, so §3.16's two-sided rule applies to it
+exactly as it does to a set-style AMO: a `seq_cst` store, not a `release` one.
+
 **Rejected:**
 
 - *Per-node generation counter with wake-all.* No table at all: the progress

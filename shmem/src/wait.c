@@ -18,9 +18,9 @@
 #include "base/deadline.h"
 #include "export.h"
 #include "fatal.h"
-#include "state.h"
 #include "sym.h"
 #include "transport.h"
+#include "wait.h"
 
 static bool satisfied(int cmp, uint64_t have, uint64_t want, const char *routine)
 {
@@ -37,56 +37,49 @@ static bool satisfied(int cmp, uint64_t have, uint64_t want, const char *routine
     }
 }
 
-/* The variable must be this PE's own symmetric object, aligned for its width. */
-static uint64_t ivar_offset(const char *routine, const void *ivar, unsigned width)
+/* Returns the value that satisfied the condition, which shmem_signal_wait_until
+ * needs (spec §9.11.15) and the other waits discard. */
+uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, int cmp,
+                         uint64_t want)
 {
-    uint64_t offset;
-    if (!osoe_sym_heap_offset(ivar, width, &offset))
-        osoe_fatal("%s: %p is not within the symmetric heap (symmetric statics are not "
-                   "yet supported)", routine, ivar);
-    if (offset % width)
-        osoe_fatal("%s: %p is not %u-byte aligned", routine, ivar, width);
-    return offset;
-}
-
-static void wait_until(const char *routine, const void *ivar, unsigned width, int cmp,
-                       uint64_t want)
-{
-    uint64_t offset = ivar_offset(routine, ivar, width);
+    uint64_t offset = osoe_sym_word_offset(routine, ivar, width);
     struct osoe_tp_watch *w = osoe_tp_watch(OSOE_REGION_HEAP, offset, width);
+    uint64_t have;
     for (;;) {
         uint32_t seq = osoe_tp_watch_seq(w);
-        if (satisfied(cmp, osoe_tp_load(OSOE_REGION_HEAP, offset, width), want, routine))
+        have = osoe_tp_load(OSOE_REGION_HEAP, offset, width);
+        if (satisfied(cmp, have, want, routine))
             break;
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_tp_watch_wait(w, seq, &sweep);
     }
     osoe_tp_unwatch(w);
+    return have;
 }
 
-static int test(const char *routine, const void *ivar, unsigned width, int cmp,
-                uint64_t want)
+int osoe_test(const char *routine, const void *ivar, unsigned width, int cmp,
+              uint64_t want)
 {
-    uint64_t offset = ivar_offset(routine, ivar, width);
+    uint64_t offset = osoe_sym_word_offset(routine, ivar, width);
     return satisfied(cmp, osoe_tp_load(OSOE_REGION_HEAP, offset, width), want, routine);
 }
 
 OSOE_API void shmem_uint64_wait_until(uint64_t *ivar, int cmp, uint64_t cmp_value)
 {
-    wait_until("shmem_uint64_wait_until", ivar, 8, cmp, cmp_value);
+    osoe_wait_until("shmem_uint64_wait_until", ivar, 8, cmp, cmp_value);
 }
 
 OSOE_API void shmem_uint32_wait_until(uint32_t *ivar, int cmp, uint32_t cmp_value)
 {
-    wait_until("shmem_uint32_wait_until", ivar, 4, cmp, cmp_value);
+    osoe_wait_until("shmem_uint32_wait_until", ivar, 4, cmp, cmp_value);
 }
 
 OSOE_API int shmem_uint64_test(uint64_t *ivar, int cmp, uint64_t cmp_value)
 {
-    return test("shmem_uint64_test", ivar, 8, cmp, cmp_value);
+    return osoe_test("shmem_uint64_test", ivar, 8, cmp, cmp_value);
 }
 
 OSOE_API int shmem_uint32_test(uint32_t *ivar, int cmp, uint32_t cmp_value)
 {
-    return test("shmem_uint32_test", ivar, 4, cmp, cmp_value);
+    return osoe_test("shmem_uint32_test", ivar, 4, cmp, cmp_value);
 }

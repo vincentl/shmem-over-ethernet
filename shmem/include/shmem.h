@@ -50,6 +50,18 @@ void shmem_query_initialized(int *initialized);
 #define _SHMEM_CMP_LT SHMEM_CMP_LT
 #define _SHMEM_CMP_GE SHMEM_CMP_GE
 
+/* Signal operators for the put-with-signal routines (§6, §9.8.2) */
+#define SHMEM_SIGNAL_SET 0
+#define SHMEM_SIGNAL_ADD 1
+
+/* Signalling operations (§9.8) */
+void shmem_putmem_signal(void *dest, const void *source, size_t nelems, uint64_t *sig_addr,
+                         uint64_t signal, int sig_op, int pe);
+void shmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe);
+void shmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe);
+uint64_t shmem_signal_fetch(const uint64_t *sig_addr);
+uint64_t shmem_signal_wait_until(uint64_t *sig_addr, int cmp, uint64_t cmp_value);
+
 /* Point-to-point synchronization (§9.11.1, §9.11.8) */
 void shmem_uint64_wait_until(uint64_t *ivar, int cmp, uint64_t cmp_value);
 void shmem_uint32_wait_until(uint32_t *ivar, int cmp, uint32_t cmp_value);

@@ -13,24 +13,14 @@
 #include <shmem.h>
 
 #include "export.h"
-#include "fatal.h"
-#include "state.h"
 #include "sym.h"
 #include "transport.h"
 
-/* An AMO's target must be in the heap and aligned for its width; the spec's
- * types are aligned by C, so a failure here means a non-symmetric address. */
+/* An AMO's target must be a word in the heap, aligned for its width. */
 static uint64_t amo_offset(const char *routine, const void *addr, unsigned width, int pe)
 {
-    if (pe < 0 || (uint32_t)pe >= osoe.boot.world_size)
-        osoe_fatal("%s: PE %d is not in 0..%u", routine, pe, osoe.boot.world_size - 1);
-    uint64_t offset;
-    if (!osoe_sym_heap_offset(addr, width, &offset))
-        osoe_fatal("%s: %p is not within the symmetric heap (symmetric statics are not "
-                   "yet supported)", routine, addr);
-    if (offset % width)
-        osoe_fatal("%s: %p is not %u-byte aligned", routine, addr, width);
-    return offset;
+    osoe_check_pe(routine, pe);
+    return osoe_sym_word_offset(routine, addr, width);
 }
 
 #define OSOE_AMO(T, NAME, WIDTH)                                                      \
