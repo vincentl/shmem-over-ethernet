@@ -17,7 +17,7 @@ param     BYTES  data   # bytes buffered for one destination since the last exch
 
 # mpp_or_long -> xshmem_or_long, the REDUCER macro (mpp2shmem.h:21; mpp2shmem.c:28-40,44), called at simple.c:273
 call  shmem_barrier_all     -  -  all  -  src/bale_classic/convey/mpp2shmem.c:35
-call  shmem_long_or_to_all  8  1  all  -  src/bale_classic/convey/mpp2shmem.c:36  # the macro's Call argument, shmem_long_or_to_all at :44; the three decision bits
+call  shmem_long_or_to_all  8  1  all  -  src/bale_classic/convey/mpp2shmem.c:36  # expanded from a macro; spelled at :44. The three decision bits
 call  shmem_barrier_all     -  -  all  -  src/bale_classic/convey/mpp2shmem.c:38
 
 when some PE wants to communicate and none is blocked (simple.c:277-278)

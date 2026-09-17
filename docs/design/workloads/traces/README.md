@@ -110,7 +110,9 @@ Fields:
 - **`repeat` count**: an integer, a param, arithmetic on them, or a range. `a..b` is
   inclusive; `a..` has no upper bound (a retry loop). `0..` includes not running.
 - **`cite`**: `path:line` or `path:first-last`, relative to the source checkout.
-  Extra lines that the step also stands for go in its note.
+  Extra lines that the step also stands for go in its note. When a macro builds
+  the call, so the cited line does not name the routine, the note says
+  `spelled at :N` for the line in the same file that does.
 
 ### What a trace leaves out
 
@@ -131,5 +133,7 @@ Fields:
 3. Cite every step. When the source contradicts q2-usage or §8.6, the trace
    follows the source and says so in a comment; q2-usage itself is a read-only
    record.
-4. Moving a pin means re-reading every trace that cites that entry and updating
-   its line numbers.
+4. Run `tools/corpus/check-traces.py`. It checks the format, the pins, that every
+   cited line exists, and that each call names its routine on its cited line.
+5. Moving a pin means re-reading every trace that cites that entry, updating its
+   line numbers, and running the check again.
