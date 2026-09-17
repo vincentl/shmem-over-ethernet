@@ -543,18 +543,87 @@ Keep futex words few (one per connection, not one per PE per connection) and
 cache-line aligned. Futex waits hash into kernel buckets by address; unrelated
 words can collide on the same bucket spinlock.
 
-### 3.12 Progress threads
+### 3.12 Progress threads and where they run
 
-**A small fixed pool per node, sharded by peer node — not one thread per PE.**
+> **Every PE starts one agent thread in `shmem_init`. The local lead's agent is
+> the node's progress engine. Every other agent is a service thread that does
+> only work which must happen inside its own process.**
 
-Target-side progress is fully discharged by a thread that shares the coherence
-domain with local PEs, because incoming puts, AMOs, and signalled puts all land
-in the shared symmetric heap. The origin side never needs a helper, because the
-calling thread is inside the library by definition.
+An earlier draft said "a small fixed pool per node" without saying which process
+the pool lives in. PEs are processes, so that choice decides how every
+cross-process mechanism works.
 
-Pool size is set by memory bandwidth, not PE count. On a Pi it is one. At 256
-PEs perhaps four. Shard by peer node so each connection has exactly one owner,
-preserving single-threaded ordering per stream.
+**The lead's agent owns the node's network state:** every io_uring ring, every
+node-pair socket, every provided buffer. It seals, submits, reaps, applies
+incoming operations to every local PE's heap (all local heaps are mapped in every
+process, §4.1), and drains the deferred reply queues. It is the sole issuer
+(§3.3).
+
+**Non-lead agents never touch a ring or a socket.** Each sleeps on a futex word in
+the node segment and is woken only for work that must run in its own address
+space:
+
+- operations on that PE's **symmetric statics** while they are private memory
+  (§4.3), applied in FIFO order per PE;
+- copying completed **nonblocking get** replies from the landing zone into a
+  private destination, so landing-zone space is released without waiting for the
+  application to call `quiet`;
+- **`shmem_global_exit` and job abort**: the agent calls `exit(status)` inside its
+  own process, so the exit status survives (§3.15).
+
+**Application threads never submit.** They reserve and copy into connection
+buffers (§3.5), and ask the lead for everything else — seal-and-flush for
+`fence` and `quiet`, a wake for new work — with a flag plus a futex wake.
+
+**Replies land in shared memory, never at a private address.** A get's `dest`
+may be a stack or `malloc` buffer the lead's process cannot see. Each PE
+therefore has a **landing zone** in the node segment, sized by the outstanding-get
+resource (§4.6). The progress thread writes reply chunks and fetching-AMO results
+there, and the *origin* copies into `dest`:
+
+- blocking get or fetching AMO: the calling thread, already waiting in the
+  library;
+- nonblocking get: that PE's agent, or the application thread at `quiet`,
+  whichever comes first.
+
+This corrects the earlier claim that "the origin side never needs a helper." It
+never needs one *for progress*; it does need its private memory written by a
+thread inside it.
+
+**Progress thread count** is set by memory bandwidth, not PE count. On a Pi it is
+one: the lead's agent itself. At 256 PEs perhaps four, all in the lead process,
+sharded by peer node so each connection has exactly one owner and each stream
+keeps single-threaded ordering.
+
+**Why threads in every PE rather than a helper process:**
+
+| Concern | Agent threads | Helper process |
+|---|---|---|
+| Creation | `pthread_create` in `shmem_init` | `fork` from a PE that may already be multithreaded — only async-signal-safe calls in the child, so in practice `fork`+`exec` of an installed helper binary and path discovery |
+| Lifetime | Dies with its PE | Needs its own supervision: pidfds both ways, orphan cleanup |
+| Private statics | Already inside the address space | CMA, which needs ptrace permission (`process_vm_writev` fails with `EPERM` at Yama `ptrace_scope=1`) |
+| `shmem_global_exit` | `exit(status)` in-process | Signals to each PE; exit status is lost |
+| CPU binding, cgroup | Lead task's cpuset | The same: a helper forked by the lead inherits it |
+
+*(The review that found this gap rejected "a thread in every PE" as contradicting
+§3.1 and this section. That holds only if every thread did network I/O; here only
+the lead's does.)*
+
+**Costs accepted:**
+
+- **The lead is special.** Pausing the lead PE in a debugger stops the node's
+  network progress; debug with non-stop mode, or read `am_dump_state` from another
+  PE, which sees the node segment. A crashed lead cuts the node off. Under §3.15
+  the job aborts either way, but the other PEs must *notice*: every wait carries a
+  deadline (§3.10), and on expiry the waiter checks the lead's liveness.
+- **The lead's cores carry the progress work.** Under Slurm CPU binding the agent
+  runs in the lead task's cpuset, competing with the lead's application thread. On
+  a Pi with one core per task this is the oversubscription case §3.11 plans for;
+  measure it (§8.4) rather than assume.
+- **Internal threads in an application process.** Agents block all asynchronous
+  signals before they are created, so application handlers keep running on
+  application threads. A child created by `fork()` after `shmem_init` has no
+  agents and must neither call OpenSHMEM nor run teardown (§6.4).
 
 ### 3.13 Handler table
 
@@ -563,7 +632,7 @@ dispatch is an array index with one bounds compare. No registration lock, no
 lifetime question, no teardown race. The whole subsystem is a `static const`
 array.
 
-**Checksum the table at init and exchange through PMI.** Every PE must agree.
+**Checksum the table at init and compare it at rendezvous (§6.2).** Every PE must agree.
 This catches mismatched binaries across nodes immediately with a clear message,
 rather than as an undecodable message arriving at PE 47 an hour in.
 
@@ -617,13 +686,48 @@ is "abort the job loudly," not "recover."
 
 ## 4. SHMEM Layer
 
-### 4.1 Symmetric heap
+### 4.1 Symmetric heaps
 
-Shared `memfd`/hugetlbfs segment, mapped by every local PE. Intranode put/get
-collapses to `memcpy` — no syscall, no proxy. The progress thread shares the
-coherence domain with every local PE, so remote AMOs applied by the progress
-thread and local AMOs issued by PEs are the same CPU atomic on the same cache
-line. **Atomicity unifies for free.**
+> **One heap per PE, as the spec requires. Every local process maps every local
+> PE's heap.**
+
+Spec §9.2: "Each PE has a single symmetric data segment and symmetric heap", and
+`SHMEM_SYMMETRIC_SIZE` is "the size (in bytes) of the symmetric heap memory per
+PE" (§8). An earlier draft had all local PEs share one heap, which makes a put to
+one local PE overwrite another's data and makes `shmem_ptr(x, 1) == shmem_ptr(x,
+2)`.
+
+Each PE's heap is its own shared memory object (§6.2 covers how siblings find
+it). Because every local process maps all of them, an intranode put or get to
+*any* local PE still collapses to `memcpy` — no syscall, no proxy — and the lead's
+progress thread applies remote operations to any local heap directly.
+
+**Layout.** Each process maps **its own heap at a fixed base `B`**, the same in
+every PE, so a PE's symmetric addresses are the same numbers on every PE —
+matching how symmetric statics behave under `-no-pie` (§4.3). Sibling heaps go
+wherever the process can place them, recorded in a per-process table:
+
+```c
+/* per process; O(local PEs), which the §9.3 implementer notes allow */
+void *base_of[L][NREGIONS];
+
+/* symmetric address a on the calling PE, target local PE t: */
+target = base_of[t][region] + (a - base_of[me][region]);
+```
+
+**Costs.** Every process reserves L × `SHMEM_SYMMETRIC_SIZE` of virtual address
+space — 256 GiB for 256 PEs at 1 GiB, comfortable in 48-bit aarch64. `memfd` pages
+are committed only when touched; hugetlbfs pages are reserved up front, so L
+heaps' worth of huge pages must exist before init, with a fallback to regular
+pages when they do not (the development VM has none). `SHMEM_SYMMETRIC_SIZE` must
+agree across PEs and is checked at rendezvous.
+
+The progress thread maps the same physical pages as the owning PE and its local
+siblings, so remote AMOs applied by the progress thread and local AMOs issued by
+PEs are the same CPU atomic on the same cache line. **Atomicity unifies for
+free** — for single-word AMOs of one width. It does not extend to multi-byte puts,
+or to AMOs of different widths on overlapping bytes; the spec makes neither
+exclusive.
 
 This is *stronger* than the spec requires, which is worth knowing before anyone
 trades it away. Spec §3.2 guarantees exclusivity only between OpenSHMEM AMOs on
@@ -638,7 +742,7 @@ over — note that the spec defines it as a **separate atomicity domain** from
 `SHMEM_TEAM_WORLD`, so AMOs from the two are mutually undefined by the standard
 even though this implementation would make them exclusive anyway.
 
-Reserve a fixed virtual range with `MAP_FIXED_NOREPLACE` so a collision fails
+Reserve the own-heap range at `B` with `MAP_FIXED_NOREPLACE` so a collision fails
 loudly rather than silently unmapping something. `-no-pie` pins the executable
 but **not** the heap — ASLR still randomizes heap, stack, mmap region, and
 shared libraries.
@@ -651,6 +755,12 @@ ends. This survives ASLR, PIE, heterogeneous nodes, and future region types.
 Identical-VA mapping is pursued *as well*, purely so intranode access and
 `shmem_ptr` are raw pointer arithmetic — but **the wire format must never depend
 on it.** This is the decision that is genuinely painful to revisit.
+
+"Identical" applies to each PE's *own* heap, at `B` in every process. Sibling heaps
+sit at per-process addresses and are reached through `base_of` (§4.1), so
+intranode code already exercises translation. The wire format's independence
+from addresses cannot fail a test while every process maps its own heap at the
+same base, so the test suite includes a mode that shifts `B` per PE (§8.2).
 
 ### 4.3 Symmetric statics
 
@@ -667,7 +777,7 @@ link on aarch64 (`R_AARCH64_ADR_PREL_PG_HI21` against a symbol in a PIE).
 | Phase | Approach | Notes |
 |---|---|---|
 | 1 | Unsupported; error on statics | `shmem_malloc` covers most real codes |
-| 1.5 | `-no-pie` + CMA (`process_vm_readv/writev`) | Correct but slow. Needs `PR_SET_PTRACER(PR_SET_PTRACER_ANY)` — Yama `ptrace_scope` defaults to 1, which permits only descendants, and PEs are siblings |
+| 1.5 | `-no-pie` + agent threads (§3.12) | Correct but slow: the target PE's agent applies each put, get, or AMO in its own process, in FIFO order. No CMA, so no ptrace permission is needed |
 | 2 | Wrapper-generated linker script | Fast; no source changes |
 
 Phase 2 needs no macro. The wrapper knows which objects it compiled from user
@@ -684,6 +794,18 @@ source and emits a fragment naming them:
 
 Mapped over with `MAP_FIXED` at init. Aligned to the linker's maximum page size,
 not 4096: a Pi 5 running Raspberry Pi OS defaults to 16K pages (§8.5).
+
+**Phase 1.5 ordering and replies.** Statics and heaps are disjoint regions, so
+applying statics operations through a per-PE FIFO agent queue while heap
+operations apply directly never reorders operations on the same object. A get
+*from* a PE's statics cannot use §3.8's reference descriptors — the lead cannot
+read that memory at drain time — so the agent copies the requested bytes into
+reply staging when it handles the request. That reintroduces the memory cost §3.8
+avoids, on a path that is slow by design.
+
+*(Rejected for phase 1.5: CMA via `process_vm_readv/writev`. It needs ptrace
+permission between sibling processes, which depends on Yama `ptrace_scope` — 1 on
+Ubuntu, 0 on the Debian 13 VM — and the agent threads already exist.)*
 
 **Rejected:** runtime discovery of the whole data segment via `/proc/self/maps`
 or `__bss_start`/`_end`. The main executable's data segment also holds the GOT
@@ -709,9 +831,9 @@ across PEs.** No timing, no PE rank, no address hashing, no randomization. Even
 though `-no-pie` plus a fixed heap base makes pointer-derived decisions safe,
 forbid them as hygiene.
 
-**Metadata out of band.** Inline headers mean every local PE writes identical
-bytes to the same shared pages — harmless but confusing, and it wastes shared
-heap on bookkeeping. Private per-process metadata is cleaner, and since every PE
+**Metadata out of band.** Inline headers would put bookkeeping inside every PE's
+heap — harmless, but a waste of symmetric memory, and visible through
+`shmem_ptr`. Private per-process metadata is cleaner, and since every PE
 computes the same answer independently, **there is no cross-process allocator
 lock at all.**
 
@@ -900,8 +1022,10 @@ with per-PE endpoints cannot do this at all — there is nothing to coalesce
 Available: `_nbi` plus `quiet`; batching many gets into one segment;
 `shmem_ptr` intranode, where get is a `memcpy` and the asymmetry vanishes.
 
-Write replies **directly into the destination** rather than staging where
-possible.
+Replies land in the origin PE's **landing zone** and the origin copies them into
+`dest` (§3.12). When `dest` is itself in a local symmetric heap, the progress
+thread may write it directly and skip the copy: `dest` is undefined until the get
+returns, so no conforming program can observe the difference.
 
 ### 4.8 `shmem_ptr`
 
@@ -960,7 +1084,7 @@ sees every change whatever the `ivar`'s width.
 
 ```c
 /* waiter */
-slot = watch_insert(node->watch, ivar);          /* BEFORE the first check */
+slot = watch_insert(node->watch, me, offset_of(ivar));   /* BEFORE the first check */
 for (;;) {
     uint32_t seq = atomic_load_explicit(&slot->seq, memory_order_acquire);
     if (predicate(load_ivar(ivar), cmp, value)) break;
@@ -970,8 +1094,8 @@ watch_remove(node->watch, slot);
 ```
 
 ```c
-/* progress thread or local PE, having stored to addr */
-if (watch_nonempty(node->watch) && (slot = watch_find(node->watch, addr))) {
+/* progress thread or local PE, having stored to (pe, offset) */
+if (watch_nonempty(node->watch) && (slot = watch_find(node->watch, pe, offset))) {
     atomic_fetch_add_explicit(&slot->seq, 1, memory_order_release);
     futex_wake(&slot->seq, INT_MAX);
 }
@@ -984,8 +1108,10 @@ compare catches. Reversing either order reopens the lost-wake window.
 The slot lives in the shared node segment, so the wait is a shared (not
 `FUTEX2_PRIVATE`) futex on a shared mapping — also verified by the probe.
 
-**The table is a set, not a registry.** It answers exactly one question — is
-anyone waiting on this address — so it needs no PE list, no ownership, and
+**The table is a set, not a registry, keyed by `(PE, offset)` — never by
+address**, because a PE's heap sits at a different address in each sibling
+process (§4.1). It answers exactly one question — is anyone waiting on this
+location — so it needs no PE list, no ownership, and
 nothing beyond a small per-slot counter for concurrent waiters on one address. A
 fixed open-addressed table of cache-line-padded slots, sized from local PE count
 at init. Membership is the entire interface, which is why it stays cheap.
