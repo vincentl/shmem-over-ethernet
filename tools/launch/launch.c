@@ -251,6 +251,12 @@ int main(int argc, char **argv)
         sigtimedwait(&chld, NULL, &ts);
     }
 
+    /* Test programs' own coordination tables (shmem/tests/arrivals.h) are not
+     * the library's: remove them quietly. */
+    char table[64];
+    snprintf(table, sizeof table, "/dev/shm/osoetest.%s", job);
+    unlink(table);
+
     int left = remove_leftovers(job);
     if (left && !failed) {
         fprintf(stderr, "osoe-launch: every process succeeded but %d shared-memory "

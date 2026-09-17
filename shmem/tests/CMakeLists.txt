@@ -37,6 +37,7 @@ osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
 osoe_tier2_test(malloc)
+osoe_tier2_test(rma)
 
 # Init must refuse what it cannot run, saying why.
 add_test(NAME shmem.refuse.no_launcher
@@ -60,6 +61,13 @@ add_test(NAME shmem.refuse.size_mismatch
           -- $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.refuse.size_mismatch PROPERTIES
   PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE differs between PEs")
+add_executable(shmem_test_badput test_badput.c)
+target_link_libraries(shmem_test_badput PRIVATE osoe)
+osoe_warnings(shmem_test_badput)
+add_test(NAME shmem.refuse.nonsymmetric_put
+  COMMAND osoe-launch -n 1 -t 60 -- $<TARGET_FILE:shmem_test_badput>)
+set_tests_properties(shmem.refuse.nonsymmetric_put PROPERTIES
+  PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap")
 set_tests_properties(shmem.refuse.no_launcher shmem.refuse.multinode
-  shmem.refuse.bad_size shmem.refuse.size_mismatch PROPERTIES
+  shmem.refuse.bad_size shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
   LABELS "tier2" TIMEOUT 90)

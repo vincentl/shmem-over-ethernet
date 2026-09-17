@@ -6,10 +6,11 @@
  * Nothing is ever outstanding: fence and wait are the serializing store alone.
  *
  * Phase 1 step 1 has one node, so this is the only backend and dispatch is
- * trivial. rmw, load, watch and notify arrive with AMOs and wait_until.
+ * trivial. rmw, load and watch arrive with AMOs and wait_until.
  */
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "base/order.h"
 #include "fatal.h"
@@ -67,4 +68,39 @@ void osoe_tp_wait(struct osoe_tp_ctx *ctx, const int *pes, size_t npes)
     if (pes && npes == 0)
         return;
     osoe_serializing_store();
+}
+
+void osoe_tp_put(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
+                 uint64_t offset, const void *src, size_t len, unsigned flags)
+{
+    (void)ctx;
+    (void)flags;                /* applied in issue order already: FENCED is free */
+    char *dst = osoe_tp_direct(pe, region, offset);
+    /* A put to the caller's own PE may name overlapping bytes. */
+    if ((uint32_t)pe == osoe.boot.rank)
+        memmove(dst, src, len);
+    else
+        memcpy(dst, src, len);
+    osoe_tp_notify(pe, region, offset, len);
+}
+
+void osoe_tp_get(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
+                 uint64_t offset, void *dst, size_t len)
+{
+    (void)ctx;
+    const char *src = osoe_tp_direct(pe, region, offset);
+    if ((uint32_t)pe == osoe.boot.rank)
+        memmove(dst, src, len);
+    else
+        memcpy(dst, src, len);
+}
+
+/* No watch slots exist until wait_until (§4.9), so there is nobody to wake:
+ * doing nothing is exactly the contract until then. */
+void osoe_tp_notify(int pe, enum osoe_region region, uint64_t offset, size_t len)
+{
+    (void)pe;
+    (void)region;
+    (void)offset;
+    (void)len;
 }

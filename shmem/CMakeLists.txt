@@ -10,6 +10,7 @@ add_library(osoe
   src/init.c
   src/malloc.c
   src/node.c
+  src/rma.c
   src/transport_local.c)
 target_include_directories(osoe
   PUBLIC

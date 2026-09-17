@@ -1533,7 +1533,10 @@ return `NULL` across logical nodes too.
   unconditionally is conforming.** The intranode case is essentially free from
   the shared heap.
 - `shmem_ptr` returns `NULL` for any target reached over the network, including a
-  local PE under §8.1's force-remote flag (§4.6).
+  local PE under §8.1's force-remote flag (§4.6). It also returns `NULL` for an
+  address outside the symmetric heap and for a PE number out of range. RMA
+  routines treat those two cases as fatal instead, naming the routine, because
+  there a silent no-op would hide the bug.
 - Accesses through the returned pointer are ordinary loads and stores, which the
   spec calls **memory stores**. Table 14 puts memory stores under `fence` and
   `quiet`, for the calling thread only; §4.6 describes how that is met. An earlier
@@ -2622,6 +2625,25 @@ written once.
   heap at the same base. A test mode shifts `B` per PE.
 - **Timeouts on every test**, so a hang fails instead of stalling the suite.
 - **A `NEEDED`-libraries check** on built binaries for invariant 15.
+- **Collective timing checks must not depend on scheduling.** A first version of
+  the barrier tests had each PE measure its wait from its own clock reading after
+  the previous collective returned. A PE descheduled after that return starts late
+  and measures less than the stagger, although the barrier worked; it failed about
+  once in a hundred parallel runs under the sanitizers. The tests now check what a
+  barrier actually guarantees. Each PE records its arrival time on
+  `CLOCK_MONOTONIC` (shared by every process on a machine) in a table outside the
+  library, and every PE must leave no earlier than the latest arrival. A mutation
+  that skips the release wait fails every staggered check.
+
+**What ThreadSanitizer proves here.** TSan instruments one process. The `tsan`
+preset therefore checks races between threads of one PE: the agent against the
+application thread, and the futex and epoch tests' threads. It cannot see a race
+between two PEs on the control segment or on a heap, which is where most of this
+design's shared words live. Those protocols rest on §3.16's memory-order rules, on
+the review's exhaustive models, and on tests that run many epochs with skewed
+arrivals on native aarch64, where weak memory ordering is possible (§8.5). A
+cross-process race that TSan would otherwise report can pass the `tsan` preset
+silently.
 - **A 32-bit wait path.** Phase-1 AMOs were all `uint64`, which never exercises it;
   step 1 includes one 32-bit AMO type (§7.1).
 - **The probe's receive check** asserts only more than one completion; tighten it to

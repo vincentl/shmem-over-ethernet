@@ -33,9 +33,16 @@ int shmem_n_pes(void);
 void shmem_finalize(void);
 void shmem_query_initialized(int *initialized);
 
+/* Symmetric pointer (§9.1.9) */
+void *shmem_ptr(const void *dest, int pe);
+
 /* Memory management (§9.3) */
 void *shmem_malloc(size_t size);
 void shmem_free(void *ptr);
+
+/* Remote memory access (§9.6.1) */
+void shmem_putmem(void *dest, const void *source, size_t nelems, int pe);
+void shmem_getmem(void *dest, const void *source, size_t nelems, int pe);
 
 /* Collective routines (§9.10) */
 void shmem_barrier_all(void);
