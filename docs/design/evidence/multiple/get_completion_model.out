@@ -1,0 +1,101 @@
+== safety: does every quiet complete the gets issued before it was called?
+equality: 2 issuers, 1 quiet                                 SC  states=      1,278 depth= 25 (    0.0s, miss<1e-23) -> ok
+snapshot: 2 issuers, 1 quiet                                 SC  states=        412 depth= 18 (    0.0s, miss<1e-24) -> VIOLATION
+    quiet returned with prior get(s) [1] incomplete
+    trace: T1:ghost ('$started', 1)=1 + add iss[0] += 1 ; T3:[call] + load ('iss', 0)->1 ; T3:load ('wake',)->0 ; T3:load ('lan', 0)->0 ; T3:futex_wait ('wake',) SLEEP ; T0:ghost ('$started', 0)=1 + add iss[0] += 2 ; T2:land a byte of get 0, lan[0] += 1 ; T2:add ('wake',)->1 ; T2:futex_wake ('wake',) ; T3:load ('wake',)->1 ; T3:load ('lan', 0)->1 ; T3: CHECK FAILED: quiet returned with prior get(s) [1] incomplete
+design: 2 issuers, 2 quiets                                  SC  states=    333,487 depth= 75 (    6.2s, miss<7e-19) -> ok
+design: 1 issuer x 2 gets, 2 quiets                          SC  states=     94,822 depth= 57 (    1.5s, miss<6e-20) -> ok
+    .. design: issuers of 2 gets and 1 get, 2 quiets: 712,704 states, 47,096/s, stack 30, depth 28 (max 78), largest ('wake',)=3, 15s
+    .. design: issuers of 2 gets and 1 get, 2 quiets: 1,433,600 states, 47,358/s, stack 53, depth 40 (max 96), largest ('iss', 1)=5, 30s
+    .. design: issuers of 2 gets and 1 get, 2 quiets: 2,138,112 states, 47,125/s, stack 30, depth 32 (max 96), largest ('wake',)=3, 45s
+    .. design: issuers of 2 gets and 1 get, 2 quiets: 2,850,816 states, 47,088/s, stack 28, depth 26 (max 96), largest ('iss', 0)=5, 61s
+    .. design: issuers of 2 gets and 1 get, 2 quiets: 3,620,864 states, 47,879/s, stack 89, depth 61 (max 96), largest ('wake',)=4, 76s
+design: issuers of 2 gets and 1 get, 2 quiets                SC  states=  4,293,289 depth= 96 (   89.5s, miss<1e-16) -> ok
+    .. design: 2 issuers x 2 gets, 2 quiets: 671,744 states, 44,540/s, stack 58, depth 38 (max 74), largest ('iss', 1)=3, 15s
+    .. design: 2 issuers x 2 gets, 2 quiets: 1,228,800 states, 40,792/s, stack 43, depth 32 (max 74), largest ('wake',)=3, 30s
+    .. design: 2 issuers x 2 gets, 2 quiets: 1,818,624 states, 40,193/s, stack 27, depth 22 (max 74), largest ('lan', 0)=2, 45s
+    .. design: 2 issuers x 2 gets, 2 quiets: 2,457,600 states, 40,772/s, stack 56, depth 45 (max 76), largest ('wake',)=4, 60s
+    .. design: 2 issuers x 2 gets, 2 quiets: 3,072,000 states, 40,785/s, stack 54, depth 34 (max 80), largest ('iss', 1)=3, 75s
+    .. design: 2 issuers x 2 gets, 2 quiets: 3,629,056 states, 40,115/s, stack 37, depth 24 (max 80), largest ('iss', 1)=2, 90s
+    .. design: 2 issuers x 2 gets, 2 quiets: 4,268,032 states, 40,461/s, stack 32, depth 20 (max 80), largest ('iss', 0)=2, 105s
+    .. design: 2 issuers x 2 gets, 2 quiets: 4,907,008 states, 40,670/s, stack 75, depth 52 (max 88), largest ('wake',)=4, 121s
+    .. design: 2 issuers x 2 gets, 2 quiets: 5,554,176 states, 40,884/s, stack 52, depth 42 (max 88), largest ('wake',)=4, 136s
+    .. design: 2 issuers x 2 gets, 2 quiets: 6,176,768 states, 40,923/s, stack 63, depth 55 (max 88), largest ('wake',)=4, 151s
+    .. design: 2 issuers x 2 gets, 2 quiets: 6,791,168 states, 40,877/s, stack 71, depth 54 (max 92), largest ('wake',)=4, 166s
+    .. design: 2 issuers x 2 gets, 2 quiets: 7,389,184 states, 40,780/s, stack 61, depth 49 (max 92), largest ('wake',)=4, 181s
+    .. design: 2 issuers x 2 gets, 2 quiets: 7,979,008 states, 40,642/s, stack 89, depth 51 (max 92), largest ('wake',)=4, 196s
+    .. design: 2 issuers x 2 gets, 2 quiets: 8,609,792 states, 40,740/s, stack 84, depth 67 (max 92), largest ('wake',)=6, 211s
+    .. design: 2 issuers x 2 gets, 2 quiets: 9,224,192 states, 40,745/s, stack 46, depth 31 (max 92), largest ('iss', 0)=3, 226s
+    .. design: 2 issuers x 2 gets, 2 quiets: 9,846,784 states, 40,759/s, stack 65, depth 34 (max 92), largest ('gen',)=2, 242s
+    .. design: 2 issuers x 2 gets, 2 quiets: 10,493,952 states, 40,880/s, stack 28, depth 25 (max 92), largest ('iss', 0)=4, 257s
+    .. design: 2 issuers x 2 gets, 2 quiets: 11,141,120 states, 41,001/s, stack 75, depth 38 (max 92), largest ('gen',)=2, 272s
+    .. design: 2 issuers x 2 gets, 2 quiets: 11,780,096 states, 41,057/s, stack 56, depth 42 (max 92), largest ('wake',)=2, 287s
+    .. design: 2 issuers x 2 gets, 2 quiets: 12,410,880 states, 41,106/s, stack 66, depth 44 (max 92), largest ('wake',)=4, 302s
+    .. design: 2 issuers x 2 gets, 2 quiets: 13,049,856 states, 41,153/s, stack 57, depth 28 (max 92), largest ('wake',)=2, 317s
+    .. design: 2 issuers x 2 gets, 2 quiets: 13,664,256 states, 41,124/s, stack 78, depth 45 (max 92), largest ('wake',)=3, 332s
+    .. design: 2 issuers x 2 gets, 2 quiets: 14,303,232 states, 41,171/s, stack 35, depth 34 (max 92), largest ('wake',)=3, 347s
+    .. design: 2 issuers x 2 gets, 2 quiets: 14,974,976 states, 41,312/s, stack 21, depth 23 (max 92), largest ('iss', 0)=4, 362s
+    .. design: 2 issuers x 2 gets, 2 quiets: 15,605,760 states, 41,335/s, stack 86, depth 48 (max 92), largest ('wake',)=3, 378s
+    .. design: 2 issuers x 2 gets, 2 quiets: 16,236,544 states, 41,344/s, stack 32, depth 29 (max 92), largest ('wake',)=3, 393s
+    .. design: 2 issuers x 2 gets, 2 quiets: 16,875,520 states, 41,375/s, stack 43, depth 37 (max 92), largest ('wake',)=4, 408s
+    .. design: 2 issuers x 2 gets, 2 quiets: 17,506,304 states, 41,381/s, stack 41, depth 37 (max 92), largest ('wake',)=4, 423s
+    .. design: 2 issuers x 2 gets, 2 quiets: 18,169,856 states, 41,463/s, stack 20, depth 22 (max 92), largest ('iss', 0)=3, 438s
+    .. design: 2 issuers x 2 gets, 2 quiets: 18,792,448 states, 41,464/s, stack 49, depth 28 (max 92), largest ('gen',)=2, 453s
+design: 2 issuers x 2 gets, 2 quiets                         SC  states= 18,902,872 depth= 92 (  455.8s, miss<2e-15) -> ok
+    .. design: 1 issuer x 2 gets, 3 quiets: 688,128 states, 45,452/s, stack 43, depth 46 (max 73), largest ('gen',)=3, 15s
+    .. design: 1 issuer x 2 gets, 3 quiets: 1,368,064 states, 45,233/s, stack 24, depth 24 (max 73), largest ('wake',)=3, 30s
+design: 1 issuer x 2 gets, 3 quiets                          SC  states=  1,567,508 depth= 73 (   34.5s, miss<2e-17) -> ok
+    .. design: 2 issuers, 3 quiets: 614,400 states, 40,396/s, stack 45, depth 21 (max 83), largest ('gen',)=2, 15s
+    .. design: 2 issuers, 3 quiets: 1,187,840 states, 39,302/s, stack 74, depth 45 (max 83), largest ('wake',)=3, 30s
+    .. design: 2 issuers, 3 quiets: 1,810,432 states, 39,909/s, stack 92, depth 60 (max 83), largest ('wake',)=4, 45s
+    .. design: 2 issuers, 3 quiets: 2,416,640 states, 40,011/s, stack 50, depth 34 (max 83), largest ('gen',)=2, 60s
+    .. design: 2 issuers, 3 quiets: 3,014,656 states, 39,949/s, stack 66, depth 34 (max 89), largest ('wake',)=3, 75s
+    .. design: 2 issuers, 3 quiets: 3,612,672 states, 39,915/s, stack 33, depth 24 (max 89), largest ('wake',)=2, 91s
+    .. design: 2 issuers, 3 quiets: 4,194,304 states, 39,737/s, stack 59, depth 48 (max 101), largest ('wake',)=4, 106s
+    .. design: 2 issuers, 3 quiets: 4,800,512 states, 39,795/s, stack 51, depth 33 (max 101), largest ('gen',)=2, 121s
+    .. design: 2 issuers, 3 quiets: 5,455,872 states, 40,216/s, stack 29, depth 27 (max 101), largest ('wake',)=3, 136s
+design: 2 issuers, 3 quiets                                  SC  states=  5,743,575 depth=101 (  142.1s, miss<2e-16) -> ok
+design/nopiggy: 2 issuers, 2 quiets                          SC  states=    345,262 depth= 75 (    6.4s, miss<8e-19) -> ok
+design/order: 2 issuers, 2 quiets                            SC  states=    345,885 depth= 75 (    6.5s, miss<8e-19) -> ok
+design/noretag: 1 issuer, 2 quiets                           SC  states=      1,358 depth= 29 (    0.0s, miss<1e-23) -> VIOLATION
+    quiet returned with prior get(s) [0] incomplete
+    trace: T2:[call] + load ('gen',)->0 ; T3:cas ('qlock',) 0->1 True ; T3:load ('gen',)->0 ; T0:ghost ('$started', 0)=1 + load ('gen',)->0 ; T3:store ('gen',)=1 ; T3:load ('wake',)->0 ; T3:load ('lan', 0)->0 ; T3:load ('iss', 0)->0 ; T3:store ('qlock',)=0 ; T3:futex_wake ('qlock',) ; T3:check ok ; T0:add iss[0] += 1 ; T2:[call] + load ('gen',)->1 ; T2:cas ('qlock',) 0->1 True ; T2:load ('gen',)->1 ; T2:store ('gen',)=2 ; T2:load ('wake',)->0 ; T2:load ('lan', 1)->0 ; T2:load ('iss', 1)->0 ; T2:store ('qlock',)=0 ; T2:futex_wake ('qlock',) ; T2: CHECK FAILED: quiet returned with prior get(s) [0] incomplete
+design/nolock: 1 issuer, 2 quiets                            SC  states=      8,467 depth= 44 (    0.1s, miss<5e-22) -> VIOLATION
+    quiet returned with prior get(s) [0] incomplete
+    trace: T2:[call] + load ('gen',)->0 ; T3:load ('gen',)->0 ; T0:ghost ('$started', 0)=1 + load ('gen',)->0 ; T0:add iss[0] += 1 ; T0:load ('gen',)->0 ; T3:store ('gen',)=1 ; T3:load ('wake',)->0 ; T3:load ('lan', 0)->0 ; T3:load ('iss', 0)->1 ; T3:futex_wait ('wake',) SLEEP ; T2:[call] + load ('gen',)->1 ; T2:load ('gen',)->1 ; T2:store ('gen',)=2 ; T2:load ('wake',)->0 ; T3:load ('lan', 1)->0 ; T3:load ('iss', 1)->0 ; T3: CHECK FAILED: quiet returned with prior get(s) [0] incomplete
+
+== starvation: most gets one quiet waited for that began issuing after its wait began
+   (2 issuers, each issuing N one-byte gets; maximum over all interleavings)
+starvation equality: 2 issuers x 1 gets                      SC  states=        672 depth= 20 (    0.0s, miss<3e-24) -> ok
+   equality, N = 1: waited for 2 gets begun after the wait began
+starvation equality: 2 issuers x 2 gets                      SC  states=     14,070 depth= 36 (    0.2s, miss<1e-21) -> ok
+   equality, N = 2: waited for 4 gets begun after the wait began
+starvation equality: 2 issuers x 3 gets                      SC  states=    176,068 depth= 52 (    3.1s, miss<2e-19) -> ok
+   equality, N = 3: waited for 6 gets begun after the wait began
+   equality  N = 1..3 -> [2, 4, 6]
+starvation design: 2 issuers x 1 gets                        SC  states=      9,727 depth= 42 (    0.1s, miss<6e-22) -> ok
+   design, N = 1: waited for 0 gets begun after the wait began
+starvation design: 2 issuers x 2 gets                        SC  states=    595,377 depth= 64 (    9.3s, miss<2e-18) -> ok
+   design, N = 2: waited for 0 gets begun after the wait began
+    .. starvation design: 2 issuers x 3 gets: 811,008 states, 53,926/s, stack 27, depth 24 (max 80), largest ('iss', 0)=3, 15s
+    .. starvation design: 2 issuers x 3 gets: 1,605,632 states, 53,200/s, stack 35, depth 29 (max 80), largest ('wake',)=3, 30s
+    .. starvation design: 2 issuers x 3 gets: 2,351,104 states, 51,906/s, stack 33, depth 28 (max 84), largest ('wake',)=3, 45s
+    .. starvation design: 2 issuers x 3 gets: 3,137,536 states, 51,972/s, stack 57, depth 49 (max 84), largest ('wake',)=5, 60s
+    .. starvation design: 2 issuers x 3 gets: 3,940,352 states, 52,176/s, stack 39, depth 29 (max 84), largest ('wake',)=3, 76s
+    .. starvation design: 2 issuers x 3 gets: 4,710,400 states, 51,956/s, stack 27, depth 27 (max 84), largest ('wake',)=2, 91s
+    .. starvation design: 2 issuers x 3 gets: 5,488,640 states, 51,933/s, stack 34, depth 37 (max 84), largest ('wake',)=5, 106s
+    .. starvation design: 2 issuers x 3 gets: 6,324,224 states, 52,396/s, stack 40, depth 37 (max 84), largest ('wake',)=4, 121s
+    .. starvation design: 2 issuers x 3 gets: 7,135,232 states, 52,535/s, stack 29, depth 30 (max 84), largest ('wake',)=3, 136s
+    .. starvation design: 2 issuers x 3 gets: 7,929,856 states, 52,539/s, stack 25, depth 25 (max 84), largest ('iss', 0)=3, 151s
+    .. starvation design: 2 issuers x 3 gets: 8,691,712 states, 52,366/s, stack 27, depth 28 (max 84), largest ('iss', 0)=4, 166s
+    .. starvation design: 2 issuers x 3 gets: 9,445,376 states, 52,146/s, stack 31, depth 34 (max 84), largest ('wake',)=3, 181s
+    .. starvation design: 2 issuers x 3 gets: 10,174,464 states, 51,863/s, stack 33, depth 25 (max 84), largest ('iss', 0)=3, 196s
+    .. starvation design: 2 issuers x 3 gets: 10,960,896 states, 51,902/s, stack 73, depth 47 (max 84), largest ('wake',)=5, 211s
+    .. starvation design: 2 issuers x 3 gets: 11,739,136 states, 51,865/s, stack 42, depth 33 (max 84), largest ('wake',)=3, 226s
+    .. starvation design: 2 issuers x 3 gets: 12,500,992 states, 51,795/s, stack 31, depth 37 (max 84), largest ('wake',)=4, 241s
+    .. starvation design: 2 issuers x 3 gets: 13,271,040 states, 51,762/s, stack 18, depth 18 (max 84), largest ('iss', 0)=2, 256s
+starvation design: 2 issuers x 3 gets                        SC  states= 13,693,174 depth= 84 (  264.6s, miss<1e-15) -> ok
+   design, N = 3: waited for 0 gets begun after the wait began
+   design    N = 1..3 -> [0, 0, 0]
+
+ALL AS EXPECTED

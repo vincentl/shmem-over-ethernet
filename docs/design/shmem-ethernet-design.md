@@ -1346,7 +1346,8 @@ In normal mode `barrier_all` already happened to conform, because its arrival
 provides `SERIALIZED`, which §9.2.1 permits. The structures below assume that at
 most one application thread of a PE is inside the library at a time. They are
 marked where `MULTIPLE` would change them: under `MULTIPLE` the equality wait below
-can starve, and clearing the dirty set races.
+can starve, and clearing the dirty set races. §4.11 designs both changes. Contexts
+that promise serialization keep these structures as they are.
 
 The three levels cost the same, because every structure in this section is safe
 under "one caller at a time". Which thread the caller is does not matter.
@@ -1638,12 +1639,12 @@ have no AMO type. Serializing every put was rejected: it costs a store on every
 intranode put for programs the spec does not require it for, and it would force an
 RDMA backend to raise a CPU event on every NIC write.
 
-**Under `MULTIPLE`**, several threads of one PE can wait on different variables,
-so a slot becomes a small per-PE list. The review found that the obvious list
-designs lose wakes — a naive reference count, and linear-probe deletion even with
-one waiter per key — and model-checked rules that do not
-(`docs/reviews/evidence/semantics/`). Adopt those rules, or re-run the model,
-before adding `MULTIPLE`.
+**Under `MULTIPLE`**, several threads of one PE can wait at once. Each thread then
+owns a watch record, and a per-PE bitmap tells a writer which records to check
+(§4.11 item 3). The review's rules for a keyed list (`docs/reviews/evidence/semantics/`)
+are not needed, because the records have no keys. The per-thread design was
+model-checked instead, under x86-TSO as well
+(`docs/design/evidence/multiple/watch_list_model.py`).
 
 **Insert before the first predicate check.** Checking and then inserting loses a
 wake that lands in the window. This is the one ordering rule in the section that
@@ -1805,6 +1806,393 @@ instead of pushing every on-node rmw through NIC loopback.
   the heap from unhinted ones. That is still deterministic.
 - **Nonblocking gets and contexts beyond the default.** They add calls to the
   header when they arrive (§7.3). They do not change the operations above.
+
+### 4.11 `SHMEM_THREAD_MULTIPLE`
+
+> **Designed and model-checked, not scheduled.** Phase 1 still provides up to
+> `SERIALIZED` (§4.6). Under `MULTIPLE`, a context that promises serialization
+> (`SHMEM_CTX_PRIVATE` or `SHMEM_CTX_SERIALIZED`) keeps the §4.6 structures unchanged.
+> A shareable context, `SHMEM_CTX_DEFAULT` included, keeps a lock-free issue path and
+> serializes its quiets with a per-context mutex. Under that mutex, a generation word
+> bounds get completion and dirty bits are cleared. Each application thread owns
+> one thread block, which holds its watch record and its completion slot.
+
+The usage study is why this is worth designing now: Kokkos and hclib call
+`shmem_init_thread`, and the threaded GUPs and Graph500 variants issue their hot
+operations on one context per thread (§8.6 U6;
+`docs/reviews/evidence/q2/q2-usage.md` §1, §4).
+
+**Evidence.** Three exhaustive models and their engine are in
+`docs/design/evidence/multiple/`, in the style of the review's models, with ghost
+state that states each guarantee. Each model checks the design and deliberately
+broken variants. Every broken variant fails with a trace, and every design case
+passes. `selftest.py` reruns small cases without the engine's state-space
+reductions and gets the same verdicts. Run any model as
+`python3 <model>.py [case substring]`; the `.out` files are the recorded runs.
+
+| Model | Question | Largest design case |
+|---|---|---|
+| `get_completion_model.py` | Does every quiet complete the nonblocking gets issued before it was called? | 2 issuers × 2 gets, 2 quiets: 18.9 M states |
+| `dirty_set_model.py` | Does every quiet wait for the puts issued before it was called? | 2 issuers × 2 puts, 2 quiets: 4.2 M states |
+| `watch_list_model.py` | Is a wake lost when several threads of one PE wait at once, under SC and x86-TSO? | 3 records, 2 writers: 0.9 M states |
+
+#### What does not change
+
+- **The transport under the SHMEM layer.** Reservation (§3.5), reply credits
+  (§3.8), acknowledgements (§3.4), and every futex word of §3.11 already take
+  concurrent writers, because PEs are processes and they already share them.
+- **The intranode backend's data path.** Operations apply in the calling thread,
+  and fence and wait are a serializing store. Only notify changes (item 3).
+- **Memory stores.** Fence and quiet order only the calling thread's stores (spec
+  §9.12.1, §9.12.2 Notes), so the per-thread serializing store of §4.6 is already
+  right.
+- **Collectives and allocation.** A team may not be used concurrently for
+  collectives by threads of one PE (spec §9.4, Thread Safety), and allocation is a
+  world-team collective whose order the program fixes (spec §9.2 rule 5). Per-team
+  state is already separate (§5.4).
+- **Init and finalize.** The count is already atomic behind a once-gate (§6.4).
+
+What does change is the §4.6 argument that "library state handed between threads"
+is made visible by the application's own serialization. On a shareable context
+under `MULTIPLE` there is no such serialization. Every word two threads can touch
+at once becomes a §3.16 protocol word.
+
+#### Context modes
+
+Each context gets a mode at creation, and the mode never changes:
+
+| Thread level | Context options | Mode |
+|---|---|---|
+| Below `MULTIPLE` | any | serial |
+| `MULTIPLE` | `PRIVATE` or `SERIALIZED` | serial |
+| `MULTIPLE` | neither, including `SHMEM_CTX_DEFAULT` | shared |
+
+**Serial mode is the §4.6 code, unchanged.** The spec makes the application
+serialize every operation on a `SERIALIZED` context, quiet included. So no issue
+overlaps a quiet on that context and the equality wait cannot starve. The progress
+thread and agent touch only landed counters and acknowledgements, which are atomics
+already. `PRIVATE` adds one thing: the context caches its creating thread's block
+(below), so a blocking operation skips the thread-local lookup. `NOSTORE` skips the
+serializing store in either mode.
+
+Operations branch once on the mode. Programs that never request `MULTIPLE` run only
+serial mode, so phase-1 costs do not move.
+
+| Per operation | Serial | Shared |
+|---|---|---|
+| Put, non-fetching rmw (AM) | Reservation; plain stores for `high_seg` and the dirty bit | Reservation; one load each of `high_seg` and the bit word. A CAS only when the segment number rises, and a `fetch_or` only when the bit is clear: about once per segment per node |
+| Nonblocking get | One add to `issued` | Load `gen`, locked add, load `gen` again |
+| Blocking get, fetching rmw | Per-thread slot (item 5) | The same |
+| Quiet | §4.6 | Lock, bump `gen`, wait, clear under the lock, unlock |
+
+#### 1. Get completion
+
+**The problem.** §4.6 waits for `bytes_landed == bytes_issued`. With another thread
+issuing nonblocking gets on the same context, equality may never hold.
+
+**The review's fix is unsound.** Review D6 item 2 proposed snapshotting `issued` at
+entry and waiting for `landed >= snapshot`. Landed bytes are fungible: a small get
+issued *after* the call lands first and covers the bytes of an earlier get that has
+not landed. The model finds this in 412 states: a 1-byte get returns, quiet
+snapshots 1, a 2-byte get lands one byte, and quiet returns with the first get
+incomplete.
+
+**Decision: a generation word, two counter pairs, and a quiet mutex per shareable
+context.** All of them live in the context's block in the node segment, because
+the progress thread and the agents credit landed bytes from other threads and other
+processes.
+
+```c
+/* issue a nonblocking get (or fetching nonblocking rmw) of n bytes */
+for (;;) {
+    uint32_t g = atomic_load_explicit(&ctx->gen, memory_order_acquire);
+    atomic_fetch_add_explicit(&ctx->issued[g & 1], n, memory_order_seq_cst);
+    if (atomic_load_explicit(&ctx->gen, memory_order_acquire) == g) {
+        req.pair = g & 1;                  /* the reply credits landed[g & 1] */
+        break;
+    }
+    atomic_fetch_sub_explicit(&ctx->issued[g & 1], n, memory_order_seq_cst);
+    wake_bump_and_wake(&ctx->wake);        /* a waiting quiet may now see equality */
+}
+
+/* landing: the copy-out actor, after copying into dest */
+atomic_fetch_add_explicit(&ctx->landed[pair], n, memory_order_seq_cst);
+wake_bump_and_wake(&ctx->wake);
+
+void quiet_shared(struct ctx *ctx) {
+    serializing_store();                                   /* §4.6 memory stores */
+    uint32_t e = atomic_load_explicit(&ctx->gen, memory_order_acquire);
+    mutex_lock(&ctx->qlock);
+    uint32_t g = atomic_load_explicit(&ctx->gen, memory_order_acquire);
+    if (g == e) {                             /* else piggyback: see below */
+        atomic_store_explicit(&ctx->gen, g + 1, memory_order_seq_cst);
+        wait_until(landed[g & 1] == issued[g & 1]);        /* §4.6 wake-word pattern */
+        flush_and_clear_dirty(ctx);                        /* item 2 */
+        copy_out_completed_gets(ctx);
+    }
+    mutex_unlock(&ctx->qlock);                             /* wakes every waiter */
+}
+```
+
+**Why it holds.** The issuer's add and re-load, against the quiet's bump and later
+loads of `issued`, is a two-sided protocol (§3.16), and every store in it is locked
+or `seq_cst`. If the issuer's re-load sees the old generation, the quiet's loads
+see the add. If the re-load sees the new generation, the issuer takes its add back
+and retries in the other pair, and its reply never lands in the closed pair. So
+the closed pair counts exactly the gets issued before the bump, plus older
+generations, which earlier holders of the mutex already completed. Gets issued
+after the bump go to the other pair, and the wait for the closed pair ends once
+those earlier gets have landed. Two pairs suffice because the mutex lets only one
+quiet close a generation at a time.
+
+**Piggyback.** A get that returned before this quiet was called is tagged with a
+generation no later than `e`. If the generation has moved past `e` by the time the
+lock is taken, another quiet bumped it after this call began and completed while
+holding the lock. So every such get is complete, and this quiet returns at once.
+Concurrent quiets on one context therefore collapse into one wait, and the mutex's
+release wakes every waiter, the "divisible" case of §3.11. The model passes with and
+without piggyback.
+
+**Found by the models, not assumed:**
+- **Without the retag** (`noretag`), an issuer whose add lands after a quiet's
+  loads is missed by the *next* quiet, which closes the other pair.
+- **Without the mutex** (`nolock`), a second quiet closes the other pair while the
+  first still waits, and returns before a get the first was waiting for has landed.
+- **The order of the two loads does not matter** (`order` passes). Once late adds
+  are taken back, no byte of a later get can reach the closed pair. §4.6's serial
+  path therefore needs no load-order rule either.
+
+**Starvation, measured.** One quiet, two issuers each issuing N one-byte gets. The
+table gives, over all interleavings, the most gets the quiet waited for that began
+issuing after its wait began. For the design, the wait begins at the generation
+bump. For equality, which has no bump, it begins at the call:
+
+| N | 1 | 2 | 3 |
+|---|---|---|---|
+| Equality (§4.6) | 2 | 4 | 6 |
+| This design | 0 | 0 | 0 |
+
+Equality can be made to wait for every get the other threads issue, however many
+there are. The design never waits for a get begun after its bump. The adversary
+can still delay the quiet before the bump, but those gets are then genuinely
+earlier than its wait. N = 4 was not run: equality took 1.7 M states, and the design,
+growing about twenty-fold per step, would need a few hundred million.
+
+**Lock-free, not wait-free.** An issuer retries only when a quiet bumps the
+generation between its two loads. Each bump costs a quiet a network round trip, so
+retries are rare. A retry counter goes in the thread's counter block (§3.14).
+
+*(Rejected:*
+- *The review's `landed >= snapshot`: unsound, above.*
+- *Per-thread counters. A quiet must complete every thread's earlier gets on the
+  context, so it would sum every thread block, O(threads) per quiet. Each thread's
+  pair has the same fungibility problem as soon as that thread issues concurrently.*
+- *Blocking issuers while a quiet runs. It cannot starve, but a quiet on the default
+  context would stall every thread's `get_nbi` for a network round trip, which
+  defeats U6.*
+- *Per-operation records scanned by quiet against a sequence snapshot. It is exact,
+  but every quiet costs O(outstanding gets), and codes that quiet after every
+  operation (U1, U3) pay it each time.*
+- *Equality on shared contexts: starves, above.)*
+
+#### 2. Dirty set
+
+**The problem.** §4.6 clears the dirty set (`ndirty = 0`) after waiting. A put
+issued by another thread between the wait and the clear loses its entry, and the
+next quiet returns before that put is applied.
+
+**Decision.** A shareable context keeps a bitmap over node indices (⌈nodes / 8⌉
+bytes) and a `high_seg` word per node (8 bytes per node).
+
+- **Issue**, after reserving and reading the segment number `s` (§3.5): raise
+  `high_seg[n]` to at least `s` with a load-compare-CAS loop, *then* set bit `n` if
+  it is clear. Every operation in one segment reads the same `s`, so the CAS and the
+  `fetch_or` happen about once per segment, not once per operation.
+- **Quiet**, under the item 1 mutex and after the generation bump: for each set bit,
+  load `high_seg[n]`, flush with ack requested, and wait for `acked[n] >= high_seg`.
+  Clear the bit, re-load `high_seg[n]` and `acked[n]`, and if the node is still
+  behind, set the bit again and repeat.
+- **Fence** reads the bits and flushes, and never clears, so it takes no lock.
+- **`shmem_ctx_pe_quiet`** clears only its listed nodes' bits, under the same mutex.
+  It still bumps the generation for gets, since it waits on every get (§4.6). It
+  must never satisfy a full quiet's piggyback, so the piggyback test in item 1 reads
+  a second word, the generation closed by the last *full* quiet. This rule is not
+  in the models (§10).
+
+**Found by the models:**
+- **Clears without the mutex** (`unlocked`). Between one quiet's clear and its
+  re-set, a second quiet reads the bit as clear and returns early. This is why the
+  quiet mutex exists for puts as well as gets.
+- **Clearing without the re-check** (`naive`, §4.6 as written) loses a put.
+- **Setting the bit before raising `high_seg`** (`bitfirst`). A quiet sees the bit
+  and an old `high_seg`, clears the bit, and the raise lands after its re-check.
+- **Raising `high_seg` with load-compare-store** (`plainmax`). A lower segment
+  number overwrites a higher one.
+
+*(Rejected:*
+- *A per-node "done" watermark, cleared by CAS without a lock. It needs no mutex,
+  but finding dirty nodes then means either scanning every node the context ever
+  touched, or a summary bitmap whose clears reopen the same window.*
+- *Per-thread dirty sets. A quiet would take the union of every thread's set, and
+  a thread that exits leaves entries nobody clears.)*
+
+#### 3. Watch records for concurrent waiters
+
+**Decision: one watch record per application thread, never keyed.** A record
+lives in the thread's block in the node segment, and holds:
+- `rng`, one 64-bit word packing region, offset, and a saturating length, with 0
+  meaning none. A saturated length means "to the end of the region", which can
+  cause only spurious wakes;
+- `seq`, the 32-bit futex word of §4.9.
+
+Each PE also has an `active` bitmap, ⌈T/64⌉ words, with a bit for each record that
+holds a published range.
+
+```c
+/* waiter: thread record r of PE me */
+atomic_store_explicit(&rec->rng, pack(region, offset, len), memory_order_seq_cst);
+atomic_fetch_or_explicit(&node->active[me][r / 64], bit(r), memory_order_seq_cst);
+for (;;) {                                            /* the §4.9 loop, unchanged */
+    uint32_t seq = atomic_load_explicit(&rec->seq, memory_order_acquire);
+    if (predicate(osoe_tp_load(...))) break;
+    futex_wait(&rec->seq, seq, deadline);
+}
+atomic_fetch_and_explicit(&node->active[me][r / 64], ~bit(r), memory_order_seq_cst);
+atomic_store_explicit(&rec->rng, 0, memory_order_seq_cst);
+
+/* writer, after a locked or seq_cst update of bytes [o, o + n) of PE pe */
+for (each word w of node->active[pe], loaded with acquire)
+    for (each set bit r in w)
+        if (overlaps(atomic_load_explicit(&record(pe, r)->rng, memory_order_acquire), o, n)) {
+            atomic_fetch_add_explicit(&record(pe, r)->seq, 1, memory_order_seq_cst);
+            futex_wake(&record(pe, r)->seq, INT_MAX);
+        }                                             /* every match, not the first */
+```
+
+**Adopt or re-check the review's rules?** Neither rule is needed, and the model was
+re-run. The review's rules (V8fix, a CAS-joined reference count with a teardown
+marker; V9fix, bump every matching slot) repair a *keyed* table, where waiters on
+one address share a slot. A record found by thread index has no key, no sharing,
+no join and no probe chain, so V8 and V9 cannot occur. What remained unchecked is
+new to this design: the bitmap as the writer's filter, overlapping byte ranges, an
+array wait, a thread reusing its record for a second wait, and x86-TSO. The model
+covers each of these, and finds:
+- **A writer must bump every overlapping record** (`firstmatch` loses a wake): two
+  threads waiting on one variable is ordinary.
+- **Publish before the first check** (`checkfirst`) and **update before loading
+  `active`** (`notifyfirst`): the §4.9 rules, unchanged.
+- **Setting the bit with a plain load and store** loses a wake under TSO
+  (`plainbit`), as §3.16 predicts.
+- **Publishing `rng` with a plain store is safe** (`plainrng` passes), because the
+  locked `fetch_or` that follows drains the store buffer. It stays `seq_cst`
+  anyway, so the argument does not depend on the next line.
+- **A two-word range is also safe** (`tworange` passes), even while a thread reuses
+  its record. One word is chosen because it is one store fewer, not for
+  correctness.
+- **A put's plain `memcpy` loses a wake under TSO** (`plainput`), as §4.9 and §4.10
+  already accept: best effort for puts, bounded by the safety-sweep deadline.
+
+§4.9 publishes the same range in two words. Either is sound, so phase 1 may keep
+two words and adopt the packed one only if it wants the store.
+
+**Cost.** When nobody on the PE waits, a writer loads the `active` word, which is
+the same single load as phase 1's `watched` word. With `k` threads waiting, it adds
+one load and a compare per waiting thread. The phase-1 slot of §4.9 is this record
+with at most one bit set.
+
+*(Rejected:*
+- *A keyed table with the review's reference-count and probe rules. Correct, but
+  every blocked thread needs its own futex word anyway, so sharing slots saves
+  nothing and adds the V8 and V9 rules.*
+- *One sequence word per PE, waking all of the PE's waiters: the §3.11 thundering
+  herd, among one PE's threads.*
+- *`futex_waitv` over several words. One word per waiter is enough.)*
+
+#### 4. Shareable-context state: lock-free issue, locked quiet
+
+**Decision.** Issue paths on a shareable context are lock-free, as in items 1 and 2.
+Quiet, `pe_quiet`, and `shmem_ctx_destroy`'s implicit quiet take a per-context
+futex mutex. Context blocks come from a per-PE pool in the node segment, claimed and
+released by CAS. `shmem_ctx_create` fails, as spec §9.5.1 allows, when the pool is
+empty.
+
+- **Issue is the hot path** (U1, U3, U6). On an oversubscribed Pi, a lock holder
+  preempted mid-operation stalls every thread on the context. §3.11 rules out
+  spinning before blocking, so every contended acquisition would be a syscall. The
+  transport below is already lock-free (§3.5), so a lock above it adds contention
+  and protects nothing.
+- **Quiet already blocks** on a network round trip. Two locked instructions for the
+  mutex cost nothing by comparison. Serializing quiets is what makes the two-pair
+  generation and the bit clear sound (the `nolock` and `unlocked` variants), and
+  piggyback turns concurrent quiets into one wait.
+- **The fast paths are serial mode.** `PRIVATE` and `SERIALIZED` contexts pay none
+  of the shared-mode costs. `PRIVATE` also skips the thread-block lookup. Codes with
+  one context per thread (U6) therefore run the phase-1 code on every thread.
+
+*(Rejected:*
+- *A mutex around every operation on a shareable context. It costs two locked
+  instructions per operation, and a descheduled holder convoys every other thread.*
+- *A lock-free quiet. Both models show quiets racing each other. Repairing that
+  without a lock needs a second generation-style protocol for bit clears, which
+  costs more than the mutex it replaces.)*
+
+#### 5. Thread blocks and completion slots
+
+**One completion slot per thread.** A blocking get or fetching rmw blocks its
+thread until the reply lands, so a thread holds at most one outstanding. The slot
+sits in the thread's block, holding a state word, a nonce, the fetched value, and a
+32-bit wake word. The request carries `(pe, thread index, nonce)`, and the progress
+thread writes the result, bumps the wake word, and wakes. This is §4.6's
+wake-word pattern with one waiter and one writer, the shape V0 and V5 of the
+review's model already check. The nonce cannot mismatch, since an operation is
+never cancelled (§3.15); it is asserted.
+
+**Thread blocks.** The same block also holds the thread's watch record (item 3) and
+its §3.14 counter block and "blocked in" record.
+- A thread claims a block by CAS on its PE's table at its first library call, and
+  caches the index in a `_Thread_local`, as `base/order.c` already does for the
+  serializing store.
+- A `pthread_key_create` destructor releases the block at thread exit. A thread
+  cannot exit inside a call, so the block's bit and slot are idle then.
+- `PRIVATE` contexts cache the creator's block.
+
+**How many.** `T` blocks per PE, read from `OSOE_MAX_THREADS` at the first init, as
+`max_teams` is (§5.7). The default is the node's online CPU count. At 128 bytes per
+block, 256 PEs × 64 blocks is 2 MiB of node segment. What happens when a PE's
+table is full is open (§10).
+
+*(Rejected:*
+- *One slot per PE behind a mutex: a 1 MB get would hold up every other thread's
+  8-byte get.*
+- *Slots from a per-operation pool: a claim on every operation, and exhaustion
+  couples unrelated threads through a second limit.)*
+
+#### 6. The transport boundary under `MULTIPLE`
+
+The operations of §4.10 do not change. The contract gains concurrency rules, and
+`transport.h`'s "Threads" paragraph becomes, when `MULTIPLE` is implemented:
+
+```c
+ * Threads. Under SHMEM_THREAD_MULTIPLE every operation may be called by any
+ * number of threads at once, on the same context or different ones, except
+ * where the context's mode forbids it: a context created with
+ * SHMEM_CTX_PRIVATE or SHMEM_CTX_SERIALIZED, or any context below
+ * SHMEM_THREAD_MULTIPLE, is serial, and the caller guarantees one call on it at
+ * a time (§4.11). An operation takes effect before it returns. A fence or wait
+ * covers every operation on its context whose call returned before the fence
+ * or wait was called; operations that overlap it may or may not be covered.
+ * OSOE_TP_FENCED orders an operation after every write on the same (ctx, pe)
+ * whose call returned before this one began. A thread holds at most one watch.
+ * osoe_tp_notify may run in any number of threads and processes at once.
+```
+
+Two declarations follow from it:
+- `osoe_tp_ctx_create(options)`, which may fail and records the mode;
+- a per-thread handle behind the watch and blocking calls, obtained by
+  `osoe_tp_watch` and `osoe_tp_get` themselves, so callers do not change.
+
+"Returned before it was called" is exactly spec §9.12.2's "posted prior to calling
+shmem_quiet". The models check it in that form.
 
 ---
 
@@ -2873,6 +3261,17 @@ Each is independently breakable, and each failure appears far from its cause.
     ties the layer to one backend. A guarantee stronger than the spec's, relied on
     above the boundary, rules out every backend that cannot give it.
 
+29. **Under `MULTIPLE`, a quiet on a shareable context bumps the generation, while
+    holding the context's quiet mutex, before any of its waits; an issuer re-loads
+    the generation after its add and moves the add if it changed.** (§4.11) Without
+    the re-load, the next quiet closes the wrong pair. Without the mutex, two quiets
+    close both. Either way a quiet returns before an earlier get has landed.
+30. **Dirty bits are cleared only under the context's quiet mutex, and an issuer
+    raises `high_seg` before it sets the bit.** (§4.11) Each rule alone was shown by
+    a model to let a quiet return before an earlier put is applied.
+31. **A writer wakes every watch record whose range overlaps the bytes it wrote,
+    not the first.** (§4.11) Two threads waiting on one variable is ordinary.
+
 Assert what can be asserted. Instrument the rest.
 
 ---
@@ -2899,7 +3298,8 @@ Recorded rather than deleted, so they are not reopened from memory.
 | 64-bit futex support | **Not implemented.** `EINVAL` on 6.12 aarch64 (`tools/probe`) |
 | Development environment | **Lima + Debian 13 on Apple Silicon**; CI deferred; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
 | Which process hosts progress | **An agent thread in every PE; the local lead's runs the transport** (§3.12). A helper process was rejected on setup complexity, supervision, statics access, and exit status |
-| Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is open (below) |
+| Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is designed but not scheduled (below) |
+| `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked, not scheduled** (§4.11). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
 | Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector. The control segment keeps its name until finalize, accepting a small leak on crash. Flight recorder on by default for now |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
@@ -2940,18 +3340,27 @@ Recorded rather than deleted, so they are not reopened from memory.
   cheap; pick it from measurement.
 - **Team range allocator and split protocol** (§5.7). Undesigned; becomes blocking
   when team creation lands.
-- **`SHMEM_THREAD_MULTIPLE`** (§4.6, §4.9). Real codes need it: Kokkos and hclib
-  call `shmem_init_thread`, and the threaded GUPs and Graph500 variants put one
-  context per thread on their hot paths. Open design points:
-  - get completion (the equality wait can starve);
-  - clearing the dirty set concurrently;
-  - per-PE watch lists (the review's model-checked rules);
-  - locking or lock-free per-context state on shareable contexts, including the
-    default context;
-  - the `SHMEM_CTX_PRIVATE` / `SERIALIZED` fast paths.
-
-  §3.5's reservation protocol already takes many writers per buffer. Model-check the
-  §4.6 structures before implementing.
+- **`SHMEM_THREAD_MULTIPLE`: points §4.11 leaves open.** None blocks phase 1.
+  - **A full thread table.** A PE's `OSOE_MAX_THREADS` blocks can all be taken by
+    live threads. Aborting with a diagnostic naming the variable is loud and simple.
+    A shared overflow block needs its own locking and wake-all rules, which only
+    that rare case would exercise. Aborting is the proposal; decide before
+    implementing.
+  - **Landing-zone space under concurrent blocking gets.** §3.12 sizes the landing
+    zone per PE, and phase 1 allocates from it with one caller at a time. Several
+    threads claiming reply space at once need a concurrent allocator, such as
+    fixed extents claimed by CAS over a bitmap. It is undesigned.
+  - **Copy-out claims.** The agent and any quiet may both copy a landed
+    nonblocking get to its destination. A CAS on the record's state gives exactly
+    one copier. The idea is standard but not modeled.
+  - **`pe_quiet` and piggyback.** The rule that a full quiet never piggybacks on a
+    `pe_quiet` is stated in §4.11 item 2 but is not in the models. Add `pe_quiet`
+    to `get_completion_model.py` before implementing it.
+  - **A quiet with nothing outstanding.** It would be cheaper to load both counter
+    pairs and the bitmap and return, without taking the mutex, when all show
+    nothing outstanding. That looks sound, but it is not modeled. It matters only
+    for shared contexts that quiet after every operation. U6 codes use serial
+    contexts.
 - **Fence eagerness** (§4.6, §4.10). The boundary lets fence send nothing, but
   §4.6 seals and flushes the dirty set on every `shmem_fence`. PRK and Graph500
   fence or quiet after every operation, so eager sealing costs neighbouring PEs
