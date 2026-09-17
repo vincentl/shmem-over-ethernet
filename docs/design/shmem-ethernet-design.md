@@ -747,8 +747,8 @@ the lead's does.)*
 **Costs accepted:**
 
 - **The lead is special.** Pausing the lead PE in a debugger stops the node's
-  network progress; debug with non-stop mode, or read `am_dump_state` from another
-  PE, which sees the node segment. A crashed lead cuts the node off. Under §3.15
+  network progress; debug with non-stop mode, or read its state with `osoe-stat`
+  (§3.14), which needs no cooperation from the stopped process. A crashed lead cuts the node off. Under §3.15
   the job aborts either way, but the other PEs must *notice*: every wait carries a
   deadline (§3.10), and on expiry the waiter checks the lead's liveness.
 - **The lead's cores carry the progress work.** Under Slurm CPU binding the agent
@@ -771,28 +771,167 @@ array.
 This catches mismatched binaries across nodes immediately with a clear message,
 rather than as an undecodable message arriving at PE 47 an hour in.
 
-### 3.14 Introspection (first-class, not retrofitted)
+### 3.14 Introspection and metrics (first-class, not retrofitted)
 
-- **Counters:** per-thread, cache-line padded, summed only on read — free in the
-  fast path, so they stay compiled in for production. Count messages and bytes
-  per peer, handler invocations per handler id, coalescing batch sizes, queue
-  depths with high-water marks, reservation stalls, spin outcomes, wake counts,
-  failed-acquire-after-wake.
-- **Named handlers** alongside ids, so traces and dumps are readable.
-- **Tracing hooks** at enqueue / wire send / wire receive / handler entry /
-  handler exit, default no-op. Sequence-number every AM so a trace is replayable
-  and reordering is visible rather than inferred.
-- **Fault injection** in the layer, not the tests — delay, drop, reorder,
-  truncate, allocation failure. Injecting from outside cannot reach most error
-  paths.
-- **`am_dump_state(FILE *)`** — every queue, counter, and in-flight operation.
-  The difference between a diagnosis and a guess when a 64-PE job hangs.
-- **Quiescence primitive** — drain, then assert nothing in flight and all
-  accounting balances. Most correctness bugs surface as a failed invariant here
-  rather than as a wrong answer.
-- **Slow mode as a policy setting, not a separate code path:** no coalescing,
-  one message per operation, synchronous acknowledgement. Every test runs both
-  ways and results are compared.
+> **The library writes introspection state into shared memory; an external tool
+> reads it. The library serves nothing and writes no files.**
+
+The case that matters most is a hung job. Any export the job serves or writes
+fails exactly then, because the process that would serve or write it is the one
+that is stuck. Memory can be read without the job's cooperation.
+
+#### Where the state lives
+
+- **In the node's control segment**, `/osoe.<job>.<step>.<node>` (§6.2), which
+  **keeps its name until the last finalize** so a reader can open it while the job
+  runs. Heap names are still removed once every local PE has mapped them.
+- **A crash leaves the control segment in `/dev/shm`** — a few MB. That is also the
+  post-mortem: the state at the moment of the crash stays readable until someone
+  removes it. `osoe-stat --gc` removes segments whose recorded pids are all gone,
+  and a Slurm epilog can remove `/dev/shm/osoe.<jobid>.*`.
+- **Mode 0600.** The segment holds connection buffers, and so application data;
+  only the job's user can read it.
+- **Self-describing.** A header carries a layout version and a table of metrics —
+  name, type, unit, offset — checksummed like the handler table (§3.13), so
+  `osoe-stat` need not be the same build as the job. Handler names live in the
+  same table.
+- **On abort**, the library prints the control segment's name to standard error, so
+  whoever reads the message knows what to point `osoe-stat` at.
+
+#### `osoe-stat`
+
+An **installed** tool that maps the control segment read-only and reads without
+locks and without the job's cooperation:
+
+- a live view of counters and rates, per node, per PE, and per connection;
+- a **state dump** — every buffer, queue, credit, watch slot, epoch counter, and
+  "blocked in" record. This replaces the earlier `am_dump_state(FILE *)`, which
+  needed a call from inside the job;
+- the flight recorder's recent events;
+- output as a human-readable table, JSON, or Prometheus text format. For Prometheus,
+  node_exporter's textfile collector picks up `osoe-stat --prometheus` output, so
+  osoe contains no HTTP code;
+- `--gc` for segments left by crashed jobs.
+
+Readers load with `memory_order_acquire` and accept values a moment stale.
+
+*(Rejected: an HTTP endpoint in the library. It fails during a hang, when it is
+needed most; ports per ephemeral job do not fit scrape discovery; it exposes a
+network port; and it puts socket code in the progress process. If a scrape endpoint
+is ever wanted, it belongs in a separate process built on `osoe-stat`. Rejected:
+metrics files written by the library. The library writes no files; the persistent
+control segment already provides post-mortem state after a crash.)*
+
+#### Cost rules
+
+- **One counter block per thread** — application thread, agent, progress thread —
+  cache-line aligned with `_Alignas` in the control segment. Only the owning thread
+  updates it, with an `acquire` load and a `release` store: §3.16's single-writer
+  case, with no locked instruction.
+- **Per-peer detail only in progress-thread blocks**, one set per connection: about
+  500 connections × 30 counters × 8 B ≈ 120 KB. PE-side counters aggregate across
+  peers; per-PE-per-peer counters would be hundreds of MB at 256 PEs and 500 peers.
+- **Timing only on slow paths:** blocking operations, waits, and once per segment.
+  Never per put or AMO. `CLOCK_MONOTONIC`, through the vDSO.
+- **Histograms use log2 buckets**, about 32 per histogram. The bucket index comes
+  from `stdc_leading_zeros_ull` in C23 `<stdbit.h>` — verified to build under
+  `-std=gnu11` with glibc 2.41 — rather than `__builtin_clzll`, which §3.16 rules
+  out.
+- **Anything the kernel already tracks is read by `osoe-stat`, not maintained by
+  the job.** Per-thread CPU time and context switches come from
+  `/proc/<pid>/task/<tid>/`, using the thread ids recorded in the segment (verified
+  readable by another process). TCP round-trip time, retransmits, and congestion
+  window come from netlink `sock_diag` — the mechanism `ss -ti` uses — keyed by the
+  socket addresses recorded in the segment.
+
+#### Catalogue, by the question each metric answers
+
+**1. Is it hung, and where?** State, not counters:
+
+- **Progress heartbeat:** loop iterations and the time of the last completion, per
+  progress thread. Two reads showing the same values mean the lead is stalled.
+- **Per team:** `arrived`, `released`, `copied`, and each PE's epoch counts `k` and
+  `d` (§5.4). This shows which PE did not reach a barrier — the most common real
+  hang.
+- **Per PE:** a "blocked in" record (routine, target, and since when), its watch
+  slot (§4.9), outstanding get bytes, bootstrap phase, and the abort word.
+- **Per connection:** sequence numbers sent, acknowledged as applied, and received
+  and applied; the age of the in-flight send; each buffer's reserved and filled
+  counts and seal bit; reply queue depths; credits left; waiters per wake word; the
+  armed-futex flag.
+
+**2. Is the network the bottleneck?**
+
+- **Per peer:** bytes, segments, and messages in each direction; messages per
+  segment and bytes per segment, as histograms; send latency from submit to
+  completion, as a histogram; short sends; `-ENOBUFS` re-arms; multishot
+  terminations; header-only ack segments sent.
+- **Per connection, at read time:** TCP round-trip time, retransmits, and congestion
+  window. These separate "the network is slow" from "osoe is slow".
+
+**3. Are aggregation and progress healthy?**
+
+- Publication-window stalls, count and duration (§3.6).
+- Bytes per DRAINING pass and how often the cap hits (§3.8).
+- Seals forced by `fence` and `quiet`, per PE (§4.6).
+- Waits for a reservable buffer, and seal requests.
+- Wakes issued and wakes avoided; failed acquisitions after a wake (§3.11).
+
+**4. What is the application doing?** The SHMEM layer, per PE:
+
+- Calls and bytes per routine family, split into intranode and internode.
+- Latency histograms for blocking gets, `quiet`, barriers, and `wait_until`.
+- Outstanding-get high-water mark; how often and for how long a missing reply
+  credit blocks the PE.
+- Heap bytes in use, high-water mark, and largest free block.
+- Agent wakeups, by reason.
+
+**5. Is the node itself the problem?**
+
+- The progress thread's CPU time and **involuntary context switches**, read at read
+  time. Rising involuntary switches mean application threads on the lead's cores
+  are starving progress — the cost §3.12 accepts.
+
+**6. Invariant counters, which must stay zero:**
+
+- Safety-sweep submissions that found sealed work nobody had signalled (§3.10).
+- Deadline expiries after which the awaited condition was already true: a missed
+  wake, in the watch slots (§4.9) or any other wait.
+
+**The test suite asserts every invariant counter is zero at quiescence after every
+test** (§8.2), so these counters double as a correctness oracle.
+
+#### Flight recorder
+
+**On by default, for now, for transport events.** Each progress thread has a ring
+of fixed-size records in the control segment — for example 4,096 × 32 B = 128 KB:
+
+- **Events:** seal, submit, send completion, segment received, handler dispatch,
+  ack sent, ack received.
+- **Record:** monotonic timestamp, event type, connection, sequence number, and one
+  argument. Writing one is a few single-writer stores and an index update.
+- **PE-side events** are off by default and enabled through an `OSOE_` environment
+  variable.
+- **Reading:** `osoe-stat` copies the ring and discards records overwritten during
+  the copy, detected by comparing the write index before and after.
+
+When a job hangs, the last events before it stopped are usually the difference
+between reading counters and knowing the answer. Revisit the default if
+measurement shows a cost.
+
+#### Other introspection
+
+- **Tracing hooks** at enqueue, wire send, wire receive, handler entry, and handler
+  exit, default no-op. Sequence-number every AM so a trace is replayable and
+  reordering is visible rather than inferred.
+- **Fault injection** in the layer, not the tests — delay, drop, reorder, truncate,
+  allocation failure. Injecting from outside cannot reach most error paths.
+- **Quiescence primitive** — drain, then assert nothing in flight, all accounting
+  balances, and every invariant counter is zero. Most correctness bugs surface as a
+  failed invariant here rather than as a wrong answer.
+- **Slow mode as a policy setting, not a separate code path:** no coalescing, one
+  message per operation, synchronous acknowledgement. Every test runs both ways and
+  results are compared.
 
 #### Fault-injection determinism
 
@@ -1797,9 +1936,12 @@ rendezvous** from each node's `SLURM_GTIDS` (§6.2).
 local PE opens it by name, records its rank, pid, and heap object name in its slot,
 and maps its siblings' heaps as they appear (§4.1). Heaps are named objects too,
 opened the same way: no sockets and no descriptor passing between local PEs. The
-lead waits on a futex until all `L` local PEs have arrived, then unlinks every name,
-so a later crash leaves nothing behind in `/dev/shm`; only a crash during init can
-leak names. Where hugetlbfs is mounted and has pages, heaps use it under the same
+lead waits on a futex until all `L` local PEs have arrived, then removes every heap
+name, so a later crash leaves no heaps behind in `/dev/shm`. The control segment
+**keeps its name until the last finalize**, so `osoe-stat` can open it while the
+job runs (§3.14). A crash therefore leaves the control segment — a few MB, and the
+post-mortem — for `osoe-stat --gc` or a Slurm epilog to remove; a crash during
+init can also leave heap names. Where hugetlbfs is mounted and has pages, heaps use it under the same
 names; otherwise they fall back to regular shared memory.
 
 **Global.** The step's rendezvous server is the lead of node 0: the task with
@@ -1926,10 +2068,12 @@ machinery. The review's order is adopted.
    - `shmem_ptr`, `shmem_team_ptr`, `SHMEM_TEAM_SHARED`;
    - `shmem_barrier_all` on intranode counters, `shmem_quiet`, `shmem_fence`,
      `shmem_pe_quiet`;
-   - the mandatory surface of §7.4.
+   - the mandatory surface of §7.4;
+   - the control segment's counters, the flight recorder, and `osoe-stat` (§3.14),
+     so single-node hangs are debuggable from the start.
 
    This exercises the heap layout, watch slots, allocator, epoch counters, agents,
-   and lifecycle.
+   lifecycle, and introspection.
 2. **In-process AM backend (tier 1), slow mode first.** Internode put, get, and AMOs
    with landing zones and reply credits; `quiet`, `fence`, and `pe_quiet` with
    ack-only segments; `put_signal`; internode `barrier_all`. Semantics are
@@ -2084,6 +2228,11 @@ written once.
 
 **Tests the review found missing:**
 
+- **Invariant counters at zero.** Every test ends at quiescence and asserts every
+  §3.14 invariant counter is zero.
+- **Introspection against a live job.** A tier-2 test runs `osoe-stat` against a
+  running job, and against one deliberately stalled, and checks the heartbeat and
+  "blocked in" records.
 - **Bootstrap fixtures.** No tier fed real `SLURM_*` values. Capture `srun`
   environments for block, cyclic, plane, and arbitrary distributions, relative node
   selection (`-r`) and exclusions (`-x`), heterogeneous jobs, and a bare `sbatch`
@@ -2282,6 +2431,10 @@ Each is independently breakable, and each failure appears far from its cause.
     the network.
 26. **A non-last `shmem_finalize` is a barrier.** (§6.4) Skipping it lets epoch
     counts diverge across PEs.
+27. **Introspection never needs the job's cooperation.** (§3.14) Everything an
+    investigator needs is in the named control segment, written by single writers;
+    the library serves nothing and writes no files. An export that depends on the
+    job fails during a hang, the one time it is essential.
 
 Assert what can be asserted. Instrument the rest.
 
@@ -2311,6 +2464,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Which process hosts progress | **An agent thread in every PE; the local lead's runs the transport** (§3.12). A helper process was rejected on setup complexity, supervision, statics access, and exit status |
 | Phase-1 thread level | **`SHMEM_THREAD_SINGLE`** (§4.6) |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
+| Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector. The control segment keeps its name until finalize, accepting a small leak on crash. Flight recorder on by default for now |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
 | Build tool | **CMake ≥ 3.25** (§1) |
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
