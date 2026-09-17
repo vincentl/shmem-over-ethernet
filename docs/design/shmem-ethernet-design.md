@@ -829,7 +829,10 @@ control segment already provides post-mortem state after a crash.)*
 #### Cost rules
 
 - **One counter block per thread** — application thread, agent, progress thread —
-  cache-line aligned with `_Alignas` in the control segment. Only the owning thread
+  cache-line aligned with `_Alignas` in the control segment. The alignment constant
+  is 128 bytes on aarch64 and 64 elsewhere. Apple cores, where the development VM
+  runs, use 128-byte lines although the guest reports 64. 128 is a multiple of the
+  Pis' 64, so one value separates words on both, at the cost of some padding. Only the owning thread
   updates it, with an `acquire` load and a `release` store: §3.16's single-writer
   case, with no locked instruction.
 - **Per-peer detail only in progress-thread blocks**, one set per connection: about
@@ -1206,6 +1209,17 @@ local lead and again at the root.
 - `SHMEM_SYMMETRIC_SIZE` accepts the §8 grammar — a non-negative integer or
   floating-point prefix with an optional scaling character — and must agree across
   PEs, checked at rendezvous (§6.2).
+  - **The size is exact.** It is the integer ceiling of the number times the
+    multiplier, computed in integer arithmetic, so "3.1M" is the spec's 3250586
+    on every machine, with no dependence on binary floating point.
+  - **Decimal notation only.** The spec says "floating point value" without
+    defining it. An exponent ("1e3"), a sign, surrounding space, or any character
+    other than a multiplier after the number is an error, which the spec lets init
+    report by terminating. Characters after the multiplier are ignored, as the spec
+    requires. Accepting `strtod`'s wider grammar would silently turn a typo such as
+    `1e` into a size.
+  - **A value that does not fit in 64 bits is an error.**
+  - The grammar lives in `base/size.c`, with its tier-1 test next to it.
 
 `shmem_malloc_with_hints` is an alias for `shmem_malloc`. SOS itself added the
 routine supporting no hint values.

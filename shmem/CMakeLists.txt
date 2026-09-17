@@ -9,6 +9,7 @@ set_target_properties(osoe PROPERTIES
   C_VISIBILITY_PRESET hidden
   VERSION ${PROJECT_VERSION}
   SOVERSION ${PROJECT_VERSION_MAJOR})
+target_link_libraries(osoe PRIVATE osoe_base)
 osoe_warnings(osoe)
 
 install(TARGETS osoe)

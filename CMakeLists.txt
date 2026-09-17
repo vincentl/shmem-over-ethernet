@@ -40,5 +40,6 @@ if(NOT LIBURING_FOUND)
     "Older OS releases are not supported.")
 endif()
 
+add_subdirectory(base)
 add_subdirectory(shmem)
 add_subdirectory(tools)
