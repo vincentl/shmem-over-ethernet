@@ -1416,7 +1416,7 @@ enough.
 **Pass a safety-sweep deadline**, for the same reason §3.10 does: a missed wake
 becomes a latency spike with a counter rather than a hang. It is an **absolute**
 deadline — see §3.10 on the two timeout conventions. **Count
-timeout-wakes.** A nonzero count in production means the watch table has a bug,
+timeout-wakes.** A nonzero count in production means the watch slots have a bug,
 and that counter is the only thing that will ever tell you.
 
 **`shmem_test` never blocks** — predicate check, no slot interaction at all.
@@ -1726,7 +1726,7 @@ rebuild, which is the whole objection.)*
 
 **Team ranges leak until `finalize`**, with a counter. §9.4.8 calls
 `shmem_team_destroy` "a collective operation that destroys the team referenced by
-team" without naming a scope in the routine text, but the rest of the spec fixes
+the team handle argument team" without naming a scope in the routine text, but the rest of the spec fixes
 it: a parent-team PE that is not in a new team "will receive a value of
 SHMEM_TEAM_INVALID" (§9.4), and destroying `SHMEM_TEAM_INVALID` is a no-op. So
 destroy is collective over the team's members. An earlier draft called the scope
@@ -1895,35 +1895,107 @@ Things to get right, each of which is a silent bug otherwise:
 
 ---
 
-## 7. Spec Subset
+## 7. Spec Subset and Sequencing
 
 **Criterion: what forces an architectural decision, however small.** Mechanical
 expansion of an existing decision waits indefinitely.
 
-### Phase 1
+### 7.1 Phase 1, in order
+
+> **Every step ends with something that runs.**
+
+An earlier draft listed phase 1 as one set of routines, every one of which depended
+on the whole transport, bootstrap, and io_uring stack at once: nothing would work
+until everything did, and the review's two blocking findings sat in exactly that
+machinery. The review's order is adopted.
+
+0. **Model before code.** Model-check the designs that are subtle and cheap to
+   model: the repaired reservation protocol (§3.5), the handoff word layout
+   (§3.11), and the collective counters with release ordering and downward
+   forwards (§5.5). The review's harnesses are in `docs/reviews/evidence/`.
+1. **One node, no network.** A functional OpenSHMEM on one machine without TCP:
+   - `shmem_init`, `shmem_init_thread` and `shmem_query_thread` providing
+     `SHMEM_THREAD_SINGLE`, `shmem_finalize` with the non-last barrier,
+     `shmem_query_initialized`, `shmem_my_pe`, `shmem_n_pes`;
+   - node-local rendezvous and agent threads (§3.12, §6.2);
+   - `shmem_malloc`, `shmem_free`, `shmem_calloc`, `shmem_realloc`, `shmem_align`,
+     and `shmem_malloc_with_hints` over per-PE heaps;
+   - intranode `shmem_putmem` and `shmem_getmem` as `memcpy`;
+   - AMOs, including one 32-bit type so the 32-bit wait path is exercised (§8.2);
+   - `shmem_wait_until`, `shmem_test`, and the signal routines;
+   - `shmem_ptr`, `shmem_team_ptr`, `SHMEM_TEAM_SHARED`;
+   - `shmem_barrier_all` on intranode counters, `shmem_quiet`, `shmem_fence`,
+     `shmem_pe_quiet`;
+   - the mandatory surface of §7.4.
+
+   This exercises the heap layout, watch slots, allocator, epoch counters, agents,
+   and lifecycle.
+2. **In-process AM backend (tier 1), slow mode first.** Internode put, get, and AMOs
+   with landing zones and reply credits; `quiet`, `fence`, and `pe_quiet` with
+   ack-only segments; `put_signal`; internode `barrier_all`. Semantics are
+   validated before a socket exists.
+3. **Real transport.** Start with the `echo-uring` floor harness (§8.4), the
+   transport's smallest reproducer. Then io_uring with the repaired reservation
+   protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
+   reply credits and DRAINING caps, and the global rendezvous with its timeout.
+4. **Robustness.** Pidfd liveness, abort propagation, `shmem_global_exit`,
+   keepalive; Slurm environment fixtures and the heap-base-shift test mode (§8.2).
+
+Symmetric statics and the compiler wrapper follow step 4 (§7.4).
+
+### 7.2 What each phase-1 routine forces
 
 | Routine | Forces |
 |---|---|
-| `shmem_init`, `finalize`, `my_pe`, `n_pes` | Bootstrap, node topology, shared segment, election |
+| `shmem_init`, `finalize`, `my_pe`, `n_pes` | Bootstrap, node topology, shared segment, election, agent threads |
+| `shmem_init_thread`, `shmem_query_thread` | The thread level every completion structure assumes (§4.6) |
 | `shmem_query_initialized`, repeated `init`/`finalize` | **Pool lifetime.** §4.4, §5.7 and §6.2 all carve once at init; refcounting is small but the teardown boundary is architectural (§6.4) |
-| `shmem_malloc`, `shmem_free` | Deterministic allocator, identical offsets |
-| `shmem_putmem`, `shmem_getmem` | Staging, descriptors, aggregation |
-| `shmem_quiet`, `shmem_fence` | Completion model |
+| `shmem_malloc`, `shmem_free` | Deterministic allocator, identical offsets, per-PE heaps |
+| `shmem_calloc`, `shmem_realloc`, `shmem_align` | Allocator edge semantics: barrier on exit, size 0 without a barrier (§4.4) |
+| `shmem_putmem`, `shmem_getmem` | Descriptors, landing zones, reply credits, aggregation |
+| `shmem_quiet`, `shmem_fence` | Completion model, ack-only segments, memory stores |
 | `shmem_barrier_all` | Two-level collective skeleton all others inherit |
 | `shmem_uint64_atomic_fetch_add`, `compare_swap` | **Unification of proxy-applied and locally-issued atomics.** Defer all AMOs and you build a transport that cannot express them |
 | `shmem_wait_until`, `shmem_test` | How a PE blocks without starving the progress thread |
-| `shmem_ptr`, `shmem_team_ptr` | Nearly free from the shared heap; large intranode win; forces the single locality function (§8.1) |
+| `shmem_ptr`, `shmem_team_ptr`, `SHMEM_TEAM_SHARED` | Nearly free from shared heaps; large intranode win; forces the single locality function (§8.1) |
 | `shmem_put_signal` | Fits aggregation well; how modern codes express producer-consumer |
 | `shmem_signal_add`, `shmem_signal_set` | Signal-word update with no data transfer — AMO-shaped, not put-shaped, so they land on §3.8's handler-time rule rather than the payload path |
 | `shmem_pe_quiet` | Validates the §4.6 dirty set: a global-sequence completion model could not implement it without over-quieting |
+| `shmem_global_exit` | Termination of PEs that are not inside the library (§3.15) |
 
-### Plumb but do not implement
+### 7.3 Plumb but do not implement
 
 A **context handle** on every RMA entry point and a **team parameter** on every
 collective, implementing only `SHMEM_CTX_DEFAULT` and `SHMEM_TEAM_WORLD`.
 Retrofitting either parameter later touches every function written.
+`shmem_ctx_create` and the team split routines exist and return nonzero until
+implemented, which the spec permits.
 
-### Deferred (mechanical)
+### 7.4 Mandatory surface
+
+Required for conformance even though none of it forces a design decision: stubs,
+aliases, and thin wrappers, but they must exist. An earlier draft scheduled none of
+it.
+
+| Item | Requirement | Plan |
+|---|---|---|
+| `shmemx.h` | "The shmemx.h header file must exist, even if no extensions are provided"; extensions use the `shmemx_` prefix | Step 1, empty. The export check admits `^shmemx_` |
+| Profiling interface (§10) | Mandatory: `pshmem_` names for every routine, `pshmem.h`, `shmem_pcontrol` | Step 1, as weak aliases. The export check widens to `^p?shmem_` |
+| Deprecated routines and headers (Annex F) | `start_pes` — "Implementations must include it" — and the other deprecated names; the `mpp/shmem.h` header location | Step 1: `start_pes` with an implicit finalize at exit; aliases |
+| Environment variables (§8) | `SHMEM_SYMMETRIC_SIZE`, `SHMEM_DEBUG`, `SHMEM_VERSION`, `SHMEM_INFO`, and their deprecated `SMA_*` forms | Step 1 |
+| C11 type-generic interfaces | Part of the API | Step 1, for the types implemented |
+| `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1 |
+| `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
+
+**Known non-conformance: symmetric statics.** Most of the spec's examples use
+global or static variables as symmetric objects, including the canonical
+put-with-signal example. Until §4.3's phase 1.5 lands, osoe rejects them: an address
+in neither a symmetric heap nor the statics range fails with a diagnostic naming the
+routine, and `shmem_addr_accessible` returns 0 for it. Statics need the compiler
+wrapper for `-fno-pie`/`-no-pie` address agreement, so the two are scheduled
+together, immediately after step 4.
+
+### 7.5 Deferred (mechanical)
 
 Full type/operation cross product, strided transfers, nonblocking variants,
 broadcast/reduce/collect/alltoall, locks.
@@ -1933,7 +2005,7 @@ local lead is the single writer before release and leaves last, and a peer's
 `source` is read only after that peer has called. A pull-based collect or
 alltoall is non-conforming.
 
-### Deferred 1.6 additions
+### 7.6 Deferred 1.6 additions
 
 | Routine | Why it waits |
 |---|---|
@@ -1975,11 +2047,19 @@ Plus a **force-remote flag** routing even same-logical-node traffic over the
 network. Running a program both ways and diffing is the strongest differential
 test, since the shared-memory path is simple enough to trust as the reference.
 
-**Three poles, not one:** all PEs in one logical node; one PE per logical node;
-and a mixed asymmetric map (`0,0,0,1,2,2`) exercising uneven node sizes and
-non-contiguous rank-to-node mapping. **Uneven sizes are where two-level
-collectives break** and a uniform map will never show it. Multiply by fast and
-slow mode: six passes over a suite that runs in seconds at tier 1.
+**Four poles, not one:**
+
+- all PEs in one logical node;
+- one PE per logical node;
+- uneven node sizes, `0,0,0,1,2,2`;
+- **ranks not contiguous per node**, `0,1,2,0,1,0` — the shape Slurm's cyclic
+  distribution produces (§6.1).
+
+An earlier draft called `0,0,0,1,2,2` non-contiguous; it is contiguous, so nothing
+exercised the case that breaks per-node member counts. **Uneven sizes and
+non-contiguous ranks are where two-level collectives break**, and a uniform map
+will never show it. Multiply by fast and slow mode: eight passes over a suite that
+runs in seconds at tier 1.
 
 ### 8.2 Tiers
 
@@ -1996,9 +2076,28 @@ slow mode: six passes over a suite that runs in seconds at tier 1.
 > defect in hand-rolled TCP framing.
 
 Mitigations: deliberately small `SO_SNDBUF`/`SO_RCVBUF` so partial writes
-actually occur; separate network namespaces over veth with `netem` for delay,
-loss, reordering, and small MTU. A Pi handles four namespaces; the setup is a
-shell script written once.
+actually occur (verified: 20 of 20 sends came back short); separate network
+namespaces over veth with `netem` for delay, loss, and small MTU. `netem` reordering
+is invisible to a TCP application — the kernel reorders before delivery — so it
+tests TCP, not osoe. A Pi handles four namespaces; the setup is a shell script
+written once.
+
+**Tests the review found missing:**
+
+- **Bootstrap fixtures.** No tier fed real `SLURM_*` values. Capture `srun`
+  environments for block, cyclic, plane, and arbitrary distributions, relative node
+  selection (`-r`) and exclusions (`-x`), heterogeneous jobs, and a bare `sbatch`
+  launch, and replay them into bootstrap parsing at tier 1. Test node-pair
+  connection direction and the rendezvous handshake, including a client reaching
+  the wrong job's server.
+- **Heap-base shift.** Invariant 7 cannot fail while every process maps its own
+  heap at the same base. A test mode shifts `B` per PE.
+- **Timeouts on every test**, so a hang fails instead of stalling the suite.
+- **A `NEEDED`-libraries check** on built binaries for invariant 15.
+- **A 32-bit wait path.** Phase-1 AMOs were all `uint64`, which never exercises it;
+  step 1 includes one 32-bit AMO type (§7.1).
+- **The probe's receive check** asserts only more than one completion; tighten it to
+  the verified shape of one per provided buffer plus a terminal `-ENOBUFS`.
 
 ### 8.3 Without Pi hardware
 
@@ -2056,8 +2155,8 @@ futex2. The environment is chosen so the daily loop is still native aarch64:
 
 | Environment | Role |
 |---|---|
-| **Lima VM, Debian 13** (`vz`, repository mounted over virtiofs; `dev/lima/create.sh`) | Daily build and test loop. Kernel 6.12, the same line as Raspberry Pi OS Trixie. Native aarch64, so weak memory ordering is exercised on every run. Tiers 1–3 fit: network namespaces, veth pairs and `sch_netem` all verified in the cloud kernel image |
-| GitHub Actions `ubuntu-24.04` and `ubuntu-24.04-arm`, directly on the runner | Per-commit CI, and the only x86 leg — the case §8.3 calls adversarial for performance constants |
+| **Lima VM, Debian 13** (`vz`, repository mounted over virtiofs; `dev/lima/create.sh`) | Daily build and test loop. Kernel 6.12, the same line as Raspberry Pi OS Trixie. Native aarch64, so weak-memory-ordering failures are *possible* on every run, though not guaranteed to be observed. Tiers 1–3 fit: network namespaces, veth pairs and `sch_netem` all verified in the cloud kernel image |
+| CI — **deferred** | The VM is sufficient for now. When CI is added it is also the only x86 leg, the case §8.3 calls adversarial for performance constants. Note that `ubuntu-24.04` ships liburing 2.5, below the §1 floor, so it needs a newer image |
 | One physical Pi over SSH | The Pi kernel fork, the real NIC and driver path, and — on a Pi 5 — 16K pages |
 
 **Rejected:** QEMU's `raspi4b` board model — no Ethernet controller, no PCIe
@@ -2141,9 +2240,10 @@ Each is independently breakable, and each failure appears far from its cause.
 11. **AMO result descriptors carry values; get descriptors carry references.**
     (§3.8) Unifying them reorders AMOs.
 12. **The completion queue is sized from the provided-buffer ring, not from the
-    submission-queue bound.** (§3.3) One multishot SQE yields many CQEs; applying
-    the SQ bound to the CQ reintroduces an overflow path under load only.
-13. **A waiter inserts into the watch table before its first predicate check.**
+    submission-queue bound, and each ring arms at most one futex wait.** (§3.3,
+    §3.10) One multishot SQE yields many CQEs, and every extra armed wait adds one
+    more; either mistake reintroduces an overflow path under load only.
+13. **A waiter publishes its watch slot before its first predicate check.**
     (§4.9) Reversing them loses a wake that lands in the window, and no test will
     show it.
 14. **The application layer owns coalescing; `TCP_NODELAY` is always set.**
@@ -2160,6 +2260,28 @@ Each is independently breakable, and each failure appears far from its cause.
 18. **Futex words are 32-bit, and `futex_wait` deadlines are absolute.** (§3.10,
     §4.9) The first is a kernel limit (`FUTEX2_SIZE_U64` returns `EINVAL`); the
     second fails silently, as a busy loop.
+19. **Only the local lead's agent submits, and it alone owns rings and sockets.**
+    (§3.12) Application threads and other agents request; they never submit.
+20. **One symmetric heap per PE, addressed as `(PE, region, offset)` everywhere
+    outside the owning process.** (§4.1, §4.9) Sharing a heap between PEs makes
+    one PE's puts overwrite another's data; keying by address loses cross-process
+    wakes.
+21. **A non-reservable buffer carries the seal bit, at most one buffer per
+    connection is reservable, and sequence numbers are assigned when a buffer
+    opens.** (§3.5) Each rule alone was shown by a model to lose, tear, or reorder
+    messages when broken.
+22. **Every applied segment is eventually acknowledged, with or without reverse
+    traffic.** (§3.4) Without ack-only segments, `quiet` on one-way traffic never
+    returns.
+23. **A provided buffer is never held across reaps.** (§3.3) Holding one stalls a
+    large segment and can deadlock two connections sharing a ring.
+24. **Every access to a shared protocol word is a `<stdatomic.h>` call naming an ISO
+    memory order, and two-sided protocols use `seq_cst` or locked stores on both
+    sides.** (§3.16) A `release` store in a two-sided protocol loses wakes on x86.
+25. **Bootstrap connections scale with node count.** (§6.2) Only node leads cross
+    the network.
+26. **A non-last `shmem_finalize` is a barrier.** (§6.4) Skipping it lets epoch
+    counts diverge across PEs.
 
 Assert what can be asserted. Instrument the rest.
 
@@ -2176,16 +2298,19 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Which SOS configuration is the baseline? | **Withdrawn.** libfabric does not build usably on the target hardware, which is the project's premise, not an obstacle to measuring it. Replaced by the §1 floors |
 | `shmem_ptr` context-variant signature | **No such thing.** The variant is team-scoped: `shmem_team_ptr` (1.6 §9.1.10). §4.8 corrected |
 | `barrier_all` versus `sync` quiet semantics | **Confirmed** (§9.10.1 Notes): `barrier_all` ≡ `shmem_ctx_quiet` on the default context, then `shmem_team_sync` on world |
-| `shmem_team_destroy` scoping | **Ambiguous in the standard**, which never names the scope. Leak team ranges until finalize (§5.7) |
+| `shmem_team_destroy` scoping | **Collective over the team's members**: non-members hold `SHMEM_TEAM_INVALID`, on which destroy is a no-op. An earlier resolution called the scope ambiguous. Team ranges still leak until finalize (§5.7) |
 | Team-based allocation | **Does not exist through 1.6.** 1.6 change #10 states malloc and friends are world-team collective (§4.5) |
 | PMIx on the actual nodes | **Moot.** Nothing links against PMIx or PMI-2 on the default path (§6) |
 | `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7) |
-| How a PE blocks in `wait_until` | **Watch table plus a 32-bit futex sequence word per slot** (§4.9). Futexing on the `ivar` itself was withdrawn: 64-bit futexes do not exist |
+| How a PE blocks in `wait_until` | **One watch slot per local PE with a 32-bit futex sequence word** (§4.9). Futexing on the `ivar` itself was withdrawn, since 64-bit futexes do not exist, and the hash table was replaced once waits were seen to be on the caller's own variable |
 | io_uring ring bound | **Two bounds, two rings.** CQ is sized from the provided-buffer ring (§3.3). Verified by `tools/probe` |
 | Reduction `dest` versus 1.6 change #17 | **Not a conflict** — same arrays means same symmetric offset. The surrounding text exposed three real bugs, fixed by a single-writer lead that leaves last (§5.5) |
 | Collective epoch identification | **Cumulative 32-bit counters with equality waits** (§5.4). Sense reversal retired |
 | 64-bit futex support | **Not implemented.** `EINVAL` on 6.12 aarch64 (`tools/probe`) |
-| Development environment | **Lima + Debian 13 on Apple Silicon**; x86 and ARM in CI; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
+| Development environment | **Lima + Debian 13 on Apple Silicon**; CI deferred; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
+| Which process hosts progress | **An agent thread in every PE; the local lead's runs the transport** (§3.12). A helper process was rejected on setup complexity, supervision, statics access, and exit status |
+| Phase-1 thread level | **`SHMEM_THREAD_SINGLE`** (§4.6) |
+| Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
 | Build tool | **CMake ≥ 3.25** (§1) |
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
@@ -2193,10 +2318,11 @@ Recorded rather than deleted, so they are not reopened from memory.
 
 ### Still open — blocking
 
-- **Thorough 1.6 spec read.** The targeted questions above are answered; the
-  sweep is not done. Specifically still unchecked: whether any team query must
-  return remotely accessible memory; and the exact semantics of the 1.6 session
-  routines if they are ever more than no-ops.
+- **Thorough 1.6 spec read.** The review's omissions pass covered the phase-1
+  routines and the general sections, and closed "does any team query return
+  remotely accessible memory" (none does). Still unchecked: the exact semantics of
+  the 1.6 session routines if they are ever more than no-ops, and the routines
+  beyond phase 1.
 
 ### Still open — measurement, once hardware exists
 
@@ -2218,10 +2344,45 @@ Recorded rather than deleted, so they are not reopened from memory.
   Waiting on the global get counter is conforming and free; splitting it per peer
   node costs 16 bytes per peer and only pays for applications that actually
   restrict quiet by PE.
-- **Does the watch table need a fast path for the single-waiter case?** (§4.9)
-  The empty-table check is one branch; the one-entry case is plausibly the
-  common one in real codes and might justify a cached last-inserted slot.
-  Measure before adding.
+- **The value of the reply credit `C`** (§3.8, §4.6). Large enough to be
+  irrelevant to real codes, small enough that `connections × C` descriptors stay
+  cheap; pick it from measurement.
+- **Team range allocator and split protocol** (§5.7). Undesigned; becomes blocking
+  when team creation lands.
+- **Designs for alltoall, scans, and variable-size collect** (§5.5). The
+  lead's-`dest` accumulator does not cover them.
+
+### Review of 2026-09-16
+
+`docs/reviews/design-soundness.md`, an adversarial review with a refutation pass,
+reported 2 blocking findings, 9 design changes, 18 clarifications, and minor
+items. Each was checked independently against the spec, the design text, and the
+development VM before being folded in.
+
+| Finding | Outcome | Where |
+|---|---|---|
+| B1 No process hosts the progress threads | **Accepted.** Agent thread per PE; lead's runs the transport; landing zones | §3.12, §4.7 |
+| B2 One heap shared by all local PEs | **Accepted.** One heap per PE, `base_of` translation | §4.1, §4.2, §4.4 |
+| D1 Reservation races | **Accepted** as model-checked | §3.4, §3.5 |
+| D2 No acks for one-way traffic | **Accepted.** Ack-only segments | §3.4, §3.9 |
+| D3 Accumulating armed futex waits | **Accepted.** One armed wait per ring | §3.3, §3.10 |
+| D4 Bootstrap discovery and node map | **Accepted** | §6.1, §6.2 |
+| D5 Rendezvous scales with PE count | **Accepted.** Leads only | §6.2 |
+| D6 Fence and quiet cover memory stores | **Accepted** | §4.6, §4.8 |
+| D7 Memory-order discipline | **Accepted for two-sided protocols; one claim discarded** (below) | §3.16, §4.9 |
+| D8 DRAINING starvation | **Accepted.** Capped passes | §3.8 |
+| D9 `global_exit`, non-last finalize, crashes | **Accepted** | §3.15, §6.4 |
+| C1–C18 | **Accepted.** C5 resolved with a per-connection credit rather than only a node-wide pool, since the pool alone leaves the worst case growing with job size | §3, §4, §5, §6, §7, §8 |
+| Minor items | **Accepted except one** (below) | Throughout |
+
+**Discarded:**
+
+- **D7's claim that §3.5's "never on x86" is wrong.** For §3.5's single-writer
+  publication, which ends in a locked `fetch_add`, the claim holds. The defect was
+  §4.9 applying the same rule to a two-sided protocol, which §3.16 now separates.
+- **"§8.5 says `limactl shell osoe` but the instance is `shmem`."** The document
+  correctly names the VM `dev/lima/create.sh` creates; the reviewer's VM predates
+  the script.
 
 ### Still open — project
 
