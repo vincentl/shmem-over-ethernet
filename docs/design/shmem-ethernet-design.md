@@ -225,8 +225,9 @@ bound and applied it to "the ring." That conflated the submission and completion
 queues, which are bounded by different things.
 
 *Submission queue:* `2 × connections + constant` — one send and one multishot
-recv per connection, plus the constant: at most one futex wait per ring (§3.10)
-and the cancel and re-arm SQEs in flight at once. Size above that and it can never
+recv per connection, plus the constant: at most one futex wait per ring (§3.10),
+the cancel and re-arm SQEs in flight at once, and — on the lead's first ring — one
+pidfd poll per local PE (§3.15). Size above that and it can never
 fill. **Assert at init** — it
 breaks silently the day someone adds a second in-flight send.
 
@@ -236,7 +237,8 @@ how many provided buffers the kernel can fill:
 
 > `CQ entries ≥ pbuf_ring_entries + 2 × connections + 1 + slack`, set explicitly
 > via `IORING_SETUP_CQSIZE`. The `+ 1` is the ring's single armed futex wait
-> (§3.10); an idle loop that arms more than one breaks this bound.
+> (§3.10); an idle loop that arms more than one breaks this bound. The lead's
+> first ring adds `L`, one completion per local PE's pidfd poll (§3.15).
 
 This restores "can never fill" for both rings and puts both asserts at init. The
 cost is a few hundred KB of CQEs — irrelevant beside the buffer ring itself, and
@@ -814,6 +816,32 @@ A connection dying mid-message leaves part of a payload written into the
 symmetric heap, unrecoverably. For a library where connection loss means job
 loss this is acceptable, but it is a **documented invariant**: AM's error path
 is "abort the job loudly," not "recover."
+
+The policy is right; an earlier draft lacked **detection and propagation**:
+
+- **`shmem_global_exit(status)`** (§9.1.6) must terminate every PE "regardless of
+  their current execution state" — including PEs deep in computation that never
+  call the library.
+  1. The calling PE's lead floods an abort AM to every node.
+  2. Each lead sets an **abort word** in its node segment and wakes every local
+     agent.
+  3. Each agent calls `exit(status)` in its own process (§3.12), so the status
+     survives and standard I/O is flushed as §9.1.6 requires.
+
+  Every library wait also checks the abort word. `exit` from a non-main thread can
+  block if an application thread holds a stdio lock, so an agent falls back to
+  `_exit(status)` after a bounded delay.
+- **A crashed local PE** can die mid-reservation, leaving a segment that never
+  becomes sendable while every TCP connection stays healthy — so nothing "aborts
+  loudly". The lead's agent holds a **pidfd for every local PE**, polled on its
+  ring, using the pids recorded at local rendezvous (§6.2). A pidfd completion for
+  a PE that has not finalized aborts the job. Non-lead PEs detect a dead lead when
+  a wait deadline expires (§3.12).
+- **A vanished peer node** surfaces through TCP keepalive with `TCP_USER_TIMEOUT`
+  on every node-pair connection, as a connection error — which aborts.
+- **Slurm's `KillOnBadExit` defaults to 0**, so one PE exiting nonzero does not by
+  itself stop the others. Document `srun -K1`. The spec does not define crash
+  behaviour, so this is operability, not conformance.
 
 ### 3.16 Memory-order discipline
 
@@ -1678,53 +1706,97 @@ kind of system package the project exists to avoid. The PMIx-availability
 question that blocked the previous draft is not answered here — it is deleted,
 because nothing links against PMIx any more.
 
-### 6.1 What Slurm already tells us
-
-Everything the bootstrap needs is in the environment of every task:
+### 6.1 What Slurm tells each task
 
 | Variable | Supplies |
 |---|---|
-| `SLURM_PROCID` | Rank |
-| `SLURM_NTASKS` | Size |
-| `SLURM_NODEID` | **Node index — the node grouping, directly** |
-| `SLURM_LOCALID` | **Local rank within the node — the election input, directly** |
-| `SLURM_TASKS_PER_NODE` | Local member counts for every node (§5.2) |
-| `SLURM_NODELIST` | Hostnames, for the rendezvous address |
+| `SLURM_PROCID` | Rank: step-relative and dense |
+| `SLURM_STEP_NUM_TASKS` | Size |
+| `SLURM_NODEID` | This task's node index within the step |
+| `SLURM_LOCALID` | This task's rank within its node — the lead is `0` |
+| `SLURM_GTIDS` | Global ranks of the tasks on this node, and so the local count `L` |
+| `SLURM_STEP_NODELIST` | The step's hosts, in the order `SLURM_NODEID` indexes |
+| `SLURM_JOB_ID`, `SLURM_STEP_ID` | Rendezvous port derivation and handshake identity |
 
-This is *better* than the PMIx path it replaces. `SLURM_NODEID` and
-`SLURM_LOCALID` hand over node grouping and local-lead election with no
-agreement protocol at all, where the PMI-2 path required a hostname-hash-into-KVS
-dance and the PMIx path required a library. The node map falls out of the
-environment before a single socket is opened.
+**What the environment does not give is placement.** An earlier draft claimed the
+node map "falls out of the environment before a single socket is opened". Two
+things made that wrong (review D4, from Slurm's `env.c` and
+`slurm_step_layout.c`):
 
-Note this is also exactly the shape §8.1 wants: locality is already a
-configuration input rather than something derived from `gethostname()`, so
-`SHMEM_NODE_MAP` simply overrides `SLURM_NODEID` and the two paths share one
-code path.
+- `SLURM_TASKS_PER_NODE` gives counts, not which ranks. Under cyclic, plane,
+  arbitrary, or topology-ordered distribution — the default whenever a topology
+  plugin is configured — ranks are not contiguous per node, so per-node member
+  counts derived from it are wrong (§5.2) and barrier targets are never reached.
+- `SLURM_NODELIST` is the *job's* node list, while `SLURM_NODEID` indexes the
+  *step's*. Inside `sbatch -N4`, a task of `srun -N2 -r2` running on `pi03` has
+  `SLURM_NODEID=0`, which `SLURM_NODELIST` maps to `pi01`. Use `SLURM_STEP_*`
+  variables throughout.
+
+Each task therefore knows only its own node. The **rank→node map is assembled at
+rendezvous** from each node's `SLURM_GTIDS` (§6.2).
+
+`SLURM_NODEID` is still the locality input, which is the shape §8.1 wants:
+`OSOE_NODE_MAP` overrides it, and both paths share one code path.
 
 ### 6.2 Rendezvous
 
-Rank 0 binds a listening socket; every other PE connects; ranks, addresses, and
-the segment key are exchanged; the full node map and connection table are
-broadcast back. One round trip, no KVS, no external daemon.
+> **Local PEs meet on their node; only each node's lead crosses the network.
+> Rendezvous connections scale with node count.**
 
-Finding rank 0's address is the only real work:
+**Node-local.** The lead creates the node segment as a named shared memory object,
+`/osoe.<job>.<step>.<node>`, so concurrent steps on one node cannot collide. Every
+local PE opens it by name, records its rank, pid, and heap object name in its slot,
+and maps its siblings' heaps as they appear (§4.1). Heaps are named objects too,
+opened the same way: no sockets and no descriptor passing between local PEs. The
+lead waits on a futex until all `L` local PEs have arrived, then unlinks every name,
+so a later crash leaves nothing behind in `/dev/shm`; only a crash during init can
+leak names. Where hugetlbfs is mounted and has pages, heaps use it under the same
+names; otherwise they fall back to regular shared memory.
 
-- `SLURM_NODELIST` is a compressed hostlist (`pi[01-04,07]`). Expanding it is a
-  small parser — call it fifty lines, and **write it with unit tests in tier 1**,
-  because it is pure string handling that will otherwise be debugged on a
-  cluster.
-- Under Slurm's default block distribution, rank 0 is on the first expanded
-  host. **Do not rely on the default.** Have rank 0 publish its resolved address
-  and port, and have everyone else learn it the same way regardless of
-  distribution policy.
-- Port: an environment variable with a default, plus retry on bind conflict so
-  two concurrent jobs on one node do not collide.
+**Global.** The step's rendezvous server is the lead of node 0: the task with
+`SLURM_NODEID == 0` and `SLURM_LOCALID == 0`, on the first host of
+`SLURM_STEP_NODELIST`. That is the same list `SLURM_NODEID` indexes, so every task
+computes the same host under any distribution.
 
-**Non-Slurm launch** (plain `ssh`, a test harness, `mpirun`) sets the same
-variables under a `SHMEM_` prefix that takes precedence. The tier-1 and tier-2
-harnesses of §8 use this path, which means the bootstrap is exercised by every
-test rather than only on a cluster.
+- **Port:** a deterministic sequence of candidate ports hashed from the job and
+  step IDs, within a configurable range. The server binds the first free
+  candidate; clients try candidates in the same order. The handshake carries the
+  job and step IDs, so a client that reaches another job's server is rejected and
+  moves on.
+- **Who connects:** only node leads — one connection per node. Each sends its
+  node's rank list (`SLURM_GTIDS`), `SHMEM_SYMMETRIC_SIZE`, and handler-table
+  checksum (§3.13). The server checks agreement, then broadcasts the rank→node map
+  and node addresses.
+- **Node-pair connections:** the lower node index connects to the higher, so each
+  pair opens exactly one stream (§3.1).
+
+`SLURM_STEP_NODELIST` is a compressed hostlist (`pi[01-04,07]`). Expanding it is a
+small parser — call it fifty lines — **written with unit tests in tier 1**, because
+it is pure string handling that would otherwise be debugged on a cluster.
+
+**Failure handling:**
+
+- Clients retry with jittered backoff until `OSOE_BOOTSTRAP_TIMEOUT`, then abort
+  naming what they were waiting for.
+- `shmem_init` raises the soft `RLIMIT_NOFILE` to the hard limit. Slurm propagates
+  the submitting shell's limits, commonly a soft limit of 1,024, and a lead on a
+  500-node job holds one socket per peer node.
+- **Bare `sbatch` launch.** If `SLURM_JOB_ID` is set but `SLURM_STEP_NUM_TASKS` is
+  not, the program was started directly by a batch script rather than by `srun`.
+  Fail at once with that message rather than waiting for peers that will never
+  start.
+
+*(Rejected: every PE connecting to rank 0 — about 77,000 connections into one
+listener at 256 PEs × 300 nodes, violating §1, and failing at the 1,021st
+connection under a 1,024 file limit. Rejected: rank 0 "publishing" its address, as
+an earlier draft proposed — there is no channel to publish on without a KVS or a
+shared filesystem.)*
+
+**Non-Slurm launch** (plain `ssh`, a test harness) sets the same variables under
+the `OSOE_` prefix — `OSOE_PROCID`, `OSOE_NODEID`, and so on — which take
+precedence. The `SHMEM_` prefix is the specification's, not ours. The tier-1 and
+tier-2 harnesses of §8 use this path, so the bootstrap runs in every test rather
+than only on a cluster.
 
 ### 6.3 PMI-2 as an optional backend
 
@@ -1732,7 +1804,9 @@ Keep the thin interface and keep a PMI-2 backend behind it, **off by default and
 not linked unless requested at build time**. It costs little, and it is the
 escape hatch for a launcher that does not export usable environment variables.
 It is not on the default path and nothing in the build requires it to be
-present.
+present. A PMI-2 *wire* client speaking the protocol directly over `PMI_FD` would
+need no library at all; the protocol details are recalled, not verified, so
+confirm them before relying on it.
 
 ### 6.4 Initialization lifecycle
 
@@ -1747,9 +1821,19 @@ construction; subsequent calls increment and return. `shmem_finalize` decrements
 the last one tears down. `shmem_query_initialized` reports whether the count is
 nonzero.
 
-Three things to get right, each of which is a silent bug otherwise:
+Things to get right, each of which is a silent bug otherwise:
 
+- **A non-last `shmem_finalize` performs `shmem_barrier_all`.** §9.1.4: "All other
+  calls to shmem_finalize perform an operation semantically equivalent to
+  shmem_barrier_all". An earlier draft only decremented the count, which skips
+  completion and lets §5.4's epoch counts diverge across PEs. The last call
+  performs its implicit barrier, then tears down.
 - **The count is per process, not per thread**, and must be updated atomically.
+- **Concurrent first `shmem_init`** from two application threads passes through a
+  once-gate, so bootstrap runs exactly once.
+- **A child created by `fork()`** after init inherits the mappings but no agent
+  threads (§3.12). It must not call OpenSHMEM, and teardown code compares the
+  current pid with the initializing pid and does nothing in a child.
 - **A re-init after a full teardown is a fresh job**, not a resumption: new
   rendezvous, new pools, and PE numbering that must come out identical or the
   symmetric heap is not symmetric. Simplest correct behaviour is to re-run the
@@ -1827,7 +1911,7 @@ different logical nodes open real TCP connections and take the internode path.
 Both paths run in their real form on one machine.
 
 ```
-SHMEM_NODE_MAP=0,0,1,1,2,2,3,3
+OSOE_NODE_MAP=0,0,1,1,2,2,3,3
 ```
 
 Two details that must be planned rather than patched:
