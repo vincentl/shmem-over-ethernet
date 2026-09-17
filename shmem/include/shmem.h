@@ -8,6 +8,8 @@
 #ifndef OSOE_SHMEM_H
 #define OSOE_SHMEM_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -23,6 +25,27 @@ extern "C" {
 #define _SHMEM_MINOR_VERSION SHMEM_MINOR_VERSION
 #define _SHMEM_MAX_NAME_LEN  SHMEM_MAX_NAME_LEN
 #define _SHMEM_VENDOR_STRING SHMEM_VENDOR_STRING
+
+/* Library setup, exit, and query (§9.1) */
+void shmem_init(void);
+int shmem_my_pe(void);
+int shmem_n_pes(void);
+void shmem_finalize(void);
+void shmem_query_initialized(int *initialized);
+
+/* Symmetric pointer (§9.1.9) */
+void *shmem_ptr(const void *dest, int pe);
+
+/* Memory management (§9.3) */
+void *shmem_malloc(size_t size);
+void shmem_free(void *ptr);
+
+/* Remote memory access (§9.6.1) */
+void shmem_putmem(void *dest, const void *source, size_t nelems, int pe);
+void shmem_getmem(void *dest, const void *source, size_t nelems, int pe);
+
+/* Collective routines (§9.10) */
+void shmem_barrier_all(void);
 
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);

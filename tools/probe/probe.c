@@ -75,7 +75,7 @@ static void probe_shared_futex(void)
     int fd = memfd_create("probe", 0);
     ftruncate(fd, 4096);
     _Atomic uint32_t *w = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    atomic_store(w, 0);
+    atomic_store_explicit(w, 0, memory_order_release);   /* before fork: no reader yet */
 
     pid_t pid = fork();
     if (pid == 0) {
@@ -83,14 +83,16 @@ static void probe_shared_futex(void)
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
         ts.tv_sec += 2;
-        while (atomic_load(w) == 0) {
+        while (atomic_load_explicit(w, memory_order_acquire) == 0) {
             long r = futex2_wait(w, 0, FUTEX2_SIZE_U32, &ts);
             if (r == -1 && errno == ETIMEDOUT) _exit(2);
         }
         _exit(0);
     }
     usleep(100000);            /* let the child block */
-    atomic_store(w, 1);
+    /* Single-writer publication (§3.16): the parent stores, the child only
+     * loads, and the kernel's compare in futex_wait closes the race. */
+    atomic_store_explicit(w, 1, memory_order_release);
     long woke = futex2_wake(w, 1, FUTEX2_SIZE_U32);
     int status;
     waitpid(pid, &status, 0);

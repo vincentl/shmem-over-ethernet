@@ -1,0 +1,14 @@
+get: design, 1 issuer x 2 gets, 2 quiets         reduced ok           94,822 states | unreduced ok          340,323 states  ok
+get: design, 2 issuers, 2 quiets                 reduced ok          218,942 states | unreduced ok          792,855 states  ok
+get: snapshot                                    reduced VIOLATION       412 states | unreduced VIOLATION     2,166 states  ok
+get: noretag                                     reduced VIOLATION     1,358 states | unreduced VIOLATION     2,587 states  ok
+get: nolock                                      reduced VIOLATION     8,467 states | unreduced VIOLATION    17,940 states  ok
+dirty: design, 2 issuers x 1 put, 2 quiets       reduced ok           33,973 states | unreduced ok          149,599 states  ok
+dirty: design, 1 issuer x 3 puts, 2 quiets       reduced ok           39,131 states | unreduced ok          171,561 states  ok
+dirty: unlocked                                  reduced VIOLATION     5,538 states | unreduced VIOLATION    52,455 states  ok
+dirty: naive                                     reduced VIOLATION     3,534 states | unreduced VIOLATION     6,617 states  ok
+dirty: bitfirst                                  reduced VIOLATION     6,603 states | unreduced VIOLATION    12,417 states  ok
+watch: design, one thread watches twice          reduced ok           31,920 states | unreduced ok          140,921 states  ok
+watch: firstmatch                                reduced LOST WAKE       647 states | unreduced LOST WAKE     1,159 states  ok
+
+REDUCTIONS PRESERVE EVERY VERDICT
