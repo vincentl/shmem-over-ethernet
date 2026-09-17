@@ -1,0 +1,38 @@
+== 1 waiter / 1 writer: design protocol and deliberate reversals
+V0 design order                                                SC  states=    204 terminals=    4  -> no lost wake
+V1 check-then-insert (insert after first predicate check)      SC  states=    128 terminals=    4  -> LOST WAKE
+    counterexample: T0:load ivar->0 ; T1:store ivar=1 ; T1:load count->0 ; T1:br ; T0:br ; T0:set s ; T0:load ('key', 0)->0 ; T0:br ; T0:br ; T0:cas ('key', 0) True ; T0:br ; T0:add ('slotcnt', 0)+1->1 ; T0:add count+1->1 ; T0:set x ; T0:load ('seq', 0)->0 ; T0:futex_wait ('seq', 0) SLEEP
+    final mem: {'count': 1, 'ivar': 1, ('key', 0): 1000, ('slotcnt', 0): 1}
+V2 writer bumps seq before storing ivar                        SC  states=    158 terminals=    5  -> LOST WAKE
+    counterexample: T1:load count->0 ; T1:br ; T0:set s ; T0:load ('key', 0)->0 ; T0:br ; T0:br ; T0:cas ('key', 0) True ; T0:br ; T0:add ('slotcnt', 0)+1->1 ; T0:add count+1->1 ; T0:set x ; T0:load ('seq', 0)->0 ; T0:load ivar->0 ; T1:store ivar=1 ; T0:br ; T0:futex_wait ('seq', 0) SLEEP
+    final mem: {'count': 1, 'ivar': 1, ('key', 0): 1000, ('slotcnt', 0): 1}
+V3 waiter loads ivar before seq                                SC  states=    224 terminals=    5  -> LOST WAKE
+    counterexample: T0:set s ; T0:load ('key', 0)->0 ; T0:br ; T0:br ; T0:cas ('key', 0) True ; T0:br ; T0:add ('slotcnt', 0)+1->1 ; T0:add count+1->1 ; T0:set x ; T0:load ivar->0 ; T1:store ivar=1 ; T1:load count->1 ; T1:br ; T1:set s ; T1:br ; T1:load ('key', 0)->1000 ; T1:br ; T1:add ('seq', 0)+1->1 ; T1:futex_wake ('seq', 0) ; T1:br ; T0:load ('seq', 0)->1 ; T0:br ; T0:futex_wait ('seq', 0) SLEEP
+    final mem: {'count': 1, 'ivar': 1, ('key', 0): 1000, ('seq', 0): 1, ('slotcnt', 0): 1}
+== memory model (Dekker pattern: waiter count++ / load ivar  vs  writer store ivar / load count)
+V4 TSO, count++ and ivar store both non-serializing            TSO states=    336 terminals=    5  -> LOST WAKE
+    counterexample: T1:store(buf) ivar=1 ; T1:load count->0 ; T1:br ; T0:set s ; T0:load ('key', 0)->0 ; T0:br ; T0:br ; T0:cas ('key', 0) True ; T0:br ; T0:add ('slotcnt', 0)+1->1 ; T0:load count->0 ; T0:store(buf) count=1 ; T0:set x ; T0:load ('seq', 0)->0 ; T0:load ivar->0 ; T1:flush ivar=1 ; T0:br ; T0:flush count=1 ; T0:futex_wait ('seq', 0) SLEEP
+    final mem: {'count': 1, 'ivar': 1, ('key', 0): 1000, ('slotcnt', 0): 1}
+V4b TSO, count++ serializing, ivar store plain                 TSO states=    288 terminals=    5  -> LOST WAKE
+    counterexample: T1:store(buf) ivar=1 ; T1:load count->0 ; T1:br ; T0:set s ; T0:load ('key', 0)->0 ; T0:br ; T0:br ; T0:cas ('key', 0) True ; T0:br ; T0:add ('slotcnt', 0)+1->1 ; T0:add count+1->1 ; T0:set x ; T0:load ('seq', 0)->0 ; T0:load ivar->0 ; T1:flush ivar=1 ; T0:br ; T0:futex_wait ('seq', 0) SLEEP
+    final mem: {'count': 1, 'ivar': 1, ('key', 0): 1000, ('slotcnt', 0): 1}
+V4c TSO, count++ plain, ivar store serializing                 TSO states=    240 terminals=    5  -> LOST WAKE
+    counterexample: T0:set s ; T0:load ('key', 0)->0 ; T0:br ; T0:br ; T0:cas ('key', 0) True ; T0:br ; T0:add ('slotcnt', 0)+1->1 ; T0:load count->0 ; T0:store(buf) count=1 ; T0:set x ; T0:load ('seq', 0)->0 ; T0:load ivar->0 ; T1:store ivar=1 ; T1:load count->0 ; T1:br ; T0:br ; T0:flush count=1 ; T0:futex_wait ('seq', 0) SLEEP
+    final mem: {'count': 1, 'ivar': 1, ('key', 0): 1000, ('slotcnt', 0): 1}
+V5 TSO, both serializing (lock-prefixed atomics)               TSO states=    204 terminals=    4  -> no lost wake
+== keys
+V6 writer keys by its own VA of the slot (differs from waiter's) SC  states=    215 terminals=    4  -> LOST WAKE
+    counterexample: T0:set s ; T0:load ('key', 0)->0 ; T0:br ; T0:br ; T0:cas ('key', 0) True ; T0:br ; T0:add ('slotcnt', 0)+1->1 ; T0:add count+1->1 ; T0:set x ; T0:load ('seq', 0)->0 ; T0:load ivar->0 ; T1:store ivar=1 ; T1:load count->1 ; T1:br ; T1:set s ; T1:br ; T1:load ('key', 0)->1000 ; T1:br ; T1:br ; T1:set s ; T1:br ; T1:load ('key', 1)->0 ; T1:br ; T1:br ; T0:br ; T0:futex_wait ('seq', 0) SLEEP
+    final mem: {'count': 1, 'ivar': 1, ('key', 0): 1000, ('slotcnt', 0): 1}
+== two writers (progress thread + local PE), atomic add, wait for ivar==2
+V7 two atomic adders, design                                   SC  states=   6102 terminals=   30  -> no lost wake
+== concurrent waiters on one address / slot reuse
+V8 naive refcount: remover clears key while joiner increments  SC  states=  57544 terminals=  422  -> LOST WAKE
+    counterexample: T1:set s ; T1:load ('key', 0)->0 ; T1:br ; T1:br ; T1:cas ('key', 0) True ; T1:br ; T0:set s ; T0:load ('key', 0)->1000 ; T0:br ; T0:add ('slotcnt', 0)+1->1 ; T0:add count+1->1 ; T0:set x ; T0:load ('seq', 0)->0 ; T0:load ivar->0 ; T0:br ; T0:add count-1->0 ; T0:add ('slotcnt', 0)-1->0 ; T1:add ('slotcnt', 0)+1->1 ; T1:add count+1->1 ; T1:set x ; T1:load ('seq', 0)->0 ; T1:load ivar->0 ; T2:store ivar=1 ; T2:load count->1 ; T2:br ; T2:set s ; T2:br ; T1:br ; T1:futex_wait ('seq', 0) SLEEP ; T0:br ; T0:store ('key', 0)=0 ; T2:load ('key', 0)->0 ; T2:br ; T2:br
+    final mem: {'count': 1, 'ivar': 1, ('key', 0): 0, ('slotcnt', 0): 1}
+V8fix refcount CAS with -1 teardown + key recheck              SC  states=  87906 terminals=  264  -> no lost wake
+== linear-probe hole: slot 0 (key Y) freed while key A lives in slot 1
+V9 hole -> second A slot claimed at 0; writer stops at first match SC  states=  54310 terminals=   66  -> LOST WAKE
+    counterexample: T2:set s ; T2:load ('key', 0)->2000 ; T2:br ; T2:br ; T2:set s ; T2:load ('key', 1)->1000 ; T2:br ; T2:add ('slotcnt', 1)+1->2 ; T2:add count+1->3 ; T2:set x ; T2:load ('seq', 1)->0 ; T2:load ivar->0 ; T3:store ivar=1 ; T3:load count->3 ; T3:br ; T3:set s ; T3:br ; T2:br ; T2:futex_wait ('seq', 1) SLEEP ; T1:set s ; T1:load ('seq', 1)->0 ; T1:load ivar->1 ; T1:br ; T0:add count-1->2 ; T0:add ('slotcnt', 0)-1->0 ; T0:br ; T0:store ('key', 0)=0 ; T3:load ('key', 0)->0 ; T3:br ; T3:br
+    final mem: {'count': 2, 'ivar': 1, ('key', 0): 0, ('key', 1): 1000, ('slotcnt', 0): 0, ('slotcnt', 1): 2}
+V9fix writer bumps every matching slot                         SC  states=  71520 terminals=   40  -> no lost wake

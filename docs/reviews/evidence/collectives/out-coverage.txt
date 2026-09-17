@@ -1,0 +1,16 @@
+N=1 L=3 BRB states 7265
+   reachable transitions matching 'n0.pe0[k=0 & ENQ_B' : 9
+   reachable transitions matching 'n0.pe2[k=2 & ENQ_B' : 25
+   reachable transitions matching 'ARR_WAIT & sleeps' : 137
+   reachable transitions matching 'ARR_WAIT & EAGAIN' : 154
+   reachable transitions matching 'REL_WAIT & EAGAIN' : 1597
+   reachable transitions matching 'COP_WAIT & sleeps' : 305
+   reachable transitions matching 'futex_wake(arrived,1)(nobody)' : 648
+   reachable transitions matching 'futex_wake(arrived,1)->woke' : 28
+   reachable transitions matching 'futex_wake(copied,1)(nobody)' : 364
+   reachable transitions matching 'pe1[k=2 & INC & arrived:=' : 342
+N=1 L=3 RBRR M=4 states 13588
+   reachable transitions matching 'arrived:=0' : 753
+   reachable transitions matching 'released:=0' : 96
+   reachable transitions matching 'copied:=0' : 246
+   reachable transitions matching 'ARR_LOAD & load=0==target' : 117

@@ -1,0 +1,30 @@
+== reviewer E1
+after 1000 idle-loop iterations: futex SQEs submitted=1000, futex CQEs=0, other CQEs=1000 -> 1000 futex waits still armed in kernel
+CQEs from that single wake: 1000 (CQ size 64; kernel overflow flag=clear)
+further CQEs flushed from overflow list: 0
+== reviewer E2
+(a) 100x3000B records, 4096B pbufs: 100 data CQEs, CQE sizes <=1K:0 <=2K:0 <=3000:100 <4096:0 =4096:0; CQE boundaries falling inside a record: 0; ENOBUFS=0
+(b) 64KB segment, pbufs held until segment complete: got 32768/65536 bytes in 8 pbufs, last terminal res=-105 (No buffer space available), re-arms=4 -> segment never completes (receive stalled; TCP window then stalls the sender)
+== reviewer E3
+(a) queue order: 0 1 2 3 4 then 99(SCHED_FIFO; 98 = setschedparam failed). wake(1) order: 0 1 2 3 4 98
+(b) released one descriptor; futex_wake(1) woke 1
+(b) buffer-space waiter woken (wake #1), no buffer, re-sleeps
+(b) descriptor waiter: TIMED OUT after 1.00s although a descriptor was freed and a wake issued
+(b) descriptor waiter finally acquired (via safety timeout)
+(b) buffer-space waiter woken (wake #2), no buffer, re-sleeps
+== R1 literal
+mode=literal: idle iterations=1881 futex SQEs=1881 futex CQEs=0 armed now=1881 (max 1881)
+  wake(1) woke 1; then wake(INT_MAX) woke 1880; CQ ring overflow flag before reaping: SET, cq_ready=64 (CQ size 64)
+  CQEs eventually reaped via peek (liburing flushes overflow list): 1881
+== R1 armed flag
+mode=armed-flag: idle iterations=1914 futex SQEs=1 futex CQEs=0 armed now=1 (max 1)
+  wake(1) woke 1; then wake(INT_MAX) woke 0; CQ ring overflow flag before reaping: clear, cq_ready=1 (CQ size 64)
+  CQEs eventually reaped via peek (liburing flushes overflow list): 1
+== R2
+(a) 8 pbufs, hold-until-complete, 1 conn, 64KB : conn0 32768/65536 ENOBUFS=50 -> STALLED
+(b) 32 pbufs, hold-until-complete, 1 conn, 64KB: conn0 65536/65536 ENOBUFS=0 -> completed
+(c) 8 pbufs, stream-parse/recycle, 1 conn, 64KB: conn0 65536/65536 ENOBUFS=1 -> completed
+(d) 32 pbufs, hold-until-complete, 2 conns, 128KB each: conn0 131072/131072 conn1 131072/131072 ENOBUFS=1 -> completed
+(e) 8 pbufs, stream-parse/recycle, 2 conns, 128KB each: conn0 131072/131072 conn1 131072/131072 ENOBUFS=6 -> completed
+hold-until-segment-complete : conn0 64997/131072 conn1 64997/131072 held=16+16 ENOBUFS=22 -> STALLED (both conns)
+stream-parse, recycle per CQE: conn0 131072/131072 conn1 131072/131072 held=0+0 ENOBUFS=0 -> completed

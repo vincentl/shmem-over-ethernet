@@ -1,0 +1,173 @@
+=== variant: literal
+  writers=[[1, 2]] cap=2 states=484 violations=['STUCK']
+  writers=[[1, 2, 1]] cap=2 states=3397 violations=['ORDER', 'SEQ', 'STUCK']
+  writers=[[1, 1], [1]] cap=2 states=17032 violations=['ACCT', 'LOST', 'SEQ', 'STALESEQ', 'STUCK', 'TORN']
+  writers=[[1, 2], [1]] cap=2 states=30441 violations=['ACCT', 'LOST', 'SEQ', 'STUCK']
+  writers=[[2, 1], [1, 1]] cap=3 states=481887 violations=['ACCT', 'LOST', 'ORDER', 'SEQ', 'STALESEQ', 'STUCK', 'TORN']
+  -- shortest counterexample ACCT (writers=[[1, 1], [1]] cap=2): filled 1 > head 0
+        W0 load b0
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b0 (state now OPEN)
+        W0 read seq=0
+        W0 memcpy
+        W0 filled+=1
+        W0 load b0
+        W0 check ok (state=OPEN)
+        PT seal b0
+        PT submit b0 len=1
+        W0 CAS ok off=1 b0 (state now SENDING)
+        W0 read seq=0
+        W0 memcpy
+        PT complete b0 seq=0
+        PT recycle b0 -> OPEN seq=1
+        W0 filled+=1
+  -- shortest counterexample LOST (writers=[[1, 1], [1]] cap=2): msg W0#1 at off 1 beyond snapshot 1 of b0
+        W0 load b0
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b0 (state now OPEN)
+        W0 read seq=0
+        W0 memcpy
+        W0 filled+=1
+        W0 load b0
+        W0 check ok (state=OPEN)
+        PT seal b0
+        PT submit b0 len=1
+        W0 CAS ok off=1 b0 (state now SENDING)
+        PT complete b0 seq=0
+  -- shortest counterexample ORDER (writers=[[1, 2, 1]] cap=2): writer 0 msg 1 on wire after msg 2
+        W0 load b0
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b0 (state now OPEN)
+        W0 read seq=0
+        W0 memcpy
+        W0 filled+=1
+        W0 load b0
+        W0 fail->seal
+        PT seal b0
+        PT recycle b1 -> OPEN seq=1
+        PT submit b0 len=1
+        W0 store SEALED b0 (was SENDING)
+        W0 load b1
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b1 (state now OPEN)
+        W0 read seq=1
+        W0 memcpy
+        W0 filled+=2
+        W0 load b1
+        W0 fail->seal
+        W0 store SEALED b1 (was OPEN)
+        PT complete b0 seq=0
+        PT recycle b0 -> OPEN seq=2
+        W0 load b0
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b0 (state now OPEN)
+        W0 read seq=2
+        W0 memcpy
+        W0 filled+=1
+        PT seal b0
+        PT submit b0 len=1
+        PT complete b0 seq=2
+        PT submit b1 len=2
+        PT complete b1 seq=1
+  -- shortest counterexample SEQ (writers=[[1, 2, 1]] cap=2): seq 1 after 2
+        W0 load b0
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b0 (state now OPEN)
+        W0 read seq=0
+        W0 memcpy
+        W0 filled+=1
+        PT seal b0
+        PT recycle b1 -> OPEN seq=1
+        PT submit b0 len=1
+        PT complete b0 seq=0
+        PT recycle b0 -> OPEN seq=2
+        W0 load b0
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b0 (state now OPEN)
+        W0 read seq=2
+        W0 memcpy
+        W0 filled+=2
+        W0 load b0
+        W0 fail->seal
+        W0 store SEALED b0 (was OPEN)
+        W0 load b1
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b1 (state now OPEN)
+        W0 read seq=1
+        W0 memcpy
+        W0 filled+=1
+        PT seal b1
+        PT submit b0 len=2
+        PT complete b0 seq=2
+        PT submit b1 len=1
+        PT complete b1 seq=1
+  -- shortest counterexample STALESEQ (writers=[[1, 1], [1]] cap=2): W1#0 read seq 2, sent in seq 1
+        W0 load b0
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b0 (state now OPEN)
+        W0 read seq=0
+        W0 memcpy
+        W0 filled+=1
+        W0 load b0
+        W0 check ok (state=OPEN)
+        PT seal b0
+        PT submit b0 len=1
+        W0 CAS ok off=1 b0 (state now SENDING)
+        W0 read seq=0
+        W0 memcpy
+        PT complete b0 seq=0
+        PT recycle b0 -> OPEN seq=1
+        W0 filled+=1
+        W1 load b0
+        W1 check ok (state=OPEN)
+        W1 CAS ok off=0 b0 (state now OPEN)
+        PT seal b0
+        PT submit b0 len=1
+        PT complete b0 seq=1
+        PT recycle b0 -> OPEN seq=2
+        W1 read seq=2
+  -- shortest counterexample STUCK (writers=[[1, 2]] cap=2): terminal with 1/2 delivered
+        W0 load b0
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b0 (state now OPEN)
+        W0 read seq=0
+        W0 memcpy
+        W0 filled+=1
+        W0 load b0
+        W0 fail->seal
+        PT seal b0
+        PT recycle b1 -> OPEN seq=1
+        PT submit b0 len=1
+        W0 store SEALED b0 (was SENDING)
+        W0 load b1
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b1 (state now OPEN)
+        W0 read seq=1
+        W0 memcpy
+        W0 filled+=2
+        PT seal b1
+        PT complete b0 seq=0
+        PT recycle b0 -> OPEN seq=2
+  -- shortest counterexample TORN (writers=[[1, 1], [1]] cap=2): msg (1, 0, 0, 1, False) sent uncopied
+        W0 load b0
+        W0 check ok (state=OPEN)
+        W0 CAS ok off=0 b0 (state now OPEN)
+        W0 read seq=0
+        W0 memcpy
+        W0 filled+=1
+        W0 load b0
+        W0 check ok (state=OPEN)
+        PT seal b0
+        PT submit b0 len=1
+        W0 CAS ok off=1 b0 (state now SENDING)
+        W0 read seq=0
+        W0 memcpy
+        PT complete b0 seq=0
+        PT recycle b0 -> OPEN seq=1
+        W0 filled+=1
+        W1 load b0
+        W1 check ok (state=OPEN)
+        W1 CAS ok off=0 b0 (state now OPEN)
+        PT seal b0
+        PT submit b0 len=1
+        PT complete b0 seq=1

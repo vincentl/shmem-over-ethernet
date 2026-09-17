@@ -1,0 +1,98 @@
+[FAIL] N=2 L=(1,1) prog=RR fwd=after: states=1274 terminal-done=1 deadlocks=0 cannot-finish=0 violations=yes (0.0s)
+   first violation: node0: downward forward to n1 epoch 0 chunk 0 read dest tagged (1, 1)
+      n0.pe0[k=0,d=0] START source:=epoch0
+      n0.pe0[k=0,d=0] INC arrived:=1
+      n0.pe0[k=0,d=0] ARR_LOAD load=1==target
+      n0.pe0[k=0,d=0] COMB combine step 0 -> dest=(e0,local)
+      n0.pe0[k=0,d=0] ENQ_R enqueue arrival(epoch 0, dest ref)
+      n1.pe0[k=0,d=0] START source:=epoch0
+      n1.pe0[k=0,d=0] INC arrived:=1
+      n1.pe0[k=0,d=0] ARR_LOAD load=1==target
+      n1.pe0[k=0,d=0] COMB combine step 0 -> dest=(e0,local)
+      n1.pe0[k=0,d=0] ENQ_R enqueue arrival(epoch 0, dest ref)
+      n1.prog up-send epoch 0 chunk 0
+      n1.prog up-send epoch 0 chunk 1
+      n0.prog merge child n1 epoch 0
+      n0.root release epoch 0
+      n0.prog release e0: write final dest
+      n0.prog released:=1
+      n0.pe0[k=0,d=0] REL_LOAD load=1==target
+      n0.pe0[k=0,d=0] COP_LOAD load=0==target
+      n0.pe0[k=0,d=0] FINISH return
+      n0.pe0[k=1,d=1] START source:=epoch1
+      n0.pe0[k=1,d=1] INC arrived:=2
+      n0.pe0[k=1,d=1] ARR_LOAD load=2==target
+      n0.pe0[k=1,d=1] COMB combine step 0 -> dest=(e1,local)
+      n0.prog futex_wake(released,ALL)(nobody)
+[FAIL] N=2 L=(2,1) prog=RR fwd=after: states=13353 terminal-done=1 deadlocks=0 cannot-finish=0 violations=yes (0.2s)
+   first violation: node0: downward forward to n1 epoch 0 chunk 0 read dest tagged (1, 0)
+      n0.pe0[k=0,d=0] START source:=epoch0
+      n0.pe1[k=0,d=0] START source:=epoch0
+      n0.pe1[k=0,d=0] INC arrived:=1
+      n0.pe0[k=0,d=0] INC arrived:=2
+      n0.pe0[k=0,d=0] ARR_LOAD load=2==target
+      n0.pe0[k=0,d=0] COMB combine step 0
+      n0.pe0[k=0,d=0] COMB combine step 1 -> dest=(e0,local)
+      n0.pe0[k=0,d=0] ENQ_R enqueue arrival(epoch 0, dest ref)
+      n1.pe0[k=0,d=0] START source:=epoch0
+      n1.pe0[k=0,d=0] INC arrived:=1
+      n1.pe0[k=0,d=0] ARR_LOAD load=1==target
+      n1.pe0[k=0,d=0] COMB combine step 0 -> dest=(e0,local)
+      n1.pe0[k=0,d=0] ENQ_R enqueue arrival(epoch 0, dest ref)
+      n1.prog up-send epoch 0 chunk 0
+      n1.prog up-send epoch 0 chunk 1
+      n0.prog merge child n1 epoch 0
+      n0.root release epoch 0
+      n0.prog release e0: write final dest
+      n0.prog released:=1
+      n0.pe0[k=0,d=0] REL_LOAD load=1==target
+      n0.pe1[k=0,d=0] REL_LOAD load=1==target
+      n0.pe1[k=0,d=0] COPYOUT copy-out chunk 0
+      n0.pe1[k=0,d=0] COPYOUT copy-out chunk 1
+      n0.pe1[k=0,d=0] COPINC copied:=1
+      n0.pe0[k=0,d=0] COP_LOAD load=1==target
+      n0.pe0[k=0,d=0] FINISH return
+      n0.pe0[k=1,d=1] START source:=epoch1
+      n0.pe0[k=1,d=1] INC arrived:=3
+      n0.pe1[k=0,d=0] WAKE_COP futex_wake(copied,1)(nobody)
+      n0.pe1[k=0,d=0] FINISH return
+      n0.pe1[k=1,d=1] START source:=epoch1
+      n0.pe1[k=1,d=1] INC arrived:=4
+      n0.pe0[k=1,d=1] ARR_LOAD load=4==target
+      n0.pe0[k=1,d=1] COMB combine step 0
+      n0.prog futex_wake(released,ALL)(nobody)
+[FAIL] N=3 chain L=(1,1,1) prog=RR fwd=after: states=15861 terminal-done=1 deadlocks=0 cannot-finish=0 violations=yes (0.3s)
+   first violation: node0: downward forward to n1 epoch 0 chunk 0 read dest tagged (1, 1)
+      n0.pe0[k=0,d=0] START source:=epoch0
+      n0.pe0[k=0,d=0] INC arrived:=1
+      n0.pe0[k=0,d=0] ARR_LOAD load=1==target
+      n0.pe0[k=0,d=0] COMB combine step 0 -> dest=(e0,local)
+      n0.pe0[k=0,d=0] ENQ_R enqueue arrival(epoch 0, dest ref)
+      n1.pe0[k=0,d=0] START source:=epoch0
+      n1.pe0[k=0,d=0] INC arrived:=1
+      n1.pe0[k=0,d=0] ARR_LOAD load=1==target
+      n1.pe0[k=0,d=0] COMB combine step 0 -> dest=(e0,local)
+      n1.pe0[k=0,d=0] ENQ_R enqueue arrival(epoch 0, dest ref)
+      n2.pe0[k=0,d=0] START source:=epoch0
+      n2.pe0[k=0,d=0] INC arrived:=1
+      n2.pe0[k=0,d=0] ARR_LOAD load=1==target
+      n2.pe0[k=0,d=0] COMB combine step 0 -> dest=(e0,local)
+      n2.pe0[k=0,d=0] ENQ_R enqueue arrival(epoch 0, dest ref)
+      n2.prog up-send epoch 0 chunk 0
+      n2.prog up-send epoch 0 chunk 1
+      n1.prog merge child n2 epoch 0
+      n1.prog up-send epoch 0 chunk 0
+      n1.prog up-send epoch 0 chunk 1
+      n0.prog merge child n1 epoch 0
+      n0.root release epoch 0
+      n0.prog release e0: write final dest
+      n0.prog released:=1
+      n0.pe0[k=0,d=0] REL_LOAD load=1==target
+      n0.pe0[k=0,d=0] COP_LOAD load=0==target
+      n0.pe0[k=0,d=0] FINISH return
+      n0.pe0[k=1,d=1] START source:=epoch1
+      n0.pe0[k=1,d=1] INC arrived:=2
+      n0.pe0[k=1,d=1] ARR_LOAD load=2==target
+      n0.pe0[k=1,d=1] COMB combine step 0 -> dest=(e1,local)
+      n0.prog futex_wake(released,ALL)(nobody)
+[PASS] N=2 L=(1,1) prog=BB fwd=after: states=950 terminal-done=1 deadlocks=0 cannot-finish=0 violations=no (0.0s)

@@ -1,0 +1,5 @@
+B PEs=  1 get=   4096 B: A-PE share of segment bytes: doc policy 0.984, capped-at-half 0.984
+B PEs=  4 get=  65536 B: A-PE share of segment bytes: doc policy 0.000, capped-at-half 0.500
+B PEs= 16 get=  65536 B: A-PE share of segment bytes: doc policy 0.000, capped-at-half 0.500
+B PEs=256 get=   4096 B: A-PE share of segment bytes: doc policy 0.000, capped-at-half 0.500
+B PEs=256 get=1048576 B: A-PE share of segment bytes: doc policy 0.000, capped-at-half 0.500

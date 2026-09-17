@@ -1,0 +1,93 @@
+==E1
+after 1000 idle-loop iterations: futex SQEs submitted=1000, futex CQEs=0, other CQEs=1000 -> 1000 futex waits still armed in kernel
+CQEs from that single wake: 1000 (CQ size 64; kernel overflow flag=clear)
+further CQEs flushed from overflow list: 0
+==E2
+(a) 100x3000B records, 4096B pbufs: 100 data CQEs, CQE sizes <=1K:0 <=2K:1 <=3000:98 <4096:0 =4096:1; CQE boundaries falling inside a record: 1; ENOBUFS=0
+(b) 64KB segment, pbufs held until segment complete: got 32768/65536 bytes in 8 pbufs, last terminal res=-105 (No buffer space available), re-arms=4 -> segment never completes (receive stalled; TCP window then stalls the sender)
+==E3
+(a) queue order: 0 1 2 3 4 then 99(SCHED_FIFO; 98 = setschedparam failed). wake(1) order: 99 0 1 2 3 4
+(b) released one descriptor; futex_wake(1) woke 1
+(b) buffer-space waiter woken (wake #1), no buffer, re-sleeps
+(b) descriptor waiter: TIMED OUT after 1.01s although a descriptor was freed and a wake issued
+(b) descriptor waiter finally acquired (via safety timeout)
+(b) buffer-space waiter woken (wake #2), no buffer, re-sleeps
+==E5
+send 4194304 bytes, flags=0: CQE res=32741  <-- SHORT SEND
+send 4194304 bytes, flags=MSG_WAITALL: CQE res=4194304
+==E4
+e4.o:     file format elf64-littleaarch64
+Disassembly of section .text:
+0000000000000000 <load_acq>:
+   0:	ldar	w0, [x0]
+   4:	ret
+0000000000000008 <load_seq>:
+   8:	ldar	w0, [x0]
+   c:	ret
+0000000000000010 <load_rel>:
+  10:	ldr	w0, [x0]
+  14:	ret
+  18:	nop
+  1c:	nop
+0000000000000020 <add_rel>:
+  20:	mov	x2, x0
+  24:	stp	x29, x30, [sp, #-16]!
+  28:	mov	w0, w1
+  2c:	mov	x29, sp
+  30:	add	x1, x2, #0x4
+  34:	bl	0 <__aarch64_ldadd4_rel>
+  38:	ldp	x29, x30, [sp], #16
+  3c:	ret
+0000000000000040 <add_seq>:
+  40:	mov	x2, x0
+  44:	stp	x29, x30, [sp, #-16]!
+  48:	mov	w0, w1
+  4c:	mov	x29, sp
+  50:	add	x1, x2, #0x4
+  54:	bl	0 <__aarch64_ldadd4_acq_rel>
+  58:	ldp	x29, x30, [sp], #16
+  5c:	ret
+0000000000000060 <cas_acq>:
+  60:	stp	x29, x30, [sp, #-32]!
+  64:	mov	x29, sp
+  68:	str	x19, [sp, #16]
+  6c:	mov	w19, w1
+  70:	add	w1, w2, w1
+  74:	mov	x2, x0
+  78:	mov	w0, w19
+  7c:	bl	0 <__aarch64_cas4_acq>
+  80:	cmp	w0, w19
+  84:	ldr	x19, [sp, #16]
+  88:	cset	w0, eq	// eq = none
+  8c:	ldp	x29, x30, [sp], #32
+  90:	ret
+  94:	nop
+  98:	nop
+  9c:	nop
+00000000000000a0 <cas_seq>:
+  a0:	stp	x29, x30, [sp, #-32]!
+  a4:	mov	x29, sp
+  a8:	str	x19, [sp, #16]
+  ac:	mov	w19, w1
+  b0:	add	w1, w2, w1
+  b4:	mov	x2, x0
+  b8:	mov	w0, w19
+  bc:	bl	0 <__aarch64_cas4_acq_rel>
+  c0:	cmp	w0, w19
+  c4:	ldr	x19, [sp, #16]
+  c8:	cset	w0, eq	// eq = none
+  cc:	ldp	x29, x30, [sp], #32
+  d0:	ret
+0000000000000060 <cas_acq>:
+  60:	stp	x29, x30, [sp, #-32]!
+  64:	mov	x29, sp
+  68:	str	x19, [sp, #16]
+  6c:	mov	w19, w1
+  70:	add	w1, w2, w1
+  74:	mov	x2, x0
+  78:	mov	w0, w19
+  7c:	bl	0 <__aarch64_cas4_acq>
+  80:	cmp	w0, w19
+  84:	ldr	x19, [sp, #16]
+  88:	cset	w0, eq	// eq = none
+  8c:	ldp	x29, x30, [sp], #32

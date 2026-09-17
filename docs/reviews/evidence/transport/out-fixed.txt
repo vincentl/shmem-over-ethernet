@@ -1,0 +1,6 @@
+=== variant: fixed
+  writers=[[1, 2]] cap=2 states=107 violations=[]
+  writers=[[1, 2, 1]] cap=2 states=279 violations=[]
+  writers=[[1, 1], [1]] cap=2 states=4783 violations=[]
+  writers=[[1, 2], [1]] cap=2 states=3490 violations=[]
+  writers=[[2, 1], [1, 1]] cap=3 states=44627 violations=[]
