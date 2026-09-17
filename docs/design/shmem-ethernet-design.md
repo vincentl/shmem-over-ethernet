@@ -2247,10 +2247,31 @@ an earlier draft proposed — there is no channel to publish on without a KVS or
 shared filesystem.)*
 
 **Non-Slurm launch** (plain `ssh`, a test harness) sets the same variables under
-the `OSOE_` prefix — `OSOE_PROCID`, `OSOE_NODEID`, and so on — which take
-precedence. The `SHMEM_` prefix is the specification's, not ours. The tier-1 and
-tier-2 harnesses of §8 use this path, so the bootstrap runs in every test rather
-than only on a cluster.
+the `OSOE_` prefix, which take precedence. The `SHMEM_` prefix is the
+specification's, not ours. The tier-1 and tier-2 harnesses of §8 use this path, so
+the bootstrap runs in every test rather than only on a cluster. The names mirror
+§6.1 exactly:
+
+| `OSOE_` variable | Mirrors | Read by phase 1 step 1 |
+|---|---|---|
+| `OSOE_PROCID` | `SLURM_PROCID` | Yes |
+| `OSOE_STEP_NUM_TASKS` | `SLURM_STEP_NUM_TASKS` | Yes |
+| `OSOE_NODEID` | `SLURM_NODEID` | Yes |
+| `OSOE_LOCALID` | `SLURM_LOCALID` | Yes |
+| `OSOE_GTIDS` | `SLURM_GTIDS` | Yes |
+| `OSOE_STEP_NODELIST` | `SLURM_STEP_NODELIST` | No: one node needs no host list |
+| `OSOE_JOB_ID` | `SLURM_JOB_ID` | Yes, in segment names |
+| `OSOE_STEP_ID` | `SLURM_STEP_ID` | Yes, in segment names |
+
+The rule is the `SLURM_` name with the prefix replaced, including `STEP_` where
+Slurm has it, so nobody has to remember a second vocabulary. `OSOE_NODE_MAP`
+(§8.1) and `OSOE_BOOTSTRAP_TIMEOUT` (above) are osoe's own.
+
+The test launcher, `tools/launch/osoe-launch`, starts L processes of a one-node
+job with these variables set. Its job id is its own pid, so concurrent launches
+never share a name. It fails on a nonzero exit, a signal, a timeout, or a clean
+job that left `/dev/shm/osoe.<job>.*` behind. That last check tests the naming
+rules above on every multi-process test.
 
 ### 6.3 PMI-2 as an optional backend
 
