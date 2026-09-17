@@ -3181,6 +3181,24 @@ Each workload runs under the four §8.1 node maps, so both paths are measured.
 U1, U3 and U7 exercise the §10 fence-eagerness question directly. U6 waits for
 `MULTIPLE`.
 
+**Corpus and traces.** `tools/corpus/manifest.tsv` pins the usage study's code
+bases at full commit SHAs (the OSU tarball by SHA-256), and
+`tools/corpus/fetch.sh` fetches exactly those into `corpus/`, which git ignores.
+Pins make every `file:line` citation reproducible. The corpus is read, never
+built or copied: this repository has no license yet, and corpus licenses vary.
+Each workload is backed by a *virtual trace* in `docs/design/workloads/traces/`,
+one hot-loop iteration as ordered calls with sizes, targets, repeat counts, and
+contexts, each step cited. Traces come from reading, not running, since building
+C, Fortran, UPC, and CUDA codes tells us little before osoe exists; frequencies
+and data-dependent sizes therefore stay symbolic. Reading already corrected the
+table in three places, noted in the traces: ISx uses blocking puts and a barrier,
+not nonblocking puts and a quiet; its offset counter is a symmetric static, so U5
+needs §4.3; and convey's on-node path never fences. Dynamic traces come later
+with no changes to the codes: §7.4 makes `pshmem_` names mandatory with `shmem_`
+as weak aliases, so an interposition library defining `shmem_*` and forwarding to
+`pshmem_*` can record real call sequences to check the virtual traces and fill in
+their symbols.
+
 ---
 
 ## 9. Load-Bearing Invariants

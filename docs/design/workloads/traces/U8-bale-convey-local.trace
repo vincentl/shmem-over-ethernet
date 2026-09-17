@@ -1,0 +1,28 @@
+# U8, intranode direct access: bale's tensor conveyor, on-node (local) porter.
+# The sender copies a full buffer straight into the peer's receive area and
+# stores a signal word there, both through pointers from shmem_ptr. The
+# receiver polls its signal words with plain atomic loads (putport.c:109) and,
+# once it has used the buffer, acknowledges with an ordinary one-word put.
+#
+# Against §8.6: the local send path has no fence (putport.c:328-348); only the
+# RMA porter fences (:261). And the acknowledgement stays RMA even on-node.
+#
+# Setup, outside this trace: shmem_ptr on each on-node peer's receive buffers
+# and signal array (putport.c:309,311), once per porter setup (:302-317).
+trace     U8-bale-convey-local
+workload  U8
+source    bale 1b8f673b56645b2bd74a8af6213462bbc9d559fe
+loop      src/bale_classic/convey/putport.c:328-348  one buffer sent to an on-node PE, and its acknowledgement (:175-199)
+threads   1
+build     MPP_USE_SHMEM and CONVEY_INTRANODE, which needs HAVE_SHMEM_PTR and lock-free 64-bit atomics (common.h:23-25); the tensor conveyor gives its on-node porters porter_opt_LOCAL (tensor.c:466-467, putport.c:522,579)
+param     BUF  data   # bytes in the buffer, at most the porter's buffer size
+
+# The destination is one of the PEs on this node (tensor.c:462-463), chosen by
+# where the buffered items are going: random within the node.
+role sender  the PE whose buffer is full
+  direct  store  1  BUF  random  -  src/bale_classic/convey/putport.c:339  # memcpy into the peer's receive buffer
+  direct  store  8  1    random  -  src/bale_classic/convey/putport.c:346  # atomic store of the signal word
+end
+role receiver  the on-node PE that received it, after using the buffer
+  call  shmem_longlong_p  8  1  random  default  src/bale_classic/convey/putport.c:194  # consumed[slot] on the sender
+end

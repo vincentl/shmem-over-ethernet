@@ -1,0 +1,33 @@
+# U7, phase boundaries: bale's simple conveyor, one convey_advance call.
+# Every advance takes a collective decision with a one-word OR reduction, and
+# bale's wrapper puts a barrier on each side of it. When the PEs decide to
+# communicate, the alltoallv emulation adds two more barriers around a putmem
+# loop. Applications call convey_advance in a loop until it reports done
+# (for example apps/histo_src/histo_conveyor.upc:45).
+trace     U7-bale-convey
+workload  U7
+source    bale 1b8f673b56645b2bd74a8af6213462bbc9d559fe
+loop      src/bale_classic/convey/simple.c:244-287  one advance of the simple conveyor
+threads   1
+build     MPP_USE_SHMEM, without HAVE_SHMEMX_ALLTOALLV and HAVE_MPP_UTIL (simple.c:83-105); with the SOS extension, shmemx_alltoallv (:95) replaces the emulation below
+build     convey_new picks the simple conveyor when its parameters say sync (src/bale_classic/convey/convey.c:441-443); otherwise the tensor conveyor (U8)
+param     P      data   # PEs in the job
+param     BYTES  data   # bytes buffered for one destination since the last exchange
+# No calls when the conveyor is already quiet (simple.c:253-254).
+
+# mpp_or_long -> xshmem_or_long, the REDUCER macro (mpp2shmem.h:21; mpp2shmem.c:28-40,44), called at simple.c:273
+call  shmem_barrier_all     -  -  all  -  src/bale_classic/convey/mpp2shmem.c:35
+call  shmem_long_or_to_all  8  1  all  -  src/bale_classic/convey/mpp2shmem.c:36  # expanded from a macro; spelled at :44. The three decision bits
+call  shmem_barrier_all     -  -  all  -  src/bale_classic/convey/mpp2shmem.c:38
+
+when some PE wants to communicate and none is blocked (simple.c:277-278)
+  # simple_alltoallv -> xshmem_alltoallv, called at simple.c:101
+  call  shmem_barrier_all  -  -  all  -  src/bale_classic/convey/mpp2shmem.c:87
+  repeat P  every PE including the caller, in a fixed pseudo-random permutation (simple.c:34-57)
+    when BYTES > 0
+      call  shmem_putmem  1  BYTES  each  default  src/bale_classic/convey/mpp2shmem.c:92
+    end
+    call  shmem_putmem  1  8  each  default  src/bale_classic/convey/mpp2shmem.c:93  # the byte count, a size_t
+  end
+  call  shmem_barrier_all  -  -  all  -  src/bale_classic/convey/mpp2shmem.c:96
+end

@@ -1,0 +1,32 @@
+# U5, aggregated alltoallv: ISx bucket sort, key exchange.
+# Per destination PE, reserve space in its receive buffer with a remote
+# fetch-and-add on its offset counter, then put the whole bucket there. The
+# receiver makes no call: the reservations serialize concurrent senders.
+#
+# Against §8.6: ISx uses blocking puts and a barrier, not nonblocking puts and a
+# quiet; bale convey's nonblocking porter (convey/putport.c:431,460) is the
+# quiet form. And the offset counter receive_offset is a global variable
+# (SHMEM/isx.c:65), a symmetric static, which osoe rejects until §4.3 lands.
+trace     U5-isx
+workload  U5
+source    isx d31936a68c49415e7605125d810e13a6ec5b50b1
+loop      SHMEM/isx.c:209-258  one sort iteration (BURN_IN iterations run the same calls untimed)
+threads   1
+build     BARRIER_ATA defined (SHMEM/params.h:82)
+build     PERMUTE commented out (params.h:86) and INCAST not defined: targets in ring order from the calling PE
+param     P     data   # PEs in the job
+param     KEYS  data   # keys in one bucket; varies per destination
+
+call  shmem_barrier_all  -  -  all  -  SHMEM/isx.c:215
+
+# exchange_keys(), called at :229-231
+call  shmem_longlong_fadd  8  1  self  default  SHMEM/isx.c:439  # own reservation; the keys are then copied locally (:440-442)
+repeat P-1  destination PEs (my_rank + i) % P, skipping the calling PE (:445-456)
+  call  shmem_longlong_fadd  8  1     each  default  SHMEM/isx.c:461  # returns the write offset
+  call  shmem_int_put        4  KEYS  each  default  SHMEM/isx.c:468  # the bucket, at that offset
+end
+call  shmem_barrier_all  -  -  all  -  SHMEM/isx.c:477  # BARRIER_ATA
+
+# receive_offset is read locally after this barrier (:233) and reset to 0 (:247).
+call  shmem_barrier_all  -  -  all  -  SHMEM/isx.c:237
+call  shmem_barrier_all  -  -  all  -  SHMEM/isx.c:256
