@@ -1,5 +1,7 @@
 # Reading corpus for the reference workloads (design §8.6), fetched by fetch.sh.
-# Entries and pins come from docs/reviews/evidence/q2/q2-usage.md §0.
+# Entries and pins come from docs/reviews/evidence/q2/q2-usage.md §0, except
+# OSU Micro-Benchmarks: q2-usage read 7.5; 7.5.2 is the latest stable release,
+# and its c/openshmem/ differs only in copyright years and "int size" -> "size_t size".
 #
 # Columns, tab-separated; "-" marks an empty field:
 #   name     directory under corpus/
@@ -17,7 +19,7 @@
 # deepep, pplx-kernels, triton-distributed, and pytorch call NVSHMEM, not
 # OpenSHMEM (triton-distributed also wraps rocSHMEM). They are kept as evidence
 # for the put-with-signal idiom behind U4; no trace cites them.
-osu-omb	tarball	https://mvapich.cse.ohio-state.edu/download/mvapich/osu-micro-benchmarks-7.5.tar.gz	1cf84ac5419456202757a757c5f9a4f5c6ecd05c65783c7976421cfd6020b3b3	osu-micro-benchmarks-7.5/c/openshmem
+osu-omb	tarball	https://mvapich.cse.ohio-state.edu/download/mvapich/osu-micro-benchmarks-7.5.2.tar.gz	618de3d0b1122f73a9229177d2da1e5cd62e431190580cb915f2605849cbbbdc	osu-micro-benchmarks-7.5.2/c/openshmem
 osb	git	https://github.com/ornl-languages/osb	39cfcadd70164ac29bb141c9eb34bec6add54520	-
 openshmem-npbs	git	https://github.com/openshmem-org/openshmem-npbs	0028e8d07e1e860cc924cca2df02bc528e4e461d	-
 isx	git	https://github.com/ParRes/ISx	d31936a68c49415e7605125d810e13a6ec5b50b1	SHMEM/isx.c
