@@ -9,7 +9,14 @@
 #   paths    comma-separated paths of interest, relative to corpus/<name>/;
 #            the checkout for git-sparse, informational otherwise
 #
-# Not listed: TAU (tau2), which q2-usage excluded because it wraps every routine.
+# Not listed, though q2-usage §0 read them:
+#   TAU (tau2): excluded by q2-usage because it wraps every routine.
+#   lamellar-runtime: makes no OpenSHMEM calls; its "shmem" is POSIX shared memory.
+#   openshmem_rs: Rust bindings with no application using them.
+#
+# deepep, pplx-kernels, triton-distributed, and pytorch call NVSHMEM, not
+# OpenSHMEM (triton-distributed also wraps rocSHMEM). They are kept as evidence
+# for the put-with-signal idiom behind U4; no trace cites them.
 osu-omb	tarball	https://mvapich.cse.ohio-state.edu/download/mvapich/osu-micro-benchmarks-7.5.tar.gz	1cf84ac5419456202757a757c5f9a4f5c6ecd05c65783c7976421cfd6020b3b3	osu-micro-benchmarks-7.5/c/openshmem
 osb	git	https://github.com/ornl-languages/osb	39cfcadd70164ac29bb141c9eb34bec6add54520	-
 openshmem-npbs	git	https://github.com/openshmem-org/openshmem-npbs	0028e8d07e1e860cc924cca2df02bc528e4e461d	-
@@ -24,5 +31,3 @@ deepep	git	https://github.com/deepseek-ai/DeepEP	a56d6156febcd9976e55adc85b5155b
 pplx-kernels	git	https://github.com/ppl-ai/pplx-kernels	f70d1eb7572dac725da9cf4ca6d1db075595b012	csrc/all_to_all
 triton-distributed	git	https://github.com/ByteDance-Seed/Triton-distributed	8260bc34398c2b8f36dc840fd22f741ca9294584	python/triton_dist/kernels,python/triton_dist/layers
 pytorch	git-sparse	https://github.com/pytorch/pytorch	9f5701fdbdafa2f0656224322c11660064cc4c8f	torch/csrc/distributed/c10d/symm_mem/nvshmem_extension.cu,torch/csrc/distributed/c10d/symm_mem/NVSHMEMSymmetricMemory.cpp
-openshmem-rs	git	https://github.com/kumaryash6352/openshmem_rs	5e1fa06fb81748f894b364bf1823452d9ba10003	-
-lamellar-runtime	git	https://github.com/pnnl/lamellar-runtime	06b7746b0e9a3a9292cfd632a06d6f87eea7ecd7	-
