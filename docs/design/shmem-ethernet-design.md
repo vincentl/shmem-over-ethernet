@@ -137,6 +137,10 @@ Puts, gets, AMOs, signalled puts, and all collectives are AM handlers. The
 symmetric heap, address translation, and the intranode shared-memory path are
 the actual product and do not come from any lower layer.
 
+Inside the SHMEM layer, §4 reaches other PEs only through the transport boundary
+of §4.10: put, get, rmw, fence, wait, and notify. AM is one implementation of
+that boundary.
+
 ### 2.3 Rejected alternatives
 
 | Candidate | Reason rejected |
@@ -1282,10 +1286,35 @@ In normal mode `barrier_all` already happened to conform, because its arrival
 
 #### Data structures
 
-**Thread level.** Phase 1 provides `SHMEM_THREAD_SINGLE`; §9.2.1 lets
-`shmem_init_thread` provide less than requested. The structures below assume it
-and are marked where `MULTIPLE` would change them: under `MULTIPLE` the
-equality wait below can starve, and clearing the dirty set races.
+**Thread level.** Phase 1 provides up to `SHMEM_THREAD_SERIALIZED`: `SINGLE`,
+`FUNNELED`, and `SERIALIZED` are all supported, and a request for `MULTIPLE`
+provides `SERIALIZED`, which §9.2.1 permits. The structures below assume that at
+most one application thread of a PE is inside the library at a time. They are
+marked where `MULTIPLE` would change them: under `MULTIPLE` the equality wait below
+can starve, and clearing the dirty set races.
+
+The three levels cost the same, because every structure in this section is safe
+under "one caller at a time". Which thread the caller is does not matter.
+`FUNNELED` is `SERIALIZED` with one thread. Three things do depend on the calling
+thread, and each is already per-thread or checked:
+
+- **Memory stores.** Fence and wait order only the calling thread's stores (spec
+  §9.12.1, §9.12.2). Stores by another thread are the application's to make
+  visible.
+- **Library state handed between threads.** Under `SERIALIZED`, thread A may leave
+  plain stores in library-private state, such as the dirty set or a team's epoch
+  count, and thread B may load them next on another core. The spec requires the
+  application to keep calls from overlapping. Any mechanism that does so is a
+  synchronization under the platform's memory model, and that makes A's stores
+  visible to B. This is the same argument the spec makes for memory stores, and the
+  library relies on it rather than adding a serializing store to every entry point.
+- **Finalize and fork.** `shmem_finalize` must come from the thread that called
+  `shmem_init_thread` (spec §9.2, rule 1). The fork check (§6.4) compares pids, not
+  threads.
+
+Per-thread records (a watch, a blocking-get completion slot) are allocated per
+calling thread even though `SERIALIZED` needs only one per PE. That way `MULTIPLE`
+adds concurrency to them rather than multiplying them.
 
 **Get completion — two cumulative counters per PE, no per-operation state:**
 
@@ -1307,7 +1336,7 @@ compares the counters, then waits on the wake word. The per-connection `acked`
 value that `quiet` waits on follows the same pattern.
 
 **Blocking gets and fetching AMOs** do need per-operation completion: the caller
-waits for *its* reply, not for a byte count. Under `SINGLE` a PE has at most one
+waits for *its* reply, not for a byte count. Up to `SERIALIZED` a PE has at most one
 such operation outstanding, so its landing zone holds one completion slot with its
 own wake word.
 
@@ -1479,10 +1508,19 @@ local PE storing through the shared heap.
 > **One watch slot per local PE for the wake decision; a 32-bit sequence word in
 > the slot for the wait.**
 
-A wait is always on the *caller's own* symmetric variable, so a writer that stores
-to `(PE, offset)` only ever needs to look at that one PE's slot. Under
-`SHMEM_THREAD_SINGLE` (§4.6) a PE waits on at most one variable at a time, so one
-slot per PE is enough: no hash table, no probing, and no slot deletion.
+A wait is always on the *caller's own* symmetric variables, so a writer that
+stores to `(PE, offset)` only ever needs to look at that one PE's slot. Under
+`SHMEM_THREAD_SERIALIZED` and below (§4.6) a PE is in at most one wait at a time, so one slot per
+PE is enough: no hash table, no probing, and no slot deletion.
+
+**A slot watches a byte range, not one offset.** An earlier draft said a PE waits on
+one variable at a time. The multiple-element waits contradict that:
+`shmem_wait_until_{all,any,some}` and their `_vector` forms (spec §9.11.2–§9.11.7)
+block on an array `ivars[0..nelems)`. That array is one contiguous range, so the
+slot publishes `[offset, offset + len)` and a writer wakes on overlap. A write to
+an unwaited element of the array wakes spuriously, and the loop re-checks. The
+two-word publication replaces the single `watched` word below. Re-run the §4.9
+model on it before `wait_until` is implemented.
 
 An earlier draft had the waiter futex directly on the `ivar`. That works only for
 32-bit types: **the kernel implements only 32-bit futexes.** `futex_wait` with
@@ -1529,9 +1567,18 @@ The slot lives in the shared node segment, so the wait is a shared (not
 sits at a different address in each sibling process (§4.1). Slots are
 cache-line padded with `_Alignas` and live in the node segment.
 
-**Cost is one load per applied operation on the target side**, and only for
-operations that write a heap: the target PE's `watched` word, compared with the
-offset just written.
+**Cost is a load or two per applied operation on the target side**, and only for
+operations that write a heap: the target PE's watched range, compared with the
+bytes just written.
+
+**Exact for AMOs, best effort for puts** (§4.10). The writer side above assumes a
+locked or `seq_cst` store. A put's `memcpy` is neither, so a put notifies straight
+after the copy, and on x86 the wake can be lost. The safety-sweep deadline bounds
+that loss. Spec 1.5 change #17 requires `ivar` to be updated with AMOs, so only a
+non-conforming program sees it, or one using the deprecated `short` waits, which
+have no AMO type. Serializing every put was rejected: it costs a store on every
+intranode put for programs the spec does not require it for, and it would force an
+RDMA backend to raise a CPU event on every NIC write.
 
 **Under `MULTIPLE`**, several threads of one PE can wait on different variables,
 so a slot becomes a small per-PE list. The review found that the obvious list
@@ -1556,7 +1603,8 @@ enough.
 becomes a latency spike with a counter rather than a hang. It is an **absolute**
 deadline — see §3.10 on the two timeout conventions. **Count
 timeout-wakes.** A nonzero count in production means the watch slots have a bug,
-and that counter is the only thing that will ever tell you.
+or the program updates wait variables with puts. That counter is the only thing
+that will ever tell you.
 
 **`shmem_test` never blocks** — predicate check, no slot interaction at all.
 Likewise the multiple-element tests. On an empty test set, `shmem_test_all` and
@@ -1580,6 +1628,125 @@ the same instruction a local PE would issue — so both hold without further wor
   establishes that the Pi will not honour a short `nanosleep`, so the choice
   collapses to latency or a burned core — on hardware where a burned core is a
   progress thread or a mid-`memcpy` writer.
+
+### 4.10 The SHMEM↔transport boundary
+
+> **The SHMEM layer reaches other PEs only through seven operations — put, get,
+> read-modify-write, fence, wait, notify, and a coherent load of its own words —
+> addressed as `(pe, region, offset)`. It never calls the AM layer.**
+
+AM is the only network implementation, and §2.2 makes puts and gets AM handlers.
+Nothing in §4 should know that. The core-API study (`docs/reviews/core-api.md`
+§8.3) proposed naming the boundary in these terms so a future RDMA backend can
+replace the handlers without touching this section. It costs one internal header,
+`shmem/src/transport.h`, which states the full contract. This section records the
+decisions in it. The core-API study named six operations; the seventh, `load`,
+closes a gap found against it: without it, `shmem_test` and the `wait_until`
+predicate would read the variable directly, which is incoherent on a network whose
+NIC atomics the CPU cannot see.
+
+**Addressing.** A world rank, a region that exists in every PE (the heap, the
+library's internal region of §5.8, and statics with §4.3 phase 1.5), and an offset from that region's start in the
+*target*. The SHMEM layer converts an address to an offset against its own base
+and checks bounds. It also converts team-relative ranks to world ranks. Nothing
+below the boundary sees an address (invariants 7 and 20).
+
+**Dispatch.** Each call chooses a backend per target PE through the one
+locality function of §8.1. A single context can use both backends at once.
+`osoe_tp_direct(pe, region, offset)` *is* that function. It returns the target's
+address in this process only where the backend orders the calling thread's stores
+through that address against its own writes by the next fence or wait (§4.6). osoe's
+intranode backend does, because it applies writes in the calling thread. The AM
+backend does not, so every PE it carries gets `NULL`, including a local PE under
+force-remote. The rule is phrased as a property rather than "local or not" so that a
+future direct path, such as CXL memory, is not excluded. `shmem_ptr`,
+`shmem_team_ptr`, and `shmem_addr_accessible` consult it and nothing else.
+
+**Binding.** Backends are chosen at build time. There is no table of function
+pointers, and a backend's fast path may become `static inline` behind the same
+names. The intranode floor (§8.4) is `memcpy` plus the synchronization the API
+requires; an indirect call per put is not part of that.
+
+**No capability queries above the boundary.** Every operation is mandatory for
+every backend, and nothing above the boundary asks what a backend supports. Where
+a network lacks something natively, the backend emulates it underneath:
+- a bitwise rmw as a read-then-compare-and-swap loop;
+- a blocking watch as a poll;
+- a fence by draining;
+- a visibility flush inside wait.
+
+What a capability bit would otherwise have exposed becomes either a weaker
+guarantee that all callers tolerate (best-effort notify for puts, spurious wakes)
+or a resource limit the spec already lets fail (`shmem_ctx_create`). The cost is
+that the SHMEM layer cannot choose a different algorithm per network. Build-time
+binding gives backends that freedom instead.
+
+*(Rejected: the core-API study's capability bits. Each one is a branch above the
+boundary that is tested only on the network that sets it.)*
+
+**Errors.** No operation returns one. A transport failure aborts the job (§3.15).
+A wait that cannot finish checks the abort word and the lead's liveness at each
+safety-sweep deadline.
+
+| Operation | Guarantee | Intranode backend | AM backend |
+|---|---|---|---|
+| put | Returns at local completion. Applied later; complete and visible once a covering wait returns. No ordering between puts to one PE except across a fence (spec §9.6.1.1). Notify best effort | `memcpy` into the target's mapping, applied before return, then notify | Reserve and copy into the node-pair buffer (§3.5); the dirty set records the node |
+| get | Blocking. Complete per operation: `dst` holds the bytes on return. Never fenced | `memcpy` out of the target's mapping | Request; the reply lands in the landing zone; the calling thread copies it out (§3.12) |
+| rmw | One 4- or 8-byte word. Exactly once. Exclusive against same-width rmw on the word within one atomicity domain, and against waiters and tests (spec §3.2). Fetching: complete on return. Non-fetching: as a put. Notify exact | One C11 atomic on the shared mapping (§3.16 orders), then notify | Handler-time CPU atomic at the target; a fetched value is a value descriptor (§3.8) |
+| fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then seal and flush the dirty set with ack requested (§4.6) |
+| wait | Every write and nonblocking get on the context — to listed PEs, or to all — is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes |
+| load | A coherent load of a word of the caller's own region, 2, 4 or 8 bytes. Exclusive against rmw on it (spec §3.2). For `shmem_test*`, the `wait_until` predicate, and `shmem_signal_fetch` | One `acquire` load of the word | The same: every writer is a CPU atomic on the shared mapping |
+| notify | Wakes a PE's waiters whose watched range a write overlaps (§4.9). Exact for rmw, best effort for puts; wakes may be spurious | §4.9 watch slot | The same function, called by the progress thread after it applies a write |
+
+**Ordering is the weak contract, with a per-operation fence flag.** The boundary
+promises only what the spec promises: writes to one PE are ordered across a
+fence. An operation may also carry `OSOE_TP_FENCED`, which places it after every
+earlier write on the same `(context, PE)`. `put_signal` is a put followed by an
+rmw with that flag, which is how invariant 5 survives a backend with no stream
+order. Both osoe backends place writes in issue order already: intranode because
+writes apply in the calling thread, and AM because of §3.1. So the flag costs
+them nothing. Stating the weaker contract is what keeps an RDMA backend possible.
+
+*(Rejected: requiring every backend to place writes in issue order. It is true
+of both osoe backends. But it would make order a hidden property of the boundary,
+and an RDMA backend could meet it only by serializing everything to a peer. The
+core-API study also rejects ordered-by-default delivery, because it forfeits
+packet spraying across paths.)*
+
+**Notify belongs to the backends.** The SHMEM layer uses the waiter half: watch,
+load the sequence word, check, wait. A backend calls the writer half after it
+applies any write, whether in the calling thread or on the progress thread
+applying a remote operation. A backend whose writes the CPU never sees, such as
+RDMA, would bridge its NIC events into that call.
+
+**Notify is exact for rmw and best effort for puts.** The §4.9 protocol is
+two-sided (§3.16), and a `memcpy` does not make the writer's side sound. Making it
+sound would take a serializing store on every put, which spec 1.5 change #17 does
+not require (§4.9). A backend whose puts the CPU never sees need not notify for them.
+
+**Atomicity is the spec's, not osoe's.** osoe gets exclusivity across atomicity
+domains for free, because every path is the same CPU atomic on the same mapping
+(§4.1). The boundary does not promise it. A backend whose NIC atomics are not
+coherent with the CPU can then run one domain on the NIC and another on the CPU,
+instead of pushing every on-node rmw through NIC loopback.
+
+**Outside the boundary:**
+
+- **Collectives (§5).** The intranode phase runs on node-segment counters, which
+  are the same under any backend. The internode phase is AM traffic between
+  leads. A future backend implements it either natively or generically over this
+  boundary, using `OSOE_REGION_INTERNAL` for scratch and control words (§5.8). The
+  core-API study also keeps collectives above its core.
+- **Allocation (§4.4)** is a pure function of the call sequence and makes no
+  transport call today. A later hook, `set_range(region, offset, len,
+  attributes)`, may tell a backend which ranges carry atomics or signals. That
+  hook is how an RDMA backend avoids registering the whole heap for NIC atomics
+  or counters (on CXI, a counter on a region disables its optimized RMA). The
+  allocator therefore keeps hinted allocations (`SHMEM_MALLOC_ATOMICS_REMOTE`,
+  `SHMEM_MALLOC_SIGNAL_REMOTE`, spec §9.3.5) able to grow from the opposite end of
+  the heap from unhinted ones. That is still deterministic.
+- **Nonblocking gets and contexts beyond the default.** They add calls to the
+  header when they arrive (§7.3). They do not change the operations above.
 
 ---
 
@@ -1802,14 +1969,16 @@ does **not** generalize:
   rank;
 - **collect** with a different `nelems` per PE needs per-PE sizes and offsets.
 
-Each needs its own design before it is implemented (§7).
+Each needs its own design before it is implemented (§7). Scans have one (§5.8);
+alltoall and collect do not yet.
 
 For the collectives it covers, this still eliminates scratch sizing — no chunking
 loop, no high-water allocation, no per-team data area. Their shared footprint is
 **three counters on three cache lines**, regardless of reduction size.
 
 *(Fallback for cases where `dest` cannot serve: chunk through fixed scratch. The
-loop costs nothing on small reductions and adds pipelining on large ones.)*
+loop costs nothing on small reductions and adds pipelining on large ones. §5.8 turns
+this into the large-reduction design.)*
 
 ### 5.6 Barrier versus sync
 
@@ -1879,6 +2048,100 @@ contexts are the user's responsibility to destroy first or behaviour is
 undefined. Destroying a predefined team is undefined; destroying
 `SHMEM_TEAM_INVALID` is a no-op. The no-op case is worth implementing literally
 rather than asserting on it.
+
+### 5.8 Algorithms beyond the accumulator
+
+§5.5's accumulator is right for barrier, sync, small reductions, and small
+broadcasts, which the usage study shows dominate real codes: two barriers around
+every collective in bale, and one-element reductions per iteration (§8.6 U7).
+Two cases need more:
+- **large reductions**, where the accumulator's internode tree wastes bandwidth;
+- **prefix scans**, which it cannot express at all.
+
+This section records the decisions that must hold when those arrive. Nothing here
+uses an OpenSHMEM extension.
+
+#### What the surface provides, and what it lacks
+
+osoe's collective machinery is:
+- counters in the node segment (§5.4);
+- a local lead that writes its own `dest` (§5.5);
+- AM messages between node leads, carrying values or references (§3.8);
+- handlers that forward down a tree without waking an application thread.
+
+That is enough to express fast algorithms for every collective below.
+
+The transport boundary (§4.10) is not enough on its own. It lacks a region the
+library owns, so a generic implementation has nowhere to land a chunk it has not
+yet combined. **`OSOE_REGION_INTERNAL`** closes that gap. It is a per-PE region
+for library scratch and collective control words, addressed `(pe, region, offset)`
+like the heap. With it, a generic collective can run on any backend over put,
+fenced rmw, and watch, while osoe's AM backend keeps its handlers. Adding the
+region is additive and costs nothing until a collective uses it.
+
+*(Deferred: a separate internal collective-transport header. Both implementations
+would sit behind the same collective routines and be chosen at build time, so the
+header can wait until reductions land and show what it must contain.)*
+
+#### Large reductions
+
+The accumulator's internode phase sends each node's whole vector up a tree and the
+result back down: about twice the bandwidth of a ring (reduce-scatter then
+allgather) or of Rabenseifner's algorithm at large element counts. The rules for
+replacing it:
+
+1. **Chunks land in scratch, never in `dest`.** A ring step receives a chunk and
+   combines it into a `dest` chunk that still holds live data, and with
+   `source == dest` that data is also the source. The receiving lead needs space
+   that is not `dest`: `OSOE_REGION_INTERNAL`, sized to one chunk per step, which
+   bounds it independently of the reduction.
+2. **The lead's application thread combines, never the progress thread.** The lead
+   is blocked in the call regardless. §5.3 keeps O(count) work off the progress
+   thread, because every connection waits behind it. Invariant 16 keeps a second
+   writer out of `dest`, and the progress thread would be one. Handlers only land
+   chunks and signal their arrival.
+3. **Every PE ends with bit-identical results.** Floating-point `SUM` and `PROD`
+   are not associative. Each element's final value is computed once and copied to
+   every PE, never recomputed along different paths. A ring's allgather phase and
+   the accumulator both satisfy this. A scheme where PEs combine the same inputs in
+   different orders does not, and it gives PEs results that differ in the last bit.
+4. **The algorithm is chosen from element count, team node count, and local member
+   count**, above the boundary. That is not a capability query (§4.10). The
+   crossover sizes come from measurement (§10).
+
+The intranode phase is unchanged: the lead combines local members' sources into
+its `dest` after they arrive (§5.5). The internode algorithm then runs between
+leads, and release and copy-out follow the §5.4 counters as before.
+
+#### Prefix scans
+
+`shmem_sum_inscan` and `shmem_sum_exscan` (spec §9.10.10) give PE *i*, in team rank
+order, the sum of sources 0..*i* (inclusive) or 0..*i*−1 (exclusive). Every PE's
+result differs, so there is no accumulator. The spec allows reading a PE's `source`
+once that PE has called, so the design pushes as §5.5 requires.
+
+- **Runs.** At team creation, split the team's rank order into maximal runs of
+  consecutive team ranks on one node. A contiguous layout gives one run per node.
+  Slurm's cyclic distribution (§6.1) can give one run per PE. Team resources (§5.7)
+  record the runs.
+- **Within a run**, the node's lead computes the run's local prefix from members'
+  sources once they have arrived.
+- **Across runs**, a parallel prefix (up-sweep and down-sweep) over the run
+  sequence gives each run the offset vector of everything before it: O(log runs)
+  rounds of `nelems` elements each. Every round's messages between runs on the same
+  node pair share that pair's stream and aggregate (§3.9). A contiguous layout
+  therefore costs O(log nodes) rounds; the cyclic worst case costs O(log PEs).
+- **Each member writes its own `dest`**: the run offset plus its local prefix
+  (exclusive: minus its own source). No PE writes another's `dest`, so invariant 16
+  does not arise.
+- **Floating point.** The spec defines the scan mathematically. The rounding of a
+  floating-point result depends on the combination order, and the order depends on
+  the run layout, so results can differ between two layouts of the same job. That
+  is conforming. Document it, because a user comparing two runs will notice.
+
+*(Rejected: a sequential chain through the ranks — O(PEs) rounds, and a dead PE
+stalls everything behind it. Rejected: a rank-level parallel prefix even when runs
+are long, which multiplies the rounds by the local member count for nothing.)*
 
 ---
 
@@ -2057,7 +2320,7 @@ machinery. The review's order is adopted.
    forwards (§5.5). The review's harnesses are in `docs/reviews/evidence/`.
 1. **One node, no network.** A functional OpenSHMEM on one machine without TCP:
    - `shmem_init`, `shmem_init_thread` and `shmem_query_thread` providing
-     `SHMEM_THREAD_SINGLE`, `shmem_finalize` with the non-last barrier,
+     up to `SHMEM_THREAD_SERIALIZED` (§4.6), `shmem_finalize` with the non-last barrier,
      `shmem_query_initialized`, `shmem_my_pe`, `shmem_n_pes`;
    - node-local rendezvous and agent threads (§3.12, §6.2);
    - `shmem_malloc`, `shmem_free`, `shmem_calloc`, `shmem_realloc`, `shmem_align`,
@@ -2360,6 +2623,31 @@ producing one CQE per provided buffer plus a terminal `-ENOBUFS`, cross-process
 futexes on a shared mapping, and the absence of 64-bit futexes. **Run it first on
 any new machine**, before debugging anything else there.
 
+### 8.6 Reference workloads
+
+> **A small, fixed set of workloads drawn from real OpenSHMEM codes defines what
+> must be fast.** Each is a tier-2 program when its routines exist, a performance
+> harness beside §8.4 later, and a checklist for any change to the §4.10 contract.
+
+They come from the usage study (`docs/reviews/evidence/q2/q2-usage.md` §1–§2),
+which read the hot loops of 18 public code bases. A workload is the idiom, not the
+application: a few dozen lines reproducing the call pattern and its sizes.
+
+| # | Workload | Idiom, from | Boundary operations | What must be fast |
+|---|---|---|---|---|
+| U1 | Scalar remote access | One-word typed get or put per element, sometimes a quiet after each: Kokkos Remote Spaces, GUPs, bale `lgp_*` | 8-byte put and get; wait | Small-operation latency; wait with nothing pending |
+| U2 | Halo exchange | Bulk put per neighbour, fence, increment a flag, `wait_until` on the receiver: NAS SP/BT/MG, PRK stencil | Bulk put and get; fence; rmw ADD; watch | Bandwidth; head-of-line blocking behind bulk data |
+| U3 | Remote atomic per element | add, fetch-add, compare-and-swap per element or edge, quiet after each: Graph500, bale, ISx, Kokkos | rmw ADD, CSWAP, with and without fetch; wait | Atomic latency; wait with nothing pending |
+| U4 | Put-with-signal | Payload put then a counter add or set; the receiver waits on the counter: bale convey, PRK Synch_p2p, and the NVSHMEM MoE kernels | put; fenced rmw; watch and wait | End-to-end message latency; wake latency; spurious wakes |
+| U5 | Aggregated alltoallv | Remote offset reservation by fetch-add, then a bulk nonblocking put to many peers, then quiet: ISx, bale convey | rmw ADD with fetch; put; wait over many PEs | Dirty-set cost at high degree; aggregation |
+| U6 | One context per thread | U1 and U3 on per-thread contexts: threaded GUPs and Graph500, hclib | U1 and U3 operations | Scaling with threads (needs `MULTIPLE`) |
+| U7 | Phase boundaries | Barriers around every collective and one-element reductions per iteration: every code; bale issues two barriers per collective | Barrier; small reduce | Barrier latency against local PE count and node count |
+| U8 | Intranode direct access | `shmem_ptr` once, then loads and stores, then fence: bale convey | direct; fence | A plain load or store |
+
+Each workload runs under the four §8.1 node maps, so both paths are measured.
+U1, U3 and U7 exercise the §10 fence-eagerness question directly. U6 waits for
+`MULTIPLE`.
+
 ---
 
 ## 9. Load-Bearing Invariants
@@ -2435,6 +2723,10 @@ Each is independently breakable, and each failure appears far from its cause.
     investigator needs is in the named control segment, written by single writers;
     the library serves nothing and writes no files. An export that depends on the
     job fails during a hang, the one time it is essential.
+28. **The SHMEM layer reaches other PEs only through the transport boundary, and
+    the boundary promises no more than the spec.** (§4.10) A direct AM call from §4
+    ties the layer to one backend. A guarantee stronger than the spec's, relied on
+    above the boundary, rules out every backend that cannot give it.
 
 Assert what can be asserted. Instrument the rest.
 
@@ -2462,7 +2754,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | 64-bit futex support | **Not implemented.** `EINVAL` on 6.12 aarch64 (`tools/probe`) |
 | Development environment | **Lima + Debian 13 on Apple Silicon**; CI deferred; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
 | Which process hosts progress | **An agent thread in every PE; the local lead's runs the transport** (§3.12). A helper process was rejected on setup complexity, supervision, statics access, and exit status |
-| Phase-1 thread level | **`SHMEM_THREAD_SINGLE`** (§4.6) |
+| Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is open (below) |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
 | Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector. The control segment keeps its name until finalize, accepting a small leak on crash. Flight recorder on by default for now |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
@@ -2503,7 +2795,28 @@ Recorded rather than deleted, so they are not reopened from memory.
   cheap; pick it from measurement.
 - **Team range allocator and split protocol** (§5.7). Undesigned; becomes blocking
   when team creation lands.
-- **Designs for alltoall, scans, and variable-size collect** (§5.5). The
+- **`SHMEM_THREAD_MULTIPLE`** (§4.6, §4.9). Real codes need it: Kokkos and hclib
+  call `shmem_init_thread`, and the threaded GUPs and Graph500 variants put one
+  context per thread on their hot paths. Open design points:
+  - get completion (the equality wait can starve);
+  - clearing the dirty set concurrently;
+  - per-PE watch lists (the review's model-checked rules);
+  - locking or lock-free per-context state on shareable contexts, including the
+    default context;
+  - the `SHMEM_CTX_PRIVATE` / `SERIALIZED` fast paths.
+
+  §3.5's reservation protocol already takes many writers per buffer. Model-check the
+  §4.6 structures before implementing.
+- **Fence eagerness** (§4.6, §4.10). The boundary lets fence send nothing, but
+  §4.6 seals and flushes the dirty set on every `shmem_fence`. PRK and Graph500
+  fence or quiet after every operation, so eager sealing costs neighbouring PEs
+  their aggregation. Measure before choosing.
+- **Designs for alltoall and variable-size collect** (§5.5). Scans and large
+  reductions are designed in §5.8. collect can follow the spec's Example 37:
+  exclusive-scan the sizes, then each PE pushes its block after it has called.
+- **Reduction algorithm crossovers** (§5.8). The element counts at which a ring or
+  Rabenseifner replaces the accumulator's internode tree are chosen from measurement
+  on the §8.4 harness, not fixed in advance. The
   lead's-`dest` accumulator does not cover them.
 
 ### Review of 2026-09-16
