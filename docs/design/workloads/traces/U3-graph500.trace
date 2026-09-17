@@ -1,0 +1,43 @@
+# U3, remote atomic per element: Graph500 BFS, OpenSHMEM one-sided variant.
+# Per edge, a remote MIN into the predecessor map and a remote OR into the
+# next-level queue bitmap. Neither atomic exists in the spec, so local wrappers
+# emulate both with a fetch (add of 0) and a compare-and-swap retry loop, and
+# the caller quiets after each.
+trace     U3-graph500
+workload  U3
+source    osb 39cfcadd70164ac29bb141c9eb34bec6add54520
+loop      Graph500/mpi/bfs_shmem.c:184-229  one edge of a grey vertex, within one BFS level
+threads   1
+build     USE_OPENSHMEM (Graph500/mpi/Makefile:50)
+build     asserts live: make-incs/make.inc.oshmem.gcc, the suggested starting point (README_shmem.md:15-17), leaves NDEBUG undefined
+param     RETRY  1..   # compare-and-swap passes; 1 without contention
+# Per level, outside this trace: shmem_quiet and a barrier before the edges
+# (bfs_shmem.c:154-155), a barrier after (:238), and a one-element OR reduction
+# with four barriers around it (:253, shmem_lib.c:625-631, 571-608).
+
+# The owner of the far vertex, VERTEX_OWNER(w), is a mask or modulus of the
+# vertex number (mpi/common.h:48-58): random. Both operations below address it.
+
+# shmem_long_min(pred2[offset], v, pe), called at bfs_shmem.c:196
+when asserts are compiled in
+  call  shmem_pe_accessible    -  -  random  -  Graph500/mpi/shmem_lib.c:94
+  call  shmem_addr_accessible  -  -  random  -  Graph500/mpi/shmem_lib.c:95
+end
+call  shmem_long_fadd  8  1  random  default  Graph500/mpi/shmem_lib.c:98  # add 0: an atomic fetch
+when v is below the fetched value
+  repeat RETRY  until the swap lands or the word is already at most v
+    call  shmem_long_cswap  8  1  random  default  Graph500/mpi/shmem_lib.c:102
+  end
+end
+call  shmem_quiet  -  -  -  default  Graph500/mpi/bfs_shmem.c:197
+
+# shmem_ulong_bor(queue_bitmap2[offset], mask, pe), called at bfs_shmem.c:217
+when asserts are compiled in
+  call  shmem_pe_accessible    -  -  random  -  Graph500/mpi/shmem_lib.c:148
+  call  shmem_addr_accessible  -  -  random  -  Graph500/mpi/shmem_lib.c:149
+end
+call  shmem_long_fadd  8  1  random  default  Graph500/mpi/shmem_lib.c:152  # add 0: an atomic fetch
+repeat 0..  swap passes; none when the bit is already set (shmem_lib.c:159-161)
+  call  shmem_long_cswap  8  1  random  default  Graph500/mpi/shmem_lib.c:166
+end
+call  shmem_quiet  -  -  -  default  Graph500/mpi/bfs_shmem.c:218

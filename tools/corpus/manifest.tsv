@@ -1,0 +1,28 @@
+# Reading corpus for the reference workloads (design §8.6), fetched by fetch.sh.
+# Entries and pins come from docs/reviews/evidence/q2/q2-usage.md §0.
+#
+# Columns, tab-separated; "-" marks an empty field:
+#   name     directory under corpus/
+#   kind     git (whole tree), git-sparse (only the listed paths), or tarball
+#   source   repository or tarball URL
+#   pin      full commit SHA (git kinds) or SHA-256 of the tarball
+#   paths    comma-separated paths of interest, relative to corpus/<name>/;
+#            the checkout for git-sparse, informational otherwise
+#
+# Not listed: TAU (tau2), which q2-usage excluded because it wraps every routine.
+osu-omb	tarball	https://mvapich.cse.ohio-state.edu/download/mvapich/osu-micro-benchmarks-7.5.tar.gz	1cf84ac5419456202757a757c5f9a4f5c6ecd05c65783c7976421cfd6020b3b3	osu-micro-benchmarks-7.5/c/openshmem
+osb	git	https://github.com/ornl-languages/osb	39cfcadd70164ac29bb141c9eb34bec6add54520	-
+openshmem-npbs	git	https://github.com/openshmem-org/openshmem-npbs	0028e8d07e1e860cc924cca2df02bc528e4e461d	-
+isx	git	https://github.com/ParRes/ISx	d31936a68c49415e7605125d810e13a6ec5b50b1	SHMEM/isx.c
+prk	git	https://github.com/ParRes/Kernels	25051e46e54cd9dad33af1cdfbe66484131a603a	SHMEM,Cxx11
+tests-sos	git	https://github.com/openshmem-org/tests-sos	ca9cb12b13a10eda4b94844ccabdc119f6b48f88	test/apps,test/performance,test/unit,test/spec-example,test/shmemx
+openshmem-examples	git	https://github.com/openshmem-org/openshmem-examples	4c742d5ece16e13be25977a836b1cd1a2845d095	-
+bale	git	https://github.com/jdevinney/bale	1b8f673b56645b2bd74a8af6213462bbc9d559fe	-
+hclib	git	https://github.com/habanero-rice/hclib	50970656ac133477c0fbe80bb674fe88a19d7177	modules/openshmem,modules/sos,modules/openshmem-am,test/performance-regression/full-apps
+kokkos-remote-spaces	git	https://github.com/kokkos/kokkos-remote-spaces	b8b6f0697e8d0a9d72a1e12f658360f8593eee01	src/impl/shmemspace
+deepep	git	https://github.com/deepseek-ai/DeepEP	a56d6156febcd9976e55adc85b5155bfac9f28f8	csrc/kernels/legacy
+pplx-kernels	git	https://github.com/ppl-ai/pplx-kernels	f70d1eb7572dac725da9cf4ca6d1db075595b012	csrc/all_to_all
+triton-distributed	git	https://github.com/ByteDance-Seed/Triton-distributed	8260bc34398c2b8f36dc840fd22f741ca9294584	python/triton_dist/kernels,python/triton_dist/layers
+pytorch	git-sparse	https://github.com/pytorch/pytorch	9f5701fdbdafa2f0656224322c11660064cc4c8f	torch/csrc/distributed/c10d/symm_mem/nvshmem_extension.cu,torch/csrc/distributed/c10d/symm_mem/NVSHMEMSymmetricMemory.cpp
+openshmem-rs	git	https://github.com/kumaryash6352/openshmem_rs	5e1fa06fb81748f894b364bf1823452d9ba10003	-
+lamellar-runtime	git	https://github.com/pnnl/lamellar-runtime	06b7746b0e9a3a9292cfd632a06d6f87eea7ecd7	-

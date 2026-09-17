@@ -1,0 +1,19 @@
+# U1, scalar remote access: HPCC RandomAccess as ported to OpenSHMEM.
+# One-word get, then put to the same word, then quiet, per table update.
+# The timed loop is bracketed by shmem_barrier_all at :232 and :252.
+trace     U1-gups
+workload  U1
+source    osb 39cfcadd70164ac29bb141c9eb34bec6add54520
+loop      GUPs/SHMEMRandomAccess.c:235-250  one table update
+threads   1
+param     NUPDATES  data   # iterations of the loop (niterate), from the table size
+param     VERIFY    0      # :229; enables the counter increment
+
+# The PE is drawn from an LFSR (:236-237), so it is random. The intended
+# self-avoidance at :240-241 actually maps the PE to 0 or 1, not to the next PE.
+call  shmem_longlong_g    8  1  random  default  GUPs/SHMEMRandomAccess.c:243
+call  shmem_longlong_p    8  1  random  default  GUPs/SHMEMRandomAccess.c:245  # same PE and word as the get
+call  shmem_quiet         -  -  -       default  GUPs/SHMEMRandomAccess.c:246  # after every update
+when VERIFY
+  call  shmem_longlong_inc  8  1  random  default  GUPs/SHMEMRandomAccess.c:249
+end

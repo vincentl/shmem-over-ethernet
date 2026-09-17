@@ -10,3 +10,7 @@
 
 # macOS
 .DS_Store
+
+# Public OpenSHMEM code bases, fetched for reading only (tools/corpus/fetch.sh).
+# Never built, never copied into the repository.
+/corpus/
