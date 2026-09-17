@@ -1576,10 +1576,32 @@ PE is enough: no hash table, no probing, and no slot deletion.
 one variable at a time. The multiple-element waits contradict that:
 `shmem_wait_until_{all,any,some}` and their `_vector` forms (spec §9.11.2–§9.11.7)
 block on an array `ivars[0..nelems)`. That array is one contiguous range, so the
-slot publishes `[offset, offset + len)` and a writer wakes on overlap. A write to
-an unwaited element of the array wakes spuriously, and the loop re-checks. The
-two-word publication replaces the single `watched` word below. Re-run the §4.9
-model on it before `wait_until` is implemented.
+slot publishes the range and a writer wakes on overlap. A write to an unwaited
+element of the array wakes spuriously, and the loop re-checks.
+
+**The range is one word: the aligned power-of-two block that contains it**,
+encoded as `((offset >> k) << 6) | (k + 1)`, where `k` is the smallest shift with
+`(offset >> k) == ((offset + len - 1) >> k)`. Zero means no watch. The writer's
+test is `(written >> k) == (word >> 6)`: one load, a shift, and a compare, so
+§4.9's "one load per applied operation" still holds. One word is published and
+read atomically, so no writer can read a stale half of a range.
+
+It wakes more than necessary: a range straddling a boundary rounds out to the
+enclosing block, at worst twice its length, so a nearby write wakes a waiter that
+re-checks and sleeps again. A wake is a hint and never an answer, so that costs
+only the re-check. Blocks are in *offset* space, so they are the same in every
+process.
+
+**Model-checked** (`docs/design/evidence/watch/`), on sequential consistency and
+x86-TSO, for a scalar wait, an array wait, two writers, a range straddling a
+boundary, and a PE that watches one range and then another. The same model finds
+that a **two-word** publication — offset and length, stored and loaded separately —
+is sound as well, because the writer updates the variable before it reads the
+slot: if it reads the new offset, the update is already visible to the waiter's
+next check. The single word is chosen for the atomic read and the cheaper test,
+not for correctness. *(Rejected: a hash table keyed by offset, which the earlier
+draft's per-address watch table needed. One slot per PE is enough while a PE is in
+one wait at a time.)*
 
 An earlier draft had the waiter futex directly on the `ivar`. That works only for
 32-bit types: **the kernel implements only 32-bit futexes.** `futex_wait` with

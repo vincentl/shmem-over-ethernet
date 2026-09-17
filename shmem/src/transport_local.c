@@ -6,10 +6,11 @@
  * Nothing is ever outstanding: fence and wait are the serializing store alone.
  *
  * Phase 1 step 1 has one node, so this is the only backend and dispatch is
- * trivial. rmw, load and watch arrive with AMOs and wait_until.
+ * trivial. The watch and notify halves of the boundary are in watch.c, which
+ * both this backend and a future progress thread call.
  */
+#include <stdatomic.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "base/order.h"
@@ -22,23 +23,13 @@ struct osoe_tp_ctx {
 };
 
 static struct osoe_tp_ctx default_ctx;
-static int32_t *local_of_rank;  /* world rank -> local id, or -1 */
 
 void osoe_tp_init(void)
 {
-    local_of_rank = malloc(sizeof *local_of_rank * osoe.boot.world_size);
-    if (!local_of_rank)
-        osoe_fatal("out of memory");
-    for (uint32_t r = 0; r < osoe.boot.world_size; r++)
-        local_of_rank[r] = -1;
-    for (uint32_t i = 0; i < osoe.boot.local_count; i++)
-        local_of_rank[osoe.boot.gtids[i]] = (int32_t)i;
 }
 
 void osoe_tp_fini(void)
 {
-    free(local_of_rank);
-    local_of_rank = NULL;
 }
 
 struct osoe_tp_ctx *osoe_tp_ctx_default(void)
@@ -50,7 +41,7 @@ void *osoe_tp_direct(int pe, enum osoe_region region, uint64_t offset)
 {
     if (region != OSOE_REGION_HEAP)
         return NULL;
-    int32_t local = local_of_rank[pe];
+    int32_t local = osoe.node.local_of_rank[pe];
     if (local < 0)
         return NULL;
     return (char *)osoe.node.heap_of[local] + offset;
@@ -95,12 +86,74 @@ void osoe_tp_get(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
         memcpy(dst, src, len);
 }
 
-/* No watch slots exist until wait_until (§4.9), so there is nobody to wake:
- * doing nothing is exactly the contract until then. */
-void osoe_tp_notify(int pe, enum osoe_region region, uint64_t offset, size_t len)
+/*
+ * rmw and load are one C11 atomic operation on the shared mapping (§4.1), the
+ * same instruction the progress thread will use to apply a remote operation,
+ * so the two unify. §3.16 fixes the orders: CAS and fetch_add name seq_cst, a
+ * set-style write names seq_cst because the watch protocol is two-sided, and a
+ * load names acquire.
+ */
+#define OSOE_RMW_BODY(T)                                                             \
+    _Atomic T *p = ptr;                                                              \
+    T v = (T)operand, old = 0;                                                       \
+    switch (op) {                                                                    \
+    case OSOE_RMW_WRITE:                                                             \
+        if (flags & OSOE_TP_FETCH)                                                   \
+            old = atomic_exchange_explicit(p, v, memory_order_seq_cst);               \
+        else                                                                         \
+            atomic_store_explicit(p, v, memory_order_seq_cst);                       \
+        break;                                                                       \
+    case OSOE_RMW_READ:                                                              \
+        old = atomic_load_explicit(p, memory_order_acquire);                          \
+        break;                                                                       \
+    case OSOE_RMW_CSWAP: {                                                           \
+        T want = (T)compare;                                                         \
+        atomic_compare_exchange_strong_explicit(p, &want, v, memory_order_seq_cst,    \
+                                                memory_order_seq_cst);                \
+        old = want;                     /* the value found, swapped or not */        \
+        break;                                                                        \
+    }                                                                                 \
+    case OSOE_RMW_ADD:                                                               \
+        old = atomic_fetch_add_explicit(p, v, memory_order_seq_cst);                   \
+        break;                                                                        \
+    case OSOE_RMW_AND:                                                               \
+        old = atomic_fetch_and_explicit(p, v, memory_order_seq_cst);                   \
+        break;                                                                        \
+    case OSOE_RMW_OR:                                                                \
+        old = atomic_fetch_or_explicit(p, v, memory_order_seq_cst);                    \
+        break;                                                                        \
+    case OSOE_RMW_XOR:                                                               \
+        old = atomic_fetch_xor_explicit(p, v, memory_order_seq_cst);                   \
+        break;                                                                        \
+    }                                                                                 \
+    result = old;
+
+uint64_t osoe_tp_rmw(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
+                     uint64_t offset, enum osoe_rmw_op op, unsigned width,
+                     uint64_t operand, uint64_t compare, unsigned flags)
 {
-    (void)pe;
-    (void)region;
-    (void)offset;
-    (void)len;
+    (void)ctx;
+    void *ptr = osoe_tp_direct(pe, region, offset);
+    uint64_t result = 0;
+    if (width == 8) {
+        OSOE_RMW_BODY(uint64_t)
+    } else {
+        OSOE_RMW_BODY(uint32_t)
+    }
+    /* Exact: every applied rmw notifies (§4.10). */
+    osoe_tp_notify(pe, region, offset, width);
+    return flags & OSOE_TP_FETCH ? result : 0;
+}
+
+uint64_t osoe_tp_load(enum osoe_region region, uint64_t offset, unsigned width)
+{
+    void *ptr = osoe_tp_direct((int)osoe.boot.rank, region, offset);
+    switch (width) {
+    case 8:
+        return atomic_load_explicit((_Atomic uint64_t *)ptr, memory_order_acquire);
+    case 4:
+        return atomic_load_explicit((_Atomic uint32_t *)ptr, memory_order_acquire);
+    default:
+        return atomic_load_explicit((_Atomic uint16_t *)ptr, memory_order_acquire);
+    }
 }

@@ -300,8 +300,13 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t ses
     n->heap_size = b->symmetric_size;
     n->heap_bytes = page_round(b->symmetric_size ? b->symmetric_size : 1);
     n->heap_of = calloc(b->local_count, sizeof *n->heap_of);
-    if (!n->heap_of)
+    n->local_of_rank = malloc(sizeof *n->local_of_rank * b->world_size);
+    if (!n->heap_of || !n->local_of_rank)
         osoe_fatal("out of memory");
+    for (uint32_t r = 0; r < b->world_size; r++)
+        n->local_of_rank[r] = -1;
+    for (uint32_t i = 0; i < b->local_count; i++)
+        n->local_of_rank[b->gtids[i]] = (int32_t)i;
 
     if (lead)
         create_control(n, b, session);
@@ -385,6 +390,8 @@ void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b)
             munmap(n->heap_of[i], n->slots[i].heap_bytes);
     free(n->heap_of);
     n->heap_of = NULL;
+    free(n->local_of_rank);
+    n->local_of_rank = NULL;
 
     atomic_store_explicit(&me->phase, OSOE_PHASE_FINALIZED, memory_order_release);
     uint32_t done = atomic_fetch_add_explicit(&n->hdr->finalized, 1, memory_order_seq_cst) + 1;

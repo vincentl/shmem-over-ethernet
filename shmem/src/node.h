@@ -25,7 +25,7 @@
 #include "boot.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 1
+#define OSOE_NODE_LAYOUT 2
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -40,6 +40,12 @@ struct osoe_pe_slot {
     _Alignas(OSOE_CACHELINE)
     _Atomic uint32_t phase;         /* enum osoe_phase; this PE only */
     _Atomic uint32_t agent_wake;    /* shared futex word: wakes this PE's agent */
+    /* The §4.9 watch slot: the block this PE waits on, and its futex word.
+     * Written by this PE, read by every writer that touches its heap. On their
+     * own cache line, so a notifying writer does not share one with the words
+     * this PE's own agent and rendezvous use. */
+    _Alignas(OSOE_CACHELINE) _Atomic uint64_t watch_block;
+    _Atomic uint32_t watch_seq;
     uint32_t rank;
     int32_t pid;
     uint64_t symmetric_size;        /* SHMEM_SYMMETRIC_SIZE as this PE parsed it */
@@ -91,6 +97,7 @@ struct osoe_node {
     struct osoe_pe_slot *slots;
     uint64_t control_bytes;
     void **heap_of;                 /* base_of[local id][OSOE_REGION_HEAP] */
+    int32_t *local_of_rank;         /* world rank -> local id, or -1 */
     uint64_t heap_bytes;
     uint64_t heap_size;             /* the agreed SHMEM_SYMMETRIC_SIZE */
 };
