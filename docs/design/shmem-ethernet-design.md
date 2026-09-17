@@ -173,7 +173,10 @@ This property is destroyed by any second data socket. Do not add one.
 
 Application-level fragmentation at ~64 KB. A 4 MB payload holds the stream for
 ~32 ms on 1 GbE; a barrier queued behind it waits the full time. Chunking bounds
-head-of-line blocking to one chunk time while keeping a single ordered stream.
+head-of-line blocking while keeping a single ordered stream. The bound for a
+control message is roughly **two segments** — the one in flight and the one
+sealed behind it — plus any publication-window stall (§3.6); an earlier draft's
+"one chunk time" understated it.
 
 Each chunk is a self-contained AM carrying `(region, offset, length)`. The
 receiver lands each chunk at its own offset — no reassembly, no fragment
@@ -191,7 +194,21 @@ Only the progress thread submits.
 (`IORING_REGISTER_PBUF_RING`). One SQE per connection yields many CQEs; the
 kernel selects a buffer on arrival. Handle `ENOBUFS` (ring exhausted, recv
 terminated) as a normal under-load event — replenish and re-arm. This path
-must be tested; it is a good fault-injection target.
+must be tested; it is a good fault-injection target. A multishot recv can also
+end on any CQE that lacks `IORING_CQE_F_MORE`, not only on `-ENOBUFS`; every such
+CQE re-arms.
+
+**Parse as a stream; never hold a provided buffer.** Segments and messages span
+provided buffers. Holding buffers until a segment is complete stalls once a
+segment outgrows the ring — and with one ring serving several connections, two
+connections each holding buffers for partial segments deadlock (review C1,
+reproduced). So each connection keeps a parse cursor:
+
+- header bytes accumulate in a small per-connection area;
+- payload bytes are copied straight to their destination — heap offset, landing
+  zone, or reply staging — as they arrive;
+- AMO and signal messages are applied only once complete;
+- **every provided buffer is recycled before the next reap.**
 
 **Send:** **one in-flight send per connection.**
 
@@ -207,16 +224,19 @@ or submit the next queued buffer.
 bound and applied it to "the ring." That conflated the submission and completion
 queues, which are bounded by different things.
 
-*Submission queue:* `2 × connections + constant` — one send, one multishot recv
-per connection. Size above that and it can never fill. **Assert at init** — it
+*Submission queue:* `2 × connections + constant` — one send and one multishot
+recv per connection, plus the constant: at most one futex wait per ring (§3.10)
+and the cancel and re-arm SQEs in flight at once. Size above that and it can never
+fill. **Assert at init** — it
 breaks silently the day someone adds a second in-flight send.
 
 *Completion queue:* the SQ bound does **not** carry over, because one multishot
 recv SQE produces many CQEs. Pending receive completions are bounded instead by
 how many provided buffers the kernel can fill:
 
-> `CQ entries ≥ pbuf_ring_entries + 2 × connections + slack`, set explicitly via
-> `IORING_SETUP_CQSIZE`.
+> `CQ entries ≥ pbuf_ring_entries + 2 × connections + 1 + slack`, set explicitly
+> via `IORING_SETUP_CQSIZE`. The `+ 1` is the ring's single armed futex wait
+> (§3.10); an idle loop that arms more than one breaks this bound.
 
 This restores "can never fill" for both rings and puts both asserts at init. The
 cost is a few hundred KB of CQEs — irrelevant beside the buffer ring itself, and
@@ -253,6 +273,8 @@ only pays above ~10–16 KB. Revisit only on a fast NIC.
 ### 3.4 Segment structure
 
 Two buffers per connection: one filling, one in flight. A third smooths nothing.
+**At most one of them is reservable at any moment** — a rule (§3.5), not a sizing
+remark.
 
 ```
 [ segment header ][ message ][ message ][ message ] ...
@@ -261,8 +283,12 @@ Two buffers per connection: one filling, one in flight. A third smooths nothing.
 Segment header (fixed size, 16–32 B, at offset 0, never reserved by writers,
 filled by the progress thread at seal time):
 
-- **Sequence number** — makes `quiet` nearly free (see §4.6)
-- **Piggybacked acknowledgement** of the reverse direction
+- **Sequence number** — makes `quiet` nearly free (see §4.6). *Assigned* when the
+  buffer becomes reservable and *written* here at seal (§3.5).
+- **Acknowledgement** of the reverse direction: the highest sequence number
+  *applied*, not merely received, since completion means applied at the target
+  (§4.6). Piggybacked when possible; see ack-only segments below.
+- **Flags**, including *ack requested*.
 - **Credit return** (if credits are ever added; see §3.7)
 - **Message count and total length** — deliberately redundant with per-message
   lengths. Cross-checking on receipt turns a framing bug into an immediate
@@ -276,20 +302,75 @@ Buffer size must be at least 2× maximum message size, or aggregation stops
 working at the top of the range. A 64 KB message in a 64 KB buffer means one
 message per segment, forever.
 
+**Ack-only segments.** Piggybacking alone never acknowledges one-way traffic. If
+node A only puts to B, no B→A segment exists to carry the ack, and A's `quiet`,
+`barrier_all`, and finalize wait forever: the safety sweep submits only sealed
+buffers, and B has none.
+
+- A `fence`, `quiet`, or barrier flush sets *ack requested* on the segments it
+  seals.
+- On applying such a segment, B's progress thread carries the ack on the next
+  segment toward A if one is sealed or in flight, and otherwise sends a
+  **header-only segment**: acknowledgement, zero messages.
+- Header-only segments reserve nothing, so §3.7's handler rule is untouched. They
+  use the connection's single in-flight send like any other segment.
+
 ### 3.5 Reservation protocol
 
-Writers are PE threads. Two atomics, no locks.
+Writers are application threads. Two atomics per buffer, no locks.
 
 ```c
+/* head: reserved bytes in the low bits, SEALED in the top bit.
+ * Every buffer that is not reservable carries SEALED. */
 for (;;) {
     uint32_t h = atomic_load_explicit(&buf->head, memory_order_acquire);
-    if (buf->state != OPEN || h + n > buf->cap) { /* seal; try other buffer */ }
+    if (h & SEALED) {                       /* sealed: use the current buffer */
+        buf = current_reservable(conn);     /* waits if there is none (§3.11) */
+        continue;
+    }
+    if (h + n > buf->cap) {                 /* full: ask for a seal, then wait */
+        request_seal(conn, buf);
+        buf = current_reservable(conn);
+        continue;
+    }
     if (atomic_compare_exchange_weak_explicit(&buf->head, &h, h + n,
-            memory_order_acq_rel, memory_order_acquire)) { off = h; break; }
+            memory_order_seq_cst, memory_order_acquire))
+        break;
 }
-memcpy(buf->data + off, src, n);
-atomic_fetch_add_explicit(&buf->filled, n, memory_order_release);
+uint64_t seq = buf->seq;                    /* stable: see "Sequence numbers" */
+memcpy(buf->data + h, src, n);
+atomic_fetch_add_explicit(&buf->filled, n, memory_order_seq_cst);
 ```
+
+**The seal is a bit in `head`, set by the progress thread's CAS.** Writers never
+read a separate `state` field. An earlier draft checked `state == OPEN` and then
+CASed `head`; the progress thread could seal and submit between the two, and the
+writer's CAS still succeeded. The message was lost or torn, and `filled` exceeded
+`head` in the next generation. Setting the seal bit changes the value every
+later writer CAS compares, so a sealed buffer rejects them all. `state` survives
+only as the progress thread's own bookkeeping.
+
+**At most one reservable buffer per connection.** A freed buffer becomes
+reservable only when the other buffer is not — sealed, in flight, or retired
+because it is empty. Buffers are submitted in seal order. With two reservable
+buffers, one PE's later operation can be sealed and sent first, which breaks
+`fence`, signal-after-payload (invariant 5), and `quiet`. An earlier draft's
+"seal; try other buffer" was exactly that bug.
+
+Both defects were reproduced by two independent exhaustive models, and the
+repaired rules above pass both, including DRAINING, progress-thread reply
+reservations, and a liveness check (`docs/reviews/evidence/transport/`,
+`docs/reviews/evidence/refutation/`).
+
+**Sequence numbers are assigned when a buffer becomes reservable**, in submission
+order, and written into the header at seal together with the ack, message count,
+and length. A writer reads the buffer's sequence number after a successful
+reservation with no extra synchronization: the buffer cannot recycle until
+`filled == head`, and this writer has not completed. Comment this so nobody later
+"fixes" it with a lock. *(Assigning the number at seal instead lets a writer
+record the previous generation's number, so `quiet` returns early — also
+model-checked.)* Numbers assigned at open are monotone on the wire only because
+of the one-reservable rule.
 
 **CAS loop, not `fetch_add`.** With `fetch_add`, an overflowing writer has
 already moved `head` and must unwind, and the unwind must still account for
@@ -299,27 +380,23 @@ non-event.
 
 **`filled` is a count, not a watermark.** Out-of-order completion means no
 prefix property holds. This is fine: the buffer is sendable when
-`filled == head`. Do not reach for a watermark and then discover it cannot be
-maintained.
+`filled == head & ~SEALED`. Do not reach for a watermark and then discover it
+cannot be maintained.
 
-**Buffer states:** `OPEN → SEALED → SENDING → FREE`, plus `DRAINING` (§3.6).
-Reservation succeeds only in `OPEN`. The progress thread seals, and submits
-only once `filled == head`. Conflating sealing and draining is the race that
-corrupts a segment.
+**Buffer states** are the progress thread's bookkeeping: `FREE → [DRAINING →]
+OPEN → SEALED → SENDING → FREE`. Writers see only the seal bit. A `DRAINING`
+buffer (§3.8) carries the seal bit, so writers skip it while the progress thread
+fills it with replies; opening it clears the bit. The progress thread submits only
+once `filled` equals the reserved count.
 
-**The progress thread must never spin waiting for `filled == head`.** A writer
-may be descheduled mid-`memcpy`. Move to other connections and re-check later.
-At 256 PEs on an oversubscribed node, a spin here is a hang.
+**The progress thread must never spin waiting for `filled` to catch up.** A
+writer may be descheduled mid-`memcpy`. Move to other connections and re-check
+later. At 256 PEs on an oversubscribed node, a spin here is a hang.
 
-**Memory ordering:** acquire on the CAS, release on the `filled` increment,
-acquire when the progress thread reads `filled`. On aarch64 these are
-`ldar`/`stlr`, nearly free. Omitting them produces corruption visible only
-under load and never on x86.
-
-**Generation numbers are self-stabilizing.** A writer reads the buffer's
-sequence number after a successful reservation with no extra synchronization,
-because the buffer cannot recycle until `filled == head` and this writer has
-not completed. Comment this so nobody later "fixes" it with a lock.
+**Memory orders** follow §3.16: loads name `acquire`; the CAS and `fetch_add`
+name `seq_cst` and compile to locked instructions on every target. This protocol
+is single-writer publication — each `filled` update is a locked instruction the
+progress thread later loads — so it is also safe under x86's store buffering.
 
 ### 3.6 Publication-window stall (accepted)
 
@@ -374,9 +451,20 @@ outbound resource shortage is a cycle waiting to close.**
 Per connection. Descriptors, not reserved payload space.
 
 > Reserving reply *payload* space commits ~4 KB per outstanding get. Reserving a
-> *descriptor* commits ~48 bytes. At `P=256`, that is the difference between
-> roughly a gigabyte per node and roughly 12 MB. The reply's source data is
-> already in the symmetric heap and needs no copy until send time.
+> *descriptor* commits 48 bytes. For 250,000 outstanding replies that is the
+> difference between roughly a gigabyte and roughly 12 MB. The reply's source data
+> is already in the symmetric heap and needs no copy until send time.
+
+**Bounded by a per-connection credit, not a per-PE count.** An earlier draft sized
+each connection's queues as P × G — every PE on the peer node times a per-PE
+outstanding-get cap. Summed over connections, that grows with *job* size: about
+6 GB per node at 500 nodes if pre-allocated. Instead, each node pair has a credit
+`C` for outstanding replies. The origin's lead takes a credit when one of its PEs
+issues a get or fetching AMO toward that peer and returns it when the reply
+lands; with no credit left, the issuing PE blocks, which the spec permits (§4.6).
+The target's worst case is then `connections × C` descriptors — it scales with
+node count, as §1 requires. Descriptors come from one **node-wide pool** that each
+connection's queues link into, so idle connections cost nothing.
 
 Because reservation may now *fail* — the progress thread leaves the descriptor
 in place and carries on reaping — there is no infallibility requirement and no
@@ -420,9 +508,16 @@ blocked in `shmem_get` waits forever. Not a deadlock — everything is running �
 but observably a hang.
 
 **Fix:** a freed buffer enters `DRAINING`, in which only the progress thread may
-reserve. It drains, then transitions to `OPEN`. One extra state, no counters, no
-fairness arithmetic. Instrument bytes drained per generation and queue-depth
-high-water.
+reserve. It drains, then transitions to `OPEN`. One extra state, no fairness
+arithmetic. Instrument bytes drained per generation and queue-depth high-water.
+
+**Cap each DRAINING pass at half the buffer.** Uncapped, the guard starves the
+other direction: whenever outstanding reply bytes exceed roughly (round-trip
+generations + 1) buffers, every freed buffer fills entirely with replies and local
+PEs' puts to that peer never go out. A segment-level simulation shows local PEs'
+share of segment bytes at zero with 16 PEs doing 64 KB gets at a realistic one-
+to two-generation round trip (review D8, `docs/reviews/evidence/transport/`). The cap
+guarantees both directions progress every generation.
 
 #### Queue bounds — three separate arguments, each independently breakable
 
@@ -436,10 +531,15 @@ high-water.
    write this into the code, because a future contributor adding
    `shmem_barrier_nbi` would not know to check.
 3. **Quiet acknowledgements:** coalescable to one outstanding per connection
-   (a high-water mark subsumes older ones); piggybacked, so not really a queue
-   entry.
+   (a high-water mark subsumes older ones); piggybacked or header-only (§3.4), so
+   not really a queue entry.
 
-Size as `P×G + degree×max_teams + slack`. Pre-allocate at maximum. **Assert
+Size as `C + degree×max_teams + slack` per connection, drawn from the node-wide
+pool.
+
+**The control queue is multi-producer** once a node runs more than one progress
+thread: a collective forward received on one shard's connection is enqueued
+toward a peer owned by another shard, with a wake to that shard. Pre-allocate at maximum. **Assert
 hard on overflow** with peer identity and queue contents. Export the high-water
 mark so the counter history identifies which invariant broke.
 
@@ -458,22 +558,40 @@ parameters. This is both the simplest implementation and close to the right
 policy.
 
 Explicit flush on `fence` and `quiet` covers the case where there is no reverse
-traffic to clock it.
+traffic to clock it. The flush is a request from the application thread to the
+lead (§3.12), and it sets *ack requested* so a one-way peer still acknowledges
+(§3.4).
 
 ### 3.10 Idle and wakeup
 
 `IORING_OP_FUTEX_WAIT` (6.7+). A counter in userspace; nothing to drain.
 
 ```c
-uint32_t v = atomic_load_explicit(&ep->wake, memory_order_acquire);
-reap_cqes(); submit_sealed_buffers();
-if (work_pending()) continue;
-io_uring_prep_futex_wait(sqe, &ep->wake, v, FUTEX_BITSET_MATCH_ANY,
-                         FUTEX2_SIZE_U32, 0);
-io_uring_submit_and_wait(&ep->ring, 1);
+for (;;) {
+    uint32_t v = atomic_load_explicit(&ep->wake, memory_order_acquire);
+    reap_cqes();                     /* the futex CQE, when it arrives, clears armed */
+    submit_sealed_buffers();
+    if (work_pending()) continue;
+    if (!ep->futex_armed) {          /* at most one armed wait per ring */
+        io_uring_prep_futex_wait(sqe, &ep->wake, v, FUTEX_BITSET_MATCH_ANY,
+                                 FUTEX2_SIZE_U32, 0);
+        ep->futex_armed = true;
+    }
+    io_uring_submit_and_wait_timeout(&ep->ring, &cqe, 1, &sweep, NULL);
+}
 ```
 
-PE side: `atomic_fetch_add(&ep->wake, 1)` then `futex_wake`.
+PE side: `atomic_fetch_add_explicit(&ep->wake, 1, memory_order_seq_cst)`, then
+`futex_wake`.
+
+**One armed wait per ring.** An earlier draft armed a new
+`IORING_OP_FUTEX_WAIT` on every idle pass while earlier ones were still armed. One
+`futex_wake` then completes all of them at once and overflows the completion
+queue: 1,881 armed waits and the kernel overflow flag set, in a run with real TCP
+receive (review D3). The `futex_armed` flag is private to the progress thread. A
+wait armed on an older value stays correct: any later increment is followed by a
+`futex_wake`, which completes it, and an increment between the load and the arm
+makes the arm return `-EAGAIN`.
 
 > **The kernel closes the missed-wakeup race.** If the value no longer matches at
 > submission time, the wait completes immediately with `-EAGAIN`. The `blocked`
@@ -489,7 +607,8 @@ latency-neutral, since the Pi will not honour a 10 µs `nanosleep` and a 1 ms
 sleep roughly doubles round-trip latency); `IORING_OP_MSG_RING` (requires a ring
 per PE to avoid one futex word).
 
-**Safety sweep:** pass a ~100 ms timeout via `IORING_ENTER_EXT_ARG` and submit
+**Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
+which uses `IORING_ENTER_EXT_ARG`) and submit
 anything sealed regardless of signalling. This converts a class of hangs into a
 class of latency spikes with a findable counter. The wakeup mechanism must
 affect only *how soon* a sealed buffer is submitted, never *whether*.
@@ -506,9 +625,15 @@ wait shows up as a timeout rate orders of magnitude above normal.
 ### 3.11 Waiter fairness
 
 Waiters are held on a priority-sorted list; `FUTEX_WAKE(1)` dequeues the head,
-FIFO for equal priority. *(Verify the priority-ordering half against
-`kernel/futex/` on 6.12; the FIFO-for-equal-priority behaviour is safe to
-assume.)*
+FIFO for equal priority. **Verified** against `kernel/futex/core.c` on 6.12:
+real-time waiters first, then FIFO. In the development VM a `SCHED_FIFO` waiter
+jumped the queue, which supports the no-real-time-priority rule below.
+
+**One futex word per resource class, never shared.** Buffer space (divisible),
+reply credits and descriptors (indivisible), and the wait for a reservable buffer
+(§3.5) each get their own word per connection. If two classes share a word,
+wake-one can reach the wrong class's waiter; with §3.10's deadlines that is a
+latency spike rather than a hang, but it is avoidable (review C4).
 
 **Wake count tracks divisibility:**
 
@@ -528,19 +653,27 @@ available.
 Note this defeats a hand-built intrusive FIFO too — the problem is not queue
 order but that acquisition is not mediated by the queue.
 
+The handoff bit shares a word with the resource it guards. **Model the word
+layout** — which bits, which stores, which wakes — before implementing it, with
+the same exhaustive tooling as §3.5.
+
 Applied to **indivisible resources only**; divisible ones do not starve.
 
-**Short spin before blocking.** Count set at init from local PE count versus
-available cores; **zero under oversubscription**, where a spinning PE consumes a
-core that a progress thread or mid-copy writer needs. Instrument
-spin-succeeded versus spin-expired.
+**No spinning before blocking, in phase 1.** A useful spin loop needs a CPU relax
+hint, which is an intrinsic or assembly, and §3.16 allows neither. A spin without
+one burns power and, on x86 with SMT, slows the sibling thread. Waits therefore go
+straight to the futex. Under oversubscription — the Pi's normal case — a spin
+would be wrong anyway, since it takes a core a progress thread or mid-copy writer
+needs. Revisit only with measurements.
 
 **No real-time priority anywhere.** It is tempting on an oversubscribed Pi and
-would introduce unbounded priority inversion. Use cpuset isolation for the
-progress thread instead — isolation without a priority relationship.
+would introduce unbounded priority inversion. Where isolation is needed, place
+the progress thread on its own core with cpusets — isolation without a priority
+relationship — bearing in mind that it runs inside the lead task's Slurm cpuset
+(§3.12), so the job's CPU binding must leave room for it.
 
-Keep futex words few (one per connection, not one per PE per connection) and
-cache-line aligned. Futex waits hash into kernel buckets by address; unrelated
+Keep futex words few (one per resource class per connection, not one per PE per
+connection) and cache-line aligned with `_Alignas`. Futex waits hash into kernel buckets by address; unrelated
 words can collide on the same bucket spinlock.
 
 ### 3.12 Progress threads and where they run
@@ -681,6 +814,54 @@ A connection dying mid-message leaves part of a payload written into the
 symmetric heap, unrecoverably. For a library where connection loss means job
 loss this is acceptable, but it is a **documented invariant**: AM's error path
 is "abort the job loudly," not "recover."
+
+### 3.16 Memory-order discipline
+
+> **ISO C11 `<stdatomic.h>` only, with a named memory order at every access to a
+> shared protocol word.** No compiler intrinsics, no assembly, no `__atomic_*` or
+> `__sync_*` builtins.
+
+Rules:
+
+- **Loads** name `memory_order_acquire`.
+- **CAS and `fetch_add`/`fetch_sub`** name `memory_order_seq_cst`. They compile to
+  locked instructions on every target whatever order is named — `lock cmpxchg`
+  and `lock xadd` on x86-64, LSE instructions or libgcc's outline helpers on
+  aarch64 — so naming `seq_cst` keeps the text honest.
+- **Plain stores** name `memory_order_release` for single-writer publication,
+  where one side stores and the other only loads.
+- **Two-sided ("Dekker-shaped") protocols** — each side stores its own word and
+  then loads the other's — name `memory_order_seq_cst` on **both** stores, or use a
+  locked operation. The §4.9 watch-table insert against the `ivar` store is one;
+  `shmem_signal_set` against a signal wait is another.
+- Implicit-order calls (`atomic_load`, `atomic_store`, operator forms) and
+  `memory_order_relaxed` are forbidden on protocol words, so every access shows its
+  order.
+- Only the four ISO orders. GCC's header also defines `memory_order_acq_rel` and
+  `memory_order_consume`, and an earlier draft used `acq_rel`, but they are
+  extensions and buy nothing here.
+- Configure fails if the compiler defines `__STDC_NO_ATOMICS__`.
+
+**Why two-sided stores need `seq_cst`.** GCC 14 compiles both `release` and
+`seq_cst` stores to `stlr` on aarch64, but on x86-64 a `release` store is a plain
+`mov`, which sits in the store buffer where another core cannot see it, while a
+`seq_cst` store is `xchg`, which forces it out. In a two-sided protocol, both
+sides can then miss each other's store and a wake is lost — shown by the review's
+model (variants V4, V4b, V4c lose wakes and V5 does not) and confirmed by
+disassembly in the development VM. §3.5's earlier claim that missing orders cause
+corruption "never on x86" is true for single-writer publication and false for
+this shape.
+
+**Consequences:**
+
+- **Futex words** are `_Atomic uint32_t`, with a `_Static_assert` that its size
+  and alignment equal `uint32_t`'s (true for GCC on aarch64 and x86-64).
+- **Outline atomics** on ARMv8.0 cores without LSE, such as the Pi 4's Cortex-A72,
+  link statically from `libgcc.a`; a test binary's `NEEDED` list is libc only
+  (review, lead-verified), so invariant 15 holds.
+- **No spin-before-block** (§3.11): there is no ISO C relax hint.
+- **A serializing point** — for `fence` and `quiet` ordering memory stores (§4.8) —
+  is one `seq_cst` store in the calling thread.
 
 ---
 
