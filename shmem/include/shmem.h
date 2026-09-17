@@ -31,6 +31,9 @@ int shmem_n_pes(void);
 void shmem_finalize(void);
 void shmem_query_initialized(int *initialized);
 
+/* Collective routines (§9.10) */
+void shmem_barrier_all(void);
+
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);
 void shmem_info_get_name(char *name);

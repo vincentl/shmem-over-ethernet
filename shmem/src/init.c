@@ -9,8 +9,10 @@
 #include <shmem.h>
 
 #include "agent.h"
+#include "barrier.h"
 #include "export.h"
 #include "state.h"
+#include "transport.h"
 
 struct osoe_state osoe;
 
@@ -34,6 +36,7 @@ static void session_start(void)
     /* A re-init after a full teardown is a fresh session (§6.4). Every PE runs
      * the same sequence of sessions, so the numbers agree. */
     osoe_node_join(&osoe.node, &osoe.boot, sessions++);
+    osoe_tp_init();
     osoe_agent_start(&osoe.node.slots[osoe.boot.local_id]);
     init_pid = getpid();
 }
@@ -41,6 +44,7 @@ static void session_start(void)
 static void session_end(void)
 {
     osoe_agent_stop(&osoe.node.slots[osoe.boot.local_id]);
+    osoe_tp_fini();
     osoe_node_leave(&osoe.node, &osoe.boot);
     osoe_boot_free(&osoe.boot);
 }
@@ -64,6 +68,10 @@ OSOE_API void shmem_finalize(void)
         pthread_mutex_unlock(&lifecycle);
         return;
     }
+    /* Every finalize is a barrier (spec §9.1.4, invariant 26): a non-last one
+     * only that, the last one before tearing down. Skipping it would let the
+     * world team's epoch counts diverge across PEs. */
+    osoe_barrier_all();
     refcount--;
     if (refcount == 0) {
         session_end();

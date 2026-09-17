@@ -2,11 +2,13 @@ find_package(Threads REQUIRED)
 
 add_library(osoe
   src/agent.c
+  src/barrier.c
   src/boot.c
   src/fatal.c
   src/info.c
   src/init.c
-  src/node.c)
+  src/node.c
+  src/transport_local.c)
 target_include_directories(osoe
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

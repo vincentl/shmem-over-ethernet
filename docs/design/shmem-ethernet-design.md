@@ -1987,8 +1987,11 @@ model assumes them and cannot show what breaks without them:
   its own arrival**, which is after its local combine. Merging earlier races the
   combine and loses updates.
 - **Write the final `dest`, then bump `released`** — never the reverse, or members
-  copy out a partial result. For a team that spans a single node, the lead's own
-  arrival triggers the release locally, with no internode message.
+  copy out a partial result. For a team that spans a single node, the release
+  happens locally, with no internode message. In a data-carrying collective the lead
+  bumps `released` after its combine. In barrier and sync, whichever member's
+  arrival reaches the target bumps it (§5.3). That member knows it is the last
+  arrival from its `fetch_add` result, so no member waits on a designated one.
 - **A result forwarded down the internode tree by reference** reads the lead's
   `dest` when the forward drains (§3.8). If that drain happens after `released` is
   bumped, the lead can see every local copy-out complete, leave, and let the
