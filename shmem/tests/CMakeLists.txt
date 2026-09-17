@@ -39,6 +39,7 @@ osoe_tier2_test(barrier)
 osoe_tier2_test(malloc)
 osoe_tier2_test(rma)
 osoe_tier2_test(amo)
+osoe_tier2_test(wait)
 
 # Init must refuse what it cannot run, saying why.
 add_test(NAME shmem.refuse.no_launcher

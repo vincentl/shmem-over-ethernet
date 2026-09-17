@@ -34,6 +34,28 @@ int shmem_n_pes(void);
 void shmem_finalize(void);
 void shmem_query_initialized(int *initialized);
 
+/* Comparison constants for the wait and test routines (§6, §9.11) */
+#define SHMEM_CMP_EQ 0
+#define SHMEM_CMP_NE 1
+#define SHMEM_CMP_GT 2
+#define SHMEM_CMP_LE 3
+#define SHMEM_CMP_LT 4
+#define SHMEM_CMP_GE 5
+
+/* Deprecated spellings (§6) */
+#define _SHMEM_CMP_EQ SHMEM_CMP_EQ
+#define _SHMEM_CMP_NE SHMEM_CMP_NE
+#define _SHMEM_CMP_GT SHMEM_CMP_GT
+#define _SHMEM_CMP_LE SHMEM_CMP_LE
+#define _SHMEM_CMP_LT SHMEM_CMP_LT
+#define _SHMEM_CMP_GE SHMEM_CMP_GE
+
+/* Point-to-point synchronization (§9.11.1, §9.11.8) */
+void shmem_uint64_wait_until(uint64_t *ivar, int cmp, uint64_t cmp_value);
+void shmem_uint32_wait_until(uint32_t *ivar, int cmp, uint32_t cmp_value);
+int shmem_uint64_test(uint64_t *ivar, int cmp, uint64_t cmp_value);
+int shmem_uint32_test(uint32_t *ivar, int cmp, uint32_t cmp_value);
+
 /* Atomic memory operations (§9.7). Phase 1 step 1 provides the 64-bit and
  * 32-bit unsigned types; the rest of Table 6 follows mechanically. */
 void shmem_uint64_atomic_set(uint64_t *dest, uint64_t value, int pe);

@@ -13,6 +13,7 @@ add_library(osoe
   src/node.c
   src/rma.c
   src/transport_local.c
+  src/wait.c
   src/watch.c)
 target_include_directories(osoe
   PUBLIC
