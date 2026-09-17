@@ -1098,7 +1098,27 @@ should cite §3.2 item 4 rather than argue from first principles; and
 even though this implementation would make them exclusive anyway.
 
 Reserve the own-heap range at `B` with `MAP_FIXED_NOREPLACE` so a collision fails
-loudly rather than silently unmapping something. `-no-pie` pins the executable
+loudly rather than silently unmapping something.
+
+**Choosing `B`.** No single address works for every build. In the development VM
+(aarch64, 48-bit addresses), a 16 GiB fixed mapping succeeds from `0x10_0000_0000`
+upward in a plain build. AddressSanitizer allows only
+`[0x2010_0000_0000, 0x5000_0000_0000)` and above `0x5410_0000_0000`.
+ThreadSanitizer allows only below `0x0a00_0000_0000`, a small band near
+`0xaab0_0000_0000`, and above `0xfc00_0000_0000`. Above `0xfc00_0000_0000` is common
+to all three, but it does not exist in a 39-bit or x86-64 address space. So:
+- **The lead chooses `B`** by mapping its own heap at the first of a short
+  candidate list that succeeds: `0x1000_0000_0000`, `0x3000_0000_0000`,
+  `0x100_0000_0000`, `0x10_0000_0000`. That is a plain build, ASan, TSan, and a
+  39-bit address space, in order.
+- **It publishes `B` in the control segment** before any sibling reads it.
+- **Every other PE maps its own heap at the published `B`**, and fails loudly if it
+  cannot. All local PEs run the same binary, so the lead's choice suits them.
+- **`OSOE_HEAP_BASE` replaces the list** for systems where none of the candidates
+  is free. It is also the hook for §8.2's heap-base-shift test mode.
+
+*(Rejected: a compile-time `B` selected by sanitizer macros. It gives each build one
+fixed guess, whereas the lead's search adapts to address spaces nobody listed.)* `-no-pie` pins the executable
 but **not** the heap — ASLR still randomizes heap, stack, mmap region, and
 shared libraries.
 
@@ -1220,6 +1240,11 @@ local lead and again at the root.
     `1e` into a size.
   - **A value that does not fit in 64 bits is an error.**
   - The grammar lives in `base/size.c`, with its tier-1 test next to it.
+
+**Default size.** Without `SHMEM_SYMMETRIC_SIZE` a heap is 256 MiB. Heap objects
+commit pages only when touched, so the default costs address space: L × 256 MiB
+per process, 64 GiB at 256 local PEs. A size of 0 is valid and maps one page, so
+every allocation of nonzero size fails.
 
 `shmem_malloc_with_hints` is an alias for `shmem_malloc`. SOS itself added the
 routine supporting no hint values.
@@ -2209,12 +2234,42 @@ rendezvous** from each node's `SLURM_GTIDS` (§6.2).
 > Rendezvous connections scale with node count.**
 
 **Node-local.** The lead creates the node segment as a named shared memory object,
-`/osoe.<job>.<step>.<node>`, so concurrent steps on one node cannot collide. Every
+`/osoe.<job>.<step>.<node>.<session>`, so concurrent steps on one node cannot
+collide. The session is the number of full `shmem_init` sessions this process has
+started, counting from 0 (§6.4). Every
 local PE opens it by name, records its rank, pid, and heap object name in its slot,
 and maps its siblings' heaps as they appear (§4.1). Heaps are named objects too,
 opened the same way: no sockets and no descriptor passing between local PEs. The
 lead waits on a futex until all `L` local PEs have arrived, then removes every heap
-name, so a later crash leaves no heaps behind in `/dev/shm`. The control segment
+name, so a later crash leaves no heaps behind in `/dev/shm`.
+
+The sequence, as implemented:
+1. **The lead creates the control segment** with `O_EXCL`, mode 0600. A name that
+   already exists is a crashed job's leftover and is reported, never reused. The
+   lead writes the versioned header, maps its own heap (choosing `B`, §4.1), and
+   publishes `ready`.
+2. **Every other PE opens the segment by name.** It polls with backoff until the
+   name exists, since there is nothing to wait on before it does. It then waits on
+   `ready`, checks the magic number, layout version, and job description, and maps
+   its own heap `/…<session>.heap.<local id>` at `B`.
+3. **Each PE writes its own slot** (rank, pid, parsed `SHMEM_SYMMETRIC_SIZE`, heap
+   name and length), publishes `phase = JOINED`, and bumps `joined`.
+4. **Once `joined == L`**, every PE checks that all slots agree on the size and
+   that slot *i* holds `OSOE_GTIDS[i]`. Every PE runs the same check on the same
+   data, so a mismatch fails all of them with the same message. Each PE then maps
+   its siblings' heaps and bumps `mapped`.
+5. **Once `mapped == L`**, the lead removes every heap name.
+
+Any PE that fails stores a `failed` word and wakes the rendezvous words, so its
+siblings stop within one safety sweep instead of waiting out
+`OSOE_BOOTSTRAP_TIMEOUT` (60 s by default). A timeout names the local ids that
+never arrived.
+
+**Removing the control segment's name.** At the last finalize each PE bumps
+`finalized`. Exactly one increment reaches `L`, and that PE removes the name. The
+others' mappings stay valid. The session number is what makes this safe: without
+it, a PE that had finished and immediately re-initialized could recreate the name,
+and a slower sibling would then remove the new segment. The control segment
 **keeps its name until the last finalize**, so `osoe-stat` can open it while the
 job runs (§3.14). A crash therefore leaves the control segment — a few MB, and the
 post-mortem — for `osoe-stat --gc` or a Slurm epilog to remove; a crash during
@@ -2309,6 +2364,13 @@ at init and torn down at finalize.
 construction; subsequent calls increment and return. `shmem_finalize` decrements;
 the last one tears down. `shmem_query_initialized` reports whether the count is
 nonzero.
+
+As implemented, a process-private mutex serves as the once-gate and guards the
+count. A published `initialized` word mirrors the count, stored with `release`,
+because the spec lets `shmem_query_initialized` be called from any thread at any
+time without blocking behind an init in progress. Each full session gets the next
+session number, which goes into every shared-memory name (§6.2). A finalize without
+an init does nothing.
 
 Things to get right, each of which is a silent bug otherwise:
 

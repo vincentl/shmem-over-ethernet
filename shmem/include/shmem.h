@@ -24,6 +24,13 @@ extern "C" {
 #define _SHMEM_MAX_NAME_LEN  SHMEM_MAX_NAME_LEN
 #define _SHMEM_VENDOR_STRING SHMEM_VENDOR_STRING
 
+/* Library setup, exit, and query (§9.1) */
+void shmem_init(void);
+int shmem_my_pe(void);
+int shmem_n_pes(void);
+void shmem_finalize(void);
+void shmem_query_initialized(int *initialized);
+
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);
 void shmem_info_get_name(char *name);
