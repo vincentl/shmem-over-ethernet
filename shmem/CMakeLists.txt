@@ -2,11 +2,13 @@ find_package(Threads REQUIRED)
 
 add_library(osoe
   src/agent.c
+  src/alloc.c
   src/barrier.c
   src/boot.c
   src/fatal.c
   src/info.c
   src/init.c
+  src/malloc.c
   src/node.c
   src/transport_local.c)
 target_include_directories(osoe

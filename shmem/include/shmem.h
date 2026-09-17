@@ -8,6 +8,8 @@
 #ifndef OSOE_SHMEM_H
 #define OSOE_SHMEM_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,6 +32,10 @@ int shmem_my_pe(void);
 int shmem_n_pes(void);
 void shmem_finalize(void);
 void shmem_query_initialized(int *initialized);
+
+/* Memory management (§9.3) */
+void *shmem_malloc(size_t size);
+void shmem_free(void *ptr);
 
 /* Collective routines (§9.10) */
 void shmem_barrier_all(void);

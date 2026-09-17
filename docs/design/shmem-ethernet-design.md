@@ -1197,7 +1197,20 @@ Fixed pool at init, sized by `SHMEM_SYMMETRIC_SIZE`.
 > `shmem_free` are both collective and every PE executes the same sequence with
 > the same sizes, any allocator that is a pure deterministic function of its call
 > sequence produces **bit-identical** state on every PE. Out-of-order frees are
-> fine. First-fit with coalescing, or a buddy allocator, both work. Fragmentation
+> fine. First-fit with coalescing, or a buddy allocator, both work.
+
+**Chosen: first fit over an address-ordered block list, splitting on allocation and
+coalescing with both neighbours on free.** Blocks are aligned to 16 bytes, which is
+`_Alignof(max_align_t)` on both targets and is what spec §9.3.1 asks for. The list
+is a private array, so allocation is O(blocks). That is acceptable because
+allocation is cold in every code the usage study read (§8.6), and the array's size
+depends only on the call sequence, so determinism holds. A buddy allocator was
+rejected: it rounds every request up to a power of two, which wastes up to half the
+heap. A tier-1 test runs two allocators through 20,000 random allocations and
+out-of-order frees and requires identical offsets.
+
+Running out of private memory for the metadata is fatal rather than a null return:
+a failure on one PE and not another would desynchronize the heaps. Fragmentation
 > behaves exactly as in a single-threaded arena — every PE fragments identically,
 > so symmetry is never at risk, only capacity.
 
@@ -1225,6 +1238,9 @@ local lead and again at the root.
   **exit**; `shmem_free` barriers on **entry**.
 - A size of 0 (for `calloc`, a count or size of 0) returns a null pointer **without
   a barrier**. Every PE must make the same call, so none waits.
+- `shmem_free(NULL)` does nothing, also **without a barrier** (spec §9.3.2).
+- A failed allocation still barriers on exit. Every PE fails identically, so the
+  collective completes and all of them return a null pointer.
 - `shmem_calloc` treats `count × size` overflow as a failed allocation.
 - `SHMEM_SYMMETRIC_SIZE` accepts the §8 grammar — a non-negative integer or
   floating-point prefix with an optional scaling character — and must agree across

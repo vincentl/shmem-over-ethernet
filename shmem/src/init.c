@@ -11,6 +11,7 @@
 #include "agent.h"
 #include "barrier.h"
 #include "export.h"
+#include "fatal.h"
 #include "state.h"
 #include "transport.h"
 
@@ -37,6 +38,8 @@ static void session_start(void)
      * the same sequence of sessions, so the numbers agree. */
     osoe_node_join(&osoe.node, &osoe.boot, sessions++);
     osoe_tp_init();
+    if (osoe_alloc_init(&osoe.alloc, osoe.node.heap_size) != 0)
+        osoe_fatal("out of memory");
     osoe_agent_start(&osoe.node.slots[osoe.boot.local_id]);
     init_pid = getpid();
 }
@@ -44,6 +47,7 @@ static void session_start(void)
 static void session_end(void)
 {
     osoe_agent_stop(&osoe.node.slots[osoe.boot.local_id]);
+    osoe_alloc_fini(&osoe.alloc);
     osoe_tp_fini();
     osoe_node_leave(&osoe.node, &osoe.boot);
     osoe_boot_free(&osoe.boot);

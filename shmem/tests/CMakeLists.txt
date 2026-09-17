@@ -11,6 +11,13 @@ if(BUILD_SHARED_LIBS)
   set_tests_properties(shmem.exports PROPERTIES LABELS "tier1" TIMEOUT 30)
 endif()
 
+# The allocator on its own (tier 1): compiled in, since libosoe hides it.
+add_executable(shmem_test_alloc test_alloc.c ../src/alloc.c)
+target_include_directories(shmem_test_alloc PRIVATE ../src)
+osoe_warnings(shmem_test_alloc)
+add_test(NAME shmem.alloc COMMAND shmem_test_alloc)
+set_tests_properties(shmem.alloc PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # Multi-process tests (tier 2): each program runs under osoe-launch at every
 # listed local PE count, as shmem.<name>.L<count>.
 set(OSOE_LAUNCH_COUNTS 1 2 4)
@@ -29,6 +36,7 @@ endfunction()
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
+osoe_tier2_test(malloc)
 
 # Init must refuse what it cannot run, saying why.
 add_test(NAME shmem.refuse.no_launcher
