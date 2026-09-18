@@ -15,6 +15,7 @@
 
 #include "base/order.h"
 #include "fatal.h"
+#include "metrics.h"
 #include "state.h"
 #include "transport.h"
 
@@ -50,6 +51,7 @@ void *osoe_tp_direct(int pe, enum osoe_region region, uint64_t offset)
 void osoe_tp_fence(struct osoe_tp_ctx *ctx)
 {
     (void)ctx;
+    osoe_count(OSOE_C_TP_FENCE_CALLS, 1);
     osoe_serializing_store();
 }
 
@@ -58,6 +60,11 @@ void osoe_tp_wait(struct osoe_tp_ctx *ctx, const int *pes, size_t npes)
     (void)ctx;
     if (pes && npes == 0)
         return;
+    osoe_count(OSOE_C_TP_WAIT_CALLS, 1);
+    /* Nothing is ever outstanding on this backend, so every wait finds nothing
+     * to do. The counter says so rather than being omitted, because against the
+     * AM backend the same name means something quite different. */
+    osoe_count(OSOE_C_TP_WAIT_NOTHING_OUTSTANDING, 1);
     osoe_serializing_store();
 }
 
@@ -65,7 +72,9 @@ void osoe_tp_put(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
                  uint64_t offset, const void *src, size_t len, unsigned flags)
 {
     (void)ctx;
-    (void)flags;                /* applied in issue order already: FENCED is free */
+    (void)flags;                /* applied in issue order already: FENCED and MORE are free */
+    osoe_count(OSOE_C_TP_PUT_CALLS, 1);
+    osoe_count(OSOE_C_TP_PUT_BYTES, len);
     char *dst = osoe_tp_direct(pe, region, offset);
     /* A put to the caller's own PE may name overlapping bytes. */
     if ((uint32_t)pe == osoe.boot.rank)
@@ -79,6 +88,8 @@ void osoe_tp_get(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
                  uint64_t offset, void *dst, size_t len)
 {
     (void)ctx;
+    osoe_count(OSOE_C_TP_GET_CALLS, 1);
+    osoe_count(OSOE_C_TP_GET_BYTES, len);
     const char *src = osoe_tp_direct(pe, region, offset);
     if ((uint32_t)pe == osoe.boot.rank)
         memmove(dst, src, len);
@@ -133,6 +144,9 @@ uint64_t osoe_tp_rmw(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
                      uint64_t operand, uint64_t compare, unsigned flags)
 {
     (void)ctx;
+    osoe_count(OSOE_C_TP_RMW_CALLS, 1);
+    if (flags & OSOE_TP_FETCH)
+        osoe_count(OSOE_C_TP_RMW_FETCHING, 1);
     void *ptr = osoe_tp_direct(pe, region, offset);
     uint64_t result = 0;
     if (width == 8) {

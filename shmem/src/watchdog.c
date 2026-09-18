@@ -54,7 +54,14 @@ static bool slot_dead(const struct osoe_pe_slot *s)
 
 void osoe_sweep_expired(const char *routine)
 {
-    if (!osoe.boot.watchdog || !osoe.node.hdr)
+    if (!osoe.node.hdr)
+        return;
+    /* A blocked PE's liveness signal: it is asleep, but its sweeps still rise.
+     * Counted whether or not the watchdog is on, since it costs one add on a
+     * path that has just slept for OSOE_SWEEP_NS (§3.14). */
+    atomic_fetch_add_explicit(&osoe.node.slots[osoe.boot.local_id].sweeps, 1,
+                              memory_order_seq_cst);
+    if (!osoe.boot.watchdog)
         return;
 
     if (atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire)) {

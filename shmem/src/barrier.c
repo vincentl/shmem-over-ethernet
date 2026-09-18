@@ -1,6 +1,10 @@
 #include <shmem.h>
 
+#include <stdatomic.h>
+
 #include "barrier.h"
+#include "blocked.h"
+#include "metrics.h"
 #include "base/epoch.h"
 #include "export.h"
 #include "fatal.h"
@@ -31,6 +35,11 @@ static void sync_world(const char *routine)
     }
     osoe_epoch_wait_eq(&h->world_released, k + 1, routine);
     osoe.world_epoch = k + 1;
+    /* Publish it: comparing each PE's k against the team's counters is how
+     * osoe-stat says which PE has not reached a barrier, the most common real
+     * hang (§3.14 question 1). */
+    atomic_store_explicit(&osoe.node.slots[osoe.boot.local_id].world_epoch, k + 1,
+                          memory_order_release);
 }
 
 /* §5.6: barrier_all is a quiet on the default context followed by a sync on
@@ -38,8 +47,14 @@ static void sync_world(const char *routine)
  * store, which makes the calling thread's memory stores visible (§4.6). */
 void osoe_barrier_all(const char *routine)
 {
+    /* A barrier is a blocking operation, which §3.14 allows to be timed. */
+    uint64_t t0 = osoe_now_ns();
+    osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
+    osoe_blocked_enter(routine, osoe.world_epoch + 1);
     osoe_tp_wait(osoe_tp_ctx_default(), NULL, 0);
     sync_world(routine);
+    osoe_blocked_leave();
+    osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
 }
 
 OSOE_API void shmem_barrier_all(void)

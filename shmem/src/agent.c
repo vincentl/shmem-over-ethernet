@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stdatomic.h>
 #include <pthread.h>
 #include <signal.h>
 #include <string.h>
@@ -6,7 +7,9 @@
 #include "agent.h"
 #include "base/deadline.h"
 #include "base/futex.h"
+#include "blocked.h"
 #include "fatal.h"
+#include "metrics.h"
 
 static pthread_t agent;
 static _Atomic uint32_t stop_requested;     /* process-private */
@@ -22,12 +25,19 @@ static _Atomic uint32_t stop_requested;     /* process-private */
 static void *agent_main(void *arg)
 {
     struct osoe_pe_slot *slot = arg;
+    struct osoe_counter_block *b = osoe_metrics_block();
     for (;;) {
+        /* §3.14's progress heartbeat: two reads showing the same loop count and
+         * the same last-wake time mean this agent is stalled, not merely idle. */
+        osoe_counter_add(b, OSOE_C_AGENT_LOOPS, 1);
         uint32_t seen = atomic_load_explicit(&slot->agent_wake, memory_order_acquire);
         if (atomic_load_explicit(&stop_requested, memory_order_acquire))
             break;
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-        osoe_futex_wait(&slot->agent_wake, seen, &sweep, OSOE_FUTEX_SHARED);
+        if (osoe_futex_wait(&slot->agent_wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0) {
+            osoe_counter_add(b, OSOE_C_AGENT_WAKEUPS, 1);
+            osoe_counter_set(b, OSOE_C_AGENT_LAST_WAKE_NS, osoe_now_ns());
+        }
     }
     return NULL;
 }

@@ -799,6 +799,31 @@ that is stuck. Memory can be read without the job's cooperation.
   name, type, unit, offset — checksummed like the handler table (§3.13), so
   `osoe-stat` need not be the same build as the job. Handler names live in the
   same table.
+
+  **A frozen directory makes that real.** The segment opens with
+  `struct osoe_segment_directory`: magic, layout, and where the three arrays are
+  with the size of each element. It is the *only* part a reader may depend on by
+  layout, and it exists so nothing else has to be — fields are never reordered,
+  resized or removed there, only appended, and `directory_bytes` says how much
+  of it the writer filled in. Everything after it is read through the table, by
+  name. Without a directory that is separated and frozen on purpose, "self
+  describing" is a claim rather than a mechanism, and the first structural
+  change quietly breaks every tool.
+
+  Four sections, each starting on a cache line: the header, the PE slots, the
+  metric table, and the counter blocks. A metric names its **scope** — node,
+  PE, or thread — which says which record its offset is into.
+
+- **Counters are bounded per PE, and exhaustion is visible rather than fatal.**
+  `OSOE_MAX_THREADS` blocks per PE, claimed by CAS on first use. A thread that
+  finds none gets a **process-private block** and bumps
+  `threads.blocks_exhausted` in it. Not an abort: §4.11 proposes aborting when a
+  PE's thread table fills, because there correctness depends on having a record,
+  but here only the metrics do — and a job that dies because it made a ninth
+  thread would be a worse failure than a job whose ninth thread is not counted.
+  Not a shared block either, which would break §3.16's single-writer rule on
+  every counter. The private block makes the fallback path identical to the
+  normal one, so nothing has to test whether it is initialized.
 - **On abort**, the library prints the control segment's name to standard error, so
   whoever reads the message knows what to point `osoe-stat` at.
 
@@ -862,6 +887,24 @@ control segment already provides post-mortem state after a crash.)*
   hang.
 - **Per PE:** a "blocked in" record (routine, target, and since when), its watch
   slot (§4.9), outstanding get bytes, bootstrap phase, and the abort word.
+
+  It is the first record here with more than one word in it, so it is the first
+  that can be read torn while the PE publishes its next wait. A **generation
+  word bumped with two `seq_cst` read-modify-writes** around the field writes,
+  and a reader that loads it, reads the fields, and loads it again, accepting
+  only an unchanged even value. Two locked operations rather than a textbook
+  seqlock, because that needs relaxed stores and a release fence and §3.16
+  permits neither, while `fetch_add` naming `seq_cst` is a rule the design
+  already has and is a full barrier on both targets. Model-checked in
+  `docs/design/evidence/blocked-record/`, which also shows the four ways to get
+  it wrong: no generation, bumping after the writes, letting a field write
+  escape above the opening bump, and a reader that does not re-read.
+
+  **Published only when a wait is about to sleep**, never on entry. A wait whose
+  predicate is already true touches no locked instruction and no clock — which
+  is exactly what §8.6's U1 and U3 measure, "wait with nothing pending", so the
+  record must not appear in that path's cost. The consequence to accept is that
+  a PE spinning through satisfied waits shows no record; it is also not blocked.
 - **Per connection:** sequence numbers sent, acknowledged as applied, and received
   and applied; the age of the in-flight send; each buffer's reserved and filled
   counts and seal bit; reply queue depths; credits left; waiters per wake word; the
@@ -909,6 +952,20 @@ control segment already provides post-mortem state after a crash.)*
 test** (§8.2), so these counters double as a correctness oracle.
 
 #### Flight recorder
+
+**Deferred, and not for cost.** Every event listed below is a transport
+event — seal, submit, send completion, segment received, handler dispatch, ack —
+and there is no transport until §7.1 step 2. A ring designed now would be
+designed against imagined events and their imagined arguments, and would be
+rewritten by the first real one. It arrives with the backend that produces the
+events, and the design below stands until then.
+
+Two smaller deferrals for the same reason. **Prometheus output** is a third
+formatter over the same table and waits for a reason to exist. The **intranode
+versus internode split** on the RMA counters needs a dispatch to split on, and
+so does `tp.wait.dirty_peers`; both land with the AM backend, which is also when
+the per-peer and per-connection counters of questions 2 and 3 first have write
+sites.
 
 **On by default, for now, for transport events.** Each progress thread has a ring
 of fixed-size records in the control segment — for example 4,096 × 32 B = 128 KB:

@@ -21,11 +21,12 @@
 #include <stdint.h>
 
 #include "base/cacheline.h"
+#include "base/counters.h"
 #include "base/epoch.h"
 #include "boot.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 4
+#define OSOE_NODE_LAYOUT 5
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -35,6 +36,10 @@ enum osoe_phase {
 };
 
 enum { OSOE_HEAP_NAME_MAX = 96 };
+
+/* The routine name in a "blocked in" record (§3.14). Fixed width: it is read
+ * from another process, so it cannot be a pointer. */
+enum { OSOE_BLOCKED_ROUTINE_MAX = 32 };
 
 struct osoe_pe_slot {
     _Alignas(OSOE_CACHELINE)
@@ -48,33 +53,92 @@ struct osoe_pe_slot {
     _Atomic uint32_t watch_seq;
     uint32_t rank;
     int32_t pid;                    /* this PE's process id, for the watchdog (§3.15) */
+    int32_t tid;                    /* the initializing thread, for /proc/<pid>/task/<tid> */
     uint64_t symmetric_size;        /* SHMEM_SYMMETRIC_SIZE as this PE parsed it */
     uint64_t heap_bytes;            /* mapped length of the heap object */
     char heap_name[OSOE_HEAP_NAME_MAX];
+
+    /*
+     * The §3.14 "blocked in" record, so a hung job says where each PE is
+     * waiting. Written by this PE only when a wait is about to sleep - a wait
+     * that returns at once touches none of it - and read by osoe-stat from
+     * another process while this PE may be publishing its next wait.
+     *
+     * `blocked_gen` is odd while the fields are in flux: the writer bumps it,
+     * writes, and bumps again, both bumps seq_cst; a reader loads it, reads the
+     * fields, and loads it again, accepting only an unchanged even value. Two
+     * locked read-modify-writes rather than a textbook seqlock, because that
+     * needs relaxed stores and a release fence and §3.16 permits neither.
+     * Model-checked in docs/design/evidence/blocked-record/.
+     */
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint64_t blocked_gen;
+    _Atomic uint64_t blocked_detail;     /* routine-specific: a PE, an epoch, an offset */
+    _Atomic uint64_t blocked_since_ns;   /* CLOCK_MONOTONIC when the wait began */
+    char blocked_routine[OSOE_BLOCKED_ROUTINE_MAX];
+
+    /* Liveness and progress, published by this PE (§3.14 question 1). */
+    _Atomic uint64_t sweeps;             /* safety-sweep expiries: a blocked PE still moves */
+    _Atomic uint32_t world_epoch;        /* this PE's k for SHMEM_TEAM_WORLD (§5.4) */
+
+    /* Heap levels. Per PE, not per thread: a gauge cannot be summed. */
+    _Atomic uint64_t heap_in_use;
+    _Atomic uint64_t heap_high_water;
+    _Atomic uint64_t heap_largest_free;
+};
+
+/*
+ * The frozen prefix of the control segment (§3.14).
+ *
+ * This is the one part of the segment a reader may depend on by layout, and it
+ * exists so that nothing else has to be: it says where the three arrays are and
+ * how big their elements are, and the metric table then describes every field
+ * of every one of them by name. A tool built from a different commit reads a
+ * job correctly because it reads this, then the table, and then everything else
+ * by name.
+ *
+ * So: **fields are never reordered, resized or removed here, only appended**,
+ * and `directory_bytes` says how much of it the writer filled in. Changing
+ * anything above that line is what `layout` is for, and a reader that finds a
+ * layout it does not know can still print the directory and say so.
+ */
+struct osoe_segment_directory {
+    uint64_t magic;
+    uint32_t layout;
+    uint32_t directory_bytes;        /* how much of this structure is valid */
+    uint32_t header_bytes;
+    uint32_t reserved;
+    uint64_t segment_bytes;
+
+    uint64_t slots_offset;
+    uint32_t slot_bytes;
+    uint32_t local_count;
+
+    /* metrics_count == 0 means "no table": a reader shows nothing rather than
+     * guessing at a layout. */
+    uint64_t metrics_offset;
+    uint64_t metrics_bytes;
+    uint32_t metrics_count;
+    uint32_t metrics_checksum;       /* FNV-1a over the table's bytes */
+    uint32_t metric_desc_bytes;
+
+    uint64_t blocks_offset;
+    uint64_t blocks_bytes;
+    uint32_t block_count;            /* local_count * blocks_per_pe */
+    uint32_t block_bytes;
+    uint32_t blocks_per_pe;          /* OSOE_MAX_THREADS */
 };
 
 struct osoe_node_header {
     /* Written by the lead before `ready`; constant afterwards. */
-    uint64_t magic;
-    uint32_t layout;
-    uint32_t header_bytes;
-    uint64_t segment_bytes;
+    struct osoe_segment_directory dir;
+
     uint64_t job;
     uint32_t step;
     uint32_t node;
     uint32_t session;
-    uint32_t local_count;
     uint32_t world_size;
-    uint32_t slot_bytes;
-    uint64_t slots_offset;
     uint64_t heap_base;             /* B, where every PE maps its own heap (§4.1) */
-
-    /* The §3.14 metric table, described here once it exists. Zero in layout 1;
-     * a reader treats metrics_count == 0 as "no table". */
-    uint64_t metrics_offset;
-    uint64_t metrics_bytes;
-    uint32_t metrics_count;
-    uint32_t metrics_checksum;
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)
@@ -104,6 +168,7 @@ struct osoe_node {
     char control_name[80];
     struct osoe_node_header *hdr;
     struct osoe_pe_slot *slots;
+    struct osoe_counter_block *blocks;   /* this node's whole pool (§3.14) */
     uint64_t control_bytes;
     void **heap_of;                 /* base_of[local id][OSOE_REGION_HEAP] */
     int32_t *local_of_rank;         /* world rank -> local id, or -1 */

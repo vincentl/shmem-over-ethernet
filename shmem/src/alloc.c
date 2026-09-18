@@ -84,3 +84,18 @@ int osoe_alloc_give(struct osoe_alloc *a, uint64_t offset)
         merge_with_next(a, lo - 1);
     return 0;
 }
+
+void osoe_alloc_levels(const struct osoe_alloc *a, uint64_t *in_use, uint64_t *largest_free)
+{
+    uint64_t used = 0, largest = 0;
+    for (size_t i = 0; i < a->count; i++) {
+        if (a->blocks[i].free) {
+            if (a->blocks[i].size > largest)
+                largest = a->blocks[i].size;
+        } else {
+            used += a->blocks[i].size;
+        }
+    }
+    *in_use = used;
+    *largest_free = largest;
+}

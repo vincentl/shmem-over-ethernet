@@ -51,4 +51,10 @@ int osoe_alloc_take(struct osoe_alloc *a, uint64_t size, uint64_t *offset);
  * there. */
 int osoe_alloc_give(struct osoe_alloc *a, uint64_t offset);
 
+/* Bytes currently allocated, and the largest single block still available -
+ * the two numbers that distinguish "the heap is full" from "the heap is
+ * fragmented" (§3.14 question 4). O(blocks), so call it once per allocation,
+ * never in a loop. */
+void osoe_alloc_levels(const struct osoe_alloc *a, uint64_t *in_use, uint64_t *largest_free);
+
 #endif /* OSOE_ALLOC_H */

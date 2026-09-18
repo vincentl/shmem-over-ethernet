@@ -27,6 +27,7 @@
 #include "base/deadline.h"
 #include "base/futex.h"
 #include "fatal.h"
+#include "metrics.h"
 #include "state.h"
 #include "transport.h"
 #include "watch_range.h"
@@ -45,9 +46,18 @@ struct osoe_tp_watch *osoe_tp_watch(enum osoe_region region, uint64_t offset, si
     if (region != OSOE_REGION_HEAP)
         osoe_fatal("watching region %d is not supported", (int)region);
     struct osoe_pe_slot *slot = &osoe.node.slots[osoe.boot.local_id];
+    osoe_count(OSOE_C_TP_WATCH_CALLS, 1);
+    /* One slot per PE is enough while a PE is in one wait at a time (§4.6). A
+     * published watch here means two threads are inside the library at once,
+     * which SHMEM_THREAD_SERIALIZED forbids; §4.11 is the design that lifts it. */
+    if (atomic_load_explicit(&slot->watch_rng, memory_order_acquire) != 0)
+        osoe_count(OSOE_C_INVARIANT_WATCH_REENTERED, 1);
+
+    uint64_t rng = osoe_watch_pack((unsigned)region, offset, len);
+    if ((rng & OSOE_WATCH_LEN_MAX) == OSOE_WATCH_LEN_MAX)
+        osoe_count(OSOE_C_TP_WATCH_SATURATED, 1);   /* filtering to the region's end */
     the_watch.slot = slot;
-    atomic_store_explicit(&slot->watch_rng, osoe_watch_pack((unsigned)region, offset, len),
-                          memory_order_seq_cst);
+    atomic_store_explicit(&slot->watch_rng, rng, memory_order_seq_cst);
     return &the_watch;
 }
 
@@ -74,9 +84,14 @@ void osoe_tp_notify(int pe, enum osoe_region region, uint64_t offset, size_t len
     if (local < 0)
         return;                             /* not on this node: the AM backend notifies */
     struct osoe_pe_slot *slot = &osoe.node.slots[local];
+    osoe_count(OSOE_C_TP_NOTIFY_CALLS, 1);
     uint64_t rng = atomic_load_explicit(&slot->watch_rng, memory_order_acquire);
     if (!osoe_watch_covers(rng, (unsigned)region, offset, len))
         return;
+    /* Against notify.calls, this is the filter's precision: every wake here
+     * that the waiter's predicate then rejects cost a locked instruction and a
+     * futex_wake syscall on a path whose floor is a memcpy (§8.4). */
+    osoe_count(OSOE_C_TP_NOTIFY_WAKES, 1);
     atomic_fetch_add_explicit(&slot->watch_seq, 1, memory_order_seq_cst);
     osoe_futex_wake(&slot->watch_seq, INT_MAX, OSOE_FUTEX_SHARED);
 }

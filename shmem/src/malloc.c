@@ -1,4 +1,5 @@
 /* shmem_malloc and shmem_free (spec §9.3.1, §9.3.2; design §4.4). */
+#include <stdatomic.h>
 #include <stddef.h>
 
 #include <shmem.h>
@@ -7,6 +8,7 @@
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
+#include "metrics.h"
 #include "state.h"
 #include "sym.h"
 
@@ -18,6 +20,7 @@ OSOE_API void *shmem_malloc(size_t size)
 {
     if (size == 0)
         return NULL;
+    osoe_count(OSOE_C_SHMEM_MALLOC_CALLS, 1);
     void *p = NULL;
     uint64_t offset;
     switch (osoe_alloc_take(&osoe.alloc, size, &offset)) {
@@ -30,6 +33,7 @@ OSOE_API void *shmem_malloc(size_t size)
         /* Failing on some PEs and not others would desynchronize the heaps. */
         osoe_fatal("shmem_malloc: out of private memory for heap metadata");
     }
+    osoe_publish_heap_levels();
     osoe_barrier_all("shmem_malloc");
     return p;
 }
@@ -40,9 +44,26 @@ OSOE_API void shmem_free(void *ptr)
 {
     if (!ptr)
         return;
+    osoe_count(OSOE_C_SHMEM_FREE_CALLS, 1);
     osoe_barrier_all("shmem_free");
     uint64_t offset;
     if (!osoe_sym_heap_offset(ptr, 0, &offset) || osoe_alloc_give(&osoe.alloc, offset) != 0)
         osoe_fatal("shmem_free: %p is not the address of a block allocated from the "
                    "symmetric heap", ptr);
+    osoe_publish_heap_levels();
+}
+
+/* Per PE, not per thread: a level cannot be summed across threads, and under
+ * SHMEM_THREAD_SERIALIZED whichever thread is inside the allocator is the only
+ * writer (§3.14). */
+void osoe_publish_heap_levels(void)
+{
+    uint64_t in_use, largest_free;
+    osoe_alloc_levels(&osoe.alloc, &in_use, &largest_free);
+
+    struct osoe_pe_slot *me = &osoe.node.slots[osoe.boot.local_id];
+    atomic_store_explicit(&me->heap_in_use, in_use, memory_order_release);
+    atomic_store_explicit(&me->heap_largest_free, largest_free, memory_order_release);
+    if (in_use > atomic_load_explicit(&me->heap_high_water, memory_order_acquire))
+        atomic_store_explicit(&me->heap_high_water, in_use, memory_order_release);
 }

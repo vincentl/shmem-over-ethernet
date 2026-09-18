@@ -10,6 +10,7 @@ add_library(osoe
   src/info.c
   src/init.c
   src/malloc.c
+  src/metrics.c
   src/node.c
   src/rma.c
   src/signal.c

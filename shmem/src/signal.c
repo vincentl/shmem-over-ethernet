@@ -29,6 +29,7 @@
 
 #include "export.h"
 #include "fatal.h"
+#include "metrics.h"
 #include "sym.h"
 #include "transport.h"
 #include "wait.h"
@@ -51,6 +52,7 @@ static void signal_update(const char *routine, uint64_t *sig_addr, uint64_t sign
                           enum osoe_rmw_op op, int pe, unsigned flags)
 {
     osoe_check_pe(routine, pe);
+    osoe_count(OSOE_C_SHMEM_SIGNAL_UPDATE_CALLS, 1);
     uint64_t offset = osoe_sym_word_offset(routine, sig_addr, OSOE_SIGNAL_WIDTH);
     osoe_tp_rmw(osoe_tp_ctx_default(), pe, OSOE_REGION_HEAP, offset, op,
                 OSOE_SIGNAL_WIDTH, signal, 0, flags);
@@ -90,6 +92,7 @@ OSOE_API void shmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe)
 /* Local: the signal object of the calling PE (§9.8.6 takes no pe argument). */
 OSOE_API uint64_t shmem_signal_fetch(const uint64_t *sig_addr)
 {
+    osoe_count(OSOE_C_SHMEM_SIGNAL_FETCH_CALLS, 1);
     uint64_t offset = osoe_sym_word_offset("shmem_signal_fetch", sig_addr, OSOE_SIGNAL_WIDTH);
     return osoe_tp_load(OSOE_REGION_HEAP, offset, OSOE_SIGNAL_WIDTH);
 }
@@ -103,6 +106,7 @@ OSOE_API uint64_t shmem_signal_fetch(const uint64_t *sig_addr)
  */
 OSOE_API uint64_t shmem_signal_wait_until(uint64_t *sig_addr, int cmp, uint64_t cmp_value)
 {
+    osoe_count(OSOE_C_SHMEM_SIGNAL_WAIT_CALLS, 1);
     return osoe_wait_until("shmem_signal_wait_until", sig_addr, OSOE_SIGNAL_WIDTH, cmp,
                            cmp_value);
 }
