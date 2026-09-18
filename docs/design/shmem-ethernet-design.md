@@ -1141,6 +1141,23 @@ even though this implementation would make them exclusive anyway.
 Reserve the own-heap range at `B` with `MAP_FIXED_NOREPLACE` so a collision fails
 loudly rather than silently unmapping something.
 
+**A trap to record before anyone falls into it.** An RDMA backend wants one
+registrable memory region per *node* rather than one per PE — 16 bytes of
+`{base, rkey}` per node instead of per PE, and one registration instead of `L`.
+That needs a node's heaps contiguous in the registering process's address space,
+and the obvious way to get it is to slot each heap by local id at
+`N + local_id × SHMEM_SYMMETRIC_SIZE`. **That is wrong**, and wrong in a way that
+would not surface for a long time: it destroys the property that a PE's own heap
+sits at the same `B` in every process, which is what makes a PE's symmetric
+addresses the same numbers everywhere and what §4.3 relies on for statics under
+`-no-pie`. The right shape is a **second mapping** — the node lead maps all `L`
+heap objects again into one contiguous reservation, used only as something to
+register. Same physical pages, no change to `B`, no change to `base_of`, and the
+cost is `L × SHMEM_SYMMETRIC_SIZE` of address space in the lead alone, against
+the same amount every process already reserves. It is an optimization, not a
+requirement: skipping it costs one registration per PE and a per-PE table, with
+no redesign anywhere. Record it so nobody buys contiguity by moving `B`.
+
 **Choosing `B`.** No single address works for every build. In the development VM
 (aarch64, 48-bit addresses), a 16 GiB fixed mapping succeeds from `0x10_0000_0000`
 upward in a plain build. AddressSanitizer allows only
@@ -1275,8 +1292,18 @@ local lead and again at the root.
 
 **Edge semantics (§9.3), easy to get wrong:**
 
-- `shmem_malloc`, `shmem_align`, `shmem_calloc`, and `shmem_realloc` barrier on
-  **exit**; `shmem_free` barriers on **entry**.
+- `shmem_malloc`, `shmem_align` and `shmem_calloc` barrier on **exit**;
+  `shmem_free` barriers on **entry**.
+- **`shmem_realloc` barriers on entry *and* exit**, which an earlier draft of
+  this list got wrong by giving it the exit barrier alone. Spec §9.3.3 permits
+  both — "`shmem_realloc` may call barriers on both entry and exit, depending on
+  whether an existing allocation is modified and whether new memory is
+  allocated" — and both are needed here: it frees the old block, which no PE may
+  still be reading, and it publishes a new one, which every PE must see before
+  any returns. It is `free` and `malloc` in one call and takes each one's
+  barrier. A null `ptr` makes it `shmem_malloc`, so it takes only the exit
+  barrier; a zero `size` with a non-null `ptr` makes it `shmem_free`, so it takes
+  only the entry one.
 - A size of 0 (for `calloc`, a count or size of 0) returns a null pointer **without
   a barrier**. Every PE must make the same call, so none waits.
 - `shmem_free(NULL)` does nothing, also **without a barrier** (spec §9.3.2).
@@ -1303,8 +1330,26 @@ commit pages only when touched, so the default costs address space: L × 256 MiB
 per process, 64 GiB at 256 local PEs. A size of 0 is valid and maps one page, so
 every allocation of nonzero size fails.
 
-`shmem_malloc_with_hints` is an alias for `shmem_malloc`. SOS itself added the
-routine supporting no hint values.
+**Hints are recorded, not discarded.** An earlier note here called
+`shmem_malloc_with_hints` an alias for `shmem_malloc`, on the grounds that SOS
+added the routine supporting no hint values. That is a fine *implementation* of
+the hints and a bad *structure*, because two other decisions need the hint to
+have been kept:
+
+- spec §9.3.3 requires `shmem_realloc` to **preserve** an allocation's hints, and
+  to return a null pointer "if the space cannot be allocated **or if hints cannot
+  be preserved**". So a hinted block that cannot be grown at the hinted end fails
+  the call — it never silently migrates to the unhinted end, which would be a
+  quiet loss of the property the program asked for.
+- §4.10's `set_range` tells a backend which ranges carry atomics or signals, and
+  its call site is the moment a hinted allocation extends the hinted end.
+
+So the allocator records a hint with each allocation and grows hinted
+allocations from the opposite end of the heap from unhinted ones. Both ends are
+a pure function of the call sequence, so determinism and invariant 6 are
+untouched. The hints change no behaviour on one node and are not required to
+change any behaviour ever — they are advisory — but retrofitting hint plumbing
+into a finished allocator is the expensive version of this.
 
 ### 4.5 Teams and allocation
 
@@ -1830,8 +1875,21 @@ library's internal region of §5.8, and statics with §4.3 phase 1.5), and an of
 and checks bounds. It also converts team-relative ranks to world ranks. Nothing
 below the boundary sees an address (invariants 7 and 20).
 
-**Dispatch.** Each call chooses a backend per target PE through the one
-locality function of §8.1. A single context can use both backends at once.
+**Dispatch is per `(pe, operation class)`, not per PE.** Each call chooses a
+backend through the one locality function of §8.1, and a single context can use
+both backends at once — but so can a single *PE*. A backend may carry one PE's
+puts and gets while another carries that PE's rmw, and a NIC whose atomics are
+not coherent with the CPU must do exactly that: a CPU atomic and a NIC atomic on
+one word are not exclusive, while `rmw` promises exclusivity across the whole
+atomicity domain, so on-node atomics go to the NIC by loopback while on-node put
+and get stay `memcpy`. This is the general case rather than one fabric's quirk —
+Portals, UET and UCX each carry a capability flag saying whether their NIC
+atomics are CPU-coherent, which means all three expect the incoherent case.
+
+Consequently `osoe_tp_direct` returning non-NULL says that *stores* through the
+pointer are ordered as described; it does not say that rmw to that PE executes
+locally. Nothing above the boundary changes, because the spec already makes a
+plain store racing an AMO on the same word undefined (spec §3.2).
 `osoe_tp_direct(pe, region, offset)` *is* that function. It returns the target's
 address in this process only where the backend orders the calling thread's stores
 through that address against its own writes by the next fence or wait (§4.6). osoe's
@@ -1864,8 +1922,40 @@ binding gives backends that freedom instead.
 boundary that is tested only on the network that sets it.)*
 
 **Errors.** No operation returns one. A transport failure aborts the job (§3.15).
-A wait that cannot finish checks the abort word and the lead's liveness at each
-safety-sweep deadline.
+That is the right contract precisely because something outside the job owns
+tearing it down — a resource manager on a cluster, the launcher otherwise — so a
+boundary returning recoverable errors would be inventing a job it does not own.
+
+**Every blocking call sweeps, on a bound.** A wait that cannot finish checks the
+abort word and the lead's liveness at least every `OSOE_SWEEP_NS`, whether or not
+the call takes a deadline. `osoe_tp_wait`, a blocking `osoe_tp_get` and any
+future blocking call sweep on the same schedule as `osoe_tp_watch_wait`. Neither
+blocks on the intranode backend, so nothing has forced the question yet; on the
+AM backend `osoe_tp_wait` blocks on acknowledgements and on an RDMA backend it is
+a completion-queue spin, and the rule is the difference between a hang and a
+clean abort.
+
+**A batching hint, `OSOE_TP_MORE`.** One flag on put and rmw saying more
+operations follow on this context, so a backend may hold one back and submit it
+with the next. Purely a hint: it changes nothing about completion, ordering or
+when `src` may be reused, and a backend that ignores it is correct — which is how
+the intranode backend implements it. The rule that makes it safe is that **a
+backend may defer an operation only if it has taken its own copy of the source
+bytes**; put's local-completion contract is unconditional, so deferring a large
+zero-copy put is wrong however the flag is set. Nothing sets it on one node,
+where every put is a `memcpy`. It exists because an RDMA backend can post a list
+of work requests under one doorbell instead of ringing one per put, which is
+where the small-message rate is won, and because §3.9's aggregation wants to be
+told when not to seal a buffer early. Its drivers are the 1.6 session routines
+(§7.6) and the strided, block and collective loops.
+
+**Nonblocking completion is counters, never per-operation handles.** A
+nonblocking operation is a flag on the existing call, completed by the existing
+`osoe_tp_wait`. The spec defines `_nbi` completion only at `quiet`, so there is
+no per-operation wait call to serve; §4.6's `bytes_issued`/`bytes_landed` pair
+already *is* this design; and the core-API study found counters sufficient in all
+six production transports it surveyed, with per-operation handles an open
+question nobody needed. Recorded before a benchmark applies pressure for them.
 
 | Operation | Guarantee | Intranode backend | AM backend |
 |---|---|---|---|
@@ -1918,12 +2008,29 @@ instead of pushing every on-node rmw through NIC loopback.
   core-API study also keeps collectives above its core.
 - **Allocation (§4.4)** is a pure function of the call sequence and makes no
   transport call today. A later hook, `set_range(region, offset, len,
-  attributes)`, may tell a backend which ranges carry atomics or signals. That
+  attributes)`, tells a backend which ranges carry atomics or signals. That
   hook is how an RDMA backend avoids registering the whole heap for NIC atomics
   or counters (on CXI, a counter on a region disables its optimized RMA). The
   allocator therefore keeps hinted allocations (`SHMEM_MALLOC_ATOMICS_REMOTE`,
   `SHMEM_MALLOC_SIGNAL_REMOTE`, spec §9.3.5) able to grow from the opposite end of
   the heap from unhinted ones. That is still deterministic.
+
+  Three properties it must have, each easy to lose in implementation. It is
+  **not a collective and must not block**: every PE calls it with identical
+  arguments in the same order as a *consequence* of the allocator's determinism
+  (§4.4, invariant 6), not by coordination, and a backend that put a barrier in
+  it would be synchronizing for no reason. It is **advisory in both directions**
+  — a backend may ignore it entirely, an operation outside a declared range is
+  still correct, and nothing above the boundary asks what a backend did with it,
+  which is what keeps it from becoming a capability query. And repeated or
+  overlapping calls take the **union, never a replacement**, because `realloc`
+  preserves an allocation's hints and so must survive a grown or moved block.
+
+  It is the largest recoverable loss for an RDMA backend: without it, a backend
+  cannot know which words a PE may wait on, so it cannot afford exact
+  notification — it would have to add a second work request to *every* atomic —
+  and every blocked wait degenerates to polling, a core per node at best. It is
+  not scheduled here; §7.1 step 3 places it with the backend that consumes it.
 - **Nonblocking gets and contexts beyond the default.** They add calls to the
   header when they arrive (§7.3). They do not change the operations above.
 
@@ -2882,6 +2989,15 @@ never share a name. It fails on a nonzero exit, a signal, a timeout, or a clean
 job that left `/dev/shm/osoe.<job>.*` behind. That last check tests the naming
 rules above on every multi-process test.
 
+**Bootstrap is out of band in every build, and always will be.** An RDMA
+transport cannot bootstrap itself: the GIDs, queue-pair numbers and memory keys
+that make RDMA possible have to be exchanged before any RDMA exists, so the
+rendezvous above stays the mechanism whatever carries the data path afterwards.
+That is arithmetic rather than a decision, and it is true of every RDMA stack.
+Note what it does *not* imply: the rendezvous is a socket and a handshake, not
+§3's reservation protocol, handler table or aggregation, and an RDMA build
+needing the former says nothing about whether it keeps the latter running (§10).
+
 ### 6.3 PMI-2 as an optional backend
 
 Keep the thin interface and keep a PMI-2 backend behind it, **off by default and
@@ -2978,10 +3094,25 @@ machinery. The review's order is adopted.
    with landing zones and reply credits; `quiet`, `fence`, and `pe_quiet` with
    ack-only segments; `put_signal`; internode `barrier_all`. Semantics are
    validated before a socket exists.
+
+   **This is the boundary's first real test**, and the reason it is worth
+   noticing: it is the second backend behind §4.10, so §8.1's force-remote flag
+   can run the same program over both paths and diff. Two open items are timed
+   to land with it, because this step writes the code they would otherwise have
+   to restructure: **decide `osoe_tp_sync`** (§10 — whether a collective's
+   internode phase crosses the boundary) while writing the internode phase that
+   is its only caller, and **`OSOE_TP_MORE`'s first caller**, since this is the
+   first backend for which deferring a submission means anything.
 3. **Real transport.** Start with the `echo-uring` floor harness (§8.4), the
    transport's smallest reproducer. Then io_uring with the repaired reservation
    protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
    reply credits and DRAINING caps, and the global rendezvous with its timeout.
+
+   **`osoe_tp_set_range` lands here** (§4.10), with the allocator call site it
+   has been waiting for: this is the first backend that can do anything with the
+   answer. The allocator half — recording hints and growing hinted allocations
+   from the opposite end — is done earlier, in step 1, because retrofitting hint
+   plumbing into a finished allocator is the expensive version.
 4. **Robustness.** Pidfd liveness, abort propagation, `shmem_global_exit`,
    keepalive; Slurm environment fixtures and the heap-base-shift test mode (§8.2).
 
@@ -3090,6 +3221,13 @@ Two details that must be planned rather than patched:
 Plus a **force-remote flag** routing even same-logical-node traffic over the
 network. Running a program both ways and diffing is the strongest differential
 test, since the shared-memory path is simple enough to trust as the reference.
+
+**It becomes a three-way switch** — intranode, AM, and any third backend — the
+moment a second network backend exists, so the differential test extends to it
+for free. This is also the answer to "is the §4.10 boundary really carrying two
+backends": not analysis, but running the same program over both and diffing. It
+does not need new hardware. §7.1 step 2's in-process AM backend is the second
+backend, so the boundary gets its first real test one step from here.
 
 **Four poles, not one:**
 
@@ -3447,6 +3585,10 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Build tool | **CMake ≥ 3.25** (§1) |
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
+| What `OSOE_NODE_LAYOUT` covers | **The encoding of every word in the control segment, not only the offsets of fields.** A word written by one process and interpreted by another is part of the inter-process contract even when its width and position do not move; changing what its bits mean without bumping the version gives mixed builds silent lost wakes rather than the loud refusal `open_control` exists to produce. Recorded because a proposal got it wrong, arguing the §4.9 watch word could change encoding without a bump since it is "an opaque filter" — it is opaque to its *reader*, which is another process |
+| Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_tp_watch_wait` being the backend's own function |
+| A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_tp_wait`, `osoe_tp_get`, `osoe_tp_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
+| `osoe_tp_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 
 ### Still open — blocking
 
@@ -3464,6 +3606,67 @@ Recorded rather than deleted, so they are not reopened from memory.
   decisions, and chunk sizing. Probably right; worth an hour to confirm rather
   than carry. Now has a home in the test suite rather than being a one-off.
 - **Pin the §1 floor ratios.** Deliberately unwritten until the harness runs.
+
+### Still open — the RoCE exercise of 2026-09-17
+
+`docs/reviews/roce-transport.md` planned a RoCEv2 backend behind §4.10 to test
+whether the boundary can carry RDMA at all, and estimated what it leaves on the
+table. Its hardware facts are **recalled**, not measured — its §10 lists eight
+things to verify before any number is quoted as a result — so nothing below is
+implemented on its authority alone.
+
+**The headline is that nothing in the boundary prevents an RDMA backend.** Of six
+losses it identifies, four are RoCE's own (8-byte-only atomics, no non-fetching
+atomic, no target-side counters, NIC atomics not CPU-coherent) or a phase
+boundary (`get_nbi`, whose shape §4.10 now fixes as counters). The two that are
+the boundary's cost one flag and one function, both now specified in §4.10, and
+they are the *same two* the core-API study arrived at from a different direction.
+Two independent searches converging on the same two gaps is the useful result.
+
+Folded in already: dispatch per `(pe, operation class)`, the sweep bound on
+blocking calls, `OSOE_TP_MORE` with the source-ownership rule that makes it safe,
+nonblocking-as-counters, `set_range`'s contract, §4.1's registration trap, §6.2's
+out-of-band bootstrap, and §8.1's three-way switch.
+
+- **`osoe_tp_sync`: does a collective's internode phase cross the boundary?**
+  §2.2 puts collectives on AM, decided when AM was the only backend; in an RDMA
+  build that sends every barrier over TCP while the data path runs on the NIC.
+  The proposal is a mandatory `osoe_tp_sync(ctx, group)` over a group of *nodes*,
+  called after the intranode phase (§5.3) by one PE per node that has a member —
+  note that is the team's local lead (§5.2), not necessarily the node lead of
+  §3.12, so it asks the node lead's agent to send rather than sending itself
+  (invariant 19). A backend with no native group barrier gets a generic tree over
+  put and watch, so it carries no capability and §4.10's rejection of capability
+  bits still holds.
+
+  **Deferred to step 2, deliberately.** The case is an estimated 4–6× on barrier
+  at 10^6 PEs — unmeasured, and four orders of magnitude beyond the target
+  hardware. An earlier draft argued §4.10 contradicts itself on this and
+  **withdrew it**: §2.2 scopes the boundary claim to §4 and puts collectives on
+  AM on purpose, so there is a decision here, not an oversight. What is left is a
+  trade between fifteen lines now and restructuring `barrier.c` later, and step 2
+  writes the internode phase that is `osoe_tp_sync`'s only caller and its only
+  implementation. Deciding it there means deciding it with the code in front of
+  us rather than an estimate — and we may notice something on the way that
+  changes the answer. *(Not rejected. Recorded so it is decided at step 2 rather
+  than rediscovered.)*
+- **Does the AM data path stay hot in an RDMA build?** Bootstrap is out of band
+  in every build (§6.2) and that is forced. Whether §3's *data* path — the
+  reservation protocol, deferred reply queues, aggregation — stays running is
+  not. The argument for keeping it is that it cannot rot if it runs on every
+  run; the flaw in that argument is that if RDMA carries the traffic, those are
+  exactly the parts that would not run, so what gets exercised is bootstrap and
+  control, which is less than the claim. The argument from abort propagation is
+  weak on the machines RDMA runs on, where a resource manager tears the job down
+  (§3.15). Three costs nobody has counted: the lead's agent still runs its idle
+  loop; a PE that touched a peer over both paths must wait on two completion
+  domains, so §4.6's dirty set grows a second dimension; and §3.4's connection
+  buffers cost memory whether or not they carry traffic. Needs a device.
+- **Verification before any RoCE number is quoted.** `roce-transport.md` §10's
+  V1–V8. V1 — whether a remote initiator can target a memory region registered
+  by the node lead, arriving on an XRC target queue pair on a shared XRCD — is
+  the load-bearing assumption of the whole plan; its fallback costs 16 MB per
+  node and no redesign.
 
 ### Still open — design, deferrable
 

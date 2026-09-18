@@ -19,9 +19,17 @@
  *   - intranode: the target's heap is mapped in this process (§4.1); every
  *     operation is a memory operation in the calling thread;
  *   - AM: everything else (§3; not in phase 1 step 1).
- * A backend may be chosen per PE, so one context can use both at once.
  * Backends are bound at build time: no table of function pointers, and a
  * backend's fast path may become static inline behind these names (§4.10).
+ *
+ * Dispatch is per (pe, operation class), not per PE. A backend may carry one
+ * PE's puts and gets while another carries that PE's rmw - a NIC whose atomics
+ * are not coherent with the CPU must, since a CPU atomic and a NIC atomic on
+ * one word are then not exclusive, and rmw below promises exclusivity across
+ * the whole atomicity domain. So osoe_tp_direct returning non-NULL says that
+ * *stores* through the pointer are ordered as described; it does not say that
+ * rmw to that PE executes locally. Nothing above this header changes: the spec
+ * already makes a plain store racing an AMO on one word undefined (spec §3.2).
  *
  * Capabilities. Every operation is mandatory for every backend, and nothing
  * above this header asks what a backend supports. A backend without native
@@ -33,8 +41,18 @@
  * SHMEM_THREAD_MULTIPLE is open (§10).
  *
  * Errors. There is no error return. A transport failure aborts the job
- * (§3.15); a wait that cannot complete checks the abort word and the lead's
- * liveness on each safety-sweep deadline (§3.10, §3.12).
+ * (§3.15). That is the right contract because something outside the job - the
+ * resource manager, or the launcher - owns tearing it down; a boundary that
+ * returned recoverable errors would be inventing a job it does not own.
+ *
+ * Every blocking call here checks the abort word and the lead's liveness at
+ * least every OSOE_SWEEP_NS (base/deadline.h), whether or not it takes a
+ * deadline. A backend must not spin or block indefinitely without sweeping:
+ * osoe_tp_wait, a blocking osoe_tp_get and any future blocking call sweep on
+ * the same schedule as osoe_tp_watch_wait, which is the difference between a
+ * hang and a clean abort. Neither osoe_tp_wait nor osoe_tp_get blocks on the
+ * intranode backend, so nothing exercises this yet; it is stated here because
+ * the first backend whose wait blocks will be written against this header.
  */
 #ifndef OSOE_TRANSPORT_H
 #define OSOE_TRANSPORT_H
@@ -103,6 +121,30 @@ enum {
      * only once the operation has executed. Without it, an rmw may return
      * before it executes (spec §9.7). */
     OSOE_TP_FETCH = 1u << 1,
+
+    /*
+     * More operations follow on this context immediately: a backend may hold
+     * this one back and submit it with the next. Purely a hint. It changes
+     * nothing about completion, ordering, or when src may be reused, and a
+     * backend that ignores it is correct - which is how the intranode backend
+     * implements it, since every operation is applied before it returns.
+     * Any fence, wait, get, fetching rmw, or operation without this flag
+     * submits whatever is held.
+     *
+     * A backend may defer an operation only if it has taken its own copy of
+     * the source bytes. Put's contract is unconditional - src may be reused
+     * the moment the call returns - so deferring a large zero-copy put is
+     * wrong however the flag is set. That rule is the flag's whole safety
+     * argument, and it is the backend's to keep.
+     *
+     * No caller sets this yet: on one node every put is a memcpy. It exists so
+     * that an RDMA backend can post a list of work requests under one doorbell
+     * rather than ringing one per put, which is where the small-put message
+     * rate is won, and so that §3.9's aggregation is told when not to seal a
+     * buffer early. Its drivers are the 1.6 session routines (§7.6), the
+     * strided and block RMA loops, and the collectives' own loops.
+     */
+    OSOE_TP_MORE = 1u << 2,
 };
 
 /*
@@ -140,6 +182,13 @@ void osoe_tp_put(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
  * it out (§3.12).
  *
  * The nonblocking form, completed by osoe_tp_wait, arrives with shmem_get_nbi.
+ * It is a flag on this call, not a separate one, and it yields no handle: a
+ * nonblocking operation is completed by the existing osoe_tp_wait and nothing
+ * else. The spec defines _nbi completion only at quiet, so there is no
+ * per-operation wait call to serve, §4.6's bytes_issued/bytes_landed pair is
+ * already this design, and the core-API study found counters sufficient in all
+ * six production transports it surveyed. Recorded here before a benchmark
+ * applies pressure for per-operation handles.
  */
 void osoe_tp_get(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
                  uint64_t offset, void *dst, size_t len);
