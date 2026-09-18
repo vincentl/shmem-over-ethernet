@@ -61,6 +61,12 @@ osoe_tier2_test(quiet)
 osoe_tier2_test(heap)
 osoe_tier2_test(amotypes)
 
+# The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
+# §4.9 watch word to check the unmasked-span refinement, which is the one place
+# a test needs the encoding itself rather than a name in the metric table.
+osoe_tier2_test(waitmany)
+target_include_directories(shmem_test_waitmany PRIVATE ../src)
+
 # osoe-stat, against a live job and against one deliberately stalled (§3.14).
 # It needs the tool's path, which only the build knows; the launcher passes its
 # environment through, so setting it on the test reaches every rank.

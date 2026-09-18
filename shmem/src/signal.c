@@ -107,6 +107,6 @@ OSOE_API uint64_t shmem_signal_fetch(const uint64_t *sig_addr)
 OSOE_API uint64_t shmem_signal_wait_until(uint64_t *sig_addr, int cmp, uint64_t cmp_value)
 {
     osoe_count(OSOE_C_SHMEM_SIGNAL_WAIT_CALLS, 1);
-    return osoe_wait_until("shmem_signal_wait_until", sig_addr, OSOE_SIGNAL_WIDTH, cmp,
-                           cmp_value);
+    return osoe_wait_until("shmem_signal_wait_until", sig_addr, OSOE_SIGNAL_WIDTH,
+                           false, cmp, cmp_value);
 }

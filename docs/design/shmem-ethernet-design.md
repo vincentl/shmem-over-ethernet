@@ -2008,6 +2008,17 @@ but loads and compares. The blocking forms are the weird ones, and they are the
 ones with no callers. **Revisit when a real user appears, or when a measurement
 shows the re-check dominating** — not before.
 
+**Signedness is a parameter of the comparison, not a property of the word.**
+Every value crosses the library's internal wait boundary as a `uint64_t`,
+because that is what the boundary's `load` and `rmw` take, and Table 6 has
+signed types: `SHMEM_CMP_LT` against 0 on an `int` holding −1 is true, and on a
+`uint32_t` holding the same bits it is false. So a value is extended to 64 bits
+according to its type's signedness and compared as an `int64_t` or a `uint64_t`
+accordingly. This is the one place where the uniform `uint64_t` carriage that
+makes the rest of the wait layer one piece of code would silently give the
+wrong answer, and it is worth naming because the first implementation of
+`wait_until` had only unsigned types and was therefore correct by accident.
+
 **Spec constraints, both satisfied for free.** `ivar` must be updated using
 OpenSHMEM AMOs (1.5 change #17), and §3.2 makes a wait or test on a location
 exclusive with AMOs on that location of the same datatype. The progress thread
