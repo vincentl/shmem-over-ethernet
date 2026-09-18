@@ -1,0 +1,47 @@
+== does the coverage predicate change the §4.9 protocol?
+design block:  scalar                                        SC  states=         40 depth=  9 (    0.0s, miss<1e-26) -> ok
+design block:  spread array                                  SC  states=      4,595 depth= 21 (    0.0s, miss<1e-22) -> ok
+design exact:  scalar                                        SC  states=         40 depth=  9 (    0.0s, miss<1e-26) -> ok
+design exact:  scalar                                        TSO states=         40 depth=  9 (    0.0s, miss<1e-26) -> ok
+design exact:  two near elements                             SC  states=        423 depth= 15 (    0.0s, miss<1e-24) -> ok
+design exact:  two near elements                             TSO states=        423 depth= 15 (    0.0s, miss<1e-24) -> ok
+design exact:  spread array (sat)                            SC  states=      4,595 depth= 21 (    0.0s, miss<1e-22) -> ok
+design exact:  spread array (sat)                            TSO states=      4,595 depth= 21 (    0.0s, miss<1e-22) -> ok
+design exact:  multi-grain write                             SC  states=         40 depth=  9 (    0.0s, miss<1e-26) -> ok
+design sig:    scalar                                        SC  states=         40 depth=  9 (    0.0s, miss<1e-26) -> ok
+design sig:    spread array                                  SC  states=      4,595 depth= 21 (    0.0s, miss<1e-22) -> ok
+design sig:    spread array                                  TSO states=      4,595 depth= 21 (    0.0s, miss<1e-22) -> ok
+design sig:    multi-grain write                             SC  states=         40 depth=  9 (    0.0s, miss<1e-26) -> ok
+endpoints: spread array                                      SC  states=        214 depth= 17 (    0.0s, miss<3e-25) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T3:add ('var', 128)->1 ; T3:load ('watch',)->0 ; T1:add ('var', 0)->1 ; T1:load ('watch',)->0 ; T0:store ('watch',)=8589934593 ; T0:load ('seq',)->0 ; T0:load ('var', 0)->1 ; T0:load ('var', 64)->0 ; T2:add ('var', 64)->1 ; T2:load ('watch',)->8589934593 ; T0:load ('var', 128)->1 ; T0:futex_wait ('seq',) SLEEP
+endpoints: scalar (passes)                                   SC  states=         40 depth=  9 (    0.0s, miss<1e-26) -> ok
+endpoints: two near elements (passes)                        SC  states=        423 depth= 15 (    0.0s, miss<1e-24) -> ok
+satzero:   spread array                                      SC  states=         27 depth= 12 (    0.0s, miss<5e-27) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T3:add ('var', 128)->1 ; T3:load ('watch',)->0 ; T2:add ('var', 64)->1 ; T2:load ('watch',)->0 ; T0:store ('watch',)=0 ; T0:load ('seq',)->0 ; T0:load ('var', 0)->0 ; T1:add ('var', 0)->1 ; T1:load ('watch',)->0 ; T0:load ('var', 64)->1 ; T0:load ('var', 128)->1 ; T0:futex_wait ('seq',) SLEEP
+satzero:   two near elements (passes)                        SC  states=        423 depth= 15 (    0.0s, miss<1e-24) -> ok
+sigfirst:  multi-grain write                                 SC  states=         21 depth=  6 (    0.0s, miss<3e-27) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T0:store ('watch',)=2305843009213693952 ; T0:load ('seq',)->0 ; T0:load ('var', 32)->0 ; T1:add ('var', 32)->1 ; T1:load ('watch',)->2305843009213693952 ; T0:futex_wait ('seq',) SLEEP
+sigfirst:  scalar (passes)                                   SC  states=         40 depth=  9 (    0.0s, miss<1e-26) -> ok
+exact + checkfirst                                           SC  states=         16 depth=  9 (    0.0s, miss<2e-27) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T2:add ('var', 8)->1 ; T2:load ('watch',)->0 ; T0:load ('var', 0)->0 ; T1:add ('var', 0)->1 ; T1:load ('watch',)->0 ; T0:load ('var', 8)->1 ; T0:store ('watch',)=4 ; T0:load ('seq',)->0 ; T0:futex_wait ('seq',) SLEEP
+exact + notifyfirst                                          SC  states=         12 depth=  6 (    0.0s, miss<9e-28) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T1:load ('watch',)->0 ; T0:store ('watch',)=2 ; T0:load ('seq',)->0 ; T0:load ('var', 0)->0 ; T1:add ('var', 0)->1 ; T0:futex_wait ('seq',) SLEEP
+exact + plainpub                                             TSO states=         38 depth=  9 (    0.0s, miss<9e-27) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T0:store(buf) ('watch',)=2 ; T0:load ('seq',)->0 ; T0:load ('var', 0)->0 ; T1:add ('var', 0)->1 ; T1:load ('watch',)->0 ; T0:flush ('watch',)=2 ; T0:futex_wait ('seq',) SLEEP
+sig + checkfirst                                             SC  states=         16 depth=  9 (    0.0s, miss<2e-27) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T2:add ('var', 8)->1 ; T2:load ('watch',)->0 ; T0:load ('var', 0)->0 ; T1:add ('var', 0)->1 ; T1:load ('watch',)->0 ; T0:load ('var', 8)->1 ; T0:store ('watch',)=1 ; T0:load ('seq',)->0 ; T0:futex_wait ('seq',) SLEEP
+sig + notifyfirst                                            SC  states=         12 depth=  6 (    0.0s, miss<9e-28) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T1:load ('watch',)->0 ; T0:store ('watch',)=1 ; T0:load ('seq',)->0 ; T0:load ('var', 0)->0 ; T1:add ('var', 0)->1 ; T0:futex_wait ('seq',) SLEEP
+sig + plainpub                                               TSO states=         38 depth=  9 (    0.0s, miss<9e-27) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T0:store(buf) ('watch',)=1 ; T0:load ('seq',)->0 ; T0:load ('var', 0)->0 ; T1:add ('var', 0)->1 ; T1:load ('watch',)->0 ; T0:flush ('watch',)=1 ; T0:futex_wait ('seq',) SLEEP
+
+ALL AS EXPECTED
