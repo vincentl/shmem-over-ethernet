@@ -6,6 +6,7 @@
 
 #include "arrivals.h"
 #include "check.h"
+#include "invariants.h"
 
 enum { QUICK = 2000, STAGGERED = 5 };
 
@@ -25,6 +26,8 @@ int main(void)
         shmem_barrier_all();
         CHECK(arrivals_left_after_all(n));
     }
+
+    CHECK_INVARIANTS();
 
     /* A non-last finalize is a barrier. */
     shmem_init();

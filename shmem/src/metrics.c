@@ -99,6 +99,14 @@ static const struct osoe_metric_desc record_metrics[] = {
     PE("pe.pid", pid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
     PE("pe.tid", tid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
     PE("pe.phase", phase, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    PE("pe.agent_wake", agent_wake, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    PE("pe.symmetric_size", symmetric_size, OSOE_MTYPE_U64, OSOE_MKIND_STATE, "bytes"),
+    PE("pe.heap_bytes", heap_bytes, OSOE_MTYPE_U64, OSOE_MKIND_STATE, "bytes"),
+    /* The heap object's name, so osoe-stat --gc can remove what a job that
+     * crashed during bootstrap left behind, without knowing how the name is
+     * built. Everything else in the segment is found by name; the names of the
+     * other objects a job owns should be too. */
+    PE("pe.heap_name", heap_name, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
     PE("pe.watch_rng", watch_rng, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     PE("pe.watch_seq", watch_seq, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.world_epoch", world_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
@@ -115,8 +123,22 @@ static const struct osoe_metric_desc record_metrics[] = {
     NDEPOCH("team.world.copied", world_copied),
     ND("node.aborting", aborting, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_pe", abort_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.abort_status", abort_status, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
     ND("node.world_size", world_size, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.job", job, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    ND("node.step", step, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.id", node, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.session", session, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.heap_base", heap_base, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    /* The rendezvous words (§6.2). A job stuck in bootstrap is stuck in one of
+     * these, and which one says how far it got. */
+    ND("node.ready", ready, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.joined", joined, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.mapped", mapped, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.finalized", finalized, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.failed", failed, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     NDDIR("node.local_count", local_count, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
+    NDDIR("node.blocks_per_pe", blocks_per_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
 };
 
 enum {

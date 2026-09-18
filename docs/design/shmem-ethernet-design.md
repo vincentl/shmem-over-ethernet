@@ -810,6 +810,15 @@ that is stuck. Memory can be read without the job's cooperation.
   describing" is a claim rather than a mechanism, and the first structural
   change quietly breaks every tool.
 
+  **`struct osoe_metric_desc` is frozen with it, and for the same reason.** The
+  table is what makes every other field readable, so its own element cannot be
+  described by the table; something has to be the floor. The directory carries
+  `metric_desc_bytes` so that a reader *checks* this assumption rather than
+  making it, and a reader that meets a descriptor size it does not know prints
+  the directory and stops, which is the same behaviour as an unknown `layout`.
+  Two structures, both frozen, both checked: that is the whole contract between
+  a job and a tool from another commit.
+
   Four sections, each starting on a cache line: the header, the PE slots, the
   metric table, and the counter blocks. A metric names its **scope** — node,
   PE, or thread — which says which record its offset is into.
@@ -830,19 +839,57 @@ that is stuck. Memory can be read without the job's cooperation.
 #### `osoe-stat`
 
 An **installed** tool that maps the control segment read-only and reads without
-locks and without the job's cooperation:
+locks and without the job's cooperation. It is the only tool under `tools/` that
+is installed, because the thing it is for happens on a machine that has no build
+tree.
 
-- a live view of counters and rates, per node, per PE, and per connection;
-- a **state dump** — every buffer, queue, credit, watch slot, epoch counter, and
-  "blocked in" record. This replaces the earlier `am_dump_state(FILE *)`, which
-  needed a call from inside the job;
-- the flight recorder's recent events;
-- output as a human-readable table, JSON, or Prometheus text format. For Prometheus,
-  node_exporter's textfile collector picks up `osoe-stat --prometheus` output, so
-  osoe contains no HTTP code;
-- `--gc` for segments left by crashed jobs.
+It is written **against the segment, not the library**: it includes nothing from
+`shmem/src` and nothing from `base/`, only libc and the two frozen structures
+above. That constraint is the mechanism. A reader with access to the library's
+headers would find fields by `offsetof` like the library does, the table would
+describe nothing anyone depended on, and the first structural change would break
+every tool while the build still passed. Having no other way to find anything is
+what keeps "self-describing" true.
+
+What it does:
+
+- a **live view of counters**, per PE, with `--interval` to repeat. A PE's value
+  for a thread-scope metric is the **sum** of its blocks for a counter and the
+  **maximum** for anything else: adding two threads' last-wake timestamps would
+  produce a number that means nothing, and `kind` is exactly that distinction,
+  which is why it is in the table;
+- a **state dump** — every field of the header, every PE slot, every watch slot,
+  epoch counter and "blocked in" record, and every claimed counter block. This
+  replaces the earlier `am_dump_state(FILE *)`, which needed a call from inside
+  the job;
+- per-thread **CPU time and involuntary context switches**, read from
+  `/proc/<pid>/task/<tid>/` using the tid each block records and the pid its PE's
+  slot records — the cost rule below, that anything the kernel already tracks is
+  read by the tool;
+- **human-readable and JSON** output;
+- **`--gc`** for segments left by crashed jobs. A segment is collectable when
+  every PE that ever joined it is gone; one where *no* PE has joined yet is left
+  alone, because that is a job in bootstrap and not a corpse. Heap objects are
+  removed first, by the name each slot records, since removing the control
+  segment first would strand them. A recycled pid can only make a dead job look
+  alive, which costs a few megabytes of `/dev/shm` rather than removing a
+  running job's segment.
 
 Readers load with `memory_order_acquire` and accept values a moment stale.
+
+**One field is decoded, not merely printed: the §4.9 watch word.** Its encoding
+is part of what `layout` covers (§10), so the tool carries its own small copy of
+the decode and uses it only when the segment's layout is the one it was built
+against; any other layout gets the raw word and a note. That is what a layout
+version is *for*, and it is the only place the tool knows an encoding rather
+than an offset.
+
+**Deferred, and why.** *Prometheus output* is a third formatter over the same
+table and waits for a reason to exist; node_exporter's textfile collector is
+still where it would go, so osoe would contain no HTTP code. *Netlink
+`sock_diag`* for per-connection round-trip time, retransmits and congestion
+window needs connections, which arrive with the AM backend (§7.1 step 2). *The
+flight recorder* is deferred below, for the same reason.
 
 *(Rejected: an HTTP endpoint in the library. It fails during a hang, when it is
 needed most; ports per ephemeral job do not fit scrape discovery; it exposes a
@@ -850,6 +897,33 @@ network port; and it puts socket code in the progress process. If a scrape endpo
 is ever wanted, it belongs in a separate process built on `osoe-stat`. Rejected:
 metrics files written by the library. The library writes no files; the persistent
 control segment already provides post-mortem state after a crash.)*
+
+#### Two claims, and what tests them
+
+Both are claims a tool cannot make about itself.
+
+**"A tool built from a different commit reads a job correctly."** Running
+`osoe-stat` against a job from the same tree tests none of this: every offset
+matches by accident. So a tier-1 test writes a control segment by hand with
+record layouts unlike the library's, a metric table in a different order,
+metrics this build has never heard of, and a layout version from the future, and
+requires the reader to find every value it does know, by name, anyway. It also
+requires the refusals: a metric whose offset runs past the end of its record, one
+whose offset is not a multiple of its width, and an index outside its scope are
+each refused rather than followed, because a corrupt segment is read on a
+machine where something has already gone wrong.
+
+**"Every `invariant.*` counter is zero at quiescence."** Until something asserts
+it, an invariant counter is a diagnostic and not an oracle: `missed_wake` could
+fire on every run of every test and nothing would say so. Every tier-2 test now
+calls `shmem/tests/invariants.h` before its last `shmem_finalize`. It takes a
+barrier as the definition of quiescence, then walks the metric table and asserts
+every metric of kind `OSOE_MKIND_INVARIANT` is zero in every record of its
+scope — **found by kind, not by name**, so it covers every invariant counter
+added later without being edited. It uses the same reader `osoe-stat` uses.
+Sharing that reader with the tool is the point; sharing it with the library
+would not be, since a check that read the counters through the library's own
+headers would pass whenever the library agreed with itself.
 
 #### Cost rules
 
@@ -3372,11 +3446,19 @@ written once.
 
 **Tests the review found missing:**
 
-- **Invariant counters at zero.** Every test ends at quiescence and asserts every
-  §3.14 invariant counter is zero.
-- **Introspection against a live job.** A tier-2 test runs `osoe-stat` against a
-  running job, and against one deliberately stalled, and checks the heartbeat and
-  "blocked in" records.
+- **Invariant counters at zero.** *Done.* Every tier-2 test calls
+  `shmem/tests/invariants.h` before its last `shmem_finalize`: a barrier, then
+  every metric of kind `OSOE_MKIND_INVARIANT` in every record of its scope,
+  found through the metric table by kind rather than by name. Checked by
+  breaking it: a deliberate extra `missed_wake` bump made the wait tests fail,
+  naming the counter and the block.
+- **Introspection against a live job.** *Done.* `shmem.stat` runs `osoe-stat`
+  against a running job at L = 1, 2 and 4, and at L ≥ 2 makes a PE sit in a wait
+  nothing will satisfy while another reads it: the "blocked in" record names the
+  routine, and `pe.sweeps` rises while the PE sleeps, which is the difference
+  between a PE that is blocked and one that is dead. Both were checked by
+  breaking them — suppressing the record, and suppressing the sweep count — and
+  the test failed each time.
 - **Bootstrap fixtures.** No tier fed real `SLURM_*` values. Capture `srun`
   environments for block, cyclic, plane, and arbitrary distributions, relative node
   selection (`-r`) and exclusions (`-x`), heterogeneous jobs, and a bare `sbatch`

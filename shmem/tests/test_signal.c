@@ -18,6 +18,7 @@
 #include <shmem.h>
 
 #include "check.h"
+#include "invariants.h"
 
 enum { PAYLOAD = 8192, ROUNDS = 40, ADDERS_PER_ROUND = 3 };
 
@@ -100,6 +101,7 @@ int main(void)
     shmem_free(mine);
     shmem_free(sig);
     shmem_free(data);
+    CHECK_INVARIANTS();
     shmem_finalize();
     return CHECK_DONE();
 }

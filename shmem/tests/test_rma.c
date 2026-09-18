@@ -10,6 +10,7 @@
 #include <shmem.h>
 
 #include "check.h"
+#include "invariants.h"
 
 enum { ALLOCS = 64 };
 
@@ -133,6 +134,7 @@ int main(void)
     shmem_free(o);
 
     shmem_free(flags);
+    CHECK_INVARIANTS();
     shmem_finalize();
     return CHECK_DONE();
 }

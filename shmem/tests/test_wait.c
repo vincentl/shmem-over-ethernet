@@ -11,6 +11,7 @@
 #include <shmem.h>
 
 #include "check.h"
+#include "invariants.h"
 
 enum { ROUNDS = 20, SLEEP_MS = 5 };
 
@@ -106,6 +107,7 @@ int main(void)
     (void)left;
     shmem_free(flag32);
     shmem_free(flag);
+    CHECK_INVARIANTS();
     shmem_finalize();
     return CHECK_DONE();
 }

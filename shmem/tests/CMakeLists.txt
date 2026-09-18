@@ -30,9 +30,17 @@ set_tests_properties(shmem.watchrange PROPERTIES LABELS "tier1" TIMEOUT 60)
 # listed local PE count, as shmem.<name>.L<count>.
 set(OSOE_LAUNCH_COUNTS 1 2 4)
 
+# Every tier-2 test asserts §8.2's rule that invariant counters are zero at
+# quiescence (invariants.h). It reads the control segment through osoe-stat's
+# segment reader, compiled in: shared with the tool, deliberately not with the
+# library, since a check that used the library's own headers would only prove
+# the library agrees with itself.
 function(osoe_tier2_test name)
-  add_executable(shmem_test_${name} test_${name}.c)
-  target_link_libraries(shmem_test_${name} PRIVATE osoe)
+  add_executable(shmem_test_${name} test_${name}.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_${name} PRIVATE
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_${name} PRIVATE osoe rt)
   osoe_warnings(shmem_test_${name})
   foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
     add_test(NAME shmem.${name}.L${count}
@@ -49,6 +57,15 @@ osoe_tier2_test(rma)
 osoe_tier2_test(amo)
 osoe_tier2_test(wait)
 osoe_tier2_test(signal)
+
+# osoe-stat, against a live job and against one deliberately stalled (§3.14).
+# It needs the tool's path, which only the build knows; the launcher passes its
+# environment through, so setting it on the test reaches every rank.
+osoe_tier2_test(stat)
+foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
+  set_tests_properties(shmem.stat.L${count} PROPERTIES
+    ENVIRONMENT "OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>")
+endforeach()
 
 # The development watchdog (§3.15). Not an osoe_tier2_test: it needs -k, so the
 # launcher leaves the survivors to the library, and it asserts on output rather

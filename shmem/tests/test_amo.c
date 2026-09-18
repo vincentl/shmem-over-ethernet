@@ -12,6 +12,7 @@
 #include <shmem.h>
 
 #include "check.h"
+#include "invariants.h"
 
 enum { ROUNDS = 500 };
 
@@ -138,6 +139,7 @@ int main(void)
     semantics(me, n);
     contended_fetch_add(me, n);
     cswap_lock(me, n);
+    CHECK_INVARIANTS();
     shmem_finalize();
     return CHECK_DONE();
 }

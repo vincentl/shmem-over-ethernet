@@ -10,6 +10,7 @@
 
 #include "arrivals.h"
 #include "check.h"
+#include "invariants.h"
 
 int main(void)
 {
@@ -56,6 +57,7 @@ int main(void)
     char *e = shmem_malloc(1000);
     CHECK(e == a);
     shmem_free(e);
+    CHECK_INVARIANTS_SESSION(1);        /* the second session (§6.4) */
     shmem_finalize();
     arrivals_close();
     return CHECK_DONE();
