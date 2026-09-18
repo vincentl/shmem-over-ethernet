@@ -30,6 +30,22 @@ static _Atomic int initialized;
 static pid_t init_pid;
 static uint32_t sessions;       /* completed or current full sessions */
 
+/*
+ * The thread level (§9.2, §4.6). osoe provides up to SHMEM_THREAD_SERIALIZED;
+ * SHMEM_THREAD_MULTIPLE is §4.11 and is not implemented, so a request for it is
+ * answered with SERIALIZED rather than refused - the interface exists precisely
+ * so that a program can ask for more than it gets and find out.
+ *
+ * The level is fixed by the *first* initialization of a session and does not
+ * change afterwards, which spec §9.2.1 permits in as many words ("may not be
+ * able to change the level of threading support provided after the first
+ * initialization call has been made"). shmem_query_thread may be called at any
+ * time, including before any init, where the answer is the level a
+ * shmem_init would provide.
+ */
+#define OSOE_THREAD_MAX SHMEM_THREAD_SERIALIZED
+static _Atomic int thread_level = OSOE_THREAD_MAX;
+
 static void session_start(void)
 {
     osoe = (struct osoe_state){ 0 };
@@ -56,8 +72,12 @@ static void session_end(void)
 OSOE_API void shmem_init(void)
 {
     pthread_mutex_lock(&lifecycle);
-    if (refcount == 0)
+    if (refcount == 0) {
+        /* Initialized by shmem_init, the implementation chooses the level
+         * (§9.2.2), and osoe chooses the most it has. */
+        atomic_store_explicit(&thread_level, OSOE_THREAD_MAX, memory_order_release);
         session_start();
+    }
     refcount++;
     atomic_store_explicit(&initialized, 1, memory_order_release);
     pthread_mutex_unlock(&lifecycle);
@@ -80,8 +100,48 @@ OSOE_API void shmem_finalize(void)
     if (refcount == 0) {
         session_end();
         atomic_store_explicit(&initialized, 0, memory_order_release);
+        /* A fresh session may be initialized at a different level. Until it
+         * is, the answer is the one a shmem_init would give. */
+        atomic_store_explicit(&thread_level, OSOE_THREAD_MAX, memory_order_release);
     }
     pthread_mutex_unlock(&lifecycle);
+}
+
+/*
+ * spec §9.2.1. Returns 0 on success, which is about whether the library came
+ * up, not about whether the requested level was granted: a lower `provided` is
+ * the interface working as designed, not a failure. A `requested` outside the
+ * four defined values is undefined by the spec and is clamped here, so a
+ * program that passes garbage gets a defined level rather than a level derived
+ * from its garbage.
+ */
+OSOE_API int shmem_init_thread(int requested, int *provided)
+{
+    if (requested < SHMEM_THREAD_SINGLE)
+        requested = SHMEM_THREAD_SINGLE;
+    if (requested > OSOE_THREAD_MAX)
+        requested = OSOE_THREAD_MAX;
+
+    pthread_mutex_lock(&lifecycle);
+    if (refcount == 0) {
+        atomic_store_explicit(&thread_level, requested, memory_order_release);
+        session_start();
+    }
+    refcount++;
+    atomic_store_explicit(&initialized, 1, memory_order_release);
+    int level = atomic_load_explicit(&thread_level, memory_order_acquire);
+    pthread_mutex_unlock(&lifecycle);
+
+    if (provided)
+        *provided = level;
+    return 0;
+}
+
+/* Callable at any time and from any thread, so it takes no lock (§9.2.2). */
+OSOE_API void shmem_query_thread(int *provided)
+{
+    if (provided)
+        *provided = atomic_load_explicit(&thread_level, memory_order_acquire);
 }
 
 OSOE_API void shmem_query_initialized(int *flag)

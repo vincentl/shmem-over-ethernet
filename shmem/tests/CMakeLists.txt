@@ -64,6 +64,7 @@ osoe_tier2_test(amotypes)
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
 # §4.9 watch word to check the unmasked-span refinement, which is the one place
 # a test needs the encoding itself rather than a name in the metric table.
+osoe_tier2_test(thread)
 osoe_tier2_test(waitmany)
 target_include_directories(shmem_test_waitmany PRIVATE ../src)
 

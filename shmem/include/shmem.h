@@ -34,6 +34,20 @@ int shmem_n_pes(void);
 void shmem_finalize(void);
 void shmem_query_initialized(int *initialized);
 
+/*
+ * Thread levels (§6, §9.2). The spec requires increasing integer values, and
+ * osoe provides up to SHMEM_THREAD_SERIALIZED: SHMEM_THREAD_MULTIPLE is §4.11
+ * of the design notes and is not implemented, so asking for it yields
+ * SERIALIZED rather than a failure, which is what the interface is shaped for.
+ */
+#define SHMEM_THREAD_SINGLE     0
+#define SHMEM_THREAD_FUNNELED   1
+#define SHMEM_THREAD_SERIALIZED 2
+#define SHMEM_THREAD_MULTIPLE   3
+
+int shmem_init_thread(int requested, int *provided);
+void shmem_query_thread(int *provided);
+
 /* Comparison constants for the wait and test routines (§6, §9.11) */
 #define SHMEM_CMP_EQ 0
 #define SHMEM_CMP_NE 1

@@ -76,13 +76,13 @@ enum osoe_counter {
      * SHMEM_THREAD_SERIALIZED a PE is in at most one wait at a time, so this is
      * the application calling the library from two threads at once.
      *
-     * blocks_exhausted: a thread found no free counter block and got a
-     * process-private one whose counters nobody reads. Capacity, not
-     * correctness, but it must be visible or the metrics quietly under-report.
+     * The third invariant, "a thread found no free counter block", is not here
+     * but in the PE's slot: a thread that fails to claim a block writes to a
+     * process-private one nobody can read, so a counter kept there could never
+     * be seen by the tool or the test that exists to see it.
      */
     OSOE_C_INVARIANT_MISSED_WAKE,
     OSOE_C_INVARIANT_WATCH_REENTERED,
-    OSOE_C_THREADS_BLOCKS_EXHAUSTED,
 
     /*
      * The block's own identity, in the block rather than in a parallel array so

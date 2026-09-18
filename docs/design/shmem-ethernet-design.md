@@ -825,8 +825,14 @@ that is stuck. Memory can be read without the job's cooperation.
 
 - **Counters are bounded per PE, and exhaustion is visible rather than fatal.**
   `OSOE_MAX_THREADS` blocks per PE, claimed by CAS on first use. A thread that
-  finds none gets a **process-private block** and bumps
-  `threads.blocks_exhausted` in it. Not an abort: §4.11 proposes aborting when a
+  finds none gets a **process-private block**, and the *fact* is recorded as
+  `invariant.blocks_exhausted` **in the PE's slot, not in a counter block**.
+  That distinction is the whole point and an earlier version of this line got it
+  wrong: a thread with no block writes to memory nobody outside the process can
+  read, so a counter kept there is exactly the one counter that can never be
+  seen — including by the §8.2 assertion that exists to see it. It is written by
+  whichever thread ran out, so it is a `seq_cst` read-modify-write rather than
+  this PE's single-writer publication, on a path taken at most once per thread. Not an abort: §4.11 proposes aborting when a
   PE's thread table fills, because there correctness depends on having a record,
   but here only the metrics do — and a job that dies because it made a ninth
   thread would be a worse failure than a job whose ninth thread is not counted.
@@ -1021,6 +1027,9 @@ headers would pass whenever the library agreed with itself.
 - Safety-sweep submissions that found sealed work nobody had signalled (§3.10).
 - Deadline expiries after which the awaited condition was already true: a missed
   wake, in the watch slots (§4.9) or any other wait.
+- A thread that found no counter block (above). Not a correctness failure, but a
+  silent loss of every other counter that thread would have kept, which is the
+  same thing from a reader's point of view.
 
 **The test suite asserts every invariant counter is zero at quiescence after every
 test** (§8.2), so these counters double as a correctness oracle.
@@ -1599,6 +1608,18 @@ thread, and each is already per-thread or checked:
 - **Finalize and fork.** `shmem_finalize` must come from the thread that called
   `shmem_init_thread` (spec §9.2, rule 1). The fork check (§6.4) compares pids, not
   threads.
+- **`shmem_init_thread` answers, it does not refuse.** A request for
+  `SHMEM_THREAD_MULTIPLE` returns 0 with `provided` set to
+  `SHMEM_THREAD_SERIALIZED`. The return value is about whether the library came
+  up, and the `provided` argument exists precisely so that a program can ask for
+  more than it gets and find out; a nonzero return would make an ordinary
+  negotiation look like a failed initialization.
+- **The level is fixed by the first initialization of a session** and a nested
+  one does not change it, which spec §9.2.1 permits in as many words. Between
+  sessions it is free again. `shmem_query_thread` may be called at any time,
+  including before any `shmem_init`, where the answer is the level a
+  `shmem_init` would provide — which, since `shmem_init` lets the implementation
+  choose (§9.2.2), is the most osoe has.
 
 Per-thread records (a watch, a blocking-get completion slot) are allocated per
 calling thread even though `SERIALIZED` needs only one per PE. That way `MULTIPLE`

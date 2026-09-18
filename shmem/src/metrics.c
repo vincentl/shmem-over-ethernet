@@ -76,7 +76,6 @@ static const struct osoe_metric_desc thread_metrics[] = {
     T("agent.last_wake_ns", OSOE_MKIND_STATE, "ns"),
     T("invariant.missed_wake", OSOE_MKIND_INVARIANT, ""),
     T("invariant.watch_reentered", OSOE_MKIND_INVARIANT, ""),
-    T("threads.blocks_exhausted", OSOE_MKIND_INVARIANT, ""),
     T("thread.claimed", OSOE_MKIND_STATE, ""),
     T("thread.tid", OSOE_MKIND_STATE, ""),
 };
@@ -123,6 +122,10 @@ static const struct osoe_metric_desc record_metrics[] = {
     PE("pe.watch_seq", watch_seq, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.world_epoch", world_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.sweeps", sweeps, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    /* An invariant at PE scope, because the thread it describes is by
+     * definition one whose counter block nobody can read. */
+    PE("invariant.blocks_exhausted", blocks_exhausted, OSOE_MTYPE_U32,
+       OSOE_MKIND_INVARIANT, ""),
     PE("pe.blocked.gen", blocked_gen, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     PE("pe.blocked.routine", blocked_routine, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
     PE("pe.blocked.detail", blocked_detail, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
@@ -246,8 +249,13 @@ struct osoe_counter_block *osoe_metrics_block(void)
             return my_block;
         }
     }
+    /* No block left. This thread counts into a private one nobody reads, which
+     * is why the fact that it happened is recorded in the PE's slot instead
+     * (§3.14): capacity, not correctness, but it must be visible or the
+     * metrics quietly under-report. */
     my_block = &orphan;
-    osoe_counter_add(my_block, OSOE_C_THREADS_BLOCKS_EXHAUSTED, 1);
+    atomic_fetch_add_explicit(&osoe.node.slots[osoe.boot.local_id].blocks_exhausted, 1,
+                              memory_order_seq_cst);
     return my_block;
 }
 

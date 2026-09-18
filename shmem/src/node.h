@@ -81,6 +81,17 @@ struct osoe_pe_slot {
     _Atomic uint64_t sweeps;             /* safety-sweep expiries: a blocked PE still moves */
     _Atomic uint32_t world_epoch;        /* this PE's k for SHMEM_TEAM_WORLD (§5.4) */
 
+    /*
+     * Threads of this PE that found no free counter block (§3.14). It belongs
+     * here and not in a counter block, which is where it started: a thread that
+     * fails to claim a block writes to a process-private one that nobody can
+     * read, so the one counter whose job is to say "the metrics are
+     * under-reporting" was itself unreadable. It is written by whichever thread
+     * ran out, so it is a seq_cst read-modify-write rather than this PE's
+     * single-writer publication - on a path taken once per thread, at most.
+     */
+    _Atomic uint32_t blocks_exhausted;
+
     /* Heap levels. Per PE, not per thread: a gauge cannot be summed. */
     _Atomic uint64_t heap_in_use;
     _Atomic uint64_t heap_high_water;
