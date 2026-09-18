@@ -1435,6 +1435,21 @@ local lead and again at the root.
   barrier. A null `ptr` makes it `shmem_malloc`, so it takes only the exit
   barrier; a zero `size` with a non-null `ptr` makes it `shmem_free`, so it takes
   only the entry one.
+- **`shmem_align` aligns an address, but the allocator works in offsets.** The
+  two agree only while the heap's base `B` is itself a multiple of the requested
+  alignment, which every candidate base in §4.1 is up to a terabyte. Above that,
+  `shmem_align` reports a failed allocation rather than returning an address
+  that is not what was asked for: a null return is a value the spec defines, and
+  every PE reaches it identically because `B` is the same number on all of them.
+  A non-conforming alignment — not a power of two, or not a multiple of
+  `sizeof(void *)` — is undefined by spec §9.3.4 and is a loud failure here,
+  because the alternative is a symmetric object that is not where the program
+  thinks it is.
+- **`shmem_realloc` resizes in place where it can**, growing into a free
+  neighbour above and shrinking by releasing the tail, before falling back to
+  allocate-copy-free. That is not an optimization: the fallback needs the old
+  and the new block to fit in the heap at once, so a program that grows one
+  large array would run out at half the heap instead of all of it.
 - A size of 0 (for `calloc`, a count or size of 0) returns a null pointer **without
   a barrier**. Every PE must make the same call, so none waits.
 - `shmem_free(NULL)` does nothing, also **without a barrier** (spec §9.3.2).

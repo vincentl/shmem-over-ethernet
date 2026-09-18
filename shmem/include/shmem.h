@@ -103,8 +103,16 @@ uint32_t shmem_uint32_atomic_fetch_xor(uint32_t *dest, uint32_t value, int pe);
 /* Symmetric pointer (§9.1.9) */
 void *shmem_ptr(const void *dest, int pe);
 
+/* Memory usage hints for shmem_malloc_with_hints (§6, §9.3.5, Table 4) */
+#define SHMEM_MALLOC_ATOMICS_REMOTE 1L
+#define SHMEM_MALLOC_SIGNAL_REMOTE  2L
+
 /* Memory management (§9.3) */
 void *shmem_malloc(size_t size);
+void *shmem_calloc(size_t count, size_t size);
+void *shmem_realloc(void *ptr, size_t size);
+void *shmem_align(size_t alignment, size_t size);
+void *shmem_malloc_with_hints(size_t size, long hints);
 void shmem_free(void *ptr);
 
 /* Remote memory access (§9.6.1) */

@@ -54,6 +54,10 @@ static const struct osoe_metric_desc thread_metrics[] = {
     T("shmem.barrier.ns", OSOE_MKIND_COUNTER, "ns"),
     T("shmem.malloc.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.free.calls", OSOE_MKIND_COUNTER, ""),
+    /* Every allocating routine counts as a malloc, since that is the family
+     * §3.14 question 4 asks about. realloc is counted separately as well,
+     * because it is the only one that both frees and allocates. */
+    T("shmem.realloc.calls", OSOE_MKIND_COUNTER, ""),
     /* The API layer's own call counts, beside the boundary's. They are not the
      * same number: shmem_barrier_all begins with a wait too (§5.6), so
      * tp.wait.calls alone cannot say how often the application asked for a
