@@ -3368,10 +3368,48 @@ Symmetric statics and the compiler wrapper follow step 4 (§7.4).
 ### 7.3 Plumb but do not implement
 
 A **context handle** on every RMA entry point and a **team parameter** on every
-collective, implementing only `SHMEM_CTX_DEFAULT` and `SHMEM_TEAM_WORLD`.
-Retrofitting either parameter later touches every function written.
-`shmem_ctx_create` and the team split routines exist and return nonzero until
-implemented, which the spec permits.
+collective, implementing only `SHMEM_CTX_DEFAULT`, `SHMEM_TEAM_WORLD` and
+`SHMEM_TEAM_SHARED`. Retrofitting either parameter later touches every function
+written. `shmem_ctx_create`, `shmem_team_create_ctx` and the team split routines
+exist and return nonzero until implemented, which the spec permits: §9.5.1 says
+an unsuccessful context creation "is not treated as an error", and §9.4 gives a
+PE that is not a member of a new team `SHMEM_TEAM_INVALID` — so a program
+written against the spec already has the branch these take.
+
+**The context form is the definition; the plain form calls it with
+`SHMEM_CTX_DEFAULT`.** The other way round — a plain form that does the work and
+a context form that discards its argument — passes every test that can be
+written while one context exists, and is the shape that breaks when a second
+one appears. Every AMO, `putmem`, `getmem`, `putmem_signal`, the signal updates,
+`fence`, `quiet` and `pe_quiet` are generated this way from one body.
+
+**Handles are opaque pointers with macro constants, not exported objects.**
+`shmem_team_t` and `shmem_ctx_t` are pointers to incomplete types, so passing a
+team where a context is expected is a compile error, and the predefined handles
+are small integers cast to those types. A library that exported
+`SHMEM_TEAM_WORLD` as data would be exporting a symbol outside the `shmem_`
+namespace the export test enforces, for no gain.
+
+**`SHMEM_TEAM_SHARED` has its own §5.4 epoch counters**, although on one node
+its membership is the world's. The spec makes the two distinct predefined teams
+forming separate atomicity domains, and sharing the counters is not merely
+untidy: a sync on one team would find `released` already at its target and
+return without waiting for anybody — a collective that does not collect, which
+no value check would notice. It is caught by the arrival table instead
+(`shmem/tests/arrivals.h`), and by each PE's published epoch count for each
+team.
+
+**`SHMEM_CTX_INVALID` is ignored by `fence` and `quiet`, and only by them.**
+Spec §9.12.1 and §9.12.2 say "no operation is performed" for those two; nothing
+says it for an RMA or an AMO, where silently doing nothing would turn a program
+bug into lost data. So the test for it is in those two routines rather than in
+the shared handle resolution, which is loud.
+
+**The C11 generic AMOs dispatch on arity first.** Each has two spellings, with
+and without a leading context, and `_Generic` cannot tell them apart — they
+differ in how many arguments they take, not in the type of one. The argument
+count selects between two selectors, and each selector then makes the ordinary
+type selection on whichever argument is the target pointer.
 
 ### 7.4 Mandatory surface
 

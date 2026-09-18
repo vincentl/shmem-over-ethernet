@@ -31,6 +31,7 @@
 #include "fatal.h"
 #include "metrics.h"
 #include "sym.h"
+#include "team.h"
 #include "transport.h"
 #include "wait.h"
 
@@ -48,13 +49,13 @@ static enum osoe_rmw_op signal_op(const char *routine, int sig_op)
     }
 }
 
-static void signal_update(const char *routine, uint64_t *sig_addr, uint64_t signal,
-                          enum osoe_rmw_op op, int pe, unsigned flags)
+static void signal_update(const char *routine, shmem_ctx_t ctx, uint64_t *sig_addr,
+                          uint64_t signal, enum osoe_rmw_op op, int pe, unsigned flags)
 {
     osoe_check_pe(routine, pe);
     osoe_count(OSOE_C_SHMEM_SIGNAL_UPDATE_CALLS, 1);
     uint64_t offset = osoe_sym_word_offset(routine, sig_addr, OSOE_SIGNAL_WIDTH);
-    osoe_tp_rmw(osoe_tp_ctx_default(), pe, OSOE_REGION_HEAP, offset, op,
+    osoe_tp_rmw(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, op,
                 OSOE_SIGNAL_WIDTH, signal, 0, flags);
 }
 
@@ -66,27 +67,50 @@ static void signal_update(const char *routine, uint64_t *sig_addr, uint64_t sign
  * nelems 0 still signals: the spec makes the signal update unconditional, and a
  * zero-length put is the empty transfer it announces.
  */
-OSOE_API void shmem_putmem_signal(void *dest, const void *source, size_t nelems,
-                                  uint64_t *sig_addr, uint64_t signal, int sig_op, int pe)
+OSOE_API void shmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *source,
+                                      size_t nelems, uint64_t *sig_addr, uint64_t signal,
+                                      int sig_op, int pe)
 {
-    static const char routine[] = "shmem_putmem_signal";
+    static const char routine[] = "shmem_ctx_putmem_signal";
     enum osoe_rmw_op op = signal_op(routine, sig_op);
     osoe_check_pe(routine, pe);
     if (nelems > 0) {
         uint64_t offset = osoe_sym_offset(routine, dest, nelems);
-        osoe_tp_put(osoe_tp_ctx_default(), pe, OSOE_REGION_HEAP, offset, source, nelems, 0);
+        osoe_tp_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source,
+                    nelems, 0);
     }
-    signal_update(routine, sig_addr, signal, op, pe, OSOE_TP_FENCED);
+    /* The fence is on the same context as the put, which is what makes it
+     * order the two (spec §9.12.1, 1.6 change #18). */
+    signal_update(routine, ctx, sig_addr, signal, op, pe, OSOE_TP_FENCED);
+}
+
+OSOE_API void shmem_putmem_signal(void *dest, const void *source, size_t nelems,
+                                  uint64_t *sig_addr, uint64_t signal, int sig_op, int pe)
+{
+    shmem_ctx_putmem_signal(SHMEM_CTX_DEFAULT, dest, source, nelems, sig_addr, signal,
+                            sig_op, pe);
+}
+
+OSOE_API void shmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
+                                   int pe)
+{
+    signal_update("shmem_ctx_signal_set", ctx, sig_addr, signal, OSOE_RMW_WRITE, pe, 0);
+}
+
+OSOE_API void shmem_ctx_signal_add(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
+                                   int pe)
+{
+    signal_update("shmem_ctx_signal_add", ctx, sig_addr, signal, OSOE_RMW_ADD, pe, 0);
 }
 
 OSOE_API void shmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe)
 {
-    signal_update("shmem_signal_set", sig_addr, signal, OSOE_RMW_WRITE, pe, 0);
+    shmem_ctx_signal_set(SHMEM_CTX_DEFAULT, sig_addr, signal, pe);
 }
 
 OSOE_API void shmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe)
 {
-    signal_update("shmem_signal_add", sig_addr, signal, OSOE_RMW_ADD, pe, 0);
+    shmem_ctx_signal_add(SHMEM_CTX_DEFAULT, sig_addr, signal, pe);
 }
 
 /* Local: the signal object of the calling PE (§9.8.6 takes no pe argument). */

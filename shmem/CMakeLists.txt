@@ -16,6 +16,7 @@ add_library(osoe
   src/rma.c
   src/signal.c
   src/sym.c
+  src/team.c
   src/transport_local.c
   src/wait.c
   src/watch.c

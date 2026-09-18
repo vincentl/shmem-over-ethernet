@@ -121,6 +121,7 @@ static const struct osoe_metric_desc record_metrics[] = {
     PE("pe.watch_rng", watch_rng, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     PE("pe.watch_seq", watch_seq, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.world_epoch", world_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    PE("pe.shared_epoch", shared_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.sweeps", sweeps, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     /* An invariant at PE scope, because the thread it describes is by
      * definition one whose counter block nobody can read. */
@@ -136,6 +137,9 @@ static const struct osoe_metric_desc record_metrics[] = {
     NDEPOCH("team.world.arrived", world_arrived),
     NDEPOCH("team.world.released", world_released),
     NDEPOCH("team.world.copied", world_copied),
+    NDEPOCH("team.shared.arrived", shared_arrived),
+    NDEPOCH("team.shared.released", shared_released),
+    NDEPOCH("team.shared.copied", shared_copied),
     ND("node.aborting", aborting, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_pe", abort_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_status", abort_status, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),

@@ -257,6 +257,9 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
     osoe_epoch_init(&h->world_arrived);
     osoe_epoch_init(&h->world_released);
     osoe_epoch_init(&h->world_copied);
+    osoe_epoch_init(&h->shared_arrived);
+    osoe_epoch_init(&h->shared_released);
+    osoe_epoch_init(&h->shared_copied);
 }
 
 /* A non-lead opens the control segment by name, waiting for the lead to

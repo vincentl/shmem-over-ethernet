@@ -7,37 +7,56 @@
 #include "export.h"
 #include "state.h"
 #include "sym.h"
+#include "team.h"
 #include "transport.h"
 
-/* The context parameter is plumbed now (§7.3); only the default exists. */
-static void ctx_putmem(struct osoe_tp_ctx *ctx, void *dest, const void *source,
-                       size_t nelems, int pe)
+/*
+ * The context form is the definition and the plain form calls it with
+ * SHMEM_CTX_DEFAULT, rather than the other way round (§7.3). That way the
+ * parameter is carried on the real path from the start; a plain form that did
+ * the work and a context form that ignored its argument would be the shape that
+ * breaks when a second context exists.
+ */
+static void ctx_putmem(const char *routine, shmem_ctx_t ctx, void *dest,
+                       const void *source, size_t nelems, int pe)
 {
     if (nelems == 0)
         return;
-    osoe_check_pe("shmem_putmem", pe);
-    uint64_t offset = osoe_sym_offset("shmem_putmem", dest, nelems);
-    osoe_tp_put(ctx, pe, OSOE_REGION_HEAP, offset, source, nelems, 0);
+    osoe_check_pe(routine, pe);
+    uint64_t offset = osoe_sym_offset(routine, dest, nelems);
+    osoe_tp_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source, nelems, 0);
 }
 
-static void ctx_getmem(struct osoe_tp_ctx *ctx, void *dest, const void *source,
-                       size_t nelems, int pe)
+static void ctx_getmem(const char *routine, shmem_ctx_t ctx, void *dest,
+                       const void *source, size_t nelems, int pe)
 {
     if (nelems == 0)
         return;
-    osoe_check_pe("shmem_getmem", pe);
-    uint64_t offset = osoe_sym_offset("shmem_getmem", source, nelems);
-    osoe_tp_get(ctx, pe, OSOE_REGION_HEAP, offset, dest, nelems);
+    osoe_check_pe(routine, pe);
+    uint64_t offset = osoe_sym_offset(routine, source, nelems);
+    osoe_tp_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, nelems);
 }
 
 OSOE_API void shmem_putmem(void *dest, const void *source, size_t nelems, int pe)
 {
-    ctx_putmem(osoe_tp_ctx_default(), dest, source, nelems, pe);
+    ctx_putmem("shmem_putmem", SHMEM_CTX_DEFAULT, dest, source, nelems, pe);
 }
 
 OSOE_API void shmem_getmem(void *dest, const void *source, size_t nelems, int pe)
 {
-    ctx_getmem(osoe_tp_ctx_default(), dest, source, nelems, pe);
+    ctx_getmem("shmem_getmem", SHMEM_CTX_DEFAULT, dest, source, nelems, pe);
+}
+
+OSOE_API void shmem_ctx_putmem(shmem_ctx_t ctx, void *dest, const void *source,
+                               size_t nelems, int pe)
+{
+    ctx_putmem("shmem_ctx_putmem", ctx, dest, source, nelems, pe);
+}
+
+OSOE_API void shmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
+                               size_t nelems, int pe)
+{
+    ctx_getmem("shmem_ctx_getmem", ctx, dest, source, nelems, pe);
 }
 
 /* NULL for anything not reachable by loads and stores in this process: a

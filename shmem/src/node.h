@@ -80,6 +80,7 @@ struct osoe_pe_slot {
     /* Liveness and progress, published by this PE (§3.14 question 1). */
     _Atomic uint64_t sweeps;             /* safety-sweep expiries: a blocked PE still moves */
     _Atomic uint32_t world_epoch;        /* this PE's k for SHMEM_TEAM_WORLD (§5.4) */
+    _Atomic uint32_t shared_epoch;       /* and for SHMEM_TEAM_SHARED */
 
     /*
      * Threads of this PE that found no free counter block (§3.14). It belongs
@@ -168,10 +169,19 @@ struct osoe_node_header {
     _Atomic uint32_t abort_pe;      /* the world rank the abort names */
     _Atomic int32_t abort_status;   /* the status to exit with (§9.1.6) */
 
-    /* SHMEM_TEAM_WORLD's epoch counters (§5.4), each on its own line. */
+    /*
+     * Each predefined team's epoch counters (§5.4), each on its own line.
+     * SHMEM_TEAM_SHARED has its own set although on one node its membership is
+     * the world's: the spec makes them distinct predefined teams forming
+     * separate atomicity domains, and sharing the counters would make a sync on
+     * one team release a wait on the other.
+     */
     struct osoe_epoch world_arrived;
     struct osoe_epoch world_released;
     struct osoe_epoch world_copied;
+    struct osoe_epoch shared_arrived;
+    struct osoe_epoch shared_released;
+    struct osoe_epoch shared_copied;
 };
 
 /* Process-private view of the node. */
