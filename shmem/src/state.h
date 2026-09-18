@@ -14,6 +14,7 @@ struct osoe_state {
     struct osoe_node node;
     struct osoe_alloc alloc;
     uint32_t world_epoch;           /* k for SHMEM_TEAM_WORLD (§5.4) */
+    uint32_t shared_epoch;          /* and for SHMEM_TEAM_SHARED */
 };
 
 extern struct osoe_state osoe;

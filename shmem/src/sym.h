@@ -22,4 +22,19 @@ static inline bool osoe_sym_heap_offset(const void *addr, uint64_t len, uint64_t
     return true;
 }
 
+/*
+ * The same check, fatal on failure, for the API entry points. `routine` names
+ * the caller. Symmetric statics are not supported yet (§4.3, §7.4), so an
+ * address outside the heap is an error naming the routine, not a silent miss.
+ */
+uint64_t osoe_sym_offset(const char *routine, const void *addr, uint64_t len);
+
+/* As osoe_sym_offset, for a word of `width` bytes, which must also be aligned
+ * for its width. The spec's AMO and wait types are aligned by C, so a failure
+ * here means the address is not a symmetric object at all. */
+uint64_t osoe_sym_word_offset(const char *routine, const void *addr, unsigned width);
+
+/* Fatal unless pe is a world rank of this job. */
+void osoe_check_pe(const char *routine, int pe);
+
 #endif /* OSOE_SYM_H */

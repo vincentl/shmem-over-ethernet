@@ -799,25 +799,103 @@ that is stuck. Memory can be read without the job's cooperation.
   name, type, unit, offset — checksummed like the handler table (§3.13), so
   `osoe-stat` need not be the same build as the job. Handler names live in the
   same table.
+
+  **A frozen directory makes that real.** The segment opens with
+  `struct osoe_segment_directory`: magic, layout, and where the three arrays are
+  with the size of each element. It is the *only* part a reader may depend on by
+  layout, and it exists so nothing else has to be — fields are never reordered,
+  resized or removed there, only appended, and `directory_bytes` says how much
+  of it the writer filled in. Everything after it is read through the table, by
+  name. Without a directory that is separated and frozen on purpose, "self
+  describing" is a claim rather than a mechanism, and the first structural
+  change quietly breaks every tool.
+
+  **`struct osoe_metric_desc` is frozen with it, and for the same reason.** The
+  table is what makes every other field readable, so its own element cannot be
+  described by the table; something has to be the floor. The directory carries
+  `metric_desc_bytes` so that a reader *checks* this assumption rather than
+  making it, and a reader that meets a descriptor size it does not know prints
+  the directory and stops, which is the same behaviour as an unknown `layout`.
+  Two structures, both frozen, both checked: that is the whole contract between
+  a job and a tool from another commit.
+
+  Four sections, each starting on a cache line: the header, the PE slots, the
+  metric table, and the counter blocks. A metric names its **scope** — node,
+  PE, or thread — which says which record its offset is into.
+
+- **Counters are bounded per PE, and exhaustion is visible rather than fatal.**
+  `OSOE_MAX_THREADS` blocks per PE, claimed by CAS on first use. A thread that
+  finds none gets a **process-private block**, and the *fact* is recorded as
+  `invariant.blocks_exhausted` **in the PE's slot, not in a counter block**.
+  That distinction is the whole point and an earlier version of this line got it
+  wrong: a thread with no block writes to memory nobody outside the process can
+  read, so a counter kept there is exactly the one counter that can never be
+  seen — including by the §8.2 assertion that exists to see it. It is written by
+  whichever thread ran out, so it is a `seq_cst` read-modify-write rather than
+  this PE's single-writer publication, on a path taken at most once per thread. Not an abort: §4.11 proposes aborting when a
+  PE's thread table fills, because there correctness depends on having a record,
+  but here only the metrics do — and a job that dies because it made a ninth
+  thread would be a worse failure than a job whose ninth thread is not counted.
+  Not a shared block either, which would break §3.16's single-writer rule on
+  every counter. The private block makes the fallback path identical to the
+  normal one, so nothing has to test whether it is initialized.
 - **On abort**, the library prints the control segment's name to standard error, so
   whoever reads the message knows what to point `osoe-stat` at.
 
 #### `osoe-stat`
 
 An **installed** tool that maps the control segment read-only and reads without
-locks and without the job's cooperation:
+locks and without the job's cooperation. It is the only tool under `tools/` that
+is installed, because the thing it is for happens on a machine that has no build
+tree.
 
-- a live view of counters and rates, per node, per PE, and per connection;
-- a **state dump** — every buffer, queue, credit, watch slot, epoch counter, and
-  "blocked in" record. This replaces the earlier `am_dump_state(FILE *)`, which
-  needed a call from inside the job;
-- the flight recorder's recent events;
-- output as a human-readable table, JSON, or Prometheus text format. For Prometheus,
-  node_exporter's textfile collector picks up `osoe-stat --prometheus` output, so
-  osoe contains no HTTP code;
-- `--gc` for segments left by crashed jobs.
+It is written **against the segment, not the library**: it includes nothing from
+`shmem/src` and nothing from `base/`, only libc and the two frozen structures
+above. That constraint is the mechanism. A reader with access to the library's
+headers would find fields by `offsetof` like the library does, the table would
+describe nothing anyone depended on, and the first structural change would break
+every tool while the build still passed. Having no other way to find anything is
+what keeps "self-describing" true.
+
+What it does:
+
+- a **live view of counters**, per PE, with `--interval` to repeat. A PE's value
+  for a thread-scope metric is the **sum** of its blocks for a counter and the
+  **maximum** for anything else: adding two threads' last-wake timestamps would
+  produce a number that means nothing, and `kind` is exactly that distinction,
+  which is why it is in the table;
+- a **state dump** — every field of the header, every PE slot, every watch slot,
+  epoch counter and "blocked in" record, and every claimed counter block. This
+  replaces the earlier `am_dump_state(FILE *)`, which needed a call from inside
+  the job;
+- per-thread **CPU time and involuntary context switches**, read from
+  `/proc/<pid>/task/<tid>/` using the tid each block records and the pid its PE's
+  slot records — the cost rule below, that anything the kernel already tracks is
+  read by the tool;
+- **human-readable and JSON** output;
+- **`--gc`** for segments left by crashed jobs. A segment is collectable when
+  every PE that ever joined it is gone; one where *no* PE has joined yet is left
+  alone, because that is a job in bootstrap and not a corpse. Heap objects are
+  removed first, by the name each slot records, since removing the control
+  segment first would strand them. A recycled pid can only make a dead job look
+  alive, which costs a few megabytes of `/dev/shm` rather than removing a
+  running job's segment.
 
 Readers load with `memory_order_acquire` and accept values a moment stale.
+
+**One field is decoded, not merely printed: the §4.9 watch word.** Its encoding
+is part of what `layout` covers (§10), so the tool carries its own small copy of
+the decode and uses it only when the segment's layout is the one it was built
+against; any other layout gets the raw word and a note. That is what a layout
+version is *for*, and it is the only place the tool knows an encoding rather
+than an offset.
+
+**Deferred, and why.** *Prometheus output* is a third formatter over the same
+table and waits for a reason to exist; node_exporter's textfile collector is
+still where it would go, so osoe would contain no HTTP code. *Netlink
+`sock_diag`* for per-connection round-trip time, retransmits and congestion
+window needs connections, which arrive with the AM backend (§7.1 step 2). *The
+flight recorder* is deferred below, for the same reason.
 
 *(Rejected: an HTTP endpoint in the library. It fails during a hang, when it is
 needed most; ports per ephemeral job do not fit scrape discovery; it exposes a
@@ -825,6 +903,33 @@ network port; and it puts socket code in the progress process. If a scrape endpo
 is ever wanted, it belongs in a separate process built on `osoe-stat`. Rejected:
 metrics files written by the library. The library writes no files; the persistent
 control segment already provides post-mortem state after a crash.)*
+
+#### Two claims, and what tests them
+
+Both are claims a tool cannot make about itself.
+
+**"A tool built from a different commit reads a job correctly."** Running
+`osoe-stat` against a job from the same tree tests none of this: every offset
+matches by accident. So a tier-1 test writes a control segment by hand with
+record layouts unlike the library's, a metric table in a different order,
+metrics this build has never heard of, and a layout version from the future, and
+requires the reader to find every value it does know, by name, anyway. It also
+requires the refusals: a metric whose offset runs past the end of its record, one
+whose offset is not a multiple of its width, and an index outside its scope are
+each refused rather than followed, because a corrupt segment is read on a
+machine where something has already gone wrong.
+
+**"Every `invariant.*` counter is zero at quiescence."** Until something asserts
+it, an invariant counter is a diagnostic and not an oracle: `missed_wake` could
+fire on every run of every test and nothing would say so. Every tier-2 test now
+calls `shmem/tests/invariants.h` before its last `shmem_finalize`. It takes a
+barrier as the definition of quiescence, then walks the metric table and asserts
+every metric of kind `OSOE_MKIND_INVARIANT` is zero in every record of its
+scope — **found by kind, not by name**, so it covers every invariant counter
+added later without being edited. It uses the same reader `osoe-stat` uses.
+Sharing that reader with the tool is the point; sharing it with the library
+would not be, since a check that read the counters through the library's own
+headers would pass whenever the library agreed with itself.
 
 #### Cost rules
 
@@ -862,6 +967,24 @@ control segment already provides post-mortem state after a crash.)*
   hang.
 - **Per PE:** a "blocked in" record (routine, target, and since when), its watch
   slot (§4.9), outstanding get bytes, bootstrap phase, and the abort word.
+
+  It is the first record here with more than one word in it, so it is the first
+  that can be read torn while the PE publishes its next wait. A **generation
+  word bumped with two `seq_cst` read-modify-writes** around the field writes,
+  and a reader that loads it, reads the fields, and loads it again, accepting
+  only an unchanged even value. Two locked operations rather than a textbook
+  seqlock, because that needs relaxed stores and a release fence and §3.16
+  permits neither, while `fetch_add` naming `seq_cst` is a rule the design
+  already has and is a full barrier on both targets. Model-checked in
+  `docs/design/evidence/blocked-record/`, which also shows the four ways to get
+  it wrong: no generation, bumping after the writes, letting a field write
+  escape above the opening bump, and a reader that does not re-read.
+
+  **Published only when a wait is about to sleep**, never on entry. A wait whose
+  predicate is already true touches no locked instruction and no clock — which
+  is exactly what §8.6's U1 and U3 measure, "wait with nothing pending", so the
+  record must not appear in that path's cost. The consequence to accept is that
+  a PE spinning through satisfied waits shows no record; it is also not blocked.
 - **Per connection:** sequence numbers sent, acknowledged as applied, and received
   and applied; the age of the in-flight send; each buffer's reserved and filled
   counts and seal bit; reply queue depths; credits left; waiters per wake word; the
@@ -904,11 +1027,28 @@ control segment already provides post-mortem state after a crash.)*
 - Safety-sweep submissions that found sealed work nobody had signalled (§3.10).
 - Deadline expiries after which the awaited condition was already true: a missed
   wake, in the watch slots (§4.9) or any other wait.
+- A thread that found no counter block (above). Not a correctness failure, but a
+  silent loss of every other counter that thread would have kept, which is the
+  same thing from a reader's point of view.
 
 **The test suite asserts every invariant counter is zero at quiescence after every
 test** (§8.2), so these counters double as a correctness oracle.
 
 #### Flight recorder
+
+**Deferred, and not for cost.** Every event listed below is a transport
+event — seal, submit, send completion, segment received, handler dispatch, ack —
+and there is no transport until §7.1 step 2. A ring designed now would be
+designed against imagined events and their imagined arguments, and would be
+rewritten by the first real one. It arrives with the backend that produces the
+events, and the design below stands until then.
+
+Two smaller deferrals for the same reason. **Prometheus output** is a third
+formatter over the same table and waits for a reason to exist. The **intranode
+versus internode split** on the RMA counters needs a dispatch to split on, and
+so does `tp.wait.dirty_peers`; both land with the AM backend, which is also when
+the per-peer and per-connection counters of questions 2 and 3 first have write
+sites.
 
 **On by default, for now, for transport events.** Each progress thread has a ring
 of fixed-size records in the control segment — for example 4,096 × 32 B = 128 KB:
@@ -988,6 +1128,47 @@ The policy is right; an earlier draft lacked **detection and propagation**:
 - **Slurm's `KillOnBadExit` defaults to 0**, so one PE exiting nonzero does not by
   itself stop the others. Document `srun -K1`. The spec does not define crash
   behaviour, so this is operability, not conformance.
+
+#### The development watchdog
+
+> **A development aid, not the release path: on in the `debug`, `asan` and `tsan`
+> presets and off in `release`, with `OSOE_WATCHDOG` forcing either way.**
+
+Everything above is the production answer, and none of it exists before §7.1
+step 4. Until then a PE blocked in `wait_until` or a barrier whose sibling has
+died waits for the launcher's timeout, which on a development machine means
+minutes of nothing. The watchdog gives the developer a loud failure instead:
+
+- **An abort word in the control segment header**, plus a liveness check of the
+  local PEs' recorded pids, **run only when a library wait's safety-sweep
+  deadline expires** (§3.10). Never on the wake path, so a healthy wait pays
+  nothing at all for it — no load, no branch — and a wait that is merely slow
+  pays one pass over the local slots per sweep.
+- **On a dead PE or a set abort word, abort loudly**, naming the PE, the routine
+  the caller is inside, and the control segment to point `osoe-stat` at (§3.14).
+  The PE that notices sets the abort word first, so its siblings stop at their
+  own next sweep instead of each rediscovering the same corpse.
+- **Liveness is `kill(pid, 0)`**, using the pid each PE publishes in its slot
+  before the release store of its phase. `ESRCH` is unambiguous: no process holds
+  that pid. A recycled pid can only make a dead PE look alive, which is the hang
+  this replaces — never a false abort on a healthy job.
+
+**The scoping is the point.** Production must not come to depend on it, because
+it is strictly weaker than what step 4 brings and is absent from the build that
+ships. Off in `release` is what keeps that honest. What it deliberately does not
+do:
+
+- **No pidfd polling.** Detection is a poll at a sweep, so it is up to one sweep
+  late, and it cannot see a PE that is alive but wedged. The lead's ring holding
+  a pidfd per local PE is step 4's answer.
+- **No cross-node detection.** One node's PEs check one node's pids. A vanished
+  peer node is TCP keepalive's business, and there is no TCP yet.
+- **No `shmem_global_exit` and no abort flood.** The abort word is written and
+  read within one node by whichever PE noticed. `global_exit` (§9.1.6) needs the
+  agent-calls-`exit` path above and an AM to carry the abort between nodes.
+- **Not during rendezvous.** The bootstrap waits already carry
+  `OSOE_BOOTSTRAP_TIMEOUT` and a `failed` word, and run before the slots a
+  liveness check would read are all published.
 
 ### 3.16 Memory-order discipline
 
@@ -1099,6 +1280,23 @@ even though this implementation would make them exclusive anyway.
 
 Reserve the own-heap range at `B` with `MAP_FIXED_NOREPLACE` so a collision fails
 loudly rather than silently unmapping something.
+
+**A trap to record before anyone falls into it.** An RDMA backend wants one
+registrable memory region per *node* rather than one per PE — 16 bytes of
+`{base, rkey}` per node instead of per PE, and one registration instead of `L`.
+That needs a node's heaps contiguous in the registering process's address space,
+and the obvious way to get it is to slot each heap by local id at
+`N + local_id × SHMEM_SYMMETRIC_SIZE`. **That is wrong**, and wrong in a way that
+would not surface for a long time: it destroys the property that a PE's own heap
+sits at the same `B` in every process, which is what makes a PE's symmetric
+addresses the same numbers everywhere and what §4.3 relies on for statics under
+`-no-pie`. The right shape is a **second mapping** — the node lead maps all `L`
+heap objects again into one contiguous reservation, used only as something to
+register. Same physical pages, no change to `B`, no change to `base_of`, and the
+cost is `L × SHMEM_SYMMETRIC_SIZE` of address space in the lead alone, against
+the same amount every process already reserves. It is an optimization, not a
+requirement: skipping it costs one registration per PE and a per-PE table, with
+no redesign anywhere. Record it so nobody buys contiguity by moving `B`.
 
 **Choosing `B`.** No single address works for every build. In the development VM
 (aarch64, 48-bit addresses), a 16 GiB fixed mapping succeeds from `0x10_0000_0000`
@@ -1234,8 +1432,33 @@ local lead and again at the root.
 
 **Edge semantics (§9.3), easy to get wrong:**
 
-- `shmem_malloc`, `shmem_align`, `shmem_calloc`, and `shmem_realloc` barrier on
-  **exit**; `shmem_free` barriers on **entry**.
+- `shmem_malloc`, `shmem_align` and `shmem_calloc` barrier on **exit**;
+  `shmem_free` barriers on **entry**.
+- **`shmem_realloc` barriers on entry *and* exit**, which an earlier draft of
+  this list got wrong by giving it the exit barrier alone. Spec §9.3.3 permits
+  both — "`shmem_realloc` may call barriers on both entry and exit, depending on
+  whether an existing allocation is modified and whether new memory is
+  allocated" — and both are needed here: it frees the old block, which no PE may
+  still be reading, and it publishes a new one, which every PE must see before
+  any returns. It is `free` and `malloc` in one call and takes each one's
+  barrier. A null `ptr` makes it `shmem_malloc`, so it takes only the exit
+  barrier; a zero `size` with a non-null `ptr` makes it `shmem_free`, so it takes
+  only the entry one.
+- **`shmem_align` aligns an address, but the allocator works in offsets.** The
+  two agree only while the heap's base `B` is itself a multiple of the requested
+  alignment, which every candidate base in §4.1 is up to a terabyte. Above that,
+  `shmem_align` reports a failed allocation rather than returning an address
+  that is not what was asked for: a null return is a value the spec defines, and
+  every PE reaches it identically because `B` is the same number on all of them.
+  A non-conforming alignment — not a power of two, or not a multiple of
+  `sizeof(void *)` — is undefined by spec §9.3.4 and is a loud failure here,
+  because the alternative is a symmetric object that is not where the program
+  thinks it is.
+- **`shmem_realloc` resizes in place where it can**, growing into a free
+  neighbour above and shrinking by releasing the tail, before falling back to
+  allocate-copy-free. That is not an optimization: the fallback needs the old
+  and the new block to fit in the heap at once, so a program that grows one
+  large array would run out at half the heap instead of all of it.
 - A size of 0 (for `calloc`, a count or size of 0) returns a null pointer **without
   a barrier**. Every PE must make the same call, so none waits.
 - `shmem_free(NULL)` does nothing, also **without a barrier** (spec §9.3.2).
@@ -1262,8 +1485,26 @@ commit pages only when touched, so the default costs address space: L × 256 MiB
 per process, 64 GiB at 256 local PEs. A size of 0 is valid and maps one page, so
 every allocation of nonzero size fails.
 
-`shmem_malloc_with_hints` is an alias for `shmem_malloc`. SOS itself added the
-routine supporting no hint values.
+**Hints are recorded, not discarded.** An earlier note here called
+`shmem_malloc_with_hints` an alias for `shmem_malloc`, on the grounds that SOS
+added the routine supporting no hint values. That is a fine *implementation* of
+the hints and a bad *structure*, because two other decisions need the hint to
+have been kept:
+
+- spec §9.3.3 requires `shmem_realloc` to **preserve** an allocation's hints, and
+  to return a null pointer "if the space cannot be allocated **or if hints cannot
+  be preserved**". So a hinted block that cannot be grown at the hinted end fails
+  the call — it never silently migrates to the unhinted end, which would be a
+  quiet loss of the property the program asked for.
+- §4.10's `set_range` tells a backend which ranges carry atomics or signals, and
+  its call site is the moment a hinted allocation extends the hinted end.
+
+So the allocator records a hint with each allocation and grows hinted
+allocations from the opposite end of the heap from unhinted ones. Both ends are
+a pure function of the call sequence, so determinism and invariant 6 are
+untouched. The hints change no behaviour on one node and are not required to
+change any behaviour ever — they are advisory — but retrofitting hint plumbing
+into a finished allocator is the expensive version of this.
 
 ### 4.5 Teams and allocation
 
@@ -1367,6 +1608,18 @@ thread, and each is already per-thread or checked:
 - **Finalize and fork.** `shmem_finalize` must come from the thread that called
   `shmem_init_thread` (spec §9.2, rule 1). The fork check (§6.4) compares pids, not
   threads.
+- **`shmem_init_thread` answers, it does not refuse.** A request for
+  `SHMEM_THREAD_MULTIPLE` returns 0 with `provided` set to
+  `SHMEM_THREAD_SERIALIZED`. The return value is about whether the library came
+  up, and the `provided` argument exists precisely so that a program can ask for
+  more than it gets and find out; a nonzero return would make an ordinary
+  negotiation look like a failed initialization.
+- **The level is fixed by the first initialization of a session** and a nested
+  one does not change it, which spec §9.2.1 permits in as many words. Between
+  sessions it is free again. `shmem_query_thread` may be called at any time,
+  including before any `shmem_init`, where the answer is the level a
+  `shmem_init` would provide — which, since `shmem_init` lets the implementation
+  choose (§9.2.2), is the most osoe has.
 
 Per-thread records (a watch, a blocking-get completion slot) are allocated per
 calling thread even though `SERIALIZED` needs only one per PE. That way `MULTIPLE`
@@ -1576,10 +1829,67 @@ PE is enough: no hash table, no probing, and no slot deletion.
 one variable at a time. The multiple-element waits contradict that:
 `shmem_wait_until_{all,any,some}` and their `_vector` forms (spec §9.11.2–§9.11.7)
 block on an array `ivars[0..nelems)`. That array is one contiguous range, so the
-slot publishes `[offset, offset + len)` and a writer wakes on overlap. A write to
-an unwaited element of the array wakes spuriously, and the loop re-checks. The
-two-word publication replaces the single `watched` word below. Re-run the §4.9
-model on it before `wait_until` is implemented.
+slot publishes the range and a writer wakes on overlap. A write to an unwaited
+element of the array wakes spuriously, and the loop re-checks.
+
+**The range is one word: region, first grain, and a saturating grain count**
+(`shmem/src/watch_range.h`), which is the same word §4.11 item 3 publishes per
+thread under `MULTIPLE`. The grain is 4 bytes, the width of the narrowest AMO
+type, so an ivar at its natural alignment is filtered exactly and no two
+AMO-type objects share a grain unless they are adjacent elements of one array.
+Zero means no watch. The writer's test is one load, two shifts and two compares,
+so §4.9's "one load per applied operation" still holds. One word is published and
+read atomically, so no writer can read a stale half of a range.
+
+**The word names its region**, because `OSOE_REGION_INTERNAL` (§5.8) and statics
+(§4.3 phase 1.5) both start at offset 0, as the heap does, and spec Example 27 —
+the canonical put-with-signal example — waits on a `static uint64_t`. Without the
+region a heap waiter at a low offset and a static at a similar offset collide
+*systematically* rather than by chance. Only the heap has waiters today, so
+`watch.c` rejects the others; removing that guard is all either needs, and not a
+second layout version.
+
+**Saturation is always permissive.** Above 16 MiB the count saturates to "to the
+end of the region", and an offset the field cannot name saturates to the whole
+region. Both over-wake and neither loses a wake. Encoding an over-long range as
+*no watch* does lose one, which the model records as `satzero`. The offset field
+addresses 4 TiB, and `shmem_init` refuses a larger `SHMEM_SYMMETRIC_SIZE` rather
+than let the filter silently stop filtering.
+
+*(Rejected: **the smallest aligned power-of-two block containing the range**,
+encoded as `((offset >> k) << 6) | (k + 1)`. It is exact for a scalar ivar and
+for an aligned power-of-two array, and badly wrong otherwise, because the block
+must contain **both ends**: measured, an 8 KiB array wait publishes 122 KiB on
+average and exceeds 64 KiB in 7.3% of real allocator placements, and under the
+adjacent-write pattern of a halo exchange or a put-with-signal — a payload buffer
+beside the flag — it wakes on 35.7% of writes at the mean and 90.3% at the 99th
+percentile. An earlier draft of this section claimed the inflation was "at worst
+twice its length", which is why nobody looked. It also spent all 64 bits, 58 on
+the block and 6 on the shift, leaving no room for the region; and decoding a
+shift count from a packed field produced two latent defects — a shift of
+4294967295 in the saturating case, and a loop that does not terminate when a
+range's ends differ in bit 63. The replacement has no variable shift and no loop.
+`docs/reviews/watch-notification-options.md` has the measurements and the
+alternatives, including why a 128-bit atomic word and a Bloom-filter signature
+were rejected.)*
+
+*(Rejected: a hash table keyed by offset, which the earlier draft's per-address
+watch table needed. One slot per PE is enough while a PE is in one wait at a
+time.)*
+
+**Model-checked** (`docs/design/evidence/watch/`), on sequential consistency and
+x86-TSO, for a scalar wait, an array wait, two writers, a range straddling a
+boundary, and a PE that watches one range and then another. The same model finds
+that a **two-word** publication — offset and length, stored and loaded separately —
+is sound as well, because the writer updates the variable before it reads the
+slot: if it reads the new offset, the update is already visible to the waiter's
+next check. The single word is chosen for the atomic read and the cheaper test,
+not for correctness. The model's elements are one grain apart deliberately: its
+`endpoints` variant, a predicate covering a range's two ends and not its middle,
+**passes** every scalar and two-element case and loses a wake only on a
+three-element array. A model whose cases all fall inside one grain cannot tell a
+predicate with a hole from a correct one, and an earlier version of this one
+could not.
 
 An earlier draft had the waiter futex directly on the `ivar`. That works only for
 32-bit types: **the kernel implements only 32-bit futexes.** `futex_wait` with
@@ -1670,11 +1980,93 @@ Likewise the multiple-element tests. On an empty test set, `shmem_test_all` and
 `shmem_test_all_vector` return 1 (1.6 change #19), `shmem_test_any` returns
 `SIZE_MAX`, and `shmem_test_some` returns 0.
 
+#### Waiting on many, and why it is left simple
+
+One watch covers the whole array, so a write anywhere in it wakes the waiter,
+which then re-evaluates the predicate over every element of the test set: **O(N)
+per wake**. That is inherent, not an artifact of the encoding. The kernel can
+tell a waiter which *word changed*; what the operation needs is which *predicate
+became true*, and nothing but evaluating the predicate answers that — the gap
+between the two is exactly the spurious wake §4.9 already tolerates.
+
+**Watch the span of the *unmasked* elements, not the whole array.**
+`wait_until_some` and its vector form take a `status` mask excluding elements
+from the test set, and the wait already walks it, so taking the first and last
+unmasked element costs nothing. Spec Example 44 masks each element as it
+completes, so the watched span shrinks to the outstanding ones and the waiter
+stops being woken by elements it has already finished with. This is the whole of
+what is worth doing here.
+
+**Two kernel mechanisms could narrow the re-check. Neither is taken.** Recorded
+so the next reader does not have to rediscover that the channel exists, since
+one of them is an argument we already pass:
+
+- **The futex bitmask.** `futex_wait` and `futex_wake` each take a 32-bit mask
+  and the kernel wakes a waiter only when the two intersect; `base/futex.c`
+  passes `FUTEX_BITSET_MATCH_ANY` today. A waiter could set the bits of its
+  unmasked elements and a writer the bit of what it wrote, and the kernel would
+  drop the rest. It degrades safely in both directions, since `MATCH_ANY`
+  intersects every narrow mask, so scalar and range waiters mix without either
+  knowing; and a wrong mask costs a safety sweep, not a hang. What it does *not*
+  buy is anything for the writer, which still pays the `futex_wake` syscall
+  because the kernel filters after the call. Only the userspace watch word saves
+  the writer, and that is already exact.
+- **`futex_waitv` over K sequence words.** It waits on up to `FUTEX_WAITV_MAX`
+  (128, verified on 6.12) words and **returns the index of the one that woke
+  it** — literally "which item". With `bucket = written_grain % K` the writer
+  bumps one word instead of one, at the cost of an AND, and the waiter rescans
+  `N/K` elements rather than `N`. It needs no key and no element stride, only
+  the grain arithmetic the writer already does. It costs K words per waiter and
+  caps the narrowing at 128.
+
+**Why neither is worth building.** The usage study found **no public application
+users** of `wait_until_{all,any,some}[_vector]` or the corresponding tests
+(`docs/reviews/evidence/q2/q2-usage.md`) — only unit tests and spec examples.
+And the idiom the spec itself demonstrates is the *non-blocking* one: Example 44
+spins on `shmem_test_some` with computation overlapped, and `shmem_test*`
+touches no slot at all, so the path that idiom actually uses is already nothing
+but loads and compares. The blocking forms are the weird ones, and they are the
+ones with no callers. **Revisit when a real user appears, or when a measurement
+shows the re-check dominating** — not before.
+
+**Signedness is a parameter of the comparison, not a property of the word.**
+Every value crosses the library's internal wait boundary as a `uint64_t`,
+because that is what the boundary's `load` and `rmw` take, and Table 6 has
+signed types: `SHMEM_CMP_LT` against 0 on an `int` holding −1 is true, and on a
+`uint32_t` holding the same bits it is false. So a value is extended to 64 bits
+according to its type's signedness and compared as an `int64_t` or a `uint64_t`
+accordingly. This is the one place where the uniform `uint64_t` carriage that
+makes the rest of the wait layer one piece of code would silently give the
+wrong answer, and it is worth naming because the first implementation of
+`wait_until` had only unsigned types and was therefore correct by accident.
+
 **Spec constraints, both satisfied for free.** `ivar` must be updated using
 OpenSHMEM AMOs (1.5 change #17), and §3.2 makes a wait or test on a location
 exclusive with AMOs on that location of the same datatype. The progress thread
 applies a remote AMO as an ordinary CPU atomic on the shared mapping (§4.1) —
 the same instruction a local PE would issue — so both hold without further work.
+
+**The signal routines are the same wait, on a `uint64_t`.** A signal data object
+is a symmetric `uint64_t` (spec §9.8.1), every update to it is a boundary rmw,
+and `shmem_signal_wait_until` is `wait_until` on it. Two spec requirements are
+worth naming because they are satisfied by the structure rather than by code:
+
+- §9.11.15 requires that `shmem_signal_wait_until` **not return before the update
+  of the memory indicated by `sig_addr` is fully complete**, and §9.11.1 and
+  §9.11.8–§9.11.14 say the same of every wait and test. Here the predicate's value
+  comes from the boundary's `load`, which is exclusive against rmw on that word
+  (§4.10), so a half-applied update is not a value a predicate can ever see. The
+  same sentence is why the predicate may not read the variable directly: on a
+  backend whose NIC applies remote atomics out of the CPU's sight, an ordinary
+  load could return a value the update had not finished producing. This is the
+  gap `load` was added to close.
+- §9.11.15 also returns *the value that satisfied the condition*. The wait loop
+  therefore keeps the value its last predicate check loaded rather than re-reading
+  the variable after the loop: a re-read can see a later update, and would return
+  a value that never satisfied the condition the caller asked about.
+
+`shmem_signal_set` is a set-style update, so §3.16's two-sided rule applies to it
+exactly as it does to a set-style AMO: a `seq_cst` store, not a `release` one.
 
 **Rejected:**
 
@@ -1710,8 +2102,21 @@ library's internal region of §5.8, and statics with §4.3 phase 1.5), and an of
 and checks bounds. It also converts team-relative ranks to world ranks. Nothing
 below the boundary sees an address (invariants 7 and 20).
 
-**Dispatch.** Each call chooses a backend per target PE through the one
-locality function of §8.1. A single context can use both backends at once.
+**Dispatch is per `(pe, operation class)`, not per PE.** Each call chooses a
+backend through the one locality function of §8.1, and a single context can use
+both backends at once — but so can a single *PE*. A backend may carry one PE's
+puts and gets while another carries that PE's rmw, and a NIC whose atomics are
+not coherent with the CPU must do exactly that: a CPU atomic and a NIC atomic on
+one word are not exclusive, while `rmw` promises exclusivity across the whole
+atomicity domain, so on-node atomics go to the NIC by loopback while on-node put
+and get stay `memcpy`. This is the general case rather than one fabric's quirk —
+Portals, UET and UCX each carry a capability flag saying whether their NIC
+atomics are CPU-coherent, which means all three expect the incoherent case.
+
+Consequently `osoe_tp_direct` returning non-NULL says that *stores* through the
+pointer are ordered as described; it does not say that rmw to that PE executes
+locally. Nothing above the boundary changes, because the spec already makes a
+plain store racing an AMO on the same word undefined (spec §3.2).
 `osoe_tp_direct(pe, region, offset)` *is* that function. It returns the target's
 address in this process only where the backend orders the calling thread's stores
 through that address against its own writes by the next fence or wait (§4.6). osoe's
@@ -1744,8 +2149,40 @@ binding gives backends that freedom instead.
 boundary that is tested only on the network that sets it.)*
 
 **Errors.** No operation returns one. A transport failure aborts the job (§3.15).
-A wait that cannot finish checks the abort word and the lead's liveness at each
-safety-sweep deadline.
+That is the right contract precisely because something outside the job owns
+tearing it down — a resource manager on a cluster, the launcher otherwise — so a
+boundary returning recoverable errors would be inventing a job it does not own.
+
+**Every blocking call sweeps, on a bound.** A wait that cannot finish checks the
+abort word and the lead's liveness at least every `OSOE_SWEEP_NS`, whether or not
+the call takes a deadline. `osoe_tp_wait`, a blocking `osoe_tp_get` and any
+future blocking call sweep on the same schedule as `osoe_tp_watch_wait`. Neither
+blocks on the intranode backend, so nothing has forced the question yet; on the
+AM backend `osoe_tp_wait` blocks on acknowledgements and on an RDMA backend it is
+a completion-queue spin, and the rule is the difference between a hang and a
+clean abort.
+
+**A batching hint, `OSOE_TP_MORE`.** One flag on put and rmw saying more
+operations follow on this context, so a backend may hold one back and submit it
+with the next. Purely a hint: it changes nothing about completion, ordering or
+when `src` may be reused, and a backend that ignores it is correct — which is how
+the intranode backend implements it. The rule that makes it safe is that **a
+backend may defer an operation only if it has taken its own copy of the source
+bytes**; put's local-completion contract is unconditional, so deferring a large
+zero-copy put is wrong however the flag is set. Nothing sets it on one node,
+where every put is a `memcpy`. It exists because an RDMA backend can post a list
+of work requests under one doorbell instead of ringing one per put, which is
+where the small-message rate is won, and because §3.9's aggregation wants to be
+told when not to seal a buffer early. Its drivers are the 1.6 session routines
+(§7.6) and the strided, block and collective loops.
+
+**Nonblocking completion is counters, never per-operation handles.** A
+nonblocking operation is a flag on the existing call, completed by the existing
+`osoe_tp_wait`. The spec defines `_nbi` completion only at `quiet`, so there is
+no per-operation wait call to serve; §4.6's `bytes_issued`/`bytes_landed` pair
+already *is* this design; and the core-API study found counters sufficient in all
+six production transports it surveyed, with per-operation handles an open
+question nobody needed. Recorded before a benchmark applies pressure for them.
 
 | Operation | Guarantee | Intranode backend | AM backend |
 |---|---|---|---|
@@ -1798,12 +2235,29 @@ instead of pushing every on-node rmw through NIC loopback.
   core-API study also keeps collectives above its core.
 - **Allocation (§4.4)** is a pure function of the call sequence and makes no
   transport call today. A later hook, `set_range(region, offset, len,
-  attributes)`, may tell a backend which ranges carry atomics or signals. That
+  attributes)`, tells a backend which ranges carry atomics or signals. That
   hook is how an RDMA backend avoids registering the whole heap for NIC atomics
   or counters (on CXI, a counter on a region disables its optimized RMA). The
   allocator therefore keeps hinted allocations (`SHMEM_MALLOC_ATOMICS_REMOTE`,
   `SHMEM_MALLOC_SIGNAL_REMOTE`, spec §9.3.5) able to grow from the opposite end of
   the heap from unhinted ones. That is still deterministic.
+
+  Three properties it must have, each easy to lose in implementation. It is
+  **not a collective and must not block**: every PE calls it with identical
+  arguments in the same order as a *consequence* of the allocator's determinism
+  (§4.4, invariant 6), not by coordination, and a backend that put a barrier in
+  it would be synchronizing for no reason. It is **advisory in both directions**
+  — a backend may ignore it entirely, an operation outside a declared range is
+  still correct, and nothing above the boundary asks what a backend did with it,
+  which is what keeps it from becoming a capability query. And repeated or
+  overlapping calls take the **union, never a replacement**, because `realloc`
+  preserves an allocation's hints and so must survive a grown or moved block.
+
+  It is the largest recoverable loss for an RDMA backend: without it, a backend
+  cannot know which words a PE may wait on, so it cannot afford exact
+  notification — it would have to add a second work request to *every* atomic —
+  and every blocked wait degenerates to polling, a core per node at best. It is
+  not scheduled here; §7.1 step 3 places it with the backend that consumes it.
 - **Nonblocking gets and contexts beyond the default.** They add calls to the
   header when they arrive (§7.3). They do not change the operations above.
 
@@ -2092,8 +2546,11 @@ covers each of these, and finds:
 - **A put's plain `memcpy` loses a wake under TSO** (`plainput`), as §4.9 and §4.10
   already accept: best effort for puts, bounded by the safety-sweep deadline.
 
-§4.9 publishes the same range in two words. Either is sound, so phase 1 may keep
-two words and adopt the packed one only if it wants the store.
+§4.9 publishes this same packed word, so phase 1 and `MULTIPLE` share one
+encoding rather than two: the phase-1 slot is this record with at most one bit
+set, and `MULTIPLE` adds the `active` bitmap and the scan over it. (An earlier
+draft of this paragraph said §4.9 publishes the range in two words. It does not,
+and the two sections specified different encodings for a while.)
 
 **Cost.** When nobody on the PE waits, a writer loads the `active` word, which is
 the same single load as phase 1's `watched` word. With `k` threads waiting, it adds
@@ -2759,6 +3216,15 @@ never share a name. It fails on a nonzero exit, a signal, a timeout, or a clean
 job that left `/dev/shm/osoe.<job>.*` behind. That last check tests the naming
 rules above on every multi-process test.
 
+**Bootstrap is out of band in every build, and always will be.** An RDMA
+transport cannot bootstrap itself: the GIDs, queue-pair numbers and memory keys
+that make RDMA possible have to be exchanged before any RDMA exists, so the
+rendezvous above stays the mechanism whatever carries the data path afterwards.
+That is arithmetic rather than a decision, and it is true of every RDMA stack.
+Note what it does *not* imply: the rendezvous is a socket and a handshake, not
+§3's reservation protocol, handler table or aggregation, and an RDMA build
+needing the former says nothing about whether it keeps the latter running (§10).
+
 ### 6.3 PMI-2 as an optional backend
 
 Keep the thin interface and keep a PMI-2 backend behind it, **off by default and
@@ -2846,8 +3312,10 @@ machinery. The review's order is adopted.
    - `shmem_barrier_all` on intranode counters, `shmem_quiet`, `shmem_fence`,
      `shmem_pe_quiet`;
    - the mandatory surface of §7.4;
-   - the control segment's counters, the flight recorder, and `osoe-stat` (§3.14),
-     so single-node hangs are debuggable from the start.
+   - the control segment's counters and `osoe-stat` (§3.14), so single-node hangs
+     are debuggable from the start. The flight recorder is **not** here: every
+     event it would record is a transport event and there is no transport until
+     step 2, so it arrives with the backend that produces them (§3.14).
 
    This exercises the heap layout, watch slots, allocator, epoch counters, agents,
    lifecycle, and introspection.
@@ -2855,10 +3323,25 @@ machinery. The review's order is adopted.
    with landing zones and reply credits; `quiet`, `fence`, and `pe_quiet` with
    ack-only segments; `put_signal`; internode `barrier_all`. Semantics are
    validated before a socket exists.
+
+   **This is the boundary's first real test**, and the reason it is worth
+   noticing: it is the second backend behind §4.10, so §8.1's force-remote flag
+   can run the same program over both paths and diff. Two open items are timed
+   to land with it, because this step writes the code they would otherwise have
+   to restructure: **decide `osoe_tp_sync`** (§10 — whether a collective's
+   internode phase crosses the boundary) while writing the internode phase that
+   is its only caller, and **`OSOE_TP_MORE`'s first caller**, since this is the
+   first backend for which deferring a submission means anything.
 3. **Real transport.** Start with the `echo-uring` floor harness (§8.4), the
    transport's smallest reproducer. Then io_uring with the repaired reservation
    protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
    reply credits and DRAINING caps, and the global rendezvous with its timeout.
+
+   **`osoe_tp_set_range` lands here** (§4.10), with the allocator call site it
+   has been waiting for: this is the first backend that can do anything with the
+   answer. The allocator half — recording hints and growing hinted allocations
+   from the opposite end — is done earlier, in step 1, because retrofitting hint
+   plumbing into a finished allocator is the expensive version.
 4. **Robustness.** Pidfd liveness, abort propagation, `shmem_global_exit`,
    keepalive; Slurm environment fixtures and the heap-base-shift test mode (§8.2).
 
@@ -2887,10 +3370,48 @@ Symmetric statics and the compiler wrapper follow step 4 (§7.4).
 ### 7.3 Plumb but do not implement
 
 A **context handle** on every RMA entry point and a **team parameter** on every
-collective, implementing only `SHMEM_CTX_DEFAULT` and `SHMEM_TEAM_WORLD`.
-Retrofitting either parameter later touches every function written.
-`shmem_ctx_create` and the team split routines exist and return nonzero until
-implemented, which the spec permits.
+collective, implementing only `SHMEM_CTX_DEFAULT`, `SHMEM_TEAM_WORLD` and
+`SHMEM_TEAM_SHARED`. Retrofitting either parameter later touches every function
+written. `shmem_ctx_create`, `shmem_team_create_ctx` and the team split routines
+exist and return nonzero until implemented, which the spec permits: §9.5.1 says
+an unsuccessful context creation "is not treated as an error", and §9.4 gives a
+PE that is not a member of a new team `SHMEM_TEAM_INVALID` — so a program
+written against the spec already has the branch these take.
+
+**The context form is the definition; the plain form calls it with
+`SHMEM_CTX_DEFAULT`.** The other way round — a plain form that does the work and
+a context form that discards its argument — passes every test that can be
+written while one context exists, and is the shape that breaks when a second
+one appears. Every AMO, `putmem`, `getmem`, `putmem_signal`, the signal updates,
+`fence`, `quiet` and `pe_quiet` are generated this way from one body.
+
+**Handles are opaque pointers with macro constants, not exported objects.**
+`shmem_team_t` and `shmem_ctx_t` are pointers to incomplete types, so passing a
+team where a context is expected is a compile error, and the predefined handles
+are small integers cast to those types. A library that exported
+`SHMEM_TEAM_WORLD` as data would be exporting a symbol outside the `shmem_`
+namespace the export test enforces, for no gain.
+
+**`SHMEM_TEAM_SHARED` has its own §5.4 epoch counters**, although on one node
+its membership is the world's. The spec makes the two distinct predefined teams
+forming separate atomicity domains, and sharing the counters is not merely
+untidy: a sync on one team would find `released` already at its target and
+return without waiting for anybody — a collective that does not collect, which
+no value check would notice. It is caught by the arrival table instead
+(`shmem/tests/arrivals.h`), and by each PE's published epoch count for each
+team.
+
+**`SHMEM_CTX_INVALID` is ignored by `fence` and `quiet`, and only by them.**
+Spec §9.12.1 and §9.12.2 say "no operation is performed" for those two; nothing
+says it for an RMA or an AMO, where silently doing nothing would turn a program
+bug into lost data. So the test for it is in those two routines rather than in
+the shared handle resolution, which is loud.
+
+**The C11 generic AMOs dispatch on arity first.** Each has two spellings, with
+and without a leading context, and `_Generic` cannot tell them apart — they
+differ in how many arguments they take, not in the type of one. The argument
+count selects between two selectors, and each selector then makes the ordinary
+type selection on whichever argument is the target pointer.
 
 ### 7.4 Mandatory surface
 
@@ -2900,13 +3421,15 @@ it.
 
 | Item | Requirement | Plan |
 |---|---|---|
-| `shmemx.h` | "The shmemx.h header file must exist, even if no extensions are provided"; extensions use the `shmemx_` prefix | Step 1, empty. The export check admits `^shmemx_` |
-| Profiling interface (§10) | Mandatory: `pshmem_` names for every routine, `pshmem.h`, `shmem_pcontrol` | Step 1, as weak aliases. The export check widens to `^p?shmem_` |
-| Deprecated routines and headers (Annex F) | `start_pes` — "Implementations must include it" — and the other deprecated names; the `mpp/shmem.h` header location | Step 1: `start_pes` with an implicit finalize at exit; aliases |
-| Environment variables (§8) | `SHMEM_SYMMETRIC_SIZE`, `SHMEM_DEBUG`, `SHMEM_VERSION`, `SHMEM_INFO`, and their deprecated `SMA_*` forms | Step 1 |
-| C11 type-generic interfaces | Part of the API | Step 1, for the types implemented |
-| `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1 |
+| `shmemx.h` | "The shmemx.h header file must exist, even if no extensions are provided"; extensions use the `shmemx_` prefix | Step 1, and **empty by design**. Introspection is deliberately not an extension: §3.14's rule is that the library writes state into shared memory and a tool reads it, so `osoe-stat` needs no entry point and a hung job stays readable. The export check admits `^shmemx_` |
+| Profiling interface (§10) | Mandatory: `pshmem_` names for every routine, `pshmem.h`, `shmem_pcontrol` | Step 1. **`pshmem_X` is the strong definition and `shmem_X` a weak alias**, the MPI convention: an application defines its own `shmem_X` and calls `pshmem_X` to reach the implementation. With the strong definition on the `shmem_` name, static linking would be a duplicate symbol. The library's own internal calls go to `pshmem_`, so a profiler counts what the application called, not what the library did about it. `pshmem.h` declares the generated families from the same lists and the same macros as `shmem.h`, with the prefix as a parameter. The export check widens to `^p?shmem_\|^shmemx_` and a second check asserts the *binding* of every pair, which no behavioural test can see: in a shared-library build the executable's definition preempts whatever the library's binding is |
+| Deprecated routines and headers (Annex F) | `start_pes` — "Implementations must include it" — and the other deprecated names; the `mpp/shmem.h` header location | Step 1. Each is the modern routine under its old name, so the two spellings cannot drift. **`start_pes` registers a finalize at exit**, because a program written against it never calls one — finalization used to be implicit (F.2.3) — and without it every such program leaves its segment and heaps in `/dev/shm`, which is the state `osoe-stat --gc` exists to clean up after a *crash*. A program that exits normally must not look like one that crashed. A second `start_pes` is a no-op: it predates the reference counting that makes a repeated `shmem_init` meaningful, and a second implicit finalize would tear down a library the first call owns. `SHMEM_CACHE` (F.2.7) is six no-ops, which is the *correct* implementation on a cache-coherent machine rather than an unimplemented one — §4.1 already rests on coherence. `mpp/shmem.h` is a redirection to `shmem.h` and nothing else. The unprefixed names get no `pshmem_` spelling: §10's profiling interface is defined over the `shmem_` namespace and a `pstart_pes` would be an invention |
+| Environment variables (§8) | `SHMEM_SYMMETRIC_SIZE`, `SHMEM_DEBUG`, `SHMEM_VERSION`, `SHMEM_INFO`, and their deprecated `SMA_*` forms | Step 1. The `SHMEM_`-prefixed spelling controls when both are set, written as that rule rather than as the shortcut the three flag variables would allow, since `SHMEM_SYMMETRIC_SIZE` has a value and will need it. `SHMEM_VERSION` prints before the rendezvous, so a job that fails to start still says which library it was; `SHMEM_DEBUG` prints after it, because the two things worth knowing are the ones it produces — the control segment to point `osoe-stat` at, and the heap base every PE agreed on. `SHMEM_INFO` documents the `OSOE_` variables too, which a user would otherwise have to read the source to find |
+| C11 type-generic interfaces | Part of the API | Step 1, for the types implemented. `_Generic` selects on *type*, and the exact-width types of Tables 6–8 are typedefs of the canonical ones on LP64 Linux, so the selection lists one association per distinct type and the library's build asserts that each typedef is the type assumed. Each list emits a *leading* comma per entry, so there is no `default:` association and a type outside the table is a compile error naming the call rather than a silent route to another type's routine |
+| `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1, and not stubs. Every PE of an osoe job runs the same executable by construction, so `pe_accessible` is whether `pe` names a PE of this job. `addr_accessible` additionally requires the address to be in the symmetric heap, so a static or automatic address answers 0 — the known non-conformance below, stated by the query rather than discovered at the first put |
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
+| Deprecated active-set constants (F.2.8) | `SHMEM_SYNC_VALUE` and the `pSync` sizes | Step 1: **the constants, and not the routines that take them.** A program that declares `static long pSync[SHMEM_BARRIER_SYNC_SIZE]` must compile; a program that then calls `shmem_barrier(...)` must fail at the link rather than reach a routine whose machinery — active sets, `pSync` ownership, the reuse rules — does not exist. A wrong answer is worse than a missing symbol |
+| `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TP_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
 
 **Known non-conformance: symmetric statics.** Most of the spec's examples use
 global or static variables as symmetric objects, including the canonical
@@ -2968,6 +3491,13 @@ Plus a **force-remote flag** routing even same-logical-node traffic over the
 network. Running a program both ways and diffing is the strongest differential
 test, since the shared-memory path is simple enough to trust as the reference.
 
+**It becomes a three-way switch** — intranode, AM, and any third backend — the
+moment a second network backend exists, so the differential test extends to it
+for free. This is also the answer to "is the §4.10 boundary really carrying two
+backends": not analysis, but running the same program over both and diffing. It
+does not need new hardware. §7.1 step 2's in-process AM backend is the second
+backend, so the boundary gets its first real test one step from here.
+
 **Four poles, not one:**
 
 - all PEs in one logical node;
@@ -3005,11 +3535,19 @@ written once.
 
 **Tests the review found missing:**
 
-- **Invariant counters at zero.** Every test ends at quiescence and asserts every
-  §3.14 invariant counter is zero.
-- **Introspection against a live job.** A tier-2 test runs `osoe-stat` against a
-  running job, and against one deliberately stalled, and checks the heartbeat and
-  "blocked in" records.
+- **Invariant counters at zero.** *Done.* Every tier-2 test calls
+  `shmem/tests/invariants.h` before its last `shmem_finalize`: a barrier, then
+  every metric of kind `OSOE_MKIND_INVARIANT` in every record of its scope,
+  found through the metric table by kind rather than by name. Checked by
+  breaking it: a deliberate extra `missed_wake` bump made the wait tests fail,
+  naming the counter and the block.
+- **Introspection against a live job.** *Done.* `shmem.stat` runs `osoe-stat`
+  against a running job at L = 1, 2 and 4, and at L ≥ 2 makes a PE sit in a wait
+  nothing will satisfy while another reads it: the "blocked in" record names the
+  routine, and `pe.sweeps` rises while the PE sleeps, which is the difference
+  between a PE that is blocked and one that is dead. Both were checked by
+  breaking them — suppressing the record, and suppressing the sweep count — and
+  the test failed each time.
 - **Bootstrap fixtures.** No tier fed real `SLURM_*` values. Capture `srun`
   environments for block, cyclic, plane, and arbitrary distributions, relative node
   selection (`-r`) and exclusions (`-x`), heterogeneous jobs, and a bare `sbatch`
@@ -3319,11 +3857,15 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is designed but not scheduled (below) |
 | `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked, not scheduled** (§4.11). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
-| Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector. The control segment keeps its name until finalize, accepting a small leak on crash. Flight recorder on by default for now |
+| Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector, deferred until there is a reason for a third formatter. The control segment keeps its name until finalize, accepting a small leak on crash. The reader shares only the frozen directory and the metric descriptor with the writer and finds everything else by name, which a tier-1 test enforces by handing it a segment this build did not write. The flight recorder is deferred to step 2, with its design standing: its events do not exist yet |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
 | Build tool | **CMake ≥ 3.25** (§1) |
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
+| What `OSOE_NODE_LAYOUT` covers | **The encoding of every word in the control segment, not only the offsets of fields.** A word written by one process and interpreted by another is part of the inter-process contract even when its width and position do not move; changing what its bits mean without bumping the version gives mixed builds silent lost wakes rather than the loud refusal `open_control` exists to produce. Recorded because a proposal got it wrong, arguing the §4.9 watch word could change encoding without a bump since it is "an opaque filter" — it is opaque to its *reader*, which is another process |
+| Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_tp_watch_wait` being the backend's own function |
+| A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_tp_wait`, `osoe_tp_get`, `osoe_tp_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
+| `osoe_tp_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 
 ### Still open — blocking
 
@@ -3341,6 +3883,67 @@ Recorded rather than deleted, so they are not reopened from memory.
   decisions, and chunk sizing. Probably right; worth an hour to confirm rather
   than carry. Now has a home in the test suite rather than being a one-off.
 - **Pin the §1 floor ratios.** Deliberately unwritten until the harness runs.
+
+### Still open — the RoCE exercise of 2026-09-17
+
+`docs/reviews/roce-transport.md` planned a RoCEv2 backend behind §4.10 to test
+whether the boundary can carry RDMA at all, and estimated what it leaves on the
+table. Its hardware facts are **recalled**, not measured — its §10 lists eight
+things to verify before any number is quoted as a result — so nothing below is
+implemented on its authority alone.
+
+**The headline is that nothing in the boundary prevents an RDMA backend.** Of six
+losses it identifies, four are RoCE's own (8-byte-only atomics, no non-fetching
+atomic, no target-side counters, NIC atomics not CPU-coherent) or a phase
+boundary (`get_nbi`, whose shape §4.10 now fixes as counters). The two that are
+the boundary's cost one flag and one function, both now specified in §4.10, and
+they are the *same two* the core-API study arrived at from a different direction.
+Two independent searches converging on the same two gaps is the useful result.
+
+Folded in already: dispatch per `(pe, operation class)`, the sweep bound on
+blocking calls, `OSOE_TP_MORE` with the source-ownership rule that makes it safe,
+nonblocking-as-counters, `set_range`'s contract, §4.1's registration trap, §6.2's
+out-of-band bootstrap, and §8.1's three-way switch.
+
+- **`osoe_tp_sync`: does a collective's internode phase cross the boundary?**
+  §2.2 puts collectives on AM, decided when AM was the only backend; in an RDMA
+  build that sends every barrier over TCP while the data path runs on the NIC.
+  The proposal is a mandatory `osoe_tp_sync(ctx, group)` over a group of *nodes*,
+  called after the intranode phase (§5.3) by one PE per node that has a member —
+  note that is the team's local lead (§5.2), not necessarily the node lead of
+  §3.12, so it asks the node lead's agent to send rather than sending itself
+  (invariant 19). A backend with no native group barrier gets a generic tree over
+  put and watch, so it carries no capability and §4.10's rejection of capability
+  bits still holds.
+
+  **Deferred to step 2, deliberately.** The case is an estimated 4–6× on barrier
+  at 10^6 PEs — unmeasured, and four orders of magnitude beyond the target
+  hardware. An earlier draft argued §4.10 contradicts itself on this and
+  **withdrew it**: §2.2 scopes the boundary claim to §4 and puts collectives on
+  AM on purpose, so there is a decision here, not an oversight. What is left is a
+  trade between fifteen lines now and restructuring `barrier.c` later, and step 2
+  writes the internode phase that is `osoe_tp_sync`'s only caller and its only
+  implementation. Deciding it there means deciding it with the code in front of
+  us rather than an estimate — and we may notice something on the way that
+  changes the answer. *(Not rejected. Recorded so it is decided at step 2 rather
+  than rediscovered.)*
+- **Does the AM data path stay hot in an RDMA build?** Bootstrap is out of band
+  in every build (§6.2) and that is forced. Whether §3's *data* path — the
+  reservation protocol, deferred reply queues, aggregation — stays running is
+  not. The argument for keeping it is that it cannot rot if it runs on every
+  run; the flaw in that argument is that if RDMA carries the traffic, those are
+  exactly the parts that would not run, so what gets exercised is bootstrap and
+  control, which is less than the claim. The argument from abort propagation is
+  weak on the machines RDMA runs on, where a resource manager tears the job down
+  (§3.15). Three costs nobody has counted: the lead's agent still runs its idle
+  loop; a PE that touched a peer over both paths must wait on two completion
+  domains, so §4.6's dirty set grows a second dimension; and §3.4's connection
+  buffers cost memory whether or not they carry traffic. Needs a device.
+- **Verification before any RoCE number is quoted.** `roce-transport.md` §10's
+  V1–V8. V1 — whether a remote initiator can target a memory region registered
+  by the node lead, arriving on an XRC target queue pair on a shared XRCD — is
+  the load-bearing assumption of the whole plan; its fallback costs 16 MB per
+  node and no redesign.
 
 ### Still open — design, deferrable
 

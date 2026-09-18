@@ -8,6 +8,7 @@
 #include <shmem.h>
 
 #include "check.h"
+#include "invariants.h"
 
 int main(void)
 {
@@ -33,6 +34,7 @@ int main(void)
     shmem_query_initialized(&flag);
     CHECK(flag != 0);
 
+    CHECK_INVARIANTS();
     shmem_finalize();
     return CHECK_DONE();
 }

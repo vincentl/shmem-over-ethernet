@@ -11,8 +11,15 @@
  * Offsets are from the heap's start; every block starts at a multiple of
  * OSOE_ALLOC_ALIGN, which suits any object type (spec §9.3.1).
  *
- * Hinted allocations (spec §9.3.5) will grow from the opposite end of the heap
- * (§4.10), which this structure allows without change.
+ * **Hints are recorded, not discarded** (§4.4). spec §9.3.5's hints are
+ * advisory and change nothing on one node, but §9.3.3 requires shmem_realloc to
+ * *preserve* an allocation's hints and to return a null pointer rather than
+ * lose them, so the hint has to have been kept. A hinted allocation is placed
+ * from the **high end** of the heap and an unhinted one from the low end, which
+ * is what makes "the hints cannot be preserved" a case that exists: a hinted
+ * block that cannot be grown at the hinted end fails the call instead of
+ * silently migrating. Both ends are a pure function of the call sequence, so
+ * determinism is untouched.
  */
 #ifndef OSOE_ALLOC_H
 #define OSOE_ALLOC_H
@@ -29,6 +36,7 @@ _Static_assert(OSOE_ALLOC_ALIGN >= _Alignof(max_align_t),
 struct osoe_alloc_block {
     uint64_t offset;
     uint64_t size;
+    long hints;                         /* spec §9.3.5; 0 on a free block */
     bool free;
 };
 
@@ -43,12 +51,44 @@ struct osoe_alloc {
 int osoe_alloc_init(struct osoe_alloc *a, uint64_t capacity);
 void osoe_alloc_fini(struct osoe_alloc *a);
 
-/* Allocate size > 0 bytes. 0 and *offset set; 1 if no free block fits;
- * -1 if private memory for the metadata ran out. */
-int osoe_alloc_take(struct osoe_alloc *a, uint64_t size, uint64_t *offset);
+/*
+ * Allocate size > 0 bytes at a multiple of `align`, which must be a power of
+ * two; anything below OSOE_ALLOC_ALIGN is raised to it. `hints` is spec
+ * §9.3.5's bit array, recorded with the block and deciding which end of the
+ * heap it comes from.
+ *
+ * 0 and *offset set; 1 if no free block fits; -1 if private memory for the
+ * metadata ran out.
+ */
+int osoe_alloc_take(struct osoe_alloc *a, uint64_t size, uint64_t align, long hints,
+                    uint64_t *offset);
 
 /* Free the block starting at offset. 0, or -1 if no allocated block starts
  * there. */
 int osoe_alloc_give(struct osoe_alloc *a, uint64_t offset);
+
+/* The size and hints of the allocated block starting at offset. 0, or -1 if no
+ * allocated block starts there. `size` is the rounded size the allocator
+ * holds, which is at least what was asked for. */
+int osoe_alloc_query(const struct osoe_alloc *a, uint64_t offset, uint64_t *size,
+                     long *hints);
+
+/*
+ * Resize the block at `offset` without moving it: shrink always works, grow
+ * only into a free neighbour above. 0 on success, 1 if it cannot be done
+ * without moving, -1 if no allocated block starts there or the metadata could
+ * not grow. The block is unchanged unless 0 is returned.
+ *
+ * This exists so that shmem_realloc's common case - a block grown with nothing
+ * live above it - does not need both the old and the new block to fit in the
+ * heap at once.
+ */
+int osoe_alloc_resize(struct osoe_alloc *a, uint64_t offset, uint64_t size);
+
+/* Bytes currently allocated, and the largest single block still available -
+ * the two numbers that distinguish "the heap is full" from "the heap is
+ * fragmented" (§3.14 question 4). O(blocks), so call it once per allocation,
+ * never in a loop. */
+void osoe_alloc_levels(const struct osoe_alloc *a, uint64_t *in_use, uint64_t *largest_free);
 
 #endif /* OSOE_ALLOC_H */

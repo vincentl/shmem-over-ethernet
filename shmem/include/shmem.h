@@ -9,6 +9,7 @@
 #define OSOE_SHMEM_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,6 +27,37 @@ extern "C" {
 #define _SHMEM_MAX_NAME_LEN  SHMEM_MAX_NAME_LEN
 #define _SHMEM_VENDOR_STRING SHMEM_VENDOR_STRING
 
+/*
+ * The deprecated active-set collective constants (§6, Annex F.2.8).
+ *
+ * The constants are defined; the active-set routines that use them are not
+ * (§7.4). That is deliberate rather than half-finished: a program that declares
+ * `static long pSync[SHMEM_BARRIER_SYNC_SIZE]` and initializes it to
+ * SHMEM_SYNC_VALUE must compile, and a program that then calls
+ * shmem_barrier(...) must fail at the link rather than be given a routine whose
+ * machinery - active sets, pSync ownership, the reuse rules - does not exist.
+ * A wrong answer is worse than a missing symbol.
+ *
+ * The sizes are this implementation's, as the spec says they are. They are
+ * large enough for a conforming program's array and are otherwise unused.
+ */
+#define SHMEM_SYNC_VALUE               (-1L)
+#define SHMEM_SYNC_SIZE                 256
+#define SHMEM_BARRIER_SYNC_SIZE         256
+#define SHMEM_BCAST_SYNC_SIZE           256
+#define SHMEM_COLLECT_SYNC_SIZE         256
+#define SHMEM_REDUCE_SYNC_SIZE          256
+#define SHMEM_ALLTOALL_SYNC_SIZE        256
+#define SHMEM_ALLTOALLS_SYNC_SIZE       256
+#define SHMEM_REDUCE_MIN_WRKDATA_SIZE   256
+
+#define _SHMEM_SYNC_VALUE              SHMEM_SYNC_VALUE
+#define _SHMEM_BARRIER_SYNC_SIZE       SHMEM_BARRIER_SYNC_SIZE
+#define _SHMEM_BCAST_SYNC_SIZE         SHMEM_BCAST_SYNC_SIZE
+#define _SHMEM_COLLECT_SYNC_SIZE       SHMEM_COLLECT_SYNC_SIZE
+#define _SHMEM_REDUCE_SYNC_SIZE        SHMEM_REDUCE_SYNC_SIZE
+#define _SHMEM_REDUCE_MIN_WRKDATA_SIZE SHMEM_REDUCE_MIN_WRKDATA_SIZE
+
 /* Library setup, exit, and query (§9.1) */
 void shmem_init(void);
 int shmem_my_pe(void);
@@ -33,23 +65,616 @@ int shmem_n_pes(void);
 void shmem_finalize(void);
 void shmem_query_initialized(int *initialized);
 
+/*
+ * Thread levels (§6, §9.2). The spec requires increasing integer values, and
+ * osoe provides up to SHMEM_THREAD_SERIALIZED: SHMEM_THREAD_MULTIPLE is §4.11
+ * of the design notes and is not implemented, so asking for it yields
+ * SERIALIZED rather than a failure, which is what the interface is shaped for.
+ */
+#define SHMEM_THREAD_SINGLE     0
+#define SHMEM_THREAD_FUNNELED   1
+#define SHMEM_THREAD_SERIALIZED 2
+#define SHMEM_THREAD_MULTIPLE   3
+
+int shmem_init_thread(int requested, int *provided);
+void shmem_query_thread(int *provided);
+
+/*
+ * Teams and contexts (§6, §9.4, §9.5).
+ *
+ * Both handles are opaque, so their representation is this implementation's
+ * choice. They are pointers to incomplete types rather than integers so that a
+ * team passed where a context is expected is a compile error, and the
+ * predefined handles are integer constants cast to those types rather than
+ * exported objects - a library that exported `SHMEM_TEAM_WORLD` as data would
+ * be exporting a symbol outside the `shmem_` namespace the export test
+ * enforces, for no gain.
+ *
+ * osoe implements SHMEM_TEAM_WORLD, SHMEM_TEAM_SHARED and SHMEM_CTX_DEFAULT
+ * (§7.3). `shmem_ctx_create`, `shmem_team_create_ctx` and the team splits
+ * exist and return nonzero, which the spec permits: an unsuccessful context
+ * creation "is not treated as an error". The parameter is on every entry point
+ * from the start because retrofitting it later touches every function written.
+ */
+typedef struct shmem_team_opaque *shmem_team_t;
+typedef struct shmem_ctx_opaque *shmem_ctx_t;
+
+#define SHMEM_TEAM_INVALID ((shmem_team_t)0)
+#define SHMEM_TEAM_WORLD   ((shmem_team_t)1)
+#define SHMEM_TEAM_SHARED  ((shmem_team_t)2)
+
+#define SHMEM_CTX_INVALID  ((shmem_ctx_t)0)
+#define SHMEM_CTX_DEFAULT  ((shmem_ctx_t)1)
+
+/* Context creation options (§6, §9.5.1) */
+#define SHMEM_CTX_SERIALIZED 1L
+#define SHMEM_CTX_PRIVATE    2L
+#define SHMEM_CTX_NOSTORE    4L
+
+/* Team configuration (§9.4.3) */
+typedef struct {
+    int num_contexts;
+} shmem_team_config_t;
+
+#define SHMEM_TEAM_NUM_CONTEXTS 1L
+
+int shmem_team_my_pe(shmem_team_t team);
+int shmem_team_n_pes(shmem_team_t team);
+int shmem_team_get_config(shmem_team_t team, long config_mask,
+                          shmem_team_config_t *config);
+int shmem_team_translate_pe(shmem_team_t src_team, int src_pe, shmem_team_t dest_team);
+int shmem_team_split_strided(shmem_team_t parent_team, int start, int stride, int size,
+                             const shmem_team_config_t *config, long config_mask,
+                             shmem_team_t *new_team);
+int shmem_team_split_2d(shmem_team_t parent_team, int xrange,
+                        const shmem_team_config_t *xaxis_config, long xaxis_mask,
+                        shmem_team_t *xaxis_team,
+                        const shmem_team_config_t *yaxis_config, long yaxis_mask,
+                        shmem_team_t *yaxis_team);
+void shmem_team_destroy(shmem_team_t team);
+void *shmem_team_ptr(shmem_team_t team, const void *dest, int pe);
+
+int shmem_ctx_create(long options, shmem_ctx_t *ctx);
+int shmem_team_create_ctx(shmem_team_t team, long options, shmem_ctx_t *ctx);
+void shmem_ctx_destroy(shmem_ctx_t ctx);
+int shmem_ctx_get_team(shmem_ctx_t ctx, shmem_team_t *team);
+
+/* Comparison constants for the wait and test routines (§6, §9.11) */
+#define SHMEM_CMP_EQ 0
+#define SHMEM_CMP_NE 1
+#define SHMEM_CMP_GT 2
+#define SHMEM_CMP_LE 3
+#define SHMEM_CMP_LT 4
+#define SHMEM_CMP_GE 5
+
+/* Deprecated spellings (§6) */
+#define _SHMEM_CMP_EQ SHMEM_CMP_EQ
+#define _SHMEM_CMP_NE SHMEM_CMP_NE
+#define _SHMEM_CMP_GT SHMEM_CMP_GT
+#define _SHMEM_CMP_LE SHMEM_CMP_LE
+#define _SHMEM_CMP_LT SHMEM_CMP_LT
+#define _SHMEM_CMP_GE SHMEM_CMP_GE
+
+/* Signal operators for the put-with-signal routines (§6, §9.8.2) */
+#define SHMEM_SIGNAL_SET 0
+#define SHMEM_SIGNAL_ADD 1
+
+/* Signalling operations (§9.8) */
+void shmem_putmem_signal(void *dest, const void *source, size_t nelems, uint64_t *sig_addr,
+                         uint64_t signal, int sig_op, int pe);
+void shmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *source,
+                             size_t nelems, uint64_t *sig_addr, uint64_t signal,
+                             int sig_op, int pe);
+void shmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe);
+void shmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe);
+void shmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal, int pe);
+void shmem_ctx_signal_add(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal, int pe);
+uint64_t shmem_signal_fetch(const uint64_t *sig_addr);
+uint64_t shmem_signal_wait_until(uint64_t *sig_addr, int cmp, uint64_t cmp_value);
+
+/*
+ * Atomic memory operations (spec §9.7).
+ *
+ * The spec names one routine per (operation, type), over three type sets:
+ * Table 6 "standard" for compare_swap, inc, fetch_inc, add and fetch_add;
+ * Table 7 "extended", which is Table 6 plus float and double, for fetch, set
+ * and swap; and Table 8 "bitwise" for the and, or and xor families. They are
+ * declared here by expanding the type lists, the same way the definitions are
+ * generated, so a type appears once and the two cannot disagree.
+ *
+ * Every type in the three tables is four or eight bytes on this
+ * implementation's targets (LP64 Linux), which is the width the transport
+ * boundary's rmw takes. The library's own build asserts that, and asserts that
+ * each exact-width typedef really is the canonical type the C11 selection below
+ * lists, so a platform where they differ fails to build the library rather than
+ * silently omitting a case here.
+ */
+#define OSOE_AMO_STANDARD_TYPES(X)                                            \
+    X(int, int) X(long, long) X(long long, longlong)                          \
+    X(unsigned int, uint) X(unsigned long, ulong)                             \
+    X(unsigned long long, ulonglong)                                          \
+    X(int32_t, int32) X(int64_t, int64) X(uint32_t, uint32) X(uint64_t, uint64) \
+    X(size_t, size) X(ptrdiff_t, ptrdiff)
+
+/* Table 7 is Table 6 plus these two. */
+#define OSOE_AMO_FLOAT_TYPES(X) X(float, float) X(double, double)
+
+#define OSOE_AMO_BITWISE_TYPES(X)                                             \
+    X(unsigned int, uint) X(unsigned long, ulong)                             \
+    X(unsigned long long, ulonglong)                                          \
+    X(int32_t, int32) X(int64_t, int64) X(uint32_t, uint32) X(uint64_t, uint64)
+
+/*
+ * The declarations take the prefix as a parameter, so that pshmem.h can
+ * generate the `pshmem_` spellings of the same 500 routines from the same
+ * lists (§7.4; spec §10). Writing them out twice is the version of this that
+ * drifts.
+ */
+#define OSOE_CAT2(a, b) a##b
+#define OSOE_CAT(a, b) OSOE_CAT2(a, b)
+#define OSOE_FN(P, NAME, SUF) OSOE_CAT(OSOE_CAT(P, NAME), SUF)
+
+#define OSOE_AMO_DECL_STANDARD_P(P, T, NAME)                                  \
+    T OSOE_FN(P, NAME, _atomic_compare_swap)(T *dest, T cond, T value, int pe); \
+    void OSOE_FN(P, NAME, _atomic_inc)(T *dest, int pe);                      \
+    T OSOE_FN(P, NAME, _atomic_fetch_inc)(T *dest, int pe);                   \
+    void OSOE_FN(P, NAME, _atomic_add)(T *dest, T value, int pe);             \
+    T OSOE_FN(P, NAME, _atomic_fetch_add)(T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_EXTENDED_P(P, T, NAME)                                  \
+    T OSOE_FN(P, NAME, _atomic_fetch)(const T *source, int pe);               \
+    void OSOE_FN(P, NAME, _atomic_set)(T *dest, T value, int pe);             \
+    T OSOE_FN(P, NAME, _atomic_swap)(T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_BITWISE_P(P, T, NAME)                                   \
+    void OSOE_FN(P, NAME, _atomic_and)(T *dest, T value, int pe);             \
+    T OSOE_FN(P, NAME, _atomic_fetch_and)(T *dest, T value, int pe);          \
+    void OSOE_FN(P, NAME, _atomic_or)(T *dest, T value, int pe);              \
+    T OSOE_FN(P, NAME, _atomic_fetch_or)(T *dest, T value, int pe);           \
+    void OSOE_FN(P, NAME, _atomic_xor)(T *dest, T value, int pe);             \
+    T OSOE_FN(P, NAME, _atomic_fetch_xor)(T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_CTX_STANDARD_P(P, T, NAME)                              \
+    T OSOE_FN(P, ctx_##NAME, _atomic_compare_swap)(shmem_ctx_t ctx, T *dest,  \
+                                                   T cond, T value, int pe);  \
+    void OSOE_FN(P, ctx_##NAME, _atomic_inc)(shmem_ctx_t ctx, T *dest, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_inc)(shmem_ctx_t ctx, T *dest, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_add)(shmem_ctx_t ctx, T *dest, T value, \
+                                             int pe);                         \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_add)(shmem_ctx_t ctx, T *dest, T value, \
+                                                int pe);
+
+#define OSOE_AMO_DECL_CTX_EXTENDED_P(P, T, NAME)                              \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch)(shmem_ctx_t ctx, const T *source, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_set)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_swap)(shmem_ctx_t ctx, T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_CTX_BITWISE_P(P, T, NAME)                               \
+    void OSOE_FN(P, ctx_##NAME, _atomic_and)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_and)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_or)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_or)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_xor)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_xor)(shmem_ctx_t ctx, T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_STANDARD(T, NAME) OSOE_AMO_DECL_STANDARD_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_EXTENDED(T, NAME) OSOE_AMO_DECL_EXTENDED_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_BITWISE(T, NAME) OSOE_AMO_DECL_BITWISE_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_CTX_STANDARD(T, NAME) OSOE_AMO_DECL_CTX_STANDARD_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_CTX_EXTENDED(T, NAME) OSOE_AMO_DECL_CTX_EXTENDED_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_CTX_BITWISE(T, NAME) OSOE_AMO_DECL_CTX_BITWISE_P(shmem_, T, NAME)
+
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_STANDARD)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_EXTENDED)
+OSOE_AMO_FLOAT_TYPES(OSOE_AMO_DECL_EXTENDED)
+OSOE_AMO_BITWISE_TYPES(OSOE_AMO_DECL_BITWISE)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_CTX_STANDARD)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_CTX_EXTENDED)
+OSOE_AMO_FLOAT_TYPES(OSOE_AMO_DECL_CTX_EXTENDED)
+OSOE_AMO_BITWISE_TYPES(OSOE_AMO_DECL_CTX_BITWISE)
+
+/*
+ * Point-to-point synchronization (spec §9.11).
+ *
+ * The wait and test routines take the standard AMO types of Table 6. The
+ * scalar shmem_wait_until and shmem_test additionally take the deprecated
+ * `short` and `unsigned short` of Table 12, which are two bytes wide - a width
+ * no AMO type has, and the only reason the transport boundary's coherent load
+ * takes a width of 2 at all. There is no AMO for them, so a conforming program
+ * cannot update one (1.5 change #17 requires wait variables to be written with
+ * AMOs); they exist for programs written before that rule.
+ */
+#define OSOE_WAIT_SHORT_TYPES(X) X(short, short) X(unsigned short, ushort)
+
+/* The deprecated shmem_TYPENAME_wait, which is wait_until with SHMEM_CMP_NE. */
+#define OSOE_WAIT_DEPRECATED_TYPES(X)                                         \
+    X(short, short) X(int, int) X(long, long) X(long long, longlong)
+
+#define OSOE_WAIT_DECL_SCALAR_P(P, T, NAME)                                   \
+    void OSOE_FN(P, NAME, _wait_until)(T *ivar, int cmp, T cmp_value);        \
+    int OSOE_FN(P, NAME, _test)(T *ivar, int cmp, T cmp_value);
+
+#define OSOE_WAIT_DECL_MANY_P(P, T, NAME)                                     \
+    void OSOE_FN(P, NAME, _wait_until_all)(T *ivars, size_t nelems,           \
+                                           const int *status, int cmp, T cmp_value); \
+    size_t OSOE_FN(P, NAME, _wait_until_any)(T *ivars, size_t nelems,         \
+                                             const int *status, int cmp, T cmp_value); \
+    size_t OSOE_FN(P, NAME, _wait_until_some)(T *ivars, size_t nelems, size_t *indices, \
+                                              const int *status, int cmp, T cmp_value); \
+    void OSOE_FN(P, NAME, _wait_until_all_vector)(T *ivars, size_t nelems,    \
+                                                  const int *status, int cmp, \
+                                                  const T *cmp_values);       \
+    size_t OSOE_FN(P, NAME, _wait_until_any_vector)(T *ivars, size_t nelems,  \
+                                                    const int *status, int cmp, \
+                                                    const T *cmp_values);     \
+    size_t OSOE_FN(P, NAME, _wait_until_some_vector)(T *ivars, size_t nelems, \
+                                                     size_t *indices,         \
+                                                     const int *status, int cmp, \
+                                                     const T *cmp_values);    \
+    int OSOE_FN(P, NAME, _test_all)(T *ivars, size_t nelems, const int *status, \
+                                    int cmp, T cmp_value);                    \
+    size_t OSOE_FN(P, NAME, _test_any)(T *ivars, size_t nelems, const int *status, \
+                                       int cmp, T cmp_value);                 \
+    size_t OSOE_FN(P, NAME, _test_some)(T *ivars, size_t nelems, size_t *indices, \
+                                        const int *status, int cmp, T cmp_value); \
+    int OSOE_FN(P, NAME, _test_all_vector)(T *ivars, size_t nelems,           \
+                                           const int *status, int cmp,        \
+                                           const T *cmp_values);              \
+    size_t OSOE_FN(P, NAME, _test_any_vector)(T *ivars, size_t nelems,        \
+                                              const int *status, int cmp,     \
+                                              const T *cmp_values);           \
+    size_t OSOE_FN(P, NAME, _test_some_vector)(T *ivars, size_t nelems,       \
+                                               size_t *indices, const int *status, \
+                                               int cmp, const T *cmp_values);
+
+#define OSOE_WAIT_DECL_DEPRECATED_P(P, T, NAME)                               \
+    void OSOE_FN(P, NAME, _wait)(T *ivar, T cmp_value);
+
+#define OSOE_WAIT_DECL_SCALAR(T, NAME) OSOE_WAIT_DECL_SCALAR_P(shmem_, T, NAME)
+#define OSOE_WAIT_DECL_MANY(T, NAME) OSOE_WAIT_DECL_MANY_P(shmem_, T, NAME)
+#define OSOE_WAIT_DECL_DEPRECATED(T, NAME) OSOE_WAIT_DECL_DEPRECATED_P(shmem_, T, NAME)
+
+OSOE_AMO_STANDARD_TYPES(OSOE_WAIT_DECL_SCALAR)
+OSOE_WAIT_SHORT_TYPES(OSOE_WAIT_DECL_SCALAR)
+OSOE_AMO_STANDARD_TYPES(OSOE_WAIT_DECL_MANY)
+OSOE_WAIT_DEPRECATED_TYPES(OSOE_WAIT_DECL_DEPRECATED)
+
+/* The unprefixed deprecated spellings, which the spec fixes at `long`. They
+ * are declared before the C11 generic macros of the same name are defined, so
+ * a program can still reach them as (shmem_wait)(...). */
+void shmem_wait(long *ivar, long cmp_value);
+void shmem_wait_until(long *ivar, int cmp, long cmp_value);
+
 /* Symmetric pointer (§9.1.9) */
 void *shmem_ptr(const void *dest, int pe);
 
+/* Memory usage hints for shmem_malloc_with_hints (§6, §9.3.5, Table 4) */
+#define SHMEM_MALLOC_ATOMICS_REMOTE 1L
+#define SHMEM_MALLOC_SIGNAL_REMOTE  2L
+
 /* Memory management (§9.3) */
 void *shmem_malloc(size_t size);
+void *shmem_calloc(size_t count, size_t size);
+void *shmem_realloc(void *ptr, size_t size);
+void *shmem_align(size_t alignment, size_t size);
+void *shmem_malloc_with_hints(size_t size, long hints);
 void shmem_free(void *ptr);
 
 /* Remote memory access (§9.6.1) */
 void shmem_putmem(void *dest, const void *source, size_t nelems, int pe);
 void shmem_getmem(void *dest, const void *source, size_t nelems, int pe);
+void shmem_ctx_putmem(shmem_ctx_t ctx, void *dest, const void *source, size_t nelems,
+                      int pe);
+void shmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source, size_t nelems,
+                      int pe);
 
-/* Collective routines (§9.10) */
+/* Memory ordering (§9.12) */
+void shmem_fence(void);
+void shmem_quiet(void);
+void shmem_pe_quiet(const int *target_pes, size_t npes);
+void shmem_ctx_fence(shmem_ctx_t ctx);
+void shmem_ctx_quiet(shmem_ctx_t ctx);
+void shmem_ctx_pe_quiet(shmem_ctx_t ctx, const int *target_pes, size_t npes);
+
+/* Collective routines (§9.10). §5.6: barrier_all includes a quiet on the
+ * default context; sync does not. */
 void shmem_barrier_all(void);
+void shmem_sync_all(void);
+int shmem_team_sync(shmem_team_t team);
+
+/* spec §9.10.3's C11 spelling. The deprecated active-set form of the same name
+ * takes four arguments and is not implemented (§7.4), so there is nothing to
+ * dispatch between and this is a plain alias. */
+#define shmem_sync(team) shmem_team_sync(team)
 
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);
 void shmem_info_get_name(char *name);
+
+/* Accessibility queries (§9.1.7, §9.1.8) */
+int shmem_pe_accessible(int pe);
+int shmem_addr_accessible(const void *addr, int pe);
+
+/*
+ * Communication sessions (§9.9). A session is a hint about what a context is
+ * about to be used for and "sessions do not affect the completion or ordering
+ * semantics of any OpenSHMEM routines", so a library that does nothing with
+ * them is conforming. osoe does nothing with them yet: the aggregation they
+ * would inform is §3.9's, which arrives with the AM backend.
+ */
+typedef struct {
+    size_t total_ops;
+} shmem_ctx_session_config_t;
+
+#define SHMEM_CTX_SESSION_TOTAL_OPS 1L
+#define SHMEM_CTX_SESSION_BATCH     1L
+
+void shmem_ctx_session_start(shmem_ctx_t ctx, long options,
+                             const shmem_ctx_session_config_t *config, long config_mask);
+void shmem_ctx_session_stop(shmem_ctx_t ctx);
+
+/*
+ * The deprecated routines (Annex F). They exist because the spec says they
+ * must: "support for start_pes is still required in OpenSHMEM libraries".
+ * start_pes takes an initialization argument that has meant nothing for
+ * decades, and finalizes implicitly at exit, which is the behaviour programs
+ * written against it expect.
+ */
+void start_pes(int npes);
+int _my_pe(void);
+int _num_pes(void);
+void *shmalloc(size_t size);
+void shfree(void *ptr);
+void *shrealloc(void *ptr, size_t size);
+void *shmemalign(size_t alignment, size_t size);
+
+/* SHMEM_CACHE (Annex F.2.7): no-ops on every cache-coherent machine, which is
+ * every machine osoe targets. */
+void shmem_clear_cache_inv(void);
+void shmem_set_cache_inv(void);
+void shmem_set_cache_line_inv(void *dest);
+void shmem_clear_cache_line_inv(void *dest);
+void shmem_udcflush(void);
+void shmem_udcflush_line(void *dest);
+
+/*
+ * C11 type-generic interfaces (§7.4; spec §9.7).
+ *
+ * `_Generic` selects on the *type* of the pointer, so each association must
+ * name a distinct C type. The exact-width types of Tables 6-8 are typedefs of
+ * the canonical types on LP64 Linux - int32_t is int, uint64_t is unsigned
+ * long, size_t is unsigned long, and so on - so listing both spellings would be
+ * two associations for one type, which does not compile. The lists below are
+ * therefore one entry per distinct type, and the library's build asserts that
+ * each typedef really is the type assumed here.
+ *
+ * Each list emits a *leading* comma per entry, so `_Generic((dest) LIST)` is
+ * well formed and there is no `default:` association. That is deliberate: a
+ * type outside the table is then a compile error naming the call, rather than
+ * being quietly routed to some other type's routine.
+ *
+ * The OSOE_-prefixed macros here are this implementation's, not part of the
+ * API. They stay defined because the generic macros expand them at the point of
+ * use.
+ */
+#if !defined(__cplusplus) && defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+
+#define OSOE_AMO_G(T, NAME, OP)  , T *: shmem_##NAME##_atomic_##OP
+/* For shmem_atomic_fetch, whose argument may be const-qualified. */
+#define OSOE_AMO_GC(T, NAME, OP) , T *: shmem_##NAME##_atomic_##OP                \
+                                 , const T *: shmem_##NAME##_atomic_##OP
+/* The same, for the context-taking spellings. */
+#define OSOE_AMO_GX(T, NAME, OP)  , T *: shmem_ctx_##NAME##_atomic_##OP
+#define OSOE_AMO_GCX(T, NAME, OP) , T *: shmem_ctx_##NAME##_atomic_##OP           \
+                                  , const T *: shmem_ctx_##NAME##_atomic_##OP
+
+/*
+ * Every AMO has two C11 spellings, with and without a leading context
+ * (spec §9.7): shmem_atomic_add(dest, value, pe) and
+ * shmem_atomic_add(ctx, dest, value, pe). `_Generic` cannot tell them apart -
+ * they differ in arity, not in the type of one argument - so the count is
+ * counted first and the selection is made on whichever argument is the target
+ * pointer. Each selector below names the routines with N arguments and the ones
+ * with N + 1, and lets the argument list pick.
+ */
+#define OSOE_PICK3(_1, _2, _3, NAME, ...) NAME
+#define OSOE_PICK4(_1, _2, _3, _4, NAME, ...) NAME
+#define OSOE_PICK5(_1, _2, _3, _4, _5, NAME, ...) NAME
+
+/* Table 6, one entry per distinct C type. */
+#define OSOE_AMO_G_STANDARD(X, OP)                                                \
+    X(int, int, OP) X(long, long, OP) X(long long, longlong, OP)                  \
+    X(unsigned int, uint, OP) X(unsigned long, ulong, OP)                         \
+    X(unsigned long long, ulonglong, OP)
+
+/* Table 7: Table 6 plus float and double. */
+#define OSOE_AMO_G_EXTENDED(X, OP)                                                \
+    OSOE_AMO_G_STANDARD(X, OP) X(float, float, OP) X(double, double, OP)
+
+/* Table 8. int and long appear as int32_t and int64_t; there is no plain
+ * signed int or long in the bitwise table, which is why they map to the
+ * exact-width routine names. */
+#define OSOE_AMO_G_BITWISE(X, OP)                                                 \
+    X(int, int32, OP) X(long, int64, OP)                                          \
+    X(unsigned int, uint, OP) X(unsigned long, ulong, OP)                         \
+    X(unsigned long long, ulonglong, OP)
+
+#define OSOE_G_FETCH_2(source, pe)                                                \
+    (_Generic((source) OSOE_AMO_G_EXTENDED(OSOE_AMO_GC, fetch))((source), (pe)))
+#define OSOE_G_FETCH_3(ctx, source, pe)                                           \
+    (_Generic((source) OSOE_AMO_G_EXTENDED(OSOE_AMO_GCX, fetch))((ctx), (source), (pe)))
+#define shmem_atomic_fetch(...)                                                   \
+    OSOE_PICK3(__VA_ARGS__, OSOE_G_FETCH_3, OSOE_G_FETCH_2, )(__VA_ARGS__)
+#define OSOE_G_SET_3(dest, value, pe)                                             \
+    (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_G, set))((dest), (value), (pe)))
+#define OSOE_G_SET_4(ctx, dest, value, pe)                                        \
+    (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_GX, set))((ctx), (dest), (value), (pe)))
+#define shmem_atomic_set(...)                                                     \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_SET_4, OSOE_G_SET_3, , )(__VA_ARGS__)
+#define OSOE_G_SWAP_3(dest, value, pe)                                            \
+    (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_G, swap))((dest), (value), (pe)))
+#define OSOE_G_SWAP_4(ctx, dest, value, pe)                                       \
+    (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_GX, swap))((ctx), (dest), (value), (pe)))
+#define shmem_atomic_swap(...)                                                    \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_SWAP_4, OSOE_G_SWAP_3, , )(__VA_ARGS__)
+
+#define OSOE_G_CSWAP_4(dest, cond, value, pe)                                     \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, compare_swap))               \
+        ((dest), (cond), (value), (pe)))
+#define OSOE_G_CSWAP_5(ctx, dest, cond, value, pe)                                \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, compare_swap))              \
+        ((ctx), (dest), (cond), (value), (pe)))
+#define shmem_atomic_compare_swap(...)                                            \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_CSWAP_5, OSOE_G_CSWAP_4, , , )(__VA_ARGS__)
+#define OSOE_G_INC_2(dest, pe)                                                    \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, inc))((dest), (pe)))
+#define OSOE_G_INC_3(ctx, dest, pe)                                               \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, inc))((ctx), (dest), (pe)))
+#define shmem_atomic_inc(...)                                                     \
+    OSOE_PICK3(__VA_ARGS__, OSOE_G_INC_3, OSOE_G_INC_2, )(__VA_ARGS__)
+#define OSOE_G_FINC_2(dest, pe)                                                   \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_inc))((dest), (pe)))
+#define OSOE_G_FINC_3(ctx, dest, pe)                                              \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, fetch_inc))((ctx), (dest), (pe)))
+#define shmem_atomic_fetch_inc(...)                                               \
+    OSOE_PICK3(__VA_ARGS__, OSOE_G_FINC_3, OSOE_G_FINC_2, )(__VA_ARGS__)
+#define OSOE_G_ADD_3(dest, value, pe)                                             \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, add))((dest), (value), (pe)))
+#define OSOE_G_ADD_4(ctx, dest, value, pe)                                        \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, add))((ctx), (dest), (value), (pe)))
+#define shmem_atomic_add(...)                                                     \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_ADD_4, OSOE_G_ADD_3, , )(__VA_ARGS__)
+#define OSOE_G_FADD_3(dest, value, pe)                                            \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_add))                  \
+        ((dest), (value), (pe)))
+#define OSOE_G_FADD_4(ctx, dest, value, pe)                                       \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, fetch_add))                 \
+        ((ctx), (dest), (value), (pe)))
+#define shmem_atomic_fetch_add(...)                                               \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FADD_4, OSOE_G_FADD_3, , )(__VA_ARGS__)
+
+#define OSOE_G_AND_3(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, and))((dest), (value), (pe)))
+#define OSOE_G_AND_4(ctx, dest, value, pe)                                    \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, and))                    \
+        ((ctx), (dest), (value), (pe)))
+#define shmem_atomic_and(...)                                                 \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_AND_4, OSOE_G_AND_3, , )(__VA_ARGS__)
+#define OSOE_G_FAND_3(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_and))((dest), (value), (pe)))
+#define OSOE_G_FAND_4(ctx, dest, value, pe)                                    \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_and))                    \
+        ((ctx), (dest), (value), (pe)))
+#define shmem_atomic_fetch_and(...)                                                 \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FAND_4, OSOE_G_FAND_3, , )(__VA_ARGS__)
+#define OSOE_G_OR_3(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, or))((dest), (value), (pe)))
+#define OSOE_G_OR_4(ctx, dest, value, pe)                                    \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, or))                    \
+        ((ctx), (dest), (value), (pe)))
+#define shmem_atomic_or(...)                                                 \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_OR_4, OSOE_G_OR_3, , )(__VA_ARGS__)
+#define OSOE_G_FOR_3(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_or))((dest), (value), (pe)))
+#define OSOE_G_FOR_4(ctx, dest, value, pe)                                    \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_or))                    \
+        ((ctx), (dest), (value), (pe)))
+#define shmem_atomic_fetch_or(...)                                                 \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FOR_4, OSOE_G_FOR_3, , )(__VA_ARGS__)
+#define OSOE_G_XOR_3(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, xor))((dest), (value), (pe)))
+#define OSOE_G_XOR_4(ctx, dest, value, pe)                                    \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, xor))                    \
+        ((ctx), (dest), (value), (pe)))
+#define shmem_atomic_xor(...)                                                 \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_XOR_4, OSOE_G_XOR_3, , )(__VA_ARGS__)
+#define OSOE_G_FXOR_3(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_xor))((dest), (value), (pe)))
+#define OSOE_G_FXOR_4(ctx, dest, value, pe)                                    \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_xor))                    \
+        ((ctx), (dest), (value), (pe)))
+#define shmem_atomic_fetch_xor(...)                                                 \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FXOR_4, OSOE_G_FXOR_3, , )(__VA_ARGS__)
+
+
+/* ---- Point-to-point synchronization (spec §9.11) --------------------- */
+
+/* Table 6, one entry per distinct C type, as above. */
+#define OSOE_WAIT_G_STANDARD(X, OP)                                               \
+    X(int, int, OP) X(long, long, OP) X(long long, longlong, OP)                  \
+    X(unsigned int, uint, OP) X(unsigned long, ulong, OP)                         \
+    X(unsigned long long, ulonglong, OP)
+
+/* shmem_wait_until and shmem_test also take the deprecated two-byte types. */
+#define OSOE_WAIT_G_SCALAR(X, OP)                                                 \
+    OSOE_WAIT_G_STANDARD(X, OP) X(short, short, OP)                               \
+    X(unsigned short, ushort, OP)
+
+/* The deprecated shmem_wait. */
+#define OSOE_WAIT_G_DEPRECATED(X, OP)                                             \
+    X(short, short, OP) X(int, int, OP) X(long, long, OP)                         \
+    X(long long, longlong, OP)
+
+#define OSOE_WAIT_G(T, NAME, OP)  , T *: shmem_##NAME##_##OP
+
+#define shmem_wait_until(ivar, cmp, cmp_value)                                    \
+    (_Generic((ivar) OSOE_WAIT_G_SCALAR(OSOE_WAIT_G, wait_until))                 \
+        ((ivar), (cmp), (cmp_value)))
+#define shmem_test(ivar, cmp, cmp_value)                                          \
+    (_Generic((ivar) OSOE_WAIT_G_SCALAR(OSOE_WAIT_G, test))                       \
+        ((ivar), (cmp), (cmp_value)))
+#define shmem_wait(ivar, cmp_value)                                               \
+    (_Generic((ivar) OSOE_WAIT_G_DEPRECATED(OSOE_WAIT_G, wait))((ivar), (cmp_value)))
+
+#define shmem_wait_until_all(ivars, nelems, status, cmp, cmp_value)               \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, wait_until_all))          \
+        ((ivars), (nelems), (status), (cmp), (cmp_value)))
+#define shmem_wait_until_any(ivars, nelems, status, cmp, cmp_value)               \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, wait_until_any))          \
+        ((ivars), (nelems), (status), (cmp), (cmp_value)))
+#define shmem_wait_until_some(ivars, nelems, indices, status, cmp, cmp_value)     \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, wait_until_some))         \
+        ((ivars), (nelems), (indices), (status), (cmp), (cmp_value)))
+#define shmem_wait_until_all_vector(ivars, nelems, status, cmp, cmp_values)       \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, wait_until_all_vector))   \
+        ((ivars), (nelems), (status), (cmp), (cmp_values)))
+#define shmem_wait_until_any_vector(ivars, nelems, status, cmp, cmp_values)       \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, wait_until_any_vector))   \
+        ((ivars), (nelems), (status), (cmp), (cmp_values)))
+#define shmem_wait_until_some_vector(ivars, nelems, indices, status, cmp, cmp_values) \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, wait_until_some_vector))  \
+        ((ivars), (nelems), (indices), (status), (cmp), (cmp_values)))
+
+#define shmem_test_all(ivars, nelems, status, cmp, cmp_value)                     \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, test_all))                \
+        ((ivars), (nelems), (status), (cmp), (cmp_value)))
+#define shmem_test_any(ivars, nelems, status, cmp, cmp_value)                     \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, test_any))                \
+        ((ivars), (nelems), (status), (cmp), (cmp_value)))
+#define shmem_test_some(ivars, nelems, indices, status, cmp, cmp_value)           \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, test_some))               \
+        ((ivars), (nelems), (indices), (status), (cmp), (cmp_value)))
+#define shmem_test_all_vector(ivars, nelems, status, cmp, cmp_values)             \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, test_all_vector))         \
+        ((ivars), (nelems), (status), (cmp), (cmp_values)))
+#define shmem_test_any_vector(ivars, nelems, status, cmp, cmp_values)             \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, test_any_vector))         \
+        ((ivars), (nelems), (status), (cmp), (cmp_values)))
+#define shmem_test_some_vector(ivars, nelems, indices, status, cmp, cmp_values)   \
+    (_Generic((ivars) OSOE_WAIT_G_STANDARD(OSOE_WAIT_G, test_some_vector))        \
+        ((ivars), (nelems), (indices), (status), (cmp), (cmp_values)))
+
+#endif /* C11 */
+
+#undef OSOE_AMO_DECL_STANDARD
+#undef OSOE_AMO_DECL_EXTENDED
+#undef OSOE_AMO_DECL_BITWISE
+#undef OSOE_AMO_DECL_CTX_STANDARD
+#undef OSOE_AMO_DECL_CTX_EXTENDED
+#undef OSOE_AMO_DECL_CTX_BITWISE
+#undef OSOE_WAIT_DECL_SCALAR
+#undef OSOE_WAIT_DECL_MANY
+#undef OSOE_WAIT_DECL_DEPRECATED
 
 #ifdef __cplusplus
 }

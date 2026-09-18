@@ -5,7 +5,9 @@ designed to build entirely from a Linux distribution's own packages — no fabri
 libraries.
 
 **Status:** phase 1 in progress. A single node works: init and finalize, barrier,
-`shmem_malloc`/`shmem_free`, `shmem_putmem`/`shmem_getmem`, and `shmem_ptr`.
+`shmem_malloc`/`shmem_free`, `shmem_putmem`/`shmem_getmem`, `shmem_ptr`, the
+`uint64` and `uint32` AMOs, `shmem_wait_until`/`shmem_test`, and the signalling
+operations.
 
 ## Requirements
 
@@ -64,7 +66,9 @@ build/debug/tools/launch/osoe-launch -n 4 -- ./my_program
 
 It fails if any process fails, if the timeout (`-t SECONDS`, default 60)
 expires, or if the job leaves shared memory behind. `-e RANK:NAME=VALUE` sets a
-variable for one rank only.
+variable for one rank only. `-k` leaves the surviving processes alone when one
+fails, instead of terminating them, so that what ends the job is the library's
+own reaction rather than the launcher's.
 
 ### Without a launcher
 
@@ -84,6 +88,7 @@ There is no single-PE default.
 | `SHMEM_SYMMETRIC_SIZE` | no | Heap size per PE, e.g. `64m` or `2g`; default 256 MiB. Must agree across PEs |
 | `OSOE_BOOTSTRAP_TIMEOUT` | no | Seconds to wait for the other PEs at init; default 60 |
 | `OSOE_HEAP_BASE` | no | Address for each PE's own heap, e.g. `0x100000000000`, if the defaults are taken |
+| `OSOE_WATCHDOG` | no | `1` or `0`: the development watchdog, which aborts loudly when a PE dies while others wait, instead of hanging. On in the `debug`, `asan` and `tsan` builds, off in `release` (design §3.15) |
 
 Rules:
 - The job id and step id name the job's shared memory

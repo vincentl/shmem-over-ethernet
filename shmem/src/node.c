@@ -14,6 +14,7 @@
 #include "base/deadline.h"
 #include "base/futex.h"
 #include "fatal.h"
+#include "metrics.h"
 #include "node.h"
 
 /*
@@ -29,6 +30,12 @@ static const uint64_t heap_base_candidates[] = {
     UINT64_C(0x010000000000),
     UINT64_C(0x001000000000),
 };
+
+/* Sections of the control segment start on a cache line, so none shares one. */
+static uint64_t align_up(uint64_t n)
+{
+    return (n + OSOE_CACHELINE - 1) / OSOE_CACHELINE * OSOE_CACHELINE;
+}
 
 static uint64_t page_round(uint64_t n)
 {
@@ -188,11 +195,24 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
         osoe_fatal("cannot create control segment %s: %s", n->control_name,
                    strerror(errno));
     }
-    /* Slots start on the cache line after the header. */
-    uint64_t slots_offset = (sizeof(struct osoe_node_header) + OSOE_CACHELINE - 1) /
-                            OSOE_CACHELINE * OSOE_CACHELINE;
-    n->control_bytes = page_round(slots_offset +
-                                  (uint64_t)b->local_count * sizeof(struct osoe_pe_slot));
+    /*
+     * Four sections: the header, the PE slots, the §3.14 metric table, and the
+     * counter blocks. Each starts on a cache line, so no two sections share
+     * one. The header records where each begins, which is the whole directory
+     * osoe-stat needs before it can read the rest by name.
+     */
+    uint32_t per_pe = osoe_metrics_blocks_per_pe();
+    uint32_t metrics_count;
+    const struct osoe_metric_desc *metrics = osoe_metrics_table(&metrics_count);
+
+    uint64_t slots_offset = align_up(sizeof(struct osoe_node_header));
+    uint64_t metrics_offset =
+        align_up(slots_offset + (uint64_t)b->local_count * sizeof(struct osoe_pe_slot));
+    uint64_t metrics_bytes = (uint64_t)metrics_count * sizeof *metrics;
+    uint64_t blocks_offset = align_up(metrics_offset + metrics_bytes);
+    uint64_t block_count = (uint64_t)b->local_count * per_pe;
+    uint64_t blocks_bytes = block_count * sizeof(struct osoe_counter_block);
+    n->control_bytes = page_round(blocks_offset + blocks_bytes);
     if (ftruncate(fd, (off_t)n->control_bytes) != 0) {
         close(fd);
         shm_unlink(n->control_name);
@@ -209,21 +229,37 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
     n->hdr = p;
     n->slots = (struct osoe_pe_slot *)((char *)p + slots_offset);
     struct osoe_node_header *h = n->hdr;
-    h->magic = OSOE_NODE_MAGIC;
-    h->layout = OSOE_NODE_LAYOUT;
-    h->header_bytes = sizeof *h;
-    h->segment_bytes = n->control_bytes;
+    h->dir.magic = OSOE_NODE_MAGIC;
+    h->dir.layout = OSOE_NODE_LAYOUT;
+    h->dir.header_bytes = sizeof *h;
+    h->dir.segment_bytes = n->control_bytes;
     h->job = b->job;
     h->step = b->step;
     h->node = b->node;
     h->session = session;
-    h->local_count = b->local_count;
+    h->dir.local_count = b->local_count;
     h->world_size = b->world_size;
-    h->slot_bytes = sizeof(struct osoe_pe_slot);
-    h->slots_offset = slots_offset;
+    h->dir.slot_bytes = sizeof(struct osoe_pe_slot);
+    h->dir.slots_offset = slots_offset;
+    h->dir.metrics_offset = metrics_offset;
+    h->dir.metrics_bytes = metrics_bytes;
+    h->dir.metrics_count = metrics_count;
+    h->dir.metrics_checksum = osoe_metric_checksum(metrics, metrics_count);
+    h->dir.directory_bytes = sizeof h->dir;
+    h->dir.metric_desc_bytes = sizeof *metrics;
+    h->dir.blocks_offset = blocks_offset;
+    h->dir.blocks_bytes = blocks_bytes;
+    h->dir.block_count = (uint32_t)block_count;
+    h->dir.blocks_per_pe = per_pe;
+    h->dir.block_bytes = (uint32_t)sizeof(struct osoe_counter_block);
+    memcpy((char *)p + metrics_offset, metrics, metrics_bytes);
+    n->blocks = (struct osoe_counter_block *)((char *)p + blocks_offset);
     osoe_epoch_init(&h->world_arrived);
     osoe_epoch_init(&h->world_released);
     osoe_epoch_init(&h->world_copied);
+    osoe_epoch_init(&h->shared_arrived);
+    osoe_epoch_init(&h->shared_released);
+    osoe_epoch_init(&h->shared_copied);
 }
 
 /* A non-lead opens the control segment by name, waiting for the lead to
@@ -273,21 +309,36 @@ static void open_control(struct osoe_node *n, const struct osoe_boot *b, uint32_
     }
 
     struct osoe_node_header *h = n->hdr;
-    if (h->magic != OSOE_NODE_MAGIC || h->layout != OSOE_NODE_LAYOUT ||
-        h->header_bytes != sizeof *h || h->slot_bytes != sizeof(struct osoe_pe_slot))
+    if (h->dir.magic != OSOE_NODE_MAGIC || h->dir.layout != OSOE_NODE_LAYOUT ||
+        h->dir.header_bytes != sizeof *h || h->dir.slot_bytes != sizeof(struct osoe_pe_slot))
         osoe_fatal("control segment %s has layout %u; this library expects %u (mixed "
-                   "library versions?)", n->control_name, h->layout, OSOE_NODE_LAYOUT);
+                   "library versions?)", n->control_name, h->dir.layout, OSOE_NODE_LAYOUT);
     if (h->job != b->job || h->step != b->step || h->node != b->node ||
-        h->session != session || h->local_count != b->local_count ||
+        h->session != session || h->dir.local_count != b->local_count ||
         h->world_size != b->world_size)
         osoe_fatal("control segment %s describes a different job: %u local of %u PEs, "
                    "session %u; this PE expects %u of %u, session %u", n->control_name,
-                   h->local_count, h->world_size, h->session, b->local_count,
+                   h->dir.local_count, h->world_size, h->session, b->local_count,
                    b->world_size, session);
-    if (h->slots_offset + (uint64_t)h->local_count * h->slot_bytes > n->control_bytes)
-        osoe_fatal("control segment %s is too small for %u slots", n->control_name,
-                   h->local_count);
-    n->slots = (struct osoe_pe_slot *)((char *)n->hdr + h->slots_offset);
+    if (h->dir.slots_offset + (uint64_t)h->dir.local_count * h->dir.slot_bytes > n->control_bytes ||
+        h->dir.blocks_offset + h->dir.blocks_bytes > n->control_bytes ||
+        h->dir.metrics_offset + h->dir.metrics_bytes > n->control_bytes)
+        osoe_fatal("control segment %s is too small for its own directory",
+                   n->control_name);
+    n->slots = (struct osoe_pe_slot *)((char *)n->hdr + h->dir.slots_offset);
+    n->blocks = (struct osoe_counter_block *)((char *)n->hdr + h->dir.blocks_offset);
+
+    /* The metric table is fixed for a build, so a mismatch is a mixed-library
+     * job that the layout check above did not catch (§3.13's argument for
+     * checksumming the handler table, applied here). */
+    uint32_t want_count;
+    const struct osoe_metric_desc *want = osoe_metrics_table(&want_count);
+    if (h->dir.metrics_count != want_count ||
+        h->dir.metrics_checksum != osoe_metric_checksum(want, want_count))
+        osoe_fatal("control segment %s carries a different metric table (%u metrics, "
+                   "checksum %#x); this library has %u and %#x", n->control_name,
+                   h->dir.metrics_count, h->dir.metrics_checksum, want_count,
+                   osoe_metric_checksum(want, want_count));
 }
 
 void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t session)
@@ -300,8 +351,13 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t ses
     n->heap_size = b->symmetric_size;
     n->heap_bytes = page_round(b->symmetric_size ? b->symmetric_size : 1);
     n->heap_of = calloc(b->local_count, sizeof *n->heap_of);
-    if (!n->heap_of)
+    n->local_of_rank = malloc(sizeof *n->local_of_rank * b->world_size);
+    if (!n->heap_of || !n->local_of_rank)
         osoe_fatal("out of memory");
+    for (uint32_t r = 0; r < b->world_size; r++)
+        n->local_of_rank[r] = -1;
+    for (uint32_t i = 0; i < b->local_count; i++)
+        n->local_of_rank[b->gtids[i]] = (int32_t)i;
 
     if (lead)
         create_control(n, b, session);
@@ -340,6 +396,7 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t ses
     /* Publish this PE's slot, then count it. */
     me->rank = b->rank;
     me->pid = (int32_t)getpid();
+    me->tid = (int32_t)gettid();
     me->symmetric_size = b->symmetric_size;
     me->heap_bytes = n->heap_bytes;
     atomic_store_explicit(&me->phase, OSOE_PHASE_JOINED, memory_order_release);
@@ -355,6 +412,7 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t ses
     }
     check_agreement(n, b);
     map_siblings(n, b);
+    osoe_metrics_init(n->blocks, n->hdr->dir.blocks_per_pe, b->local_id);
 
     atomic_store_explicit(&me->phase, OSOE_PHASE_MAPPED, memory_order_release);
     atomic_fetch_add_explicit(&n->hdr->mapped, 1, memory_order_seq_cst);
@@ -377,14 +435,34 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t ses
     }
 }
 
+/*
+ * Two-step publication: the rank and status first, then the flag that makes
+ * them readable. A reader loads the flag with acquire before it reads either,
+ * so it never prints a rank from a half-written abort. Single-writer
+ * publication (§3.16) - there is no protocol here, only a word a poller reads,
+ * so no wake can be lost: a waiter that misses the store sees it one sweep
+ * later, which is the whole cost.
+ */
+void osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status)
+{
+    if (!n->hdr)
+        return;
+    atomic_store_explicit(&n->hdr->abort_pe, pe, memory_order_release);
+    atomic_store_explicit(&n->hdr->abort_status, status, memory_order_release);
+    atomic_store_explicit(&n->hdr->aborting, 1, memory_order_release);
+}
+
 void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b)
 {
     struct osoe_pe_slot *me = &n->slots[b->local_id];
+    osoe_metrics_fini();
     for (uint32_t i = 0; i < b->local_count; i++)
         if (n->heap_of[i])
             munmap(n->heap_of[i], n->slots[i].heap_bytes);
     free(n->heap_of);
     n->heap_of = NULL;
+    free(n->local_of_rank);
+    n->local_of_rank = NULL;
 
     atomic_store_explicit(&me->phase, OSOE_PHASE_FINALIZED, memory_order_release);
     uint32_t done = atomic_fetch_add_explicit(&n->hdr->finalized, 1, memory_order_seq_cst) + 1;
@@ -397,5 +475,6 @@ void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b)
     munmap(n->hdr, n->control_bytes);
     n->hdr = NULL;
     n->slots = NULL;
+    n->blocks = NULL;
     n->control_name[0] = '\0';
 }

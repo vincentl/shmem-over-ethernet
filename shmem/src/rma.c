@@ -2,66 +2,68 @@
  * transport boundary (§4.10). */
 #include <stddef.h>
 
+#include <pshmem.h>
 #include <shmem.h>
 
 #include "export.h"
-#include "fatal.h"
 #include "state.h"
 #include "sym.h"
+#include "team.h"
 #include "transport.h"
 
-static void check_pe(const char *routine, int pe)
-{
-    if (pe < 0 || (uint32_t)pe >= osoe.boot.world_size)
-        osoe_fatal("%s: PE %d is not in 0..%u", routine, pe, osoe.boot.world_size - 1);
-}
-
-/* Symmetric statics are not supported yet (§4.3, §7.4): an address outside
- * the heap is an error naming the routine, not a silent miss. */
-static uint64_t heap_offset(const char *routine, const void *addr, size_t len)
-{
-    uint64_t offset;
-    if (!osoe_sym_heap_offset(addr, len, &offset))
-        osoe_fatal("%s: [%p, +%zu) is not within the symmetric heap (symmetric statics "
-                   "are not yet supported)", routine, addr, len);
-    return offset;
-}
-
-/* The context parameter is plumbed now (§7.3); only the default exists. */
-static void ctx_putmem(struct osoe_tp_ctx *ctx, void *dest, const void *source,
-                       size_t nelems, int pe)
+/*
+ * The context form is the definition and the plain form calls it with
+ * SHMEM_CTX_DEFAULT, rather than the other way round (§7.3). That way the
+ * parameter is carried on the real path from the start; a plain form that did
+ * the work and a context form that ignored its argument would be the shape that
+ * breaks when a second context exists.
+ */
+static void ctx_putmem(const char *routine, shmem_ctx_t ctx, void *dest,
+                       const void *source, size_t nelems, int pe)
 {
     if (nelems == 0)
         return;
-    check_pe("shmem_putmem", pe);
-    uint64_t offset = heap_offset("shmem_putmem", dest, nelems);
-    osoe_tp_put(ctx, pe, OSOE_REGION_HEAP, offset, source, nelems, 0);
+    osoe_check_pe(routine, pe);
+    uint64_t offset = osoe_sym_offset(routine, dest, nelems);
+    osoe_tp_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source, nelems, 0);
 }
 
-static void ctx_getmem(struct osoe_tp_ctx *ctx, void *dest, const void *source,
-                       size_t nelems, int pe)
+static void ctx_getmem(const char *routine, shmem_ctx_t ctx, void *dest,
+                       const void *source, size_t nelems, int pe)
 {
     if (nelems == 0)
         return;
-    check_pe("shmem_getmem", pe);
-    uint64_t offset = heap_offset("shmem_getmem", source, nelems);
-    osoe_tp_get(ctx, pe, OSOE_REGION_HEAP, offset, dest, nelems);
+    osoe_check_pe(routine, pe);
+    uint64_t offset = osoe_sym_offset(routine, source, nelems);
+    osoe_tp_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, nelems);
 }
 
-OSOE_API void shmem_putmem(void *dest, const void *source, size_t nelems, int pe)
+OSOE_API void pshmem_putmem(void *dest, const void *source, size_t nelems, int pe)
 {
-    ctx_putmem(osoe_tp_ctx_default(), dest, source, nelems, pe);
+    ctx_putmem("shmem_putmem", SHMEM_CTX_DEFAULT, dest, source, nelems, pe);
 }
 
-OSOE_API void shmem_getmem(void *dest, const void *source, size_t nelems, int pe)
+OSOE_API void pshmem_getmem(void *dest, const void *source, size_t nelems, int pe)
 {
-    ctx_getmem(osoe_tp_ctx_default(), dest, source, nelems, pe);
+    ctx_getmem("shmem_getmem", SHMEM_CTX_DEFAULT, dest, source, nelems, pe);
+}
+
+OSOE_API void pshmem_ctx_putmem(shmem_ctx_t ctx, void *dest, const void *source,
+                               size_t nelems, int pe)
+{
+    ctx_putmem("shmem_ctx_putmem", ctx, dest, source, nelems, pe);
+}
+
+OSOE_API void pshmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
+                               size_t nelems, int pe)
+{
+    ctx_getmem("shmem_ctx_getmem", ctx, dest, source, nelems, pe);
 }
 
 /* NULL for anything not reachable by loads and stores in this process: a
  * non-symmetric address, a PE out of range, or a PE the network carries
  * (§4.8). Returning NULL is always conforming. */
-OSOE_API void *shmem_ptr(const void *dest, int pe)
+OSOE_API void *pshmem_ptr(const void *dest, int pe)
 {
     uint64_t offset;
     if (pe < 0 || (uint32_t)pe >= osoe.boot.world_size ||
@@ -69,3 +71,10 @@ OSOE_API void *shmem_ptr(const void *dest, int pe)
         return NULL;
     return osoe_tp_direct(pe, OSOE_REGION_HEAP, offset);
 }
+
+/* The weak `shmem_` aliases (export.h). */
+OSOE_ALIAS(putmem)
+OSOE_ALIAS(getmem)
+OSOE_ALIAS(ctx_putmem)
+OSOE_ALIAS(ctx_getmem)
+OSOE_ALIAS(ptr)

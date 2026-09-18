@@ -5,6 +5,7 @@
 #include <shmem.h>
 
 #include "check.h"
+#include "invariants.h"
 
 static void check_running(int want_n)
 {
@@ -37,6 +38,7 @@ int main(void)
         shmem_finalize();               /* non-last */
         check_running(n);
 
+        CHECK_INVARIANTS_SESSION((unsigned)session);
         shmem_finalize();               /* last: tears down */
         shmem_query_initialized(&flag);
         CHECK(flag == 0);

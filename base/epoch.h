@@ -38,7 +38,8 @@ bool osoe_epoch_bump_eq(struct osoe_epoch *e, uint32_t target);
 void osoe_epoch_wake_all(struct osoe_epoch *e);
 
 /* Return once the counter equals target. Waits on the counter itself with a
- * safety-sweep deadline, so a lost wake costs latency, not a hang. */
-void osoe_epoch_wait_eq(struct osoe_epoch *e, uint32_t target);
+ * safety-sweep deadline, so a lost wake costs latency, not a hang; `routine`
+ * names the API routine for the diagnostic a sweep may print (base/sweep.h). */
+void osoe_epoch_wait_eq(struct osoe_epoch *e, uint32_t target, const char *routine);
 
 #endif /* OSOE_BASE_EPOCH_H */
