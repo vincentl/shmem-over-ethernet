@@ -18,6 +18,14 @@ osoe_warnings(shmem_test_alloc)
 add_test(NAME shmem.alloc COMMAND shmem_test_alloc)
 set_tests_properties(shmem.alloc PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# The §4.9 watched-range encoding on its own (tier 1): pure logic, and the
+# property it must have is one a brute-force check can state directly.
+add_executable(shmem_test_watchrange test_watchrange.c)
+target_include_directories(shmem_test_watchrange PRIVATE ../src)
+osoe_warnings(shmem_test_watchrange)
+add_test(NAME shmem.watchrange COMMAND shmem_test_watchrange)
+set_tests_properties(shmem.watchrange PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # Multi-process tests (tier 2): each program runs under osoe-launch at every
 # listed local PE count, as shmem.<name>.L<count>.
 set(OSOE_LAUNCH_COUNTS 1 2 4)

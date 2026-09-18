@@ -6,8 +6,8 @@ at a time and has one slot. What it must watch is a *range*, not one offset,
 because shmem_wait_until_{all,any,some} and their vector forms wait on an array
 (spec §9.11.2-§9.11.7).
 
-  blk[p]   one word: the watched range, rounded out to an aligned power-of-two
-           block, encoded as ((lo >> k) << 6) | (k + 1); 0 is none
+  blk[p]   one word: the watched range, packed as region | first grain |
+           saturating grain count (shmem/src/watch_range.h); 0 is none
   seq[p]   the 32-bit futex word
 
 Waiter (PE p):  store blk[p] (seq_cst, before the first check);
@@ -15,18 +15,17 @@ Waiter (PE p):  store blk[p] (seq_cst, before the first check);
                 stop; futex_wait(seq[p]) };
                 store blk[p] = 0 (seq_cst).
 Writer (another local PE, or the progress thread applying a remote operation):
-                update the variable with a locked AMO; load blk[p]; if the block
-                contains the offset written, add 1 to seq[p] and futex_wake it.
+                update the variable with a locked AMO; load blk[p]; if the range
+                covers the offset written, add 1 to seq[p] and futex_wake it.
 
-The block encoding is what this model is for. One word is published and read
-atomically, so no combination of a stale half can be read, and the writer's test
-is a shift and a compare. It over-wakes: a range that straddles a power-of-two
-boundary rounds out to the enclosing block, so writes near the watched array can
-wake a waiter that then re-checks and sleeps again. A wake is a hint, never an
-answer, so that is free of correctness cost. Testing the published range exactly
-would be sound as well - the block contains it - and is what the two-word
-alternative below does; the block is chosen for its single atomic word, not for
-waking more.
+One word is published and read atomically, so no combination of a stale half can
+be read, and the writer's test is two shifts and two compares. Elements here are
+one grain apart, so a predicate that covers a range's ends and not its middle is
+reachable - see the `endpoints` variant. An earlier draft's cases were all
+within one grain, which is exactly why it could not see that.
+
+docs/design/evidence/watch-options/ is the separate question of which coverage
+predicate to use; this model is the protocol around whichever one is chosen.
 
 Checked: no lost wake. Every waiter's predicate becomes true in every run, so a
 terminal state with a PE asleep is a missed wake.
@@ -37,6 +36,10 @@ Variants
                writer updates the variable before it reads the slot, so if it
                reads the new offset the update is already visible to the
                waiter's next check
+  endpoints    a predicate covering only a range's two ends. It passes every
+               scalar case and every two-element case, and loses a wake on a
+               three-element array: the demonstration that these cases can see
+               a hole in the middle of a range
   checkfirst   the waiter checks the variables before publishing its range
   notifyfirst  the writer reads the slot before updating the variable
   plainblk     the waiter publishes with a plain store (TSO)
@@ -56,19 +59,36 @@ LEN = ('len',)
 SEQ = ('seq',)
 
 
-def enc(lo, n):
-    """The smallest aligned power-of-two block containing [lo, lo + n)."""
-    k = 0
-    while (lo >> k) != ((lo + n - 1) >> k):
-        k += 1
-    return ((lo >> k) << 6) | (k + 1)
+# shmem/src/watch_range.h, mirrored. An element of the model is one grain, so
+# element e lives at byte offset e * GRAIN.
+GRAIN, LEN_BITS, OFF_BITS = 4, 22, 40
+LEN_MAX = (1 << LEN_BITS) - 1
+OFF_MAX = (1 << OFF_BITS) - 1
 
 
-def in_block(word, o):
+def enc(lo, n, variant=''):
+    """Pack the range of n elements starting at element lo."""
+    first, last = lo, lo + n - 1
+    grains = last - first + 1
+    if variant == 'endpoints':
+        # Covers the two ends and not the middle: sound only for n <= 2.
+        return ('ends', first, last)
+    if first > OFF_MAX:
+        return LEN_MAX
+    if grains >= LEN_MAX:
+        return (first << LEN_BITS) | LEN_MAX
+    return (first << LEN_BITS) | grains
+
+
+def in_block(word, o, variant=''):
+    if variant == 'endpoints':
+        return word != 0 and o in (word[1], word[2])
     if word == 0:
         return False
-    k = (word & 63) - 1
-    return (o >> k) == (word >> 6)
+    wlen = word & LEN_MAX
+    wfirst = (word >> LEN_BITS) & OFF_MAX
+    wlast = (1 << 64) if wlen == LEN_MAX else wfirst + wlen - 1
+    return o <= wlast and wfirst <= o
 
 
 def waiter(waits, variant=''):
@@ -105,7 +125,8 @@ def waiter(waits, variant=''):
                   (p + 'P0b', ('store', lambda L: LEN, lambda L, n=n: n, True,
                                '@' + after_publish))]
         else:
-            B += [(p + 'P0', ('store', lambda L: BLK, lambda L, lo=lo, n=n: enc(lo, n),
+            B += [(p + 'P0', ('store', lambda L: BLK,
+                              lambda L, lo=lo, n=n, v=variant: enc(lo, n, v),
                               variant != 'plainblk', '@' + after_publish))]
 
         B += [(p + 'L0', ('load', lambda L: SEQ, 'q', '@' + p + 'V0'))]
@@ -138,7 +159,7 @@ def writer(o, variant=''):
                         '@X3', '@END'))]
     else:
         scan = [('X1', ('load', lambda L: BLK, 'x', '@X2')),
-                ('X2', ('br', lambda L: in_block(L['x'], o), '@X3', '@END'))]
+                ('X2', ('br', lambda L, v=variant: in_block(L['x'], o, v), '@X3', '@END'))]
 
     scan += [('X3', ('add', lambda L: SEQ, lambda L: 1, '_', '@X4')),
              ('X4', ('fwake', lambda L: SEQ, '@END'))]
@@ -185,6 +206,12 @@ CASES = [
     ('notifyfirst: one variable', SCALAR, False, 'notifyfirst', False),
     ('plainblk: one variable', SCALAR, True, 'plainblk', False),
     ('plainput: one variable', SCALAR, True, 'plainput', False),
+    # A predicate that covers only a range's ends passes every case an earlier
+    # draft of this model had, and loses a wake on a three-element array. That
+    # is what makes these cases able to see a hole in the middle of a range.
+    ('endpoints: one variable (passes)', SCALAR, False, 'endpoints', True),
+    ('endpoints: range straddling a boundary (passes)', STRADDLE, False, 'endpoints', True),
+    ('endpoints: array wait', ARRAY, False, 'endpoints', False),
 ]
 
 if __name__ == '__main__':

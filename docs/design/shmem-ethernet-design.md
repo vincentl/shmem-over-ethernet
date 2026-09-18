@@ -1620,18 +1620,50 @@ block on an array `ivars[0..nelems)`. That array is one contiguous range, so the
 slot publishes the range and a writer wakes on overlap. A write to an unwaited
 element of the array wakes spuriously, and the loop re-checks.
 
-**The range is one word: the aligned power-of-two block that contains it**,
-encoded as `((offset >> k) << 6) | (k + 1)`, where `k` is the smallest shift with
-`(offset >> k) == ((offset + len - 1) >> k)`. Zero means no watch. The writer's
-test is `(written >> k) == (word >> 6)`: one load, a shift, and a compare, so
-§4.9's "one load per applied operation" still holds. One word is published and
+**The range is one word: region, first grain, and a saturating grain count**
+(`shmem/src/watch_range.h`), which is the same word §4.11 item 3 publishes per
+thread under `MULTIPLE`. The grain is 4 bytes, the width of the narrowest AMO
+type, so an ivar at its natural alignment is filtered exactly and no two
+AMO-type objects share a grain unless they are adjacent elements of one array.
+Zero means no watch. The writer's test is one load, two shifts and two compares,
+so §4.9's "one load per applied operation" still holds. One word is published and
 read atomically, so no writer can read a stale half of a range.
 
-It wakes more than necessary: a range straddling a boundary rounds out to the
-enclosing block, at worst twice its length, so a nearby write wakes a waiter that
-re-checks and sleeps again. A wake is a hint and never an answer, so that costs
-only the re-check. Blocks are in *offset* space, so they are the same in every
-process.
+**The word names its region**, because `OSOE_REGION_INTERNAL` (§5.8) and statics
+(§4.3 phase 1.5) both start at offset 0, as the heap does, and spec Example 27 —
+the canonical put-with-signal example — waits on a `static uint64_t`. Without the
+region a heap waiter at a low offset and a static at a similar offset collide
+*systematically* rather than by chance. Only the heap has waiters today, so
+`watch.c` rejects the others; removing that guard is all either needs, and not a
+second layout version.
+
+**Saturation is always permissive.** Above 16 MiB the count saturates to "to the
+end of the region", and an offset the field cannot name saturates to the whole
+region. Both over-wake and neither loses a wake. Encoding an over-long range as
+*no watch* does lose one, which the model records as `satzero`. The offset field
+addresses 4 TiB, and `shmem_init` refuses a larger `SHMEM_SYMMETRIC_SIZE` rather
+than let the filter silently stop filtering.
+
+*(Rejected: **the smallest aligned power-of-two block containing the range**,
+encoded as `((offset >> k) << 6) | (k + 1)`. It is exact for a scalar ivar and
+for an aligned power-of-two array, and badly wrong otherwise, because the block
+must contain **both ends**: measured, an 8 KiB array wait publishes 122 KiB on
+average and exceeds 64 KiB in 7.3% of real allocator placements, and under the
+adjacent-write pattern of a halo exchange or a put-with-signal — a payload buffer
+beside the flag — it wakes on 35.7% of writes at the mean and 90.3% at the 99th
+percentile. An earlier draft of this section claimed the inflation was "at worst
+twice its length", which is why nobody looked. It also spent all 64 bits, 58 on
+the block and 6 on the shift, leaving no room for the region; and decoding a
+shift count from a packed field produced two latent defects — a shift of
+4294967295 in the saturating case, and a loop that does not terminate when a
+range's ends differ in bit 63. The replacement has no variable shift and no loop.
+`docs/reviews/watch-notification-options.md` has the measurements and the
+alternatives, including why a 128-bit atomic word and a Bloom-filter signature
+were rejected.)*
+
+*(Rejected: a hash table keyed by offset, which the earlier draft's per-address
+watch table needed. One slot per PE is enough while a PE is in one wait at a
+time.)*
 
 **Model-checked** (`docs/design/evidence/watch/`), on sequential consistency and
 x86-TSO, for a scalar wait, an array wait, two writers, a range straddling a
@@ -1640,9 +1672,12 @@ that a **two-word** publication — offset and length, stored and loaded separat
 is sound as well, because the writer updates the variable before it reads the
 slot: if it reads the new offset, the update is already visible to the waiter's
 next check. The single word is chosen for the atomic read and the cheaper test,
-not for correctness. *(Rejected: a hash table keyed by offset, which the earlier
-draft's per-address watch table needed. One slot per PE is enough while a PE is in
-one wait at a time.)*
+not for correctness. The model's elements are one grain apart deliberately: its
+`endpoints` variant, a predicate covering a range's two ends and not its middle,
+**passes** every scalar and two-element case and loses a wake only on a
+three-element array. A model whose cases all fall inside one grain cannot tell a
+predicate with a hole from a correct one, and an earlier version of this one
+could not.
 
 An earlier draft had the waiter futex directly on the `ivar`. That works only for
 32-bit types: **the kernel implements only 32-bit futexes.** `futex_wait` with
@@ -2177,8 +2212,11 @@ covers each of these, and finds:
 - **A put's plain `memcpy` loses a wake under TSO** (`plainput`), as §4.9 and §4.10
   already accept: best effort for puts, bounded by the safety-sweep deadline.
 
-§4.9 publishes the same range in two words. Either is sound, so phase 1 may keep
-two words and adopt the packed one only if it wants the store.
+§4.9 publishes this same packed word, so phase 1 and `MULTIPLE` share one
+encoding rather than two: the phase-1 slot is this record with at most one bit
+set, and `MULTIPLE` adds the `active` bitmap and the scan over it. (An earlier
+draft of this paragraph said §4.9 publishes the range in two words. It does not,
+and the two sections specified different encodings for a while.)
 
 **Cost.** When nobody on the PE waits, a writer loads the `active` word, which is
 the same single load as phase 1's `watched` word. With `k` threads waiting, it adds

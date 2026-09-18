@@ -4,6 +4,7 @@
 #include "base/size.h"
 #include "boot.h"
 #include "fatal.h"
+#include "watch_range.h"
 #include "watchdog.h"
 
 static uint32_t need_u32(const char *name)
@@ -84,6 +85,15 @@ void osoe_boot_read(struct osoe_boot *b)
     if (size && osoe_parse_size(size, &b->symmetric_size) != 0)
         osoe_fatal("SHMEM_SYMMETRIC_SIZE='%s' is invalid: expected a non-negative "
                    "decimal number with an optional k, m, g or t multiplier", size);
+    /* The §4.9 watch word names an offset within a region, and stops filtering
+     * above what it can address: a watch in a larger heap would saturate to the
+     * whole region and wake on every write. Refuse the size rather than lose
+     * that silently. No real job is near this - it is 4 TiB per PE. */
+    if (b->symmetric_size > OSOE_WATCH_MAX_REGION)
+        osoe_fatal("SHMEM_SYMMETRIC_SIZE='%s' is %llu bytes; the largest supported "
+                   "symmetric heap is %llu bytes per PE (design §4.9)", size,
+                   (unsigned long long)b->symmetric_size,
+                   (unsigned long long)OSOE_WATCH_MAX_REGION);
 
     uint32_t timeout_s = OSOE_DEFAULT_BOOTSTRAP_TIMEOUT_S;
     if (osoe_env_u32("OSOE_BOOTSTRAP_TIMEOUT", &timeout_s) == OSOE_ENV_INVALID ||

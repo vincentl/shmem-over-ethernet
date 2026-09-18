@@ -25,7 +25,7 @@
 #include "boot.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 3
+#define OSOE_NODE_LAYOUT 4
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -40,11 +40,11 @@ struct osoe_pe_slot {
     _Alignas(OSOE_CACHELINE)
     _Atomic uint32_t phase;         /* enum osoe_phase; this PE only */
     _Atomic uint32_t agent_wake;    /* shared futex word: wakes this PE's agent */
-    /* The §4.9 watch slot: the block this PE waits on, and its futex word.
-     * Written by this PE, read by every writer that touches its heap. On their
-     * own cache line, so a notifying writer does not share one with the words
-     * this PE's own agent and rendezvous use. */
-    _Alignas(OSOE_CACHELINE) _Atomic uint64_t watch_block;
+    /* The §4.9 watch slot: the range this PE waits on, packed by watch_range.h,
+     * and its futex word. Written by this PE, read by every writer that touches
+     * its memory. On their own cache line, so a notifying writer does not share
+     * one with the words this PE's own agent and rendezvous use. */
+    _Alignas(OSOE_CACHELINE) _Atomic uint64_t watch_rng;
     _Atomic uint32_t watch_seq;
     uint32_t rank;
     int32_t pid;                    /* this PE's process id, for the watchdog (§3.15) */
