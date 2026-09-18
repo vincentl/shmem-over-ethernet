@@ -104,6 +104,28 @@ int pshmem_team_sync(shmem_team_t team);
 void pshmem_info_get_version(int *major, int *minor);
 void pshmem_info_get_name(char *name);
 
+/* Accessibility queries (§9.1.7, §9.1.8) */
+int pshmem_pe_accessible(int pe);
+int pshmem_addr_accessible(const void *addr, int pe);
+
+/* Communication sessions (§9.9) */
+void pshmem_ctx_session_start(shmem_ctx_t ctx, long options,
+                              const shmem_ctx_session_config_t *config, long config_mask);
+void pshmem_ctx_session_stop(shmem_ctx_t ctx);
+
+/*
+ * SHMEM_CACHE (Annex F.2.7). The other deprecated routines - start_pes,
+ * _my_pe, shmalloc and the rest - have no `shmem_` prefix, so there is no
+ * `pshmem_` spelling of them: §10's profiling interface is defined over the
+ * `shmem_` namespace, and a `pstart_pes` would be an invention.
+ */
+void pshmem_clear_cache_inv(void);
+void pshmem_set_cache_inv(void);
+void pshmem_set_cache_line_inv(void *dest);
+void pshmem_clear_cache_line_inv(void *dest);
+void pshmem_udcflush(void);
+void pshmem_udcflush_line(void *dest);
+
 /* The deprecated unprefixed waits (§9.11.1) */
 void pshmem_wait(long *ivar, long cmp_value);
 void pshmem_wait_until(long *ivar, int cmp, long cmp_value);

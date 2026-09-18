@@ -27,6 +27,37 @@ extern "C" {
 #define _SHMEM_MAX_NAME_LEN  SHMEM_MAX_NAME_LEN
 #define _SHMEM_VENDOR_STRING SHMEM_VENDOR_STRING
 
+/*
+ * The deprecated active-set collective constants (§6, Annex F.2.8).
+ *
+ * The constants are defined; the active-set routines that use them are not
+ * (§7.4). That is deliberate rather than half-finished: a program that declares
+ * `static long pSync[SHMEM_BARRIER_SYNC_SIZE]` and initializes it to
+ * SHMEM_SYNC_VALUE must compile, and a program that then calls
+ * shmem_barrier(...) must fail at the link rather than be given a routine whose
+ * machinery - active sets, pSync ownership, the reuse rules - does not exist.
+ * A wrong answer is worse than a missing symbol.
+ *
+ * The sizes are this implementation's, as the spec says they are. They are
+ * large enough for a conforming program's array and are otherwise unused.
+ */
+#define SHMEM_SYNC_VALUE               (-1L)
+#define SHMEM_SYNC_SIZE                 256
+#define SHMEM_BARRIER_SYNC_SIZE         256
+#define SHMEM_BCAST_SYNC_SIZE           256
+#define SHMEM_COLLECT_SYNC_SIZE         256
+#define SHMEM_REDUCE_SYNC_SIZE          256
+#define SHMEM_ALLTOALL_SYNC_SIZE        256
+#define SHMEM_ALLTOALLS_SYNC_SIZE       256
+#define SHMEM_REDUCE_MIN_WRKDATA_SIZE   256
+
+#define _SHMEM_SYNC_VALUE              SHMEM_SYNC_VALUE
+#define _SHMEM_BARRIER_SYNC_SIZE       SHMEM_BARRIER_SYNC_SIZE
+#define _SHMEM_BCAST_SYNC_SIZE         SHMEM_BCAST_SYNC_SIZE
+#define _SHMEM_COLLECT_SYNC_SIZE       SHMEM_COLLECT_SYNC_SIZE
+#define _SHMEM_REDUCE_SYNC_SIZE        SHMEM_REDUCE_SYNC_SIZE
+#define _SHMEM_REDUCE_MIN_WRKDATA_SIZE SHMEM_REDUCE_MIN_WRKDATA_SIZE
+
 /* Library setup, exit, and query (§9.1) */
 void shmem_init(void);
 int shmem_my_pe(void);
@@ -359,6 +390,52 @@ int shmem_team_sync(shmem_team_t team);
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);
 void shmem_info_get_name(char *name);
+
+/* Accessibility queries (§9.1.7, §9.1.8) */
+int shmem_pe_accessible(int pe);
+int shmem_addr_accessible(const void *addr, int pe);
+
+/*
+ * Communication sessions (§9.9). A session is a hint about what a context is
+ * about to be used for and "sessions do not affect the completion or ordering
+ * semantics of any OpenSHMEM routines", so a library that does nothing with
+ * them is conforming. osoe does nothing with them yet: the aggregation they
+ * would inform is §3.9's, which arrives with the AM backend.
+ */
+typedef struct {
+    size_t total_ops;
+} shmem_ctx_session_config_t;
+
+#define SHMEM_CTX_SESSION_TOTAL_OPS 1L
+#define SHMEM_CTX_SESSION_BATCH     1L
+
+void shmem_ctx_session_start(shmem_ctx_t ctx, long options,
+                             const shmem_ctx_session_config_t *config, long config_mask);
+void shmem_ctx_session_stop(shmem_ctx_t ctx);
+
+/*
+ * The deprecated routines (Annex F). They exist because the spec says they
+ * must: "support for start_pes is still required in OpenSHMEM libraries".
+ * start_pes takes an initialization argument that has meant nothing for
+ * decades, and finalizes implicitly at exit, which is the behaviour programs
+ * written against it expect.
+ */
+void start_pes(int npes);
+int _my_pe(void);
+int _num_pes(void);
+void *shmalloc(size_t size);
+void shfree(void *ptr);
+void *shrealloc(void *ptr, size_t size);
+void *shmemalign(size_t alignment, size_t size);
+
+/* SHMEM_CACHE (Annex F.2.7): no-ops on every cache-coherent machine, which is
+ * every machine osoe targets. */
+void shmem_clear_cache_inv(void);
+void shmem_set_cache_inv(void);
+void shmem_set_cache_line_inv(void *dest);
+void shmem_clear_cache_line_inv(void *dest);
+void shmem_udcflush(void);
+void shmem_udcflush_line(void *dest);
 
 /*
  * C11 type-generic interfaces (§7.4; spec §9.7).

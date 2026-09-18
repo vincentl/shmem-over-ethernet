@@ -1,11 +1,13 @@
 find_package(Threads REQUIRED)
 
 add_library(osoe
+  src/accessible.c
   src/agent.c
   src/alloc.c
   src/amo.c
   src/barrier.c
   src/boot.c
+  src/deprecated.c
   src/fatal.c
   src/info.c
   src/init.c
@@ -15,6 +17,7 @@ add_library(osoe
   src/profile.c
   src/quiet.c
   src/rma.c
+  src/session.c
   src/signal.c
   src/sym.c
   src/team.c
@@ -47,6 +50,8 @@ osoe_warnings(osoe)
 
 install(TARGETS osoe)
 install(FILES include/shmem.h include/pshmem.h include/shmemx.h TYPE INCLUDE)
+# The historical header location (Annex F): <mpp/shmem.h> must resolve.
+install(FILES include/mpp/shmem.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mpp)
 
 if(BUILD_TESTING)
   add_subdirectory(tests)

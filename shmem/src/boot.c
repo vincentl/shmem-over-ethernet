@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "base/env.h"
@@ -6,6 +7,26 @@
 #include "fatal.h"
 #include "watch_range.h"
 #include "watchdog.h"
+
+/*
+ * A specification environment variable (§8), whose deprecated SMA_ spelling is
+ * still honoured: "If both SHMEM_- and SMA_-prefixed environment variables are
+ * set, then the value in the SHMEM_-prefixed environment variable establishes
+ * the controlling value." These four are all "Any", so being set is the whole
+ * value and the rule reduces to checking SHMEM_ first - but it is written as
+ * the rule rather than as the shortcut, because SHMEM_SYMMETRIC_SIZE has a
+ * value and will need it.
+ */
+static const char *spec_env(const char *suffix)
+{
+    char name[64];
+    snprintf(name, sizeof name, "SHMEM_%s", suffix);
+    const char *v = getenv(name);
+    if (v)
+        return v;
+    snprintf(name, sizeof name, "SMA_%s", suffix);
+    return getenv(name);
+}
 
 static uint32_t need_u32(const char *name)
 {
@@ -106,6 +127,10 @@ void osoe_boot_read(struct osoe_boot *b)
     if (osoe_env_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENV_INVALID || watchdog > 1)
         osoe_fatal("OSOE_WATCHDOG='%s' is not 0 or 1", getenv("OSOE_WATCHDOG"));
     b->watchdog = watchdog != 0;
+
+    b->print_version = spec_env("VERSION") != NULL;
+    b->print_info = spec_env("INFO") != NULL;
+    b->debug = spec_env("DEBUG") != NULL;
 
     const char *base = getenv("OSOE_HEAP_BASE");
     if (base) {

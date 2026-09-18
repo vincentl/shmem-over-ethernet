@@ -75,6 +75,12 @@ osoe_tier2_test(amotypes)
 # The profiling interface (§10): the test program interposes three routines,
 # which only works because the library defines them under pshmem_ names with
 # shmem_ as a weak alias.
+osoe_tier2_test(surface)
+
+# start_pes leaves no shmem_finalize behind on purpose: what proves the implicit
+# one ran is that osoe-launch reports no leaked shared memory (Annex F.2.3).
+osoe_tier2_test(startpes)
+
 osoe_tier2_test(profile)
 osoe_tier2_test(team)
 osoe_tier2_test(thread)

@@ -24,6 +24,13 @@ struct osoe_boot {
     uint64_t timeout_ns;        /* OSOE_BOOTSTRAP_TIMEOUT, seconds in the environment */
     uint64_t heap_base;         /* OSOE_HEAP_BASE, 0 if unset */
     bool watchdog;              /* OSOE_WATCHDOG, or the build default (§3.15) */
+
+    /* The specification's own variables (§8). Each is "Any": the value does
+     * not matter, only that it is set. SMA_-prefixed spellings are deprecated
+     * and still honoured, with the SHMEM_ one controlling when both are set. */
+    bool print_version;         /* SHMEM_VERSION */
+    bool print_info;            /* SHMEM_INFO */
+    bool debug;                 /* SHMEM_DEBUG */
 };
 
 /* The default SHMEM_SYMMETRIC_SIZE: 256 MiB (§4.4). */
