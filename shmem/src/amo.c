@@ -27,6 +27,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <pshmem.h>
 #include <shmem.h>
 
 #include "export.h"
@@ -94,7 +95,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
 /* ---- Table 6: the standard AMO types ---------------------------------- */
 
 #define OSOE_AMO_STANDARD(T, NAME)                                                     \
-    OSOE_API T shmem_ctx_##NAME##_atomic_compare_swap(shmem_ctx_t ctx, T *dest, T cond, \
+    OSOE_API T pshmem_ctx_##NAME##_atomic_compare_swap(shmem_ctx_t ctx, T *dest, T cond, \
                                                       T value, int pe)                  \
     {                                                                                   \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_compare_swap", ctx,      \
@@ -102,84 +103,84 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
                                        OSOE_AMO_IN(value), OSOE_AMO_IN(cond),           \
                                        OSOE_TP_FETCH, pe));                             \
     }                                                                                   \
-    OSOE_API T shmem_##NAME##_atomic_compare_swap(T *dest, T cond, T value, int pe)     \
+    OSOE_API T pshmem_##NAME##_atomic_compare_swap(T *dest, T cond, T value, int pe)     \
     {                                                                                   \
-        return shmem_ctx_##NAME##_atomic_compare_swap(SHMEM_CTX_DEFAULT, dest, cond,    \
+        return pshmem_ctx_##NAME##_atomic_compare_swap(SHMEM_CTX_DEFAULT, dest, cond,    \
                                                       value, pe);                       \
     }                                                                                   \
-    OSOE_API void shmem_ctx_##NAME##_atomic_inc(shmem_ctx_t ctx, T *dest, int pe)       \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_inc(shmem_ctx_t ctx, T *dest, int pe)       \
     {                                                                                   \
         amo_rmw("shmem_" #NAME "_atomic_inc", ctx, dest, (unsigned)sizeof(T),           \
                 OSOE_RMW_ADD, 1, 0, 0, pe);                                             \
     }                                                                                   \
-    OSOE_API void shmem_##NAME##_atomic_inc(T *dest, int pe)                            \
+    OSOE_API void pshmem_##NAME##_atomic_inc(T *dest, int pe)                            \
     {                                                                                   \
-        shmem_ctx_##NAME##_atomic_inc(SHMEM_CTX_DEFAULT, dest, pe);                     \
+        pshmem_ctx_##NAME##_atomic_inc(SHMEM_CTX_DEFAULT, dest, pe);                     \
     }                                                                                   \
-    OSOE_API T shmem_ctx_##NAME##_atomic_fetch_inc(shmem_ctx_t ctx, T *dest, int pe)    \
+    OSOE_API T pshmem_ctx_##NAME##_atomic_fetch_inc(shmem_ctx_t ctx, T *dest, int pe)    \
     {                                                                                   \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_inc", ctx, dest,   \
                                        (unsigned)sizeof(T), OSOE_RMW_ADD, 1, 0,         \
                                        OSOE_TP_FETCH, pe));                             \
     }                                                                                   \
-    OSOE_API T shmem_##NAME##_atomic_fetch_inc(T *dest, int pe)                         \
+    OSOE_API T pshmem_##NAME##_atomic_fetch_inc(T *dest, int pe)                         \
     {                                                                                   \
-        return shmem_ctx_##NAME##_atomic_fetch_inc(SHMEM_CTX_DEFAULT, dest, pe);        \
+        return pshmem_ctx_##NAME##_atomic_fetch_inc(SHMEM_CTX_DEFAULT, dest, pe);        \
     }                                                                                   \
-    OSOE_API void shmem_ctx_##NAME##_atomic_add(shmem_ctx_t ctx, T *dest, T value,      \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_add(shmem_ctx_t ctx, T *dest, T value,      \
                                                 int pe)                                 \
     {                                                                                   \
         amo_rmw("shmem_" #NAME "_atomic_add", ctx, dest, (unsigned)sizeof(T),           \
                 OSOE_RMW_ADD, OSOE_AMO_IN(value), 0, 0, pe);                            \
     }                                                                                   \
-    OSOE_API void shmem_##NAME##_atomic_add(T *dest, T value, int pe)                   \
+    OSOE_API void pshmem_##NAME##_atomic_add(T *dest, T value, int pe)                   \
     {                                                                                   \
-        shmem_ctx_##NAME##_atomic_add(SHMEM_CTX_DEFAULT, dest, value, pe);              \
+        pshmem_ctx_##NAME##_atomic_add(SHMEM_CTX_DEFAULT, dest, value, pe);              \
     }                                                                                   \
-    OSOE_API T shmem_ctx_##NAME##_atomic_fetch_add(shmem_ctx_t ctx, T *dest, T value,   \
+    OSOE_API T pshmem_ctx_##NAME##_atomic_fetch_add(shmem_ctx_t ctx, T *dest, T value,   \
                                                    int pe)                              \
     {                                                                                   \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_add", ctx, dest,   \
                                        (unsigned)sizeof(T), OSOE_RMW_ADD,               \
                                        OSOE_AMO_IN(value), 0, OSOE_TP_FETCH, pe));      \
     }                                                                                   \
-    OSOE_API T shmem_##NAME##_atomic_fetch_add(T *dest, T value, int pe)                \
+    OSOE_API T pshmem_##NAME##_atomic_fetch_add(T *dest, T value, int pe)                \
     {                                                                                   \
-        return shmem_ctx_##NAME##_atomic_fetch_add(SHMEM_CTX_DEFAULT, dest, value, pe); \
+        return pshmem_ctx_##NAME##_atomic_fetch_add(SHMEM_CTX_DEFAULT, dest, value, pe); \
     }
 
 /* ---- Table 7: the extended AMO types, integers ------------------------ */
 
 #define OSOE_AMO_EXTENDED(T, NAME)                                                      \
-    OSOE_API T shmem_ctx_##NAME##_atomic_fetch(shmem_ctx_t ctx, const T *source, int pe) \
+    OSOE_API T pshmem_ctx_##NAME##_atomic_fetch(shmem_ctx_t ctx, const T *source, int pe) \
     {                                                                                    \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch", ctx, source,      \
                                        (unsigned)sizeof(T), OSOE_RMW_READ, 0, 0,         \
                                        OSOE_TP_FETCH, pe));                              \
     }                                                                                    \
-    OSOE_API T shmem_##NAME##_atomic_fetch(const T *source, int pe)                      \
+    OSOE_API T pshmem_##NAME##_atomic_fetch(const T *source, int pe)                      \
     {                                                                                    \
-        return shmem_ctx_##NAME##_atomic_fetch(SHMEM_CTX_DEFAULT, source, pe);           \
+        return pshmem_ctx_##NAME##_atomic_fetch(SHMEM_CTX_DEFAULT, source, pe);           \
     }                                                                                    \
-    OSOE_API void shmem_ctx_##NAME##_atomic_set(shmem_ctx_t ctx, T *dest, T value,       \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_set(shmem_ctx_t ctx, T *dest, T value,       \
                                                 int pe)                                  \
     {                                                                                    \
         amo_rmw("shmem_" #NAME "_atomic_set", ctx, dest, (unsigned)sizeof(T),            \
                 OSOE_RMW_WRITE, OSOE_AMO_IN(value), 0, 0, pe);                           \
     }                                                                                    \
-    OSOE_API void shmem_##NAME##_atomic_set(T *dest, T value, int pe)                    \
+    OSOE_API void pshmem_##NAME##_atomic_set(T *dest, T value, int pe)                    \
     {                                                                                    \
-        shmem_ctx_##NAME##_atomic_set(SHMEM_CTX_DEFAULT, dest, value, pe);               \
+        pshmem_ctx_##NAME##_atomic_set(SHMEM_CTX_DEFAULT, dest, value, pe);               \
     }                                                                                    \
-    OSOE_API T shmem_ctx_##NAME##_atomic_swap(shmem_ctx_t ctx, T *dest, T value, int pe) \
+    OSOE_API T pshmem_ctx_##NAME##_atomic_swap(shmem_ctx_t ctx, T *dest, T value, int pe) \
     {                                                                                    \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_swap", ctx, dest,         \
                                        (unsigned)sizeof(T), OSOE_RMW_WRITE,              \
                                        OSOE_AMO_IN(value), 0, OSOE_TP_FETCH, pe));       \
     }                                                                                    \
-    OSOE_API T shmem_##NAME##_atomic_swap(T *dest, T value, int pe)                      \
+    OSOE_API T pshmem_##NAME##_atomic_swap(T *dest, T value, int pe)                      \
     {                                                                                    \
-        return shmem_ctx_##NAME##_atomic_swap(SHMEM_CTX_DEFAULT, dest, value, pe);       \
+        return pshmem_ctx_##NAME##_atomic_swap(SHMEM_CTX_DEFAULT, dest, value, pe);       \
     }
 
 /* ---- Table 7: float and double, as bit patterns ----------------------- */
@@ -198,60 +199,60 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
         memcpy(&v, &u, sizeof v);                                                        \
         return v;                                                                        \
     }                                                                                    \
-    OSOE_API T shmem_ctx_##NAME##_atomic_fetch(shmem_ctx_t ctx, const T *source, int pe)  \
+    OSOE_API T pshmem_ctx_##NAME##_atomic_fetch(shmem_ctx_t ctx, const T *source, int pe)  \
     {                                                                                    \
         return NAME##_value(amo_rmw("shmem_" #NAME "_atomic_fetch", ctx, source,         \
                                     (unsigned)sizeof(T), OSOE_RMW_READ, 0, 0,            \
                                     OSOE_TP_FETCH, pe));                                 \
     }                                                                                    \
-    OSOE_API T shmem_##NAME##_atomic_fetch(const T *source, int pe)                       \
+    OSOE_API T pshmem_##NAME##_atomic_fetch(const T *source, int pe)                       \
     {                                                                                    \
-        return shmem_ctx_##NAME##_atomic_fetch(SHMEM_CTX_DEFAULT, source, pe);           \
+        return pshmem_ctx_##NAME##_atomic_fetch(SHMEM_CTX_DEFAULT, source, pe);           \
     }                                                                                    \
-    OSOE_API void shmem_ctx_##NAME##_atomic_set(shmem_ctx_t ctx, T *dest, T value,        \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_set(shmem_ctx_t ctx, T *dest, T value,        \
                                                 int pe)                                  \
     {                                                                                    \
         amo_rmw("shmem_" #NAME "_atomic_set", ctx, dest, (unsigned)sizeof(T),            \
                 OSOE_RMW_WRITE, NAME##_bits(value), 0, 0, pe);                           \
     }                                                                                    \
-    OSOE_API void shmem_##NAME##_atomic_set(T *dest, T value, int pe)                     \
+    OSOE_API void pshmem_##NAME##_atomic_set(T *dest, T value, int pe)                     \
     {                                                                                    \
-        shmem_ctx_##NAME##_atomic_set(SHMEM_CTX_DEFAULT, dest, value, pe);               \
+        pshmem_ctx_##NAME##_atomic_set(SHMEM_CTX_DEFAULT, dest, value, pe);               \
     }                                                                                    \
-    OSOE_API T shmem_ctx_##NAME##_atomic_swap(shmem_ctx_t ctx, T *dest, T value, int pe)  \
+    OSOE_API T pshmem_ctx_##NAME##_atomic_swap(shmem_ctx_t ctx, T *dest, T value, int pe)  \
     {                                                                                    \
         return NAME##_value(amo_rmw("shmem_" #NAME "_atomic_swap", ctx, dest,            \
                                     (unsigned)sizeof(T), OSOE_RMW_WRITE,                 \
                                     NAME##_bits(value), 0, OSOE_TP_FETCH, pe));          \
     }                                                                                    \
-    OSOE_API T shmem_##NAME##_atomic_swap(T *dest, T value, int pe)                       \
+    OSOE_API T pshmem_##NAME##_atomic_swap(T *dest, T value, int pe)                       \
     {                                                                                    \
-        return shmem_ctx_##NAME##_atomic_swap(SHMEM_CTX_DEFAULT, dest, value, pe);       \
+        return pshmem_ctx_##NAME##_atomic_swap(SHMEM_CTX_DEFAULT, dest, value, pe);       \
     }
 
 /* ---- Table 8: the bitwise AMO types ----------------------------------- */
 
 #define OSOE_AMO_BITWISE_OP(T, NAME, OP, RMW)                                            \
-    OSOE_API void shmem_ctx_##NAME##_atomic_##OP(shmem_ctx_t ctx, T *dest, T value,       \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_##OP(shmem_ctx_t ctx, T *dest, T value,       \
                                                  int pe)                                 \
     {                                                                                    \
         amo_rmw("shmem_" #NAME "_atomic_" #OP, ctx, dest, (unsigned)sizeof(T), RMW,      \
                 OSOE_AMO_IN(value), 0, 0, pe);                                           \
     }                                                                                    \
-    OSOE_API void shmem_##NAME##_atomic_##OP(T *dest, T value, int pe)                    \
+    OSOE_API void pshmem_##NAME##_atomic_##OP(T *dest, T value, int pe)                    \
     {                                                                                    \
-        shmem_ctx_##NAME##_atomic_##OP(SHMEM_CTX_DEFAULT, dest, value, pe);              \
+        pshmem_ctx_##NAME##_atomic_##OP(SHMEM_CTX_DEFAULT, dest, value, pe);              \
     }                                                                                    \
-    OSOE_API T shmem_ctx_##NAME##_atomic_fetch_##OP(shmem_ctx_t ctx, T *dest, T value,    \
+    OSOE_API T pshmem_ctx_##NAME##_atomic_fetch_##OP(shmem_ctx_t ctx, T *dest, T value,    \
                                                     int pe)                              \
     {                                                                                    \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_" #OP, ctx, dest,   \
                                        (unsigned)sizeof(T), RMW, OSOE_AMO_IN(value), 0,  \
                                        OSOE_TP_FETCH, pe));                              \
     }                                                                                    \
-    OSOE_API T shmem_##NAME##_atomic_fetch_##OP(T *dest, T value, int pe)                 \
+    OSOE_API T pshmem_##NAME##_atomic_fetch_##OP(T *dest, T value, int pe)                 \
     {                                                                                    \
-        return shmem_ctx_##NAME##_atomic_fetch_##OP(SHMEM_CTX_DEFAULT, dest, value, pe); \
+        return pshmem_ctx_##NAME##_atomic_fetch_##OP(SHMEM_CTX_DEFAULT, dest, value, pe); \
     }
 
 #define OSOE_AMO_BITWISE(T, NAME)                                                        \
@@ -259,8 +260,50 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     OSOE_AMO_BITWISE_OP(T, NAME, or, OSOE_RMW_OR)                                        \
     OSOE_AMO_BITWISE_OP(T, NAME, xor, OSOE_RMW_XOR)
 
+/*
+ * The weak `shmem_` aliases (export.h), over the same type lists. They are a
+ * separate pass rather than a line inside each body so that the definitions
+ * above read as definitions; the lists are the same ones, so a type cannot get
+ * a definition without an alias.
+ */
+#define OSOE_AMO_ALIAS_STANDARD(T, NAME)                                                \
+    OSOE_ALIAS(ctx_##NAME##_atomic_compare_swap)                                        \
+    OSOE_ALIAS(NAME##_atomic_compare_swap)                                              \
+    OSOE_ALIAS(ctx_##NAME##_atomic_inc)                                                 \
+    OSOE_ALIAS(NAME##_atomic_inc)                                                       \
+    OSOE_ALIAS(ctx_##NAME##_atomic_fetch_inc)                                           \
+    OSOE_ALIAS(NAME##_atomic_fetch_inc)                                                 \
+    OSOE_ALIAS(ctx_##NAME##_atomic_add)                                                 \
+    OSOE_ALIAS(NAME##_atomic_add)                                                       \
+    OSOE_ALIAS(ctx_##NAME##_atomic_fetch_add)                                           \
+    OSOE_ALIAS(NAME##_atomic_fetch_add)
+
+#define OSOE_AMO_ALIAS_EXTENDED(T, NAME)                                                \
+    OSOE_ALIAS(ctx_##NAME##_atomic_fetch)                                               \
+    OSOE_ALIAS(NAME##_atomic_fetch)                                                     \
+    OSOE_ALIAS(ctx_##NAME##_atomic_set)                                                 \
+    OSOE_ALIAS(NAME##_atomic_set)                                                       \
+    OSOE_ALIAS(ctx_##NAME##_atomic_swap)                                                \
+    OSOE_ALIAS(NAME##_atomic_swap)
+
+#define OSOE_AMO_ALIAS_BITWISE_OP(T, NAME, OP)                                          \
+    OSOE_ALIAS(ctx_##NAME##_atomic_##OP)                                                \
+    OSOE_ALIAS(NAME##_atomic_##OP)                                                      \
+    OSOE_ALIAS(ctx_##NAME##_atomic_fetch_##OP)                                          \
+    OSOE_ALIAS(NAME##_atomic_fetch_##OP)
+
+#define OSOE_AMO_ALIAS_BITWISE(T, NAME)                                                 \
+    OSOE_AMO_ALIAS_BITWISE_OP(T, NAME, and)                                             \
+    OSOE_AMO_ALIAS_BITWISE_OP(T, NAME, or)                                              \
+    OSOE_AMO_ALIAS_BITWISE_OP(T, NAME, xor)
+
 OSOE_AMO_STANDARD_TYPES(OSOE_AMO_STANDARD)
 OSOE_AMO_STANDARD_TYPES(OSOE_AMO_EXTENDED)
 OSOE_AMO_FLOAT(float, float, uint32_t)
 OSOE_AMO_FLOAT(double, double, uint64_t)
 OSOE_AMO_BITWISE_TYPES(OSOE_AMO_BITWISE)
+
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_ALIAS_STANDARD)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_ALIAS_EXTENDED)
+OSOE_AMO_FLOAT_TYPES(OSOE_AMO_ALIAS_EXTENDED)
+OSOE_AMO_BITWISE_TYPES(OSOE_AMO_ALIAS_BITWISE)

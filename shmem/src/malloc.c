@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <pshmem.h>
 #include <shmem.h>
 
 #include "alloc.h"
@@ -69,7 +70,7 @@ static void *allocate(const char *routine, uint64_t size, uint64_t align, long h
     return p;
 }
 
-OSOE_API void *shmem_malloc(size_t size)
+OSOE_API void *pshmem_malloc(size_t size)
 {
     if (size == 0)
         return NULL;
@@ -85,7 +86,7 @@ OSOE_API void *shmem_malloc(size_t size)
  * program will use the memory, and this library's not knowing a particular one
  * does not make it untrue.
  */
-OSOE_API void *shmem_malloc_with_hints(size_t size, long hints)
+OSOE_API void *pshmem_malloc_with_hints(size_t size, long hints)
 {
     if (size == 0)
         return NULL;
@@ -97,7 +98,7 @@ OSOE_API void *shmem_malloc_with_hints(size_t size, long hints)
  * count * size overflowing is a failed allocation - which does barrier, since
  * every PE overflows identically.
  */
-OSOE_API void *shmem_calloc(size_t count, size_t size)
+OSOE_API void *pshmem_calloc(size_t count, size_t size)
 {
     if (count == 0 || size == 0)
         return NULL;
@@ -113,7 +114,7 @@ OSOE_API void *shmem_calloc(size_t count, size_t size)
  * wrong and stop - because the alternative is a symmetric object that is not
  * where the program thinks it is on some PEs and not others.
  */
-OSOE_API void *shmem_align(size_t alignment, size_t size)
+OSOE_API void *pshmem_align(size_t alignment, size_t size)
 {
     if (size == 0)
         return NULL;
@@ -138,7 +139,7 @@ OSOE_API void *shmem_align(size_t alignment, size_t size)
 
 /* NULL does nothing, with no barrier. Otherwise the barrier is on entry, so no
  * PE frees memory another PE is still using in a collective sense. */
-OSOE_API void shmem_free(void *ptr)
+OSOE_API void pshmem_free(void *ptr)
 {
     if (!ptr)
         return;
@@ -166,13 +167,13 @@ OSOE_API void shmem_free(void *ptr)
  * so a program that grows one large array would fail at half the heap rather
  * than at all of it.
  */
-OSOE_API void *shmem_realloc(void *ptr, size_t size)
+OSOE_API void *pshmem_realloc(void *ptr, size_t size)
 {
     osoe_count(OSOE_C_SHMEM_REALLOC_CALLS, 1);
     if (!ptr)
-        return shmem_malloc(size);      /* shmem_malloc: exit barrier only */
+        return pshmem_malloc(size);      /* shmem_malloc: exit barrier only */
     if (size == 0) {
-        shmem_free(ptr);                /* shmem_free: entry barrier only */
+        pshmem_free(ptr);                /* shmem_free: entry barrier only */
         return NULL;
     }
 
@@ -229,3 +230,11 @@ void osoe_publish_heap_levels(void)
     if (in_use > atomic_load_explicit(&me->heap_high_water, memory_order_acquire))
         atomic_store_explicit(&me->heap_high_water, in_use, memory_order_release);
 }
+
+/* The weak `shmem_` aliases (export.h). */
+OSOE_ALIAS(malloc)
+OSOE_ALIAS(malloc_with_hints)
+OSOE_ALIAS(calloc)
+OSOE_ALIAS(align)
+OSOE_ALIAS(free)
+OSOE_ALIAS(realloc)

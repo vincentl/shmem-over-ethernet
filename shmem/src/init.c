@@ -6,6 +6,7 @@
 #include <stdatomic.h>
 #include <unistd.h>
 
+#include <pshmem.h>
 #include <shmem.h>
 
 #include "agent.h"
@@ -69,7 +70,7 @@ static void session_end(void)
     osoe_boot_free(&osoe.boot);
 }
 
-OSOE_API void shmem_init(void)
+OSOE_API void pshmem_init(void)
 {
     pthread_mutex_lock(&lifecycle);
     if (refcount == 0) {
@@ -83,7 +84,7 @@ OSOE_API void shmem_init(void)
     pthread_mutex_unlock(&lifecycle);
 }
 
-OSOE_API void shmem_finalize(void)
+OSOE_API void pshmem_finalize(void)
 {
     pthread_mutex_lock(&lifecycle);
     /* A child forked after init inherits the mappings but no agent, and must
@@ -115,7 +116,7 @@ OSOE_API void shmem_finalize(void)
  * program that passes garbage gets a defined level rather than a level derived
  * from its garbage.
  */
-OSOE_API int shmem_init_thread(int requested, int *provided)
+OSOE_API int pshmem_init_thread(int requested, int *provided)
 {
     if (requested < SHMEM_THREAD_SINGLE)
         requested = SHMEM_THREAD_SINGLE;
@@ -138,24 +139,33 @@ OSOE_API int shmem_init_thread(int requested, int *provided)
 }
 
 /* Callable at any time and from any thread, so it takes no lock (§9.2.2). */
-OSOE_API void shmem_query_thread(int *provided)
+OSOE_API void pshmem_query_thread(int *provided)
 {
     if (provided)
         *provided = atomic_load_explicit(&thread_level, memory_order_acquire);
 }
 
-OSOE_API void shmem_query_initialized(int *flag)
+OSOE_API void pshmem_query_initialized(int *flag)
 {
     *flag = atomic_load_explicit(&initialized, memory_order_acquire);
 }
 
-OSOE_API int shmem_my_pe(void)
+OSOE_API int pshmem_my_pe(void)
 {
     return atomic_load_explicit(&initialized, memory_order_acquire) ? (int)osoe.boot.rank : -1;
 }
 
-OSOE_API int shmem_n_pes(void)
+OSOE_API int pshmem_n_pes(void)
 {
     return atomic_load_explicit(&initialized, memory_order_acquire)
                ? (int)osoe.boot.world_size : -1;
 }
+
+/* The weak `shmem_` aliases (export.h). */
+OSOE_ALIAS(init)
+OSOE_ALIAS(finalize)
+OSOE_ALIAS(init_thread)
+OSOE_ALIAS(query_thread)
+OSOE_ALIAS(query_initialized)
+OSOE_ALIAS(my_pe)
+OSOE_ALIAS(n_pes)

@@ -173,46 +173,65 @@ uint64_t shmem_signal_wait_until(uint64_t *sig_addr, int cmp, uint64_t cmp_value
     X(unsigned long long, ulonglong)                                          \
     X(int32_t, int32) X(int64_t, int64) X(uint32_t, uint32) X(uint64_t, uint64)
 
-#define OSOE_AMO_DECL_STANDARD(T, NAME)                                       \
-    T shmem_##NAME##_atomic_compare_swap(T *dest, T cond, T value, int pe);   \
-    void shmem_##NAME##_atomic_inc(T *dest, int pe);                          \
-    T shmem_##NAME##_atomic_fetch_inc(T *dest, int pe);                       \
-    void shmem_##NAME##_atomic_add(T *dest, T value, int pe);                 \
-    T shmem_##NAME##_atomic_fetch_add(T *dest, T value, int pe);
+/*
+ * The declarations take the prefix as a parameter, so that pshmem.h can
+ * generate the `pshmem_` spellings of the same 500 routines from the same
+ * lists (§7.4; spec §10). Writing them out twice is the version of this that
+ * drifts.
+ */
+#define OSOE_CAT2(a, b) a##b
+#define OSOE_CAT(a, b) OSOE_CAT2(a, b)
+#define OSOE_FN(P, NAME, SUF) OSOE_CAT(OSOE_CAT(P, NAME), SUF)
 
-#define OSOE_AMO_DECL_EXTENDED(T, NAME)                                       \
-    T shmem_##NAME##_atomic_fetch(const T *source, int pe);                   \
-    void shmem_##NAME##_atomic_set(T *dest, T value, int pe);                 \
-    T shmem_##NAME##_atomic_swap(T *dest, T value, int pe);
+#define OSOE_AMO_DECL_STANDARD_P(P, T, NAME)                                  \
+    T OSOE_FN(P, NAME, _atomic_compare_swap)(T *dest, T cond, T value, int pe); \
+    void OSOE_FN(P, NAME, _atomic_inc)(T *dest, int pe);                      \
+    T OSOE_FN(P, NAME, _atomic_fetch_inc)(T *dest, int pe);                   \
+    void OSOE_FN(P, NAME, _atomic_add)(T *dest, T value, int pe);             \
+    T OSOE_FN(P, NAME, _atomic_fetch_add)(T *dest, T value, int pe);
 
-#define OSOE_AMO_DECL_BITWISE(T, NAME)                                        \
-    void shmem_##NAME##_atomic_and(T *dest, T value, int pe);                 \
-    T shmem_##NAME##_atomic_fetch_and(T *dest, T value, int pe);              \
-    void shmem_##NAME##_atomic_or(T *dest, T value, int pe);                  \
-    T shmem_##NAME##_atomic_fetch_or(T *dest, T value, int pe);               \
-    void shmem_##NAME##_atomic_xor(T *dest, T value, int pe);                 \
-    T shmem_##NAME##_atomic_fetch_xor(T *dest, T value, int pe);
+#define OSOE_AMO_DECL_EXTENDED_P(P, T, NAME)                                  \
+    T OSOE_FN(P, NAME, _atomic_fetch)(const T *source, int pe);               \
+    void OSOE_FN(P, NAME, _atomic_set)(T *dest, T value, int pe);             \
+    T OSOE_FN(P, NAME, _atomic_swap)(T *dest, T value, int pe);
 
-#define OSOE_AMO_DECL_CTX_STANDARD(T, NAME)                                   \
-    T shmem_ctx_##NAME##_atomic_compare_swap(shmem_ctx_t ctx, T *dest, T cond, \
-                                             T value, int pe);                 \
-    void shmem_ctx_##NAME##_atomic_inc(shmem_ctx_t ctx, T *dest, int pe);      \
-    T shmem_ctx_##NAME##_atomic_fetch_inc(shmem_ctx_t ctx, T *dest, int pe);   \
-    void shmem_ctx_##NAME##_atomic_add(shmem_ctx_t ctx, T *dest, T value, int pe); \
-    T shmem_ctx_##NAME##_atomic_fetch_add(shmem_ctx_t ctx, T *dest, T value, int pe);
+#define OSOE_AMO_DECL_BITWISE_P(P, T, NAME)                                   \
+    void OSOE_FN(P, NAME, _atomic_and)(T *dest, T value, int pe);             \
+    T OSOE_FN(P, NAME, _atomic_fetch_and)(T *dest, T value, int pe);          \
+    void OSOE_FN(P, NAME, _atomic_or)(T *dest, T value, int pe);              \
+    T OSOE_FN(P, NAME, _atomic_fetch_or)(T *dest, T value, int pe);           \
+    void OSOE_FN(P, NAME, _atomic_xor)(T *dest, T value, int pe);             \
+    T OSOE_FN(P, NAME, _atomic_fetch_xor)(T *dest, T value, int pe);
 
-#define OSOE_AMO_DECL_CTX_EXTENDED(T, NAME)                                   \
-    T shmem_ctx_##NAME##_atomic_fetch(shmem_ctx_t ctx, const T *source, int pe); \
-    void shmem_ctx_##NAME##_atomic_set(shmem_ctx_t ctx, T *dest, T value, int pe); \
-    T shmem_ctx_##NAME##_atomic_swap(shmem_ctx_t ctx, T *dest, T value, int pe);
+#define OSOE_AMO_DECL_CTX_STANDARD_P(P, T, NAME)                              \
+    T OSOE_FN(P, ctx_##NAME, _atomic_compare_swap)(shmem_ctx_t ctx, T *dest,  \
+                                                   T cond, T value, int pe);  \
+    void OSOE_FN(P, ctx_##NAME, _atomic_inc)(shmem_ctx_t ctx, T *dest, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_inc)(shmem_ctx_t ctx, T *dest, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_add)(shmem_ctx_t ctx, T *dest, T value, \
+                                             int pe);                         \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_add)(shmem_ctx_t ctx, T *dest, T value, \
+                                                int pe);
 
-#define OSOE_AMO_DECL_CTX_BITWISE(T, NAME)                                    \
-    void shmem_ctx_##NAME##_atomic_and(shmem_ctx_t ctx, T *dest, T value, int pe); \
-    T shmem_ctx_##NAME##_atomic_fetch_and(shmem_ctx_t ctx, T *dest, T value, int pe); \
-    void shmem_ctx_##NAME##_atomic_or(shmem_ctx_t ctx, T *dest, T value, int pe); \
-    T shmem_ctx_##NAME##_atomic_fetch_or(shmem_ctx_t ctx, T *dest, T value, int pe); \
-    void shmem_ctx_##NAME##_atomic_xor(shmem_ctx_t ctx, T *dest, T value, int pe); \
-    T shmem_ctx_##NAME##_atomic_fetch_xor(shmem_ctx_t ctx, T *dest, T value, int pe);
+#define OSOE_AMO_DECL_CTX_EXTENDED_P(P, T, NAME)                              \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch)(shmem_ctx_t ctx, const T *source, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_set)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_swap)(shmem_ctx_t ctx, T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_CTX_BITWISE_P(P, T, NAME)                               \
+    void OSOE_FN(P, ctx_##NAME, _atomic_and)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_and)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_or)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_or)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_xor)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    T OSOE_FN(P, ctx_##NAME, _atomic_fetch_xor)(shmem_ctx_t ctx, T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_STANDARD(T, NAME) OSOE_AMO_DECL_STANDARD_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_EXTENDED(T, NAME) OSOE_AMO_DECL_EXTENDED_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_BITWISE(T, NAME) OSOE_AMO_DECL_BITWISE_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_CTX_STANDARD(T, NAME) OSOE_AMO_DECL_CTX_STANDARD_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_CTX_EXTENDED(T, NAME) OSOE_AMO_DECL_CTX_EXTENDED_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_CTX_BITWISE(T, NAME) OSOE_AMO_DECL_CTX_BITWISE_P(shmem_, T, NAME)
 
 OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_STANDARD)
 OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_EXTENDED)
@@ -240,45 +259,49 @@ OSOE_AMO_BITWISE_TYPES(OSOE_AMO_DECL_CTX_BITWISE)
 #define OSOE_WAIT_DEPRECATED_TYPES(X)                                         \
     X(short, short) X(int, int) X(long, long) X(long long, longlong)
 
-#define OSOE_WAIT_DECL_SCALAR(T, NAME)                                        \
-    void shmem_##NAME##_wait_until(T *ivar, int cmp, T cmp_value);            \
-    int shmem_##NAME##_test(T *ivar, int cmp, T cmp_value);
+#define OSOE_WAIT_DECL_SCALAR_P(P, T, NAME)                                   \
+    void OSOE_FN(P, NAME, _wait_until)(T *ivar, int cmp, T cmp_value);        \
+    int OSOE_FN(P, NAME, _test)(T *ivar, int cmp, T cmp_value);
 
-#define OSOE_WAIT_DECL_MANY(T, NAME)                                          \
-    void shmem_##NAME##_wait_until_all(T *ivars, size_t nelems,               \
-                                       const int *status, int cmp, T cmp_value); \
-    size_t shmem_##NAME##_wait_until_any(T *ivars, size_t nelems,             \
-                                         const int *status, int cmp, T cmp_value); \
-    size_t shmem_##NAME##_wait_until_some(T *ivars, size_t nelems, size_t *indices, \
-                                          const int *status, int cmp, T cmp_value); \
-    void shmem_##NAME##_wait_until_all_vector(T *ivars, size_t nelems,        \
+#define OSOE_WAIT_DECL_MANY_P(P, T, NAME)                                     \
+    void OSOE_FN(P, NAME, _wait_until_all)(T *ivars, size_t nelems,           \
+                                           const int *status, int cmp, T cmp_value); \
+    size_t OSOE_FN(P, NAME, _wait_until_any)(T *ivars, size_t nelems,         \
+                                             const int *status, int cmp, T cmp_value); \
+    size_t OSOE_FN(P, NAME, _wait_until_some)(T *ivars, size_t nelems, size_t *indices, \
+                                              const int *status, int cmp, T cmp_value); \
+    void OSOE_FN(P, NAME, _wait_until_all_vector)(T *ivars, size_t nelems,    \
+                                                  const int *status, int cmp, \
+                                                  const T *cmp_values);       \
+    size_t OSOE_FN(P, NAME, _wait_until_any_vector)(T *ivars, size_t nelems,  \
+                                                    const int *status, int cmp, \
+                                                    const T *cmp_values);     \
+    size_t OSOE_FN(P, NAME, _wait_until_some_vector)(T *ivars, size_t nelems, \
+                                                     size_t *indices,         \
+                                                     const int *status, int cmp, \
+                                                     const T *cmp_values);    \
+    int OSOE_FN(P, NAME, _test_all)(T *ivars, size_t nelems, const int *status, \
+                                    int cmp, T cmp_value);                    \
+    size_t OSOE_FN(P, NAME, _test_any)(T *ivars, size_t nelems, const int *status, \
+                                       int cmp, T cmp_value);                 \
+    size_t OSOE_FN(P, NAME, _test_some)(T *ivars, size_t nelems, size_t *indices, \
+                                        const int *status, int cmp, T cmp_value); \
+    int OSOE_FN(P, NAME, _test_all_vector)(T *ivars, size_t nelems,           \
+                                           const int *status, int cmp,        \
+                                           const T *cmp_values);              \
+    size_t OSOE_FN(P, NAME, _test_any_vector)(T *ivars, size_t nelems,        \
                                               const int *status, int cmp,     \
                                               const T *cmp_values);           \
-    size_t shmem_##NAME##_wait_until_any_vector(T *ivars, size_t nelems,      \
-                                                const int *status, int cmp,   \
-                                                const T *cmp_values);         \
-    size_t shmem_##NAME##_wait_until_some_vector(T *ivars, size_t nelems,     \
-                                                 size_t *indices,             \
-                                                 const int *status, int cmp,  \
-                                                 const T *cmp_values);        \
-    int shmem_##NAME##_test_all(T *ivars, size_t nelems, const int *status,   \
-                                int cmp, T cmp_value);                        \
-    size_t shmem_##NAME##_test_any(T *ivars, size_t nelems, const int *status, \
-                                   int cmp, T cmp_value);                     \
-    size_t shmem_##NAME##_test_some(T *ivars, size_t nelems, size_t *indices, \
-                                    const int *status, int cmp, T cmp_value); \
-    int shmem_##NAME##_test_all_vector(T *ivars, size_t nelems,               \
-                                       const int *status, int cmp,            \
-                                       const T *cmp_values);                  \
-    size_t shmem_##NAME##_test_any_vector(T *ivars, size_t nelems,            \
-                                          const int *status, int cmp,         \
-                                          const T *cmp_values);               \
-    size_t shmem_##NAME##_test_some_vector(T *ivars, size_t nelems,           \
-                                           size_t *indices, const int *status, \
-                                           int cmp, const T *cmp_values);
+    size_t OSOE_FN(P, NAME, _test_some_vector)(T *ivars, size_t nelems,       \
+                                               size_t *indices, const int *status, \
+                                               int cmp, const T *cmp_values);
 
-#define OSOE_WAIT_DECL_DEPRECATED(T, NAME)                                    \
-    void shmem_##NAME##_wait(T *ivar, T cmp_value);
+#define OSOE_WAIT_DECL_DEPRECATED_P(P, T, NAME)                               \
+    void OSOE_FN(P, NAME, _wait)(T *ivar, T cmp_value);
+
+#define OSOE_WAIT_DECL_SCALAR(T, NAME) OSOE_WAIT_DECL_SCALAR_P(shmem_, T, NAME)
+#define OSOE_WAIT_DECL_MANY(T, NAME) OSOE_WAIT_DECL_MANY_P(shmem_, T, NAME)
+#define OSOE_WAIT_DECL_DEPRECATED(T, NAME) OSOE_WAIT_DECL_DEPRECATED_P(shmem_, T, NAME)
 
 OSOE_AMO_STANDARD_TYPES(OSOE_WAIT_DECL_SCALAR)
 OSOE_WAIT_SHORT_TYPES(OSOE_WAIT_DECL_SCALAR)

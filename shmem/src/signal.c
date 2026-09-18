@@ -25,6 +25,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <pshmem.h>
 #include <shmem.h>
 
 #include "export.h"
@@ -67,7 +68,7 @@ static void signal_update(const char *routine, shmem_ctx_t ctx, uint64_t *sig_ad
  * nelems 0 still signals: the spec makes the signal update unconditional, and a
  * zero-length put is the empty transfer it announces.
  */
-OSOE_API void shmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *source,
+OSOE_API void pshmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *source,
                                       size_t nelems, uint64_t *sig_addr, uint64_t signal,
                                       int sig_op, int pe)
 {
@@ -84,37 +85,37 @@ OSOE_API void shmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *s
     signal_update(routine, ctx, sig_addr, signal, op, pe, OSOE_TP_FENCED);
 }
 
-OSOE_API void shmem_putmem_signal(void *dest, const void *source, size_t nelems,
+OSOE_API void pshmem_putmem_signal(void *dest, const void *source, size_t nelems,
                                   uint64_t *sig_addr, uint64_t signal, int sig_op, int pe)
 {
-    shmem_ctx_putmem_signal(SHMEM_CTX_DEFAULT, dest, source, nelems, sig_addr, signal,
+    pshmem_ctx_putmem_signal(SHMEM_CTX_DEFAULT, dest, source, nelems, sig_addr, signal,
                             sig_op, pe);
 }
 
-OSOE_API void shmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
+OSOE_API void pshmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
                                    int pe)
 {
     signal_update("shmem_ctx_signal_set", ctx, sig_addr, signal, OSOE_RMW_WRITE, pe, 0);
 }
 
-OSOE_API void shmem_ctx_signal_add(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
+OSOE_API void pshmem_ctx_signal_add(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
                                    int pe)
 {
     signal_update("shmem_ctx_signal_add", ctx, sig_addr, signal, OSOE_RMW_ADD, pe, 0);
 }
 
-OSOE_API void shmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe)
+OSOE_API void pshmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe)
 {
-    shmem_ctx_signal_set(SHMEM_CTX_DEFAULT, sig_addr, signal, pe);
+    pshmem_ctx_signal_set(SHMEM_CTX_DEFAULT, sig_addr, signal, pe);
 }
 
-OSOE_API void shmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe)
+OSOE_API void pshmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe)
 {
-    shmem_ctx_signal_add(SHMEM_CTX_DEFAULT, sig_addr, signal, pe);
+    pshmem_ctx_signal_add(SHMEM_CTX_DEFAULT, sig_addr, signal, pe);
 }
 
 /* Local: the signal object of the calling PE (§9.8.6 takes no pe argument). */
-OSOE_API uint64_t shmem_signal_fetch(const uint64_t *sig_addr)
+OSOE_API uint64_t pshmem_signal_fetch(const uint64_t *sig_addr)
 {
     osoe_count(OSOE_C_SHMEM_SIGNAL_FETCH_CALLS, 1);
     uint64_t offset = osoe_sym_word_offset("shmem_signal_fetch", sig_addr, OSOE_SIGNAL_WIDTH);
@@ -128,9 +129,19 @@ OSOE_API uint64_t shmem_signal_fetch(const uint64_t *sig_addr)
  * load, which is exclusive against the rmw that wrote it, so a half-applied
  * update is not a value this can return.
  */
-OSOE_API uint64_t shmem_signal_wait_until(uint64_t *sig_addr, int cmp, uint64_t cmp_value)
+OSOE_API uint64_t pshmem_signal_wait_until(uint64_t *sig_addr, int cmp, uint64_t cmp_value)
 {
     osoe_count(OSOE_C_SHMEM_SIGNAL_WAIT_CALLS, 1);
     return osoe_wait_until("shmem_signal_wait_until", sig_addr, OSOE_SIGNAL_WIDTH,
                            false, cmp, cmp_value);
 }
+
+/* The weak `shmem_` aliases (export.h). */
+OSOE_ALIAS(ctx_putmem_signal)
+OSOE_ALIAS(putmem_signal)
+OSOE_ALIAS(ctx_signal_set)
+OSOE_ALIAS(ctx_signal_add)
+OSOE_ALIAS(signal_set)
+OSOE_ALIAS(signal_add)
+OSOE_ALIAS(signal_fetch)
+OSOE_ALIAS(signal_wait_until)

@@ -12,6 +12,7 @@ add_library(osoe
   src/malloc.c
   src/metrics.c
   src/node.c
+  src/profile.c
   src/quiet.c
   src/rma.c
   src/signal.c
@@ -45,7 +46,7 @@ set_target_properties(osoe PROPERTIES
 osoe_warnings(osoe)
 
 install(TARGETS osoe)
-install(FILES include/shmem.h TYPE INCLUDE)
+install(FILES include/shmem.h include/pshmem.h include/shmemx.h TYPE INCLUDE)
 
 if(BUILD_TESTING)
   add_subdirectory(tests)

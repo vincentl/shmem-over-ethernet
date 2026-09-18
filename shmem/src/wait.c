@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <pshmem.h>
 #include <shmem.h>
 
 #include "base/deadline.h"
@@ -375,12 +376,12 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
 /* wait_until and test, for every type in Table 6 and for the deprecated
  * two-byte ones of Table 12. */
 #define OSOE_WAIT_SCALAR(T, NAME)                                                      \
-    OSOE_API void shmem_##NAME##_wait_until(T *ivar, int cmp, T cmp_value)              \
+    OSOE_API void pshmem_##NAME##_wait_until(T *ivar, int cmp, T cmp_value)              \
     {                                                                                   \
         osoe_wait_until("shmem_" #NAME "_wait_until", ivar, (unsigned)sizeof(T),        \
                         (T)-1 < (T)0, cmp, (uint64_t)cmp_value);                        \
     }                                                                                   \
-    OSOE_API int shmem_##NAME##_test(T *ivar, int cmp, T cmp_value)                     \
+    OSOE_API int pshmem_##NAME##_test(T *ivar, int cmp, T cmp_value)                     \
     {                                                                                   \
         return osoe_test("shmem_" #NAME "_test", ivar, (unsigned)sizeof(T),             \
                          (T)-1 < (T)0, cmp, (uint64_t)cmp_value);                       \
@@ -388,7 +389,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
 
 /* The multiple-element forms, Table 6 only. */
 #define OSOE_WAIT_MANY(T, NAME)                                                        \
-    OSOE_API void shmem_##NAME##_wait_until_all(T *ivars, size_t nelems,                \
+    OSOE_API void pshmem_##NAME##_wait_until_all(T *ivars, size_t nelems,                \
                                                 const int *status, int cmp, T cmp_value) \
     {                                                                                   \
         struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
@@ -396,7 +397,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_wait_until_all");       \
         osoe_wait_all(&w);                                                              \
     }                                                                                   \
-    OSOE_API size_t shmem_##NAME##_wait_until_any(T *ivars, size_t nelems,              \
+    OSOE_API size_t pshmem_##NAME##_wait_until_any(T *ivars, size_t nelems,              \
                                                   const int *status, int cmp, T cmp_value) \
     {                                                                                   \
         struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
@@ -404,7 +405,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_wait_until_any");       \
         return osoe_wait_any(&w);                                                       \
     }                                                                                   \
-    OSOE_API size_t shmem_##NAME##_wait_until_some(T *ivars, size_t nelems,             \
+    OSOE_API size_t pshmem_##NAME##_wait_until_some(T *ivars, size_t nelems,             \
                                                    size_t *indices, const int *status,  \
                                                    int cmp, T cmp_value)                \
     {                                                                                   \
@@ -413,7 +414,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_wait_until_some");      \
         return osoe_wait_some(&w, indices);                                             \
     }                                                                                   \
-    OSOE_API void shmem_##NAME##_wait_until_all_vector(T *ivars, size_t nelems,         \
+    OSOE_API void pshmem_##NAME##_wait_until_all_vector(T *ivars, size_t nelems,         \
                                                        const int *status, int cmp,      \
                                                        const T *cmp_values)             \
     {                                                                                   \
@@ -422,7 +423,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_wait_until_all_vector"); \
         osoe_wait_all(&w);                                                              \
     }                                                                                   \
-    OSOE_API size_t shmem_##NAME##_wait_until_any_vector(T *ivars, size_t nelems,       \
+    OSOE_API size_t pshmem_##NAME##_wait_until_any_vector(T *ivars, size_t nelems,       \
                                                          const int *status, int cmp,    \
                                                          const T *cmp_values)           \
     {                                                                                   \
@@ -431,7 +432,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_wait_until_any_vector"); \
         return osoe_wait_any(&w);                                                       \
     }                                                                                   \
-    OSOE_API size_t shmem_##NAME##_wait_until_some_vector(T *ivars, size_t nelems,      \
+    OSOE_API size_t pshmem_##NAME##_wait_until_some_vector(T *ivars, size_t nelems,      \
                                                           size_t *indices,              \
                                                           const int *status, int cmp,   \
                                                           const T *cmp_values)          \
@@ -441,7 +442,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_wait_until_some_vector"); \
         return osoe_wait_some(&w, indices);                                             \
     }                                                                                   \
-    OSOE_API int shmem_##NAME##_test_all(T *ivars, size_t nelems, const int *status,    \
+    OSOE_API int pshmem_##NAME##_test_all(T *ivars, size_t nelems, const int *status,    \
                                          int cmp, T cmp_value)                          \
     {                                                                                   \
         struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
@@ -449,7 +450,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_test_all");             \
         return osoe_test_all(&w);                                                       \
     }                                                                                   \
-    OSOE_API size_t shmem_##NAME##_test_any(T *ivars, size_t nelems, const int *status, \
+    OSOE_API size_t pshmem_##NAME##_test_any(T *ivars, size_t nelems, const int *status, \
                                             int cmp, T cmp_value)                       \
     {                                                                                   \
         struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
@@ -457,7 +458,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_test_any");             \
         return osoe_test_any(&w);                                                       \
     }                                                                                   \
-    OSOE_API size_t shmem_##NAME##_test_some(T *ivars, size_t nelems, size_t *indices,  \
+    OSOE_API size_t pshmem_##NAME##_test_some(T *ivars, size_t nelems, size_t *indices,  \
                                              const int *status, int cmp, T cmp_value)   \
     {                                                                                   \
         struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
@@ -465,7 +466,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_test_some");            \
         return osoe_test_some(&w, indices);                                             \
     }                                                                                   \
-    OSOE_API int shmem_##NAME##_test_all_vector(T *ivars, size_t nelems,                \
+    OSOE_API int pshmem_##NAME##_test_all_vector(T *ivars, size_t nelems,                \
                                                 const int *status, int cmp,             \
                                                 const T *cmp_values)                    \
     {                                                                                   \
@@ -474,7 +475,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_test_all_vector");      \
         return osoe_test_all(&w);                                                       \
     }                                                                                   \
-    OSOE_API size_t shmem_##NAME##_test_any_vector(T *ivars, size_t nelems,             \
+    OSOE_API size_t pshmem_##NAME##_test_any_vector(T *ivars, size_t nelems,             \
                                                    const int *status, int cmp,          \
                                                    const T *cmp_values)                 \
     {                                                                                   \
@@ -483,7 +484,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                "shmem_" #NAME "_test_any_vector");      \
         return osoe_test_any(&w);                                                       \
     }                                                                                   \
-    OSOE_API size_t shmem_##NAME##_test_some_vector(T *ivars, size_t nelems,            \
+    OSOE_API size_t pshmem_##NAME##_test_some_vector(T *ivars, size_t nelems,            \
                                                     size_t *indices, const int *status, \
                                                     int cmp, const T *cmp_values)       \
     {                                                                                   \
@@ -496,26 +497,55 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
 /* The deprecated shmem_TYPENAME_wait, which is wait_until with SHMEM_CMP_NE
  * (spec §9.11.1 Notes). */
 #define OSOE_WAIT_DEPRECATED(T, NAME)                                                  \
-    OSOE_API void shmem_##NAME##_wait(T *ivar, T cmp_value)                             \
+    OSOE_API void pshmem_##NAME##_wait(T *ivar, T cmp_value)                             \
     {                                                                                   \
         osoe_wait_until("shmem_" #NAME "_wait", ivar, (unsigned)sizeof(T),              \
                         (T)-1 < (T)0, SHMEM_CMP_NE, (uint64_t)cmp_value);               \
     }
+
+/* The weak `shmem_` aliases (export.h), over the same lists. */
+#define OSOE_WAIT_ALIAS_SCALAR(T, NAME)                                                \
+    OSOE_ALIAS(NAME##_wait_until)                                                      \
+    OSOE_ALIAS(NAME##_test)
+
+#define OSOE_WAIT_ALIAS_MANY(T, NAME)                                                  \
+    OSOE_ALIAS(NAME##_wait_until_all)                                                  \
+    OSOE_ALIAS(NAME##_wait_until_any)                                                  \
+    OSOE_ALIAS(NAME##_wait_until_some)                                                 \
+    OSOE_ALIAS(NAME##_wait_until_all_vector)                                           \
+    OSOE_ALIAS(NAME##_wait_until_any_vector)                                           \
+    OSOE_ALIAS(NAME##_wait_until_some_vector)                                          \
+    OSOE_ALIAS(NAME##_test_all)                                                        \
+    OSOE_ALIAS(NAME##_test_any)                                                        \
+    OSOE_ALIAS(NAME##_test_some)                                                       \
+    OSOE_ALIAS(NAME##_test_all_vector)                                                 \
+    OSOE_ALIAS(NAME##_test_any_vector)                                                 \
+    OSOE_ALIAS(NAME##_test_some_vector)
+
+#define OSOE_WAIT_ALIAS_DEPRECATED(T, NAME) OSOE_ALIAS(NAME##_wait)
 
 OSOE_AMO_STANDARD_TYPES(OSOE_WAIT_SCALAR)
 OSOE_WAIT_SHORT_TYPES(OSOE_WAIT_SCALAR)
 OSOE_AMO_STANDARD_TYPES(OSOE_WAIT_MANY)
 OSOE_WAIT_DEPRECATED_TYPES(OSOE_WAIT_DEPRECATED)
 
+OSOE_AMO_STANDARD_TYPES(OSOE_WAIT_ALIAS_SCALAR)
+OSOE_WAIT_SHORT_TYPES(OSOE_WAIT_ALIAS_SCALAR)
+OSOE_AMO_STANDARD_TYPES(OSOE_WAIT_ALIAS_MANY)
+OSOE_WAIT_DEPRECATED_TYPES(OSOE_WAIT_ALIAS_DEPRECATED)
+
 /* The unprefixed deprecated spellings, which the spec fixes at `long`. */
-OSOE_API void shmem_wait(long *ivar, long cmp_value)
+OSOE_API void pshmem_wait(long *ivar, long cmp_value)
 {
     osoe_wait_until("shmem_wait", ivar, (unsigned)sizeof(long), true, SHMEM_CMP_NE,
                     (uint64_t)cmp_value);
 }
 
-OSOE_API void shmem_wait_until(long *ivar, int cmp, long cmp_value)
+OSOE_API void pshmem_wait_until(long *ivar, int cmp, long cmp_value)
 {
     osoe_wait_until("shmem_wait_until", ivar, (unsigned)sizeof(long), true, cmp,
                     (uint64_t)cmp_value);
 }
+
+OSOE_ALIAS(wait)
+OSOE_ALIAS(wait_until)

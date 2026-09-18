@@ -1,3 +1,4 @@
+#include <pshmem.h>
 #include <shmem.h>
 
 #include <stdatomic.h>
@@ -72,7 +73,7 @@ void osoe_barrier_all(const char *routine)
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
 }
 
-OSOE_API void shmem_barrier_all(void)
+OSOE_API void pshmem_barrier_all(void)
 {
     osoe_barrier_all("shmem_barrier_all");
 }
@@ -84,14 +85,14 @@ OSOE_API void shmem_barrier_all(void)
  * most tests, which is why the two are written apart rather than one in terms
  * of the other.
  */
-OSOE_API void shmem_sync_all(void)
+OSOE_API void pshmem_sync_all(void)
 {
     team_sync(osoe_team_of("shmem_sync_all", SHMEM_TEAM_WORLD), "shmem_sync_all");
 }
 
 /* spec §9.10.3. SHMEM_TEAM_INVALID is not a team to synchronize, and returns
  * nonzero rather than blocking forever on a team that does not exist. */
-OSOE_API int shmem_team_sync(shmem_team_t team)
+OSOE_API int pshmem_team_sync(shmem_team_t team)
 {
     struct osoe_team *t = osoe_team_of("shmem_team_sync", team);
     if (!t)
@@ -99,3 +100,8 @@ OSOE_API int shmem_team_sync(shmem_team_t team)
     team_sync(t, "shmem_team_sync");
     return 0;
 }
+
+/* The weak `shmem_` aliases (export.h). */
+OSOE_ALIAS(barrier_all)
+OSOE_ALIAS(sync_all)
+OSOE_ALIAS(team_sync)

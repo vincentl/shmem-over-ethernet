@@ -2,6 +2,7 @@
  * transport boundary (§4.10). */
 #include <stddef.h>
 
+#include <pshmem.h>
 #include <shmem.h>
 
 #include "export.h"
@@ -37,23 +38,23 @@ static void ctx_getmem(const char *routine, shmem_ctx_t ctx, void *dest,
     osoe_tp_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, nelems);
 }
 
-OSOE_API void shmem_putmem(void *dest, const void *source, size_t nelems, int pe)
+OSOE_API void pshmem_putmem(void *dest, const void *source, size_t nelems, int pe)
 {
     ctx_putmem("shmem_putmem", SHMEM_CTX_DEFAULT, dest, source, nelems, pe);
 }
 
-OSOE_API void shmem_getmem(void *dest, const void *source, size_t nelems, int pe)
+OSOE_API void pshmem_getmem(void *dest, const void *source, size_t nelems, int pe)
 {
     ctx_getmem("shmem_getmem", SHMEM_CTX_DEFAULT, dest, source, nelems, pe);
 }
 
-OSOE_API void shmem_ctx_putmem(shmem_ctx_t ctx, void *dest, const void *source,
+OSOE_API void pshmem_ctx_putmem(shmem_ctx_t ctx, void *dest, const void *source,
                                size_t nelems, int pe)
 {
     ctx_putmem("shmem_ctx_putmem", ctx, dest, source, nelems, pe);
 }
 
-OSOE_API void shmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
+OSOE_API void pshmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
                                size_t nelems, int pe)
 {
     ctx_getmem("shmem_ctx_getmem", ctx, dest, source, nelems, pe);
@@ -62,7 +63,7 @@ OSOE_API void shmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
 /* NULL for anything not reachable by loads and stores in this process: a
  * non-symmetric address, a PE out of range, or a PE the network carries
  * (§4.8). Returning NULL is always conforming. */
-OSOE_API void *shmem_ptr(const void *dest, int pe)
+OSOE_API void *pshmem_ptr(const void *dest, int pe)
 {
     uint64_t offset;
     if (pe < 0 || (uint32_t)pe >= osoe.boot.world_size ||
@@ -70,3 +71,10 @@ OSOE_API void *shmem_ptr(const void *dest, int pe)
         return NULL;
     return osoe_tp_direct(pe, OSOE_REGION_HEAP, offset);
 }
+
+/* The weak `shmem_` aliases (export.h). */
+OSOE_ALIAS(putmem)
+OSOE_ALIAS(getmem)
+OSOE_ALIAS(ctx_putmem)
+OSOE_ALIAS(ctx_getmem)
+OSOE_ALIAS(ptr)

@@ -15,6 +15,7 @@
  */
 #include <stddef.h>
 
+#include <pshmem.h>
 #include <shmem.h>
 
 #include "export.h"
@@ -30,7 +31,7 @@
  * ignoring an invalid handle is right for the two routines the spec says so
  * about, and wrong for an RMA that would then silently do nothing.
  */
-OSOE_API void shmem_ctx_fence(shmem_ctx_t ctx)
+OSOE_API void pshmem_ctx_fence(shmem_ctx_t ctx)
 {
     if (ctx == SHMEM_CTX_INVALID)
         return;
@@ -38,7 +39,7 @@ OSOE_API void shmem_ctx_fence(shmem_ctx_t ctx)
     osoe_tp_fence(osoe_ctx_of("shmem_ctx_fence", ctx));
 }
 
-OSOE_API void shmem_ctx_quiet(shmem_ctx_t ctx)
+OSOE_API void pshmem_ctx_quiet(shmem_ctx_t ctx)
 {
     if (ctx == SHMEM_CTX_INVALID)
         return;
@@ -46,14 +47,14 @@ OSOE_API void shmem_ctx_quiet(shmem_ctx_t ctx)
     osoe_tp_wait(osoe_ctx_of("shmem_ctx_quiet", ctx), NULL, 0);
 }
 
-OSOE_API void shmem_fence(void)
+OSOE_API void pshmem_fence(void)
 {
-    shmem_ctx_fence(SHMEM_CTX_DEFAULT);
+    pshmem_ctx_fence(SHMEM_CTX_DEFAULT);
 }
 
-OSOE_API void shmem_quiet(void)
+OSOE_API void pshmem_quiet(void)
 {
-    shmem_ctx_quiet(SHMEM_CTX_DEFAULT);
+    pshmem_ctx_quiet(SHMEM_CTX_DEFAULT);
 }
 
 /*
@@ -67,7 +68,7 @@ OSOE_API void shmem_quiet(void)
  * rather than on everything only if the backend reads npes first. Returning
  * here says it once, where the spec says it.
  */
-OSOE_API void shmem_ctx_pe_quiet(shmem_ctx_t ctx, const int *target_pes, size_t npes)
+OSOE_API void pshmem_ctx_pe_quiet(shmem_ctx_t ctx, const int *target_pes, size_t npes)
 {
     if (npes == 0 || ctx == SHMEM_CTX_INVALID)
         return;
@@ -77,7 +78,15 @@ OSOE_API void shmem_ctx_pe_quiet(shmem_ctx_t ctx, const int *target_pes, size_t 
     osoe_tp_wait(osoe_ctx_of("shmem_ctx_pe_quiet", ctx), target_pes, npes);
 }
 
-OSOE_API void shmem_pe_quiet(const int *target_pes, size_t npes)
+OSOE_API void pshmem_pe_quiet(const int *target_pes, size_t npes)
 {
-    shmem_ctx_pe_quiet(SHMEM_CTX_DEFAULT, target_pes, npes);
+    pshmem_ctx_pe_quiet(SHMEM_CTX_DEFAULT, target_pes, npes);
 }
+
+/* The weak `shmem_` aliases (export.h). */
+OSOE_ALIAS(ctx_fence)
+OSOE_ALIAS(ctx_quiet)
+OSOE_ALIAS(fence)
+OSOE_ALIAS(quiet)
+OSOE_ALIAS(ctx_pe_quiet)
+OSOE_ALIAS(pe_quiet)

@@ -9,6 +9,14 @@ if(BUILD_SHARED_LIBS)
     COMMAND ${CMAKE_COMMAND} -DLIB=$<TARGET_FILE:osoe>
             -P ${PROJECT_SOURCE_DIR}/cmake/CheckExports.cmake)
   set_tests_properties(shmem.exports PROPERTIES LABELS "tier1" TIMEOUT 30)
+
+  # The profiling interface must be strong pshmem_ + weak shmem_ (spec §10).
+  # A behavioural test cannot see this: in a shared-library build the
+  # executable's definition preempts the library's whatever its binding.
+  add_test(NAME shmem.profiling_aliases
+    COMMAND ${CMAKE_COMMAND} -DLIB=$<TARGET_FILE:osoe>
+            -P ${PROJECT_SOURCE_DIR}/cmake/CheckProfiling.cmake)
+  set_tests_properties(shmem.profiling_aliases PROPERTIES LABELS "tier1" TIMEOUT 30)
 endif()
 
 # The allocator on its own (tier 1): compiled in, since libosoe hides it.
@@ -64,6 +72,10 @@ osoe_tier2_test(amotypes)
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
 # §4.9 watch word to check the unmasked-span refinement, which is the one place
 # a test needs the encoding itself rather than a name in the metric table.
+# The profiling interface (§10): the test program interposes three routines,
+# which only works because the library defines them under pshmem_ names with
+# shmem_ as a weak alias.
+osoe_tier2_test(profile)
 osoe_tier2_test(team)
 osoe_tier2_test(thread)
 osoe_tier2_test(waitmany)
