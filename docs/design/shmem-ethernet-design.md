@@ -3312,8 +3312,10 @@ machinery. The review's order is adopted.
    - `shmem_barrier_all` on intranode counters, `shmem_quiet`, `shmem_fence`,
      `shmem_pe_quiet`;
    - the mandatory surface of §7.4;
-   - the control segment's counters, the flight recorder, and `osoe-stat` (§3.14),
-     so single-node hangs are debuggable from the start.
+   - the control segment's counters and `osoe-stat` (§3.14), so single-node hangs
+     are debuggable from the start. The flight recorder is **not** here: every
+     event it would record is a transport event and there is no transport until
+     step 2, so it arrives with the backend that produces them (§3.14).
 
    This exercises the heap layout, watch slots, allocator, epoch counters, agents,
    lifecycle, and introspection.
@@ -3855,7 +3857,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is designed but not scheduled (below) |
 | `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked, not scheduled** (§4.11). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
-| Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector. The control segment keeps its name until finalize, accepting a small leak on crash. Flight recorder on by default for now |
+| Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector, deferred until there is a reason for a third formatter. The control segment keeps its name until finalize, accepting a small leak on crash. The reader shares only the frozen directory and the metric descriptor with the writer and finds everything else by name, which a tier-1 test enforces by handing it a segment this build did not write. The flight recorder is deferred to step 2, with its design standing: its events do not exist yet |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
 | Build tool | **CMake ≥ 3.25** (§1) |
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
