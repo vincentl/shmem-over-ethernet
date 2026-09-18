@@ -1870,6 +1870,55 @@ Likewise the multiple-element tests. On an empty test set, `shmem_test_all` and
 `shmem_test_all_vector` return 1 (1.6 change #19), `shmem_test_any` returns
 `SIZE_MAX`, and `shmem_test_some` returns 0.
 
+#### Waiting on many, and why it is left simple
+
+One watch covers the whole array, so a write anywhere in it wakes the waiter,
+which then re-evaluates the predicate over every element of the test set: **O(N)
+per wake**. That is inherent, not an artifact of the encoding. The kernel can
+tell a waiter which *word changed*; what the operation needs is which *predicate
+became true*, and nothing but evaluating the predicate answers that — the gap
+between the two is exactly the spurious wake §4.9 already tolerates.
+
+**Watch the span of the *unmasked* elements, not the whole array.**
+`wait_until_some` and its vector form take a `status` mask excluding elements
+from the test set, and the wait already walks it, so taking the first and last
+unmasked element costs nothing. Spec Example 44 masks each element as it
+completes, so the watched span shrinks to the outstanding ones and the waiter
+stops being woken by elements it has already finished with. This is the whole of
+what is worth doing here.
+
+**Two kernel mechanisms could narrow the re-check. Neither is taken.** Recorded
+so the next reader does not have to rediscover that the channel exists, since
+one of them is an argument we already pass:
+
+- **The futex bitmask.** `futex_wait` and `futex_wake` each take a 32-bit mask
+  and the kernel wakes a waiter only when the two intersect; `base/futex.c`
+  passes `FUTEX_BITSET_MATCH_ANY` today. A waiter could set the bits of its
+  unmasked elements and a writer the bit of what it wrote, and the kernel would
+  drop the rest. It degrades safely in both directions, since `MATCH_ANY`
+  intersects every narrow mask, so scalar and range waiters mix without either
+  knowing; and a wrong mask costs a safety sweep, not a hang. What it does *not*
+  buy is anything for the writer, which still pays the `futex_wake` syscall
+  because the kernel filters after the call. Only the userspace watch word saves
+  the writer, and that is already exact.
+- **`futex_waitv` over K sequence words.** It waits on up to `FUTEX_WAITV_MAX`
+  (128, verified on 6.12) words and **returns the index of the one that woke
+  it** — literally "which item". With `bucket = written_grain % K` the writer
+  bumps one word instead of one, at the cost of an AND, and the waiter rescans
+  `N/K` elements rather than `N`. It needs no key and no element stride, only
+  the grain arithmetic the writer already does. It costs K words per waiter and
+  caps the narrowing at 128.
+
+**Why neither is worth building.** The usage study found **no public application
+users** of `wait_until_{all,any,some}[_vector]` or the corresponding tests
+(`docs/reviews/evidence/q2/q2-usage.md`) — only unit tests and spec examples.
+And the idiom the spec itself demonstrates is the *non-blocking* one: Example 44
+spins on `shmem_test_some` with computation overlapped, and `shmem_test*`
+touches no slot at all, so the path that idiom actually uses is already nothing
+but loads and compares. The blocking forms are the weird ones, and they are the
+ones with no callers. **Revisit when a real user appears, or when a measurement
+shows the re-check dominating** — not before.
+
 **Spec constraints, both satisfied for free.** `ivar` must be updated using
 OpenSHMEM AMOs (1.5 change #17), and §3.2 makes a wait or test on a location
 exclusive with AMOs on that location of the same datatype. The progress thread
