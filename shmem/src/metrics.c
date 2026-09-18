@@ -54,6 +54,14 @@ static const struct osoe_metric_desc thread_metrics[] = {
     T("shmem.barrier.ns", OSOE_MKIND_COUNTER, "ns"),
     T("shmem.malloc.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.free.calls", OSOE_MKIND_COUNTER, ""),
+    /* The API layer's own call counts, beside the boundary's. They are not the
+     * same number: shmem_barrier_all begins with a wait too (§5.6), so
+     * tp.wait.calls alone cannot say how often the application asked for a
+     * quiet. No `.ns` here - on this backend neither ever blocks, and §3.14
+     * forbids a clock read on a path that does not sleep. */
+    T("shmem.fence.calls", OSOE_MKIND_COUNTER, ""),
+    T("shmem.quiet.calls", OSOE_MKIND_COUNTER, ""),
+    T("shmem.pe_quiet.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.wait_until.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.test.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.signal.update.calls", OSOE_MKIND_COUNTER, ""),

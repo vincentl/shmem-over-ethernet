@@ -111,6 +111,11 @@ void shmem_free(void *ptr);
 void shmem_putmem(void *dest, const void *source, size_t nelems, int pe);
 void shmem_getmem(void *dest, const void *source, size_t nelems, int pe);
 
+/* Memory ordering (§9.12) */
+void shmem_fence(void);
+void shmem_quiet(void);
+void shmem_pe_quiet(const int *target_pes, size_t npes);
+
 /* Collective routines (§9.10) */
 void shmem_barrier_all(void);
 
