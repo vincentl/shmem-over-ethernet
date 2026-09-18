@@ -3353,7 +3353,7 @@ it.
 | Profiling interface (§10) | Mandatory: `pshmem_` names for every routine, `pshmem.h`, `shmem_pcontrol` | Step 1, as weak aliases. The export check widens to `^p?shmem_` |
 | Deprecated routines and headers (Annex F) | `start_pes` — "Implementations must include it" — and the other deprecated names; the `mpp/shmem.h` header location | Step 1: `start_pes` with an implicit finalize at exit; aliases |
 | Environment variables (§8) | `SHMEM_SYMMETRIC_SIZE`, `SHMEM_DEBUG`, `SHMEM_VERSION`, `SHMEM_INFO`, and their deprecated `SMA_*` forms | Step 1 |
-| C11 type-generic interfaces | Part of the API | Step 1, for the types implemented |
+| C11 type-generic interfaces | Part of the API | Step 1, for the types implemented. `_Generic` selects on *type*, and the exact-width types of Tables 6–8 are typedefs of the canonical ones on LP64 Linux, so the selection lists one association per distinct type and the library's build asserts that each typedef is the type assumed. Each list emits a *leading* comma per entry, so there is no `default:` association and a type outside the table is a compile error naming the call rather than a silent route to another type's routine |
 | `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1 |
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
 

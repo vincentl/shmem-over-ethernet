@@ -59,6 +59,7 @@ osoe_tier2_test(wait)
 osoe_tier2_test(signal)
 osoe_tier2_test(quiet)
 osoe_tier2_test(heap)
+osoe_tier2_test(amotypes)
 
 # osoe-stat, against a live job and against one deliberately stalled (§3.14).
 # It needs the tool's path, which only the build knows; the launcher passes its

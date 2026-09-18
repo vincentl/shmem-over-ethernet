@@ -68,37 +68,62 @@ void shmem_uint32_wait_until(uint32_t *ivar, int cmp, uint32_t cmp_value);
 int shmem_uint64_test(uint64_t *ivar, int cmp, uint64_t cmp_value);
 int shmem_uint32_test(uint32_t *ivar, int cmp, uint32_t cmp_value);
 
-/* Atomic memory operations (§9.7). Phase 1 step 1 provides the 64-bit and
- * 32-bit unsigned types; the rest of Table 6 follows mechanically. */
-void shmem_uint64_atomic_set(uint64_t *dest, uint64_t value, int pe);
-uint64_t shmem_uint64_atomic_swap(uint64_t *dest, uint64_t value, int pe);
-uint64_t shmem_uint64_atomic_fetch(const uint64_t *source, int pe);
-uint64_t shmem_uint64_atomic_compare_swap(uint64_t *dest, uint64_t cond, uint64_t value, int pe);
-void shmem_uint64_atomic_add(uint64_t *dest, uint64_t value, int pe);
-uint64_t shmem_uint64_atomic_fetch_add(uint64_t *dest, uint64_t value, int pe);
-void shmem_uint64_atomic_inc(uint64_t *dest, int pe);
-uint64_t shmem_uint64_atomic_fetch_inc(uint64_t *dest, int pe);
-void shmem_uint64_atomic_and(uint64_t *dest, uint64_t value, int pe);
-uint64_t shmem_uint64_atomic_fetch_and(uint64_t *dest, uint64_t value, int pe);
-void shmem_uint64_atomic_or(uint64_t *dest, uint64_t value, int pe);
-uint64_t shmem_uint64_atomic_fetch_or(uint64_t *dest, uint64_t value, int pe);
-void shmem_uint64_atomic_xor(uint64_t *dest, uint64_t value, int pe);
-uint64_t shmem_uint64_atomic_fetch_xor(uint64_t *dest, uint64_t value, int pe);
+/*
+ * Atomic memory operations (spec §9.7).
+ *
+ * The spec names one routine per (operation, type), over three type sets:
+ * Table 6 "standard" for compare_swap, inc, fetch_inc, add and fetch_add;
+ * Table 7 "extended", which is Table 6 plus float and double, for fetch, set
+ * and swap; and Table 8 "bitwise" for the and, or and xor families. They are
+ * declared here by expanding the type lists, the same way the definitions are
+ * generated, so a type appears once and the two cannot disagree.
+ *
+ * Every type in the three tables is four or eight bytes on this
+ * implementation's targets (LP64 Linux), which is the width the transport
+ * boundary's rmw takes. The library's own build asserts that, and asserts that
+ * each exact-width typedef really is the canonical type the C11 selection below
+ * lists, so a platform where they differ fails to build the library rather than
+ * silently omitting a case here.
+ */
+#define OSOE_AMO_STANDARD_TYPES(X)                                            \
+    X(int, int) X(long, long) X(long long, longlong)                          \
+    X(unsigned int, uint) X(unsigned long, ulong)                             \
+    X(unsigned long long, ulonglong)                                          \
+    X(int32_t, int32) X(int64_t, int64) X(uint32_t, uint32) X(uint64_t, uint64) \
+    X(size_t, size) X(ptrdiff_t, ptrdiff)
 
-void shmem_uint32_atomic_set(uint32_t *dest, uint32_t value, int pe);
-uint32_t shmem_uint32_atomic_swap(uint32_t *dest, uint32_t value, int pe);
-uint32_t shmem_uint32_atomic_fetch(const uint32_t *source, int pe);
-uint32_t shmem_uint32_atomic_compare_swap(uint32_t *dest, uint32_t cond, uint32_t value, int pe);
-void shmem_uint32_atomic_add(uint32_t *dest, uint32_t value, int pe);
-uint32_t shmem_uint32_atomic_fetch_add(uint32_t *dest, uint32_t value, int pe);
-void shmem_uint32_atomic_inc(uint32_t *dest, int pe);
-uint32_t shmem_uint32_atomic_fetch_inc(uint32_t *dest, int pe);
-void shmem_uint32_atomic_and(uint32_t *dest, uint32_t value, int pe);
-uint32_t shmem_uint32_atomic_fetch_and(uint32_t *dest, uint32_t value, int pe);
-void shmem_uint32_atomic_or(uint32_t *dest, uint32_t value, int pe);
-uint32_t shmem_uint32_atomic_fetch_or(uint32_t *dest, uint32_t value, int pe);
-void shmem_uint32_atomic_xor(uint32_t *dest, uint32_t value, int pe);
-uint32_t shmem_uint32_atomic_fetch_xor(uint32_t *dest, uint32_t value, int pe);
+/* Table 7 is Table 6 plus these two. */
+#define OSOE_AMO_FLOAT_TYPES(X) X(float, float) X(double, double)
+
+#define OSOE_AMO_BITWISE_TYPES(X)                                             \
+    X(unsigned int, uint) X(unsigned long, ulong)                             \
+    X(unsigned long long, ulonglong)                                          \
+    X(int32_t, int32) X(int64_t, int64) X(uint32_t, uint32) X(uint64_t, uint64)
+
+#define OSOE_AMO_DECL_STANDARD(T, NAME)                                       \
+    T shmem_##NAME##_atomic_compare_swap(T *dest, T cond, T value, int pe);   \
+    void shmem_##NAME##_atomic_inc(T *dest, int pe);                          \
+    T shmem_##NAME##_atomic_fetch_inc(T *dest, int pe);                       \
+    void shmem_##NAME##_atomic_add(T *dest, T value, int pe);                 \
+    T shmem_##NAME##_atomic_fetch_add(T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_EXTENDED(T, NAME)                                       \
+    T shmem_##NAME##_atomic_fetch(const T *source, int pe);                   \
+    void shmem_##NAME##_atomic_set(T *dest, T value, int pe);                 \
+    T shmem_##NAME##_atomic_swap(T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_BITWISE(T, NAME)                                        \
+    void shmem_##NAME##_atomic_and(T *dest, T value, int pe);                 \
+    T shmem_##NAME##_atomic_fetch_and(T *dest, T value, int pe);              \
+    void shmem_##NAME##_atomic_or(T *dest, T value, int pe);                  \
+    T shmem_##NAME##_atomic_fetch_or(T *dest, T value, int pe);               \
+    void shmem_##NAME##_atomic_xor(T *dest, T value, int pe);                 \
+    T shmem_##NAME##_atomic_fetch_xor(T *dest, T value, int pe);
+
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_STANDARD)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_EXTENDED)
+OSOE_AMO_FLOAT_TYPES(OSOE_AMO_DECL_EXTENDED)
+OSOE_AMO_BITWISE_TYPES(OSOE_AMO_DECL_BITWISE)
 
 /* Symmetric pointer (§9.1.9) */
 void *shmem_ptr(const void *dest, int pe);
@@ -130,6 +155,93 @@ void shmem_barrier_all(void);
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);
 void shmem_info_get_name(char *name);
+
+/*
+ * C11 type-generic interfaces (§7.4; spec §9.7).
+ *
+ * `_Generic` selects on the *type* of the pointer, so each association must
+ * name a distinct C type. The exact-width types of Tables 6-8 are typedefs of
+ * the canonical types on LP64 Linux - int32_t is int, uint64_t is unsigned
+ * long, size_t is unsigned long, and so on - so listing both spellings would be
+ * two associations for one type, which does not compile. The lists below are
+ * therefore one entry per distinct type, and the library's build asserts that
+ * each typedef really is the type assumed here.
+ *
+ * Each list emits a *leading* comma per entry, so `_Generic((dest) LIST)` is
+ * well formed and there is no `default:` association. That is deliberate: a
+ * type outside the table is then a compile error naming the call, rather than
+ * being quietly routed to some other type's routine.
+ *
+ * The OSOE_-prefixed macros here are this implementation's, not part of the
+ * API. They stay defined because the generic macros expand them at the point of
+ * use.
+ */
+#if !defined(__cplusplus) && defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+
+#define OSOE_AMO_G(T, NAME, OP)  , T *: shmem_##NAME##_atomic_##OP
+/* For shmem_atomic_fetch, whose argument may be const-qualified. */
+#define OSOE_AMO_GC(T, NAME, OP) , T *: shmem_##NAME##_atomic_##OP                \
+                                 , const T *: shmem_##NAME##_atomic_##OP
+
+/* Table 6, one entry per distinct C type. */
+#define OSOE_AMO_G_STANDARD(X, OP)                                                \
+    X(int, int, OP) X(long, long, OP) X(long long, longlong, OP)                  \
+    X(unsigned int, uint, OP) X(unsigned long, ulong, OP)                         \
+    X(unsigned long long, ulonglong, OP)
+
+/* Table 7: Table 6 plus float and double. */
+#define OSOE_AMO_G_EXTENDED(X, OP)                                                \
+    OSOE_AMO_G_STANDARD(X, OP) X(float, float, OP) X(double, double, OP)
+
+/* Table 8. int and long appear as int32_t and int64_t; there is no plain
+ * signed int or long in the bitwise table, which is why they map to the
+ * exact-width routine names. */
+#define OSOE_AMO_G_BITWISE(X, OP)                                                 \
+    X(int, int32, OP) X(long, int64, OP)                                          \
+    X(unsigned int, uint, OP) X(unsigned long, ulong, OP)                         \
+    X(unsigned long long, ulonglong, OP)
+
+#define shmem_atomic_fetch(source, pe)                                            \
+    (_Generic((source) OSOE_AMO_G_EXTENDED(OSOE_AMO_GC, fetch))((source), (pe)))
+#define shmem_atomic_set(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_G, set))((dest), (value), (pe)))
+#define shmem_atomic_swap(dest, value, pe)                                        \
+    (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_G, swap))((dest), (value), (pe)))
+
+#define shmem_atomic_compare_swap(dest, cond, value, pe)                          \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, compare_swap))               \
+        ((dest), (cond), (value), (pe)))
+#define shmem_atomic_inc(dest, pe)                                                \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, inc))((dest), (pe)))
+#define shmem_atomic_fetch_inc(dest, pe)                                          \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_inc))((dest), (pe)))
+#define shmem_atomic_add(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, add))((dest), (value), (pe)))
+#define shmem_atomic_fetch_add(dest, value, pe)                                   \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_add))                  \
+        ((dest), (value), (pe)))
+
+#define shmem_atomic_and(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, and))((dest), (value), (pe)))
+#define shmem_atomic_fetch_and(dest, value, pe)                                   \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_and))                   \
+        ((dest), (value), (pe)))
+#define shmem_atomic_or(dest, value, pe)                                          \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, or))((dest), (value), (pe)))
+#define shmem_atomic_fetch_or(dest, value, pe)                                    \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_or))                    \
+        ((dest), (value), (pe)))
+#define shmem_atomic_xor(dest, value, pe)                                         \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, xor))((dest), (value), (pe)))
+#define shmem_atomic_fetch_xor(dest, value, pe)                                   \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_xor))                   \
+        ((dest), (value), (pe)))
+
+#endif /* C11 */
+
+#undef OSOE_AMO_DECL_STANDARD
+#undef OSOE_AMO_DECL_EXTENDED
+#undef OSOE_AMO_DECL_BITWISE
 
 #ifdef __cplusplus
 }
