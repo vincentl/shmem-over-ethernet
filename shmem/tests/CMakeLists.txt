@@ -135,6 +135,7 @@ osoe_tier2_test(wait)
 osoe_tier2_test(signal)
 osoe_tier2_test(quiet)
 osoe_tier2_test(heap)
+osoe_tier2_test(landing)
 osoe_tier2_test(amo-types)
 
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published

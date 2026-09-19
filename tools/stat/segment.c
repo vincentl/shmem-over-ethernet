@@ -17,11 +17,24 @@
 
 #include "segment.h"
 
-/* Only the two structures the design freezes may be known by layout, and a
+/*
+ * Only the two structures the design freezes may be known by layout, and a
  * reader that silently disagreed about their size would read nonsense from a
- * segment it had just declared valid. */
+ * segment it had just declared valid.
+ *
+ * These numbers move when a field is *appended*, which §3.14 allows, and never
+ * for any other reason - so a failure here is either an intended append whose
+ * number needs updating in both copies, or a reorder or resize that must not
+ * happen. The directory grew to 136 at layout 6, with the landing zones.
+ *
+ * The library declares the same structure independently in shmem/src/node.h,
+ * deliberately: a tool that included the library's headers would only prove the
+ * library agrees with itself. The cost is two copies that must not drift, and
+ * the matching assertion there is what makes a drift in size fail the build
+ * rather than the job.
+ */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 112, "frozen by §3.14");
+_Static_assert(sizeof(struct osoe_segment_directory) == 136, "frozen by §3.14; 136 at layout 6");
 
 uint64_t osoe_segment_now_ns(void)
 {
@@ -93,7 +106,7 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
     s->bytes = (size_t)st.st_size;
     s->dir = (const struct osoe_segment_directory *)p;
 
-    if (s->dir->magic != OSOE_SEG_MAGIC) {
+    if (s->dir->magic != OSOE_SEGMENT_MAGIC) {
         unsigned long long magic = (unsigned long long)s->dir->magic;
         char shown[OSOE_SEGMENT_NAME_MAX];
         memcpy(shown, s->name, sizeof shown);
@@ -107,7 +120,10 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
      * caller prints what it does know. That is what freezing the directory
      * bought, and refusing here would spend it.
      */
-    if (s->dir->directory_bytes < sizeof *s->dir)
+    /* Ask for the fields the table needs, not for the whole directory: see
+     * OSOE_SEGMENT_HAS. Requiring the whole structure discarded the table of
+     * every segment written by an older library. */
+    if (!OSOE_SEGMENT_HAS(s->dir, metric_descriptor_bytes))
         return 0;
     if (s->dir->metrics_count == 0 || s->dir->metric_descriptor_bytes != sizeof(struct osoe_metric_descriptor))
         return 0;

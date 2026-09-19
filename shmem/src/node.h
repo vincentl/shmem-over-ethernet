@@ -26,7 +26,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 5
+#define OSOE_NODE_LAYOUT 6
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -139,6 +139,12 @@ struct osoe_segment_directory {
     uint32_t block_count;            /* local_count * blocks_per_pe */
     uint32_t block_bytes;
     uint32_t blocks_per_pe;          /* OSOE_MAX_THREADS */
+
+    /* Appended at layout 6: the §3.12 landing zones, one slot per local PE. */
+    uint64_t landing_offset;
+    uint64_t landing_bytes;
+    uint32_t landing_slot_bytes;     /* header plus one AM chunk */
+    uint32_t landing_count;          /* local_count */
 };
 
 struct osoe_node_header {
@@ -184,6 +190,56 @@ struct osoe_node_header {
     struct osoe_epoch shared_copied;
 };
 
+/*
+ * A PE's landing zone (§3.12, §4.6).
+ *
+ * A get's `dest` may be a stack or malloc buffer that the lead's process cannot
+ * see, so a reply cannot be written where the caller asked for it. It lands
+ * here, in the node segment, and the *origin* copies it out - the calling
+ * thread for a blocking get or fetching AMO, that PE's agent or the application
+ * thread at quiet for a nonblocking one. This is the correction to the earlier
+ * claim that the origin never needs a helper: it never needs one for progress,
+ * but it does need its private memory written by a thread inside it.
+ *
+ * It belongs in the control segment rather than the AM connection area because
+ * it is needed by *every* backend: the reason it exists is the address space
+ * boundary, not the network. An RDMA backend writing a reply straight into the
+ * origin's memory still cannot write a private `dest`.
+ *
+ * One slot per PE is enough while gets and fetching AMOs are blocking: under
+ * SERIALIZED a PE has at most one outstanding (§4.6), so the slot is sized by L
+ * alone and not by node count. Nonblocking gets change that, and the counters
+ * below are already the shape §4.6 specifies for them.
+ */
+struct osoe_landing_slot {
+    /*
+     * §4.6's get completion: two cumulative counters, never reset, with the
+     * companion 32-bit wake word they need because a 64-bit counter cannot be
+     * futexed (§4.9). The progress thread adds landed bytes, bumps the wake
+     * word, then wakes; the waiter loads the wake word, then compares the
+     * counters, then waits on the wake word.
+     */
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint64_t bytes_issued;      /* this PE adds expected bytes on issue */
+    _Atomic uint64_t bytes_landed;      /* the progress thread adds as chunks land */
+    _Atomic uint32_t counter_wake;
+
+    /*
+     * Per-operation completion, which the counters cannot serve: a blocking
+     * caller waits for *its* reply, not for a byte count (§4.6).
+     */
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint32_t wake;
+    _Atomic uint32_t ready;             /* 0, or 1 once `data` and `value` are complete */
+    _Atomic uint32_t length;            /* bytes in `data` */
+    _Atomic uint64_t value;             /* a fetching AMO's result */
+
+    /* The reply bytes. One AM chunk is enough: a larger get is chunked on the
+     * wire (§3.2) and the origin copies each chunk out before the next lands. */
+    _Alignas(OSOE_CACHELINE)
+    unsigned char data[];
+};
+
 /* Process-private view of the node. */
 struct osoe_node {
     char control_name[80];
@@ -195,7 +251,18 @@ struct osoe_node {
     int32_t *local_of_rank;         /* world rank -> local id, or -1 */
     uint64_t heap_bytes;
     uint64_t heap_size;             /* the agreed SHMEM_SYMMETRIC_SIZE */
+    unsigned char *landing;         /* the landing zones; index with osoe_node_landing */
+    uint32_t landing_slot_bytes;
 };
+
+/* This node's landing slot for a local PE. The slot is not a fixed-size type -
+ * its payload is one AM chunk - so it is indexed by bytes, never by array. */
+static inline struct osoe_landing_slot *osoe_node_landing(const struct osoe_node *n,
+                                                          uint32_t local_id)
+{
+    return (struct osoe_landing_slot *)(n->landing +
+                                        (size_t)local_id * n->landing_slot_bytes);
+}
 
 /* Rendezvous with the other local PEs; map every heap. Fatal on failure. */
 void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session);

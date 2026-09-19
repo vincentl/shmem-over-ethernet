@@ -36,7 +36,7 @@
 #include <stdint.h>
 
 /* "osoenode", little-endian. */
-#define OSOE_SEG_MAGIC UINT64_C(0x65646f6e656f736f)
+#define OSOE_SEGMENT_MAGIC UINT64_C(0x65646f6e656f736f)
 
 /* Long enough for /osoe.<u64>.<u32>.<u32>.<u32> and then some. */
 enum { OSOE_SEGMENT_NAME_MAX = 128 };
@@ -66,7 +66,30 @@ struct osoe_segment_directory {
     uint32_t block_count;
     uint32_t block_bytes;
     uint32_t blocks_per_pe;
+
+    /* Appended at layout 6: the §3.12 landing zones. A reader built before
+     * them sees a shorter `directory_bytes` and simply does not ask. */
+    uint64_t landing_offset;
+    uint64_t landing_bytes;
+    uint32_t landing_slot_bytes;
+    uint32_t landing_count;
 };
+
+/*
+ * Is this field present in the directory the writer actually filled in?
+ *
+ * The append-only rule only works if a reader asks per field rather than for
+ * the whole structure. An earlier version of this reader required
+ * `directory_bytes >= sizeof(struct osoe_segment_directory)` before it would
+ * use the metric table at all, which made the contract one-directional: the
+ * moment the library appended a field, a tool built against the older
+ * directory was fine but a tool built against the newer one discarded the
+ * table of every older segment - losing everything, over a field it was not
+ * going to read. Ask for what you are about to use.
+ */
+#define OSOE_SEGMENT_HAS(dir, field) \
+    ((dir)->directory_bytes >= offsetof(struct osoe_segment_directory, field) + \
+                               sizeof (dir)->field)
 
 struct osoe_metric_descriptor {
     char     name[40];
@@ -125,7 +148,7 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
 void osoe_segment_close(struct osoe_segment *s);
 
 /* The layout this reader was built against. Not a requirement - see above. */
-#define OSOE_SEG_KNOWN_LAYOUT 5
+#define OSOE_SEGMENT_KNOWN_LAYOUT 6
 
 /* The metric of that name, or NULL. */
 const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name);

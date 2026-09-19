@@ -828,7 +828,19 @@ buffers (§3.5), and ask the lead for everything else — seal-and-flush for
 **Replies land in shared memory, never at a private address.** A get's `dest`
 may be a stack or `malloc` buffer the lead's process cannot see. Each PE
 therefore has a **landing zone** in the node segment, sized by the outstanding-get
-resource (§4.6). The progress thread writes reply chunks and fetching-AMO results
+resource (§4.6).
+
+It is in the **control segment**, not the AM connection area (§3.4), because the
+reason it exists is the address-space boundary rather than the network: every
+backend needs it, and an RDMA backend writing a reply straight into the origin's
+memory still cannot write a private `dest`. It arrived at control-segment
+**layout 6**, one slot per local PE, each holding one AM chunk — a landing zone
+smaller than the wire's largest message would make that message undeliverable,
+which is a hang rather than a short read. One slot per PE is enough while gets
+and fetching AMOs are blocking, since `SERIALIZED` allows one outstanding (§4.6),
+so the zone is sized by `L` and not by node count; nonblocking gets change that,
+and the `bytes_issued`/`bytes_landed` pair beside it is already the shape §4.6
+specifies for them. The progress thread writes reply chunks and fetching-AMO results
 there, and the *origin* copies into `dest`:
 
 - blocking get or fetching AMO: the calling thread, already waiting in the

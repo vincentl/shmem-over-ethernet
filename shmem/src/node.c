@@ -14,8 +14,20 @@
 #include "base/deadline.h"
 #include "base/futex.h"
 #include "fatal.h"
+#include "connection-area.h"
+
 #include "metrics.h"
 #include "node.h"
+
+/*
+ * The writer's half of §3.14's frozen prefix. tools/stat declares the same
+ * structure independently, so that the reader proves something about the
+ * segment rather than about the library's own headers; these assertions are
+ * what keep the two copies the same size. Both move together when a field is
+ * appended, and never otherwise.
+ */
+_Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
+_Static_assert(sizeof(struct osoe_segment_directory) == 136, "frozen by §3.14; 136 at layout 6");
 
 /*
  * Candidate heap bases, tried in order by the lead; the first where its own
@@ -212,7 +224,21 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint64_t blocks_offset = align_up(metrics_offset + metrics_bytes);
     uint64_t block_count = (uint64_t)b->local_count * per_pe;
     uint64_t blocks_bytes = block_count * sizeof(struct osoe_counter_block);
-    n->control_bytes = page_round(blocks_offset + blocks_bytes);
+
+    /*
+     * The §3.12 landing zones, one slot per local PE, each holding one AM chunk
+     * (§3.2). Sized from the same OSOE_AM_CHUNK the AM layer uses, because a
+     * reply chunk has to fit: a landing zone smaller than a chunk would make
+     * the wire's maximum message undeliverable, which is a hang rather than a
+     * short read.
+     */
+    struct osoe_am_config am;
+    osoe_am_config_read(&am);
+    uint64_t landing_slot_bytes =
+        align_up(sizeof(struct osoe_landing_slot) + am.chunk);
+    uint64_t landing_offset = align_up(blocks_offset + blocks_bytes);
+    uint64_t landing_bytes = (uint64_t)b->local_count * landing_slot_bytes;
+    n->control_bytes = page_round(landing_offset + landing_bytes);
     if (ftruncate(fd, (off_t)n->control_bytes) != 0) {
         close(fd);
         shm_unlink(n->control_name);
@@ -251,9 +277,15 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->dir.blocks_bytes = blocks_bytes;
     h->dir.block_count = (uint32_t)block_count;
     h->dir.blocks_per_pe = per_pe;
+    h->dir.landing_offset = landing_offset;
+    h->dir.landing_bytes = landing_bytes;
+    h->dir.landing_slot_bytes = (uint32_t)landing_slot_bytes;
+    h->dir.landing_count = b->local_count;
     h->dir.block_bytes = (uint32_t)sizeof(struct osoe_counter_block);
     memcpy((char *)p + metrics_offset, metrics, metrics_bytes);
     n->blocks = (struct osoe_counter_block *)((char *)p + blocks_offset);
+    n->landing = (unsigned char *)p + landing_offset;
+    n->landing_slot_bytes = (uint32_t)landing_slot_bytes;
     osoe_epoch_init(&h->world_arrived);
     osoe_epoch_init(&h->world_released);
     osoe_epoch_init(&h->world_copied);
@@ -327,6 +359,11 @@ static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, ui
                    n->control_name);
     n->slots = (struct osoe_pe_slot *)((char *)n->hdr + h->dir.slots_offset);
     n->blocks = (struct osoe_counter_block *)((char *)n->hdr + h->dir.blocks_offset);
+    /* Read from the directory rather than recomputed: a PE that derived the
+     * offset itself would disagree with the lead the moment the two ran
+     * different builds, which is what the frozen directory exists to prevent. */
+    n->landing = (unsigned char *)n->hdr + h->dir.landing_offset;
+    n->landing_slot_bytes = h->dir.landing_slot_bytes;
 
     /* The metric table is fixed for a build, so a mismatch is a mixed-library
      * job that the layout check above did not catch (§3.13's argument for
@@ -476,5 +513,6 @@ void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)
     n->hdr = NULL;
     n->slots = NULL;
     n->blocks = NULL;
+    n->landing = NULL;
     n->control_name[0] = '\0';
 }

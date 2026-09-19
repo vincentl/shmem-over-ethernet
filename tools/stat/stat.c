@@ -104,7 +104,7 @@ static void describe_watch(char *buf, size_t len, uint32_t layout, uint64_t word
         snprintf(buf, len, "-");
         return;
     }
-    if (layout != OSOE_SEG_KNOWN_LAYOUT) {
+    if (layout != OSOE_SEGMENT_KNOWN_LAYOUT) {
         snprintf(buf, len, "%#" PRIx64 " (layout %u: encoding unknown)", word, layout);
         return;
     }

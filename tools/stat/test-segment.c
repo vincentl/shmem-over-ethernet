@@ -149,7 +149,7 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
 
     struct osoe_segment_directory d;
     memset(&d, 0, sizeof d);
-    d.magic = damage == BAD_MAGIC ? UINT64_C(0xdeadbeef) : OSOE_SEG_MAGIC;
+    d.magic = damage == BAD_MAGIC ? UINT64_C(0xdeadbeef) : OSOE_SEGMENT_MAGIC;
     d.layout = 999;                         /* a layout from the future */
     d.directory_bytes = sizeof d;
     d.header_bytes = HEADER_BYTES;
