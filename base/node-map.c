@@ -68,10 +68,10 @@ uint32_t osoe_node_map_local_count(const struct osoe_node_map *m, uint32_t node)
 }
 
 uint32_t osoe_node_map_gtids(const struct osoe_node_map *m, uint32_t node,
-                             uint32_t *out, uint32_t cap)
+                             uint32_t *out, uint32_t capacity)
 {
     uint32_t n = osoe_node_map_local_count(m, node);
-    if (n > cap)
+    if (n > capacity)
         return 0;
     uint32_t k = 0;
     for (uint32_t i = 0; i < m->world_size; i++)

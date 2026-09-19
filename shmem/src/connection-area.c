@@ -27,7 +27,7 @@
  * from it. `ready` is last and on its own line because it is the publication
  * point: everything above it is written before it is set.
  */
-struct osoe_connectionection_area_header {
+struct osoe_connection_area_header {
     uint64_t magic;
     uint32_t layout;
     uint32_t node;
@@ -35,7 +35,7 @@ struct osoe_connectionection_area_header {
     uint32_t reserved;
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
-    uint64_t conns_offset;      /* nodes-1 struct osoe_connectionection_shared */
+    uint64_t conns_offset;      /* nodes-1 struct osoe_connection_shared */
     uint64_t data_offset;       /* nodes-1 pairs of buffer_bytes */
     uint64_t area_bytes;
 
@@ -69,8 +69,8 @@ uint64_t osoe_am_area_bytes(uint32_t nodes, uint64_t buffer)
     if (nodes < 2)
         return 0;
     uint64_t peers = nodes - 1;
-    uint64_t conns = align_up(sizeof(struct osoe_connectionection_area_header)) +
-                     align_up(peers * sizeof(struct osoe_connectionection_shared));
+    uint64_t conns = align_up(sizeof(struct osoe_connection_area_header)) +
+                     align_up(peers * sizeof(struct osoe_connection_shared));
     return conns + peers * 2 * buffer;
 }
 
@@ -133,10 +133,10 @@ void osoe_am_config_read(struct osoe_am_config *c)
     c->hugepages = huge != 0;
 }
 
-void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const struct osoe_bootstrap *b,
+void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe_bootstrap *b,
                         uint32_t nodes, uint32_t session)
 {
-    *a = (struct osoe_connectionection_area){ 0 };
+    *a = (struct osoe_connection_area){ 0 };
     a->node = b->node;
     a->nodes = nodes;
     if (nodes < 2)
@@ -234,18 +234,18 @@ void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const
     }
     a->map = p;
 
-    struct osoe_connectionection_area_header *h = p;
+    struct osoe_connection_area_header *h = p;
     uint64_t conns_offset = align_up(sizeof *h);
     uint64_t data_offset = conns_offset +
-                           align_up((uint64_t)peers * sizeof(struct osoe_connectionection_shared));
+                           align_up((uint64_t)peers * sizeof(struct osoe_connection_shared));
 
     a->conn = calloc(peers, sizeof *a->conn);
     if (!a->conn)
         osoe_fatal("out of memory for %u connection handles", peers);
     for (uint32_t i = 0; i < peers; i++) {
-        a->conn[i].s = (struct osoe_connectionection_shared *)((char *)p + conns_offset) + i;
+        a->conn[i].s = (struct osoe_connection_shared *)((char *)p + conns_offset) + i;
         a->conn[i].data = (unsigned char *)p + data_offset + (uint64_t)i * 2 * buffer;
-        a->conn[i].cap = (uint32_t)buffer;
+        a->conn[i].capacity = (uint32_t)buffer;
     }
 
     if (a->creator) {
@@ -262,7 +262,7 @@ void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const
          * until the agent opens one. Zeroed memory would say the opposite
          * (§3.5). */
         for (uint32_t i = 0; i < peers; i++)
-            osoe_connectionection_init(&a->conn[i]);
+            osoe_connection_init(&a->conn[i]);
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
@@ -286,7 +286,7 @@ void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const
     }
 }
 
-void osoe_connectionection_area_close(struct osoe_connectionection_area *a)
+void osoe_connection_area_close(struct osoe_connection_area *a)
 {
     free(a->conn);
     if (a->map) {
@@ -294,10 +294,10 @@ void osoe_connectionection_area_close(struct osoe_connectionection_area *a)
         if (a->creator)
             shm_unlink(a->name);
     }
-    *a = (struct osoe_connectionection_area){ 0 };
+    *a = (struct osoe_connection_area){ 0 };
 }
 
-struct osoe_connection *osoe_connectionection_to(struct osoe_connectionection_area *a, uint32_t peer)
+struct osoe_connection *osoe_connection_to(struct osoe_connection_area *a, uint32_t peer)
 {
     if (peer == a->node || peer >= a->nodes || !a->conn)
         return NULL;

@@ -100,7 +100,7 @@ struct osoe_am_config {
 void osoe_am_config_read(struct osoe_am_config *c);
 
 /* Process-private handle on the area. */
-struct osoe_connectionection_area {
+struct osoe_connection_area {
     char name[96];
     void *map;
     uint64_t bytes;
@@ -117,13 +117,13 @@ struct osoe_connectionection_area {
  * failure (§3.15). A job of one node maps nothing and leaves the handle empty,
  * so the caller need not special-case it.
  */
-void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const struct osoe_bootstrap *b,
+void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe_bootstrap *b,
                         uint32_t nodes, uint32_t session);
 
 /* Unmap; the lead also removes the name. */
-void osoe_connectionection_area_close(struct osoe_connectionection_area *a);
+void osoe_connection_area_close(struct osoe_connection_area *a);
 
 /* This node's connection toward `peer`, or NULL if peer is this node. */
-struct osoe_connection *osoe_connectionection_to(struct osoe_connectionection_area *a, uint32_t peer);
+struct osoe_connection *osoe_connection_to(struct osoe_connection_area *a, uint32_t peer);
 
 #endif /* OSOE_CONNECTION_AREA_H */

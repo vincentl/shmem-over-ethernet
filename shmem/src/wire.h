@@ -41,8 +41,8 @@
  *
  *     for (;;) {
  *         uint32_t seq = osoe_wire_seq(w);       // BEFORE draining
- *         n = osoe_wire_recv(w, buf, sizeof buf);
- *         if (n > 0) { parse(buf, n); continue; }
+ *         n = osoe_wire_recv(w, buffer, sizeof buffer);
+ *         if (n > 0) { parse(buffer, n); continue; }
  *         osoe_wire_wait(w, seq, &sweep_deadline);
  *     }
  */
@@ -76,7 +76,7 @@ struct osoe_wire {
     uint64_t bytes;             /* its mapped length */
     struct osoe_wire_direction *tx;   /* this node writes here */
     struct osoe_wire_direction *rx;   /* and reads here */
-    uint64_t cap;               /* bytes per direction */
+    uint64_t capacity;               /* bytes per direction */
     uint64_t seed;              /* split injection, derived from job and step */
     uint32_t split;             /* truncations per myriad; 0 disables */
     uint64_t sends;             /* this process's transfers, for the seed */
@@ -102,10 +102,10 @@ void osoe_wire_close(struct osoe_wire *w);
  * short send on a real socket ("advance past a short send and resubmit the
  * remainder").
  */
-size_t osoe_wire_send(struct osoe_wire *w, const void *buf, size_t len);
+size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len);
 
 /* Read up to len bytes. Returns how many were delivered, which may be 0. */
-size_t osoe_wire_recv(struct osoe_wire *w, void *buf, size_t len);
+size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len);
 
 /*
  * The receive side's wake value. Load it BEFORE draining, and pass it to

@@ -57,7 +57,7 @@ struct payload {
     uint64_t seq_read;
 };
 
-static struct osoe_connectionection_shared shared;
+static struct osoe_connection_shared shared;
 static unsigned char storage[2 * CAP];
 static struct osoe_connection conn = { &shared, storage, CAP };
 
@@ -78,7 +78,7 @@ static void *writer_main(void *arg)
     for (uint32_t i = 0; i < PER_WRITER; i++) {
         struct osoe_reservation r;
         for (;;) {
-            enum osoe_reservation_status st = osoe_connectionection_reserve(&conn, len, &r);
+            enum osoe_reservation_status st = osoe_connection_reserve(&conn, len, &r);
             if (st == OSOE_RESERVATION_OK)
                 break;
             /* FULL asks the progress thread for a seal and NONE waits for one
@@ -91,7 +91,7 @@ static void *writer_main(void *arg)
         struct payload p = { me, i, r.seq };
         memcpy(at, &h, sizeof h);
         memcpy(at + sizeof h, &p, sizeof p);
-        osoe_connectionection_commit(&conn, &r);
+        osoe_connection_commit(&conn, &r);
     }
     atomic_fetch_add_explicit(&writers_done, 1, memory_order_seq_cst);
     return NULL;
@@ -143,8 +143,8 @@ int main(void)
     uint64_t last_seq = 0;
     uint32_t replies = 0;
 
-    osoe_connectionection_init(&conn);
-    osoe_connectionection_open(&conn, 0, next_seq++);
+    osoe_connection_init(&conn);
+    osoe_connection_open(&conn, 0, next_seq++);
     state[0] = OSOE_BUFFER_OPEN;
 
     pthread_t th[WRITERS];
@@ -168,16 +168,16 @@ int main(void)
             last_ngot = ngot;
             moved = now;
         } else if (now.tv_sec - moved.tv_sec > 5) {
-            uint32_t h0 = atomic_load_explicit(&shared.buf[0].head, memory_order_acquire);
-            uint32_t h1 = atomic_load_explicit(&shared.buf[1].head, memory_order_acquire);
+            uint32_t h0 = atomic_load_explicit(&shared.buffer[0].head, memory_order_acquire);
+            uint32_t h1 = atomic_load_explicit(&shared.buffer[1].head, memory_order_acquire);
             fprintf(stderr, "stalled after %zu of %d messages: "
                             "buf0 head=%#x filled=%u state=%d, "
                             "buf1 head=%#x filled=%u state=%d, pending=%d draining=%d, "
                             "writers done %u of %d\n",
                     ngot, TOTAL,
-                    h0, atomic_load_explicit(&shared.buf[0].filled, memory_order_acquire),
+                    h0, atomic_load_explicit(&shared.buffer[0].filled, memory_order_acquire),
                     (int)state[0],
-                    h1, atomic_load_explicit(&shared.buf[1].filled, memory_order_acquire),
+                    h1, atomic_load_explicit(&shared.buffer[1].filled, memory_order_acquire),
                     (int)state[1], (int)pending, (int)draining,
                     atomic_load_explicit(&writers_done, memory_order_acquire), WRITERS);
             CHECK(false);
@@ -188,10 +188,10 @@ int main(void)
          * and asks again (§3.5). */
         if (pending != OSOE_CONNECTION_NONE) {
             uint32_t bytes;
-            if (osoe_connectionection_sendable(&conn, pending, &bytes)) {
+            if (osoe_connection_sendable(&conn, pending, &bytes)) {
                 /* Seal-time fields, filled by the progress thread (§3.4). */
                 struct osoe_am_segment_header sh = { 0 };
-                sh.seq = atomic_load_explicit(&shared.buf[pending].seq,
+                sh.seq = atomic_load_explicit(&shared.buffer[pending].seq,
                                               memory_order_acquire);
                 sh.total_len = bytes;
                 uint32_t off = (uint32_t)sizeof sh;
@@ -206,7 +206,7 @@ int main(void)
                 CHECK(sh.seq >= last_seq);                  /* SEQ */
                 last_seq = sh.seq;
                 deliver(pending, bytes);
-                osoe_connectionection_release(&conn, pending);
+                osoe_connection_release(&conn, pending);
                 /*
                  * Every other buffer goes through DRAINING with one reply in
                  * it, so the guard's path runs constantly rather than never.
@@ -226,7 +226,7 @@ int main(void)
          * open. Only the progress thread may reserve here. */
         if (draining != OSOE_CONNECTION_NONE) {
             struct osoe_reservation r;
-            if (osoe_connectionection_drain_reserve(&conn, draining,
+            if (osoe_connection_drain_reserve(&conn, draining,
                                         osoe_message_padded(sizeof(struct payload)), &r)) {
                 unsigned char *at = osoe_reservation_bytes(&conn, &r);
                 struct osoe_message_header mh = { REPLY_ID, 0,
@@ -247,7 +247,7 @@ int main(void)
         if (!any_open) {
             for (uint32_t k = 0; k < 2; k++)
                 if (state[k] == OSOE_BUFFER_FREE && k != pending && k != draining) {
-                    osoe_connectionection_open(&conn, k, next_seq++);
+                    osoe_connection_open(&conn, k, next_seq++);
                     state[k] = OSOE_BUFFER_OPEN;
                     break;
                 }
@@ -257,7 +257,7 @@ int main(void)
         if (++pass % 32 == 0 && pending == OSOE_CONNECTION_NONE) {
             for (uint32_t k = 0; k < 2; k++)
                 if (state[k] == OSOE_BUFFER_OPEN) {
-                    osoe_connectionection_seal(&conn, k);
+                    osoe_connection_seal(&conn, k);
                     state[k] = OSOE_BUFFER_SEALED_STATE;
                     pending = k;
                     break;
@@ -280,9 +280,9 @@ int main(void)
          * cross between the two loads.
          */
         for (uint32_t k = 0; k < 2; k++) {
-            uint32_t f = atomic_load_explicit(&shared.buf[k].filled,
+            uint32_t f = atomic_load_explicit(&shared.buffer[k].filled,
                                               memory_order_acquire);
-            uint32_t h = OSOE_BUFFER_USED(atomic_load_explicit(&shared.buf[k].head,
+            uint32_t h = OSOE_BUFFER_USED(atomic_load_explicit(&shared.buffer[k].head,
                                                             memory_order_acquire));
             CHECK(f <= h);
         }

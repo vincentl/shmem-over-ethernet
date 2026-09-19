@@ -57,9 +57,9 @@ uint32_t osoe_node_map_local_count(const struct osoe_node_map *m, uint32_t node)
 
 /*
  * The node's ranks in local-id order, written to out. Returns how many there
- * are; writes nothing and returns 0 if that exceeds cap.
+ * are; writes nothing and returns 0 if that exceeds capacity.
  */
 uint32_t osoe_node_map_gtids(const struct osoe_node_map *m, uint32_t node,
-                             uint32_t *out, uint32_t cap);
+                             uint32_t *out, uint32_t capacity);
 
 #endif /* OSOE_BASE_NODE_MAP_H */

@@ -110,7 +110,7 @@ void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset);
 enum {
     /*
      * Place this operation at the target only after every write issued
-     * earlier on the same (ctx, pe) has been placed. put-with-signal is a
+     * earlier on the same (context, pe) has been placed. put-with-signal is a
      * put followed by an rmw carrying this flag, so the signal never
      * announces bytes that have not landed (invariant 5). Free on backends
      * whose placement is already in issue order, which both of osoe's are.
@@ -177,7 +177,7 @@ enum {
  * Intranode: memcpy into the target's heap mapping, then osoe_transport_notify.
  * Applied before return.
  */
-void osoe_transport_put(struct osoe_transport_context *ctx, int pe, enum osoe_region region,
+void osoe_transport_put(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, const void *src, size_t len, unsigned flags);
 
 /*
@@ -202,7 +202,7 @@ void osoe_transport_put(struct osoe_transport_context *ctx, int pe, enum osoe_re
  * six production transports it surveyed. Recorded here before a benchmark
  * applies pressure for per-operation handles.
  */
-void osoe_transport_get(struct osoe_transport_context *ctx, int pe, enum osoe_region region,
+void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, void *dst, size_t len);
 
 /* Read-modify-write operations on one word. */
@@ -225,7 +225,7 @@ enum osoe_rmw_op {
  *
  * Applied exactly once, never replayed. Exclusive, as spec §3.2 requires,
  * against every other rmw of the same width on the same word issued through
- * contexts in the same atomicity domain - the domain of ctx's team - and
+ * contexts in the same atomicity domain - the domain of context's team - and
  * against waiters and tests on that word. Nothing more is promised: not
  * across domains, widths, or against puts, gets, and plain loads and stores.
  * osoe's intranode and AM backends happen to be exclusive across domains too
@@ -242,7 +242,7 @@ enum osoe_rmw_op {
  * osoe_transport_notify. The progress thread applies a remote rmw with the same
  * instruction on the same cache line, so the two unify (§4.1).
  */
-uint64_t osoe_transport_rmw(struct osoe_transport_context *ctx, int pe, enum osoe_region region,
+uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum osoe_region region,
                      uint64_t offset, enum osoe_rmw_op op, unsigned width,
                      uint64_t operand, uint64_t compare, unsigned flags);
 
@@ -312,8 +312,8 @@ void osoe_transport_set_range(enum osoe_region region, uint64_t offset, uint64_t
 /* ---- Ordering and completion ----------------------------------------- */
 
 /*
- * Fence: every write issued on ctx to any PE before this call is placed at
- * its target before any write issued on ctx to the same PE after it (spec
+ * Fence: every write issued on context to any PE before this call is placed at
+ * its target before any write issued on context to the same PE after it (spec
  * §9.12.1). On contexts without SHMEM_CTX_NOSTORE, also makes the calling
  * thread's earlier memory stores visible to other cores (§4.6 rule 2); a
  * NOSTORE context may skip that. Orders delivery; does not wait for
@@ -323,10 +323,10 @@ void osoe_transport_set_range(enum osoe_region region, uint64_t offset, uint64_t
  * AM: the serializing store, then seal and flush the dirty set with ack
  * requested; the dirty set is kept (§4.6).
  */
-void osoe_transport_fence(struct osoe_transport_context *ctx);
+void osoe_transport_fence(struct osoe_transport_context *context);
 
 /*
- * Wait: return once every write and nonblocking get issued on ctx - to the
+ * Wait: return once every write and nonblocking get issued on context - to the
  * listed PEs, or to every PE if pes is NULL - is complete, and visible to
  * every PE; and, on contexts without SHMEM_CTX_NOSTORE, the calling thread's
  * earlier memory stores are visible to other cores (spec §9.12.2, §9.12.3). With pes non-NULL and npes 0, returns
@@ -340,7 +340,7 @@ void osoe_transport_fence(struct osoe_transport_context *ctx);
  * PEs' nodes, wait for acknowledgements and bytes_landed == bytes_issued,
  * copy out completed gets, clear what was waited on (§4.6).
  */
-void osoe_transport_wait(struct osoe_transport_context *ctx, const int *pes, size_t npes);
+void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes);
 
 /* ---- Notification (§4.9) --------------------------------------------- */
 

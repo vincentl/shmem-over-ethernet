@@ -48,16 +48,16 @@ void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
     return (char *)osoe.node.heap_of[local] + offset;
 }
 
-void osoe_transport_fence(struct osoe_transport_context *ctx)
+void osoe_transport_fence(struct osoe_transport_context *context)
 {
-    (void)ctx;
+    (void)context;
     osoe_count(OSOE_C_TRANSPORT_FENCE_CALLS, 1);
     osoe_serializing_store();
 }
 
-void osoe_transport_wait(struct osoe_transport_context *ctx, const int *pes, size_t npes)
+void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes)
 {
-    (void)ctx;
+    (void)context;
     if (pes && npes == 0)
         return;
     osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
@@ -68,10 +68,10 @@ void osoe_transport_wait(struct osoe_transport_context *ctx, const int *pes, siz
     osoe_serializing_store();
 }
 
-void osoe_transport_put(struct osoe_transport_context *ctx, int pe, enum osoe_region region,
+void osoe_transport_put(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, const void *src, size_t len, unsigned flags)
 {
-    (void)ctx;
+    (void)context;
     (void)flags;                /* applied in issue order already: FENCED and MORE are free */
     osoe_count(OSOE_C_TRANSPORT_PUT_CALLS, 1);
     osoe_count(OSOE_C_TRANSPORT_PUT_BYTES, len);
@@ -84,10 +84,10 @@ void osoe_transport_put(struct osoe_transport_context *ctx, int pe, enum osoe_re
     osoe_transport_notify(pe, region, offset, len);
 }
 
-void osoe_transport_get(struct osoe_transport_context *ctx, int pe, enum osoe_region region,
+void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, void *dst, size_t len)
 {
-    (void)ctx;
+    (void)context;
     osoe_count(OSOE_C_TRANSPORT_GET_CALLS, 1);
     osoe_count(OSOE_C_TRANSPORT_GET_BYTES, len);
     const char *src = osoe_transport_direct(pe, region, offset);
@@ -139,11 +139,11 @@ void osoe_transport_get(struct osoe_transport_context *ctx, int pe, enum osoe_re
     }                                                                                 \
     result = old;
 
-uint64_t osoe_transport_rmw(struct osoe_transport_context *ctx, int pe, enum osoe_region region,
+uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum osoe_region region,
                      uint64_t offset, enum osoe_rmw_op op, unsigned width,
                      uint64_t operand, uint64_t compare, unsigned flags)
 {
-    (void)ctx;
+    (void)context;
     osoe_count(OSOE_C_TRANSPORT_RMW_CALLS, 1);
     if (flags & OSOE_TRANSPORT_FETCH)
         osoe_count(OSOE_C_TRANSPORT_RMW_FETCHING, 1);

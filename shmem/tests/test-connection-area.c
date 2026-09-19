@@ -87,18 +87,18 @@ int main(void)
         if (*g == ',')
             local_count++;
 
-    struct osoe_connectionection_area area;
-    osoe_connectionection_area_open(&area, &b, NODES, 0);
+    struct osoe_connection_area area;
+    osoe_connection_area_open(&area, &b, NODES, 0);
 
     /* One connection per peer node, and none to itself. */
-    CHECK(osoe_connectionection_to(&area, b.node) == NULL);
+    CHECK(osoe_connection_to(&area, b.node) == NULL);
     uint32_t peers = 0;
     for (uint32_t n = 0; n < NODES; n++)
         if (n != b.node) {
-            struct osoe_connection *c = osoe_connectionection_to(&area, n);
+            struct osoe_connection *c = osoe_connection_to(&area, n);
             CHECK(c != NULL);
             if (c) {
-                CHECK(c->cap == area.buffer_bytes);
+                CHECK(c->capacity == area.buffer_bytes);
                 peers++;
             }
         }
@@ -107,8 +107,8 @@ int main(void)
     /* Distinct connections get distinct buffers: an indexing slip that aliased
      * two peers would otherwise be invisible until traffic crossed. */
     if (NODES >= 3) {
-        struct osoe_connection *a = osoe_connectionection_to(&area, (b.node + 1) % NODES);
-        struct osoe_connection *c = osoe_connectionection_to(&area, (b.node + 2) % NODES);
+        struct osoe_connection *a = osoe_connection_to(&area, (b.node + 1) % NODES);
+        struct osoe_connection *c = osoe_connection_to(&area, (b.node + 2) % NODES);
         CHECK(a && c && a != c);
         if (a && c) {
             CHECK(a->s != c->s);
@@ -128,14 +128,14 @@ int main(void)
         for (uint32_t n = 0; n < NODES; n++) {
             if (n == b.node)
                 continue;
-            struct osoe_connection *c = osoe_connectionection_to(&area, n);
+            struct osoe_connection *c = osoe_connection_to(&area, n);
             struct osoe_reservation r;
-            CHECK(c && osoe_connectionection_reserve(c, len, &r) == OSOE_RESERVATION_NONE);
+            CHECK(c && osoe_connection_reserve(c, len, &r) == OSOE_RESERVATION_NONE);
         }
         /* Now play the agent: open one buffer per connection (§3.12). */
         for (uint32_t n = 0; n < NODES; n++)
             if (n != b.node)
-                osoe_connectionection_open(osoe_connectionection_to(&area, n), 0, 1000 + n);
+                osoe_connection_open(osoe_connection_to(&area, n), 0, 1000 + n);
     }
 
     /*
@@ -147,17 +147,17 @@ int main(void)
     for (uint32_t n = 0; n < NODES; n++) {
         if (n == b.node)
             continue;
-        struct osoe_connection *c = osoe_connectionection_to(&area, n);
+        struct osoe_connection *c = osoe_connection_to(&area, n);
         struct osoe_reservation r;
         for (;;) {
-            enum osoe_reservation_status st = osoe_connectionection_reserve(c, len, &r);
+            enum osoe_reservation_status st = osoe_connection_reserve(c, len, &r);
             if (st == OSOE_RESERVATION_OK)
                 break;
             if (osoe_deadline_expired(&give_up)) {
                 fprintf(stderr, "PE %u: no reservation on the connection to node %u\n",
                         b.rank, n);
                 CHECK(false);
-                osoe_connectionection_area_close(&area);
+                osoe_connection_area_close(&area);
                 return CHECK_DONE();
             }
             sched_yield();
@@ -169,7 +169,7 @@ int main(void)
         struct payload p = { b.rank, n, r.seq };
         memcpy(at, &mh, sizeof mh);
         memcpy(at + sizeof mh, &p, sizeof p);
-        osoe_connectionection_commit(c, &r);
+        osoe_connection_commit(c, &r);
     }
 
     /*
@@ -182,27 +182,27 @@ int main(void)
         for (uint32_t n = 0; n < NODES; n++) {
             if (n == b.node)
                 continue;
-            struct osoe_connection *c = osoe_connectionection_to(&area, n);
-            while (OSOE_BUFFER_USED(atomic_load_explicit(&c->s->buf[0].head,
+            struct osoe_connection *c = osoe_connection_to(&area, n);
+            while (OSOE_BUFFER_USED(atomic_load_explicit(&c->s->buffer[0].head,
                                                       memory_order_acquire)) < want) {
                 if (osoe_deadline_expired(&give_up)) {
                     fprintf(stderr, "lead: only %u of %u bytes reserved toward node %u\n",
-                            OSOE_BUFFER_USED(atomic_load_explicit(&c->s->buf[0].head,
+                            OSOE_BUFFER_USED(atomic_load_explicit(&c->s->buffer[0].head,
                                                                memory_order_acquire)),
                             want, n);
                     CHECK(false);
-                    osoe_connectionection_area_close(&area);
+                    osoe_connection_area_close(&area);
                     return CHECK_DONE();
                 }
                 sched_yield();
             }
-            osoe_connectionection_seal(c, 0);
+            osoe_connection_seal(c, 0);
             uint32_t bytes = 0;
-            while (!osoe_connectionection_sendable(c, 0, &bytes)) {
+            while (!osoe_connection_sendable(c, 0, &bytes)) {
                 if (osoe_deadline_expired(&give_up)) {
                     fprintf(stderr, "lead: connection to node %u never became sendable\n", n);
                     CHECK(false);
-                    osoe_connectionection_area_close(&area);
+                    osoe_connection_area_close(&area);
                     return CHECK_DONE();
                 }
                 sched_yield();
@@ -232,6 +232,6 @@ int main(void)
         }
     }
 
-    osoe_connectionection_area_close(&area);
+    osoe_connection_area_close(&area);
     return CHECK_DONE();
 }

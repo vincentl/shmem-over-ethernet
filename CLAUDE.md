@@ -49,7 +49,9 @@ and which words those are depends on the layer:
   `osoe_transport_context`, not `osoe_tp_ctx`. The design notes' own terms are
   words and stay as the notes spell them: `am` (active message), `rmw`, `cas`,
   `futex`, `numa`, `mtu`.
-- **Universal C spellings stay everywhere**: `len`, `ptr`, `fd`, `argv`.
+- **Universal C spellings stay everywhere**: `len`, `ptr`, `fd`, `argv`, and
+  `src`/`dst`, which are the parameter names of every `memcpy`-shaped
+  signature there has ever been.
 
 Everything else is spelled out, however long that gets.
 `osoe_connection_payload_capacity` beats `osoe_conn_payload_cap`, and the extra
@@ -67,3 +69,17 @@ and a one- or two-letter name for something used within a few lines of its
 declaration where the type makes it obvious, beat ceremony. The rule is about
 names a reader meets away from their declaration: anything in a header, anything
 crossing a function boundary, anything outliving a screen.
+
+## Mechanical renames
+
+Order substitutions **longest-first**, and remember that a catch-all applied
+after a specific one rewrites its own output: `osoe_conn` -> `osoe_connection`
+turned an already-correct `osoe_connection_shared` into
+`osoe_connectionection_shared`. That compiled and passed all four presets,
+because it was wrong *consistently* — a rename is one of the few changes whose
+defects a green test suite cannot see.
+
+So audit afterwards, and **check that the audit command can find something you
+know is there before believing an empty result**. An empty result from a broken
+grep looks exactly like a clean tree. The first audit of that rename reported
+clean because the pattern itself never matched anything.

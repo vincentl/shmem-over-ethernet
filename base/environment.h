@@ -23,8 +23,8 @@ int osoe_parse_u64(const char *s, uint64_t *out);
 int osoe_parse_u32(const char *s, uint32_t *out);
 
 /* A comma-separated list of u32, e.g. SLURM_GTIDS "0,1,2". At least one
- * element, at most cap. 0 on success, -1 if malformed or longer than cap. */
-int osoe_parse_u32_list(const char *s, uint32_t *out, size_t cap, size_t *n);
+ * element, at most capacity. 0 on success, -1 if malformed or longer than capacity. */
+int osoe_parse_u32_list(const char *s, uint32_t *out, size_t capacity, size_t *n);
 
 enum osoe_environment_status osoe_environment_u64(const char *name, uint64_t *out);
 enum osoe_environment_status osoe_environment_u32(const char *name, uint32_t *out);

@@ -33,10 +33,10 @@ struct osoe_wire_direction {
 };
 
 struct osoe_wire_header {
-    _Alignas(OSOE_CACHELINE) uint64_t cap;            /* bytes per direction */
+    _Alignas(OSOE_CACHELINE) uint64_t capacity;            /* bytes per direction */
     uint64_t magic;
     /*
-     * Published by the creator once cap and magic are written, and waited on by
+     * Published by the creator once capacity and magic are written, and waited on by
      * the opener - §6.2's `ready`, for the same reason it exists there. The
      * name appears at shm_open, which is before the header has been filled in
      * and before ftruncate has given the object its length, so a peer that
@@ -44,7 +44,7 @@ struct osoe_wire_header {
      * end of a zero-length mapping.
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t ready;
-    _Alignas(OSOE_CACHELINE) struct osoe_wire_direction dir[2];
+    _Alignas(OSOE_CACHELINE) struct osoe_wire_direction direction[2];
 };
 
 #define OSOE_WIRE_MAGIC UINT64_C(0x65726977656f736f)   /* "osoewire", little-endian */
@@ -56,7 +56,7 @@ static uint64_t data_offset(void)
 
 static unsigned char *ring(const struct osoe_wire *w, int which)
 {
-    return (unsigned char *)w->map + data_offset() + (uint64_t)which * w->cap;
+    return (unsigned char *)w->map + data_offset() + (uint64_t)which * w->capacity;
 }
 
 /*
@@ -97,17 +97,17 @@ static size_t truncate_to(const struct osoe_wire *w, uint64_t site, uint64_t n, 
 
 static void read_env(struct osoe_wire *w, const struct osoe_bootstrap *b)
 {
-    uint64_t cap = OSOE_WIRE_DEFAULT_BYTES;
-    if (osoe_environment_u64("OSOE_WIRE_BYTES", &cap) == OSOE_ENVIRONMENT_INVALID ||
-        cap < OSOE_WIRE_MIN_BYTES || cap > OSOE_WIRE_MAX_BYTES)
+    uint64_t capacity = OSOE_WIRE_DEFAULT_BYTES;
+    if (osoe_environment_u64("OSOE_WIRE_BYTES", &capacity) == OSOE_ENVIRONMENT_INVALID ||
+        capacity < OSOE_WIRE_MIN_BYTES || capacity > OSOE_WIRE_MAX_BYTES)
         osoe_fatal("OSOE_WIRE_BYTES='%s' is not a byte count between %llu and %llu",
                    getenv("OSOE_WIRE_BYTES"), (unsigned long long)OSOE_WIRE_MIN_BYTES,
                    (unsigned long long)OSOE_WIRE_MAX_BYTES);
     /* A power of two, so the wrap is a mask and the ring has no dead bytes. */
-    if ((cap & (cap - 1)) != 0)
+    if ((capacity & (capacity - 1)) != 0)
         osoe_fatal("OSOE_WIRE_BYTES=%llu is not a power of two",
-                   (unsigned long long)cap);
-    w->cap = cap;
+                   (unsigned long long)capacity);
+    w->capacity = capacity;
 
     uint32_t split = 0;
     if (osoe_environment_u32("OSOE_WIRE_SPLIT", &split) == OSOE_ENVIRONMENT_INVALID || split > 10000)
@@ -160,7 +160,7 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
     snprintf(w->name, sizeof w->name, "/osoe.%llu.%u.wire.%u.%u.%u",
              (unsigned long long)b->job, b->step, lo, hi, session);
 
-    uint64_t bytes = data_offset() + 2 * w->cap;
+    uint64_t bytes = data_offset() + 2 * w->capacity;
     int fd;
     if (w->creator) {
         fd = shm_open(w->name, O_CREAT | O_EXCL | O_RDWR, 0600);
@@ -223,7 +223,7 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
          * header is written before `ready`, and `ready` is what the peer waits
          * on - the store is seq_cst because this is the publishing half of a
          * two-sided protocol (§3.16). */
-        h->cap = w->cap;
+        h->capacity = w->capacity;
         h->magic = OSOE_WIRE_MAGIC;
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
@@ -240,18 +240,18 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
         }
         /* Both sides must agree on the capacity, or their index arithmetic
          * disagrees and the stream silently tears. */
-        if (h->magic != OSOE_WIRE_MAGIC || h->cap != w->cap)
+        if (h->magic != OSOE_WIRE_MAGIC || h->capacity != w->capacity)
             osoe_fatal("wire %s was created with a different OSOE_WIRE_BYTES (%llu, not "
                        "%llu): every PE of a job must set it the same", w->name,
-                       (unsigned long long)h->cap, (unsigned long long)w->cap);
+                       (unsigned long long)h->capacity, (unsigned long long)w->capacity);
     }
 
     /*
      * Direction 0 carries lo -> hi and direction 1 hi -> lo, so each side's tx
      * is the other's rx without either needing to know which created the object.
      */
-    w->tx = &h->dir[w->creator ? 0 : 1];
-    w->rx = &h->dir[w->creator ? 1 : 0];
+    w->tx = &h->direction[w->creator ? 0 : 1];
+    w->rx = &h->direction[w->creator ? 1 : 0];
 }
 
 void osoe_wire_close(struct osoe_wire *w)
@@ -266,10 +266,10 @@ void osoe_wire_close(struct osoe_wire *w)
 
 uint64_t osoe_wire_capacity(const struct osoe_wire *w)
 {
-    return w->cap;
+    return w->capacity;
 }
 
-size_t osoe_wire_send(struct osoe_wire *w, const void *buf, size_t len)
+size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len)
 {
     /*
      * The reader's progress first, then our own count. Both are ours to
@@ -279,7 +279,7 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buf, size_t len)
      */
     uint64_t consumed = atomic_load_explicit(&w->tx->consumed, memory_order_acquire);
     uint64_t produced = atomic_load_explicit(&w->tx->produced, memory_order_acquire);
-    uint64_t room = w->cap - (produced - consumed);
+    uint64_t room = w->capacity - (produced - consumed);
     if (room > len)
         room = len;
     size_t n = truncate_to(w, w->sends++, room, true);
@@ -288,14 +288,14 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buf, size_t len)
 
     /* Copy in, wrapping once at most. The mask is valid because the capacity
      * is a power of two, checked at open. */
-    uint64_t mask = w->cap - 1;
+    uint64_t mask = w->capacity - 1;
     uint64_t at = produced & mask;
     size_t first = n;
-    if (at + first > w->cap)
-        first = (size_t)(w->cap - at);
-    memcpy(ring(w, w->creator ? 0 : 1) + at, buf, first);
+    if (at + first > w->capacity)
+        first = (size_t)(w->capacity - at);
+    memcpy(ring(w, w->creator ? 0 : 1) + at, buffer, first);
     if (first < n)
-        memcpy(ring(w, w->creator ? 0 : 1), (const unsigned char *)buf + first, n - first);
+        memcpy(ring(w, w->creator ? 0 : 1), (const unsigned char *)buffer + first, n - first);
 
     /*
      * Publish the bytes, then the wake. This order is the protocol: a reader
@@ -309,7 +309,7 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buf, size_t len)
     return n;
 }
 
-size_t osoe_wire_recv(struct osoe_wire *w, void *buf, size_t len)
+size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len)
 {
     uint64_t produced = atomic_load_explicit(&w->rx->produced, memory_order_acquire);
     uint64_t consumed = atomic_load_explicit(&w->rx->consumed, memory_order_acquire);
@@ -320,14 +320,14 @@ size_t osoe_wire_recv(struct osoe_wire *w, void *buf, size_t len)
     if (n == 0)
         return 0;
 
-    uint64_t mask = w->cap - 1;
+    uint64_t mask = w->capacity - 1;
     uint64_t at = consumed & mask;
     size_t first = n;
-    if (at + first > w->cap)
-        first = (size_t)(w->cap - at);
-    memcpy(buf, ring(w, w->creator ? 1 : 0) + at, first);
+    if (at + first > w->capacity)
+        first = (size_t)(w->capacity - at);
+    memcpy(buffer, ring(w, w->creator ? 1 : 0) + at, first);
     if (first < n)
-        memcpy((unsigned char *)buf + first, ring(w, w->creator ? 1 : 0), n - first);
+        memcpy((unsigned char *)buffer + first, ring(w, w->creator ? 1 : 0), n - first);
 
     /* Release the space only once the bytes are out of it. */
     atomic_store_explicit(&w->rx->consumed, consumed + n, memory_order_seq_cst);
