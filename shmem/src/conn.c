@@ -1,0 +1,171 @@
+#include <stdatomic.h>
+
+#include "conn.h"
+
+/*
+ * §3.16's orders, applied here once so the rest reads as prose:
+ *   - every load of a shared protocol word names acquire;
+ *   - the reservation CAS and the `filled` accumulation name seq_cst, and
+ *     compile to locked instructions on every target;
+ *   - the progress thread's publication of a newly open buffer is a release
+ *     store on `open`, which is what carries head, filled and seq with it.
+ *
+ * This protocol is single-writer publication for everything the progress
+ * thread sets, and a locked read-modify-write for everything a writer sets, so
+ * it is also safe under x86's store buffering without any extra fence.
+ */
+
+void osoe_conn_init(struct osoe_conn *c)
+{
+    for (uint32_t k = 0; k < 2; k++) {
+        atomic_store_explicit(&c->s->buf[k].filled, 0, memory_order_release);
+        atomic_store_explicit(&c->s->buf[k].seq, 0, memory_order_release);
+        /* Sealed and empty: not reservable, and not mistakable for an open
+         * buffer with nothing in it. */
+        atomic_store_explicit(&c->s->buf[k].head, OSOE_BUF_SEALED, memory_order_release);
+    }
+}
+
+enum osoe_resv_status osoe_conn_reserve(struct osoe_conn *c, uint32_t len,
+                                        struct osoe_resv *r)
+{
+    struct osoe_conn_shared *s = c->s;
+    for (;;) {
+        /*
+         * Find the reservable buffer by the seal bit and nothing else. At most
+         * one is ever unsealed (§3.5), so this picks the only candidate; if
+         * both carry the bit there is nothing to reserve and the caller waits
+         * (§3.11).
+         */
+        uint32_t k = OSOE_CONN_NONE, h = 0;
+        for (uint32_t i = 0; i < 2; i++) {
+            uint32_t v = atomic_load_explicit(&s->buf[i].head, memory_order_acquire);
+            if (!(v & OSOE_BUF_SEALED)) {
+                k = i;
+                h = v;
+                break;
+            }
+        }
+        if (k == OSOE_CONN_NONE)
+            return OSOE_RESV_NONE;
+
+        if (h + len > c->cap)
+            return OSOE_RESV_FULL;      /* the caller asks for a seal, then retries */
+
+        /*
+         * A CAS, not a fetch_add: a writer that loses this race has changed
+         * nothing and simply looks again. The seal bit is part of the compared
+         * value, so a seal landing between the load above and this CAS makes it
+         * fail rather than succeed into a buffer already on its way out.
+         */
+        if (atomic_compare_exchange_weak_explicit(&s->buf[k].head, &h, h + len,
+                                                  memory_order_seq_cst,
+                                                  memory_order_acquire)) {
+            r->buf = k;
+            r->off = h;
+            r->len = len;
+            /*
+             * Read the sequence number after the reservation, with no extra
+             * synchronization. This is sound, and the comment is here because
+             * it looks like a race and someone will want to "fix" it with a
+             * lock: the buffer cannot recycle until filled == head, and this
+             * writer has not committed, so the number cannot change underneath.
+             */
+            r->seq = atomic_load_explicit(&s->buf[k].seq, memory_order_acquire);
+            return OSOE_RESV_OK;
+        }
+    }
+}
+
+void osoe_conn_commit(struct osoe_conn *c, const struct osoe_resv *r)
+{
+    atomic_fetch_add_explicit(&c->s->buf[r->buf].filled, r->len, memory_order_seq_cst);
+}
+
+void osoe_conn_open(struct osoe_conn *c, uint32_t k, uint64_t seq)
+{
+    struct osoe_conn_shared *s = c->s;
+    /*
+     * Nothing may reserve here yet: the buffer still carries the seal bit, so
+     * every writer CAS on it fails. filled and seq are therefore published
+     * first, and clearing the bit last is what hands the buffer over - a
+     * release store, so a writer that acquires the head sees both.
+     *
+     * head starts past the segment header, which the progress thread fills at
+     * seal time and no writer ever reserves (§3.4).
+     */
+    atomic_store_explicit(&s->buf[k].filled, (uint32_t)sizeof(struct osoe_seg_header),
+                          memory_order_release);
+    atomic_store_explicit(&s->buf[k].seq, seq, memory_order_release);
+    atomic_store_explicit(&s->buf[k].head, (uint32_t)sizeof(struct osoe_seg_header),
+                          memory_order_release);
+}
+
+void osoe_conn_seal(struct osoe_conn *c, uint32_t k)
+{
+    /*
+     * One locked instruction, and it is the whole seal. Every writer CAS
+     * compares against a head value that this changes, so a reservation racing
+     * the seal fails rather than landing in a buffer already on its way out -
+     * which is the defect the draft protocol had, with its separate state field
+     * read before the CAS.
+     */
+    atomic_fetch_or_explicit(&c->s->buf[k].head, OSOE_BUF_SEALED, memory_order_seq_cst);
+}
+
+bool osoe_conn_sendable(const struct osoe_conn *c, uint32_t k, uint32_t *bytes)
+{
+    const struct osoe_conn_shared *s = c->s;
+    uint32_t h = atomic_load_explicit(&s->buf[k].head, memory_order_acquire);
+    uint32_t f = atomic_load_explicit(&s->buf[k].filled, memory_order_acquire);
+    uint32_t used = OSOE_BUF_USED(h);
+    /*
+     * Equality, not >=. filled can never exceed the reserved count in a correct
+     * run, and a strict comparison would hide the generation-crossing defect
+     * the models call ACCT - a writer's commit landing in the next generation -
+     * behind a test that still looked satisfied.
+     */
+    if (f != used)
+        return false;
+    *bytes = used;
+    return true;
+}
+
+void osoe_conn_release(struct osoe_conn *c, uint32_t k)
+{
+    /*
+     * Keep the seal bit. A freed buffer that cleared it would accept a writer
+     * that had loaded `open` naming this buffer in the previous generation and
+     * not yet run its CAS, which is the DRAINRES defect of §3.8's guard. The
+     * bit comes off only in osoe_conn_open, together with `open`.
+     */
+    atomic_store_explicit(&c->s->buf[k].head, OSOE_BUF_SEALED, memory_order_release);
+    atomic_store_explicit(&c->s->buf[k].filled, 0, memory_order_release);
+}
+
+bool osoe_conn_drain_reserve(struct osoe_conn *c, uint32_t k, uint32_t len,
+                             struct osoe_resv *r)
+{
+    struct osoe_conn_shared *s = c->s;
+    /*
+     * Only the progress thread runs here. What keeps writers out is the seal
+     * bit the buffer still carries from osoe_conn_release: every writer CAS
+     * against it fails, and a writer scanning for an unsealed buffer skips it.
+     * The bit is kept in the stored value below, so the buffer stays closed
+     * while it fills with replies, and comes off only in osoe_conn_open.
+     */
+    uint32_t h = atomic_load_explicit(&s->buf[k].head, memory_order_acquire);
+    uint32_t used = OSOE_BUF_USED(h);
+    if (used < sizeof(struct osoe_seg_header))
+        used = (uint32_t)sizeof(struct osoe_seg_header);
+    if (used + len > c->cap)
+        return false;
+    atomic_store_explicit(&s->buf[k].head, (used + len) | OSOE_BUF_SEALED,
+                          memory_order_release);
+    atomic_fetch_add_explicit(&s->buf[k].filled, len, memory_order_seq_cst);
+    r->buf = k;
+    r->off = used;
+    r->len = len;
+    r->seq = atomic_load_explicit(&s->buf[k].seq, memory_order_acquire);
+    return true;
+}

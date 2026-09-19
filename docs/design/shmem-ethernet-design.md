@@ -395,6 +395,27 @@ buffer (§3.8) carries the seal bit, so writers skip it while the progress threa
 fills it with replies; opening it clears the bit. The progress thread submits only
 once `filled` equals the reserved count.
 
+**A connection starts with both buffers sealed, and that has to be written
+down.** Shared memory arrives zeroed — `ftruncate` guarantees it, and §6.2
+relies on that for every other counter and futex word in the design — so a
+connection that is merely zeroed has both heads at 0, which reads as *unsealed
+and empty*: two reservable buffers, the state this section forbids, before the
+progress thread has opened anything. Writers would reserve into a buffer the
+progress thread believes is free, and it would reset the head over their
+messages when it opened it. Initializing a connection therefore means setting
+the seal bit on both buffers, not zeroing them. *(Found in implementation at
+§7.1 step 2: the zeroed state is reachable precisely because zeroing is
+otherwise the right default everywhere else.)*
+
+**Writers find the reservable buffer by the seal bit and nothing else.** With
+two buffers that is two loads, and no separate word names the open one. An index
+would be this section's rejected draft in a new place: a writer reads it and
+then CASes a head the progress thread sealed in between. The CAS would still
+fail, so the index would not be *wrong* — it would be worse than that, leaving
+the seal bit doing nothing the index had not already done, while §3.8's
+`DRAINING` guard rests on the bit alone. Keeping the bit as the only decider is
+what keeps the guard's rule load-bearing rather than decorative.
+
 **The progress thread must never spin waiting for `filled` to catch up.** A
 writer may be descheduled mid-`memcpy`. Move to other connections and re-check
 later. At 256 PEs on an oversubscribed node, a spin here is a hang.

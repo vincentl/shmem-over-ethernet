@@ -34,6 +34,16 @@ osoe_warnings(shmem_test_watchrange)
 add_test(NAME shmem.watchrange COMMAND shmem_test_watchrange)
 set_tests_properties(shmem.watchrange PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# The reservation protocol (tier 1): the real code under real threads, checking
+# the properties the models check. Writers are threads because that is what the
+# tsan preset can instrument; §8.2 says what that does and does not buy.
+add_executable(shmem_test_conn test_conn.c ../src/conn.c)
+target_include_directories(shmem_test_conn PRIVATE ../src)
+target_link_libraries(shmem_test_conn PRIVATE osoe_base Threads::Threads)
+osoe_warnings(shmem_test_conn)
+add_test(NAME shmem.conn COMMAND shmem_test_conn)
+set_tests_properties(shmem.conn PROPERTIES LABELS "tier1" TIMEOUT 120)
+
 # The node-pair wire on its own (tier 1): both ends in one process, so no
 # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
 # its own osoe_fatal so a failure inside it fails the test.

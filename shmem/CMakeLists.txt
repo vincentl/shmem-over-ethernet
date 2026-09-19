@@ -7,6 +7,7 @@ add_library(osoe
   src/amo.c
   src/barrier.c
   src/boot.c
+  src/conn.c
   src/deprecated.c
   src/fatal.c
   src/info.c

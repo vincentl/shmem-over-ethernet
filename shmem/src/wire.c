@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,6 +35,15 @@ struct osoe_wire_dir {
 struct osoe_wire_hdr {
     _Alignas(OSOE_CACHELINE) uint64_t cap;            /* bytes per direction */
     uint64_t magic;
+    /*
+     * Published by the creator once cap and magic are written, and waited on by
+     * the opener - §6.2's `ready`, for the same reason it exists there. The
+     * name appears at shm_open, which is before the header has been filled in
+     * and before ftruncate has given the object its length, so a peer that
+     * trusted the name alone would read a zero capacity or take SIGBUS off the
+     * end of a zero-length mapping.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t ready;
     _Alignas(OSOE_CACHELINE) struct osoe_wire_dir dir[2];
 };
 
@@ -167,16 +177,27 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_boot *b, uint32_t pee
         /*
          * Wait for the creator. There is nothing to wait *on* before the name
          * exists, so this polls with backoff exactly as §6.2's non-lead PEs do
-         * for the control segment. The bootstrap timeout bounds it.
+         * for the control segment, and then waits on `ready` for the contents.
+         * Both halves are needed: shm_open succeeds the moment the name exists,
+         * which is before ftruncate has sized the object and before the header
+         * has been written.
          */
         struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
         struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
         for (;;) {
             fd = shm_open(w->name, O_RDWR, 0);
-            if (fd >= 0)
-                break;
-            if (errno != ENOENT)
+            if (fd >= 0) {
+                /* Mapping past the end of a still-unsized object is allowed and
+                 * faults with SIGBUS on the first touch, so wait for the length
+                 * too, not only the name. */
+                struct stat st;
+                if (fstat(fd, &st) == 0 && (uint64_t)st.st_size >= bytes)
+                    break;
+                close(fd);
+                fd = -1;
+            } else if (errno != ENOENT) {
                 osoe_fatal("cannot open wire %s: %s", w->name, strerror(errno));
+            }
             if (osoe_deadline_expired(&until))
                 osoe_fatal("timed out waiting for node %u to create the wire %s", lo,
                            w->name);
@@ -198,10 +219,25 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_boot *b, uint32_t pee
 
     struct osoe_wire_hdr *h = p;
     if (w->creator) {
-        /* ftruncate zeroed it: every counter and futex word starts at 0. */
+        /* ftruncate zeroed it: every counter and futex word starts at 0. The
+         * header is written before `ready`, and `ready` is what the peer waits
+         * on - the store is seq_cst because this is the publishing half of a
+         * two-sided protocol (§3.16). */
         h->cap = w->cap;
         h->magic = OSOE_WIRE_MAGIC;
+        atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
+        osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
+        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+        while (atomic_load_explicit(&h->ready, memory_order_acquire) == 0) {
+            struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+            osoe_futex_wait(&h->ready, 0, &sweep, OSOE_FUTEX_SHARED);
+            if (osoe_deadline_expired(&until)) {
+                munmap(p, bytes);
+                osoe_fatal("timed out waiting for node %u to finish creating the wire %s",
+                           lo, w->name);
+            }
+        }
         /* Both sides must agree on the capacity, or their index arithmetic
          * disagrees and the stream silently tears. */
         if (h->magic != OSOE_WIRE_MAGIC || h->cap != w->cap)
