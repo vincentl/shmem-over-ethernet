@@ -50,6 +50,9 @@ static const struct osoe_metric_desc thread_metrics[] = {
     T("tp.watch.spurious", OSOE_MKIND_COUNTER, ""),
     T("tp.watch.sweeps", OSOE_MKIND_COUNTER, ""),
     T("tp.watch.saturated", OSOE_MKIND_COUNTER, ""),
+    /* A missed wake on a variable that has no AMO type, so it can only have
+     * been written with a put: expected, not an invariant (see metrics.h). */
+    T("tp.watch.late_wake", OSOE_MKIND_COUNTER, ""),
     T("shmem.barrier.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.barrier.ns", OSOE_MKIND_COUNTER, "ns"),
     T("shmem.malloc.calls", OSOE_MKIND_COUNTER, ""),

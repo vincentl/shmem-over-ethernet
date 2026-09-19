@@ -163,6 +163,17 @@ add_test(NAME shmem.refuse.size_mismatch
           -- $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.refuse.size_mismatch PROPERTIES
   PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE differs between PEs")
+# Destroying a predefined team is undefined by spec §9.4.8, and undefined is
+# loud here: no other team can exist, so every call naming one is a program bug.
+add_executable(shmem_test_badteam test_badteam.c)
+target_link_libraries(shmem_test_badteam PRIVATE osoe)
+osoe_warnings(shmem_test_badteam)
+add_test(NAME shmem.refuse.destroy_predefined_team
+  COMMAND osoe-launch -n 1 -t 60 -- $<TARGET_FILE:shmem_test_badteam>)
+set_tests_properties(shmem.refuse.destroy_predefined_team PROPERTIES
+  LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "SHMEM_TEAM_WORLD is a predefined team and cannot be destroyed")
+
 add_executable(shmem_test_badput test_badput.c)
 target_link_libraries(shmem_test_badput PRIVATE osoe)
 osoe_warnings(shmem_test_badput)
