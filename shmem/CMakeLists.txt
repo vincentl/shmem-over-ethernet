@@ -18,6 +18,7 @@ add_library(osoe
   src/node.c
   src/profile.c
   src/quiet.c
+  src/reply.c
   src/rma.c
   src/session.c
   src/signal.c

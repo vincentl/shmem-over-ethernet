@@ -34,6 +34,14 @@ osoe_warnings(shmem_test_watch_range)
 add_test(NAME shmem.watch-range COMMAND shmem_test_watch_range)
 set_tests_properties(shmem.watch-range PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# Deferred reply queues and the credit (tier 1): pure logic and one atomic.
+add_executable(shmem_test_reply test-reply.c ../src/reply.c)
+target_include_directories(shmem_test_reply PRIVATE ../src)
+target_link_libraries(shmem_test_reply PRIVATE osoe_base Threads::Threads)
+osoe_warnings(shmem_test_reply)
+add_test(NAME shmem.reply COMMAND shmem_test_reply)
+set_tests_properties(shmem.reply PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The AM sizing policy (tier 1): pure arithmetic, compiled in.
 add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/connection.c)
 target_include_directories(shmem_test_am_size PRIVATE ../src)
