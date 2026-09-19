@@ -39,6 +39,13 @@ Breakages
              permanent.
   nospace    the writer does not check that the ring has room, which is the
              off-by-one the small ring exists to catch.
+  consumed_early
+             the reader publishes `consumed` before copying the byte out of the
+             slot, so the writer may refill it mid-copy. This is the defect a
+             single-threaded test cannot see at all and a two-process test sees
+             only sometimes - about half of runs, measured - which is the reason
+             it is settled here instead: the model reaches it in every
+             interleaving that contains it.
 
 Every protocol store here is a locked instruction, a seq_cst store or a futex
 call, so x86-TSO adds no interleavings; runs are SC. The wire is
@@ -126,6 +133,17 @@ def reader(design, nbytes, cap):
           ('GOT', ('gpre', lambda M, L: ({GOT(L['c']): L['v']}, {}), '@ADV')),
           ('ADV', ('store', lambda L: CONS, lambda L: L['c'] + 1, True, '@R')),
           ('REND', ('done',))]
+    if design == 'consumed_early':
+        # Release the slot before the byte is out of it: the reader publishes
+        # `consumed` and only then copies. The writer is free to fill that slot
+        # the moment it sees the space, so the copy takes the next byte.
+        B = [(lab, ins) for lab, ins in B if lab not in ('TAKE', 'ADV')]
+        B += [('ADV', ('store', lambda L: CONS, lambda L: L['c'] + 1, True, '@TAKE')),
+              ('TAKE', ('load', lambda L, cap=cap: SLOT(L['c'] % cap), 'v', '@CHECK'))]
+        B = [('HAVE?', ('br', lambda L: L['p'] > L['c'], '@ADV', '@SLEEP'))
+             if lab == 'HAVE?' else (lab, ins) for lab, ins in B]
+        B = [('GOT', ('gpre', lambda M, L: ({GOT(L['c']): L['v']}, {}), '@R'))
+             if lab == 'GOT' else (lab, ins) for lab, ins in B]
     return assemble(B)
 
 
@@ -142,6 +160,7 @@ CASES = [
     ('wake_after', 2, 2), ('wake_after', 3, 2),
     ('nowake', 2, 2),
     ('nospace', 2, 1), ('nospace', 3, 2),
+    ('consumed_early', 2, 1), ('consumed_early', 3, 2),
 ]
 
 if __name__ == '__main__':

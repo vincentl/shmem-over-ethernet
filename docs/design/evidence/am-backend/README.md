@@ -47,6 +47,15 @@ where a PE issues every request before landing any, show why §3.8 says "lands".
 Recorded so nobody simplifies it later on the evidence of the blocking cases
 alone.
 
+**A fourth, found while testing the wire.** A reader that publishes `consumed`
+before copying the byte out of the slot lets the writer refill it mid-copy. The
+single-process test cannot see this at all — nothing races — and the two-process
+test sees it in about half of runs, measured at 4 of 8 with the defect present
+and 0 of 8 without. It is settled here instead, as `consumed_early`, because a
+model reaches it in every interleaving that contains it. The lesson generalises
+to the rest of this step: a publication-ordering defect belongs to a model, and
+a test across two processes is corroboration rather than the proof.
+
 ## What they do not cover
 
 - The reservation protocol itself; see above.

@@ -1,0 +1,309 @@
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <stdatomic.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "base/cacheline.h"
+#include "base/env.h"
+#include "base/futex.h"
+#include "fatal.h"
+#include "wire.h"
+
+/*
+ * One direction. produced and consumed are monotone byte counts, never reduced
+ * modulo the capacity: their difference is the bytes outstanding, which is what
+ * both sides test, and a wrapped pair could not tell "empty" from "full". They
+ * are 64-bit and never wrap in any job that could finish.
+ *
+ * Each is on its own cache line: the writer stores produced while the reader
+ * stores consumed, and sharing a line would put a coherence miss on every byte.
+ */
+struct osoe_wire_dir {
+    _Alignas(OSOE_CACHELINE) _Atomic uint64_t produced;
+    _Alignas(OSOE_CACHELINE) _Atomic uint64_t consumed;
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t wake;   /* futex word, the reader's */
+};
+
+struct osoe_wire_hdr {
+    _Alignas(OSOE_CACHELINE) uint64_t cap;            /* bytes per direction */
+    uint64_t magic;
+    _Alignas(OSOE_CACHELINE) struct osoe_wire_dir dir[2];
+};
+
+#define OSOE_WIRE_MAGIC UINT64_C(0x65726977656f736f)   /* "osoewire", little-endian */
+
+static uint64_t data_offset(void)
+{
+    return (sizeof(struct osoe_wire_hdr) + OSOE_CACHELINE - 1) / OSOE_CACHELINE * OSOE_CACHELINE;
+}
+
+static unsigned char *ring(const struct osoe_wire *w, int which)
+{
+    return (unsigned char *)w->map + data_offset() + (uint64_t)which * w->cap;
+}
+
+/*
+ * §3.14's fault injection, stateless and hash-derived, so the same seed gives
+ * the same decision for the same transfer however the threads interleave. A
+ * shared generator would make the split each site sees depend on arrival order
+ * and destroy reproducibility, which is the whole value.
+ */
+static uint64_t hash64(uint64_t x)
+{
+    x ^= x >> 33;
+    x *= UINT64_C(0xff51afd7ed558ccd);
+    x ^= x >> 33;
+    x *= UINT64_C(0xc4ceb9fe1a85ec53);
+    x ^= x >> 33;
+    return x;
+}
+
+/*
+ * How much of `avail` this transfer will actually move. Truncating to zero is
+ * deliberately allowed for a send - a socket may accept nothing - but not for a
+ * receive, where returning 0 with bytes waiting would make the caller sleep on
+ * a wake that has already happened. The caller's loop tolerates it either way;
+ * this keeps the injected behaviour inside what a socket can do.
+ */
+static size_t truncate_to(const struct osoe_wire *w, uint64_t site, uint64_t n, bool allow_zero)
+{
+    if (w->split == 0 || n == 0)
+        return (size_t)n;
+    uint64_t h = hash64(w->seed ^ site ^ (n * UINT64_C(0x9E3779B97F4A7C15)));
+    if (h % 10000 >= w->split)
+        return (size_t)n;
+    uint64_t keep = (h >> 20) % (n + (allow_zero ? 1 : 0));
+    if (!allow_zero && keep == 0)
+        keep = 1;
+    return (size_t)keep;
+}
+
+static void read_env(struct osoe_wire *w, const struct osoe_boot *b)
+{
+    uint64_t cap = OSOE_WIRE_DEFAULT_BYTES;
+    if (osoe_env_u64("OSOE_WIRE_BYTES", &cap) == OSOE_ENV_INVALID ||
+        cap < OSOE_WIRE_MIN_BYTES || cap > OSOE_WIRE_MAX_BYTES)
+        osoe_fatal("OSOE_WIRE_BYTES='%s' is not a byte count between %llu and %llu",
+                   getenv("OSOE_WIRE_BYTES"), (unsigned long long)OSOE_WIRE_MIN_BYTES,
+                   (unsigned long long)OSOE_WIRE_MAX_BYTES);
+    /* A power of two, so the wrap is a mask and the ring has no dead bytes. */
+    if ((cap & (cap - 1)) != 0)
+        osoe_fatal("OSOE_WIRE_BYTES=%llu is not a power of two",
+                   (unsigned long long)cap);
+    w->cap = cap;
+
+    uint32_t split = 0;
+    if (osoe_env_u32("OSOE_WIRE_SPLIT", &split) == OSOE_ENV_INVALID || split > 10000)
+        osoe_fatal("OSOE_WIRE_SPLIT='%s' is not a rate per myriad (0 to 10000)",
+                   getenv("OSOE_WIRE_SPLIT"));
+    w->split = split;
+
+    /*
+     * §3.14: the injection is stateless and hash-derived so that the same seed
+     * gives the same decision for the same transfer however the threads
+     * interleave - and the seed must be **overridable by environment**, with a
+     * failing one committed as a permanent regression case. Without the
+     * override the seed here would come from the job id, which is the
+     * launcher's pid, so every run would inject a different pattern and a case
+     * that failed could not be run again. A test that sets OSOE_WIRE_SPLIT
+     * should set this too.
+     */
+    w->seed = hash64(b->job ^ ((uint64_t)b->step << 32));
+    uint64_t seed;
+    switch (osoe_env_u64("OSOE_WIRE_SEED", &seed)) {
+    case OSOE_ENV_OK:
+        w->seed = seed;
+        break;
+    case OSOE_ENV_UNSET:
+        break;
+    default:
+        osoe_fatal("OSOE_WIRE_SEED='%s' is not a decimal number",
+                   getenv("OSOE_WIRE_SEED"));
+    }
+    /* Print it whenever injection is on, so a failure names what to reproduce
+     * with. Off by default, so a normal run says nothing. */
+    if (w->split != 0)
+        fprintf(stderr, "osoe: wire split %u per myriad, OSOE_WIRE_SEED=%llu\n",
+                w->split, (unsigned long long)w->seed);
+}
+
+void osoe_wire_open(struct osoe_wire *w, const struct osoe_boot *b, uint32_t peer,
+                    uint32_t session)
+{
+    *w = (struct osoe_wire){ 0 };
+    if (peer == b->node)
+        osoe_fatal("a node cannot open a wire to itself (node %u)", b->node);
+    read_env(w, b);
+
+    /* §6.2: the lower node index connects to the higher, so exactly one wire
+     * exists per pair and exactly one side creates it. */
+    uint32_t lo = peer < b->node ? peer : b->node;
+    uint32_t hi = peer < b->node ? b->node : peer;
+    w->creator = b->node == lo;
+    snprintf(w->name, sizeof w->name, "/osoe.%llu.%u.wire.%u.%u.%u",
+             (unsigned long long)b->job, b->step, lo, hi, session);
+
+    uint64_t bytes = data_offset() + 2 * w->cap;
+    int fd;
+    if (w->creator) {
+        fd = shm_open(w->name, O_CREAT | O_EXCL | O_RDWR, 0600);
+        if (fd < 0)
+            osoe_fatal("cannot create wire /dev/shm%s: %s%s", w->name, strerror(errno),
+                       errno == EEXIST ? "; probably left by a crashed job with the same "
+                                         "job and step ids" : "");
+        if (ftruncate(fd, (off_t)bytes) != 0) {
+            close(fd);
+            shm_unlink(w->name);
+            osoe_fatal("cannot size wire %s: %s", w->name, strerror(errno));
+        }
+    } else {
+        /*
+         * Wait for the creator. There is nothing to wait *on* before the name
+         * exists, so this polls with backoff exactly as §6.2's non-lead PEs do
+         * for the control segment. The bootstrap timeout bounds it.
+         */
+        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+        struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
+        for (;;) {
+            fd = shm_open(w->name, O_RDWR, 0);
+            if (fd >= 0)
+                break;
+            if (errno != ENOENT)
+                osoe_fatal("cannot open wire %s: %s", w->name, strerror(errno));
+            if (osoe_deadline_expired(&until))
+                osoe_fatal("timed out waiting for node %u to create the wire %s", lo,
+                           w->name);
+            nanosleep(&back, NULL);
+            if (back.tv_nsec < 10000000)
+                back.tv_nsec *= 2;
+        }
+    }
+
+    void *p = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    if (p == MAP_FAILED) {
+        if (w->creator)
+            shm_unlink(w->name);
+        osoe_fatal("cannot map wire %s: %s", w->name, strerror(errno));
+    }
+    w->map = p;
+    w->bytes = bytes;
+
+    struct osoe_wire_hdr *h = p;
+    if (w->creator) {
+        /* ftruncate zeroed it: every counter and futex word starts at 0. */
+        h->cap = w->cap;
+        h->magic = OSOE_WIRE_MAGIC;
+    } else {
+        /* Both sides must agree on the capacity, or their index arithmetic
+         * disagrees and the stream silently tears. */
+        if (h->magic != OSOE_WIRE_MAGIC || h->cap != w->cap)
+            osoe_fatal("wire %s was created with a different OSOE_WIRE_BYTES (%llu, not "
+                       "%llu): every PE of a job must set it the same", w->name,
+                       (unsigned long long)h->cap, (unsigned long long)w->cap);
+    }
+
+    /*
+     * Direction 0 carries lo -> hi and direction 1 hi -> lo, so each side's tx
+     * is the other's rx without either needing to know which created the object.
+     */
+    w->tx = &h->dir[w->creator ? 0 : 1];
+    w->rx = &h->dir[w->creator ? 1 : 0];
+}
+
+void osoe_wire_close(struct osoe_wire *w)
+{
+    if (!w->map)
+        return;
+    munmap(w->map, w->bytes);
+    if (w->creator)
+        shm_unlink(w->name);
+    *w = (struct osoe_wire){ 0 };
+}
+
+uint64_t osoe_wire_capacity(const struct osoe_wire *w)
+{
+    return w->cap;
+}
+
+size_t osoe_wire_send(struct osoe_wire *w, const void *buf, size_t len)
+{
+    /*
+     * The reader's progress first, then our own count. Both are ours to
+     * compare; only `consumed` is written by the peer, and reading it early
+     * only ever understates the room, which costs a short write and never
+     * correctness.
+     */
+    uint64_t consumed = atomic_load_explicit(&w->tx->consumed, memory_order_acquire);
+    uint64_t produced = atomic_load_explicit(&w->tx->produced, memory_order_acquire);
+    uint64_t room = w->cap - (produced - consumed);
+    if (room > len)
+        room = len;
+    size_t n = truncate_to(w, w->sends++, room, true);
+    if (n == 0)
+        return 0;
+
+    /* Copy in, wrapping once at most. The mask is valid because the capacity
+     * is a power of two, checked at open. */
+    uint64_t mask = w->cap - 1;
+    uint64_t at = produced & mask;
+    size_t first = n;
+    if (at + first > w->cap)
+        first = (size_t)(w->cap - at);
+    memcpy(ring(w, w->creator ? 0 : 1) + at, buf, first);
+    if (first < n)
+        memcpy(ring(w, w->creator ? 0 : 1), (const unsigned char *)buf + first, n - first);
+
+    /*
+     * Publish the bytes, then the wake. This order is the protocol: a reader
+     * that has loaded the wake word already will find the bytes, and one that
+     * has not will find the bump. Reversing it, or reversing the reader's two
+     * loads, loses the wake (wire_model.py, the `wake_after` case).
+     */
+    atomic_store_explicit(&w->tx->produced, produced + n, memory_order_seq_cst);
+    atomic_fetch_add_explicit(&w->tx->wake, 1, memory_order_seq_cst);
+    osoe_futex_wake(&w->tx->wake, 1, OSOE_FUTEX_SHARED);
+    return n;
+}
+
+size_t osoe_wire_recv(struct osoe_wire *w, void *buf, size_t len)
+{
+    uint64_t produced = atomic_load_explicit(&w->rx->produced, memory_order_acquire);
+    uint64_t consumed = atomic_load_explicit(&w->rx->consumed, memory_order_acquire);
+    uint64_t have = produced - consumed;
+    if (have > len)
+        have = len;
+    size_t n = truncate_to(w, w->recvs++, have, false);
+    if (n == 0)
+        return 0;
+
+    uint64_t mask = w->cap - 1;
+    uint64_t at = consumed & mask;
+    size_t first = n;
+    if (at + first > w->cap)
+        first = (size_t)(w->cap - at);
+    memcpy(buf, ring(w, w->creator ? 1 : 0) + at, first);
+    if (first < n)
+        memcpy((unsigned char *)buf + first, ring(w, w->creator ? 1 : 0), n - first);
+
+    /* Release the space only once the bytes are out of it. */
+    atomic_store_explicit(&w->rx->consumed, consumed + n, memory_order_seq_cst);
+    return n;
+}
+
+uint32_t osoe_wire_seq(const struct osoe_wire *w)
+{
+    return atomic_load_explicit(&w->rx->wake, memory_order_acquire);
+}
+
+bool osoe_wire_wait(struct osoe_wire *w, uint32_t seq, const struct osoe_deadline *deadline)
+{
+    return osoe_futex_wait(&w->rx->wake, seq, deadline, OSOE_FUTEX_SHARED) == 0;
+}

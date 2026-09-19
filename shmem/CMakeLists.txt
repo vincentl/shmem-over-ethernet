@@ -23,6 +23,7 @@ add_library(osoe
   src/team.c
   src/transport_local.c
   src/wait.c
+  src/wire.c
   src/watch.c
   src/watchdog.c)
 target_include_directories(osoe

@@ -34,6 +34,33 @@ osoe_warnings(shmem_test_watchrange)
 add_test(NAME shmem.watchrange COMMAND shmem_test_watchrange)
 set_tests_properties(shmem.watchrange PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# The node-pair wire on its own (tier 1): both ends in one process, so no
+# launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
+# its own osoe_fatal so a failure inside it fails the test.
+add_executable(shmem_test_wire test_wire.c ../src/wire.c)
+target_include_directories(shmem_test_wire PRIVATE ../src)
+target_link_libraries(shmem_test_wire PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_wire)
+add_test(NAME shmem.wire COMMAND shmem_test_wire)
+set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
+
+# The wire between two processes (tier 2). Two logical nodes, one PE each, so
+# each process is a node lead - the only role that touches a wire (§3.12). It
+# does not call shmem_init, since a two-node job is still refused until the
+# backend lands, and takes its identity straight from the launcher environment.
+# The seed is fixed: §3.14 wants an injected fault reproducible, and without it
+# the pattern would follow the launcher's pid and differ every run.
+add_executable(shmem_test_wirepair test_wirepair.c ../src/wire.c)
+target_include_directories(shmem_test_wirepair PRIVATE ../src)
+target_link_libraries(shmem_test_wirepair PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_wirepair)
+add_test(NAME shmem.wirepair
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000
+          OSOE_WIRE_SEED=20260919
+          $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+          $<TARGET_FILE:shmem_test_wirepair>)
+set_tests_properties(shmem.wirepair PROPERTIES LABELS "tier2" TIMEOUT 90)
+
 # Multi-process tests (tier 2): each program runs under osoe-launch at every
 # listed local PE count, as shmem.<name>.L<count>.
 set(OSOE_LAUNCH_COUNTS 1 2 4)
