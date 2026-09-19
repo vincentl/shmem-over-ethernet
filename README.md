@@ -4,10 +4,17 @@ OpenSHMEM Over Ethernet: an implementation of OpenSHMEM 1.6 for commodity Ethern
 designed to build entirely from a Linux distribution's own packages — no fabric
 libraries.
 
-**Status:** phase 1 in progress. A single node works: init and finalize, barrier,
-`shmem_malloc`/`shmem_free`, `shmem_putmem`/`shmem_getmem`, `shmem_ptr`, the
-`uint64` and `uint32` AMOs, `shmem_wait_until`/`shmem_test`, and the signalling
-operations.
+**Status:** phase 1 in progress. **A single node is complete** (design §7.1 step
+1): initialization and thread levels, teams and contexts, the symmetric heap
+allocator in full, RMA, `shmem_ptr`, every atomic type of specification Tables
+6–8 with the C11 type-generic interfaces, the point-to-point waits and tests
+including the multiple-element forms, signalling operations, memory ordering,
+`shmem_barrier_all` and `shmem_sync_all`, and the mandatory surface of §7.4
+including the `pshmem_` profiling interface. 526 routines; 82 tests in tiers 1
+and 2.
+
+Not yet: anything between nodes. The network backend is §7.1 step 2 onward.
+Symmetric statics are not supported and are refused with a diagnostic (§4.3).
 
 ## Requirements
 

@@ -2,7 +2,7 @@
 
 You are continuing implementation work on **osoe** (OpenSHMEM Over Ethernet) on
 branch `phase1-slice2`. A previous session completed roughly the first third of
-the slice. **Read `docs/prompts/phase1-slice2-prompt.md` first** — it is the
+the slice. **Read `docs/prompts/phase1-step1-slice2-prompt.md` first** — it is the
 slice's brief, and every rule in it still applies unchanged. This document says
 what has been done since, what was decided and why, and what is left.
 
@@ -167,7 +167,7 @@ one deliberately stalled, checking the heartbeat and the "blocked in" records.
 
 ## Rules, unchanged and load-bearing
 
-Everything in `docs/prompts/phase1-slice2-prompt.md` still applies. The ones
+Everything in `docs/prompts/phase1-step1-slice2-prompt.md` still applies. The ones
 most easily lost:
 
 - **C11 `<stdatomic.h>` only**, named ISO orders: loads `acquire`, CAS and
