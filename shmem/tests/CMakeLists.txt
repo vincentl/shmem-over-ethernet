@@ -34,6 +34,14 @@ osoe_warnings(shmem_test_watchrange)
 add_test(NAME shmem.watchrange COMMAND shmem_test_watchrange)
 set_tests_properties(shmem.watchrange PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# The AM sizing policy (tier 1): pure arithmetic, compiled in.
+add_executable(shmem_test_amsize test_amsize.c ../src/connarea.c ../src/conn.c)
+target_include_directories(shmem_test_amsize PRIVATE ../src)
+target_link_libraries(shmem_test_amsize PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_amsize)
+add_test(NAME shmem.amsize COMMAND shmem_test_amsize)
+set_tests_properties(shmem.amsize PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The reservation protocol (tier 1): the real code under real threads, checking
 # the properties the models check. Writers are threads because that is what the
 # tsan preset can instrument; §8.2 says what that does and does not buy.
@@ -74,6 +82,20 @@ set_tests_properties(shmem.wirepair PROPERTIES LABELS "tier2" TIMEOUT 90)
 # Multi-process tests (tier 2): each program runs under osoe-launch at every
 # listed local PE count, as shmem.<name>.L<count>.
 set(OSOE_LAUNCH_COUNTS 1 2 4)
+
+# The connection area across the PEs of a node (tier 2). The local lead creates
+# it and the others open it, which is §3.12's arrangement. Not an
+# osoe_tier2_test: it does not call shmem_init, since a multi-node job is still
+# refused, and it takes its identity from the launcher environment.
+add_executable(shmem_test_connarea test_connarea.c ../src/connarea.c ../src/conn.c)
+target_include_directories(shmem_test_connarea PRIVATE ../src)
+target_link_libraries(shmem_test_connarea PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_connarea)
+foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
+  add_test(NAME shmem.connarea.L${count}
+    COMMAND osoe-launch -n ${count} -t 60 -- $<TARGET_FILE:shmem_test_connarea>)
+  set_tests_properties(shmem.connarea.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
 
 # Every tier-2 test asserts §8.2's rule that invariant counters are zero at
 # quiescence (invariants.h). It reads the control segment through osoe-stat's

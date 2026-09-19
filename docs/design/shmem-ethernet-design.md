@@ -308,6 +308,71 @@ Buffer size must be at least 2× maximum message size, or aggregation stops
 working at the top of the range. A 64 KB message in a 64 KB buffer means one
 message per segment, forever.
 
+#### Where the buffers live, and how they are sized
+
+**A separate shared object per node, not part of the control segment.** The
+connection buffers are the only AM-specific allocation in the design, and §10's
+open question — whether §3's data path stays hot in an RDMA build — counts their
+memory among its uncounted costs. Putting them in the control segment would
+settle that question by accident, in the direction of "always allocated", in the
+one segment `osoe-stat` maps read-only and whose size would then vary by build.
+Separate, a build that does not keep the AM data path hot never creates it, an
+RDMA backend registers one contiguous region rather than N, and a put can go
+from the caller's `src` straight to the NIC rather than through a staging copy
+nothing needs. Writers are application threads in every local PE and the reaper
+is the lead's agent in another process (§3.12), so it is shared memory either
+way; the question was only which object.
+
+**Sizing scales with node count and has no PE dimension at all** (§1). Per node
+the area is `2 × (nodes − 1) × buffer`: every local PE contends on the same open
+buffer through §3.5's CAS, so 256 PEs on a node cost exactly what one PE costs.
+Giving each PE its own buffer per peer would make it `L × 2 × nodes` and destroy
+the single ordered stream §3.1 depends on for free `fence` ordering — the same
+mistake as a second data socket, in a different place.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `OSOE_AM_CHUNK` | 64 KiB | §3.2's fragmentation size, and so the largest message on the wire |
+| `OSOE_AM_BUFFER` | `2 × chunk` | Bytes per connection buffer; a power of two, refused below the floor |
+| `OSOE_AM_BUFFER_BUDGET` | 256 MiB | Per-node ceiling on `2 × (nodes − 1) × buffer` |
+| `OSOE_AM_HUGEPAGES` | 0 | Opt in to huge pages for the area |
+
+**The floor is the default, because everything except aggregation pushes down.**
+§3.2 bounds head-of-line blocking at roughly two segments — about 2 ms on 1 GbE
+at 128 KiB, doubling with the buffer — and §3.9's self-clocking already grows the
+batch under load without needing headroom, since the buffer only has to hold
+what accumulates during one in-flight send. Going above the floor is an opt-in
+for links fast enough that a millisecond of wire time stops mattering.
+
+**The budget is a guard rail, not a routine mechanism.** At these defaults it is
+not reached until about a thousand nodes, past what §1 targets, so inside the
+supported range the behaviour is a constant buffer size with no heuristic to
+reason about: 3.75 MB per node at 16 nodes, 125 MB at 500. When it is exceeded
+the buffer halves — staying a power of two, which the ring arithmetic needs —
+and keeps the *largest* size that fits; the floor is a limit, not a target. If
+the floor itself does not fit, that is an error naming both knobs, not a silent
+drop below it, because below the floor aggregation fails at the top of the range
+and surfaces as a performance mystery rather than a message.
+
+**The case that actually needs tuning is testing, not production.** §8.1's
+logical node map puts every node on one machine, so the whole-host cost is
+quadratic: 60 MB at 16 logical nodes, about 1 GB at 64, 16 GB at 256. Lowering
+`OSOE_AM_CHUNK` is the knob for it, since it lowers the floor with it — 64
+logical nodes cost about 1 GB at the default chunk and 129 MB at 8 KiB. Tier-2
+tests set the sizes explicitly rather than inheriting the production default.
+
+**Huge pages are off by default, the opposite of the rule for heaps** (§6.2),
+and the inversion is deliberate. Heaps are touched densely; connection buffers
+are touched sparsely, because a halo exchange faults six peers' worth of the
+whole area. `hugetlbfs` pages are reserved up front, so opting in trades away
+exactly the demand paging that makes a large node count affordable.
+
+**Known and not addressed: NUMA first touch.** On a multi-socket node the lead
+creates the area, so first touch places every buffer on the lead's NUMA node and
+PEs on the other socket pay for it on every `memcpy`. The target hardware is
+single-socket, and fixing it means a first-touch policy per PE or per peer.
+Recorded rather than built.
+
 **Ack-only segments.** Piggybacking alone never acknowledges one-way traffic. If
 node A only puts to B, no B→A segment exists to carry the ack, and A's `quiet`,
 `barrier_all`, and finalize wait forever: the safety sweep submits only sealed
@@ -2232,7 +2297,23 @@ clean abort.
 
 **A batching hint, `OSOE_TP_MORE`.** One flag on put and rmw saying more
 operations follow on this context, so a backend may hold one back and submit it
-with the next. Purely a hint: it changes nothing about completion, ordering or
+with the next.
+
+*What it defers on the AM backend is the wake, not the seal.* §3.9's aggregation
+self-clocks off the send completion, so an operation on an idle connection is
+sealed and submitted at once — batch of one — and nothing ever waits for a
+buffer to fill. The only thing an application thread controls is whether it asks
+the lead for a wake (§3.12), so `OSOE_TP_MORE` means "do not wake the lead yet";
+the next operation without it, or any fence, wait or get, does. The source-bytes
+rule below is satisfied unconditionally here, because reservation copies into
+the connection buffer, so the flag is safe and its only saving is futex wakes on
+a burst. **Ignoring it is correct and nearly free**: §3.10 requires the safety
+sweep to submit anything sealed regardless of signalling, so the worst case is
+one sweep interval of added latency, and in practice the next operation wakes
+the lead anyway. Its first *acting* caller is a backend that posts work requests
+referencing the caller's `src` rather than a copy — an RDMA one — which is the
+case the rule was written for. Phase 1 implements it as a no-op on both
+backends and says so. Purely a hint: it changes nothing about completion, ordering or
 when `src` may be reused, and a backend that ignores it is correct — which is how
 the intranode backend implements it. The rule that makes it safe is that **a
 backend may defer an operation only if it has taken its own copy of the source

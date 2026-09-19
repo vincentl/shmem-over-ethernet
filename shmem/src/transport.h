@@ -137,12 +137,24 @@ enum {
      * wrong however the flag is set. That rule is the flag's whole safety
      * argument, and it is the backend's to keep.
      *
-     * No caller sets this yet: on one node every put is a memcpy. It exists so
-     * that an RDMA backend can post a list of work requests under one doorbell
-     * rather than ringing one per put, which is where the small-put message
-     * rate is won, and so that §3.9's aggregation is told when not to seal a
-     * buffer early. Its drivers are the 1.6 session routines (§7.6), the
-     * strided and block RMA loops, and the collectives' own loops.
+     * No caller sets this yet, and both of osoe's backends ignore it.
+     *
+     * On the intranode backend there is nothing to defer: every put is a memcpy
+     * applied before the call returns. On the AM backend what it would defer is
+     * the *wake*, not the seal - §3.9's aggregation self-clocks off the send
+     * completion, so an operation on an idle connection is sealed and submitted
+     * at once and nothing waits for a buffer to fill; the only thing an
+     * application thread controls is whether it asks the lead for a wake
+     * (§3.12). The saving is futex wakes on a burst, and ignoring the flag
+     * costs at most one safety-sweep interval, because §3.10 requires a sealed
+     * buffer to be submitted regardless of signalling.
+     *
+     * It exists for a backend that posts a list of work requests under one
+     * doorbell rather than ringing one per put, which is where the small-put
+     * message rate is won - and that is also the backend for which the
+     * source-bytes rule above binds, since such a request references the
+     * caller's src rather than a copy. Its drivers are the 1.6 session routines
+     * (§7.6), the strided and block RMA loops, and the collectives' own loops.
      */
     OSOE_TP_MORE = 1u << 2,
 };
