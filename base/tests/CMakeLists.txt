@@ -1,6 +1,6 @@
 find_package(Threads REQUIRED)
 
-foreach(name size env futex epoch)
+foreach(name size env nodemap futex epoch)
   add_executable(base_test_${name} test_${name}.c)
   target_link_libraries(base_test_${name} PRIVATE osoe_base Threads::Threads)
   osoe_warnings(base_test_${name})

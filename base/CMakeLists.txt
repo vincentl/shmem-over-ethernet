@@ -3,6 +3,7 @@ add_library(osoe_base STATIC
   counters.h
   deadline.c
   env.c
+  nodemap.c
   epoch.c
   futex.c
   order.c

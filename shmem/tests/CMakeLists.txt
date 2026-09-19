@@ -152,7 +152,15 @@ add_test(NAME shmem.refuse.multinode
           OSOE_NODEID=0 OSOE_GTIDS=0 OSOE_JOB_ID=1 OSOE_STEP_ID=0
           $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.refuse.multinode PROPERTIES
-  PASS_REGULAR_EXPRESSION "multi-node jobs are not yet supported")
+  PASS_REGULAR_EXPRESSION "internode traffic needs the AM backend")
+# The same refusal reached the way a test will reach it: §8.1's node map, turned
+# by osoe-launch into the per-rank variables Slurm would set. This is what says
+# the launcher's derived environment and the library's check agree about what a
+# multi-node job looks like.
+add_test(NAME shmem.refuse.multinode_map
+  COMMAND osoe-launch -n 2 -m 0,1 -t 20 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.refuse.multinode_map PROPERTIES
+  PASS_REGULAR_EXPRESSION "internode traffic needs the AM backend")
 add_test(NAME shmem.refuse.bad_size
   COMMAND osoe-launch -n 2 -t 60 -e 0:SHMEM_SYMMETRIC_SIZE=12q -e 1:SHMEM_SYMMETRIC_SIZE=12q
           -- $<TARGET_FILE:shmem_test_init>)
@@ -182,5 +190,5 @@ add_test(NAME shmem.refuse.nonsymmetric_put
 set_tests_properties(shmem.refuse.nonsymmetric_put PROPERTIES
   PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap")
 set_tests_properties(shmem.refuse.no_launcher shmem.refuse.multinode
-  shmem.refuse.bad_size shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
+  shmem.refuse.multinode_map shmem.refuse.bad_size shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
   LABELS "tier2" TIMEOUT 90)

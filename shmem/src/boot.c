@@ -95,11 +95,18 @@ void osoe_boot_read(struct osoe_boot *b)
                 osoe_fatal("OSOE_GTIDS='%s' names rank %u twice", gtids, b->gtids[i]);
     }
 
-    /* Only one node, until the network bootstrap exists (§7.1 step 3). */
+    /*
+     * One logical node still, until the AM backend carries internode traffic
+     * (§7.1 step 2). What is missing is the backend, not the bootstrap: the
+     * variables checked above are already a multi-node environment, and
+     * osoe-launch derives them from §8.1's node map exactly as Slurm derives
+     * them from a distribution. So this rejection moves rather than loosens
+     * when the backend lands.
+     */
     if (b->node != 0 || b->local_count != b->world_size)
         osoe_fatal("this job spans more than one node (OSOE_NODEID=%u, %u of %u ranks "
-                   "local); multi-node jobs are not yet supported", b->node,
-                   b->local_count, b->world_size);
+                   "local); internode traffic needs the AM backend of §7.1 step 2",
+                   b->node, b->local_count, b->world_size);
 
     const char *size = getenv("SHMEM_SYMMETRIC_SIZE");
     b->symmetric_size = OSOE_DEFAULT_SYMMETRIC_SIZE;

@@ -3229,8 +3229,11 @@ environment"). It does not run as a single PE. Silently becoming one PE is how a
 mis-launched job ends up as N independent jobs, each succeeding. Every variable
 marked "Yes" above is required, and the README shows how to launch a one-node job
 by hand. *(Rejected: singleton launch when the variables are absent, as some
-implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)* `OSOE_NODE_MAP`
-(§8.1) and `OSOE_BOOTSTRAP_TIMEOUT` (above) are osoe's own.
+implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)*
+`OSOE_BOOTSTRAP_TIMEOUT` (above) is osoe's own, read by the library.
+`OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
+turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
+library never sees it.
 
 The test launcher, `tools/launch/osoe-launch`, starts L processes of a one-node
 job with these variables set. Its job id is its own pid, so concurrent launches
@@ -3520,13 +3523,30 @@ Both paths run in their real form on one machine.
 OSOE_NODE_MAP=0,0,1,1,2,2,3,3
 ```
 
-Two details that must be planned rather than patched:
+**The map is the launcher's input, not the library's.** `osoe-launch` reads it
+(or takes `-m`) and derives each rank's `OSOE_NODEID`, `OSOE_LOCALID` and
+`OSOE_GTIDS` — exactly what Slurm computes from a distribution on a real step,
+with a rank's local id being the number of earlier ranks on its node. Nothing
+under `shmem/src` reads `OSOE_NODE_MAP`, so the library sees the same
+environment in a test as in production and carries no test-only bootstrap path.
+*(Decided at §7.1 step 2, when the map was first implemented. The alternative —
+the library reading the map and overriding the variables it was given — builds a
+second, test-only bootstrap into the one piece of code whose whole job is to
+agree with the launcher.)*
+
+Two details that must be planned rather than patched. Both then hold **by
+construction** rather than by a check, which is the reason the split above is
+worth stating:
 
 - **Shared segment name keyed on logical node id**, not physical host, or four
-  logical nodes accidentally share memory.
+  logical nodes accidentally share memory. The control segment is already named
+  `/osoe.<job>.<step>.<node>.<session>` where `<node>` is `OSOE_NODEID` (§6.2),
+  and the launcher sets that to the logical node id.
 - **`shmem_ptr` must return `NULL` across logical nodes** even though the pages
   are physically reachable. The locality decision lives in exactly one function
-  that everything else consults.
+  that everything else consults. PEs rendezvous only with the PEs named in their
+  own node's `OSOE_GTIDS`, so a PE never maps a heap outside its logical node and
+  the function has no address to return.
 
 Plus a **force-remote flag** routing even same-logical-node traffic over the
 network. Running a program both ways and diffing is the strongest differential
