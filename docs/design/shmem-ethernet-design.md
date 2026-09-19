@@ -472,6 +472,31 @@ The target's worst case is then `connections × C` descriptors — it scales wit
 node count, as §1 requires. Descriptors come from one **node-wide pool** that each
 connection's queues link into, so idle connections cost nothing.
 
+**Taking a credit is a CAS loop, not a test and a decrement.** The credit is per
+*connection*, so the PEs of a node share it and contend on it. A PE that tests
+`credits > 0` and then decrements can be overtaken between the two steps by a
+sibling doing the same, and both take the last credit — the count goes negative
+and the target's queue is over-subscribed by exactly the amount nobody
+accounted for. This is the same argument §3.5 makes for the reservation itself,
+and it is stated here because it was missing: the model's own first encoding of
+the take had this bug, which is how it was found
+(`docs/design/evidence/am-backend/`, the `race_take` case).
+
+Two further results from that model, each easy to lose:
+
+- **Every breakage passes with one PE per node.** The credit binds only when a
+  node has more than one PE contending for it, which is every real node. A model
+  or a test run only at `L = 1` calls all of these correct.
+- **The credit returns when the reply *lands*, not when it is sent**, and the
+  difference is invisible while gets are blocking. The credit keeps a bound at
+  each end: reply descriptors at the target, and replies in flight toward the
+  origin's landing zone (§3.12). Returning it at handler time breaks both.
+  Returning it when the reply is drained onto the wire keeps descriptors bounded
+  and breaks only the landing zone — and under `SERIALIZED` with blocking gets a
+  PE waits for its own reply before issuing again (§4.6), so nothing can show it
+  until nonblocking gets arrive. Do not simplify "lands" to "sent" on the
+  evidence of the blocking cases.
+
 Because reservation may now *fail* — the progress thread leaves the descriptor
 in place and carries on reaping — there is no infallibility requirement and no
 blocking path. This is what makes §3.7 satisfiable trivially rather than by
