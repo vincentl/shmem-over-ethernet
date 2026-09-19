@@ -252,6 +252,51 @@ uint64_t osoe_tp_rmw(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
  */
 uint64_t osoe_tp_load(enum osoe_region region, uint64_t offset, unsigned width);
 
+/* ---- Range attributes (§4.4, §4.10) ---------------------------------- */
+
+/* What a range of this PE's own memory is used for. */
+enum {
+    /* rmw may target these bytes: spec §9.3.5's SHMEM_MALLOC_ATOMICS_REMOTE. */
+    OSOE_TP_RANGE_ATOMICS = 1u << 0,
+    /* signals live here: SHMEM_MALLOC_SIGNAL_REMOTE, so put_signal's rmw half
+     * and the signal waits of §4.9 land in it. */
+    OSOE_TP_RANGE_SIGNAL  = 1u << 1,
+};
+
+/*
+ * Tell the backend that (region, offset, len) of *this PE's own* memory carries
+ * the named attributes. The allocator calls it for every hinted allocation
+ * (§4.4); nothing else does.
+ *
+ * Advisory in both directions. A backend may ignore it entirely, an operation
+ * on bytes outside any declared range is still correct, and nothing above this
+ * header asks what a backend did with it - which is what keeps it from becoming
+ * the capability query §4.10 rejects. The intranode backend ignores it, because
+ * every operation is already a memory operation on a mapping it has.
+ *
+ * **Not a collective, and it must not block.** Every PE calls it with identical
+ * arguments in the same order as a consequence of the allocator's determinism
+ * (§4.4, invariant 6), never by coordination. A backend that put a barrier here
+ * would be synchronizing for no reason.
+ *
+ * **Repeated or overlapping calls take the union, never a replacement**, so
+ * that shmem_realloc preserving an allocation's hints (spec §9.3.3) survives a
+ * grown or moved block. There is deliberately no call to withdraw a range:
+ * freeing a block does not un-declare its bytes, because over-declaring is
+ * safe - the attribute is a statement about what may happen there, and a
+ * backend that registered the range keeps a registration it did not need. A
+ * withdrawal would instead have to be ordered against operations still in
+ * flight toward those bytes, which is a synchronization this call must not have.
+ *
+ * It exists for a backend that must prepare memory before the network can
+ * touch it: an RDMA backend registers only the ranges that need NIC atomics or
+ * counters rather than the whole heap, and without it cannot know which words a
+ * PE may wait on, so it cannot afford exact notification and every blocked wait
+ * degenerates to polling (§4.10).
+ */
+void osoe_tp_set_range(enum osoe_region region, uint64_t offset, uint64_t len,
+                       unsigned attributes);
+
 /* ---- Ordering and completion ----------------------------------------- */
 
 /*

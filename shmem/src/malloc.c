@@ -36,10 +36,36 @@
 #include "metrics.h"
 #include "state.h"
 #include "sym.h"
+#include "transport.h"
 
 static void *heap_at(uint64_t offset)
 {
     return (char *)osoe.node.heap_of[osoe.boot.local_id] + offset;
+}
+
+/*
+ * Tell the transport what a hinted block is for (§4.4, §4.10). Spec §9.3.5's
+ * hints are the only thing that says which bytes may carry remote atomics or
+ * signals, and a backend that must prepare memory before the network can touch
+ * it has no other source for it.
+ *
+ * Not a collective and it does not block: every PE reaches this with identical
+ * arguments because the allocator is a pure function of the call sequence
+ * (§4.4, invariant 6), not because anything coordinated. Unhinted blocks say
+ * nothing, which is what an unhinted allocation means.
+ *
+ * Bits this build does not recognize are carried in the hints but name no
+ * attribute, since there is nothing to tell a backend about them.
+ */
+static void declare_range(uint64_t offset, uint64_t size, long hints)
+{
+    unsigned attrs = 0;
+    if (hints & SHMEM_MALLOC_ATOMICS_REMOTE)
+        attrs |= OSOE_TP_RANGE_ATOMICS;
+    if (hints & SHMEM_MALLOC_SIGNAL_REMOTE)
+        attrs |= OSOE_TP_RANGE_SIGNAL;
+    if (attrs)
+        osoe_tp_set_range(OSOE_REGION_HEAP, offset, size, attrs);
 }
 
 /*
@@ -56,6 +82,7 @@ static void *allocate(const char *routine, uint64_t size, uint64_t align, long h
     switch (osoe_alloc_take(&osoe.alloc, size, align, hints, &offset)) {
     case 0:
         p = heap_at(offset);
+        declare_range(offset, size, hints);
         if (zero)
             memset(p, 0, size);
         break;
@@ -189,7 +216,10 @@ OSOE_API void *pshmem_realloc(void *ptr, size_t size)
     void *result = ptr;
     switch (osoe_alloc_resize(&osoe.alloc, offset, size)) {
     case 0:
-        break;                          /* same address, contents intact */
+        /* Same address, contents intact - but possibly more bytes than were
+         * declared before, and §4.10 takes the union, so say it again. */
+        declare_range(offset, size, hints);
+        break;
     case 1: {
         uint64_t moved;
         switch (osoe_alloc_take(&osoe.alloc, size, OSOE_ALLOC_ALIGN, hints, &moved)) {
@@ -197,6 +227,7 @@ OSOE_API void *pshmem_realloc(void *ptr, size_t size)
             memcpy(heap_at(moved), ptr, old_size < size ? old_size : size);
             if (osoe_alloc_give(&osoe.alloc, offset) != 0)
                 osoe_fatal("shmem_realloc: the block at %p vanished", ptr);
+            declare_range(moved, size, hints);   /* spec §9.3.3 preserves hints */
             result = heap_at(moved);
             break;
         case 1:

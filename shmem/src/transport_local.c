@@ -171,3 +171,19 @@ uint64_t osoe_tp_load(enum osoe_region region, uint64_t offset, unsigned width)
         return atomic_load_explicit((_Atomic uint16_t *)ptr, memory_order_acquire);
     }
 }
+
+/*
+ * Nothing to do: every operation on this backend is a memory operation on a
+ * mapping the process already holds, so no range needs preparing (§4.10). The
+ * call is still made by the allocator, because the contract is the backend's to
+ * ignore, not the caller's to skip.
+ */
+void osoe_tp_set_range(enum osoe_region region, uint64_t offset, uint64_t len,
+                       unsigned attributes)
+{
+    (void)region;
+    (void)offset;
+    (void)len;
+    (void)attributes;
+    osoe_count(OSOE_C_TP_SET_RANGE_CALLS, 1);
+}

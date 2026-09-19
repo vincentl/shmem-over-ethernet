@@ -2255,9 +2255,9 @@ instead of pushing every on-node rmw through NIC loopback.
   leads. A future backend implements it either natively or generically over this
   boundary, using `OSOE_REGION_INTERNAL` for scratch and control words (§5.8). The
   core-API study also keeps collectives above its core.
-- **Allocation (§4.4)** is a pure function of the call sequence and makes no
-  transport call today. A later hook, `set_range(region, offset, len,
-  attributes)`, tells a backend which ranges carry atomics or signals. That
+- **Allocation (§4.4)** is a pure function of the call sequence and makes one
+  transport call: `set_range(region, offset, len, attributes)` tells a backend
+  which ranges carry atomics or signals, called for each hinted allocation. That
   hook is how an RDMA backend avoids registering the whole heap for NIC atomics
   or counters (on CXI, a counter on a region disables its optimized RMA). The
   allocator therefore keeps hinted allocations (`SHMEM_MALLOC_ATOMICS_REMOTE`,
@@ -2278,8 +2278,16 @@ instead of pushing every on-node rmw through NIC loopback.
   It is the largest recoverable loss for an RDMA backend: without it, a backend
   cannot know which words a PE may wait on, so it cannot afford exact
   notification — it would have to add a second work request to *every* atomic —
-  and every blocked wait degenerates to polling, a core per node at best. It is
-  not scheduled here; §7.1 step 3 places it with the backend that consumes it.
+  and every blocked wait degenerates to polling, a core per node at best.
+
+  **It lands at §7.1 step 2**, with the allocator call site it needs. An earlier
+  draft scheduled it for step 3, with the first backend that can act on the
+  answer, and that is still where the first backend that *uses* it arrives — but
+  the call site is in the allocator, not in a backend, and step 2 is the step
+  that writes the code around it. Landing it later would mean revisiting
+  `shmem_malloc_with_hints` and `shmem_realloc` once the structures near them had
+  hardened. The intranode backend ignores it, which is the contract: advisory in
+  both directions, so a backend that does nothing with it is correct.
 - **Nonblocking gets and contexts beyond the default.** They add calls to the
   header when they arrive (§7.3). They do not change the operations above.
 
@@ -3357,16 +3365,22 @@ machinery. The review's order is adopted.
    internode phase crosses the boundary) while writing the internode phase that
    is its only caller, and **`OSOE_TP_MORE`'s first caller**, since this is the
    first backend for which deferring a submission means anything.
+
+   **`osoe_tp_set_range` also lands here** (§4.10), with the allocator call site
+   it needs, for the same reason: the call site is in the allocator, which this
+   step is already working around.
 3. **Real transport.** Start with the `echo-uring` floor harness (§8.4), the
    transport's smallest reproducer. Then io_uring with the repaired reservation
    protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
    reply credits and DRAINING caps, and the global rendezvous with its timeout.
 
-   **`osoe_tp_set_range` lands here** (§4.10), with the allocator call site it
-   has been waiting for: this is the first backend that can do anything with the
-   answer. The allocator half — recording hints and growing hinted allocations
-   from the opposite end — is done earlier, in step 1, because retrofitting hint
-   plumbing into a finished allocator is the expensive version.
+   The first backend that *acts* on `osoe_tp_set_range` is here — it is the
+   first that must prepare memory before the network can touch it — but the hook
+   and its allocator call site landed at step 2 (§4.10), because the call site is
+   in the allocator rather than in a backend. The allocator half — recording
+   hints and growing hinted allocations from the opposite end — is older still,
+   from step 1, because retrofitting hint plumbing into a finished allocator is
+   the expensive version.
 4. **Robustness.** Pidfd liveness, abort propagation, `shmem_global_exit`,
    keepalive; Slurm environment fixtures and the heap-base-shift test mode (§8.2).
 
