@@ -62,7 +62,7 @@
  * Segment header (§3.4): fixed size, at offset 0, never reserved by a writer,
  * filled by the progress thread at seal time.
  *
- * `msg_count` and `total_len` are deliberately redundant with the per-message
+ * `message_count` and `total_len` are deliberately redundant with the per-message
  * lengths. Cross-checking them on receipt turns a framing bug into an immediate
  * assertion rather than a garbage dispatch 50 MB later.
  */
@@ -80,7 +80,7 @@ struct osoe_am_segment_header {
                              * received: completion means applied (§4.6) */
     uint32_t credits;       /* reply credits returned to the peer (§3.8) */
     uint32_t flags;
-    uint32_t msg_count;
+    uint32_t message_count;
     uint32_t total_len;     /* including this header */
 };
 

@@ -3,6 +3,7 @@ find_package(Threads REQUIRED)
 add_library(osoe
   src/accessible.c
   src/agent.c
+  src/am.c
   src/allocator.c
   src/amo.c
   src/barrier.c

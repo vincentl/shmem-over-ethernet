@@ -34,6 +34,31 @@ osoe_warnings(shmem_test_watch_range)
 add_test(NAME shmem.watch-range COMMAND shmem_test_watch_range)
 set_tests_properties(shmem.watch-range PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# AM framing and the stream parser (tier 1): the same bytes in every split.
+add_executable(shmem_test_am test-am.c ../src/am.c)
+target_include_directories(shmem_test_am PRIVATE ../src)
+target_link_libraries(shmem_test_am PRIVATE osoe_base)
+osoe_warnings(shmem_test_am)
+add_test(NAME shmem.am COMMAND shmem_test_am)
+set_tests_properties(shmem.am PROPERTIES LABELS "tier1" TIMEOUT 120)
+
+# A framing error must be a loud, immediate abort naming the field that
+# disagreed (§3.4, §3.15) - not a garbage dispatch later. These assert the
+# message, so a check that stopped firing fails here rather than going quiet.
+foreach(case_expect
+    "count|carried 4 messages, its header says 5"
+    "length|was [0-9]+ bytes, its header says"
+    "short-segment|less than its own header"
+    "kind|this build knows"
+    "short-message|less than its fixed part")
+  string(REPLACE "|" ";" parts "${case_expect}")
+  list(GET parts 0 case)
+  list(GET parts 1 expect)
+  add_test(NAME shmem.am.malformed.${case} COMMAND shmem_test_am ${case})
+  set_tests_properties(shmem.am.malformed.${case} PROPERTIES
+    LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
+endforeach()
+
 # Deferred reply queues and the credit (tier 1): pure logic and one atomic.
 add_executable(shmem_test_reply test-reply.c ../src/reply.c)
 target_include_directories(shmem_test_reply PRIVATE ../src)

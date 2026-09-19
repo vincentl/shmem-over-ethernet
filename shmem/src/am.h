@@ -1,0 +1,198 @@
+/*
+ * Active messages: the handler table and the stream parser (§3.3, §3.7, §3.13).
+ *
+ * A segment (§3.4) carries a header and then messages, each padded to 8-byte
+ * alignment. This is what turns a byte stream back into those messages, and
+ * what says which handler each one belongs to.
+ *
+ * **Parse as a stream; never hold a buffer.** §3.3 is explicit that a segment
+ * spans receive buffers, and that holding them until a segment is complete
+ * stalls once a segment outgrows the ring - with one ring serving several
+ * connections, two connections each holding buffers for partial segments
+ * deadlock, which the review reproduced. So each connection keeps a parse
+ * cursor: header bytes accumulate in a small per-connection area, and payload
+ * bytes are copied **straight to their destination** as they arrive, rather
+ * than into a reassembly buffer that would have to be as large as a segment.
+ *
+ * That destination is resolved by the caller, through `struct osoe_am_sink`,
+ * at the moment the fixed part of a message is complete and before any payload
+ * byte has arrived. The parser therefore knows nothing about heaps, landing
+ * zones or PEs - which is what keeps §3.3's rule ("never hold a provided
+ * buffer") a property of this file rather than a convention the backend has to
+ * remember.
+ *
+ * **What this cannot catch is truncation.** A segment header claiming more
+ * bytes than ever arrive leaves the parser waiting, and waiting for bytes that
+ * have not come yet is indistinguishable from waiting for bytes that never
+ * will. Only the layer that owns the connection can tell those apart, by
+ * noticing that it ended with a segment still open - so that check belongs with
+ * the socket in §7.1 step 3, not here. Everything the bytes themselves can
+ * contradict is caught here and at once.
+ *
+ * **The handler table is fixed at init.** Identifiers are a compile-time enum
+ * and dispatch is an array index with one bounds compare: no registration lock,
+ * no lifetime question, no teardown race (§3.13). The table is checksummed so
+ * that a mismatched binary across nodes is caught at rendezvous with a clear
+ * message, rather than as an undecodable message arriving at PE 47 an hour in.
+ */
+#ifndef OSOE_AM_H
+#define OSOE_AM_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "connection.h"
+
+/* §3.13's compile-time enum. Appending is a table change and so a checksum
+ * change, which is the point. */
+enum osoe_am_handler {
+    OSOE_AM_PUT = 0,        /* bytes for a target's region */
+    OSOE_AM_GET_REQUEST,
+    OSOE_AM_GET_REPLY,
+    OSOE_AM_RMW_REQUEST,
+    OSOE_AM_RMW_REPLY,
+    OSOE_AM_HANDLER_COUNT
+};
+
+/* ---- The fixed part of each message ---------------------------------- */
+/*
+ * Every one is 8-byte aligned and a multiple of 8 long, so a payload following
+ * it is aligned too: on aarch64 an unaligned 64-bit atomic faults, so an AMO
+ * payload at an odd offset crashes rather than degrades (§3.4).
+ */
+
+struct osoe_am_put {
+    uint32_t target_pe;         /* world rank; the wire never carries an address */
+    uint16_t region;            /* enum osoe_region */
+    uint16_t flags;
+    uint64_t offset;
+    /* payload: the bytes to write */
+};
+
+struct osoe_am_get_request {
+    uint32_t target_pe;
+    uint32_t origin_pe;
+    uint16_t region;
+    uint16_t flags;
+    uint32_t length;
+    uint64_t offset;
+    uint64_t token;             /* the origin's completion slot */
+};
+
+struct osoe_am_get_reply {
+    uint32_t origin_pe;
+    uint32_t chunk_offset;      /* where in the requested range these bytes go */
+    uint64_t token;
+    /* payload: the bytes read */
+};
+
+struct osoe_am_rmw_request {
+    uint32_t target_pe;
+    uint32_t origin_pe;
+    uint16_t region;
+    uint16_t op;                /* enum osoe_rmw_op */
+    uint32_t width;             /* 4 or 8 */
+    uint64_t offset;
+    uint64_t operand;
+    uint64_t compare;
+    uint64_t token;
+    uint32_t flags;             /* OSOE_TRANSPORT_FETCH, OSOE_TRANSPORT_FENCED */
+    uint32_t reserved;
+};
+
+struct osoe_am_rmw_reply {
+    uint32_t origin_pe;
+    uint32_t reserved;
+    uint64_t token;
+    uint64_t value;             /* the previous value, for a fetching rmw */
+};
+
+_Static_assert(sizeof(struct osoe_am_put) % 8 == 0, "a fixed part must keep the payload 8-byte aligned");
+_Static_assert(sizeof(struct osoe_am_get_request) % 8 == 0, "as above");
+_Static_assert(sizeof(struct osoe_am_get_reply) % 8 == 0, "as above");
+_Static_assert(sizeof(struct osoe_am_rmw_request) % 8 == 0, "as above");
+_Static_assert(sizeof(struct osoe_am_rmw_reply) % 8 == 0, "as above");
+
+/* The largest fixed part, which bounds the parser's accumulation area. */
+#define OSOE_AM_MAX_FIXED 56
+
+/* ---- The table ------------------------------------------------------- */
+
+struct osoe_am_descriptor {
+    const char *name;           /* for diagnostics only */
+    uint32_t fixed_bytes;
+    bool carries_payload;
+};
+
+const struct osoe_am_descriptor *osoe_am_table(uint32_t *count);
+
+/*
+ * FNV-1a over the table's shape. Exchanged at rendezvous (§6.2, §3.13): every
+ * PE must agree, and a mismatch is a mismatched binary, caught at once with a
+ * clear message rather than as a garbage dispatch later.
+ */
+uint32_t osoe_am_table_checksum(void);
+
+/* ---- The sink -------------------------------------------------------- */
+
+/*
+ * Where a message's payload goes, and what to do when it is complete.
+ *
+ * `destination` is called once the fixed part is parsed and **before any
+ * payload byte has been consumed**, which is what lets the payload be copied
+ * straight where it belongs. Returning NULL discards the payload - the bytes
+ * are consumed and dropped, which is what a reply for a PE that has since
+ * failed must do rather than stalling the stream.
+ *
+ * `complete` is called once the whole message has arrived. A message with no
+ * payload reaches it directly.
+ */
+struct osoe_am_sink {
+    void *(*destination)(void *context, const struct osoe_message_header *header,
+                         const void *fixed, uint32_t payload_bytes);
+    void (*complete)(void *context, const struct osoe_message_header *header,
+                     const void *fixed, void *payload, uint32_t payload_bytes);
+    /* A segment has been fully applied: its sequence number may be
+     * acknowledged (§3.4, §4.6 - completion means applied, not received). */
+    void (*segment_applied)(void *context, const struct osoe_am_segment_header *segment);
+    void *context;
+};
+
+/* ---- The parser ------------------------------------------------------ */
+
+enum osoe_am_stage {
+    OSOE_AM_STAGE_SEGMENT = 0,  /* accumulating the segment header */
+    OSOE_AM_STAGE_MESSAGE,      /* accumulating a message header */
+    OSOE_AM_STAGE_FIXED,        /* accumulating a message's fixed part */
+    OSOE_AM_STAGE_PAYLOAD,      /* streaming payload to its destination */
+    OSOE_AM_STAGE_PADDING,      /* consuming the 8-byte alignment padding */
+};
+
+struct osoe_am_parser {
+    enum osoe_am_stage stage;
+    unsigned char accumulator[OSOE_AM_MAX_FIXED];
+    uint32_t have;              /* bytes in the accumulator */
+    uint32_t need;              /* bytes this stage wants */
+
+    struct osoe_am_segment_header segment;
+    struct osoe_message_header message;
+    uint32_t segment_seen;      /* bytes of the segment consumed, header included */
+    uint32_t messages_seen;
+    uint32_t payload_seen;
+    uint32_t payload_bytes;     /* this message's payload length */
+    unsigned char *destination; /* where the payload is going, or NULL to discard */
+};
+
+void osoe_am_parser_init(struct osoe_am_parser *p);
+
+/*
+ * Feed bytes from the wire. Every byte is consumed: a parser that could refuse
+ * bytes would need the caller to hold them, which is the buffer-holding §3.3
+ * forbids. A framing error aborts the job (§3.15) - it means the peer and this
+ * PE disagree about the format, and there is no recovery that is not a guess.
+ */
+void osoe_am_parse(struct osoe_am_parser *p, const void *bytes, size_t length,
+                   const struct osoe_am_sink *sink);
+
+#endif /* OSOE_AM_H */

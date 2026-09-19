@@ -142,11 +142,11 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
     if (nodes < 2)
         return;                          /* one node: no peers, nothing to map */
 
-    struct osoe_am_config cfg;
-    osoe_am_config_read(&cfg);
+    struct osoe_am_config config;
+    osoe_am_config_read(&config);
 
     uint64_t buffer;
-    switch (osoe_am_choose_buffer(cfg.chunk, cfg.buffer, cfg.budget, nodes, &buffer)) {
+    switch (osoe_am_choose_buffer(config.chunk, config.buffer, config.budget, nodes, &buffer)) {
     case OSOE_AM_SIZE_OK:
         break;
     case OSOE_AM_SIZE_SHRUNK:
@@ -154,19 +154,19 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
          * chose neither the size nor the shrink. */
         fprintf(stderr, "osoe: connection buffers reduced from %llu to %llu bytes to "
                         "fit OSOE_AM_BUFFER_BUDGET=%llu over %u nodes\n",
-                (unsigned long long)cfg.buffer, (unsigned long long)buffer,
-                (unsigned long long)cfg.budget, nodes);
+                (unsigned long long)config.buffer, (unsigned long long)buffer,
+                (unsigned long long)config.budget, nodes);
         break;
     case OSOE_AM_SIZE_NO_ROOM:
         osoe_fatal("%u nodes need %llu bytes of connection buffers at the smallest "
                    "size §3.4 allows (2 x OSOE_AM_CHUNK = %llu), which exceeds "
                    "OSOE_AM_BUFFER_BUDGET=%llu; raise the budget or lower the chunk",
                    nodes, (unsigned long long)((nodes - 1) * 2 * buffer),
-                   (unsigned long long)buffer, (unsigned long long)cfg.budget);
+                   (unsigned long long)buffer, (unsigned long long)config.budget);
     }
 
     a->buffer_bytes = buffer;
-    a->chunk_bytes = cfg.chunk;
+    a->chunk_bytes = config.chunk;
     a->bytes = osoe_am_area_bytes(nodes, buffer);
     a->creator = b->local_id == 0;      /* the local lead (§6.2) */
     snprintf(a->name, sizeof a->name, "/osoe.%llu.%u.%u.conn.%u",
@@ -217,10 +217,10 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
      * exactly the demand paging that makes a large node count affordable.
      */
     int flags = MAP_SHARED;
-    if (cfg.hugepages)
+    if (config.hugepages)
         flags |= MAP_HUGETLB;
     void *p = mmap(NULL, a->bytes, PROT_READ | PROT_WRITE, flags, fd, 0);
-    if (p == MAP_FAILED && cfg.hugepages) {
+    if (p == MAP_FAILED && config.hugepages) {
         fprintf(stderr, "osoe: OSOE_AM_HUGEPAGES=1 but the connection area could not "
                         "be mapped with huge pages (%s); using ordinary pages\n",
                 strerror(errno));
@@ -254,7 +254,7 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         h->node = b->node;
         h->nodes = nodes;
         h->buffer_bytes = buffer;
-        h->chunk_bytes = cfg.chunk;
+        h->chunk_bytes = config.chunk;
         h->conns_offset = conns_offset;
         h->data_offset = data_offset;
         h->area_bytes = a->bytes;
@@ -275,14 +275,14 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
                            a->name);
         }
         if (h->magic != OSOE_CONNECTION_AREA_MAGIC || h->layout != OSOE_CONNECTION_AREA_LAYOUT ||
-            h->buffer_bytes != buffer || h->chunk_bytes != cfg.chunk ||
+            h->buffer_bytes != buffer || h->chunk_bytes != config.chunk ||
             h->nodes != nodes)
             osoe_fatal("connection area %s was created with different AM sizing "
                        "(buffer %llu chunk %llu nodes %u, not %llu/%llu/%u): every PE "
                        "of a job must set OSOE_AM_* the same", a->name,
                        (unsigned long long)h->buffer_bytes,
                        (unsigned long long)h->chunk_bytes, h->nodes,
-                       (unsigned long long)buffer, (unsigned long long)cfg.chunk, nodes);
+                       (unsigned long long)buffer, (unsigned long long)config.chunk, nodes);
     }
 }
 

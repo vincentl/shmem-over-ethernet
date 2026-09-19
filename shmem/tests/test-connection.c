@@ -128,7 +128,7 @@ static void deliver(uint32_t k, uint32_t bytes)
     }
     /* §3.4's redundant fields must agree with the bytes actually present. */
     CHECK(off == bytes);
-    CHECK(sh.msg_count == count);
+    CHECK(sh.message_count == count);
     CHECK(sh.total_len == bytes);
 }
 
@@ -198,7 +198,7 @@ int main(void)
                 while (off < bytes) {
                     struct osoe_message_header mh;
                     memcpy(&mh, storage + (size_t)pending * CAP + off, sizeof mh);
-                    sh.msg_count++;
+                    sh.message_count++;
                     off += osoe_message_padded(mh.len);
                 }
                 memcpy(storage + (size_t)pending * CAP, &sh, sizeof sh);
