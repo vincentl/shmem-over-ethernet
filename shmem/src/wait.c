@@ -88,6 +88,25 @@ static bool satisfied(int cmp, uint64_t have, uint64_t want, bool sgn, const cha
                routine, cmp);
 }
 
+/*
+ * Which counter a late wake belongs in.
+ *
+ * Spec 1.5 change #17 requires a wait variable to be updated with an AMO, and
+ * every AMO type is four or eight bytes wide. So at those widths a sweep that
+ * expires on an already-true predicate means a wake was lost by the mechanism
+ * that must not lose one, and the counter is an invariant (§8.2).
+ *
+ * At two bytes there is no AMO type - the deprecated short waits of Table 12
+ * predate the rule - so the only remote update is a put, for which notification
+ * is best effort by design (§4.10) and a sweep is how the wait is meant to
+ * finish. Counting that as an invariant violation would make the oracle
+ * unusable for the one case it is known to be wrong about.
+ */
+static enum osoe_counter late_wake_counter(unsigned width)
+{
+    return width >= 4 ? OSOE_C_INVARIANT_MISSED_WAKE : OSOE_C_TP_WATCH_LATE_WAKE;
+}
+
 /* ---- the scalar forms -------------------------------------------------- */
 
 uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, bool sgn,
@@ -105,12 +124,10 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
         have = osoe_tp_load(OSOE_REGION_HEAP, offset, width);
         if (satisfied(cmp, extend(have, width, sgn), want, sgn, routine)) {
             /* The condition was already true when the sweep expired, so the
-             * update landed while this PE slept and no wake arrived: a missed
-             * wake (§4.9). Zero at quiescence for a conforming program, and
-             * legitimately nonzero for an ivar written with a put, where notify
-             * is best effort by design (§4.10). */
+             * update landed while this PE slept and no wake arrived (§4.9).
+             * Which counter that is depends on the width: see above. */
             if (timed_out)
-                osoe_count(OSOE_C_INVARIANT_MISSED_WAKE, 1);
+                osoe_count(late_wake_counter(width), 1);
             break;
         }
         if (woken)
@@ -310,8 +327,11 @@ static size_t wait_many(const struct osoe_waitmany *w, enum many_mode mode, size
         uint32_t seq = osoe_tp_watch_seq(watch);
         result = scan(w, base, mode, indices);
         if (scan_done(mode, result)) {
+            /* Table 6 only, so always four or eight bytes and always the
+             * invariant - written through the same rule so there is one place
+             * that decides. */
             if (timed_out)
-                osoe_count(OSOE_C_INVARIANT_MISSED_WAKE, 1);
+                osoe_count(late_wake_counter(w->width), 1);
             break;
         }
         if (woken)

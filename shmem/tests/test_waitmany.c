@@ -24,6 +24,7 @@
  * separates a signed type from a bit pattern.
  */
 #define _GNU_SOURCE
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -300,27 +301,101 @@ static void blocking(uint64_t *v)
     shmem_barrier_all();
 }
 
+/* This PE's total for a thread-scope counter. */
+static uint64_t my_counter(const char *name)
+{
+    char segment[OSOE_SEG_NAME_MAX], err[256];
+    osoe_test_segment_name(segment, sizeof segment, 0);
+    struct osoe_seg s;
+    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+        fprintf(stderr, "%s\n", err);
+        return UINT64_MAX;
+    }
+    const struct osoe_metric_desc *m = osoe_seg_metric(&s, name);
+    uint64_t total = 0;
+    for (uint32_t i = 0; m && i < s.dir->blocks_per_pe; i++) {
+        uint64_t v;
+        if (osoe_seg_read(&s, m, (uint32_t)me * s.dir->blocks_per_pe + i, &v))
+            total += v;
+    }
+    osoe_seg_close(&s);
+    return m ? total : UINT64_MAX;
+}
+
 /*
- * The two-byte types across PEs. A short has no AMO, so the only way to update
- * one remotely is a put - for which notification is best effort by design
- * (§4.10) and a lost wake is charged to invariant.missed_wake. So the waiter
- * here spins on shmem_short_test, which touches no watch slot: the 2-byte
- * coherent load is what is under test, and the blocking form on a put-written
- * variable would make this test's own invariant assertion flaky by design.
+ * The two-byte types across PEs, in the *blocking* form.
+ *
+ * A short has no AMO type, so the only way to update one remotely is a put -
+ * for which notification is best effort by design (§4.10) and the wait may only
+ * finish at its safety sweep. An earlier version of this test used
+ * shmem_short_test in a spin loop and said why: the blocking form would charge
+ * a lost wake to invariant.missed_wake and make this test's own §8.2 assertion
+ * fail intermittently, by design rather than by fault.
+ *
+ * That was the counter's problem, not the test's, and it is now split by width:
+ * a late wake at two bytes goes to tp.watch.late_wake, an ordinary counter. So
+ * the blocking path is exercised here for the first time - and it is the only
+ * user of the boundary's two-byte coherent load and two-byte watch range.
+ *
+ * The PEs are split into writers and waiters rather than every PE doing both,
+ * because a PE that puts and then waits usually finds its neighbour's bytes
+ * already there and never sleeps. With the two disjoint, the writer's delay is
+ * a real gap: the waiter has nothing to do but block, and the test asserts that
+ * it did.
  */
 static void short_across_pes(void)
 {
     short *v = shmem_malloc(sizeof *v);
-    CHECK(v != NULL);
+    unsigned short *u = shmem_malloc(sizeof *u);
+    CHECK(v && u);
     *v = 0;
+    *u = 0;
     shmem_barrier_all();
-    int right = (me + 1) % npes;
-    short payload = (short)-1234;
-    shmem_putmem(v, &payload, sizeof payload, right);
-    while (!shmem_short_test(v, SHMEM_CMP_EQ, (short)-1234))
-        ;
-    CHECK(*v == (short)-1234);
-    shmem_barrier_all();
+
+    if (npes == 1) {
+        /* Nobody to write from, so the wait cannot block; the two-byte load
+         * and compare are still worth running. */
+        short payload = (short)-1234;
+        unsigned short upayload = (unsigned short)0xbeef;
+        shmem_putmem(v, &payload, sizeof payload, 0);
+        shmem_putmem(u, &upayload, sizeof upayload, 0);
+        shmem_short_wait_until(v, SHMEM_CMP_EQ, (short)-1234);
+        shmem_ushort_wait_until(u, SHMEM_CMP_EQ, (unsigned short)0xbeef);
+        CHECK(*v == (short)-1234 && *u == (unsigned short)0xbeef);
+    } else {
+        bool writer = (me % 2) == 1;
+        bool waiter = (me % 2) == 0 && me + 1 < npes;
+        uint64_t blocked_before = my_counter("tp.watch.blocked");
+        CHECK(blocked_before != UINT64_MAX);
+        shmem_barrier_all();
+
+        if (writer) {
+            /* The two puts are staggered as well as delayed. Sent together,
+             * the second value is already there when the first wait returns
+             * and only one of the two waits ever sleeps. */
+            struct timespec gap = { 0, 20 * 1000 * 1000 };
+            short payload = (short)-1234;
+            unsigned short upayload = (unsigned short)0xbeef;
+            nanosleep(&gap, NULL);
+            shmem_putmem(v, &payload, sizeof payload, me - 1);
+            nanosleep(&gap, NULL);
+            shmem_putmem(u, &upayload, sizeof upayload, me - 1);
+        } else if (waiter) {
+            shmem_short_wait_until(v, SHMEM_CMP_EQ, (short)-1234);
+            shmem_ushort_wait_until(u, SHMEM_CMP_EQ, (unsigned short)0xbeef);
+            CHECK(*v == (short)-1234);
+            CHECK(*u == (unsigned short)0xbeef);
+            /* Both really slept, so the width-2 watch and the sleep path were
+             * exercised rather than a predicate that was already true. */
+            CHECK(my_counter("tp.watch.blocked") >= blocked_before + 2);
+            /* And the signed comparison still holds at two bytes. */
+            CHECK(shmem_short_test(v, SHMEM_CMP_LT, (short)0) == 1);
+            CHECK(shmem_ushort_test(u, SHMEM_CMP_GT, (unsigned short)0) == 1);
+        }
+        shmem_barrier_all();
+    }
+
+    shmem_free(u);
     shmem_free(v);
 }
 

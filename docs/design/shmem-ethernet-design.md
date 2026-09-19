@@ -1026,7 +1026,29 @@ headers would pass whenever the library agreed with itself.
 
 - Safety-sweep submissions that found sealed work nobody had signalled (§3.10).
 - Deadline expiries after which the awaited condition was already true: a missed
-  wake, in the watch slots (§4.9) or any other wait.
+  wake, in the watch slots (§4.9) or any other wait — **but only where the spec
+  requires the variable to be updated with an AMO**, which is every width of 4
+  or 8 bytes. At two bytes there is no AMO type at all: the deprecated `short`
+  waits of Table 12 predate 1.5 change #17, so the only remote update is a put,
+  for which notification is best effort by design (§4.10) and finishing at a
+  sweep is how such a wait is *meant* to end. Those go to `tp.watch.late_wake`,
+  an ordinary counter.
+
+  The split is what makes this an oracle rather than a diagnostic. One counter
+  was nonzero for reasons that were not bugs, so the only way to keep the §8.2
+  assertion true was to write the tests around it — `shmem.waitmany` used the
+  non-blocking `shmem_short_test` and said so — and a test suite shaped to avoid
+  a counter is not checking it. With the split, the blocking two-byte path is
+  exercised for the first time, and it is the only user of the boundary's
+  two-byte coherent load and two-byte watch range.
+
+  **Measured: the late counter is zero on this backend.** Thirty runs at four
+  PEs, with the writer delayed so the waiter is certainly asleep, produced no
+  lost wake — the intranode backend's `notify` after a `memcpy` does reach the
+  waiter in practice on aarch64. The split is therefore justified by the
+  *contract* and not by an observed failure, which is the right basis: §4.10
+  promises nothing here, and a NIC that writes without the CPU seeing it will
+  lose these wakes even where this memcpy does not.
 - A thread that found no counter block (above). Not a correctness failure, but a
   silent loss of every other counter that thread would have kept, which is the
   same thing from a reader's point of view.
@@ -3428,8 +3450,27 @@ it.
 | C11 type-generic interfaces | Part of the API | Step 1, for the types implemented. `_Generic` selects on *type*, and the exact-width types of Tables 6–8 are typedefs of the canonical ones on LP64 Linux, so the selection lists one association per distinct type and the library's build asserts that each typedef is the type assumed. Each list emits a *leading* comma per entry, so there is no `default:` association and a type outside the table is a compile error naming the call rather than a silent route to another type's routine |
 | `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1, and not stubs. Every PE of an osoe job runs the same executable by construction, so `pe_accessible` is whether `pe` names a PE of this job. `addr_accessible` additionally requires the address to be in the symmetric heap, so a static or automatic address answers 0 — the known non-conformance below, stated by the query rather than discovered at the first put |
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
+| Name-shifted deprecated routines | §10 item 1 wants a `pshmem_` entry point for every function | **Not done**, and recorded as known non-conformance below: the spec does not say how to shift a name that never had a `shmem_` prefix, and guessing wrong helps nobody |
 | Deprecated active-set constants (F.2.8) | `SHMEM_SYNC_VALUE` and the `pSync` sizes | Step 1: **the constants, and not the routines that take them.** A program that declares `static long pSync[SHMEM_BARRIER_SYNC_SIZE]` must compile; a program that then calls `shmem_barrier(...)` must fail at the link rather than reach a routine whose machinery — active sets, `pSync` ownership, the reuse rules — does not exist. A wrong answer is worse than a missing symbol |
 | `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TP_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
+
+**Known non-conformance: the deprecated routines have no name-shifted entry
+points.** §10 item 1 requires "an alternate entry point name, with the prefix
+`pshmem_` for each OpenSHMEM function", and the seven unprefixed deprecated
+routines — `start_pes`, `_my_pe`, `_num_pes`, `shmalloc`, `shfree`,
+`shrealloc`, `shmemalign` — have none. The spec's wording does not say what the
+shifted name of a function that never had a `shmem_` prefix should be:
+`pstart_pes` is what Sandia OpenSHMEM chose, and `pshmem_start_pes` is the
+literal reading, which also yields `pshmem__my_pe`. Deferred rather than
+guessed, because a profiling tool that looks for the wrong one is no better off
+than one that finds nothing, and every other routine — all 526 — has its pair.
+
+Two of §10's other requirements are satisfied and worth recording as such, since
+both look like omissions otherwise. Item 3 states that the C11 type-generic
+interfaces "cannot have any equivalent `pshmem_` interfaces because [they] are
+implemented as macros", so their absence is required rather than missing. Item 6
+requires the types and constants the `pshmem_` interfaces need to be defined in
+`pshmem.h`, which it satisfies by including `shmem.h`.
 
 **Known non-conformance: symmetric statics.** Most of the spec's examples use
 global or static variables as symmetric objects, including the canonical

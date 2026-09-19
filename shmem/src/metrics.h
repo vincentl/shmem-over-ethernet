@@ -50,7 +50,7 @@ enum osoe_counter {
     OSOE_C_TP_NOTIFY_CALLS, OSOE_C_TP_NOTIFY_WAKES,
     OSOE_C_TP_WATCH_CALLS, OSOE_C_TP_WATCH_BLOCKED, OSOE_C_TP_WATCH_BLOCKED_NS,
     OSOE_C_TP_WATCH_WAKES, OSOE_C_TP_WATCH_SPURIOUS, OSOE_C_TP_WATCH_SWEEPS,
-    OSOE_C_TP_WATCH_SATURATED,
+    OSOE_C_TP_WATCH_SATURATED, OSOE_C_TP_WATCH_LATE_WAKE,
 
     /* The API layer. */
     OSOE_C_SHMEM_BARRIER_CALLS, OSOE_C_SHMEM_BARRIER_NS,
@@ -67,10 +67,19 @@ enum osoe_counter {
      * Must be zero at quiescence (§3.14 question 6, §8.2).
      *
      * missed_wake: a safety sweep expired and the predicate was *then* true, so
-     * the update landed during the sleep and no wake arrived (§4.9). It is also
-     * legitimately nonzero for a wait variable updated with a put, where notify
-     * is best effort by design (§4.10) - which is stated with the counter
-     * rather than left for someone to discover.
+     * the update landed during the sleep and no wake arrived (§4.9).
+     *
+     * It counts only waits on a variable the spec requires to be updated with
+     * an AMO - every width of 4 or 8 bytes, which is every type of Table 6.
+     * A late wake on a two-byte variable is expected rather than a bug: the
+     * deprecated short waits have no AMO type at all, so the only remote update
+     * is a put, for which notification is best effort by design (§4.10). Those
+     * go to tp.watch.late_wake, which is an ordinary counter.
+     *
+     * Splitting them is what makes this an oracle rather than a diagnostic. A
+     * single counter was nonzero for reasons that were not bugs, so the only
+     * way to keep the §8.2 assertion true was to write the tests around it -
+     * which is the kind of thing that stops being true without anyone noticing.
      *
      * watch_reentered: a watch published while one was already published. Under
      * SHMEM_THREAD_SERIALIZED a PE is in at most one wait at a time, so this is
