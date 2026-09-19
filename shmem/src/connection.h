@@ -48,8 +48,8 @@
  * writer may be descheduled mid-copy, and at 256 PEs on an oversubscribed node
  * a spin here is a hang (§3.6). Every call below returns instead.
  */
-#ifndef OSOE_CONN_H
-#define OSOE_CONN_H
+#ifndef OSOE_CONNECTION_H
+#define OSOE_CONNECTION_H
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -71,10 +71,10 @@ enum {
      * acknowledge it: piggybacked if the peer has traffic, and otherwise a
      * header-only segment, or one-way traffic is never acknowledged at all and
      * quiet waits forever (§3.4). */
-    OSOE_SEG_ACK_REQUESTED = 1u << 0,
+    OSOE_AM_SEGMENT_ACK_REQUESTED = 1u << 0,
 };
 
-struct osoe_seg_header {
+struct osoe_am_segment_header {
     uint64_t seq;           /* this segment's sequence number */
     uint64_t ack;           /* highest reverse-direction seq APPLIED, not merely
                              * received: completion means applied (§4.6) */
@@ -84,38 +84,38 @@ struct osoe_seg_header {
     uint32_t total_len;     /* including this header */
 };
 
-_Static_assert(sizeof(struct osoe_seg_header) == 32, "§3.4 sizes the segment header at 16-32 bytes");
+_Static_assert(sizeof(struct osoe_am_segment_header) == 32, "§3.4 sizes the segment header at 16-32 bytes");
 
 /*
  * Message header. Every message within a segment is padded to 8-byte
  * alignment: on aarch64 an unaligned 64-bit atomic faults, so an AMO payload at
  * an odd offset crashes rather than degrades (§3.4).
  */
-struct osoe_msg_header {
+struct osoe_message_header {
     uint16_t kind;          /* §3.13's compile-time handler enum */
     uint16_t flags;
     uint32_t len;           /* payload bytes after this header, before padding */
 };
 
-_Static_assert(sizeof(struct osoe_msg_header) == 8, "a message header must be 8-byte sized");
+_Static_assert(sizeof(struct osoe_message_header) == 8, "a message header must be 8-byte sized");
 
-#define OSOE_MSG_ALIGN 8u
+#define OSOE_MESSAGE_ALIGN 8u
 
-static inline uint32_t osoe_msg_padded(uint32_t payload)
+static inline uint32_t osoe_message_padded(uint32_t payload)
 {
-    uint32_t n = (uint32_t)sizeof(struct osoe_msg_header) + payload;
-    return (n + OSOE_MSG_ALIGN - 1) & ~(OSOE_MSG_ALIGN - 1);
+    uint32_t n = (uint32_t)sizeof(struct osoe_message_header) + payload;
+    return (n + OSOE_MESSAGE_ALIGN - 1) & ~(OSOE_MESSAGE_ALIGN - 1);
 }
 
 /* The top bit of `head`. Every buffer that is not reservable carries it. */
-#define OSOE_BUF_SEALED (UINT32_C(1) << 31)
-#define OSOE_BUF_USED(h) ((h) & ~OSOE_BUF_SEALED)
+#define OSOE_BUFFER_SEALED (UINT32_C(1) << 31)
+#define OSOE_BUFFER_USED(h) ((h) & ~OSOE_BUFFER_SEALED)
 
 /* No buffer is reservable, and "no buffer" generally. */
-#define OSOE_CONN_NONE UINT32_C(0xffffffff)
+#define OSOE_CONNECTION_NONE UINT32_C(0xffffffff)
 
 /* One buffer's shared words. */
-struct osoe_conn_buf {
+struct osoe_connectionection_buffer {
     /* Reserved bytes in the low bits, the seal in the top bit. Writers CAS it;
      * the progress thread sets and clears the seal. */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t head;
@@ -139,39 +139,39 @@ struct osoe_conn_buf {
  * §3.8's DRAINING guard rests on the bit alone. With two buffers the scan is
  * two loads on a path that then does a CAS and a memcpy.
  */
-struct osoe_conn_shared {
-    struct osoe_conn_buf buf[2];
+struct osoe_connectionection_shared {
+    struct osoe_connectionection_buffer buf[2];
 };
 
 /* Process-private handle onto one connection. */
-struct osoe_conn {
-    struct osoe_conn_shared *s;
+struct osoe_connection {
+    struct osoe_connectionection_shared *s;
     unsigned char *data;        /* buffer k's bytes at data + k * cap */
     uint32_t cap;               /* bytes per buffer */
 };
 
 /* The progress thread's own bookkeeping, private to the lead (§3.5). Writers
  * see only the seal bit, so this never needs to be shared. */
-enum osoe_buf_state {
-    OSOE_BUF_FREE = 0,
-    OSOE_BUF_DRAINING,      /* only the progress thread may reserve (§3.8) */
-    OSOE_BUF_OPEN,
-    OSOE_BUF_SEALED_STATE,
-    OSOE_BUF_SENDING,
+enum osoe_buffer_state {
+    OSOE_BUFFER_FREE = 0,
+    OSOE_BUFFER_DRAINING,      /* only the progress thread may reserve (§3.8) */
+    OSOE_BUFFER_OPEN,
+    OSOE_BUFFER_SEALED_STATE,
+    OSOE_BUFFER_SENDING,
 };
 
 /* A granted reservation. */
-struct osoe_resv {
+struct osoe_reservation {
     uint32_t buf;           /* which buffer */
     uint32_t off;           /* byte offset within it */
     uint32_t len;           /* what was reserved, padded */
     uint64_t seq;           /* the segment this message will go out in */
 };
 
-enum osoe_resv_status {
-    OSOE_RESV_OK,
-    OSOE_RESV_FULL,         /* the open buffer cannot fit this: ask for a seal */
-    OSOE_RESV_NONE,         /* nothing is reservable: wait (§3.11) */
+enum osoe_reservation_status {
+    OSOE_RESERVATION_OK,
+    OSOE_RESERVATION_FULL,         /* the open buffer cannot fit this: ask for a seal */
+    OSOE_RESERVATION_NONE,         /* nothing is reservable: wait (§3.11) */
 };
 
 /* ---- Lifecycle -------------------------------------------------------- */
@@ -188,29 +188,29 @@ enum osoe_resv_status {
  * the segment is what makes this reachable, so the connection area calls this
  * for every connection before any PE can reach it.
  */
-void osoe_conn_init(struct osoe_conn *c);
+void osoe_connectionection_init(struct osoe_connection *c);
 
 /* ---- Writer side: application threads, in any local PE ---------------- */
 
 /*
- * Reserve `len` bytes, which the caller must have padded with osoe_msg_padded.
- * On OSOE_RESV_OK the caller copies into osoe_conn_at() and then commits;
+ * Reserve `len` bytes, which the caller must have padded with osoe_message_padded.
+ * On OSOE_RESERVATION_OK the caller copies into osoe_reservation_bytes() and then commits;
  * until it commits, the buffer cannot be sent, so the window must stay short
  * (§3.6's publication-window stall, which is accepted and instrumented rather
  * than fixed).
  */
-enum osoe_resv_status osoe_conn_reserve(struct osoe_conn *c, uint32_t len,
-                                        struct osoe_resv *r);
+enum osoe_reservation_status osoe_connectionection_reserve(struct osoe_connection *c, uint32_t len,
+                                        struct osoe_reservation *r);
 
 /* Where a granted reservation's bytes go. */
-static inline void *osoe_conn_at(const struct osoe_conn *c, const struct osoe_resv *r)
+static inline void *osoe_reservation_bytes(const struct osoe_connection *c, const struct osoe_reservation *r)
 {
     return c->data + (size_t)r->buf * c->cap + r->off;
 }
 
 /* Announce that the copy is complete. Until every reservation in a buffer has
  * been committed, the buffer is not sendable. */
-void osoe_conn_commit(struct osoe_conn *c, const struct osoe_resv *r);
+void osoe_connectionection_commit(struct osoe_connection *c, const struct osoe_reservation *r);
 
 /* ---- Progress thread side: the lead's agent only ---------------------- */
 
@@ -222,24 +222,24 @@ void osoe_conn_commit(struct osoe_conn *c, const struct osoe_resv *r);
  * operation can be sealed and sent first, which breaks fence,
  * signal-after-payload (invariant 5) and quiet.
  */
-void osoe_conn_open(struct osoe_conn *c, uint32_t k, uint64_t seq);
+void osoe_connectionection_open(struct osoe_connection *c, uint32_t k, uint64_t seq);
 
 /*
  * Seal buffer k, so no further reservation can succeed in it. Sealing an empty
  * buffer is allowed and is how a flush with nothing to send retires it.
  */
-void osoe_conn_seal(struct osoe_conn *c, uint32_t k);
+void osoe_connectionection_seal(struct osoe_connection *c, uint32_t k);
 
 /*
  * True once every reservation in buffer k has been committed, with the byte
  * count in *bytes. Never blocks: a writer may be mid-copy, and the caller must
  * move on to other connections and ask again (§3.5).
  */
-bool osoe_conn_sendable(const struct osoe_conn *c, uint32_t k, uint32_t *bytes);
+bool osoe_connectionection_sendable(const struct osoe_connection *c, uint32_t k, uint32_t *bytes);
 
 /* Return a sent buffer to free. It keeps the seal bit, so no writer can touch
  * it until it is opened again. */
-void osoe_conn_release(struct osoe_conn *c, uint32_t k);
+void osoe_connectionection_release(struct osoe_connection *c, uint32_t k);
 
 /*
  * Reserve in a buffer the writers cannot reach, for §3.8's starvation guard: a
@@ -248,13 +248,13 @@ void osoe_conn_release(struct osoe_conn *c, uint32_t k);
  * each pass at half the buffer, or the guard starves the other direction
  * (§3.8, review D8).
  */
-bool osoe_conn_drain_reserve(struct osoe_conn *c, uint32_t k, uint32_t len,
-                             struct osoe_resv *r);
+bool osoe_connectionection_drain_reserve(struct osoe_connection *c, uint32_t k, uint32_t len,
+                             struct osoe_reservation *r);
 
 /* Bytes a buffer can hold below the segment header. */
-static inline uint32_t osoe_conn_payload_cap(const struct osoe_conn *c)
+static inline uint32_t osoe_connectionection_payload_capacity(const struct osoe_connection *c)
 {
-    return c->cap - (uint32_t)sizeof(struct osoe_seg_header);
+    return c->cap - (uint32_t)sizeof(struct osoe_am_segment_header);
 }
 
-#endif /* OSOE_CONN_H */
+#endif /* OSOE_CONNECTION_H */

@@ -7,8 +7,8 @@ add_library(osoe
   src/amo.c
   src/barrier.c
   src/boot.c
-  src/conn.c
-  src/connarea.c
+  src/connection.c
+  src/connection-area.c
   src/deprecated.c
   src/fatal.c
   src/info.c
@@ -23,7 +23,7 @@ add_library(osoe
   src/signal.c
   src/sym.c
   src/team.c
-  src/transport_local.c
+  src/transport-local.c
   src/wait.c
   src/wire.c
   src/watch.c

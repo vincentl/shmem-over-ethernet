@@ -1,4 +1,4 @@
-add_executable(shmem_test_info test_info.c)
+add_executable(shmem_test_info test-info.c)
 target_link_libraries(shmem_test_info PRIVATE osoe)
 osoe_warnings(shmem_test_info)
 add_test(NAME shmem.info COMMAND shmem_test_info)
@@ -20,7 +20,7 @@ if(BUILD_SHARED_LIBS)
 endif()
 
 # The allocator on its own (tier 1): compiled in, since libosoe hides it.
-add_executable(shmem_test_alloc test_alloc.c ../src/alloc.c)
+add_executable(shmem_test_alloc test-alloc.c ../src/alloc.c)
 target_include_directories(shmem_test_alloc PRIVATE ../src)
 osoe_warnings(shmem_test_alloc)
 add_test(NAME shmem.alloc COMMAND shmem_test_alloc)
@@ -28,34 +28,34 @@ set_tests_properties(shmem.alloc PROPERTIES LABELS "tier1" TIMEOUT 60)
 
 # The §4.9 watched-range encoding on its own (tier 1): pure logic, and the
 # property it must have is one a brute-force check can state directly.
-add_executable(shmem_test_watchrange test_watchrange.c)
-target_include_directories(shmem_test_watchrange PRIVATE ../src)
-osoe_warnings(shmem_test_watchrange)
-add_test(NAME shmem.watchrange COMMAND shmem_test_watchrange)
-set_tests_properties(shmem.watchrange PROPERTIES LABELS "tier1" TIMEOUT 60)
+add_executable(shmem_test_watch_range test-watch-range.c)
+target_include_directories(shmem_test_watch_range PRIVATE ../src)
+osoe_warnings(shmem_test_watch_range)
+add_test(NAME shmem.watch-range COMMAND shmem_test_watch_range)
+set_tests_properties(shmem.watch-range PROPERTIES LABELS "tier1" TIMEOUT 60)
 
 # The AM sizing policy (tier 1): pure arithmetic, compiled in.
-add_executable(shmem_test_amsize test_amsize.c ../src/connarea.c ../src/conn.c)
-target_include_directories(shmem_test_amsize PRIVATE ../src)
-target_link_libraries(shmem_test_amsize PRIVATE osoe_base rt)
-osoe_warnings(shmem_test_amsize)
-add_test(NAME shmem.amsize COMMAND shmem_test_amsize)
-set_tests_properties(shmem.amsize PROPERTIES LABELS "tier1" TIMEOUT 60)
+add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/connection.c)
+target_include_directories(shmem_test_am_size PRIVATE ../src)
+target_link_libraries(shmem_test_am_size PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_am_size)
+add_test(NAME shmem.am-size COMMAND shmem_test_am_size)
+set_tests_properties(shmem.am-size PROPERTIES LABELS "tier1" TIMEOUT 60)
 
 # The reservation protocol (tier 1): the real code under real threads, checking
 # the properties the models check. Writers are threads because that is what the
 # tsan preset can instrument; §8.2 says what that does and does not buy.
-add_executable(shmem_test_conn test_conn.c ../src/conn.c)
-target_include_directories(shmem_test_conn PRIVATE ../src)
-target_link_libraries(shmem_test_conn PRIVATE osoe_base Threads::Threads)
-osoe_warnings(shmem_test_conn)
-add_test(NAME shmem.conn COMMAND shmem_test_conn)
-set_tests_properties(shmem.conn PROPERTIES LABELS "tier1" TIMEOUT 120)
+add_executable(shmem_test_connection test-connection.c ../src/connection.c)
+target_include_directories(shmem_test_connection PRIVATE ../src)
+target_link_libraries(shmem_test_connection PRIVATE osoe_base Threads::Threads)
+osoe_warnings(shmem_test_connection)
+add_test(NAME shmem.connection COMMAND shmem_test_connection)
+set_tests_properties(shmem.connection PROPERTIES LABELS "tier1" TIMEOUT 120)
 
 # The node-pair wire on its own (tier 1): both ends in one process, so no
 # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
 # its own osoe_fatal so a failure inside it fails the test.
-add_executable(shmem_test_wire test_wire.c ../src/wire.c)
+add_executable(shmem_test_wire test-wire.c ../src/wire.c)
 target_include_directories(shmem_test_wire PRIVATE ../src)
 target_link_libraries(shmem_test_wire PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_wire)
@@ -68,16 +68,16 @@ set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
 # backend lands, and takes its identity straight from the launcher environment.
 # The seed is fixed: §3.14 wants an injected fault reproducible, and without it
 # the pattern would follow the launcher's pid and differ every run.
-add_executable(shmem_test_wirepair test_wirepair.c ../src/wire.c)
-target_include_directories(shmem_test_wirepair PRIVATE ../src)
-target_link_libraries(shmem_test_wirepair PRIVATE osoe_base rt)
-osoe_warnings(shmem_test_wirepair)
-add_test(NAME shmem.wirepair
+add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c)
+target_include_directories(shmem_test_wire_pair PRIVATE ../src)
+target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_wire_pair)
+add_test(NAME shmem.wire-pair
   COMMAND ${CMAKE_COMMAND} -E env OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000
           OSOE_WIRE_SEED=20260919
           $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
-          $<TARGET_FILE:shmem_test_wirepair>)
-set_tests_properties(shmem.wirepair PROPERTIES LABELS "tier2" TIMEOUT 90)
+          $<TARGET_FILE:shmem_test_wire_pair>)
+set_tests_properties(shmem.wire-pair PROPERTIES LABELS "tier2" TIMEOUT 90)
 
 # Multi-process tests (tier 2): each program runs under osoe-launch at every
 # listed local PE count, as shmem.<name>.L<count>.
@@ -87,14 +87,14 @@ set(OSOE_LAUNCH_COUNTS 1 2 4)
 # it and the others open it, which is §3.12's arrangement. Not an
 # osoe_tier2_test: it does not call shmem_init, since a multi-node job is still
 # refused, and it takes its identity from the launcher environment.
-add_executable(shmem_test_connarea test_connarea.c ../src/connarea.c ../src/conn.c)
-target_include_directories(shmem_test_connarea PRIVATE ../src)
-target_link_libraries(shmem_test_connarea PRIVATE osoe_base rt)
-osoe_warnings(shmem_test_connarea)
+add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/connection.c)
+target_include_directories(shmem_test_connection_area PRIVATE ../src)
+target_link_libraries(shmem_test_connection_area PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_connection_area)
 foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
-  add_test(NAME shmem.connarea.L${count}
-    COMMAND osoe-launch -n ${count} -t 60 -- $<TARGET_FILE:shmem_test_connarea>)
-  set_tests_properties(shmem.connarea.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
+  add_test(NAME shmem.connection-area.L${count}
+    COMMAND osoe-launch -n ${count} -t 60 -- $<TARGET_FILE:shmem_test_connection_area>)
+  set_tests_properties(shmem.connection-area.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
 
 # Every tier-2 test asserts §8.2's rule that invariant counters are zero at
@@ -103,7 +103,7 @@ endforeach()
 # library, since a check that used the library's own headers would only prove
 # the library agrees with itself.
 function(osoe_tier2_test name)
-  add_executable(shmem_test_${name} test_${name}.c
+  add_executable(shmem_test_${name} test-${name}.c
     ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
   target_include_directories(shmem_test_${name} PRIVATE
     ${PROJECT_SOURCE_DIR}/tools/stat)
@@ -120,14 +120,14 @@ osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
 osoe_tier2_test(malloc)
-osoe_tier2_test(setrange)
+osoe_tier2_test(set-range)
 osoe_tier2_test(rma)
 osoe_tier2_test(amo)
 osoe_tier2_test(wait)
 osoe_tier2_test(signal)
 osoe_tier2_test(quiet)
 osoe_tier2_test(heap)
-osoe_tier2_test(amotypes)
+osoe_tier2_test(amo-types)
 
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
 # §4.9 watch word to check the unmasked-span refinement, which is the one place
@@ -139,13 +139,13 @@ osoe_tier2_test(surface)
 
 # start_pes leaves no shmem_finalize behind on purpose: what proves the implicit
 # one ran is that osoe-launch reports no leaked shared memory (Annex F.2.3).
-osoe_tier2_test(startpes)
+osoe_tier2_test(start-pes)
 
 osoe_tier2_test(profile)
 osoe_tier2_test(team)
 osoe_tier2_test(thread)
-osoe_tier2_test(waitmany)
-target_include_directories(shmem_test_waitmany PRIVATE ../src)
+osoe_tier2_test(wait-many)
+target_include_directories(shmem_test_wait-many PRIVATE ../src)
 
 # osoe-stat, against a live job and against one deliberately stalled (§3.14).
 # It needs the tool's path, which only the build knows; the launcher passes its
@@ -160,7 +160,7 @@ endforeach()
 # launcher leaves the survivors to the library, and it asserts on output rather
 # than on an exit status. A PASS_REGULAR_EXPRESSION test ignores the exit code,
 # which is what these need: the job is meant to fail.
-add_executable(shmem_test_watchdog test_watchdog.c)
+add_executable(shmem_test_watchdog test-watchdog.c)
 target_link_libraries(shmem_test_watchdog PRIVATE osoe)
 osoe_warnings(shmem_test_watchdog)
 
@@ -233,20 +233,20 @@ set_tests_properties(shmem.refuse.size_mismatch PROPERTIES
   PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE differs between PEs")
 # Destroying a predefined team is undefined by spec §9.4.8, and undefined is
 # loud here: no other team can exist, so every call naming one is a program bug.
-add_executable(shmem_test_badteam test_badteam.c)
-target_link_libraries(shmem_test_badteam PRIVATE osoe)
-osoe_warnings(shmem_test_badteam)
+add_executable(shmem_test_bad_team test-bad-team.c)
+target_link_libraries(shmem_test_bad_team PRIVATE osoe)
+osoe_warnings(shmem_test_bad_team)
 add_test(NAME shmem.refuse.destroy_predefined_team
-  COMMAND osoe-launch -n 1 -t 60 -- $<TARGET_FILE:shmem_test_badteam>)
+  COMMAND osoe-launch -n 1 -t 60 -- $<TARGET_FILE:shmem_test_bad_team>)
 set_tests_properties(shmem.refuse.destroy_predefined_team PROPERTIES
   LABELS "tier2" TIMEOUT 90
   PASS_REGULAR_EXPRESSION "SHMEM_TEAM_WORLD is a predefined team and cannot be destroyed")
 
-add_executable(shmem_test_badput test_badput.c)
-target_link_libraries(shmem_test_badput PRIVATE osoe)
-osoe_warnings(shmem_test_badput)
+add_executable(shmem_test_bad_put test-bad-put.c)
+target_link_libraries(shmem_test_bad_put PRIVATE osoe)
+osoe_warnings(shmem_test_bad_put)
 add_test(NAME shmem.refuse.nonsymmetric_put
-  COMMAND osoe-launch -n 1 -t 60 -- $<TARGET_FILE:shmem_test_badput>)
+  COMMAND osoe-launch -n 1 -t 60 -- $<TARGET_FILE:shmem_test_bad_put>)
 set_tests_properties(shmem.refuse.nonsymmetric_put PROPERTIES
   PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap")
 set_tests_properties(shmem.refuse.no_launcher shmem.refuse.multinode

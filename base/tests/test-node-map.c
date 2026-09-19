@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "base/nodemap.h"
+#include "base/node-map.h"
 #include "check.h"
 
 /* The node a rank is on, its local id, and its node's gtids, in one check. */

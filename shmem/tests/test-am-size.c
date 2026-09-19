@@ -12,11 +12,11 @@
 #include <stdlib.h>
 
 #include "check.h"
-#include "connarea.h"
+#include "connection-area.h"
 
-/* connarea.c's error path, replaced so a failure is a test failure. Nothing
+/* connection-area.c's error path, replaced so a failure is a test failure. Nothing
  * here should reach it: this file exercises the pure sizing function, and the
- * mapping half is covered across processes by shmem.connarea. */
+ * mapping half is covered across processes by shmem.connection-area. */
 _Noreturn void osoe_fatal(const char *fmt, ...);
 _Noreturn void osoe_fatal(const char *fmt, ...)
 {

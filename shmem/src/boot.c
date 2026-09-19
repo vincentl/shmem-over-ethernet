@@ -5,7 +5,7 @@
 #include "base/size.h"
 #include "boot.h"
 #include "fatal.h"
-#include "watch_range.h"
+#include "watch-range.h"
 #include "watchdog.h"
 
 /*

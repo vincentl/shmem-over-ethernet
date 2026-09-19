@@ -74,8 +74,8 @@ struct osoe_wire {
     char name[96];
     void *map;                  /* the whole shared object */
     uint64_t bytes;             /* its mapped length */
-    struct osoe_wire_dir *tx;   /* this node writes here */
-    struct osoe_wire_dir *rx;   /* and reads here */
+    struct osoe_wire_direction *tx;   /* this node writes here */
+    struct osoe_wire_direction *rx;   /* and reads here */
     uint64_t cap;               /* bytes per direction */
     uint64_t seed;              /* split injection, derived from job and step */
     uint32_t split;             /* truncations per myriad; 0 disables */

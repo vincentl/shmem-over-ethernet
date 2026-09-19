@@ -16,7 +16,7 @@
  * several nodes. The launcher derives each rank's OSOE_NODEID, OSOE_LOCALID and
  * OSOE_GTIDS from it, which is what Slurm computes from a distribution on a
  * real step - so the library sees the same environment in a test as in
- * production and reads no test-only variable (base/nodemap.h).
+ * production and reads no test-only variable (base/node-map.h).
  *
  * Fails (exit 1) if any process exits nonzero or dies on a signal, if the
  * timeout (default 60 s) expires, or if the job left shared-memory objects
@@ -44,7 +44,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "base/nodemap.h"
+#include "base/node-map.h"
 
 enum { MAX_PROCS = 1024, MAX_OVERRIDES = 64 };
 

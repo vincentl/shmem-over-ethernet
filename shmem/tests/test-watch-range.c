@@ -17,7 +17,7 @@
 #include <stdio.h>
 
 #include "check.h"
-#include "watch_range.h"
+#include "watch-range.h"
 
 enum { HEAP = 0, INTERNAL = 1 };
 

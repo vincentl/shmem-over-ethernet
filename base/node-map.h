@@ -25,8 +25,8 @@
  * makes the map's four poles (§8.1) - one node, one PE per node, uneven sizes
  * 0,0,0,1,2,2, and non-contiguous ranks 0,1,2,0,1,0 - all expressible.
  */
-#ifndef OSOE_BASE_NODEMAP_H
-#define OSOE_BASE_NODEMAP_H
+#ifndef OSOE_BASE_NODE_MAP_H
+#define OSOE_BASE_NODE_MAP_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -62,4 +62,4 @@ uint32_t osoe_node_map_local_count(const struct osoe_node_map *m, uint32_t node)
 uint32_t osoe_node_map_gtids(const struct osoe_node_map *m, uint32_t node,
                              uint32_t *out, uint32_t cap);
 
-#endif /* OSOE_BASE_NODEMAP_H */
+#endif /* OSOE_BASE_NODE_MAP_H */

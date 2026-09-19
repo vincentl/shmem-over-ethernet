@@ -26,13 +26,13 @@
  * Each is on its own cache line: the writer stores produced while the reader
  * stores consumed, and sharing a line would put a coherence miss on every byte.
  */
-struct osoe_wire_dir {
+struct osoe_wire_direction {
     _Alignas(OSOE_CACHELINE) _Atomic uint64_t produced;
     _Alignas(OSOE_CACHELINE) _Atomic uint64_t consumed;
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t wake;   /* futex word, the reader's */
 };
 
-struct osoe_wire_hdr {
+struct osoe_wire_header {
     _Alignas(OSOE_CACHELINE) uint64_t cap;            /* bytes per direction */
     uint64_t magic;
     /*
@@ -44,14 +44,14 @@ struct osoe_wire_hdr {
      * end of a zero-length mapping.
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t ready;
-    _Alignas(OSOE_CACHELINE) struct osoe_wire_dir dir[2];
+    _Alignas(OSOE_CACHELINE) struct osoe_wire_direction dir[2];
 };
 
 #define OSOE_WIRE_MAGIC UINT64_C(0x65726977656f736f)   /* "osoewire", little-endian */
 
 static uint64_t data_offset(void)
 {
-    return (sizeof(struct osoe_wire_hdr) + OSOE_CACHELINE - 1) / OSOE_CACHELINE * OSOE_CACHELINE;
+    return (sizeof(struct osoe_wire_header) + OSOE_CACHELINE - 1) / OSOE_CACHELINE * OSOE_CACHELINE;
 }
 
 static unsigned char *ring(const struct osoe_wire *w, int which)
@@ -217,7 +217,7 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_boot *b, uint32_t pee
     w->map = p;
     w->bytes = bytes;
 
-    struct osoe_wire_hdr *h = p;
+    struct osoe_wire_header *h = p;
     if (w->creator) {
         /* ftruncate zeroed it: every counter and futex word starts at 0. The
          * header is written before `ready`, and `ready` is what the peer waits

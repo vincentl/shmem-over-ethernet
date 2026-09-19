@@ -37,7 +37,7 @@
 #include "invariants.h"
 #include "segment.h"
 #include "transport.h"   /* OSOE_REGION_HEAP, for the watch word below */
-#include "watch_range.h"
+#include "watch-range.h"
 
 static int me, npes;
 

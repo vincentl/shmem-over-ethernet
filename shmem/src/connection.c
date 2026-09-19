@@ -1,6 +1,6 @@
 #include <stdatomic.h>
 
-#include "conn.h"
+#include "connection.h"
 
 /*
  * §3.16's orders, applied here once so the rest reads as prose:
@@ -15,21 +15,21 @@
  * it is also safe under x86's store buffering without any extra fence.
  */
 
-void osoe_conn_init(struct osoe_conn *c)
+void osoe_connectionection_init(struct osoe_connection *c)
 {
     for (uint32_t k = 0; k < 2; k++) {
         atomic_store_explicit(&c->s->buf[k].filled, 0, memory_order_release);
         atomic_store_explicit(&c->s->buf[k].seq, 0, memory_order_release);
         /* Sealed and empty: not reservable, and not mistakable for an open
          * buffer with nothing in it. */
-        atomic_store_explicit(&c->s->buf[k].head, OSOE_BUF_SEALED, memory_order_release);
+        atomic_store_explicit(&c->s->buf[k].head, OSOE_BUFFER_SEALED, memory_order_release);
     }
 }
 
-enum osoe_resv_status osoe_conn_reserve(struct osoe_conn *c, uint32_t len,
-                                        struct osoe_resv *r)
+enum osoe_reservation_status osoe_connectionection_reserve(struct osoe_connection *c, uint32_t len,
+                                        struct osoe_reservation *r)
 {
-    struct osoe_conn_shared *s = c->s;
+    struct osoe_connectionection_shared *s = c->s;
     for (;;) {
         /*
          * Find the reservable buffer by the seal bit and nothing else. At most
@@ -37,20 +37,20 @@ enum osoe_resv_status osoe_conn_reserve(struct osoe_conn *c, uint32_t len,
          * both carry the bit there is nothing to reserve and the caller waits
          * (§3.11).
          */
-        uint32_t k = OSOE_CONN_NONE, h = 0;
+        uint32_t k = OSOE_CONNECTION_NONE, h = 0;
         for (uint32_t i = 0; i < 2; i++) {
             uint32_t v = atomic_load_explicit(&s->buf[i].head, memory_order_acquire);
-            if (!(v & OSOE_BUF_SEALED)) {
+            if (!(v & OSOE_BUFFER_SEALED)) {
                 k = i;
                 h = v;
                 break;
             }
         }
-        if (k == OSOE_CONN_NONE)
-            return OSOE_RESV_NONE;
+        if (k == OSOE_CONNECTION_NONE)
+            return OSOE_RESERVATION_NONE;
 
         if (h + len > c->cap)
-            return OSOE_RESV_FULL;      /* the caller asks for a seal, then retries */
+            return OSOE_RESERVATION_FULL;      /* the caller asks for a seal, then retries */
 
         /*
          * A CAS, not a fetch_add: a writer that loses this race has changed
@@ -72,19 +72,19 @@ enum osoe_resv_status osoe_conn_reserve(struct osoe_conn *c, uint32_t len,
              * writer has not committed, so the number cannot change underneath.
              */
             r->seq = atomic_load_explicit(&s->buf[k].seq, memory_order_acquire);
-            return OSOE_RESV_OK;
+            return OSOE_RESERVATION_OK;
         }
     }
 }
 
-void osoe_conn_commit(struct osoe_conn *c, const struct osoe_resv *r)
+void osoe_connectionection_commit(struct osoe_connection *c, const struct osoe_reservation *r)
 {
     atomic_fetch_add_explicit(&c->s->buf[r->buf].filled, r->len, memory_order_seq_cst);
 }
 
-void osoe_conn_open(struct osoe_conn *c, uint32_t k, uint64_t seq)
+void osoe_connectionection_open(struct osoe_connection *c, uint32_t k, uint64_t seq)
 {
-    struct osoe_conn_shared *s = c->s;
+    struct osoe_connectionection_shared *s = c->s;
     /*
      * Nothing may reserve here yet: the buffer still carries the seal bit, so
      * every writer CAS on it fails. filled and seq are therefore published
@@ -94,14 +94,14 @@ void osoe_conn_open(struct osoe_conn *c, uint32_t k, uint64_t seq)
      * head starts past the segment header, which the progress thread fills at
      * seal time and no writer ever reserves (§3.4).
      */
-    atomic_store_explicit(&s->buf[k].filled, (uint32_t)sizeof(struct osoe_seg_header),
+    atomic_store_explicit(&s->buf[k].filled, (uint32_t)sizeof(struct osoe_am_segment_header),
                           memory_order_release);
     atomic_store_explicit(&s->buf[k].seq, seq, memory_order_release);
-    atomic_store_explicit(&s->buf[k].head, (uint32_t)sizeof(struct osoe_seg_header),
+    atomic_store_explicit(&s->buf[k].head, (uint32_t)sizeof(struct osoe_am_segment_header),
                           memory_order_release);
 }
 
-void osoe_conn_seal(struct osoe_conn *c, uint32_t k)
+void osoe_connectionection_seal(struct osoe_connection *c, uint32_t k)
 {
     /*
      * One locked instruction, and it is the whole seal. Every writer CAS
@@ -110,15 +110,15 @@ void osoe_conn_seal(struct osoe_conn *c, uint32_t k)
      * which is the defect the draft protocol had, with its separate state field
      * read before the CAS.
      */
-    atomic_fetch_or_explicit(&c->s->buf[k].head, OSOE_BUF_SEALED, memory_order_seq_cst);
+    atomic_fetch_or_explicit(&c->s->buf[k].head, OSOE_BUFFER_SEALED, memory_order_seq_cst);
 }
 
-bool osoe_conn_sendable(const struct osoe_conn *c, uint32_t k, uint32_t *bytes)
+bool osoe_connectionection_sendable(const struct osoe_connection *c, uint32_t k, uint32_t *bytes)
 {
-    const struct osoe_conn_shared *s = c->s;
+    const struct osoe_connectionection_shared *s = c->s;
     uint32_t h = atomic_load_explicit(&s->buf[k].head, memory_order_acquire);
     uint32_t f = atomic_load_explicit(&s->buf[k].filled, memory_order_acquire);
-    uint32_t used = OSOE_BUF_USED(h);
+    uint32_t used = OSOE_BUFFER_USED(h);
     /*
      * Equality, not >=. filled can never exceed the reserved count in a correct
      * run, and a strict comparison would hide the generation-crossing defect
@@ -131,36 +131,36 @@ bool osoe_conn_sendable(const struct osoe_conn *c, uint32_t k, uint32_t *bytes)
     return true;
 }
 
-void osoe_conn_release(struct osoe_conn *c, uint32_t k)
+void osoe_connectionection_release(struct osoe_connection *c, uint32_t k)
 {
     /*
      * Keep the seal bit. A freed buffer that cleared it would accept a writer
      * that had loaded `open` naming this buffer in the previous generation and
      * not yet run its CAS, which is the DRAINRES defect of §3.8's guard. The
-     * bit comes off only in osoe_conn_open, together with `open`.
+     * bit comes off only in osoe_connectionection_open, together with `open`.
      */
-    atomic_store_explicit(&c->s->buf[k].head, OSOE_BUF_SEALED, memory_order_release);
+    atomic_store_explicit(&c->s->buf[k].head, OSOE_BUFFER_SEALED, memory_order_release);
     atomic_store_explicit(&c->s->buf[k].filled, 0, memory_order_release);
 }
 
-bool osoe_conn_drain_reserve(struct osoe_conn *c, uint32_t k, uint32_t len,
-                             struct osoe_resv *r)
+bool osoe_connectionection_drain_reserve(struct osoe_connection *c, uint32_t k, uint32_t len,
+                             struct osoe_reservation *r)
 {
-    struct osoe_conn_shared *s = c->s;
+    struct osoe_connectionection_shared *s = c->s;
     /*
      * Only the progress thread runs here. What keeps writers out is the seal
-     * bit the buffer still carries from osoe_conn_release: every writer CAS
+     * bit the buffer still carries from osoe_connectionection_release: every writer CAS
      * against it fails, and a writer scanning for an unsealed buffer skips it.
      * The bit is kept in the stored value below, so the buffer stays closed
-     * while it fills with replies, and comes off only in osoe_conn_open.
+     * while it fills with replies, and comes off only in osoe_connectionection_open.
      */
     uint32_t h = atomic_load_explicit(&s->buf[k].head, memory_order_acquire);
-    uint32_t used = OSOE_BUF_USED(h);
-    if (used < sizeof(struct osoe_seg_header))
-        used = (uint32_t)sizeof(struct osoe_seg_header);
+    uint32_t used = OSOE_BUFFER_USED(h);
+    if (used < sizeof(struct osoe_am_segment_header))
+        used = (uint32_t)sizeof(struct osoe_am_segment_header);
     if (used + len > c->cap)
         return false;
-    atomic_store_explicit(&s->buf[k].head, (used + len) | OSOE_BUF_SEALED,
+    atomic_store_explicit(&s->buf[k].head, (used + len) | OSOE_BUFFER_SEALED,
                           memory_order_release);
     atomic_fetch_add_explicit(&s->buf[k].filled, len, memory_order_seq_cst);
     r->buf = k;

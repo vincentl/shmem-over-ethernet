@@ -30,7 +30,7 @@
 #include "metrics.h"
 #include "state.h"
 #include "transport.h"
-#include "watch_range.h"
+#include "watch-range.h"
 
 struct osoe_tp_watch {
     struct osoe_pe_slot *slot;

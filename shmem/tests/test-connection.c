@@ -31,7 +31,7 @@
 #include <time.h>
 
 #include "check.h"
-#include "conn.h"
+#include "connection.h"
 
 enum { WRITERS = 4, PER_WRITER = 200, CAP = 512, TOTAL = WRITERS * PER_WRITER };
 
@@ -57,9 +57,9 @@ struct payload {
     uint64_t seq_read;
 };
 
-static struct osoe_conn_shared shared;
+static struct osoe_connectionection_shared shared;
 static unsigned char storage[2 * CAP];
-static struct osoe_conn conn = { &shared, storage, CAP };
+static struct osoe_connection conn = { &shared, storage, CAP };
 
 static _Atomic uint32_t writers_done;
 
@@ -73,25 +73,25 @@ static size_t ngot;
 static void *writer_main(void *arg)
 {
     uint32_t me = (uint32_t)(uintptr_t)arg;
-    uint32_t len = osoe_msg_padded(sizeof(struct payload));
+    uint32_t len = osoe_message_padded(sizeof(struct payload));
 
     for (uint32_t i = 0; i < PER_WRITER; i++) {
-        struct osoe_resv r;
+        struct osoe_reservation r;
         for (;;) {
-            enum osoe_resv_status st = osoe_conn_reserve(&conn, len, &r);
-            if (st == OSOE_RESV_OK)
+            enum osoe_reservation_status st = osoe_connectionection_reserve(&conn, len, &r);
+            if (st == OSOE_RESERVATION_OK)
                 break;
             /* FULL asks the progress thread for a seal and NONE waits for one
              * to open; a test can simply look again, which is also what makes
              * this a hard interleaving rather than a polite one. */
             sched_yield();
         }
-        unsigned char *at = osoe_conn_at(&conn, &r);
-        struct osoe_msg_header h = { (uint16_t)me, 0, (uint32_t)sizeof(struct payload) };
+        unsigned char *at = osoe_reservation_bytes(&conn, &r);
+        struct osoe_message_header h = { (uint16_t)me, 0, (uint32_t)sizeof(struct payload) };
         struct payload p = { me, i, r.seq };
         memcpy(at, &h, sizeof h);
         memcpy(at + sizeof h, &p, sizeof p);
-        osoe_conn_commit(&conn, &r);
+        osoe_connectionection_commit(&conn, &r);
     }
     atomic_fetch_add_explicit(&writers_done, 1, memory_order_seq_cst);
     return NULL;
@@ -101,12 +101,12 @@ static void *writer_main(void *arg)
 static void deliver(uint32_t k, uint32_t bytes)
 {
     const unsigned char *base = storage + (size_t)k * CAP;
-    struct osoe_seg_header sh;
+    struct osoe_am_segment_header sh;
     memcpy(&sh, base, sizeof sh);
 
     uint32_t off = (uint32_t)sizeof sh, count = 0;
     while (off < bytes) {
-        struct osoe_msg_header mh;
+        struct osoe_message_header mh;
         memcpy(&mh, base + off, sizeof mh);
         CHECK(mh.len == sizeof(struct payload));
         /* A message whose header does not name a known role is a torn or
@@ -123,7 +123,7 @@ static void deliver(uint32_t k, uint32_t bytes)
             got[ngot].seg_seq = sh.seq;
             ngot++;
         }
-        off += osoe_msg_padded(mh.len);
+        off += osoe_message_padded(mh.len);
         count++;
     }
     /* §3.4's redundant fields must agree with the bytes actually present. */
@@ -135,17 +135,17 @@ static void deliver(uint32_t k, uint32_t bytes)
 int main(void)
 {
     /* The progress thread owns the buffer states; writers never see them. */
-    enum osoe_buf_state state[2] = { OSOE_BUF_FREE, OSOE_BUF_FREE };
+    enum osoe_buffer_state state[2] = { OSOE_BUFFER_FREE, OSOE_BUFFER_FREE };
     uint64_t next_seq = 1;
-    uint32_t pending = OSOE_CONN_NONE;       /* sealed, not yet sent */
+    uint32_t pending = OSOE_CONNECTION_NONE;       /* sealed, not yet sent */
     (void)0;
-    uint32_t draining = OSOE_CONN_NONE;      /* freed, being filled with replies */
+    uint32_t draining = OSOE_CONNECTION_NONE;      /* freed, being filled with replies */
     uint64_t last_seq = 0;
     uint32_t replies = 0;
 
-    osoe_conn_init(&conn);
-    osoe_conn_open(&conn, 0, next_seq++);
-    state[0] = OSOE_BUF_OPEN;
+    osoe_connectionection_init(&conn);
+    osoe_connectionection_open(&conn, 0, next_seq++);
+    state[0] = OSOE_BUFFER_OPEN;
 
     pthread_t th[WRITERS];
     for (uint32_t i = 0; i < WRITERS; i++)
@@ -186,79 +186,79 @@ int main(void)
         /* Finish a sealed buffer once every writer in it has committed. The
          * progress thread never spins here: if a writer is mid-copy it moves on
          * and asks again (§3.5). */
-        if (pending != OSOE_CONN_NONE) {
+        if (pending != OSOE_CONNECTION_NONE) {
             uint32_t bytes;
-            if (osoe_conn_sendable(&conn, pending, &bytes)) {
+            if (osoe_connectionection_sendable(&conn, pending, &bytes)) {
                 /* Seal-time fields, filled by the progress thread (§3.4). */
-                struct osoe_seg_header sh = { 0 };
+                struct osoe_am_segment_header sh = { 0 };
                 sh.seq = atomic_load_explicit(&shared.buf[pending].seq,
                                               memory_order_acquire);
                 sh.total_len = bytes;
                 uint32_t off = (uint32_t)sizeof sh;
                 while (off < bytes) {
-                    struct osoe_msg_header mh;
+                    struct osoe_message_header mh;
                     memcpy(&mh, storage + (size_t)pending * CAP + off, sizeof mh);
                     sh.msg_count++;
-                    off += osoe_msg_padded(mh.len);
+                    off += osoe_message_padded(mh.len);
                 }
                 memcpy(storage + (size_t)pending * CAP, &sh, sizeof sh);
 
                 CHECK(sh.seq >= last_seq);                  /* SEQ */
                 last_seq = sh.seq;
                 deliver(pending, bytes);
-                osoe_conn_release(&conn, pending);
+                osoe_connectionection_release(&conn, pending);
                 /*
                  * Every other buffer goes through DRAINING with one reply in
                  * it, so the guard's path runs constantly rather than never.
                  */
                 if (replies < MAX_REPLIES && (replies & 1) == 0) {
-                    state[pending] = OSOE_BUF_DRAINING;
+                    state[pending] = OSOE_BUFFER_DRAINING;
                     draining = pending;
                 } else {
-                    state[pending] = OSOE_BUF_FREE;
+                    state[pending] = OSOE_BUFFER_FREE;
                 }
                 replies++;
-                pending = OSOE_CONN_NONE;
+                pending = OSOE_CONNECTION_NONE;
             }
         }
 
         /* Fill the DRAINING buffer with one progress-thread reply, then let it
          * open. Only the progress thread may reserve here. */
-        if (draining != OSOE_CONN_NONE) {
-            struct osoe_resv r;
-            if (osoe_conn_drain_reserve(&conn, draining,
-                                        osoe_msg_padded(sizeof(struct payload)), &r)) {
-                unsigned char *at = osoe_conn_at(&conn, &r);
-                struct osoe_msg_header mh = { REPLY_ID, 0,
+        if (draining != OSOE_CONNECTION_NONE) {
+            struct osoe_reservation r;
+            if (osoe_connectionection_drain_reserve(&conn, draining,
+                                        osoe_message_padded(sizeof(struct payload)), &r)) {
+                unsigned char *at = osoe_reservation_bytes(&conn, &r);
+                struct osoe_message_header mh = { REPLY_ID, 0,
                                               (uint32_t)sizeof(struct payload) };
                 struct payload p = { REPLY_ID, replies / 2, r.seq };
                 memcpy(at, &mh, sizeof mh);
                 memcpy(at + sizeof mh, &p, sizeof p);
             }
-            state[draining] = OSOE_BUF_FREE;
-            draining = OSOE_CONN_NONE;
+            state[draining] = OSOE_BUFFER_FREE;
+            draining = OSOE_CONNECTION_NONE;
         }
 
         /* One reservable buffer at a time: open a free one only when no other
          * is open. Nothing in conn.c enforces this - the states are the
          * progress thread's own bookkeeping (§3.5) - so the driver keeps it,
          * exactly as the lead's agent will have to. */
-        bool any_open = state[0] == OSOE_BUF_OPEN || state[1] == OSOE_BUF_OPEN;
+        bool any_open = state[0] == OSOE_BUFFER_OPEN || state[1] == OSOE_BUFFER_OPEN;
         if (!any_open) {
             for (uint32_t k = 0; k < 2; k++)
-                if (state[k] == OSOE_BUF_FREE && k != pending && k != draining) {
-                    osoe_conn_open(&conn, k, next_seq++);
-                    state[k] = OSOE_BUF_OPEN;
+                if (state[k] == OSOE_BUFFER_FREE && k != pending && k != draining) {
+                    osoe_connectionection_open(&conn, k, next_seq++);
+                    state[k] = OSOE_BUFFER_OPEN;
                     break;
                 }
         }
 
         /* Seal periodically, so buffers fill and recycle many times over. */
-        if (++pass % 32 == 0 && pending == OSOE_CONN_NONE) {
+        if (++pass % 32 == 0 && pending == OSOE_CONNECTION_NONE) {
             for (uint32_t k = 0; k < 2; k++)
-                if (state[k] == OSOE_BUF_OPEN) {
-                    osoe_conn_seal(&conn, k);
-                    state[k] = OSOE_BUF_SEALED_STATE;
+                if (state[k] == OSOE_BUFFER_OPEN) {
+                    osoe_connectionection_seal(&conn, k);
+                    state[k] = OSOE_BUFFER_SEALED_STATE;
                     pending = k;
                     break;
                 }
@@ -282,7 +282,7 @@ int main(void)
         for (uint32_t k = 0; k < 2; k++) {
             uint32_t f = atomic_load_explicit(&shared.buf[k].filled,
                                               memory_order_acquire);
-            uint32_t h = OSOE_BUF_USED(atomic_load_explicit(&shared.buf[k].head,
+            uint32_t h = OSOE_BUFFER_USED(atomic_load_explicit(&shared.buf[k].head,
                                                             memory_order_acquire));
             CHECK(f <= h);
         }

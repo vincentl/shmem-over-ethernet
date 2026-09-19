@@ -29,14 +29,14 @@
  * contends on the same open buffer through §3.5's CAS. 256 PEs on a node cost
  * exactly what one PE costs.
  */
-#ifndef OSOE_CONNAREA_H
-#define OSOE_CONNAREA_H
+#ifndef OSOE_CONNECTION_AREA_H
+#define OSOE_CONNECTION_AREA_H
 
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "boot.h"
-#include "conn.h"
+#include "connection.h"
 
 /*
  * Defaults (§3.2, §3.4).
@@ -100,7 +100,7 @@ struct osoe_am_config {
 void osoe_am_config_read(struct osoe_am_config *c);
 
 /* Process-private handle on the area. */
-struct osoe_connarea {
+struct osoe_connectionection_area {
     char name[96];
     void *map;
     uint64_t bytes;
@@ -108,7 +108,7 @@ struct osoe_connarea {
     uint32_t nodes;         /* the job's logical node count */
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
-    struct osoe_conn *conn; /* nodes - 1 handles, indexed by peer_slot() */
+    struct osoe_connection *conn; /* nodes - 1 handles, indexed by peer_slot() */
     bool creator;           /* this PE is the node lead, so it made the object */
 };
 
@@ -117,13 +117,13 @@ struct osoe_connarea {
  * failure (§3.15). A job of one node maps nothing and leaves the handle empty,
  * so the caller need not special-case it.
  */
-void osoe_connarea_open(struct osoe_connarea *a, const struct osoe_boot *b,
+void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const struct osoe_boot *b,
                         uint32_t nodes, uint32_t session);
 
 /* Unmap; the lead also removes the name. */
-void osoe_connarea_close(struct osoe_connarea *a);
+void osoe_connectionection_area_close(struct osoe_connectionection_area *a);
 
 /* This node's connection toward `peer`, or NULL if peer is this node. */
-struct osoe_conn *osoe_connarea_conn(struct osoe_connarea *a, uint32_t peer);
+struct osoe_connection *osoe_connectionection_to(struct osoe_connectionection_area *a, uint32_t peer);
 
-#endif /* OSOE_CONNAREA_H */
+#endif /* OSOE_CONNECTION_AREA_H */

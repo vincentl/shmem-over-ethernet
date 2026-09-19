@@ -1966,7 +1966,7 @@ slot publishes the range and a writer wakes on overlap. A write to an unwaited
 element of the array wakes spuriously, and the loop re-checks.
 
 **The range is one word: region, first grain, and a saturating grain count**
-(`shmem/src/watch_range.h`), which is the same word §4.11 item 3 publishes per
+(`shmem/src/watch-range.h`), which is the same word §4.11 item 3 publishes per
 thread under `MULTIPLE`. The grain is 4 bytes, the width of the narrowest AMO
 type, so an ivar at its natural alignment is filtered exactly and no two
 AMO-type objects share a grain unless they are adjacent elements of one array.

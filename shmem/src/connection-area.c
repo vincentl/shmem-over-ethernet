@@ -15,11 +15,11 @@
 #include "base/deadline.h"
 #include "base/env.h"
 #include "base/futex.h"
-#include "connarea.h"
+#include "connection-area.h"
 #include "fatal.h"
 
-#define OSOE_CONNAREA_MAGIC UINT64_C(0x61657261656f736f)   /* "osoearea" */
-#define OSOE_CONNAREA_LAYOUT 1
+#define OSOE_CONNECTION_AREA_MAGIC UINT64_C(0x61657261656f736f)   /* "osoearea" */
+#define OSOE_CONNECTION_AREA_LAYOUT 1
 
 /*
  * The frozen prefix, for the same reason the control segment has one (§3.14):
@@ -27,7 +27,7 @@
  * from it. `ready` is last and on its own line because it is the publication
  * point: everything above it is written before it is set.
  */
-struct osoe_connarea_hdr {
+struct osoe_connectionection_area_header {
     uint64_t magic;
     uint32_t layout;
     uint32_t node;
@@ -35,7 +35,7 @@ struct osoe_connarea_hdr {
     uint32_t reserved;
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
-    uint64_t conns_offset;      /* nodes-1 struct osoe_conn_shared */
+    uint64_t conns_offset;      /* nodes-1 struct osoe_connectionection_shared */
     uint64_t data_offset;       /* nodes-1 pairs of buffer_bytes */
     uint64_t area_bytes;
 
@@ -69,8 +69,8 @@ uint64_t osoe_am_area_bytes(uint32_t nodes, uint64_t buffer)
     if (nodes < 2)
         return 0;
     uint64_t peers = nodes - 1;
-    uint64_t conns = align_up(sizeof(struct osoe_connarea_hdr)) +
-                     align_up(peers * sizeof(struct osoe_conn_shared));
+    uint64_t conns = align_up(sizeof(struct osoe_connectionection_area_header)) +
+                     align_up(peers * sizeof(struct osoe_connectionection_shared));
     return conns + peers * 2 * buffer;
 }
 
@@ -133,10 +133,10 @@ void osoe_am_config_read(struct osoe_am_config *c)
     c->hugepages = huge != 0;
 }
 
-void osoe_connarea_open(struct osoe_connarea *a, const struct osoe_boot *b,
+void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const struct osoe_boot *b,
                         uint32_t nodes, uint32_t session)
 {
-    *a = (struct osoe_connarea){ 0 };
+    *a = (struct osoe_connectionection_area){ 0 };
     a->node = b->node;
     a->nodes = nodes;
     if (nodes < 2)
@@ -234,23 +234,23 @@ void osoe_connarea_open(struct osoe_connarea *a, const struct osoe_boot *b,
     }
     a->map = p;
 
-    struct osoe_connarea_hdr *h = p;
+    struct osoe_connectionection_area_header *h = p;
     uint64_t conns_offset = align_up(sizeof *h);
     uint64_t data_offset = conns_offset +
-                           align_up((uint64_t)peers * sizeof(struct osoe_conn_shared));
+                           align_up((uint64_t)peers * sizeof(struct osoe_connectionection_shared));
 
     a->conn = calloc(peers, sizeof *a->conn);
     if (!a->conn)
         osoe_fatal("out of memory for %u connection handles", peers);
     for (uint32_t i = 0; i < peers; i++) {
-        a->conn[i].s = (struct osoe_conn_shared *)((char *)p + conns_offset) + i;
+        a->conn[i].s = (struct osoe_connectionection_shared *)((char *)p + conns_offset) + i;
         a->conn[i].data = (unsigned char *)p + data_offset + (uint64_t)i * 2 * buffer;
         a->conn[i].cap = (uint32_t)buffer;
     }
 
     if (a->creator) {
-        h->magic = OSOE_CONNAREA_MAGIC;
-        h->layout = OSOE_CONNAREA_LAYOUT;
+        h->magic = OSOE_CONNECTION_AREA_MAGIC;
+        h->layout = OSOE_CONNECTION_AREA_LAYOUT;
         h->node = b->node;
         h->nodes = nodes;
         h->buffer_bytes = buffer;
@@ -262,7 +262,7 @@ void osoe_connarea_open(struct osoe_connarea *a, const struct osoe_boot *b,
          * until the agent opens one. Zeroed memory would say the opposite
          * (§3.5). */
         for (uint32_t i = 0; i < peers; i++)
-            osoe_conn_init(&a->conn[i]);
+            osoe_connectionection_init(&a->conn[i]);
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
@@ -274,7 +274,7 @@ void osoe_connarea_open(struct osoe_connarea *a, const struct osoe_boot *b,
                 osoe_fatal("timed out waiting for the local lead to finish creating %s",
                            a->name);
         }
-        if (h->magic != OSOE_CONNAREA_MAGIC || h->layout != OSOE_CONNAREA_LAYOUT ||
+        if (h->magic != OSOE_CONNECTION_AREA_MAGIC || h->layout != OSOE_CONNECTION_AREA_LAYOUT ||
             h->buffer_bytes != buffer || h->chunk_bytes != cfg.chunk ||
             h->nodes != nodes)
             osoe_fatal("connection area %s was created with different AM sizing "
@@ -286,7 +286,7 @@ void osoe_connarea_open(struct osoe_connarea *a, const struct osoe_boot *b,
     }
 }
 
-void osoe_connarea_close(struct osoe_connarea *a)
+void osoe_connectionection_area_close(struct osoe_connectionection_area *a)
 {
     free(a->conn);
     if (a->map) {
@@ -294,10 +294,10 @@ void osoe_connarea_close(struct osoe_connarea *a)
         if (a->creator)
             shm_unlink(a->name);
     }
-    *a = (struct osoe_connarea){ 0 };
+    *a = (struct osoe_connectionection_area){ 0 };
 }
 
-struct osoe_conn *osoe_connarea_conn(struct osoe_connarea *a, uint32_t peer)
+struct osoe_connection *osoe_connectionection_to(struct osoe_connectionection_area *a, uint32_t peer)
 {
     if (peer == a->node || peer >= a->nodes || !a->conn)
         return NULL;
