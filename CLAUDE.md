@@ -83,3 +83,13 @@ So audit afterwards, and **check that the audit command can find something you
 know is there before believing an empty result**. An empty result from a broken
 grep looks exactly like a clean tree. The first audit of that rename reported
 clean because the pattern itself never matched anything.
+
+## Review documents are named for the work they reviewed
+
+`docs/reviews/` holds the record of each adversarial review. A review's files
+carry the phase, step and slice they were run against — for example
+`phase1-step2-slice1-design-soundness.md` — so that a finding can be traced to
+the state of the tree that produced it. The first round predates the convention
+and keeps its names (`design-soundness.md`, `core-api.md`, `roce-transport.md`,
+`watch-notification-options.md`); it was run against the design alone, before
+there was an implementation to name.
