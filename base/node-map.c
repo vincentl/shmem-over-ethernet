@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "base/env.h"
+#include "base/environment.h"
 #include "base/node-map.h"
 
 int osoe_node_map_parse(const char *s, uint32_t world_size, struct osoe_node_map *m)

@@ -88,7 +88,7 @@ static void check_live_output(const char *segment, int n)
 
     CHECK(run_stat("-j -c", segment, out, sizeof out) == 0);
     CHECK(out[0] == '{');
-    CHECK(strstr(out, "\"tp.rmw.calls\"") != NULL);
+    CHECK(strstr(out, "\"transport.rmw.calls\"") != NULL);
 
     CHECK(run_stat("-T", segment, out, sizeof out) == 0);
     CHECK(strstr(out, "application") != NULL);
@@ -102,9 +102,9 @@ static void check_live_output(const char *segment, int n)
  */
 static void observe_stalled(const char *segment, uint32_t who)
 {
-    struct osoe_seg s;
+    struct osoe_segment s;
     char err[256];
-    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
         CHECK(0);
         return;
@@ -113,10 +113,10 @@ static void observe_stalled(const char *segment, uint32_t who)
     /* Wait for the record to appear: it is published when the wait sleeps, not
      * when it is entered (§3.14 cost rules), so there is nothing to see until
      * PE 1 has really blocked. */
-    struct osoe_seg_blocked b = { 0 };
+    struct osoe_segment_blocked b = { 0 };
     unsigned waited = 0;
     for (; waited < STALL_GIVE_UP_MS; waited += STALL_POLL_MS) {
-        if (osoe_seg_blocked(&s, who, &b) && b.valid && b.blocked &&
+        if (osoe_segment_blocked(&s, who, &b) && b.valid && b.blocked &&
             strstr(b.routine, "wait_until"))
             break;
         sleep_ms(STALL_POLL_MS);
@@ -124,18 +124,18 @@ static void observe_stalled(const char *segment, uint32_t who)
     CHECK(waited < STALL_GIVE_UP_MS);
     CHECK(b.valid && b.blocked);
     CHECK(strcmp(b.routine, "shmem_uint64_wait_until") == 0);
-    CHECK(b.since_ns != 0 && b.since_ns < osoe_seg_now_ns());
+    CHECK(b.since_ns != 0 && b.since_ns < osoe_segment_now_ns());
 
     /* The watch word says it is waiting on its own heap, not on nothing. */
     uint64_t rng = 0;
-    CHECK(osoe_seg_read_name(&s, "pe.watch_rng", who, &rng));
+    CHECK(osoe_segment_read_name(&s, "pe.watch_rng", who, &rng));
     CHECK(rng != 0);
 
     /* The heartbeat: a blocked PE still sweeps. */
     uint64_t before = 0, after = 0;
-    CHECK(osoe_seg_read_name(&s, "pe.sweeps", who, &before));
+    CHECK(osoe_segment_read_name(&s, "pe.sweeps", who, &before));
     sleep_ms(HEARTBEAT_MS);
-    CHECK(osoe_seg_read_name(&s, "pe.sweeps", who, &after));
+    CHECK(osoe_segment_read_name(&s, "pe.sweeps", who, &after));
     CHECK(after > before);
 
     /* And the tool says so too, in as many words. */
@@ -143,7 +143,7 @@ static void observe_stalled(const char *segment, uint32_t who)
     CHECK(run_stat("-c", segment, out, sizeof out) == 0);
     CHECK(strstr(out, "shmem_uint64_wait_until") != NULL);
 
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
 }
 
 int main(void)
@@ -151,7 +151,7 @@ int main(void)
     shmem_init();
     int me = shmem_my_pe(), n = shmem_n_pes();
 
-    char segment[OSOE_SEG_NAME_MAX];
+    char segment[OSOE_SEGMENT_NAME_MAX];
     osoe_test_segment_name(segment, sizeof segment, 0);
 
     uint64_t *flag = shmem_malloc(sizeof *flag);

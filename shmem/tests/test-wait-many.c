@@ -224,10 +224,10 @@ enum { SPAN_N = 64, SPAN_FIRST = 40, SPAN_LAST = 47 };
  */
 static void watched_span(uint64_t *v)
 {
-    char segment[OSOE_SEG_NAME_MAX], err[256];
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(segment, sizeof segment, 0);
-    struct osoe_seg s;
-    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
         CHECK(0);
         return;
@@ -236,13 +236,13 @@ static void watched_span(uint64_t *v)
     /* The array is symmetric, so its offset from the heap base is the same on
      * every PE; the base itself is in the segment (§3.14). */
     uint64_t base = 0;
-    CHECK(osoe_seg_read_name(&s, "node.heap_base", 0, &base));
+    CHECK(osoe_segment_read_name(&s, "node.heap_base", 0, &base));
     uint64_t offset = (uint64_t)(uintptr_t)v - base;
 
-    struct osoe_seg_blocked b = { 0 };
+    struct osoe_segment_blocked b = { 0 };
     int waited = 0;
     for (; waited < 2000; waited++) {
-        if (osoe_seg_blocked(&s, 1, &b) && b.valid && b.blocked &&
+        if (osoe_segment_blocked(&s, 1, &b) && b.valid && b.blocked &&
             strstr(b.routine, "wait_until_some"))
             break;
         struct timespec ts = { 0, 1000 * 1000 };
@@ -251,14 +251,14 @@ static void watched_span(uint64_t *v)
     CHECK(waited < 2000);
 
     uint64_t published = 0;
-    CHECK(osoe_seg_read_name(&s, "pe.watch_rng", 1, &published));
+    CHECK(osoe_segment_read_name(&s, "pe.watch_rng", 1, &published));
     uint64_t expect = osoe_watch_pack(OSOE_REGION_HEAP,
                                       offset + SPAN_FIRST * sizeof *v,
                                       (SPAN_LAST - SPAN_FIRST + 1) * sizeof *v);
     uint64_t whole = osoe_watch_pack(OSOE_REGION_HEAP, offset, SPAN_N * sizeof *v);
     CHECK(published == expect);
     CHECK(published != whole);          /* the refinement, not the array */
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
 
     /* Release it: an AMO on an element inside the span. */
     shmem_uint64_atomic_set(&v[SPAN_FIRST + 2], 1, 1);
@@ -304,21 +304,21 @@ static void blocking(uint64_t *v)
 /* This PE's total for a thread-scope counter. */
 static uint64_t my_counter(const char *name)
 {
-    char segment[OSOE_SEG_NAME_MAX], err[256];
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(segment, sizeof segment, 0);
-    struct osoe_seg s;
-    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
         return UINT64_MAX;
     }
-    const struct osoe_metric_desc *m = osoe_seg_metric(&s, name);
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(&s, name);
     uint64_t total = 0;
     for (uint32_t i = 0; m && i < s.dir->blocks_per_pe; i++) {
         uint64_t v;
-        if (osoe_seg_read(&s, m, (uint32_t)me * s.dir->blocks_per_pe + i, &v))
+        if (osoe_segment_read(&s, m, (uint32_t)me * s.dir->blocks_per_pe + i, &v))
             total += v;
     }
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
     return m ? total : UINT64_MAX;
 }
 
@@ -365,7 +365,7 @@ static void short_across_pes(void)
     } else {
         bool writer = (me % 2) == 1;
         bool waiter = (me % 2) == 0 && me + 1 < npes;
-        uint64_t blocked_before = my_counter("tp.watch.blocked");
+        uint64_t blocked_before = my_counter("transport.watch.blocked");
         CHECK(blocked_before != UINT64_MAX);
         shmem_barrier_all();
 
@@ -387,7 +387,7 @@ static void short_across_pes(void)
             CHECK(*u == (unsigned short)0xbeef);
             /* Both really slept, so the width-2 watch and the sleep path were
              * exercised rather than a predicate that was already true. */
-            CHECK(my_counter("tp.watch.blocked") >= blocked_before + 2);
+            CHECK(my_counter("transport.watch.blocked") >= blocked_before + 2);
             /* And the signed comparison still holds at two bytes. */
             CHECK(shmem_short_test(v, SHMEM_CMP_LT, (short)0) == 1);
             CHECK(shmem_ushort_test(u, SHMEM_CMP_GT, (unsigned short)0) == 1);

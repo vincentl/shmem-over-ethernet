@@ -15,7 +15,7 @@ A PE blocks in `shmem_wait_until` on its own symmetric variable. Some other PE
 process*, or a NIC nobody can see — writes that memory. The writer must decide,
 cheaply, whether to wake the waiter.
 
-`osoe_tp_notify` runs after **every** intranode put and rmw. The 8-byte put
+`osoe_transport_notify` runs after **every** intranode put and rmw. The 8-byte put
 itself is a `memcpy` that costs nothing measurable; the filter costs 0.63 ns;
 a wake costs 150–540 ns. So the filter is the whole cost of notification when
 it says no, and is irrelevant when it says yes. The design freedom is entirely
@@ -56,7 +56,7 @@ for.
    control words (§5.8), and `STATICS` with §4.3 phase 1.5. Watching statics is
    *certain*, not speculative: spec Example 27, the canonical put-with-signal
    example, waits on a `static uint64_t`. `watch.c` today calls `osoe_fatal`
-   for any region but `HEAP`, and `osoe_tp_notify` silently returns for them.
+   for any region but `HEAP`, and `osoe_transport_notify` silently returns for them.
 7. **Several waiting threads per PE**, each with its own record and futex word
    (§4.11 item 3), on up to ~128–256 PEs per node.
 8. **The writer may be in another process.** Anything the filter touches lives
@@ -486,7 +486,7 @@ are useless.
 - **`wait_until_all` over N elements.** The writer would need the current value
   of every element to evaluate the conjunction — N loads of memory it does not
   own, on the fast path. Worse, those loads would have to be *coherent* loads in
-  the §4.10 sense: the whole reason `osoe_tp_load` exists is that reading an
+  the §4.10 sense: the whole reason `osoe_transport_load` exists is that reading an
   ivar with a plain load is not sound on a backend whose NIC atomics the CPU
   cannot see. The boundary cannot require a writer to evaluate a predicate over
   memory it does not own.
@@ -522,8 +522,8 @@ the vector forms leave it clear and the writer uses the interval alone. **The
 fast path does not change at all**: the predicate is consulted only after the
 interval has already matched, which is the rare path.
 
-**What it costs the boundary.** `osoe_tp_notify` must learn the value that was
-applied and its width, or gain a sibling `osoe_tp_notify_rmw(pe, region, offset,
+**What it costs the boundary.** `osoe_transport_notify` must learn the value that was
+applied and its width, or gain a sibling `osoe_transport_notify_rmw(pe, region, offset,
 width, value)`. That is a §4.10 change, and §4.10 changes are expensive on
 purpose. It also duplicates `satisfied()` below the boundary.
 
@@ -536,7 +536,7 @@ futex wakes" into "one".
 semantics below the boundary, and it is worthless until the interval is exact
 (with `block_of`, an 8 KiB array's spurious coverage swamps it). Record it as
 the follow-on, with U4 as its justification, and revisit when
-`osoe_tp_set_range` (`roce-transport.md` §9.2) is on the table, since both are
+`osoe_transport_set_range` (`roce-transport.md` §9.2) is on the table, since both are
 boundary changes about telling a backend what the program is waiting for.
 
 ### D. A signature instead of an interval
@@ -690,7 +690,7 @@ answers, and the third is the one that decides it.
    collective control words in `OSOE_REGION_INTERNAL` and says a generic
    collective runs "over put, fenced rmw, and watch"; §4.3 phase 1.5 adds
    `STATICS`, and spec Example 27 waits on a `static uint64_t`. `watch.c` today
-   is `osoe_fatal("watching region %d is not supported")` and `osoe_tp_notify`
+   is `osoe_fatal("watching region %d is not supported")` and `osoe_transport_notify`
    is a silent early return for anything but `HEAP`. That must change, the
    encoding has no room, and §4.11 has already chosen what replaces it. The
    choice is between doing it once and doing it twice.
@@ -811,7 +811,7 @@ reason not to spend a boundary change on option C until something measures it.
 2. **The grain, decided rather than assumed.** 4 bytes suits every AMO and wait
    type the spec has. The deprecated `short` waits are 2 bytes and would round
    out to 4, which is spurious-only. Confirm no wait type is smaller, and
-   confirm `osoe_sym_word_offset`'s alignment guarantee covers it.
+   confirm `osoe_symmetric_word_offset`'s alignment guarantee covers it.
 3. **The field split.** 2/40/22 gives 4 TiB of offsets and 16 MiB of exact
    length. Check that against the largest plausible `wait_until_all` array and
    against `OSOE_REGION_INTERNAL`'s planned size in §5.8, and record why.

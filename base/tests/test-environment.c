@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "base/env.h"
+#include "base/environment.h"
 #include "check.h"
 
 int main(void)
@@ -33,13 +33,13 @@ int main(void)
     CHECK(osoe_parse_u32_list("1;2", list, 4, &n) == -1);
 
     unsetenv("OSOE_TEST_VAR");
-    CHECK(osoe_env_u32("OSOE_TEST_VAR", &v32) == OSOE_ENV_UNSET);
+    CHECK(osoe_environment_u32("OSOE_TEST_VAR", &v32) == OSOE_ENVIRONMENT_UNSET);
     setenv("OSOE_TEST_VAR", "42", 1);
-    CHECK(osoe_env_u32("OSOE_TEST_VAR", &v32) == OSOE_ENV_OK && v32 == 42);
-    CHECK(osoe_env_u64("OSOE_TEST_VAR", &v64) == OSOE_ENV_OK && v64 == 42);
+    CHECK(osoe_environment_u32("OSOE_TEST_VAR", &v32) == OSOE_ENVIRONMENT_OK && v32 == 42);
+    CHECK(osoe_environment_u64("OSOE_TEST_VAR", &v64) == OSOE_ENVIRONMENT_OK && v64 == 42);
     setenv("OSOE_TEST_VAR", "4x", 1);
-    CHECK(osoe_env_u32("OSOE_TEST_VAR", &v32) == OSOE_ENV_INVALID);
+    CHECK(osoe_environment_u32("OSOE_TEST_VAR", &v32) == OSOE_ENVIRONMENT_INVALID);
     setenv("OSOE_TEST_VAR", "", 1);
-    CHECK(osoe_env_u32("OSOE_TEST_VAR", &v32) == OSOE_ENV_INVALID);
+    CHECK(osoe_environment_u32("OSOE_TEST_VAR", &v32) == OSOE_ENVIRONMENT_INVALID);
     return CHECK_DONE();
 }

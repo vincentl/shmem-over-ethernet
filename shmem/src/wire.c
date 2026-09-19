@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #include "base/cacheline.h"
-#include "base/env.h"
+#include "base/environment.h"
 #include "base/futex.h"
 #include "fatal.h"
 #include "wire.h"
@@ -95,10 +95,10 @@ static size_t truncate_to(const struct osoe_wire *w, uint64_t site, uint64_t n, 
     return (size_t)keep;
 }
 
-static void read_env(struct osoe_wire *w, const struct osoe_boot *b)
+static void read_env(struct osoe_wire *w, const struct osoe_bootstrap *b)
 {
     uint64_t cap = OSOE_WIRE_DEFAULT_BYTES;
-    if (osoe_env_u64("OSOE_WIRE_BYTES", &cap) == OSOE_ENV_INVALID ||
+    if (osoe_environment_u64("OSOE_WIRE_BYTES", &cap) == OSOE_ENVIRONMENT_INVALID ||
         cap < OSOE_WIRE_MIN_BYTES || cap > OSOE_WIRE_MAX_BYTES)
         osoe_fatal("OSOE_WIRE_BYTES='%s' is not a byte count between %llu and %llu",
                    getenv("OSOE_WIRE_BYTES"), (unsigned long long)OSOE_WIRE_MIN_BYTES,
@@ -110,7 +110,7 @@ static void read_env(struct osoe_wire *w, const struct osoe_boot *b)
     w->cap = cap;
 
     uint32_t split = 0;
-    if (osoe_env_u32("OSOE_WIRE_SPLIT", &split) == OSOE_ENV_INVALID || split > 10000)
+    if (osoe_environment_u32("OSOE_WIRE_SPLIT", &split) == OSOE_ENVIRONMENT_INVALID || split > 10000)
         osoe_fatal("OSOE_WIRE_SPLIT='%s' is not a rate per myriad (0 to 10000)",
                    getenv("OSOE_WIRE_SPLIT"));
     w->split = split;
@@ -127,11 +127,11 @@ static void read_env(struct osoe_wire *w, const struct osoe_boot *b)
      */
     w->seed = hash64(b->job ^ ((uint64_t)b->step << 32));
     uint64_t seed;
-    switch (osoe_env_u64("OSOE_WIRE_SEED", &seed)) {
-    case OSOE_ENV_OK:
+    switch (osoe_environment_u64("OSOE_WIRE_SEED", &seed)) {
+    case OSOE_ENVIRONMENT_OK:
         w->seed = seed;
         break;
-    case OSOE_ENV_UNSET:
+    case OSOE_ENVIRONMENT_UNSET:
         break;
     default:
         osoe_fatal("OSOE_WIRE_SEED='%s' is not a decimal number",
@@ -144,7 +144,7 @@ static void read_env(struct osoe_wire *w, const struct osoe_boot *b)
                 w->split, (unsigned long long)w->seed);
 }
 
-void osoe_wire_open(struct osoe_wire *w, const struct osoe_boot *b, uint32_t peer,
+void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_t peer,
                     uint32_t session)
 {
     *w = (struct osoe_wire){ 0 };

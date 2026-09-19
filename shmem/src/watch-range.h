@@ -62,7 +62,7 @@ _Static_assert(OSOE_WATCH_GRAIN == (UINT64_C(1) << OSOE_WATCH_GRAIN_SHIFT),
  * The largest offset the encoding addresses exactly, and so the largest a
  * region may be. A region beyond it still works - a watch in it saturates to
  * the whole region, which only over-wakes - but the filter stops filtering, so
- * osoe_boot_read refuses a SHMEM_SYMMETRIC_SIZE above this instead of silently
+ * osoe_bootstrap_read refuses a SHMEM_SYMMETRIC_SIZE above this instead of silently
  * losing the property this encoding exists for.
  */
 #define OSOE_WATCH_MAX_REGION ((OSOE_WATCH_OFF_MAX + 1) * OSOE_WATCH_GRAIN)

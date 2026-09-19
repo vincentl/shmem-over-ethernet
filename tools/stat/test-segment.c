@@ -68,11 +68,11 @@ static uint32_t fnv1a(const void *p, size_t n)
     return h;
 }
 
-static struct osoe_metric_desc desc(const char *name, const char *unit, unsigned type,
+static struct osoe_metric_descriptor desc(const char *name, const char *unit, unsigned type,
                                     unsigned kind, unsigned scope, unsigned width,
                                     uint32_t offset)
 {
-    struct osoe_metric_desc m;
+    struct osoe_metric_descriptor m;
     memset(&m, 0, sizeof m);
     snprintf(m.name, sizeof m.name, "%s", name);
     snprintf(m.unit, sizeof m.unit, "%s", unit);
@@ -92,7 +92,7 @@ enum damage { GOOD, BAD_MAGIC, BAD_CHECKSUM, STRANGE_DESC_SIZE };
 
 static void *build(const char *name, enum damage damage, size_t *bytes)
 {
-    struct osoe_metric_desc table[] = {
+    struct osoe_metric_descriptor table[] = {
         /* Deliberately not the library's order: node, thread and PE metrics
          * interleaved, and two names nothing in this build knows. */
         desc("node.world_size", "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,
@@ -160,7 +160,7 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
     d.metrics_offset = metrics_off;
     d.metrics_bytes = (uint64_t)n * sizeof table[0];
     d.metrics_count = n;
-    d.metric_desc_bytes = damage == STRANGE_DESC_SIZE ? 96 : (uint32_t)sizeof table[0];
+    d.metric_descriptor_bytes = damage == STRANGE_DESC_SIZE ? 96 : (uint32_t)sizeof table[0];
     d.metrics_checksum = fnv1a(table, (size_t)d.metrics_bytes) +
                          (damage == BAD_CHECKSUM ? 1u : 0u);
     d.blocks_offset = blocks_off;
@@ -199,34 +199,34 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
 
 static void check_good(const char *name)
 {
-    struct osoe_seg s;
+    struct osoe_segment s;
     char err[256] = "";
-    CHECK(osoe_seg_open(&s, name, err, sizeof err) == 0);
+    CHECK(osoe_segment_open(&s, name, err, sizeof err) == 0);
     CHECK(s.table_usable);
     CHECK(s.dir->layout == 999);            /* unknown, and still readable */
 
     uint64_t v = 0;
-    CHECK(osoe_seg_read_name(&s, "node.world_size", 0, &v) && v == 7);
-    CHECK(osoe_seg_read_name(&s, "pe.rank", 0, &v) && v == 40);
-    CHECK(osoe_seg_read_name(&s, "pe.rank", 1, &v) && v == 41);
-    CHECK(osoe_seg_read_name(&s, "pe.sweeps", 1, &v) && v == 1001);
-    CHECK(osoe_seg_read_name(&s, "future.gadget.calls", 2, &v) && v == 30);
+    CHECK(osoe_segment_read_name(&s, "node.world_size", 0, &v) && v == 7);
+    CHECK(osoe_segment_read_name(&s, "pe.rank", 0, &v) && v == 40);
+    CHECK(osoe_segment_read_name(&s, "pe.rank", 1, &v) && v == 41);
+    CHECK(osoe_segment_read_name(&s, "pe.sweeps", 1, &v) && v == 1001);
+    CHECK(osoe_segment_read_name(&s, "future.gadget.calls", 2, &v) && v == 30);
 
     /* An i32 sign-extends; a u32 of the same bits does not. */
-    CHECK(osoe_seg_read_name(&s, "pe.pid", 0, &v) && (int64_t)v == -1);
+    CHECK(osoe_segment_read_name(&s, "pe.pid", 0, &v) && (int64_t)v == -1);
 
     /* Blocks map to PEs by blocks_per_pe, which is the segment's number. */
-    CHECK(osoe_seg_block_pe(&s, 0) == 0);
-    CHECK(osoe_seg_block_pe(&s, 3) == 1);
+    CHECK(osoe_segment_block_pe(&s, 0) == 0);
+    CHECK(osoe_segment_block_pe(&s, 3) == 1);
 
     /* The blocked record, through the generation protocol, in a record whose
      * fields are nowhere near where this build puts them. */
-    struct osoe_seg_blocked b;
-    CHECK(osoe_seg_blocked(&s, 0, &b));
+    struct osoe_segment_blocked b;
+    CHECK(osoe_segment_blocked(&s, 0, &b));
     CHECK(b.valid && b.blocked);
     CHECK(strcmp(b.routine, "shmem_future_wait") == 0);
     CHECK(b.detail == 0x1234 && b.since_ns == 42 && b.gen == 8);
-    CHECK(osoe_seg_blocked(&s, 1, &b) && b.valid && !b.blocked);
+    CHECK(osoe_segment_blocked(&s, 1, &b) && b.valid && !b.blocked);
 
     /* An invariant metric is found by kind, which is how invariants.h finds
      * counters it has never been told about. */
@@ -238,21 +238,21 @@ static void check_good(const char *name)
 
     /* A string, copied out and terminated. */
     char buf[64];
-    CHECK(osoe_seg_read_str(&s, "pe.blocked.routine", 0, buf, sizeof buf));
+    CHECK(osoe_segment_read_str(&s, "pe.blocked.routine", 0, buf, sizeof buf));
     CHECK(strcmp(buf, "shmem_future_wait") == 0);
 
     /* Refusals, all of which would otherwise be a read outside a record. */
-    CHECK(!osoe_seg_read_name(&s, "bogus.past_the_end", 0, &v));
-    CHECK(!osoe_seg_read_name(&s, "bogus.misaligned", 0, &v));
-    CHECK(!osoe_seg_read_name(&s, "pe.rank", LOCAL_COUNT, &v));
-    CHECK(!osoe_seg_read_name(&s, "future.gadget.calls", BLOCK_COUNT, &v));
-    CHECK(!osoe_seg_read_name(&s, "no.such.metric", 0, &v));
-    CHECK(osoe_seg_metric(&s, "no.such.metric") == NULL);
+    CHECK(!osoe_segment_read_name(&s, "bogus.past_the_end", 0, &v));
+    CHECK(!osoe_segment_read_name(&s, "bogus.misaligned", 0, &v));
+    CHECK(!osoe_segment_read_name(&s, "pe.rank", LOCAL_COUNT, &v));
+    CHECK(!osoe_segment_read_name(&s, "future.gadget.calls", BLOCK_COUNT, &v));
+    CHECK(!osoe_segment_read_name(&s, "no.such.metric", 0, &v));
+    CHECK(osoe_segment_metric(&s, "no.such.metric") == NULL);
     /* A string is not a number and a number is not a string. */
-    CHECK(!osoe_seg_read_name(&s, "pe.blocked.routine", 0, &v));
-    CHECK(!osoe_seg_read_str(&s, "pe.rank", 0, buf, sizeof buf));
+    CHECK(!osoe_segment_read_name(&s, "pe.blocked.routine", 0, &v));
+    CHECK(!osoe_segment_read_str(&s, "pe.rank", 0, buf, sizeof buf));
 
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
 }
 
 static void check_refused(const char *name, enum damage damage, bool expect_open)
@@ -263,16 +263,16 @@ static void check_refused(const char *name, enum damage damage, bool expect_open
     if (!p)
         return;
 
-    struct osoe_seg s;
+    struct osoe_segment s;
     char err[256] = "";
-    int rc = osoe_seg_open(&s, name, err, sizeof err);
+    int rc = osoe_segment_open(&s, name, err, sizeof err);
     CHECK((rc == 0) == expect_open);
     if (rc == 0) {
         /* Openable but not usable: the directory is still printable, which is
          * the whole reason it is frozen separately. */
         CHECK(!s.table_usable);
         CHECK(s.dir->local_count == LOCAL_COUNT);
-        osoe_seg_close(&s);
+        osoe_segment_close(&s);
     } else {
         CHECK(err[0] != '\0');
     }
@@ -304,9 +304,9 @@ int main(void)
     check_refused(name, STRANGE_DESC_SIZE, true);
 
     /* And a segment that is not there at all. */
-    struct osoe_seg s;
+    struct osoe_segment s;
     char err[256] = "";
-    CHECK(osoe_seg_open(&s, "/osoe.definitely.not.here.0", err, sizeof err) != 0);
+    CHECK(osoe_segment_open(&s, "/osoe.definitely.not.here.0", err, sizeof err) != 0);
     CHECK(strstr(err, "cannot open") != NULL);
 
     return CHECK_DONE();

@@ -1,5 +1,5 @@
 /*
- * osoe_tp_set_range (§4.4, §4.10): the allocator tells the transport which
+ * osoe_transport_set_range (§4.4, §4.10): the allocator tells the transport which
  * ranges carry remote atomics or signals.
  *
  * The call has no observable value on a backend that ignores it - which the
@@ -23,30 +23,30 @@
 /* This PE's total for a thread-scope counter, summed over its blocks. */
 static uint64_t my_counter(const char *name)
 {
-    char segment[OSOE_SEG_NAME_MAX], err[256];
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(segment, sizeof segment, 0);
 
-    struct osoe_seg s;
-    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
         return UINT64_MAX;
     }
-    const struct osoe_metric_desc *m = osoe_seg_metric(&s, name);
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(&s, name);
     uint64_t total = 0;
     if (m) {
         uint32_t me = (uint32_t)shmem_my_pe();     /* rank == local id on one node */
         for (uint32_t i = 0; i < s.dir->blocks_per_pe; i++) {
             uint64_t v;
-            if (osoe_seg_read(&s, m, me * s.dir->blocks_per_pe + i, &v))
+            if (osoe_segment_read(&s, m, me * s.dir->blocks_per_pe + i, &v))
                 total += v;
         }
     } else
         total = UINT64_MAX;
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
     return total;
 }
 
-#define SET_RANGE_CALLS() my_counter("tp.set_range.calls")
+#define SET_RANGE_CALLS() my_counter("transport.set_range.calls")
 
 int main(void)
 {

@@ -24,17 +24,17 @@
 
 #include "export.h"
 #include "state.h"
-#include "sym.h"
+#include "symmetric.h"
 
 OSOE_API int pshmem_pe_accessible(int pe)
 {
-    return pe >= 0 && (uint32_t)pe < osoe.boot.world_size;
+    return pe >= 0 && (uint32_t)pe < osoe.bootstrap.world_size;
 }
 
 OSOE_API int pshmem_addr_accessible(const void *addr, int pe)
 {
     uint64_t offset;
-    return pshmem_pe_accessible(pe) && osoe_sym_heap_offset(addr, 1, &offset);
+    return pshmem_pe_accessible(pe) && osoe_symmetric_heap_offset(addr, 1, &offset);
 }
 
 /* The weak `shmem_` aliases (export.h). */

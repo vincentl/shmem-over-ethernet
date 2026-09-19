@@ -19,26 +19,26 @@
 #include "state.h"
 #include "transport.h"
 
-struct osoe_tp_ctx {
+struct osoe_transport_context {
     char unused;                /* ordering and dirty-set state belong to AM */
 };
 
-static struct osoe_tp_ctx default_ctx;
+static struct osoe_transport_context default_ctx;
 
-void osoe_tp_init(void)
+void osoe_transport_init(void)
 {
 }
 
-void osoe_tp_fini(void)
+void osoe_transport_fini(void)
 {
 }
 
-struct osoe_tp_ctx *osoe_tp_ctx_default(void)
+struct osoe_transport_context *osoe_transport_context_default(void)
 {
     return &default_ctx;
 }
 
-void *osoe_tp_direct(int pe, enum osoe_region region, uint64_t offset)
+void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
 {
     if (region != OSOE_REGION_HEAP)
         return NULL;
@@ -48,50 +48,50 @@ void *osoe_tp_direct(int pe, enum osoe_region region, uint64_t offset)
     return (char *)osoe.node.heap_of[local] + offset;
 }
 
-void osoe_tp_fence(struct osoe_tp_ctx *ctx)
+void osoe_transport_fence(struct osoe_transport_context *ctx)
 {
     (void)ctx;
-    osoe_count(OSOE_C_TP_FENCE_CALLS, 1);
+    osoe_count(OSOE_C_TRANSPORT_FENCE_CALLS, 1);
     osoe_serializing_store();
 }
 
-void osoe_tp_wait(struct osoe_tp_ctx *ctx, const int *pes, size_t npes)
+void osoe_transport_wait(struct osoe_transport_context *ctx, const int *pes, size_t npes)
 {
     (void)ctx;
     if (pes && npes == 0)
         return;
-    osoe_count(OSOE_C_TP_WAIT_CALLS, 1);
+    osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
     /* Nothing is ever outstanding on this backend, so every wait finds nothing
      * to do. The counter says so rather than being omitted, because against the
      * AM backend the same name means something quite different. */
-    osoe_count(OSOE_C_TP_WAIT_NOTHING_OUTSTANDING, 1);
+    osoe_count(OSOE_C_TRANSPORT_WAIT_NOTHING_OUTSTANDING, 1);
     osoe_serializing_store();
 }
 
-void osoe_tp_put(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
+void osoe_transport_put(struct osoe_transport_context *ctx, int pe, enum osoe_region region,
                  uint64_t offset, const void *src, size_t len, unsigned flags)
 {
     (void)ctx;
     (void)flags;                /* applied in issue order already: FENCED and MORE are free */
-    osoe_count(OSOE_C_TP_PUT_CALLS, 1);
-    osoe_count(OSOE_C_TP_PUT_BYTES, len);
-    char *dst = osoe_tp_direct(pe, region, offset);
+    osoe_count(OSOE_C_TRANSPORT_PUT_CALLS, 1);
+    osoe_count(OSOE_C_TRANSPORT_PUT_BYTES, len);
+    char *dst = osoe_transport_direct(pe, region, offset);
     /* A put to the caller's own PE may name overlapping bytes. */
-    if ((uint32_t)pe == osoe.boot.rank)
+    if ((uint32_t)pe == osoe.bootstrap.rank)
         memmove(dst, src, len);
     else
         memcpy(dst, src, len);
-    osoe_tp_notify(pe, region, offset, len);
+    osoe_transport_notify(pe, region, offset, len);
 }
 
-void osoe_tp_get(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
+void osoe_transport_get(struct osoe_transport_context *ctx, int pe, enum osoe_region region,
                  uint64_t offset, void *dst, size_t len)
 {
     (void)ctx;
-    osoe_count(OSOE_C_TP_GET_CALLS, 1);
-    osoe_count(OSOE_C_TP_GET_BYTES, len);
-    const char *src = osoe_tp_direct(pe, region, offset);
-    if ((uint32_t)pe == osoe.boot.rank)
+    osoe_count(OSOE_C_TRANSPORT_GET_CALLS, 1);
+    osoe_count(OSOE_C_TRANSPORT_GET_BYTES, len);
+    const char *src = osoe_transport_direct(pe, region, offset);
+    if ((uint32_t)pe == osoe.bootstrap.rank)
         memmove(dst, src, len);
     else
         memcpy(dst, src, len);
@@ -109,7 +109,7 @@ void osoe_tp_get(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
     T v = (T)operand, old = 0;                                                       \
     switch (op) {                                                                    \
     case OSOE_RMW_WRITE:                                                             \
-        if (flags & OSOE_TP_FETCH)                                                   \
+        if (flags & OSOE_TRANSPORT_FETCH)                                                   \
             old = atomic_exchange_explicit(p, v, memory_order_seq_cst);               \
         else                                                                         \
             atomic_store_explicit(p, v, memory_order_seq_cst);                       \
@@ -139,15 +139,15 @@ void osoe_tp_get(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
     }                                                                                 \
     result = old;
 
-uint64_t osoe_tp_rmw(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
+uint64_t osoe_transport_rmw(struct osoe_transport_context *ctx, int pe, enum osoe_region region,
                      uint64_t offset, enum osoe_rmw_op op, unsigned width,
                      uint64_t operand, uint64_t compare, unsigned flags)
 {
     (void)ctx;
-    osoe_count(OSOE_C_TP_RMW_CALLS, 1);
-    if (flags & OSOE_TP_FETCH)
-        osoe_count(OSOE_C_TP_RMW_FETCHING, 1);
-    void *ptr = osoe_tp_direct(pe, region, offset);
+    osoe_count(OSOE_C_TRANSPORT_RMW_CALLS, 1);
+    if (flags & OSOE_TRANSPORT_FETCH)
+        osoe_count(OSOE_C_TRANSPORT_RMW_FETCHING, 1);
+    void *ptr = osoe_transport_direct(pe, region, offset);
     uint64_t result = 0;
     if (width == 8) {
         OSOE_RMW_BODY(uint64_t)
@@ -155,13 +155,13 @@ uint64_t osoe_tp_rmw(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
         OSOE_RMW_BODY(uint32_t)
     }
     /* Exact: every applied rmw notifies (§4.10). */
-    osoe_tp_notify(pe, region, offset, width);
-    return flags & OSOE_TP_FETCH ? result : 0;
+    osoe_transport_notify(pe, region, offset, width);
+    return flags & OSOE_TRANSPORT_FETCH ? result : 0;
 }
 
-uint64_t osoe_tp_load(enum osoe_region region, uint64_t offset, unsigned width)
+uint64_t osoe_transport_load(enum osoe_region region, uint64_t offset, unsigned width)
 {
-    void *ptr = osoe_tp_direct((int)osoe.boot.rank, region, offset);
+    void *ptr = osoe_transport_direct((int)osoe.bootstrap.rank, region, offset);
     switch (width) {
     case 8:
         return atomic_load_explicit((_Atomic uint64_t *)ptr, memory_order_acquire);
@@ -178,12 +178,12 @@ uint64_t osoe_tp_load(enum osoe_region region, uint64_t offset, unsigned width)
  * call is still made by the allocator, because the contract is the backend's to
  * ignore, not the caller's to skip.
  */
-void osoe_tp_set_range(enum osoe_region region, uint64_t offset, uint64_t len,
+void osoe_transport_set_range(enum osoe_region region, uint64_t offset, uint64_t len,
                        unsigned attributes)
 {
     (void)region;
     (void)offset;
     (void)len;
     (void)attributes;
-    osoe_count(OSOE_C_TP_SET_RANGE_CALLS, 1);
+    osoe_count(OSOE_C_TRANSPORT_SET_RANGE_CALLS, 1);
 }

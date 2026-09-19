@@ -54,7 +54,7 @@
 #include <stdint.h>
 
 #include "base/deadline.h"
-#include "boot.h"
+#include "bootstrap.h"
 
 /*
  * Ring capacity per direction, and the split rate, both OSOE_ (§6.2) because
@@ -89,7 +89,7 @@ struct osoe_wire {
  * is the lower of the two. Fatal on failure (§3.15: a transport failure aborts
  * the job).
  */
-void osoe_wire_open(struct osoe_wire *w, const struct osoe_boot *b, uint32_t peer,
+void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_t peer,
                     uint32_t session);
 
 /* Unmap; the creating node also removes the name. */

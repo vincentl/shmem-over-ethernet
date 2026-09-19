@@ -13,7 +13,7 @@
 
 #include "base/cacheline.h"
 #include "base/deadline.h"
-#include "base/env.h"
+#include "base/environment.h"
 #include "base/futex.h"
 #include "connection-area.h"
 #include "fatal.h"
@@ -97,10 +97,10 @@ static uint64_t env_bytes(const char *name, uint64_t dflt, uint64_t lo, uint64_t
                           bool power_of_two)
 {
     uint64_t v = dflt;
-    switch (osoe_env_u64(name, &v)) {
-    case OSOE_ENV_UNSET:
+    switch (osoe_environment_u64(name, &v)) {
+    case OSOE_ENVIRONMENT_UNSET:
         return dflt;
-    case OSOE_ENV_OK:
+    case OSOE_ENVIRONMENT_OK:
         break;
     default:
         osoe_fatal("%s='%s' is not a decimal byte count", name, getenv(name));
@@ -128,12 +128,12 @@ void osoe_am_config_read(struct osoe_am_config *c)
                           2 * c->chunk, UINT64_C(64) << 30, false);
 
     uint32_t huge = 0;
-    if (osoe_env_u32("OSOE_AM_HUGEPAGES", &huge) == OSOE_ENV_INVALID || huge > 1)
+    if (osoe_environment_u32("OSOE_AM_HUGEPAGES", &huge) == OSOE_ENVIRONMENT_INVALID || huge > 1)
         osoe_fatal("OSOE_AM_HUGEPAGES='%s' is not 0 or 1", getenv("OSOE_AM_HUGEPAGES"));
     c->hugepages = huge != 0;
 }
 
-void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const struct osoe_boot *b,
+void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const struct osoe_bootstrap *b,
                         uint32_t nodes, uint32_t session)
 {
     *a = (struct osoe_connectionection_area){ 0 };

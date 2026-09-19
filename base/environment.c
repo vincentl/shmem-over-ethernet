@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "base/env.h"
+#include "base/environment.h"
 
 /* Parse digits from *s up to a delimiter (NUL or ','); advance *s past them. */
 static int parse_digits(const char **s, uint64_t max, uint64_t *out)
@@ -56,18 +56,18 @@ int osoe_parse_u32_list(const char *s, uint32_t *out, size_t cap, size_t *n)
     return 0;
 }
 
-enum osoe_env_status osoe_env_u64(const char *name, uint64_t *out)
+enum osoe_environment_status osoe_environment_u64(const char *name, uint64_t *out)
 {
     const char *s = getenv(name);
     if (!s)
-        return OSOE_ENV_UNSET;
-    return osoe_parse_u64(s, out) == 0 ? OSOE_ENV_OK : OSOE_ENV_INVALID;
+        return OSOE_ENVIRONMENT_UNSET;
+    return osoe_parse_u64(s, out) == 0 ? OSOE_ENVIRONMENT_OK : OSOE_ENVIRONMENT_INVALID;
 }
 
-enum osoe_env_status osoe_env_u32(const char *name, uint32_t *out)
+enum osoe_environment_status osoe_environment_u32(const char *name, uint32_t *out)
 {
     const char *s = getenv(name);
     if (!s)
-        return OSOE_ENV_UNSET;
-    return osoe_parse_u32(s, out) == 0 ? OSOE_ENV_OK : OSOE_ENV_INVALID;
+        return OSOE_ENVIRONMENT_UNSET;
+    return osoe_parse_u32(s, out) == 0 ? OSOE_ENVIRONMENT_OK : OSOE_ENVIRONMENT_INVALID;
 }

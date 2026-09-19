@@ -23,7 +23,7 @@
 #include "base/cacheline.h"
 #include "base/counters.h"
 #include "base/epoch.h"
-#include "boot.h"
+#include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
 #define OSOE_NODE_LAYOUT 5
@@ -132,7 +132,7 @@ struct osoe_segment_directory {
     uint64_t metrics_bytes;
     uint32_t metrics_count;
     uint32_t metrics_checksum;       /* FNV-1a over the table's bytes */
-    uint32_t metric_desc_bytes;
+    uint32_t metric_descriptor_bytes;
 
     uint64_t blocks_offset;
     uint64_t blocks_bytes;
@@ -198,11 +198,11 @@ struct osoe_node {
 };
 
 /* Rendezvous with the other local PEs; map every heap. Fatal on failure. */
-void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t session);
+void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session);
 
 /* Unmap everything; the PE whose finalize is the node's last removes the
  * control segment's name. */
-void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b);
+void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b);
 
 /* Declare the job over: publish the abort word so every other local PE stops at
  * its next safety sweep. Does not itself terminate the caller. */

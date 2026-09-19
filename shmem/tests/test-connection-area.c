@@ -31,7 +31,7 @@
 #include <unistd.h>
 
 #include "base/deadline.h"
-#include "boot.h"
+#include "bootstrap.h"
 #include "check.h"
 #include "connection-area.h"
 
@@ -67,7 +67,7 @@ struct payload {
 
 int main(void)
 {
-    struct osoe_boot b = {
+    struct osoe_bootstrap b = {
         .job = strtoull(getenv("OSOE_JOB_ID") ? getenv("OSOE_JOB_ID") : "0", NULL, 10),
         .step = env_u32("OSOE_STEP_ID"),
         .node = env_u32("OSOE_NODEID"),

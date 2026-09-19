@@ -4,13 +4,13 @@
  * Phase 1 step 1 reads only the OSOE_ variables, and only a one-node job:
  * Slurm's SLURM_ variables arrive with the environment fixtures of §8.2.
  */
-#ifndef OSOE_BOOT_H
-#define OSOE_BOOT_H
+#ifndef OSOE_BOOTSTRAP_H
+#define OSOE_BOOTSTRAP_H
 
 #include <stdbool.h>
 #include <stdint.h>
 
-struct osoe_boot {
+struct osoe_bootstrap {
     bool have_rank;             /* rank is valid, for messages */
     uint32_t rank;              /* OSOE_PROCID */
     uint32_t world_size;        /* OSOE_STEP_NUM_TASKS */
@@ -38,7 +38,7 @@ struct osoe_boot {
 #define OSOE_DEFAULT_BOOTSTRAP_TIMEOUT_S 60
 
 /* Read and validate the environment; fatal on anything unusable. */
-void osoe_boot_read(struct osoe_boot *b);
-void osoe_boot_free(struct osoe_boot *b);
+void osoe_bootstrap_read(struct osoe_bootstrap *b);
+void osoe_bootstrap_free(struct osoe_bootstrap *b);
 
-#endif /* OSOE_BOOT_H */
+#endif /* OSOE_BOOTSTRAP_H */

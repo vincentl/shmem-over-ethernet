@@ -15,9 +15,9 @@
  *   - `struct osoe_segment_directory`, the segment's opening prefix. §3.14
  *     freezes it: fields are appended, never reordered, resized or removed,
  *     and `directory_bytes` says how much of it the writer filled in.
- *   - `struct osoe_metric_desc`, one entry of the metric table. The table is
+ *   - `struct osoe_metric_descriptor`, one entry of the metric table. The table is
  *     what makes everything else readable, so its own element must be readable
- *     without it; `directory_bytes`'s companion `metric_desc_bytes` exists so a
+ *     without it; `directory_bytes`'s companion `metric_descriptor_bytes` exists so a
  *     reader can check that assumption instead of assuming it. A reader that
  *     finds a size it does not know prints the directory and says so.
  *
@@ -39,7 +39,7 @@
 #define OSOE_SEG_MAGIC UINT64_C(0x65646f6e656f736f)
 
 /* Long enough for /osoe.<u64>.<u32>.<u32>.<u32> and then some. */
-enum { OSOE_SEG_NAME_MAX = 128 };
+enum { OSOE_SEGMENT_NAME_MAX = 128 };
 
 /* ---- The frozen layout, and only it -------------------------------- */
 
@@ -59,7 +59,7 @@ struct osoe_segment_directory {
     uint64_t metrics_bytes;
     uint32_t metrics_count;
     uint32_t metrics_checksum;
-    uint32_t metric_desc_bytes;
+    uint32_t metric_descriptor_bytes;
 
     uint64_t blocks_offset;
     uint64_t blocks_bytes;
@@ -68,7 +68,7 @@ struct osoe_segment_directory {
     uint32_t blocks_per_pe;
 };
 
-struct osoe_metric_desc {
+struct osoe_metric_descriptor {
     char     name[40];
     char     unit[8];
     uint16_t type;
@@ -102,12 +102,12 @@ enum osoe_metric_scope {
 
 /* ---- An opened segment --------------------------------------------- */
 
-struct osoe_seg {
-    char name[OSOE_SEG_NAME_MAX];            /* "/osoe.<job>.<step>.<node>.<session>" */
+struct osoe_segment {
+    char name[OSOE_SEGMENT_NAME_MAX];            /* "/osoe.<job>.<step>.<node>.<session>" */
     const unsigned char *map;
     size_t bytes;
     const struct osoe_segment_directory *dir;
-    const struct osoe_metric_desc *metrics;  /* NULL when metrics_count == 0 */
+    const struct osoe_metric_descriptor *metrics;  /* NULL when metrics_count == 0 */
     uint32_t nmetrics;
     bool table_usable;                       /* checksum and element size agree */
 };
@@ -121,14 +121,14 @@ struct osoe_seg {
  * frozen precisely so that such a segment can still be printed, so it opens
  * with `table_usable` false and the caller says what it found.
  */
-int osoe_seg_open(struct osoe_seg *s, const char *name, char *err, size_t errlen);
-void osoe_seg_close(struct osoe_seg *s);
+int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen);
+void osoe_segment_close(struct osoe_segment *s);
 
 /* The layout this reader was built against. Not a requirement - see above. */
 #define OSOE_SEG_KNOWN_LAYOUT 5
 
 /* The metric of that name, or NULL. */
-const struct osoe_metric_desc *osoe_seg_metric(const struct osoe_seg *s, const char *name);
+const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name);
 
 /*
  * Load a numeric metric with acquire. `index` selects the record within the
@@ -139,18 +139,18 @@ const struct osoe_metric_desc *osoe_seg_metric(const struct osoe_seg *s, const c
  * would read outside its record or the mapping - so a malformed segment is
  * reported rather than dereferenced.
  */
-bool osoe_seg_read(const struct osoe_seg *s, const struct osoe_metric_desc *m,
+bool osoe_segment_read(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
                    uint32_t index, uint64_t *out);
-bool osoe_seg_read_name(const struct osoe_seg *s, const char *name, uint32_t index,
+bool osoe_segment_read_name(const struct osoe_segment *s, const char *name, uint32_t index,
                         uint64_t *out);
 
 /* A string metric, NUL-terminated into `buf`. Strings in the segment are fixed
  * width and may be unterminated, so this always terminates. */
-bool osoe_seg_read_str(const struct osoe_seg *s, const char *name, uint32_t index,
+bool osoe_segment_read_str(const struct osoe_segment *s, const char *name, uint32_t index,
                        char *buf, size_t len);
 
 /* Which PE owns counter block `block`. */
-uint32_t osoe_seg_block_pe(const struct osoe_seg *s, uint32_t block);
+uint32_t osoe_segment_block_pe(const struct osoe_segment *s, uint32_t block);
 
 /*
  * The §3.14 "blocked in" record for local PE `pe`, read under the generation
@@ -163,7 +163,7 @@ uint32_t osoe_seg_block_pe(const struct osoe_seg *s, uint32_t block);
  * `blocked` is false when the record is the empty one a wait leaves behind: the
  * PE is not asleep in a library wait.
  */
-struct osoe_seg_blocked {
+struct osoe_segment_blocked {
     bool valid;
     bool blocked;
     uint64_t gen;
@@ -172,16 +172,16 @@ struct osoe_seg_blocked {
     char routine[64];
 };
 
-bool osoe_seg_blocked(const struct osoe_seg *s, uint32_t pe, struct osoe_seg_blocked *out);
+bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe_segment_blocked *out);
 
 /* CLOCK_MONOTONIC now, so `since_ns` can be turned into an age. The clock is
  * system-wide on Linux, so the tool's reading and the job's are comparable. */
-uint64_t osoe_seg_now_ns(void);
+uint64_t osoe_segment_now_ns(void);
 
 /*
  * Every control segment in /dev/shm, sorted, written into `names`. Returns how
  * many were found, which may exceed `max`; at most `max` are written.
  */
-int osoe_seg_list(char (*names)[OSOE_SEG_NAME_MAX], int max);
+int osoe_segment_list(char (*names)[OSOE_SEGMENT_NAME_MAX], int max);
 
 #endif /* OSOE_STAT_SEGMENT_H */

@@ -4,7 +4,7 @@
  * The producer-consumer case first: a PE fills a payload, sends it with
  * shmem_putmem_signal, and its neighbour blocks in shmem_signal_wait_until and
  * then checks the payload. That the payload is always complete when the signal
- * arrives is invariant 5, which put-with-signal buys with OSOE_TP_FENCED
+ * arrives is invariant 5, which put-with-signal buys with OSOE_TRANSPORT_FENCED
  * (§4.10). The payload is large enough that a signal overtaking it would be
  * seen: a memcpy of 64 KiB that had not finished would leave the tail unwritten.
  *

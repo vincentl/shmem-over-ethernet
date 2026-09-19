@@ -20,11 +20,11 @@ if(BUILD_SHARED_LIBS)
 endif()
 
 # The allocator on its own (tier 1): compiled in, since libosoe hides it.
-add_executable(shmem_test_alloc test-alloc.c ../src/alloc.c)
-target_include_directories(shmem_test_alloc PRIVATE ../src)
-osoe_warnings(shmem_test_alloc)
-add_test(NAME shmem.alloc COMMAND shmem_test_alloc)
-set_tests_properties(shmem.alloc PROPERTIES LABELS "tier1" TIMEOUT 60)
+add_executable(shmem_test_allocator test-allocator.c ../src/allocator.c)
+target_include_directories(shmem_test_allocator PRIVATE ../src)
+osoe_warnings(shmem_test_allocator)
+add_test(NAME shmem.allocator COMMAND shmem_test_allocator)
+set_tests_properties(shmem.allocator PROPERTIES LABELS "tier1" TIMEOUT 60)
 
 # The §4.9 watched-range encoding on its own (tier 1): pure logic, and the
 # property it must have is one a brute-force check can state directly.

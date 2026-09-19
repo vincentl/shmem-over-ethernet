@@ -21,10 +21,10 @@
  *   PE      a field of a PE's slot: one per local PE, written by that PE
  *   THREAD  a counter in a thread's block: one per thread (§3.14 cost rules)
  *
- * Naming. `tp.*` is the transport boundary's own vocabulary, defined here
+ * Naming. `transport.*` is the transport boundary's own vocabulary, defined here
  * rather than by each backend, so two backends are comparable in one harness
  * instead of each reporting its own words; a backend's private counters take a
- * further qualifier, `tp.local.*` and later `tp.am.*`. `shmem.*` is the API
+ * further qualifier, `transport.local.*` and later `transport.am.*`. `shmem.*` is the API
  * layer. `pe.*`, `team.*` and `agent.*` are state. `invariant.*` must be zero at
  * quiescence, which the test suite asserts (§8.2), so they double as a
  * correctness oracle rather than only as diagnostics.
@@ -41,17 +41,17 @@
  * a reader never depends on it. */
 enum osoe_counter {
     /* The transport boundary (transport.h), identical for every backend. */
-    OSOE_C_TP_PUT_CALLS, OSOE_C_TP_PUT_BYTES,
-    OSOE_C_TP_GET_CALLS, OSOE_C_TP_GET_BYTES,
-    OSOE_C_TP_RMW_CALLS, OSOE_C_TP_RMW_FETCHING,
-    OSOE_C_TP_FENCE_CALLS,
-    OSOE_C_TP_WAIT_CALLS, OSOE_C_TP_WAIT_NOTHING_OUTSTANDING,
-    OSOE_C_TP_WAIT_NS, OSOE_C_TP_WAIT_DIRTY_PEERS,
-    OSOE_C_TP_NOTIFY_CALLS, OSOE_C_TP_NOTIFY_WAKES,
-    OSOE_C_TP_WATCH_CALLS, OSOE_C_TP_WATCH_BLOCKED, OSOE_C_TP_WATCH_BLOCKED_NS,
-    OSOE_C_TP_WATCH_WAKES, OSOE_C_TP_WATCH_SPURIOUS, OSOE_C_TP_WATCH_SWEEPS,
-    OSOE_C_TP_WATCH_SATURATED, OSOE_C_TP_WATCH_LATE_WAKE,
-    OSOE_C_TP_SET_RANGE_CALLS,
+    OSOE_C_TRANSPORT_PUT_CALLS, OSOE_C_TRANSPORT_PUT_BYTES,
+    OSOE_C_TRANSPORT_GET_CALLS, OSOE_C_TRANSPORT_GET_BYTES,
+    OSOE_C_TRANSPORT_RMW_CALLS, OSOE_C_TRANSPORT_RMW_FETCHING,
+    OSOE_C_TRANSPORT_FENCE_CALLS,
+    OSOE_C_TRANSPORT_WAIT_CALLS, OSOE_C_TRANSPORT_WAIT_NOTHING_OUTSTANDING,
+    OSOE_C_TRANSPORT_WAIT_NS, OSOE_C_TRANSPORT_WAIT_DIRTY_PEERS,
+    OSOE_C_TRANSPORT_NOTIFY_CALLS, OSOE_C_TRANSPORT_NOTIFY_WAKES,
+    OSOE_C_TRANSPORT_WATCH_CALLS, OSOE_C_TRANSPORT_WATCH_BLOCKED, OSOE_C_TRANSPORT_WATCH_BLOCKED_NS,
+    OSOE_C_TRANSPORT_WATCH_WAKES, OSOE_C_TRANSPORT_WATCH_SPURIOUS, OSOE_C_TRANSPORT_WATCH_SWEEPS,
+    OSOE_C_TRANSPORT_WATCH_SATURATED, OSOE_C_TRANSPORT_WATCH_LATE_WAKE,
+    OSOE_C_TRANSPORT_SET_RANGE_CALLS,
 
     /* The API layer. */
     OSOE_C_SHMEM_BARRIER_CALLS, OSOE_C_SHMEM_BARRIER_NS,
@@ -134,7 +134,7 @@ enum osoe_metric_scope {
     OSOE_MSCOPE_THREAD,       /* a counter in a thread's block */
 };
 
-struct osoe_metric_desc {
+struct osoe_metric_descriptor {
     char     name[40];
     char     unit[8];         /* "", "bytes", "ns" */
     uint16_t type;            /* enum osoe_metric_type */
@@ -145,7 +145,7 @@ struct osoe_metric_desc {
     uint32_t reserved;
 };
 
-_Static_assert(sizeof(struct osoe_metric_desc) == 64,
+_Static_assert(sizeof(struct osoe_metric_descriptor) == 64,
                "the metric descriptor is part of the segment's layout");
 
 /*
@@ -154,10 +154,10 @@ _Static_assert(sizeof(struct osoe_metric_desc) == 64,
  * offsets are derived from the counter order rather than written twice, so the
  * table is assembled once on first use instead of being a compile-time array.
  */
-const struct osoe_metric_desc *osoe_metrics_table(uint32_t *count);
+const struct osoe_metric_descriptor *osoe_metrics_table(uint32_t *count);
 
 /* FNV-1a over the table's bytes. */
-uint32_t osoe_metric_checksum(const struct osoe_metric_desc *t, uint32_t n);
+uint32_t osoe_metric_checksum(const struct osoe_metric_descriptor *t, uint32_t n);
 
 /*
  * This thread's counter block, claimed on first use and kept in thread-local

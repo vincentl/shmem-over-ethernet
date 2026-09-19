@@ -32,26 +32,26 @@ enum { N = 64, ROUNDS = 8 };
 /* This PE's total for a thread-scope counter, summed over its blocks. */
 static uint64_t my_counter(const char *name)
 {
-    char segment[OSOE_SEG_NAME_MAX], err[256];
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(segment, sizeof segment, 0);
 
-    struct osoe_seg s;
-    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
         return UINT64_MAX;
     }
-    const struct osoe_metric_desc *m = osoe_seg_metric(&s, name);
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(&s, name);
     uint64_t total = 0;
     if (m) {
         uint32_t me = (uint32_t)shmem_my_pe();     /* rank == local id on one node */
         for (uint32_t i = 0; i < s.dir->blocks_per_pe; i++) {
             uint64_t v;
-            if (osoe_seg_read(&s, m, me * s.dir->blocks_per_pe + i, &v))
+            if (osoe_segment_read(&s, m, me * s.dir->blocks_per_pe + i, &v))
                 total += v;
         }
     } else
         total = UINT64_MAX;
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
     return total;
 }
 
@@ -137,15 +137,15 @@ int main(void)
      * Each entry point was called what it was called, and - the part that
      * matters - each reached the *boundary*. An entry point that counted itself
      * and then returned would pass every check above, so the boundary's own
-     * counters are checked too. Nothing but shmem_fence calls osoe_tp_fence, so
-     * that one is exact; osoe_tp_wait is shared with the barrier (§5.6), so the
+     * counters are checked too. Nothing but shmem_fence calls osoe_transport_fence, so
+     * that one is exact; osoe_transport_wait is shared with the barrier (§5.6), so the
      * check there is the identity that composition implies.
      */
     uint64_t api_fence = my_counter("shmem.fence.calls");
     uint64_t api_quiet = my_counter("shmem.quiet.calls");
     uint64_t api_pe_quiet = my_counter("shmem.pe_quiet.calls");
-    uint64_t tp_fence = my_counter("tp.fence.calls");
-    uint64_t tp_wait = my_counter("tp.wait.calls");
+    uint64_t tp_fence = my_counter("transport.fence.calls");
+    uint64_t tp_wait = my_counter("transport.wait.calls");
     uint64_t barriers = my_counter("shmem.barrier.calls");
 
     CHECK(api_fence == ROUNDS);

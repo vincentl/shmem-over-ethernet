@@ -22,7 +22,7 @@
 #include <unistd.h>
 
 #include "base/deadline.h"
-#include "boot.h"
+#include "bootstrap.h"
 #include "check.h"
 #include "wire.h"
 
@@ -135,9 +135,9 @@ int main(void)
      */
     setenv("OSOE_WIRE_SEED", "20260919", 1);
 
-    struct osoe_boot lo = { .job = (uint64_t)getpid(), .step = 0, .node = 0,
+    struct osoe_bootstrap lo = { .job = (uint64_t)getpid(), .step = 0, .node = 0,
                             .timeout_ns = UINT64_C(10000000000) };
-    struct osoe_boot hi = lo;
+    struct osoe_bootstrap hi = lo;
     hi.node = 1;
 
     struct osoe_wire a, b;

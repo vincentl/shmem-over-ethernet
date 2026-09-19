@@ -35,39 +35,39 @@
 /* This PE's own value for a PE-scope metric. */
 static uint64_t pe_value(const char *name)
 {
-    char segment[OSOE_SEG_NAME_MAX], err[256];
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(segment, sizeof segment, 0);
-    struct osoe_seg s;
-    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
         return UINT64_MAX;
     }
     uint64_t v = UINT64_MAX;
-    if (!osoe_seg_read_name(&s, name, (uint32_t)shmem_my_pe(), &v))
+    if (!osoe_segment_read_name(&s, name, (uint32_t)shmem_my_pe(), &v))
         v = UINT64_MAX;
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
     return v;
 }
 
 /* This PE's barrier count, read from its own counter blocks. */
 static uint64_t barriers(void)
 {
-    char segment[OSOE_SEG_NAME_MAX], err[256];
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(segment, sizeof segment, 0);
-    struct osoe_seg s;
-    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
         return UINT64_MAX;
     }
-    const struct osoe_metric_desc *m = osoe_seg_metric(&s, "shmem.barrier.calls");
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(&s, "shmem.barrier.calls");
     uint64_t total = 0;
     uint32_t me = (uint32_t)shmem_my_pe();
     for (uint32_t i = 0; m && i < s.dir->blocks_per_pe; i++) {
         uint64_t v;
-        if (osoe_seg_read(&s, m, me * s.dir->blocks_per_pe + i, &v))
+        if (osoe_segment_read(&s, m, me * s.dir->blocks_per_pe + i, &v))
             total += v;
     }
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
     return m ? total : UINT64_MAX;
 }
 

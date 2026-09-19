@@ -25,12 +25,12 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
     va_end(ap);
 
     int n;
-    if (osoe.boot.have_rank && osoe.node.control_name[0])
+    if (osoe.bootstrap.have_rank && osoe.node.control_name[0])
         n = snprintf(out, sizeof out, "osoe: PE %u: %s\nosoe: PE %u: control segment "
-                     "/dev/shm%s\n", osoe.boot.rank, msg, osoe.boot.rank,
+                     "/dev/shm%s\n", osoe.bootstrap.rank, msg, osoe.bootstrap.rank,
                      osoe.node.control_name);
-    else if (osoe.boot.have_rank)
-        n = snprintf(out, sizeof out, "osoe: PE %u: %s\n", osoe.boot.rank, msg);
+    else if (osoe.bootstrap.have_rank)
+        n = snprintf(out, sizeof out, "osoe: PE %u: %s\n", osoe.bootstrap.rank, msg);
     else
         n = snprintf(out, sizeof out, "osoe: %s\n", msg);
 

@@ -921,10 +921,10 @@ that is stuck. Memory can be read without the job's cooperation.
   describing" is a claim rather than a mechanism, and the first structural
   change quietly breaks every tool.
 
-  **`struct osoe_metric_desc` is frozen with it, and for the same reason.** The
+  **`struct osoe_metric_descriptor` is frozen with it, and for the same reason.** The
   table is what makes every other field readable, so its own element cannot be
   described by the table; something has to be the floor. The directory carries
-  `metric_desc_bytes` so that a reader *checks* this assumption rather than
+  `metric_descriptor_bytes` so that a reader *checks* this assumption rather than
   making it, and a reader that meets a descriptor size it does not know prints
   the directory and stops, which is the same behaviour as an unknown `layout`.
   Two structures, both frozen, both checked: that is the whole contract between
@@ -1142,7 +1142,7 @@ headers would pass whenever the library agreed with itself.
   or 8 bytes. At two bytes there is no AMO type at all: the deprecated `short`
   waits of Table 12 predate 1.5 change #17, so the only remote update is a put,
   for which notification is best effort by design (§4.10) and finishing at a
-  sweep is how such a wait is *meant* to end. Those go to `tp.watch.late_wake`,
+  sweep is how such a wait is *meant* to end. Those go to `transport.watch.late_wake`,
   an ordinary counter.
 
   The split is what makes this an oracle rather than a diagnostic. One counter
@@ -1179,7 +1179,7 @@ events, and the design below stands until then.
 Two smaller deferrals for the same reason. **Prometheus output** is a third
 formatter over the same table and waits for a reason to exist. The **intranode
 versus internode split** on the RMA counters needs a dispatch to split on, and
-so does `tp.wait.dirty_peers`; both land with the AM backend, which is also when
+so does `transport.wait.dirty_peers`; both land with the AM backend, which is also when
 the per-peer and per-connection counters of questions 2 and 3 first have write
 sites.
 
@@ -2246,11 +2246,11 @@ and get stay `memcpy`. This is the general case rather than one fabric's quirk �
 Portals, UET and UCX each carry a capability flag saying whether their NIC
 atomics are CPU-coherent, which means all three expect the incoherent case.
 
-Consequently `osoe_tp_direct` returning non-NULL says that *stores* through the
+Consequently `osoe_transport_direct` returning non-NULL says that *stores* through the
 pointer are ordered as described; it does not say that rmw to that PE executes
 locally. Nothing above the boundary changes, because the spec already makes a
 plain store racing an AMO on the same word undefined (spec §3.2).
-`osoe_tp_direct(pe, region, offset)` *is* that function. It returns the target's
+`osoe_transport_direct(pe, region, offset)` *is* that function. It returns the target's
 address in this process only where the backend orders the calling thread's stores
 through that address against its own writes by the next fence or wait (§4.6). osoe's
 intranode backend does, because it applies writes in the calling thread. The AM
@@ -2288,14 +2288,14 @@ boundary returning recoverable errors would be inventing a job it does not own.
 
 **Every blocking call sweeps, on a bound.** A wait that cannot finish checks the
 abort word and the lead's liveness at least every `OSOE_SWEEP_NS`, whether or not
-the call takes a deadline. `osoe_tp_wait`, a blocking `osoe_tp_get` and any
-future blocking call sweep on the same schedule as `osoe_tp_watch_wait`. Neither
+the call takes a deadline. `osoe_transport_wait`, a blocking `osoe_transport_get` and any
+future blocking call sweep on the same schedule as `osoe_transport_watch_wait`. Neither
 blocks on the intranode backend, so nothing has forced the question yet; on the
-AM backend `osoe_tp_wait` blocks on acknowledgements and on an RDMA backend it is
+AM backend `osoe_transport_wait` blocks on acknowledgements and on an RDMA backend it is
 a completion-queue spin, and the rule is the difference between a hang and a
 clean abort.
 
-**A batching hint, `OSOE_TP_MORE`.** One flag on put and rmw saying more
+**A batching hint, `OSOE_TRANSPORT_MORE`.** One flag on put and rmw saying more
 operations follow on this context, so a backend may hold one back and submit it
 with the next.
 
@@ -2303,7 +2303,7 @@ with the next.
 self-clocks off the send completion, so an operation on an idle connection is
 sealed and submitted at once — batch of one — and nothing ever waits for a
 buffer to fill. The only thing an application thread controls is whether it asks
-the lead for a wake (§3.12), so `OSOE_TP_MORE` means "do not wake the lead yet";
+the lead for a wake (§3.12), so `OSOE_TRANSPORT_MORE` means "do not wake the lead yet";
 the next operation without it, or any fence, wait or get, does. The source-bytes
 rule below is satisfied unconditionally here, because reservation copies into
 the connection buffer, so the flag is safe and its only saving is futex wakes on
@@ -2327,7 +2327,7 @@ told when not to seal a buffer early. Its drivers are the 1.6 session routines
 
 **Nonblocking completion is counters, never per-operation handles.** A
 nonblocking operation is a flag on the existing call, completed by the existing
-`osoe_tp_wait`. The spec defines `_nbi` completion only at `quiet`, so there is
+`osoe_transport_wait`. The spec defines `_nbi` completion only at `quiet`, so there is
 no per-operation wait call to serve; §4.6's `bytes_issued`/`bytes_landed` pair
 already *is* this design; and the core-API study found counters sufficient in all
 six production transports it surveyed, with per-operation handles an open
@@ -2345,7 +2345,7 @@ question nobody needed. Recorded before a benchmark applies pressure for them.
 
 **Ordering is the weak contract, with a per-operation fence flag.** The boundary
 promises only what the spec promises: writes to one PE are ordered across a
-fence. An operation may also carry `OSOE_TP_FENCED`, which places it after every
+fence. An operation may also carry `OSOE_TRANSPORT_FENCED`, which places it after every
 earlier write on the same `(context, PE)`. `put_signal` is a put followed by an
 rmw with that flag, which is how invariant 5 survives a backend with no stream
 order. Both osoe backends place writes in issue order already: intranode because
@@ -2665,7 +2665,7 @@ atomic_store_explicit(&rec->rng, pack(region, offset, len), memory_order_seq_cst
 atomic_fetch_or_explicit(&node->active[me][r / 64], bit(r), memory_order_seq_cst);
 for (;;) {                                            /* the §4.9 loop, unchanged */
     uint32_t seq = atomic_load_explicit(&rec->seq, memory_order_acquire);
-    if (predicate(osoe_tp_load(...))) break;
+    if (predicate(osoe_transport_load(...))) break;
     futex_wait(&rec->seq, seq, deadline);
 }
 atomic_fetch_and_explicit(&node->active[me][r / 64], ~bit(r), memory_order_seq_cst);
@@ -2795,15 +2795,15 @@ The operations of §4.10 do not change. The contract gains concurrency rules, an
  * a time (§4.11). An operation takes effect before it returns. A fence or wait
  * covers every operation on its context whose call returned before the fence
  * or wait was called; operations that overlap it may or may not be covered.
- * OSOE_TP_FENCED orders an operation after every write on the same (ctx, pe)
+ * OSOE_TRANSPORT_FENCED orders an operation after every write on the same (ctx, pe)
  * whose call returned before this one began. A thread holds at most one watch.
- * osoe_tp_notify may run in any number of threads and processes at once.
+ * osoe_transport_notify may run in any number of threads and processes at once.
 ```
 
 Two declarations follow from it:
-- `osoe_tp_ctx_create(options)`, which may fail and records the mode;
+- `osoe_transport_context_create(options)`, which may fail and records the mode;
 - a per-thread handle behind the watch and blocking calls, obtained by
-  `osoe_tp_watch` and `osoe_tp_get` themselves, so callers do not change.
+  `osoe_transport_watch` and `osoe_transport_get` themselves, so callers do not change.
 
 "Returned before it was called" is exactly spec §9.12.2's "posted prior to calling
 shmem_quiet". The models check it in that form.
@@ -3488,12 +3488,12 @@ machinery. The review's order is adopted.
    noticing: it is the second backend behind §4.10, so §8.1's force-remote flag
    can run the same program over both paths and diff. Two open items are timed
    to land with it, because this step writes the code they would otherwise have
-   to restructure: **decide `osoe_tp_sync`** (§10 — whether a collective's
+   to restructure: **decide `osoe_transport_sync`** (§10 — whether a collective's
    internode phase crosses the boundary) while writing the internode phase that
-   is its only caller, and **`OSOE_TP_MORE`'s first caller**, since this is the
+   is its only caller, and **`OSOE_TRANSPORT_MORE`'s first caller**, since this is the
    first backend for which deferring a submission means anything.
 
-   **`osoe_tp_set_range` also lands here** (§4.10), with the allocator call site
+   **`osoe_transport_set_range` also lands here** (§4.10), with the allocator call site
    it needs, for the same reason: the call site is in the allocator, which this
    step is already working around.
 3. **Real transport.** Start with the `echo-uring` floor harness (§8.4), the
@@ -3501,7 +3501,7 @@ machinery. The review's order is adopted.
    protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
    reply credits and DRAINING caps, and the global rendezvous with its timeout.
 
-   The first backend that *acts* on `osoe_tp_set_range` is here — it is the
+   The first backend that *acts* on `osoe_transport_set_range` is here — it is the
    first that must prepare memory before the network can touch it — but the hook
    and its allocator call site landed at step 2 (§4.10), because the call site is
    in the allocator rather than in a backend. The allocator half — recording
@@ -3596,7 +3596,7 @@ it.
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
 | Name-shifted deprecated routines | §10 item 1 wants a `pshmem_` entry point for every function | **Not done**, and recorded as known non-conformance below: the spec does not say how to shift a name that never had a `shmem_` prefix, and guessing wrong helps nobody |
 | Deprecated active-set constants (F.2.8) | `SHMEM_SYNC_VALUE` and the `pSync` sizes | Step 1: **the constants, and not the routines that take them.** A program that declares `static long pSync[SHMEM_BARRIER_SYNC_SIZE]` must compile; a program that then calls `shmem_barrier(...)` must fail at the link rather than reach a routine whose machinery — active sets, `pSync` ownership, the reuse rules — does not exist. A wrong answer is worse than a missing symbol |
-| `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TP_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
+| `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TRANSPORT_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
 
 **Known non-conformance: the deprecated routines have no name-shifted entry
 points.** §10 item 1 requires "an alternate entry point name, with the prefix
@@ -4065,9 +4065,9 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 | What `OSOE_NODE_LAYOUT` covers | **The encoding of every word in the control segment, not only the offsets of fields.** A word written by one process and interpreted by another is part of the inter-process contract even when its width and position do not move; changing what its bits mean without bumping the version gives mixed builds silent lost wakes rather than the loud refusal `open_control` exists to produce. Recorded because a proposal got it wrong, arguing the §4.9 watch word could change encoding without a bump since it is "an opaque filter" — it is opaque to its *reader*, which is another process |
-| Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_tp_watch_wait` being the backend's own function |
-| A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_tp_wait`, `osoe_tp_get`, `osoe_tp_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
-| `osoe_tp_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
+| Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_transport_watch_wait` being the backend's own function |
+| A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
+| `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 
 ### Still open — blocking
 
@@ -4103,14 +4103,14 @@ they are the *same two* the core-API study arrived at from a different direction
 Two independent searches converging on the same two gaps is the useful result.
 
 Folded in already: dispatch per `(pe, operation class)`, the sweep bound on
-blocking calls, `OSOE_TP_MORE` with the source-ownership rule that makes it safe,
+blocking calls, `OSOE_TRANSPORT_MORE` with the source-ownership rule that makes it safe,
 nonblocking-as-counters, `set_range`'s contract, §4.1's registration trap, §6.2's
 out-of-band bootstrap, and §8.1's three-way switch.
 
-- **`osoe_tp_sync`: does a collective's internode phase cross the boundary?**
+- **`osoe_transport_sync`: does a collective's internode phase cross the boundary?**
   §2.2 puts collectives on AM, decided when AM was the only backend; in an RDMA
   build that sends every barrier over TCP while the data path runs on the NIC.
-  The proposal is a mandatory `osoe_tp_sync(ctx, group)` over a group of *nodes*,
+  The proposal is a mandatory `osoe_transport_sync(ctx, group)` over a group of *nodes*,
   called after the intranode phase (§5.3) by one PE per node that has a member —
   note that is the team's local lead (§5.2), not necessarily the node lead of
   §3.12, so it asks the node lead's agent to send rather than sending itself
@@ -4124,7 +4124,7 @@ out-of-band bootstrap, and §8.1's three-way switch.
   **withdrew it**: §2.2 scopes the boundary claim to §4 and puts collectives on
   AM on purpose, so there is a decision here, not an oversight. What is left is a
   trade between fifteen lines now and restructuring `barrier.c` later, and step 2
-  writes the internode phase that is `osoe_tp_sync`'s only caller and its only
+  writes the internode phase that is `osoe_transport_sync`'s only caller and its only
   implementation. Deciding it there means deciding it with the code in front of
   us rather than an estimate — and we may notice something on the way that
   changes the answer. *(Not rejected. Recorded so it is decided at step 2 rather

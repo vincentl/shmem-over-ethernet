@@ -13,7 +13,7 @@
 #include "base/counters.h"
 #include <stdlib.h>
 
-#include "base/env.h"
+#include "base/environment.h"
 #include "fatal.h"
 #include "blocked.h"
 #include "metrics.h"
@@ -29,31 +29,31 @@
  */
 #define T(name, kind, unit) { name, unit, OSOE_MTYPE_U64, kind, OSOE_MSCOPE_THREAD, 0, 0, 0 }
 
-static const struct osoe_metric_desc thread_metrics[] = {
-    T("tp.put.calls", OSOE_MKIND_COUNTER, ""),
-    T("tp.put.bytes", OSOE_MKIND_COUNTER, "bytes"),
-    T("tp.get.calls", OSOE_MKIND_COUNTER, ""),
-    T("tp.get.bytes", OSOE_MKIND_COUNTER, "bytes"),
-    T("tp.rmw.calls", OSOE_MKIND_COUNTER, ""),
-    T("tp.rmw.fetching", OSOE_MKIND_COUNTER, ""),
-    T("tp.fence.calls", OSOE_MKIND_COUNTER, ""),
-    T("tp.wait.calls", OSOE_MKIND_COUNTER, ""),
-    T("tp.wait.nothing_outstanding", OSOE_MKIND_COUNTER, ""),
-    T("tp.wait.ns", OSOE_MKIND_COUNTER, "ns"),
-    T("tp.wait.dirty_peers", OSOE_MKIND_COUNTER, ""),
-    T("tp.notify.calls", OSOE_MKIND_COUNTER, ""),
-    T("tp.notify.wakes", OSOE_MKIND_COUNTER, ""),
-    T("tp.watch.calls", OSOE_MKIND_COUNTER, ""),
-    T("tp.watch.blocked", OSOE_MKIND_COUNTER, ""),
-    T("tp.watch.blocked_ns", OSOE_MKIND_COUNTER, "ns"),
-    T("tp.watch.wakes", OSOE_MKIND_COUNTER, ""),
-    T("tp.watch.spurious", OSOE_MKIND_COUNTER, ""),
-    T("tp.watch.sweeps", OSOE_MKIND_COUNTER, ""),
-    T("tp.watch.saturated", OSOE_MKIND_COUNTER, ""),
+static const struct osoe_metric_descriptor thread_metrics[] = {
+    T("transport.put.calls", OSOE_MKIND_COUNTER, ""),
+    T("transport.put.bytes", OSOE_MKIND_COUNTER, "bytes"),
+    T("transport.get.calls", OSOE_MKIND_COUNTER, ""),
+    T("transport.get.bytes", OSOE_MKIND_COUNTER, "bytes"),
+    T("transport.rmw.calls", OSOE_MKIND_COUNTER, ""),
+    T("transport.rmw.fetching", OSOE_MKIND_COUNTER, ""),
+    T("transport.fence.calls", OSOE_MKIND_COUNTER, ""),
+    T("transport.wait.calls", OSOE_MKIND_COUNTER, ""),
+    T("transport.wait.nothing_outstanding", OSOE_MKIND_COUNTER, ""),
+    T("transport.wait.ns", OSOE_MKIND_COUNTER, "ns"),
+    T("transport.wait.dirty_peers", OSOE_MKIND_COUNTER, ""),
+    T("transport.notify.calls", OSOE_MKIND_COUNTER, ""),
+    T("transport.notify.wakes", OSOE_MKIND_COUNTER, ""),
+    T("transport.watch.calls", OSOE_MKIND_COUNTER, ""),
+    T("transport.watch.blocked", OSOE_MKIND_COUNTER, ""),
+    T("transport.watch.blocked_ns", OSOE_MKIND_COUNTER, "ns"),
+    T("transport.watch.wakes", OSOE_MKIND_COUNTER, ""),
+    T("transport.watch.spurious", OSOE_MKIND_COUNTER, ""),
+    T("transport.watch.sweeps", OSOE_MKIND_COUNTER, ""),
+    T("transport.watch.saturated", OSOE_MKIND_COUNTER, ""),
     /* A missed wake on a variable that has no AMO type, so it can only have
      * been written with a put: expected, not an invariant (see metrics.h). */
-    T("tp.watch.late_wake", OSOE_MKIND_COUNTER, ""),
-    T("tp.set_range.calls", OSOE_MKIND_COUNTER, ""),
+    T("transport.watch.late_wake", OSOE_MKIND_COUNTER, ""),
+    T("transport.set_range.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.barrier.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.barrier.ns", OSOE_MKIND_COUNTER, "ns"),
     T("shmem.malloc.calls", OSOE_MKIND_COUNTER, ""),
@@ -109,7 +109,7 @@ _Static_assert(sizeof thread_metrics / sizeof thread_metrics[0] == OSOE_COUNTER_
       (uint32_t)(offsetof(struct osoe_node_header, field) +                 \
                  offsetof(struct osoe_epoch, count_compare_only_by_equality)), 0 }
 
-static const struct osoe_metric_desc record_metrics[] = {
+static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.rank", rank, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.pid", pid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
     PE("pe.tid", tid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
@@ -170,9 +170,9 @@ enum {
     TABLE_N = THREAD_N + RECORD_N,
 };
 
-const struct osoe_metric_desc *osoe_metrics_table(uint32_t *count)
+const struct osoe_metric_descriptor *osoe_metrics_table(uint32_t *count)
 {
-    static struct osoe_metric_desc table[TABLE_N];
+    static struct osoe_metric_descriptor table[TABLE_N];
     static bool built;
 
     if (!built) {
@@ -188,7 +188,7 @@ const struct osoe_metric_desc *osoe_metrics_table(uint32_t *count)
     return table;
 }
 
-uint32_t osoe_metric_checksum(const struct osoe_metric_desc *t, uint32_t n)
+uint32_t osoe_metric_checksum(const struct osoe_metric_descriptor *t, uint32_t n)
 {
     const unsigned char *p = (const unsigned char *)t;
     uint32_t h = 2166136261u;
@@ -218,9 +218,9 @@ static _Thread_local struct osoe_counter_block orphan;
 uint32_t osoe_metrics_blocks_per_pe(void)
 {
     uint32_t n = OSOE_DEFAULT_MAX_THREADS;
-    /* A malformed value is an error, never a default (base/env.h): a typo in a
+    /* A malformed value is an error, never a default (base/environment.h): a typo in a
      * launch script must fail at init rather than quietly change the pool. */
-    if (osoe_env_u32("OSOE_MAX_THREADS", &n) == OSOE_ENV_INVALID || n == 0)
+    if (osoe_environment_u32("OSOE_MAX_THREADS", &n) == OSOE_ENVIRONMENT_INVALID || n == 0)
         osoe_fatal("OSOE_MAX_THREADS='%s' is not a positive number of threads",
                    getenv("OSOE_MAX_THREADS"));
     return n;
@@ -262,7 +262,7 @@ struct osoe_counter_block *osoe_metrics_block(void)
      * (§3.14): capacity, not correctness, but it must be visible or the
      * metrics quietly under-report. */
     my_block = &orphan;
-    atomic_fetch_add_explicit(&osoe.node.slots[osoe.boot.local_id].blocks_exhausted, 1,
+    atomic_fetch_add_explicit(&osoe.node.slots[osoe.bootstrap.local_id].blocks_exhausted, 1,
                               memory_order_seq_cst);
     return my_block;
 }
@@ -285,7 +285,7 @@ uint64_t osoe_now_ns(void)
  */
 static void publish(const char *routine, uint64_t detail, uint64_t since)
 {
-    struct osoe_pe_slot *me = &osoe.node.slots[osoe.boot.local_id];
+    struct osoe_pe_slot *me = &osoe.node.slots[osoe.bootstrap.local_id];
 
     atomic_fetch_add_explicit(&me->blocked_gen, 1, memory_order_seq_cst);
     if (routine) {

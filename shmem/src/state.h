@@ -5,14 +5,14 @@
 
 #include <stdint.h>
 
-#include "alloc.h"
-#include "boot.h"
+#include "allocator.h"
+#include "bootstrap.h"
 #include "node.h"
 
 struct osoe_state {
-    struct osoe_boot boot;
+    struct osoe_bootstrap bootstrap;
     struct osoe_node node;
-    struct osoe_alloc alloc;
+    struct osoe_allocator allocator;
     uint32_t world_epoch;           /* k for SHMEM_TEAM_WORLD (§5.4) */
     uint32_t shared_epoch;          /* and for SHMEM_TEAM_SHARED */
 };

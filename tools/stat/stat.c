@@ -52,7 +52,7 @@ static const char *phase_name(uint64_t p)
 }
 
 /* A NUL-terminated copy of a fixed-width name from the table. */
-static void metric_name(const struct osoe_metric_desc *m, char *buf, size_t len)
+static void metric_name(const struct osoe_metric_descriptor *m, char *buf, size_t len)
 {
     size_t n = sizeof m->name < len - 1 ? sizeof m->name : len - 1;
     memcpy(buf, m->name, n);
@@ -210,12 +210,12 @@ static void read_thread_kernel(struct thread_kernel *k, int64_t pid, int64_t tid
  * last-wake timestamps or thread ids would produce a number that means nothing.
  * Kind is exactly the distinction, which is why §3.14 puts it in the table.
  */
-static bool metric_sums(const struct osoe_metric_desc *m)
+static bool metric_sums(const struct osoe_metric_descriptor *m)
 {
     return m->kind == OSOE_MKIND_COUNTER || m->kind == OSOE_MKIND_INVARIANT;
 }
 
-static uint64_t pe_thread_value(const struct osoe_seg *s, const struct osoe_metric_desc *m,
+static uint64_t pe_thread_value(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
                                 uint32_t pe)
 {
     uint32_t per_pe = s->dir->blocks_per_pe;
@@ -223,7 +223,7 @@ static uint64_t pe_thread_value(const struct osoe_seg *s, const struct osoe_metr
     for (uint32_t i = 0; i < per_pe; i++) {
         uint64_t v;
         uint32_t block = pe * per_pe + i;
-        if (block >= s->dir->block_count || !osoe_seg_read(s, m, block, &v))
+        if (block >= s->dir->block_count || !osoe_segment_read(s, m, block, &v))
             continue;
         if (metric_sums(m))
             acc += v;
@@ -235,14 +235,14 @@ static uint64_t pe_thread_value(const struct osoe_seg *s, const struct osoe_metr
 
 /* ---- headers ---------------------------------------------------------- */
 
-static void print_identity(const struct osoe_seg *s)
+static void print_identity(const struct osoe_segment *s)
 {
     uint64_t job = 0, step = 0, node = 0, session = 0, world = 0;
-    osoe_seg_read_name(s, "node.job", 0, &job);
-    osoe_seg_read_name(s, "node.step", 0, &step);
-    osoe_seg_read_name(s, "node.id", 0, &node);
-    osoe_seg_read_name(s, "node.session", 0, &session);
-    osoe_seg_read_name(s, "node.world_size", 0, &world);
+    osoe_segment_read_name(s, "node.job", 0, &job);
+    osoe_segment_read_name(s, "node.step", 0, &step);
+    osoe_segment_read_name(s, "node.id", 0, &node);
+    osoe_segment_read_name(s, "node.session", 0, &session);
+    osoe_segment_read_name(s, "node.world_size", 0, &world);
 
     printf("%s  layout %u  %u local PE%s of %" PRIu64 "  (job %" PRIu64 " step %" PRIu64
            " node %" PRIu64 " session %" PRIu64 ")\n",
@@ -253,9 +253,9 @@ static void print_identity(const struct osoe_seg *s)
            s->dir->block_count, s->dir->block_bytes);
 
     uint64_t aborting = 0, abort_pe = 0, failed = 0;
-    osoe_seg_read_name(s, "node.aborting", 0, &aborting);
-    osoe_seg_read_name(s, "node.abort_pe", 0, &abort_pe);
-    osoe_seg_read_name(s, "node.failed", 0, &failed);
+    osoe_segment_read_name(s, "node.aborting", 0, &aborting);
+    osoe_segment_read_name(s, "node.abort_pe", 0, &abort_pe);
+    osoe_segment_read_name(s, "node.failed", 0, &failed);
     if (aborting)
         printf("  ABORTING on behalf of PE %" PRIu64 "\n", abort_pe);
     if (failed)
@@ -263,23 +263,23 @@ static void print_identity(const struct osoe_seg *s)
 }
 
 /* One line per PE: who it is, whether it is alive, and where it is blocked. */
-static void print_pe_lines(const struct osoe_seg *s)
+static void print_pe_lines(const struct osoe_segment *s)
 {
-    uint64_t now = osoe_seg_now_ns();
+    uint64_t now = osoe_segment_now_ns();
     printf("\n%3s %5s %8s %-10s %6s %8s  %s\n",
            "PE", "rank", "pid", "phase", "epoch", "sweeps", "blocked in");
     for (uint32_t i = 0; i < s->dir->local_count; i++) {
         uint64_t rank = 0, pid = 0, phase = 0, epoch = 0, sweeps = 0;
-        osoe_seg_read_name(s, "pe.rank", i, &rank);
-        osoe_seg_read_name(s, "pe.pid", i, &pid);
-        osoe_seg_read_name(s, "pe.phase", i, &phase);
-        osoe_seg_read_name(s, "pe.world_epoch", i, &epoch);
-        osoe_seg_read_name(s, "pe.sweeps", i, &sweeps);
+        osoe_segment_read_name(s, "pe.rank", i, &rank);
+        osoe_segment_read_name(s, "pe.pid", i, &pid);
+        osoe_segment_read_name(s, "pe.phase", i, &phase);
+        osoe_segment_read_name(s, "pe.world_epoch", i, &epoch);
+        osoe_segment_read_name(s, "pe.sweeps", i, &sweeps);
 
         bool alive = (int64_t)pid > 0 && !(kill((pid_t)(int64_t)pid, 0) != 0 && errno == ESRCH);
         char where[160] = "-";
-        struct osoe_seg_blocked b;
-        if (osoe_seg_blocked(s, i, &b)) {
+        struct osoe_segment_blocked b;
+        if (osoe_segment_blocked(s, i, &b)) {
             if (!b.valid)
                 snprintf(where, sizeof where, "(republishing: not blocked)");
             else if (b.blocked) {
@@ -298,7 +298,7 @@ static void print_pe_lines(const struct osoe_seg *s)
 
 /* ---- the counter view ------------------------------------------------- */
 
-static void counters_human(const struct osoe_seg *s)
+static void counters_human(const struct osoe_segment *s)
 {
     print_identity(s);
     print_pe_lines(s);
@@ -310,7 +310,7 @@ static void counters_human(const struct osoe_seg *s)
     printf("%14s\n", "total");
 
     for (uint32_t i = 0; i < s->nmetrics; i++) {
-        const struct osoe_metric_desc *m = &s->metrics[i];
+        const struct osoe_metric_descriptor *m = &s->metrics[i];
         if (m->scope != OSOE_MSCOPE_THREAD)
             continue;
         uint64_t per[64], total = 0;
@@ -339,7 +339,7 @@ static void counters_human(const struct osoe_seg *s)
     /* §3.14: the whole point of a separate kind. Say it plainly rather than
      * leaving it to be spotted in a column of forty numbers. */
     for (uint32_t i = 0; i < s->nmetrics; i++) {
-        const struct osoe_metric_desc *m = &s->metrics[i];
+        const struct osoe_metric_descriptor *m = &s->metrics[i];
         if (m->scope != OSOE_MSCOPE_THREAD || m->kind != OSOE_MKIND_INVARIANT)
             continue;
         uint64_t total = 0;
@@ -353,7 +353,7 @@ static void counters_human(const struct osoe_seg *s)
     }
 }
 
-static void counters_json(const struct osoe_seg *s)
+static void counters_json(const struct osoe_segment *s)
 {
     uint32_t npe = s->dir->local_count;
     printf("{\"segment\":");
@@ -361,7 +361,7 @@ static void counters_json(const struct osoe_seg *s)
     printf(",\"layout\":%u,\"local_count\":%u,\"counters\":{", s->dir->layout, npe);
     bool first = true;
     for (uint32_t i = 0; i < s->nmetrics; i++) {
-        const struct osoe_metric_desc *m = &s->metrics[i];
+        const struct osoe_metric_descriptor *m = &s->metrics[i];
         if (m->scope != OSOE_MSCOPE_THREAD)
             continue;
         char name[48];
@@ -380,19 +380,19 @@ static void counters_json(const struct osoe_seg *s)
 
 /* ---- the per-thread view ---------------------------------------------- */
 
-static void threads_human(const struct osoe_seg *s)
+static void threads_human(const struct osoe_segment *s)
 {
     print_identity(s);
     printf("\n%5s %3s %8s %8s %12s %12s  %s\n",
            "block", "PE", "pid", "tid", "cpu", "invol.csw", "kind");
     for (uint32_t b = 0; b < s->dir->block_count; b++) {
         uint64_t claimed = 0, tid = 0, loops = 0, pid = 0;
-        if (!osoe_seg_read_name(s, "thread.claimed", b, &claimed) || !claimed)
+        if (!osoe_segment_read_name(s, "thread.claimed", b, &claimed) || !claimed)
             continue;
-        osoe_seg_read_name(s, "thread.tid", b, &tid);
-        osoe_seg_read_name(s, "agent.loops", b, &loops);
-        uint32_t pe = osoe_seg_block_pe(s, b);
-        osoe_seg_read_name(s, "pe.pid", pe, &pid);
+        osoe_segment_read_name(s, "thread.tid", b, &tid);
+        osoe_segment_read_name(s, "agent.loops", b, &loops);
+        uint32_t pe = osoe_segment_block_pe(s, b);
+        osoe_segment_read_name(s, "pe.pid", pe, &pid);
 
         struct thread_kernel k;
         read_thread_kernel(&k, (int64_t)pid, (int64_t)tid);
@@ -408,19 +408,19 @@ static void threads_human(const struct osoe_seg *s)
 
 /* ---- the state dump --------------------------------------------------- */
 
-static void print_value(const struct osoe_seg *s, const struct osoe_metric_desc *m,
+static void print_value(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
                         uint32_t index)
 {
     char name[48];
     metric_name(m, name, sizeof name);
     if (m->type == OSOE_MTYPE_STRING) {
         char buf[128];
-        osoe_seg_read_str(s, name, index, buf, sizeof buf);
+        osoe_segment_read_str(s, name, index, buf, sizeof buf);
         printf("    %-32s %s\n", name, buf[0] ? buf : "-");
         return;
     }
     uint64_t v;
-    if (!osoe_seg_read(s, m, index, &v)) {
+    if (!osoe_segment_read(s, m, index, &v)) {
         printf("    %-32s (unreadable)\n", name);
         return;
     }
@@ -438,7 +438,7 @@ static void print_value(const struct osoe_seg *s, const struct osoe_metric_desc 
         printf("    %-32s %" PRIu64 "\n", name, v);
 }
 
-static void dump_human(const struct osoe_seg *s)
+static void dump_human(const struct osoe_segment *s)
 {
     print_identity(s);
 
@@ -448,7 +448,7 @@ static void dump_human(const struct osoe_seg *s)
     printf("    %-32s %" PRIu64 " + %u * %u\n", "slots", s->dir->slots_offset,
            s->dir->local_count, s->dir->slot_bytes);
     printf("    %-32s %" PRIu64 " + %u * %u\n", "metrics", s->dir->metrics_offset,
-           s->dir->metrics_count, s->dir->metric_desc_bytes);
+           s->dir->metrics_count, s->dir->metric_descriptor_bytes);
     printf("    %-32s %" PRIu64 " + %u * %u (%u per PE)\n", "blocks", s->dir->blocks_offset,
            s->dir->block_count, s->dir->block_bytes, s->dir->blocks_per_pe);
 
@@ -457,7 +457,7 @@ static void dump_human(const struct osoe_seg *s)
         if (s->metrics[i].scope == OSOE_MSCOPE_NODE)
             print_value(s, &s->metrics[i], 0);
 
-    uint64_t now = osoe_seg_now_ns();
+    uint64_t now = osoe_segment_now_ns();
     for (uint32_t p = 0; p < s->dir->local_count; p++) {
         printf("\n  PE %u\n", p);
         for (uint32_t i = 0; i < s->nmetrics; i++)
@@ -465,13 +465,13 @@ static void dump_human(const struct osoe_seg *s)
                 print_value(s, &s->metrics[i], p);
 
         uint64_t rng = 0;
-        if (osoe_seg_read_name(s, "pe.watch_rng", p, &rng)) {
+        if (osoe_segment_read_name(s, "pe.watch_rng", p, &rng)) {
             char w[96];
             describe_watch(w, sizeof w, s->dir->layout, rng);
             printf("    %-32s %s\n", "pe.watch (decoded)", w);
         }
-        struct osoe_seg_blocked b;
-        if (osoe_seg_blocked(s, p, &b)) {
+        struct osoe_segment_blocked b;
+        if (osoe_segment_blocked(s, p, &b)) {
             if (!b.valid)
                 printf("    %-32s (republishing; not blocked)\n", "pe.blocked (read)");
             else if (!b.blocked)
@@ -489,12 +489,12 @@ static void dump_human(const struct osoe_seg *s)
     printf("\n  counter blocks\n");
     for (uint32_t b = 0; b < s->dir->block_count; b++) {
         uint64_t claimed = 0;
-        if (!osoe_seg_read_name(s, "thread.claimed", b, &claimed) || !claimed)
+        if (!osoe_segment_read_name(s, "thread.claimed", b, &claimed) || !claimed)
             continue;
         uint64_t tid = 0, pid = 0;
-        osoe_seg_read_name(s, "thread.tid", b, &tid);
-        uint32_t pe = osoe_seg_block_pe(s, b);
-        osoe_seg_read_name(s, "pe.pid", pe, &pid);
+        osoe_segment_read_name(s, "thread.tid", b, &tid);
+        uint32_t pe = osoe_segment_block_pe(s, b);
+        osoe_segment_read_name(s, "pe.pid", pe, &pid);
         struct thread_kernel k;
         read_thread_kernel(&k, (int64_t)pid, (int64_t)tid);
         char cpu[32] = "?";
@@ -503,9 +503,9 @@ static void dump_human(const struct osoe_seg *s)
         printf("    block %u (PE %u, tid %" PRIu64 "): cpu %s, involuntary switches %"
                PRIu64 "\n", b, pe, tid, cpu, k.involuntary);
         for (uint32_t i = 0; i < s->nmetrics; i++) {
-            const struct osoe_metric_desc *m = &s->metrics[i];
+            const struct osoe_metric_descriptor *m = &s->metrics[i];
             uint64_t v;
-            if (m->scope != OSOE_MSCOPE_THREAD || !osoe_seg_read(s, m, b, &v))
+            if (m->scope != OSOE_MSCOPE_THREAD || !osoe_segment_read(s, m, b, &v))
                 continue;
             if (opt_nonzero && !v)
                 continue;
@@ -516,7 +516,7 @@ static void dump_human(const struct osoe_seg *s)
     }
 }
 
-static void dump_json(const struct osoe_seg *s)
+static void dump_json(const struct osoe_segment *s)
 {
     printf("{\"segment\":");
     json_str(stdout, s->name);
@@ -526,11 +526,11 @@ static void dump_json(const struct osoe_seg *s)
     printf(",\"node\":{");
     bool first = true;
     for (uint32_t i = 0; i < s->nmetrics; i++) {
-        const struct osoe_metric_desc *m = &s->metrics[i];
+        const struct osoe_metric_descriptor *m = &s->metrics[i];
         if (m->scope != OSOE_MSCOPE_NODE)
             continue;
         uint64_t v;
-        if (!osoe_seg_read(s, m, 0, &v))
+        if (!osoe_segment_read(s, m, 0, &v))
             continue;
         char name[48];
         metric_name(m, name, sizeof name);
@@ -547,7 +547,7 @@ static void dump_json(const struct osoe_seg *s)
         printf("%s{", p ? "," : "");
         first = true;
         for (uint32_t i = 0; i < s->nmetrics; i++) {
-            const struct osoe_metric_desc *m = &s->metrics[i];
+            const struct osoe_metric_descriptor *m = &s->metrics[i];
             if (m->scope != OSOE_MSCOPE_PE)
                 continue;
             char name[48];
@@ -558,17 +558,17 @@ static void dump_json(const struct osoe_seg *s)
             json_str(stdout, name);
             if (m->type == OSOE_MTYPE_STRING) {
                 char buf[128];
-                osoe_seg_read_str(s, name, p, buf, sizeof buf);
+                osoe_segment_read_str(s, name, p, buf, sizeof buf);
                 printf(":");
                 json_str(stdout, buf);
             } else {
                 uint64_t v = 0;
-                osoe_seg_read(s, m, p, &v);
+                osoe_segment_read(s, m, p, &v);
                 printf(":%" PRIu64, v);
             }
         }
-        struct osoe_seg_blocked b;
-        if (osoe_seg_blocked(s, p, &b)) {
+        struct osoe_segment_blocked b;
+        if (osoe_segment_blocked(s, p, &b)) {
             printf(",\"blocked\":");
             if (b.valid && b.blocked) {
                 printf("{\"routine\":");
@@ -581,7 +581,7 @@ static void dump_json(const struct osoe_seg *s)
         printf(",\"counters\":{");
         first = true;
         for (uint32_t i = 0; i < s->nmetrics; i++) {
-            const struct osoe_metric_desc *m = &s->metrics[i];
+            const struct osoe_metric_descriptor *m = &s->metrics[i];
             if (m->scope != OSOE_MSCOPE_THREAD)
                 continue;
             char name[48];
@@ -605,13 +605,13 @@ static void dump_json(const struct osoe_seg *s)
  * corpse. A recycled pid can only make a dead job look alive, which loses a few
  * megabytes of /dev/shm rather than removing a running job's segment.
  */
-static bool all_pes_gone(const struct osoe_seg *s, bool *any_joined)
+static bool all_pes_gone(const struct osoe_segment *s, bool *any_joined)
 {
     *any_joined = false;
     for (uint32_t i = 0; i < s->dir->local_count; i++) {
         uint64_t phase = 0, pid = 0;
-        osoe_seg_read_name(s, "pe.phase", i, &phase);
-        osoe_seg_read_name(s, "pe.pid", i, &pid);
+        osoe_segment_read_name(s, "pe.phase", i, &phase);
+        osoe_segment_read_name(s, "pe.pid", i, &pid);
         if (phase == 0)
             continue;
         *any_joined = true;
@@ -623,16 +623,16 @@ static bool all_pes_gone(const struct osoe_seg *s, bool *any_joined)
 
 static int gc_one(const char *name)
 {
-    struct osoe_seg s;
+    struct osoe_segment s;
     char err[256];
-    if (osoe_seg_open(&s, name, err, sizeof err) != 0) {
+    if (osoe_segment_open(&s, name, err, sizeof err) != 0) {
         fprintf(stderr, "osoe-stat: %s\n", err);
         return 1;
     }
     if (!s.table_usable) {
         fprintf(stderr, "osoe-stat: %s has no readable metric table; not removing it\n",
                 s.name);
-        osoe_seg_close(&s);
+        osoe_segment_close(&s);
         return 1;
     }
     bool any_joined = false;
@@ -640,7 +640,7 @@ static int gc_one(const char *name)
     if (!gone || !any_joined) {
         printf("%s: %s\n", s.name, gone ? "no PE has joined yet; left alone"
                                         : "still has live PEs; left alone");
-        osoe_seg_close(&s);
+        osoe_segment_close(&s);
         return 0;
     }
 
@@ -648,16 +648,16 @@ static int gc_one(const char *name)
      * first would strand them. */
     for (uint32_t i = 0; i < s.dir->local_count; i++) {
         char heap[128];
-        if (!osoe_seg_read_str(&s, "pe.heap_name", i, heap, sizeof heap) || !heap[0])
+        if (!osoe_segment_read_str(&s, "pe.heap_name", i, heap, sizeof heap) || !heap[0])
             continue;
         if (shm_unlink(heap) == 0)
             printf("%s: removed\n", heap);
         else if (errno != ENOENT)
             fprintf(stderr, "osoe-stat: cannot remove %s: %s\n", heap, strerror(errno));
     }
-    char name_copy[OSOE_SEG_NAME_MAX];
+    char name_copy[OSOE_SEGMENT_NAME_MAX];
     snprintf(name_copy, sizeof name_copy, "%s", s.name);
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
 
     if (shm_unlink(name_copy) != 0) {
         fprintf(stderr, "osoe-stat: cannot remove %s: %s\n", name_copy, strerror(errno));
@@ -669,16 +669,16 @@ static int gc_one(const char *name)
 
 static int list_segments(void)
 {
-    char names[64][OSOE_SEG_NAME_MAX];
-    int found = osoe_seg_list(names, 64);
+    char names[64][OSOE_SEGMENT_NAME_MAX];
+    int found = osoe_segment_list(names, 64);
     int shown = found < 64 ? found : 64;
 
     if (opt_json)
         printf("[");
     for (int i = 0; i < shown; i++) {
-        struct osoe_seg s;
+        struct osoe_segment s;
         char err[256];
-        if (osoe_seg_open(&s, names[i], err, sizeof err) != 0) {
+        if (osoe_segment_open(&s, names[i], err, sizeof err) != 0) {
             if (!opt_json)
                 printf("%-28s %s\n", names[i], err);
             continue;
@@ -686,8 +686,8 @@ static int list_segments(void)
         uint64_t live = 0;
         for (uint32_t p = 0; p < s.dir->local_count; p++) {
             uint64_t pid = 0, phase = 0;
-            osoe_seg_read_name(&s, "pe.pid", p, &pid);
-            osoe_seg_read_name(&s, "pe.phase", p, &phase);
+            osoe_segment_read_name(&s, "pe.pid", p, &pid);
+            osoe_segment_read_name(&s, "pe.phase", p, &phase);
             if (phase != 0 && (int64_t)pid > 0 &&
                 !(kill((pid_t)(int64_t)pid, 0) != 0 && errno == ESRCH))
                 live++;
@@ -702,7 +702,7 @@ static int list_segments(void)
                    s.name, s.dir->layout, s.dir->local_count,
                    s.dir->local_count == 1 ? " " : "s", live, s.dir->segment_bytes);
         }
-        osoe_seg_close(&s);
+        osoe_segment_close(&s);
     }
     if (opt_json)
         printf("]\n");
@@ -717,9 +717,9 @@ static int list_segments(void)
 
 static int show(const char *name, enum mode m)
 {
-    struct osoe_seg s;
+    struct osoe_segment s;
     char err[256];
-    if (osoe_seg_open(&s, name, err, sizeof err) != 0) {
+    if (osoe_segment_open(&s, name, err, sizeof err) != 0) {
         fprintf(stderr, "osoe-stat: %s\n", err);
         return 1;
     }
@@ -729,8 +729,8 @@ static int show(const char *name, enum mode m)
                "not readable by this build (%u metrics of %u bytes, checksum %#010x).\n"
                "Nothing beyond the directory can be shown.\n",
                s.name, s.dir->layout, s.dir->segment_bytes, s.dir->local_count,
-               s.dir->metrics_count, s.dir->metric_desc_bytes, s.dir->metrics_checksum);
-        osoe_seg_close(&s);
+               s.dir->metrics_count, s.dir->metric_descriptor_bytes, s.dir->metrics_checksum);
+        osoe_segment_close(&s);
         return 1;
     }
 
@@ -746,7 +746,7 @@ static int show(const char *name, enum mode m)
         sleep(opt_interval);
         printf("\n");
     }
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
     return 0;
 }
 
@@ -812,8 +812,8 @@ int main(int argc, char **argv)
                 rc |= gc_one(argv[i]);
             return rc;
         }
-        char names[64][OSOE_SEG_NAME_MAX];
-        int found = osoe_seg_list(names, 64);
+        char names[64][OSOE_SEGMENT_NAME_MAX];
+        int found = osoe_segment_list(names, 64);
         for (int k = 0; k < found && k < 64; k++)
             rc |= gc_one(names[k]);
         if (found == 0)

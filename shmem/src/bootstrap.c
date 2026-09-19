@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "base/env.h"
+#include "base/environment.h"
 #include "base/size.h"
-#include "boot.h"
+#include "bootstrap.h"
 #include "fatal.h"
 #include "watch-range.h"
 #include "watchdog.h"
@@ -31,20 +31,20 @@ static const char *spec_env(const char *suffix)
 static uint32_t need_u32(const char *name)
 {
     uint32_t v;
-    switch (osoe_env_u32(name, &v)) {
-    case OSOE_ENV_OK:
+    switch (osoe_environment_u32(name, &v)) {
+    case OSOE_ENVIRONMENT_OK:
         return v;
-    case OSOE_ENV_UNSET:
+    case OSOE_ENVIRONMENT_UNSET:
         osoe_fatal("%s is not set", name);
-    case OSOE_ENV_INVALID:
+    case OSOE_ENVIRONMENT_INVALID:
     default:
         osoe_fatal("%s='%s' is not a decimal number", name, getenv(name));
     }
 }
 
-void osoe_boot_read(struct osoe_boot *b)
+void osoe_bootstrap_read(struct osoe_bootstrap *b)
 {
-    *b = (struct osoe_boot){ 0 };
+    *b = (struct osoe_bootstrap){ 0 };
 
     if (!getenv("OSOE_PROCID")) {
         if (getenv("SLURM_JOB_ID"))
@@ -61,9 +61,9 @@ void osoe_boot_read(struct osoe_boot *b)
     b->node = need_u32("OSOE_NODEID");
     b->local_id = need_u32("OSOE_LOCALID");
     b->step = need_u32("OSOE_STEP_ID");
-    switch (osoe_env_u64("OSOE_JOB_ID", &b->job)) {
-    case OSOE_ENV_OK: break;
-    case OSOE_ENV_UNSET: osoe_fatal("OSOE_JOB_ID is not set");
+    switch (osoe_environment_u64("OSOE_JOB_ID", &b->job)) {
+    case OSOE_ENVIRONMENT_OK: break;
+    case OSOE_ENVIRONMENT_UNSET: osoe_fatal("OSOE_JOB_ID is not set");
     default: osoe_fatal("OSOE_JOB_ID='%s' is not a decimal number", getenv("OSOE_JOB_ID"));
     }
 
@@ -124,14 +124,14 @@ void osoe_boot_read(struct osoe_boot *b)
                    (unsigned long long)OSOE_WATCH_MAX_REGION);
 
     uint32_t timeout_s = OSOE_DEFAULT_BOOTSTRAP_TIMEOUT_S;
-    if (osoe_env_u32("OSOE_BOOTSTRAP_TIMEOUT", &timeout_s) == OSOE_ENV_INVALID ||
+    if (osoe_environment_u32("OSOE_BOOTSTRAP_TIMEOUT", &timeout_s) == OSOE_ENVIRONMENT_INVALID ||
         timeout_s == 0)
         osoe_fatal("OSOE_BOOTSTRAP_TIMEOUT='%s' is not a positive number of seconds",
                    getenv("OSOE_BOOTSTRAP_TIMEOUT"));
     b->timeout_ns = (uint64_t)timeout_s * UINT64_C(1000000000);
 
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
-    if (osoe_env_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENV_INVALID || watchdog > 1)
+    if (osoe_environment_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENVIRONMENT_INVALID || watchdog > 1)
         osoe_fatal("OSOE_WATCHDOG='%s' is not 0 or 1", getenv("OSOE_WATCHDOG"));
     b->watchdog = watchdog != 0;
 
@@ -149,7 +149,7 @@ void osoe_boot_read(struct osoe_boot *b)
     }
 }
 
-void osoe_boot_free(struct osoe_boot *b)
+void osoe_bootstrap_free(struct osoe_bootstrap *b)
 {
     free(b->gtids);
     b->gtids = NULL;

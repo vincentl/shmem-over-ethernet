@@ -43,6 +43,6 @@ int osoe_team_to_world(const struct osoe_team *t, int pe);
  * spec says must ignore it (fence and quiet, §9.12.1-§9.12.2) test for it
  * before calling.
  */
-struct osoe_tp_ctx *osoe_ctx_of(const char *routine, shmem_ctx_t ctx);
+struct osoe_transport_context *osoe_ctx_of(const char *routine, shmem_ctx_t ctx);
 
 #endif /* OSOE_TEAM_H */

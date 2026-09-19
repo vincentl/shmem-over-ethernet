@@ -7,7 +7,7 @@
  * exactly the exclusivity §9.8.1 asks for (§4.10: rmw, and the intranode
  * backend's C11 atomic on the shared mapping).
  *
- * Put-with-signal is a put followed by an rmw carrying OSOE_TP_FENCED, never a
+ * Put-with-signal is a put followed by an rmw carrying OSOE_TRANSPORT_FENCED, never a
  * compound transport operation (§4.10). The flag places the signal after every
  * write issued earlier on the same (context, PE), so the signal never announces
  * bytes that have not landed - invariant 5, stated at the boundary rather than
@@ -31,7 +31,7 @@
 #include "export.h"
 #include "fatal.h"
 #include "metrics.h"
-#include "sym.h"
+#include "symmetric.h"
 #include "team.h"
 #include "transport.h"
 #include "wait.h"
@@ -55,8 +55,8 @@ static void signal_update(const char *routine, shmem_ctx_t ctx, uint64_t *sig_ad
 {
     osoe_check_pe(routine, pe);
     osoe_count(OSOE_C_SHMEM_SIGNAL_UPDATE_CALLS, 1);
-    uint64_t offset = osoe_sym_word_offset(routine, sig_addr, OSOE_SIGNAL_WIDTH);
-    osoe_tp_rmw(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, op,
+    uint64_t offset = osoe_symmetric_word_offset(routine, sig_addr, OSOE_SIGNAL_WIDTH);
+    osoe_transport_rmw(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, op,
                 OSOE_SIGNAL_WIDTH, signal, 0, flags);
 }
 
@@ -76,13 +76,13 @@ OSOE_API void pshmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *
     enum osoe_rmw_op op = signal_op(routine, sig_op);
     osoe_check_pe(routine, pe);
     if (nelems > 0) {
-        uint64_t offset = osoe_sym_offset(routine, dest, nelems);
-        osoe_tp_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source,
+        uint64_t offset = osoe_symmetric_offset(routine, dest, nelems);
+        osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source,
                     nelems, 0);
     }
     /* The fence is on the same context as the put, which is what makes it
      * order the two (spec §9.12.1, 1.6 change #18). */
-    signal_update(routine, ctx, sig_addr, signal, op, pe, OSOE_TP_FENCED);
+    signal_update(routine, ctx, sig_addr, signal, op, pe, OSOE_TRANSPORT_FENCED);
 }
 
 OSOE_API void pshmem_putmem_signal(void *dest, const void *source, size_t nelems,
@@ -118,8 +118,8 @@ OSOE_API void pshmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe)
 OSOE_API uint64_t pshmem_signal_fetch(const uint64_t *sig_addr)
 {
     osoe_count(OSOE_C_SHMEM_SIGNAL_FETCH_CALLS, 1);
-    uint64_t offset = osoe_sym_word_offset("shmem_signal_fetch", sig_addr, OSOE_SIGNAL_WIDTH);
-    return osoe_tp_load(OSOE_REGION_HEAP, offset, OSOE_SIGNAL_WIDTH);
+    uint64_t offset = osoe_symmetric_word_offset("shmem_signal_fetch", sig_addr, OSOE_SIGNAL_WIDTH);
+    return osoe_transport_load(OSOE_REGION_HEAP, offset, OSOE_SIGNAL_WIDTH);
 }
 
 /*

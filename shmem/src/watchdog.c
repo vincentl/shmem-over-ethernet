@@ -59,9 +59,9 @@ void osoe_sweep_expired(const char *routine)
     /* A blocked PE's liveness signal: it is asleep, but its sweeps still rise.
      * Counted whether or not the watchdog is on, since it costs one add on a
      * path that has just slept for OSOE_SWEEP_NS (§3.14). */
-    atomic_fetch_add_explicit(&osoe.node.slots[osoe.boot.local_id].sweeps, 1,
+    atomic_fetch_add_explicit(&osoe.node.slots[osoe.bootstrap.local_id].sweeps, 1,
                               memory_order_seq_cst);
-    if (!osoe.boot.watchdog)
+    if (!osoe.bootstrap.watchdog)
         return;
 
     if (atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire)) {
@@ -70,8 +70,8 @@ void osoe_sweep_expired(const char *routine)
                    "progress", routine, pe);
     }
 
-    for (uint32_t i = 0; i < osoe.boot.local_count; i++) {
-        if (i == osoe.boot.local_id || !slot_dead(&osoe.node.slots[i]))
+    for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++) {
+        if (i == osoe.bootstrap.local_id || !slot_dead(&osoe.node.slots[i]))
             continue;
         uint32_t rank = osoe.node.slots[i].rank;
         /* Tell the siblings before dying, so they stop at their next sweep

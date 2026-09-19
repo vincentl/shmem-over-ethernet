@@ -40,21 +40,21 @@ static int me, npes;
 /* This PE's total for a thread-scope counter. */
 static uint64_t counter(const char *name)
 {
-    char segment[OSOE_SEG_NAME_MAX], err[256];
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(segment, sizeof segment, 0);
-    struct osoe_seg s;
-    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
         return UINT64_MAX;
     }
-    const struct osoe_metric_desc *m = osoe_seg_metric(&s, name);
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(&s, name);
     uint64_t total = 0;
     for (uint32_t i = 0; m && i < s.dir->blocks_per_pe; i++) {
         uint64_t v;
-        if (osoe_seg_read(&s, m, (uint32_t)me * s.dir->blocks_per_pe + i, &v))
+        if (osoe_segment_read(&s, m, (uint32_t)me * s.dir->blocks_per_pe + i, &v))
             total += v;
     }
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
     return m ? total : UINT64_MAX;
 }
 
@@ -215,17 +215,17 @@ static void context_forms(void)
  * be read while the other PEs run. */
 static uint64_t pe_value(const char *name)
 {
-    char segment[OSOE_SEG_NAME_MAX], err[256];
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(segment, sizeof segment, 0);
-    struct osoe_seg s;
-    if (osoe_seg_open(&s, segment, err, sizeof err) != 0) {
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
         return UINT64_MAX;
     }
     uint64_t v = UINT64_MAX;
-    if (!osoe_seg_read_name(&s, name, (uint32_t)me, &v))
+    if (!osoe_segment_read_name(&s, name, (uint32_t)me, &v))
         v = UINT64_MAX;
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
     return v;
 }
 
@@ -287,17 +287,17 @@ static void teams_are_distinct(void)
 static void sync_is_not_a_barrier(void)
 {
     shmem_barrier_all();
-    uint64_t waits0 = counter("tp.wait.calls");
+    uint64_t waits0 = counter("transport.wait.calls");
     CHECK(waits0 != UINT64_MAX);
 
     shmem_sync_all();
     shmem_sync_all();
     CHECK(shmem_team_sync(SHMEM_TEAM_SHARED) == 0);
-    uint64_t waits1 = counter("tp.wait.calls");
+    uint64_t waits1 = counter("transport.wait.calls");
     CHECK(waits1 == waits0);            /* three syncs, no quiet */
 
     shmem_barrier_all();
-    CHECK(counter("tp.wait.calls") == waits1 + 1);
+    CHECK(counter("transport.wait.calls") == waits1 + 1);
 
     /* And a sync still synchronizes: everyone arrives before anyone leaves,
      * which is what the arrival table of the barrier test measures and what

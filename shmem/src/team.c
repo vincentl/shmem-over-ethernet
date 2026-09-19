@@ -24,7 +24,7 @@
 #include "export.h"
 #include "fatal.h"
 #include "state.h"
-#include "sym.h"
+#include "symmetric.h"
 #include "team.h"
 #include "transport.h"
 
@@ -37,24 +37,24 @@ struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team)
     if (team == SHMEM_TEAM_WORLD) {
         world_team = (struct osoe_team){
             .name = "SHMEM_TEAM_WORLD",
-            .members = osoe.boot.world_size,
-            .me = osoe.boot.rank,
+            .members = osoe.bootstrap.world_size,
+            .me = osoe.bootstrap.rank,
             .arrived = &osoe.node.hdr->world_arrived,
             .released = &osoe.node.hdr->world_released,
             .epoch = &osoe.world_epoch,
-            .published = &osoe.node.slots[osoe.boot.local_id].world_epoch,
+            .published = &osoe.node.slots[osoe.bootstrap.local_id].world_epoch,
         };
         return &world_team;
     }
     if (team == SHMEM_TEAM_SHARED) {
         shared_team = (struct osoe_team){
             .name = "SHMEM_TEAM_SHARED",
-            .members = osoe.boot.local_count,
-            .me = osoe.boot.local_id,
+            .members = osoe.bootstrap.local_count,
+            .me = osoe.bootstrap.local_id,
             .arrived = &osoe.node.hdr->shared_arrived,
             .released = &osoe.node.hdr->shared_released,
             .epoch = &osoe.shared_epoch,
-            .published = &osoe.node.slots[osoe.boot.local_id].shared_epoch,
+            .published = &osoe.node.slots[osoe.bootstrap.local_id].shared_epoch,
         };
         return &shared_team;
     }
@@ -68,14 +68,14 @@ int osoe_team_to_world(const struct osoe_team *t, int pe)
     if (pe < 0 || (uint32_t)pe >= t->members)
         return -1;
     if (t == &shared_team)
-        return (int)osoe.boot.gtids[pe];
+        return (int)osoe.bootstrap.gtids[pe];
     return pe;                          /* the world team numbers PEs by rank */
 }
 
 /* The world rank `world` as a number in `t`, or -1 if it is not a member. */
 static int world_to_team(const struct osoe_team *t, int world)
 {
-    if (world < 0 || (uint32_t)world >= osoe.boot.world_size)
+    if (world < 0 || (uint32_t)world >= osoe.bootstrap.world_size)
         return -1;
     if (t == &shared_team) {
         int32_t local = osoe.node.local_of_rank[world];
@@ -84,10 +84,10 @@ static int world_to_team(const struct osoe_team *t, int world)
     return world;
 }
 
-struct osoe_tp_ctx *osoe_ctx_of(const char *routine, shmem_ctx_t ctx)
+struct osoe_transport_context *osoe_ctx_of(const char *routine, shmem_ctx_t ctx)
 {
     if (ctx == SHMEM_CTX_DEFAULT)
-        return osoe_tp_ctx_default();
+        return osoe_transport_context_default();
     if (ctx == SHMEM_CTX_INVALID)
         osoe_fatal("%s: SHMEM_CTX_INVALID is not a context this operation may use",
                    routine);

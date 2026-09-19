@@ -32,21 +32,21 @@
 #include "transport.h"
 #include "watch-range.h"
 
-struct osoe_tp_watch {
+struct osoe_transport_watch {
     struct osoe_pe_slot *slot;
 };
 
-static struct osoe_tp_watch the_watch;      /* one wait at a time (§4.6) */
+static struct osoe_transport_watch the_watch;      /* one wait at a time (§4.6) */
 
-struct osoe_tp_watch *osoe_tp_watch(enum osoe_region region, uint64_t offset, size_t len)
+struct osoe_transport_watch *osoe_transport_watch(enum osoe_region region, uint64_t offset, size_t len)
 {
     /* Only the heap has waiters today. The encoding names the region, so
      * OSOE_REGION_INTERNAL (§5.8) and statics (§4.3 phase 1.5) need this guard
      * removed and nothing else - not a second layout version. */
     if (region != OSOE_REGION_HEAP)
         osoe_fatal("watching region %d is not supported", (int)region);
-    struct osoe_pe_slot *slot = &osoe.node.slots[osoe.boot.local_id];
-    osoe_count(OSOE_C_TP_WATCH_CALLS, 1);
+    struct osoe_pe_slot *slot = &osoe.node.slots[osoe.bootstrap.local_id];
+    osoe_count(OSOE_C_TRANSPORT_WATCH_CALLS, 1);
     /* One slot per PE is enough while a PE is in one wait at a time (§4.6). A
      * published watch here means two threads are inside the library at once,
      * which SHMEM_THREAD_SERIALIZED forbids; §4.11 is the design that lifts it. */
@@ -55,43 +55,43 @@ struct osoe_tp_watch *osoe_tp_watch(enum osoe_region region, uint64_t offset, si
 
     uint64_t rng = osoe_watch_pack((unsigned)region, offset, len);
     if ((rng & OSOE_WATCH_LEN_MAX) == OSOE_WATCH_LEN_MAX)
-        osoe_count(OSOE_C_TP_WATCH_SATURATED, 1);   /* filtering to the region's end */
+        osoe_count(OSOE_C_TRANSPORT_WATCH_SATURATED, 1);   /* filtering to the region's end */
     the_watch.slot = slot;
     atomic_store_explicit(&slot->watch_rng, rng, memory_order_seq_cst);
     return &the_watch;
 }
 
-uint32_t osoe_tp_watch_seq(struct osoe_tp_watch *w)
+uint32_t osoe_transport_watch_seq(struct osoe_transport_watch *w)
 {
     return atomic_load_explicit(&w->slot->watch_seq, memory_order_acquire);
 }
 
-bool osoe_tp_watch_wait(struct osoe_tp_watch *w, uint32_t seq,
+bool osoe_transport_watch_wait(struct osoe_transport_watch *w, uint32_t seq,
                         const struct osoe_deadline *deadline)
 {
     return osoe_futex_wait(&w->slot->watch_seq, seq, deadline, OSOE_FUTEX_SHARED) == 0;
 }
 
-void osoe_tp_unwatch(struct osoe_tp_watch *w)
+void osoe_transport_unwatch(struct osoe_transport_watch *w)
 {
     atomic_store_explicit(&w->slot->watch_rng, 0, memory_order_seq_cst);
     w->slot = NULL;
 }
 
-void osoe_tp_notify(int pe, enum osoe_region region, uint64_t offset, size_t len)
+void osoe_transport_notify(int pe, enum osoe_region region, uint64_t offset, size_t len)
 {
     int32_t local = osoe.node.local_of_rank[pe];
     if (local < 0)
         return;                             /* not on this node: the AM backend notifies */
     struct osoe_pe_slot *slot = &osoe.node.slots[local];
-    osoe_count(OSOE_C_TP_NOTIFY_CALLS, 1);
+    osoe_count(OSOE_C_TRANSPORT_NOTIFY_CALLS, 1);
     uint64_t rng = atomic_load_explicit(&slot->watch_rng, memory_order_acquire);
     if (!osoe_watch_covers(rng, (unsigned)region, offset, len))
         return;
     /* Against notify.calls, this is the filter's precision: every wake here
      * that the waiter's predicate then rejects cost a locked instruction and a
      * futex_wake syscall on a path whose floor is a memcpy (§8.4). */
-    osoe_count(OSOE_C_TP_NOTIFY_WAKES, 1);
+    osoe_count(OSOE_C_TRANSPORT_NOTIFY_WAKES, 1);
     atomic_fetch_add_explicit(&slot->watch_seq, 1, memory_order_seq_cst);
     osoe_futex_wake(&slot->watch_seq, INT_MAX, OSOE_FUTEX_SHARED);
 }

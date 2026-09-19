@@ -35,7 +35,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "boot.h"
+#include "bootstrap.h"
 #include "connection.h"
 
 /*
@@ -89,7 +89,7 @@ enum osoe_am_size_status osoe_am_choose_buffer(uint64_t chunk, uint64_t requeste
 uint64_t osoe_am_area_bytes(uint32_t nodes, uint64_t buffer);
 
 /* What the environment asks for, before the budget is applied. Fatal on a
- * malformed or out-of-range value, never a silent default (base/env.h). */
+ * malformed or out-of-range value, never a silent default (base/environment.h). */
 struct osoe_am_config {
     uint64_t chunk;         /* OSOE_AM_CHUNK */
     uint64_t buffer;        /* OSOE_AM_BUFFER */
@@ -117,7 +117,7 @@ struct osoe_connectionection_area {
  * failure (§3.15). A job of one node maps nothing and leaves the handle empty,
  * so the caller need not special-case it.
  */
-void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const struct osoe_boot *b,
+void osoe_connectionection_area_open(struct osoe_connectionection_area *a, const struct osoe_bootstrap *b,
                         uint32_t nodes, uint32_t session);
 
 /* Unmap; the lead also removes the name. */

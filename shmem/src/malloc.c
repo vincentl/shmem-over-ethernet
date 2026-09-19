@@ -29,18 +29,18 @@
 #include <pshmem.h>
 #include <shmem.h>
 
-#include "alloc.h"
+#include "allocator.h"
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
 #include "metrics.h"
 #include "state.h"
-#include "sym.h"
+#include "symmetric.h"
 #include "transport.h"
 
 static void *heap_at(uint64_t offset)
 {
-    return (char *)osoe.node.heap_of[osoe.boot.local_id] + offset;
+    return (char *)osoe.node.heap_of[osoe.bootstrap.local_id] + offset;
 }
 
 /*
@@ -61,11 +61,11 @@ static void declare_range(uint64_t offset, uint64_t size, long hints)
 {
     unsigned attrs = 0;
     if (hints & SHMEM_MALLOC_ATOMICS_REMOTE)
-        attrs |= OSOE_TP_RANGE_ATOMICS;
+        attrs |= OSOE_TRANSPORT_RANGE_ATOMICS;
     if (hints & SHMEM_MALLOC_SIGNAL_REMOTE)
-        attrs |= OSOE_TP_RANGE_SIGNAL;
+        attrs |= OSOE_TRANSPORT_RANGE_SIGNAL;
     if (attrs)
-        osoe_tp_set_range(OSOE_REGION_HEAP, offset, size, attrs);
+        osoe_transport_set_range(OSOE_REGION_HEAP, offset, size, attrs);
 }
 
 /*
@@ -79,7 +79,7 @@ static void *allocate(const char *routine, uint64_t size, uint64_t align, long h
     osoe_count(OSOE_C_SHMEM_MALLOC_CALLS, 1);
     void *p = NULL;
     uint64_t offset;
-    switch (osoe_alloc_take(&osoe.alloc, size, align, hints, &offset)) {
+    switch (osoe_allocator_take(&osoe.allocator, size, align, hints, &offset)) {
     case 0:
         p = heap_at(offset);
         declare_range(offset, size, hints);
@@ -101,7 +101,7 @@ OSOE_API void *pshmem_malloc(size_t size)
 {
     if (size == 0)
         return NULL;
-    return allocate("shmem_malloc", size, OSOE_ALLOC_ALIGN, 0, false);
+    return allocate("shmem_malloc", size, OSOE_ALLOCATOR_ALIGN, 0, false);
 }
 
 /*
@@ -117,7 +117,7 @@ OSOE_API void *pshmem_malloc_with_hints(size_t size, long hints)
 {
     if (size == 0)
         return NULL;
-    return allocate("shmem_malloc_with_hints", size, OSOE_ALLOC_ALIGN, hints, false);
+    return allocate("shmem_malloc_with_hints", size, OSOE_ALLOCATOR_ALIGN, hints, false);
 }
 
 /*
@@ -130,8 +130,8 @@ OSOE_API void *pshmem_calloc(size_t count, size_t size)
     if (count == 0 || size == 0)
         return NULL;
     if (size > SIZE_MAX / count)
-        return allocate("shmem_calloc", UINT64_MAX, OSOE_ALLOC_ALIGN, 0, false);
-    return allocate("shmem_calloc", (uint64_t)count * size, OSOE_ALLOC_ALIGN, 0, true);
+        return allocate("shmem_calloc", UINT64_MAX, OSOE_ALLOCATOR_ALIGN, 0, false);
+    return allocate("shmem_calloc", (uint64_t)count * size, OSOE_ALLOCATOR_ALIGN, 0, true);
 }
 
 /*
@@ -158,9 +158,9 @@ OSOE_API void *pshmem_align(size_t alignment, size_t size)
      * value the spec defines, and every PE reaches it identically because B is
      * the same number on all of them.
      */
-    uintptr_t base = (uintptr_t)osoe.node.heap_of[osoe.boot.local_id];
+    uintptr_t base = (uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id];
     if (base % alignment != 0)
-        return allocate("shmem_align", UINT64_MAX, OSOE_ALLOC_ALIGN, 0, false);
+        return allocate("shmem_align", UINT64_MAX, OSOE_ALLOCATOR_ALIGN, 0, false);
     return allocate("shmem_align", size, alignment, 0, false);
 }
 
@@ -173,7 +173,7 @@ OSOE_API void pshmem_free(void *ptr)
     osoe_count(OSOE_C_SHMEM_FREE_CALLS, 1);
     osoe_barrier_all("shmem_free");
     uint64_t offset;
-    if (!osoe_sym_heap_offset(ptr, 0, &offset) || osoe_alloc_give(&osoe.alloc, offset) != 0)
+    if (!osoe_symmetric_heap_offset(ptr, 0, &offset) || osoe_allocator_give(&osoe.allocator, offset) != 0)
         osoe_fatal("shmem_free: %p is not the address of a block allocated from the "
                    "symmetric heap", ptr);
     osoe_publish_heap_levels();
@@ -208,13 +208,13 @@ OSOE_API void *pshmem_realloc(void *ptr, size_t size)
 
     uint64_t offset, old_size;
     long hints;
-    if (!osoe_sym_heap_offset(ptr, 0, &offset) ||
-        osoe_alloc_query(&osoe.alloc, offset, &old_size, &hints) != 0)
+    if (!osoe_symmetric_heap_offset(ptr, 0, &offset) ||
+        osoe_allocator_query(&osoe.allocator, offset, &old_size, &hints) != 0)
         osoe_fatal("shmem_realloc: %p is not the address of a block allocated from the "
                    "symmetric heap", ptr);
 
     void *result = ptr;
-    switch (osoe_alloc_resize(&osoe.alloc, offset, size)) {
+    switch (osoe_allocator_resize(&osoe.allocator, offset, size)) {
     case 0:
         /* Same address, contents intact - but possibly more bytes than were
          * declared before, and §4.10 takes the union, so say it again. */
@@ -222,10 +222,10 @@ OSOE_API void *pshmem_realloc(void *ptr, size_t size)
         break;
     case 1: {
         uint64_t moved;
-        switch (osoe_alloc_take(&osoe.alloc, size, OSOE_ALLOC_ALIGN, hints, &moved)) {
+        switch (osoe_allocator_take(&osoe.allocator, size, OSOE_ALLOCATOR_ALIGN, hints, &moved)) {
         case 0:
             memcpy(heap_at(moved), ptr, old_size < size ? old_size : size);
-            if (osoe_alloc_give(&osoe.alloc, offset) != 0)
+            if (osoe_allocator_give(&osoe.allocator, offset) != 0)
                 osoe_fatal("shmem_realloc: the block at %p vanished", ptr);
             declare_range(moved, size, hints);   /* spec §9.3.3 preserves hints */
             result = heap_at(moved);
@@ -253,9 +253,9 @@ OSOE_API void *pshmem_realloc(void *ptr, size_t size)
 void osoe_publish_heap_levels(void)
 {
     uint64_t in_use, largest_free;
-    osoe_alloc_levels(&osoe.alloc, &in_use, &largest_free);
+    osoe_allocator_levels(&osoe.allocator, &in_use, &largest_free);
 
-    struct osoe_pe_slot *me = &osoe.node.slots[osoe.boot.local_id];
+    struct osoe_pe_slot *me = &osoe.node.slots[osoe.bootstrap.local_id];
     atomic_store_explicit(&me->heap_in_use, in_use, memory_order_release);
     atomic_store_explicit(&me->heap_largest_free, largest_free, memory_order_release);
     if (in_use > atomic_load_explicit(&me->heap_high_water, memory_order_acquire))

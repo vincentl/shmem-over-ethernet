@@ -86,24 +86,24 @@ SHMEM_VENDOR_STRING " environment variables\n"
 static void session_start(void)
 {
     osoe = (struct osoe_state){ 0 };
-    osoe_boot_read(&osoe.boot);
+    osoe_bootstrap_read(&osoe.bootstrap);
 
     /*
      * Before the rendezvous, so that a job which fails to start still says
      * which library it was and how to ask it for help.
      */
-    if (osoe.boot.print_version)
+    if (osoe.bootstrap.print_version)
         fprintf(stderr, "osoe: PE %u: " SHMEM_VENDOR_STRING ", OpenSHMEM %d.%d\n",
-                osoe.boot.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
-    if (osoe.boot.print_info && osoe.boot.local_id == 0)
+                osoe.bootstrap.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
+    if (osoe.bootstrap.print_info && osoe.bootstrap.local_id == 0)
         print_info();
     /* A re-init after a full teardown is a fresh session (§6.4). Every PE runs
      * the same sequence of sessions, so the numbers agree. */
-    osoe_node_join(&osoe.node, &osoe.boot, sessions++);
-    osoe_tp_init();
-    if (osoe_alloc_init(&osoe.alloc, osoe.node.heap_size) != 0)
+    osoe_node_join(&osoe.node, &osoe.bootstrap, sessions++);
+    osoe_transport_init();
+    if (osoe_allocator_init(&osoe.allocator, osoe.node.heap_size) != 0)
         osoe_fatal("out of memory");
-    osoe_agent_start(&osoe.node.slots[osoe.boot.local_id]);
+    osoe_agent_start(&osoe.node.slots[osoe.bootstrap.local_id]);
     init_pid = getpid();
 
     /*
@@ -112,23 +112,23 @@ static void session_start(void)
      * (§3.14), and the heap base every PE agreed on (§4.1). This is the same
      * name §3.15 prints on an abort, said once at start-up instead.
      */
-    if (osoe.boot.debug)
+    if (osoe.bootstrap.debug)
         fprintf(stderr, "osoe: PE %u of %u (local %u of %u): segment /dev/shm%s, "
                 "heap %llu bytes at %#llx, watchdog %s\n",
-                osoe.boot.rank, osoe.boot.world_size, osoe.boot.local_id,
-                osoe.boot.local_count, osoe.node.control_name,
+                osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
+                osoe.bootstrap.local_count, osoe.node.control_name,
                 (unsigned long long)osoe.node.heap_size,
                 (unsigned long long)osoe.node.hdr->heap_base,
-                osoe.boot.watchdog ? "on" : "off");
+                osoe.bootstrap.watchdog ? "on" : "off");
 }
 
 static void session_end(void)
 {
-    osoe_agent_stop(&osoe.node.slots[osoe.boot.local_id]);
-    osoe_alloc_fini(&osoe.alloc);
-    osoe_tp_fini();
-    osoe_node_leave(&osoe.node, &osoe.boot);
-    osoe_boot_free(&osoe.boot);
+    osoe_agent_stop(&osoe.node.slots[osoe.bootstrap.local_id]);
+    osoe_allocator_fini(&osoe.allocator);
+    osoe_transport_fini();
+    osoe_node_leave(&osoe.node, &osoe.bootstrap);
+    osoe_bootstrap_free(&osoe.bootstrap);
 }
 
 OSOE_API void pshmem_init(void)
@@ -213,13 +213,13 @@ OSOE_API void pshmem_query_initialized(int *flag)
 
 OSOE_API int pshmem_my_pe(void)
 {
-    return atomic_load_explicit(&initialized, memory_order_acquire) ? (int)osoe.boot.rank : -1;
+    return atomic_load_explicit(&initialized, memory_order_acquire) ? (int)osoe.bootstrap.rank : -1;
 }
 
 OSOE_API int pshmem_n_pes(void)
 {
     return atomic_load_explicit(&initialized, memory_order_acquire)
-               ? (int)osoe.boot.world_size : -1;
+               ? (int)osoe.bootstrap.world_size : -1;
 }
 
 /* The weak `shmem_` aliases (export.h). */

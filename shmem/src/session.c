@@ -8,7 +8,7 @@
  * these are no-ops.
  *
  * They are not, however, pointless to have now. The thing a session would
- * inform is §3.9's aggregation, through the boundary's OSOE_TP_MORE flag, and
+ * inform is §3.9's aggregation, through the boundary's OSOE_TRANSPORT_MORE flag, and
  * §4.10 records the session routines as that flag's first driver. On one node
  * every put is a memcpy that is finished before its call returns, so there is
  * nothing to hold back and nothing to tell. The entry points exist so that the

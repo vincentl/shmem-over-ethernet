@@ -3,10 +3,10 @@ find_package(Threads REQUIRED)
 add_library(osoe
   src/accessible.c
   src/agent.c
-  src/alloc.c
+  src/allocator.c
   src/amo.c
   src/barrier.c
-  src/boot.c
+  src/bootstrap.c
   src/connection.c
   src/connection-area.c
   src/deprecated.c
@@ -21,7 +21,7 @@ add_library(osoe
   src/rma.c
   src/session.c
   src/signal.c
-  src/sym.c
+  src/symmetric.c
   src/team.c
   src/transport-local.c
   src/wait.c

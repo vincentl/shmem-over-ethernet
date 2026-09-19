@@ -95,7 +95,7 @@ static void describe_missing(struct osoe_node *n, uint32_t count, enum osoe_phas
 
 /* Create this PE's heap object and map it. With base == 0, try the
  * candidates and return the one that worked; 0 if none did. */
-static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_boot *b,
+static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap *b,
                                 struct osoe_pe_slot *slot, uint64_t base)
 {
     int fd = shm_open(slot->heap_name, O_CREAT | O_EXCL | O_RDWR, 0600);
@@ -136,7 +136,7 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_boot *b,
     return mapped_at;
 }
 
-static void map_siblings(struct osoe_node *n, const struct osoe_boot *b)
+static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
 {
     for (uint32_t i = 0; i < b->local_count; i++) {
         if (i == b->local_id)
@@ -163,7 +163,7 @@ static void map_siblings(struct osoe_node *n, const struct osoe_boot *b)
 
 /* Every local PE must have parsed the same SHMEM_SYMMETRIC_SIZE (§4.1, §4.4).
  * Every PE runs this check on the same slots, so all of them fail together. */
-static void check_agreement(struct osoe_node *n, const struct osoe_boot *b)
+static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
 {
     for (uint32_t i = 0; i < b->local_count; i++) {
         if (n->slots[i].symmetric_size != b->symmetric_size) {
@@ -184,7 +184,7 @@ static void check_agreement(struct osoe_node *n, const struct osoe_boot *b)
 }
 
 /* The lead creates and initializes the control segment. */
-static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint32_t session)
+static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
     int fd = shm_open(n->control_name, O_CREAT | O_EXCL | O_RDWR, 0600);
     if (fd < 0) {
@@ -203,7 +203,7 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
      */
     uint32_t per_pe = osoe_metrics_blocks_per_pe();
     uint32_t metrics_count;
-    const struct osoe_metric_desc *metrics = osoe_metrics_table(&metrics_count);
+    const struct osoe_metric_descriptor *metrics = osoe_metrics_table(&metrics_count);
 
     uint64_t slots_offset = align_up(sizeof(struct osoe_node_header));
     uint64_t metrics_offset =
@@ -246,7 +246,7 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
     h->dir.metrics_count = metrics_count;
     h->dir.metrics_checksum = osoe_metric_checksum(metrics, metrics_count);
     h->dir.directory_bytes = sizeof h->dir;
-    h->dir.metric_desc_bytes = sizeof *metrics;
+    h->dir.metric_descriptor_bytes = sizeof *metrics;
     h->dir.blocks_offset = blocks_offset;
     h->dir.blocks_bytes = blocks_bytes;
     h->dir.block_count = (uint32_t)block_count;
@@ -264,7 +264,7 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
 
 /* A non-lead opens the control segment by name, waiting for the lead to
  * create and publish it. */
-static void open_control(struct osoe_node *n, const struct osoe_boot *b, uint32_t session,
+static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session,
                          const struct osoe_deadline *overall)
 {
     struct timespec backoff = { 0, 1000 * 1000 };   /* 1 ms, doubling to 64 ms */
@@ -332,7 +332,7 @@ static void open_control(struct osoe_node *n, const struct osoe_boot *b, uint32_
      * job that the layout check above did not catch (§3.13's argument for
      * checksumming the handler table, applied here). */
     uint32_t want_count;
-    const struct osoe_metric_desc *want = osoe_metrics_table(&want_count);
+    const struct osoe_metric_descriptor *want = osoe_metrics_table(&want_count);
     if (h->dir.metrics_count != want_count ||
         h->dir.metrics_checksum != osoe_metric_checksum(want, want_count))
         osoe_fatal("control segment %s carries a different metric table (%u metrics, "
@@ -341,7 +341,7 @@ static void open_control(struct osoe_node *n, const struct osoe_boot *b, uint32_
                    osoe_metric_checksum(want, want_count));
 }
 
-void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t session)
+void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
     struct osoe_deadline overall = osoe_deadline_in(b->timeout_ns);
     bool lead = b->local_id == 0;
@@ -452,7 +452,7 @@ void osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status)
     atomic_store_explicit(&n->hdr->aborting, 1, memory_order_release);
 }
 
-void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b)
+void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)
 {
     struct osoe_pe_slot *me = &n->slots[b->local_id];
     osoe_metrics_fini();

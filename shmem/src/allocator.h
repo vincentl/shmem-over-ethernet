@@ -9,7 +9,7 @@
  * memory, never in the heap, so there is no cross-process lock.
  *
  * Offsets are from the heap's start; every block starts at a multiple of
- * OSOE_ALLOC_ALIGN, which suits any object type (spec §9.3.1).
+ * OSOE_ALLOCATOR_ALIGN, which suits any object type (spec §9.3.1).
  *
  * **Hints are recorded, not discarded** (§4.4). spec §9.3.5's hints are
  * advisory and change nothing on one node, but §9.3.3 requires shmem_realloc to
@@ -21,56 +21,56 @@
  * silently migrating. Both ends are a pure function of the call sequence, so
  * determinism is untouched.
  */
-#ifndef OSOE_ALLOC_H
-#define OSOE_ALLOC_H
+#ifndef OSOE_ALLOCATOR_H
+#define OSOE_ALLOCATOR_H
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#define OSOE_ALLOC_ALIGN UINT64_C(16)
+#define OSOE_ALLOCATOR_ALIGN UINT64_C(16)
 
-_Static_assert(OSOE_ALLOC_ALIGN >= _Alignof(max_align_t),
+_Static_assert(OSOE_ALLOCATOR_ALIGN >= _Alignof(max_align_t),
                "heap blocks must be aligned for any object type");
 
-struct osoe_alloc_block {
+struct osoe_allocator_block {
     uint64_t offset;
     uint64_t size;
     long hints;                         /* spec §9.3.5; 0 on a free block */
     bool free;
 };
 
-struct osoe_alloc {
+struct osoe_allocator {
     uint64_t capacity;
-    struct osoe_alloc_block *blocks;    /* ordered by offset, contiguous */
+    struct osoe_allocator_block *blocks;    /* ordered by offset, contiguous */
     size_t count;
     size_t room;
 };
 
 /* 0, or -1 if private memory for the metadata ran out. */
-int osoe_alloc_init(struct osoe_alloc *a, uint64_t capacity);
-void osoe_alloc_fini(struct osoe_alloc *a);
+int osoe_allocator_init(struct osoe_allocator *a, uint64_t capacity);
+void osoe_allocator_fini(struct osoe_allocator *a);
 
 /*
  * Allocate size > 0 bytes at a multiple of `align`, which must be a power of
- * two; anything below OSOE_ALLOC_ALIGN is raised to it. `hints` is spec
+ * two; anything below OSOE_ALLOCATOR_ALIGN is raised to it. `hints` is spec
  * §9.3.5's bit array, recorded with the block and deciding which end of the
  * heap it comes from.
  *
  * 0 and *offset set; 1 if no free block fits; -1 if private memory for the
  * metadata ran out.
  */
-int osoe_alloc_take(struct osoe_alloc *a, uint64_t size, uint64_t align, long hints,
+int osoe_allocator_take(struct osoe_allocator *a, uint64_t size, uint64_t align, long hints,
                     uint64_t *offset);
 
 /* Free the block starting at offset. 0, or -1 if no allocated block starts
  * there. */
-int osoe_alloc_give(struct osoe_alloc *a, uint64_t offset);
+int osoe_allocator_give(struct osoe_allocator *a, uint64_t offset);
 
 /* The size and hints of the allocated block starting at offset. 0, or -1 if no
  * allocated block starts there. `size` is the rounded size the allocator
  * holds, which is at least what was asked for. */
-int osoe_alloc_query(const struct osoe_alloc *a, uint64_t offset, uint64_t *size,
+int osoe_allocator_query(const struct osoe_allocator *a, uint64_t offset, uint64_t *size,
                      long *hints);
 
 /*
@@ -83,12 +83,12 @@ int osoe_alloc_query(const struct osoe_alloc *a, uint64_t offset, uint64_t *size
  * live above it - does not need both the old and the new block to fit in the
  * heap at once.
  */
-int osoe_alloc_resize(struct osoe_alloc *a, uint64_t offset, uint64_t size);
+int osoe_allocator_resize(struct osoe_allocator *a, uint64_t offset, uint64_t size);
 
 /* Bytes currently allocated, and the largest single block still available -
  * the two numbers that distinguish "the heap is full" from "the heap is
  * fragmented" (§3.14 question 4). O(blocks), so call it once per allocation,
  * never in a loop. */
-void osoe_alloc_levels(const struct osoe_alloc *a, uint64_t *in_use, uint64_t *largest_free);
+void osoe_allocator_levels(const struct osoe_allocator *a, uint64_t *in_use, uint64_t *largest_free);
 
-#endif /* OSOE_ALLOC_H */
+#endif /* OSOE_ALLOCATOR_H */
