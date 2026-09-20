@@ -64,6 +64,31 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
 enum { HEAP = 8192, DESCRIPTORS = 32, SCRATCH = 4096, PAYLOAD = 600 };
 
 /*
+ * Turn the engine until this node owes the peer nothing.
+ *
+ * **"Nothing moved this pass" is not "nothing is left to send."** A pass moves
+ * nothing whenever the wire is momentarily full - the ring here is 256 bytes
+ * and the split injection truncates transfers on purpose - and a loop that
+ * stops there walks away from a sealed segment that has not finished going out.
+ * With the barrier release in that segment, the peer waits forever for a node
+ * that has stopped sending.
+ *
+ * This is the same defect the library had at teardown, and osoe_progress_idle
+ * is the predicate written for it: every queue empty, nothing sealed, nothing
+ * in flight, no committed bytes waiting in an open buffer. Using it here rather
+ * than a second condition of the test's own is the point - if the two ever
+ * disagree, one of them is wrong.
+ */
+static void drain(struct osoe_progress *p, const struct osoe_deadline *give_up)
+{
+    while (!osoe_progress_idle(p)) {
+        osoe_progress_poll(p);
+        if (osoe_deadline_expired(give_up))
+            return;
+    }
+}
+
+/*
  * Disjoint regions of the peer's heap, one per operation. They must not
  * overlap: an earlier version read back a range the put was writing, and the
  * reply correctly returned the put's bytes - §4.6's deferred-sampling hazard
@@ -325,9 +350,7 @@ int main(void)
             goto done;
         }
     }
-    while (osoe_progress_poll(&p))
-        if (osoe_deadline_expired(&give_up))
-            break;
+    drain(&p, &give_up);
 
     /*
      * Now wait for what the peer node sent *here*: its lead's put, its
@@ -424,10 +447,16 @@ int main(void)
      * thread sends them. In the library the agent never stops, and §3.10's
      * safety sweep submits anything sealed regardless of signalling; a test
      * that stops polling is simulating an agent that died.
+     *
+     * **And "keep turning until a pass moves nothing" is not enough**, which is
+     * what this loop said before. Under load a pass moves nothing while the
+     * wire is merely full, so the root walked away with the peer's release
+     * still in its outbox and the peer hung - about one run in thirty, and only
+     * ever in the full suite, where the machine is busy enough for a send to
+     * come back short at the wrong moment. drain() waits on the same predicate
+     * the library's own teardown uses.
      */
-    while (osoe_progress_poll(&p))
-        if (osoe_deadline_expired(&give_up))
-            break;
+    drain(&p, &give_up);
 
     /* Every applied rmw notifies; a put notifies best effort (§4.10). */
     CHECK(notifies >= 3);

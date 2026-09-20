@@ -145,12 +145,25 @@ int main(void)
     CHECK(released_epoch == EPOCH);
     CHECK(releases == 1);
 
-    /* Keep the engine turning: the root's own wait is satisfied while the
+    /*
+     * Keep the engine turning: the root's own wait is satisfied while the
      * releases it owes every other node are still in its outbox, and only this
-     * thread sends them. */
-    while (osoe_progress_poll(&p))
+     * thread sends them.
+     *
+     * **Until it owes nothing, not until a pass moves nothing.** A pass moves
+     * nothing whenever the wire is momentarily full, which under load happens
+     * while a sealed segment is still going out - so the older form here walked
+     * away from a release the peer was waiting for. It was caught in
+     * shmem.progress, at about one run in thirty and only in the full suite;
+     * this file has the same shape with three nodes and two peers to owe
+     * rather than one. osoe_progress_idle is the library's own predicate for
+     * exactly this question.
+     */
+    while (!osoe_progress_idle(&p)) {
+        osoe_progress_poll(&p);
         if (osoe_deadline_expired(&give_up))
             break;
+    }
 
 done:
     for (uint32_t i = 0; i < peers; i++)

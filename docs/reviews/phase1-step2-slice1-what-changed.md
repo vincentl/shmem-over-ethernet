@@ -94,15 +94,12 @@ A reviewer should not take these as verified, because they are not:
   simulation of a cluster on one host.
 - **Performance is unmeasured.** There is no benchmark in the tree. Every
   performance claim in the design is an argument.
-- **`shmem.progress` is intermittently failing, at roughly 1 run in 30.**
-  Observed three times in this slice's final session, always under full-suite
-  load and never in isolation: 0 failures in 25 targeted runs of that test and 0
-  in 20 further full-suite runs after the last sighting, so it was not
-  reproducible on demand and its cause is **not known**. The test predates this
-  slice (`2541a33`), and that commit records fixing a similar one-in-twenty
-  flake in the same test, so this may be a second cause in the same place or the
-  first one incompletely fixed. It is reported here rather than left for a
-  reviewer to trip over, and it is the single loosest thread in the tree.
+- **Two intermittent failures were chased down and fixed** rather than left for
+  this review; both needed artificial CPU load to reproduce, which is why they
+  had only ever appeared in the full suite. They are noted here because the
+  *class* is worth a reviewer's attention: in both, a test asserted something
+  the code did not promise, and the promise turned out to be the thing worth
+  fixing. See the commit for the measurements.
 
 - **The models prove what they model.** Five exist
   (`docs/design/evidence/`), each with deliberately broken variants, and they
