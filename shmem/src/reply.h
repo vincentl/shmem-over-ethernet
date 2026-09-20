@@ -67,6 +67,13 @@ enum osoe_reply_kind {
     OSOE_REPLY_AMO = 0,
     /* A get reply, sampled at drain time. Carries a reference. */
     OSOE_REPLY_GET,
+    /*
+     * A collective's release, forwarded by the root node to each participant
+     * (§5.3). It rides the control queue with the AMO results, for the reason
+     * §3.8 gives: barrier latency gates the whole job, so a forward must not
+     * queue behind a large get reply.
+     */
+    OSOE_REPLY_RELEASE,
 };
 
 /*

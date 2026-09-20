@@ -52,6 +52,14 @@ enum osoe_am_handler {
     OSOE_AM_GET_REPLY,
     OSOE_AM_RMW_REQUEST,
     OSOE_AM_RMW_REPLY,
+    /*
+     * The internode phase of a collective (§5.1, §5.3). A team's intranode
+     * phase runs on the node's epoch counters; when the last local member
+     * arrives it sends one of these, and the release comes back the same way
+     * and is applied by the progress thread.
+     */
+    OSOE_AM_BARRIER_ARRIVE,
+    OSOE_AM_BARRIER_RELEASE,
     OSOE_AM_HANDLER_COUNT
 };
 
@@ -110,7 +118,20 @@ struct osoe_am_rmw_reply {
     uint64_t value;             /* the previous value, for a fetching rmw */
 };
 
+/*
+ * A team's internode arrival and release. Addressed to a *node*, not a PE:
+ * §5.1's internode phase is between node leads, and the epoch counter it moves
+ * is the node's, shared by every local member of the team.
+ */
+struct osoe_am_barrier {
+    uint32_t team;              /* which team's counters (§5.4) */
+    uint32_t epoch;             /* the epoch being arrived at or released */
+    uint32_t from_node;
+    uint32_t reserved;
+};
+
 _Static_assert(sizeof(struct osoe_am_put) % 8 == 0, "a fixed part must keep the payload 8-byte aligned");
+_Static_assert(sizeof(struct osoe_am_barrier) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_get_request) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_get_reply) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_rmw_request) % 8 == 0, "as above");

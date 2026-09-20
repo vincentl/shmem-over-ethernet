@@ -15,6 +15,8 @@ static const struct osoe_am_descriptor table[] = {
     [OSOE_AM_GET_REPLY]   = { "get.reply",   sizeof(struct osoe_am_get_reply),   true  },
     [OSOE_AM_RMW_REQUEST] = { "rmw.request", sizeof(struct osoe_am_rmw_request), false },
     [OSOE_AM_RMW_REPLY]   = { "rmw.reply",   sizeof(struct osoe_am_rmw_reply),   false },
+    [OSOE_AM_BARRIER_ARRIVE]  = { "barrier.arrive",  sizeof(struct osoe_am_barrier), false },
+    [OSOE_AM_BARRIER_RELEASE] = { "barrier.release", sizeof(struct osoe_am_barrier), false },
 };
 
 _Static_assert(sizeof table / sizeof *table == OSOE_AM_HANDLER_COUNT,

@@ -116,6 +116,28 @@ set_tests_properties(shmem.wire-pair PROPERTIES LABELS "tier2" TIMEOUT 90)
 # listed local PE count, as shmem.<name>.L<count>.
 set(OSOE_LAUNCH_COUNTS 1 2 4)
 
+# The internode phase of a barrier (tier 2). Three nodes at least: with two,
+# the root's own arrival and the single message it receives are the first and
+# the last, so releasing on any arrival is indistinguishable from releasing on
+# all of them - and that mutation passed a two-node test.
+add_executable(shmem_test_barrier_am test-barrier-am.c
+  ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
+  ../src/reply.c ../src/wire.c ../src/bootstrap.c)
+target_include_directories(shmem_test_barrier_am PRIVATE ../src)
+target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_barrier_am)
+foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.barrier-am.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_barrier_am>)
+  set_tests_properties(shmem.barrier-am.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+
 # The job-wide rendezvous and the locality function (tier 2), over §8.1's four
 # poles: one node, one PE per node, uneven sizes, and ranks not contiguous per
 # node - the last two being where two-level collectives break, and a uniform

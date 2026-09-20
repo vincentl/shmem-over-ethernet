@@ -67,14 +67,26 @@ static inline void arrivals_arrive(int me)
     arrivals[me] = arrivals_now();
 }
 
-/* Call immediately after the collective: true if this PE left no earlier than
- * any PE arrived. */
+/*
+ * Call immediately after the collective: true if this PE left no earlier than
+ * any PE arrived.
+ *
+ * An entry that is still zero means that PE had not arrived when this one left,
+ * and that is a failure rather than a vacuous pass. Without the check, a
+ * collective that released early compared against zero - earlier than
+ * everything - and reported success: the table said nothing precisely in the
+ * case it exists to catch. Found when a deliberately broken internode barrier
+ * passed this.
+ */
 static inline int arrivals_left_after_all(int n)
 {
     double left = arrivals_now();
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < n; i++) {
+        if (arrivals[i] == 0.0)
+            return 0;
         if (left < arrivals[i])
             return 0;
+    }
     return 1;
 }
 

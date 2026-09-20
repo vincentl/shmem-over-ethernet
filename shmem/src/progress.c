@@ -173,6 +173,57 @@ static void complete(void *context, const struct osoe_message_header *header,
         break;
     }
 
+    case OSOE_AM_BARRIER_ARRIVE: {
+        struct osoe_am_barrier m;
+        memcpy(&m, fixed, sizeof m);
+        if (m.team >= OSOE_PROGRESS_TEAMS)
+            osoe_fatal("a barrier arrival names team %u; this build has %u", m.team,
+                       OSOE_PROGRESS_TEAMS);
+        /*
+         * The root counts arrivals for the epoch. A node that arrives for the
+         * next epoch while this one is still open cannot happen: a member
+         * cannot reach epoch k+1 without this node having been released from k
+         * (§5.4's bounded skew), which is the same argument §3.8 uses to bound
+         * the forward queue.
+         */
+        if (p->arrivals[m.team] == 0)
+            p->arrival_epoch[m.team] = m.epoch;
+        else if (p->arrival_epoch[m.team] != m.epoch)
+            osoe_fatal("team %u has arrivals for epochs %u and %u at once; collective "
+                       "epochs have diverged", m.team, p->arrival_epoch[m.team], m.epoch);
+        p->arrivals[m.team]++;
+        p->barrier_arrivals++;
+        if (p->arrivals[m.team] == p->participants[m.team]) {
+            p->arrivals[m.team] = 0;
+            /*
+             * Release everyone. A handler may enqueue but never reserve (§3.7),
+             * so each peer's release goes onto its control queue and the drain
+             * step writes it; this node's own release is applied here, because
+             * it is not a message.
+             */
+            for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
+                struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE,
+                                        .origin_pe = m.team, .length = 0,
+                                        .value = m.epoch };
+                enqueue(p, &p->connection[slot].queues.control, &r);
+            }
+            p->host.release(p->host.context, m.team, m.epoch);
+        }
+        break;
+    }
+
+    case OSOE_AM_BARRIER_RELEASE: {
+        struct osoe_am_barrier m;
+        memcpy(&m, fixed, sizeof m);
+        /*
+         * Applied by the progress thread, which is §5.3's rule: it advances the
+         * team's released counter and wakes all local waiters. A divisible
+         * event, so wake-many (§3.11).
+         */
+        p->host.release(p->host.context, m.team, m.epoch);
+        break;
+    }
+
     case OSOE_AM_RMW_REPLY: {
         struct osoe_am_rmw_reply m;
         memcpy(&m, fixed, sizeof m);
@@ -247,16 +298,25 @@ static bool drain(struct osoe_progress *p, uint32_t slot)
         uint32_t i = osoe_reply_peek(&c->queues.control);
         struct osoe_reply *r = osoe_reply_at(&p->pool, i);
         struct osoe_reservation resv;
-        uint32_t len = osoe_message_padded(sizeof(struct osoe_am_rmw_reply));
-        if (osoe_connection_reserve(conn, len, &resv) != OSOE_RESERVATION_OK)
+        bool release = r->kind == OSOE_REPLY_RELEASE;
+        uint32_t fixed_bytes = release ? (uint32_t)sizeof(struct osoe_am_barrier)
+                                       : (uint32_t)sizeof(struct osoe_am_rmw_reply);
+        if (osoe_connection_reserve(conn, osoe_message_padded(fixed_bytes), &resv) !=
+            OSOE_RESERVATION_OK)
             return moved;                   /* no room: try again next pass */
-        struct osoe_message_header h = { OSOE_AM_RMW_REPLY, 0,
-                                         (uint32_t)sizeof(struct osoe_am_rmw_reply) };
-        struct osoe_am_rmw_reply m = { .origin_pe = r->origin_pe, .token = r->token,
-                                       .value = r->value };
+        struct osoe_message_header h = {
+            release ? OSOE_AM_BARRIER_RELEASE : OSOE_AM_RMW_REPLY, 0, fixed_bytes };
         unsigned char *at = osoe_reservation_bytes(conn, &resv);
         memcpy(at, &h, sizeof h);
-        memcpy(at + sizeof h, &m, sizeof m);
+        if (release) {
+            struct osoe_am_barrier m = { .team = r->origin_pe, .epoch = (uint32_t)r->value,
+                                         .from_node = p->node };
+            memcpy(at + sizeof h, &m, sizeof m);
+        } else {
+            struct osoe_am_rmw_reply m = { .origin_pe = r->origin_pe, .token = r->token,
+                                           .value = r->value };
+            memcpy(at + sizeof h, &m, sizeof m);
+        }
         osoe_connection_commit(conn, &resv);
         osoe_reply_give(&p->pool, osoe_reply_pop(&p->pool, &c->queues.control));
         moved = true;
@@ -481,6 +541,83 @@ void osoe_progress_request_ack(struct osoe_progress *p, uint32_t peer)
     uint32_t slot = osoe_progress_slot(p, peer);
     if (slot != OSOE_CONNECTION_NONE)
         p->connection[slot].owe_ack = true;
+}
+
+/*
+ * **Why the internode phase is not expressed over the §4.10 boundary.**
+ *
+ * §10 left open whether a collective's internode phase should cross the
+ * boundary as a mandatory osoe_transport_sync(ctx, group), and scheduled the
+ * decision for the step that writes its only caller. Writing it, two obstacles
+ * are concrete rather than estimated.
+ *
+ * The first is addressing. §4.10's entire model is (pe, region, offset) - its
+ * opening sentence, and invariant 20 - while this phase is addressed to a
+ * *node*, and the counter it moves is the node's, shared by every local member
+ * of the team. A sync over a group of nodes is not one more operation in that
+ * vocabulary; it is a second addressing model beside it.
+ *
+ * The second is the release. §5.4 makes each epoch counter *its own futex
+ * word*, because the kernel implements only 32-bit futexes, and a member waits
+ * on the counter itself. Expressing the release as an rmw would need the
+ * backend to know that this particular word has futex waiters on it - which
+ * §4.10's notify does not mean: notify is §4.9's watch mechanism, over watched
+ * ranges, and the collective's waiters hold no watch. Making them hold one
+ * would rewrite §5.4's wait, which is where the bounded-skew argument lives.
+ *
+ * So the cost is not the fifteen lines §10 estimated. §2.2 put collectives on
+ * AM deliberately and §4.10 keeps them outside the boundary deliberately, and
+ * having now written the phase, that remains the right call: the boundary stays
+ * point-to-point and PE-addressed, and a backend that wants a native group
+ * barrier implements §5's internode phase rather than growing a new primitive.
+ * Recorded in §10 with this reasoning.
+ */
+void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch,
+                          uint32_t root, uint32_t participants)
+{
+    if (team >= OSOE_PROGRESS_TEAMS)
+        osoe_fatal("a barrier arrival names team %u; this build has %u", team,
+                   OSOE_PROGRESS_TEAMS);
+    p->participants[team] = participants;
+
+    if (p->node == root) {
+        /* No message to send: this node is where the arrivals are counted. */
+        if (p->arrivals[team] == 0)
+            p->arrival_epoch[team] = epoch;
+        p->arrivals[team]++;
+        p->barrier_arrivals++;
+        if (p->arrivals[team] == participants) {
+            p->arrivals[team] = 0;
+            for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
+                struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE, .origin_pe = team,
+                                        .length = 0, .value = epoch };
+                enqueue(p, &p->connection[slot].queues.control, &r);
+            }
+            p->host.release(p->host.context, team, epoch);
+        }
+        return;
+    }
+
+    /*
+     * Post it to the root. This runs on an application thread - whichever local
+     * member's increment reached the arrival target (§5.3) - so it reserves and
+     * copies like any other writer and the lead's agent sends it (§3.12).
+     */
+    uint32_t slot = osoe_progress_slot(p, root);
+    struct osoe_connection *conn = osoe_connection_to(p->area, root);
+    if (slot == OSOE_CONNECTION_NONE || !conn)
+        osoe_fatal("no connection to the collective root, node %u", root);
+    struct osoe_message_header h = { OSOE_AM_BARRIER_ARRIVE, 0,
+                                     (uint32_t)sizeof(struct osoe_am_barrier) };
+    struct osoe_am_barrier m = { .team = team, .epoch = epoch, .from_node = p->node };
+    struct osoe_reservation resv;
+    while (osoe_connection_reserve(conn, osoe_message_padded(sizeof m), &resv) !=
+           OSOE_RESERVATION_OK)
+        ;                       /* the agent is sealing; the space comes back */
+    unsigned char *at = osoe_reservation_bytes(conn, &resv);
+    memcpy(at, &h, sizeof h);
+    memcpy(at + sizeof h, &m, sizeof m);
+    osoe_connection_commit(conn, &resv);
 }
 
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer)

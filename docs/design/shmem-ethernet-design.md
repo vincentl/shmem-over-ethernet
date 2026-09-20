@@ -2867,6 +2867,19 @@ the lead is blocked in the same call regardless.
 
 **Release** arrives at the progress thread, which advances the team's `released`
 counter and wakes all local waiters — a divisible event, so wake-many per §3.11.
+
+**The arrival and the release are AM messages, not boundary operations.** §10
+weighed a mandatory `osoe_transport_sync` here and closed it against the code at
+§7.1 step 2: this phase addresses a *node* where §4.10 addresses a PE, and its
+release wakes futex waiters on an epoch counter where §4.10's notify wakes watch
+waiters on a range. Both arguments are there.
+
+**The root counts, and the count is the node's, not the PE's.** Whichever local
+member's increment reaches the arrival target sends one arrival for the whole
+node, so a node of eight members arrives once. The root releases only when every
+participating node has arrived — which at *two* nodes is indistinguishable from
+releasing on any arrival, since the single message it receives is also the last
+one. A test of this phase needs three (§8.2).
 The progress thread never touches non-lead `dest` buffers, so it does no
 `O(members × count)` copying while other connections wait.
 
@@ -4130,17 +4143,32 @@ out-of-band bootstrap, and §8.1's three-way switch.
   put and watch, so it carries no capability and §4.10's rejection of capability
   bits still holds.
 
-  **Deferred to step 2, deliberately.** The case is an estimated 4–6× on barrier
-  at 10^6 PEs — unmeasured, and four orders of magnitude beyond the target
-  hardware. An earlier draft argued §4.10 contradicts itself on this and
-  **withdrew it**: §2.2 scopes the boundary claim to §4 and puts collectives on
-  AM on purpose, so there is a decision here, not an oversight. What is left is a
-  trade between fifteen lines now and restructuring `barrier.c` later, and step 2
-  writes the internode phase that is `osoe_transport_sync`'s only caller and its only
-  implementation. Deciding it there means deciding it with the code in front of
-  us rather than an estimate — and we may notice something on the way that
-  changes the answer. *(Not rejected. Recorded so it is decided at step 2 rather
-  than rediscovered.)*
+  **Decided at step 2, against the code: no.** The internode phase does not
+  cross the boundary. Writing it turned the trade from "fifteen lines now versus
+  restructuring `barrier.c` later" into two concrete obstacles, neither of which
+  was visible from the estimate:
+
+  - **Addressing.** §4.10's model is `(pe, region, offset)` — its opening
+    sentence, and invariant 20 — while this phase is addressed to a *node*, and
+    the counter it moves is the node's, shared by every local member of the
+    team. A sync over a group of nodes is not one more operation in that
+    vocabulary; it is a second addressing model beside it.
+  - **The release.** §5.4 makes each epoch counter *its own futex word*, because
+    the kernel implements only 32-bit futexes, and a member waits on the counter
+    itself. Expressing the release as an rmw would need the backend to know that
+    this particular word has futex waiters — which `osoe_transport_notify` does
+    not mean: notify is §4.9's watch mechanism over watched ranges, and a
+    collective's waiters hold no watch. Making them hold one rewrites §5.4's
+    wait, which is where the bounded-skew argument lives.
+
+  So the boundary stays point-to-point and PE-addressed, §2.2's placement of
+  collectives on AM stands, and a backend wanting a native group barrier
+  implements §5's internode phase rather than growing a new primitive. The 4–6×
+  estimate at 10^6 PEs is unchanged and still unmeasured, four orders of
+  magnitude beyond the target hardware; if a device ever makes it matter, what
+  changes is §5's internode phase, where the knowledge of nodes and epochs
+  already lives. *(Closed. The reasoning sits beside the code in
+  `shmem/src/progress.c`.)*
 - **Does the AM data path stay hot in an RDMA build?** Bootstrap is out of band
   in every build (§6.2) and that is forced. Whether §3's *data* path — the
   reservation protocol, deferred reply queues, aggregation — stays running is

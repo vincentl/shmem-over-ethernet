@@ -111,6 +111,19 @@ static void notify(void *context, uint32_t pe, uint16_t region, uint64_t offset,
     notifies++;
 }
 
+/* Stands in for the team's epoch counters (§5.4). The real one advances the
+ * team's `released` and wakes every local waiter; here it is enough to record
+ * which epoch was released, which is what a waiter would be waiting for. */
+static uint32_t released_epoch;
+static uint32_t releases;
+
+static void release(void *context, uint32_t team, uint32_t epoch)
+{
+    (void)context; (void)team;
+    released_epoch = epoch;
+    releases++;
+}
+
 /* An application thread's half: reserve, copy, commit (§3.5). Never seals -
  * that is the progress thread's (§3.12). */
 static bool post(struct osoe_connection *c, uint16_t kind, const void *fixed,
@@ -214,7 +227,7 @@ int main(void)
     static struct osoe_reply descriptors[DESCRIPTORS];
     static unsigned char scratch[SCRATCH];
     static struct osoe_progress_connection connections[1];
-    struct osoe_progress_host host = { resolve, landing, notify, NULL };
+    struct osoe_progress_host host = { resolve, landing, notify, release, NULL };
     struct osoe_progress p;
     osoe_progress_init(&p, &area, &wire, descriptors, DESCRIPTORS, scratch, SCRATCH,
                        &host);
@@ -372,6 +385,49 @@ int main(void)
             CHECK(false);
             break;
         }
+
+    /*
+     * The internode phase of a barrier (§5.1, §5.3). Node 0 is the root: both
+     * nodes arrive, the root counts them, and the release comes back and is
+     * applied by the progress thread. The epoch is arbitrary here - the point
+     * is that no node is released before every node has arrived, which is the
+     * only thing a barrier promises.
+     */
+    enum { EPOCH = 11 };
+    CHECK(releases == 0);
+    osoe_progress_arrive(&p, 0, EPOCH, 0, 2);
+    /*
+     * No assertion about *when* the release happens here. The root's own
+     * arrival may legitimately be the last one - the peer's may already have
+     * been received during the polling above - so "the root has not released
+     * yet" is an ordering the protocol does not promise, and asserting it
+     * failed about one run in twenty. What a barrier does promise is checked
+     * where it can be: shmem.barrier-am runs three nodes and §8.2's arrival
+     * table, which is the only configuration where releasing too early and
+     * releasing correctly differ at all.
+     */
+    while (releases == 0) {
+        osoe_progress_poll(&p);
+        if (osoe_deadline_expired(&give_up)) {
+            fprintf(stderr, "PE %u: the barrier never released\n", my_pe);
+            CHECK(false);
+            goto done;
+        }
+    }
+    CHECK(released_epoch == EPOCH);
+    CHECK(releases == 1);
+
+    /*
+     * Keep the engine turning. The root counts the last arrival and releases
+     * itself in the same call, so its own wait is satisfied while the releases
+     * it enqueued for every other node are still in its outbox - and only this
+     * thread sends them. In the library the agent never stops, and §3.10's
+     * safety sweep submits anything sealed regardless of signalling; a test
+     * that stops polling is simulating an agent that died.
+     */
+    while (osoe_progress_poll(&p))
+        if (osoe_deadline_expired(&give_up))
+            break;
 
     /* Every applied rmw notifies; a put notifies best effort (§4.10). */
     CHECK(notifies >= 3);

@@ -40,6 +40,10 @@
 #include "reply.h"
 #include "wire.h"
 
+/* Teams whose internode phase this build carries: the two predefined ones
+ * (§7.3). shmem_team_split_* is not implemented, so there are no others. */
+#define OSOE_PROGRESS_TEAMS 2
+
 /* What the progress loop asks of the PE it runs inside. */
 struct osoe_progress_host {
     /*
@@ -57,6 +61,16 @@ struct osoe_progress_host {
     /* Wake that PE's waiters whose watched range this write overlapped (§4.9). */
     void (*notify)(void *context, uint32_t pe, uint16_t region, uint64_t offset,
                    uint32_t length);
+    /*
+     * Release a team's epoch on this node: advance its `released` counter and
+     * wake every local waiter (§5.3). It is a host callback rather than
+     * something this file does, because the counter is the *team's* (§5.4) and
+     * the progress loop has no business knowing what a team is.
+     *
+     * It is also the reason the internode phase is not expressed over the §4.10
+     * boundary - see the note in progress.c.
+     */
+    void (*release)(void *context, uint32_t team, uint32_t epoch);
     void *context;
 };
 
@@ -87,6 +101,16 @@ struct osoe_progress {
     uint32_t scratch_bytes;
     uint32_t node, nodes;
     struct osoe_progress_host host;
+
+    /*
+     * The root node's count of internode arrivals, per team. Private to the
+     * progress thread, like everything else here. Only the root counts; every
+     * other node's lead only forwards its own arrival and applies the release.
+     */
+    uint32_t arrivals[OSOE_PROGRESS_TEAMS];
+    uint32_t arrival_epoch[OSOE_PROGRESS_TEAMS];
+    uint32_t participants[OSOE_PROGRESS_TEAMS];
+    uint64_t barrier_arrivals;
 
     /* §3.14 counters, read by osoe-stat and by the tests. */
     uint64_t segments_sent, segments_applied, messages_applied;
@@ -128,5 +152,18 @@ void osoe_progress_request_ack(struct osoe_progress *p, uint32_t peer);
 
 /* The highest sequence number `peer` has applied (§4.6's completion evidence). */
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer);
+
+/*
+ * This node's arrival at a team's internode phase (§5.3), called by whichever
+ * local member's increment reached the epoch's arrival target - an application
+ * thread, which is why it only ever *enqueues* (§3.7).
+ *
+ * `root` is the node that counts arrivals and sends the releases; `nodes` is
+ * how many participate, which for a team is the nodes holding at least one
+ * member (§5.2). On the root this is applied directly; elsewhere it is posted
+ * to the root's connection.
+ */
+void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch,
+                          uint32_t root, uint32_t participants);
 
 #endif /* OSOE_PROGRESS_H */
