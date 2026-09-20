@@ -15,6 +15,7 @@ struct osoe_bootstrap {
     uint32_t rank;              /* OSOE_PROCID */
     uint32_t world_size;        /* OSOE_STEP_NUM_TASKS */
     uint32_t node;              /* OSOE_NODEID */
+    uint32_t node_count;        /* OSOE_STEP_NUM_NODES */
     uint32_t local_id;          /* OSOE_LOCALID; the lead is 0 */
     uint32_t local_count;       /* L: the length of OSOE_GTIDS */
     uint32_t *gtids;            /* world rank of each local id */

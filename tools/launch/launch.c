@@ -98,6 +98,8 @@ struct placement {
     const char *gtids;      /* its node's ranks, in local-id order */
 };
 
+static uint32_t node_count_for_children;
+
 /* Runs in the child between fork and exec. */
 static void exec_rank(long rank, long n, const char *job, const struct placement *p,
                       const struct override *ov, int nov, char **argv)
@@ -111,6 +113,8 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
     setenv_or_die("OSOE_STEP_NUM_TASKS", buf);
     snprintf(buf, sizeof buf, "%u", p->node);
     setenv_or_die("OSOE_NODEID", buf);
+    snprintf(buf, sizeof buf, "%u", node_count_for_children);
+    setenv_or_die("OSOE_STEP_NUM_NODES", buf);
     setenv_or_die("OSOE_JOB_ID", job);
     setenv_or_die("OSOE_STEP_ID", "0");
     setenv_or_die("OSOE_GTIDS", p->gtids);
@@ -250,6 +254,7 @@ int main(int argc, char **argv)
     }
     free(ranks);
     osoe_node_map_free(&map);
+    node_count_for_children = node_count;
 
     /* SIGCHLD is consumed with sigtimedwait, so block it before any fork. */
     sigset_t chld;

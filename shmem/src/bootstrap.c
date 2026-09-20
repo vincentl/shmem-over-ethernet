@@ -59,6 +59,7 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     b->have_rank = true;
     b->world_size = need_u32("OSOE_STEP_NUM_TASKS");
     b->node = need_u32("OSOE_NODEID");
+    b->node_count = need_u32("OSOE_STEP_NUM_NODES");
     b->local_id = need_u32("OSOE_LOCALID");
     b->step = need_u32("OSOE_STEP_ID");
     switch (osoe_environment_u64("OSOE_JOB_ID", &b->job)) {
@@ -67,6 +68,9 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     default: osoe_fatal("OSOE_JOB_ID='%s' is not a decimal number", getenv("OSOE_JOB_ID"));
     }
 
+    if (b->node_count == 0 || b->node >= b->node_count)
+        osoe_fatal("OSOE_NODEID=%u is not below OSOE_STEP_NUM_NODES=%u", b->node,
+                   b->node_count);
     if (b->world_size == 0 || b->rank >= b->world_size)
         osoe_fatal("OSOE_PROCID=%u is not below OSOE_STEP_NUM_TASKS=%u", b->rank,
                    b->world_size);
@@ -95,18 +99,6 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                 osoe_fatal("OSOE_GTIDS='%s' names rank %u twice", gtids, b->gtids[i]);
     }
 
-    /*
-     * One logical node still, until the AM backend carries internode traffic
-     * (§7.1 step 2). What is missing is the backend, not the bootstrap: the
-     * variables checked above are already a multi-node environment, and
-     * osoe-launch derives them from §8.1's node map exactly as Slurm derives
-     * them from a distribution. So this rejection moves rather than loosens
-     * when the backend lands.
-     */
-    if (b->node != 0 || b->local_count != b->world_size)
-        osoe_fatal("this job spans more than one node (OSOE_NODEID=%u, %u of %u ranks "
-                   "local); internode traffic needs the AM backend of §7.1 step 2",
-                   b->node, b->local_count, b->world_size);
 
     const char *size = getenv("SHMEM_SYMMETRIC_SIZE");
     b->symmetric_size = OSOE_DEFAULT_SYMMETRIC_SIZE;

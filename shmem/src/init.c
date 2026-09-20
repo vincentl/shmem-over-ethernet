@@ -89,6 +89,20 @@ static void session_start(void)
     osoe_bootstrap_read(&osoe.bootstrap);
 
     /*
+     * One logical node still, until the AM backend carries internode traffic
+     * (§7.1 step 2). The check is here rather than in the bootstrap because
+     * what is missing is the *library's* ability to run such a job, not
+     * anything wrong with the environment: the rendezvous of §6.2 parses and
+     * uses that environment already, and refusing it there would stop it being
+     * testable before the backend exists.
+     */
+    if (osoe.bootstrap.node != 0 || osoe.bootstrap.local_count != osoe.bootstrap.world_size)
+        osoe_fatal("this job spans more than one node (OSOE_NODEID=%u, %u of %u ranks "
+                   "local); internode traffic needs the AM backend of §7.1 step 2",
+                   osoe.bootstrap.node, osoe.bootstrap.local_count,
+                   osoe.bootstrap.world_size);
+
+    /*
      * Before the rendezvous, so that a job which fails to start still says
      * which library it was and how to ask it for help.
      */

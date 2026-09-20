@@ -14,6 +14,7 @@ add_library(osoe
   src/fatal.c
   src/info.c
   src/init.c
+  src/job.c
   src/malloc.c
   src/metrics.c
   src/node.c

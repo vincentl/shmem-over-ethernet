@@ -116,6 +116,24 @@ set_tests_properties(shmem.wire-pair PROPERTIES LABELS "tier2" TIMEOUT 90)
 # listed local PE count, as shmem.<name>.L<count>.
 set(OSOE_LAUNCH_COUNTS 1 2 4)
 
+# The job-wide rendezvous and the locality function (tier 2), over §8.1's four
+# poles: one node, one PE per node, uneven sizes, and ranks not contiguous per
+# node - the last two being where two-level collectives break, and a uniform
+# map never shows it.
+add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c
+  ../src/am.c)
+target_include_directories(shmem_test_job PRIVATE ../src)
+target_link_libraries(shmem_test_job PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_job)
+foreach(map 0 0,0,0,0 0,1,2,3 0,0,0,1,2,2 0,1,2,0,1,0)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.job.${label}
+    COMMAND osoe-launch -n ${count} -m ${map} -t 60 -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.job.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+
 # The progress loop between two logical nodes (tier 2): every layer at once.
 # The wire is far smaller than a segment and its split injection is on, so the
 # stream really arrives in pieces (§8.2). Sizes are pinned rather than
@@ -261,7 +279,7 @@ set_tests_properties(shmem.refuse.no_launcher PROPERTIES
   PASS_REGULAR_EXPRESSION "no launcher environment")
 add_test(NAME shmem.refuse.multinode
   COMMAND ${CMAKE_COMMAND} -E env OSOE_PROCID=0 OSOE_LOCALID=0 OSOE_STEP_NUM_TASKS=2
-          OSOE_NODEID=0 OSOE_GTIDS=0 OSOE_JOB_ID=1 OSOE_STEP_ID=0
+          OSOE_NODEID=0 OSOE_STEP_NUM_NODES=2 OSOE_GTIDS=0 OSOE_JOB_ID=1 OSOE_STEP_ID=0
           $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.refuse.multinode PROPERTIES
   PASS_REGULAR_EXPRESSION "internode traffic needs the AM backend")
