@@ -1,0 +1,21 @@
+--- /Users/vincent/shmem-over-ethernet/build/scratch/review-performance-scale/tree/shmem/src/progress.c	2026-09-20 13:05:35
++++ shmem/src/progress.c	2026-09-20 13:51:38
+@@ -1,6 +1,7 @@
+ #include <stdatomic.h>
+ #include <limits.h>
+ #include <string.h>
++#include <stdio.h>
+ 
+ #include "base/futex.h"
+ #include "fatal.h"
+@@ -64,6 +65,10 @@
+     uint32_t i = osoe_reply_take(&p->pool);
+     if (i == OSOE_REPLY_NONE) {
+         p->reply_reservation_failures++;
++        fprintf(stderr, "REVIEW-INSTRUMENT node %u: reply pool empty (in_use %u of %u), "
++                "DROPPING request kind %u from PE %u token %llu\n", p->node, p->pool.in_use,
++                p->pool.count, (unsigned)value->kind, value->origin_pe,
++                (unsigned long long)value->token);
+         return;
+     }
+     struct osoe_reply *r = osoe_reply_at(&p->pool, i);

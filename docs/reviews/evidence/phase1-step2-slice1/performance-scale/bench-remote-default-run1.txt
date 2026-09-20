@@ -1,0 +1,13 @@
+ 13:46:18 up 20:57,  1 user,  load average: 5.85, 3.03, 1.44
+# internode (logical), PE 0 -> PE 1, shared-memory wire
+put 8 B + quiet (round trip)                 min   145442.0  p10   224244.0  med   349847.0  p90   939498.0  max    8646900.0 ns/op
+put 8 B alone (local completion)             min      217.0  p10      260.0  med      304.0  p90      304.0  max     123997.0 ns/op
+1000 x put 8 B, then one quiet (per put)     min      767.3  p10      977.6  med     1485.2  p90     2042.2  max       2597.0 ns/op
+200 x (put 8 B + quiet) (per put)            min   305338.3  p10   307779.6  med   315647.9  p90   337178.8  max     498963.8 ns/op
+get 8 B                                      min    46224.0  p10   312293.0  med   356444.0  p90   696644.0  max    3133688.0 ns/op
+get 4 KiB                                    min   264298.0  p10   312250.0  med   350741.0  p90   594994.0  max    2418986.0 ns/op  (    11.1 MiB/s at med)
+put 4 KiB + quiet                            min   133963.0  p10   214704.0  med   303221.0  p90   417701.0  max   11992847.0 ns/op  (    12.9 MiB/s at med)
+atomic_fetch_inc                             min    54365.0  p10   298195.0  med   336002.0  p90   407486.0  max    3366554.0 ns/op
+atomic_inc (no reply) + quiet                min   131700.0  p10   214410.0  med   299485.0  p90   388088.0  max   29240533.0 ns/op
+put 1 MiB + quiet                            min 17982698.0  p10 18529193.0  med 18919131.0  p90 20110236.0  max   20894995.0 ns/op  (    52.9 MiB/s at med)
+get 1 MiB                                    min 24228121.0  p10 24361071.0  med 25302087.0  p90 26502533.0  max   27528041.0 ns/op  (    39.5 MiB/s at med)

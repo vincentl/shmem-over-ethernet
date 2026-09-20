@@ -1,0 +1,153 @@
+[ 11%] Building C object shmem/CMakeFiles/osoe.dir/src/progress.c.o
+[ 41%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/progress.c.o
+[ 50%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/progress.c.o
+      Start  44: shmem.internode.0-0-1-1-2-2
+14/22 Test  #44: shmem.internode.0-0-1-1-2-2 ................***Failed    0.01 sec
+osoe: PE 0: team 0 has arrivals for epochs 2 and 1 at once; collective epochs have diverged
+osoe: PE 0: control segment /dev/shm/osoe.657121.0.0.0
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+
+      Start  45: shmem.internode.0-0-0-1-2-2
+15/22 Test  #45: shmem.internode.0-0-0-1-2-2 ................***Failed    0.01 sec
+osoe: PE 0: team 0 has arrivals for epochs 1 and 2 at once; collective epochs have diverged
+osoe: PE 0: control segment /dev/shm/osoe.657135.0.0.0
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+
+      Start  46: shmem.internode.0-1-2-0-1-0
+16/22 Test  #46: shmem.internode.0-1-2-0-1-0 ................***Failed    0.01 sec
+osoe: PE 0: team 0 has arrivals for epochs 1 and 2 at once; collective epochs have diverged
+osoe: PE 0: control segment /dev/shm/osoe.657149.0.0.0
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+
+      Start  47: shmem.differential
+17/22 Test  #47: shmem.differential .........................***Failed    0.02 sec
+CMake Error at /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/cmake/Differential.cmake:34 (message):
+  map 0,1,2,3,4,5 exited 1
+
+  --- stdout ---
+
+
+
+  --- stderr ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  osoe: PE 0: team 0 has arrivals for epochs 1 and 2 at once; collective
+  epochs have diverged
+
+  osoe: PE 0: control segment /dev/shm/osoe.657178.0.0.0
+
+
+
+
+
+
+  osoe-launch: rank 0 exited with status 1
+
+
+  osoe-launch: rank 1 killed by signal 15
+
+  osoe-launch: rank 2 killed by signal 15
+
+  osoe-launch: rank 3 killed by signal 15
+
+  osoe-launch: rank 4 killed by signal 15
+
+  osoe-launch: rank 5 killed by signal 15
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      Start  54: shmem.barrier.L1
+18/22 Test  #54: shmem.barrier.L1 ...........................   Passed    0.00 sec
+      Start  55: shmem.barrier.L2
+19/22 Test  #55: shmem.barrier.L2 ...........................   Passed    0.17 sec
+      Start  56: shmem.barrier.L4
+20/22 Test  #56: shmem.barrier.L4 ...........................   Passed    0.49 sec
+      Start 108: shmem.watchdog.barrier.L2
+21/22 Test #108: shmem.watchdog.barrier.L2 ..................   Passed    0.11 sec
+      Start 110: shmem.watchdog.barrier.L4
+22/22 Test #110: shmem.watchdog.barrier.L4 ..................   Passed    0.11 sec
+
+32% tests passed, 15 tests failed out of 22
+
+Label Time Summary:
+tier2    =   1.64 sec*proc (22 tests)
+
+Total Test time (real) =   1.69 sec
+
+The following tests FAILED:
+	 22 - shmem.barrier-am.0-1-2 (Failed)                   tier2
+	 23 - shmem.barrier-am.0-0-1-1-2-2 (Failed)             tier2
+	 24 - shmem.barrier-am.0-0-0-1-2-2 (Failed)             tier2
+	 25 - shmem.barrier-am.0-1-2-0-1-0 (Failed)             tier2
+	 36 - shmem.multinode.0-1-2 (Failed)                    tier2
+	 37 - shmem.multinode.0-0-1-1-2-2 (Failed)              tier2
+	 38 - shmem.multinode.0-0-0-1-2-2 (Failed)              tier2
+	 39 - shmem.multinode.0-1-2-0-1-0 (Failed)              tier2
+	 40 - shmem.multinode.force-remote.0-1-2 (Failed)       tier2
+	 41 - shmem.multinode.force-remote.0-0-1-1-2-2 (Failed) tier2
+	 43 - shmem.internode.0-1-2 (Failed)                    tier2
+	 44 - shmem.internode.0-0-1-1-2-2 (Failed)              tier2
+	 45 - shmem.internode.0-0-0-1-2-2 (Failed)              tier2
+	 46 - shmem.internode.0-1-2-0-1-0 (Failed)              tier2
+	 47 - shmem.differential (Failed)                       tier2
+Errors while running CTest

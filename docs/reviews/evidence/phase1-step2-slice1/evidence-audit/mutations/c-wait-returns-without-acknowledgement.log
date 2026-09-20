@@ -1,0 +1,87 @@
+[ 11%] Building C object shmem/CMakeFiles/osoe.dir/src/signal.c.o
+[ 12%] Building C object shmem/CMakeFiles/osoe.dir/src/transport-am.c.o
+Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/build/debug
+      Start 35: shmem.multinode.0-0-0-0
+ 1/22 Test #35: shmem.multinode.0-0-0-0 ....................   Passed    0.33 sec
+      Start 36: shmem.multinode.0-1-2
+ 2/22 Test #36: shmem.multinode.0-1-2 ......................   Passed    0.44 sec
+      Start 37: shmem.multinode.0-0-1-1-2-2
+ 3/22 Test #37: shmem.multinode.0-0-1-1-2-2 ................   Passed    0.78 sec
+      Start 38: shmem.multinode.0-0-0-1-2-2
+ 4/22 Test #38: shmem.multinode.0-0-0-1-2-2 ................   Passed    0.79 sec
+      Start 39: shmem.multinode.0-1-2-0-1-0
+ 5/22 Test #39: shmem.multinode.0-1-2-0-1-0 ................   Passed    0.79 sec
+      Start 40: shmem.multinode.force-remote.0-1-2
+ 6/22 Test #40: shmem.multinode.force-remote.0-1-2 .........   Passed    0.46 sec
+      Start 41: shmem.multinode.force-remote.0-0-1-1-2-2
+ 7/22 Test #41: shmem.multinode.force-remote.0-0-1-1-2-2 ...   Passed    0.78 sec
+      Start 42: shmem.internode.0-0-0-0
+ 8/22 Test #42: shmem.internode.0-0-0-0 ....................   Passed    0.02 sec
+      Start 43: shmem.internode.0-1-2
+ 9/22 Test #43: shmem.internode.0-1-2 ......................***Failed    0.07 sec
+PE 1: byte 3212 of 5000 from PE 2 is 0, expected 13
+/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:149: CHECK(bad < 0) failed
+osoe-launch: rank 1 exited with status 1
+
+      Start 44: shmem.internode.0-0-1-1-2-2
+10/22 Test #44: shmem.internode.0-0-1-1-2-2 ................***Failed    0.14 sec
+PE 5: byte 3552 of 5000 from PE 2 is 0, expected 135
+/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:149: CHECK(bad < 0) failed
+osoe-launch: rank 5 exited with status 1
+
+      Start 45: shmem.internode.0-0-0-1-2-2
+11/22 Test #45: shmem.internode.0-0-0-1-2-2 ................***Failed    0.13 sec
+PE 3: byte 3200 of 5000 from PE 5 is 0, expected 108
+/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:149: CHECK(bad < 0) failed
+osoe-launch: rank 3 exited with status 1
+
+      Start 46: shmem.internode.0-1-2-0-1-0
+12/22 Test #46: shmem.internode.0-1-2-0-1-0 ................   Passed    0.12 sec
+      Start 47: shmem.differential
+13/22 Test #47: shmem.differential .........................***Failed    0.09 sec
+CMake Error at /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/cmake/Differential.cmake:72 (message):
+  node map 0,1,2,3,4,5 disagrees with 0,0,0,0,0,0
+
+  line 101:
+
+    0,0,0,0,0,0: pe 4 put-from 1 8bd6dd8c913798b3
+    0,1,2,3,4,5: pe 4 put-from 1 e0b0bdd89fb7f962
+
+  The same program over two logical layouts must produce the same results; a
+  difference here is a difference between the intranode path and the AM layer
+  (§8.1).
+
+
+
+      Start 63: shmem.rma.L1
+14/22 Test #63: shmem.rma.L1 ...............................   Passed    0.01 sec
+      Start 64: shmem.rma.L2
+15/22 Test #64: shmem.rma.L2 ...............................   Passed    0.02 sec
+      Start 65: shmem.rma.L4
+16/22 Test #65: shmem.rma.L4 ...............................   Passed    0.04 sec
+      Start 72: shmem.signal.L1
+17/22 Test #72: shmem.signal.L1 ............................   Passed    0.11 sec
+      Start 73: shmem.signal.L2
+18/22 Test #73: shmem.signal.L2 ............................   Passed    0.12 sec
+      Start 74: shmem.signal.L4
+19/22 Test #74: shmem.signal.L4 ............................   Passed    0.11 sec
+      Start 75: shmem.quiet.L1
+20/22 Test #75: shmem.quiet.L1 .............................   Passed    0.00 sec
+      Start 76: shmem.quiet.L2
+21/22 Test #76: shmem.quiet.L2 .............................   Passed    0.00 sec
+      Start 77: shmem.quiet.L4
+22/22 Test #77: shmem.quiet.L4 .............................   Passed    0.01 sec
+
+82% tests passed, 4 tests failed out of 22
+
+Label Time Summary:
+tier2    =   5.39 sec*proc (22 tests)
+
+Total Test time (real) =   5.47 sec
+
+The following tests FAILED:
+	 43 - shmem.internode.0-1-2 (Failed)                    tier2
+	 44 - shmem.internode.0-0-1-1-2-2 (Failed)              tier2
+	 45 - shmem.internode.0-0-0-1-2-2 (Failed)              tier2
+	 47 - shmem.differential (Failed)                       tier2
+Errors while running CTest

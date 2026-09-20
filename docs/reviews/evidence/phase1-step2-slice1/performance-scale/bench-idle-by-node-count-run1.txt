@@ -1,0 +1,23 @@
+ 13:47:14 up 20:58,  1 user,  load average: 3.18, 2.80, 1.45
+## 8 nodes x 1 PE
+PE 0: idle 3.00 s wall, 0.1073 s CPU (3.58% of a core), 9122 voluntary context switches
+PE 1: idle 3.00 s wall, 0.1065 s CPU (3.55% of a core), 9096 voluntary context switches
+PE 2: idle 3.00 s wall, 0.1090 s CPU (3.63% of a core), 9112 voluntary context switches
+## 16 nodes x 1 PE
+PE 0: idle 3.00 s wall, 0.0824 s CPU (2.75% of a core), 9840 voluntary context switches
+PE 10: idle 3.00 s wall, 0.0826 s CPU (2.75% of a core), 9849 voluntary context switches
+PE 11: idle 3.00 s wall, 0.0814 s CPU (2.71% of a core), 9848 voluntary context switches
+## 32 nodes x 1 PE
+PE 0: idle 3.00 s wall, 0.0916 s CPU (3.05% of a core), 10149 voluntary context switches
+PE 10: idle 3.00 s wall, 0.0907 s CPU (3.02% of a core), 10135 voluntary context switches
+PE 11: idle 3.00 s wall, 0.0911 s CPU (3.04% of a core), 10145 voluntary context switches
+osoe-segment-test.648126
+osoe.644405.0.0.conn.0
+osoe.644405.0.1.conn.0
+osoe.644405.0.job.0
+osoe.644405.0.wire.0.1.0
+osoe.646871.0.0.0
+osoe.646871.0.0.conn.0
+osoe.646871.0.1.0
+osoe.646871.0.1.conn.0
+osoe.646871.0.job.0

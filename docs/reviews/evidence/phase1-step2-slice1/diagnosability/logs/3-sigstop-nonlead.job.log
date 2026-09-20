@@ -1,0 +1,201 @@
+hang: PE 1 of 6 pid 633803 mode traffic culprit 3
+hang: PE 0 of 6 pid 633802 mode traffic culprit 3
+hang: PE 4 of 6 pid 633806 mode traffic culprit 3
+hang: PE 3 of 6 pid 633805 mode traffic culprit 3
+hang: PE 2 of 6 pid 633804 mode traffic culprit 3
+hang: PE 5 of 6 pid 633807 mode traffic culprit 3
+hang: PE 2 round 0
+hang: PE 5 round 0
+hang: PE 1 round 0
+hang: PE 0 round 0
+hang: PE 4 round 0
+hang: PE 2 round 1000
+hang: PE 2 round 2000
+hang: PE 2 round 3000
+hang: PE 2 round 4000
+hang: PE 2 round 5000
+hang: PE 2 round 6000
+hang: PE 2 round 7000
+hang: PE 2 round 8000
+hang: PE 2 round 9000
+hang: PE 2 round 10000
+hang: PE 2 round 11000
+hang: PE 2 round 12000
+hang: PE 2 round 13000
+hang: PE 2 round 14000
+hang: PE 2 round 15000
+hang: PE 2 round 16000
+hang: PE 2 round 17000
+hang: PE 2 round 18000
+hang: PE 2 round 19000
+hang: PE 2 round 20000
+hang: PE 2 round 21000
+hang: PE 2 round 22000
+hang: PE 2 round 23000
+hang: PE 2 round 24000
+hang: PE 2 round 25000
+hang: PE 2 round 26000
+hang: PE 2 round 27000
+hang: PE 2 round 28000
+hang: PE 2 round 29000
+hang: PE 2 round 30000
+hang: PE 2 round 31000
+hang: PE 2 round 32000
+hang: PE 2 round 33000
+hang: PE 2 round 34000
+hang: PE 2 round 35000
+hang: PE 2 round 36000
+hang: PE 2 round 37000
+hang: PE 2 round 38000
+hang: PE 2 round 39000
+hang: PE 2 round 40000
+hang: PE 2 round 41000
+hang: PE 2 round 42000
+hang: PE 2 round 43000
+hang: PE 2 round 44000
+hang: PE 2 round 45000
+hang: PE 2 round 46000
+hang: PE 2 round 47000
+hang: PE 2 round 48000
+hang: PE 2 round 49000
+hang: PE 2 round 50000
+hang: PE 2 round 51000
+hang: PE 2 round 52000
+hang: PE 2 round 53000
+hang: PE 2 round 54000
+hang: PE 2 round 55000
+hang: PE 2 round 56000
+hang: PE 2 round 57000
+hang: PE 2 round 58000
+hang: PE 2 round 59000
+hang: PE 2 round 60000
+hang: PE 2 round 61000
+hang: PE 2 round 62000
+hang: PE 2 round 63000
+hang: PE 2 round 64000
+hang: PE 2 round 65000
+hang: PE 2 round 66000
+hang: PE 2 round 67000
+hang: PE 2 round 68000
+hang: PE 2 round 69000
+hang: PE 2 round 70000
+hang: PE 2 round 71000
+hang: PE 2 round 72000
+hang: PE 2 round 73000
+hang: PE 2 round 74000
+hang: PE 2 round 75000
+hang: PE 2 round 76000
+hang: PE 2 round 77000
+hang: PE 2 round 78000
+hang: PE 2 round 79000
+hang: PE 2 round 80000
+hang: PE 2 round 81000
+hang: PE 2 round 82000
+hang: PE 2 round 83000
+hang: PE 2 round 84000
+hang: PE 2 round 85000
+hang: PE 2 round 86000
+hang: PE 2 round 87000
+hang: PE 2 round 88000
+hang: PE 2 round 89000
+[... 124777 of 124977 lines of per-iteration progress output removed by the review lead before commit ...]
+hang: PE 2 round 124456000
+hang: PE 2 round 124457000
+hang: PE 2 round 124458000
+hang: PE 2 round 124459000
+hang: PE 2 round 124460000
+hang: PE 2 round 124461000
+hang: PE 2 round 124462000
+hang: PE 2 round 124463000
+hang: PE 2 round 124464000
+hang: PE 1 round 103000
+hang: PE 2 round 124465000
+hang: PE 2 round 124466000
+hang: PE 2 round 124467000
+hang: PE 2 round 124468000
+hang: PE 2 round 124469000
+hang: PE 2 round 124470000
+hang: PE 2 round 124471000
+hang: PE 2 round 124472000
+hang: PE 2 round 124473000
+hang: PE 2 round 124474000
+hang: PE 2 round 124475000
+hang: PE 2 round 124476000
+hang: PE 2 round 124477000
+hang: PE 2 round 124478000
+hang: PE 2 round 124479000
+hang: PE 2 round 124480000
+hang: PE 2 round 124481000
+hang: PE 2 round 124482000
+hang: PE 2 round 124483000
+hang: PE 2 round 124484000
+hang: PE 2 round 124485000
+hang: PE 2 round 124486000
+hang: PE 2 round 124487000
+hang: PE 2 round 124488000
+hang: PE 2 round 124489000
+hang: PE 2 round 124490000
+hang: PE 2 round 124491000
+hang: PE 2 round 124492000
+hang: PE 2 round 124493000
+hang: PE 2 round 124494000
+hang: PE 2 round 124495000
+hang: PE 2 round 124496000
+hang: PE 2 round 124497000
+hang: PE 2 round 124498000
+hang: PE 2 round 124499000
+hang: PE 2 round 124500000
+hang: PE 2 round 124501000
+hang: PE 2 round 124502000
+hang: PE 2 round 124503000
+hang: PE 2 round 124504000
+hang: PE 2 round 124505000
+hang: PE 2 round 124506000
+hang: PE 2 round 124507000
+hang: PE 2 round 124508000
+hang: PE 2 round 124509000
+hang: PE 2 round 124510000
+hang: PE 2 round 124511000
+hang: PE 2 round 124512000
+hang: PE 2 round 124513000
+hang: PE 2 round 124514000
+hang: PE 2 round 124515000
+hang: PE 2 round 124516000
+hang: PE 2 round 124517000
+hang: PE 2 round 124518000
+hang: PE 2 round 124519000
+hang: PE 2 round 124520000
+hang: PE 2 round 124521000
+hang: PE 2 round 124522000
+hang: PE 2 round 124523000
+hang: PE 2 round 124524000
+hang: PE 2 round 124525000
+hang: PE 2 round 124526000
+hang: PE 2 round 124527000
+hang: PE 2 round 124528000
+hang: PE 2 round 124529000
+hang: PE 2 round 124530000
+hang: PE 2 round 124531000
+hang: PE 2 round 124532000
+hang: PE 2 round 124533000
+hang: PE 2 round 124534000
+hang: PE 2 round 124535000
+hang: PE 2 round 124536000
+osoe-launch: timeout after 40 s; killing 6 process(es)
+hang: PE 2 round 124537000
+osoe-launch: rank 0 killed by signal 9
+osoe-launch: rank 1 killed by signal 9
+osoe-launch: rank 2 killed by signal 9
+osoe-launch: rank 3 killed by signal 9
+osoe-launch: rank 4 killed by signal 9
+osoe-launch: rank 5 killed by signal 9
+osoe-launch: left behind: /dev/shm/osoe.633800.0.wire.1.2.0
+osoe-launch: left behind: /dev/shm/osoe.633800.0.wire.0.2.0
+osoe-launch: left behind: /dev/shm/osoe.633800.0.wire.0.1.0
+osoe-launch: left behind: /dev/shm/osoe.633800.0.0.conn.0
+osoe-launch: left behind: /dev/shm/osoe.633800.0.2.conn.0
+osoe-launch: left behind: /dev/shm/osoe.633800.0.1.conn.0
+osoe-launch: left behind: /dev/shm/osoe.633800.0.job.0
+osoe-launch: left behind: /dev/shm/osoe.633800.0.2.0
+osoe-launch: left behind: /dev/shm/osoe.633800.0.0.0
+osoe-launch: left behind: /dev/shm/osoe.633800.0.1.0

@@ -1,0 +1,23 @@
+## run 1, OSOE_AM_CREDITS=2
+osoe: PE 2: no get reply after 60 s
+osoe: PE 2: control segment /dev/shm/osoe.649136.0.0.0
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+exit 0
+## run 2, OSOE_AM_CREDITS=2
+osoe: PE 1: no get reply after 60 s
+osoe: PE 1: control segment /dev/shm/osoe.651392.0.0.0
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+exit 0
+## run 3, OSOE_AM_CREDITS=2
+osoe: PE 1: no get reply after 60 s
+osoe: PE 1: control segment /dev/shm/osoe.651790.0.0.0
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+exit 0
+## default credits
+completed 50 iterations

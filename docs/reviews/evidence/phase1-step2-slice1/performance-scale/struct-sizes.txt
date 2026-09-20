@@ -1,0 +1,45 @@
+sizeof(struct osoe_connection_shared)          1152
+sizeof(struct osoe_connection_buffer)           384
+sizeof(struct osoe_connection)                   24
+sizeof(struct osoe_am_segment_header)            32
+sizeof(struct osoe_message_header)                8
+sizeof(struct osoe_am_put)                       16
+sizeof(struct osoe_am_get_request)               32
+sizeof(struct osoe_am_get_reply)                 24
+sizeof(struct osoe_am_rmw_request)               56
+sizeof(struct osoe_am_rmw_reply)                 24
+sizeof(struct osoe_am_barrier)                   16
+sizeof(struct osoe_reply)                        48
+sizeof(struct osoe_progress_connection)         224
+sizeof(struct osoe_am_parser)                   136
+sizeof(struct osoe_progress)                    192
+sizeof(struct osoe_wire)                        184
+sizeof(struct osoe_node_header)                1536
+sizeof(struct osoe_pe_slot)                     512
+sizeof(struct osoe_landing_slot)                256
+sizeof(struct osoe_counter_block)               512
+sizeof(struct osoe_metric_descriptor)            64
+sizeof(struct osoe_team)                         64
+sizeof(struct osoe_allocator_block)              32
+sizeof(struct osoe_state)                       824
+metric descriptors: 89
+blocks per PE (OSOE_MAX_THREADS default): 8
+OSOE_TEAMS 2
+nodes     2: status 0 buffer 131072 area 263552
+nodes     4: status 0 buffer 131072 area 790144
+nodes     8: status 0 buffer 131072 area 1843328
+nodes    16: status 0 buffer 131072 area 3949696
+nodes    32: status 0 buffer 131072 area 8162432
+nodes    64: status 0 buffer 131072 area 16587904
+nodes   128: status 0 buffer 131072 area 33438848
+nodes   256: status 0 buffer 131072 area 67140736
+nodes   512: status 0 buffer 131072 area 134544512
+nodes  1024: status 0 buffer 131072 area 269352064
+nodes  2048: status 2 buffer 131072 area 538967168
+nodes  4096: status 2 buffer 131072 area 1078197376
+nodes  8192: status 2 buffer 131072 area 2156657792
+nodes     4: status 0 buffer 131072 area 790144
+nodes   500: status 0 buffer 131072 area 131384960
+nodes  1024: status 0 buffer 131072 area 269352064
+nodes  1025: status 0 buffer 131072 area 269615360
+nodes  4096: status 2 buffer 131072 area 1078197376

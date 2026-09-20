@@ -1,0 +1,148 @@
+##### compile-only probes
+--- pcontrol-from-shmem-header
+/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/pcontrol-from-shmem-header.c:8:5: error: implicit declaration of function ‘shmem_pcontrol’; did you mean ‘shmem_ptr’? [-Wimplicit-function-declaration]
+exit: NOT-BUILT
+--- mpp-shmemx-header
+/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/mpp-shmemx-header.c:4:10: fatal error: mpp/shmemx.h: No such file or directory
+exit: NOT-BUILT
+--- deprecated-amo-names
+/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:10:5: error: implicit declaration of function ‘shmem_long_inc’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:11:16: error: implicit declaration of function ‘shmem_long_finc’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:12:12: error: implicit declaration of function ‘shmem_long_cswap’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:13:12: error: implicit declaration of function ‘shmem_long_swap’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:14:5: error: implicit declaration of function ‘shmem_long_add’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:15:12: error: implicit declaration of function ‘shmem_long_fadd’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+exit: NOT-BUILT
+--- spec-example-5
+/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/spec-example-5.c:12:7: error: implicit declaration of function ‘shmem_put’; did you mean ‘shmem_ptr’? [-Wimplicit-function-declaration]
+exit: NOT-BUILT
+##### spec examples, 4 PEs on 2 logical nodes (-m 0,0,1,1) and on one node
+--- spec-example-38 map 0,0,0,0: exit 0
+--- spec-example-38 map 0,0,1,1: exit 0
+--- spec-example-38 map 0,1,2,3: exit 0
+--- spec-example-42 map 0,0,0,0: exit 0
+PE 0 observed first update from PE 3
+--- spec-example-42 map 0,0,1,1: exit 0
+PE 0 observed first update from PE 1
+--- spec-example-42 map 0,1,2,3: exit 0
+PE 0 observed first update from PE 1
+--- spec-example-43 map 0,0,0,0: exit 0
+--- spec-example-43 map 0,0,1,1: exit 0
+--- spec-example-43 map 0,1,2,3: exit 0
+##### SMA_SYMMETRIC_SIZE
+--- default:
+2 MiB allocation SUCCEEDED
+--- SHMEM_SYMMETRIC_SIZE=1m:
+2 MiB allocation FAILED
+--- SMA_SYMMETRIC_SIZE=1m:
+2 MiB allocation SUCCEEDED
+--- SMA_SYMMETRIC_SIZE=garbage:
+2 MiB allocation SUCCEEDED
+##### SHMEM_SYMMETRIC_SIZE syntax (heap bytes from SHMEM_DEBUG)
+--- '20m': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662879.0.0.0, heap 20971520 bytes at 0x100000000000, watchdog on, node 0 of 1
+--- '3.1M': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662884.0.0.0, heap 3250586 bytes at 0x100000000000, watchdog on, node 0 of 1
+--- '.5m': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662889.0.0.0, heap 524288 bytes at 0x100000000000, watchdog on, node 0 of 1
+--- '0.5m': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662894.0.0.0, heap 524288 bytes at 0x100000000000, watchdog on, node 0 of 1
+--- '20kk': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662899.0.0.0, heap 20480 bytes at 0x100000000000, watchdog on, node 0 of 1
+--- '1.5': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662904.0.0.0, heap 2 bytes at 0x100000000000, watchdog on, node 0 of 1
+--- '5.': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662909.0.0.0, heap 5 bytes at 0x100000000000, watchdog on, node 0 of 1
+--- '0': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662914.0.0.0, heap 0 bytes at 0x100000000000, watchdog on, node 0 of 1
+--- '1e6': osoe: PE 0: SHMEM_SYMMETRIC_SIZE='1e6' is invalid: expected a non-negative decimal number with an optional k, m, g or t multiplier
+--- '+5m': osoe: PE 0: SHMEM_SYMMETRIC_SIZE='+5m' is invalid: expected a non-negative decimal number with an optional k, m, g or t multiplier
+--- ' 5m': osoe: PE 0: SHMEM_SYMMETRIC_SIZE=' 5m' is invalid: expected a non-negative decimal number with an optional k, m, g or t multiplier
+--- '5mb': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662931.0.0.0, heap 5242880 bytes at 0x100000000000, watchdog on, node 0 of 1
+--- '1K': osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.662936.0.0.0, heap 1024 bytes at 0x100000000000, watchdog on, node 0 of 1
+##### test_any / wait_until_any fairness
+test_any returned index 0 100000 times, index 3 0 times
+wait_until_any returned index 0 100000 times, index 3 0 times
+##### SHMEM_TEAM_SHARED vs shmem_ptr
+--- map 0,0,0,0
+consistent: SHARED has 4 of 4 PEs
+--- map 0,0,1,1
+consistent: SHARED has 2 of 4 PEs
+--- map 0,1,2,0
+consistent: SHARED has 2 of 4 PEs
+--- map 0,0,1,1 with OSOE_FORCE_REMOTE=1
+osoe: PE 0: no connection toward node 0, which holds PE 1
+osoe: PE 0: control segment /dev/shm/osoe.662985.0.0.0
+PE 0: PE 1 is in SHMEM_TEAM_SHARED but shmem_ptr returns NULL
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: left behind: /dev/shm/osoe.662985.0.wire.0.1.0
+##### lifecycle
+--- map 0,0
+lifecycle: 0 failures (first provided level 2)
+exit 0
+--- map 0,1
+lifecycle: 0 failures (first provided level 2)
+exit 0
+##### calls into an uninitialized library (1 PE)
+--- query          exit 0   initialized=0|thread=2|
+--- info           exit 0   name=osoe|
+--- my_pe          exit 0   my_pe=-1 n_pes=-1|
+--- pe_accessible  exit 0   pe_accessible=0|
+--- ptr            exit 0   ptr=(nil)|
+--- finalize       exit 0   
+--- team_my_pe     exit 0   team_my_pe=0|
+--- malloc         exit 1   osoe-launch: rank 0 killed by signal 11|
+--- free           exit 1   osoe-launch: rank 0 killed by signal 11|
+--- putmem         exit 1   osoe: shmem_putmem: PE 0 is not in 0..4294967295|osoe-launch: rank 0 exited with status 1|
+--- atomic         exit 1   osoe: shmem_long_atomic_inc: PE 0 is not in 0..4294967295|osoe-launch: rank 0 exited with status 1|
+--- wait           exit 1   osoe-launch: rank 0 killed by signal 11|
+--- quiet          exit 0   
+--- barrier_all    exit 1   osoe-launch: rank 0 killed by signal 11|
+--- team_sync      exit 1   osoe-launch: rank 0 killed by signal 11|
+--- +my_pe         exit 0   my_pe=-1 n_pes=-1|
+--- +ptr           exit 1   osoe-launch: rank 0 killed by signal 11|
+--- +malloc        exit 1   osoe-launch: rank 0 killed by signal 11|
+--- +putmem        exit 1   osoe-launch: rank 0 killed by signal 11|
+--- +quiet         exit 0   
+--- +barrier_all   exit 1   osoe-launch: rank 0 killed by signal 11|
+--- +team_my_pe    exit 0   team_my_pe=0|
+##### a fatal error under shmem_init and under start_pes (2 PEs, watchdog on and off)
+--- init OSOE_WATCHDOG=1: exit 1 after 0 s
+osoe: PE 0: shmem_putmem: [0xffffffac63c8, +8) is not within the symmetric heap (symmetric statics are not yet supported)
+osoe: PE 0: control segment /dev/shm/osoe.663210.0.0.0
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+--- init OSOE_WATCHDOG=0: exit 1 after 0 s
+osoe: PE 0: shmem_putmem: [0xffffe6728228, +8) is not within the symmetric heap (symmetric statics are not yet supported)
+osoe: PE 0: control segment /dev/shm/osoe.663219.0.0.0
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+--- start_pes OSOE_WATCHDOG=1: exit 1 after 15 s
+osoe: PE 0: shmem_putmem: [0xffffe432be08, +8) is not within the symmetric heap (symmetric statics are not yet supported)
+osoe: PE 0: control segment /dev/shm/osoe.663228.0.0.0
+osoe-launch: timeout after 15 s; killing 2 process(es)
+osoe-launch: rank 0 killed by signal 9
+--- start_pes OSOE_WATCHDOG=0: exit 1 after 15 s
+osoe: PE 0: shmem_putmem: [0xffffdbd0cc38, +8) is not within the symmetric heap (symmetric statics are not yet supported)
+osoe: PE 0: control segment /dev/shm/osoe.663237.0.0.0
+osoe-launch: timeout after 15 s; killing 2 process(es)
+osoe-launch: rank 0 killed by signal 9
+##### completion seen from a third PE; multi-chunk put-with-signal
+--- map 0,0,0: exit 0
+completion probe: 100 rounds of 65536 bytes
+--- map 0,1,2: exit 0
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+--- map 0,1,1,0: exit 0
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+completion probe: 100 rounds of 65536 bytes
+--- map 0,1,0,1: exit 0
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+completion probe: 100 rounds of 65536 bytes
+##### header properties under C99, C11, C++
+--- -std=c99: ok
+--- -std=c11: ok
+--- -std=c17: ok
+--- c++17: ok
+##### signed and exact-width AMOs
+signed and exact-width AMOs agree
+signed and exact-width AMOs agree

@@ -1,0 +1,43 @@
+[ 97%] Built target osoe-launch
+[ 98%] Built target osoe-stat
+[100%] Built target osoe_segment_test
+16/22 Test  #46: shmem.internode.0-1-2-0-1-0 ................***Failed    0.01 sec
+      Start  47: shmem.differential
+17/22 Test  #47: shmem.differential .........................***Failed    0.02 sec
+      Start  54: shmem.barrier.L1
+18/22 Test  #54: shmem.barrier.L1 ...........................   Passed    0.00 sec
+      Start  55: shmem.barrier.L2
+19/22 Test  #55: shmem.barrier.L2 ...........................   Passed    0.17 sec
+      Start  56: shmem.barrier.L4
+20/22 Test  #56: shmem.barrier.L4 ...........................   Passed    0.48 sec
+      Start 108: shmem.watchdog.barrier.L2
+21/22 Test #108: shmem.watchdog.barrier.L2 ..................   Passed    0.11 sec
+      Start 110: shmem.watchdog.barrier.L4
+22/22 Test #110: shmem.watchdog.barrier.L4 ..................   Passed    0.11 sec
+
+32% tests passed, 15 tests failed out of 22
+
+Label Time Summary:
+tier2    =   1.64 sec*proc (22 tests)
+
+Total Test time (real) =   1.70 sec
+
+The following tests FAILED:
+	 22 - shmem.barrier-am.0-1-2 (Failed)                   tier2
+	 23 - shmem.barrier-am.0-0-1-1-2-2 (Failed)             tier2
+	 24 - shmem.barrier-am.0-0-0-1-2-2 (Failed)             tier2
+	 25 - shmem.barrier-am.0-1-2-0-1-0 (Failed)             tier2
+	 36 - shmem.multinode.0-1-2 (Failed)                    tier2
+	 37 - shmem.multinode.0-0-1-1-2-2 (Failed)              tier2
+	 38 - shmem.multinode.0-0-0-1-2-2 (Failed)              tier2
+	 39 - shmem.multinode.0-1-2-0-1-0 (Failed)              tier2
+	 40 - shmem.multinode.force-remote.0-1-2 (Failed)       tier2
+	 41 - shmem.multinode.force-remote.0-0-1-1-2-2 (Failed) tier2
+	 43 - shmem.internode.0-1-2 (Failed)                    tier2
+	 44 - shmem.internode.0-0-1-1-2-2 (Failed)              tier2
+	 45 - shmem.internode.0-0-0-1-2-2 (Failed)              tier2
+	 46 - shmem.internode.0-1-2-0-1-0 (Failed)              tier2
+	 47 - shmem.differential (Failed)                       tier2
+Errors while running CTest
+Output from these tests are in: /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/build/debug/Testing/Temporary/LastTest.log
+Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.

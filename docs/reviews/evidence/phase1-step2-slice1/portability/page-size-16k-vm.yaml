@@ -1,0 +1,19 @@
+# A throwaway second Lima VM used by the portability review to boot Debian 13's
+# 16 KiB-page arm64 kernel (linux-image-arm64-16k), the closest available stand-in
+# for the Raspberry Pi 5's 16 KiB-page kernel. Created with:
+#   limactl create --name=osoe-16k --mount-only "<repo>/build/scratch/review-portability:w" --tty=false page-size-16k-vm.yaml
+# then: apt install linux-image-arm64-16k, make it the GRUB default, restart.
+base: template:debian-13
+vmType: vz
+cpus: 2
+memory: 3GiB
+disk: 12GiB
+mountType: virtiofs
+provision:
+- mode: system
+  script: |
+    #!/bin/sh
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y build-essential cmake pkgconf liburing-dev iproute2

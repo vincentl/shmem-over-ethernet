@@ -1,0 +1,6 @@
+pe 0: idle cpu before any put 50.0 ms / 2 s; after put+quiet 72.4 ms / 2 s
+pe 1: idle cpu before any put 53.7 ms / 2 s; after put+quiet 72.3 ms / 2 s
+pe 1: idle cpu before any put 65.5 ms / 2 s; after put+quiet 57.1 ms / 2 s
+pe 0: idle cpu before any put 61.4 ms / 2 s; after put+quiet 56.0 ms / 2 s
+pe 1: idle cpu before any put 67.7 ms / 2 s; after put+quiet 64.4 ms / 2 s
+pe 0: idle cpu before any put 50.0 ms / 2 s; after put+quiet 67.4 ms / 2 s

@@ -1,0 +1,22 @@
+[ 11%] Building C object shmem/CMakeFiles/osoe.dir/src/progress.c.o
+[ 41%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/progress.c.o
+[ 50%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/progress.c.o
+Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/build/debug
+    Start 43: shmem.internode.0-1-2
+1/1 Test #43: shmem.internode.0-1-2 ............***Failed   60.01 sec
+osoe-launch: timeout after 60 s; killing 3 process(es)
+osoe-launch: rank 1 killed by signal 9
+osoe-launch: rank 0 killed by signal 9
+osoe-launch: rank 2 killed by signal 9
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+tier2    =  60.01 sec*proc (1 test)
+
+Total Test time (real) =  60.02 sec
+
+The following tests FAILED:
+	 43 - shmem.internode.0-1-2 (Failed)                    tier2
+Errors while running CTest

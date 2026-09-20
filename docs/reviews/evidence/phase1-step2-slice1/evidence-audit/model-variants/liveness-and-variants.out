@@ -1,0 +1,55 @@
+== 1. can every reachable state of each design still terminate?
+wire/design bytes=2 cap=1                                    SC  states=     304 good terminals=   3 states that cannot reach termination=0
+wire/design bytes=3 cap=1                                    SC  states=     559 good terminals=   3 states that cannot reach termination=0
+wire/design bytes=3 cap=2                                    SC  states=   1,319 good terminals=   5 states that cannot reach termination=0
+wire/design bytes=4 cap=2                                    SC  states=   2,182 good terminals=   5 states that cannot reach termination=0
+credit/design pes=1 ops=2 C=1 [descriptors]                  SC  states=      21 good terminals=   1 states that cannot reach termination=0
+credit/design pes=2 ops=1 C=1 [descriptors]                  SC  states=     117 good terminals=   1 states that cannot reach termination=0
+credit/design pes=2 ops=2 C=1 [descriptors]                  SC  states=     545 good terminals=   1 states that cannot reach termination=0
+credit/design pes=2 ops=2 C=2 [descriptors]                  SC  states=   1,279 good terminals=   1 states that cannot reach termination=0
+credit/design nbi pes=1 ops=2 C=1 [descriptors]              SC  states=      29 good terminals=   1 states that cannot reach termination=0
+credit/design nbi pes=1 ops=3 C=2 [descriptors]              SC  states=     156 good terminals=   2 states that cannot reach termination=0
+credit/design pes=1 ops=2 C=1 [landing]                      SC  states=      31 good terminals=   1 states that cannot reach termination=0
+credit/design pes=2 ops=1 C=1 [landing]                      SC  states=     164 good terminals=   1 states that cannot reach termination=0
+credit/design pes=2 ops=2 C=1 [landing]                      SC  states=     888 good terminals=   1 states that cannot reach termination=0
+credit/design pes=2 ops=2 C=2 [landing]                      SC  states=   1,999 good terminals=   1 states that cannot reach termination=0
+credit/design nbi pes=1 ops=2 C=1 [landing]                  SC  states=      43 good terminals=   1 states that cannot reach termination=0
+credit/design nbi pes=1 ops=3 C=2 [landing]                  SC  states=     276 good terminals=   2 states that cannot reach termination=0
+arrival/design members=1 epochs=2                            SC  states=     182 good terminals=   3 states that cannot reach termination=0
+arrival/design members=2 epochs=2                            SC  states=     239 good terminals=   3 states that cannot reach termination=0
+arrival/design members=3 epochs=2                            SC  states=     315 good terminals=   3 states that cannot reach termination=0
+arrival/design members=2 epochs=3                            SC  states=     422 good terminals=   3 states that cannot reach termination=0
+arrival/design members=2 epochs=2                            TSO states=     250 good terminals=   3 states that cannot reach termination=0
+arrival/design members=3 epochs=2                            TSO states=     326 good terminals=   3 states that cannot reach termination=0
+range_watch/design: one variable                             SC  states=      40 good terminals=   2 states that cannot reach termination=0
+range_watch/design: one variable                             TSO states=      40 good terminals=   2 states that cannot reach termination=0
+range_watch/design: two writers                              SC  states=     252 good terminals=   4 states that cannot reach termination=0
+range_watch/design: two writers                              TSO states=     252 good terminals=   4 states that cannot reach termination=0
+range_watch/design: array wait                               SC  states=   4,595 good terminals=   8 states that cannot reach termination=0
+range_watch/design: array wait                               TSO states=   4,595 good terminals=   8 states that cannot reach termination=0
+range_watch/design: range straddling a block boundary        SC  states=     423 good terminals=   4 states that cannot reach termination=0
+range_watch/design: range straddling a block boundary        TSO states=     423 good terminals=   4 states that cannot reach termination=0
+range_watch/design: two waits in turn                        SC  states=     432 good terminals=   9 states that cannot reach termination=0
+range_watch/design: two waits in turn                        TSO states=     432 good terminals=   9 states that cannot reach termination=0
+   every design state can terminate
+
+== 2. engine blind spot: a wire reader that never advances
+wire/noadvance bytes=2 cap=2 (reader delivers byte 0 forever) SC  states=        343 depth= 60 (    0.0s, miss<7e-25) -> ok
+wire/noadvance bytes=2 cap=2, AG EF termination              SC  states=     343 good terminals=   0 states that cannot reach termination=343
+
+== 3. arrival: the wake bump as a plain load+store, under TSO and SC
+arrival/plainwake members=2 epochs=2                         SC  states=        414 depth= 36 (    0.0s, miss<1e-24) -> ok
+arrival/plainwake members=2 epochs=2                         TSO states=        532 depth= 40 (    0.0s, miss<2e-24) -> ok
+arrival/plainwake members=3 epochs=2                         TSO states=        701 depth= 44 (    0.0s, miss<3e-24) -> ok
+arrival/plainwake members=2 epochs=3                         TSO states=      1,162 depth= 60 (    0.0s, miss<9e-24) -> ok
+
+== 4. arrival: is order()'s 'lost' branch reachable? consume_reread with the POSTED check removed
+arrival/consume_reread-no-posted-check members=2 epochs=2    SC  states=        126 depth= 36 (    0.0s, miss<1e-25) -> STUCK
+    T0 blocked at pc 17 (await)
+    trace: T2:load ('wake',)->0 ; T2:load ('handoff',)->0 ; T2:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T0:futex_wake ('wake',) ; T2:load ('wake',)->1 ; T2:load ('handoff',)->1 
+arrival/consume_reread-no-posted-check members=2 epochs=3    SC  states=        144 depth= 54 (    0.0s, miss<1e-25) -> STUCK
+    T0 blocked at pc 26 (await)
+    trace: T2:load ('wake',)->0 ; T2:load ('handoff',)->0 ; T2:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T0:futex_wake ('wake',) ; T2:load ('wake',)->1 ; T2:load ('handoff',)->1 
+arrival/consume_reread-no-posted-check members=3 epochs=3    SC  states=        175 depth= 60 (    0.0s, miss<2e-25) -> STUCK
+    T0 blocked at pc 26 (await)
+    trace: T3:load ('wake',)->0 ; T3:load ('handoff',)->0 ; T3:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:add ('arrived',)->3 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T0:futex_wake ('wake',) ; T3:load ('wake',)->1 ;

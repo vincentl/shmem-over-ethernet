@@ -1,0 +1,37 @@
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: left behind: /dev/shm/osoe.643607.0.wire.0.1.0
+osoe-launch: left behind: /dev/shm/osoe.643607.0.0.conn.0
+osoe-launch: left behind: /dev/shm/osoe.643607.0.1.conn.0
+osoe-launch: left behind: /dev/shm/osoe.643607.0.job.0
+osoe-launch: left behind: /dev/shm/osoe.643607.0.0.0
+osoe-launch: left behind: /dev/shm/osoe.643607.0.1.0
+exit=1
+----
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: left behind: /dev/shm/osoe.643621.0.wire.0.1.0
+osoe-launch: left behind: /dev/shm/osoe.643621.0.0.conn.0
+osoe-launch: left behind: /dev/shm/osoe.643621.0.1.conn.0
+osoe-launch: left behind: /dev/shm/osoe.643621.0.job.0
+osoe-launch: left behind: /dev/shm/osoe.643621.0.0.0
+osoe-launch: left behind: /dev/shm/osoe.643621.0.1.0
+exit=1
+----
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: left behind: /dev/shm/osoe.643635.0.wire.0.1.0
+osoe-launch: left behind: /dev/shm/osoe.643635.0.0.conn.0
+osoe-launch: left behind: /dev/shm/osoe.643635.0.1.conn.0
+osoe-launch: left behind: /dev/shm/osoe.643635.0.job.0
+osoe-launch: left behind: /dev/shm/osoe.643635.0.1.0
+osoe-launch: left behind: /dev/shm/osoe.643635.0.0.0
+exit=1
+----
+62
+exit=0
+osoe: PE 0: no connection toward node 0, which holds PE 1
+osoe: PE 0: control segment /dev/shm/osoe.643948.0.0.0
+osoe: PE 1: no connection toward node 0, which holds PE 0
+osoe: PE 1: control segment /dev/shm/osoe.643948.0.0.0
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 1 exited with status 1

@@ -1,0 +1,13 @@
+[100%] Built target shmem_test_info
+== one put + quiet: 0, then 500 ms of application sleep
+review: node 0 segments_sent=4 acks_only=0 segments_applied=4
+review: node 1 segments_sent=4 acks_only=0 segments_applied=4
+== one put + quiet: 0, then 2000 ms of application sleep
+review: node 0 segments_sent=4 acks_only=0 segments_applied=4
+review: node 1 segments_sent=4 acks_only=0 segments_applied=4
+== one put + quiet: 1, then 500 ms of application sleep
+review: node 0 segments_sent=1302 acks_only=1297 segments_applied=1300
+review: node 1 segments_sent=1301 acks_only=1297 segments_applied=1302
+== one put + quiet: 1, then 2000 ms of application sleep
+review: node 0 segments_sent=4973 acks_only=4969 segments_applied=4974
+review: node 1 segments_sent=4974 acks_only=4970 segments_applied=4974

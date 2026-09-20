@@ -1,0 +1,26 @@
+[ 11%] Building C object shmem/CMakeFiles/osoe.dir/src/watch.c.o
+../../shmem/src/connection-area.h:71:#define OSOE_AM_MIN_CREDITS     1u
+credits=1 map=0,1,2 rep=1 rc=0 
+credits=1 map=0,1,2 rep=2 rc=0 
+credits=1 map=0,1,2 rep=3 rc=0 
+credits=1 map=0,0,1,1,2,2 rep=1 rc=0 
+credits=1 map=0,0,1,1,2,2 rep=2 rc=0 
+credits=1 map=0,0,1,1,2,2 rep=3 rc=0 
+credits=1 map=0,0,0,1,2,2 rep=1 rc=0 
+credits=1 map=0,0,0,1,2,2 rep=2 rc=0 
+credits=1 map=0,0,0,1,2,2 rep=3 rc=0 
+credits=1 map=0,1,2,0,1,0 rep=1 rc=0 
+credits=1 map=0,1,2,0,1,0 rep=2 rc=0 
+credits=1 map=0,1,2,0,1,0 rep=3 rc=0 
+credits=2 map=0,1,2 rep=1 rc=0 
+credits=2 map=0,1,2 rep=2 rc=0 
+credits=2 map=0,1,2 rep=3 rc=0 
+credits=2 map=0,0,1,1,2,2 rep=1 rc=0 
+credits=2 map=0,0,1,1,2,2 rep=2 rc=0 
+credits=2 map=0,0,1,1,2,2 rep=3 rc=0 
+credits=2 map=0,0,0,1,2,2 rep=1 rc=0 
+credits=2 map=0,0,0,1,2,2 rep=2 rc=0 
+credits=2 map=0,0,0,1,2,2 rep=3 rc=0 
+credits=2 map=0,1,2,0,1,0 rep=1 rc=0 
+credits=2 map=0,1,2,0,1,0 rep=2 rc=0 
+credits=2 map=0,1,2,0,1,0 rep=3 rc=0 

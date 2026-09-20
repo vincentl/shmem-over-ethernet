@@ -1,0 +1,20 @@
+--- /Users/vincent/shmem-over-ethernet/shmem/src/progress.c	2026-09-20 13:05:35
++++ /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/src/progress.c	2026-09-20 17:03:35
+@@ -217,7 +217,7 @@
+                        "epochs have diverged", m.team, p->arrival_epoch[m.team], m.epoch);
+         p->arrivals[m.team]++;
+         p->barrier_arrivals++;
+-        if (p->arrivals[m.team] == p->participants[m.team]) {
++        if (p->arrivals[m.team] >= 1) {
+             p->arrivals[m.team] = 0;
+             /*
+              * Release everyone. A handler may enqueue but never reserve (§3.7),
+@@ -663,7 +663,7 @@
+             p->arrival_epoch[team] = epoch;
+         p->arrivals[team]++;
+         p->barrier_arrivals++;
+-        if (p->arrivals[team] == participants) {
++        if (p->arrivals[team] >= 1) {
+             p->arrivals[team] = 0;
+             for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
+                 struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE, .origin_pe = team,

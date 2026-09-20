@@ -1,0 +1,10 @@
+--- /Users/vincent/shmem-over-ethernet/shmem/src/watch.c	2026-09-20 13:05:35
++++ /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/src/watch.c	2026-09-20 17:05:58
+@@ -92,6 +92,5 @@
+      * that the waiter's predicate then rejects cost a locked instruction and a
+      * futex_wake syscall on a path whose floor is a memcpy (§8.4). */
+     osoe_count(OSOE_C_TRANSPORT_NOTIFY_WAKES, 1);
+-    atomic_fetch_add_explicit(&slot->watch_seq, 1, memory_order_seq_cst);
+-    osoe_futex_wake(&slot->watch_seq, INT_MAX, OSOE_FUTEX_SHARED);
++    (void)0;
+ }

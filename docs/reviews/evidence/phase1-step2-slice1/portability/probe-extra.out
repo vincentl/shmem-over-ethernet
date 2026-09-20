@@ -1,0 +1,12 @@
+=== osoe
+info page size 4096, a stack address needs 48 bits
+info /dev/shm: 3968 MiB free - heaps are sparse tmpfs files, so L x SHMEM_SYMMETRIC_SIZE beyond this is SIGBUS on first touch, not an error at init
+ok   shm_open O_EXCL                                      /osoe-probe-extra.654015
+ok   MAP_FIXED_NOREPLACE refuses an occupied address      File exists
+ok   io_uring ring                                        r=0
+ok   pidfd_open                                           
+ok   uring FUTEX_WAIT, shared word, woken by another process res=0, child says woke=1
+ok   uring POLL_ADD on a pidfd reports the exit           res=1
+PROBE-EXTRA PASSED (0 failures)
+=== osoe-16k
+not run: the evidence directory is outside that VM's mount, and the review's budget ended first.

@@ -1,0 +1,69 @@
+## direct includes
+accessible.c: export.h state.h symmetric.h 
+agent.c: agent.h base/deadline.h base/futex.h blocked.h fatal.h metrics.h progress-host.h 
+allocator.c: allocator.h 
+am.c: am.h fatal.h 
+amo.c: export.h metrics.h symmetric.h team.h transport.h 
+barrier.c: barrier.h blocked.h metrics.h base/epoch.h progress-host.h export.h fatal.h state.h team.h transport.h 
+bootstrap.c: base/environment.h base/size.h bootstrap.h fatal.h watch-range.h watchdog.h 
+connection-area.c: base/cacheline.h base/deadline.h base/environment.h base/futex.h connection-area.h fatal.h 
+connection.c: connection.h 
+deprecated.c: export.h 
+fatal.c: fatal.h state.h 
+info.c: export.h 
+init.c: agent.h barrier.h export.h fatal.h job.h progress-host.h state.h transport.h 
+job.c: am.h base/cacheline.h base/deadline.h base/environment.h base/futex.h fatal.h job.h 
+malloc.c: allocator.h barrier.h export.h fatal.h metrics.h state.h symmetric.h transport.h 
+metrics.c: base/counters.h base/environment.h fatal.h blocked.h metrics.h node.h state.h 
+node.c: base/deadline.h base/futex.h fatal.h connection-area.h metrics.h node.h 
+profile.c: export.h 
+progress-host.c: base/deadline.h base/epoch.h base/futex.h connection-area.h fatal.h job.h node.h progress.h progress-host.h state.h transport.h wire.h 
+progress.c: base/futex.h fatal.h progress.h rmw.h 
+quiet.c: export.h metrics.h symmetric.h team.h transport.h 
+reply.c: fatal.h reply.h 
+rma.c: export.h state.h symmetric.h team.h transport.h 
+session.c: export.h team.h 
+signal.c: export.h fatal.h metrics.h symmetric.h team.h transport.h wait.h 
+symmetric.c: fatal.h state.h symmetric.h 
+team.c: export.h fatal.h state.h symmetric.h team.h transport.h 
+transport-am.c: am.h base/deadline.h base/futex.h base/order.h blocked.h connection-area.h fatal.h job.h metrics.h node.h progress.h progress-host.h state.h transport.h transport-local.h 
+transport-local.c: base/order.h fatal.h job.h metrics.h state.h rmw.h transport.h transport-local.h 
+wait.c: base/deadline.h base/sweep.h blocked.h export.h fatal.h metrics.h symmetric.h transport.h wait.h 
+watch.c: base/deadline.h base/futex.h fatal.h metrics.h state.h transport.h watch-range.h 
+watchdog.c: base/sweep.h fatal.h state.h 
+wire.c: base/cacheline.h base/environment.h base/futex.h fatal.h wire.h 
+
+## transitive closure, AM-layer headers reached
+accessible.c (OSOE_API entry points: 2):  am.h connection.h connection-area.h wire.h reply.h progress.h
+agent.c (OSOE_API entry points: 0):  progress-host.h
+allocator.c (OSOE_API entry points: 0):  none
+am.c (OSOE_API entry points: 0):  am.h connection.h reply.h
+amo.c (OSOE_API entry points: 26):  am.h connection.h connection-area.h wire.h reply.h progress.h
+barrier.c (OSOE_API entry points: 3):  am.h connection.h connection-area.h wire.h reply.h progress.h progress-host.h
+bootstrap.c (OSOE_API entry points: 0):  none
+connection-area.c (OSOE_API entry points: 0):  connection.h connection-area.h reply.h
+connection.c (OSOE_API entry points: 0):  connection.h reply.h
+deprecated.c (OSOE_API entry points: 13):  none
+fatal.c (OSOE_API entry points: 0):  am.h connection.h connection-area.h wire.h reply.h progress.h
+info.c (OSOE_API entry points: 2):  none
+init.c (OSOE_API entry points: 7):  am.h connection.h connection-area.h wire.h reply.h progress.h progress-host.h
+job.c (OSOE_API entry points: 0):  am.h connection.h reply.h
+malloc.c (OSOE_API entry points: 6):  am.h connection.h connection-area.h wire.h reply.h progress.h
+metrics.c (OSOE_API entry points: 0):  am.h connection.h connection-area.h wire.h reply.h progress.h
+node.c (OSOE_API entry points: 0):  connection.h connection-area.h reply.h
+profile.c (OSOE_API entry points: 1):  none
+progress-host.c (OSOE_API entry points: 0):  am.h connection.h connection-area.h wire.h reply.h progress.h progress-host.h
+progress.c (OSOE_API entry points: 0):  am.h connection.h connection-area.h wire.h reply.h progress.h
+quiet.c (OSOE_API entry points: 6):  am.h connection.h connection-area.h wire.h reply.h progress.h
+reply.c (OSOE_API entry points: 0):  reply.h
+rma.c (OSOE_API entry points: 5):  am.h connection.h connection-area.h wire.h reply.h progress.h
+session.c (OSOE_API entry points: 2):  none
+signal.c (OSOE_API entry points: 8):  am.h connection.h connection-area.h wire.h reply.h progress.h
+symmetric.c (OSOE_API entry points: 0):  am.h connection.h connection-area.h wire.h reply.h progress.h
+team.c (OSOE_API entry points: 12):  am.h connection.h connection-area.h wire.h reply.h progress.h
+transport-am.c (OSOE_API entry points: 0):  am.h connection.h connection-area.h wire.h reply.h progress.h progress-host.h
+transport-local.c (OSOE_API entry points: 0):  am.h connection.h connection-area.h wire.h reply.h progress.h
+wait.c (OSOE_API entry points: 17):  am.h connection.h connection-area.h wire.h reply.h progress.h
+watch.c (OSOE_API entry points: 0):  am.h connection.h connection-area.h wire.h reply.h progress.h
+watchdog.c (OSOE_API entry points: 0):  am.h connection.h connection-area.h wire.h reply.h progress.h
+wire.c (OSOE_API entry points: 0):  wire.h

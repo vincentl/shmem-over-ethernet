@@ -1,0 +1,3 @@
+drain_reserve ok=1 off=32  head=96 filled=64  sendable=0
+after open: head=32 (the reply was at offset 32..96)
+first writer reservation lands at offset 32: ON TOP OF THE DRAINED REPLY

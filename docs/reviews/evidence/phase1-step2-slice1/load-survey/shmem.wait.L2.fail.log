@@ -1,0 +1,33 @@
+Internal ctest changing into directory: /Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/build/release
+Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/build/release
+    Start 70: shmem.wait.L2
+    Test #70: shmem.wait.L2 ....................   Passed    0.18 sec
+    Start 70: shmem.wait.L2
+    Test #70: shmem.wait.L2 ....................   Passed    0.31 sec
+    Start 70: shmem.wait.L2
+    Test #70: shmem.wait.L2 ....................   Passed    0.21 sec
+    Start 70: shmem.wait.L2
+    Test #70: shmem.wait.L2 ....................   Passed    0.20 sec
+    Start 70: shmem.wait.L2
+    Test #70: shmem.wait.L2 ....................   Passed    0.22 sec
+    Start 70: shmem.wait.L2
+    Test #70: shmem.wait.L2 ....................***Failed   60.02 sec
+/Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/shmem/tests/test-wait.c:39: CHECK(shmem_uint64_test(flag, SHMEM_CMP_EQ, 0) == 1) failed
+/Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/shmem/tests/test-wait.c:40: CHECK(shmem_uint64_test(flag, SHMEM_CMP_NE, 0) == 0) failed
+osoe-launch: timeout after 60 s; killing 2 process(es)
+osoe-launch: rank 0 killed by signal 9
+osoe-launch: rank 1 killed by signal 9
+osoe-launch: left behind: /dev/shm/osoe.683763.0.job.0
+osoe-launch: left behind: /dev/shm/osoe.683763.0.0.0
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+tier2    =  60.02 sec*proc (1 test)
+
+Total Test time (real) =  61.19 sec
+
+The following tests FAILED:
+	 70 - shmem.wait.L2 (Failed)                            tier2
+Errors while running CTest

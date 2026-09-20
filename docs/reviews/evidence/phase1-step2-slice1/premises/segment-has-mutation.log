@@ -1,0 +1,36 @@
+[100%] Built target osoe_segment_test
+[100%] Built target osoe-stat
+[ 20%] Built target osoe_base
+[ 95%] Built target osoe
+[100%] Built target shmem_test_stat
+[ 20%] Built target osoe_base
+[ 95%] Built target osoe
+[100%] Built target shmem_test_landing
+6/9 Test #107: shmem.stat.L4 ....................   Passed    0.38 sec
+    Start 129: stat.segment
+7/9 Test #129: stat.segment .....................   Passed    0.00 sec
+    Start 130: stat.absent
+8/9 Test #130: stat.absent ......................   Passed    0.00 sec
+    Start 131: stat.help
+9/9 Test #131: stat.help ........................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 9
+
+Label Time Summary:
+tier1    =   0.01 sec*proc (3 tests)
+tier2    =   0.76 sec*proc (6 tests)
+
+Total Test time (real) =   0.80 sec
+[100%] Built target osoe_segment_test
+--- older writer (directory_bytes=112), fixed reader:
+exit=0
+--- newer writer (directory_bytes=200), fixed reader:
+exit=0
+[100%] Built target osoe_segment_test
+--- older writer (112) against the PRE-FIX reader check:
+/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:206: CHECK(s.table_usable) failed
+/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:210: CHECK(osoe_segment_read_name(&s, "node.world_size", 0, &v) && v == 7) failed
+/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:211: CHECK(osoe_segment_read_name(&s, "pe.rank", 0, &v) && v == 40) failed
+/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:212: CHECK(osoe_segment_read_name(&s, "pe.rank", 1, &v) && v == 41) failed
+/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:213: CHECK(osoe_segment_read_name(&s, "pe.sweeps", 1, &v) && v == 1001) failed
+exit=0

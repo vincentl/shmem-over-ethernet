@@ -1,0 +1,4 @@
+16k debug: 100% tests passed, 0 tests failed out of 131
+16k release: 100% tests passed, 0 tests failed out of 131
+16k asan: 100% tests passed, 0 tests failed out of 131
+16k tsan: every test fails at start-up: 'FATAL: ThreadSanitizer: unsupported VMA range / Found 47 - Supported 39, 42 and 48' (Debian linux-image-arm64-16k 6.12.107, CONFIG_ARM64_VA_BITS=52, user VA 47 bits)

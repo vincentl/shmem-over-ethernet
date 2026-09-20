@@ -1,0 +1,13 @@
+ 13:47:05 up 20:58,  1 user,  load average: 3.67, 2.88, 1.47
+## map 0,0
+barrier_all, 2 PEs, seen by PE 0             min      509.0  p10     2674.0  med     6324.0  p90    34334.0  max      93710.0 ns/op
+## map 0,0,0,0
+barrier_all, 4 PEs, seen by PE 0             min     6027.0  p10     6876.0  med    32976.0  p90    44011.0  max     212375.0 ns/op
+## map 0,1
+barrier_all, 2 PEs, seen by PE 0             min    22239.0  p10   336698.0  med   355018.0  p90   658576.0  max     817546.0 ns/op
+## map 0,1,2
+barrier_all, 3 PEs, seen by PE 0             min    42940.0  p10   308539.0  med   364393.0  p90   670730.0  max    4254321.0 ns/op
+## map 0,1,2,3
+barrier_all, 4 PEs, seen by PE 0             min    34047.0  p10   312095.0  med   389720.0  p90   662430.0  max   10809043.0 ns/op
+## map 0,0,1,1
+barrier_all, 4 PEs, seen by PE 0             min    24725.0  p10   327125.0  med   356711.0  p90   659704.0  max     760504.0 ns/op

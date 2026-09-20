@@ -1,0 +1,100 @@
+--- ../tree/shmem/src/progress.c	2026-09-20 13:05:35
++++ shmem/src/progress.c	2026-09-20 13:48:26
+@@ -1,6 +1,8 @@
+ #include <stdatomic.h>
+ #include <limits.h>
+ #include <string.h>
++#include <stdlib.h>
++#include <time.h>
+ 
+ #include "base/futex.h"
+ #include "fatal.h"
+@@ -439,12 +441,13 @@
+     struct osoe_am_segment_header sh = {
+         .seq = atomic_load_explicit(&conn->s->buffer[k].seq, memory_order_acquire),
+         .ack = c->applied,
+-        .flags = c->owe_ack ? OSOE_AM_SEGMENT_ACK_REQUESTED : 0,
++        .flags = c->want_ack ? OSOE_AM_SEGMENT_ACK_REQUESTED : 0,
+         .message_count = count,
+         .total_len = bytes,
+     };
+     memcpy(base, &sh, sizeof sh);
+     c->owe_ack = false;
++    c->want_ack = false;
+ }
+ 
+ static bool flush(struct osoe_progress *p, uint32_t slot)
+@@ -465,7 +468,7 @@
+      * particular segment.
+      */
+     if (osoe_connection_take_ack_request(conn))
+-        c->owe_ack = true;
++        c->want_ack = true;
+     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
+ 
+     /* Finish an in-flight send. A short write is the normal case (§3.3): keep
+@@ -492,7 +495,14 @@
+     if (c->sending == OSOE_CONNECTION_NONE && c->sealed != OSOE_CONNECTION_NONE) {
+         uint32_t bytes;
+         if (osoe_connection_sendable(conn, c->sealed, &bytes)) {
++            bool review_flagged = c->want_ack;
+             finalize(p, slot, conn, c->sealed, bytes);
++            /* REVIEW INJECTION: the lead is descheduled for a moment before it
++             * sends a segment that carries no acknowledgement request. */
++            if (!review_flagged && bytes > header && getenv("OSOE_REVIEW_DELAY_US")) {
++                struct timespec d = { 0, atol(getenv("OSOE_REVIEW_DELAY_US")) * 1000L };
++                nanosleep(&d, NULL);
++            }
+             c->sending = c->sealed;
+             c->sealed = OSOE_CONNECTION_NONE;
+             c->state[c->sending] = OSOE_BUFFER_SENDING;
+@@ -512,7 +522,7 @@
+     if (c->sealed == OSOE_CONNECTION_NONE && c->open != OSOE_CONNECTION_NONE) {
+         uint32_t used = OSOE_BUFFER_USED(
+             atomic_load_explicit(&conn->s->buffer[c->open].head, memory_order_acquire));
+-        if (used > header || c->owe_ack) {
++        if (used > header || c->owe_ack || c->want_ack) {
+             if (used == header)
+                 p->acks_only++;     /* a header-only segment: §3.4's ack-only */
+             osoe_connection_seal(conn, c->open);
+@@ -535,6 +545,13 @@
+                 break;
+             }
+     }
++    /* REVIEW INJECTION: a long pass - the rest of a loop over many peers, or
++     * the lead descheduled - between sealing one buffer and the next pass. */
++    if (c->sealed != OSOE_CONNECTION_NONE && c->open != OSOE_CONNECTION_NONE &&
++        getenv("OSOE_REVIEW_PASS_US")) {
++        struct timespec d = { 0, atol(getenv("OSOE_REVIEW_PASS_US")) * 1000L };
++        nanosleep(&d, NULL);
++    }
+     return moved;
+ }
+ 
+@@ -610,14 +627,14 @@
+ void osoe_progress_forget_acks(struct osoe_progress *p)
+ {
+     for (uint32_t slot = 0; slot + 1 < p->nodes; slot++)
+-        p->connection[slot].owe_ack = false;
++        p->connection[slot].owe_ack = p->connection[slot].want_ack = false;
+ }
+ 
+ void osoe_progress_request_ack(struct osoe_progress *p, uint32_t peer)
+ {
+     uint32_t slot = osoe_progress_slot(p, peer);
+     if (slot != OSOE_CONNECTION_NONE)
+-        p->connection[slot].owe_ack = true;
++        p->connection[slot].want_ack = true;
+ }
+ 
+ /*
+--- ../tree/shmem/src/progress.h	2026-09-20 13:05:35
++++ shmem/src/progress.h	2026-09-20 13:45:04
+@@ -83,6 +83,7 @@
+     uint64_t applied;               /* highest sequence number applied from the peer */
+     uint64_t acked;                 /* highest the peer says it has applied */
+     bool owe_ack;                   /* the peer asked; a segment must carry one */
++    bool want_ack;                  /* a local writer asked; the next segment carries the request */
+     struct osoe_am_parser parser;
+     struct osoe_reply_queues queues;
+ };

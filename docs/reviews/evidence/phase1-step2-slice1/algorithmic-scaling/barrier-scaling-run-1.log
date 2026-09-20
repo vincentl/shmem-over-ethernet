@@ -1,0 +1,17 @@
+ 13:45:20 up 20:56,  1 user,  load average: 4.37, 2.16, 1.07
+# internode star: one PE per logical node
+map nodes=2 L=1: pes 2 rounds 1000 mean_us 573.8 max_us 23355.2
+map nodes=3 L=1: pes 3 rounds 1000 mean_us 625.2 max_us 7108.0
+map nodes=4 L=1: pes 4 rounds 1000 mean_us 765.0 max_us 13634.6
+map nodes=6 L=1: pes 6 rounds 1000 mean_us 1248.5 max_us 52808.8
+map nodes=8 L=1: pes 8 rounds 1000 mean_us 934.4 max_us 16802.8
+map nodes=12 L=1: pes 12 rounds 1000 mean_us 1157.6 max_us 97466.9
+map nodes=16 L=1: pes 16 rounds 1000 mean_us 933.4 max_us 15428.8
+# intranode: one logical node, L PEs
+map nodes=1 L=1: pes 1 rounds 1000 mean_us 0.4 max_us 14.7
+map nodes=1 L=2: pes 2 rounds 1000 mean_us 5.7 max_us 2425.7
+map nodes=1 L=4: pes 4 rounds 1000 mean_us 21.8 max_us 7277.5
+map nodes=1 L=8: pes 8 rounds 1000 mean_us 48.5 max_us 1194.7
+map nodes=1 L=16: pes 16 rounds 1000 mean_us 64.3 max_us 4142.1
+map nodes=1 L=32: pes 32 rounds 1000 mean_us 105.0 max_us 2471.9
+ 13:45:28 up 20:56,  1 user,  load average: 5.22, 2.37, 1.14

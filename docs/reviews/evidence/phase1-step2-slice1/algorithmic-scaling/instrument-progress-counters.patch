@@ -1,0 +1,22 @@
+--- shmem/src/progress-host.c	2026-09-20 13:05:35
++++ build/scratch/review-algorithmic-scaling/tree/shmem/src/progress-host.c	2026-09-20 13:48:54
+@@ -4,6 +4,7 @@
+  * See progress-host.h for what this is and why it is separate from progress.c.
+  */
+ #include <stdatomic.h>
++#include <stdio.h>
+ #include <stdlib.h>
+ 
+ #include "base/deadline.h"
+@@ -295,6 +296,11 @@
+     if (!osoe.internode)
+         return;
+     if (osoe.lead) {
++        fprintf(stderr, "REVIEW node %u: segments_sent %llu acks_only %llu segments_applied %llu messages_applied %llu\n",
++                osoe.job.node, (unsigned long long)osoe.progress.segments_sent,
++                (unsigned long long)osoe.progress.acks_only,
++                (unsigned long long)osoe.progress.segments_applied,
++                (unsigned long long)osoe.progress.messages_applied);
+         flush_before_close();
+         /*
+          * Announce to every peer first and only then wait (wire.h), or this

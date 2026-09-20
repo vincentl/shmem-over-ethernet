@@ -1,0 +1,23 @@
+ 13:52:37 up 21:04,  1 user,  load average: 5.21, 3.70, 2.17
+## OSOE_WIRE_BYTES=16384
+pressure 0 (32768-byte puts): 11435 gets in 4 s; us: min 2 p10 291 med 316 p90 435 p99 680 max 4049
+PE 3: 4591 puts of 32768 bytes (28.7 MiB/s)
+PE 2: 4716 puts of 32768 bytes (29.5 MiB/s)
+pressure 1 (32768-byte puts): 1263 gets in 4 s; us: min 291 p10 3005 med 3142 p90 3396 p99 3615 max 7447
+PE 2: 152020 puts of 1024 bytes (29.7 MiB/s)
+PE 3: 152326 puts of 1024 bytes (29.8 MiB/s)
+pressure 1 (1024-byte puts): 3883 gets in 4 s; us: min 20 p10 559 med 865 p90 1663 p99 3630 max 5328
+PE 2: 2156 puts of 65000 bytes (26.7 MiB/s)
+PE 3: 2183 puts of 65000 bytes (27.1 MiB/s)
+pressure 1 (65000-byte puts): 870 gets in 4 s; us: min 292 p10 4056 med 4418 p90 5066 p99 9948 max 45525
+## OSOE_WIRE_BYTES=4194304
+pressure 0 (32768-byte puts): 9695 gets in 4 s; us: min 24 p10 309 med 345 p90 646 p99 726 max 32365
+PE 3: 117096 puts of 32768 bytes (731.9 MiB/s)
+pressure 1 (32768-byte puts): 12838 gets in 4 s; us: min 15 p10 289 med 307 p90 342 p99 430 max 1999
+PE 2: 118041 puts of 32768 bytes (737.8 MiB/s)
+PE 3: 1952634 puts of 1024 bytes (381.4 MiB/s)
+PE 2: 1948535 puts of 1024 bytes (380.6 MiB/s)
+pressure 1 (1024-byte puts): 13010 gets in 4 s; us: min 14 p10 286 med 305 p90 335 p99 380 max 1638
+PE 3: 79769 puts of 65000 bytes (989.0 MiB/s)
+PE 2: 78869 puts of 65000 bytes (977.8 MiB/s)
+pressure 1 (65000-byte puts): 12686 gets in 4 s; us: min 15 p10 292 med 312 p90 345 p99 415 max 4049

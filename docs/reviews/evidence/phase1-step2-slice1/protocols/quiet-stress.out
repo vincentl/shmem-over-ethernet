@@ -1,0 +1,47 @@
+== tree run 1
+stress: 20000 rounds of put, put, quiet completed
+review: node 0 segments_sent=41122 acks_only=20482 segments_applied=21173
+review: node 1 segments_sent=21174 acks_only=21169 segments_applied=41122
+== tree run 2
+stress: 20000 rounds of put, put, quiet completed
+review: node 1 segments_sent=23064 acks_only=23059 segments_applied=49636
+review: node 0 segments_sent=49636 acks_only=24550 segments_applied=23063
+== tree run 3
+stress: 20000 rounds of put, put, quiet completed
+review: node 0 segments_sent=46864 acks_only=23245 segments_applied=23261
+review: node 1 segments_sent=23262 acks_only=23257 segments_applied=46864
+== tree-naive run 1
+stress: 20000 rounds of put, put, quiet completed
+review: node 0 segments_sent=34657 acks_only=6906 segments_applied=20005
+review: node 1 segments_sent=20005 acks_only=20000 segments_applied=34657
+== tree-naive run 2
+stress: 20000 rounds of put, put, quiet completed
+review: node 0 segments_sent=20757 acks_only=311 segments_applied=20005
+review: node 1 segments_sent=20005 acks_only=20000 segments_applied=20757
+== tree-naive run 3
+stress: 20000 rounds of put, put, quiet completed
+review: node 0 segments_sent=21124 acks_only=388 segments_applied=20005
+review: node 1 segments_sent=20005 acks_only=20000 segments_applied=21125
+== tree-naive run 1, with the lead descheduled 3 ms before sending an unflagged segment (OSOE_REVIEW_DELAY_US=3000)
+stress: 2000 rounds of put, put, quiet completed
+review: node 0 segments_sent=2006 acks_only=0 segments_applied=2005
+review: node 1 segments_sent=2005 acks_only=2000 segments_applied=2007
+== tree-naive run 2, with the lead descheduled 3 ms before sending an unflagged segment (OSOE_REVIEW_DELAY_US=3000)
+stress: 2000 rounds of put, put, quiet completed
+review: node 0 segments_sent=2009 acks_only=1 segments_applied=2005
+review: node 1 segments_sent=2005 acks_only=2000 segments_applied=2010
+== tree-naive run 3, with the lead descheduled 3 ms before sending an unflagged segment (OSOE_REVIEW_DELAY_US=3000)
+stress: 2000 rounds of put, put, quiet completed
+review: node 0 segments_sent=2006 acks_only=1 segments_applied=2005
+review: node 1 segments_sent=2005 acks_only=2000 segments_applied=2007
+== tree-naive run 4 (full output head), OSOE_REVIEW_PASS_US=3000 OSOE_REVIEW_DELAY_US=3000
+osoe: PE 0: node 1 has not acknowledged this PE's writes after 10 s
+osoe: PE 0: control segment /dev/shm/osoe.651609.0.0.0
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+== tree-naive run 5 (full output head), OSOE_REVIEW_PASS_US=3000 OSOE_REVIEW_DELAY_US=3000
+osoe: PE 0: node 1 has not acknowledged this PE's writes after 10 s
+osoe: PE 0: control segment /dev/shm/osoe.651667.0.0.0
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+48

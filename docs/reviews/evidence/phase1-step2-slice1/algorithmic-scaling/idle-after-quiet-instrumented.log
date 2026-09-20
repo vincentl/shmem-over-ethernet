@@ -1,0 +1,33 @@
+[100%] Built target osoe
+pe 1: idle cpu before any put 69.5 ms / 2 s; after put+quiet 62.9 ms / 2 s
+pe 0: idle cpu before any put 48.5 ms / 2 s; after put+quiet 59.5 ms / 2 s
+REVIEW node 0: segments_sent 5972 acks_only 5966 segments_applied 5971 messages_applied 5
+REVIEW node 1: segments_sent 5972 acks_only 5967 segments_applied 5972 messages_applied 6
+pe 0: idle cpu before any put 55.6 ms / 2 s; after put+quiet 54.3 ms / 2 s
+pe 1: idle cpu before any put 51.5 ms / 2 s; after put+quiet 54.4 ms / 2 s
+REVIEW node 0: segments_sent 6546 acks_only 6540 segments_applied 6546 messages_applied 5
+REVIEW node 1: segments_sent 6547 acks_only 6542 segments_applied 6546 messages_applied 6
+pe 0: idle cpu before any put 47.0 ms / 2 s; after put+quiet 52.1 ms / 2 s
+pe 1: idle cpu before any put 47.1 ms / 2 s; after put+quiet 51.1 ms / 2 s
+REVIEW node 0: segments_sent 6373 acks_only 6367 segments_applied 6374 messages_applied 5
+REVIEW node 1: segments_sent 6375 acks_only 6370 segments_applied 6373 messages_applied 6
+## control: no put
+pe 1: idle cpu before any put 46.8 ms / 2 s; after put+quiet 44.9 ms / 2 s
+pe 0: idle cpu before any put 47.9 ms / 2 s; after put+quiet 44.4 ms / 2 s
+REVIEW node 0: segments_sent 5 acks_only 0 segments_applied 5 messages_applied 5
+REVIEW node 1: segments_sent 5 acks_only 0 segments_applied 5 messages_applied 5
+pe 1: idle cpu before any put 41.6 ms / 2 s; after put+quiet 35.2 ms / 2 s
+pe 0: idle cpu before any put 41.9 ms / 2 s; after put+quiet 35.5 ms / 2 s
+REVIEW node 0: segments_sent 5 acks_only 0 segments_applied 5 messages_applied 5
+REVIEW node 1: segments_sent 5 acks_only 0 segments_applied 5 messages_applied 5
+REVIEW node 0: segments_sent 5 acks_only 0 segments_applied 5 messages_applied 5
+pe 1: idle cpu before any put 35.9 ms / 2 s; after put+quiet 37.3 ms / 2 s
+pe 0: idle cpu before any put 35.6 ms / 2 s; after put+quiet 36.7 ms / 2 s
+REVIEW node 1: segments_sent 5 acks_only 0 segments_applied 5 messages_applied 5
+## three nodes, PE0 puts to PE1 only
+REVIEW node 0: segments_sent 6794 acks_only 6783 segments_applied 6792 messages_applied 10
+REVIEW node 1: segments_sent 6788 acks_only 6783 segments_applied 6789 messages_applied 6
+REVIEW node 2: segments_sent 5 acks_only 0 segments_applied 5 messages_applied 5
+pe 2: idle cpu before any put 41.2 ms / 2 s; after put+quiet 38.3 ms / 2 s
+pe 1: idle cpu before any put 40.9 ms / 2 s; after put+quiet 42.6 ms / 2 s
+pe 0: idle cpu before any put 40.3 ms / 2 s; after put+quiet 43.3 ms / 2 s

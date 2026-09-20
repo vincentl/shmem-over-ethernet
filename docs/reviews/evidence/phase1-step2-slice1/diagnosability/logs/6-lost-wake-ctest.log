@@ -1,0 +1,31 @@
+[100%] Built target osoe_segment_test
+11/22 Test  #41: shmem.multinode.force-remote.0-0-1-1-2-2 ...   Passed   41.96 sec
+      Start  42: shmem.internode.0-0-0-0
+12/22 Test  #42: shmem.internode.0-0-0-0 ....................   Passed    0.01 sec
+      Start  43: shmem.internode.0-1-2
+13/22 Test  #43: shmem.internode.0-1-2 ......................   Passed    3.15 sec
+      Start  44: shmem.internode.0-0-1-1-2-2
+14/22 Test  #44: shmem.internode.0-0-1-1-2-2 ................   Passed    3.23 sec
+      Start  45: shmem.internode.0-0-0-1-2-2
+15/22 Test  #45: shmem.internode.0-0-0-1-2-2 ................   Passed    3.23 sec
+      Start  46: shmem.internode.0-1-2-0-1-0
+16/22 Test  #46: shmem.internode.0-1-2-0-1-0 ................   Passed    3.21 sec
+      Start  47: shmem.differential
+17/22 Test  #47: shmem.differential .........................   Passed    8.93 sec
+      Start  54: shmem.barrier.L1
+18/22 Test  #54: shmem.barrier.L1 ...........................   Passed    0.01 sec
+      Start  55: shmem.barrier.L2
+19/22 Test  #55: shmem.barrier.L2 ...........................   Passed    0.18 sec
+      Start  56: shmem.barrier.L4
+20/22 Test  #56: shmem.barrier.L4 ...........................   Passed    0.48 sec
+      Start 108: shmem.watchdog.barrier.L2
+21/22 Test #108: shmem.watchdog.barrier.L2 ..................   Passed    0.11 sec
+      Start 110: shmem.watchdog.barrier.L4
+22/22 Test #110: shmem.watchdog.barrier.L4 ..................   Passed    0.11 sec
+
+100% tests passed, 0 tests failed out of 22
+
+Label Time Summary:
+tier2    = 274.93 sec*proc (22 tests)
+
+Total Test time (real) = 275.06 sec

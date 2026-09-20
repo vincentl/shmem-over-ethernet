@@ -1,0 +1,11 @@
+--- ../tree/shmem/src/progress-host.c	2026-09-20 13:05:35
++++ shmem/src/progress-host.c	2026-09-20 13:47:17
+@@ -112,7 +112,7 @@
+         osoe_fatal("the internode release for %s arrived for epoch %u out of order: "
+                    "the PEs of this job called different numbers of collectives", name,
+                    epoch);
+-    osoe_epoch_wake_all(released);
++    /* REVIEW MUTATION: the internode release no longer wakes its waiters. */
+ }
+ 
+ /* ---- §5.2's node participation ----------------------------------------- */

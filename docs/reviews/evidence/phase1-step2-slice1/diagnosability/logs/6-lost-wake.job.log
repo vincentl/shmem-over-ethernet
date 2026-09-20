@@ -1,0 +1,29 @@
+hang: PE 2 of 6 pid 648674 mode barriers culprit 0
+hang: PE 3 of 6 pid 648675 mode barriers culprit 0
+hang: PE 0 of 6 pid 648672 mode barriers culprit 0
+hang: PE 1 of 6 pid 648673 mode barriers culprit 0
+hang: PE 5 of 6 pid 648677 mode barriers culprit 0
+hang: PE 4 of 6 pid 648676 mode barriers culprit 0
+hang: PE 2: 30 barriers in 3.002 s
+hang: PE 3: 30 barriers in 3.002 s
+hang: PE 5: 30 barriers in 3.001 s
+hang: PE 1: 30 barriers in 3.002 s
+hang: PE 4: 30 barriers in 3.006 s
+hang: PE 0: 30 barriers in 3.006 s
+osoe-launch: timeout after 25 s; killing 6 process(es)
+osoe-launch: rank 1 killed by signal 9
+osoe-launch: rank 0 killed by signal 9
+osoe-launch: rank 2 killed by signal 9
+osoe-launch: rank 3 killed by signal 9
+osoe-launch: rank 4 killed by signal 9
+osoe-launch: rank 5 killed by signal 9
+osoe-launch: left behind: /dev/shm/osoe.648670.0.2.conn.0
+osoe-launch: left behind: /dev/shm/osoe.648670.0.wire.0.2.0
+osoe-launch: left behind: /dev/shm/osoe.648670.0.wire.1.2.0
+osoe-launch: left behind: /dev/shm/osoe.648670.0.wire.0.1.0
+osoe-launch: left behind: /dev/shm/osoe.648670.0.1.conn.0
+osoe-launch: left behind: /dev/shm/osoe.648670.0.0.conn.0
+osoe-launch: left behind: /dev/shm/osoe.648670.0.job.0
+osoe-launch: left behind: /dev/shm/osoe.648670.0.0.0
+osoe-launch: left behind: /dev/shm/osoe.648670.0.1.0
+osoe-launch: left behind: /dev/shm/osoe.648670.0.2.0

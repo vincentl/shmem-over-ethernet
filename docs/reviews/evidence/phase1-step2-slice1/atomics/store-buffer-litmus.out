@@ -1,0 +1,8 @@
+plain: 1000000 rounds, 68 both-zero (forbidden under seq_cst)
+seqcst: 1000000 rounds, 0 both-zero (forbidden under seq_cst)
+release: 1000000 rounds, 0 both-zero (forbidden under seq_cst)
+plain: 1000000 rounds, 182 both-zero (forbidden under seq_cst)
+plain: 1000000 rounds, 91 both-zero (forbidden under seq_cst)
+amo: 1000000 rounds, 0 both-zero (forbidden under seq_cst)
+put: 1000000 rounds, 58 both-zero (forbidden under seq_cst)
+plain: 1000000 rounds, 203 both-zero (forbidden under seq_cst)

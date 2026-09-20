@@ -1,0 +1,202 @@
+# job id (launcher pid) 628951
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --list
+/osoe.628951.0.0.0           layout 7  2 PEs, 2 live  151552 bytes
+/osoe.628951.0.0.conn.0      /dev/shm/osoe.628951.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+/osoe.628951.0.1.0           layout 7  2 PEs, 2 live  151552 bytes
+/osoe.628951.0.1.conn.0      /dev/shm/osoe.628951.0.1.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+/osoe.628951.0.2.0           layout 7  2 PEs, 2 live  151552 bytes
+/osoe.628951.0.2.conn.0      /dev/shm/osoe.628951.0.2.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+/osoe.628951.0.job.0         /dev/shm/osoe.628951.0.job.0 is not an osoe control segment (magic 0x626f6a656f736f)
+/osoe.628951.0.wire.0.1.0    /dev/shm/osoe.628951.0.wire.0.1.0 is not an osoe control segment (magic 0x4000)
+/osoe.628951.0.wire.0.2.0    /dev/shm/osoe.628951.0.wire.0.2.0 is not an osoe control segment (magic 0x4000)
+/osoe.628951.0.wire.1.2.0    /dev/shm/osoe.628951.0.wire.1.2.0 is not an osoe control segment (magic 0x4000)
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.0
+/osoe.628951.0.0.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 0 session 0)
+  151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     0   628953 mapped          2       59  shmem_barrier_all(+0x3) for 5.966 s
+  1     1   628954 mapped          2       59  shmem_barrier_all(+0x3) for 5.966 s
+
+counter                                           PE0          PE1         total
+transport.wait.calls                                3            3             6
+transport.wait.nothing_outstanding                  3            3             6
+shmem.barrier.calls                                 3            3             6
+shmem.barrier.ns                             13551683     13453626      27005309
+shmem.malloc.calls                                  1            1             2
+agent.loops                                     15972           60         16032
+agent.wakeups                                       3            0             3
+agent.last_wake_ns                      75216315979715            075216315979715
+thread.claimed                                      1            1             1
+thread.tid                                     628960       628962        628962
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.conn.0
+osoe-stat: /dev/shm/osoe.628951.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.0
+/osoe.628951.0.1.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 1 session 0)
+  151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     2   628955 mapped          2       59  shmem_barrier_all(+0x3) for 5.970 s
+  1     3   628956 mapped          2        0  -
+
+counter                                           PE0          PE1         total
+transport.wait.calls                                3            2             5
+transport.wait.nothing_outstanding                  3            2             5
+shmem.barrier.calls                                 3            2             5
+shmem.barrier.ns                             12846057     11381566      24227623
+shmem.malloc.calls                                  1            1             2
+agent.loops                                     15912           60         15972
+agent.wakeups                                       2            0             2
+agent.last_wake_ns                      75216314146040            075216314146040
+thread.claimed                                      1            1             1
+thread.tid                                     628961       628959        628961
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.conn.0
+osoe-stat: /dev/shm/osoe.628951.0.1.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.0
+/osoe.628951.0.2.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 2 session 0)
+  151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     4   628957 mapped          2       59  shmem_barrier_all(+0x3) for 5.975 s
+  1     5   628958 mapped          2       59  shmem_barrier_all(+0x3) for 5.975 s
+
+counter                                           PE0          PE1         total
+transport.wait.calls                                3            3             6
+transport.wait.nothing_outstanding                  3            3             6
+shmem.barrier.calls                                 3            3             6
+shmem.barrier.ns                             10990610      7054175      18044785
+shmem.malloc.calls                                  1            1             2
+agent.loops                                     16024           60         16084
+agent.wakeups                                       3            0             3
+agent.last_wake_ns                      75216317777883            075216317777883
+thread.claimed                                      1            1             1
+thread.tid                                     628963       628964        628964
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.conn.0
+osoe-stat: /dev/shm/osoe.628951.0.2.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.0
+/osoe.628951.0.0.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 0 session 0)
+  151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     0   628953 mapped          2       89  shmem_barrier_all(+0x3) for 8.983 s
+  1     1   628954 mapped          2       89  shmem_barrier_all(+0x3) for 8.983 s
+
+counter                                           PE0          PE1         total
+transport.wait.calls                                3            3             6
+transport.wait.nothing_outstanding                  3            3             6
+shmem.barrier.calls                                 3            3             6
+shmem.barrier.ns                             13551683     13453626      27005309
+shmem.malloc.calls                                  1            1             2
+agent.loops                                     24913           90         25003
+agent.wakeups                                       3            0             3
+agent.last_wake_ns                      75216315979715            075216315979715
+thread.claimed                                      1            1             1
+thread.tid                                     628960       628962        628962
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.0.0
+/osoe.628951.0.0.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 0 session 0)
+  151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
+
+block  PE      pid      tid          cpu    invol.csw  kind
+    0   0   628953   628960     240.0 ms           92  agent
+    1   0   628953   628953         0 ns            2  application
+    8   1   628954   628962         0 ns            3  agent
+    9   1   628954   628954         0 ns            2  application
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.conn.0
+osoe-stat: /dev/shm/osoe.628951.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.0.conn.0
+osoe-stat: /dev/shm/osoe.628951.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.0
+/osoe.628951.0.1.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 1 session 0)
+  151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     2   628955 mapped          2       89  shmem_barrier_all(+0x3) for 8.994 s
+  1     3   628956 mapped          2        0  -
+
+counter                                           PE0          PE1         total
+transport.wait.calls                                3            2             5
+transport.wait.nothing_outstanding                  3            2             5
+shmem.barrier.calls                                 3            2             5
+shmem.barrier.ns                             12846057     11381566      24227623
+shmem.malloc.calls                                  1            1             2
+agent.loops                                     24818           90         24908
+agent.wakeups                                       2            0             2
+agent.last_wake_ns                      75216314146040            075216314146040
+thread.claimed                                      1            1             1
+thread.tid                                     628961       628959        628961
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.1.0
+/osoe.628951.0.1.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 1 session 0)
+  151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
+
+block  PE      pid      tid          cpu    invol.csw  kind
+    0   0   628955   628961     220.0 ms           72  agent
+    1   0   628955   628955         0 ns            3  application
+    8   1   628956   628959         0 ns            1  agent
+    9   1   628956   628956         0 ns            0  application
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.conn.0
+osoe-stat: /dev/shm/osoe.628951.0.1.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.1.conn.0
+osoe-stat: /dev/shm/osoe.628951.0.1.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.0
+/osoe.628951.0.2.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 2 session 0)
+  151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     4   628957 mapped          2       89  shmem_barrier_all(+0x3) for 9.007 s
+  1     5   628958 mapped          2       89  shmem_barrier_all(+0x3) for 9.007 s
+
+counter                                           PE0          PE1         total
+transport.wait.calls                                3            3             6
+transport.wait.nothing_outstanding                  3            3             6
+shmem.barrier.calls                                 3            3             6
+shmem.barrier.ns                             10990610      7054175      18044785
+shmem.malloc.calls                                  1            1             2
+agent.loops                                     25065           90         25155
+agent.wakeups                                       3            0             3
+agent.last_wake_ns                      75216317777883            075216317777883
+thread.claimed                                      1            1             1
+thread.tid                                     628963       628964        628964
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.2.0
+/osoe.628951.0.2.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 2 session 0)
+  151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
+
+block  PE      pid      tid          cpu    invol.csw  kind
+    0   0   628957   628963     250.0 ms           74  agent
+    1   0   628957   628957         0 ns            5  application
+    8   1   628958   628964         0 ns            1  agent
+    9   1   628958   628958         0 ns            3  application
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.conn.0
+osoe-stat: /dev/shm/osoe.628951.0.2.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+
+$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.2.conn.0
+osoe-stat: /dev/shm/osoe.628951.0.2.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+
+-rw-------  1 vincent vincent 151552 Sep 20 13:42 osoe.628951.0.0.0
+-rw-------  1 vincent vincent 526848 Sep 20 13:42 osoe.628951.0.0.conn.0
+-rw-------  1 vincent vincent 151552 Sep 20 13:42 osoe.628951.0.1.0
+-rw-------  1 vincent vincent 526848 Sep 20 13:42 osoe.628951.0.1.conn.0
+-rw-------  1 vincent vincent 151552 Sep 20 13:42 osoe.628951.0.2.0
+-rw-------  1 vincent vincent 526848 Sep 20 13:42 osoe.628951.0.2.conn.0
+-rw-------  1 vincent vincent    664 Sep 20 13:42 osoe.628951.0.job.0
+-rw-------  1 vincent vincent  33920 Sep 20 13:42 osoe.628951.0.wire.0.1.0
+-rw-------  1 vincent vincent  33920 Sep 20 13:42 osoe.628951.0.wire.0.2.0
+-rw-------  1 vincent vincent  33920 Sep 20 13:42 osoe.628951.0.wire.1.2.0
+# launcher exit 1
+# left in /dev/shm afterwards:

@@ -1,0 +1,11 @@
+[100%] Built target shmem_test_wait-many
+REVIEW-INSTRUMENT node 1: reply pool empty (in_use 2 of 2), DROPPING request kind 1 from PE 2 token 11
+osoe: PE 2: no get reply after 10 s
+osoe: PE 2: control segment /dev/shm/osoe.653938.0.0.0
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: left behind: /dev/shm/osoe.653938.0.wire.0.1.0
+osoe-launch: left behind: /dev/shm/osoe.653938.0.0.conn.0
+osoe-launch: left behind: /dev/shm/osoe.653938.0.1.conn.0

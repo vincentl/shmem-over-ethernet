@@ -1,0 +1,25 @@
+hang: PE 1 of 6 pid 643081 mode barrier culprit 0
+hang: PE 2 of 6 pid 643083 mode barrier culprit 0
+hang: PE 0 of 6 pid 643079 mode barrier culprit 0
+hang: PE 5 of 6 pid 643089 mode barrier culprit 0
+hang: PE 4 of 6 pid 643087 mode barrier culprit 0
+hang: PE 3 of 6 pid 643085 mode barrier culprit 0
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 2: shmem_barrier_all: local PE 1 (rank 3, pid 643085) has died; this PE would wait for it forever. This is the development watchdog (OSOE_WATCHDOG); in production the launcher tears the job down instead (srun -K1)
+osoe: PE 2: control segment /dev/shm/osoe.643077.0.1.0
+osoe-launch: rank 2 exited with status 1
+osoe-launch: timeout after 25 s; killing 4 process(es)
+osoe-launch: rank 1 killed by signal 9
+osoe-launch: rank 0 killed by signal 9
+osoe-launch: rank 4 killed by signal 9
+osoe-launch: rank 5 killed by signal 9
+osoe-launch: left behind: /dev/shm/osoe.643077.0.wire.1.2.0
+osoe-launch: left behind: /dev/shm/osoe.643077.0.wire.0.2.0
+osoe-launch: left behind: /dev/shm/osoe.643077.0.wire.0.1.0
+osoe-launch: left behind: /dev/shm/osoe.643077.0.2.conn.0
+osoe-launch: left behind: /dev/shm/osoe.643077.0.0.conn.0
+osoe-launch: left behind: /dev/shm/osoe.643077.0.1.conn.0
+osoe-launch: left behind: /dev/shm/osoe.643077.0.job.0
+osoe-launch: left behind: /dev/shm/osoe.643077.0.0.0
+osoe-launch: left behind: /dev/shm/osoe.643077.0.2.0
+osoe-launch: left behind: /dev/shm/osoe.643077.0.1.0

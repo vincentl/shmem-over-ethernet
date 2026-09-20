@@ -1,0 +1,46 @@
+hang: PE 1 of 4 pid 646346 mode barrier culprit 3
+hang: PE 0 of 4 pid 646345 mode barrier culprit 3
+hang: PE 3 of 4 pid 646348 mode barrier culprit 3
+hang: PE 2 of 4 pid 646347 mode barrier culprit 3
+# SIGKILL launcher 646343 and PEs 646345 646346 646347 646348
+$ ls /dev/shm | grep osoe.77700123
+-rw-------  1 vincent vincent 151552 Sep 20 13:46 osoe.77700123.0.0.0
+-rw-------  1 vincent vincent 263552 Sep 20 13:46 osoe.77700123.0.0.conn.0
+-rw-------  1 vincent vincent 151552 Sep 20 13:46 osoe.77700123.0.1.0
+-rw-------  1 vincent vincent 263552 Sep 20 13:46 osoe.77700123.0.1.conn.0
+-rw-------  1 vincent vincent    656 Sep 20 13:46 osoe.77700123.0.job.0
+-rw-------  1 vincent vincent  33920 Sep 20 13:46 osoe.77700123.0.wire.0.1.0
+$ osoe-stat --list (this job only)
+/osoe.77700123.0.0.0         layout 7  2 PEs, 0 live  151552 bytes
+/osoe.77700123.0.0.conn.0    /dev/shm/osoe.77700123.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+/osoe.77700123.0.1.0         layout 7  2 PEs, 0 live  151552 bytes
+/osoe.77700123.0.1.conn.0    /dev/shm/osoe.77700123.0.1.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+/osoe.77700123.0.job.0       /dev/shm/osoe.77700123.0.job.0 is not an osoe control segment (magic 0x626f6a656f736f)
+/osoe.77700123.0.wire.0.1.0  /dev/shm/osoe.77700123.0.wire.0.1.0 is not an osoe control segment (magic 0x4000)
+$ osoe-stat --gc
+osoe-stat: /dev/shm/osoe.77700123.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+osoe-stat: /dev/shm/osoe.77700123.0.1.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
+osoe-stat: /dev/shm/osoe.77700123.0.job.0 is not an osoe control segment (magic 0x626f6a656f736f)
+osoe-stat: /dev/shm/osoe.77700123.0.wire.0.1.0 is not an osoe control segment (magic 0x4000)
+/osoe.77700123.0.0.0: removed
+/osoe.77700123.0.1.0: removed
+$ ls /dev/shm | grep osoe.77700123 (after --gc)
+-rw-------  1 vincent vincent 263552 Sep 20 13:46 osoe.77700123.0.0.conn.0
+-rw-------  1 vincent vincent 263552 Sep 20 13:46 osoe.77700123.0.1.conn.0
+-rw-------  1 vincent vincent    656 Sep 20 13:46 osoe.77700123.0.job.0
+-rw-------  1 vincent vincent  33920 Sep 20 13:46 osoe.77700123.0.wire.0.1.0
+# second job, same job id, WITHOUT removing what --gc left
+osoe: PE 2: cannot create connection area /dev/shm/osoe.77700123.0.1.conn.0: File exists; probably left by a crashed job with the same job and step ids
+osoe: PE 2: control segment /dev/shm/osoe.77700123.0.1.0
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+# second job exit 1
+-rw-------  1 vincent vincent    151552 Sep 20 13:46 osoe.77700123.0.0.0
+-rw-------  1 vincent vincent 268435456 Sep 20 13:46 osoe.77700123.0.0.0.heap.0
+-rw-------  1 vincent vincent    263552 Sep 20 13:46 osoe.77700123.0.0.conn.0
+-rw-------  1 vincent vincent    151552 Sep 20 13:46 osoe.77700123.0.1.0
+-rw-------  1 vincent vincent    263552 Sep 20 13:46 osoe.77700123.0.1.conn.0
+-rw-------  1 vincent vincent       656 Sep 20 13:46 osoe.77700123.0.job.0
+-rw-------  1 vincent vincent     33920 Sep 20 13:46 osoe.77700123.0.wire.0.1.0

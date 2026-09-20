@@ -1,0 +1,60 @@
+[ 11%] Building C object shmem/CMakeFiles/osoe.dir/src/connection.c.o
+[ 12%] Building C object shmem/CMakeFiles/osoe.dir/src/watch.c.o
+[ 35%] Building C object shmem/tests/CMakeFiles/shmem_test_am_size.dir/__/src/connection.c.o
+[ 37%] Building C object shmem/tests/CMakeFiles/shmem_test_connection.dir/__/src/connection.c.o
+[ 41%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/connection.c.o
+[ 49%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/connection.c.o
+[ 54%] Building C object shmem/tests/CMakeFiles/shmem_test_connection_area.dir/__/src/connection.c.o
+Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/build/debug
+      Start 19: shmem.connection
+ 1/22 Test #19: shmem.connection ...........................   Passed    0.00 sec
+      Start 22: shmem.barrier-am.0-1-2
+ 2/22 Test #22: shmem.barrier-am.0-1-2 .....................   Passed    0.05 sec
+      Start 23: shmem.barrier-am.0-0-1-1-2-2
+ 3/22 Test #23: shmem.barrier-am.0-0-1-1-2-2 ...............   Passed    0.09 sec
+      Start 24: shmem.barrier-am.0-0-0-1-2-2
+ 4/22 Test #24: shmem.barrier-am.0-0-0-1-2-2 ...............   Passed    0.09 sec
+      Start 25: shmem.barrier-am.0-1-2-0-1-0
+ 5/22 Test #25: shmem.barrier-am.0-1-2-0-1-0 ...............   Passed    0.05 sec
+      Start 31: shmem.progress
+ 6/22 Test #31: shmem.progress .............................   Passed    0.01 sec
+      Start 32: shmem.connection-area.L1
+ 7/22 Test #32: shmem.connection-area.L1 ...................   Passed    0.00 sec
+      Start 33: shmem.connection-area.L2
+ 8/22 Test #33: shmem.connection-area.L2 ...................   Passed    0.00 sec
+      Start 34: shmem.connection-area.L4
+ 9/22 Test #34: shmem.connection-area.L4 ...................   Passed    0.00 sec
+      Start 35: shmem.multinode.0-0-0-0
+10/22 Test #35: shmem.multinode.0-0-0-0 ....................   Passed    0.34 sec
+      Start 36: shmem.multinode.0-1-2
+11/22 Test #36: shmem.multinode.0-1-2 ......................   Passed    0.47 sec
+      Start 37: shmem.multinode.0-0-1-1-2-2
+12/22 Test #37: shmem.multinode.0-0-1-1-2-2 ................   Passed    0.78 sec
+      Start 38: shmem.multinode.0-0-0-1-2-2
+13/22 Test #38: shmem.multinode.0-0-0-1-2-2 ................   Passed    0.79 sec
+      Start 39: shmem.multinode.0-1-2-0-1-0
+14/22 Test #39: shmem.multinode.0-1-2-0-1-0 ................   Passed    0.76 sec
+      Start 40: shmem.multinode.force-remote.0-1-2
+15/22 Test #40: shmem.multinode.force-remote.0-1-2 .........   Passed    0.47 sec
+      Start 41: shmem.multinode.force-remote.0-0-1-1-2-2
+16/22 Test #41: shmem.multinode.force-remote.0-0-1-1-2-2 ...   Passed    0.80 sec
+      Start 42: shmem.internode.0-0-0-0
+17/22 Test #42: shmem.internode.0-0-0-0 ....................   Passed    0.03 sec
+      Start 43: shmem.internode.0-1-2
+18/22 Test #43: shmem.internode.0-1-2 ......................   Passed    0.07 sec
+      Start 44: shmem.internode.0-0-1-1-2-2
+19/22 Test #44: shmem.internode.0-0-1-1-2-2 ................   Passed    0.13 sec
+      Start 45: shmem.internode.0-0-0-1-2-2
+20/22 Test #45: shmem.internode.0-0-0-1-2-2 ................   Passed    0.14 sec
+      Start 46: shmem.internode.0-1-2-0-1-0
+21/22 Test #46: shmem.internode.0-1-2-0-1-0 ................   Passed    0.12 sec
+      Start 47: shmem.differential
+22/22 Test #47: shmem.differential .........................   Passed    0.25 sec
+
+100% tests passed, 0 tests failed out of 22
+
+Label Time Summary:
+tier1    =   0.00 sec*proc (1 test)
+tier2    =   5.43 sec*proc (21 tests)
+
+Total Test time (real) =   5.51 sec

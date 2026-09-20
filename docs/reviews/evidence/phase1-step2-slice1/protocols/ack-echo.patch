@@ -1,0 +1,22 @@
+--- /Users/vincent/shmem-over-ethernet/shmem/src/progress-host.c	2026-09-20 13:05:35
++++ shmem/src/progress-host.c	2026-09-20 13:44:24
+@@ -4,6 +4,7 @@
+  * See progress-host.h for what this is and why it is separate from progress.c.
+  */
+ #include <stdatomic.h>
++#include <stdio.h>
+ #include <stdlib.h>
+ 
+ #include "base/deadline.h"
+@@ -279,6 +280,11 @@
+  */
+ static void flush_before_close(void)
+ {
++    if (getenv("OSOE_REVIEW_PRINT"))
++        fprintf(stderr, "review: node %u segments_sent=%llu acks_only=%llu segments_applied=%llu\n",
++                osoe.job.node, (unsigned long long)osoe.progress.segments_sent,
++                (unsigned long long)osoe.progress.acks_only,
++                (unsigned long long)osoe.progress.segments_applied);
+     osoe_progress_forget_acks(&osoe.progress);
+     struct osoe_deadline until = osoe_deadline_in(osoe.bootstrap.timeout_ns);
+     while (!osoe_progress_idle(&osoe.progress)) {

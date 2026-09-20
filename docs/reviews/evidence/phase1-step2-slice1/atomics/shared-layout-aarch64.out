@@ -1,0 +1,60 @@
+struct osoe_pe_slot: size 512 align 128 (4 lines of 128)
+  phase                        off     0  size    4  line   0  
+  agent_wake                   off     4  size    4  line   0  (not 8-aligned)
+  watch_rng                    off   128  size    8  line   1  
+  watch_seq                    off   136  size    4  line   1  
+  rank                         off   140  size    4  line   1  (not 8-aligned)
+  pid                          off   144  size    4  line   1  
+  tid                          off   148  size    4  line   1  (not 8-aligned)
+  symmetric_size               off   152  size    8  line   1  
+  heap_bytes                   off   160  size    8  line   1  
+  heap_name                    off   168  size   96  line   1  
+  blocked_gen                  off   384  size    8  line   3  
+  blocked_detail               off   392  size    8  line   3  
+  blocked_since_ns             off   400  size    8  line   3  
+  blocked_routine              off   408  size   32  line   3  
+  sweeps                       off   440  size    8  line   3  
+  world_epoch                  off   448  size    4  line   3  
+  shared_epoch                 off   452  size    4  line   3  (not 8-aligned)
+  blocks_exhausted             off   456  size    4  line   3  
+  heap_in_use                  off   464  size    8  line   3  
+  heap_high_water              off   472  size    8  line   3  
+  heap_largest_free            off   480  size    8  line   3  
+struct osoe_segment_directory: size 136 align 8 (1 lines of 128)
+struct osoe_node_header: size 1536 align 128 (12 lines of 128)
+  dir                          off     0  size  136  line   0  
+  heap_base                    off   160  size    8  line   1  
+  ready                        off   256  size    4  line   2  
+  joined                       off   260  size    4  line   2  (not 8-aligned)
+  mapped                       off   264  size    4  line   2  
+  finalized                    off   268  size    4  line   2  (not 8-aligned)
+  failed                       off   272  size    4  line   2  
+  aborting                     off   384  size    4  line   3  
+  abort_pe                     off   388  size    4  line   3  (not 8-aligned)
+  abort_status                 off   392  size    4  line   3  
+  world_arrived                off   512  size  128  line   4  
+  world_released               off   640  size  128  line   5  
+  shared_arrived               off   896  size  128  line   7  
+  arrival                      off  1280  size  256  line  10  
+struct osoe_landing_slot: size 256 align 128 (2 lines of 128)
+  bytes_issued                 off     0  size    8  line   0  
+  bytes_landed                 off     8  size    8  line   0  
+  counter_wake                 off    16  size    4  line   0  
+  wake                         off   128  size    4  line   1  
+  ready                        off   132  size    4  line   1  (not 8-aligned)
+  length                       off   136  size    4  line   1  
+  value                        off   144  size    8  line   1  
+  token                        off   152  size    8  line   1  
+  data                         off   256
+struct osoe_connection_buffer: size 384 align 128 (3 lines of 128)
+struct osoe_connection_shared: size 1152 align 128 (9 lines of 128)
+  buffer[0].head               off     0  size    4  line   0  
+  buffer[0].filled             off   128  size    4  line   1  
+  buffer[0].seq                off   256  size    8  line   2  
+  buffer[1].head               off   384  size    4  line   3  
+  ack_requested                off   768  size    4  line   6  
+  acked                        off   896  size    8  line   7  
+  credit                       off  1024  size    4  line   8  
+struct osoe_counter_block: size 512 align 128 (4 lines of 128)
+struct osoe_epoch: size 128 align 128 (1 lines of 128)
+alignof(_Atomic uint64_t) 8, sizeof 8; alignof(_Atomic uint32_t) 4

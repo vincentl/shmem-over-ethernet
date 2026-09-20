@@ -1,0 +1,24 @@
+== tree run 1
+stress: 200 rounds of 1 MiB put, quiet completed
+review: node 1 segments_sent=1810 acks_only=1805 segments_applied=3425
+review: node 0 segments_sent=3425 acks_only=220 segments_applied=1809
+== tree run 2
+stress: 200 rounds of 1 MiB put, quiet completed
+review: node 0 segments_sent=3443 acks_only=238 segments_applied=1821
+review: node 1 segments_sent=1822 acks_only=1817 segments_applied=3443
+== tree run 3
+stress: 200 rounds of 1 MiB put, quiet completed
+review: node 0 segments_sent=3430 acks_only=224 segments_applied=1816
+review: node 1 segments_sent=1817 acks_only=1812 segments_applied=3430
+== tree-naive run 1
+stress: 200 rounds of 1 MiB put, quiet completed
+review: node 1 segments_sent=205 acks_only=200 segments_applied=3205
+review: node 0 segments_sent=3205 acks_only=0 segments_applied=205
+== tree-naive run 2
+stress: 200 rounds of 1 MiB put, quiet completed
+review: node 0 segments_sent=3205 acks_only=0 segments_applied=205
+review: node 1 segments_sent=205 acks_only=200 segments_applied=3205
+== tree-naive run 3
+stress: 200 rounds of 1 MiB put, quiet completed
+review: node 1 segments_sent=205 acks_only=200 segments_applied=3205
+review: node 0 segments_sent=3205 acks_only=0 segments_applied=205

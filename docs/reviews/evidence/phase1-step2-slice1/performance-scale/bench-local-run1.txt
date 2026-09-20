@@ -1,0 +1,16 @@
+ 13:46:08 up 20:57,  1 user,  load average: 6.35, 3.03, 1.42
+# intranode, PE 0 -> PE 1
+raw memcpy 8 B                               min        0.3  p10        0.3  med        0.3  p90        0.3  max          0.4 ns/op  ( 22891.8 MiB/s at med)
+shmem_putmem 8 B                             min       13.3  p10       14.0  med       17.3  p90       27.2  max         57.1 ns/op  (   442.0 MiB/s at med)
+shmem_getmem 8 B                             min       11.0  p10       11.6  med       15.0  p90       28.6  max        304.7 ns/op  (   509.7 MiB/s at med)
+raw memcpy 4 KiB                             min       59.9  p10       60.0  med       71.0  p90      138.6  max        233.9 ns/op  ( 55002.7 MiB/s at med)
+shmem_putmem 4 KiB                           min       66.4  p10       68.2  med       98.0  p90      148.4  max        354.2 ns/op  ( 39869.6 MiB/s at med)
+shmem_getmem 4 KiB                           min       64.1  p10       64.3  med       71.0  p90      120.3  max        174.4 ns/op  ( 55046.6 MiB/s at med)
+raw memcpy 1 MiB                             min    24518.9  p10    25434.0  med    28490.8  p90    38891.7  max      61106.4 ns/op  ( 35099.0 MiB/s at med)
+shmem_putmem 1 MiB                           min    19215.8  p10    21138.9  med    42846.2  p90    77646.9  max     106330.3 ns/op  ( 23339.3 MiB/s at med)
+raw atomic_fetch_add (seq_cst)               min        2.3  p10        2.3  med        2.9  p90        3.8  max         37.4 ns/op
+shmem_long_atomic_fetch_inc                  min       15.6  p10       16.3  med       18.8  p90       28.2  max         58.5 ns/op
+shmem_long_atomic_inc                        min       15.0  p10       15.2  med       21.2  p90       42.7  max         55.7 ns/op
+shmem_fence (nothing outstanding)            min        7.6  p10        7.6  med       11.9  p90       24.3  max         92.2 ns/op
+shmem_quiet (nothing outstanding)            min       24.5  p10       24.6  med       29.8  p90       39.4  max         65.9 ns/op
+shmem_putmem 8 B + shmem_quiet               min       36.8  p10       38.8  med       45.1  p90       81.9  max        101.4 ns/op  (   169.2 MiB/s at med)

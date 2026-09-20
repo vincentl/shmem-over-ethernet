@@ -1,0 +1,26 @@
+--- /Users/vincent/shmem-over-ethernet/shmem/src/progress.c	2026-09-20 13:05:35
++++ /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/src/progress.c	2026-09-20 17:04:34
+@@ -217,8 +217,10 @@
+                        "epochs have diverged", m.team, p->arrival_epoch[m.team], m.epoch);
+         p->arrivals[m.team]++;
+         p->barrier_arrivals++;
+-        if (p->arrivals[m.team] == p->participants[m.team]) {
++        bool first = p->arrivals[m.team] == 1;
++        if (p->arrivals[m.team] == p->participants[m.team])
+             p->arrivals[m.team] = 0;
++        if (first) {
+             /*
+              * Release everyone. A handler may enqueue but never reserve (§3.7),
+              * so each peer's release goes onto its control queue and the drain
+@@ -663,8 +665,10 @@
+             p->arrival_epoch[team] = epoch;
+         p->arrivals[team]++;
+         p->barrier_arrivals++;
+-        if (p->arrivals[team] == participants) {
++        bool first = p->arrivals[team] == 1;
++        if (p->arrivals[team] == participants)
+             p->arrivals[team] = 0;
++        if (first) {
+             for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
+                 struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE, .origin_pe = team,
+                                         .length = 0, .value = epoch };

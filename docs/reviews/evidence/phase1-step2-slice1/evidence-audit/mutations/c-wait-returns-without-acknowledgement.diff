@@ -1,0 +1,11 @@
+--- /Users/vincent/shmem-over-ethernet/shmem/src/transport-am.c	2026-09-20 13:05:35
++++ /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/src/transport-am.c	2026-09-20 17:05:01
+@@ -599,7 +599,7 @@
+         }
+         waited++;
+         struct osoe_deadline until = osoe_deadline_in(osoe.bootstrap.timeout_ns);
+-        while (!acknowledged(c, slot)) {
++        while (0 && !acknowledged(c, slot)) {
+             osoe_progress_host_wake_lead();
+             struct timespec back = { 0, 20000 };
+             nanosleep(&back, NULL);

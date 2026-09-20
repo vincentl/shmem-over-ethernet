@@ -1,0 +1,32 @@
+=== run 1: OSOE_FORCE_REMOTE=1 osoe-launch -n 4 -m 0,0,1,1 -t 30 -- shmem_test_internode
+osoe: PE 1: no connection toward node 0, which holds PE 0
+osoe: PE 1: control segment /dev/shm/osoe.648827.0.0.0
+osoe: PE 2: no connection toward node 1, which holds PE 3
+osoe: PE 2: control segment /dev/shm/osoe.648827.0.1.0
+osoe: PE 0: no connection toward node 0, which holds PE 1
+osoe: PE 0: control segment /dev/shm/osoe.648827.0.0.0
+osoe: PE 3: no connection toward node 1, which holds PE 2
+osoe: PE 3: control segment /dev/shm/osoe.648827.0.1.0
+launcher exit=?
+=== run 2: OSOE_FORCE_REMOTE=1 osoe-launch -n 4 -m 0,0,1,1 -t 30 -- shmem_test_internode
+osoe: PE 0: no connection toward node 0, which holds PE 1
+osoe: PE 0: control segment /dev/shm/osoe.648838.0.0.0
+osoe: PE 1: no connection toward node 0, which holds PE 0
+osoe: PE 1: control segment /dev/shm/osoe.648838.0.0.0
+osoe-launch: rank 0 exited with status 1
+osoe: PE 2: no connection toward node 1, which holds PE 3
+osoe: PE 2: control segment /dev/shm/osoe.648838.0.1.0
+osoe: PE 3: no connection toward node 1, which holds PE 2
+launcher exit=?
+=== run 3: OSOE_FORCE_REMOTE=1 osoe-launch -n 4 -m 0,0,1,1 -t 30 -- shmem_test_internode
+osoe: PE 1: no connection toward node 0, which holds PE 0
+osoe: PE 1: control segment /dev/shm/osoe.648849.0.0.0
+osoe: PE 0: no connection toward node 0, which holds PE 1
+osoe: PE 0: control segment /dev/shm/osoe.648849.0.0.0
+osoe: PE 3: no connection toward node 1, which holds PE 2
+osoe: PE 3: control segment /dev/shm/osoe.648849.0.1.0
+osoe: PE 2: no connection toward node 1, which holds PE 3
+osoe: PE 2: control segment /dev/shm/osoe.648849.0.1.0
+launcher exit=?
+=== control (no force-remote)
+launcher exit=0

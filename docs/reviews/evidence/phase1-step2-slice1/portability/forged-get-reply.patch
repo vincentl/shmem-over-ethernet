@@ -1,0 +1,46 @@
+--- tree/shmem/tests/test-progress.c	2026-09-20 13:05:35
++++ tree-forge/shmem/tests/test-progress.c	2026-09-20 13:49:08
+@@ -104,7 +104,10 @@
+  * care where they came from. */
+ static uint32_t my_pe;
+ static unsigned char heap[HEAP];
+-static unsigned char landing_storage[sizeof(struct osoe_landing_slot) + HEAP];
++/* REVIEW MUTATION: the landing zone, then memory that is not the landing zone. */
++static struct { unsigned char zone[sizeof(struct osoe_landing_slot) + HEAP];
++                unsigned char canary[256]; } landing_block;
++#define landing_storage landing_block.zone
+ static uint64_t notifies;
+ 
+ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offset,
+@@ -277,6 +280,17 @@
+     for (size_t i = 0; i < sizeof mine; i++)
+         mine[i] = (unsigned char)((i ^ 0x5a) + node);
+ 
++    /* REVIEW MUTATION: an unsolicited get reply - nobody asked for it, its token
++     * matches nothing, and its chunk_offset points past the landing zone. */
++    {
++        unsigned char forged[64];
++        memset(forged, 0xEE, sizeof forged);
++        struct osoe_am_get_reply lie = { .origin_pe = peer_lead, .chunk_offset = HEAP + 32,
++                                         .total = 0xffffffffu, .token = 0xdeadbeef };
++        while (!post(c, OSOE_AM_GET_REPLY, &lie, sizeof lie, forged, sizeof forged))
++            osoe_progress_poll(&p);
++    }
++
+     /* A put larger than the wire's ring, so it crosses in pieces. */
+     struct osoe_am_put put = { .target_pe = peer_lead, .region = 0, .offset = PUT_AT };
+     while (!post(c, OSOE_AM_PUT, &put, sizeof put, mine, sizeof mine))
+@@ -366,6 +380,13 @@
+      * signal - and this is precisely why the specification has waits on a
+      * signal variable (§4.9) rather than on the payload itself.
+      */
++    {
++        unsigned hit = 0;
++        for (size_t i = 0; i < sizeof landing_block.canary; i++)
++            hit += landing_block.canary[i] == 0xEE;
++        fprintf(stderr, "REVIEW: PE %u: %u bytes beyond the landing zone were overwritten by a "
++                        "forged get reply\n", my_pe, hit);
++    }
+     uint32_t last_lead = PAYLOAD - 1;
+     uint32_t last_sibling = PEER_PUT_BYTES - 1;
+     unsigned char want_lead = (unsigned char)((last_lead ^ 0x5a) + peer);

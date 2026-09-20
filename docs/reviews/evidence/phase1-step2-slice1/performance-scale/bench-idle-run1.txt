@@ -1,0 +1,9 @@
+ 13:46:38 up 20:58,  1 user,  load average: 5.17, 3.06, 1.48
+PE 1: idle 3.01 s wall, 0.1119 s CPU (3.71% of a core), 8073 voluntary context switches
+PE 0: idle 3.00 s wall, 0.1151 s CPU (3.84% of a core), 8044 voluntary context switches
+PE 3: idle 3.00 s wall, 0.0970 s CPU (3.23% of a core), 8424 voluntary context switches
+PE 0: idle 3.00 s wall, 0.0975 s CPU (3.25% of a core), 8389 voluntary context switches
+PE 1: idle 3.00 s wall, 0.1022 s CPU (3.41% of a core), 8409 voluntary context switches
+PE 2: idle 3.00 s wall, 0.0992 s CPU (3.31% of a core), 8393 voluntary context switches
+PE 0: idle 3.00 s wall, 0.0013 s CPU (0.04% of a core), 30 voluntary context switches
+PE 1: idle 3.00 s wall, 0.0011 s CPU (0.04% of a core), 30 voluntary context switches
