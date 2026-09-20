@@ -183,7 +183,13 @@ struct osoe_credit {
     _Atomic uint32_t available;
 };
 
-void osoe_credit_init(struct osoe_credit *c, uint32_t credits);
+/* Set the count before anyone else can see the connection. Inline, so that
+ * connection.c can start a credit without depending on this file's object -
+ * the tier-1 tests of the connection compile it on its own. */
+static inline void osoe_credit_init(struct osoe_credit *c, uint32_t credits)
+{
+    atomic_store_explicit(&c->available, credits, memory_order_release);
+}
 
 /* True if a credit was taken. False means none is free, and §4.6 permits the
  * issuing PE to block until one is. */

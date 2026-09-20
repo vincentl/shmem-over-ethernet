@@ -57,6 +57,7 @@
 #include <stdint.h>
 
 #include "base/cacheline.h"
+#include "reply.h"
 
 /*
  * Segment header (§3.4): fixed size, at offset 0, never reserved by a writer,
@@ -168,6 +169,17 @@ struct osoe_connection_shared {
      * handshake of its own.
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint64_t acked;
+    /*
+     * §3.8's reply credit, shared by the PEs of this node.
+     *
+     * It bounds what the *peer* must hold: the origin takes one when a local PE
+     * issues a get or fetching AMO toward that peer and returns it when the
+     * reply lands, so the peer's deferred reply queues never exceed
+     * connections x C and scale with node count rather than job size. Shared
+     * rather than per PE because the bound is per connection - which is also
+     * why taking it is a CAS and not a test and a decrement (reply.h).
+     */
+    _Alignas(OSOE_CACHELINE) struct osoe_credit credit;
 };
 
 /* Process-private handle onto one connection. */
@@ -215,7 +227,7 @@ enum osoe_reservation_status {
  * the segment is what makes this reachable, so the connection area calls this
  * for every connection before any PE can reach it.
  */
-void osoe_connection_init(struct osoe_connection *c);
+void osoe_connection_init(struct osoe_connection *c, uint32_t credits);
 
 /* ---- Writer side: application threads, in any local PE ---------------- */
 
@@ -242,6 +254,12 @@ void osoe_connection_commit(struct osoe_connection *c, const struct osoe_reserva
 /* Ask that a segment toward this peer carry an acknowledgement request (§3.4).
  * Called by an application thread in fence and quiet; idempotent. */
 void osoe_connection_request_ack(struct osoe_connection *c);
+
+/* This connection's reply credit (§3.8), for the origin to take and give. */
+static inline struct osoe_credit *osoe_connection_credit(struct osoe_connection *c)
+{
+    return &c->s->credit;
+}
 
 /* ---- Progress thread side: the lead's agent only ---------------------- */
 

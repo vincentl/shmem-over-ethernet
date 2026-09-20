@@ -68,6 +68,8 @@
  * than per PE.
  */
 #define OSOE_AM_DEFAULT_CREDITS 64u
+#define OSOE_AM_MIN_CREDITS     1u
+#define OSOE_AM_MAX_CREDITS     65536u
 
 enum osoe_am_size_status {
     OSOE_AM_SIZE_OK,
@@ -102,6 +104,7 @@ struct osoe_am_config {
     uint64_t chunk;         /* OSOE_AM_CHUNK */
     uint64_t buffer;        /* OSOE_AM_BUFFER */
     uint64_t budget;        /* OSOE_AM_BUFFER_BUDGET */
+    uint32_t credits;       /* OSOE_AM_CREDITS: §3.8's C, per connection */
     bool hugepages;         /* OSOE_AM_HUGEPAGES */
 };
 
@@ -116,6 +119,7 @@ struct osoe_connection_area {
     uint32_t nodes;         /* the job's logical node count */
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
+    uint32_t credits;       /* §3.8's C, so the pool can be sized by it */
     struct osoe_connection *conn; /* nodes - 1 handles, indexed by peer_slot() */
     bool creator;           /* this PE is the node lead, so it made the object */
 };

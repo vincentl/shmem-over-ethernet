@@ -127,6 +127,19 @@ void osoe_am_config_read(struct osoe_am_config *c)
     c->budget = env_bytes("OSOE_AM_BUFFER_BUDGET", OSOE_AM_DEFAULT_BUDGET,
                           2 * c->chunk, UINT64_C(64) << 30, false);
 
+    /*
+     * §3.8's credit C. Tunable because the only way to exercise exhaustion in a
+     * test is to make it small: at the default a test would have to issue tens
+     * of thousands of gets before the bound bound anything, and a credit that is
+     * never reached is a credit nothing checks.
+     */
+    uint32_t credits = OSOE_AM_DEFAULT_CREDITS;
+    if (osoe_environment_u32("OSOE_AM_CREDITS", &credits) == OSOE_ENVIRONMENT_INVALID ||
+        credits < OSOE_AM_MIN_CREDITS || credits > OSOE_AM_MAX_CREDITS)
+        osoe_fatal("OSOE_AM_CREDITS='%s' is not between %u and %u",
+                   getenv("OSOE_AM_CREDITS"), OSOE_AM_MIN_CREDITS, OSOE_AM_MAX_CREDITS);
+    c->credits = credits;
+
     uint32_t huge = 0;
     if (osoe_environment_u32("OSOE_AM_HUGEPAGES", &huge) == OSOE_ENVIRONMENT_INVALID || huge > 1)
         osoe_fatal("OSOE_AM_HUGEPAGES='%s' is not 0 or 1", getenv("OSOE_AM_HUGEPAGES"));
@@ -144,6 +157,7 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
 
     struct osoe_am_config config;
     osoe_am_config_read(&config);
+    a->credits = config.credits;
 
     uint64_t buffer;
     switch (osoe_am_choose_buffer(config.chunk, config.buffer, config.budget, nodes, &buffer)) {
@@ -262,7 +276,7 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
          * until the agent opens one. Zeroed memory would say the opposite
          * (§3.5). */
         for (uint32_t i = 0; i < peers; i++)
-            osoe_connection_init(&a->conn[i]);
+            osoe_connection_init(&a->conn[i], a->credits);
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {

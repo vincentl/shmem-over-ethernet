@@ -95,11 +95,6 @@ void osoe_reply_rotate(struct osoe_reply_pool *pool, struct osoe_reply_queue *q)
     q->tail = i;
 }
 
-void osoe_credit_init(struct osoe_credit *c, uint32_t credits)
-{
-    atomic_store_explicit(&c->available, credits, memory_order_release);
-}
-
 bool osoe_credit_take(struct osoe_credit *c)
 {
     /*

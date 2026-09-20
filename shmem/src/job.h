@@ -45,7 +45,7 @@ struct osoe_job {
     uint32_t node;                  /* this PE's logical node */
     uint32_t me;                    /* this PE's world rank */
     const uint32_t *node_of;        /* world rank -> logical node, world_size long */
-    bool force_remote;              /* §8.1: route even same-node traffic remotely */
+    bool force_remote;              /* §8.1: deny the pointer to a node-mate */
     bool creator;                   /* node 0's lead made the object */
 };
 
@@ -68,12 +68,19 @@ static inline uint32_t osoe_node_of(const struct osoe_job *j, uint32_t pe)
 /*
  * Is this PE reachable by ordinary loads and stores from here?
  *
- * Same logical node, and not forced remote. §8.1's force-remote flag routes
- * same-node traffic over the network so that the same program can be run both
- * ways and the results diffed - the strongest differential test available, and
- * the answer to "is the §4.10 boundary really carrying two backends" that is
- * running code rather than analysis. It has to be consulted *here*, in the one
- * locality function, or half the library would keep taking the short path.
+ * Same logical node, and not forced remote.
+ *
+ * **The node map is what says which PEs are remote** (§8.1): PEs rendezvous
+ * only with the PEs named in their own node's OSOE_GTIDS, so a PE never maps a
+ * heap outside its logical node and there is no address to return. Running the
+ * same program over both paths and diffing is two node maps, not a flag.
+ *
+ * §8.1's force-remote flag is the narrower thing left over: it denies the
+ * *pointer* to a node-mate without changing the route, so a program cannot be
+ * written against the shared-memory shortcut and then quietly depend on it, and
+ * a boundary that stopped consulting this function fails a test. It is
+ * consulted here, in the one locality function, or half the library would keep
+ * answering from somewhere else.
  *
  * **A PE is always local to itself, force-remote or not.** There is no route
  * from a node to itself: a connection exists per node *pair* (§3.4), so

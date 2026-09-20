@@ -279,6 +279,7 @@ foreach(map IN LISTS osoe_internode_maps)
   string(REPLACE "," "-" label "${map}")
   add_test(NAME shmem.internode.${label}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_AM_CREDITS=2
             OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
             $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
             $<TARGET_FILE:shmem_test_internode>)

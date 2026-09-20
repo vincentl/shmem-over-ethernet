@@ -33,12 +33,14 @@
 
 #include "am.h"
 #include "base/deadline.h"
+#include "base/futex.h"
 #include "base/order.h"
 #include "blocked.h"
 #include "connection-area.h"
 #include "fatal.h"
 #include "job.h"
 #include "metrics.h"
+#include "node.h"
 #include "progress.h"
 #include "progress-host.h"
 #include "state.h"
@@ -119,13 +121,13 @@ struct osoe_transport_context *osoe_transport_context_default(void)
  * calling thread. So the answer is NULL for a PE on another logical node -
  * whose heap this process never mapped, since PEs rendezvous only with the PEs
  * in their own node's OSOE_GTIDS - and also for a local PE under §8.1's
- * force-remote flag, where the pages are right there but the traffic is
- * deliberately routed over the AM layer, which orders nothing of the sort.
+ * force-remote flag, which denies the pointer to a node-mate without changing
+ * the route (§8.1) - so that a program cannot be written against the
+ * shared-memory shortcut and then quietly depend on it.
  *
- * That second case is what makes the differential test compare like with like:
  * shmem_ptr, shmem_team_ptr and shmem_addr_accessible consult this and nothing
- * else (§4.8), so a program run both ways sees the same answers from them
- * rather than one path quietly taking a shortcut the other cannot.
+ * else (§4.8). Which PEs are actually carried over the AM layer is decided by
+ * the node map, not by the flag.
  */
 void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
 {
@@ -249,6 +251,193 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
     osoe_progress_host_wake_lead();
 }
 
+/*
+ * This PE's landing zone, and the capacity of its payload area (§3.12).
+ *
+ * The zone holds one AM chunk, and a get request is therefore issued in pieces
+ * no larger than that. **The origin chunks the request; the target does not
+ * chunk beyond it.** A reply may still be split when the connection buffer is
+ * tight - the drain sends one chunk per descriptor per pass (§3.8) - and every
+ * piece then lands at an offset inside the range this request asked for, which
+ * is what keeps `destination()` writing inside the slot.
+ *
+ * The alternative was to let one request cover the whole get and size the zone
+ * for it, which is unbounded, or to flow-control the chunks, which needs a
+ * handshake per chunk. Issuing sequentially costs a round trip per chunk and is
+ * what "slow mode first" (§3.14) means here; pipelining the requests, and
+ * landing straight into a symmetric `dest` where there is one, are the two
+ * obvious ways to take that back.
+ */
+static struct osoe_landing_slot *my_landing(void)
+{
+    return osoe_node_landing(&osoe.node, osoe.bootstrap.local_id);
+}
+
+static uint32_t landing_capacity(void)
+{
+    return osoe.node.landing_slot_bytes - (uint32_t)sizeof(struct osoe_landing_slot);
+}
+
+/*
+ * Take a reply credit for this connection, waiting if none is free.
+ *
+ * §4.6 permits blocking rather than failing, and §3.8 needs the bound kept at
+ * the origin: this is what stops the node's PEs between them putting more
+ * outstanding replies on a peer than its descriptor pool holds. A PE holds its
+ * credit from issue until its reply *lands*, not until it is sent.
+ */
+static void take_credit(struct osoe_connection *conn)
+{
+    if (osoe_credit_take(osoe_connection_credit(conn)))
+        return;
+    struct osoe_deadline until = osoe_deadline_in(osoe.bootstrap.timeout_ns);
+    for (;;) {
+        osoe_progress_host_wake_lead();
+        struct timespec back = { 0, 20000 };
+        nanosleep(&back, NULL);
+        if (osoe_credit_take(osoe_connection_credit(conn)))
+            return;
+        if (osoe_deadline_expired(&until))
+            osoe_fatal("no reply credit for this connection after %llu s; replies are "
+                       "not landing",
+                       (unsigned long long)(osoe.bootstrap.timeout_ns / 1000000000u));
+    }
+}
+
+/*
+ * Wait for the reply carrying `token`, which is what §4.6 means by a blocking
+ * get or fetching AMO being complete per operation: the caller waits for *its*
+ * reply, not for a byte count. Under SERIALIZED a PE has one outstanding, so
+ * the slot holds one completion - and the token is what makes "its" checkable
+ * rather than assumed, since a reply for an abandoned operation is otherwise
+ * indistinguishable from the one being waited for.
+ *
+ * The wake word is loaded **before** the flag it guards (§4.6), so a bump
+ * between the load and the wait makes the wait return at once rather than sleep
+ * on a value that has already moved.
+ */
+static void await_reply(struct osoe_landing_slot *slot, uint64_t token,
+                        const char *what)
+{
+    struct osoe_deadline until = osoe_deadline_in(osoe.bootstrap.timeout_ns);
+    for (;;) {
+        uint32_t seen = atomic_load_explicit(&slot->wake, memory_order_acquire);
+        if (atomic_load_explicit(&slot->ready, memory_order_acquire) &&
+            atomic_load_explicit(&slot->token, memory_order_acquire) == token)
+            return;
+        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_futex_wait(&slot->wake, seen, &sweep, OSOE_FUTEX_SHARED);
+        if (osoe_deadline_expired(&until) &&
+            !atomic_load_explicit(&slot->ready, memory_order_acquire))
+            osoe_fatal("no %s reply after %llu s", what,
+                       (unsigned long long)(osoe.bootstrap.timeout_ns / 1000000000u));
+    }
+}
+
+/* Arm the landing slot for one operation, and give it a token nothing else
+ * this PE has used. */
+static uint64_t arm(struct osoe_landing_slot *slot)
+{
+    static uint64_t next_token;
+    atomic_store_explicit(&slot->ready, 0, memory_order_seq_cst);
+    return ++next_token;
+}
+
+/* Reserve, fill and commit one message of `fixed_bytes` plus `payload` bytes. */
+static uint64_t send_message(struct osoe_connection *conn, uint16_t kind,
+                             const void *fixed, uint32_t fixed_bytes,
+                             const void *payload, uint32_t payload_bytes)
+{
+    uint32_t body = fixed_bytes + payload_bytes;
+    struct osoe_message_header h = { kind, 0, body };
+    struct osoe_reservation r;
+    reserve_waiting(conn, osoe_message_padded(body), &r);
+    unsigned char *to = osoe_reservation_bytes(conn, &r);
+    memcpy(to, &h, sizeof h);
+    memcpy(to + sizeof h, fixed, fixed_bytes);
+    if (payload_bytes)
+        memcpy(to + sizeof h + fixed_bytes, payload, payload_bytes);
+    osoe_connection_commit(conn, &r);
+    return r.seq;
+}
+
+static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *dst,
+                       size_t len)
+{
+    uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
+    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    if (!conn)
+        osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
+    struct osoe_landing_slot *slot = my_landing();
+    uint32_t limit = landing_capacity();
+    if (limit > payload_limit(conn, (uint32_t)sizeof(struct osoe_am_get_reply)))
+        limit = payload_limit(conn, (uint32_t)sizeof(struct osoe_am_get_reply));
+
+    unsigned char *at = dst;
+    while (len > 0) {
+        uint32_t n = len > limit ? limit : (uint32_t)len;
+        uint64_t token = arm(slot);
+        take_credit(conn);
+        struct osoe_am_get_request m = { .target_pe = (uint32_t)pe,
+                                         .origin_pe = osoe.bootstrap.rank,
+                                         .region = (uint16_t)region, .flags = 0,
+                                         .length = n, .offset = offset,
+                                         .token = token };
+        send_message(conn, OSOE_AM_GET_REQUEST, &m, (uint32_t)sizeof m, NULL, 0);
+        osoe_progress_host_wake_lead();
+        await_reply(slot, token, "get");
+        uint32_t landed = atomic_load_explicit(&slot->length, memory_order_acquire);
+        if (landed != n)
+            osoe_fatal("a get of %u bytes from PE %d landed %u", n, pe, landed);
+        memcpy(at, slot->data, n);
+        /* Returned when the reply has *landed* (§3.8), which is here and not
+         * when the target sent it: the bound being kept is on replies in
+         * flight toward this node, not on replies the peer has finished with. */
+        osoe_credit_give(osoe_connection_credit(conn));
+        at += n;
+        offset += n;
+        len -= n;
+    }
+}
+
+static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
+                           enum osoe_region region, uint64_t offset,
+                           enum osoe_rmw_op op, unsigned width, uint64_t operand,
+                           uint64_t compare, unsigned flags)
+{
+    uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
+    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    if (!conn)
+        osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
+    bool fetching = (flags & OSOE_TRANSPORT_FETCH) != 0;
+    struct osoe_landing_slot *slot = my_landing();
+    uint64_t token = 0;
+
+    if (fetching) {
+        token = arm(slot);
+        take_credit(conn);
+    }
+    struct osoe_am_rmw_request m = { .target_pe = (uint32_t)pe,
+                                     .origin_pe = osoe.bootstrap.rank,
+                                     .region = (uint16_t)region, .op = (uint16_t)op,
+                                     .width = width, .offset = offset,
+                                     .operand = operand, .compare = compare,
+                                     .token = token, .flags = flags };
+    uint64_t seq = send_message(conn, OSOE_AM_RMW_REQUEST, &m, (uint32_t)sizeof m,
+                                NULL, 0);
+    osoe_progress_host_wake_lead();
+    if (!fetching) {
+        /* §4.10: without FETCH an rmw completes as a put does, so it joins the
+         * dirty set and a later quiet is what says it has been applied. */
+        mark(c, peer, seq);
+        return 0;
+    }
+    await_reply(slot, token, "atomic");
+    uint64_t previous = atomic_load_explicit(&slot->value, memory_order_acquire);
+    osoe_credit_give(osoe_connection_credit(conn));
+    return previous;
+}
+
 /* ---- §4.10's data operations ------------------------------------------- */
 
 void osoe_transport_put(struct osoe_transport_context *context, int pe, enum osoe_region region,
@@ -271,22 +460,25 @@ void osoe_transport_get(struct osoe_transport_context *context, int pe, enum oso
         osoe_transport_local_get(pe, region, offset, dst, len);
         return;
     }
-    osoe_fatal("an internode get is not implemented yet (§7.1 step 2): PE %d is on "
-               "node %u, this one is node %u", pe,
-               osoe_node_of(&osoe.job, (uint32_t)pe), osoe.job.node);
+    osoe_count(OSOE_C_TRANSPORT_GET_CALLS, 1);
+    osoe_count(OSOE_C_TRANSPORT_GET_BYTES, len);
+    /* A blocking get is complete on return, so it never joins the dirty set:
+     * §4.6 makes gets a quiet-only concern and there is nothing left for a
+     * quiet to wait for once the bytes are in dst. */
+    remote_get(pe, region, offset, dst, len);
 }
 
 uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum osoe_region region,
                      uint64_t offset, enum osoe_rmw_op op, unsigned width,
                      uint64_t operand, uint64_t compare, unsigned flags)
 {
-    (void)context;
     if (osoe_is_local(&osoe.job, (uint32_t)pe))
         return osoe_transport_local_rmw(pe, region, offset, op, width, operand, compare,
                                         flags);
-    osoe_fatal("an internode atomic is not implemented yet (§7.1 step 2): PE %d is on "
-               "node %u, this one is node %u", pe,
-               osoe_node_of(&osoe.job, (uint32_t)pe), osoe.job.node);
+    osoe_count(OSOE_C_TRANSPORT_RMW_CALLS, 1);
+    if (flags & OSOE_TRANSPORT_FETCH)
+        osoe_count(OSOE_C_TRANSPORT_RMW_FETCHING, 1);
+    return remote_rmw(context, pe, region, offset, op, width, operand, compare, flags);
 }
 
 /* ---- Ordering and completion (§4.6) ------------------------------------ */

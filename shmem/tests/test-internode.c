@@ -170,6 +170,133 @@ int main(void)
     shmem_quiet();
     shmem_barrier_all();
 
+    /*
+     * Refill every inbox, because the rounds above end by clearing them and the
+     * get below reads what is there. Leaving that out made the get read zeroes
+     * and fail on the single-node map as well as the others, which is the
+     * useful part: it said "test bug" rather than "transport bug" immediately.
+     */
+    for (int to = 0; to < npes; to++) {
+        for (size_t i = 0; i < CHUNKED; i++)
+            source[i] = pattern(me, to, i);
+        shmem_putmem(inbox + stride * (size_t)me, source, CHUNKED, to);
+    }
+    shmem_quiet();
+    shmem_barrier_all();
+
+    /*
+     * get, over the same boundary. A get is complete per operation on return
+     * (§4.6), so there is nothing to quiet and nothing to barrier: if the bytes
+     * are not in `dst` when the call returns, the check below fails at once.
+     * The long one crosses the landing zone's capacity, which is what makes the
+     * origin issue it in pieces (§3.12).
+     */
+    for (int from = 0; from < npes; from++) {
+        for (size_t i = 0; i < CHUNKED; i++)
+            source[i] = 0;
+        /*
+         * What this reads is PE `from`'s own inbox slot `from`, which holds
+         * what that PE sent to *itself* - not what it sent here. Expecting the
+         * latter is the mistake that makes a get test pass on one node and fail
+         * on several for the wrong reason, so the expectation names both ends
+         * explicitly.
+         */
+        shmem_getmem(source, inbox + stride * (size_t)from, CHUNKED, from);
+        int bad = -1;
+        for (size_t i = 0; i < CHUNKED && bad < 0; i++)
+            if (source[i] != pattern(from, from, i))
+                bad = (int)i;
+        if (bad >= 0)
+            fprintf(stderr, "PE %d: get byte %d from PE %d is %u, expected %u\n",
+                    me, bad, from, source[bad], pattern(from, from, (size_t)bad));
+        CHECK(bad < 0);
+    }
+    shmem_barrier_all();
+
+    /*
+     * Enough gets to outlast the credit several times over, which is what makes
+     * §3.8's bound a thing the test can break. The environment pins
+     * OSOE_AM_CREDITS low for exactly this: at the default the bound would not
+     * bind until tens of thousands of operations, and a credit that is never
+     * reached is a credit nothing checks. A credit that is taken and not
+     * returned stalls here rather than passing quietly.
+     */
+    for (int repeat = 0; repeat < 12; repeat++) {
+        int from = (me + repeat) % npes;
+        shmem_getmem(source, inbox + stride * (size_t)from, SMALL, from);
+        for (size_t i = 0; i < SMALL; i++)
+            CHECK(source[i] == pattern(from, from, i));
+    }
+    shmem_barrier_all();
+
+    /*
+     * The atomics, fetching and not.
+     *
+     * Every PE adds to every PE's counter, so the total each one ends with is
+     * the whole job's contribution and a lost or duplicated atomic shows up as
+     * a wrong sum rather than as nothing. A non-fetching add completes as a put
+     * does (§4.10), so it needs the quiet; the fetching one is complete on
+     * return, and its returned value is checked for being a value some add
+     * actually left there rather than a torn mix.
+     */
+    long *counter_cell = shmem_malloc(sizeof *counter_cell);
+    CHECK(counter_cell != NULL);
+    *counter_cell = 0;
+    shmem_barrier_all();
+    for (int to = 0; to < npes; to++)
+        shmem_long_atomic_add(counter_cell, 1, to);
+    shmem_quiet();
+    shmem_barrier_all();
+    CHECK(*counter_cell == npes);
+
+    shmem_barrier_all();
+    long got = shmem_long_atomic_fetch_add(counter_cell, 100, (me + 1) % npes);
+    /* Every PE adds 100 to exactly one cell, and each cell started at npes, so
+     * any return is npes plus a multiple of 100 below the final total. */
+    CHECK(got >= npes && (got - npes) % 100 == 0);
+    shmem_barrier_all();
+    CHECK(*counter_cell == npes + 100);
+
+    /* fetch and set, on a cell nobody else touches this round. */
+    shmem_barrier_all();
+    long previous = shmem_long_atomic_fetch(counter_cell, me);
+    CHECK(previous == npes + 100);
+    shmem_barrier_all();
+
+    /*
+     * put_signal is a put followed by a fenced atomic (§4.10, invariant 5): the
+     * signal must never announce bytes that have not landed. The waiter blocks
+     * on the signal and then reads the payload, which is the ordering that
+     * would break if the fence were dropped.
+     */
+    uint64_t *signal = shmem_malloc(sizeof *signal);
+    CHECK(signal != NULL);
+    *signal = 0;
+    memset(inbox, 0, stride * (size_t)npes);
+    shmem_barrier_all();
+    int partner = (me + 1) % npes;
+    for (size_t i = 0; i < SMALL; i++)
+        source[i] = pattern(me, partner, i);
+    shmem_putmem_signal(inbox + stride * (size_t)me, source, SMALL, signal, 1,
+                        SHMEM_SIGNAL_SET, partner);
+    shmem_quiet();
+    int sender = (me + npes - 1) % npes;
+    shmem_uint64_wait_until(signal, SHMEM_CMP_NE, 0);
+    {
+        const unsigned char *got_bytes = inbox + stride * (size_t)sender;
+        int bad = -1;
+        for (size_t i = 0; i < SMALL && bad < 0; i++)
+            if (got_bytes[i] != pattern(sender, me, i))
+                bad = (int)i;
+        if (bad >= 0)
+            fprintf(stderr, "PE %d: signal arrived before byte %d from PE %d\n",
+                    me, bad, sender);
+        CHECK(bad < 0);
+    }
+    shmem_barrier_all();
+    shmem_free(signal);
+    shmem_free(counter_cell);
+
     CHECK_INVARIANTS();
     free(source);
     shmem_free(inbox);

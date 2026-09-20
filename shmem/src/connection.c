@@ -15,7 +15,7 @@
  * it is also safe under x86's store buffering without any extra fence.
  */
 
-void osoe_connection_init(struct osoe_connection *c)
+void osoe_connection_init(struct osoe_connection *c, uint32_t credits)
 {
     for (uint32_t k = 0; k < 2; k++) {
         atomic_store_explicit(&c->s->buffer[k].filled, 0, memory_order_release);
@@ -26,6 +26,7 @@ void osoe_connection_init(struct osoe_connection *c)
     }
     atomic_store_explicit(&c->s->ack_requested, 0, memory_order_release);
     atomic_store_explicit(&c->s->acked, 0, memory_order_release);
+    osoe_credit_init(&c->s->credit, credits);
 }
 
 enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c, uint32_t len,

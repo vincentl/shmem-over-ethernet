@@ -143,7 +143,7 @@ int main(void)
     uint64_t last_seq = 0;
     uint32_t replies = 0;
 
-    osoe_connection_init(&conn);
+    osoe_connection_init(&conn, 8);
     osoe_connection_open(&conn, 0, next_seq++);
     state[0] = OSOE_BUFFER_OPEN;
 

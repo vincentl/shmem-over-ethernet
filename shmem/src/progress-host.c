@@ -230,7 +230,7 @@ void osoe_progress_host_start(uint32_t session)
      * are the root's releases, one per peer per team - but sizing it by §3.8's
      * own formula is what keeps the data path from having to resize it.
      */
-    uint32_t descriptors = peers * OSOE_AM_DEFAULT_CREDITS;
+    uint32_t descriptors = peers * osoe.area.credits;
     osoe.wire = calloc(peers, sizeof *osoe.wire);
     osoe.connection = calloc(peers, sizeof *osoe.connection);
     osoe.descriptor = calloc(descriptors, sizeof *osoe.descriptor);

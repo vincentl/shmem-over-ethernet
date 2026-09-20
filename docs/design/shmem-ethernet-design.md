@@ -1727,8 +1727,7 @@ made by the calling thread (§9.12.1 and §9.12.2 Notes), and contexts created w
 `SHMEM_CTX_NOSTORE` are exempt. Two rules deliver it:
 
 1. **`shmem_ptr` returns `NULL` for any target reached over the network** —
-   including a local PE when §8.1's force-remote flag sends intranode traffic over
-   TCP. A thread's store can then never race that same thread's queued put to the
+   including a local PE under §8.1's force-remote flag. A thread's store can then never race that same thread's queued put to the
    same object: either both are local and ordered by the thread itself, or no
    pointer exists.
 2. **`fence`, `quiet`, `pe_quiet`, and the barriers begin with one `seq_cst` store in
@@ -1945,7 +1944,8 @@ return `NULL` across logical nodes too.
   unconditionally is conforming.** The intranode case is essentially free from
   the shared heap.
 - `shmem_ptr` returns `NULL` for any target reached over the network, including a
-  local PE under §8.1's force-remote flag (§4.6). It also returns `NULL` for an
+  local PE under §8.1's force-remote flag, which makes the pointer unavailable
+  without changing the route (§4.6, §8.1). It also returns `NULL` for an
   address outside the symmetric heap and for a PE number out of range. RMA
   routines treat those two cases as fatal instead, naming the routine, because
   there a silent no-op would hide the bug.
@@ -3571,8 +3571,8 @@ machinery. The review's order is adopted.
    validated before a socket exists.
 
    **This is the boundary's first real test**, and the reason it is worth
-   noticing: it is the second backend behind §4.10, so §8.1's force-remote flag
-   can run the same program over both paths and diff. Two open items are timed
+   noticing: it is the second backend behind §4.10, so §8.1's node map can run
+   the same program over both paths and diff. Two open items are timed
    to land with it, because this step writes the code they would otherwise have
    to restructure: **decide `osoe_transport_sync`** (§10 — whether a collective's
    internode phase crosses the boundary) while writing the internode phase that
@@ -3775,12 +3775,40 @@ worth stating:
   own node's `OSOE_GTIDS`, so a PE never maps a heap outside its logical node and
   the function has no address to return.
 
-Plus a **force-remote flag** routing even same-logical-node traffic over the
-network. Running a program both ways and diffing is the strongest differential
-test, since the shared-memory path is simple enough to trust as the reference.
+Plus a **force-remote flag**. An earlier draft had it route even
+same-logical-node traffic over the network, and called that the strongest
+differential test available. Implementing it showed the claim was built on a
+mechanism that does not exist and a comparison the node map already provides.
 
-Two boundaries on what the flag means, both of them consequences rather than
-concessions, and both found by writing it:
+**The node map is how a job says what is local and what is remote**, and it is
+the only thing that needs to. `osoe-launch -n 6 -m 0,0,1,1,2,2` starts six
+processes on one machine and gives each its logical node; PEs rendezvous only
+with the PEs named in their own node's `OSOE_GTIDS`, so a PE never maps a heap
+outside its logical node and the locality function has no address it could
+return. Every arrangement is expressible — all local, all remote, and the four
+poles above — so running a program "both ways and diffing" is `-m 0,0,0,0`
+against `-m 0,1,2,3`, with no flag involved.
+
+The one arrangement the map cannot express is two PEs that *are* on one logical
+node, and so *have* mapped each other's heaps, communicating over the network
+anyway. That is what the flag was for, and it is exactly the case with no route:
+connections exist per node **pair** (§3.4), so there is none from a node to
+itself and such an operation has nowhere to go. Giving it one means a self slot
+in the connection area, a wire from a node to itself, and peer-slot arithmetic
+that no longer excludes this node — real structure, in the data path, for a
+feature no production run will ever use.
+
+**So the flag keeps only its locality half.** `OSOE_FORCE_REMOTE=1` makes
+`shmem_ptr`, `shmem_team_ptr` and `shmem_addr_accessible` answer `NULL` for a
+node-mate, while the traffic itself still takes the intranode path. That costs
+nothing, and it keeps the property worth having: a program cannot be written
+against the pointer shortcut and then quietly depend on it, and a boundary that
+stopped consulting the locality function fails a test. What it no longer claims
+is to exercise the AM path for same-node pairs — the node map does that by
+putting the pair on different nodes, which is both simpler and closer to the
+job a real cluster runs.
+
+Two further boundaries on the flag, both consequences rather than concessions:
 
 - **A PE is always local to itself.** Connections exist per node *pair* (§3.4),
   so there is none from a node to itself and an operation addressed to a PE's
@@ -3790,11 +3818,11 @@ concessions, and both found by writing it:
   and every `wait_until` (§4.10) — resolves through the same locality function
   on the caller's own rank, so a rule that made a PE remote from itself is a
   null dereference on the most-travelled path in the library.
-- **It needs at least two logical nodes**, and is refused at init otherwise, for
-  the same reason: on one node there is no peer and no connection, so every
-  operation would be addressed to a link that does not exist. A job that wants
-  the remote path on one host asks the node map for it instead, which is what
-  the map is for.
+- **It needs at least two logical nodes**, and is refused at init otherwise. On
+  one node the flag would make every PE unreachable by pointer while no remote
+  path exists to replace it, which is a job that can allocate and synchronize
+  but whose `shmem_ptr` lies about a machine with nowhere else to go. A job that
+  wants the remote path asks the node map for it.
 
 `SHMEM_TEAM_SHARED` keeps its membership under the flag — it stays the set of
 PEs on the node, not the single PE that `shmem_ptr` still answers for. §4.8
