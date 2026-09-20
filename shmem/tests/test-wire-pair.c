@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "base/deadline.h"
@@ -80,7 +81,18 @@ int main(void)
 
     unsigned char out[CHUNK], in[CHUNK];
     size_t sent = 0, got = 0;
-    uint64_t idle = 0;
+    bool stalled = false;
+    /*
+     * A deadline, not a spin budget. This was `idle > 100000` iterations, which
+     * looks like a timeout and is not one: with this node's own receive already
+     * complete the loop below skips the recv block entirely - and with it the
+     * futex wait - so it spins on send alone at roughly ten million iterations
+     * a second. A hundred thousand of them is about ten milliseconds, and on a
+     * loaded machine the peer simply has not been scheduled in that time. It
+     * failed about one run in forty under load and never otherwise, which is
+     * exactly the shape of a spin count standing in for a clock.
+     */
+    struct osoe_deadline give_up = osoe_deadline_in(UINT64_C(20000000000));
 
     /*
      * Both directions at once: this process fills its ring while the peer
@@ -124,17 +136,43 @@ int main(void)
             }
         }
 
-        idle = (sent == sent_was && got == got_was) ? idle + 1 : 0;
-        if (idle > 100000) {
-            fprintf(stderr, "node %u stalled: %zu of %d sent, %zu received\n", me, sent,
-                    PAYLOAD, got);
-            CHECK(false);
-            break;
+        if (sent == sent_was && got == got_was) {
+            /*
+             * Yield rather than spin. The peer needs a core to drain the ring
+             * this node is waiting on, and on a machine with more runnable
+             * threads than cores, spinning here is what keeps it from getting
+             * one - the test was creating the stall it then reported.
+             */
+            struct timespec pause = { 0, 100000 };      /* 100 us */
+            nanosleep(&pause, NULL);
+            if (osoe_deadline_expired(&give_up)) {
+                fprintf(stderr, "node %u stalled: %zu of %d sent, %zu received\n", me,
+                        sent, PAYLOAD, got);
+                CHECK(false);
+                stalled = true;
+                break;
+            }
         }
     }
 
     CHECK(sent == PAYLOAD);
     CHECK(got == PAYLOAD);
+
+    /*
+     * **Stop here if the exchange failed, rather than carrying on.** CHECK only
+     * counts; it does not return. So a node that gave up above used to fall
+     * through into the acknowledgement below and put 0xA5 into a ring the peer
+     * was still reading as payload - which the peer duly reported as a wrong
+     * byte, at the exact index this node had stopped sending at. That made a
+     * one-sided timeout look like a stream corruption on the other node, and it
+     * is the reason this took three reproductions to read correctly. Closing
+     * rather than returning bare also lets the peer's own close finish at once
+     * instead of waiting out its timeout.
+     */
+    if (stalled || CHECK_DONE()) {
+        osoe_wire_close(&w);
+        return CHECK_DONE();
+    }
 
     /*
      * Both sides must finish before either unmaps: the creator removes the
