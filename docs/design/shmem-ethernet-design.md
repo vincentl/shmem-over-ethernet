@@ -3779,6 +3779,31 @@ Plus a **force-remote flag** routing even same-logical-node traffic over the
 network. Running a program both ways and diffing is the strongest differential
 test, since the shared-memory path is simple enough to trust as the reference.
 
+Two boundaries on what the flag means, both of them consequences rather than
+concessions, and both found by writing it:
+
+- **A PE is always local to itself.** Connections exist per node *pair* (§3.4),
+  so there is none from a node to itself and an operation addressed to a PE's
+  own rank has nowhere to be routed. The flag routes traffic *between* PEs; a PE
+  reading and writing its own symmetric memory is not traffic. This is not
+  cosmetic: `osoe_transport_load` — the coherent load behind every `shmem_test`
+  and every `wait_until` (§4.10) — resolves through the same locality function
+  on the caller's own rank, so a rule that made a PE remote from itself is a
+  null dereference on the most-travelled path in the library.
+- **It needs at least two logical nodes**, and is refused at init otherwise, for
+  the same reason: on one node there is no peer and no connection, so every
+  operation would be addressed to a link that does not exist. A job that wants
+  the remote path on one host asks the node map for it instead, which is what
+  the map is for.
+
+`SHMEM_TEAM_SHARED` keeps its membership under the flag — it stays the set of
+PEs on the node, not the single PE that `shmem_ptr` still answers for. §4.8
+already states that returning `NULL` unconditionally is conforming, so a
+node-sized SHARED whose members answer `NULL` is legal; and stable membership is
+what makes the differential diff mean something, since a team whose size changed
+between the two runs would make every program using it differ for a reason that
+has nothing to do with the transport.
+
 **It becomes a three-way switch** — intranode, AM, and any third backend — the
 moment a second network backend exists, so the differential test extends to it
 for free. This is also the answer to "is the §4.10 boundary really carrying two

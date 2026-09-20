@@ -76,12 +76,22 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
     j->world_size = b->world_size;
     j->node_count = b->node_count;
     j->node = b->node;
+    j->me = b->rank;
 
     uint32_t force = 0;
     if (osoe_environment_u32("OSOE_FORCE_REMOTE", &force) == OSOE_ENVIRONMENT_INVALID ||
         force > 1)
         osoe_fatal("OSOE_FORCE_REMOTE='%s' is not 0 or 1", getenv("OSOE_FORCE_REMOTE"));
     j->force_remote = force != 0;
+    /*
+     * §8.1's flag routes traffic that would be intranode over the network, so
+     * it needs a network to route it to. On one logical node there is no peer
+     * and no connection, and every operation would be addressed to a link that
+     * does not exist. Refusing says so at init rather than at the first put.
+     */
+    if (j->force_remote && j->node_count < 2)
+        osoe_fatal("OSOE_FORCE_REMOTE=1 needs a job of at least two logical nodes; "
+                   "this one has %u, so there is nowhere to route to", j->node_count);
 
     snprintf(j->name, sizeof j->name, "/osoe.%llu.%u.job.%u",
              (unsigned long long)b->job, b->step, session);

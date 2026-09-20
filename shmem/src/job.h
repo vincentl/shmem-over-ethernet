@@ -43,6 +43,7 @@ struct osoe_job {
     uint32_t world_size;
     uint32_t node_count;
     uint32_t node;                  /* this PE's logical node */
+    uint32_t me;                    /* this PE's world rank */
     const uint32_t *node_of;        /* world rank -> logical node, world_size long */
     bool force_remote;              /* §8.1: route even same-node traffic remotely */
     bool creator;                   /* node 0's lead made the object */
@@ -73,9 +74,21 @@ static inline uint32_t osoe_node_of(const struct osoe_job *j, uint32_t pe)
  * the answer to "is the §4.10 boundary really carrying two backends" that is
  * running code rather than analysis. It has to be consulted *here*, in the one
  * locality function, or half the library would keep taking the short path.
+ *
+ * **A PE is always local to itself, force-remote or not.** There is no route
+ * from a node to itself: a connection exists per node *pair* (§3.4), so
+ * osoe_connection_to returns NULL for this node by construction, and an
+ * operation a PE addresses to its own rank has nowhere to go. It is not a
+ * special case granted to make the flag work - it is what the flag means. §8.1
+ * routes traffic between PEs over the network; a PE reading and writing its own
+ * symmetric memory is not traffic, and the library's own coherent load
+ * (osoe_transport_load) resolves through this function on every wait_until and
+ * every shmem_test.
  */
 static inline bool osoe_is_local(const struct osoe_job *j, uint32_t pe)
 {
+    if (pe == j->me)
+        return true;
     return !j->force_remote && osoe_node_of(j, pe) == j->node;
 }
 

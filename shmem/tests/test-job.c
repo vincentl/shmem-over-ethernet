@@ -84,15 +84,26 @@ int main(void)
     CHECK(osoe_node_of(&job, job.world_size) == UINT32_MAX);
 
     /*
-     * §8.1's force-remote flag makes every PE remote, including this node's
-     * own. It has to be consulted inside the locality function or half the
-     * library keeps taking the short path - so this checks the function, not
-     * the flag.
+     * §8.1's force-remote flag makes every PE remote **except this one**. It
+     * has to be consulted inside the locality function or half the library
+     * keeps taking the short path - so this checks the function, not the flag.
+     *
+     * The exception is not a concession to make the flag work. Connections
+     * exist per node pair (§3.4), so there is none from a node to itself and an
+     * operation addressed to a PE's own rank has nowhere to be routed; the flag
+     * routes traffic between PEs, and a PE reading its own symmetric memory is
+     * not traffic. An earlier version of this check required the caller's own
+     * rank to be remote too, which made osoe_transport_load - the coherent load
+     * behind every shmem_test and wait_until - a null dereference under the
+     * flag, on the most-travelled path in the library and on none of the paths
+     * the shmem_ptr checks cover.
      */
     struct osoe_job forced = job;
     forced.force_remote = true;
     for (uint32_t r = 0; r < job.world_size; r++)
-        CHECK(!osoe_is_local(&forced, r));
+        CHECK(osoe_is_local(&forced, r) == (r == b.rank));
+    CHECK(osoe_is_local(&forced, b.rank));
+    CHECK(!osoe_is_local(&forced, job.world_size));     /* still nobody's PE */
 
     osoe_job_leave(&job);
     osoe_bootstrap_free(&b);

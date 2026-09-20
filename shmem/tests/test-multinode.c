@@ -112,7 +112,11 @@ int main(void)
 
     for (int pe = 0; pe < n; pe++) {
         void *p = shmem_ptr(mine, pe);
-        if (forced || !is_local(pe)) {
+        /* A PE is always local to itself, force-remote or not (§8.1): there is
+         * no connection from a node to itself, so an operation a PE addresses
+         * to its own rank has nowhere to be routed. */
+        int direct = (pe == me) || (!forced && is_local(pe));
+        if (!direct) {
             CHECK(p == NULL);
         } else {
             CHECK(p != NULL);
@@ -123,6 +127,24 @@ int main(void)
          * (spec §9.2.3), since it lands on the same locality function. */
         CHECK(shmem_team_ptr(SHMEM_TEAM_WORLD, mine, pe) == p);
     }
+    CHECK(shmem_ptr(mine, me) == mine);
+
+    /*
+     * The library's own coherent load resolves through the same locality
+     * function, on this PE's own rank (§4.10). It is reached by every
+     * shmem_test and every wait_until, so a locality rule that made a PE remote
+     * from itself would be a null dereference here and nowhere in the checks
+     * above - which is how it was found.
+     */
+    long *flag = shmem_malloc(sizeof *flag);
+    CHECK(flag != NULL);
+    *flag = 0;
+    shmem_barrier_all();
+    CHECK(shmem_test(flag, SHMEM_CMP_EQ, 0) != 0);
+    *flag = 7;
+    shmem_long_wait_until(flag, SHMEM_CMP_EQ, 7);
+    CHECK(shmem_test(flag, SHMEM_CMP_NE, 0) != 0);
+    shmem_free(flag);
 
     /*
      * Many epochs back to back. This is what reuses the handoff word, and it is
