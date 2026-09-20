@@ -229,7 +229,8 @@ static void complete(void *context, const struct osoe_message_header *header,
                 struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE,
                                         .origin_pe = m.team, .length = 0,
                                         .value = m.epoch };
-                enqueue(p, &p->connection[slot].queues.control, &r);
+                enqueue_collective(p, &p->connection[slot].queues.control, &r,
+                                   slot < p->node ? slot : slot + 1);
             }
             p->host.release(p->host.context, m.team, m.epoch);
         }
@@ -281,8 +282,15 @@ static void segment_applied(void *context, const struct osoe_am_segment_header *
     c->applied = segment->seq;
     if (segment->flags & OSOE_AM_SEGMENT_ACK_REQUESTED)
         c->owe_ack = true;
-    if (segment->ack > c->acked)
+    if (segment->ack > c->acked) {
         c->acked = segment->ack;
+        /* Publish it where a waiting PE can see it: quiet runs in whichever
+         * process issued the writes, which is usually not this one (§4.6). */
+        struct osoe_connection *conn = osoe_connection_to(p->area,
+                                          a->slot < p->node ? a->slot : a->slot + 1);
+        if (conn)
+            osoe_connection_publish_acked(conn, c->acked);
+    }
 }
 
 /* ---- Receiving -------------------------------------------------------- */
@@ -447,6 +455,17 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     if (!conn)
         return false;
     bool moved = false;
+
+    /*
+     * Any writer asking for an acknowledgement (§3.4). Taken before the seal
+     * below, so a request that arrived with the message it belongs to is
+     * carried by the same segment; one that arrives after this line is carried
+     * by the next, which is still correct because an acknowledgement is
+     * cumulative and quiet waits on a sequence number rather than on a
+     * particular segment.
+     */
+    if (osoe_connection_take_ack_request(conn))
+        c->owe_ack = true;
     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
 
     /* Finish an in-flight send. A short write is the normal case (§3.3): keep

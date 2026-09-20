@@ -1,13 +1,20 @@
 /*
- * The intranode backend of the transport boundary (transport.h, §4.10).
+ * The intranode path of the transport boundary (transport.h, §4.10).
  *
- * Every local PE's heap is mapped in this process (§4.1), so every operation
- * is a memory operation in the calling thread, applied before it returns.
- * Nothing is ever outstanding: fence and wait are the serializing store alone.
+ * Every local PE's heap is mapped in this process (§4.1), so an operation on a
+ * PE that osoe_transport_direct accepts is a memory operation in the calling
+ * thread, applied before it returns. Nothing taking this path is ever
+ * outstanding, which is why fence and wait have nothing to do for it.
  *
- * Phase 1 step 1 has one node, so this is the only backend and dispatch is
- * trivial. The watch and notify halves of the boundary are in watch.c, which
- * both this backend and a future progress thread call.
+ * In step 1 this was the whole backend. It is now the near half of one:
+ * transport-am.c owns §4.10's entry points and sends each operation here or
+ * over the AM layer, on the answer the one locality function gives (§8.1).
+ * Splitting them keeps this file what it was - the reference implementation
+ * simple enough to trust, which is what the differential test of §8.1 diffs
+ * against.
+ *
+ * The watch and notify halves of the boundary are in watch.c, which both this
+ * path and the progress thread call.
  */
 #include <stdatomic.h>
 #include <stdint.h>
@@ -20,81 +27,11 @@
 #include "state.h"
 #include "rmw.h"
 #include "transport.h"
+#include "transport-local.h"
 
-struct osoe_transport_context {
-    char unused;                /* ordering and dirty-set state belong to AM */
-};
-
-static struct osoe_transport_context default_ctx;
-
-void osoe_transport_init(void)
+void osoe_transport_local_put(int pe, enum osoe_region region, uint64_t offset,
+                              const void *src, size_t len, unsigned flags)
 {
-}
-
-void osoe_transport_fini(void)
-{
-}
-
-struct osoe_transport_context *osoe_transport_context_default(void)
-{
-    return &default_ctx;
-}
-
-/*
- * §8.1's single locality function, seen from the boundary (§4.10).
- *
- * Non-NULL says the backend orders the calling thread's stores through this
- * address against its own writes by the next fence or wait (§4.6), which this
- * backend does because it applies every write in the calling thread. So the
- * answer is NULL for a PE on another logical node - whose heap this process
- * never mapped, since PEs rendezvous only with the PEs in their own node's
- * OSOE_GTIDS - and also for a *local* PE under §8.1's force-remote flag, where
- * the pages are right there but the traffic is deliberately routed over the AM
- * backend, which orders nothing of the sort.
- *
- * That second case is what makes the differential test compare like with like:
- * shmem_ptr, shmem_team_ptr and shmem_addr_accessible all consult this and
- * nothing else (§4.8), so a program run both ways sees the same answers from
- * them rather than one path quietly taking a shortcut the other cannot.
- */
-void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
-{
-    if (region != OSOE_REGION_HEAP)
-        return NULL;
-    if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size)
-        return NULL;
-    if (!osoe_is_local(&osoe.job, (uint32_t)pe))
-        return NULL;
-    int32_t local = osoe.node.local_of_rank[pe];
-    if (local < 0)
-        return NULL;
-    return (char *)osoe.node.heap_of[local] + offset;
-}
-
-void osoe_transport_fence(struct osoe_transport_context *context)
-{
-    (void)context;
-    osoe_count(OSOE_C_TRANSPORT_FENCE_CALLS, 1);
-    osoe_serializing_store();
-}
-
-void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes)
-{
-    (void)context;
-    if (pes && npes == 0)
-        return;
-    osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
-    /* Nothing is ever outstanding on this backend, so every wait finds nothing
-     * to do. The counter says so rather than being omitted, because against the
-     * AM backend the same name means something quite different. */
-    osoe_count(OSOE_C_TRANSPORT_WAIT_NOTHING_OUTSTANDING, 1);
-    osoe_serializing_store();
-}
-
-void osoe_transport_put(struct osoe_transport_context *context, int pe, enum osoe_region region,
-                 uint64_t offset, const void *src, size_t len, unsigned flags)
-{
-    (void)context;
     (void)flags;                /* applied in issue order already: FENCED and MORE are free */
     osoe_count(OSOE_C_TRANSPORT_PUT_CALLS, 1);
     osoe_count(OSOE_C_TRANSPORT_PUT_BYTES, len);
@@ -107,10 +44,9 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
     osoe_transport_notify(pe, region, offset, len);
 }
 
-void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
-                 uint64_t offset, void *dst, size_t len)
+void osoe_transport_local_get(int pe, enum osoe_region region, uint64_t offset,
+                              void *dst, size_t len)
 {
-    (void)context;
     osoe_count(OSOE_C_TRANSPORT_GET_CALLS, 1);
     osoe_count(OSOE_C_TRANSPORT_GET_BYTES, len);
     const char *src = osoe_transport_direct(pe, region, offset);
@@ -128,11 +64,10 @@ void osoe_transport_get(struct osoe_transport_context *context, int pe, enum oso
  * load names acquire.
  */
 
-uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum osoe_region region,
-                     uint64_t offset, enum osoe_rmw_op op, unsigned width,
-                     uint64_t operand, uint64_t compare, unsigned flags)
+uint64_t osoe_transport_local_rmw(int pe, enum osoe_region region, uint64_t offset,
+                                  enum osoe_rmw_op op, unsigned width, uint64_t operand,
+                                  uint64_t compare, unsigned flags)
 {
-    (void)context;
     osoe_count(OSOE_C_TRANSPORT_RMW_CALLS, 1);
     if (flags & OSOE_TRANSPORT_FETCH)
         osoe_count(OSOE_C_TRANSPORT_RMW_FETCHING, 1);

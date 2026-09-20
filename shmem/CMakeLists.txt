@@ -28,6 +28,7 @@ add_library(osoe
   src/signal.c
   src/symmetric.c
   src/team.c
+  src/transport-am.c
   src/transport-local.c
   src/wait.c
   src/wire.c

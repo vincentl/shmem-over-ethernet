@@ -110,6 +110,15 @@ static void session_start(void)
      * its node's rank list, which it learns there.
      */
     osoe_job_join(&osoe.job, &osoe.bootstrap, session);
+    /*
+     * Two facts about the job, settled here rather than by whichever component
+     * happens to need them first. They were set inside the AM backend's own
+     * start-up once, which put them *after* osoe_transport_init - so the
+     * boundary sized its per-context ordering state for a single-node job and
+     * the first internode put wrote through a null dirty set.
+     */
+    osoe.internode = osoe.job.node_count > 1;
+    osoe.lead = osoe.bootstrap.local_id == 0;
     osoe_transport_init();
     if (osoe_allocator_init(&osoe.allocator, osoe.node.heap_size) != 0)
         osoe_fatal("out of memory");

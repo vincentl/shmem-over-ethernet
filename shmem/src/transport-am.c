@@ -1,0 +1,410 @@
+/*
+ * The transport boundary (§4.10): dispatch on locality, and the far half.
+ *
+ * This file owns §4.10's entry points. Each operation goes one of two ways on
+ * the answer §8.1's single locality function gives: a PE reachable by ordinary
+ * loads and stores takes the intranode path (transport-local.h) and is applied
+ * in the calling thread; every other PE goes over the AM layer of §3.
+ *
+ * **That is one backend with two paths, not two backends.** §4.10 chooses
+ * backends at build time and has no table of function pointers, and this keeps
+ * both properties: the branch below is on where a PE *is*, which is a fact
+ * about the job rather than a configuration, and it is the same branch
+ * osoe_transport_direct already answers for shmem_ptr. A job of one logical
+ * node never takes the far path at all.
+ *
+ * **What crosses, and what does not.** An application thread reserves into a
+ * connection buffer and copies its own bytes (§3.5, §3.12) - that much it may
+ * do, and it is what keeps the data path off the lead's critical path. What it
+ * must never do is touch the progress thread's state or a wire. So the far half
+ * here is: reserve, copy, commit, record, wake the lead. The lead's agent seals
+ * and sends (§3.9), and the peer's agent applies.
+ *
+ * **Completion evidence is the peer's acknowledgement** (§4.6). A put returns
+ * at local completion - src is reusable at once - and the bytes are complete at
+ * the target only once a wait covering them returns. The dirty set below is
+ * what makes that wait cost the application's communication degree rather than
+ * the job's size.
+ */
+#include <stdatomic.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "am.h"
+#include "base/deadline.h"
+#include "base/order.h"
+#include "blocked.h"
+#include "connection-area.h"
+#include "fatal.h"
+#include "job.h"
+#include "metrics.h"
+#include "progress.h"
+#include "progress-host.h"
+#include "state.h"
+#include "transport.h"
+#include "transport-local.h"
+
+/*
+ * Per-context ordering state (§4.6).
+ *
+ * The dirty set is the peer nodes this context has written to since its last
+ * wait, with the highest segment sequence it put a write into for each. quiet
+ * waits for each of those peers to have acknowledged up to that sequence, and
+ * fence flushes them without clearing the set, because those operations remain
+ * unacknowledged.
+ *
+ * 1.6 change #18 limits fence to operations issued on the **same context**
+ * (§9.12.1), which is the weakest thing the spec asks for and exactly what a
+ * per-context set delivers. Indexed by peer slot, so its cost is node count and
+ * never PE count (§1); `order` keeps the touched slots so a wait scans the
+ * application's communication degree - a halo exchange scans six peers whatever
+ * the job size - rather than every connection.
+ */
+struct osoe_transport_context {
+    uint64_t *high_segment;     /* per peer slot: the highest segment written into */
+    uint32_t *order;            /* the slots touched, in the order first touched */
+    bool *touched;              /* membership, so marking twice is not quadratic */
+    uint32_t count;
+};
+
+static struct osoe_transport_context default_context;
+
+/* The peer slot for a node, as the connection area and the progress loop both
+ * index it: node order with this node left out (§3.4). */
+static uint32_t peer_slot(uint32_t peer)
+{
+    return peer < osoe.job.node ? peer : peer - 1;
+}
+
+static uint32_t peer_count(void)
+{
+    return osoe.job.node_count - 1;
+}
+
+void osoe_transport_init(void)
+{
+    struct osoe_transport_context *c = &default_context;
+    *c = (struct osoe_transport_context){ 0 };
+    if (!osoe.internode)
+        return;
+    uint32_t peers = peer_count();
+    c->high_segment = calloc(peers, sizeof *c->high_segment);
+    c->order = calloc(peers, sizeof *c->order);
+    c->touched = calloc(peers, sizeof *c->touched);
+    if (!c->high_segment || !c->order || !c->touched)
+        osoe_fatal("out of memory for the ordering state of %u peer nodes", peers);
+}
+
+void osoe_transport_fini(void)
+{
+    struct osoe_transport_context *c = &default_context;
+    free(c->high_segment);
+    free(c->order);
+    free(c->touched);
+    *c = (struct osoe_transport_context){ 0 };
+}
+
+struct osoe_transport_context *osoe_transport_context_default(void)
+{
+    return &default_context;
+}
+
+/*
+ * §8.1's single locality function, seen from the boundary (§4.10).
+ *
+ * Non-NULL says this backend orders the calling thread's stores through the
+ * address against its own writes by the next fence or wait (§4.6), which is
+ * true exactly of the intranode path, since it applies every write in the
+ * calling thread. So the answer is NULL for a PE on another logical node -
+ * whose heap this process never mapped, since PEs rendezvous only with the PEs
+ * in their own node's OSOE_GTIDS - and also for a local PE under §8.1's
+ * force-remote flag, where the pages are right there but the traffic is
+ * deliberately routed over the AM layer, which orders nothing of the sort.
+ *
+ * That second case is what makes the differential test compare like with like:
+ * shmem_ptr, shmem_team_ptr and shmem_addr_accessible consult this and nothing
+ * else (§4.8), so a program run both ways sees the same answers from them
+ * rather than one path quietly taking a shortcut the other cannot.
+ */
+void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
+{
+    if (region != OSOE_REGION_HEAP)
+        return NULL;
+    if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size)
+        return NULL;
+    if (!osoe_is_local(&osoe.job, (uint32_t)pe))
+        return NULL;
+    int32_t local = osoe.node.local_of_rank[pe];
+    if (local < 0)
+        return NULL;
+    return (char *)osoe.node.heap_of[local] + offset;
+}
+
+/* ---- The far half ------------------------------------------------------ */
+
+/* Record that this context has written into `seq` toward `peer` (§4.6). */
+static void mark(struct osoe_transport_context *c, uint32_t peer, uint64_t seq)
+{
+    uint32_t slot = peer_slot(peer);
+    if (!c->touched[slot]) {
+        c->touched[slot] = true;
+        c->order[c->count++] = slot;
+    }
+    if (seq > c->high_segment[slot])
+        c->high_segment[slot] = seq;
+}
+
+/*
+ * Reserve, waiting for room.
+ *
+ * Only the lead's agent frees space here, by sealing the buffer and sending it
+ * (§3.5, §3.12), so a writer that finds none asks for a seal and tries again.
+ * **It must not spin without asking**: the lead may be asleep, and the only
+ * thing that wakes it for this connection is the bump below.
+ *
+ * §7.1 step 2 backs off with a short sleep rather than blocking on a word the
+ * lead bumps when it frees a buffer. That word would be a second wake protocol,
+ * and this step's policy is slow mode first (§3.14) - so the cost is a
+ * scheduler round trip on a full buffer, counted by am.reserve_stalls so that
+ * it is visible rather than assumed rare. A buffer that stays full is a stall
+ * the counter names; step 3 is where it becomes a wait.
+ */
+static void reserve_waiting(struct osoe_connection *conn, uint32_t len,
+                            struct osoe_reservation *r)
+{
+    if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK)
+        return;
+    osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
+    struct osoe_deadline until = osoe_deadline_in(osoe.bootstrap.timeout_ns);
+    for (;;) {
+        osoe_progress_host_wake_lead();
+        struct timespec back = { 0, 20000 };        /* 20 us */
+        nanosleep(&back, NULL);
+        if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK)
+            return;
+        if (osoe_deadline_expired(&until))
+            osoe_fatal("no room for a %u-byte message after %llu s; the local lead's "
+                       "progress engine has stopped draining this connection", len,
+                       (unsigned long long)(osoe.bootstrap.timeout_ns / 1000000000u));
+    }
+}
+
+/*
+ * The largest payload one message of this kind may carry.
+ *
+ * An AM chunk is §3.2's fragmentation size and so the largest message the wire
+ * ever carries; the connection buffer must also be able to hold it whole, or a
+ * message would be reserved that never fits and the writer would wait forever
+ * for room that cannot exist. Taking the smaller of the two is what makes a
+ * small OSOE_AM_BUFFER a slow configuration rather than a hanging one.
+ */
+static uint32_t payload_limit(struct osoe_connection *conn, uint32_t fixed_bytes)
+{
+    uint32_t chunk = (uint32_t)osoe.area.chunk_bytes;
+    uint32_t room = osoe_connection_payload_capacity(conn);
+    if (room < chunk)
+        chunk = room;
+    uint32_t overhead = (uint32_t)sizeof(struct osoe_message_header) + fixed_bytes;
+    if (chunk <= overhead)
+        osoe_fatal("a connection buffer of %llu bytes cannot carry a message with a "
+                   "%u-byte fixed part; raise OSOE_AM_BUFFER or OSOE_AM_CHUNK",
+                   (unsigned long long)osoe.area.buffer_bytes, fixed_bytes);
+    return chunk - overhead;
+}
+
+static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_region region,
+                       uint64_t offset, const void *src, size_t len, unsigned flags)
+{
+    uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
+    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    if (!conn)
+        osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
+
+    uint32_t limit = payload_limit(conn, (uint32_t)sizeof(struct osoe_am_put));
+    const unsigned char *at = src;
+    /* A zero-length put is a no-op the spec still allows to be issued; it must
+     * not become a message, or the peer applies an empty write and the loop
+     * below never terminates. */
+    while (len > 0) {
+        uint32_t n = len > limit ? limit : (uint32_t)len;
+        struct osoe_am_put m = { .target_pe = (uint32_t)pe, .region = (uint16_t)region,
+                                 .flags = (uint16_t)flags, .offset = offset };
+        uint32_t body = (uint32_t)sizeof m + n;
+        struct osoe_message_header h = { OSOE_AM_PUT, 0, body };
+        struct osoe_reservation r;
+        reserve_waiting(conn, osoe_message_padded(body), &r);
+        unsigned char *to = osoe_reservation_bytes(conn, &r);
+        memcpy(to, &h, sizeof h);
+        memcpy(to + sizeof h, &m, sizeof m);
+        memcpy(to + sizeof h + sizeof m, at, n);
+        osoe_connection_commit(conn, &r);
+        mark(c, peer, r.seq);
+        at += n;
+        offset += n;
+        len -= n;
+    }
+    /* §3.12: ask the lead for a wake. Once, after the whole operation, because
+     * one wake covers every segment it left behind. */
+    osoe_progress_host_wake_lead();
+}
+
+/* ---- §4.10's data operations ------------------------------------------- */
+
+void osoe_transport_put(struct osoe_transport_context *context, int pe, enum osoe_region region,
+                 uint64_t offset, const void *src, size_t len, unsigned flags)
+{
+    if (osoe_is_local(&osoe.job, (uint32_t)pe)) {
+        osoe_transport_local_put(pe, region, offset, src, len, flags);
+        return;
+    }
+    osoe_count(OSOE_C_TRANSPORT_PUT_CALLS, 1);
+    osoe_count(OSOE_C_TRANSPORT_PUT_BYTES, len);
+    remote_put(context, pe, region, offset, src, len, flags);
+}
+
+void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
+                 uint64_t offset, void *dst, size_t len)
+{
+    (void)context;
+    if (osoe_is_local(&osoe.job, (uint32_t)pe)) {
+        osoe_transport_local_get(pe, region, offset, dst, len);
+        return;
+    }
+    osoe_fatal("an internode get is not implemented yet (§7.1 step 2): PE %d is on "
+               "node %u, this one is node %u", pe,
+               osoe_node_of(&osoe.job, (uint32_t)pe), osoe.job.node);
+}
+
+uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum osoe_region region,
+                     uint64_t offset, enum osoe_rmw_op op, unsigned width,
+                     uint64_t operand, uint64_t compare, unsigned flags)
+{
+    (void)context;
+    if (osoe_is_local(&osoe.job, (uint32_t)pe))
+        return osoe_transport_local_rmw(pe, region, offset, op, width, operand, compare,
+                                        flags);
+    osoe_fatal("an internode atomic is not implemented yet (§7.1 step 2): PE %d is on "
+               "node %u, this one is node %u", pe,
+               osoe_node_of(&osoe.job, (uint32_t)pe), osoe.job.node);
+}
+
+/* ---- Ordering and completion (§4.6) ------------------------------------ */
+
+/*
+ * Ask every dirty peer for an acknowledgement and get the segments moving.
+ * Shared by fence and wait, which differ only in what they do afterwards.
+ */
+static void flush_dirty(struct osoe_transport_context *c)
+{
+    for (uint32_t i = 0; i < c->count; i++) {
+        uint32_t slot = c->order[i];
+        uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
+        struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+        if (conn)
+            osoe_connection_request_ack(conn);
+    }
+    if (c->count)
+        osoe_progress_host_wake_lead();
+}
+
+/*
+ * §4.6: fence orders writes becoming visible, and does **not** clear the dirty
+ * set - those operations remain unacknowledged, and a later quiet still has to
+ * wait for them. Conditional sealing costs nothing extra, because the dirty set
+ * already answers "which peers has this context touched".
+ *
+ * The serializing store comes first on both paths, and it is what puts the
+ * calling thread's ordinary memory stores under fence and quiet as Table 14
+ * requires (§4.6). It is not decoration: on the intranode path it is the entire
+ * implementation.
+ */
+void osoe_transport_fence(struct osoe_transport_context *context)
+{
+    osoe_count(OSOE_C_TRANSPORT_FENCE_CALLS, 1);
+    osoe_serializing_store();
+    if (osoe.internode)
+        flush_dirty(context);
+}
+
+/* Has `peer` acknowledged everything this context wrote toward it? Read out of
+ * the lead's connection state, which only the lead writes (§3.12). */
+static bool acknowledged(const struct osoe_transport_context *c, uint32_t slot)
+{
+    uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
+    return osoe_progress_host_acked(peer) >= c->high_segment[slot];
+}
+
+/*
+ * §4.10's wait: complete every operation this context has outstanding, to every
+ * PE or to the named ones. The spec's quiet and pe_quiet are both this call
+ * (§4.6), which is why the boundary has a wait rather than three routines.
+ *
+ * `pes == NULL` means every PE; a non-NULL list with npes == 0 has already
+ * returned in quiet.c, where the spec says it (§9.12.3).
+ */
+void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes)
+{
+    if (pes && npes == 0)
+        return;
+    osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
+    uint64_t t0 = osoe_now_ns();
+    osoe_serializing_store();
+
+    struct osoe_transport_context *c = context;
+    if (!osoe.internode || c->count == 0) {
+        /* Nothing taking the intranode path is ever outstanding, so a wait that
+         * finds nothing has genuinely nothing to do. The counter says so rather
+         * than being omitted, because on the far path the same name means
+         * something quite different. */
+        osoe_count(OSOE_C_TRANSPORT_WAIT_NOTHING_OUTSTANDING, 1);
+        return;
+    }
+
+    /*
+     * A peer list narrows the set to the nodes those PEs are on. §9.12.3's
+     * pe_quiet is the dirty set with a caller-supplied peer list substituted
+     * for the accumulated one, which is close to free here and is the routine
+     * that *validates* the data structure: an implementation tracking
+     * completion by a node-wide global sequence could not do it without
+     * quieting far more than asked.
+     */
+    bool *wanted = NULL;
+    if (pes) {
+        wanted = calloc(peer_count(), sizeof *wanted);
+        if (!wanted)
+            osoe_fatal("out of memory in shmem_pe_quiet");
+        for (size_t i = 0; i < npes; i++) {
+            uint32_t node = osoe_node_of(&osoe.job, (uint32_t)pes[i]);
+            if (node != osoe.job.node && node != UINT32_MAX)
+                wanted[peer_slot(node)] = true;
+        }
+    }
+
+    flush_dirty(c);
+    uint32_t waited = 0, kept = 0;
+    for (uint32_t i = 0; i < c->count; i++) {
+        uint32_t slot = c->order[i];
+        if (wanted && !wanted[slot]) {
+            c->order[kept++] = slot;        /* not asked for: stays dirty */
+            continue;
+        }
+        waited++;
+        struct osoe_deadline until = osoe_deadline_in(osoe.bootstrap.timeout_ns);
+        while (!acknowledged(c, slot)) {
+            osoe_progress_host_wake_lead();
+            struct timespec back = { 0, 20000 };
+            nanosleep(&back, NULL);
+            if (osoe_deadline_expired(&until) && !acknowledged(c, slot))
+                osoe_fatal("node %u has not acknowledged this PE's writes after %llu s",
+                           slot < osoe.job.node ? slot : slot + 1,
+                           (unsigned long long)(osoe.bootstrap.timeout_ns / 1000000000u));
+        }
+        c->touched[slot] = false;
+        c->high_segment[slot] = 0;
+    }
+    c->count = kept;
+    free(wanted);
+    osoe_count(OSOE_C_TRANSPORT_WAIT_DIRTY_PEERS, waited);
+    osoe_count(OSOE_C_TRANSPORT_WAIT_NS, osoe_now_ns() - t0);
+}

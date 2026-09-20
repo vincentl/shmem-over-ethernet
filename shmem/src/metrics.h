@@ -63,6 +63,10 @@ enum osoe_counter {
 
     /* The agent thread's own block (§3.14's progress heartbeat). */
     OSOE_C_AGENT_LOOPS, OSOE_C_AGENT_WAKEUPS, OSOE_C_AGENT_LAST_WAKE_NS,
+    /* A writer that found the open connection buffer full and had to ask the
+     * lead to seal it and try again (§3.5, §3.6). Not an error: it is the
+     * publication-window stall made visible rather than assumed rare. */
+    OSOE_C_AM_RESERVE_STALLS,
 
     /*
      * Must be zero at quiescence (§3.14 question 6, §8.2).

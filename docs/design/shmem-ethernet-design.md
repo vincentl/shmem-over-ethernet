@@ -3834,6 +3834,19 @@ runs in seconds at tier 1.
 | 3 | Logical nodes in netns over veth with netem | Most transport bugs |
 | 4 | Real cluster | Everything else |
 
+> **ThreadSanitizer cannot see a happens-before that runs through another
+> process, and the AM data path has one.** The lead's agent writes a local PE's
+> heap while that PE's own main thread touches the same bytes; what separates
+> them is the barrier, whose chain is this PE's arrival, then whichever local
+> member was last posting the §5.3 handoff, then the root node, then the
+> release. Every link is a `seq_cst` operation on shared memory and the middle
+> ones are in other processes, so tsan reports a race it has no way to
+> disprove. The multi-node data-path tests therefore do not run under it; the
+> single-node map does, and there the intranode path applies every put in the
+> calling thread, which is exactly the case tsan can check. Suppressing the
+> report by name would hide real races in the same parser, and adding loads for
+> the tool to follow would make it green without making anything safer.
+
 > **Loopback hides the worst bugs.** Effectively unlimited MTU, no loss, no
 > reordering, enormous buffers, microsecond latency. It will never produce a
 > short write or partial read — and partial-write handling is the most common

@@ -139,6 +139,27 @@ static uint32_t participants(uint32_t team)
 
 /* ---- the handoff, both ends (§5.3) ------------------------------------- */
 
+void osoe_progress_host_wake_lead(void)
+{
+    if (!osoe.internode)
+        return;
+    struct osoe_pe_slot *lead = &osoe.node.slots[0];
+    atomic_fetch_add_explicit(&lead->agent_wake, 1, memory_order_seq_cst);
+    osoe_futex_wake(&lead->agent_wake, 1, OSOE_FUTEX_SHARED);
+}
+
+/*
+ * Read from another process, since only the lead runs the engine. The value is
+ * the lead's own bookkeeping and is written by that thread alone, so a reader
+ * sees either the old value or the new one - and the old one only makes a wait
+ * go round again, which is why this needs no protocol of its own.
+ */
+uint64_t osoe_progress_host_acked(uint32_t peer)
+{
+    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    return conn ? osoe_connection_acked(conn) : 0;
+}
+
 void osoe_progress_host_post_arrival(uint32_t team, uint32_t epoch)
 {
     struct osoe_arrival_handoff *h = &osoe.node.hdr->arrival[team];
@@ -190,8 +211,9 @@ static bool consume_arrivals(void)
 
 void osoe_progress_host_start(uint32_t session)
 {
-    osoe.internode = osoe.job.node_count > 1;
-    osoe.lead = osoe.bootstrap.local_id == 0;
+    /* osoe.internode and osoe.lead are set by session_start, before anything
+     * that reads them - including osoe_transport_init, which sizes the dirty
+     * set from the first (init.c). */
     if (!osoe.internode)
         return;
 

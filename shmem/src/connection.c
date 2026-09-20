@@ -24,6 +24,8 @@ void osoe_connection_init(struct osoe_connection *c)
          * buffer with nothing in it. */
         atomic_store_explicit(&c->s->buffer[k].head, OSOE_BUFFER_SEALED, memory_order_release);
     }
+    atomic_store_explicit(&c->s->ack_requested, 0, memory_order_release);
+    atomic_store_explicit(&c->s->acked, 0, memory_order_release);
 }
 
 enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c, uint32_t len,
@@ -168,4 +170,19 @@ bool osoe_connection_drain_reserve(struct osoe_connection *c, uint32_t k, uint32
     r->len = len;
     r->seq = atomic_load_explicit(&s->buffer[k].seq, memory_order_acquire);
     return true;
+}
+
+void osoe_connection_request_ack(struct osoe_connection *c)
+{
+    atomic_store_explicit(&c->s->ack_requested, 1, memory_order_seq_cst);
+}
+
+bool osoe_connection_take_ack_request(struct osoe_connection *c)
+{
+    return atomic_exchange_explicit(&c->s->ack_requested, 0, memory_order_seq_cst) != 0;
+}
+
+void osoe_connection_publish_acked(struct osoe_connection *c, uint64_t seq)
+{
+    atomic_store_explicit(&c->s->acked, seq, memory_order_release);
 }

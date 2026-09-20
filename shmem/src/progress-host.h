@@ -71,4 +71,24 @@ uint64_t osoe_progress_host_idle_ns(void);
  */
 void osoe_progress_host_post_arrival(uint32_t team, uint32_t epoch);
 
+/*
+ * Ask the local lead's agent to run a pass: it seals what writers have
+ * committed, sends it, and reaps what has arrived (§3.12's "a flag plus a futex
+ * wake", where here the committed bytes are the flag).
+ *
+ * Called by an application thread after committing into a connection buffer,
+ * and again by anything waiting on a peer - a writer out of room, a quiet
+ * waiting for an acknowledgement - because the lead may be asleep and this is
+ * the only thing that wakes it for a connection.
+ */
+void osoe_progress_host_wake_lead(void);
+
+/*
+ * The highest segment sequence `peer` has acknowledged *applying* (§4.6), which
+ * is the evidence quiet waits on. Read out of the lead's own connection state,
+ * which only the lead writes (§3.12); a reader may see a stale value, and a
+ * stale value only ever makes a wait longer.
+ */
+uint64_t osoe_progress_host_acked(uint32_t peer);
+
 #endif /* OSOE_PROGRESS_HOST_H */

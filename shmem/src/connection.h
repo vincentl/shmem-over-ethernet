@@ -141,6 +141,33 @@ struct osoe_connection_buffer {
  */
 struct osoe_connection_shared {
     struct osoe_connection_buffer buffer[2];
+    /*
+     * A writer asking that the next segment carry §3.4's acknowledgement
+     * request, so that a one-way peer still acknowledges and quiet has
+     * something to wait for.
+     *
+     * It is shared because the *writer* is the one that needs the ack - an
+     * application thread in any local PE, inside fence or quiet - while the
+     * flag in the segment header is set at seal time by the lead's agent, which
+     * is the only thread that seals (§3.12). The lead takes this word with an
+     * exchange each pass and folds it into its own bookkeeping, so a set that
+     * arrives after a seal is carried by the next segment rather than lost, and
+     * two writers asking at once ask once.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t ack_requested;
+    /*
+     * The highest segment sequence the peer has acknowledged **applying**
+     * (§4.6), published by the lead's agent as it learns it.
+     *
+     * It is shared for the same reason ack_requested is, from the other side:
+     * the evidence quiet waits on has to be readable by the PE that is waiting,
+     * and the lead's own copy of it lives in the lead's process. Single-writer
+     * publication - only the lead's agent ever stores here - so a release store
+     * against an acquire load, not a two-sided protocol (§3.16). A reader that
+     * sees a stale value waits one more round, which is why this needs no
+     * handshake of its own.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint64_t acked;
 };
 
 /* Process-private handle onto one connection. */
@@ -212,6 +239,10 @@ static inline void *osoe_reservation_bytes(const struct osoe_connection *c, cons
  * been committed, the buffer is not sendable. */
 void osoe_connection_commit(struct osoe_connection *c, const struct osoe_reservation *r);
 
+/* Ask that a segment toward this peer carry an acknowledgement request (§3.4).
+ * Called by an application thread in fence and quiet; idempotent. */
+void osoe_connection_request_ack(struct osoe_connection *c);
+
 /* ---- Progress thread side: the lead's agent only ---------------------- */
 
 /*
@@ -223,6 +254,20 @@ void osoe_connection_commit(struct osoe_connection *c, const struct osoe_reserva
  * signal-after-payload (invariant 5) and quiet.
  */
 void osoe_connection_open(struct osoe_connection *c, uint32_t k, uint64_t seq);
+
+/* Take any pending acknowledgement request, clearing it. The lead's agent only.
+ * An exchange rather than a load and a store, so a request arriving between the
+ * two is not dropped. */
+bool osoe_connection_take_ack_request(struct osoe_connection *c);
+
+/* Publish what the peer has acknowledged applying. The lead's agent only. */
+void osoe_connection_publish_acked(struct osoe_connection *c, uint64_t seq);
+
+/* Read it, from any local PE. */
+static inline uint64_t osoe_connection_acked(const struct osoe_connection *c)
+{
+    return atomic_load_explicit(&c->s->acked, memory_order_acquire);
+}
 
 /*
  * Seal buffer k, so no further reservation can succeed in it. Sealing an empty

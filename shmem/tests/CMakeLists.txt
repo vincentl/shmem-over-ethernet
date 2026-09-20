@@ -243,6 +243,53 @@ foreach(map 0,1,2 0,0,1,1,2,2)
     PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
 
+# The data path across a node boundary (tier 2): the same program over the
+# intranode path and the force-remote path, which must agree byte for byte.
+# Sizes are pinned so that a put longer than an AM chunk really is split.
+add_executable(shmem_test_internode test-internode.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_internode PRIVATE
+  ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_internode PRIVATE osoe rt)
+osoe_warnings(shmem_test_internode)
+#
+# **The multi-node maps do not run under ThreadSanitizer**, and §8.2 already
+# says why in general: its view is one process. Here the ordering that makes a
+# put safe runs through *another* one. The lead's agent writes a local PE's heap
+# while that PE's own main thread touches the same bytes, and what separates
+# them is the barrier - this PE's arrival, then whichever local member happened
+# to be last posting the handoff, then the root, then the release. Every link is
+# a seq_cst operation on shared memory, and the middle ones are in processes
+# tsan cannot see, so it reports a race it has no way to disprove.
+#
+# Suppressing it by name would hide real races in the parser, and adding loads
+# for the tool to follow would make the tool green without making anything
+# safer. The single-node map still runs everywhere, and there the intranode path
+# applies every put in the calling thread, which is precisely the case tsan can
+# check. shmem.multinode.* and shmem.barrier-am.* also still run under tsan:
+# they cross nodes without an agent ever writing a heap a local thread holds.
+if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(osoe_internode_maps 0,0,0,0)
+else()
+  set(osoe_internode_maps 0,0,0,0 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+endif()
+foreach(map IN LISTS osoe_internode_maps)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.internode.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_internode>)
+  set_tests_properties(shmem.internode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+# The force-remote half of this test is NOT registered yet, and the reason is an
+# open decision rather than an oversight: §8.1's flag makes a PE on *this* node
+# remote, and there is no connection from a node to itself (§3.4), so the put
+# has nowhere to be routed. shmem.multinode.force-remote.* still runs, because
+# it exercises the locality answer rather than the data path.
+
 # Every tier-2 test asserts §8.2's rule that invariant counters are zero at
 # quiescence (invariants.h). It reads the control segment through osoe-stat's
 # segment reader, compiled in: shared with the tool, deliberately not with the
