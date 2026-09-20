@@ -9,7 +9,7 @@
 find_package(Python3 COMPONENTS Interpreter)
 
 if(Python3_Interpreter_FOUND)
-  foreach(name wire credit)
+  foreach(name wire credit arrival)
     add_test(NAME model.${name}
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${name}_model.py)
     set_tests_properties(model.${name} PROPERTIES LABELS "tier1" TIMEOUT 300)

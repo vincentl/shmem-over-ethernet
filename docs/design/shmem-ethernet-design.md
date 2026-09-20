@@ -2857,9 +2857,39 @@ counters, or with the team descriptor, hurts even at four PEs, and one alignment
 attribute prevents it.
 
 **Barrier and sync: arrival does not wait for a designated PE.** Whichever local
-member's increment reaches the epoch's arrival target enqueues the internode
-arrival AM and returns to waiting. One comparison on the `fetch_add` result; no
+member's increment reaches the epoch's arrival target posts the node's internode
+arrival and returns to waiting. One comparison on the `fetch_add` result; no
 dependency on the lead being scheduled.
+
+**It posts the arrival; it does not send it.** An earlier draft said the arriver
+"enqueues the internode arrival AM", which §3.12 does allow of an application
+thread in general - reserving and copying into a connection buffer is what every
+writer does (§3.5). It is wrong here for a different reason: the state the
+arrival moves is the progress thread's, not the connection's. The root's arrival
+counts, the participating-node count and the per-connection queues are private
+to the local lead's *agent thread*, in the lead's process, and the arriver is an
+application thread of any local PE - usually another process, which cannot see
+them at all. So the arrival crosses that boundary by §3.12's stated mechanism, a
+flag plus a futex wake: **a per-team word in the node header** (control segment
+layout 7) in which the arriver leaves the epoch, and a bump of the lead's
+`agent_wake`. The lead's agent consumes it and performs the arrival.
+
+Nothing is lost by the extra hop. The bytes could not leave before the lead's
+agent ran in either arrangement, since sending is its alone (§3.12), so posting
+costs the wake that had to happen anyway and buys one mechanism instead of two -
+the root node, where there is no message to send at all, takes the same path.
+
+**One word per team is enough, and that is the bounded-skew argument of §5.4
+again.** Epoch *k+2*'s arrival cannot be posted until every local member has
+been released from *k+1*, and that release cannot happen until the lead has
+already consumed and forwarded *k+1*. So no post can overwrite one the lead has
+not read, and the word needs no queue, no sequence number and no second slot.
+Two rules make it hold, both easy to get wrong and both model-checked in
+`docs/design/evidence/am-backend/arrival_model.py`: the agent loads `agent_wake`
+**before** the handoff word (§4.9), and it records the epoch consumed **from the
+value it forwarded**, not by re-reading the word afterwards - on the root node
+the forward can release the team locally at once, so a member can re-enter and
+post the next epoch into that word before the re-read would happen.
 
 **Data-carrying collectives do wait for the lead**, which combines every local
 contribution itself (§5.5). That dependency is the price of a single writer, and

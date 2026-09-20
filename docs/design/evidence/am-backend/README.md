@@ -1,7 +1,7 @@
 # Evidence: the in-process AM backend (§7.1 step 2)
 
-Two models written before the backend's data structures, and the record of what
-they found. Run them with `python3 <model>.py`; each exits nonzero if any case
+Three models written before the data structures they check, and the record of
+what they found. Run them with `python3 <model>.py`; each exits nonzero if any case
 disagrees with its recorded expectation, so they are regression tests and not
 only a one-off argument. `engine.py` is the copy they were run against.
 
@@ -9,6 +9,7 @@ only a one-off argument. `engine.py` is the copy they were run against.
 |---|---|
 | `wire_model.py` | The node-pair byte stream and its wake protocol (§3.1, §3.10) |
 | `credit_model.py` | Reply credits and the two bounds they keep (§3.8, §3.12, §4.6) |
+| `arrival_model.py` | The internode arrival handoff, and whether one word per team is enough (§5.3, §3.12, §4.9) |
 
 **§3.5's reservation protocol is not modelled here.** It already has two
 independent exhaustive models from the review, in
@@ -47,7 +48,37 @@ where a PE issues every request before landing any, show why §3.8 says "lands".
 Recorded so nobody simplifies it later on the evidence of the blocking cases
 alone.
 
-**A fourth, found while testing the wire.** A reader that publishes `consumed`
+**One word per team is enough, and the reason is §5.4's bounded skew.** §5.3's
+arriver cannot perform the arrival itself - the progress state is private to the
+lead's agent thread, in the lead's process - so it hands the epoch over through
+a word in the node header and wakes that agent (§3.12: "a flag plus a futex
+wake"). Whether that word needs a queue behind it is the question
+`arrival_model.py` was written to settle, and the answer is no: epoch k+2's
+arrival cannot be posted until every local member has been released from k+1,
+which cannot happen until the lead has already consumed and forwarded k+1. The
+`$posted`/`$consumed` pair checks that argument rather than asserting it, and
+`consume_reread` shows what a single word costs when the rule is broken - the
+agent records the epoch by re-reading the shared word *after* forwarding, a
+member re-enters and posts the next epoch into it first, and that arrival is
+lost. Every other node then waits for a node that will never arrive.
+
+**The smallest configuration that fails is not the same for each defect.**
+`wake_after` - the agent loading the handoff before the wake word - fails with a
+single epoch, because the very first arrival can land between the two loads.
+`consume_reread` and `noconsume` need two, because both are defects in *reusing*
+the word and one epoch never reuses it. A model run only at one epoch would have
+called two of the three breakages correct. This is the same shape as the credit
+model's `pes=1` result and the barrier test's two-node result: the configuration
+that is cheapest to run is repeatedly the one that discriminates least.
+
+**`noconsume` is in the model only to make a check able to fail.** The ordering
+check - arrivals reach the root once each, in epoch order - was never reached by
+any other case, so it asserted nothing. A breakage that forwards without
+recording the epoch forwards it twice and reaches it. Adding the case was the
+cheaper half of this project's standing rule that a check nothing can fail is a
+check that is not there.
+
+**A fifth, found while testing the wire.** A reader that publishes `consumed`
 before copying the byte out of the slot lets the writer refill it mid-copy. The
 single-process test cannot see this at all — nothing races — and the two-process
 test sees it in about half of runs, measured at 4 of 8 with the defect present
