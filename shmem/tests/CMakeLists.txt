@@ -291,6 +291,37 @@ endforeach()
 # has nowhere to be routed. shmem.multinode.force-remote.* still runs, because
 # it exercises the locality answer rather than the data path.
 
+# The differential test (§8.1): one program, §8.1's four poles of the logical
+# node map at one world size, and the transcripts must match. On the first map
+# every operation is applied in the calling thread; on the second every one
+# crosses the AM layer; the middle two mix them, which is where a path right at
+# both extremes and wrong in between shows up.
+#
+# It compares outputs rather than checking assertions, which is why it is worth
+# having beside shmem.internode: a CHECK catches what it was told to look for,
+# a diff catches anything that differs.
+#
+# Not registered under ThreadSanitizer, for the reason given above: the
+# happens-before that makes an applied put safe runs through another process,
+# and tsan sees one. Reducing it to the single-node map, as shmem.internode is
+# reduced, would leave nothing to compare it against - a differential test of
+# one configuration is not one - so it is left out there entirely and the other
+# three presets carry it.
+add_executable(shmem_test_differential test-differential.c)
+target_link_libraries(shmem_test_differential PRIVATE osoe)
+osoe_warnings(shmem_test_differential)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+add_test(NAME shmem.differential
+  COMMAND ${CMAKE_COMMAND}
+          -DLAUNCH=$<TARGET_FILE:osoe-launch>
+          -DEXE=$<TARGET_FILE:shmem_test_differential>
+          -DNRANKS=6
+          "-DMAPS=0,0,0,0,0,0;0,1,2,3,4,5;0,0,0,1,2,2;0,1,2,0,1,0"
+          "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919"
+          -P ${PROJECT_SOURCE_DIR}/cmake/Differential.cmake)
+set_tests_properties(shmem.differential PROPERTIES LABELS "tier2" TIMEOUT 300)
+endif()
+
 # Every tier-2 test asserts §8.2's rule that invariant counters are zero at
 # quiescence (invariants.h). It reads the control segment through osoe-stat's
 # segment reader, compiled in: shared with the tool, deliberately not with the
