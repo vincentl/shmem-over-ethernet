@@ -94,12 +94,26 @@ A reviewer should not take these as verified, because they are not:
   simulation of a cluster on one host.
 - **Performance is unmeasured.** There is no benchmark in the tree. Every
   performance claim in the design is an argument.
-- **Two intermittent failures were chased down and fixed** rather than left for
-  this review; both needed artificial CPU load to reproduce, which is why they
-  had only ever appeared in the full suite. They are noted here because the
-  *class* is worth a reviewer's attention: in both, a test asserted something
-  the code did not promise, and the promise turned out to be the thing worth
-  fixing. See the commit for the measurements.
+- **Three intermittent failures were chased down and fixed** rather than left
+  for this review. None reproduced in isolation; all three reproduced within
+  minutes under artificial CPU load, which is the technique worth keeping - the
+  full suite was never the cause, only the thing that happened to be busy. The
+  suite now runs 30 times clean under 8x load.
+
+  The *class* is worth a reviewer's attention, because two of the three were
+  tests asserting something the code did not promise, and in both the promise
+  was the better thing to fix: a test polled until a pass moved nothing when it
+  meant until the node owed nothing (the same defect the library had at
+  teardown), and a test expected the agent thread in the metric table before
+  `shmem_init` guaranteed it was there. The third was a spin budget standing in
+  for a timeout, and its symptom appeared on the *other* node, which is a
+  pattern to expect again: a test that keeps running after a failed check can
+  corrupt its peer's stream and make a one-sided timeout look like data
+  corruption. See the commits for measurements.
+
+  **What this says about the rest of the suite** is the part worth acting on:
+  no test here had been run under load before, and three of the first few
+  examined were timing-fragile. A reviewer should assume more remain.
 
 - **The models prove what they model.** Five exist
   (`docs/design/evidence/`), each with deliberately broken variants, and they
