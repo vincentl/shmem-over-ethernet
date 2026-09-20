@@ -127,6 +127,26 @@ part most likely to be wrong in a way no test shows.
   and break the mechanism under them. `shmem/tests/arrivals.h` has had two flaws
   found in it already, each of which made it silently vacuous.
 
+- **Run the suite under CPU load, and expect to find more.** No test here had
+  ever been run on a busy machine until the end of this slice. Doing it found
+  three timing-fragile tests among the first few examined, and the technique is
+  cheap: start more spinning threads than the VM has cores, then run one test in
+  a loop. Each of the three reproduced within minutes that way and none
+  reproduced in isolation, so the full suite was never the cause — only the
+  thing that happened to be busy.
+
+  Two of the three had the same shape, and it is the shape to hunt for: **a test
+  asserting something the code does not promise**, where the promise turned out
+  to be the better thing to fix. One polled until a pass moved *nothing* when it
+  meant until the node owed nothing; one expected a thread in the metric table
+  before `shmem_init` guaranteed it was there. The third was a spin budget
+  standing in for a timeout — and its symptom appeared on the *other* node,
+  because a test that keeps running after a failed check can corrupt its peer's
+  stream and make a one-sided timeout look like data corruption. Expect that
+  confusion again, and distrust the node that reports the error.
+
+  The three were fixed; the population they came from was not surveyed.
+
 **Deliverable:** `docs/reviews/phase1-step2-slice1-correctness.md`.
 
 ## Question 3: Will it run anywhere else?
