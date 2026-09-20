@@ -17,8 +17,8 @@ or the tree.
 | Design doc | ~1,700 lines | **4,420 lines** |
 | C source (`shmem/`, `base/`, `tools/`) | a skeleton | **~13,750 lines** |
 | Tests | none to speak of | **131**, four presets |
-| Commits | — | 91 total, 27 on `phase1-step2-slice1` |
-| Implementation status | §7.1 step 0 | **§7.1 step 1 merged, step 2 slice 1 complete** |
+| Commits | — | 96 total; the slice is the 31 under merge `d542c63` |
+| Implementation status | §7.1 step 0 | **§7.1 step 1 and step 2 slice 1, both merged to `main`** |
 
 The design doc is no longer mostly a plan. Roughly half of it is now a record of
 decisions *made against code*, several of which reversed what the first review
@@ -34,7 +34,7 @@ shares no headers with the library; agent threads and the §6.4 lifecycle; the
 §4.9 watch mechanism; **526 routines**, each a strong `pshmem_` definition with a
 weak `shmem_` alias, with teams and contexts plumbed on every entry point.
 
-**Step 2, slice 1, on the branch:** everything below the §4.10 boundary and then
+**Step 2, slice 1, merged as `d542c63`:** everything below the §4.10 boundary and then
 the join to the SHMEM layer — the §8.1 logical node map and launcher; the §6.2
 job-wide rendezvous; the node-pair wire (a byte stream, not a message queue);
 §3.4's segments and §3.5's reservation protocol; the connection area; §3.8's

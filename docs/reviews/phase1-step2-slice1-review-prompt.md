@@ -29,10 +29,17 @@ evidence is known to be thin.
   it to test claims by experiment rather than from memory.** You may install
   packages. Run `tools/probe` (the `env.probe` test) before debugging anything
   else.
-- **Branch:** `phase1-step2-slice1`, 27 commits ahead of `main`, not yet merged.
-  **The commit messages are a primary source.** Most record a defect a green
-  test suite did not catch, and several record a rule being broken on purpose to
-  prove a test could see it.
+- **Where the work is:** merged to `main` as `d542c63`, a `--no-ff` merge of the
+  31 commits of `phase1-step2-slice1`; that branch has been deleted, so read the
+  slice with `git log --first-parent main` for the shape and
+  `git log d542c63^..d542c63^2` for the commits themselves.
+
+  **The commit messages are a primary source, not commentary.** Most record a
+  defect a green test suite did not catch, several record a rule broken on
+  purpose to prove a test could see it, and a few record a measurement - failure
+  rates under load, mutation catch rates - that exists nowhere else. A finding
+  that contradicts one of them is worth having; so is one that shows a commit
+  message claims more than the code delivers.
 - **Provenance:** developed over several sessions with Claude's help, one human
   author. Treat that as a reason for more scrutiny, not less — and note that the
   same holds for the *tests*, which were written by the same process as the code
