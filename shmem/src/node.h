@@ -26,7 +26,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 6
+#define OSOE_NODE_LAYOUT 7
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -36,6 +36,20 @@ enum osoe_phase {
 };
 
 enum { OSOE_HEAP_NAME_MAX = 96 };
+
+/*
+ * The predefined teams, numbered (§7.3, spec §9.4).
+ *
+ * Both the node header and the progress loop index per-team state by this, so
+ * it is one enumeration rather than two agreeing constants. shmem_team_split_*
+ * is not implemented, so these are all the teams there are; a split team
+ * spanning several nodes is what grows this, and it grows the arrays with it.
+ */
+enum osoe_team_number {
+    OSOE_TEAM_WORLD = 0,
+    OSOE_TEAM_SHARED = 1,
+    OSOE_TEAMS,
+};
 
 /* The routine name in a "blocked in" record (§3.14). Fixed width: it is read
  * from another process, so it cannot be a pointer. */
@@ -147,6 +161,54 @@ struct osoe_segment_directory {
     uint32_t landing_count;          /* local_count */
 };
 
+/*
+ * The internode arrival handoff, one per predefined team (§5.3, §3.12).
+ *
+ * Whichever local member's increment reaches the team's arrival target leaves
+ * the epoch here and bumps the local lead's `agent_wake`; that agent consumes
+ * it and performs the node's arrival. It cannot perform it itself: the progress
+ * state the arrival moves - the root's arrival counts, the participating-node
+ * count, the per-connection queues - is private to the lead's agent thread, in
+ * the lead's process, and the arriver is an application thread of any local PE,
+ * usually another process. This is §3.12's "a flag plus a futex wake", and it
+ * is the whole of what crosses.
+ *
+ * **One word is enough, and the reason is §5.4's bounded skew.** Epoch k+2's
+ * arrival cannot be posted until every local member has been released from
+ * k+1, and that release cannot happen until the lead has already consumed and
+ * forwarded k+1 - so no post can overwrite one the agent has not read, and this
+ * needs no queue, no sequence number and no second slot. Model-checked in
+ * docs/design/evidence/am-backend/arrival_model.py, where the `$posted` and
+ * `$consumed` counters are that argument rather than an assertion of it.
+ *
+ * Two rules keep it true, and the model breaks each one. The agent loads
+ * `agent_wake` **before** this word (§4.9), or a post landing between the two
+ * loads leaves it asleep on a value that already counts the bump. And it
+ * records the epoch consumed **from the value it forwarded**, never by
+ * re-reading this word afterwards: on the root node the forward can release the
+ * team locally at once (§5.3), so a member can re-enter and post the next epoch
+ * here before a re-read would happen, and that arrival is then lost - a hang on
+ * every other node, which is the worst place to debug it.
+ *
+ * A team with no internode phase never touches its entry. SHMEM_TEAM_SHARED is
+ * one node by definition, so today only the world team's is ever written; it is
+ * per team anyway, because a split team (§7.3) spanning several nodes is the
+ * next thing to arrive and sharing one word between two teams would make a sync
+ * on one forward the arrival of the other.
+ */
+struct osoe_arrival_handoff {
+    /*
+     * The posted epoch, k+1, or 0 before the first. A single-writer publication
+     * store (§3.16): one member posts at a time, and the release of the
+     * previous epoch orders it after the last one.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t epoch;
+};
+
+_Static_assert(sizeof(struct osoe_arrival_handoff) == OSOE_CACHELINE,
+               "each team's handoff word sits alone on its cache line, as its "
+               "epoch counters do (§5.3)");
+
 struct osoe_node_header {
     /* Written by the lead before `ready`; constant afterwards. */
     struct osoe_segment_directory dir;
@@ -188,6 +250,9 @@ struct osoe_node_header {
     struct osoe_epoch shared_arrived;
     struct osoe_epoch shared_released;
     struct osoe_epoch shared_copied;
+
+    /* Appended at layout 7 (§5.3). */
+    struct osoe_arrival_handoff arrival[OSOE_TEAMS];
 };
 
 /*

@@ -20,8 +20,14 @@
  * designated one: whichever increment reaches the epoch's arrival target
  * releases the epoch. Here every team spans one node, so that member bumps
  * `released` itself - the single-node release path of §5.5 - where a
- * multi-node team would send the internode arrival AM instead. Every member
- * then waits for `released` to equal k + 1 (§5.4: equality, bounded skew).
+ * multi-node team would post the internode arrival instead. Every member then
+ * waits for `released` to equal k + 1 (§5.4: equality, bounded skew).
+ *
+ * **The target counts the team's members on this node, not its members**
+ * (§5.2). The two coincide on one node and only there, so a target written
+ * against `members` is a defect no single-node test can show: it is exactly
+ * right until the first multi-node job, where every node would wait for the
+ * whole team to arrive on it.
  *
  * The counters and the epoch count are the *team's*, which is why they arrive
  * through struct osoe_team rather than being read from the header here. Two
@@ -33,7 +39,7 @@ static void sync_team(struct osoe_team *t, const char *routine)
 {
     uint32_t k = *t->epoch;
 
-    if (osoe_epoch_bump_eq(t->arrived, (k + 1) * t->members)) {
+    if (osoe_epoch_bump_eq(t->arrived, (k + 1) * t->local_members)) {
         if (!osoe_epoch_bump_eq(t->released, k + 1))
             osoe_fatal("%s epochs diverged at epoch %u: PEs called different numbers "
                        "of collectives", t->name, k + 1);

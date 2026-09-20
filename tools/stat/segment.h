@@ -148,7 +148,7 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
 void osoe_segment_close(struct osoe_segment *s);
 
 /* The layout this reader was built against. Not a requirement - see above. */
-#define OSOE_SEGMENT_KNOWN_LAYOUT 6
+#define OSOE_SEGMENT_KNOWN_LAYOUT 7
 
 /* The metric of that name, or NULL. */
 const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name);

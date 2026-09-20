@@ -27,7 +27,7 @@
  * appended, and never otherwise.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 136, "frozen by §3.14; 136 at layout 6");
+_Static_assert(sizeof(struct osoe_segment_directory) == 136, "frozen by §3.14; 136 at layouts 6 and 7");
 
 /*
  * Candidate heap bases, tried in order by the lead; the first where its own

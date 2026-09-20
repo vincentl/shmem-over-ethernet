@@ -109,6 +109,14 @@ _Static_assert(sizeof thread_metrics / sizeof thread_metrics[0] == OSOE_COUNTER_
       (uint32_t)(offsetof(struct osoe_node_header, field) +                 \
                  offsetof(struct osoe_epoch, count_compare_only_by_equality)), 0 }
 
+/* One team's §5.3 arrival handoff. The word lives in an array of cache-line
+ * padded structures, so the entry names the element and then the word. */
+#define NDARRIVAL(name, team)                                               \
+    { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,      \
+      (uint32_t)(offsetof(struct osoe_node_header, arrival) +               \
+                 (team) * sizeof(struct osoe_arrival_handoff) +             \
+                 offsetof(struct osoe_arrival_handoff, epoch)), 0 }
+
 static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.rank", rank, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.pid", pid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
@@ -144,6 +152,16 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     NDEPOCH("team.shared.arrived", shared_arrived),
     NDEPOCH("team.shared.released", shared_released),
     NDEPOCH("team.shared.copied", shared_copied),
+    /*
+     * §5.3's internode arrival handoff: the epoch a local member posted for the
+     * lead's agent to forward. Against `released` it is where a hung multi-node
+     * barrier usually is - posted ahead of released means this node's arrival
+     * has not reached the root or the release has not come back, and posted
+     * equal to released means this node has not arrived at all, which points at
+     * a PE that has not called the collective rather than at the network.
+     */
+    NDARRIVAL("team.world.arrival_posted", OSOE_TEAM_WORLD),
+    NDARRIVAL("team.shared.arrival_posted", OSOE_TEAM_SHARED),
     ND("node.aborting", aborting, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_pe", abort_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_status", abort_status, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),

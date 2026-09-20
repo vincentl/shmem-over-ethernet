@@ -18,7 +18,16 @@
 /* The two predefined teams, resolved to the state a collective needs. */
 struct osoe_team {
     const char *name;
+    uint32_t number;                /* enum osoe_team_number: indexes per-team state */
     uint32_t members;               /* PEs in the team */
+    /*
+     * §5.2's local member count: team members *on this node*, which is not the
+     * local PE count and not the team size. It is what the intranode phase
+     * counts arrivals against (§5.3), and writing `members` there is the defect
+     * a one-node job cannot show - on one node every member is local and the
+     * two coincide exactly.
+     */
+    uint32_t local_members;
     uint32_t me;                    /* this PE's number within it */
     struct osoe_epoch *arrived;     /* the team's own epoch counters (§5.4) */
     struct osoe_epoch *released;

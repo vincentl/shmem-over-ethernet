@@ -40,10 +40,6 @@
 #include "reply.h"
 #include "wire.h"
 
-/* Teams whose internode phase this build carries: the two predefined ones
- * (§7.3). shmem_team_split_* is not implemented, so there are no others. */
-#define OSOE_PROGRESS_TEAMS 2
-
 /* What the progress loop asks of the PE it runs inside. */
 struct osoe_progress_host {
     /*
@@ -107,9 +103,9 @@ struct osoe_progress {
      * progress thread, like everything else here. Only the root counts; every
      * other node's lead only forwards its own arrival and applies the release.
      */
-    uint32_t arrivals[OSOE_PROGRESS_TEAMS];
-    uint32_t arrival_epoch[OSOE_PROGRESS_TEAMS];
-    uint32_t participants[OSOE_PROGRESS_TEAMS];
+    uint32_t arrivals[OSOE_TEAMS];
+    uint32_t arrival_epoch[OSOE_TEAMS];
+    uint32_t participants[OSOE_TEAMS];
     uint64_t barrier_arrivals;
 
     /* §3.14 counters, read by osoe-stat and by the tests. */

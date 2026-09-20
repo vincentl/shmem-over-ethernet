@@ -176,9 +176,9 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_BARRIER_ARRIVE: {
         struct osoe_am_barrier m;
         memcpy(&m, fixed, sizeof m);
-        if (m.team >= OSOE_PROGRESS_TEAMS)
+        if (m.team >= OSOE_TEAMS)
             osoe_fatal("a barrier arrival names team %u; this build has %u", m.team,
-                       OSOE_PROGRESS_TEAMS);
+                       OSOE_TEAMS);
         /*
          * The root counts arrivals for the epoch. A node that arrives for the
          * next epoch while this one is still open cannot happen: a member
@@ -575,9 +575,9 @@ void osoe_progress_request_ack(struct osoe_progress *p, uint32_t peer)
 void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch,
                           uint32_t root, uint32_t participants)
 {
-    if (team >= OSOE_PROGRESS_TEAMS)
+    if (team >= OSOE_TEAMS)
         osoe_fatal("a barrier arrival names team %u; this build has %u", team,
-                   OSOE_PROGRESS_TEAMS);
+                   OSOE_TEAMS);
     p->participants[team] = participants;
 
     if (p->node == root) {
