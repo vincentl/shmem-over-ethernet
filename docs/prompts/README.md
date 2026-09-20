@@ -39,4 +39,5 @@ and `docs/reviews/` do track the current names.
 | `phase1-step1-slice2-prompt.md` | §7.1 step 1, second slice: signals, watchdog, introspection, conformance breadth | see below |
 | `task-boundary-changes-review.md` | Review the RoCE-driven §4.10 proposals mid-slice, implement what survives | `2e44e7f`, `4cf2a93` |
 | `phase1-step1-slice2-continuation-prompt.md` | Resumption of that second slice | merged, `5955d20` and `4e96700` |
-| `phase1-step2-slice1-prompt.md` | §7.1 step 2, first slice: the in-process AM backend | next |
+| `phase1-step2-slice1-prompt.md` | §7.1 step 2, first slice: the in-process AM backend | see below |
+| `phase1-step2-slice1-continuation-prompt.md` | Resumption of that first slice | in progress |
