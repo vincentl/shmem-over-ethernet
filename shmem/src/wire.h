@@ -78,10 +78,12 @@ struct osoe_wire {
     struct osoe_wire_direction *rx;   /* and reads here */
     uint64_t capacity;               /* bytes per direction */
     uint64_t seed;              /* split injection, derived from job and step */
+    uint64_t close_timeout_ns;  /* how long osoe_wire_close waits for the peer */
     uint32_t split;             /* truncations per myriad; 0 disables */
     uint64_t sends;             /* this process's transfers, for the seed */
     uint64_t recvs;
     bool creator;               /* this node created it, so it removes the name */
+    bool left;                  /* this side has announced that it has stopped writing */
 };
 
 /*
@@ -92,7 +94,25 @@ struct osoe_wire {
 void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_t peer,
                     uint32_t session);
 
-/* Unmap; the creating node also removes the name. */
+/*
+ * Announce that this side has stopped writing, and wake the peer. Idempotent.
+ *
+ * Call it on every wire before closing any of them: a lead with several peers
+ * would otherwise wait out one peer's teardown before telling the next, and a
+ * caller holding *both* ends of a wire cannot close them one after the other
+ * at all, since the first close waits for a side it has not reached yet.
+ */
+void osoe_wire_shutdown(struct osoe_wire *w);
+
+/*
+ * Announce if not already announced, wait for the peer's announcement, then
+ * unmap; the creating node also removes the name. **Both ends must close**,
+ * and the wait is why: a barrier orders arrival, not the last byte, so a peer
+ * can still owe an acknowledgement (§3.4) after this side has run its last
+ * collective, and unmapping first leaves it storing into an address it no
+ * longer holds - a SIGSEGV on the node that did nothing wrong. Fatal if the
+ * peer does not arrive within OSOE_BOOTSTRAP_TIMEOUT (§3.15).
+ */
 void osoe_wire_close(struct osoe_wire *w);
 
 /*

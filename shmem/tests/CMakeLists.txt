@@ -97,8 +97,8 @@ set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
 
 # The wire between two processes (tier 2). Two logical nodes, one PE each, so
 # each process is a node lead - the only role that touches a wire (§3.12). It
-# does not call shmem_init, since a two-node job is still refused until the
-# backend lands, and takes its identity straight from the launcher environment.
+# does not call shmem_init: it tests the wire on its own, below the library,
+# and takes its identity straight from the launcher environment.
 # The seed is fixed: §3.14 wants an injected fault reproducible, and without it
 # the pattern would follow the launcher's pid and differ every run.
 add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c)
@@ -176,8 +176,8 @@ set_tests_properties(shmem.progress PROPERTIES LABELS "tier2" TIMEOUT 90)
 
 # The connection area across the PEs of a node (tier 2). The local lead creates
 # it and the others open it, which is §3.12's arrangement. Not an
-# osoe_tier2_test: it does not call shmem_init, since a multi-node job is still
-# refused, and it takes its identity from the launcher environment.
+# osoe_tier2_test: it does not call shmem_init, testing the area on its own
+# below the library, and it takes its identity from the launcher environment.
 add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/connection.c)
 target_include_directories(shmem_test_connection_area PRIVATE ../src)
 target_link_libraries(shmem_test_connection_area PRIVATE osoe_base rt)
@@ -186,6 +186,61 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
   add_test(NAME shmem.connection-area.L${count}
     COMMAND osoe-launch -n ${count} -t 60 -- $<TARGET_FILE:shmem_test_connection_area>)
   set_tests_properties(shmem.connection-area.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+
+# A job spanning logical nodes, end to end through the public API (tier 2).
+#
+# Three nodes at least, and more than one PE on a node: with two nodes a root
+# that releases on any arrival is indistinguishable from one that waits for all,
+# and with one PE per node the intranode phase never runs, so an arrival target
+# computed from the wrong member count is right by accident. The maps below have
+# the shape that discriminates as well as §8.1's four poles, and one single-node
+# map so the same program also covers the path where the last local arriver
+# releases the epoch itself.
+#
+# The AM sizes are pinned small and the wire's split injection is on, so the
+# stream really arrives in pieces (§8.2) rather than at whatever the production
+# defaults make of loopback.
+add_executable(shmem_test_multinode test-multinode.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_multinode PRIVATE
+  ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_multinode PRIVATE osoe rt)
+osoe_warnings(shmem_test_multinode)
+foreach(map 0,0,0,0 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.multinode.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_multinode>)
+  set_tests_properties(shmem.multinode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+
+# The same program with §8.1's force-remote flag on, which is what makes
+# osoe_transport_direct's call to the one locality function testable at all:
+# without it a PE on another node already has no mapped heap here, so the
+# answer is NULL whether the function is consulted or not, and the line that
+# matters is the one that returns NULL for a PE which *is* on this node.
+#
+# The data path does not route yet, so this is the shmem_ptr half of the
+# differential test rather than the whole of it. Multi-node maps only: with one
+# logical node there is no peer to route to, and what force-remote should mean
+# there is an open question (§8.1).
+foreach(map 0,1,2 0,0,1,1,2,2)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.multinode.force-remote.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+            OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_multinode>)
+  set_tests_properties(shmem.multinode.force-remote.${label}
+    PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
 
 # Every tier-2 test asserts §8.2's rule that invariant counters are zero at
@@ -299,20 +354,8 @@ add_test(NAME shmem.refuse.no_launcher
           $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.refuse.no_launcher PROPERTIES
   PASS_REGULAR_EXPRESSION "no launcher environment")
-add_test(NAME shmem.refuse.multinode
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_PROCID=0 OSOE_LOCALID=0 OSOE_STEP_NUM_TASKS=2
-          OSOE_NODEID=0 OSOE_STEP_NUM_NODES=2 OSOE_GTIDS=0 OSOE_JOB_ID=1 OSOE_STEP_ID=0
-          $<TARGET_FILE:shmem_test_init>)
-set_tests_properties(shmem.refuse.multinode PROPERTIES
-  PASS_REGULAR_EXPRESSION "internode traffic needs the AM backend")
-# The same refusal reached the way a test will reach it: §8.1's node map, turned
-# by osoe-launch into the per-rank variables Slurm would set. This is what says
-# the launcher's derived environment and the library's check agree about what a
-# multi-node job looks like.
-add_test(NAME shmem.refuse.multinode_map
-  COMMAND osoe-launch -n 2 -m 0,1 -t 20 -- $<TARGET_FILE:shmem_test_init>)
-set_tests_properties(shmem.refuse.multinode_map PROPERTIES
-  PASS_REGULAR_EXPRESSION "internode traffic needs the AM backend")
+# A multi-node job is no longer refused; shmem.multinode.* is what it does
+# instead, and shmem.init.* still covers the one-node case.
 add_test(NAME shmem.refuse.bad_size
   COMMAND osoe-launch -n 2 -t 60 -e 0:SHMEM_SYMMETRIC_SIZE=12q -e 1:SHMEM_SYMMETRIC_SIZE=12q
           -- $<TARGET_FILE:shmem_test_init>)
@@ -341,6 +384,6 @@ add_test(NAME shmem.refuse.nonsymmetric_put
   COMMAND osoe-launch -n 1 -t 60 -- $<TARGET_FILE:shmem_test_bad_put>)
 set_tests_properties(shmem.refuse.nonsymmetric_put PROPERTIES
   PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap")
-set_tests_properties(shmem.refuse.no_launcher shmem.refuse.multinode
-  shmem.refuse.multinode_map shmem.refuse.bad_size shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
+set_tests_properties(shmem.refuse.no_launcher shmem.refuse.bad_size
+  shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
   LABELS "tier2" TIMEOUT 90)

@@ -138,6 +138,25 @@ void osoe_progress_attach(struct osoe_progress *p,
 
 bool osoe_progress_poll(struct osoe_progress *p);
 
+/*
+ * Does this node owe the network nothing? True when every connection has an
+ * empty reply queue, nothing sealed, nothing in flight, and no committed bytes
+ * waiting in an open buffer.
+ *
+ * It exists for teardown. §5.3's root releases its own node the instant the
+ * last node arrives and only *enqueues* the releases that free the others, so
+ * a node can leave a collective while messages other nodes are waiting for are
+ * still in a buffer that only its engine sends. Stopping the engine there
+ * hangs every other node (§6.4).
+ */
+bool osoe_progress_idle(struct osoe_progress *p);
+
+/* Stop owing acknowledgements, so that a final drain does not manufacture
+ * ack-only segments for peers that have already finished (§3.4). Only at
+ * teardown: an owed ack has a waiter only inside quiet (§4.6), which cannot be
+ * running once every PE has passed shmem_finalize's barrier. */
+void osoe_progress_forget_acks(struct osoe_progress *p);
+
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
 uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);
 
@@ -150,14 +169,22 @@ void osoe_progress_request_ack(struct osoe_progress *p, uint32_t peer);
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer);
 
 /*
- * This node's arrival at a team's internode phase (§5.3), called by whichever
- * local member's increment reached the epoch's arrival target - an application
- * thread, which is why it only ever *enqueues* (§3.7).
+ * This node's arrival at a team's internode phase (§5.3).
+ *
+ * Called by the lead's agent, out of the handoff word that whichever local
+ * member's increment reached the arrival target left for it (progress-host.h).
+ * Not by that member: everything here is the progress thread's private state,
+ * in the lead's process, and the arriver is an application thread of any local
+ * PE. An earlier draft had the arriver reserve and commit the message itself,
+ * which §3.12 does allow of an application thread in general - but it cannot
+ * touch `arrivals` or `participants` below, and on the root node there is no
+ * message to reserve at all.
  *
  * `root` is the node that counts arrivals and sends the releases; `nodes` is
  * how many participate, which for a team is the nodes holding at least one
- * member (§5.2). On the root this is applied directly; elsewhere it is posted
- * to the root's connection.
+ * member (§5.2). On the root this is applied directly, and may complete the
+ * collective and release the team before returning; elsewhere it is reserved
+ * onto the root's connection for this same thread to send.
  */
 void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch,
                           uint32_t root, uint32_t participants);

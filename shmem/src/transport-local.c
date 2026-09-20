@@ -15,6 +15,7 @@
 
 #include "base/order.h"
 #include "fatal.h"
+#include "job.h"
 #include "metrics.h"
 #include "state.h"
 #include "rmw.h"
@@ -39,9 +40,30 @@ struct osoe_transport_context *osoe_transport_context_default(void)
     return &default_ctx;
 }
 
+/*
+ * §8.1's single locality function, seen from the boundary (§4.10).
+ *
+ * Non-NULL says the backend orders the calling thread's stores through this
+ * address against its own writes by the next fence or wait (§4.6), which this
+ * backend does because it applies every write in the calling thread. So the
+ * answer is NULL for a PE on another logical node - whose heap this process
+ * never mapped, since PEs rendezvous only with the PEs in their own node's
+ * OSOE_GTIDS - and also for a *local* PE under §8.1's force-remote flag, where
+ * the pages are right there but the traffic is deliberately routed over the AM
+ * backend, which orders nothing of the sort.
+ *
+ * That second case is what makes the differential test compare like with like:
+ * shmem_ptr, shmem_team_ptr and shmem_addr_accessible all consult this and
+ * nothing else (§4.8), so a program run both ways sees the same answers from
+ * them rather than one path quietly taking a shortcut the other cannot.
+ */
 void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
 {
     if (region != OSOE_REGION_HEAP)
+        return NULL;
+    if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size)
+        return NULL;
+    if (!osoe_is_local(&osoe.job, (uint32_t)pe))
         return NULL;
     int32_t local = osoe.node.local_of_rank[pe];
     if (local < 0)

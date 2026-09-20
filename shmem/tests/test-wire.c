@@ -174,6 +174,11 @@ int main(void)
                         "short-transfer path was not exercised\n",
                 short_sends, zero_sends, short_recvs);
 
+    /* One process holds both ends, so both must announce before either waits
+     * (wire.h): a close blocks until the other side has announced, and the
+     * other side here is the next statement. */
+    osoe_wire_shutdown(&a);
+    osoe_wire_shutdown(&b);
     osoe_wire_close(&b);
     osoe_wire_close(&a);
     return CHECK_DONE();

@@ -42,6 +42,7 @@ struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team)
             /* Every local PE is a member of the world team, so the world's
              * local member count is the node's PE count (§5.2). */
             .local_members = osoe.bootstrap.local_count,
+            .internode = osoe.job.node_count > 1,
             .me = osoe.bootstrap.rank,
             .arrived = &osoe.node.hdr->world_arrived,
             .released = &osoe.node.hdr->world_released,
@@ -58,6 +59,7 @@ struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team)
             /* SHMEM_TEAM_SHARED is one node by definition (§4.8), so every
              * member is local and it has no internode phase at all. */
             .local_members = osoe.bootstrap.local_count,
+            .internode = false,
             .me = osoe.bootstrap.local_id,
             .arrived = &osoe.node.hdr->shared_arrived,
             .released = &osoe.node.hdr->shared_released,

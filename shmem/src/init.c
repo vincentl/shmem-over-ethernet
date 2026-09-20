@@ -14,6 +14,8 @@
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
+#include "job.h"
+#include "progress-host.h"
 #include "state.h"
 #include "transport.h"
 
@@ -89,20 +91,6 @@ static void session_start(void)
     osoe_bootstrap_read(&osoe.bootstrap);
 
     /*
-     * One logical node still, until the AM backend carries internode traffic
-     * (§7.1 step 2). The check is here rather than in the bootstrap because
-     * what is missing is the *library's* ability to run such a job, not
-     * anything wrong with the environment: the rendezvous of §6.2 parses and
-     * uses that environment already, and refusing it there would stop it being
-     * testable before the backend exists.
-     */
-    if (osoe.bootstrap.node != 0 || osoe.bootstrap.local_count != osoe.bootstrap.world_size)
-        osoe_fatal("this job spans more than one node (OSOE_NODEID=%u, %u of %u ranks "
-                   "local); internode traffic needs the AM backend of §7.1 step 2",
-                   osoe.bootstrap.node, osoe.bootstrap.local_count,
-                   osoe.bootstrap.world_size);
-
-    /*
      * Before the rendezvous, so that a job which fails to start still says
      * which library it was and how to ask it for help.
      */
@@ -113,10 +101,24 @@ static void session_start(void)
         print_info();
     /* A re-init after a full teardown is a fresh session (§6.4). Every PE runs
      * the same sequence of sessions, so the numbers agree. */
-    osoe_node_join(&osoe.node, &osoe.bootstrap, sessions++);
+    uint32_t session = sessions++;
+    osoe_node_join(&osoe.node, &osoe.bootstrap, session);
+    /*
+     * Then the job-wide rendezvous (§6.2): only node leads take part, and it is
+     * what produces the rank -> node map that every later addressing decision
+     * reads. It comes after the node's own rendezvous because a lead publishes
+     * its node's rank list, which it learns there.
+     */
+    osoe_job_join(&osoe.job, &osoe.bootstrap, session);
     osoe_transport_init();
     if (osoe_allocator_init(&osoe.allocator, osoe.node.heap_size) != 0)
         osoe_fatal("out of memory");
+    /*
+     * The AM backend, before the agent thread rather than after: the lead's
+     * agent is the node's progress engine (§3.12), so what it polls has to
+     * exist before it does.
+     */
+    osoe_progress_host_start(session);
     osoe_agent_start(&osoe.node.slots[osoe.bootstrap.local_id]);
     init_pid = getpid();
 
@@ -128,19 +130,28 @@ static void session_start(void)
      */
     if (osoe.bootstrap.debug)
         fprintf(stderr, "osoe: PE %u of %u (local %u of %u): segment /dev/shm%s, "
-                "heap %llu bytes at %#llx, watchdog %s\n",
+                "heap %llu bytes at %#llx, watchdog %s, node %u of %u%s\n",
                 osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
                 osoe.bootstrap.local_count, osoe.node.control_name,
                 (unsigned long long)osoe.node.heap_size,
                 (unsigned long long)osoe.node.hdr->heap_base,
-                osoe.bootstrap.watchdog ? "on" : "off");
+                osoe.bootstrap.watchdog ? "on" : "off",
+                osoe.job.node, osoe.job.node_count,
+                osoe.job.force_remote ? ", force-remote" : "");
 }
 
 static void session_end(void)
 {
+    /*
+     * The agent first, so that nothing is polling the engine while it is taken
+     * apart, and so the wire close handshake (wire.h) is not racing this node's
+     * own progress loop.
+     */
     osoe_agent_stop(&osoe.node.slots[osoe.bootstrap.local_id]);
+    osoe_progress_host_stop();
     osoe_allocator_fini(&osoe.allocator);
     osoe_transport_fini();
+    osoe_job_leave(&osoe.job);
     osoe_node_leave(&osoe.node, &osoe.bootstrap);
     osoe_bootstrap_free(&osoe.bootstrap);
 }

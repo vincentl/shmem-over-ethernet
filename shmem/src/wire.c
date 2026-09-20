@@ -44,6 +44,13 @@ struct osoe_wire_header {
      * end of a zero-length mapping.
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t ready;
+    /*
+     * How many of the two sides have stopped writing (osoe_wire_close). A side
+     * unmaps only once this reads 2, because unmapping while the peer still
+     * holds the ring is a store into an address that is no longer mapped -
+     * SIGSEGV in the peer, blamed on the peer.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t leaving;
     _Alignas(OSOE_CACHELINE) struct osoe_wire_direction direction[2];
 };
 
@@ -151,6 +158,9 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
     if (peer == b->node)
         osoe_fatal("a node cannot open a wire to itself (node %u)", b->node);
     read_env(w, b);
+    /* The close handshake waits as long as the bootstrap does: both are "the
+     * other end of this job should be here by now" (§6.2). */
+    w->close_timeout_ns = b->timeout_ns;
 
     /* §6.2: the lower node index connects to the higher, so exactly one wire
      * exists per pair and exactly one side creates it. */
@@ -254,10 +264,68 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
     w->rx = &h->direction[w->creator ? 1 : 0];
 }
 
+/*
+ * Teardown is two-sided, and the reason is that a barrier orders *arrival*,
+ * not the last byte.
+ *
+ * A lead that has applied its release may still owe an acknowledgement for the
+ * segment that carried it (§3.4), so a peer can legitimately write here after
+ * this side has finished every collective it will ever run. Unmapping first
+ * leaves that peer storing into an address it no longer holds - a SIGSEGV on
+ * the node that did nothing wrong, and the backtrace names the innocent side.
+ *
+ * So it is the same shape as `ready` at the other end of the object's life:
+ * publish that this side is done, wake, and wait for the count to reach two.
+ * This is the third object in this slice to need the rule §6.2 states for the
+ * control segment - do not take the thing away while anyone still holds it -
+ * after arrivals_close() and the job segment. There the shared resource was
+ * the *name*; here it is the mapping, and the name is fine either way.
+ *
+ * **Announcing and waiting are separate calls**, which is not tidiness. A lead
+ * with several peers must tell all of them before waiting on any, or teardown
+ * costs one peer's timeout after another. And a single process holding both
+ * ends - which every tier-1 test of this file does - cannot close them one
+ * after the other if closing blocks: the first close waits for a side that has
+ * not been reached yet. Announcing to both first makes that work, and finding
+ * it out is what the tier-1 test is for.
+ */
+void osoe_wire_shutdown(struct osoe_wire *w)
+{
+    if (!w->map || w->left)
+        return;
+    struct osoe_wire_header *h = w->map;
+    w->left = true;
+    /* Both stores of a two-sided protocol are seq_cst (§3.16), and a locked
+     * add is one: each side adds its own and reads the other's. */
+    atomic_fetch_add_explicit(&h->leaving, 1, memory_order_seq_cst);
+    osoe_futex_wake(&h->leaving, INT_MAX, OSOE_FUTEX_SHARED);
+}
+
 void osoe_wire_close(struct osoe_wire *w)
 {
     if (!w->map)
         return;
+    osoe_wire_shutdown(w);
+    struct osoe_wire_header *h = w->map;
+
+    /*
+     * The wait carries the bootstrap timeout rather than running forever: a
+     * peer that has died will never arrive, and a job that hangs in teardown
+     * looks exactly like one that hangs in a collective (§3.15).
+     */
+    struct osoe_deadline until = osoe_deadline_in(w->close_timeout_ns);
+    for (;;) {
+        uint32_t left = atomic_load_explicit(&h->leaving, memory_order_acquire);
+        if (left >= 2)
+            break;
+        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_futex_wait(&h->leaving, left, &sweep, OSOE_FUTEX_SHARED);
+        if (osoe_deadline_expired(&until) &&
+            atomic_load_explicit(&h->leaving, memory_order_acquire) < 2)
+            osoe_fatal("timed out waiting for the other end of the wire %s to finish; "
+                       "that node is still running or has died mid-teardown", w->name);
+    }
+
     munmap(w->map, w->bytes);
     if (w->creator)
         shm_unlink(w->name);

@@ -724,6 +724,19 @@ latency-neutral, since the Pi will not honour a 10 µs `nanosleep` and a 1 ms
 sleep roughly doubles round-trip latency); `IORING_OP_MSG_RING` (requires a ring
 per PE to avoid one futex word).
 
+> **§7.1 step 2 polls, and that is a stand-in rather than a change of mind.**
+> The loop above waits on *one* submission that carries both the socket
+> completions and the futex — that is the whole trick, and `IORING_OP_FUTEX_WAIT`
+> is in `tools/probe` because of it. Step 2 has no ring: its wire is shared
+> memory, and a plain `futex_wait` takes one address, so the lead's agent can
+> wait on its wake word or on one peer's wire, but not on both, and with several
+> peers not on all the wires. Outbound traffic is unaffected — an application
+> thread bumps the wake word, which is an address the agent is already waiting
+> on (§3.12) — so only *arriving* bytes have no way to announce themselves, and
+> those are found by looking, at an interval far under the safety sweep. The
+> rejection above stands for the shipping design, and step 3 restores the
+> blocking form and deletes the interval.
+
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
 anything sealed regardless of signalling. This converts a class of hangs into a
@@ -3480,6 +3493,24 @@ Things to get right, each of which is a silent bug otherwise:
 - **The count is per process, not per thread**, and must be updated atomically.
 - **Concurrent first `shmem_init`** from two application threads passes through a
   once-gate, so bootstrap runs exactly once.
+- **A node must not stop its progress engine while it owes a peer bytes.** The
+  final barrier does not establish that it does not, and the gap is §5.3's own
+  shape: the root releases *its own* node the instant the last node arrives, and
+  only enqueues the releases that free the others, which later drain and flush
+  passes put on the wire. So the root's PEs can leave that barrier, reach
+  `shmem_finalize` and stop the agent while the message every other node is
+  waiting for is still in a buffer only that agent sends — and every other node
+  then waits for a node that has already exited. The lead therefore drains the
+  engine to idle after its agent is joined and before its wires close. Measured
+  at 3 hangs in 12 runs of the suite without it and 0 in 25 with it; the
+  signature is that the root's non-lead PEs exit cleanly while every other rank
+  is killed at the launcher's timeout.
+- **A wire is unmapped only after both ends have stopped writing.** Same reason
+  from the other side: a lead that has applied its release may still owe an
+  acknowledgement for the segment that carried it (§3.4), so a peer can write
+  after this side has run its last collective, and unmapping first turns that
+  into a SIGSEGV on the node that did nothing wrong. Announcing and waiting are
+  separate calls, so a lead tells every peer before waiting on any.
 - **A child created by `fork()`** after init inherits the mappings but no agent
   threads (§3.12). It must not call OpenSHMEM, and teardown code compares the
   current pid with the initializing pid and does nothing in a child.

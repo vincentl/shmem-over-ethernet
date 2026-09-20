@@ -28,6 +28,12 @@ struct osoe_team {
      * two coincide exactly.
      */
     uint32_t local_members;
+    /*
+     * Members on more than one logical node, so the team has §5.3's internode
+     * phase: the node's arrival goes to the root and the release comes back,
+     * rather than the last local arriver releasing the epoch itself.
+     */
+    bool internode;
     uint32_t me;                    /* this PE's number within it */
     struct osoe_epoch *arrived;     /* the team's own epoch counters (§5.4) */
     struct osoe_epoch *released;

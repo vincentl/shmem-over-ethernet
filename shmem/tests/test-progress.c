@@ -209,7 +209,7 @@ int main(void)
          * sibling is still coming: "nothing moved this pass" is not "nothing
          * more will move".
          */
-        arrivals[my_pe] = 1.0;
+        arrivals_row()[my_pe] = 1.0;
         osoe_connection_area_close(&area);
         /*
          * Deliberately not arrivals_close(): it unlinks the name, and a lead
@@ -317,7 +317,7 @@ int main(void)
      * sitting in a buffer. Both leads reach the wait below only after their
      * own side is fully sent, which is what makes the pair terminate.
      */
-    while (arrivals[my_pe + 1] == 0.0) {
+    while (arrivals_row()[my_pe + 1] == 0.0) {
         osoe_progress_poll(&p);
         if (osoe_deadline_expired(&give_up)) {
             fprintf(stderr, "PE %u: this node's other PE never posted\n", my_pe);

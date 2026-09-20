@@ -61,6 +61,14 @@
 #define OSOE_AM_MAX_CHUNK       (UINT64_C(1) << 20)
 #define OSOE_AM_DEFAULT_BUDGET  (UINT64_C(256) << 20)
 
+/*
+ * §3.8's per-connection reply credit C. It bounds the target's deferred reply
+ * queues, so a node's descriptor pool is `connections x C` - which scales with
+ * node count as §1 requires, and is why the bound is per connection rather
+ * than per PE.
+ */
+#define OSOE_AM_DEFAULT_CREDITS 64u
+
 enum osoe_am_size_status {
     OSOE_AM_SIZE_OK,
     OSOE_AM_SIZE_SHRUNK,    /* below what was asked for, still at or above the floor */

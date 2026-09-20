@@ -74,6 +74,14 @@ enum osoe_reply_kind {
      * queue behind a large get reply.
      */
     OSOE_REPLY_RELEASE,
+    /*
+     * This node's arrival, forwarded to the collective's root (§5.3). It is a
+     * descriptor for the same reason the release is: the lead's agent is both
+     * the thread that learns of the arrival and the thread that seals the
+     * buffer, so reserving for it inline would be waiting on space only this
+     * thread frees. Deferring costs a pass and cannot deadlock (§3.7).
+     */
+    OSOE_REPLY_ARRIVE,
 };
 
 /*

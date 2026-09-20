@@ -124,7 +124,7 @@ int main(void)
      * something to be caught by.
      */
     arrivals_arrive((int)b.rank);
-    arrivals[b.node] = arrivals_now();
+    arrivals_row()[b.node] = arrivals_now();
     osoe_progress_arrive(&p, TEAM, EPOCH, ROOT, b.node_count);
 
     while (releases == 0) {
