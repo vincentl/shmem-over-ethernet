@@ -67,6 +67,9 @@ enum osoe_counter {
      * lead to seal it and try again (§3.5, §3.6). Not an error: it is the
      * publication-window stall made visible rather than assumed rare. */
     OSOE_C_AM_RESERVE_STALLS,
+    /* Wakes OSOE_TRANSPORT_MORE held back, each one a futex syscall the
+     * following operation paid for instead (§4.10). */
+    OSOE_C_AM_WAKES_DEFERRED,
 
     /*
      * Must be zero at quiescence (§3.14 question 6, §8.2).

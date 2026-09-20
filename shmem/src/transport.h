@@ -137,17 +137,24 @@ enum {
      * wrong however the flag is set. That rule is the flag's whole safety
      * argument, and it is the backend's to keep.
      *
-     * No caller sets this yet, and both of osoe's backends ignore it.
+     * **Its first caller is put_signal** (§4.10, and signal.c), which is the
+     * one routine that can set it honestly in this step: the signal follows the
+     * put on the same context and to the same PE, so "more follows" is a fact
+     * rather than a guess. The intranode path still ignores it, correctly -
+     * there is nothing to defer when every put is a memcpy applied before the
+     * call returns.
      *
-     * On the intranode backend there is nothing to defer: every put is a memcpy
-     * applied before the call returns. On the AM backend what it would defer is
-     * the *wake*, not the seal - §3.9's aggregation self-clocks off the send
-     * completion, so an operation on an idle connection is sealed and submitted
-     * at once and nothing waits for a buffer to fill; the only thing an
-     * application thread controls is whether it asks the lead for a wake
-     * (§3.12). The saving is futex wakes on a burst, and ignoring the flag
-     * costs at most one safety-sweep interval, because §3.10 requires a sealed
-     * buffer to be submitted regardless of signalling.
+     * On the AM path what it defers is the *wake*, not the seal, and that is
+     * now what it does rather than what it would do. §3.9's aggregation
+     * self-clocks off the send completion, so an operation on an idle
+     * connection is sealed and submitted at once and nothing waits for a buffer
+     * to fill; the only thing an application thread controls is whether it asks
+     * the lead to run (§3.12). So the saving is futex syscalls on a burst, the
+     * bytes are copied and committed before the call returns either way, and a
+     * held wake costs at most one safety-sweep interval because §3.10 has the
+     * lead submit a sealed buffer regardless of signalling. am.wakes_deferred
+     * counts them, since a flag whose whole effect is to change nothing
+     * observable needs a counter to be testable at all.
      *
      * It exists for a backend that posts a list of work requests under one
      * doorbell rather than ringing one per put, which is where the small-put

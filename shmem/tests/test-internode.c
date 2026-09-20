@@ -36,6 +36,36 @@ enum { SMALL = 64, CHUNKED = 5000, TINY = 1, PATTERN_MOD = 251 };
 
 static int me, npes, local_id;
 
+/* The world ranks on this node, from the launcher's OSOE_GTIDS (§6.2), so the
+ * test can tell a node-mate from a peer without asking the library. */
+enum { LOCAL_MAX = 256 };
+static int local_ranks[LOCAL_MAX];
+static int local_count;
+
+static void read_local_ranks(void)
+{
+    const char *gtids = getenv("OSOE_GTIDS");
+    if (!gtids)
+        return;
+    for (const char *at = gtids; *at; ) {
+        char *end;
+        long v = strtol(at, &end, 10);
+        if (end == at)
+            break;
+        if (local_count < LOCAL_MAX)
+            local_ranks[local_count++] = (int)v;
+        at = (*end == ',') ? end + 1 : end;
+    }
+}
+
+static int is_local(int pe)
+{
+    for (int i = 0; i < local_count; i++)
+        if (local_ranks[i] == pe)
+            return 1;
+    return 0;
+}
+
 /*
  * This PE's total for a thread-scope counter (§3.14), read the way osoe-stat
  * reads it rather than through the library's own headers.
@@ -80,6 +110,7 @@ int main(void)
     me = shmem_my_pe();
     npes = shmem_n_pes();
     local_id = atoi(getenv("OSOE_LOCALID") ? getenv("OSOE_LOCALID") : "0");
+    read_local_ranks();
 
     /* One inbox per origin, so every PE may write concurrently without two
      * origins sharing bytes. */
@@ -294,6 +325,28 @@ int main(void)
         CHECK(bad < 0);
     }
     shmem_barrier_all();
+
+    /*
+     * §4.10's OSOE_TRANSPORT_MORE has a caller now, and put_signal is it: the
+     * signal follows the put on the same context to the same PE, so "more
+     * follows" is a fact rather than a guess. The flag defers the wake and
+     * nothing else, which has no observable effect on results by design - so
+     * the only way to say it did anything is to count it (§3.14). On one
+     * logical node there is no wake to defer, and zero is then the right
+     * answer rather than a missing check.
+     */
+    /*
+     * Per PE, not per job: the flag is only reached when the signalled put
+     * actually crosses a node, and on a map with several PEs to a node this
+     * PE's partner is usually a node-mate. Asserting it job-wide failed on
+     * exactly those maps - a check that was measuring the map rather than the
+     * flag.
+     */
+    if (nodes > 1 && !is_local(partner))
+        CHECK(counter("am.wakes_deferred") > 0);
+    else
+        CHECK(counter("am.wakes_deferred") == 0);
+
     shmem_free(signal);
     shmem_free(counter_cell);
 

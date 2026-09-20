@@ -77,8 +77,21 @@ OSOE_API void pshmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *
     osoe_check_pe(routine, pe);
     if (nelems > 0) {
         uint64_t offset = osoe_symmetric_offset(routine, dest, nelems);
+        /*
+         * **OSOE_TRANSPORT_MORE's first caller** (§4.10), and put_signal is the
+         * one routine in this step that can be it honestly: the signal below
+         * follows immediately, on the same context and to the same PE, so
+         * "more follows" is a fact rather than a guess. A backend may hold this
+         * put back and submit it with the signal.
+         *
+         * The flag's safety rule is kept by construction here: a backend may
+         * defer only if it owns a copy of the source bytes, and put's contract
+         * is that `source` is reusable the moment the call returns - so the
+         * copy has been taken either way, and what is deferred is the
+         * submission, never the copy.
+         */
         osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source,
-                    nelems, 0);
+                    nelems, OSOE_TRANSPORT_MORE);
     }
     /* The fence is on the same context as the put, which is what makes it
      * order the two (spec §9.12.1, 1.6 change #18). */

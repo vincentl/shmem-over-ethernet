@@ -246,8 +246,24 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
         offset += n;
         len -= n;
     }
-    /* §3.12: ask the lead for a wake. Once, after the whole operation, because
-     * one wake covers every segment it left behind. */
+    /*
+     * §3.12: ask the lead for a wake. Once, after the whole operation, because
+     * one wake covers every segment it left behind.
+     *
+     * **OSOE_TRANSPORT_MORE defers this wake, and nothing else** (§4.10). The
+     * bytes are already copied and committed, so `src` is reusable and the
+     * operation is as complete as a put ever is before its acknowledgement;
+     * what is held back is only the futex wake asking the lead to run. The
+     * next operation without the flag wakes it, and so does any fence, wait,
+     * get or fetching rmw - and if none of those ever comes, the lead's own
+     * sweep finds the committed bytes anyway, so the flag costs latency at
+     * worst and never correctness. §3.9's aggregation self-clocks off the send
+     * regardless, so this is a saving in syscalls rather than in segments.
+     */
+    if (flags & OSOE_TRANSPORT_MORE) {
+        osoe_count(OSOE_C_AM_WAKES_DEFERRED, 1);
+        return;
+    }
     osoe_progress_host_wake_lead();
 }
 

@@ -79,6 +79,7 @@ static const struct osoe_metric_descriptor thread_metrics[] = {
     T("agent.wakeups", OSOE_MKIND_COUNTER, ""),
     T("agent.last_wake_ns", OSOE_MKIND_STATE, "ns"),
     T("am.reserve_stalls", OSOE_MKIND_COUNTER, ""),
+    T("am.wakes_deferred", OSOE_MKIND_COUNTER, ""),
     T("invariant.missed_wake", OSOE_MKIND_INVARIANT, ""),
     T("invariant.watch_reentered", OSOE_MKIND_INVARIANT, ""),
     T("thread.claimed", OSOE_MKIND_STATE, ""),

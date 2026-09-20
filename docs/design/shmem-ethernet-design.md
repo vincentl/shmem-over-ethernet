@@ -2337,14 +2337,32 @@ sweep to submit anything sealed regardless of signalling, so the worst case is
 one sweep interval of added latency, and in practice the next operation wakes
 the lead anyway. Its first *acting* caller is a backend that posts work requests
 referencing the caller's `src` rather than a copy — an RDMA one — which is the
-case the rule was written for. Phase 1 implements it as a no-op on both
-backends and says so. Purely a hint: it changes nothing about completion, ordering or
+case the rule was written for.
+
+**Its first caller is `put_signal`**, and §7.1 step 2 is where it arrives. That
+routine is the one place in the step that can set the flag *honestly*: the
+signal follows the put on the same context and to the same PE, so "more
+follows" is a fact about the next statement rather than a guess about the
+application. The step's other candidate drivers — the strided and block RMA
+loops, and the 1.6 session routines — are all out of that step's scope, so the
+item was scheduled for a step in which every driver but this one is absent;
+`put_signal` is what keeps it from being deferred again.
+
+The AM path acts on it and the intranode path still ignores it, correctly,
+since there is nothing to defer when every put is a `memcpy` applied before the
+call returns. `am.wakes_deferred` counts what was held back, because a flag
+whose whole effect is to change nothing observable needs a counter to be
+testable at all, and the test asserts it **per PE and not per job**: the flag is
+only reached when the signalled put actually crosses a node, so on a map with
+several PEs to a node the partner is usually a node-mate and the count is
+rightly zero. Purely a hint: it changes nothing about completion, ordering or
 when `src` may be reused, and a backend that ignores it is correct — which is how
 the intranode backend implements it. The rule that makes it safe is that **a
 backend may defer an operation only if it has taken its own copy of the source
 bytes**; put's local-completion contract is unconditional, so deferring a large
-zero-copy put is wrong however the flag is set. Nothing sets it on one node,
-where every put is a `memcpy`. It exists because an RDMA backend can post a list
+zero-copy put is wrong however the flag is set. It is satisfied unconditionally
+on the AM path, where reserving copies into the connection buffer before the
+call returns, so what is deferred there is only the wake. It exists because an RDMA backend can post a list
 of work requests under one doorbell instead of ringing one per put, which is
 where the small-message rate is won, and because §3.9's aggregation wants to be
 told when not to seal a buffer early. Its drivers are the 1.6 session routines
