@@ -3,26 +3,35 @@ find_package(Threads REQUIRED)
 add_library(osoe
   src/accessible.c
   src/agent.c
-  src/alloc.c
+  src/am.c
+  src/allocator.c
   src/amo.c
   src/barrier.c
-  src/boot.c
+  src/bootstrap.c
+  src/connection.c
+  src/connection-area.c
   src/deprecated.c
   src/fatal.c
   src/info.c
   src/init.c
+  src/job.c
   src/malloc.c
   src/metrics.c
   src/node.c
   src/profile.c
+  src/progress.c
+  src/progress-host.c
   src/quiet.c
+  src/reply.c
   src/rma.c
   src/session.c
   src/signal.c
-  src/sym.c
+  src/symmetric.c
   src/team.c
-  src/transport_local.c
+  src/transport-am.c
+  src/transport-local.c
   src/wait.c
+  src/wire.c
   src/watch.c
   src/watchdog.c)
 target_include_directories(osoe

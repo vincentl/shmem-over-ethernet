@@ -26,7 +26,7 @@
  * PE's puts and gets while another carries that PE's rmw - a NIC whose atomics
  * are not coherent with the CPU must, since a CPU atomic and a NIC atomic on
  * one word are then not exclusive, and rmw below promises exclusivity across
- * the whole atomicity domain. So osoe_tp_direct returning non-NULL says that
+ * the whole atomicity domain. So osoe_transport_direct returning non-NULL says that
  * *stores* through the pointer are ordered as described; it does not say that
  * rmw to that PE executes locally. Nothing above this header changes: the spec
  * already makes a plain store racing an AMO on one word undefined (spec §3.2).
@@ -48,9 +48,9 @@
  * Every blocking call here checks the abort word and the lead's liveness at
  * least every OSOE_SWEEP_NS (base/deadline.h), whether or not it takes a
  * deadline. A backend must not spin or block indefinitely without sweeping:
- * osoe_tp_wait, a blocking osoe_tp_get and any future blocking call sweep on
- * the same schedule as osoe_tp_watch_wait, which is the difference between a
- * hang and a clean abort. Neither osoe_tp_wait nor osoe_tp_get blocks on the
+ * osoe_transport_wait, a blocking osoe_transport_get and any future blocking call sweep on
+ * the same schedule as osoe_transport_watch_wait, which is the difference between a
+ * hang and a clean abort. Neither osoe_transport_wait nor osoe_transport_get blocks on the
  * intranode backend, so nothing exercises this yet; it is stated here because
  * the first backend whose wait blocks will be written against this header.
  */
@@ -72,9 +72,9 @@ enum osoe_region {
 
 /* Per-context transport state: ordering window, dirty set (§4.6). Owned by
  * the backend and embedded in the SHMEM layer's context. The default
- * context's state is created by osoe_tp_init; creation for other contexts
+ * context's state is created by osoe_transport_init; creation for other contexts
  * arrives with shmem_ctx_create (§7.3). */
-struct osoe_tp_ctx;
+struct osoe_transport_context;
 
 /* An absolute CLOCK_MONOTONIC instant (§3.10), from base/. */
 struct osoe_deadline;
@@ -84,10 +84,10 @@ struct osoe_deadline;
 /* Called once per session by the first shmem_init, after node-local
  * rendezvous and heap mapping, and by the last shmem_finalize, after its
  * barrier (§6.4). A re-init after fini is a fresh session. */
-void osoe_tp_init(void);
-void osoe_tp_fini(void);
+void osoe_transport_init(void);
+void osoe_transport_fini(void);
 
-struct osoe_tp_ctx *osoe_tp_ctx_default(void);
+struct osoe_transport_context *osoe_transport_context_default(void);
 
 /* ---- Locality -------------------------------------------------------- */
 
@@ -102,7 +102,7 @@ struct osoe_tp_ctx *osoe_tp_ctx_default(void);
  * shmem_ptr, shmem_team_ptr and shmem_addr_accessible consult it and nothing
  * else.
  */
-void *osoe_tp_direct(int pe, enum osoe_region region, uint64_t offset);
+void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset);
 
 /* ---- Data operations ------------------------------------------------- */
 
@@ -110,17 +110,17 @@ void *osoe_tp_direct(int pe, enum osoe_region region, uint64_t offset);
 enum {
     /*
      * Place this operation at the target only after every write issued
-     * earlier on the same (ctx, pe) has been placed. put-with-signal is a
+     * earlier on the same (context, pe) has been placed. put-with-signal is a
      * put followed by an rmw carrying this flag, so the signal never
      * announces bytes that have not landed (invariant 5). Free on backends
      * whose placement is already in issue order, which both of osoe's are.
      */
-    OSOE_TP_FENCED = 1u << 0,
+    OSOE_TRANSPORT_FENCED = 1u << 0,
 
     /* rmw only: the caller needs the previous value, so the call returns
      * only once the operation has executed. Without it, an rmw may return
      * before it executes (spec §9.7). */
-    OSOE_TP_FETCH = 1u << 1,
+    OSOE_TRANSPORT_FETCH = 1u << 1,
 
     /*
      * More operations follow on this context immediately: a backend may hold
@@ -137,14 +137,33 @@ enum {
      * wrong however the flag is set. That rule is the flag's whole safety
      * argument, and it is the backend's to keep.
      *
-     * No caller sets this yet: on one node every put is a memcpy. It exists so
-     * that an RDMA backend can post a list of work requests under one doorbell
-     * rather than ringing one per put, which is where the small-put message
-     * rate is won, and so that §3.9's aggregation is told when not to seal a
-     * buffer early. Its drivers are the 1.6 session routines (§7.6), the
-     * strided and block RMA loops, and the collectives' own loops.
+     * **Its first caller is put_signal** (§4.10, and signal.c), which is the
+     * one routine that can set it honestly in this step: the signal follows the
+     * put on the same context and to the same PE, so "more follows" is a fact
+     * rather than a guess. The intranode path still ignores it, correctly -
+     * there is nothing to defer when every put is a memcpy applied before the
+     * call returns.
+     *
+     * On the AM path what it defers is the *wake*, not the seal, and that is
+     * now what it does rather than what it would do. §3.9's aggregation
+     * self-clocks off the send completion, so an operation on an idle
+     * connection is sealed and submitted at once and nothing waits for a buffer
+     * to fill; the only thing an application thread controls is whether it asks
+     * the lead to run (§3.12). So the saving is futex syscalls on a burst, the
+     * bytes are copied and committed before the call returns either way, and a
+     * held wake costs at most one safety-sweep interval because §3.10 has the
+     * lead submit a sealed buffer regardless of signalling. am.wakes_deferred
+     * counts them, since a flag whose whole effect is to change nothing
+     * observable needs a counter to be testable at all.
+     *
+     * It exists for a backend that posts a list of work requests under one
+     * doorbell rather than ringing one per put, which is where the small-put
+     * message rate is won - and that is also the backend for which the
+     * source-bytes rule above binds, since such a request references the
+     * caller's src rather than a copy. Its drivers are the 1.6 session routines
+     * (§7.6), the strided and block RMA loops, and the collectives' own loops.
      */
-    OSOE_TP_MORE = 1u << 2,
+    OSOE_TRANSPORT_MORE = 1u << 2,
 };
 
 /*
@@ -152,20 +171,20 @@ enum {
  *
  * Returns at local completion: src may be reused at once. The bytes are
  * applied at the target at some later time, and are complete and visible to
- * every PE once an osoe_tp_wait covering this operation returns. Bytes of one
+ * every PE once an osoe_transport_wait covering this operation returns. Bytes of one
  * put may land in any order, and two puts may land out of order (spec
  * §9.6.1.1). A put is not atomic with an rmw on the same bytes; the spec
  * makes that mix undefined (spec §3.2).
  *
  * Ordering: none between writes to the same PE except as fences provide -
- * OSOE_TP_FENCED, or an osoe_tp_fence between them.
+ * OSOE_TRANSPORT_FENCED, or an osoe_transport_fence between them.
  *
- * Notification: best effort (see osoe_tp_notify).
+ * Notification: best effort (see osoe_transport_notify).
  *
- * Intranode: memcpy into the target's heap mapping, then osoe_tp_notify.
+ * Intranode: memcpy into the target's heap mapping, then osoe_transport_notify.
  * Applied before return.
  */
-void osoe_tp_put(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
+void osoe_transport_put(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, const void *src, size_t len, unsigned flags);
 
 /*
@@ -181,22 +200,22 @@ void osoe_tp_put(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
  * AM: the reply lands in this PE's landing zone and the calling thread copies
  * it out (§3.12).
  *
- * The nonblocking form, completed by osoe_tp_wait, arrives with shmem_get_nbi.
+ * The nonblocking form, completed by osoe_transport_wait, arrives with shmem_get_nbi.
  * It is a flag on this call, not a separate one, and it yields no handle: a
- * nonblocking operation is completed by the existing osoe_tp_wait and nothing
+ * nonblocking operation is completed by the existing osoe_transport_wait and nothing
  * else. The spec defines _nbi completion only at quiet, so there is no
  * per-operation wait call to serve, §4.6's bytes_issued/bytes_landed pair is
  * already this design, and the core-API study found counters sufficient in all
  * six production transports it surveyed. Recorded here before a benchmark
  * applies pressure for per-operation handles.
  */
-void osoe_tp_get(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
+void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, void *dst, size_t len);
 
 /* Read-modify-write operations on one word. */
 enum osoe_rmw_op {
     OSOE_RMW_WRITE,     /* t = operand                                    */
-    OSOE_RMW_READ,      /* no change; with OSOE_TP_FETCH                  */
+    OSOE_RMW_READ,      /* no change; with OSOE_TRANSPORT_FETCH                  */
     OSOE_RMW_CSWAP,     /* if (t == compare) t = operand                  */
     OSOE_RMW_ADD,       /* t += operand, modulo 2^(8 * width)             */
     OSOE_RMW_AND,       /* t &= operand                                   */
@@ -206,14 +225,14 @@ enum osoe_rmw_op {
 
 /*
  * rmw: apply op to the width-byte word at (pe, region, offset), width 4 or 8.
- * Returns the word's previous value if flags has OSOE_TP_FETCH, else 0.
+ * Returns the word's previous value if flags has OSOE_TRANSPORT_FETCH, else 0.
  *
  * Precondition: offset is a multiple of width within the region; the object
  * is of an AMO type, so C alignment already guarantees it.
  *
  * Applied exactly once, never replayed. Exclusive, as spec §3.2 requires,
  * against every other rmw of the same width on the same word issued through
- * contexts in the same atomicity domain - the domain of ctx's team - and
+ * contexts in the same atomicity domain - the domain of context's team - and
  * against waiters and tests on that word. Nothing more is promised: not
  * across domains, widths, or against puts, gets, and plain loads and stores.
  * osoe's intranode and AM backends happen to be exclusive across domains too
@@ -222,15 +241,15 @@ enum osoe_rmw_op {
  *
  * Notification: exact. Every applied rmw, by any path, notifies.
  *
- * Completion: with OSOE_TP_FETCH, complete per operation on return. Without
+ * Completion: with OSOE_TRANSPORT_FETCH, complete per operation on return. Without
  * it, as a put.
  *
  * Intranode: one C11 atomic operation on the shared mapping (§3.16: CAS and
  * fetch_add name seq_cst, a plain write is a seq_cst store), then
- * osoe_tp_notify. The progress thread applies a remote rmw with the same
+ * osoe_transport_notify. The progress thread applies a remote rmw with the same
  * instruction on the same cache line, so the two unify (§4.1).
  */
-uint64_t osoe_tp_rmw(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
+uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum osoe_region region,
                      uint64_t offset, enum osoe_rmw_op op, unsigned width,
                      uint64_t operand, uint64_t compare, unsigned flags);
 
@@ -250,13 +269,58 @@ uint64_t osoe_tp_rmw(struct osoe_tp_ctx *ctx, int pe, enum osoe_region region,
  * shared mapping (§4.1), and a load of a word no larger than a pointer is a
  * single instruction on every target.
  */
-uint64_t osoe_tp_load(enum osoe_region region, uint64_t offset, unsigned width);
+uint64_t osoe_transport_load(enum osoe_region region, uint64_t offset, unsigned width);
+
+/* ---- Range attributes (§4.4, §4.10) ---------------------------------- */
+
+/* What a range of this PE's own memory is used for. */
+enum {
+    /* rmw may target these bytes: spec §9.3.5's SHMEM_MALLOC_ATOMICS_REMOTE. */
+    OSOE_TRANSPORT_RANGE_ATOMICS = 1u << 0,
+    /* signals live here: SHMEM_MALLOC_SIGNAL_REMOTE, so put_signal's rmw half
+     * and the signal waits of §4.9 land in it. */
+    OSOE_TRANSPORT_RANGE_SIGNAL  = 1u << 1,
+};
+
+/*
+ * Tell the backend that (region, offset, len) of *this PE's own* memory carries
+ * the named attributes. The allocator calls it for every hinted allocation
+ * (§4.4); nothing else does.
+ *
+ * Advisory in both directions. A backend may ignore it entirely, an operation
+ * on bytes outside any declared range is still correct, and nothing above this
+ * header asks what a backend did with it - which is what keeps it from becoming
+ * the capability query §4.10 rejects. The intranode backend ignores it, because
+ * every operation is already a memory operation on a mapping it has.
+ *
+ * **Not a collective, and it must not block.** Every PE calls it with identical
+ * arguments in the same order as a consequence of the allocator's determinism
+ * (§4.4, invariant 6), never by coordination. A backend that put a barrier here
+ * would be synchronizing for no reason.
+ *
+ * **Repeated or overlapping calls take the union, never a replacement**, so
+ * that shmem_realloc preserving an allocation's hints (spec §9.3.3) survives a
+ * grown or moved block. There is deliberately no call to withdraw a range:
+ * freeing a block does not un-declare its bytes, because over-declaring is
+ * safe - the attribute is a statement about what may happen there, and a
+ * backend that registered the range keeps a registration it did not need. A
+ * withdrawal would instead have to be ordered against operations still in
+ * flight toward those bytes, which is a synchronization this call must not have.
+ *
+ * It exists for a backend that must prepare memory before the network can
+ * touch it: an RDMA backend registers only the ranges that need NIC atomics or
+ * counters rather than the whole heap, and without it cannot know which words a
+ * PE may wait on, so it cannot afford exact notification and every blocked wait
+ * degenerates to polling (§4.10).
+ */
+void osoe_transport_set_range(enum osoe_region region, uint64_t offset, uint64_t len,
+                       unsigned attributes);
 
 /* ---- Ordering and completion ----------------------------------------- */
 
 /*
- * Fence: every write issued on ctx to any PE before this call is placed at
- * its target before any write issued on ctx to the same PE after it (spec
+ * Fence: every write issued on context to any PE before this call is placed at
+ * its target before any write issued on context to the same PE after it (spec
  * §9.12.1). On contexts without SHMEM_CTX_NOSTORE, also makes the calling
  * thread's earlier memory stores visible to other cores (§4.6 rule 2); a
  * NOSTORE context may skip that. Orders delivery; does not wait for
@@ -266,10 +330,10 @@ uint64_t osoe_tp_load(enum osoe_region region, uint64_t offset, unsigned width);
  * AM: the serializing store, then seal and flush the dirty set with ack
  * requested; the dirty set is kept (§4.6).
  */
-void osoe_tp_fence(struct osoe_tp_ctx *ctx);
+void osoe_transport_fence(struct osoe_transport_context *context);
 
 /*
- * Wait: return once every write and nonblocking get issued on ctx - to the
+ * Wait: return once every write and nonblocking get issued on context - to the
  * listed PEs, or to every PE if pes is NULL - is complete, and visible to
  * every PE; and, on contexts without SHMEM_CTX_NOSTORE, the calling thread's
  * earlier memory stores are visible to other cores (spec §9.12.2, §9.12.3). With pes non-NULL and npes 0, returns
@@ -283,38 +347,38 @@ void osoe_tp_fence(struct osoe_tp_ctx *ctx);
  * PEs' nodes, wait for acknowledgements and bytes_landed == bytes_issued,
  * copy out completed gets, clear what was waited on (§4.6).
  */
-void osoe_tp_wait(struct osoe_tp_ctx *ctx, const int *pes, size_t npes);
+void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes);
 
 /* ---- Notification (§4.9) --------------------------------------------- */
 
 /* A published watch: one per waiting thread. */
-struct osoe_tp_watch;
+struct osoe_transport_watch;
 
 /*
  * Waiter side. A PE waits only on its own symmetric variables. One watch
  * covers a byte range, so the multiple-element waits (spec §9.11.2-§9.11.7),
  * whose variables are one array, publish one watch:
  *
- *     struct osoe_tp_watch *w = osoe_tp_watch(region, offset, len);
+ *     struct osoe_transport_watch *w = osoe_transport_watch(region, offset, len);
  *                                               // BEFORE the first check
  *     for (;;) {
- *         uint32_t seq = osoe_tp_watch_seq(w);  // BEFORE loading variables
+ *         uint32_t seq = osoe_transport_watch_seq(w);  // BEFORE loading variables
  *         if (predicate(variables)) break;
- *         osoe_tp_watch_wait(w, seq, &sweep_deadline);
+ *         osoe_transport_watch_wait(w, seq, &sweep_deadline);
  *     }
- *     osoe_tp_unwatch(w);
+ *     osoe_transport_unwatch(w);
  *
- * Wakes may be spurious; the loop re-checks. osoe_tp_watch and
- * osoe_tp_unwatch publish with seq_cst stores (§3.16: two-sided).
- * osoe_tp_watch_wait returns false on a deadline expiry, which the caller
+ * Wakes may be spurious; the loop re-checks. osoe_transport_watch and
+ * osoe_transport_unwatch publish with seq_cst stores (§3.16: two-sided).
+ * osoe_transport_watch_wait returns false on a deadline expiry, which the caller
  * counts (§4.9). Under SHMEM_THREAD_SINGLE a PE holds at most one watch.
  */
-struct osoe_tp_watch *osoe_tp_watch(enum osoe_region region, uint64_t offset,
+struct osoe_transport_watch *osoe_transport_watch(enum osoe_region region, uint64_t offset,
                                     size_t len);
-uint32_t osoe_tp_watch_seq(struct osoe_tp_watch *w);
-bool osoe_tp_watch_wait(struct osoe_tp_watch *w, uint32_t seq,
+uint32_t osoe_transport_watch_seq(struct osoe_transport_watch *w);
+bool osoe_transport_watch_wait(struct osoe_transport_watch *w, uint32_t seq,
                         const struct osoe_deadline *deadline);
-void osoe_tp_unwatch(struct osoe_tp_watch *w);
+void osoe_transport_unwatch(struct osoe_transport_watch *w);
 
 /*
  * Writer side, called by backends, never by the SHMEM layer: after applying
@@ -335,6 +399,6 @@ void osoe_tp_unwatch(struct osoe_tp_watch *w);
  * delay. A backend whose puts the CPU never sees (RDMA) need not notify for
  * puts at all; for rmw it bridges its NIC events into this call.
  */
-void osoe_tp_notify(int pe, enum osoe_region region, uint64_t offset, size_t len);
+void osoe_transport_notify(int pe, enum osoe_region region, uint64_t offset, size_t len);
 
 #endif /* OSOE_TRANSPORT_H */

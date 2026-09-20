@@ -18,7 +18,22 @@
 /* The two predefined teams, resolved to the state a collective needs. */
 struct osoe_team {
     const char *name;
+    uint32_t number;                /* enum osoe_team_number: indexes per-team state */
     uint32_t members;               /* PEs in the team */
+    /*
+     * §5.2's local member count: team members *on this node*, which is not the
+     * local PE count and not the team size. It is what the intranode phase
+     * counts arrivals against (§5.3), and writing `members` there is the defect
+     * a one-node job cannot show - on one node every member is local and the
+     * two coincide exactly.
+     */
+    uint32_t local_members;
+    /*
+     * Members on more than one logical node, so the team has §5.3's internode
+     * phase: the node's arrival goes to the root and the release comes back,
+     * rather than the last local arriver releasing the epoch itself.
+     */
+    bool internode;
     uint32_t me;                    /* this PE's number within it */
     struct osoe_epoch *arrived;     /* the team's own epoch counters (§5.4) */
     struct osoe_epoch *released;
@@ -43,6 +58,6 @@ int osoe_team_to_world(const struct osoe_team *t, int pe);
  * spec says must ignore it (fence and quiet, §9.12.1-§9.12.2) test for it
  * before calling.
  */
-struct osoe_tp_ctx *osoe_ctx_of(const char *routine, shmem_ctx_t ctx);
+struct osoe_transport_context *osoe_ctx_of(const char *routine, shmem_ctx_t ctx);
 
 #endif /* OSOE_TEAM_H */

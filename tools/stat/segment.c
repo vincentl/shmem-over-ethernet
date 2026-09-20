@@ -17,13 +17,26 @@
 
 #include "segment.h"
 
-/* Only the two structures the design freezes may be known by layout, and a
+/*
+ * Only the two structures the design freezes may be known by layout, and a
  * reader that silently disagreed about their size would read nonsense from a
- * segment it had just declared valid. */
-_Static_assert(sizeof(struct osoe_metric_desc) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 112, "frozen by §3.14");
+ * segment it had just declared valid.
+ *
+ * These numbers move when a field is *appended*, which §3.14 allows, and never
+ * for any other reason - so a failure here is either an intended append whose
+ * number needs updating in both copies, or a reorder or resize that must not
+ * happen. The directory grew to 136 at layout 6, with the landing zones.
+ *
+ * The library declares the same structure independently in shmem/src/node.h,
+ * deliberately: a tool that included the library's headers would only prove the
+ * library agrees with itself. The cost is two copies that must not drift, and
+ * the matching assertion there is what makes a drift in size fail the build
+ * rather than the job.
+ */
+_Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
+_Static_assert(sizeof(struct osoe_segment_directory) == 136, "frozen by §3.14; 136 at layout 6");
 
-uint64_t osoe_seg_now_ns(void)
+uint64_t osoe_segment_now_ns(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -66,7 +79,7 @@ static void normalize(const char *in, char *out, size_t len)
     snprintf(out, len, "/%s", p);
 }
 
-int osoe_seg_open(struct osoe_seg *s, const char *name, char *err, size_t errlen)
+int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen)
 {
     memset(s, 0, sizeof *s);
     normalize(name, s->name, sizeof s->name);
@@ -93,11 +106,11 @@ int osoe_seg_open(struct osoe_seg *s, const char *name, char *err, size_t errlen
     s->bytes = (size_t)st.st_size;
     s->dir = (const struct osoe_segment_directory *)p;
 
-    if (s->dir->magic != OSOE_SEG_MAGIC) {
+    if (s->dir->magic != OSOE_SEGMENT_MAGIC) {
         unsigned long long magic = (unsigned long long)s->dir->magic;
-        char shown[OSOE_SEG_NAME_MAX];
+        char shown[OSOE_SEGMENT_NAME_MAX];
         memcpy(shown, s->name, sizeof shown);
-        osoe_seg_close(s);              /* nothing below may touch the mapping */
+        osoe_segment_close(s);              /* nothing below may touch the mapping */
         return fail(err, errlen, "/dev/shm%s is not an osoe control segment "
                     "(magic %#llx)", shown, magic);
     }
@@ -107,18 +120,21 @@ int osoe_seg_open(struct osoe_seg *s, const char *name, char *err, size_t errlen
      * caller prints what it does know. That is what freezing the directory
      * bought, and refusing here would spend it.
      */
-    if (s->dir->directory_bytes < sizeof *s->dir)
+    /* Ask for the fields the table needs, not for the whole directory: see
+     * OSOE_SEGMENT_HAS. Requiring the whole structure discarded the table of
+     * every segment written by an older library. */
+    if (!OSOE_SEGMENT_HAS(s->dir, metric_descriptor_bytes))
         return 0;
-    if (s->dir->metrics_count == 0 || s->dir->metric_desc_bytes != sizeof(struct osoe_metric_desc))
+    if (s->dir->metrics_count == 0 || s->dir->metric_descriptor_bytes != sizeof(struct osoe_metric_descriptor))
         return 0;
     uint64_t end = s->dir->metrics_offset + s->dir->metrics_bytes;
     if (end < s->dir->metrics_offset || end > s->bytes)
         return 0;
-    if (s->dir->metrics_bytes != (uint64_t)s->dir->metrics_count * sizeof(struct osoe_metric_desc))
+    if (s->dir->metrics_bytes != (uint64_t)s->dir->metrics_count * sizeof(struct osoe_metric_descriptor))
         return 0;
 
-    const struct osoe_metric_desc *t =
-        (const struct osoe_metric_desc *)(s->map + s->dir->metrics_offset);
+    const struct osoe_metric_descriptor *t =
+        (const struct osoe_metric_descriptor *)(s->map + s->dir->metrics_offset);
     if (checksum(t, (size_t)s->dir->metrics_bytes) != s->dir->metrics_checksum)
         return 0;
 
@@ -128,7 +144,7 @@ int osoe_seg_open(struct osoe_seg *s, const char *name, char *err, size_t errlen
     return 0;
 }
 
-void osoe_seg_close(struct osoe_seg *s)
+void osoe_segment_close(struct osoe_segment *s)
 {
     if (s->map)
         munmap((void *)(uintptr_t)s->map, s->bytes);
@@ -139,7 +155,7 @@ void osoe_seg_close(struct osoe_seg *s)
     s->table_usable = false;
 }
 
-const struct osoe_metric_desc *osoe_seg_metric(const struct osoe_seg *s, const char *name)
+const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name)
 {
     for (uint32_t i = 0; i < s->nmetrics; i++) {
         /* Names in the segment are fixed width and need not be terminated. */
@@ -150,7 +166,7 @@ const struct osoe_metric_desc *osoe_seg_metric(const struct osoe_seg *s, const c
 }
 
 /* The record a scope's `index` names, with its length, or NULL. */
-static const unsigned char *record(const struct osoe_seg *s, unsigned scope, uint32_t index,
+static const unsigned char *record(const struct osoe_segment *s, unsigned scope, uint32_t index,
                                    uint64_t *len)
 {
     uint64_t off, n;
@@ -180,7 +196,7 @@ static const unsigned char *record(const struct osoe_seg *s, unsigned scope, uin
     return s->map + off;
 }
 
-bool osoe_seg_read(const struct osoe_seg *s, const struct osoe_metric_desc *m,
+bool osoe_segment_read(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
                    uint32_t index, uint64_t *out)
 {
     if (!m || m->type == OSOE_MTYPE_STRING)
@@ -211,19 +227,19 @@ bool osoe_seg_read(const struct osoe_seg *s, const struct osoe_metric_desc *m,
     return true;
 }
 
-bool osoe_seg_read_name(const struct osoe_seg *s, const char *name, uint32_t index,
+bool osoe_segment_read_name(const struct osoe_segment *s, const char *name, uint32_t index,
                         uint64_t *out)
 {
-    return osoe_seg_read(s, osoe_seg_metric(s, name), index, out);
+    return osoe_segment_read(s, osoe_segment_metric(s, name), index, out);
 }
 
-bool osoe_seg_read_str(const struct osoe_seg *s, const char *name, uint32_t index,
+bool osoe_segment_read_str(const struct osoe_segment *s, const char *name, uint32_t index,
                        char *buf, size_t len)
 {
     if (len == 0)
         return false;
     buf[0] = '\0';
-    const struct osoe_metric_desc *m = osoe_seg_metric(s, name);
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(s, name);
     if (!m || m->type != OSOE_MTYPE_STRING || m->width == 0)
         return false;
     uint64_t rlen;
@@ -237,7 +253,7 @@ bool osoe_seg_read_str(const struct osoe_seg *s, const char *name, uint32_t inde
     return true;
 }
 
-uint32_t osoe_seg_block_pe(const struct osoe_seg *s, uint32_t block)
+uint32_t osoe_segment_block_pe(const struct osoe_segment *s, uint32_t block)
 {
     uint32_t per_pe = s->dir->blocks_per_pe;
     return per_pe ? block / per_pe : 0;
@@ -250,26 +266,26 @@ uint32_t osoe_seg_block_pe(const struct osoe_seg *s, uint32_t block)
  * and not the hung one this record exists for, so it is reported as unreadable
  * rather than retried forever.
  */
-bool osoe_seg_blocked(const struct osoe_seg *s, uint32_t pe, struct osoe_seg_blocked *out)
+bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe_segment_blocked *out)
 {
     memset(out, 0, sizeof *out);
-    const struct osoe_metric_desc *gen = osoe_seg_metric(s, "pe.blocked.gen");
-    const struct osoe_metric_desc *detail = osoe_seg_metric(s, "pe.blocked.detail");
-    const struct osoe_metric_desc *since = osoe_seg_metric(s, "pe.blocked.since_ns");
+    const struct osoe_metric_descriptor *gen = osoe_segment_metric(s, "pe.blocked.gen");
+    const struct osoe_metric_descriptor *detail = osoe_segment_metric(s, "pe.blocked.detail");
+    const struct osoe_metric_descriptor *since = osoe_segment_metric(s, "pe.blocked.since_ns");
     if (!gen || !detail || !since)
         return false;
 
     for (int attempt = 0; attempt < 64; attempt++) {
         uint64_t g0, g1;
-        if (!osoe_seg_read(s, gen, pe, &g0))
+        if (!osoe_segment_read(s, gen, pe, &g0))
             return false;
         if (g0 & 1)
             continue;                    /* mid-publication */
-        if (!osoe_seg_read(s, detail, pe, &out->detail) ||
-            !osoe_seg_read(s, since, pe, &out->since_ns))
+        if (!osoe_segment_read(s, detail, pe, &out->detail) ||
+            !osoe_segment_read(s, since, pe, &out->since_ns))
             return false;
-        osoe_seg_read_str(s, "pe.blocked.routine", pe, out->routine, sizeof out->routine);
-        if (!osoe_seg_read(s, gen, pe, &g1))
+        osoe_segment_read_str(s, "pe.blocked.routine", pe, out->routine, sizeof out->routine);
+        if (!osoe_segment_read(s, gen, pe, &g1))
             return false;
         if (g1 != g0)
             continue;
@@ -286,7 +302,7 @@ static int by_name(const void *a, const void *b)
     return strcmp(a, b);
 }
 
-int osoe_seg_list(char (*names)[OSOE_SEG_NAME_MAX], int max)
+int osoe_segment_list(char (*names)[OSOE_SEGMENT_NAME_MAX], int max)
 {
     DIR *d = opendir("/dev/shm");
     if (!d)
@@ -302,7 +318,7 @@ int osoe_seg_list(char (*names)[OSOE_SEG_NAME_MAX], int max)
          * anything longer is some other program's object that happens to start
          * "osoe." - not ours, and not truncated into a name we might unlink. */
         size_t n = strlen(e->d_name);
-        if (n + 2 > OSOE_SEG_NAME_MAX)
+        if (n + 2 > OSOE_SEGMENT_NAME_MAX)
             continue;
         if (found < max) {
             names[found][0] = '/';
@@ -312,6 +328,6 @@ int osoe_seg_list(char (*names)[OSOE_SEG_NAME_MAX], int max)
     }
     closedir(d);
     int n = found < max ? found : max;
-    qsort(names, (size_t)n, OSOE_SEG_NAME_MAX, by_name);
+    qsort(names, (size_t)n, OSOE_SEGMENT_NAME_MAX, by_name);
     return found;
 }

@@ -51,7 +51,7 @@ static inline void osoe_test_segment_name(char *buf, size_t len, unsigned sessio
 }
 
 /* How many records a scope has. */
-static inline uint32_t osoe_test_scope_count(const struct osoe_seg *s, unsigned scope)
+static inline uint32_t osoe_test_scope_count(const struct osoe_segment *s, unsigned scope)
 {
     switch (scope) {
     case OSOE_MSCOPE_NODE:   return 1;
@@ -71,30 +71,30 @@ static inline int osoe_invariants_ok_session(unsigned session)
 {
     shmem_barrier_all();
 
-    char name[OSOE_SEG_NAME_MAX], err[256];
+    char name[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(name, sizeof name, session);
 
-    struct osoe_seg s;
-    if (osoe_seg_open(&s, name, err, sizeof err) != 0) {
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, name, err, sizeof err) != 0) {
         fprintf(stderr, "invariants: %s\n", err);
         return 0;
     }
     if (!s.table_usable) {
         fprintf(stderr, "invariants: %s has no readable metric table\n", s.name);
-        osoe_seg_close(&s);
+        osoe_segment_close(&s);
         return 0;
     }
 
     int bad = 0, invariants = 0;
     for (uint32_t i = 0; i < s.nmetrics; i++) {
-        const struct osoe_metric_desc *m = &s.metrics[i];
+        const struct osoe_metric_descriptor *m = &s.metrics[i];
         if (m->kind != OSOE_MKIND_INVARIANT)
             continue;
         invariants++;
         uint32_t n = osoe_test_scope_count(&s, m->scope);
         for (uint32_t k = 0; k < n; k++) {
             uint64_t v;
-            if (!osoe_seg_read(&s, m, k, &v)) {
+            if (!osoe_segment_read(&s, m, k, &v)) {
                 fprintf(stderr, "invariants: %.40s[%u] is unreadable\n", m->name, k);
                 bad++;
                 continue;
@@ -112,7 +112,7 @@ static inline int osoe_invariants_ok_session(unsigned session)
         fprintf(stderr, "invariants: the metric table declares none\n");
         bad++;
     }
-    osoe_seg_close(&s);
+    osoe_segment_close(&s);
     return bad == 0;
 }
 

@@ -14,8 +14,20 @@
 #include "base/deadline.h"
 #include "base/futex.h"
 #include "fatal.h"
+#include "connection-area.h"
+
 #include "metrics.h"
 #include "node.h"
+
+/*
+ * The writer's half of §3.14's frozen prefix. tools/stat declares the same
+ * structure independently, so that the reader proves something about the
+ * segment rather than about the library's own headers; these assertions are
+ * what keep the two copies the same size. Both move together when a field is
+ * appended, and never otherwise.
+ */
+_Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
+_Static_assert(sizeof(struct osoe_segment_directory) == 136, "frozen by §3.14; 136 at layouts 6 and 7");
 
 /*
  * Candidate heap bases, tried in order by the lead; the first where its own
@@ -95,7 +107,7 @@ static void describe_missing(struct osoe_node *n, uint32_t count, enum osoe_phas
 
 /* Create this PE's heap object and map it. With base == 0, try the
  * candidates and return the one that worked; 0 if none did. */
-static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_boot *b,
+static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap *b,
                                 struct osoe_pe_slot *slot, uint64_t base)
 {
     int fd = shm_open(slot->heap_name, O_CREAT | O_EXCL | O_RDWR, 0600);
@@ -136,7 +148,7 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_boot *b,
     return mapped_at;
 }
 
-static void map_siblings(struct osoe_node *n, const struct osoe_boot *b)
+static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
 {
     for (uint32_t i = 0; i < b->local_count; i++) {
         if (i == b->local_id)
@@ -163,7 +175,7 @@ static void map_siblings(struct osoe_node *n, const struct osoe_boot *b)
 
 /* Every local PE must have parsed the same SHMEM_SYMMETRIC_SIZE (§4.1, §4.4).
  * Every PE runs this check on the same slots, so all of them fail together. */
-static void check_agreement(struct osoe_node *n, const struct osoe_boot *b)
+static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
 {
     for (uint32_t i = 0; i < b->local_count; i++) {
         if (n->slots[i].symmetric_size != b->symmetric_size) {
@@ -184,7 +196,7 @@ static void check_agreement(struct osoe_node *n, const struct osoe_boot *b)
 }
 
 /* The lead creates and initializes the control segment. */
-static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint32_t session)
+static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
     int fd = shm_open(n->control_name, O_CREAT | O_EXCL | O_RDWR, 0600);
     if (fd < 0) {
@@ -203,7 +215,7 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
      */
     uint32_t per_pe = osoe_metrics_blocks_per_pe();
     uint32_t metrics_count;
-    const struct osoe_metric_desc *metrics = osoe_metrics_table(&metrics_count);
+    const struct osoe_metric_descriptor *metrics = osoe_metrics_table(&metrics_count);
 
     uint64_t slots_offset = align_up(sizeof(struct osoe_node_header));
     uint64_t metrics_offset =
@@ -212,7 +224,21 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
     uint64_t blocks_offset = align_up(metrics_offset + metrics_bytes);
     uint64_t block_count = (uint64_t)b->local_count * per_pe;
     uint64_t blocks_bytes = block_count * sizeof(struct osoe_counter_block);
-    n->control_bytes = page_round(blocks_offset + blocks_bytes);
+
+    /*
+     * The §3.12 landing zones, one slot per local PE, each holding one AM chunk
+     * (§3.2). Sized from the same OSOE_AM_CHUNK the AM layer uses, because a
+     * reply chunk has to fit: a landing zone smaller than a chunk would make
+     * the wire's maximum message undeliverable, which is a hang rather than a
+     * short read.
+     */
+    struct osoe_am_config am;
+    osoe_am_config_read(&am);
+    uint64_t landing_slot_bytes =
+        align_up(sizeof(struct osoe_landing_slot) + am.chunk);
+    uint64_t landing_offset = align_up(blocks_offset + blocks_bytes);
+    uint64_t landing_bytes = (uint64_t)b->local_count * landing_slot_bytes;
+    n->control_bytes = page_round(landing_offset + landing_bytes);
     if (ftruncate(fd, (off_t)n->control_bytes) != 0) {
         close(fd);
         shm_unlink(n->control_name);
@@ -246,14 +272,20 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
     h->dir.metrics_count = metrics_count;
     h->dir.metrics_checksum = osoe_metric_checksum(metrics, metrics_count);
     h->dir.directory_bytes = sizeof h->dir;
-    h->dir.metric_desc_bytes = sizeof *metrics;
+    h->dir.metric_descriptor_bytes = sizeof *metrics;
     h->dir.blocks_offset = blocks_offset;
     h->dir.blocks_bytes = blocks_bytes;
     h->dir.block_count = (uint32_t)block_count;
     h->dir.blocks_per_pe = per_pe;
+    h->dir.landing_offset = landing_offset;
+    h->dir.landing_bytes = landing_bytes;
+    h->dir.landing_slot_bytes = (uint32_t)landing_slot_bytes;
+    h->dir.landing_count = b->local_count;
     h->dir.block_bytes = (uint32_t)sizeof(struct osoe_counter_block);
     memcpy((char *)p + metrics_offset, metrics, metrics_bytes);
     n->blocks = (struct osoe_counter_block *)((char *)p + blocks_offset);
+    n->landing = (unsigned char *)p + landing_offset;
+    n->landing_slot_bytes = (uint32_t)landing_slot_bytes;
     osoe_epoch_init(&h->world_arrived);
     osoe_epoch_init(&h->world_released);
     osoe_epoch_init(&h->world_copied);
@@ -264,7 +296,7 @@ static void create_control(struct osoe_node *n, const struct osoe_boot *b, uint3
 
 /* A non-lead opens the control segment by name, waiting for the lead to
  * create and publish it. */
-static void open_control(struct osoe_node *n, const struct osoe_boot *b, uint32_t session,
+static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session,
                          const struct osoe_deadline *overall)
 {
     struct timespec backoff = { 0, 1000 * 1000 };   /* 1 ms, doubling to 64 ms */
@@ -327,12 +359,17 @@ static void open_control(struct osoe_node *n, const struct osoe_boot *b, uint32_
                    n->control_name);
     n->slots = (struct osoe_pe_slot *)((char *)n->hdr + h->dir.slots_offset);
     n->blocks = (struct osoe_counter_block *)((char *)n->hdr + h->dir.blocks_offset);
+    /* Read from the directory rather than recomputed: a PE that derived the
+     * offset itself would disagree with the lead the moment the two ran
+     * different builds, which is what the frozen directory exists to prevent. */
+    n->landing = (unsigned char *)n->hdr + h->dir.landing_offset;
+    n->landing_slot_bytes = h->dir.landing_slot_bytes;
 
     /* The metric table is fixed for a build, so a mismatch is a mixed-library
      * job that the layout check above did not catch (§3.13's argument for
      * checksumming the handler table, applied here). */
     uint32_t want_count;
-    const struct osoe_metric_desc *want = osoe_metrics_table(&want_count);
+    const struct osoe_metric_descriptor *want = osoe_metrics_table(&want_count);
     if (h->dir.metrics_count != want_count ||
         h->dir.metrics_checksum != osoe_metric_checksum(want, want_count))
         osoe_fatal("control segment %s carries a different metric table (%u metrics, "
@@ -341,7 +378,7 @@ static void open_control(struct osoe_node *n, const struct osoe_boot *b, uint32_
                    osoe_metric_checksum(want, want_count));
 }
 
-void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t session)
+void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
     struct osoe_deadline overall = osoe_deadline_in(b->timeout_ns);
     bool lead = b->local_id == 0;
@@ -452,7 +489,7 @@ void osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status)
     atomic_store_explicit(&n->hdr->aborting, 1, memory_order_release);
 }
 
-void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b)
+void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)
 {
     struct osoe_pe_slot *me = &n->slots[b->local_id];
     osoe_metrics_fini();
@@ -476,5 +513,6 @@ void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b)
     n->hdr = NULL;
     n->slots = NULL;
     n->blocks = NULL;
+    n->landing = NULL;
     n->control_name[0] = '\0';
 }

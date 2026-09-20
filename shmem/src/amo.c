@@ -32,7 +32,7 @@
 
 #include "export.h"
 #include "metrics.h"
-#include "sym.h"
+#include "symmetric.h"
 #include "team.h"
 #include "transport.h"
 
@@ -60,7 +60,7 @@ _Static_assert(_Generic((ptrdiff_t)0, long: 1, default: 0), "ptrdiff_t must be l
 static uint64_t amo_offset(const char *routine, const void *addr, unsigned width, int pe)
 {
     osoe_check_pe(routine, pe);
-    return osoe_sym_word_offset(routine, addr, width);
+    return osoe_symmetric_word_offset(routine, addr, width);
 }
 
 static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
@@ -68,7 +68,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
                         uint64_t compare, unsigned flags, int pe)
 {
     uint64_t offset = amo_offset(routine, dest, width, pe);
-    return osoe_tp_rmw(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, op, width,
+    return osoe_transport_rmw(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, op, width,
                        value, compare, flags);
 }
 
@@ -101,7 +101,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_compare_swap", ctx,      \
                                        dest, (unsigned)sizeof(T), OSOE_RMW_CSWAP,       \
                                        OSOE_AMO_IN(value), OSOE_AMO_IN(cond),           \
-                                       OSOE_TP_FETCH, pe));                             \
+                                       OSOE_TRANSPORT_FETCH, pe));                             \
     }                                                                                   \
     OSOE_API T pshmem_##NAME##_atomic_compare_swap(T *dest, T cond, T value, int pe)     \
     {                                                                                   \
@@ -121,7 +121,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     {                                                                                   \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_inc", ctx, dest,   \
                                        (unsigned)sizeof(T), OSOE_RMW_ADD, 1, 0,         \
-                                       OSOE_TP_FETCH, pe));                             \
+                                       OSOE_TRANSPORT_FETCH, pe));                             \
     }                                                                                   \
     OSOE_API T pshmem_##NAME##_atomic_fetch_inc(T *dest, int pe)                         \
     {                                                                                   \
@@ -142,7 +142,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     {                                                                                   \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_add", ctx, dest,   \
                                        (unsigned)sizeof(T), OSOE_RMW_ADD,               \
-                                       OSOE_AMO_IN(value), 0, OSOE_TP_FETCH, pe));      \
+                                       OSOE_AMO_IN(value), 0, OSOE_TRANSPORT_FETCH, pe));      \
     }                                                                                   \
     OSOE_API T pshmem_##NAME##_atomic_fetch_add(T *dest, T value, int pe)                \
     {                                                                                   \
@@ -156,7 +156,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     {                                                                                    \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch", ctx, source,      \
                                        (unsigned)sizeof(T), OSOE_RMW_READ, 0, 0,         \
-                                       OSOE_TP_FETCH, pe));                              \
+                                       OSOE_TRANSPORT_FETCH, pe));                              \
     }                                                                                    \
     OSOE_API T pshmem_##NAME##_atomic_fetch(const T *source, int pe)                      \
     {                                                                                    \
@@ -176,7 +176,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     {                                                                                    \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_swap", ctx, dest,         \
                                        (unsigned)sizeof(T), OSOE_RMW_WRITE,              \
-                                       OSOE_AMO_IN(value), 0, OSOE_TP_FETCH, pe));       \
+                                       OSOE_AMO_IN(value), 0, OSOE_TRANSPORT_FETCH, pe));       \
     }                                                                                    \
     OSOE_API T pshmem_##NAME##_atomic_swap(T *dest, T value, int pe)                      \
     {                                                                                    \
@@ -203,7 +203,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     {                                                                                    \
         return NAME##_value(amo_rmw("shmem_" #NAME "_atomic_fetch", ctx, source,         \
                                     (unsigned)sizeof(T), OSOE_RMW_READ, 0, 0,            \
-                                    OSOE_TP_FETCH, pe));                                 \
+                                    OSOE_TRANSPORT_FETCH, pe));                                 \
     }                                                                                    \
     OSOE_API T pshmem_##NAME##_atomic_fetch(const T *source, int pe)                       \
     {                                                                                    \
@@ -223,7 +223,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     {                                                                                    \
         return NAME##_value(amo_rmw("shmem_" #NAME "_atomic_swap", ctx, dest,            \
                                     (unsigned)sizeof(T), OSOE_RMW_WRITE,                 \
-                                    NAME##_bits(value), 0, OSOE_TP_FETCH, pe));          \
+                                    NAME##_bits(value), 0, OSOE_TRANSPORT_FETCH, pe));          \
     }                                                                                    \
     OSOE_API T pshmem_##NAME##_atomic_swap(T *dest, T value, int pe)                       \
     {                                                                                    \
@@ -248,7 +248,7 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     {                                                                                    \
         return OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_" #OP, ctx, dest,   \
                                        (unsigned)sizeof(T), RMW, OSOE_AMO_IN(value), 0,  \
-                                       OSOE_TP_FETCH, pe));                              \
+                                       OSOE_TRANSPORT_FETCH, pe));                              \
     }                                                                                    \
     OSOE_API T pshmem_##NAME##_atomic_fetch_##OP(T *dest, T value, int pe)                 \
     {                                                                                    \

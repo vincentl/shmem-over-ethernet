@@ -23,10 +23,10 @@
 #include "base/cacheline.h"
 #include "base/counters.h"
 #include "base/epoch.h"
-#include "boot.h"
+#include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 5
+#define OSOE_NODE_LAYOUT 7
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -36,6 +36,20 @@ enum osoe_phase {
 };
 
 enum { OSOE_HEAP_NAME_MAX = 96 };
+
+/*
+ * The predefined teams, numbered (§7.3, spec §9.4).
+ *
+ * Both the node header and the progress loop index per-team state by this, so
+ * it is one enumeration rather than two agreeing constants. shmem_team_split_*
+ * is not implemented, so these are all the teams there are; a split team
+ * spanning several nodes is what grows this, and it grows the arrays with it.
+ */
+enum osoe_team_number {
+    OSOE_TEAM_WORLD = 0,
+    OSOE_TEAM_SHARED = 1,
+    OSOE_TEAMS,
+};
 
 /* The routine name in a "blocked in" record (§3.14). Fixed width: it is read
  * from another process, so it cannot be a pointer. */
@@ -132,14 +146,68 @@ struct osoe_segment_directory {
     uint64_t metrics_bytes;
     uint32_t metrics_count;
     uint32_t metrics_checksum;       /* FNV-1a over the table's bytes */
-    uint32_t metric_desc_bytes;
+    uint32_t metric_descriptor_bytes;
 
     uint64_t blocks_offset;
     uint64_t blocks_bytes;
     uint32_t block_count;            /* local_count * blocks_per_pe */
     uint32_t block_bytes;
     uint32_t blocks_per_pe;          /* OSOE_MAX_THREADS */
+
+    /* Appended at layout 6: the §3.12 landing zones, one slot per local PE. */
+    uint64_t landing_offset;
+    uint64_t landing_bytes;
+    uint32_t landing_slot_bytes;     /* header plus one AM chunk */
+    uint32_t landing_count;          /* local_count */
 };
+
+/*
+ * The internode arrival handoff, one per predefined team (§5.3, §3.12).
+ *
+ * Whichever local member's increment reaches the team's arrival target leaves
+ * the epoch here and bumps the local lead's `agent_wake`; that agent consumes
+ * it and performs the node's arrival. It cannot perform it itself: the progress
+ * state the arrival moves - the root's arrival counts, the participating-node
+ * count, the per-connection queues - is private to the lead's agent thread, in
+ * the lead's process, and the arriver is an application thread of any local PE,
+ * usually another process. This is §3.12's "a flag plus a futex wake", and it
+ * is the whole of what crosses.
+ *
+ * **One word is enough, and the reason is §5.4's bounded skew.** Epoch k+2's
+ * arrival cannot be posted until every local member has been released from
+ * k+1, and that release cannot happen until the lead has already consumed and
+ * forwarded k+1 - so no post can overwrite one the agent has not read, and this
+ * needs no queue, no sequence number and no second slot. Model-checked in
+ * docs/design/evidence/am-backend/arrival_model.py, where the `$posted` and
+ * `$consumed` counters are that argument rather than an assertion of it.
+ *
+ * Two rules keep it true, and the model breaks each one. The agent loads
+ * `agent_wake` **before** this word (§4.9), or a post landing between the two
+ * loads leaves it asleep on a value that already counts the bump. And it
+ * records the epoch consumed **from the value it forwarded**, never by
+ * re-reading this word afterwards: on the root node the forward can release the
+ * team locally at once (§5.3), so a member can re-enter and post the next epoch
+ * here before a re-read would happen, and that arrival is then lost - a hang on
+ * every other node, which is the worst place to debug it.
+ *
+ * A team with no internode phase never touches its entry. SHMEM_TEAM_SHARED is
+ * one node by definition, so today only the world team's is ever written; it is
+ * per team anyway, because a split team (§7.3) spanning several nodes is the
+ * next thing to arrive and sharing one word between two teams would make a sync
+ * on one forward the arrival of the other.
+ */
+struct osoe_arrival_handoff {
+    /*
+     * The posted epoch, k+1, or 0 before the first. A single-writer publication
+     * store (§3.16): one member posts at a time, and the release of the
+     * previous epoch orders it after the last one.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t epoch;
+};
+
+_Static_assert(sizeof(struct osoe_arrival_handoff) == OSOE_CACHELINE,
+               "each team's handoff word sits alone on its cache line, as its "
+               "epoch counters do (§5.3)");
 
 struct osoe_node_header {
     /* Written by the lead before `ready`; constant afterwards. */
@@ -182,6 +250,67 @@ struct osoe_node_header {
     struct osoe_epoch shared_arrived;
     struct osoe_epoch shared_released;
     struct osoe_epoch shared_copied;
+
+    /* Appended at layout 7 (§5.3). */
+    struct osoe_arrival_handoff arrival[OSOE_TEAMS];
+};
+
+/*
+ * A PE's landing zone (§3.12, §4.6).
+ *
+ * A get's `dest` may be a stack or malloc buffer that the lead's process cannot
+ * see, so a reply cannot be written where the caller asked for it. It lands
+ * here, in the node segment, and the *origin* copies it out - the calling
+ * thread for a blocking get or fetching AMO, that PE's agent or the application
+ * thread at quiet for a nonblocking one. This is the correction to the earlier
+ * claim that the origin never needs a helper: it never needs one for progress,
+ * but it does need its private memory written by a thread inside it.
+ *
+ * It belongs in the control segment rather than the AM connection area because
+ * it is needed by *every* backend: the reason it exists is the address space
+ * boundary, not the network. An RDMA backend writing a reply straight into the
+ * origin's memory still cannot write a private `dest`.
+ *
+ * One slot per PE is enough while gets and fetching AMOs are blocking: under
+ * SERIALIZED a PE has at most one outstanding (§4.6), so the slot is sized by L
+ * alone and not by node count. Nonblocking gets change that, and the counters
+ * below are already the shape §4.6 specifies for them.
+ */
+struct osoe_landing_slot {
+    /*
+     * §4.6's get completion: two cumulative counters, never reset, with the
+     * companion 32-bit wake word they need because a 64-bit counter cannot be
+     * futexed (§4.9). The progress thread adds landed bytes, bumps the wake
+     * word, then wakes; the waiter loads the wake word, then compares the
+     * counters, then waits on the wake word.
+     */
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint64_t bytes_issued;      /* this PE adds expected bytes on issue */
+    _Atomic uint64_t bytes_landed;      /* the progress thread adds as chunks land */
+    _Atomic uint32_t counter_wake;
+
+    /*
+     * Per-operation completion, which the counters cannot serve: a blocking
+     * caller waits for *its* reply, not for a byte count (§4.6).
+     */
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint32_t wake;
+    _Atomic uint32_t ready;             /* 0, or 1 once `data` and `value` are complete */
+    _Atomic uint32_t length;            /* bytes in `data` */
+    _Atomic uint64_t value;             /* a fetching AMO's result */
+    /*
+     * Which operation this reply belongs to. Under SERIALIZED a PE has one
+     * outstanding, so the slot could do without it - but a reply for an
+     * operation that has already been abandoned is then indistinguishable from
+     * the one being waited for, and §4.6 says the caller waits for *its* reply.
+     * Recording it makes "its" checkable rather than assumed.
+     */
+    _Atomic uint64_t token;
+
+    /* The reply bytes. One AM chunk is enough: a larger get is chunked on the
+     * wire (§3.2) and the origin copies each chunk out before the next lands. */
+    _Alignas(OSOE_CACHELINE)
+    unsigned char data[];
 };
 
 /* Process-private view of the node. */
@@ -195,14 +324,25 @@ struct osoe_node {
     int32_t *local_of_rank;         /* world rank -> local id, or -1 */
     uint64_t heap_bytes;
     uint64_t heap_size;             /* the agreed SHMEM_SYMMETRIC_SIZE */
+    unsigned char *landing;         /* the landing zones; index with osoe_node_landing */
+    uint32_t landing_slot_bytes;
 };
 
+/* This node's landing slot for a local PE. The slot is not a fixed-size type -
+ * its payload is one AM chunk - so it is indexed by bytes, never by array. */
+static inline struct osoe_landing_slot *osoe_node_landing(const struct osoe_node *n,
+                                                          uint32_t local_id)
+{
+    return (struct osoe_landing_slot *)(n->landing +
+                                        (size_t)local_id * n->landing_slot_bytes);
+}
+
 /* Rendezvous with the other local PEs; map every heap. Fatal on failure. */
-void osoe_node_join(struct osoe_node *n, const struct osoe_boot *b, uint32_t session);
+void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session);
 
 /* Unmap everything; the PE whose finalize is the node's last removes the
  * control segment's name. */
-void osoe_node_leave(struct osoe_node *n, const struct osoe_boot *b);
+void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b);
 
 /* Declare the job over: publish the abort word so every other local PE stops at
  * its next safety sweep. Does not itself terminate the caller. */

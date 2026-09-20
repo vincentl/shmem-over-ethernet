@@ -41,7 +41,7 @@
 #include "export.h"
 #include "fatal.h"
 #include "metrics.h"
-#include "sym.h"
+#include "symmetric.h"
 #include "transport.h"
 #include "wait.h"
 
@@ -104,7 +104,7 @@ static bool satisfied(int cmp, uint64_t have, uint64_t want, bool sgn, const cha
  */
 static enum osoe_counter late_wake_counter(unsigned width)
 {
-    return width >= 4 ? OSOE_C_INVARIANT_MISSED_WAKE : OSOE_C_TP_WATCH_LATE_WAKE;
+    return width >= 4 ? OSOE_C_INVARIANT_MISSED_WAKE : OSOE_C_TRANSPORT_WATCH_LATE_WAKE;
 }
 
 /* ---- the scalar forms -------------------------------------------------- */
@@ -113,15 +113,15 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
                          int cmp, uint64_t want)
 {
     osoe_count(OSOE_C_SHMEM_WAIT_UNTIL_CALLS, 1);
-    uint64_t offset = osoe_sym_word_offset(routine, ivar, width);
+    uint64_t offset = osoe_symmetric_word_offset(routine, ivar, width);
     want = extend(want, width, sgn);
-    struct osoe_tp_watch *w = osoe_tp_watch(OSOE_REGION_HEAP, offset, width);
+    struct osoe_transport_watch *w = osoe_transport_watch(OSOE_REGION_HEAP, offset, width);
     uint64_t have, slept_since = 0;
     bool slept = false, woken = false, timed_out = false;
 
     for (;;) {
-        uint32_t seq = osoe_tp_watch_seq(w);
-        have = osoe_tp_load(OSOE_REGION_HEAP, offset, width);
+        uint32_t seq = osoe_transport_watch_seq(w);
+        have = osoe_transport_load(OSOE_REGION_HEAP, offset, width);
         if (satisfied(cmp, extend(have, width, sgn), want, sgn, routine)) {
             /* The condition was already true when the sweep expired, so the
              * update landed while this PE slept and no wake arrived (§4.9).
@@ -131,7 +131,7 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
             break;
         }
         if (woken)
-            osoe_count(OSOE_C_TP_WATCH_SPURIOUS, 1);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_SPURIOUS, 1);
 
         if (!slept) {
             /* About to block. Everything on this path is paid only by a wait
@@ -139,23 +139,23 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
             slept = true;
             slept_since = osoe_now_ns();
             osoe_blocked_enter(routine, offset);
-            osoe_count(OSOE_C_TP_WATCH_BLOCKED, 1);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
         }
 
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-        woken = osoe_tp_watch_wait(w, seq, &sweep);
+        woken = osoe_transport_watch_wait(w, seq, &sweep);
         timed_out = !woken;
         if (woken) {
-            osoe_count(OSOE_C_TP_WATCH_WAKES, 1);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_WAKES, 1);
         } else {
-            osoe_count(OSOE_C_TP_WATCH_SWEEPS, 1);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_SWEEPS, 1);
             osoe_sweep_expired(routine);        /* only here, never on a wake */
         }
     }
 
-    osoe_tp_unwatch(w);
+    osoe_transport_unwatch(w);
     if (slept) {
-        osoe_count(OSOE_C_TP_WATCH_BLOCKED_NS, osoe_now_ns() - slept_since);
+        osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED_NS, osoe_now_ns() - slept_since);
         osoe_blocked_leave();
     }
     return have;
@@ -164,9 +164,9 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
 int osoe_test(const char *routine, const void *ivar, unsigned width, bool sgn, int cmp,
               uint64_t want)
 {
-    uint64_t offset = osoe_sym_word_offset(routine, ivar, width);
+    uint64_t offset = osoe_symmetric_word_offset(routine, ivar, width);
     osoe_count(OSOE_C_SHMEM_TEST_CALLS, 1);
-    uint64_t have = extend(osoe_tp_load(OSOE_REGION_HEAP, offset, width), width, sgn);
+    uint64_t have = extend(osoe_transport_load(OSOE_REGION_HEAP, offset, width), width, sgn);
     return satisfied(cmp, have, extend(want, width, sgn), sgn, routine);
 }
 
@@ -202,12 +202,12 @@ static uint64_t local_element(const void *base, size_t i, unsigned width, bool s
     return extend(v, width, sgn);
 }
 
-static bool in_set(const struct osoe_waitmany *w, size_t i)
+static bool in_set(const struct osoe_wait_many *w, size_t i)
 {
     return !w->status || w->status[i] == 0;
 }
 
-static uint64_t want_of(const struct osoe_waitmany *w, size_t i)
+static uint64_t want_of(const struct osoe_wait_many *w, size_t i)
 {
     return w->values ? local_element(w->values, i, w->width, w->sgn)
                      : extend(w->value, w->width, w->sgn);
@@ -215,19 +215,19 @@ static uint64_t want_of(const struct osoe_waitmany *w, size_t i)
 
 /* The heap offset of ivars[0], with the array's bounds and alignment checked
  * once for the whole call. */
-static uint64_t ivars_offset(const struct osoe_waitmany *w)
+static uint64_t ivars_offset(const struct osoe_wait_many *w)
 {
     if (w->nelems > UINT64_MAX / w->width)
         osoe_fatal("%s: %zu elements of %u bytes overflows", w->routine, w->nelems,
                    w->width);
-    uint64_t offset = osoe_sym_offset(w->routine, w->ivars, (uint64_t)w->nelems * w->width);
+    uint64_t offset = osoe_symmetric_offset(w->routine, w->ivars, (uint64_t)w->nelems * w->width);
     if (offset % w->width)
         osoe_fatal("%s: %p is not %u-byte aligned", w->routine, w->ivars, w->width);
     return offset;
 }
 
 /* The first and last unmasked element, or false when the set is empty. */
-static bool unmasked_span(const struct osoe_waitmany *w, size_t *first, size_t *last)
+static bool unmasked_span(const struct osoe_wait_many *w, size_t *first, size_t *last)
 {
     bool any = false;
     for (size_t i = 0; i < w->nelems; i++) {
@@ -242,9 +242,9 @@ static bool unmasked_span(const struct osoe_waitmany *w, size_t *first, size_t *
     return any;
 }
 
-static bool element_satisfied(const struct osoe_waitmany *w, uint64_t base, size_t i)
+static bool element_satisfied(const struct osoe_wait_many *w, uint64_t base, size_t i)
 {
-    uint64_t have = osoe_tp_load(OSOE_REGION_HEAP, base + (uint64_t)i * w->width, w->width);
+    uint64_t have = osoe_transport_load(OSOE_REGION_HEAP, base + (uint64_t)i * w->width, w->width);
     return satisfied(w->cmp, extend(have, w->width, w->sgn), want_of(w, i), w->sgn,
                      w->routine);
 }
@@ -257,7 +257,7 @@ enum many_mode { MANY_ALL, MANY_ANY, MANY_SOME };
  * element of the set at least once, which spec §9.11.4 requires and which ALL
  * and ANY are free to short-circuit.
  */
-static size_t scan(const struct osoe_waitmany *w, uint64_t base, enum many_mode mode,
+static size_t scan(const struct osoe_wait_many *w, uint64_t base, enum many_mode mode,
                    size_t *indices)
 {
     size_t found = 0;
@@ -306,7 +306,7 @@ static size_t empty_answer(enum many_mode mode)
     }
 }
 
-static size_t wait_many(const struct osoe_waitmany *w, enum many_mode mode, size_t *indices)
+static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, size_t *indices)
 {
     osoe_count(OSOE_C_SHMEM_WAIT_UNTIL_CALLS, 1);
     size_t first = 0, last = 0;
@@ -317,14 +317,14 @@ static size_t wait_many(const struct osoe_waitmany *w, enum many_mode mode, size
     /* §4.9: one watch, over the span of the unmasked elements. */
     uint64_t span_offset = base + (uint64_t)first * w->width;
     uint64_t span_len = (uint64_t)(last - first + 1) * w->width;
-    struct osoe_tp_watch *watch = osoe_tp_watch(OSOE_REGION_HEAP, span_offset,
+    struct osoe_transport_watch *watch = osoe_transport_watch(OSOE_REGION_HEAP, span_offset,
                                                 (size_t)span_len);
     uint64_t slept_since = 0;
     bool slept = false, woken = false, timed_out = false;
     size_t result;
 
     for (;;) {
-        uint32_t seq = osoe_tp_watch_seq(watch);
+        uint32_t seq = osoe_transport_watch_seq(watch);
         result = scan(w, base, mode, indices);
         if (scan_done(mode, result)) {
             /* Table 6 only, so always four or eight bytes and always the
@@ -335,35 +335,35 @@ static size_t wait_many(const struct osoe_waitmany *w, enum many_mode mode, size
             break;
         }
         if (woken)
-            osoe_count(OSOE_C_TP_WATCH_SPURIOUS, 1);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_SPURIOUS, 1);
 
         if (!slept) {
             slept = true;
             slept_since = osoe_now_ns();
             osoe_blocked_enter(w->routine, span_offset);
-            osoe_count(OSOE_C_TP_WATCH_BLOCKED, 1);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
         }
 
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-        woken = osoe_tp_watch_wait(watch, seq, &sweep);
+        woken = osoe_transport_watch_wait(watch, seq, &sweep);
         timed_out = !woken;
         if (woken) {
-            osoe_count(OSOE_C_TP_WATCH_WAKES, 1);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_WAKES, 1);
         } else {
-            osoe_count(OSOE_C_TP_WATCH_SWEEPS, 1);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_SWEEPS, 1);
             osoe_sweep_expired(w->routine);
         }
     }
 
-    osoe_tp_unwatch(watch);
+    osoe_transport_unwatch(watch);
     if (slept) {
-        osoe_count(OSOE_C_TP_WATCH_BLOCKED_NS, osoe_now_ns() - slept_since);
+        osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED_NS, osoe_now_ns() - slept_since);
         osoe_blocked_leave();
     }
     return result;
 }
 
-static size_t test_many(const struct osoe_waitmany *w, enum many_mode mode, size_t *indices)
+static size_t test_many(const struct osoe_wait_many *w, enum many_mode mode, size_t *indices)
 {
     osoe_count(OSOE_C_SHMEM_TEST_CALLS, 1);
     size_t first = 0, last = 0;
@@ -372,15 +372,15 @@ static size_t test_many(const struct osoe_waitmany *w, enum many_mode mode, size
     return scan(w, ivars_offset(w), mode, indices);
 }
 
-void   osoe_wait_all(const struct osoe_waitmany *w)  { wait_many(w, MANY_ALL, NULL); }
-size_t osoe_wait_any(const struct osoe_waitmany *w)  { return wait_many(w, MANY_ANY, NULL); }
-size_t osoe_wait_some(const struct osoe_waitmany *w, size_t *indices)
+void   osoe_wait_all(const struct osoe_wait_many *w)  { wait_many(w, MANY_ALL, NULL); }
+size_t osoe_wait_any(const struct osoe_wait_many *w)  { return wait_many(w, MANY_ANY, NULL); }
+size_t osoe_wait_some(const struct osoe_wait_many *w, size_t *indices)
 {
     return wait_many(w, MANY_SOME, indices);
 }
-int    osoe_test_all(const struct osoe_waitmany *w)  { return (int)test_many(w, MANY_ALL, NULL); }
-size_t osoe_test_any(const struct osoe_waitmany *w)  { return test_many(w, MANY_ANY, NULL); }
-size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
+int    osoe_test_all(const struct osoe_wait_many *w)  { return (int)test_many(w, MANY_ALL, NULL); }
+size_t osoe_test_any(const struct osoe_wait_many *w)  { return test_many(w, MANY_ANY, NULL); }
+size_t osoe_test_some(const struct osoe_wait_many *w, size_t *indices)
 {
     return test_many(w, MANY_SOME, indices);
 }
@@ -388,7 +388,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
 /* ---- the API surface, generated from the type lists -------------------- */
 
 #define OSOE_WAIT_SET(T, NAME, IVARS, NELEMS, STATUS, CMP, VALUE, VALUES, ROUTINE)     \
-    (struct osoe_waitmany){                                                            \
+    (struct osoe_wait_many){                                                            \
         .routine = ROUTINE, .ivars = (IVARS), .nelems = (NELEMS),                      \
         .width = (unsigned)sizeof(T), .sgn = ((T)-1 < (T)0),                           \
         .status = (STATUS), .cmp = (CMP), .value = (VALUE), .values = (VALUES) }
@@ -412,7 +412,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
     OSOE_API void pshmem_##NAME##_wait_until_all(T *ivars, size_t nelems,                \
                                                 const int *status, int cmp, T cmp_value) \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
                                                (uint64_t)cmp_value, NULL,               \
                                                "shmem_" #NAME "_wait_until_all");       \
         osoe_wait_all(&w);                                                              \
@@ -420,7 +420,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
     OSOE_API size_t pshmem_##NAME##_wait_until_any(T *ivars, size_t nelems,              \
                                                   const int *status, int cmp, T cmp_value) \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
                                                (uint64_t)cmp_value, NULL,               \
                                                "shmem_" #NAME "_wait_until_any");       \
         return osoe_wait_any(&w);                                                       \
@@ -429,7 +429,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                    size_t *indices, const int *status,  \
                                                    int cmp, T cmp_value)                \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
                                                (uint64_t)cmp_value, NULL,               \
                                                "shmem_" #NAME "_wait_until_some");      \
         return osoe_wait_some(&w, indices);                                             \
@@ -438,7 +438,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                        const int *status, int cmp,      \
                                                        const T *cmp_values)             \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
                                                cmp_values,                              \
                                                "shmem_" #NAME "_wait_until_all_vector"); \
         osoe_wait_all(&w);                                                              \
@@ -447,7 +447,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                          const int *status, int cmp,    \
                                                          const T *cmp_values)           \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
                                                cmp_values,                              \
                                                "shmem_" #NAME "_wait_until_any_vector"); \
         return osoe_wait_any(&w);                                                       \
@@ -457,7 +457,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                           const int *status, int cmp,   \
                                                           const T *cmp_values)          \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
                                                cmp_values,                              \
                                                "shmem_" #NAME "_wait_until_some_vector"); \
         return osoe_wait_some(&w, indices);                                             \
@@ -465,7 +465,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
     OSOE_API int pshmem_##NAME##_test_all(T *ivars, size_t nelems, const int *status,    \
                                          int cmp, T cmp_value)                          \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
                                                (uint64_t)cmp_value, NULL,               \
                                                "shmem_" #NAME "_test_all");             \
         return osoe_test_all(&w);                                                       \
@@ -473,7 +473,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
     OSOE_API size_t pshmem_##NAME##_test_any(T *ivars, size_t nelems, const int *status, \
                                             int cmp, T cmp_value)                       \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
                                                (uint64_t)cmp_value, NULL,               \
                                                "shmem_" #NAME "_test_any");             \
         return osoe_test_any(&w);                                                       \
@@ -481,7 +481,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
     OSOE_API size_t pshmem_##NAME##_test_some(T *ivars, size_t nelems, size_t *indices,  \
                                              const int *status, int cmp, T cmp_value)   \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp,     \
                                                (uint64_t)cmp_value, NULL,               \
                                                "shmem_" #NAME "_test_some");            \
         return osoe_test_some(&w, indices);                                             \
@@ -490,7 +490,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                 const int *status, int cmp,             \
                                                 const T *cmp_values)                    \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
                                                cmp_values,                              \
                                                "shmem_" #NAME "_test_all_vector");      \
         return osoe_test_all(&w);                                                       \
@@ -499,7 +499,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                    const int *status, int cmp,          \
                                                    const T *cmp_values)                 \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
                                                cmp_values,                              \
                                                "shmem_" #NAME "_test_any_vector");      \
         return osoe_test_any(&w);                                                       \
@@ -508,7 +508,7 @@ size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices)
                                                     size_t *indices, const int *status, \
                                                     int cmp, const T *cmp_values)       \
     {                                                                                   \
-        struct osoe_waitmany w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
+        struct osoe_wait_many w = OSOE_WAIT_SET(T, NAME, ivars, nelems, status, cmp, 0,  \
                                                cmp_values,                              \
                                                "shmem_" #NAME "_test_some_vector");     \
         return osoe_test_some(&w, indices);                                             \

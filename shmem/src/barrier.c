@@ -7,6 +7,7 @@
 #include "blocked.h"
 #include "metrics.h"
 #include "base/epoch.h"
+#include "progress-host.h"
 #include "export.h"
 #include "fatal.h"
 #include "state.h"
@@ -17,11 +18,19 @@
  * A team sync on one node (§5.3-§5.5).
  *
  * Each member arrives with one locked increment. No member waits for a
- * designated one: whichever increment reaches the epoch's arrival target
- * releases the epoch. Here every team spans one node, so that member bumps
- * `released` itself - the single-node release path of §5.5 - where a
- * multi-node team would send the internode arrival AM instead. Every member
- * then waits for `released` to equal k + 1 (§5.4: equality, bounded skew).
+ * designated one: whichever increment reaches the epoch's arrival target ends
+ * the node's arrival. On a team within one node that member bumps `released`
+ * itself - the single-node release path of §5.5. On a team spanning several it
+ * posts the node's internode arrival instead and bumps nothing: the release
+ * comes back from the root and is applied by this node's progress thread
+ * (§5.3). Every member then waits for `released` to equal k + 1 (§5.4:
+ * equality, bounded skew), and that wait is the same on both paths.
+ *
+ * **The target counts the team's members on this node, not its members**
+ * (§5.2). The two coincide on one node and only there, so a target written
+ * against `members` is a defect no single-node test can show: it is exactly
+ * right until the first multi-node job, where every node would wait for the
+ * whole team to arrive on it.
  *
  * The counters and the epoch count are the *team's*, which is why they arrive
  * through struct osoe_team rather than being read from the header here. Two
@@ -33,11 +42,29 @@ static void sync_team(struct osoe_team *t, const char *routine)
 {
     uint32_t k = *t->epoch;
 
-    if (osoe_epoch_bump_eq(t->arrived, (k + 1) * t->members)) {
-        if (!osoe_epoch_bump_eq(t->released, k + 1))
-            osoe_fatal("%s epochs diverged at epoch %u: PEs called different numbers "
-                       "of collectives", t->name, k + 1);
-        osoe_epoch_wake_all(t->released);
+    if (osoe_epoch_bump_eq(t->arrived, (k + 1) * t->local_members)) {
+        if (t->internode) {
+            /*
+             * §5.3's other half. This node has now arrived for every member of
+             * the team on it, and the release is not ours to give: the root
+             * counts the participating nodes and sends it back, and this
+             * node's progress thread applies it. So post the arrival and then
+             * wait exactly like every other member - there is no designated
+             * PE here either, and in particular this is not necessarily the
+             * lead.
+             *
+             * Posting rather than sending is progress-host.h's subject: the
+             * state an arrival moves is private to the lead's agent thread, in
+             * the lead's process, and this is an application thread of any
+             * local PE.
+             */
+            osoe_progress_host_post_arrival(t->number, k + 1);
+        } else {
+            if (!osoe_epoch_bump_eq(t->released, k + 1))
+                osoe_fatal("%s epochs diverged at epoch %u: PEs called different numbers "
+                           "of collectives", t->name, k + 1);
+            osoe_epoch_wake_all(t->released);
+        }
     }
     osoe_epoch_wait_eq(t->released, k + 1, routine);
     *t->epoch = k + 1;
@@ -67,7 +94,7 @@ void osoe_barrier_all(const char *routine)
     osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
     struct osoe_team *world = osoe_team_of(routine, SHMEM_TEAM_WORLD);
     osoe_blocked_enter(routine, osoe.world_epoch + 1);
-    osoe_tp_wait(osoe_tp_ctx_default(), NULL, 0);
+    osoe_transport_wait(osoe_transport_context_default(), NULL, 0);
     sync_team(world, routine);
     osoe_blocked_leave();
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);

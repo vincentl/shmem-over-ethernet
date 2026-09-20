@@ -42,7 +42,7 @@ int osoe_test(const char *routine, const void *ivar, unsigned width, bool sgn, i
  * (§9.11 and 1.6 change #19): `all` returns at once, `test_all` returns 1,
  * `any` and `test_any` return SIZE_MAX, `some` and `test_some` return 0.
  */
-struct osoe_waitmany {
+struct osoe_wait_many {
     const char *routine;
     const void *ivars;
     size_t nelems;
@@ -54,11 +54,11 @@ struct osoe_waitmany {
     const void *values;         /* the _vector forms' cmp_values */
 };
 
-void   osoe_wait_all(const struct osoe_waitmany *w);
-size_t osoe_wait_any(const struct osoe_waitmany *w);
-size_t osoe_wait_some(const struct osoe_waitmany *w, size_t *indices);
-int    osoe_test_all(const struct osoe_waitmany *w);
-size_t osoe_test_any(const struct osoe_waitmany *w);
-size_t osoe_test_some(const struct osoe_waitmany *w, size_t *indices);
+void   osoe_wait_all(const struct osoe_wait_many *w);
+size_t osoe_wait_any(const struct osoe_wait_many *w);
+size_t osoe_wait_some(const struct osoe_wait_many *w, size_t *indices);
+int    osoe_test_all(const struct osoe_wait_many *w);
+size_t osoe_test_any(const struct osoe_wait_many *w);
+size_t osoe_test_some(const struct osoe_wait_many *w, size_t *indices);
 
 #endif /* OSOE_WAIT_H */

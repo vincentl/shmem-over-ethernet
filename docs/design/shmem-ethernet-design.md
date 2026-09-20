@@ -308,6 +308,71 @@ Buffer size must be at least 2× maximum message size, or aggregation stops
 working at the top of the range. A 64 KB message in a 64 KB buffer means one
 message per segment, forever.
 
+#### Where the buffers live, and how they are sized
+
+**A separate shared object per node, not part of the control segment.** The
+connection buffers are the only AM-specific allocation in the design, and §10's
+open question — whether §3's data path stays hot in an RDMA build — counts their
+memory among its uncounted costs. Putting them in the control segment would
+settle that question by accident, in the direction of "always allocated", in the
+one segment `osoe-stat` maps read-only and whose size would then vary by build.
+Separate, a build that does not keep the AM data path hot never creates it, an
+RDMA backend registers one contiguous region rather than N, and a put can go
+from the caller's `src` straight to the NIC rather than through a staging copy
+nothing needs. Writers are application threads in every local PE and the reaper
+is the lead's agent in another process (§3.12), so it is shared memory either
+way; the question was only which object.
+
+**Sizing scales with node count and has no PE dimension at all** (§1). Per node
+the area is `2 × (nodes − 1) × buffer`: every local PE contends on the same open
+buffer through §3.5's CAS, so 256 PEs on a node cost exactly what one PE costs.
+Giving each PE its own buffer per peer would make it `L × 2 × nodes` and destroy
+the single ordered stream §3.1 depends on for free `fence` ordering — the same
+mistake as a second data socket, in a different place.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `OSOE_AM_CHUNK` | 64 KiB | §3.2's fragmentation size, and so the largest message on the wire |
+| `OSOE_AM_BUFFER` | `2 × chunk` | Bytes per connection buffer; a power of two, refused below the floor |
+| `OSOE_AM_BUFFER_BUDGET` | 256 MiB | Per-node ceiling on `2 × (nodes − 1) × buffer` |
+| `OSOE_AM_HUGEPAGES` | 0 | Opt in to huge pages for the area |
+
+**The floor is the default, because everything except aggregation pushes down.**
+§3.2 bounds head-of-line blocking at roughly two segments — about 2 ms on 1 GbE
+at 128 KiB, doubling with the buffer — and §3.9's self-clocking already grows the
+batch under load without needing headroom, since the buffer only has to hold
+what accumulates during one in-flight send. Going above the floor is an opt-in
+for links fast enough that a millisecond of wire time stops mattering.
+
+**The budget is a guard rail, not a routine mechanism.** At these defaults it is
+not reached until about a thousand nodes, past what §1 targets, so inside the
+supported range the behaviour is a constant buffer size with no heuristic to
+reason about: 3.75 MB per node at 16 nodes, 125 MB at 500. When it is exceeded
+the buffer halves — staying a power of two, which the ring arithmetic needs —
+and keeps the *largest* size that fits; the floor is a limit, not a target. If
+the floor itself does not fit, that is an error naming both knobs, not a silent
+drop below it, because below the floor aggregation fails at the top of the range
+and surfaces as a performance mystery rather than a message.
+
+**The case that actually needs tuning is testing, not production.** §8.1's
+logical node map puts every node on one machine, so the whole-host cost is
+quadratic: 60 MB at 16 logical nodes, about 1 GB at 64, 16 GB at 256. Lowering
+`OSOE_AM_CHUNK` is the knob for it, since it lowers the floor with it — 64
+logical nodes cost about 1 GB at the default chunk and 129 MB at 8 KiB. Tier-2
+tests set the sizes explicitly rather than inheriting the production default.
+
+**Huge pages are off by default, the opposite of the rule for heaps** (§6.2),
+and the inversion is deliberate. Heaps are touched densely; connection buffers
+are touched sparsely, because a halo exchange faults six peers' worth of the
+whole area. `hugetlbfs` pages are reserved up front, so opting in trades away
+exactly the demand paging that makes a large node count affordable.
+
+**Known and not addressed: NUMA first touch.** On a multi-socket node the lead
+creates the area, so first touch places every buffer on the lead's NUMA node and
+PEs on the other socket pay for it on every `memcpy`. The target hardware is
+single-socket, and fixing it means a first-touch policy per PE or per peer.
+Recorded rather than built.
+
 **Ack-only segments.** Piggybacking alone never acknowledges one-way traffic. If
 node A only puts to B, no B→A segment exists to carry the ack, and A's `quiet`,
 `barrier_all`, and finalize wait forever: the safety sweep submits only sealed
@@ -395,6 +460,27 @@ buffer (§3.8) carries the seal bit, so writers skip it while the progress threa
 fills it with replies; opening it clears the bit. The progress thread submits only
 once `filled` equals the reserved count.
 
+**A connection starts with both buffers sealed, and that has to be written
+down.** Shared memory arrives zeroed — `ftruncate` guarantees it, and §6.2
+relies on that for every other counter and futex word in the design — so a
+connection that is merely zeroed has both heads at 0, which reads as *unsealed
+and empty*: two reservable buffers, the state this section forbids, before the
+progress thread has opened anything. Writers would reserve into a buffer the
+progress thread believes is free, and it would reset the head over their
+messages when it opened it. Initializing a connection therefore means setting
+the seal bit on both buffers, not zeroing them. *(Found in implementation at
+§7.1 step 2: the zeroed state is reachable precisely because zeroing is
+otherwise the right default everywhere else.)*
+
+**Writers find the reservable buffer by the seal bit and nothing else.** With
+two buffers that is two loads, and no separate word names the open one. An index
+would be this section's rejected draft in a new place: a writer reads it and
+then CASes a head the progress thread sealed in between. The CAS would still
+fail, so the index would not be *wrong* — it would be worse than that, leaving
+the seal bit doing nothing the index had not already done, while §3.8's
+`DRAINING` guard rests on the bit alone. Keeping the bit as the only decider is
+what keeps the guard's rule load-bearing rather than decorative.
+
 **The progress thread must never spin waiting for `filled` to catch up.** A
 writer may be descheduled mid-`memcpy`. Move to other connections and re-check
 later. At 256 PEs on an oversubscribed node, a spin here is a hang.
@@ -471,6 +557,31 @@ lands; with no credit left, the issuing PE blocks, which the spec permits (§4.6
 The target's worst case is then `connections × C` descriptors — it scales with
 node count, as §1 requires. Descriptors come from one **node-wide pool** that each
 connection's queues link into, so idle connections cost nothing.
+
+**Taking a credit is a CAS loop, not a test and a decrement.** The credit is per
+*connection*, so the PEs of a node share it and contend on it. A PE that tests
+`credits > 0` and then decrements can be overtaken between the two steps by a
+sibling doing the same, and both take the last credit — the count goes negative
+and the target's queue is over-subscribed by exactly the amount nobody
+accounted for. This is the same argument §3.5 makes for the reservation itself,
+and it is stated here because it was missing: the model's own first encoding of
+the take had this bug, which is how it was found
+(`docs/design/evidence/am-backend/`, the `race_take` case).
+
+Two further results from that model, each easy to lose:
+
+- **Every breakage passes with one PE per node.** The credit binds only when a
+  node has more than one PE contending for it, which is every real node. A model
+  or a test run only at `L = 1` calls all of these correct.
+- **The credit returns when the reply *lands*, not when it is sent**, and the
+  difference is invisible while gets are blocking. The credit keeps a bound at
+  each end: reply descriptors at the target, and replies in flight toward the
+  origin's landing zone (§3.12). Returning it at handler time breaks both.
+  Returning it when the reply is drained onto the wire keeps descriptors bounded
+  and breaks only the landing zone — and under `SERIALIZED` with blocking gets a
+  PE waits for its own reply before issuing again (§4.6), so nothing can show it
+  until nonblocking gets arrive. Do not simplify "lands" to "sent" on the
+  evidence of the blocking cases.
 
 Because reservation may now *fail* — the progress thread leaves the descriptor
 in place and carries on reaping — there is no infallibility requirement and no
@@ -613,6 +724,19 @@ latency-neutral, since the Pi will not honour a 10 µs `nanosleep` and a 1 ms
 sleep roughly doubles round-trip latency); `IORING_OP_MSG_RING` (requires a ring
 per PE to avoid one futex word).
 
+> **§7.1 step 2 polls, and that is a stand-in rather than a change of mind.**
+> The loop above waits on *one* submission that carries both the socket
+> completions and the futex — that is the whole trick, and `IORING_OP_FUTEX_WAIT`
+> is in `tools/probe` because of it. Step 2 has no ring: its wire is shared
+> memory, and a plain `futex_wait` takes one address, so the lead's agent can
+> wait on its wake word or on one peer's wire, but not on both, and with several
+> peers not on all the wires. Outbound traffic is unaffected — an application
+> thread bumps the wake word, which is an address the agent is already waiting
+> on (§3.12) — so only *arriving* bytes have no way to announce themselves, and
+> those are found by looking, at an interval far under the safety sweep. The
+> rejection above stands for the shipping design, and step 3 restores the
+> blocking form and deletes the interval.
+
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
 anything sealed regardless of signalling. This converts a class of hangs into a
@@ -717,7 +841,19 @@ buffers (§3.5), and ask the lead for everything else — seal-and-flush for
 **Replies land in shared memory, never at a private address.** A get's `dest`
 may be a stack or `malloc` buffer the lead's process cannot see. Each PE
 therefore has a **landing zone** in the node segment, sized by the outstanding-get
-resource (§4.6). The progress thread writes reply chunks and fetching-AMO results
+resource (§4.6).
+
+It is in the **control segment**, not the AM connection area (§3.4), because the
+reason it exists is the address-space boundary rather than the network: every
+backend needs it, and an RDMA backend writing a reply straight into the origin's
+memory still cannot write a private `dest`. It arrived at control-segment
+**layout 6**, one slot per local PE, each holding one AM chunk — a landing zone
+smaller than the wire's largest message would make that message undeliverable,
+which is a hang rather than a short read. One slot per PE is enough while gets
+and fetching AMOs are blocking, since `SERIALIZED` allows one outstanding (§4.6),
+so the zone is sized by `L` and not by node count; nonblocking gets change that,
+and the `bytes_issued`/`bytes_landed` pair beside it is already the shape §4.6
+specifies for them. The progress thread writes reply chunks and fetching-AMO results
 there, and the *origin* copies into `dest`:
 
 - blocking get or fetching AMO: the calling thread, already waiting in the
@@ -810,10 +946,10 @@ that is stuck. Memory can be read without the job's cooperation.
   describing" is a claim rather than a mechanism, and the first structural
   change quietly breaks every tool.
 
-  **`struct osoe_metric_desc` is frozen with it, and for the same reason.** The
+  **`struct osoe_metric_descriptor` is frozen with it, and for the same reason.** The
   table is what makes every other field readable, so its own element cannot be
   described by the table; something has to be the floor. The directory carries
-  `metric_desc_bytes` so that a reader *checks* this assumption rather than
+  `metric_descriptor_bytes` so that a reader *checks* this assumption rather than
   making it, and a reader that meets a descriptor size it does not know prints
   the directory and stops, which is the same behaviour as an unknown `layout`.
   Two structures, both frozen, both checked: that is the whole contract between
@@ -1031,7 +1167,7 @@ headers would pass whenever the library agreed with itself.
   or 8 bytes. At two bytes there is no AMO type at all: the deprecated `short`
   waits of Table 12 predate 1.5 change #17, so the only remote update is a put,
   for which notification is best effort by design (§4.10) and finishing at a
-  sweep is how such a wait is *meant* to end. Those go to `tp.watch.late_wake`,
+  sweep is how such a wait is *meant* to end. Those go to `transport.watch.late_wake`,
   an ordinary counter.
 
   The split is what makes this an oracle rather than a diagnostic. One counter
@@ -1068,7 +1204,7 @@ events, and the design below stands until then.
 Two smaller deferrals for the same reason. **Prometheus output** is a third
 formatter over the same table and waits for a reason to exist. The **intranode
 versus internode split** on the RMA counters needs a dispatch to split on, and
-so does `tp.wait.dirty_peers`; both land with the AM backend, which is also when
+so does `transport.wait.dirty_peers`; both land with the AM backend, which is also when
 the per-peer and per-connection counters of questions 2 and 3 first have write
 sites.
 
@@ -1591,8 +1727,7 @@ made by the calling thread (§9.12.1 and §9.12.2 Notes), and contexts created w
 `SHMEM_CTX_NOSTORE` are exempt. Two rules deliver it:
 
 1. **`shmem_ptr` returns `NULL` for any target reached over the network** —
-   including a local PE when §8.1's force-remote flag sends intranode traffic over
-   TCP. A thread's store can then never race that same thread's queued put to the
+   including a local PE under §8.1's force-remote flag. A thread's store can then never race that same thread's queued put to the
    same object: either both are local and ordered by the thread itself, or no
    pointer exists.
 2. **`fence`, `quiet`, `pe_quiet`, and the barriers begin with one `seq_cst` store in
@@ -1809,7 +1944,8 @@ return `NULL` across logical nodes too.
   unconditionally is conforming.** The intranode case is essentially free from
   the shared heap.
 - `shmem_ptr` returns `NULL` for any target reached over the network, including a
-  local PE under §8.1's force-remote flag (§4.6). It also returns `NULL` for an
+  local PE under §8.1's force-remote flag, which makes the pointer unavailable
+  without changing the route (§4.6, §8.1). It also returns `NULL` for an
   address outside the symmetric heap and for a PE number out of range. RMA
   routines treat those two cases as fatal instead, naming the routine, because
   there a silent no-op would hide the bug.
@@ -1855,7 +1991,7 @@ slot publishes the range and a writer wakes on overlap. A write to an unwaited
 element of the array wakes spuriously, and the loop re-checks.
 
 **The range is one word: region, first grain, and a saturating grain count**
-(`shmem/src/watch_range.h`), which is the same word §4.11 item 3 publishes per
+(`shmem/src/watch-range.h`), which is the same word §4.11 item 3 publishes per
 thread under `MULTIPLE`. The grain is 4 bytes, the width of the narrowest AMO
 type, so an ivar at its natural alignment is filtered exactly and no two
 AMO-type objects share a grain unless they are adjacent elements of one array.
@@ -2135,11 +2271,11 @@ and get stay `memcpy`. This is the general case rather than one fabric's quirk �
 Portals, UET and UCX each carry a capability flag saying whether their NIC
 atomics are CPU-coherent, which means all three expect the incoherent case.
 
-Consequently `osoe_tp_direct` returning non-NULL says that *stores* through the
+Consequently `osoe_transport_direct` returning non-NULL says that *stores* through the
 pointer are ordered as described; it does not say that rmw to that PE executes
 locally. Nothing above the boundary changes, because the spec already makes a
 plain store racing an AMO on the same word undefined (spec §3.2).
-`osoe_tp_direct(pe, region, offset)` *is* that function. It returns the target's
+`osoe_transport_direct(pe, region, offset)` *is* that function. It returns the target's
 address in this process only where the backend orders the calling thread's stores
 through that address against its own writes by the next fence or wait (§4.6). osoe's
 intranode backend does, because it applies writes in the calling thread. The AM
@@ -2177,22 +2313,56 @@ boundary returning recoverable errors would be inventing a job it does not own.
 
 **Every blocking call sweeps, on a bound.** A wait that cannot finish checks the
 abort word and the lead's liveness at least every `OSOE_SWEEP_NS`, whether or not
-the call takes a deadline. `osoe_tp_wait`, a blocking `osoe_tp_get` and any
-future blocking call sweep on the same schedule as `osoe_tp_watch_wait`. Neither
+the call takes a deadline. `osoe_transport_wait`, a blocking `osoe_transport_get` and any
+future blocking call sweep on the same schedule as `osoe_transport_watch_wait`. Neither
 blocks on the intranode backend, so nothing has forced the question yet; on the
-AM backend `osoe_tp_wait` blocks on acknowledgements and on an RDMA backend it is
+AM backend `osoe_transport_wait` blocks on acknowledgements and on an RDMA backend it is
 a completion-queue spin, and the rule is the difference between a hang and a
 clean abort.
 
-**A batching hint, `OSOE_TP_MORE`.** One flag on put and rmw saying more
+**A batching hint, `OSOE_TRANSPORT_MORE`.** One flag on put and rmw saying more
 operations follow on this context, so a backend may hold one back and submit it
-with the next. Purely a hint: it changes nothing about completion, ordering or
+with the next.
+
+*What it defers on the AM backend is the wake, not the seal.* §3.9's aggregation
+self-clocks off the send completion, so an operation on an idle connection is
+sealed and submitted at once — batch of one — and nothing ever waits for a
+buffer to fill. The only thing an application thread controls is whether it asks
+the lead for a wake (§3.12), so `OSOE_TRANSPORT_MORE` means "do not wake the lead yet";
+the next operation without it, or any fence, wait or get, does. The source-bytes
+rule below is satisfied unconditionally here, because reservation copies into
+the connection buffer, so the flag is safe and its only saving is futex wakes on
+a burst. **Ignoring it is correct and nearly free**: §3.10 requires the safety
+sweep to submit anything sealed regardless of signalling, so the worst case is
+one sweep interval of added latency, and in practice the next operation wakes
+the lead anyway. Its first *acting* caller is a backend that posts work requests
+referencing the caller's `src` rather than a copy — an RDMA one — which is the
+case the rule was written for.
+
+**Its first caller is `put_signal`**, and §7.1 step 2 is where it arrives. That
+routine is the one place in the step that can set the flag *honestly*: the
+signal follows the put on the same context and to the same PE, so "more
+follows" is a fact about the next statement rather than a guess about the
+application. The step's other candidate drivers — the strided and block RMA
+loops, and the 1.6 session routines — are all out of that step's scope, so the
+item was scheduled for a step in which every driver but this one is absent;
+`put_signal` is what keeps it from being deferred again.
+
+The AM path acts on it and the intranode path still ignores it, correctly,
+since there is nothing to defer when every put is a `memcpy` applied before the
+call returns. `am.wakes_deferred` counts what was held back, because a flag
+whose whole effect is to change nothing observable needs a counter to be
+testable at all, and the test asserts it **per PE and not per job**: the flag is
+only reached when the signalled put actually crosses a node, so on a map with
+several PEs to a node the partner is usually a node-mate and the count is
+rightly zero. Purely a hint: it changes nothing about completion, ordering or
 when `src` may be reused, and a backend that ignores it is correct — which is how
 the intranode backend implements it. The rule that makes it safe is that **a
 backend may defer an operation only if it has taken its own copy of the source
 bytes**; put's local-completion contract is unconditional, so deferring a large
-zero-copy put is wrong however the flag is set. Nothing sets it on one node,
-where every put is a `memcpy`. It exists because an RDMA backend can post a list
+zero-copy put is wrong however the flag is set. It is satisfied unconditionally
+on the AM path, where reserving copies into the connection buffer before the
+call returns, so what is deferred there is only the wake. It exists because an RDMA backend can post a list
 of work requests under one doorbell instead of ringing one per put, which is
 where the small-message rate is won, and because §3.9's aggregation wants to be
 told when not to seal a buffer early. Its drivers are the 1.6 session routines
@@ -2200,7 +2370,7 @@ told when not to seal a buffer early. Its drivers are the 1.6 session routines
 
 **Nonblocking completion is counters, never per-operation handles.** A
 nonblocking operation is a flag on the existing call, completed by the existing
-`osoe_tp_wait`. The spec defines `_nbi` completion only at `quiet`, so there is
+`osoe_transport_wait`. The spec defines `_nbi` completion only at `quiet`, so there is
 no per-operation wait call to serve; §4.6's `bytes_issued`/`bytes_landed` pair
 already *is* this design; and the core-API study found counters sufficient in all
 six production transports it surveyed, with per-operation handles an open
@@ -2218,7 +2388,7 @@ question nobody needed. Recorded before a benchmark applies pressure for them.
 
 **Ordering is the weak contract, with a per-operation fence flag.** The boundary
 promises only what the spec promises: writes to one PE are ordered across a
-fence. An operation may also carry `OSOE_TP_FENCED`, which places it after every
+fence. An operation may also carry `OSOE_TRANSPORT_FENCED`, which places it after every
 earlier write on the same `(context, PE)`. `put_signal` is a put followed by an
 rmw with that flag, which is how invariant 5 survives a backend with no stream
 order. Both osoe backends place writes in issue order already: intranode because
@@ -2255,9 +2425,9 @@ instead of pushing every on-node rmw through NIC loopback.
   leads. A future backend implements it either natively or generically over this
   boundary, using `OSOE_REGION_INTERNAL` for scratch and control words (§5.8). The
   core-API study also keeps collectives above its core.
-- **Allocation (§4.4)** is a pure function of the call sequence and makes no
-  transport call today. A later hook, `set_range(region, offset, len,
-  attributes)`, tells a backend which ranges carry atomics or signals. That
+- **Allocation (§4.4)** is a pure function of the call sequence and makes one
+  transport call: `set_range(region, offset, len, attributes)` tells a backend
+  which ranges carry atomics or signals, called for each hinted allocation. That
   hook is how an RDMA backend avoids registering the whole heap for NIC atomics
   or counters (on CXI, a counter on a region disables its optimized RMA). The
   allocator therefore keeps hinted allocations (`SHMEM_MALLOC_ATOMICS_REMOTE`,
@@ -2278,8 +2448,16 @@ instead of pushing every on-node rmw through NIC loopback.
   It is the largest recoverable loss for an RDMA backend: without it, a backend
   cannot know which words a PE may wait on, so it cannot afford exact
   notification — it would have to add a second work request to *every* atomic —
-  and every blocked wait degenerates to polling, a core per node at best. It is
-  not scheduled here; §7.1 step 3 places it with the backend that consumes it.
+  and every blocked wait degenerates to polling, a core per node at best.
+
+  **It lands at §7.1 step 2**, with the allocator call site it needs. An earlier
+  draft scheduled it for step 3, with the first backend that can act on the
+  answer, and that is still where the first backend that *uses* it arrives — but
+  the call site is in the allocator, not in a backend, and step 2 is the step
+  that writes the code around it. Landing it later would mean revisiting
+  `shmem_malloc_with_hints` and `shmem_realloc` once the structures near them had
+  hardened. The intranode backend ignores it, which is the contract: advisory in
+  both directions, so a backend that does nothing with it is correct.
 - **Nonblocking gets and contexts beyond the default.** They add calls to the
   header when they arrive (§7.3). They do not change the operations above.
 
@@ -2530,7 +2708,7 @@ atomic_store_explicit(&rec->rng, pack(region, offset, len), memory_order_seq_cst
 atomic_fetch_or_explicit(&node->active[me][r / 64], bit(r), memory_order_seq_cst);
 for (;;) {                                            /* the §4.9 loop, unchanged */
     uint32_t seq = atomic_load_explicit(&rec->seq, memory_order_acquire);
-    if (predicate(osoe_tp_load(...))) break;
+    if (predicate(osoe_transport_load(...))) break;
     futex_wait(&rec->seq, seq, deadline);
 }
 atomic_fetch_and_explicit(&node->active[me][r / 64], ~bit(r), memory_order_seq_cst);
@@ -2660,15 +2838,15 @@ The operations of §4.10 do not change. The contract gains concurrency rules, an
  * a time (§4.11). An operation takes effect before it returns. A fence or wait
  * covers every operation on its context whose call returned before the fence
  * or wait was called; operations that overlap it may or may not be covered.
- * OSOE_TP_FENCED orders an operation after every write on the same (ctx, pe)
+ * OSOE_TRANSPORT_FENCED orders an operation after every write on the same (ctx, pe)
  * whose call returned before this one began. A thread holds at most one watch.
- * osoe_tp_notify may run in any number of threads and processes at once.
+ * osoe_transport_notify may run in any number of threads and processes at once.
 ```
 
 Two declarations follow from it:
-- `osoe_tp_ctx_create(options)`, which may fail and records the mode;
+- `osoe_transport_context_create(options)`, which may fail and records the mode;
 - a per-thread handle behind the watch and blocking calls, obtained by
-  `osoe_tp_watch` and `osoe_tp_get` themselves, so callers do not change.
+  `osoe_transport_watch` and `osoe_transport_get` themselves, so callers do not change.
 
 "Returned before it was called" is exactly spec §9.12.2's "posted prior to calling
 shmem_quiet". The models check it in that form.
@@ -2710,9 +2888,39 @@ counters, or with the team descriptor, hurts even at four PEs, and one alignment
 attribute prevents it.
 
 **Barrier and sync: arrival does not wait for a designated PE.** Whichever local
-member's increment reaches the epoch's arrival target enqueues the internode
-arrival AM and returns to waiting. One comparison on the `fetch_add` result; no
+member's increment reaches the epoch's arrival target posts the node's internode
+arrival and returns to waiting. One comparison on the `fetch_add` result; no
 dependency on the lead being scheduled.
+
+**It posts the arrival; it does not send it.** An earlier draft said the arriver
+"enqueues the internode arrival AM", which §3.12 does allow of an application
+thread in general - reserving and copying into a connection buffer is what every
+writer does (§3.5). It is wrong here for a different reason: the state the
+arrival moves is the progress thread's, not the connection's. The root's arrival
+counts, the participating-node count and the per-connection queues are private
+to the local lead's *agent thread*, in the lead's process, and the arriver is an
+application thread of any local PE - usually another process, which cannot see
+them at all. So the arrival crosses that boundary by §3.12's stated mechanism, a
+flag plus a futex wake: **a per-team word in the node header** (control segment
+layout 7) in which the arriver leaves the epoch, and a bump of the lead's
+`agent_wake`. The lead's agent consumes it and performs the arrival.
+
+Nothing is lost by the extra hop. The bytes could not leave before the lead's
+agent ran in either arrangement, since sending is its alone (§3.12), so posting
+costs the wake that had to happen anyway and buys one mechanism instead of two -
+the root node, where there is no message to send at all, takes the same path.
+
+**One word per team is enough, and that is the bounded-skew argument of §5.4
+again.** Epoch *k+2*'s arrival cannot be posted until every local member has
+been released from *k+1*, and that release cannot happen until the lead has
+already consumed and forwarded *k+1*. So no post can overwrite one the lead has
+not read, and the word needs no queue, no sequence number and no second slot.
+Two rules make it hold, both easy to get wrong and both model-checked in
+`docs/design/evidence/am-backend/arrival_model.py`: the agent loads `agent_wake`
+**before** the handoff word (§4.9), and it records the epoch consumed **from the
+value it forwarded**, not by re-reading the word afterwards - on the root node
+the forward can release the team locally at once, so a member can re-enter and
+post the next epoch into that word before the re-read would happen.
 
 **Data-carrying collectives do wait for the lead**, which combines every local
 contribution itself (§5.5). That dependency is the price of a single writer, and
@@ -2720,6 +2928,19 @@ the lead is blocked in the same call regardless.
 
 **Release** arrives at the progress thread, which advances the team's `released`
 counter and wakes all local waiters — a divisible event, so wake-many per §3.11.
+
+**The arrival and the release are AM messages, not boundary operations.** §10
+weighed a mandatory `osoe_transport_sync` here and closed it against the code at
+§7.1 step 2: this phase addresses a *node* where §4.10 addresses a PE, and its
+release wakes futex waiters on an epoch counter where §4.10's notify wakes watch
+waiters on a range. Both arguments are there.
+
+**The root counts, and the count is the node's, not the PE's.** Whichever local
+member's increment reaches the arrival target sends one arrival for the whole
+node, so a node of eight members arrives once. The root releases only when every
+participating node has arrived — which at *two* nodes is indistinguishable from
+releasing on any arrival, since the single message it receives is also the last
+one. A test of this phase needs three (§8.2).
 The progress thread never touches non-lead `dest` buffers, so it does no
 `O(members × count)` copying while other connections wait.
 
@@ -3229,8 +3450,11 @@ environment"). It does not run as a single PE. Silently becoming one PE is how a
 mis-launched job ends up as N independent jobs, each succeeding. Every variable
 marked "Yes" above is required, and the README shows how to launch a one-node job
 by hand. *(Rejected: singleton launch when the variables are absent, as some
-implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)* `OSOE_NODE_MAP`
-(§8.1) and `OSOE_BOOTSTRAP_TIMEOUT` (above) are osoe's own.
+implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)*
+`OSOE_BOOTSTRAP_TIMEOUT` (above) is osoe's own, read by the library.
+`OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
+turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
+library never sees it.
 
 The test launcher, `tools/launch/osoe-launch`, starts L processes of a one-node
 job with these variables set. Its job id is its own pid, so concurrent launches
@@ -3287,6 +3511,24 @@ Things to get right, each of which is a silent bug otherwise:
 - **The count is per process, not per thread**, and must be updated atomically.
 - **Concurrent first `shmem_init`** from two application threads passes through a
   once-gate, so bootstrap runs exactly once.
+- **A node must not stop its progress engine while it owes a peer bytes.** The
+  final barrier does not establish that it does not, and the gap is §5.3's own
+  shape: the root releases *its own* node the instant the last node arrives, and
+  only enqueues the releases that free the others, which later drain and flush
+  passes put on the wire. So the root's PEs can leave that barrier, reach
+  `shmem_finalize` and stop the agent while the message every other node is
+  waiting for is still in a buffer only that agent sends — and every other node
+  then waits for a node that has already exited. The lead therefore drains the
+  engine to idle after its agent is joined and before its wires close. Measured
+  at 3 hangs in 12 runs of the suite without it and 0 in 25 with it; the
+  signature is that the root's non-lead PEs exit cleanly while every other rank
+  is killed at the launcher's timeout.
+- **A wire is unmapped only after both ends have stopped writing.** Same reason
+  from the other side: a lead that has applied its release may still owe an
+  acknowledgement for the segment that carried it (§3.4), so a peer can write
+  after this side has run its last collective, and unmapping first turns that
+  into a SIGSEGV on the node that did nothing wrong. Announcing and waiting are
+  separate calls, so a lead tells every peer before waiting on any.
 - **A child created by `fork()`** after init inherits the mappings but no agent
   threads (§3.12). It must not call OpenSHMEM, and teardown code compares the
   current pid with the initializing pid and does nothing in a child.
@@ -3347,23 +3589,29 @@ machinery. The review's order is adopted.
    validated before a socket exists.
 
    **This is the boundary's first real test**, and the reason it is worth
-   noticing: it is the second backend behind §4.10, so §8.1's force-remote flag
-   can run the same program over both paths and diff. Two open items are timed
+   noticing: it is the second backend behind §4.10, so §8.1's node map can run
+   the same program over both paths and diff. Two open items are timed
    to land with it, because this step writes the code they would otherwise have
-   to restructure: **decide `osoe_tp_sync`** (§10 — whether a collective's
+   to restructure: **decide `osoe_transport_sync`** (§10 — whether a collective's
    internode phase crosses the boundary) while writing the internode phase that
-   is its only caller, and **`OSOE_TP_MORE`'s first caller**, since this is the
+   is its only caller, and **`OSOE_TRANSPORT_MORE`'s first caller**, since this is the
    first backend for which deferring a submission means anything.
+
+   **`osoe_transport_set_range` also lands here** (§4.10), with the allocator call site
+   it needs, for the same reason: the call site is in the allocator, which this
+   step is already working around.
 3. **Real transport.** Start with the `echo-uring` floor harness (§8.4), the
    transport's smallest reproducer. Then io_uring with the repaired reservation
    protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
    reply credits and DRAINING caps, and the global rendezvous with its timeout.
 
-   **`osoe_tp_set_range` lands here** (§4.10), with the allocator call site it
-   has been waiting for: this is the first backend that can do anything with the
-   answer. The allocator half — recording hints and growing hinted allocations
-   from the opposite end — is done earlier, in step 1, because retrofitting hint
-   plumbing into a finished allocator is the expensive version.
+   The first backend that *acts* on `osoe_transport_set_range` is here — it is the
+   first that must prepare memory before the network can touch it — but the hook
+   and its allocator call site landed at step 2 (§4.10), because the call site is
+   in the allocator rather than in a backend. The allocator half — recording
+   hints and growing hinted allocations from the opposite end — is older still,
+   from step 1, because retrofitting hint plumbing into a finished allocator is
+   the expensive version.
 4. **Robustness.** Pidfd liveness, abort propagation, `shmem_global_exit`,
    keepalive; Slurm environment fixtures and the heap-base-shift test mode (§8.2).
 
@@ -3452,7 +3700,7 @@ it.
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
 | Name-shifted deprecated routines | §10 item 1 wants a `pshmem_` entry point for every function | **Not done**, and recorded as known non-conformance below: the spec does not say how to shift a name that never had a `shmem_` prefix, and guessing wrong helps nobody |
 | Deprecated active-set constants (F.2.8) | `SHMEM_SYNC_VALUE` and the `pSync` sizes | Step 1: **the constants, and not the routines that take them.** A program that declares `static long pSync[SHMEM_BARRIER_SYNC_SIZE]` must compile; a program that then calls `shmem_barrier(...)` must fail at the link rather than reach a routine whose machinery — active sets, `pSync` ownership, the reuse rules — does not exist. A wrong answer is worse than a missing symbol |
-| `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TP_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
+| `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TRANSPORT_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
 
 **Known non-conformance: the deprecated routines have no name-shifted entry
 points.** §10 item 1 requires "an alternate entry point name, with the prefix
@@ -3520,17 +3768,87 @@ Both paths run in their real form on one machine.
 OSOE_NODE_MAP=0,0,1,1,2,2,3,3
 ```
 
-Two details that must be planned rather than patched:
+**The map is the launcher's input, not the library's.** `osoe-launch` reads it
+(or takes `-m`) and derives each rank's `OSOE_NODEID`, `OSOE_LOCALID` and
+`OSOE_GTIDS` — exactly what Slurm computes from a distribution on a real step,
+with a rank's local id being the number of earlier ranks on its node. Nothing
+under `shmem/src` reads `OSOE_NODE_MAP`, so the library sees the same
+environment in a test as in production and carries no test-only bootstrap path.
+*(Decided at §7.1 step 2, when the map was first implemented. The alternative —
+the library reading the map and overriding the variables it was given — builds a
+second, test-only bootstrap into the one piece of code whose whole job is to
+agree with the launcher.)*
+
+Two details that must be planned rather than patched. Both then hold **by
+construction** rather than by a check, which is the reason the split above is
+worth stating:
 
 - **Shared segment name keyed on logical node id**, not physical host, or four
-  logical nodes accidentally share memory.
+  logical nodes accidentally share memory. The control segment is already named
+  `/osoe.<job>.<step>.<node>.<session>` where `<node>` is `OSOE_NODEID` (§6.2),
+  and the launcher sets that to the logical node id.
 - **`shmem_ptr` must return `NULL` across logical nodes** even though the pages
   are physically reachable. The locality decision lives in exactly one function
-  that everything else consults.
+  that everything else consults. PEs rendezvous only with the PEs named in their
+  own node's `OSOE_GTIDS`, so a PE never maps a heap outside its logical node and
+  the function has no address to return.
 
-Plus a **force-remote flag** routing even same-logical-node traffic over the
-network. Running a program both ways and diffing is the strongest differential
-test, since the shared-memory path is simple enough to trust as the reference.
+Plus a **force-remote flag**. An earlier draft had it route even
+same-logical-node traffic over the network, and called that the strongest
+differential test available. Implementing it showed the claim was built on a
+mechanism that does not exist and a comparison the node map already provides.
+
+**The node map is how a job says what is local and what is remote**, and it is
+the only thing that needs to. `osoe-launch -n 6 -m 0,0,1,1,2,2` starts six
+processes on one machine and gives each its logical node; PEs rendezvous only
+with the PEs named in their own node's `OSOE_GTIDS`, so a PE never maps a heap
+outside its logical node and the locality function has no address it could
+return. Every arrangement is expressible — all local, all remote, and the four
+poles above — so running a program "both ways and diffing" is `-m 0,0,0,0`
+against `-m 0,1,2,3`, with no flag involved.
+
+The one arrangement the map cannot express is two PEs that *are* on one logical
+node, and so *have* mapped each other's heaps, communicating over the network
+anyway. That is what the flag was for, and it is exactly the case with no route:
+connections exist per node **pair** (§3.4), so there is none from a node to
+itself and such an operation has nowhere to go. Giving it one means a self slot
+in the connection area, a wire from a node to itself, and peer-slot arithmetic
+that no longer excludes this node — real structure, in the data path, for a
+feature no production run will ever use.
+
+**So the flag keeps only its locality half.** `OSOE_FORCE_REMOTE=1` makes
+`shmem_ptr`, `shmem_team_ptr` and `shmem_addr_accessible` answer `NULL` for a
+node-mate, while the traffic itself still takes the intranode path. That costs
+nothing, and it keeps the property worth having: a program cannot be written
+against the pointer shortcut and then quietly depend on it, and a boundary that
+stopped consulting the locality function fails a test. What it no longer claims
+is to exercise the AM path for same-node pairs — the node map does that by
+putting the pair on different nodes, which is both simpler and closer to the
+job a real cluster runs.
+
+Two further boundaries on the flag, both consequences rather than concessions:
+
+- **A PE is always local to itself.** Connections exist per node *pair* (§3.4),
+  so there is none from a node to itself and an operation addressed to a PE's
+  own rank has nowhere to be routed. The flag routes traffic *between* PEs; a PE
+  reading and writing its own symmetric memory is not traffic. This is not
+  cosmetic: `osoe_transport_load` — the coherent load behind every `shmem_test`
+  and every `wait_until` (§4.10) — resolves through the same locality function
+  on the caller's own rank, so a rule that made a PE remote from itself is a
+  null dereference on the most-travelled path in the library.
+- **It needs at least two logical nodes**, and is refused at init otherwise. On
+  one node the flag would make every PE unreachable by pointer while no remote
+  path exists to replace it, which is a job that can allocate and synchronize
+  but whose `shmem_ptr` lies about a machine with nowhere else to go. A job that
+  wants the remote path asks the node map for it.
+
+`SHMEM_TEAM_SHARED` keeps its membership under the flag — it stays the set of
+PEs on the node, not the single PE that `shmem_ptr` still answers for. §4.8
+already states that returning `NULL` unconditionally is conforming, so a
+node-sized SHARED whose members answer `NULL` is legal; and stable membership is
+what makes the differential diff mean something, since a team whose size changed
+between the two runs would make every program using it differ for a reason that
+has nothing to do with the transport.
 
 **It becomes a three-way switch** — intranode, AM, and any third backend — the
 moment a second network backend exists, so the differential test extends to it
@@ -3561,6 +3879,19 @@ runs in seconds at tier 1.
 | 2 | Logical nodes over loopback | Integration, threading |
 | 3 | Logical nodes in netns over veth with netem | Most transport bugs |
 | 4 | Real cluster | Everything else |
+
+> **ThreadSanitizer cannot see a happens-before that runs through another
+> process, and the AM data path has one.** The lead's agent writes a local PE's
+> heap while that PE's own main thread touches the same bytes; what separates
+> them is the barrier, whose chain is this PE's arrival, then whichever local
+> member was last posting the §5.3 handoff, then the root node, then the
+> release. Every link is a `seq_cst` operation on shared memory and the middle
+> ones are in other processes, so tsan reports a race it has no way to
+> disprove. The multi-node data-path tests therefore do not run under it; the
+> single-node map does, and there the intranode path applies every put in the
+> calling thread, which is exactly the case tsan can check. Suppressing the
+> report by name would hide real races in the same parser, and adding loads for
+> the tool to follow would make it green without making anything safer.
 
 > **Loopback hides the worst bugs.** Effectively unlimited MTU, no loss, no
 > reordering, enormous buffers, microsecond latency. It will never produce a
@@ -3904,9 +4235,9 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 | What `OSOE_NODE_LAYOUT` covers | **The encoding of every word in the control segment, not only the offsets of fields.** A word written by one process and interpreted by another is part of the inter-process contract even when its width and position do not move; changing what its bits mean without bumping the version gives mixed builds silent lost wakes rather than the loud refusal `open_control` exists to produce. Recorded because a proposal got it wrong, arguing the §4.9 watch word could change encoding without a bump since it is "an opaque filter" — it is opaque to its *reader*, which is another process |
-| Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_tp_watch_wait` being the backend's own function |
-| A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_tp_wait`, `osoe_tp_get`, `osoe_tp_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
-| `osoe_tp_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
+| Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_transport_watch_wait` being the backend's own function |
+| A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
+| `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 
 ### Still open — blocking
 
@@ -3942,14 +4273,14 @@ they are the *same two* the core-API study arrived at from a different direction
 Two independent searches converging on the same two gaps is the useful result.
 
 Folded in already: dispatch per `(pe, operation class)`, the sweep bound on
-blocking calls, `OSOE_TP_MORE` with the source-ownership rule that makes it safe,
+blocking calls, `OSOE_TRANSPORT_MORE` with the source-ownership rule that makes it safe,
 nonblocking-as-counters, `set_range`'s contract, §4.1's registration trap, §6.2's
 out-of-band bootstrap, and §8.1's three-way switch.
 
-- **`osoe_tp_sync`: does a collective's internode phase cross the boundary?**
+- **`osoe_transport_sync`: does a collective's internode phase cross the boundary?**
   §2.2 puts collectives on AM, decided when AM was the only backend; in an RDMA
   build that sends every barrier over TCP while the data path runs on the NIC.
-  The proposal is a mandatory `osoe_tp_sync(ctx, group)` over a group of *nodes*,
+  The proposal is a mandatory `osoe_transport_sync(ctx, group)` over a group of *nodes*,
   called after the intranode phase (§5.3) by one PE per node that has a member —
   note that is the team's local lead (§5.2), not necessarily the node lead of
   §3.12, so it asks the node lead's agent to send rather than sending itself
@@ -3957,17 +4288,32 @@ out-of-band bootstrap, and §8.1's three-way switch.
   put and watch, so it carries no capability and §4.10's rejection of capability
   bits still holds.
 
-  **Deferred to step 2, deliberately.** The case is an estimated 4–6× on barrier
-  at 10^6 PEs — unmeasured, and four orders of magnitude beyond the target
-  hardware. An earlier draft argued §4.10 contradicts itself on this and
-  **withdrew it**: §2.2 scopes the boundary claim to §4 and puts collectives on
-  AM on purpose, so there is a decision here, not an oversight. What is left is a
-  trade between fifteen lines now and restructuring `barrier.c` later, and step 2
-  writes the internode phase that is `osoe_tp_sync`'s only caller and its only
-  implementation. Deciding it there means deciding it with the code in front of
-  us rather than an estimate — and we may notice something on the way that
-  changes the answer. *(Not rejected. Recorded so it is decided at step 2 rather
-  than rediscovered.)*
+  **Decided at step 2, against the code: no.** The internode phase does not
+  cross the boundary. Writing it turned the trade from "fifteen lines now versus
+  restructuring `barrier.c` later" into two concrete obstacles, neither of which
+  was visible from the estimate:
+
+  - **Addressing.** §4.10's model is `(pe, region, offset)` — its opening
+    sentence, and invariant 20 — while this phase is addressed to a *node*, and
+    the counter it moves is the node's, shared by every local member of the
+    team. A sync over a group of nodes is not one more operation in that
+    vocabulary; it is a second addressing model beside it.
+  - **The release.** §5.4 makes each epoch counter *its own futex word*, because
+    the kernel implements only 32-bit futexes, and a member waits on the counter
+    itself. Expressing the release as an rmw would need the backend to know that
+    this particular word has futex waiters — which `osoe_transport_notify` does
+    not mean: notify is §4.9's watch mechanism over watched ranges, and a
+    collective's waiters hold no watch. Making them hold one rewrites §5.4's
+    wait, which is where the bounded-skew argument lives.
+
+  So the boundary stays point-to-point and PE-addressed, §2.2's placement of
+  collectives on AM stands, and a backend wanting a native group barrier
+  implements §5's internode phase rather than growing a new primitive. The 4–6×
+  estimate at 10^6 PEs is unchanged and still unmeasured, four orders of
+  magnitude beyond the target hardware; if a device ever makes it matter, what
+  changes is §5's internode phase, where the knowledge of nodes and epochs
+  already lives. *(Closed. The reasoning sits beside the code in
+  `shmem/src/progress.c`.)*
 - **Does the AM data path stay hot in an RDMA build?** Bootstrap is out of band
   in every build (§6.2) and that is forced. Whether §3's *data* path — the
   reservation protocol, deferred reply queues, aggregation — stays running is

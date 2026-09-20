@@ -14,6 +14,8 @@
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
+#include "job.h"
+#include "progress-host.h"
 #include "state.h"
 #include "transport.h"
 
@@ -86,24 +88,47 @@ SHMEM_VENDOR_STRING " environment variables\n"
 static void session_start(void)
 {
     osoe = (struct osoe_state){ 0 };
-    osoe_boot_read(&osoe.boot);
+    osoe_bootstrap_read(&osoe.bootstrap);
 
     /*
      * Before the rendezvous, so that a job which fails to start still says
      * which library it was and how to ask it for help.
      */
-    if (osoe.boot.print_version)
+    if (osoe.bootstrap.print_version)
         fprintf(stderr, "osoe: PE %u: " SHMEM_VENDOR_STRING ", OpenSHMEM %d.%d\n",
-                osoe.boot.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
-    if (osoe.boot.print_info && osoe.boot.local_id == 0)
+                osoe.bootstrap.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
+    if (osoe.bootstrap.print_info && osoe.bootstrap.local_id == 0)
         print_info();
     /* A re-init after a full teardown is a fresh session (§6.4). Every PE runs
      * the same sequence of sessions, so the numbers agree. */
-    osoe_node_join(&osoe.node, &osoe.boot, sessions++);
-    osoe_tp_init();
-    if (osoe_alloc_init(&osoe.alloc, osoe.node.heap_size) != 0)
+    uint32_t session = sessions++;
+    osoe_node_join(&osoe.node, &osoe.bootstrap, session);
+    /*
+     * Then the job-wide rendezvous (§6.2): only node leads take part, and it is
+     * what produces the rank -> node map that every later addressing decision
+     * reads. It comes after the node's own rendezvous because a lead publishes
+     * its node's rank list, which it learns there.
+     */
+    osoe_job_join(&osoe.job, &osoe.bootstrap, session);
+    /*
+     * Two facts about the job, settled here rather than by whichever component
+     * happens to need them first. They were set inside the AM backend's own
+     * start-up once, which put them *after* osoe_transport_init - so the
+     * boundary sized its per-context ordering state for a single-node job and
+     * the first internode put wrote through a null dirty set.
+     */
+    osoe.internode = osoe.job.node_count > 1;
+    osoe.lead = osoe.bootstrap.local_id == 0;
+    osoe_transport_init();
+    if (osoe_allocator_init(&osoe.allocator, osoe.node.heap_size) != 0)
         osoe_fatal("out of memory");
-    osoe_agent_start(&osoe.node.slots[osoe.boot.local_id]);
+    /*
+     * The AM backend, before the agent thread rather than after: the lead's
+     * agent is the node's progress engine (§3.12), so what it polls has to
+     * exist before it does.
+     */
+    osoe_progress_host_start(session);
+    osoe_agent_start(&osoe.node.slots[osoe.bootstrap.local_id]);
     init_pid = getpid();
 
     /*
@@ -112,23 +137,32 @@ static void session_start(void)
      * (§3.14), and the heap base every PE agreed on (§4.1). This is the same
      * name §3.15 prints on an abort, said once at start-up instead.
      */
-    if (osoe.boot.debug)
+    if (osoe.bootstrap.debug)
         fprintf(stderr, "osoe: PE %u of %u (local %u of %u): segment /dev/shm%s, "
-                "heap %llu bytes at %#llx, watchdog %s\n",
-                osoe.boot.rank, osoe.boot.world_size, osoe.boot.local_id,
-                osoe.boot.local_count, osoe.node.control_name,
+                "heap %llu bytes at %#llx, watchdog %s, node %u of %u%s\n",
+                osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
+                osoe.bootstrap.local_count, osoe.node.control_name,
                 (unsigned long long)osoe.node.heap_size,
                 (unsigned long long)osoe.node.hdr->heap_base,
-                osoe.boot.watchdog ? "on" : "off");
+                osoe.bootstrap.watchdog ? "on" : "off",
+                osoe.job.node, osoe.job.node_count,
+                osoe.job.force_remote ? ", force-remote" : "");
 }
 
 static void session_end(void)
 {
-    osoe_agent_stop(&osoe.node.slots[osoe.boot.local_id]);
-    osoe_alloc_fini(&osoe.alloc);
-    osoe_tp_fini();
-    osoe_node_leave(&osoe.node, &osoe.boot);
-    osoe_boot_free(&osoe.boot);
+    /*
+     * The agent first, so that nothing is polling the engine while it is taken
+     * apart, and so the wire close handshake (wire.h) is not racing this node's
+     * own progress loop.
+     */
+    osoe_agent_stop(&osoe.node.slots[osoe.bootstrap.local_id]);
+    osoe_progress_host_stop();
+    osoe_allocator_fini(&osoe.allocator);
+    osoe_transport_fini();
+    osoe_job_leave(&osoe.job);
+    osoe_node_leave(&osoe.node, &osoe.bootstrap);
+    osoe_bootstrap_free(&osoe.bootstrap);
 }
 
 OSOE_API void pshmem_init(void)
@@ -213,13 +247,13 @@ OSOE_API void pshmem_query_initialized(int *flag)
 
 OSOE_API int pshmem_my_pe(void)
 {
-    return atomic_load_explicit(&initialized, memory_order_acquire) ? (int)osoe.boot.rank : -1;
+    return atomic_load_explicit(&initialized, memory_order_acquire) ? (int)osoe.bootstrap.rank : -1;
 }
 
 OSOE_API int pshmem_n_pes(void)
 {
     return atomic_load_explicit(&initialized, memory_order_acquire)
-               ? (int)osoe.boot.world_size : -1;
+               ? (int)osoe.bootstrap.world_size : -1;
 }
 
 /* The weak `shmem_` aliases (export.h). */

@@ -7,7 +7,7 @@
 
 #include "export.h"
 #include "state.h"
-#include "sym.h"
+#include "symmetric.h"
 #include "team.h"
 #include "transport.h"
 
@@ -24,8 +24,8 @@ static void ctx_putmem(const char *routine, shmem_ctx_t ctx, void *dest,
     if (nelems == 0)
         return;
     osoe_check_pe(routine, pe);
-    uint64_t offset = osoe_sym_offset(routine, dest, nelems);
-    osoe_tp_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source, nelems, 0);
+    uint64_t offset = osoe_symmetric_offset(routine, dest, nelems);
+    osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source, nelems, 0);
 }
 
 static void ctx_getmem(const char *routine, shmem_ctx_t ctx, void *dest,
@@ -34,8 +34,8 @@ static void ctx_getmem(const char *routine, shmem_ctx_t ctx, void *dest,
     if (nelems == 0)
         return;
     osoe_check_pe(routine, pe);
-    uint64_t offset = osoe_sym_offset(routine, source, nelems);
-    osoe_tp_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, nelems);
+    uint64_t offset = osoe_symmetric_offset(routine, source, nelems);
+    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, nelems);
 }
 
 OSOE_API void pshmem_putmem(void *dest, const void *source, size_t nelems, int pe)
@@ -66,10 +66,10 @@ OSOE_API void pshmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
 OSOE_API void *pshmem_ptr(const void *dest, int pe)
 {
     uint64_t offset;
-    if (pe < 0 || (uint32_t)pe >= osoe.boot.world_size ||
-        !osoe_sym_heap_offset(dest, 1, &offset))
+    if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size ||
+        !osoe_symmetric_heap_offset(dest, 1, &offset))
         return NULL;
-    return osoe_tp_direct(pe, OSOE_REGION_HEAP, offset);
+    return osoe_transport_direct(pe, OSOE_REGION_HEAP, offset);
 }
 
 /* The weak `shmem_` aliases (export.h). */

@@ -52,10 +52,10 @@ bounce versus zero-copy, QP choice, batching, emulation — sits *below* the
 boundary where the backend is free. Two properties of the API happen to fit
 RoCE unusually well:
 
-- **`OSOE_TP_FENCED` as a per-operation flag** rather than ordered-by-default
+- **`OSOE_TRANSPORT_FENCED` as a per-operation flag** rather than ordered-by-default
   delivery. On one RC/XRC QP per `(ctx, pe)`, RoCE places writes in issue order
   and orders a following atomic behind them, so the flag is free and
-  `osoe_tp_fence` is an `mfence`. That makes `put_signal` one WQE cheaper than
+  `osoe_transport_fence` is an `mfence`. That makes `put_signal` one WQE cheaper than
   on CXI, which must enable a fence capability and lose PCIe relaxed ordering
   for all RMA on the endpoint (CORE §4.2). Where the fabric sprays, the flag is
   also the *only* thing that has to be paid for — the rest of the traffic keeps
@@ -216,7 +216,7 @@ pre-registered slab per PE.
 
 ## 4. Operation by operation
 
-### 4.1 `osoe_tp_put`
+### 4.1 `osoe_transport_put`
 
 Three size classes, chosen inside the backend:
 
@@ -226,7 +226,7 @@ Three size classes, chosen inside the backend:
 | ≤ bounce threshold (~16–32 KB) | copy into the pre-registered slab, unsignalled WQE | one memcpy is cheaper than waiting for a send CQE |
 | larger | zero-copy from the caller's buffer, signalled, wait for the CQE | the copy would cost more than the wait |
 
-`osoe_tp_put` promises to return at local completion — "src may be reused at
+`osoe_transport_put` promises to return at local completion — "src may be reused at
 once" — which is what forces this. It is the same choice SOS makes (CORE §2.2),
 and the spec permits either (CORE SEM §2.3).
 
@@ -234,12 +234,12 @@ Note that the first two classes make the source buffer the backend's, which
 means **small puts may legally be deferred** and flushed with one doorbell
 later. That is the batching opportunity of §8.1, and its hazard.
 
-On-node targets keep the intranode `memcpy` path; `osoe_tp_direct` still returns
+On-node targets keep the intranode `memcpy` path; `osoe_transport_direct` still returns
 non-NULL for them, because the backend's on-node writes still apply in the
 calling thread. Nothing about RoCE forces the intranode floor (§8.4) to
 regress.
 
-### 4.2 `osoe_tp_get`
+### 4.2 `osoe_transport_get`
 
 RDMA read, then spin on the send CQ. Into symmetric memory it is zero-copy.
 Into private memory — a stack buffer — the destination is unregistered, so it
@@ -251,7 +251,7 @@ NIC writes into the calling process's own memory.
 Blocking and complete per operation, as the header requires. Phase 1 has no
 `get_nbi`, so there is no read pipelining; see §8.3.
 
-### 4.3 `osoe_tp_rmw`
+### 4.3 `osoe_transport_rmw`
 
 | Case | Path |
 |---|---|
@@ -265,7 +265,7 @@ Blocking and complete per operation, as the header requires. Phase 1 has no
 Three RoCE facts shape this, all *recalled*:
 
 - **There is no non-fetching atomic.** The response packet carrying the old
-  value is sent whether or not anyone wants it. `OSOE_TP_FETCH` therefore
+  value is sent whether or not anyone wants it. `OSOE_TRANSPORT_FETCH` therefore
   controls only whether the *caller* waits — post unsignalled and return, which
   is precisely what the header allows ("an rmw may return before it executes").
   The wire cost is paid regardless.
@@ -280,7 +280,7 @@ Three RoCE facts shape this, all *recalled*:
   atomicity, not global scope, so a NIC fetch-add and a CPU `lock xadd` on the
   same word are not mutually exclusive.
 
-That last fact decides the on-node case. `osoe_tp_rmw`'s contract is exclusivity
+That last fact decides the on-node case. `osoe_transport_rmw`'s contract is exclusivity
 against every same-width rmw "issued through contexts in the same atomicity
 domain — the domain of ctx's team". For a default context on `TEAM_WORLD` that
 domain contains the whole job, so an on-node PE's rmw must be exclusive against
@@ -296,7 +296,7 @@ on the NIC. That is real, spec-legal headroom — but it only helps applications
 that actually create team-shared contexts, and CORE §3(b) records no users of
 `team_create_ctx`. In practice, **plan for loopback**.
 
-### 4.4 `osoe_tp_load`
+### 4.4 `osoe_transport_load`
 
 An acquire load of the PE's own word. The concern the header raises — "a backend
 whose NIC applies rmw out of the CPU's sight synchronizes here" — is about
@@ -306,14 +306,14 @@ platform. No synchronization needed; the signature's lack of a PE or context
 argument costs nothing here. It would bite on a platform with genuinely
 non-coherent NIC writeback, where the backend has no hook to flush.
 
-### 4.5 `osoe_tp_fence` and `OSOE_TP_FENCED`
+### 4.5 `osoe_transport_fence` and `OSOE_TRANSPORT_FENCED`
 
 **Free, if we do not spray.** Within one RC or XRC QP, RoCE places writes at the
 responder in issue order, and an atomic issued after them is ordered behind
 them. So with one QP per `(ctx, target node)`:
 
-- `OSOE_TP_FENCED` is a no-op flag — nothing is added to the WQE.
-- `osoe_tp_fence` is one serializing store for the §4.6 memory-store rule and
+- `OSOE_TRANSPORT_FENCED` is a no-op flag — nothing is added to the WQE.
+- `osoe_transport_fence` is one serializing store for the §4.6 memory-store rule and
   nothing else.
 - `put_signal` is a write WQE followed by an atomic WQE, with invariant 5
   holding by the transport's own ordering. Two WQEs, no drain, no round trip.
@@ -327,7 +327,7 @@ ordering for every RMA on the endpoint.
 and packet spraying are exclusive. Multipathing a QP across paths, or striping a
 context across several QPs per peer, breaks placement order and drops the
 backend to tier 3 — drain before posting a fenced operation. Because
-`OSOE_TP_FENCED` is per operation, a sprayed backend pays only on fenced
+`OSOE_TRANSPORT_FENCED` is per operation, a sprayed backend pays only on fenced
 operations and keeps multipathing for the rest. **An ordered-by-default boundary
 would have forfeited that, and §4.10 explicitly rejected it.** This is the
 clearest case of the boundary's weak contract being worth something on real
@@ -337,7 +337,7 @@ Two caveats, both to verify (§10 V2, V3): whether PCIe relaxed ordering on the
 MR weakens the write-then-atomic placement order at the responder, and whether
 mlx5's out-of-order data placement mode does.
 
-### 4.6 `osoe_tp_wait`
+### 4.6 `osoe_transport_wait`
 
 1. Serializing store (§4.6 rule 2).
 2. Reap the send CQ until every WQE issued on this context to the covered peers
@@ -358,7 +358,7 @@ which on RoCE plausibly holds when relaxed ordering is off. **That is a direct
 trade: turn off relaxed ordering and quiet becomes free, at some large-message
 bandwidth.** Both halves need measuring (§10 V3).
 
-`osoe_tp_wait`'s lack of a deadline argument is fine — the abort-word check
+`osoe_transport_wait`'s lack of a deadline argument is fine — the abort-word check
 belongs in the poll loop, per §4.10's error paragraph.
 
 ### 4.7 Notification — the real problem
@@ -369,7 +369,7 @@ something: Portals target CTs, CXI `FI_RMA_EVENT`, UET remote-write counters,
 uGNI `POST_CQWRITE`. Verbs has only `WRITE_WITH_IMM` / `SEND_WITH_IMM`, which
 produce a receive CQE and require a posted receive.
 
-So `osoe_tp_notify` — a writer-side call made after applying a write — has no
+So `osoe_transport_notify` — a writer-side call made after applying a write — has no
 caller in a RoCE backend. The header foresaw half of this: "a backend whose puts
 the CPU never sees (RDMA) need not notify for them". It also says notify is
 **exact for rmw**, and that "for rmw it bridges its NIC events into this call" —
@@ -385,7 +385,7 @@ Four ways out, in increasing order of merit:
    at which point it becomes attractive: signal words are rare and hot.
 2. **Route watched words through AM.** Correct, needs the target CPU, and gives
    up the whole point of RoCE for those words.
-3. **Waiter spins.** `osoe_tp_watch_seq` returns a constant, `osoe_tp_watch_wait`
+3. **Waiter spins.** `osoe_transport_watch_seq` returns a constant, `osoe_transport_watch_wait`
    spins with `pause` until the caller's deadline and returns false. The §4.9
    loop re-checks the predicate every iteration, so this is **correct with no
    change above the boundary** — the protocol's tolerance of spurious and
@@ -396,7 +396,7 @@ Four ways out, in increasing order of merit:
    local PE's watched block (`watch.c` already rounds the watch to an aligned
    power-of-two block and publishes it in the node segment), polls the live
    blocks, and on a difference bumps that PE's `watch_seq` and futex-wakes it —
-   i.e. it calls `osoe_tp_notify` exactly as the AM progress thread does today.
+   i.e. it calls `osoe_transport_notify` exactly as the AM progress thread does today.
    `watch.c` and `wait.c` need **no change at all**.
 
 **Recommendation: (4), falling back to (3) for large watched blocks.** It is the
@@ -429,15 +429,15 @@ the single most useful thing this repository has for bringing up a new backend.
    as one MR. Touches `node.c` and `§4.1`, and is the only change *outside* the
    backend that this plan requires. **Not** by slotting each heap by local id,
    which would move `B` — see §3.1.
-3. **Put and get.** Three size classes, dispatch on `osoe_tp_direct` for
+3. **Put and get.** Three size classes, dispatch on `osoe_transport_direct` for
    on-node. Differential test against the intranode backend with force-remote.
 4. **Fence and wait.** Selective signalling, dirty set of nodes (reuse the AM
    backend's structure — it is already per node, §4.6), flush read behind a
    build flag so the relaxed-ordering trade can be measured both ways.
 5. **rmw.** 8-byte native first; then on-node loopback; then 4-byte and bitwise
    emulation; then DevX masked atomics behind a build flag.
-6. **Wake poller.** Per-node thread, shadow compare, `osoe_tp_notify`. Spin
-   fallback in `osoe_tp_watch_wait` for oversized blocks.
+6. **Wake poller.** Per-node thread, shadow compare, `osoe_transport_notify`. Spin
+   fallback in `osoe_transport_watch_wait` for oversized blocks.
 7. **XRC or DC switch, and multi-QP striping** — the two things that must be
    measured rather than reasoned about.
 
@@ -497,7 +497,7 @@ wants these for Graph500 and RoCE has none either).
 ### 7.1 What the boundary costs
 
 Approximately nothing on the data path. §4.10 binds backends at build time with
-no function-pointer table, so `osoe_tp_put` of eight bytes compiles to the
+no function-pointer table, so `osoe_transport_put` of eight bytes compiles to the
 backend's inline WQE construction. There is no per-operation dispatch, no
 capability branch (§4.10 rejected capability bits precisely to avoid a branch
 per operation), and no allocation. The arguments are already in the form the
@@ -511,7 +511,7 @@ Two small frictions:
   must materialize the value in memory and pass `(&v, 8)`, and the backend
   branches on length. A spill and a compare; call it single-digit nanoseconds,
   and a good compiler removes most of it. Not worth a header change on its own.
-- **`osoe_tp_get` is blocking.** Correct for `shmem_get`, and phase 1 has
+- **`osoe_transport_get` is blocking.** Correct for `shmem_get`, and phase 1 has
   nothing else. §8.3.
 
 ### 7.2 Cost model
@@ -555,7 +555,7 @@ Two baselines, kept separate because only the first is actionable here.
 
 ### 8.1 Boundary-imposed: no batching hint
 
-**Mechanism.** Every `osoe_tp_put` is a `post_send` and a doorbell. mlx5 can
+**Mechanism.** Every `osoe_transport_put` is a `post_send` and a doorbell. mlx5 can
 post a list of WQEs with one doorbell, which is the difference between a
 doorbell-bound and a WQE-bound issue path.
 
@@ -621,7 +621,7 @@ that keeping collectives above the boundary was still right, because a
 capability-bearing collective interface would be a second boundary tested only on
 hardware that has the feature. That reasoning holds for a *capability-bearing*
 interface and is why negotiated collective offload stays rejected. It does not
-hold for a mandatory operation with a generic fallback — an `osoe_tp_sync` over a
+hold for a mandatory operation with a generic fallback — an `osoe_transport_sync` over a
 group of nodes, recorded as an open question in design §10 and deferred to §7.1
 step 2, which writes its only caller.
 
@@ -653,7 +653,7 @@ the data path runs on the NIC.
 Ranked by value per line of interface. None is needed to *build* the backend.
 
 *(Both of the changes recommended below were taken. Design §4.10 now specifies
-`OSOE_TP_MORE` — with a rule this document did not state, that a backend may
+`OSOE_TRANSPORT_MORE` — with a rule this document did not state, that a backend may
 defer an operation only if it owns a copy of the source bytes, since a large
 zero-copy put's `src` may be reused the moment the call returns — and
 `set_range`, with its call site scheduled into §7.1 step 3. Nothing is declared
@@ -661,12 +661,12 @@ in the header until there is a backend to implement it.)*
 
 ### 9.1 A batching hint
 
-An `OSOE_TP_MORE` flag on put and rmw, or an explicit
-`osoe_tp_flush(ctx)`. Recovers §8.1 without the deferral watchdog, and gives 1.6
+An `OSOE_TRANSPORT_MORE` flag on put and rmw, or an explicit
+`osoe_transport_flush(ctx)`. Recovers §8.1 without the deferral watchdog, and gives 1.6
 sessions something to drive. Cost: one flag, one branch, ignored by the
 intranode backend.
 
-### 9.2 `osoe_tp_set_range(region, offset, len, attributes)`
+### 9.2 `osoe_transport_set_range(region, offset, len, attributes)`
 
 Already named in §4.10 as a later hook. Attributes: carries atomics, carries
 signals. Recovers §8.2 — exact notification and real blocking waits on RoCE, and
@@ -681,7 +681,7 @@ Specifically *not* recommended:
   rejection. Every place a RoCE backend differs, it differed *underneath* the
   boundary: emulation, poller, loopback, size classes. The one case where the
   SHMEM layer might have wanted to know — whether to block or poll — is handled
-  by `osoe_tp_watch_wait` being the backend's own function.
+  by `osoe_transport_watch_wait` being the backend's own function.
 - **`put_word`.** Measurable only in a microbenchmark of the boundary itself.
 - **A collective hook** — ***superseded***. Rejecting it here assumed a
   capability-bearing interface. A mandatory `sync` over a node group, with a
@@ -706,7 +706,7 @@ or read in source for this document.
   at the responder? Invariant 5 and free `put_signal` depend on it.
 - **V3 — relaxed ordering and visibility.** Does PCIe relaxed ordering on the
   MR break V2, and does a write CQE imply global visibility with RO off? This
-  decides whether `osoe_tp_wait` needs a flush read at all. Same question CORE
+  decides whether `osoe_transport_wait` needs a flush read at all. Same question CORE
   §7.2 C13 asks of CXI.
 - **V4 — NIC atomic throughput.** Atomic operations per second per NIC against
   RDMA write operations per second. Possibly the single dominant number for
