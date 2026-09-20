@@ -83,6 +83,8 @@ struct osoe_am_get_request {
 struct osoe_am_get_reply {
     uint32_t origin_pe;
     uint32_t chunk_offset;      /* where in the requested range these bytes go */
+    uint32_t total;             /* bytes the whole reply owes, across every chunk */
+    uint32_t reserved;
     uint64_t token;
     /* payload: the bytes read */
 };

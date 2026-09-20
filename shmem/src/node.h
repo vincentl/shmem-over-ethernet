@@ -233,6 +233,14 @@ struct osoe_landing_slot {
     _Atomic uint32_t ready;             /* 0, or 1 once `data` and `value` are complete */
     _Atomic uint32_t length;            /* bytes in `data` */
     _Atomic uint64_t value;             /* a fetching AMO's result */
+    /*
+     * Which operation this reply belongs to. Under SERIALIZED a PE has one
+     * outstanding, so the slot could do without it - but a reply for an
+     * operation that has already been abandoned is then indistinguishable from
+     * the one being waited for, and §4.6 says the caller waits for *its* reply.
+     * Recording it makes "its" checkable rather than assumed.
+     */
+    _Atomic uint64_t token;
 
     /* The reply bytes. One AM chunk is enough: a larger get is chunked on the
      * wire (§3.2) and the origin copies each chunk out before the next lands. */

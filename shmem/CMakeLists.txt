@@ -18,6 +18,7 @@ add_library(osoe
   src/metrics.c
   src/node.c
   src/profile.c
+  src/progress.c
   src/quiet.c
   src/reply.c
   src/rma.c

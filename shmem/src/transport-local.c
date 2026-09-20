@@ -17,6 +17,7 @@
 #include "fatal.h"
 #include "metrics.h"
 #include "state.h"
+#include "rmw.h"
 #include "transport.h"
 
 struct osoe_transport_context {
@@ -104,40 +105,6 @@ void osoe_transport_get(struct osoe_transport_context *context, int pe, enum oso
  * set-style write names seq_cst because the watch protocol is two-sided, and a
  * load names acquire.
  */
-#define OSOE_RMW_BODY(T)                                                             \
-    _Atomic T *p = ptr;                                                              \
-    T v = (T)operand, old = 0;                                                       \
-    switch (op) {                                                                    \
-    case OSOE_RMW_WRITE:                                                             \
-        if (flags & OSOE_TRANSPORT_FETCH)                                                   \
-            old = atomic_exchange_explicit(p, v, memory_order_seq_cst);               \
-        else                                                                         \
-            atomic_store_explicit(p, v, memory_order_seq_cst);                       \
-        break;                                                                       \
-    case OSOE_RMW_READ:                                                              \
-        old = atomic_load_explicit(p, memory_order_acquire);                          \
-        break;                                                                       \
-    case OSOE_RMW_CSWAP: {                                                           \
-        T want = (T)compare;                                                         \
-        atomic_compare_exchange_strong_explicit(p, &want, v, memory_order_seq_cst,    \
-                                                memory_order_seq_cst);                \
-        old = want;                     /* the value found, swapped or not */        \
-        break;                                                                        \
-    }                                                                                 \
-    case OSOE_RMW_ADD:                                                               \
-        old = atomic_fetch_add_explicit(p, v, memory_order_seq_cst);                   \
-        break;                                                                        \
-    case OSOE_RMW_AND:                                                               \
-        old = atomic_fetch_and_explicit(p, v, memory_order_seq_cst);                   \
-        break;                                                                        \
-    case OSOE_RMW_OR:                                                                \
-        old = atomic_fetch_or_explicit(p, v, memory_order_seq_cst);                    \
-        break;                                                                        \
-    case OSOE_RMW_XOR:                                                               \
-        old = atomic_fetch_xor_explicit(p, v, memory_order_seq_cst);                   \
-        break;                                                                        \
-    }                                                                                 \
-    result = old;
 
 uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum osoe_region region,
                      uint64_t offset, enum osoe_rmw_op op, unsigned width,
@@ -148,12 +115,10 @@ uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum
     if (flags & OSOE_TRANSPORT_FETCH)
         osoe_count(OSOE_C_TRANSPORT_RMW_FETCHING, 1);
     void *ptr = osoe_transport_direct(pe, region, offset);
-    uint64_t result = 0;
-    if (width == 8) {
-        OSOE_RMW_BODY(uint64_t)
-    } else {
-        OSOE_RMW_BODY(uint32_t)
-    }
+    /* The same instruction the AM handler uses on the same cache line, which is
+     * what makes §4.1's cross-domain exclusivity true rather than coincidental
+     * (rmw.h). */
+    uint64_t result = osoe_rmw_apply(ptr, op, width, operand, compare, flags);
     /* Exact: every applied rmw notifies (§4.10). */
     osoe_transport_notify(pe, region, offset, width);
     return flags & OSOE_TRANSPORT_FETCH ? result : 0;

@@ -79,6 +79,9 @@ struct osoe_reply {
     uint16_t kind;          /* enum osoe_reply_kind */
     uint16_t region;        /* enum osoe_region, for a get reply */
     uint32_t origin_pe;     /* the world rank waiting for this */
+    uint32_t target_pe;     /* whose memory the bytes come from: a get reply is
+                             * a reference, sampled at drain time (§3.8), so the
+                             * descriptor must say where to read */
     uint32_t length;        /* total bytes owed */
     uint32_t sent;          /* drained so far; the descriptor pops when equal */
     uint64_t offset;        /* get: where in the target's region the bytes are */

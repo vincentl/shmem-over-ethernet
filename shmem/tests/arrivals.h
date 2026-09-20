@@ -28,14 +28,14 @@ enum { ARRIVALS_MAX = 256, ARRIVALS_STAGGER_MS = 20 };
 static double *arrivals;
 static char arrivals_name[64];
 
-static double arrivals_now(void)
+static inline double arrivals_now(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
 }
 
-static void arrivals_open(void)
+static inline void arrivals_open(void)
 {
     snprintf(arrivals_name, sizeof arrivals_name, "/osoetest.%s", getenv("OSOE_JOB_ID"));
     int fd = shm_open(arrivals_name, O_CREAT | O_RDWR, 0600);
@@ -52,7 +52,7 @@ static void arrivals_open(void)
     }
 }
 
-static void arrivals_close(void)
+static inline void arrivals_close(void)
 {
     munmap(arrivals, sizeof(double) * ARRIVALS_MAX);
     shm_unlink(arrivals_name);          /* every PE tries; ENOENT is fine */
@@ -60,7 +60,7 @@ static void arrivals_close(void)
 
 /* Delay by rank, then record this PE's arrival. Call immediately before the
  * collective. */
-static void arrivals_arrive(int me)
+static inline void arrivals_arrive(int me)
 {
     struct timespec ts = { 0, (long)me * ARRIVALS_STAGGER_MS * 1000 * 1000 };
     nanosleep(&ts, NULL);
@@ -69,7 +69,7 @@ static void arrivals_arrive(int me)
 
 /* Call immediately after the collective: true if this PE left no earlier than
  * any PE arrived. */
-static int arrivals_left_after_all(int n)
+static inline int arrivals_left_after_all(int n)
 {
     double left = arrivals_now();
     for (int i = 0; i < n; i++)

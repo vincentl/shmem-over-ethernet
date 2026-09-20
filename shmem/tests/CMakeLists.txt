@@ -116,6 +116,24 @@ set_tests_properties(shmem.wire-pair PROPERTIES LABELS "tier2" TIMEOUT 90)
 # listed local PE count, as shmem.<name>.L<count>.
 set(OSOE_LAUNCH_COUNTS 1 2 4)
 
+# The progress loop between two logical nodes (tier 2): every layer at once.
+# The wire is far smaller than a segment and its split injection is on, so the
+# stream really arrives in pieces (§8.2). Sizes are pinned rather than
+# inherited, so the production defaults cannot make the suite slow or the test
+# vacuous.
+add_executable(shmem_test_progress test-progress.c
+  ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
+  ../src/reply.c ../src/wire.c)
+target_include_directories(shmem_test_progress PRIVATE ../src)
+target_link_libraries(shmem_test_progress PRIVATE osoe_base rt)
+osoe_warnings(shmem_test_progress)
+add_test(NAME shmem.progress
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+          OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+          $<TARGET_FILE:shmem_test_progress>)
+set_tests_properties(shmem.progress PROPERTIES LABELS "tier2" TIMEOUT 90)
+
 # The connection area across the PEs of a node (tier 2). The local lead creates
 # it and the others open it, which is §3.12's arrangement. Not an
 # osoe_tier2_test: it does not call shmem_init, since a multi-node job is still
