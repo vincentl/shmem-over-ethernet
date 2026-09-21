@@ -3,7 +3,8 @@
  *
  * Checks the kernel facilities the design document relies on (see its §8.5):
  * io_uring ring setup, IORING_OP_FUTEX_WAIT, multishot recv with a provided
- * buffer ring, cross-process futexes, and 64-bit futex support.
+ * buffer ring, cross-process futexes on a named shared-memory object (by
+ * futex_wait and by io_uring), and 64-bit futex support.
  * Run it first on any new machine.
  *
  *   cmake --workflow --preset debug        (runs it as the env.probe test)
@@ -19,6 +20,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,36 +72,95 @@ static void probe_futex2(void)
                        : "U64 accepted");
 }
 
-/* Cross-process futex on a shared memfd mapping: the 4.9 / 5.x pattern. */
-static void probe_shared_futex(void)
+/*
+ * Cross-process futexes in the form the library uses (§3.10, §6.2): a word in a
+ * *named* shared-memory object, which the waiter opens by name having inherited
+ * nothing of it, woken by futex_wake from another process. The waiter sleeps in
+ * futex_wait, or with `uring` in an IORING_OP_FUTEX_WAIT - both without
+ * FUTEX2_PRIVATE, since the word is shared. A kernel could pass a private,
+ * same-process check and fail this one (review round two, portability F4).
+ *
+ * The wake must report one waiter woken, so a waiter that never got to sleep
+ * does not pass for one that was woken.
+ */
+static void probe_shared_futex(bool uring)
 {
-    int fd = memfd_create("probe", 0);
-    ftruncate(fd, 4096);
+    const char *what = uring ? "uring futex_wait, named shm, woken by process"
+                             : "futex_wait, named shm, woken by other process";
+    char name[64];
+    snprintf(name, sizeof name, "/osoe-probe-futex.%d", (int)getpid());
+    int fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
+    if (fd < 0 || ftruncate(fd, 4096) != 0) {
+        CHECK(what, 0, "shm_open/ftruncate: %s", strerror(errno));
+        if (fd >= 0) { close(fd); shm_unlink(name); }
+        return;
+    }
     _Atomic uint32_t *w = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    atomic_store_explicit(w, 0, memory_order_release);   /* before fork: no reader yet */
+    if (w == MAP_FAILED) {
+        CHECK(what, 0, "mmap: %s", strerror(errno));
+        close(fd); shm_unlink(name);
+        return;
+    }
+    /* w[0] is the futex word; w[1] says the waiter has mapped it. */
 
     pid_t pid = fork();
     if (pid == 0) {
-        /* futex2 futex_wait takes an ABSOLUTE deadline on the given clock. */
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        ts.tv_sec += 2;
-        while (atomic_load_explicit(w, memory_order_acquire) == 0) {
-            long r = futex2_wait(w, 0, FUTEX2_SIZE_U32, &ts);
-            if (r == -1 && errno == ETIMEDOUT) _exit(2);
+        /* Forget everything inherited: this stands for an unrelated process. */
+        munmap((void *)w, 4096);
+        close(fd);
+        int cfd = shm_open(name, O_RDWR, 0);
+        if (cfd < 0)
+            _exit(3);
+        _Atomic uint32_t *cw = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, cfd, 0);
+        if (cw == MAP_FAILED)
+            _exit(3);
+        struct timespec deadline;
+        clock_gettime(CLOCK_MONOTONIC, &deadline);
+        deadline.tv_sec += 2;
+        if (!uring) {
+            atomic_store_explicit(&cw[1], 1, memory_order_release);
+            while (atomic_load_explicit(&cw[0], memory_order_acquire) == 0) {
+                long r = futex2_wait(&cw[0], 0, FUTEX2_SIZE_U32, &deadline);
+                if (r == -1 && errno == ETIMEDOUT)
+                    _exit(2);
+                if (r == -1 && errno != EAGAIN && errno != EINTR)
+                    _exit(4);
+            }
+            _exit(0);
         }
-        _exit(0);
+        struct io_uring ring;
+        if (io_uring_queue_init(4, &ring, 0) != 0)
+            _exit(5);
+        struct io_uring_sqe *sqe = io_uring_get_sqe(&ring);
+        io_uring_prep_futex_wait(sqe, (uint32_t *)&cw[0], 0, FUTEX_BITSET_MATCH_ANY,
+                                 FUTEX2_SIZE_U32, 0);
+        if (io_uring_submit(&ring) != 1)
+            _exit(5);
+        atomic_store_explicit(&cw[1], 1, memory_order_release);
+        struct __kernel_timespec two = { 2, 0 };
+        struct io_uring_cqe *cqe;
+        if (io_uring_wait_cqe_timeout(&ring, &cqe, &two) != 0)
+            _exit(2);
+        _exit(cqe->res == 0 && atomic_load_explicit(&cw[0], memory_order_acquire) == 1 ? 0 : 4);
     }
-    usleep(100000);            /* let the child block */
-    /* Single-writer publication (§3.16): the parent stores, the child only
-     * loads, and the kernel's compare in futex_wait closes the race. */
-    atomic_store_explicit(w, 1, memory_order_release);
-    long woke = futex2_wake(w, 1, FUTEX2_SIZE_U32);
+
+    /* Wait until the waiter has mapped the word, then give it time to sleep. */
+    for (int i = 0; i < 200 && atomic_load_explicit(&w[1], memory_order_acquire) == 0; i++)
+        usleep(10000);
+    usleep(100000);
+    /* Single-writer publication (§3.16): this process stores, the waiter only
+     * loads, and the kernel's compare in the wait closes the race. */
+    atomic_store_explicit(&w[0], 1, memory_order_release);
+    long woke = futex2_wake(&w[0], 1, FUTEX2_SIZE_U32);
     int status;
     waitpid(pid, &status, 0);
-    CHECK("cross-process futex on memfd mapping",
-          WIFEXITED(status) && WEXITSTATUS(status) == 0,
-          "woke=%ld child_exit=%d", woke, WEXITSTATUS(status));
+    int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    CHECK(what, woke == 1 && code == 0,
+          "woke=%ld child_exit=%d (2: never woken, 3: open by name, 4: wait error, "
+          "5: ring)", woke, code);
+    munmap((void *)w, 4096);
+    close(fd);
+    shm_unlink(name);
 }
 
 /*
@@ -246,7 +307,8 @@ int main(void)
     printf("info kernel %s %s, page size %ld, liburing %d.%d\n", u.release, u.machine,
            sysconf(_SC_PAGESIZE), IO_URING_VERSION_MAJOR, IO_URING_VERSION_MINOR);
     probe_futex2();
-    probe_shared_futex();
+    probe_shared_futex(false);
+    probe_shared_futex(true);
     probe_unlinked_reopen();
     probe_uring_setup();
     probe_multishot();

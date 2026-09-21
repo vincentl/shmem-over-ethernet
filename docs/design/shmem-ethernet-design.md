@@ -66,8 +66,10 @@ liburing 2.6+: Debian 13 and Raspberry Pi OS Trixie.
 **Two checks, two failure times.** CMake requires `liburing >= 2.6` through
 pkg-config and stops at configure time, saying why. At startup the library checks
 that the *running kernel* supports what it needs — the `tools/probe` checks,
-moved into init — and aborts loudly otherwise. The first catches old headers; the
-second catches an old kernel under new headers.
+moved into init — and refuses by name otherwise, before it creates anything in
+`/dev/shm`. The first catches old headers; the second catches an old kernel under
+new headers. Init checks what the library uses: today the futex2 calls alone,
+since step 2 opens no ring; io_uring's opcode checks join them at step 3.
 
 **CMake is a build tool, not a dependency chain.** What this project exists to
 avoid is a dependency tree that does not build on the target hardware, not the
@@ -4290,8 +4292,11 @@ Nothing may hardcode 4096 — including the §4.3 linker script, which aligns to
 **`tools/probe`** checks every kernel assumption this document makes and prints
 a pass/fail line for each: single-issuer rings with an explicit CQ size,
 `IORING_OP_FUTEX_WAIT` returning `-EAGAIN` on a stale value, multishot recv
-producing one CQE per provided buffer plus a terminal `-ENOBUFS`, cross-process
-futexes on a shared mapping, and the absence of 64-bit futexes. **Run it first on
+producing one CQE per provided buffer plus a terminal `-ENOBUFS`, and the absence
+of 64-bit futexes. Its futex checks use the forms the library uses: a word in a
+**named** shared-memory object, opened by name by a process that inherited nothing
+of it, woken by `futex_wake` from another process, both by `futex_wait` and by an
+`IORING_OP_FUTEX_WAIT` without `FUTEX2_PRIVATE` (§3.10's wake word). **Run it first on
 any new machine**, before debugging anything else there.
 
 ### 8.6 Reference workloads

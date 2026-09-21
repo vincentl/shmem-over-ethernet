@@ -7,12 +7,15 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include <pshmem.h>
 #include <shmem.h>
 
 #include "agent.h"
+#include "base/futex.h"
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
@@ -145,6 +148,21 @@ static void session_start(void)
                 osoe.bootstrap.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
     if (osoe.bootstrap.print_info && osoe.bootstrap.local_id == 0)
         print_info();
+    /*
+     * §1's start-up check of the running kernel, before anything is created:
+     * an old kernel is refused by name, rather than aborting mid-rendezvous
+     * with the control segment and heaps already in /dev/shm (review round two,
+     * portability F3). futex2 is all the library uses today; io_uring's checks
+     * join it at step 3, when the library first opens a ring.
+     */
+    int futex_error = osoe_futex_check();
+    if (futex_error) {
+        struct utsname u;
+        const char *release = uname(&u) == 0 ? u.release : "unknown";
+        osoe_fatal("osoe needs Linux 6.7 or later, for the futex2 calls (they fail with "
+                   "\"%s\"); this kernel is %s", strerror(futex_error), release);
+    }
+
     /* A re-init after a full teardown is a fresh session (§6.4). Every PE runs
      * the same sequence of sessions, so the numbers agree. */
     uint32_t session = sessions++;

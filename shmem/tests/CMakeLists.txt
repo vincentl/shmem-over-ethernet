@@ -591,6 +591,23 @@ set_tests_properties(shmem.dev-shm-capacity.heaps PROPERTIES PASS_REGULAR_EXPRES
 set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES PASS_REGULAR_EXPRESSION
   "/dev/shm has [0-9]+ MiB free, but this node's connection area.*launcher exited 1")
 
+# A kernel without futex2 (Linux < 6.7) is refused at init by name, before any
+# object exists (§1; review round two, portability F3). deny-futex2 makes the
+# three calls fail with ENOSYS, as such a kernel does. Before, both PEs died of
+# SIGABRT in the rendezvous and left their heaps and control segment behind.
+# And the probe, under the same filter, fails its named-object futex checks.
+add_executable(deny-futex2 deny-futex2.c)
+osoe_warnings(deny-futex2)
+add_test(NAME shmem.refuse.old-kernel
+  COMMAND deny-futex2 $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
+          $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.refuse.old-kernel PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "needs Linux 6.7 or later, for the futex2 calls .*this kernel is"
+  FAIL_REGULAR_EXPRESSION "left behind|futex_wake failed|futex_wait failed")
+add_test(NAME env.probe.old-kernel COMMAND deny-futex2 $<TARGET_FILE:probe>)
+set_tests_properties(env.probe.old-kernel PROPERTIES LABELS "env" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "FAIL futex_wait, named shm, woken by other process")
+
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
