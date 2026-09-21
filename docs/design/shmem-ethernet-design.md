@@ -4532,6 +4532,10 @@ Recorded rather than deleted, so they are not reopened from memory.
   `atomic_thread_fence(memory_order_seq_cst)` closes it for one `dmb ish` per
   fence and quiet (an `mfence` on x86-64 in place of the `xchg`). Decide, and run
   `fence-litmus` on a Pi 4 and a Pi 5 either way.
+- **The `/dev/shm` capacity check refuses on the nominal size** (§6.2). Heaps are
+  demand-paged, so it refuses jobs that would have run: seven PEs at the default
+  256 MiB on the 3 GiB, 16 KiB-page VM, where the seven-PE tests now ask for
+  16 MiB. A warning instead of a fatal would keep the message and lose the refusal.
 
 ### Still open — measurement, once hardware exists
 
