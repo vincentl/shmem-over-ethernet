@@ -354,7 +354,7 @@ add_test(NAME shmem.differential
           -DEXE=$<TARGET_FILE:shmem_test_differential>
           -DNRANKS=6
           "-DMAPS=0,0,0,0,0,0;0,1,2,3,4,5;0,0,0,1,2,2;0,1,2,0,1,0"
-          "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919"
+          "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919;SHMEM_SYMMETRIC_SIZE=16m"
           -P ${PROJECT_SOURCE_DIR}/cmake/Differential.cmake)
 set_tests_properties(shmem.differential PROPERTIES LABELS "tier2" TIMEOUT 300)
 endif()
@@ -411,6 +411,10 @@ osoe_tier2_map_test(ack-echo 0,1)
 # leave no room for a reply. A guard, not a reproduction: it passed before the
 # pre-open drain too (§3.8 says why), so it holds the line against a real hang.
 #
+# These seven-PE tests size their heaps to what they use (16 MiB): at the
+# default 256 MiB, six or seven PEs on one node ask for more than a 3 GiB
+# machine's /dev/shm, which §6.2's capacity check refuses at init.
+#
 # Neither this nor shmem.reply-pool below runs under ThreadSanitizer, for the
 # reason shmem.internode gives: an agent serves a get from, or applies a put to,
 # a heap the local main thread wrote before a barrier, and that barrier's
@@ -418,7 +422,8 @@ osoe_tier2_map_test(ack-echo 0,1)
 # race, and only that, when slice 2 first ran them under tsan.
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(reply-starvation 0,1,1,1,1,1,1
-    OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096 OSOE_TEST_PUT_BYTES=984)
+    OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096 OSOE_TEST_PUT_BYTES=984
+    SHMEM_SYMMETRIC_SIZE=16m)
 endif()
 
 # An internode quiet sweeps (§4.10; review round two, D2): node 1 is stopped,
@@ -447,7 +452,7 @@ set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
 # under ThreadSanitizer (see shmem.reply-starvation); the overflow half is,
 # since its pass is the named fatal and not a clean exit.
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  osoe_tier2_map_test(reply-pool 0,0,0,1 OSOE_AM_CREDITS=2)
+  osoe_tier2_map_test(reply-pool 0,0,0,1 OSOE_AM_CREDITS=2 SHMEM_SYMMETRIC_SIZE=16m)
 else()
   add_executable(shmem_test_reply-pool test-reply-pool.c
     ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
@@ -457,7 +462,7 @@ else()
   osoe_warnings(shmem_test_reply-pool)
 endif()
 add_test(NAME shmem.reply-pool.overflow
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow SHMEM_SYMMETRIC_SIZE=16m
           $<TARGET_FILE:osoe-launch> -n 8 -m 0,0,0,0,0,0,0,1 -t 30
           -e 7:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
 set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
