@@ -65,6 +65,13 @@ OSOE_API void pshmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
  * (§4.8). Returning NULL is always conforming. */
 OSOE_API void *pshmem_ptr(const void *dest, int pe)
 {
+    /* Bypasses osoe_check_pe/osoe_symmetric_offset - both fatal in ways this
+     * routine's own contract forbids (an out-of-range pe or a non-symmetric
+     * address is a defined NULL here, not an error) - so it needs its own
+     * check (conformance review F5): otherwise a call after the last
+     * shmem_finalize dereferences whatever osoe_transport_direct finds in a
+     * heap table that used to be real. */
+    osoe_require_initialized("shmem_ptr");
     uint64_t offset;
     if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size ||
         !osoe_symmetric_heap_offset(dest, 1, &offset))

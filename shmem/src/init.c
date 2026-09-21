@@ -232,6 +232,16 @@ static void session_end(void)
     osoe_job_leave(&osoe.job);
     osoe_node_leave(&osoe.node, &osoe.bootstrap);
     osoe_bootstrap_free(&osoe.bootstrap);
+    /*
+     * Otherwise osoe.bootstrap.world_size and the heap table stay exactly as
+     * they were with the mappings behind them gone, so any routine that reads
+     * `osoe` without going through osoe_require_initialized() first - or a
+     * call from a process that never re-initializes - dereferences a stale
+     * table instead of a null one (conformance review F5). session_start()
+     * zeros it again at the next shmem_init, so this only matters for the
+     * window after the last one.
+     */
+    osoe = (struct osoe_state){ 0 };
 }
 
 OSOE_API void pshmem_init(void)
@@ -312,6 +322,14 @@ OSOE_API void pshmem_query_thread(int *provided)
 OSOE_API void pshmem_query_initialized(int *flag)
 {
     *flag = atomic_load_explicit(&initialized, memory_order_acquire);
+}
+
+/* See state.h. Same flag pshmem_query_initialized publishes, same ordering. */
+void osoe_require_initialized(const char *routine)
+{
+    if (!atomic_load_explicit(&initialized, memory_order_acquire))
+        osoe_fatal("%s: called before shmem_init (or shmem_init_thread), or after "
+                   "the last shmem_finalize", routine);
 }
 
 OSOE_API int pshmem_my_pe(void)

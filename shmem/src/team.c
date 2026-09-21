@@ -49,6 +49,7 @@ struct osoe_team *osoe_team_finalize(void)
 
 struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team)
 {
+    osoe_require_initialized(routine);
     if (team == SHMEM_TEAM_INVALID)
         return NULL;
     if (team == SHMEM_TEAM_WORLD) {
@@ -113,6 +114,7 @@ static int world_to_team(const struct osoe_team *t, int world)
 
 struct osoe_transport_context *osoe_ctx_of(const char *routine, shmem_ctx_t ctx)
 {
+    osoe_require_initialized(routine);
     if (ctx == SHMEM_CTX_DEFAULT)
         return osoe_transport_context_default();
     if (ctx == SHMEM_CTX_INVALID)

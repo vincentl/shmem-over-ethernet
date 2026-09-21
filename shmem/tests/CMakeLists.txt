@@ -758,3 +758,47 @@ set_tests_properties(shmem.refuse.no_launcher shmem.refuse.bad_size
   shmem.refuse.bad_size_sma shmem.refuse.zero_size
   shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
   LABELS "tier2" TIMEOUT 90)
+
+# A call before shmem_init, or after the last shmem_finalize, must be a named
+# fatal rather than a segfault, a misleading message, a valid-looking wrong
+# answer, or a silent success (conformance review F5). "before" needs no
+# launcher - none of these routines reads the environment before the
+# uninitialized check fires - so it runs directly; "after" needs a real job
+# first, so it runs under osoe-launch.
+add_executable(shmem_test_uninitialized test-uninitialized.c)
+target_link_libraries(shmem_test_uninitialized PRIVATE osoe)
+osoe_warnings(shmem_test_uninitialized)
+
+foreach(case_expect
+    "malloc|shmem_malloc: called before shmem_init"
+    "free|shmem_free: called before shmem_init"
+    "wait_until|shmem_long_wait_until: called before shmem_init"
+    "barrier_all|shmem_barrier_all: called before shmem_init"
+    "putmem|shmem_putmem: called before shmem_init"
+    "team_my_pe|shmem_team_my_pe: called before shmem_init"
+    "quiet|quiet: called before shmem_init"   # shmem_quiet wraps shmem_ctx_quiet (§7.3)
+    "ptr|shmem_ptr: called before shmem_init")
+  string(REPLACE "|" ";" parts "${case_expect}")
+  list(GET parts 0 case)
+  list(GET parts 1 expect)
+  add_test(NAME shmem.refuse.uninitialized.before.${case}
+    COMMAND shmem_test_uninitialized before ${case})
+  set_tests_properties(shmem.refuse.uninitialized.before.${case} PROPERTIES
+    LABELS "tier1" TIMEOUT 30 PASS_REGULAR_EXPRESSION "${expect}")
+endforeach()
+
+# The two the conformance review measured specifically after a real
+# shmem_finalize: shmem_malloc used to segfault on the allocator's freed
+# state, and shmem_ptr used to dereference a stale heap table instead of
+# answering the NULL its own contract allows.
+foreach(case_expect
+    "malloc|shmem_malloc: called before shmem_init"
+    "ptr|shmem_ptr: called before shmem_init")
+  string(REPLACE "|" ";" parts "${case_expect}")
+  list(GET parts 0 case)
+  list(GET parts 1 expect)
+  add_test(NAME shmem.refuse.uninitialized.after.${case}
+    COMMAND osoe-launch -n 1 -t 30 -- $<TARGET_FILE:shmem_test_uninitialized> after ${case})
+  set_tests_properties(shmem.refuse.uninitialized.after.${case} PROPERTIES
+    LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
+endforeach()

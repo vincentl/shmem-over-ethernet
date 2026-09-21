@@ -44,4 +44,16 @@ struct osoe_state {
 
 extern struct osoe_state osoe;
 
+/*
+ * Fatal, naming `routine`, unless the library is between the first
+ * shmem_init (or shmem_init_thread) and the last shmem_finalize - everything
+ * above is undefined outside that window (Annex C), and calling in anyway is
+ * the commonest beginner mistake, not a case worth a segfault on a freed
+ * mapping instead of a diagnosis (conformance review F5). One well-predicted
+ * branch against the flag shmem_query_initialized already publishes
+ * (init.c), so every routine that dereferences `osoe` can afford it; call it
+ * before doing so rather than adding a check to each of them.
+ */
+void osoe_require_initialized(const char *routine);
+
 #endif /* OSOE_STATE_H */
