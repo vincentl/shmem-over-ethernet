@@ -68,45 +68,61 @@ static void note_high_water(struct osoe_progress *p, uint32_t slot)
     osoe_counter_word_max(&p->metrics->pool_high_water, p->pool.high_water);
 }
 
+static const char *reply_kind_name(uint16_t kind)
+{
+    switch (kind) {
+    case OSOE_REPLY_AMO:     return "fetching AMO";
+    case OSOE_REPLY_GET:     return "get";
+    case OSOE_REPLY_RELEASE: return "collective release";
+    case OSOE_REPLY_ARRIVE:  return "collective arrival";
+    default:                 return "unknown";
+    }
+}
+
+/*
+ * The pool is empty, and it cannot be (§3.8; reply.h). Record it where
+ * osoe-stat reads it, then end the job on this node naming everything that
+ * says which invariant broke: the peer, what it asked for, how full the pool
+ * and this connection's queues are, and who enforces the bound.
+ *
+ * Dropping is never the alternative. A dropped get request leaves its origin
+ * waiting for a reply that is not coming, and blaming the wrong node when it
+ * gives up; a dropped collective arrival leaves the root waiting for a node
+ * that has arrived, and a dropped release leaves a whole node's members on an
+ * epoch counter nothing will advance - each a hang whose symptom is elsewhere.
+ */
+static _Noreturn void pool_exhausted(struct osoe_progress *p, uint32_t slot,
+                                     const struct osoe_reply *value)
+{
+    osoe_counter_word_add(&p->metrics->reply_reservation_failures, 1);
+    const struct osoe_reply_queues *q = &p->connection[slot].queues;
+    uint32_t peer = slot < p->node ? slot : slot + 1;
+    bool collective = value->kind == OSOE_REPLY_RELEASE || value->kind == OSOE_REPLY_ARRIVE;
+    osoe_fatal("node %u: the reply descriptor pool is empty (%u of %u in use) for a %s "
+               "%s node %u; toward it the control queue is %u deep and the bulk queue %u. "
+               "%s", p->node, p->pool.in_use, p->pool.count, reply_kind_name(value->kind),
+               collective ? "toward" : "request from", peer, q->control.depth, q->bulk.depth,
+               collective ? "The pool reserves a place for every forward a blocking "
+                            "collective can have outstanding, so this is a bug in this "
+                            "node's collective bookkeeping (§3.8, argument 2)"
+                          : "Requests are bounded by the credit the origin takes, so the "
+                            "break is on that node's side: its OSOE_AM_CREDITS differs from "
+                            "this node's, or its credit accounting is wrong (§3.8, "
+                            "argument 1)");
+}
+
 static void enqueue(struct osoe_progress *p, uint32_t slot, struct osoe_reply_queue *q,
                     const struct osoe_reply *value)
 {
     uint32_t i = osoe_reply_take(&p->pool);
-    if (i == OSOE_REPLY_NONE) {
-        osoe_counter_word_add(&p->metrics->reply_reservation_failures, 1);
-        return;
-    }
+    if (i == OSOE_REPLY_NONE)
+        pool_exhausted(p, slot, value);
     struct osoe_reply *r = osoe_reply_at(&p->pool, i);
     *r = *value;
     osoe_reply_push(&p->pool, q, i);
     note_high_water(p, slot);
 }
 
-/*
- * A collective's arrival or release, which must not be dropped.
- *
- * §3.8 makes an exhausted pool the fallible path for a *reply*: the origin's
- * credit bounds what can be outstanding, so running out means that distributed
- * invariant is broken, and reply.h already says such a break is "a hard
- * assertion naming the peer, not a silent drop". For a collective it is worse
- * than data loss. A dropped arrival means the root waits for a node that will
- * never arrive and a dropped release means every member of a node waits on an
- * epoch counter nothing will advance - in both cases a silent hang whose
- * symptom appears on the other nodes.
- */
-static void enqueue_collective(struct osoe_progress *p, uint32_t slot,
-                               struct osoe_reply_queue *q, const struct osoe_reply *value,
-                               uint32_t peer)
-{
-    uint32_t i = osoe_reply_take(&p->pool);
-    if (i == OSOE_REPLY_NONE)
-        osoe_fatal("the reply descriptor pool is empty while forwarding a collective "
-                   "toward node %u; §3.8's per-connection credit is not holding", peer);
-    struct osoe_reply *r = osoe_reply_at(&p->pool, i);
-    *r = *value;
-    osoe_reply_push(&p->pool, q, i);
-    note_high_water(p, slot);
-}
 
 /* Publish a landing zone's completion: length or value, then ready, then the
  * wake. The waiter loads the wake word before the flag (§4.6), so a bump
@@ -242,8 +258,7 @@ static void complete(void *context, const struct osoe_message_header *header,
                 struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE,
                                         .origin_pe = m.team, .length = 0,
                                         .value = m.epoch };
-                enqueue_collective(p, slot, &p->connection[slot].queues.control, &r,
-                                   slot < p->node ? slot : slot + 1);
+                enqueue(p, slot, &p->connection[slot].queues.control, &r);
             }
             p->host.release(p->host.context, m.team, m.epoch);
         }
@@ -738,8 +753,7 @@ void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch
             for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
                 struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE, .origin_pe = team,
                                         .length = 0, .value = epoch };
-                enqueue_collective(p, slot, &p->connection[slot].queues.control, &r,
-                                   slot < p->node ? slot : slot + 1);
+                enqueue(p, slot, &p->connection[slot].queues.control, &r);
             }
             p->host.release(p->host.context, team, epoch);
         }
@@ -758,7 +772,7 @@ void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch
         osoe_fatal("no connection to the collective root, node %u", root);
     struct osoe_reply r = { .kind = OSOE_REPLY_ARRIVE, .origin_pe = team,
                             .length = 0, .value = epoch };
-    enqueue_collective(p, slot, &p->connection[slot].queues.control, &r, root);
+    enqueue(p, slot, &p->connection[slot].queues.control, &r);
 }
 
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer)

@@ -418,18 +418,16 @@ set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
 
 # The reply descriptor pool (§3.8; review round two, D1). The review's scenario
 # at C = 2 must complete; with the target given a smaller credit than the
-# origin, the pool overflows and the target must say so by name. Both disabled
-# until the pool is sized by §3.8's formula: on this tree the first drops a get
-# request and times out, and the second drops one silently.
+# origin, the pool overflows and the target must say so by name. Before slice 2
+# sized the pool by §3.8's formula, both dropped a get request without a word
+# and timed out ("no get reply after 60 s").
 osoe_tier2_map_test(reply-pool 0,0,0,1 OSOE_AM_CREDITS=2)
-set_tests_properties(shmem.reply-pool.0-0-0-1 PROPERTIES DISABLED TRUE)
 add_test(NAME shmem.reply-pool.overflow
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow
           $<TARGET_FILE:osoe-launch> -n 8 -m 0,0,0,0,0,0,0,1 -t 30
           -e 7:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
 set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*from node 0"
-  DISABLED TRUE)
+  PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
 
 osoe_tier2_test(init)
 osoe_tier2_test(fork)

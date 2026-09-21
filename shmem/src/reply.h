@@ -62,6 +62,21 @@
 /* No descriptor. */
 #define OSOE_REPLY_NONE UINT32_C(0xffffffff)
 
+/*
+ * The collective forwards one connection can have outstanding per team: the
+ * tree's degree as one edge sees it (§3.8, argument 2). The internode phase is
+ * a star today - one arrival toward the root, one release back, per team - so
+ * one. The tree of slice 3 sets it to its fan-out plus one.
+ */
+#define OSOE_COLLECTIVE_DEGREE 1u
+
+/*
+ * Descriptors per connection beyond the two arguments of §3.8. Zero: every
+ * descriptor is accounted for by one of them, and a margin would only postpone
+ * the fatal that names the argument that broke.
+ */
+#define OSOE_REPLY_SLACK 0u
+
 enum osoe_reply_kind {
     /* A fetching AMO result, applied at handler time. Carries the value. */
     OSOE_REPLY_AMO = 0,
@@ -135,11 +150,17 @@ void osoe_reply_pool_init(struct osoe_reply_pool *pool, struct osoe_reply *slots
                           uint32_t count);
 
 /*
- * Take a descriptor, or OSOE_REPLY_NONE when the pool is empty. Returning NONE
- * is not an error path to handle at the call site: §3.8 makes reservation
- * *fallible* precisely so a handler never has to block, and the progress thread
- * leaves the request in place and carries on reaping. That is what makes §3.7's
- * rule satisfiable trivially rather than by construction.
+ * Take a descriptor, or OSOE_REPLY_NONE when the pool is empty. It returns
+ * rather than blocks, so a handler never waits on a resource only its own
+ * thread frees (§3.7).
+ *
+ * An empty pool is not a condition to retry: by the time a handler asks, the
+ * parser has consumed the request, so there is nothing left to leave in place
+ * (an earlier version of this comment said otherwise, and the caller dropped
+ * the request on the strength of it - second review, D1). The pool is sized so
+ * that no legal program can empty it (progress-host.c, §3.8), which makes NONE
+ * a broken invariant - usually the peer's credit accounting - and the progress
+ * layer ends the job naming the peer.
  */
 uint32_t osoe_reply_take(struct osoe_reply_pool *pool);
 void osoe_reply_give(struct osoe_reply_pool *pool, uint32_t index);

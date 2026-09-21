@@ -225,12 +225,22 @@ void osoe_progress_host_start(uint32_t session)
 
     uint32_t peers = osoe.job.node_count - 1;
     /*
-     * §3.8 sizes the target's worst case at `connections x C`, so that is the
-     * pool. Nothing takes a credit yet - the only descriptors this slice uses
-     * are the root's releases, one per peer per team - but sizing it by §3.8's
-     * own formula is what keeps the data path from having to resize it.
+     * §3.8's formula, per connection: C + degree x teams + slack. C bounds the
+     * replies - the origin takes a credit per get or fetching AMO and returns
+     * it when the reply lands (argument 1). degree x teams bounds the
+     * collective forwards: while collectives are blocking, a team has at most
+     * one forward outstanding per tree edge (argument 2). The pool is
+     * node-wide, so an idle connection costs nothing.
+     *
+     * Before slice 2 this was peers x C, with no term for the forwards, so a
+     * node holding C gets toward a peer had nothing left for its own barrier
+     * arrival and the request was dropped (second review, D1). No legal
+     * program can empty the pool now, and progress.c ends the job naming the
+     * peer if one does.
      */
-    uint32_t descriptors = peers * osoe.area.credits;
+    uint32_t per_connection = osoe.area.credits +
+                              OSOE_COLLECTIVE_DEGREE * OSOE_TEAMS + OSOE_REPLY_SLACK;
+    uint32_t descriptors = peers * per_connection;
     osoe.wire = calloc(peers, sizeof *osoe.wire);
     osoe.connection = calloc(peers, sizeof *osoe.connection);
     osoe.descriptor = calloc(descriptors, sizeof *osoe.descriptor);

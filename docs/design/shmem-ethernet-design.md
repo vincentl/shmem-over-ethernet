@@ -703,6 +703,19 @@ evidence of an observed hang.
 Size as `C + degree×max_teams + slack` per connection, drawn from the node-wide
 pool.
 
+*As built (phase 1 step 2 slice 2):* `degree` is `OSOE_COLLECTIVE_DEGREE`, 1 for
+today's star (one arrival up and one release down per team per connection; the
+tree sets it to its fan-out plus one), `max_teams` is the two predefined teams,
+and `slack` is 0 — every descriptor belongs to one of the arguments above, and a
+margin would only postpone the fatal that names the one that broke. The first
+build sized the pool at `connections × C`, with no term for the forwards, and
+dropped the request that found it empty: a node holding C gets toward a peer
+lost its own barrier arrival or a get, and the origin timed out blaming the
+wrong node (second review, D1). An empty pool is now a fatal on the node whose
+pool it is, naming the peer, the kind of request, the pool and queue depths, and
+which argument bounds it. Only a broken invariant reaches it; the test that does
+gives the target a smaller `OSOE_AM_CREDITS` than the origin.
+
 **The control queue is multi-producer** once a node runs more than one progress
 thread: a collective forward received on one shard's connection is enqueued
 toward a peer owned by another shard, with a wake to that shard. Pre-allocate at maximum. **Assert
