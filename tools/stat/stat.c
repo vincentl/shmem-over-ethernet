@@ -218,12 +218,17 @@ static bool metric_sums(const struct osoe_metric_descriptor *m)
 static uint64_t pe_thread_value(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
                                 uint32_t pe)
 {
+    /* Clamped like local_count and block_count (D-7): more per-PE blocks than
+     * the segment has blocks at all is nonsense, and blocks_per_pe drives a
+     * loop the same way those two do. */
     uint32_t per_pe = s->dir->blocks_per_pe;
+    if (per_pe > s->block_count)
+        per_pe = s->block_count;
     uint64_t acc = 0;
     for (uint32_t i = 0; i < per_pe; i++) {
         uint64_t v;
         uint32_t block = pe * per_pe + i;
-        if (block >= s->dir->block_count || !osoe_segment_read(s, m, block, &v))
+        if (block >= s->block_count || !osoe_segment_read(s, m, block, &v))
             continue;
         if (metric_sums(m))
             acc += v;
@@ -268,7 +273,7 @@ static void print_pe_lines(const struct osoe_segment *s)
     uint64_t now = osoe_segment_now_ns();
     printf("\n%3s %5s %8s %-10s %6s %8s  %s\n",
            "PE", "rank", "pid", "phase", "epoch", "sweeps", "blocked in");
-    for (uint32_t i = 0; i < s->dir->local_count; i++) {
+    for (uint32_t i = 0; i < s->local_count; i++) {
         uint64_t rank = 0, pid = 0, phase = 0, epoch = 0, sweeps = 0;
         osoe_segment_read_name(s, "pe.rank", i, &rank);
         osoe_segment_read_name(s, "pe.pid", i, &pid);
@@ -304,7 +309,7 @@ static void counters_human(const struct osoe_segment *s)
     print_identity(s);
     print_pe_lines(s);
 
-    uint32_t npe = s->dir->local_count;
+    uint32_t npe = s->local_count;
     printf("\n%-40s", "counter");
     for (uint32_t p = 0; p < npe; p++)
         printf("%12s%u", "PE", p);
@@ -356,7 +361,7 @@ static void counters_human(const struct osoe_segment *s)
 
 static void counters_json(const struct osoe_segment *s)
 {
-    uint32_t npe = s->dir->local_count;
+    uint32_t npe = s->local_count;
     printf("{\"segment\":");
     json_str(stdout, s->name);
     printf(",\"layout\":%u,\"local_count\":%u,\"counters\":{", s->dir->layout, npe);
@@ -386,7 +391,7 @@ static void threads_human(const struct osoe_segment *s)
     print_identity(s);
     printf("\n%5s %3s %8s %8s %12s %12s  %s\n",
            "block", "PE", "pid", "tid", "cpu", "invol.csw", "kind");
-    for (uint32_t b = 0; b < s->dir->block_count; b++) {
+    for (uint32_t b = 0; b < s->block_count; b++) {
         uint64_t claimed = 0, tid = 0, loops = 0, pid = 0;
         if (!osoe_segment_read_name(s, "thread.claimed", b, &claimed) || !claimed)
             continue;
@@ -459,7 +464,7 @@ static void dump_human(const struct osoe_segment *s)
             print_value(s, &s->metrics[i], 0);
 
     uint64_t now = osoe_segment_now_ns();
-    for (uint32_t p = 0; p < s->dir->local_count; p++) {
+    for (uint32_t p = 0; p < s->local_count; p++) {
         printf("\n  PE %u\n", p);
         for (uint32_t i = 0; i < s->nmetrics; i++)
             if (s->metrics[i].scope == OSOE_MSCOPE_PE)
@@ -490,7 +495,7 @@ static void dump_human(const struct osoe_segment *s)
     }
 
     printf("\n  counter blocks\n");
-    for (uint32_t b = 0; b < s->dir->block_count; b++) {
+    for (uint32_t b = 0; b < s->block_count; b++) {
         uint64_t claimed = 0;
         if (!osoe_segment_read_name(s, "thread.claimed", b, &claimed) || !claimed)
             continue;
@@ -546,7 +551,7 @@ static void dump_json(const struct osoe_segment *s)
     printf("}");
 
     printf(",\"pes\":[");
-    for (uint32_t p = 0; p < s->dir->local_count; p++) {
+    for (uint32_t p = 0; p < s->local_count; p++) {
         printf("%s{", p ? "," : "");
         first = true;
         for (uint32_t i = 0; i < s->nmetrics; i++) {
@@ -611,7 +616,7 @@ static void dump_json(const struct osoe_segment *s)
 static bool all_pes_gone(const struct osoe_segment *s, bool *any_joined)
 {
     *any_joined = false;
-    for (uint32_t i = 0; i < s->dir->local_count; i++) {
+    for (uint32_t i = 0; i < s->local_count; i++) {
         uint64_t phase = 0, pid = 0;
         osoe_segment_read_name(s, "pe.phase", i, &phase);
         osoe_segment_read_name(s, "pe.pid", i, &pid);
@@ -655,7 +660,7 @@ static int gc_one(const char *name)
 
     /* Heaps first: their names are in the segment, so removing the segment
      * first would strand them. */
-    for (uint32_t i = 0; i < s.dir->local_count; i++) {
+    for (uint32_t i = 0; i < s.local_count; i++) {
         char heap[128];
         if (!osoe_segment_read_str(&s, "pe.heap_name", i, heap, sizeof heap) || !heap[0])
             continue;
@@ -693,7 +698,7 @@ static int list_segments(void)
             continue;
         }
         uint64_t live = 0;
-        for (uint32_t p = 0; p < s.dir->local_count; p++) {
+        for (uint32_t p = 0; p < s.local_count; p++) {
             uint64_t pid = 0, phase = 0;
             osoe_segment_read_name(&s, "pe.pid", p, &pid);
             osoe_segment_read_name(&s, "pe.phase", p, &phase);

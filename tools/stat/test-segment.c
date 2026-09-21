@@ -91,7 +91,17 @@ static struct osoe_metric_descriptor desc(const char *name, const char *unit, un
 /* OLDER_DIRECTORY is not damage: it is a segment written by a library from
  * before layout 6, whose directory stops before the landing-zone fields. A
  * reader must still use its table (OSOE_SEGMENT_HAS). */
-enum damage { GOOD, BAD_MAGIC, BAD_CHECKSUM, STRANGE_DESC_SIZE, OLDER_DIRECTORY };
+/* HUGE_LOCAL_COUNT and HUGE_BLOCK_COUNT are D-7 (diagnosability review): the
+ * directory's own local_count/block_count, not the size of the mapping or of
+ * the section they name - so the segment is otherwise this same GOOD one,
+ * just lying about how many slots or blocks it holds. Before the fix, a count
+ * like this became a loop bound directly: 500-something billion iterations of
+ * "for i < local_count" is what the review's fuzz run saw as osoe-stat
+ * running silently for ten seconds and more. */
+enum damage {
+    GOOD, BAD_MAGIC, BAD_CHECKSUM, STRANGE_DESC_SIZE, OLDER_DIRECTORY,
+    HUGE_LOCAL_COUNT, HUGE_BLOCK_COUNT
+};
 
 static void *build(const char *name, enum damage damage, size_t *bytes)
 {
@@ -167,7 +177,9 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
     d.segment_bytes = total;
     d.slots_offset = slots_off;
     d.slot_bytes = SLOT_BYTES;
-    d.local_count = LOCAL_COUNT;
+    /* The mapping and the slots section are still LOCAL_COUNT-sized below;
+     * only the directory's count lies (D-7). */
+    d.local_count = damage == HUGE_LOCAL_COUNT ? UINT32_C(4278190096) : LOCAL_COUNT;
     d.metrics_offset = metrics_off;
     d.metrics_bytes = (uint64_t)n * sizeof table[0];
     d.metrics_count = n;
@@ -176,7 +188,8 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
                          (damage == BAD_CHECKSUM ? 1u : 0u);
     d.blocks_offset = blocks_off;
     d.blocks_bytes = (uint64_t)BLOCK_COUNT * BLOCK_BYTES;
-    d.block_count = BLOCK_COUNT;
+    /* Likewise: the blocks section is still BLOCK_COUNT-sized (D-7). */
+    d.block_count = damage == HUGE_BLOCK_COUNT ? UINT32_C(4278190096) : BLOCK_COUNT;
     d.block_bytes = BLOCK_BYTES;
     d.blocks_per_pe = BLOCKS_PER_PE;
     memcpy(p, &d, sizeof d);
@@ -291,6 +304,60 @@ static void check_refused(const char *name, enum damage damage, bool expect_open
     unlink(name);
 }
 
+/*
+ * D-7: a directory whose local_count or block_count lies about how much its
+ * section holds must not turn a loop over "every PE" or "every thread block"
+ * into one over the lie. The segment opens fine and its table is still usable
+ * - only a count is wrong, not the checksum - so this is not check_refused's
+ * case; it is segment.c clamping local_count/block_count itself to what the
+ * section can actually hold, which is what every loop bound in stat.c reads
+ * instead of the directory's own (untrusted) field.
+ */
+static void check_huge_counts(const char *name, enum damage damage)
+{
+    size_t bytes = 0;
+    void *p = build(name, damage, &bytes);
+    CHECK(p != NULL);
+    if (!p)
+        return;
+
+    struct osoe_segment s;
+    char err[256] = "";
+    CHECK(osoe_segment_open(&s, name, err, sizeof err) == 0);
+    CHECK(s.table_usable);
+
+    /* The lie is still there to see - print_identity shows it - but nothing
+     * that loops may read it. */
+    if (damage == HUGE_LOCAL_COUNT) {
+        CHECK(s.dir->local_count == UINT32_C(4278190096));
+        CHECK(s.local_count == LOCAL_COUNT);
+        CHECK(s.block_count == BLOCK_COUNT);        /* the other count: untouched */
+        CHECK(osoe_segment_read_name(&s, "pe.rank", LOCAL_COUNT - 1, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "pe.rank", LOCAL_COUNT, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "pe.rank", 1000000, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "pe.rank", UINT32_MAX, &(uint64_t){ 0 }));
+    } else {
+        CHECK(s.dir->block_count == UINT32_C(4278190096));
+        CHECK(s.block_count == BLOCK_COUNT);
+        CHECK(s.local_count == LOCAL_COUNT);         /* the other count: untouched */
+        CHECK(osoe_segment_read_name(&s, "future.gadget.calls", BLOCK_COUNT - 1,
+                                     &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "future.gadget.calls", BLOCK_COUNT, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "future.gadget.calls", 1000000, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "future.gadget.calls", UINT32_MAX, &(uint64_t){ 0 }));
+    }
+
+    /* The blocked record goes through the same clamp: an index past the real
+     * section is refused, not read as if the lie were true. */
+    struct osoe_segment_blocked b;
+    CHECK(!osoe_segment_blocked(&s, LOCAL_COUNT, &b));
+    CHECK(!b.valid);
+
+    osoe_segment_close(&s);
+    munmap(p, bytes);
+    unlink(name);
+}
+
 int main(void)
 {
     char name[64], file[96];
@@ -338,6 +405,9 @@ int main(void)
     check_refused(file, BAD_MAGIC, false);
     check_refused(file, BAD_CHECKSUM, true);
     check_refused(file, STRANGE_DESC_SIZE, true);
+
+    check_huge_counts(file, HUGE_LOCAL_COUNT);
+    check_huge_counts(file, HUGE_BLOCK_COUNT);
 
     /* And a segment that is not there at all. */
     struct osoe_segment s;

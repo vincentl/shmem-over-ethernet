@@ -56,6 +56,29 @@ static uint32_t checksum(const void *p, size_t n)
     return h;
 }
 
+/*
+ * How many `element_bytes`-sized records fit between `offset` and `next` (the
+ * following section's own offset, or `segment_bytes` when there is none, or
+ * `next` is itself nonsense) - clamped further by `raw`, the directory's own
+ * count, so a small honest count is never inflated (D-7). Used before a count
+ * from the directory becomes a loop bound: a single record() call already
+ * bounds one index against the mapping, but that check does nothing for a
+ * count a directory claims and a loop believes without ever landing outside
+ * the file - `local_count` or `block_count` set to four billion turns "every
+ * PE" into a loop that runs for as long as the process is left running.
+ */
+static uint32_t clamp_count(uint64_t offset, uint32_t element_bytes, uint64_t next,
+                            uint64_t segment_bytes, uint32_t raw)
+{
+    if (element_bytes == 0 || offset > segment_bytes)
+        return 0;
+    uint64_t bound = (next >= offset && next <= segment_bytes) ? next : segment_bytes;
+    uint64_t max_count = (bound - offset) / element_bytes;
+    if (max_count > UINT32_MAX)
+        max_count = UINT32_MAX;
+    return raw < (uint32_t)max_count ? raw : (uint32_t)max_count;
+}
+
 static int fail(char *err, size_t errlen, const char *fmt, ...)
     __attribute__((format(printf, 3, 4)));
 
@@ -274,6 +297,21 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
      * caller prints what it does know. That is what freezing the directory
      * bought, and refusing here would spend it.
      */
+
+    /* Clamp the two counts a caller loops over, before anything loops over
+     * them (D-7). The slots section's "next section" is metrics; the blocks
+     * section's is landing, appended at layout 6, or the end of the segment
+     * on an older directory that has none. */
+    if (OSOE_SEGMENT_HAS(s->dir, local_count))
+        s->local_count = clamp_count(s->dir->slots_offset, s->dir->slot_bytes,
+                                     s->dir->metrics_offset, s->bytes, s->dir->local_count);
+    if (OSOE_SEGMENT_HAS(s->dir, block_count)) {
+        uint64_t after_blocks = OSOE_SEGMENT_HAS(s->dir, landing_offset)
+                                 ? s->dir->landing_offset : s->bytes;
+        s->block_count = clamp_count(s->dir->blocks_offset, s->dir->block_bytes,
+                                     after_blocks, s->bytes, s->dir->block_count);
+    }
+
     /* Ask for the fields the table needs, not for the whole directory: see
      * OSOE_SEGMENT_HAS. Requiring the whole structure discarded the table of
      * every segment written by an older library. */
@@ -330,13 +368,13 @@ static const unsigned char *record(const struct osoe_segment *s, unsigned scope,
         n = s->dir->header_bytes;
         break;
     case OSOE_MSCOPE_PE:
-        if (index >= s->dir->local_count)
+        if (index >= s->local_count)
             return NULL;
         n = s->dir->slot_bytes;
         off = s->dir->slots_offset + (uint64_t)index * n;
         break;
     case OSOE_MSCOPE_THREAD:
-        if (index >= s->dir->block_count)
+        if (index >= s->block_count)
             return NULL;
         n = s->dir->block_bytes;
         off = s->dir->blocks_offset + (uint64_t)index * n;

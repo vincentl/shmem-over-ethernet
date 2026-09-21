@@ -133,6 +133,19 @@ struct osoe_segment {
     const struct osoe_metric_descriptor *metrics;  /* NULL when metrics_count == 0 */
     uint32_t nmetrics;
     bool table_usable;                       /* checksum and element size agree */
+
+    /*
+     * `dir->local_count` and `dir->block_count`, clamped to what the slots and
+     * blocks sections can actually hold (segment_bytes and the next section's
+     * offset), so that a directory naming more records than exist cannot turn
+     * a loop over "every PE" or "every thread block" into one over four
+     * billion (diagnosability review, D-7). A single indexed read was already
+     * safe - record() bounds every offset against the mapping - but a *count*
+     * used as a loop bound never was: every "for i < local_count" and
+     * "for b < block_count" must use these, not the directory's own fields.
+     */
+    uint32_t local_count;
+    uint32_t block_count;
 };
 
 /*
