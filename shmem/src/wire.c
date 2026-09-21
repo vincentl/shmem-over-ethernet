@@ -17,6 +17,7 @@
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "fatal.h"
+#include "shm-object.h"
 #include "wire.h"
 
 /*
@@ -37,6 +38,7 @@ struct osoe_wire_direction {
 struct osoe_wire_header {
     _Alignas(OSOE_CACHELINE) uint64_t capacity;            /* bytes per direction */
     uint64_t magic;
+    int32_t creator_pid;        /* for reclaiming a leftover (shm-object.h) */
     /*
      * Published by the creator once capacity and magic are written, and waited on by
      * the opener - §6.2's `ready`, for the same reason it exists there. The
@@ -178,11 +180,11 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
     uint64_t bytes = data_offset() + 2 * w->capacity;
     int fd;
     if (w->creator) {
-        fd = shm_open(w->name, O_CREAT | O_EXCL | O_RDWR, 0600);
+        char err[256];
+        fd = osoe_shm_create(w->name, (long)offsetof(struct osoe_wire_header, creator_pid),
+                             err, sizeof err);
         if (fd < 0)
-            osoe_fatal("cannot create wire /dev/shm%s: %s%s", w->name, strerror(errno),
-                       errno == EEXIST ? "; probably left by a crashed job with the same "
-                                         "job and step ids" : "");
+            osoe_fatal("the wire toward node %u: %s", peer, err);
         if (ftruncate(fd, (off_t)bytes) != 0) {
             close(fd);
             shm_unlink(w->name);
@@ -197,11 +199,13 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
          * which is before ftruncate has sized the object and before the header
          * has been written.
          */
+again:;
         struct osoe_stall_watch watch;
         osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
         for (;;) {
-            fd = shm_open(w->name, O_RDWR, 0);
+            char err[256];
+            fd = osoe_shm_open_ours(w->name, err, sizeof err);
             if (fd >= 0) {
                 /* Mapping past the end of a still-unsized object is allowed and
                  * faults with SIGBUS on the first touch, so wait for the length
@@ -212,7 +216,7 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
                 close(fd);
                 fd = -1;
             } else if (errno != ENOENT) {
-                osoe_fatal("cannot open wire %s: %s", w->name, strerror(errno));
+                osoe_fatal("the wire toward node %u: %s", peer, err);
             }
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u has not created the wire %s",
@@ -224,8 +228,8 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
     }
 
     void *p = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd);
     if (p == MAP_FAILED) {
+        close(fd);
         if (w->creator)
             shm_unlink(w->name);
         osoe_fatal("cannot map wire %s: %s", w->name, strerror(errno));
@@ -241,12 +245,21 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
          * two-sided protocol (§3.16). */
         h->capacity = w->capacity;
         h->magic = OSOE_WIRE_MAGIC;
+        h->creator_pid = (int32_t)getpid();
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
         struct osoe_stall_watch watch;
         osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         while (atomic_load_explicit(&h->ready, memory_order_acquire) == 0) {
+            /* A leftover the creating node is about to reclaim will never be
+             * ready: start over (shm-object.h). */
+            if (osoe_shm_orphaned(fd)) {
+                munmap(p, bytes);
+                close(fd);
+                w->map = NULL;
+                goto again;
+            }
             struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_futex_wait(&h->ready, 0, &sweep, OSOE_FUTEX_SHARED);
             if (osoe_stall_watch_stalled(&watch, 0)) {
@@ -262,6 +275,7 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
                        "%llu): every PE of a job must set it the same", w->name,
                        (unsigned long long)h->capacity, (unsigned long long)w->capacity);
     }
+    close(fd);
 
     /*
      * Direction 0 carries lo -> hi and direction 1 hi -> lo, so each side's tx

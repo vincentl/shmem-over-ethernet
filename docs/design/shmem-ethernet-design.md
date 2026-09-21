@@ -3504,10 +3504,29 @@ lead waits on a futex until all `L` local PEs have arrived, then removes every h
 name, so a later crash leaves no heaps behind in `/dev/shm`.
 
 The sequence, as implemented:
-1. **The lead creates the control segment** with `O_EXCL`, mode 0600. A name that
-   already exists is a crashed job's leftover and is reported, never reused. The
+1. **The lead creates the control segment** with `O_EXCL`, mode 0600. The
    lead writes the versioned header, maps its own heap (choosing `B`, §4.1), and
    publishes `ready`.
+
+   **A name that already exists is reclaimed or refused, never reused.** Every
+   named object records its creator's pid in its header, with the first store after
+   sizing it. An existing object is *reclaimed* (unlinked, then created afresh, with a
+   line on stderr) only when `fstat` says it belongs to this uid **and** its recorded
+   creator is dead or was never recorded (a job killed between `shm_open` and that
+   first store leaves exactly this). Otherwise init fails, naming the object and the
+   creator's pid: a live creator means another job is using these job and step ids,
+   and guessing which one is the leftover would destroy a running job. The same rule
+   covers the job segment, the connection areas and the wires (`shm-object.c`).
+
+   **An object whose `st_uid` is not ours is never opened**, by creator or opener.
+   On a shared node `/dev/shm` is world-writable, so another user can pre-create a
+   name this job will use; mode 0600 on our own objects does not stop that. The fatal
+   names the owner's uid.
+
+   An opener can attach to a leftover in the window before its creator reclaims it.
+   It then waits on a `ready` that will never be published, so every `ready` wait
+   also checks `st_nlink`: an object with no name left has been reclaimed, and the
+   opener starts again from the name.
 2. **Every other PE opens the segment by name.** It polls with backoff until the
    name exists, since there is nothing to wait on before it does. It then waits on
    `ready`, checks the magic number, layout version, and job description, and maps

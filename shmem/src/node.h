@@ -275,6 +275,7 @@ struct osoe_node_header {
     uint32_t session;
     uint32_t world_size;
     uint64_t heap_base;             /* B, where every PE maps its own heap (§4.1) */
+    int32_t creator_pid;            /* the lead, for reclaiming a leftover (shm-object.h) */
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)

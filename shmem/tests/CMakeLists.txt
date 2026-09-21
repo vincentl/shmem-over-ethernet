@@ -70,7 +70,8 @@ add_test(NAME shmem.reply COMMAND shmem_test_reply)
 set_tests_properties(shmem.reply PROPERTIES LABELS "tier1" TIMEOUT 60)
 
 # The AM sizing policy (tier 1): pure arithmetic, compiled in.
-add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/connection.c)
+add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/connection.c
+  ../src/shm-object.c)
 target_include_directories(shmem_test_am_size PRIVATE ../src)
 target_link_libraries(shmem_test_am_size PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_am_size)
@@ -90,7 +91,7 @@ set_tests_properties(shmem.connection PROPERTIES LABELS "tier1" TIMEOUT 120)
 # The node-pair wire on its own (tier 1): both ends in one process, so no
 # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
 # its own osoe_fatal so a failure inside it fails the test.
-add_executable(shmem_test_wire test-wire.c ../src/wire.c)
+add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/shm-object.c)
 target_include_directories(shmem_test_wire PRIVATE ../src)
 target_link_libraries(shmem_test_wire PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_wire)
@@ -103,7 +104,7 @@ set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
 # and takes its identity straight from the launcher environment.
 # The seed is fixed: §3.14 wants an injected fault reproducible, and without it
 # the pattern would follow the launcher's pid and differ every run.
-add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c)
+add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/shm-object.c)
 target_include_directories(shmem_test_wire_pair PRIVATE ../src)
 target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_wire_pair)
@@ -124,7 +125,7 @@ set(OSOE_LAUNCH_COUNTS 1 2 4)
 # all of them - and that mutation passed a two-node test.
 add_executable(shmem_test_barrier_am test-barrier-am.c
   ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c ../src/bootstrap.c)
+  ../src/reply.c ../src/wire.c ../src/bootstrap.c ../src/shm-object.c)
 target_include_directories(shmem_test_barrier_am PRIVATE ../src)
 target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_barrier_am)
@@ -144,7 +145,7 @@ endforeach()
 # poles: one node, one PE per node, uneven sizes, and ranks not contiguous per
 # node - the last two being where two-level collectives break, and a uniform
 # map never shows it.
-add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c
+add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c ../src/shm-object.c
   ../src/am.c)
 target_include_directories(shmem_test_job PRIVATE ../src)
 target_link_libraries(shmem_test_job PRIVATE osoe_base rt)
@@ -174,7 +175,7 @@ set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 
 # vacuous.
 add_executable(shmem_test_progress test-progress.c
   ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c)
+  ../src/reply.c ../src/wire.c ../src/shm-object.c)
 target_include_directories(shmem_test_progress PRIVATE ../src)
 target_link_libraries(shmem_test_progress PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_progress)
@@ -210,7 +211,8 @@ set_tests_properties(shmem.progress.forged-get-reply-bounds PROPERTIES LABELS "t
 # it and the others open it, which is §3.12's arrangement. Not an
 # osoe_tier2_test: it does not call shmem_init, testing the area on its own
 # below the library, and it takes its identity from the launcher environment.
-add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/connection.c)
+add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/connection.c
+  ../src/shm-object.c)
 target_include_directories(shmem_test_connection_area PRIVATE ../src)
 target_link_libraries(shmem_test_connection_area PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_connection_area)
@@ -512,6 +514,19 @@ add_test(NAME shmem.kill-after-init.kept
 set_tests_properties(shmem.kill-after-init.kept PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "kept for post-mortem reading.*removed"
   FAIL_REGULAR_EXPRESSION "left behind")
+
+# Init reclaims leftovers of a job killed during init, and refuses an object
+# whose creator is alive (§6.2; review round two, D11, D15). See leftovers.sh.
+add_test(NAME shmem.leftovers.reclaim
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_init> reclaim)
+set_tests_properties(shmem.leftovers.reclaim PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "reclaimed /dev/shm.*job exited 0.*with a name afterwards: 0")
+add_test(NAME shmem.leftovers.live
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_init> live)
+set_tests_properties(shmem.leftovers.live PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "the refusal names the owner: yes")
 
 osoe_tier2_test(init)
 osoe_tier2_test(fork)

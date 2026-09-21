@@ -18,6 +18,7 @@
 #include "base/futex.h"
 #include "base/stall-watch.h"
 #include "fatal.h"
+#include "shm-object.h"
 #include "job.h"
 
 #define OSOE_JOB_MAGIC UINT64_C(0x00626f6a656f736f)   /* "osoejob" */
@@ -32,7 +33,7 @@ struct osoe_job_header {
     uint32_t layout;
     uint32_t world_size;
     uint32_t node_count;
-    uint32_t reserved;
+    int32_t creator_pid;            /* for reclaiming a leftover (shm-object.h) */
 
     /*
      * What §6.2 has each lead send, and the server check: the symmetric size
@@ -116,12 +117,11 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
 
     int fd;
     if (j->creator) {
-        fd = shm_open(j->name, O_CREAT | O_EXCL | O_RDWR, 0600);
+        char err[256];
+        fd = osoe_shm_create(j->name, (long)offsetof(struct osoe_job_header, creator_pid),
+                             err, sizeof err);
         if (fd < 0)
-            osoe_fatal("cannot create the job segment /dev/shm%s: %s%s", j->name,
-                       strerror(errno),
-                       errno == EEXIST ? "; probably left by a crashed job with the "
-                                         "same job and step ids" : "");
+            osoe_fatal("the job segment: %s", err);
         if (ftruncate(fd, (off_t)j->bytes) != 0) {
             close(fd);
             shm_unlink(j->name);
@@ -132,19 +132,20 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
          * written, so wait for the length here and for `ready` below. */
         /* Nothing moves until the object appears, so the watch is on a constant:
          * with OSOE_NO_PROGRESS_TIMEOUT unset, this waits as long as it takes. */
+again:;
         struct osoe_stall_watch watch;
         osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         struct timespec back = { 0, 200000 };
         for (;;) {
-            fd = shm_open(j->name, O_RDWR, 0);
+            char err[256];
+            fd = osoe_shm_open_ours(j->name, err, sizeof err);
             if (fd >= 0) {
                 struct stat st;
                 if (fstat(fd, &st) == 0 && (uint64_t)st.st_size >= j->bytes)
                     break;
                 close(fd);
             } else if (errno != ENOENT) {
-                osoe_fatal("cannot open the job segment %s: %s", j->name,
-                           strerror(errno));
+                osoe_fatal("the job segment: %s", err);
             }
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the lead of node 0 has not created %s, the step's "
@@ -157,8 +158,8 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
     }
 
     void *p = mmap(NULL, j->bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd);
     if (p == MAP_FAILED) {
+        close(fd);
         if (j->creator)
             shm_unlink(j->name);
         osoe_fatal("cannot map the job segment %s: %s", j->name, strerror(errno));
@@ -176,6 +177,7 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
         h->node_count = b->node_count;
         h->symmetric_size = b->symmetric_size;
         h->handler_checksum = osoe_am_table_checksum();
+        h->creator_pid = (int32_t)getpid();
         for (uint32_t i = 0; i < b->world_size; i++) {
             node_of[i] = OSOE_NODE_UNSET;
             atomic_store_explicit(&claim[i], OSOE_NODE_UNSET, memory_order_release);
@@ -186,6 +188,14 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
         struct osoe_stall_watch watch;
         osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         while (atomic_load_explicit(&h->ready, memory_order_acquire) == 0) {
+            /* A leftover node 0's lead is about to reclaim will never be
+             * ready: start over (shm-object.h). */
+            if (osoe_shm_orphaned(fd)) {
+                munmap(p, j->bytes);
+                close(fd);
+                j->map = NULL;
+                goto again;
+            }
             struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_futex_wait(&h->ready, 0, &sweep, OSOE_FUTEX_SHARED);
             if (atomic_load_explicit(&h->failed, memory_order_acquire))
@@ -198,6 +208,7 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
             osoe_fatal("%s is not a job segment of this version (magic %#llx layout %u)",
                        j->name, (unsigned long long)h->magic, h->layout);
     }
+    close(fd);
 
     /*
      * Only leads publish (§6.2). Each writes its own node's rank list - which

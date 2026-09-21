@@ -25,6 +25,7 @@ add_library(osoe
   src/reply.c
   src/rma.c
   src/session.c
+  src/shm-object.c
   src/signal.c
   src/symmetric.c
   src/team.c
