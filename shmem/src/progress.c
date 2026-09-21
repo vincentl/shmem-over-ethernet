@@ -330,13 +330,35 @@ static bool receive(struct osoe_progress *p, uint32_t slot)
  * PE; the control queue is small and drains to empty, so it cannot starve the
  * bulk queue in practice, while the reverse would happen constantly.
  */
-static bool drain(struct osoe_progress *p, uint32_t slot)
+/*
+ * Where drained replies go (§3.8). Either the open buffer, reserved against the
+ * application's writers through the ordinary reservation - the opportunistic
+ * drain, which keeps reply latency low when there is room - or a released
+ * buffer that is still sealed and so private to this thread, just before it is
+ * opened: the pre-open drain, which is what guarantees a reply room however
+ * hard the writers write. The second is capped at half the buffer, so replies
+ * cannot starve the writers either (§3.8, round one's D8).
+ */
+struct drain_target {
+    uint32_t private_buffer;        /* OSOE_CONNECTION_NONE: the open buffer */
+    uint32_t budget;                /* bytes still allowed, for a private buffer */
+};
+
+static bool reserve_for_reply(struct osoe_connection *conn, struct drain_target *t,
+                              uint32_t len, struct osoe_reservation *r)
+{
+    if (t->private_buffer == OSOE_CONNECTION_NONE)
+        return osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK;
+    if (len > t->budget || !osoe_connection_drain_reserve(conn, t->private_buffer, len, r))
+        return false;
+    t->budget -= len;
+    return true;
+}
+
+static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_connection *conn,
+                       struct drain_target *t)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
-    struct osoe_connection *conn = osoe_connection_to(p->area, 
-                                                      slot < p->node ? slot : slot + 1);
-    if (!conn || c->open == OSOE_CONNECTION_NONE)
-        return false;
     bool moved = false;
 
     while (osoe_reply_peek(&c->queues.control) != OSOE_REPLY_NONE) {
@@ -348,8 +370,7 @@ static bool drain(struct osoe_progress *p, uint32_t slot)
         bool barrier = r->kind == OSOE_REPLY_RELEASE || r->kind == OSOE_REPLY_ARRIVE;
         uint32_t fixed_bytes = barrier ? (uint32_t)sizeof(struct osoe_am_barrier)
                                        : (uint32_t)sizeof(struct osoe_am_rmw_reply);
-        if (osoe_connection_reserve(conn, osoe_message_padded(fixed_bytes), &resv) !=
-            OSOE_RESERVATION_OK)
+        if (!reserve_for_reply(conn, t, osoe_message_padded(fixed_bytes), &resv))
             return moved;                   /* no room: try again next pass */
         uint16_t kind = r->kind == OSOE_REPLY_RELEASE ? OSOE_AM_BARRIER_RELEASE
                       : r->kind == OSOE_REPLY_ARRIVE  ? OSOE_AM_BARRIER_ARRIVE
@@ -393,7 +414,7 @@ static bool drain(struct osoe_progress *p, uint32_t slot)
             len = osoe_message_padded((uint32_t)sizeof(struct osoe_am_get_reply) + chunk);
         }
         struct osoe_reservation resv;
-        if (osoe_connection_reserve(conn, len, &resv) != OSOE_RESERVATION_OK)
+        if (!reserve_for_reply(conn, t, len, &resv))
             return moved;
         const void *source = p->host.resolve(p->host.context, r->target_pe, r->region,
                                              r->offset + r->sent, chunk);
@@ -419,6 +440,18 @@ static bool drain(struct osoe_progress *p, uint32_t slot)
             osoe_reply_rotate(&p->pool, &c->queues.bulk);
     }
     return moved;
+}
+
+/* The opportunistic drain, into the open buffer. */
+static bool drain(struct osoe_progress *p, uint32_t slot)
+{
+    struct osoe_progress_connection *c = &p->connection[slot];
+    struct osoe_connection *conn = osoe_connection_to(p->area,
+                                                      slot < p->node ? slot : slot + 1);
+    if (!conn || c->open == OSOE_CONNECTION_NONE)
+        return false;
+    struct drain_target open = { OSOE_CONNECTION_NONE, 0 };
+    return drain_into(p, slot, conn, &open);
 }
 
 /* ---- Sealing and sending ---------------------------------------------- */
@@ -572,6 +605,11 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     if (c->open == OSOE_CONNECTION_NONE) {
         for (uint32_t k = 0; k < 2; k++)
             if (c->state[k] == OSOE_BUFFER_FREE && k != c->sealed && k != c->sending) {
+                /* The pre-open drain (§3.8): replies first, while k is still
+                 * sealed and no writer can reach it. */
+                c->state[k] = OSOE_BUFFER_DRAINING;
+                struct drain_target preopen = { k, conn->capacity / 2 };
+                drain_into(p, slot, conn, &preopen);
                 osoe_connection_open(conn, k, c->next_seq++);
                 c->state[k] = OSOE_BUFFER_OPEN;
                 c->open = k;

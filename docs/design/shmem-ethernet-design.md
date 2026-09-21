@@ -662,6 +662,29 @@ share of segment bytes at zero with 16 PEs doing 64 KB gets at a realistic one-
 to two-generation round trip (review D8, `docs/reviews/evidence/transport/`). The cap
 guarantees both directions progress every generation.
 
+*As built (phase 1 step 2 slice 2).* The guard runs on every open: `flush`
+drains pending replies — control queue first, then the bulk rotation — into the
+freed buffer while it still carries the seal bit, up to half its capacity, and
+`osoe_connection_open` then publishes `filled` and `head` at the drained extent,
+seal bit last, instead of at the header. The opportunistic drain into an open
+buffer stays: it is what keeps reply latency low when there is room.
+`docs/design/evidence/am-backend/reservation_model.py` checks it, with breakages
+for an open that resets `head` over the drained replies, a drain whose `filled`
+misses the header (the accounting defect the second review measured, head 96
+against filled 64), and two that make ONCE and ORDER each the first check to
+fail.
+
+Before that slice the guard had no caller: `drain()` competed with writers
+through the ordinary reservation, and an open would have written over anything
+drained. **The starvation it guards against was not reproduced** on the
+shared-memory wire: one getter against 2-16 writers at the smallest legal
+buffer, with puts sized to leave no room for a reply, under CPU load, and with
+the writers' 20 µs backoff removed, never kept a get from completing; the worst
+cost was a 2-6 ms get against 0.3 ms idle. The lead wins the race for a freed
+buffer often enough. The guard is built because this section specifies it as the
+guarantee, and step 3's wake-on-free and real sockets change the race; it is not
+evidence of an observed hang.
+
 #### Queue bounds — three separate arguments, each independently breakable
 
 1. **AMO results:** bounded by the origin's outstanding-get cap. **Enforced at

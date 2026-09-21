@@ -42,7 +42,11 @@
  *   `quiet` returns early - also model-checked.
  * - **A DRAINING buffer keeps the seal bit** while the progress thread fills it
  *   with replies (§3.8's starvation guard), so writers skip it; opening it
- *   clears the bit.
+ *   clears the bit. This happens on every open: flush() drains pending replies
+ *   into a freed buffer, up to half of it, immediately before
+ *   osoe_connection_open, which then opens the buffer past them. So a reply is
+ *   guaranteed room on every buffer the writers get, however hard they write
+ *   (docs/design/evidence/am-backend/reservation_model.py).
  *
  * The progress thread must never spin waiting for `filled` to catch up: a
  * writer may be descheduled mid-copy, and at 256 PEs on an oversubscribed node
@@ -286,6 +290,7 @@ static inline struct osoe_credit *osoe_connection_credit(struct osoe_connection 
  * signal-after-payload (invariant 5) and quiet.
  */
 void osoe_connection_open(struct osoe_connection *c, uint32_t k, uint64_t seq);
+/* ... and it opens past whatever osoe_connection_drain_reserve has put there. */
 
 /* Publish what the peer has acknowledged applying. The lead's agent only. */
 void osoe_connection_publish_acked(struct osoe_connection *c, uint64_t seq);
@@ -315,10 +320,11 @@ void osoe_connection_release(struct osoe_connection *c, uint32_t k);
 
 /*
  * Reserve in a buffer the writers cannot reach, for §3.8's starvation guard: a
- * freed buffer enters DRAINING, in which only the progress thread may reserve,
- * and becomes OPEN after. Returns false if the buffer is full. The caller caps
- * each pass at half the buffer, or the guard starves the other direction
- * (§3.8, review D8).
+ * released buffer, still sealed, in which only the progress thread may
+ * reserve, before osoe_connection_open. Commit with osoe_connection_commit as
+ * usual. Returns false if the buffer is full. The caller caps each drain at
+ * half the buffer, or the guard starves the other direction (§3.8, review D8).
+ * The reservation's `seq` is 0: the buffer gets its number when it is opened.
  */
 bool osoe_connection_drain_reserve(struct osoe_connection *c, uint32_t k, uint32_t len,
                              struct osoe_reservation *r);

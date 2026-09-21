@@ -392,10 +392,11 @@ osoe_tier2_map_test(ack-echo 0,1)
 
 # A reply is not starved by puts (§3.8's DRAINING state; review round two, C7):
 # one getter on node 0, the get's target and five writers on node 1, the
-# smallest connection §3.4 allows. Registered disabled until the pre-open drain.
+# smallest connection §3.4 allows, puts of 984 bytes - two tile the buffer and
+# leave no room for a reply. A guard, not a reproduction: it passed before the
+# pre-open drain too (§3.8 says why), so it holds the line against a real hang.
 osoe_tier2_map_test(reply-starvation 0,1,1,1,1,1,1
-  OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096)
-set_tests_properties(shmem.reply-starvation.0-1-1-1-1-1-1 PROPERTIES DISABLED TRUE)
+  OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096 OSOE_TEST_PUT_BYTES=984)
 
 # An internode quiet sweeps (§4.10; review round two, D2): node 1 is stopped,
 # PE 0 quiets toward it, PE 1 sees it blocked in osoe-stat and dies, and PE 0's

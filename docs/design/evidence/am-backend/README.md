@@ -13,19 +13,27 @@ only a one-off argument. `engine.py` is the copy they were run against.
 | `credit_model.py` | Reply credits and the two bounds they keep (§3.8, §3.12, §4.6) |
 | `arrival_model.py` | The internode arrival handoff, and whether one word per team is enough (§5.3, §3.12, §4.9) |
 | `ack_model.py` | The acknowledgement protocol between two leads: quiet's termination, and whether a quiesced pair falls silent (§3.4, §4.6) |
+| `reservation_model.py` | §3.5's reservation protocol as the C implements it, and §3.8's pre-open drain (§3.5, §3.8) |
 
 Every recorded `.out` reproduces by plain `diff`: result lines carry no
 wall-clock when not written to a terminal, and a `+live` suffix says the
 engine's trapped-state check ran and found nothing (`engine.py`, "Liveness").
 
-**§3.5's reservation protocol is not modelled here.** It already has two
-independent exhaustive models from the review, in
-`docs/reviews/evidence/transport/` and `docs/reviews/evidence/refutation/`, and
-their `fixed` variant is exactly the protocol this step implements. Re-running
-`docs/reviews/evidence/transport/resv_model.py` at step 2 reproduced all five
-recorded outputs byte for byte, including the four broken variants that fail
-with counterexamples. A third model of the same protocol would have added
-nothing.
+**§3.5's reservation protocol** was at first left to the review's two models of
+the design text (`docs/reviews/evidence/transport/`, `…/refutation/`). The
+second review wrote a third from the C, and slice 2 promoted it here
+(`reservation_model.py`) because it needed §3.8's pre-open drain added: replies
+written into a freed buffer while it is still sealed, then the buffer opened
+past them. Four breakages cover the drain - an open that resets `head` over the
+replies (QUIET fails), a drain whose `filled` misses the header (STUCK: the
+accounting defect the review measured), a drain that does not consume its reply
+(ONCE, first), and one that takes the newest reply first (ORDER, first). The
+review found that neither ONCE nor ORDER had ever been the first check to fail
+in any variant; these two exist so that each has. The review's copy also saw
+only a duplicate across segments, not within one, so a same-segment duplicate
+used to surface as ORDER; `deliver_check` now counts both. `current`, the tree
+before slice 2 with no pre-open drain, passes every safety check: starving a
+reply is a property of the scheduling policy, not of this protocol.
 
 ## What the models found
 
