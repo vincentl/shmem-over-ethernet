@@ -410,8 +410,16 @@ osoe_tier2_map_test(ack-echo 0,1)
 # smallest connection §3.4 allows, puts of 984 bytes - two tile the buffer and
 # leave no room for a reply. A guard, not a reproduction: it passed before the
 # pre-open drain too (§3.8 says why), so it holds the line against a real hang.
-osoe_tier2_map_test(reply-starvation 0,1,1,1,1,1,1
-  OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096 OSOE_TEST_PUT_BYTES=984)
+#
+# Neither this nor shmem.reply-pool below runs under ThreadSanitizer, for the
+# reason shmem.internode gives: an agent serves a get from, or applies a put to,
+# a heap the local main thread wrote before a barrier, and that barrier's
+# ordering runs through processes tsan cannot see. Both reported exactly that
+# race, and only that, when slice 2 first ran them under tsan.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(reply-starvation 0,1,1,1,1,1,1
+    OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096 OSOE_TEST_PUT_BYTES=984)
+endif()
 
 # An internode quiet sweeps (§4.10; review round two, D2): node 1 is stopped,
 # PE 0 quiets toward it, PE 1 sees it blocked in osoe-stat and dies, and PE 0's
@@ -435,8 +443,19 @@ set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
 # at C = 2 must complete; with the target given a smaller credit than the
 # origin, the pool overflows and the target must say so by name. Before slice 2
 # sized the pool by §3.8's formula, both dropped a get request without a word
-# and timed out ("no get reply after 60 s").
-osoe_tier2_map_test(reply-pool 0,0,0,1 OSOE_AM_CREDITS=2)
+# and timed out ("no get reply after 60 s"). The completing half is not run
+# under ThreadSanitizer (see shmem.reply-starvation); the overflow half is,
+# since its pass is the named fatal and not a clean exit.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(reply-pool 0,0,0,1 OSOE_AM_CREDITS=2)
+else()
+  add_executable(shmem_test_reply-pool test-reply-pool.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_reply-pool PRIVATE
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_reply-pool PRIVATE osoe rt)
+  osoe_warnings(shmem_test_reply-pool)
+endif()
 add_test(NAME shmem.reply-pool.overflow
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow
           $<TARGET_FILE:osoe-launch> -n 8 -m 0,0,0,0,0,0,0,1 -t 30
