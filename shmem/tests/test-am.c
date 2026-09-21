@@ -213,6 +213,19 @@ static int malformed(const char *which)
         memcpy(&mh, stream + sizeof sh, sizeof mh);
         mh.len = 4;                             /* shorter than the fixed part */
         memcpy(stream + sizeof sh, &mh, sizeof mh);
+    } else if (strcmp(which, "long-message") == 0) {
+        /* A message whose own length runs past the end of its segment: the
+         * parser must refuse it before applying a byte of it (review round
+         * two, D4), not discover the overrun afterwards. */
+        struct osoe_message_header mh;
+        memcpy(&mh, stream + sizeof sh, sizeof mh);
+        mh.len = sh.total_len;
+        memcpy(stream + sizeof sh, &mh, sizeof mh);
+    } else if (strcmp(which, "empty-count") == 0) {
+        /* Messages claimed, and no room for any: a header-only segment that
+         * says it carries something. */
+        sh.total_len = (uint32_t)sizeof sh;
+        stream_len = (uint32_t)sizeof sh;
     } else {
         fprintf(stderr, "unknown malformed case '%s'\n", which);
         return 2;

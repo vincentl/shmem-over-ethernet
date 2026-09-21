@@ -104,7 +104,13 @@ enum { PEER_PUT_BYTES = 200 };
  * care where they came from. */
 static uint32_t my_pe;
 static unsigned char heap[HEAP];
-static unsigned char landing_storage[sizeof(struct osoe_landing_slot) + HEAP];
+/* The landing zone, then memory that is not the landing zone: the canary is
+ * what a forged get reply would land on (OSOE_TEST_FORGE below). */
+static struct {
+    unsigned char zone[sizeof(struct osoe_landing_slot) + HEAP];
+    unsigned char canary[256];
+} landing_block;
+#define landing_storage landing_block.zone
 static uint64_t notifies;
 
 static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offset,
@@ -276,6 +282,24 @@ int main(void)
     unsigned char mine[PAYLOAD];
     for (size_t i = 0; i < sizeof mine; i++)
         mine[i] = (unsigned char)((i ^ 0x5a) + node);
+
+    /*
+     * OSOE_TEST_FORGE=get-reply: node 0's lead first sends a get reply nobody
+     * asked for, whose token matches nothing and whose chunk_offset points past
+     * the landing zone (review round two, D4; the review's forged-get-reply
+     * patch). The receiving node must refuse it by name rather than write it -
+     * shmem.progress.forged-get-reply asserts the fatal, and the canary check
+     * at the end says so if it was written instead.
+     */
+    const char *forge = getenv("OSOE_TEST_FORGE");
+    if (forge && strcmp(forge, "get-reply") == 0 && node == 0 && lead) {
+        unsigned char forged[64];
+        memset(forged, 0xEE, sizeof forged);
+        struct osoe_am_get_reply lie = { .origin_pe = peer_lead, .chunk_offset = HEAP + 32,
+                                         .total = 0xffffffffu, .token = 0xdeadbeef };
+        while (!post(c, OSOE_AM_GET_REPLY, &lie, sizeof lie, forged, sizeof forged))
+            osoe_progress_poll(&p);
+    }
 
     /* A put larger than the wire's ring, so it crosses in pieces. */
     struct osoe_am_put put = { .target_pe = peer_lead, .region = 0, .offset = PUT_AT };
@@ -467,6 +491,16 @@ int main(void)
     CHECK(osoe_progress_acked(&p, peer) > 0);
 
 done:
+    {
+        unsigned hit = 0;
+        for (size_t i = 0; i < sizeof landing_block.canary; i++)
+            hit += landing_block.canary[i] != 0;
+        if (hit) {
+            fprintf(stderr, "PE %u: FORGED REPLY WROTE PAST THE LANDING ZONE: %u bytes\n",
+                    my_pe, hit);
+            check_fails++;
+        }
+    }
     osoe_wire_close(&wire);
     osoe_connection_area_close(&area);
     arrivals_close();

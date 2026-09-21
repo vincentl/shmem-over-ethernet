@@ -50,7 +50,9 @@ foreach(case_expect
     "length|was [0-9]+ bytes, its header says"
     "short-segment|less than its own header"
     "kind|this build knows"
-    "short-message|less than its fixed part")
+    "short-message|less than its fixed part"
+    "long-message|runs past the end of segment"
+    "empty-count|messages in no room")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 case)
   list(GET parts 1 expect)
@@ -58,6 +60,10 @@ foreach(case_expect
   set_tests_properties(shmem.am.malformed.${case} PROPERTIES
     LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
 endforeach()
+# Review round two, D4: lengths the parser trusts today. Disabled until it
+# checks them; on this tree both are applied without complaint.
+set_tests_properties(shmem.am.malformed.long-message shmem.am.malformed.empty-count
+  PROPERTIES DISABLED TRUE)
 
 # Deferred reply queues and the credit (tier 1): pure logic and one atomic.
 add_executable(shmem_test_reply test-reply.c ../src/reply.c)
@@ -173,6 +179,19 @@ add_test(NAME shmem.progress
           $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
           $<TARGET_FILE:shmem_test_progress>)
 set_tests_properties(shmem.progress PROPERTIES LABELS "tier2" TIMEOUT 90)
+# Review round two, D4: a get reply nobody asked for, pointing past the landing
+# zone, must be refused by name on the node that receives it. Disabled until the
+# receive side validates; on this tree it is written, 64 bytes past the zone.
+add_test(NAME shmem.progress.forged-get-reply
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+          OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+          OSOE_TEST_FORGE=get-reply
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
+          $<TARGET_FILE:shmem_test_progress>)
+set_tests_properties(shmem.progress.forged-get-reply PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "osoe_fatal: a get reply from node 0"
+  FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE"
+  DISABLED TRUE)
 
 # The connection area across the PEs of a node (tier 2). The local lead creates
 # it and the others open it, which is §3.12's arrangement. Not an
@@ -343,6 +362,74 @@ function(osoe_tier2_test name)
     set_tests_properties(shmem.${name}.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
   endforeach()
 endfunction()
+
+# A tier-2 test over a logical node map (§8.1) rather than a PE count: for
+# what only exists between nodes. Built like osoe_tier2_test, with the segment
+# reader, so it can read the control segment's metrics by name.
+function(osoe_tier2_map_test name map)
+  if(NOT TARGET shmem_test_${name})
+    add_executable(shmem_test_${name} test-${name}.c
+      ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+    target_include_directories(shmem_test_${name} PRIVATE
+      ${PROJECT_SOURCE_DIR}/tools/stat)
+    target_link_libraries(shmem_test_${name} PRIVATE osoe rt)
+    osoe_warnings(shmem_test_${name})
+  endif()
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.${name}.${label}
+    COMMAND ${CMAKE_COMMAND} -E env ${ARGN}
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_${name}>)
+  set_tests_properties(shmem.${name}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endfunction()
+
+# A quiesced pair falls silent (§3.4; review round two, C1). Fails on the tree
+# before slice 2's acknowledgement protocol with ~1,250 header-only segments in
+# the idle half second, so it is registered disabled until that lands.
+osoe_tier2_map_test(ack-echo 0,1)
+set_tests_properties(shmem.ack-echo.0-1 PROPERTIES DISABLED TRUE)
+
+# A reply is not starved by puts (§3.8's DRAINING state; review round two, C7):
+# one getter on node 0, the get's target and five writers on node 1, the
+# smallest connection §3.4 allows. Registered disabled until the pre-open drain.
+osoe_tier2_map_test(reply-starvation 0,1,1,1,1,1,1
+  OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096)
+set_tests_properties(shmem.reply-starvation.0-1-1-1-1-1-1 PROPERTIES DISABLED TRUE)
+
+# An internode quiet sweeps (§4.10; review round two, D2): node 1 is stopped,
+# PE 0 quiets toward it, PE 1 sees it blocked in osoe-stat and dies, and PE 0's
+# next sweep must end the job naming shmem_quiet. -k leaves the survivors to the
+# library. Registered disabled until the AM wait loops sweep.
+add_executable(shmem_test_unswept-wait test-unswept-wait.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_unswept-wait PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_unswept-wait PRIVATE osoe rt)
+osoe_warnings(shmem_test_unswept-wait)
+add_test(NAME shmem.unswept-wait
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_WATCHDOG=1 OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+          $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 15 -k --
+          $<TARGET_FILE:shmem_test_unswept-wait>)
+set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_quiet: local PE 1 [(]rank 1"
+  FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED"
+  DISABLED TRUE)
+
+# The reply descriptor pool (§3.8; review round two, D1). The review's scenario
+# at C = 2 must complete; with the target given a smaller credit than the
+# origin, the pool overflows and the target must say so by name. Both disabled
+# until the pool is sized by §3.8's formula: on this tree the first drops a get
+# request and times out, and the second drops one silently.
+osoe_tier2_map_test(reply-pool 0,0,0,1 OSOE_AM_CREDITS=2)
+set_tests_properties(shmem.reply-pool.0-0-0-1 PROPERTIES DISABLED TRUE)
+add_test(NAME shmem.reply-pool.overflow
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow
+          $<TARGET_FILE:osoe-launch> -n 8 -m 0,0,0,0,0,0,0,1 -t 30
+          -e 7:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
+set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*from node 0"
+  DISABLED TRUE)
 
 osoe_tier2_test(init)
 osoe_tier2_test(fork)

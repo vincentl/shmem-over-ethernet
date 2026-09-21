@@ -121,6 +121,30 @@ static inline int osoe_invariants_ok(void)
     return osoe_invariants_ok_session(0);
 }
 
+/*
+ * One node-scope metric of this PE's own node, by name, through the same reader:
+ * how a test sees what the library counts but does not return, such as
+ * `transport.am.header_only_sent`. Returns 0 and prints why if the segment or
+ * the name cannot be read, so a test that misspells a metric fails rather than
+ * reading zero.
+ */
+static inline int osoe_test_node_metric(const char *metric, uint64_t *value)
+{
+    char name[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(name, sizeof name, 0);
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, name, err, sizeof err) != 0) {
+        fprintf(stderr, "node metric %s: %s\n", metric, err);
+        return 0;
+    }
+    const struct osoe_metric_descriptor *m = s.table_usable ? osoe_segment_metric(&s, metric) : NULL;
+    int ok = m && m->scope == OSOE_MSCOPE_NODE && osoe_segment_read(&s, m, 0, value);
+    if (!ok)
+        fprintf(stderr, "node metric %s: not a readable node-scope metric of %s\n", metric, s.name);
+    osoe_segment_close(&s);
+    return ok;
+}
+
 #define CHECK_INVARIANTS() CHECK(osoe_invariants_ok())
 #define CHECK_INVARIANTS_SESSION(k) CHECK(osoe_invariants_ok_session(k))
 
