@@ -1135,6 +1135,16 @@ headers would pass whenever the library agreed with itself.
 - **Per connection, at read time:** TCP round-trip time, retransmits, and congestion
   window. These separate "the network is slow" from "osoe is slow".
 
+*As built (layout 8):* node totals, not yet per peer — `transport.am.segments_sent`,
+`header_only_sent`, `segments_applied`, `messages_applied`,
+`reply_reservation_failures`, and the high-water marks of the deepest control
+and bulk queue of any connection and of the node's descriptor pool. They are
+fields of the node header written by the lead's progress thread alone, the
+single-writer case of §3.16. They exist first because two protocols could not
+otherwise be seen working: an acknowledgement echo (§3.4) and an exhausted reply
+pool (§3.8) have no effect a test can observe except these counts. The
+per-connection scope this question asks for is the next step.
+
 **3. Are aggregation and progress healthy?**
 
 - Publication-window stalls, count and duration (§3.6).

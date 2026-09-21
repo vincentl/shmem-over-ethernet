@@ -26,7 +26,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 7
+#define OSOE_NODE_LAYOUT 8
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -209,6 +209,37 @@ _Static_assert(sizeof(struct osoe_arrival_handoff) == OSOE_CACHELINE,
                "each team's handoff word sits alone on its cache line, as its "
                "epoch counters do (§5.3)");
 
+/*
+ * The AM layer's node-wide counters (§3.14), exported under `transport.am.*`.
+ *
+ * Everything they count - segments, the reply pool and queues - is private to
+ * the lead's progress thread (§3.12), and until layout 8 so were the counts: a
+ * test could not see the acknowledgement protocol echo, or the reply pool run
+ * dry, except by the job misbehaving. This is the smallest export that lets a
+ * test see both. Node scope only: one record per node, written by that one
+ * thread, so every field is a single-writer publication (§3.16) and a reader
+ * accepts a value a moment stale. A per-connection scope is the next step.
+ *
+ * Zero on a node whose job never goes internode, and in any build whose
+ * backend is not AM - the fields are a backend's private counters, which §3.14
+ * gives the `transport.<backend>.*` names so they cannot be mistaken for the
+ * boundary's own.
+ */
+struct osoe_am_node_metrics {
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint64_t segments_sent;
+    _Atomic uint64_t header_only_sent;        /* §3.4's ack-only segments, among those */
+    _Atomic uint64_t segments_applied;
+    _Atomic uint64_t messages_applied;
+    /* §3.8's fallible path, taken: a request found the descriptor pool empty. */
+    _Atomic uint64_t reply_reservation_failures;
+    /* The deepest any one connection's queue has been, and the most
+     * descriptors the node-wide pool has had out at once. */
+    _Atomic uint64_t control_queue_high_water;
+    _Atomic uint64_t bulk_queue_high_water;
+    _Atomic uint64_t pool_high_water;
+};
+
 struct osoe_node_header {
     /* Written by the lead before `ready`; constant afterwards. */
     struct osoe_segment_directory dir;
@@ -253,6 +284,9 @@ struct osoe_node_header {
 
     /* Appended at layout 7 (§5.3). */
     struct osoe_arrival_handoff arrival[OSOE_TEAMS];
+
+    /* Appended at layout 8. */
+    struct osoe_am_node_metrics am;
 };
 
 /*

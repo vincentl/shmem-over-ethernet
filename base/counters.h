@@ -51,6 +51,23 @@ static inline void osoe_counter_max(struct osoe_counter_block *b, unsigned i, ui
         atomic_store_explicit(&b->c[i], v, memory_order_release);
 }
 
+/*
+ * The same two operations on a lone counter word rather than a block slot, for
+ * a record with one writer thread that is not a thread's own block - the node
+ * header's AM counters, whose writer is the lead's progress thread (§3.12).
+ */
+static inline void osoe_counter_word_add(_Atomic uint64_t *w, uint64_t n)
+{
+    uint64_t v = atomic_load_explicit(w, memory_order_acquire);
+    atomic_store_explicit(w, v + n, memory_order_release);
+}
+
+static inline void osoe_counter_word_max(_Atomic uint64_t *w, uint64_t v)
+{
+    if (v > atomic_load_explicit(w, memory_order_acquire))
+        atomic_store_explicit(w, v, memory_order_release);
+}
+
 /* Any thread or process. */
 static inline uint64_t osoe_counter_read(const struct osoe_counter_block *b, unsigned i)
 {

@@ -58,17 +58,28 @@ static void *destination(void *context, const struct osoe_message_header *header
  * reaping, which is what makes §3.7's "never reserve" satisfiable without any
  * blocking path at all.
  */
-static void enqueue(struct osoe_progress *p, struct osoe_reply_queue *q,
+/* The node-wide high-water marks (§3.14), after a push: the deepest this
+ * connection's queues have been, and the most descriptors out at once. */
+static void note_high_water(struct osoe_progress *p, uint32_t slot)
+{
+    const struct osoe_reply_queues *q = &p->connection[slot].queues;
+    osoe_counter_word_max(&p->metrics->control_queue_high_water, q->control.high_water);
+    osoe_counter_word_max(&p->metrics->bulk_queue_high_water, q->bulk.high_water);
+    osoe_counter_word_max(&p->metrics->pool_high_water, p->pool.high_water);
+}
+
+static void enqueue(struct osoe_progress *p, uint32_t slot, struct osoe_reply_queue *q,
                     const struct osoe_reply *value)
 {
     uint32_t i = osoe_reply_take(&p->pool);
     if (i == OSOE_REPLY_NONE) {
-        p->reply_reservation_failures++;
+        osoe_counter_word_add(&p->metrics->reply_reservation_failures, 1);
         return;
     }
     struct osoe_reply *r = osoe_reply_at(&p->pool, i);
     *r = *value;
     osoe_reply_push(&p->pool, q, i);
+    note_high_water(p, slot);
 }
 
 /*
@@ -83,8 +94,9 @@ static void enqueue(struct osoe_progress *p, struct osoe_reply_queue *q,
  * epoch counter nothing will advance - in both cases a silent hang whose
  * symptom appears on the other nodes.
  */
-static void enqueue_collective(struct osoe_progress *p, struct osoe_reply_queue *q,
-                               const struct osoe_reply *value, uint32_t peer)
+static void enqueue_collective(struct osoe_progress *p, uint32_t slot,
+                               struct osoe_reply_queue *q, const struct osoe_reply *value,
+                               uint32_t peer)
 {
     uint32_t i = osoe_reply_take(&p->pool);
     if (i == OSOE_REPLY_NONE)
@@ -93,6 +105,7 @@ static void enqueue_collective(struct osoe_progress *p, struct osoe_reply_queue 
     struct osoe_reply *r = osoe_reply_at(&p->pool, i);
     *r = *value;
     osoe_reply_push(&p->pool, q, i);
+    note_high_water(p, slot);
 }
 
 /* Publish a landing zone's completion: length or value, then ready, then the
@@ -111,7 +124,7 @@ static void complete(void *context, const struct osoe_message_header *header,
     struct arrival *a = context;
     struct osoe_progress *p = a->progress;
     struct osoe_progress_connection *c = &p->connection[a->slot];
-    p->messages_applied++;
+    osoe_counter_word_add(&p->metrics->messages_applied, 1);
 
     switch (header->kind) {
     case OSOE_AM_PUT: {
@@ -135,7 +148,7 @@ static void complete(void *context, const struct osoe_message_header *header,
                                 .origin_pe = m.origin_pe, .target_pe = m.target_pe,
                                 .length = m.length, .sent = 0, .offset = m.offset,
                                 .token = m.token };
-        enqueue(p, &c->queues.bulk, &r);
+        enqueue(p, a->slot, &c->queues.bulk, &r);
         break;
     }
 
@@ -164,7 +177,7 @@ static void complete(void *context, const struct osoe_message_header *header,
             struct osoe_reply r = { .kind = OSOE_REPLY_AMO, .origin_pe = m.origin_pe,
                                     .target_pe = m.target_pe, .length = 0,
                                     .value = previous, .token = m.token };
-            enqueue(p, &c->queues.control, &r);
+            enqueue(p, a->slot, &c->queues.control, &r);
         }
         break;
     }
@@ -229,7 +242,7 @@ static void complete(void *context, const struct osoe_message_header *header,
                 struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE,
                                         .origin_pe = m.team, .length = 0,
                                         .value = m.epoch };
-                enqueue_collective(p, &p->connection[slot].queues.control, &r,
+                enqueue_collective(p, slot, &p->connection[slot].queues.control, &r,
                                    slot < p->node ? slot : slot + 1);
             }
             p->host.release(p->host.context, m.team, m.epoch);
@@ -271,7 +284,7 @@ static void segment_applied(void *context, const struct osoe_am_segment_header *
     struct arrival *a = context;
     struct osoe_progress *p = a->progress;
     struct osoe_progress_connection *c = &p->connection[a->slot];
-    p->segments_applied++;
+    osoe_counter_word_add(&p->metrics->segments_applied, 1);
 
     /*
      * Applied, not merely received: §4.6 makes that the difference, because a
@@ -481,7 +494,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
             osoe_connection_release(conn, c->sending);
             c->state[c->sending] = OSOE_BUFFER_FREE;
             c->sending = OSOE_CONNECTION_NONE;
-            p->segments_sent++;
+            osoe_counter_word_add(&p->metrics->segments_sent, 1);
             moved = true;
         }
     }
@@ -514,7 +527,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
             atomic_load_explicit(&conn->s->buffer[c->open].head, memory_order_acquire));
         if (used > header || c->owe_ack) {
             if (used == header)
-                p->acks_only++;     /* a header-only segment: §3.4's ack-only */
+                osoe_counter_word_add(&p->metrics->header_only_sent, 1);   /* §3.4's ack-only */
             osoe_connection_seal(conn, c->open);
             c->state[c->open] = OSOE_BUFFER_SEALED_STATE;
             c->sealed = c->open;
@@ -554,6 +567,7 @@ void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *ar
     p->node = area->node;
     p->nodes = area->nodes;
     p->host = *host;
+    p->metrics = &p->own_metrics;
     osoe_reply_pool_init(&p->pool, descriptors, descriptor_count);
 }
 
@@ -668,7 +682,7 @@ void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch
             for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
                 struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE, .origin_pe = team,
                                         .length = 0, .value = epoch };
-                enqueue_collective(p, &p->connection[slot].queues.control, &r,
+                enqueue_collective(p, slot, &p->connection[slot].queues.control, &r,
                                    slot < p->node ? slot : slot + 1);
             }
             p->host.release(p->host.context, team, epoch);
@@ -688,7 +702,7 @@ void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch
         osoe_fatal("no connection to the collective root, node %u", root);
     struct osoe_reply r = { .kind = OSOE_REPLY_ARRIVE, .origin_pe = team,
                             .length = 0, .value = epoch };
-    enqueue_collective(p, &p->connection[slot].queues.control, &r, root);
+    enqueue_collective(p, slot, &p->connection[slot].queues.control, &r, root);
 }
 
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer)

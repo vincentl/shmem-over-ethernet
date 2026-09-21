@@ -108,10 +108,14 @@ struct osoe_progress {
     uint32_t participants[OSOE_TEAMS];
     uint64_t barrier_arrivals;
 
-    /* §3.14 counters, read by osoe-stat and by the tests. */
-    uint64_t segments_sent, segments_applied, messages_applied;
-    uint64_t reply_reservation_failures;        /* the fallible path, taken */
-    uint64_t acks_only;                         /* header-only segments sent */
+    /*
+     * §3.14 counters, read by osoe-stat and by the tests: the node header's
+     * `am` record when running inside a job (progress-host.c binds it), and
+     * `own_metrics` until then, so that the loop counts the same way whether
+     * or not there is a control segment to count into.
+     */
+    struct osoe_am_node_metrics *metrics;
+    struct osoe_am_node_metrics own_metrics;
 };
 
 /*

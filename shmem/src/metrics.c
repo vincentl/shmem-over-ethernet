@@ -182,6 +182,21 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("node.failed", failed, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     NDDIR("node.local_count", local_count, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
     NDDIR("node.blocks_per_pe", blocks_per_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
+    /* The AM layer's node-wide counters (node.h, layout 8). */
+    ND("transport.am.segments_sent", am.segments_sent, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.header_only_sent", am.header_only_sent, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.segments_applied", am.segments_applied, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.messages_applied", am.messages_applied, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.reply_reservation_failures", am.reply_reservation_failures, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.control_queue_high_water", am.control_queue_high_water, OSOE_MTYPE_U64,
+       OSOE_MKIND_HIGHWATER, ""),
+    ND("transport.am.bulk_queue_high_water", am.bulk_queue_high_water, OSOE_MTYPE_U64,
+       OSOE_MKIND_HIGHWATER, ""),
+    ND("transport.am.pool_high_water", am.pool_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, ""),
 };
 
 enum {

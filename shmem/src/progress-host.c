@@ -249,6 +249,8 @@ void osoe_progress_host_start(uint32_t session)
     osoe_progress_init(&osoe.progress, &osoe.area, osoe.wire, osoe.descriptor,
                        descriptors, osoe.scratch, (uint32_t)osoe.area.chunk_bytes,
                        &host);
+    /* Count into the control segment, where osoe-stat and the tests read it. */
+    osoe.progress.metrics = &osoe.node.hdr->am;
     osoe_progress_attach(&osoe.progress, osoe.connection);
     for (uint32_t team = 0; team < OSOE_TEAMS; team++)
         consumed[team] = 0;

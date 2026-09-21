@@ -460,8 +460,8 @@ int main(void)
 
     /* Every applied rmw notifies; a put notifies best effort (§4.10). */
     CHECK(notifies >= 3);
-    CHECK(p.messages_applied >= 4);
-    CHECK(p.segments_applied >= 1);
+    CHECK(atomic_load_explicit(&p.metrics->messages_applied, memory_order_acquire) >= 4);
+    CHECK(atomic_load_explicit(&p.metrics->segments_applied, memory_order_acquire) >= 1);
     /* Acknowledgements advance: §4.6 makes a peer's acknowledgement the
      * origin's evidence that its writes are in place. */
     CHECK(osoe_progress_acked(&p, peer) > 0);

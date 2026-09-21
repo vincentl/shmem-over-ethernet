@@ -147,8 +147,11 @@ struct osoe_segment {
 int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen);
 void osoe_segment_close(struct osoe_segment *s);
 
-/* The layout this reader was built against. Not a requirement - see above. */
-#define OSOE_SEGMENT_KNOWN_LAYOUT 7
+/* The layout this reader was built against. Not a requirement - see above.
+ * Layout 8 only appended the AM counters, which a reader finds by name, so a
+ * reader built for 7 prints them unchanged and differs only in showing the
+ * watch word raw, with "encoding unknown", rather than decoded. */
+#define OSOE_SEGMENT_KNOWN_LAYOUT 8
 
 /* The metric of that name, or NULL. */
 const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name);
