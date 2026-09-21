@@ -27,6 +27,21 @@ if(BUILD_SHARED_LIBS)
   set_tests_properties(shmem.profiling_aliases PROPERTIES LABELS "tier1" TIMEOUT 30)
 endif()
 
+# A static build is not one of the four presets (none sets BUILD_SHARED_LIBS),
+# so this proves it on its own: a nested configure and build of libosoe as a
+# static archive, then a link of a tiny consumer against that archive alone -
+# never against osoe_base, which is never installed. Portability review F10:
+# before osoe_base became an OBJECT library, this failed with over a hundred
+# undefined references.
+add_test(NAME shmem.static-link
+  COMMAND ${CMAKE_COMMAND}
+          -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/static-link-check
+          -DPROBE_SRC=${CMAKE_CURRENT_SOURCE_DIR}/static-link-probe.c
+          -DC_COMPILER=${CMAKE_C_COMPILER}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckStaticLink.cmake)
+set_tests_properties(shmem.static-link PROPERTIES LABELS "tier1" TIMEOUT 180)
+
 # The allocator on its own (tier 1): compiled in, since libosoe hides it.
 add_executable(shmem_test_allocator test-allocator.c ../src/allocator.c)
 target_include_directories(shmem_test_allocator PRIVATE ../src)

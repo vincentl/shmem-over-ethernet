@@ -1,5 +1,10 @@
 # base: internal building blocks linked into libosoe. Never installed.
-add_library(osoe_base STATIC
+#
+# An OBJECT library, not STATIC: target_link_libraries() then folds its object
+# files into whatever links osoe_base, archive included, so a static libosoe.a
+# carries osoe_base's own objects rather than merely recording a dependency on
+# a second archive nobody installs (portability review, F10).
+add_library(osoe_base OBJECT
   counters.h
   deadline.c
   environment.c
