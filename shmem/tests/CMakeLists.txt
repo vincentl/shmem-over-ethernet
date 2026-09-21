@@ -712,6 +712,22 @@ add_test(NAME shmem.refuse.size_mismatch
           -- $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.refuse.size_mismatch PROPERTIES
   PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE differs between PEs")
+# The deprecated SMA_ spelling (spec §8, Annex F) must be honoured the same
+# way, down to the same validation (conformance review F3): before F3's fix,
+# bootstrap.c read SHMEM_SYMMETRIC_SIZE only and SMA_SYMMETRIC_SIZE=12q was
+# silently ignored, so this job would have run instead of refusing.
+add_test(NAME shmem.refuse.bad_size_sma
+  COMMAND osoe-launch -n 2 -t 60 -e 0:SMA_SYMMETRIC_SIZE=12q -e 1:SMA_SYMMETRIC_SIZE=12q
+          -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.refuse.bad_size_sma PROPERTIES
+  PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE='12q' is invalid")
+# A zero heap is syntactically valid and never useful (conformance review F9 /
+# omissions 11): every shmem_malloc would fail on every PE.
+add_test(NAME shmem.refuse.zero_size
+  COMMAND osoe-launch -n 1 -t 60 -e 0:SHMEM_SYMMETRIC_SIZE=0
+          -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.refuse.zero_size PROPERTIES
+  PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE='0' is 0")
 # Destroying a predefined team is undefined by spec §9.4.8, and undefined is
 # loud here: no other team can exist, so every call naming one is a program bug.
 add_executable(shmem_test_bad_team test-bad-team.c)
@@ -731,5 +747,6 @@ add_test(NAME shmem.refuse.nonsymmetric_put
 set_tests_properties(shmem.refuse.nonsymmetric_put PROPERTIES
   PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap")
 set_tests_properties(shmem.refuse.no_launcher shmem.refuse.bad_size
+  shmem.refuse.bad_size_sma shmem.refuse.zero_size
   shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
   LABELS "tier2" TIMEOUT 90)

@@ -100,11 +100,19 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     }
 
 
-    const char *size = getenv("SHMEM_SYMMETRIC_SIZE");
+    const char *size = spec_env("SYMMETRIC_SIZE");
     b->symmetric_size = OSOE_DEFAULT_SYMMETRIC_SIZE;
     if (size && osoe_parse_size(size, &b->symmetric_size) != 0)
         osoe_fatal("SHMEM_SYMMETRIC_SIZE='%s' is invalid: expected a non-negative "
                    "decimal number with an optional k, m, g or t multiplier", size);
+    /* A zero heap is syntactically valid (§8 does not say otherwise) but never
+     * useful: every shmem_malloc then fails on every PE, and the first
+     * dereference of the NULL it returns segfaults far from the cause
+     * (conformance review F9 / omissions 11). Usually it is a script's
+     * unset-variable arithmetic gone wrong, so say so here instead. */
+    if (size && b->symmetric_size == 0)
+        osoe_fatal("SHMEM_SYMMETRIC_SIZE='%s' is 0; a job with no symmetric heap cannot "
+                   "run any OpenSHMEM program", size);
     /* The §4.9 watch word names an offset within a region, and stops filtering
      * above what it can address: a watch in a larger heap would saturate to the
      * whole region and wake on every write. Refuse the size rather than lose
