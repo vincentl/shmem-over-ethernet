@@ -64,7 +64,7 @@ int main(void)
      * the worse failure.
      */
     uint64_t *heap = shmem_malloc(sizeof *heap);
-    CHECK(heap != NULL);
+    CHECK_FATAL(heap != NULL);  /* NULL would be dereferenced (*heap = 0) below */
     int automatic = 0;
     for (int i = 0; i < n; i++)
         CHECK(shmem_addr_accessible(heap, i) == 1);
@@ -114,10 +114,10 @@ int main(void)
     CHECK(_num_pes() == n);
 
     char *old_style = shmalloc(64);
-    CHECK(old_style != NULL);
+    CHECK_FATAL(old_style != NULL);  /* NULL would be dereferenced just below */
     memset(old_style, 0x7e, 64);
     char *grown = shrealloc(old_style, 256);
-    CHECK(grown != NULL);
+    CHECK_FATAL(grown != NULL);      /* NULL would be indexed by the very next check */
     CHECK((unsigned char)grown[0] == 0x7e && (unsigned char)grown[63] == 0x7e);
     shmem_free(grown);                  /* freed with the modern spelling */
 

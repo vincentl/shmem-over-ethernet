@@ -212,7 +212,7 @@ int main(void)
     osoe_connection_area_open(&area, &b, 2, 0);
 
     struct osoe_connection *c = osoe_connection_to(&area, peer);
-    CHECK(c != NULL);
+    CHECK_FATAL(c != NULL);  /* a non-lead PE dereferences it below via post() */
     arrivals_open();
 
     /*

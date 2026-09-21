@@ -31,7 +31,7 @@ int main(void)
     bool in_wait = which && strcmp(which, "wait_until") == 0;
 
     uint64_t *flag = shmem_malloc(sizeof *flag);
-    CHECK(flag);
+    CHECK_FATAL(flag);  /* NULL would be dereferenced just below */
     *flag = 0;
     shmem_barrier_all();
 

@@ -63,7 +63,7 @@ int main(void)
 
     unsigned char *buf = shmem_malloc(N);
     uint64_t *flag = shmem_malloc(sizeof *flag);
-    CHECK(buf && flag);
+    CHECK_FATAL(buf && flag);  /* NULL would be dereferenced just below */
     memset(buf, 0, N);
     *flag = 0;
     shmem_barrier_all();

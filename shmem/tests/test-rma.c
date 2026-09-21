@@ -26,7 +26,7 @@ static void pairwise(size_t size)
     int me = shmem_my_pe(), n = shmem_n_pes();
     unsigned char *buf = shmem_malloc(size * (size_t)n);
     unsigned char *tmp = malloc(size);
-    CHECK(buf != NULL && tmp != NULL);
+    CHECK_FATAL(buf != NULL && tmp != NULL);  /* NULL would be dereferenced just below */
     /* Clear the local copy, then synchronize: without the barrier, another PE
      * could already be putting into this copy while it is being cleared. */
     memset(buf, 0, size * (size_t)n);
@@ -85,7 +85,8 @@ int main(void)
     for (int i = 0; i < ALLOCS; i += 3)
         addr[i] = (uintptr_t)shmem_malloc((size_t)(i * 11 % 300 + 1));
     uintptr_t *table = shmem_malloc(sizeof addr * (size_t)n);
-    CHECK(table != NULL);
+    CHECK_FATAL(table != NULL);  /* NULL would be dereferenced by the puts and the
+                                  * memcmp below */
     for (int t = 0; t < n; t++)
         shmem_putmem(table + me * ALLOCS, addr, sizeof addr, t);
     shmem_barrier_all();
@@ -104,7 +105,7 @@ int main(void)
      * own element on every PE, and the barrier's serializing store makes the
      * stores visible before anyone reads (§4.6). */
     int *flags = shmem_malloc(sizeof(int) * (size_t)n);
-    CHECK(flags != NULL);
+    CHECK_FATAL(flags != NULL);  /* NULL would be dereferenced (flags[w]) below */
     for (int t = 0; t < n; t++) {
         int *p = shmem_ptr(flags, t);
         CHECK(p != NULL);

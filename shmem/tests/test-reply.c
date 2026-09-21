@@ -257,9 +257,11 @@ int main(void)
      */
     osoe_credit_init(&shared_credit, CREDITS);
 
+    /* A failed create leaves th[i] undefined, and every th[] is joined below
+     * unconditionally - joining an undefined pthread_t is not survivable. */
     pthread_t th[THREADS];
     for (int i = 0; i < THREADS; i++)
-        CHECK(pthread_create(&th[i], NULL, hammer, NULL) == 0);
+        CHECK_FATAL(pthread_create(&th[i], NULL, hammer, NULL) == 0);
     for (int i = 0; i < THREADS; i++)
         pthread_join(th[i], NULL);
 

@@ -117,8 +117,8 @@ int main(void)
     size_t stride = CHUNKED;
     unsigned char *inbox = shmem_malloc(stride * (size_t)npes);
     unsigned char *source = malloc(stride);
-    CHECK(inbox != NULL);
-    CHECK(source != NULL);
+    CHECK_FATAL(inbox != NULL);  /* NULL would be dereferenced just below */
+    CHECK_FATAL(source != NULL);
     memset(inbox, 0, stride * (size_t)npes);
     shmem_barrier_all();
 
@@ -271,7 +271,7 @@ int main(void)
      * actually left there rather than a torn mix.
      */
     long *counter_cell = shmem_malloc(sizeof *counter_cell);
-    CHECK(counter_cell != NULL);
+    CHECK_FATAL(counter_cell != NULL);  /* NULL would be dereferenced just below */
     *counter_cell = 0;
     shmem_barrier_all();
     for (int to = 0; to < npes; to++)
@@ -301,7 +301,7 @@ int main(void)
      * would break if the fence were dropped.
      */
     uint64_t *signal = shmem_malloc(sizeof *signal);
-    CHECK(signal != NULL);
+    CHECK_FATAL(signal != NULL);  /* NULL would be dereferenced just below */
     *signal = 0;
     memset(inbox, 0, stride * (size_t)npes);
     shmem_barrier_all();

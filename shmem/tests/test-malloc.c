@@ -27,7 +27,7 @@ int main(void)
     arrivals_arrive(me);
     char *a = shmem_malloc(1000);
     CHECK(arrivals_left_after_all(n));
-    CHECK(a != NULL && (uintptr_t)a % 16 == 0);
+    CHECK_FATAL(a != NULL && (uintptr_t)a % 16 == 0);  /* NULL would be dereferenced just below */
     memset(a, 0xab, 1000);
 
     /* free barriers on entry. */

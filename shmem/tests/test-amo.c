@@ -38,7 +38,7 @@ static void contended_fetch_add(int me, int n)
     if (me == 0) {
         CHECK(*counter == (uint64_t)ROUNDS * (uint64_t)n);
         char *hit = calloc(ROUNDS * (size_t)n, 1);
-        CHECK(hit != NULL);
+        CHECK_FATAL(hit != NULL);   /* NULL would be indexed just below */
         int bad = 0;
         for (size_t i = 0; i < ROUNDS * (size_t)n; i++) {
             if (seen[i] >= ROUNDS * (uint64_t)n || hit[seen[i]])

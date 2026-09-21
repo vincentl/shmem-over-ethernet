@@ -47,7 +47,7 @@ static int me, npes;
     do {                                                                            \
         enum { N = 8 };                                                             \
         T *v = shmem_malloc(N * sizeof *v);                                         \
-        CHECK(v != NULL);                                                           \
+        CHECK_FATAL(v != NULL);   /* NULL would be indexed just below */            \
         size_t idx[N];                                                              \
         int st[N];                                                                  \
         T want[N];                                                                  \
@@ -159,7 +159,7 @@ static int me, npes;
 #define SHORT_COVERAGE(T, NAME)                                                     \
     do {                                                                            \
         T *v = shmem_malloc(sizeof *v);                                             \
-        CHECK(v != NULL);                                                           \
+        CHECK_FATAL(v != NULL);   /* NULL would be dereferenced just below */       \
         *v = (T)5;                                                                  \
         shmem_barrier_all();                                                        \
         CHECK(shmem_##NAME##_test(v, SHMEM_CMP_EQ, (T)5) == 1);                     \
@@ -229,8 +229,10 @@ static void watched_span(uint64_t *v)
     struct osoe_segment s;
     if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
-        CHECK(0);
-        return;
+        /* Returning here skips the release AMO below, which PE 1 is already
+         * blocked in shmem_uint64_wait_until_some waiting for - it would then
+         * never return. */
+        CHECK_FATAL(0);
     }
 
     /* The array is symmetric, so its offset from the heap base is the same on
@@ -411,7 +413,7 @@ int main(void)
     short_across_pes();
 
     uint64_t *v = shmem_malloc(SPAN_N * sizeof *v);
-    CHECK(v != NULL);
+    CHECK_FATAL(v != NULL);  /* NULL would be dereferenced throughout blocking() */
     if (npes >= 2)
         blocking(v);
     shmem_free(v);

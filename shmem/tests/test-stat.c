@@ -155,7 +155,7 @@ int main(void)
     osoe_test_segment_name(segment, sizeof segment, 0);
 
     uint64_t *flag = shmem_malloc(sizeof *flag);
-    CHECK(flag != NULL);
+    CHECK_FATAL(flag != NULL);  /* NULL would be dereferenced just below */
     *flag = 0;
     shmem_barrier_all();
 

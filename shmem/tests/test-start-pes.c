@@ -42,7 +42,7 @@ int main(void)
 
     /* The library really is up. */
     uint64_t *v = shmalloc(sizeof *v);
-    CHECK(v != NULL);
+    CHECK_FATAL(v != NULL);  /* NULL would be dereferenced just below */
     *v = 0;
     shmem_barrier_all();
     shmem_uint64_atomic_add(v, 1, (me + 1) % n);

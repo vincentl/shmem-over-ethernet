@@ -38,7 +38,7 @@ static int me, npes, right;
 #define STANDARD_AND_EXTENDED(T, NAME)                                              \
     do {                                                                            \
         T *a = shmem_malloc(2 * sizeof *a);                                         \
-        CHECK(a != NULL);                                                           \
+        CHECK_FATAL(a != NULL);      /* NULL would be dereferenced just below */    \
         a[0] = (T)0;                                                                \
         a[1] = (T)0x5a;                         /* the guard */                     \
         shmem_barrier_all();                                                        \
@@ -86,7 +86,7 @@ static int me, npes, right;
 #define SIGNED_ROUNDTRIP(T, NAME)                                                   \
     do {                                                                            \
         T *a = shmem_malloc(2 * sizeof *a);                                         \
-        CHECK(a != NULL);                                                           \
+        CHECK_FATAL(a != NULL);      /* NULL would be dereferenced just below */    \
         a[0] = (T)0;                                                                \
         a[1] = (T)0x5a;                                                             \
         shmem_barrier_all();                                                        \
@@ -112,7 +112,7 @@ static int me, npes, right;
 #define BITWISE(T, NAME)                                                            \
     do {                                                                            \
         T *a = shmem_malloc(2 * sizeof *a);                                         \
-        CHECK(a != NULL);                                                           \
+        CHECK_FATAL(a != NULL);      /* NULL would be dereferenced just below */    \
         a[1] = (T)0x5a;                                                             \
         shmem_barrier_all();                                                        \
         shmem_##NAME##_atomic_set(a, (T)0, me);                                     \
@@ -147,7 +147,7 @@ static int me, npes, right;
 #define FLOATING(T, NAME, NOTINT, OTHER)                                            \
     do {                                                                            \
         T *a = shmem_malloc(2 * sizeof *a);                                         \
-        CHECK(a != NULL);                                                           \
+        CHECK_FATAL(a != NULL);      /* NULL would be dereferenced just below */    \
         a[0] = (T)0;                                                                \
         a[1] = (T)-3.25;                                                            \
         shmem_barrier_all();                                                        \

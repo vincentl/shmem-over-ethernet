@@ -73,7 +73,10 @@ int main(void)
 {
     struct osoe_bootstrap b = { 0 };
     osoe_bootstrap_read(&b);
-    CHECK(b.node_count >= 3 && b.node_count <= MAX_NODES);
+    /* Out of range here overruns the fixed-size wires[MAX_NODES] below, or
+     * under-populates it against the node_count the internode phase then
+     * arrives and waits against. */
+    CHECK_FATAL(b.node_count >= 3 && b.node_count <= MAX_NODES);
 
     struct osoe_connection_area area;
     osoe_connection_area_open(&area, &b, b.node_count, 0);
@@ -95,7 +98,10 @@ int main(void)
             continue;
         osoe_wire_open(&wires[peers++], &b, n, 0);
     }
-    CHECK(peers == b.node_count - 1);
+    /* Fewer wires than nodes means the internode phase below arrives and waits
+     * against a peer count it has no wire to hear back from - a wait that
+     * cannot be satisfied by the peers it actually opened. */
+    CHECK_FATAL(peers == b.node_count - 1);
 
     static struct osoe_reply descriptors[DESCRIPTORS];
     static unsigned char scratch[SCRATCH];
