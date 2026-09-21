@@ -1,6 +1,8 @@
 # OpenSHMEM over Ethernet: Design Notes
 
-**Status:** Path-finding. No implementation. Decisions recorded with rationale so
+**Status:** Phase 1 in progress. Step 1 (one node) and step 2 (the active-message
+layer, over a shared-memory stand-in for the wire) are implemented; sockets and
+io_uring (step 3) onward are design only. Decisions recorded with rationale so
 that they are not silently reversed.
 
 **Project:** osoe (OpenSHMEM Over Ethernet) — installs `libosoe` and the spec's
@@ -22,7 +24,9 @@ that they are not silently reversed.
   scale with node count.
 - Target hardware: Raspberry Pi cluster. Design must also remain usable at 256
   PEs per node and hundreds of nodes.
-- PEs are processes. Cores are over-provisioned.
+- PEs are processes. Cores are **not** assumed spare: a Pi runs a PE per core with
+  the node's progress thread beside them, so oversubscription is the normal case
+  (§3.11, §3.12), and nothing may spin.
 - Slurm launch. No PMI link dependency (§6).
 - TCP is acceptable. io_uring is required (kernel 6.7+ for futex ops; Trixie
   ships 6.12).
@@ -318,9 +322,13 @@ filled by the progress thread at seal time):
   lengths. Cross-checking on receipt turns a framing bug into an immediate
   assertion rather than a garbage dispatch 50 MB later.
 
-Each message within a segment is **padded to 8-byte alignment**. On aarch64 an
-unaligned 64-bit atomic faults; an AMO payload at an odd offset crashes rather
-than degrades.
+Each message within a segment is **padded to 8-byte alignment**, so an AMO payload
+is aligned as the specification requires of an AMO target. An earlier draft said an
+unaligned 64-bit atomic faults on aarch64; *measured*, it does not on Linux, which
+leaves EL0 alignment checking off - it silently performs a misaligned, possibly
+line-straddling update (second review, portability F13). The rule stands; its
+reason is that nothing would catch the mistake, so alignment is checked on receipt
+rather than left to a trap.
 
 Buffer size must be at least 2× maximum message size, or aggregation stops
 working at the top of the range. A 64 KB message in a 64 KB buffer means one
@@ -1494,9 +1502,22 @@ Rules:
 - Implicit-order calls (`atomic_load`, `atomic_store`, operator forms) and
   `memory_order_relaxed` are forbidden on protocol words, so every access shows its
   order.
-- Only the four ISO orders. GCC's header also defines `memory_order_acq_rel` and
-  `memory_order_consume`, and an earlier draft used `acq_rel`, but they are
-  extensions and buy nothing here.
+- **Four of the six orders.** ISO C11 (§7.17.3) defines `relaxed`, `consume`,
+  `acquire`, `release`, `acq_rel` and `seq_cst`, all standard. The project uses
+  `acquire`, `release` and `seq_cst` as above, and `relaxed` nowhere on a protocol
+  word. `consume` is promoted to `acquire` by every compiler and buys nothing;
+  `acq_rel` is what a CAS or `fetch_add` would otherwise name, and naming `seq_cst`
+  there keeps one order for every locked operation. (An earlier draft called the
+  last two GCC extensions. They are not; the rule stands, that reason did not.)
+- **A futex word that is its own predicate** — `ready` and `failed` in every
+  segment header, the agent's `ready` — is a third shape. One side stores the word
+  and wakes; the other loads it and sleeps on the value it saw. It is not a
+  Dekker pair: the waiter's second half is the kernel's compare, and `futex_wake`'s
+  own barrier (in its waiters check) supplies the ordering, so `release` would not
+  lose a wake. It is stored **`seq_cst`** all the same, so that its safety does
+  not rest on a detail of the kernel's futex fast path, at the cost of an `xchg`
+  on a word written a handful of times per job. The tree had used both orders for
+  it (second review, atomics F4).
 - Configure fails if the compiler defines `__STDC_NO_ATOMICS__`.
 
 **Why two-sided stores need `seq_cst`.** GCC 14 compiles both `release` and
@@ -1518,7 +1539,9 @@ this shape.
   (review, lead-verified), so invariant 15 holds.
 - **No spin-before-block** (§3.11): there is no ISO C relax hint.
 - **A serializing point** — for `fence` and `quiet` ordering memory stores (§4.8) —
-  is one `seq_cst` store in the calling thread.
+  is one `seq_cst` store in the calling thread. On x86-64 that is an `xchg`, a full
+  barrier. On aarch64 it is an `stlr`, which is *not* one; §4.6 says what that
+  means for fence.
 
 ---
 
@@ -1880,6 +1903,24 @@ made by the calling thread (§9.12.1 and §9.12.2 Notes), and contexts created w
 
 In normal mode `barrier_all` already happened to conform, because its arrival
 `fetch_add` is a locked instruction. The rule makes that deliberate.
+
+**What carries rule 2 on aarch64.** A `seq_cst` store there is an `stlr` (to a
+thread-local word nothing reads, in `base/order.c`). Its release orders every
+earlier access *before* it; it does not keep a *later* plain store from passing it.
+So by the architecture, `store A; shmem_fence(); store B` — two plain stores, the
+intranode put's `memcpy` or a store through `shmem_ptr` — is not ordered by the
+`stlr` alone. Measured (`docs/design/evidence/fence-litmus/`, three threads: a
+writer, a reader, and one contending the data line), on the Apple-silicon
+development VM: with nothing between the two stores the reader saw B without A 921
+times in 40 million rounds; with the `stlr` alone, 0; with the `stlr` and then an
+acquire load, 0; with a `dmb`, 0. So this implementation orders it, and the
+architecture does not promise that another (a Cortex-A72 or A76) will. What the
+architecture does give: when the next thing after fence is a library call, that
+call's first counter update is an acquire load, and an `stlr` followed by an
+`ldar` is ordered, and the `ldar` orders everything after it — so a *put* after
+fence is ordered by architecture, incidentally. A plain store the application
+makes directly after fence is not. Whether rule 2 should become a full barrier
+(`atomic_thread_fence(memory_order_seq_cst)`, one `dmb ish`) is open (§10).
 
 #### Data structures
 
@@ -4479,6 +4520,13 @@ Recorded rather than deleted, so they are not reopened from memory.
   remotely accessible memory" (none does). Still unchecked: the exact semantics of
   the 1.6 session routines if they are ever more than no-ops, and the routines
   beyond phase 1.
+- **Fence's serializing point on aarch64** (§4.6, §3.16). By the architecture a
+  plain store the application makes after `shmem_fence` may become visible before
+  one it made before; the development VM's cores do not reorder it, and a put after
+  fence is ordered only through the next call's counter load. Making the point
+  `atomic_thread_fence(memory_order_seq_cst)` closes it for one `dmb ish` per
+  fence and quiet (an `mfence` on x86-64 in place of the `xchg`). Decide, and run
+  `fence-litmus` on a Pi 4 and a Pi 5 either way.
 
 ### Still open — measurement, once hardware exists
 

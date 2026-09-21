@@ -93,8 +93,8 @@ _Static_assert(sizeof(struct osoe_am_segment_header) == 32, "§3.4 sizes the seg
 
 /*
  * Message header. Every message within a segment is padded to 8-byte
- * alignment: on aarch64 an unaligned 64-bit atomic faults, so an AMO payload at
- * an odd offset crashes rather than degrades (§3.4).
+ * alignment, so an AMO payload is aligned: an unaligned 64-bit atomic does not
+ * fault on aarch64 Linux, it silently straddles (§3.4).
  */
 struct osoe_message_header {
     uint16_t kind;          /* §3.13's compile-time handler enum */

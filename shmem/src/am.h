@@ -66,8 +66,10 @@ enum osoe_am_handler {
 /* ---- The fixed part of each message ---------------------------------- */
 /*
  * Every one is 8-byte aligned and a multiple of 8 long, so a payload following
- * it is aligned too: on aarch64 an unaligned 64-bit atomic faults, so an AMO
- * payload at an odd offset crashes rather than degrades (§3.4).
+ * it is aligned too. The specification requires an aligned AMO target, and an
+ * unaligned 64-bit atomic on aarch64 Linux does *not* fault - it silently makes
+ * a misaligned, possibly line-straddling update - so alignment is checked, not
+ * left to a trap (§3.4).
  */
 
 struct osoe_am_put {

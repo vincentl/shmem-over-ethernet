@@ -1,0 +1,8 @@
+plain      20000000 rounds, 889 saw flag without data (forbidden by fence)
+stlr       20000000 rounds, 0 saw flag without data (forbidden by fence)
+stlr-ldar  20000000 rounds, 0 saw flag without data (forbidden by fence)
+dmb        20000000 rounds, 0 saw flag without data (forbidden by fence)
+plain      20000000 rounds, 32 saw flag without data (forbidden by fence)
+stlr       20000000 rounds, 0 saw flag without data (forbidden by fence)
+stlr-ldar  20000000 rounds, 0 saw flag without data (forbidden by fence)
+dmb        20000000 rounds, 0 saw flag without data (forbidden by fence)

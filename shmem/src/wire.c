@@ -241,8 +241,7 @@ again:;
     if (w->creator) {
         /* ftruncate zeroed it: every counter and futex word starts at 0. The
          * header is written before `ready`, and `ready` is what the peer waits
-         * on - the store is seq_cst because this is the publishing half of a
-         * two-sided protocol (§3.16). */
+         * on - a futex word that is its own predicate, stored seq_cst (§3.16). */
         h->capacity = w->capacity;
         h->magic = OSOE_WIRE_MAGIC;
         h->creator_pid = (int32_t)getpid();
