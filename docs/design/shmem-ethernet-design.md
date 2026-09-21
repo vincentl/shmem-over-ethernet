@@ -378,13 +378,39 @@ node A only puts to B, no B→A segment exists to carry the ack, and A's `quiet`
 `barrier_all`, and finalize wait forever: the safety sweep submits only sealed
 buffers, and B has none.
 
-- A `fence`, `quiet`, or barrier flush sets *ack requested* on the segments it
-  seals.
-- On applying such a segment, B's progress thread carries the ack on the next
-  segment toward A if one is sealed or in flight, and otherwise sends a
-  **header-only segment**: acknowledgement, zero messages.
+- A `fence`, `quiet`, or barrier flush asks the peer to **acknowledge through
+  S**, where S is the highest segment sequence the caller wrote into toward it.
+  The request is a sequence number in a shared word, `ack_wanted_through`, raised
+  as a monotone maximum by CAS and never cleared; the lead reads it once a pass.
+- A segment carries *ack requested* if its own sequence is above what the peer
+  has acknowledged and at or below S — or, the **late request**, if S is still
+  unacknowledged and nothing this node has sent since asked for it. Then the
+  lead seals one header-only segment carrying the flag; its sequence is past S,
+  and since an acknowledgement is cumulative, answering it covers S. The lead
+  remembers the highest sequence it has sent flagged, so a late request is asked
+  once, not every pass.
+- On applying a flagged segment, B's progress thread owes an acknowledgement. Its
+  next segment toward A pays it — every segment carries the cumulative `ack` —
+  and if none is due it sends a **header-only segment**: acknowledgement, zero
+  messages. **A segment sealed only to pay that debt never carries the flag.**
 - Header-only segments reserve nothing, so §3.7's handler rule is untouched. They
   use the connection's single in-flight send like any other segment.
+
+*Why a sequence and not a flag (phase 1 step 2 slice 2).* The first version had
+one `owe_ack` bool meaning both "the peer asked" and "my writer asked", and a
+request word the lead took with an exchange. Two defects hid each other (second
+review, C1 and C2). Every acknowledgement was itself a request, so a quiesced
+pair exchanged ~2,500 header-only segments a second per direction forever. And
+the request rode whichever segment was finalized next — possibly one sealed
+before the write the writer was waiting for — so with the echo removed the
+obvious way, `quiet` hung (4 in 5 runs under timing injection). The echo was
+what kept `quiet` live. `docs/design/evidence/am-backend/ack_model.py` has all
+three: the old protocol fails QUIESCES, the naive split fails TERMINATES, this
+one passes both under SC and TSO and needs at most three header-only seals per
+node. A quiesced pair may still exchange one: a lead that receives a request
+must answer it, and cannot know the asker's `quiet` was already satisfied by
+some other segment's ack. What makes it the last is that the answer carries no
+flag.
 
 ### 3.5 Reservation protocol
 
@@ -676,8 +702,8 @@ policy.
 
 Explicit flush on `fence` and `quiet` covers the case where there is no reverse
 traffic to clock it. The flush is a request from the application thread to the
-lead (§3.12), and it sets *ack requested* so a one-way peer still acknowledges
-(§3.4).
+lead (§3.12), and it asks the peer to acknowledge through the caller's highest
+segment so a one-way peer still acknowledges (§3.4).
 
 ### 3.10 Idle and wakeup
 
@@ -1829,7 +1855,7 @@ the entire job.)*
 ```c
 void shmem_quiet(void) {
     serializing_store();                          /* memory stores (above) */
-    request_flush(pe->dirty, pe->ndirty, ACK_REQUESTED);   /* the lead seals (§3.12) */
+    request_ack_through(pe->dirty, pe->ndirty, pe->high_seg);  /* §3.4; the lead seals */
     for (i = 0; i < pe->ndirty; i++)
         wait_until(acked[pe->dirty[i]] >= pe->high_seg[pe->dirty[i]]);
     wait_until(pe->bytes_landed == pe->bytes_issued);
@@ -1839,7 +1865,9 @@ void shmem_quiet(void) {
 
 void shmem_fence(void) {
     serializing_store();
-    request_flush(pe->dirty, pe->ndirty, ACK_REQUESTED);
+    /* peers already acknowledged through high_seg are skipped: asking again
+     * would only make the lead send another request */
+    request_ack_through(pe->dirty, pe->ndirty, pe->high_seg);
     /* does NOT clear the dirty set — those operations remain unacknowledged */
 }
 ```
@@ -2391,7 +2419,7 @@ question nobody needed. Recorded before a benchmark applies pressure for them.
 | put | Returns at local completion. Applied later; complete and visible once a covering wait returns. No ordering between puts to one PE except across a fence (spec §9.6.1.1). Notify best effort | `memcpy` into the target's mapping, applied before return, then notify | Reserve and copy into the node-pair buffer (§3.5); the dirty set records the node |
 | get | Blocking. Complete per operation: `dst` holds the bytes on return. Never fenced | `memcpy` out of the target's mapping | Request; the reply lands in the landing zone; the calling thread copies it out (§3.12) |
 | rmw | One 4- or 8-byte word. Exactly once. Exclusive against same-width rmw on the word within one atomicity domain, and against waiters and tests (spec §3.2). Fetching: complete on return. Non-fetching: as a put. Notify exact | One C11 atomic on the shared mapping (§3.16 orders), then notify | Handler-time CPU atomic at the target; a fetched value is a value descriptor (§3.8) |
-| fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then seal and flush the dirty set with ack requested (§4.6) |
+| fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then ask each dirty peer not yet acknowledged to acknowledge through its highest segment, and flush (§3.4, §4.6) |
 | wait | Every write and nonblocking get on the context — to listed PEs, or to all — is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes |
 | load | A coherent load of a word of the caller's own region, 2, 4 or 8 bytes. Exclusive against rmw on it (spec §3.2). For `shmem_test*`, the `wait_until` predicate, and `shmem_signal_fetch` | One `acquire` load of the word | The same: every writer is a CPU atomic on the shared mapping |
 | notify | Wakes a PE's waiters whose watched range a write overlaps (§4.9). Exact for rmw, best effort for puts; wakes may be spurious | §4.9 watch slot | The same function, called by the progress thread after it applies a write |
@@ -2673,7 +2701,8 @@ bytes) and a `high_seg` word per node (8 bytes per node).
   it is clear. Every operation in one segment reads the same `s`, so the CAS and the
   `fetch_or` happen about once per segment, not once per operation.
 - **Quiet**, under the item 1 mutex and after the generation bump: for each set bit,
-  load `high_seg[n]`, flush with ack requested, and wait for `acked[n] >= high_seg`.
+  load `high_seg[n]`, ask for an acknowledgement through it (§3.4), and wait for
+  `acked[n] >= high_seg`.
   Clear the bit, re-load `high_seg[n]` and `acked[n]`, and if the node is still
   behind, set the bit again and repeat.
 - **Fence** reads the bits and flushes, and never clears, so it takes no lock.

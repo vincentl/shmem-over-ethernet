@@ -82,7 +82,17 @@ struct osoe_progress_connection {
     uint64_t next_seq;              /* assigned when a buffer becomes reservable */
     uint64_t applied;               /* highest sequence number applied from the peer */
     uint64_t acked;                 /* highest the peer says it has applied */
-    bool owe_ack;                   /* the peer asked; a segment must carry one */
+    /*
+     * §3.4's acknowledgement, split in two because it is two things (second
+     * review, C1). `owe_ack`: the peer asked, and this node's next segment pays
+     * - every segment carries the cumulative `ack = applied`, so finalizing any
+     * segment clears it. `flagged`: the highest sequence this node has sent
+     * carrying ACK_REQUESTED, so a request made after its segment was already
+     * finalized is asked once, on one header-only segment, and not every pass.
+     * What this node's writers want is in the connection (ack_wanted_through).
+     */
+    bool owe_ack;
+    uint64_t flagged;
     struct osoe_am_parser parser;
     struct osoe_reply_queues queues;
 };
@@ -155,19 +165,8 @@ bool osoe_progress_poll(struct osoe_progress *p);
  */
 bool osoe_progress_idle(struct osoe_progress *p);
 
-/* Stop owing acknowledgements, so that a final drain does not manufacture
- * ack-only segments for peers that have already finished (§3.4). Only at
- * teardown: an owed ack has a waiter only inside quiet (§4.6), which cannot be
- * running once every PE has passed shmem_finalize's barrier. */
-void osoe_progress_forget_acks(struct osoe_progress *p);
-
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
 uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);
-
-/* Ask that the next segment toward `peer` carries an acknowledgement request,
- * which is what fence, quiet and the barriers set so that a one-way peer still
- * acknowledges (§3.4, §3.9). */
-void osoe_progress_request_ack(struct osoe_progress *p, uint32_t peer);
 
 /* The highest sequence number `peer` has applied (§4.6's completion evidence). */
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer);

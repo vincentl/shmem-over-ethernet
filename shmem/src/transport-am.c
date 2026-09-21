@@ -499,20 +499,36 @@ uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum
 
 /* ---- Ordering and completion (§4.6) ------------------------------------ */
 
-/*
- * Ask every dirty peer for an acknowledgement and get the segments moving.
- * Shared by fence and wait, which differ only in what they do afterwards.
- */
+/* Has `peer` acknowledged everything this context wrote toward it? Read out of
+ * the lead's connection state, which only the lead writes (§3.12). */
+static bool acknowledged(const struct osoe_transport_context *c, uint32_t slot)
+{
+    uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
+    return osoe_progress_host_acked(peer) >= c->high_segment[slot];
+}
+
+/* Ask every dirty peer that has not already acknowledged this context's writes
+ * to acknowledge through them (§3.4), and wake the lead if any was asked. A
+ * peer that already has acknowledged is skipped: fence used to ask it again on
+ * every call until the next quiet (second review, algorithmic-scaling 10).
+ * Shared by fence and wait, which differ only in what they do afterwards. */
 static void flush_dirty(struct osoe_transport_context *c)
 {
+    bool asked = false;
     for (uint32_t i = 0; i < c->count; i++) {
         uint32_t slot = c->order[i];
+        if (acknowledged(c, slot))
+            continue;
         uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
         struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
-        if (conn)
-            osoe_connection_request_ack(conn);
+        /* "Acknowledge through the highest segment this context wrote into":
+         * what quiet then waits for, and nothing more. */
+        if (conn) {
+            osoe_connection_request_ack(conn, c->high_segment[slot]);
+            asked = true;
+        }
     }
-    if (c->count)
+    if (asked)
         osoe_progress_host_wake_lead();
 }
 
@@ -535,13 +551,6 @@ void osoe_transport_fence(struct osoe_transport_context *context)
         flush_dirty(context);
 }
 
-/* Has `peer` acknowledged everything this context wrote toward it? Read out of
- * the lead's connection state, which only the lead writes (§3.12). */
-static bool acknowledged(const struct osoe_transport_context *c, uint32_t slot)
-{
-    uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
-    return osoe_progress_host_acked(peer) >= c->high_segment[slot];
-}
 
 /*
  * §4.10's wait: complete every operation this context has outstanding, to every

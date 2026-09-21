@@ -143,24 +143,30 @@ struct osoe_connection_buffer {
 struct osoe_connection_shared {
     struct osoe_connection_buffer buffer[2];
     /*
-     * A writer asking that the next segment carry §3.4's acknowledgement
-     * request, so that a one-way peer still acknowledges and quiet has
-     * something to wait for.
+     * The highest segment sequence any writer of this node needs the peer to
+     * acknowledge (§3.4): "acknowledge through S". quiet and fence set it, and
+     * the lead's agent reads it when it decides which segments carry
+     * ACK_REQUESTED.
      *
      * It is shared because the *writer* is the one that needs the ack - an
-     * application thread in any local PE, inside fence or quiet - while the
-     * flag in the segment header is set at seal time by the lead's agent, which
-     * is the only thread that seals (§3.12). The lead takes this word with an
-     * exchange each pass and folds it into its own bookkeeping, so a set that
-     * arrives after a seal is carried by the next segment rather than lost, and
-     * two writers asking at once ask once.
+     * application thread in any local PE - while the flag is written into a
+     * segment header by the lead's agent, the only thread that finalizes
+     * (§3.12). It is a sequence number and not a flag, because a flag cannot
+     * say which segment it is for: taken at the top of a pass, it rode
+     * whichever segment was finalized next, which could be one sealed before
+     * the write the writer was waiting for (second review, C2). A monotone
+     * maximum, raised by CAS and never lowered, so two writers asking at once
+     * ask for the later of the two and the lead never has to take and clear it.
+     *
+     * 64-bit sequences do not wrap: at a segment a nanosecond it would take
+     * five centuries. The comparisons are plain `<=` and say so.
      */
-    _Alignas(OSOE_CACHELINE) _Atomic uint32_t ack_requested;
+    _Alignas(OSOE_CACHELINE) _Atomic uint64_t ack_wanted_through;
     /*
      * The highest segment sequence the peer has acknowledged **applying**
      * (§4.6), published by the lead's agent as it learns it.
      *
-     * It is shared for the same reason ack_requested is, from the other side:
+     * It is shared for the same reason ack_wanted_through is, from the other side:
      * the evidence quiet waits on has to be readable by the PE that is waiting,
      * and the lead's own copy of it lives in the lead's process. Single-writer
      * publication - only the lead's agent ever stores here - so a release store
@@ -251,9 +257,17 @@ static inline void *osoe_reservation_bytes(const struct osoe_connection *c, cons
  * been committed, the buffer is not sendable. */
 void osoe_connection_commit(struct osoe_connection *c, const struct osoe_reservation *r);
 
-/* Ask that a segment toward this peer carry an acknowledgement request (§3.4).
- * Called by an application thread in fence and quiet; idempotent. */
-void osoe_connection_request_ack(struct osoe_connection *c);
+/* Ask the peer to acknowledge every segment through `seq` (§3.4): raise
+ * ack_wanted_through to at least `seq`. Called by an application thread in
+ * fence and quiet with the highest segment it has written into; idempotent,
+ * and a lower request than one already made changes nothing. */
+void osoe_connection_request_ack(struct osoe_connection *c, uint64_t seq);
+
+/* What this node's writers want acknowledged. The lead's agent, once a pass. */
+static inline uint64_t osoe_connection_ack_wanted(const struct osoe_connection *c)
+{
+    return atomic_load_explicit(&c->s->ack_wanted_through, memory_order_acquire);
+}
 
 /* This connection's reply credit (§3.8), for the origin to take and give. */
 static inline struct osoe_credit *osoe_connection_credit(struct osoe_connection *c)
@@ -272,11 +286,6 @@ static inline struct osoe_credit *osoe_connection_credit(struct osoe_connection 
  * signal-after-payload (invariant 5) and quiet.
  */
 void osoe_connection_open(struct osoe_connection *c, uint32_t k, uint64_t seq);
-
-/* Take any pending acknowledgement request, clearing it. The lead's agent only.
- * An exchange rather than a load and a store, so a request arriving between the
- * two is not dropped. */
-bool osoe_connection_take_ack_request(struct osoe_connection *c);
 
 /* Publish what the peer has acknowledged applying. The lead's agent only. */
 void osoe_connection_publish_acked(struct osoe_connection *c, uint64_t seq);

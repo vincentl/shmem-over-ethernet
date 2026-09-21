@@ -281,7 +281,6 @@ void osoe_progress_host_start(uint32_t session)
  */
 static void flush_before_close(void)
 {
-    osoe_progress_forget_acks(&osoe.progress);
     struct osoe_deadline until = osoe_deadline_in(osoe.bootstrap.timeout_ns);
     while (!osoe_progress_idle(&osoe.progress)) {
         osoe_progress_poll(&osoe.progress);

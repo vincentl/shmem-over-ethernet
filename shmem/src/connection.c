@@ -24,7 +24,7 @@ void osoe_connection_init(struct osoe_connection *c, uint32_t credits)
          * buffer with nothing in it. */
         atomic_store_explicit(&c->s->buffer[k].head, OSOE_BUFFER_SEALED, memory_order_release);
     }
-    atomic_store_explicit(&c->s->ack_requested, 0, memory_order_release);
+    atomic_store_explicit(&c->s->ack_wanted_through, 0, memory_order_release);
     atomic_store_explicit(&c->s->acked, 0, memory_order_release);
     osoe_credit_init(&c->s->credit, credits);
 }
@@ -173,14 +173,16 @@ bool osoe_connection_drain_reserve(struct osoe_connection *c, uint32_t k, uint32
     return true;
 }
 
-void osoe_connection_request_ack(struct osoe_connection *c)
+void osoe_connection_request_ack(struct osoe_connection *c, uint64_t seq)
 {
-    atomic_store_explicit(&c->s->ack_requested, 1, memory_order_seq_cst);
-}
-
-bool osoe_connection_take_ack_request(struct osoe_connection *c)
-{
-    return atomic_exchange_explicit(&c->s->ack_requested, 0, memory_order_seq_cst) != 0;
+    /* A monotone maximum: CAS, seq_cst, and nothing to do once someone has
+     * already asked for as much (§3.16; ack_model.py's design variant). */
+    uint64_t have = atomic_load_explicit(&c->s->ack_wanted_through, memory_order_acquire);
+    while (have < seq &&
+           !atomic_compare_exchange_weak_explicit(&c->s->ack_wanted_through, &have, seq,
+                                                  memory_order_seq_cst,
+                                                  memory_order_acquire))
+        ;
 }
 
 void osoe_connection_publish_acked(struct osoe_connection *c, uint64_t seq)

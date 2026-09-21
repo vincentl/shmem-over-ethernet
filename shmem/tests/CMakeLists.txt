@@ -385,11 +385,10 @@ function(osoe_tier2_map_test name map)
   set_tests_properties(shmem.${name}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endfunction()
 
-# A quiesced pair falls silent (§3.4; review round two, C1). Fails on the tree
-# before slice 2's acknowledgement protocol with ~1,250 header-only segments in
-# the idle half second, so it is registered disabled until that lands.
+# A quiesced pair falls silent (§3.4; review round two, C1). Before slice 2's
+# acknowledgement protocol: 1,320 header-only segments per node in the idle
+# half second.
 osoe_tier2_map_test(ack-echo 0,1)
-set_tests_properties(shmem.ack-echo.0-1 PROPERTIES DISABLED TRUE)
 
 # A reply is not starved by puts (§3.8's DRAINING state; review round two, C7):
 # one getter on node 0, the get's target and five writers on node 1, the

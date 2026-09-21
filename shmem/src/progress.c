@@ -430,8 +430,34 @@ static bool drain(struct osoe_progress *p, uint32_t slot)
  * by walking the buffer - the writers are in other processes, so the progress
  * thread never saw their reservations.
  */
+/*
+ * Does a segment finalized now carry ACK_REQUESTED (§3.4)?
+ *
+ * If its sequence is past what the peer has acknowledged and at or below what
+ * this node's writers want acknowledged - or, the late request, if what they
+ * want is still unacknowledged and no segment this node has sent yet asked for
+ * it. The late case is what a request made after its segment was finalized
+ * needs: the header-only segment flush() seals for it has a sequence past
+ * `wanted`, and its acknowledgement is cumulative, so it covers `wanted` too.
+ * (Given `seq > acked`, `seq <= wanted` implies the late condition, since
+ * segments are finalized in order; it is written out because it is the rule.)
+ *
+ * What never asks: a header-only segment sealed only because the peer asked.
+ * When nothing is wanted, both conditions are false. That is the whole fix for
+ * the echo - an answer that is itself a request - and ack_model.py's
+ * QUIESCES is the check that it holds.
+ */
+static bool asks_for_ack(const struct osoe_progress_connection *c, uint64_t seq,
+                         uint64_t wanted)
+{
+    if (seq <= c->acked)
+        return false;
+    bool late = wanted > c->acked && c->flagged < wanted;
+    return seq <= wanted || late;
+}
+
 static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connection *conn,
-                     uint32_t k, uint32_t bytes)
+                     uint32_t k, uint32_t bytes, uint64_t wanted)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
     unsigned char *base = conn->data + (size_t)k * conn->capacity;
@@ -449,15 +475,19 @@ static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connect
         off += osoe_message_padded(h.len);
         count++;
     }
+    uint64_t seq = atomic_load_explicit(&conn->s->buffer[k].seq, memory_order_acquire);
+    bool ask = asks_for_ack(c, seq, wanted);
     struct osoe_am_segment_header sh = {
-        .seq = atomic_load_explicit(&conn->s->buffer[k].seq, memory_order_acquire),
+        .seq = seq,
         .ack = c->applied,
-        .flags = c->owe_ack ? OSOE_AM_SEGMENT_ACK_REQUESTED : 0,
+        .flags = ask ? OSOE_AM_SEGMENT_ACK_REQUESTED : 0,
         .message_count = count,
         .total_len = bytes,
     };
     memcpy(base, &sh, sizeof sh);
-    c->owe_ack = false;
+    if (ask)
+        c->flagged = seq;
+    c->owe_ack = false;         /* this segment's `ack` pays any debt */
 }
 
 static bool flush(struct osoe_progress *p, uint32_t slot)
@@ -470,15 +500,12 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     bool moved = false;
 
     /*
-     * Any writer asking for an acknowledgement (§3.4). Taken before the seal
-     * below, so a request that arrived with the message it belongs to is
-     * carried by the same segment; one that arrives after this line is carried
-     * by the next, which is still correct because an acknowledgement is
-     * cumulative and quiet waits on a sequence number rather than on a
-     * particular segment.
+     * What this node's writers want acknowledged (§3.4), read once a pass and
+     * before the seal below, as the flag it decides is. A request raised after
+     * this load is seen by the next pass; the late-request rule in
+     * asks_for_ack is what makes that safe.
      */
-    if (osoe_connection_take_ack_request(conn))
-        c->owe_ack = true;
+    uint64_t wanted = osoe_connection_ack_wanted(conn);
     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
 
     /* Finish an in-flight send. A short write is the normal case (§3.3): keep
@@ -505,7 +532,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     if (c->sending == OSOE_CONNECTION_NONE && c->sealed != OSOE_CONNECTION_NONE) {
         uint32_t bytes;
         if (osoe_connection_sendable(conn, c->sealed, &bytes)) {
-            finalize(p, slot, conn, c->sealed, bytes);
+            finalize(p, slot, conn, c->sealed, bytes, wanted);
             c->sending = c->sealed;
             c->sealed = OSOE_CONNECTION_NONE;
             c->state[c->sending] = OSOE_BUFFER_SENDING;
@@ -525,7 +552,11 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     if (c->sealed == OSOE_CONNECTION_NONE && c->open != OSOE_CONNECTION_NONE) {
         uint32_t used = OSOE_BUFFER_USED(
             atomic_load_explicit(&conn->s->buffer[c->open].head, memory_order_acquire));
-        if (used > header || c->owe_ack) {
+        /* Seal for data, to pay a debt, or for a late request that no
+         * unfinalized segment will carry - the one header-only segment the
+         * model says a quiesced pair may still exchange. */
+        bool late = wanted > c->acked && c->flagged < wanted;
+        if (used > header || c->owe_ack || late) {
             if (used == header)
                 osoe_counter_word_add(&p->metrics->header_only_sent, 1);   /* §3.4's ack-only */
             osoe_connection_seal(conn, c->open);
@@ -619,19 +650,6 @@ bool osoe_progress_idle(struct osoe_progress *p)
             return false;
     }
     return true;
-}
-
-void osoe_progress_forget_acks(struct osoe_progress *p)
-{
-    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++)
-        p->connection[slot].owe_ack = false;
-}
-
-void osoe_progress_request_ack(struct osoe_progress *p, uint32_t peer)
-{
-    uint32_t slot = osoe_progress_slot(p, peer);
-    if (slot != OSOE_CONNECTION_NONE)
-        p->connection[slot].owe_ack = true;
 }
 
 /*
