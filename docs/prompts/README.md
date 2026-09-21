@@ -41,3 +41,5 @@ and `docs/reviews/` do track the current names.
 | `phase1-step1-slice2-continuation-prompt.md` | Resumption of that second slice | merged, `5955d20` and `4e96700` |
 | `phase1-step2-slice1-prompt.md` | §7.1 step 2, first slice: the in-process AM backend | see below |
 | `phase1-step2-slice1-continuation-prompt.md` | Resumption of that first slice | in progress |
+| `phase1-step2-slice2-prompt.md` | §7.1 step 2, second slice: what the second review (`docs/reviews/phase1-step2-slice1-review.md`) found in the protocols and failure paths — the acknowledgement protocol, the pre-open drain, the reply pool, sweeps and the no-progress rule, receive-side validation, how a job dies and what it leaves behind | not started |
+| `phase1-step2-slice3-prompt.md` | §7.1 step 2, third slice: the internode collective interface beside §4.10, the k-ary tree, send-side work discovery, the O(P) arrays, the chained wake, per-connection metrics, force-remote. Requires slice 2 merged | not started |
