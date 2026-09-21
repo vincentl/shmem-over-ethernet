@@ -31,6 +31,7 @@
  * The timing check is §8.2's arrival table rather than a per-PE clock reading,
  * for the reason arrivals.h gives.
  */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

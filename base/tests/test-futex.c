@@ -1,4 +1,5 @@
 /* futex wrappers: absolute deadlines and wakes (§3.10, invariant 18). */
+#define _GNU_SOURCE
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>

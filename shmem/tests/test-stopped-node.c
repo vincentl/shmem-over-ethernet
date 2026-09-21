@@ -12,6 +12,7 @@
  * complete; with it set below the stop, the quiet must end the job naming the
  * connection - both registered, as shmem.stopped-node.*.
  */
+#define _GNU_SOURCE
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>

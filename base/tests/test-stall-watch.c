@@ -1,5 +1,6 @@
 /* The no-progress rule (base/stall-watch.h): a watch reports a stall only when
  * its word has not changed for the whole limit, and never with a limit of 0. */
+#define _GNU_SOURCE
 #include <time.h>
 
 #include "base/stall-watch.h"

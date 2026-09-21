@@ -19,6 +19,7 @@
  * the development watchdog on, since that is what reads a sibling's liveness
  * at a sweep (§3.15).
  */
+#define _GNU_SOURCE
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>

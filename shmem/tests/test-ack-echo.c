@@ -21,6 +21,7 @@
  * Counted from the node's own `transport.am.header_only_sent`, which exists for
  * this (node.h, layout 8): header-only segments have no other observable effect.
  */
+#define _GNU_SOURCE
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>

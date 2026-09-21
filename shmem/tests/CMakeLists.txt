@@ -42,6 +42,16 @@ add_test(NAME shmem.static-link
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStaticLink.cmake)
 set_tests_properties(shmem.static-link PROPERTIES LABELS "tier1" TIMEOUT 180)
 
+# None of the four presets sets CMAKE_C_EXTENSIONS, so plain -std=c11 (design
+# §1: "a C11 compiler") is otherwise never built. A nested configure and
+# build, the same shape as shmem.static-link above. Portability review F12.
+add_test(NAME shmem.strict-c11
+  COMMAND ${CMAKE_COMMAND}
+          -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/strict-c11-check
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckStrictC11.cmake)
+set_tests_properties(shmem.strict-c11 PROPERTIES LABELS "tier1" TIMEOUT 180)
+
 # The allocator on its own (tier 1): compiled in, since libosoe hides it.
 add_executable(shmem_test_allocator test-allocator.c ../src/allocator.c)
 target_include_directories(shmem_test_allocator PRIVATE ../src)

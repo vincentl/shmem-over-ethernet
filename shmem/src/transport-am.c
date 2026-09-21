@@ -26,6 +26,7 @@
  * what makes that wait cost the application's communication degree rather than
  * the job's size.
  */
+#define _GNU_SOURCE
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>

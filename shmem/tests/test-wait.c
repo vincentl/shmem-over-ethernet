@@ -5,6 +5,7 @@
  * futex can watch directly and the 64-bit path is the one that forced the
  * sequence word (§4.9).
  */
+#define _GNU_SOURCE
 #include <stdint.h>
 #include <time.h>
 

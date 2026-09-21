@@ -25,6 +25,7 @@
  *   OSOE_TEST_GETS        gets node 0 issues (default 20)
  *   OSOE_TEST_DEADLINE_MS writers' own stop, the test's time bound (default 10000)
  */
+#define _GNU_SOURCE
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -3,6 +3,7 @@
  * barrier; otherwise malloc barriers on exit and free on entry. Symmetry across
  * PEs is checked by shmem.rma, which can compare addresses between PEs.
  */
+#define _GNU_SOURCE
 #include <stdint.h>
 #include <string.h>
 

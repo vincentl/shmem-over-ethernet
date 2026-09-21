@@ -3,6 +3,7 @@
  *
  * See progress-host.h for what this is and why it is separate from progress.c.
  */
+#define _GNU_SOURCE
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <time.h>

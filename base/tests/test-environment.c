@@ -1,4 +1,5 @@
 /* OSOE_ environment parsing (§6.2). */
+#define _GNU_SOURCE
 #include <stdint.h>
 #include <stdlib.h>
 

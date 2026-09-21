@@ -13,6 +13,7 @@
  * wire that never truncated would pass every assertion above it while proving
  * nothing about the path this exists to exercise.
  */
+#define _GNU_SOURCE
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>

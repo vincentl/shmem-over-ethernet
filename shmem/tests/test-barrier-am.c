@@ -19,6 +19,7 @@
  * check that measured each PE's own wait would fail when a PE was descheduled,
  * which is the mistake §8.2 records having made once already.
  */
+#define _GNU_SOURCE
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>

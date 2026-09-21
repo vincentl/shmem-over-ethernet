@@ -26,6 +26,7 @@
  * because production must not depend on it. OSOE_WATCHDOG=0 or 1 forces either
  * way.
  */
+#define _GNU_SOURCE
 #include <errno.h>
 #include <signal.h>
 #include <stdatomic.h>

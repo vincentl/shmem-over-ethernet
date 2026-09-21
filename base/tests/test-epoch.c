@@ -1,4 +1,5 @@
 /* Epoch counters: equality waits and bumps (§5.4). */
+#define _GNU_SOURCE
 #include <pthread.h>
 #include <stdint.h>
 #include <time.h>

@@ -30,6 +30,7 @@
  * over several passes and the descriptor survives partial draining (§3.8) -
  * another rule a single-chunk reply never reaches.
  */
+#define _GNU_SOURCE
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stdbool.h>

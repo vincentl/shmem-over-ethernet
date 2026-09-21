@@ -21,6 +21,7 @@
  * thread and would see nothing of the cross-process case. The protocol's
  * cross-process safety rests on §3.16's orders and on the models, not here.
  */
+#define _GNU_SOURCE
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdbool.h>

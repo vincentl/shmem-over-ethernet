@@ -11,6 +11,7 @@
  * Then signal_add and signal_set racing a waiter, signal_fetch, and the return
  * value of signal_wait_until.
  */
+#define _GNU_SOURCE
 #include <stdint.h>
 #include <string.h>
 #include <time.h>

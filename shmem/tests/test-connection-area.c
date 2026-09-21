@@ -20,6 +20,7 @@
  * refused until the backend lands, and the area needs only the bootstrap
  * environment osoe-launch already sets.
  */
+#define _GNU_SOURCE
 #include <sched.h>
 #include <stdarg.h>
 #include <stdatomic.h>

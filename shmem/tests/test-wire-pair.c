@@ -19,6 +19,7 @@
  * until the backend lands (§7.1 step 2), and the wire needs only the bootstrap
  * environment osoe-launch already sets.
  */
+#define _GNU_SOURCE
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
