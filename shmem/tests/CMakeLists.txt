@@ -491,7 +491,7 @@ foreach(count 2 4)
               -- $<TARGET_FILE:shmem_test_watchdog>)
     set_tests_properties(shmem.watchdog.${where}.L${count} PROPERTIES
       LABELS "tier2" TIMEOUT 60
-      PASS_REGULAR_EXPRESSION "has died; this PE would wait for it forever")
+      PASS_REGULAR_EXPRESSION "has died[;] this PE would wait for it forever")
   endforeach()
 endforeach()
 
@@ -507,7 +507,7 @@ set_tests_properties(shmem.watchdog.off PROPERTIES
 # With nothing set, the default must follow the preset: on in debug, asan and
 # tsan, off in release (§3.15).
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(osoe_watchdog_default_expect "has died; this PE would wait for it forever")
+  set(osoe_watchdog_default_expect "has died[;] this PE would wait for it forever")
 else()
   set(osoe_watchdog_default_expect "osoe-launch: timeout after 3 s")
 endif()
