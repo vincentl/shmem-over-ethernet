@@ -1,19 +1,19 @@
 == can an external reader see a torn "blocked in" record?
-design: two seq_cst bumps                                    SC  states=        738 depth= 19 (    0.0s, miss<3e-24) -> ok
-design: two seq_cst bumps                                    TSO states=      1,090 depth= 23 (    0.0s, miss<7e-24) -> ok
-nogen:     no generation word                                SC  states=         24 depth= 11 (    0.0s, miss<4e-27) -> VIOLATION
+design: two seq_cst bumps                                    SC  states=        738 depth= 19 (miss<3e-24) -> ok +live
+design: two seq_cst bumps                                    TSO states=      1,090 depth= 23 (miss<7e-24) -> ok +live
+nogen:     no generation word                                SC  states=         24 depth= 11 (miss<4e-27) -> VIOLATION
     torn read: routine=0 from one publication, detail=1 from another
     trace: T1:load ('routine',)->0 ; T0:add ('gen',)->1 ; T0:store ('routine',)=1 ; T0:store ('detail',)=1 ; T1:load ('detail',)->1 ; T1: CHECK FAILED: torn read: routine=0 from one publication, detail=1 from another
-nogen:     no generation word                                TSO states=         38 depth= 15 (    0.0s, miss<9e-27) -> VIOLATION
+nogen:     no generation word                                TSO states=         38 depth= 15 (miss<9e-27) -> VIOLATION
     torn read: routine=0 from one publication, detail=1 from another
     trace: T1:load ('routine',)->0 ; T0:add ('gen',)->1 ; T0:store(buf) ('routine',)=1 ; T0:store(buf) ('detail',)=1 ; T0:flush ('routine',)=1 ; T0:flush ('detail',)=1 ; T1:load ('detail',)->1 ; T1: CHECK FAILED: torn read: routine=0 from one publication, detail=1 from another
-bumpafter: fields written before the window                  SC  states=         53 depth= 17 (    0.0s, miss<2e-26) -> VIOLATION
+bumpafter: fields written before the window                  SC  states=         53 depth= 17 (miss<2e-26) -> VIOLATION
     torn read: routine=1 from one publication, detail=2 from another
     trace: T1:load ('gen',)->0 ; T1:load ('routine',)->0 ; T1:load ('detail',)->0 ; T0:store ('routine',)=1 ; T0:store ('detail',)=1 ; T0:add ('gen',)->1 ; T1:load ('gen',)->1 ; T1:load ('gen',)->1 ; T0:add ('gen',)->2 ; T1:load ('gen',)->2 ; T1:load ('routine',)->1 ; T0:store ('routine',)=2 ; T0:store ('detail',)=2 ; T1:load ('detail',)->2 ; T1:load ('gen',)->2 ; T1: CHECK FAILED: torn read: routine=1 from one publication, detail=2 from another
-hoist:     a field store above the opening bump              TSO states=         85 depth= 21 (    0.0s, miss<5e-26) -> VIOLATION
+hoist:     a field store above the opening bump              TSO states=         85 depth= 21 (miss<5e-26) -> VIOLATION
     torn read: routine=2 from one publication, detail=1 from another
     trace: T1:load ('gen',)->0 ; T1:load ('routine',)->0 ; T1:load ('detail',)->0 ; T0:store(buf) ('routine',)=1 ; T0:flush ('routine',)=1 ; T0:add ('gen',)->1 ; T1:load ('gen',)->1 ; T1:load ('gen',)->1 ; T0:store(buf) ('detail',)=1 ; T0:flush ('detail',)=1 ; T0:add ('gen',)->2 ; T1:load ('gen',)->2 ; T0:store(buf) ('routine',)=2 ; T0:flush ('routine',)=2 ; T1:load ('routine',)->2 ; T1:load ('detail',)->1 ; T1:load ('gen',)->2 ; T1: CHECK FAILED: torn read: routine=2 from one publication, detail=1 from another
-noverify:  reader does not re-read the generation            SC  states=         25 depth= 12 (    0.0s, miss<4e-27) -> VIOLATION
+noverify:  reader does not re-read the generation            SC  states=         25 depth= 12 (miss<4e-27) -> VIOLATION
     torn read: routine=0 from one publication, detail=1 from another
     trace: T1:load ('gen',)->0 ; T1:load ('routine',)->0 ; T0:add ('gen',)->1 ; T0:store ('routine',)=1 ; T0:store ('detail',)=1 ; T1:load ('detail',)->1 ; T1: CHECK FAILED: torn read: routine=0 from one publication, detail=1 from another
 

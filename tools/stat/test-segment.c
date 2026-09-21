@@ -88,7 +88,10 @@ static struct osoe_metric_descriptor desc(const char *name, const char *unit, un
  * Build the segment. `damage` picks a way to be wrong: 0 is a good segment.
  * Returns the mapping, with `*bytes` its length; the caller unmaps it.
  */
-enum damage { GOOD, BAD_MAGIC, BAD_CHECKSUM, STRANGE_DESC_SIZE };
+/* OLDER_DIRECTORY is not damage: it is a segment written by a library from
+ * before layout 6, whose directory stops before the landing-zone fields. A
+ * reader must still use its table (OSOE_SEGMENT_HAS). */
+enum damage { GOOD, BAD_MAGIC, BAD_CHECKSUM, STRANGE_DESC_SIZE, OLDER_DIRECTORY };
 
 static void *build(const char *name, enum damage damage, size_t *bytes)
 {
@@ -151,7 +154,9 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
     memset(&d, 0, sizeof d);
     d.magic = damage == BAD_MAGIC ? UINT64_C(0xdeadbeef) : OSOE_SEGMENT_MAGIC;
     d.layout = 999;                         /* a layout from the future */
-    d.directory_bytes = sizeof d;
+    d.directory_bytes = damage == OLDER_DIRECTORY
+        ? (uint32_t)offsetof(struct osoe_segment_directory, landing_offset)
+        : (uint32_t)sizeof d;
     d.header_bytes = HEADER_BYTES;
     d.segment_bytes = total;
     d.slots_offset = slots_off;
@@ -295,6 +300,21 @@ int main(void)
         char path[128];
         snprintf(path, sizeof path, "/dev/shm%s", name);
         check_good(path);
+        munmap(p, bytes);
+        shm_unlink(name);
+    }
+
+    /*
+     * A directory shorter than this reader's, from an older library. It holds
+     * every field the table needs, so the table must be used. The reader once
+     * required the whole structure and discarded the table of every older
+     * segment; this is the case that saw it (second review, premises: that
+     * mutation passed every test until now).
+     */
+    p = build(name, OLDER_DIRECTORY, &bytes);
+    CHECK(p != NULL);
+    if (p) {
+        check_good(name);
         munmap(p, bytes);
         shm_unlink(name);
     }

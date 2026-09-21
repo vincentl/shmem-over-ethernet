@@ -73,8 +73,12 @@ also what really happens on the root node itself.
 Runs are SC except where noted. The handoff is a **plain release store**
 followed by a locked add on the wake word (§3.16: single-writer publication
 release, the two-sided bump seq_cst), so x86-TSO could in principle let the two
-be seen out of order - it cannot, because the locked add drains the store
-buffer first, and the tso=True cases are here to say so rather than to assume it.
+be seen out of order. The tso=True cases show that it does not break the design.
+They do **not** show that the locked add is what prevents it: a bump done as a
+plain load and store passes the same SC and TSO cases (second review,
+evidence-audit F7, four configurations). The locked add is required for another
+reason, outside this model - the wake word has many writers, and a plain
+increment from two of them loses one.
 
 Usage: arrival_model.py [substring ...]   runs the cases whose names match
 """
@@ -128,10 +132,17 @@ def arriver(design, epochs, members):
 
 
 def order(M, L):
-    """Arrivals reach the root once each, in epoch order."""
+    """Arrivals reach the root once each, in epoch order.
+
+    Only a repeat can fail it here. An arrival skipped over - epoch k+2
+    forwarded after k - cannot be reached by any variant: k+2 cannot be posted
+    until k+1 is released, which needs k+1 forwarded. A lost arrival shows up as
+    STUCK instead (`consume_reread`). The comparison still refuses a skip, in
+    case that argument ever stops holding, but no case exercises it.
+    """
     return (None if L['h'] == M[FORWARDED] + 1 else
             f"epoch {L['h']} forwarded after {M[FORWARDED]}: an arrival was "
-            f"{'repeated' if L['h'] <= M[FORWARDED] else 'lost'}")
+            f"{'repeated' if L['h'] <= M[FORWARDED] else 'skipped'}")
 
 
 def lead(design, epochs):
@@ -200,11 +211,11 @@ def case(design, members, epochs):
 # members is the smallest configuration with an arriver that is not also the one
 # that posts.
 #
-# The TSO rows are the ones that say the plain release store is sufficient. The
-# arriver publishes the epoch with an ordinary store and then bumps the wake
-# word with a locked add; on x86 the locked add drains the store buffer, so the
-# agent cannot see the bump without the epoch. Were the bump a plain store too,
-# these rows would fail where the SC rows pass.
+# The TSO rows say the design holds under TSO: the arriver publishes the epoch
+# with an ordinary store and then bumps the wake word with a locked add. They do
+# not discriminate the locked add - a plain bump passes them too (see the
+# docstring) - so they are a check of the design, not an argument for its
+# instruction choice.
 CASES = [
     ('design', 1, 2, False, True),
     ('design', 2, 2, False, True),

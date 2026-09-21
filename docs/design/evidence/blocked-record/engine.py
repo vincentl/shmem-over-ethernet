@@ -63,14 +63,27 @@ fingerprint of each state (hash compaction, as in SPIN). The chance that any
 state is wrongly skipped is below n^2 / 2^97 for n states, and is printed
 with each result. exact=True stores full states instead.
 
-Guards. A progress line every `progress` seconds (states, rate, stack, depth,
-largest memory value), and TIME LIMIT, STATE LIMIT and DEPTH LIMIT verdicts
+Liveness. LOST WAKE and STUCK are reported only at a state with no successor,
+so a model in which one thread sleeps forever while another cycles forever has
+no such state and used to be reported `ok`. After a complete search the engine
+also checks AG EF done: from **every** reachable state some *finished* state
+must still be reachable. A state from which none is is *trapped*, and the
+verdict is TRAPPED with a trace to it. Finished means `done(M)` when a model
+passes one, and otherwise that every thread is at 'done' or is awake at a
+location its `idle_ok` allows. The check needs the whole state graph, which
+costs two machine words per edge and three per state, so it runs only while the
+model stays under `liveness_max_states`; past that the result line says the
+check did not run. `liveness=False` turns it off.
+
+Guards. A progress line on stderr every `progress` seconds (states, rate,
+stack, depth, largest memory value), and TIME LIMIT, STATE LIMIT and DEPTH LIMIT verdicts
 with the trace that reached them. A model with an unbounded loop or counter
 reports itself instead of hanging: its depth or its largest value keeps
 growing in the progress lines.
 """
 import hashlib
 import marshal
+from array import array
 import sys
 import time
 
@@ -141,6 +154,7 @@ class Result:
         self.max_ghost = {}
         self.seconds = 0.0
         self.exact = False
+        self.liveness = None
 
     @property
     def ok(self):
@@ -403,14 +417,42 @@ class Explorer:
 
 def explore(name, threads, mem0, tso=False, idle_ok=lambda i, M, L: False, track=(),
             symmetric=(), exact=False, max_states=100_000_000, max_seconds=3600,
-            max_depth=20_000, progress=15.0, stop_on_error=True, out=sys.stdout):
+            max_depth=20_000, progress=15.0, stop_on_error=True, out=sys.stdout,
+            done=None, liveness=True, liveness_max_states=400_000):
     ex = Explorer(threads, mem0, tso, symmetric)
     res = Result(name)
     res.exact = exact
     t0 = time.time()
     next_report = t0 + progress
-    seen = {ex.fingerprint(ex.init, exact)}
-    stack = [(ex.init, 0, None)]           # (state, depth, path node = (thread, alt, parent))
+
+    # Liveness (AG EF done): every reachable state must still be able to reach a
+    # state the model calls finished. Needs the whole state graph, so it is kept
+    # only while the model stays under liveness_max_states; past that the arrays
+    # are dropped and the result says the check did not run.
+    graph = liveness
+    edge_from, edge_to = array('l'), array('l')
+    parent = array('l', [-1])              # spanning tree of the search, per state id
+    parent_step = array('l', [-1, -1])     # (thread, alt) that reached each state
+    finished = bytearray(1)
+
+    def is_finished(mem, ths):
+        if done is not None:
+            return bool(done(_M(ex, mem)))
+        for i, (pc, _loc, status, _, _) in enumerate(ths):
+            if ex.progs[i][pc][0] == 'done':
+                continue
+            if status == SLEEP or not idle_ok(i, _M(ex, mem), _L(ex.lmaps[i], _loc)):
+                return False
+        return True
+
+    def drop_graph(why):
+        nonlocal graph
+        graph = False
+        res.liveness = why
+        del edge_from[:], edge_to[:], parent[:], parent_step[:], finished[:]
+
+    seen = {ex.fingerprint(ex.init, exact): 0}
+    stack = [(ex.init, 0, None, 0)]        # (state, depth, path node = (thread, alt, parent), state id)
 
     def fail(verdict, node, message, tail=None):
         res.verdict, res.message = verdict, message
@@ -421,11 +463,14 @@ def explore(name, threads, mem0, tso=False, idle_ok=lambda i, M, L: False, track
         res.trace = ex.replay(path[::-1], tail)
 
     while stack:
-        st, depth, node = stack.pop()
+        st, depth, node, sid = stack.pop()
         res.states += 1
         if depth > res.max_depth:
             res.max_depth = depth
         mem, ths = st
+        if graph:
+            if is_finished(mem, ths):
+                finished[sid] = 1
         for key in track:
             v = _M(ex, mem).get(key)
             if v > res.max_ghost.get(key, NONE):
@@ -438,7 +483,7 @@ def explore(name, threads, mem0, tso=False, idle_ok=lambda i, M, L: False, track
                 bigs = f'{ex.akeys[big]}={mem[big]}' if big is not None else '-'
                 print(f'    .. {name}: {res.states:,} states, {res.states / (now - t0):,.0f}/s, '
                       f'stack {len(stack):,}, depth {depth} (max {res.max_depth}), '
-                      f'largest {bigs}, {now - t0:.0f}s', file=out, flush=True)
+                      f'largest {bigs}, {now - t0:.0f}s', file=sys.stderr, flush=True)
             if now - t0 > max_seconds:
                 fail('TIME LIMIT', node, f'stopped after {max_seconds}s')
                 break
@@ -472,19 +517,93 @@ def explore(name, threads, mem0, tso=False, idle_ok=lambda i, M, L: False, track
             counts[i] = alt + 1
             ns = ex._canon(ns)
             fp = ex.fingerprint(ns, exact)
-            if fp not in seen:
-                seen.add(fp)
-                stack.append((ns, depth + 1, (i, alt, node)))
+            nid = seen.get(fp)
+            if nid is None:
+                nid = seen[fp] = len(seen)
+                stack.append((ns, depth + 1, (i, alt, node), nid))
+                if graph:
+                    parent.append(sid)
+                    parent_step.append(i)
+                    parent_step.append(alt)
+                    finished.append(0)
+                    if len(seen) > liveness_max_states:
+                        drop_graph(f'not checked: over {liveness_max_states:,} states')
+            if graph:
+                edge_from.append(sid)
+                edge_to.append(nid)
     res.seconds = time.time() - t0
+    if graph and res.verdict == 'ok' and res.complete:
+        trapped = _trapped(len(seen), edge_from, edge_to, finished, parent)
+        if trapped < 0:
+            res.liveness = 'ok'
+        else:
+            path = []
+            n = trapped
+            while n > 0:
+                path.append((parent_step[2 * n], parent_step[2 * n + 1]))
+                n = parent[n]
+            res.verdict = 'TRAPPED'
+            res.message = ('no finished state is reachable at all' if trapped == 0 else
+                           'this step enters a set of states from which no finished state is reachable: '
+                           'from here the model can run forever without finishing')
+            res.trace = ex.replay(path[::-1], 'TRAPPED: no finished state is reachable from here')
+            res.liveness = 'trapped'
+    elif graph:
+        res.liveness = 'not checked: the search did not complete'
     return res
+
+
+def _trapped(nstates, edge_from, edge_to, finished, parent):
+    """A state that cannot reach a finished state, or -1 if every state can.
+
+    Backward breadth-first search from the finished states over the reversed
+    edges, held as a counting-sorted adjacency array so the whole graph costs
+    two machine words per edge. Of the trapped states it returns one the search
+    entered from a state that is *not* trapped, so that the trace ends on the
+    step that gave up on finishing rather than somewhere deep inside the trap.
+    """
+    heads = array('l', bytes(8 * (nstates + 1)))
+    for v in edge_to:
+        heads[v + 1] += 1
+    for v in range(nstates):
+        heads[v + 1] += heads[v]
+    fill = array('l', heads[:nstates])
+    back = array('l', bytes(8 * len(edge_to)))
+    for k in range(len(edge_to)):
+        v = edge_to[k]
+        back[fill[v]] = edge_from[k]
+        fill[v] += 1
+    can = bytearray(finished)
+    work = [v for v in range(nstates) if can[v]]
+    while work:
+        v = work.pop()
+        for k in range(heads[v], heads[v + 1]):
+            u = back[k]
+            if not can[u]:
+                can[u] = 1
+                work.append(u)
+    if not can[0]:
+        return 0                             # nothing finishes, from the start
+    for v in range(1, nstates):
+        if not can[v] and can[parent[v]]:    # the search tree's step into the trap
+            return v
+    for v in range(1, nstates):              # a trap entered only off the tree
+        if not can[v]:
+            return v
+    return -1
 
 
 def report(res, expect_ok=None, tso=False, extra='', out=sys.stdout):
     """Print one result line. Returns False for an unexpected or incomplete result."""
     unexpected = res.complete and expect_ok is not None and expect_ok != res.ok
     bound = '' if res.exact else f', miss<{max(res.states, 1) ** 2 / 2 ** 97:.0e}'
+    live = '' if res.liveness is None or res.verdict != 'ok' else (
+        ' +live' if res.liveness == 'ok' else f' [liveness {res.liveness}]')
+    # Wall-clock only on a terminal: a recorded .out must reproduce by plain
+    # diff, and everything else on this line is a function of the model.
+    clock = f'{res.seconds:7.1f}s, ' if out.isatty() else ''
     print(f"{res.name:<60} {'TSO' if tso else 'SC '} states={res.states:>11,} depth={res.max_depth:>3} "
-          f"({res.seconds:7.1f}s{bound}) -> {res.verdict}{extra}"
+          f"({clock}{bound.lstrip(', ')}) -> {res.verdict}{live}{extra}"
           f"{'   <-- UNEXPECTED' if unexpected else ''}", file=out, flush=True)
     if res.verdict != 'ok':
         if res.message:
