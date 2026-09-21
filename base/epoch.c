@@ -24,14 +24,21 @@ void osoe_epoch_wake_all(struct osoe_epoch *e)
 
 void osoe_epoch_wait_eq(struct osoe_epoch *e, uint32_t target, const char *routine)
 {
+    bool timed_out = false;
     for (;;) {
         uint32_t v = atomic_load_explicit(&e->count_compare_only_by_equality,
                                           memory_order_acquire);
-        if (v == target)
+        if (v == target) {
+            /* Reached, but only noticed because the sweep expired: the bump
+             * landed while this waiter slept and its wake never came. */
+            if (timed_out)
+                osoe_missed_wake(routine);
             return;
+        }
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-        if (osoe_futex_wait(&e->count_compare_only_by_equality, v, &sweep,
-                            OSOE_FUTEX_SHARED) == ETIMEDOUT)
+        timed_out = osoe_futex_wait(&e->count_compare_only_by_equality, v, &sweep,
+                                    OSOE_FUTEX_SHARED) == ETIMEDOUT;
+        if (timed_out)
             osoe_sweep_expired(routine);
     }
 }

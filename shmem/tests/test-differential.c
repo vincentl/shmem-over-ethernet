@@ -41,6 +41,8 @@
 
 #include <shmem.h>
 
+#include "invariants.h"
+
 enum { BUFFER = 3000, SMALL = 200, ADD = 7, FETCH_ADD = 100 };
 
 static uint64_t fnv(const void *bytes, size_t len)
@@ -205,6 +207,12 @@ int main(void)
                 shmem_ptr(inbox, me) ? "yes" : "no");
         return 2;
     }
+
+    /* §8.2's rule, which every tier-2 test keeps. Outputs cannot show a lost
+     * wake - a barrier whose release wake is deleted still completes, one
+     * sweep late - and the maps here are the ones that cross nodes. */
+    if (!osoe_invariants_ok() || CHECK_DONE())
+        return 2;
 
     shmem_free(tally);
     shmem_free(sum);

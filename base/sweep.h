@@ -18,4 +18,22 @@
 
 void osoe_sweep_expired(const char *routine);
 
+/*
+ * A sweep expired on a condition that was already true: the thing waited for
+ * happened while the waiter slept, and no wake came (§3.14, invariant.missed_wake).
+ *
+ * A lost wake in a wait that carries a sweep costs latency and nothing else, so
+ * no test can see it through a result - a barrier whose release wake is deleted
+ * still completes, one sweep late each time. This is what makes it visible: the
+ * SHMEM layer overrides it to count the invariant that every tier-2 test checks
+ * at quiescence, as wait.c already does for its own waits. Same weak-default
+ * arrangement as osoe_sweep_expired, for the same reason.
+ *
+ * It can over-count by one in a window of a few hundred nanoseconds - the wake
+ * arriving between the kernel's timeout and the waiter's re-read - which a
+ * waiter reaches only after sleeping a full sweep interval. wait.c accepts the
+ * same window.
+ */
+void osoe_missed_wake(const char *routine);
+
 #endif /* OSOE_BASE_SWEEP_H */

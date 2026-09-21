@@ -307,8 +307,11 @@ endforeach()
 # reduced, would leave nothing to compare it against - a differential test of
 # one configuration is not one - so it is left out there entirely and the other
 # three presets carry it.
-add_executable(shmem_test_differential test-differential.c)
-target_link_libraries(shmem_test_differential PRIVATE osoe)
+add_executable(shmem_test_differential test-differential.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_differential PRIVATE
+  ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_differential PRIVATE osoe rt)
 osoe_warnings(shmem_test_differential)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
 add_test(NAME shmem.differential

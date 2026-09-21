@@ -34,6 +34,7 @@
 
 #include "base/sweep.h"
 #include "fatal.h"
+#include "metrics.h"
 #include "state.h"
 
 /*
@@ -82,4 +83,12 @@ void osoe_sweep_expired(const char *routine)
                    "production the launcher tears the job down instead (srun -K1)",
                    routine, i, rank, osoe.node.slots[i].pid);
     }
+}
+
+/* base/sweep.h. The epoch waits of the barriers are base's, so they report a
+ * lost wake through this hook rather than naming a counter they cannot see. */
+void osoe_missed_wake(const char *routine)
+{
+    (void)routine;
+    osoe_count(OSOE_C_INVARIANT_MISSED_WAKE, 1);
 }
