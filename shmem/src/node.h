@@ -285,7 +285,9 @@ struct osoe_node_header {
     /* Appended at layout 7 (§5.3). */
     struct osoe_arrival_handoff arrival[OSOE_TEAMS];
 
-    /* Appended at layout 8. */
+    /* Appended at layout 8. Layout 8 also gave each epoch counter's line a
+     * second word, released_at_ns (base/epoch.h), in padding it already owned:
+     * no offset moved, but the line's contents changed meaning. */
     struct osoe_am_node_metrics am;
 };
 

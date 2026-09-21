@@ -108,7 +108,7 @@ static void release(void *context, uint32_t team, uint32_t epoch)
         released = &osoe.node.hdr->shared_released;
         name = "SHMEM_TEAM_SHARED";
     }
-    if (!osoe_epoch_bump_eq(released, epoch))
+    if (!osoe_epoch_release_bump_eq(released, epoch))
         osoe_fatal("the internode release for %s arrived for epoch %u out of order: "
                    "the PEs of this job called different numbers of collectives", name,
                    epoch);

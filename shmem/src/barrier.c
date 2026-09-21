@@ -60,7 +60,7 @@ static void sync_team(struct osoe_team *t, const char *routine)
              */
             osoe_progress_host_post_arrival(t->number, k + 1);
         } else {
-            if (!osoe_epoch_bump_eq(t->released, k + 1))
+            if (!osoe_epoch_release_bump_eq(t->released, k + 1))
                 osoe_fatal("%s epochs diverged at epoch %u: PEs called different numbers "
                            "of collectives", t->name, k + 1);
             osoe_epoch_wake_all(t->released);

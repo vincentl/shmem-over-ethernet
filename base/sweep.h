@@ -29,10 +29,11 @@ void osoe_sweep_expired(const char *routine);
  * at quiescence, as wait.c already does for its own waits. Same weak-default
  * arrangement as osoe_sweep_expired, for the same reason.
  *
- * It can over-count by one in a window of a few hundred nanoseconds - the wake
- * arriving between the kernel's timeout and the waiter's re-read - which a
- * waiter reaches only after sleeping a full sweep interval. wait.c accepts the
- * same window.
+ * A caller must not report a wake that is merely late. A release landing as the
+ * sweep timer fires looks exactly like a lost wake to the waiter, and under
+ * load that is not rare; base/epoch.c's waits therefore report only a target
+ * reached well before the expired deadline (LOST_WAKE_MARGIN_NS). wait.c's
+ * waits have the same window and do not yet make that distinction.
  */
 void osoe_missed_wake(const char *routine);
 
