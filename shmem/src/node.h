@@ -357,6 +357,14 @@ struct osoe_landing_slot {
      * Recording it makes "its" checkable rather than assumed.
      */
     _Atomic uint64_t token;
+    /*
+     * The token of the operation this slot's owner is waiting for, stored by
+     * the owner before its request is sent (layout 9). The lead refuses a reply
+     * carrying any other before writing a byte of it - an unsolicited or stale
+     * reply is a peer's bug, and landing it would corrupt this zone or, past
+     * its end, a sibling's (§3.4's trust boundary; second review, D4).
+     */
+    _Atomic uint64_t armed_token;
 
     /* The reply bytes. One AM chunk is enough: a larger get is chunked on the
      * wire (§3.2) and the origin copies each chunk out before the next lands. */

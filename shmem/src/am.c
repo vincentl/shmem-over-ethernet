@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "am.h"
@@ -51,9 +52,10 @@ uint32_t osoe_am_table_checksum(void)
     return h;
 }
 
-void osoe_am_parser_init(struct osoe_am_parser *p)
+void osoe_am_parser_init(struct osoe_am_parser *p, uint32_t peer)
 {
     *p = (struct osoe_am_parser){ 0 };
+    p->peer = peer;
     p->stage = OSOE_AM_STAGE_SEGMENT;
     p->need = (uint32_t)sizeof(struct osoe_am_segment_header);
 }
@@ -91,6 +93,17 @@ static void begin_message(struct osoe_am_parser *p)
 static bool segment_complete(const struct osoe_am_parser *p)
 {
     return p->segment_seen >= p->segment.total_len;
+}
+
+/* "node 3", for a fatal: the receiving node is where a peer's bug surfaces, so
+ * the message must say which peer (§3.15; second review, D4). */
+static const char *from(const struct osoe_am_parser *p, char *buf, size_t len)
+{
+    if (p->peer == UINT32_MAX)
+        snprintf(buf, len, "an unnamed peer");
+    else
+        snprintf(buf, len, "node %u", p->peer);
+    return buf;
 }
 
 static void end_segment(struct osoe_am_parser *p, const struct osoe_am_sink *sink)
@@ -135,6 +148,22 @@ void osoe_am_parse(struct osoe_am_parser *p, const void *bytes, size_t length,
             if (p->segment.total_len < sizeof p->segment)
                 osoe_fatal("segment %llu claims %u bytes, less than its own header",
                            (unsigned long long)p->segment.seq, p->segment.total_len);
+            /*
+             * Every message needs at least its header, so a count that cannot
+             * fit in the bytes the segment says it has is refused here, before
+             * a byte of any of them is read. The check at the end of the
+             * segment would catch it too, but only after the first message had
+             * been parsed out of bytes that belong to the next segment.
+             */
+            uint32_t room = p->segment.total_len - (uint32_t)sizeof p->segment;
+            if ((uint64_t)p->segment.message_count * sizeof(struct osoe_message_header) >
+                room) {
+                char who[32];
+                osoe_fatal("segment %llu from %s claims %u messages in no room: it is %u "
+                           "bytes, %u past its header",
+                           (unsigned long long)p->segment.seq, from(p, who, sizeof who),
+                           p->segment.message_count, p->segment.total_len, room);
+            }
             if (p->segment.message_count == 0) {
                 /* A header-only segment: an acknowledgement with nothing to
                  * apply, which is how one-way traffic is acknowledged at all
@@ -161,6 +190,26 @@ void osoe_am_parse(struct osoe_am_parser *p, const void *bytes, size_t length,
             if (p->message.len < d->fixed_bytes)
                 osoe_fatal("a %s message is %u bytes, less than its fixed part of %u",
                            d->name, p->message.len, d->fixed_bytes);
+            /*
+             * The message, padding included, must fit in what is left of its
+             * segment - checked now, before any of it is applied. A length
+             * that runs past the segment would otherwise have its payload
+             * written from the next segment's bytes, and the cross-check at
+             * the segment's end would fire only after the damage (D4).
+             */
+            {
+                uint32_t header = (uint32_t)sizeof(struct osoe_message_header);
+                uint64_t padded = ((uint64_t)header + p->message.len + 7u) & ~UINT64_C(7);
+                uint64_t remaining = p->segment.total_len > p->segment_seen
+                                     ? p->segment.total_len - p->segment_seen : 0;
+                if (padded - header > remaining) {
+                    char who[32];
+                    osoe_fatal("a %s message of %u bytes runs past the end of segment %llu "
+                               "from %s: %llu bytes of the segment remain", d->name,
+                               p->message.len, (unsigned long long)p->segment.seq,
+                               from(p, who, sizeof who), (unsigned long long)remaining);
+                }
+            }
             p->payload_bytes = p->message.len - d->fixed_bytes;
             if (!d->carries_payload && p->payload_bytes != 0)
                 osoe_fatal("a %s message carries %u payload bytes and should carry none",

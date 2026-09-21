@@ -70,9 +70,10 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
     return (char *)osoe.node.heap_of[local] + offset;
 }
 
-static struct osoe_landing_slot *landing(void *context, uint32_t pe)
+static struct osoe_landing_slot *landing(void *context, uint32_t pe, uint32_t *capacity)
 {
     (void)context;
+    *capacity = osoe.node.landing_slot_bytes - (uint32_t)sizeof(struct osoe_landing_slot);
     if (pe >= osoe.bootstrap.world_size)
         return NULL;
     int32_t local = osoe.node.local_of_rank[pe];

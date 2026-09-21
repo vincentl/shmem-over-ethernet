@@ -52,8 +52,10 @@ struct osoe_progress_host {
      */
     void *(*resolve)(void *context, uint32_t pe, uint16_t region, uint64_t offset,
                      uint32_t length);
-    /* A local PE's landing zone (§3.12), or NULL if the PE is not local. */
-    struct osoe_landing_slot *(*landing)(void *context, uint32_t pe);
+    /* A local PE's landing zone (§3.12), or NULL if the PE is not local, and in
+     * `capacity` the bytes its data area holds - which a get reply is checked
+     * against before a byte of it is written (§3.4's trust boundary). */
+    struct osoe_landing_slot *(*landing)(void *context, uint32_t pe, uint32_t *capacity);
     /* Wake that PE's waiters whose watched range this write overlapped (§4.9). */
     void (*notify)(void *context, uint32_t pe, uint16_t region, uint64_t offset,
                    uint32_t length);

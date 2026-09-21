@@ -55,8 +55,8 @@ static uint32_t releases, released_epoch;
 
 static void *resolve(void *c, uint32_t pe, uint16_t r, uint64_t o, uint32_t n)
 { (void)c; (void)pe; (void)r; (void)o; (void)n; return NULL; }
-static struct osoe_landing_slot *landing(void *c, uint32_t pe)
-{ (void)c; (void)pe; return NULL; }
+static struct osoe_landing_slot *landing(void *c, uint32_t pe, uint32_t *capacity)
+{ (void)c; (void)pe; *capacity = 0; return NULL; }
 static void notify(void *c, uint32_t pe, uint16_t r, uint64_t o, uint32_t n)
 { (void)c; (void)pe; (void)r; (void)o; (void)n; }
 

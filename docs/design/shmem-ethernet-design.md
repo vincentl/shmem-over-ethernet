@@ -278,6 +278,22 @@ only pays above ~10–16 KB. Revisit only on a fast NIC.
 
 ### 3.4 Segment structure
 
+**The trust boundary.** All PEs of a job trust each other completely — a
+one-sided API cannot do otherwise, since any PE may write any heap. They are the
+same job and the same build, **assumed buggy but not hostile**. Other local users
+are untrusted, which mode 0600 and `O_EXCL` on every object enforce (§6.2). The
+network is trusted at the level Slurm's own traffic is; §10 records how a secret
+in the step-3 handshake would change that. What follows from "buggy": **a peer's
+bytes must never be able to write outside a heap or a landing slot**. The
+receiving node validates every length and index a segment carries before
+applying it — a message's length against what is left of its segment, the
+message count against the segment's size, a get reply's token, offset and total
+against the landing slot, an atomic's width, operation and alignment — and a
+failure is a fatal on the receiving node naming the peer. That turns a peer's bug
+into a named abort where it lands, instead of corruption where it lands. Before
+phase 1 step 2 slice 2 none of this was checked or stated, and a forged get reply
+wrote 64 bytes past a landing zone with the test passing (second review, D4).
+
 Two buffers per connection: one filling, one in flight. A third smooths nothing.
 **At most one of them is reservable at any moment** — a rule (§3.5), not a sizing
 remark.
@@ -3443,6 +3459,11 @@ rendezvous** from each node's `SLURM_GTIDS` (§6.2).
 > **Local PEs meet on their node; only each node's lead crosses the network.
 > Rendezvous connections scale with node count.**
 
+The rendezvous inherits §3.4's trust boundary: the PEs of a job trust each other,
+other local users do not (every object is mode 0600, created `O_EXCL`), and the
+network is trusted as Slurm's own traffic is. The step-3 handshake authenticates
+nothing beyond the job and step ids, which are public; §10 has the open item.
+
 **Node-local.** The lead creates the node segment as a named shared memory object,
 `/osoe.<job>.<step>.<node>.<session>`, so concurrent steps on one node cannot
 collide. The session is the number of full `shmem_init` sessions this process has
@@ -4436,6 +4457,16 @@ out-of-band bootstrap, and §8.1's three-way switch.
   node and no redesign.
 
 ### Still open — design, deferrable
+
+- **Authenticating the step-3 handshake.** §3.4 and §6.2 declare the network
+  trusted at Slurm's level; the handshake carries only the job and step ids,
+  which are sequential and public (`squeue`), and the port is a hash of them, so
+  any host that can reach it could join as a node and then read and write every
+  heap by design. If the cluster LAN is not trusted, the second review's
+  portability F2 has a nearly free answer: a wrapper sets
+  `OSOE_JOB_SECRET=$(head -c16 /dev/urandom | xxd -p)` before `srun`, Slurm
+  propagates the environment to every task, and the handshake carries it. Decide
+  with step 3.
 
 - Does any collective need RMA on symmetric scratch rather than AM? (Answer so
   far: no.)

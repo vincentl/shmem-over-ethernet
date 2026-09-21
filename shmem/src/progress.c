@@ -29,6 +29,35 @@ uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer)
  * bytes land where they belong rather than in a reassembly buffer (§3.3). This
  * is the only place an incoming message becomes an address.
  */
+static uint32_t peer_of(const struct osoe_progress *p, uint32_t slot)
+{
+    return slot < p->node ? slot : slot + 1;
+}
+
+/*
+ * A get reply is checked before a byte of it lands (§3.4's trust boundary;
+ * second review, D4). Its token must be the one the owner armed the slot for,
+ * and its chunk must lie inside both the whole reply and the slot. A reply that
+ * fails is a peer's bug - the same job, the same build - and the landing zone
+ * sits in the control segment beside the other PEs' zones, so writing it would
+ * corrupt a sibling rather than fail. The measured case: an unsolicited reply
+ * with chunk_offset past the zone wrote 64 bytes beyond it and the test passed.
+ */
+static void check_get_reply(struct osoe_progress *p, uint32_t slot,
+                            struct osoe_landing_slot *landing, uint32_t capacity,
+                            const struct osoe_am_get_reply *m, uint32_t chunk)
+{
+    uint64_t armed = atomic_load_explicit(&landing->armed_token, memory_order_acquire);
+    if (m->token != armed)
+        osoe_fatal("a get reply from node %u for PE %u carries token %llu; that PE is "
+                   "waiting for %llu", peer_of(p, slot), m->origin_pe,
+                   (unsigned long long)m->token, (unsigned long long)armed);
+    if ((uint64_t)m->chunk_offset + chunk > m->total || m->total > capacity)
+        osoe_fatal("a get reply from node %u for PE %u puts %u bytes at offset %u of a "
+                   "%u-byte reply, into a landing zone of %u bytes", peer_of(p, slot),
+                   m->origin_pe, chunk, m->chunk_offset, m->total, capacity);
+}
+
 static void *destination(void *context, const struct osoe_message_header *header,
                          const void *fixed, uint32_t payload_bytes)
 {
@@ -44,9 +73,13 @@ static void *destination(void *context, const struct osoe_message_header *header
     if (header->kind == OSOE_AM_GET_REPLY) {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
-        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe);
+        uint32_t capacity = 0;
+        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
+                                                         &capacity);
         if (!slot)
-            return NULL;            /* not ours: the bytes are consumed and dropped */
+            osoe_fatal("a get reply from node %u names PE %u, which is not on this node",
+                       peer_of(p, a->slot), m.origin_pe);
+        check_get_reply(p, a->slot, slot, capacity, &m, payload_bytes);
         return slot->data + m.chunk_offset;
     }
     return NULL;
@@ -171,6 +204,14 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_RMW_REQUEST: {
         struct osoe_am_rmw_request m;
         memcpy(&m, fixed, sizeof m);
+        /* §3.4's trust boundary: an atomic is 4 or 8 bytes, an operation this
+         * build knows, at an address aligned to its width - checked before
+         * osoe_rmw_apply, which assumes all three (second review, D4). */
+        if ((m.width != 4 && m.width != 8) || m.op > OSOE_RMW_XOR || m.offset % m.width != 0)
+            osoe_fatal("an atomic from node %u is %u bytes wide, operation %u, at offset "
+                       "%llu; this build takes 4 or 8 bytes, a known operation, aligned to "
+                       "the width", peer_of(p, a->slot), m.width, m.op,
+                       (unsigned long long)m.offset);
         void *at = p->host.resolve(p->host.context, m.target_pe, m.region, m.offset,
                                    m.width);
         uint64_t previous = 0;
@@ -201,9 +242,11 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_GET_REPLY: {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
-        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe);
+        uint32_t capacity = 0;
+        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
+                                                         &capacity);
         if (!slot)
-            break;
+            break;              /* destination() has already refused it */
         /*
          * A get larger than one AM chunk arrives as several replies (§3.2), so
          * `ready` is published only once the whole thing has landed - the
@@ -280,9 +323,17 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_RMW_REPLY: {
         struct osoe_am_rmw_reply m;
         memcpy(&m, fixed, sizeof m);
-        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe);
+        uint32_t capacity = 0;
+        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
+                                                         &capacity);
         if (!slot)
-            break;
+            osoe_fatal("an atomic's reply from node %u names PE %u, which is not on this "
+                       "node", peer_of(p, a->slot), m.origin_pe);
+        uint64_t armed = atomic_load_explicit(&slot->armed_token, memory_order_acquire);
+        if (m.token != armed)
+            osoe_fatal("an atomic's reply from node %u for PE %u carries token %llu; that "
+                       "PE is waiting for %llu", peer_of(p, a->slot), m.origin_pe,
+                       (unsigned long long)m.token, (unsigned long long)armed);
         atomic_store_explicit(&slot->value, m.value, memory_order_release);
         atomic_store_explicit(&slot->token, m.token, memory_order_release);
         land(slot);
@@ -665,7 +716,7 @@ void osoe_progress_attach(struct osoe_progress *p,
         c->open = c->sealed = c->sending = OSOE_CONNECTION_NONE;
         c->next_seq = 1;
         c->state[0] = c->state[1] = OSOE_BUFFER_FREE;
-        osoe_am_parser_init(&c->parser);
+        osoe_am_parser_init(&c->parser, peer_of(p, slot));
         osoe_reply_queues_init(&c->queues);
     }
 }

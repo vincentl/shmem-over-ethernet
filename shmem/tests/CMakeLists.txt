@@ -47,7 +47,7 @@ set_tests_properties(shmem.am PROPERTIES LABELS "tier1" TIMEOUT 120)
 # message, so a check that stopped firing fails here rather than going quiet.
 foreach(case_expect
     "count|carried 4 messages, its header says 5"
-    "length|was [0-9]+ bytes, its header says"
+    "length|runs past the end of segment 1 from an unnamed peer"
     "short-segment|less than its own header"
     "kind|this build knows"
     "short-message|less than its fixed part"
@@ -60,10 +60,6 @@ foreach(case_expect
   set_tests_properties(shmem.am.malformed.${case} PROPERTIES
     LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
 endforeach()
-# Review round two, D4: lengths the parser trusts today. Disabled until it
-# checks them; on this tree both are applied without complaint.
-set_tests_properties(shmem.am.malformed.long-message shmem.am.malformed.empty-count
-  PROPERTIES DISABLED TRUE)
 
 # Deferred reply queues and the credit (tier 1): pure logic and one atomic.
 add_executable(shmem_test_reply test-reply.c ../src/reply.c)
@@ -180,8 +176,8 @@ add_test(NAME shmem.progress
           $<TARGET_FILE:shmem_test_progress>)
 set_tests_properties(shmem.progress PROPERTIES LABELS "tier2" TIMEOUT 90)
 # Review round two, D4: a get reply nobody asked for, pointing past the landing
-# zone, must be refused by name on the node that receives it. Disabled until the
-# receive side validates; on this tree it is written, 64 bytes past the zone.
+# zone, must be refused by name on the node that receives it. Before slice 2 it
+# was written, 64 bytes past the zone, and the test passed.
 add_test(NAME shmem.progress.forged-get-reply
   COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
           OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
@@ -190,8 +186,16 @@ add_test(NAME shmem.progress.forged-get-reply
           $<TARGET_FILE:shmem_test_progress>)
 set_tests_properties(shmem.progress.forged-get-reply PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "osoe_fatal: a get reply from node 0"
-  FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE"
-  DISABLED TRUE)
+  FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
+add_test(NAME shmem.progress.forged-get-reply-bounds
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+          OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+          OSOE_TEST_FORGE=get-reply-bounds
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
+          $<TARGET_FILE:shmem_test_progress>)
+set_tests_properties(shmem.progress.forged-get-reply-bounds PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "osoe_fatal: a get reply from node 0 for PE 2 puts 64 bytes at offset"
+  FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
 
 # The connection area across the PEs of a node (tier 2). The local lead creates
 # it and the others open it, which is §3.12's arrangement. Not an

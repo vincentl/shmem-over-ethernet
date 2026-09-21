@@ -129,9 +129,10 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
     return heap + offset;
 }
 
-static struct osoe_landing_slot *landing(void *context, uint32_t pe)
+static struct osoe_landing_slot *landing(void *context, uint32_t pe, uint32_t *capacity)
 {
     (void)context;
+    *capacity = HEAP;
     return pe == my_pe ? (struct osoe_landing_slot *)landing_storage : NULL;
 }
 
@@ -292,11 +293,21 @@ int main(void)
      * at the end says so if it was written instead.
      */
     const char *forge = getenv("OSOE_TEST_FORGE");
-    if (forge && strcmp(forge, "get-reply") == 0 && node == 0 && lead) {
+    bool bounds = forge && strcmp(forge, "get-reply-bounds") == 0;
+    /* get-reply-bounds: the receiving lead arms a known token before anything
+     * moves and never re-arms, and the forged reply carries it, so the token
+     * check passes and the offset check is the one that must refuse it. The
+     * reply is the first thing on the 0 -> 1 stream, so it arrives before any
+     * reply this lead's own requests could get. */
+    enum { FORGED_TOKEN = 0x77 };
+    if (bounds && node == 1 && lead)
+        atomic_store_explicit(&slot->armed_token, FORGED_TOKEN, memory_order_release);
+    if (forge && (strcmp(forge, "get-reply") == 0 || bounds) && node == 0 && lead) {
         unsigned char forged[64];
         memset(forged, 0xEE, sizeof forged);
         struct osoe_am_get_reply lie = { .origin_pe = peer_lead, .chunk_offset = HEAP + 32,
-                                         .total = 0xffffffffu, .token = 0xdeadbeef };
+                                         .total = 0xffffffffu,
+                                         .token = bounds ? FORGED_TOKEN : 0xdeadbeef };
         while (!post(c, OSOE_AM_GET_REPLY, &lie, sizeof lie, forged, sizeof forged))
             osoe_progress_poll(&p);
     }
@@ -308,6 +319,10 @@ int main(void)
 
     /* A get larger than one AM chunk, so its reply is drained over several
      * passes and the descriptor survives partial draining (§3.8). */
+    /* Armed before the request, as transport-am.c's arm() does: the lead
+     * refuses a reply for any other token (§3.4's trust boundary). */
+    if (!bounds)
+        atomic_store_explicit(&slot->armed_token, 1, memory_order_release);
     struct osoe_am_get_request request = { .target_pe = peer_lead, .origin_pe = my_pe,
                                            .region = 0, .length = GET_BYTES,
                                            .offset = GET_AT, .token = 1 };
@@ -339,6 +354,8 @@ int main(void)
 
     /* A fetching AMO: applied at handler time, its value carried back on the
      * control queue (§3.8). */
+    if (!bounds)
+        atomic_store_explicit(&slot->armed_token, 2, memory_order_release);
     struct osoe_am_rmw_request rmw = { .target_pe = peer_lead, .origin_pe = my_pe,
                                        .region = 0, .op = OSOE_RMW_ADD, .width = 8,
                                        .offset = RMW_AT, .operand = 7, .token = 2,

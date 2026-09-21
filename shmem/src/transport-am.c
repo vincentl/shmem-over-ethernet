@@ -436,7 +436,10 @@ static uint64_t arm(struct osoe_landing_slot *slot)
 {
     static uint64_t next_token;
     atomic_store_explicit(&slot->ready, 0, memory_order_seq_cst);
-    return ++next_token;
+    /* Published before the request goes out: the send's reservation and
+     * commit order it before any reply can exist. */
+    atomic_store_explicit(&slot->armed_token, ++next_token, memory_order_release);
+    return next_token;
 }
 
 /* Reserve, fill and commit one message of `fixed_bytes` plus `payload` bytes. */

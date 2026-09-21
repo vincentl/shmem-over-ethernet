@@ -205,9 +205,12 @@ struct osoe_am_parser {
     uint32_t payload_seen;
     uint32_t payload_bytes;     /* this message's payload length */
     unsigned char *destination; /* where the payload is going, or NULL to discard */
+    uint32_t peer;              /* the node this stream comes from, for a fatal to name */
 };
 
-void osoe_am_parser_init(struct osoe_am_parser *p);
+/* `peer` is the node the bytes come from, or UINT32_MAX when there is none to
+ * name (a test feeding the parser directly). */
+void osoe_am_parser_init(struct osoe_am_parser *p, uint32_t peer);
 
 /*
  * Feed bytes from the wire. Every byte is consumed: a parser that could refuse
