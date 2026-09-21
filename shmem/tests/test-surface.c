@@ -20,8 +20,9 @@
 #include <stdint.h>
 #include <string.h>
 
-/* All four spellings of the interface must exist and agree (§7.4). */
+/* All five spellings of the interface must exist and agree (§7.4). */
 #include <mpp/shmem.h>
+#include <mpp/shmemx.h>
 #include <pshmem.h>
 #include <shmem.h>
 #include <shmemx.h>

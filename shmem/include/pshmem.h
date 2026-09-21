@@ -164,8 +164,9 @@ OSOE_WAIT_DEPRECATED_TYPES(OSOE_WAIT_PDECL_DEPRECATED)
 #undef OSOE_WAIT_PDECL_MANY
 #undef OSOE_WAIT_PDECL_DEPRECATED
 
-/* Profiling control (§10.1.1). */
-void shmem_pcontrol(int level, ...);
+/* Profiling control (§10.1.1). shmem_pcontrol is declared by shmem.h, which is
+ * where user code looks (conformance review F7); this header only adds the
+ * strong pshmem_ spelling a profiling library interposes. */
 void pshmem_pcontrol(int level, ...);
 
 #ifdef __cplusplus

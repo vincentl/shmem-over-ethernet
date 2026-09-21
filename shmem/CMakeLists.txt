@@ -60,8 +60,9 @@ osoe_warnings(osoe)
 
 install(TARGETS osoe)
 install(FILES include/shmem.h include/pshmem.h include/shmemx.h TYPE INCLUDE)
-# The historical header location (Annex F): <mpp/shmem.h> must resolve.
-install(FILES include/mpp/shmem.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mpp)
+# The historical header location (Annex F.2.1): <mpp/shmem.h> and
+# <mpp/shmemx.h> must both resolve (conformance review F8).
+install(FILES include/mpp/shmem.h include/mpp/shmemx.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mpp)
 
 if(BUILD_TESTING)
   add_subdirectory(tests)

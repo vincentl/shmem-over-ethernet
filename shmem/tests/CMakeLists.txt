@@ -4,6 +4,14 @@ osoe_warnings(shmem_test_info)
 add_test(NAME shmem.info COMMAND shmem_test_info)
 set_tests_properties(shmem.info PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# shmem_pcontrol declared by <shmem.h> alone (F7), and <mpp/shmemx.h> (F8):
+# both are proven by compiling, not by a runtime check. See the file comment.
+add_executable(shmem_test_header_surface test-header-surface.c)
+target_link_libraries(shmem_test_header_surface PRIVATE osoe)
+osoe_warnings(shmem_test_header_surface)
+add_test(NAME shmem.header-surface COMMAND shmem_test_header_surface)
+set_tests_properties(shmem.header-surface PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 if(BUILD_SHARED_LIBS)
   add_test(NAME shmem.exports
     COMMAND ${CMAKE_COMMAND} -DLIB=$<TARGET_FILE:osoe>
