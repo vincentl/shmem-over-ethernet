@@ -156,6 +156,20 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    getenv("OSOE_KEEP_CONTROL_SEGMENT"));
     b->keep_control_segment = keep != 0;
 
+    /*
+     * §6.2's /dev/shm capacity check refuses a request larger than the free
+     * space. Heaps are demand-paged, so a test machine with a small /dev/shm
+     * can run a job that asks for more than it touches; 0 turns the refusal
+     * into a report on stderr, for that and nothing else. Stored as "warning
+     * only" so that a bootstrap built by hand, zeroed, keeps the default.
+     */
+    uint32_t capacity_check = 1;
+    if (osoe_environment_u32("OSOE_SHM_CAPACITY_CHECK", &capacity_check) ==
+            OSOE_ENVIRONMENT_INVALID || capacity_check > 1)
+        osoe_fatal("OSOE_SHM_CAPACITY_CHECK='%s' is not 0 or 1",
+                   getenv("OSOE_SHM_CAPACITY_CHECK"));
+    b->shm_capacity_warning_only = capacity_check == 0;
+
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
     if (osoe_environment_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENVIRONMENT_INVALID || watchdog > 1)
         osoe_fatal("OSOE_WATCHDOG='%s' is not 0 or 1", getenv("OSOE_WATCHDOG"));

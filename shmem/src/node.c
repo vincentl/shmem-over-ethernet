@@ -253,13 +253,16 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      */
     uint64_t wanted = n->control_bytes + (uint64_t)b->local_count * n->heap_bytes;
     uint64_t free_bytes;
-    if (!osoe_shm_room(wanted, &free_bytes))
-        osoe_fatal("/dev/shm has %llu MiB free, but this node's control segment and %u "
-                   "heaps of %llu MiB need %llu MiB: lower SHMEM_SYMMETRIC_SIZE, run "
-                   "fewer PEs per node, or enlarge /dev/shm",
-                   (unsigned long long)(free_bytes >> 20), b->local_count,
-                   (unsigned long long)(n->heap_bytes >> 20),
-                   (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
+    if (!osoe_shm_room(wanted, &free_bytes)) {
+        char msg[320];
+        snprintf(msg, sizeof msg, "/dev/shm has %llu MiB free, but this node's control "
+                 "segment and %u heaps of %llu MiB need %llu MiB: lower "
+                 "SHMEM_SYMMETRIC_SIZE, run fewer PEs per node, or enlarge /dev/shm",
+                 (unsigned long long)(free_bytes >> 20), b->local_count,
+                 (unsigned long long)(n->heap_bytes >> 20),
+                 (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
+        osoe_shm_short(b->shm_capacity_warning_only, msg);
+    }
 
     char err[256];
     int fd = osoe_shm_create(n->control_name,

@@ -67,4 +67,11 @@ bool osoe_shm_orphaned(int fd);
  */
 bool osoe_shm_room(uint64_t wanted, uint64_t *free_bytes);
 
+/*
+ * The action on a failed osoe_shm_room: `message` as a fatal, or with
+ * `warning_only` (OSOE_SHM_CAPACITY_CHECK=0) as one line on stderr, after
+ * which init carries on.
+ */
+void osoe_shm_short(bool warning_only, const char *message);
+
 #endif /* OSOE_SHM_OBJECT_H */

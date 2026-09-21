@@ -625,8 +625,15 @@ add_test(NAME shmem.dev-shm-capacity.heaps
 add_test(NAME shmem.dev-shm-capacity.connections
   COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
           $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> connections)
+# And OSOE_SHM_CAPACITY_CHECK=0, for testing on a small /dev/shm: the same
+# request is reported and the job runs.
+add_test(NAME shmem.dev-shm-capacity.warned
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> warned)
 set_tests_properties(shmem.dev-shm-capacity.heaps shmem.dev-shm-capacity.connections
-  PROPERTIES LABELS "tier2" TIMEOUT 60)
+  shmem.dev-shm-capacity.warned PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.dev-shm-capacity.warned PROPERTIES PASS_REGULAR_EXPRESSION
+  "and 2 heaps.*continuing, since OSOE_SHM_CAPACITY_CHECK=0.*launcher exited 0")
 set_tests_properties(shmem.dev-shm-capacity.heaps PROPERTIES PASS_REGULAR_EXPRESSION
   "/dev/shm has [0-9]+ MiB free, but this node's control segment and 2 heaps.*launcher exited 1")
 set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES PASS_REGULAR_EXPRESSION

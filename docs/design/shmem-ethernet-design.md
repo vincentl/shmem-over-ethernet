@@ -3590,6 +3590,9 @@ The sequence, as implemented:
    whose memory ran out. The check is compared against the nominal size, so it
    also refuses a job that would have fitted by touching little of a large heap;
    `SHMEM_SYMMETRIC_SIZE` is the remedy it names. (Second review, omissions 5.)
+   The refusal is the default and stays so. `OSOE_SHM_CAPACITY_CHECK=0` turns it
+   into a line on stderr, for testing on a machine whose `/dev/shm` is smaller
+   than the nominal request (decided 2026-09-21).
 
    **A PE's core holds its own heap and nothing of its node-mates'.** Sibling
    heaps and the connection area are mapped `MADV_DONTDUMP`, or every crashing PE
@@ -4517,6 +4520,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_transport_watch_wait` being the backend's own function |
 | A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
+| Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
 
 ### Still open — blocking
 
@@ -4532,10 +4536,6 @@ Recorded rather than deleted, so they are not reopened from memory.
   `atomic_thread_fence(memory_order_seq_cst)` closes it for one `dmb ish` per
   fence and quiet (an `mfence` on x86-64 in place of the `xchg`). Decide, and run
   `fence-litmus` on a Pi 4 and a Pi 5 either way.
-- **The `/dev/shm` capacity check refuses on the nominal size** (§6.2). Heaps are
-  demand-paged, so it refuses jobs that would have run: seven PEs at the default
-  256 MiB on the 3 GiB, 16 KiB-page VM, where the seven-PE tests now ask for
-  16 MiB. A warning instead of a fatal would keep the message and lose the refusal.
 
 ### Still open — measurement, once hardware exists
 
