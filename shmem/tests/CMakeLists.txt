@@ -157,6 +157,15 @@ foreach(map 0 0,0,0,0 0,1,2,3 0,0,0,1,2,2 0,1,2,0,1,0)
     COMMAND osoe-launch -n ${count} -m ${map} -t 60 -- $<TARGET_FILE:shmem_test_job>)
   set_tests_properties(shmem.job.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
+# Two node leads claiming one rank: node 1's lead is told its node holds ranks 1
+# and 0, and node 0's lead holds 0. Exactly one claim wins (a CAS per rank since
+# slice 2; a plain test-and-store before, which two simultaneous leads could
+# both pass), and the job is refused naming the rank.
+add_test(NAME shmem.job.duplicate-rank
+  COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1,0 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
 
 # The progress loop between two logical nodes (tier 2): every layer at once.
 # The wire is far smaller than a segment and its split injection is on, so the

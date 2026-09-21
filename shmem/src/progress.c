@@ -794,9 +794,14 @@ void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch
     p->participants[team] = participants;
 
     if (p->node == root) {
-        /* No message to send: this node is where the arrivals are counted. */
+        /* No message to send: this node is where the arrivals are counted -
+         * and checked as the handler checks a peer's, since this node's own
+         * arrival can be the one out of step (second review, protocols P6). */
         if (p->arrivals[team] == 0)
             p->arrival_epoch[team] = epoch;
+        else if (p->arrival_epoch[team] != epoch)
+            osoe_fatal("team %u has arrivals for epochs %u and %u at once; collective "
+                       "epochs have diverged", team, p->arrival_epoch[team], epoch);
         p->arrivals[team]++;
         p->barrier_arrivals++;
         if (p->arrivals[team] == participants) {

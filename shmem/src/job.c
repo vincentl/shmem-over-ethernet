@@ -21,7 +21,7 @@
 #include "job.h"
 
 #define OSOE_JOB_MAGIC UINT64_C(0x00626f6a656f736f)   /* "osoejob" */
-#define OSOE_JOB_LAYOUT 1
+#define OSOE_JOB_LAYOUT 2     /* 2: the per-rank claim array */
 
 /* Not yet assigned to a node. The map starts full of these so that a rank no
  * lead claimed is a detectable gap rather than node 0 by accident. */
@@ -55,8 +55,21 @@ struct osoe_job_header {
      * yet, and that PE would wait for an object that can never appear.
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t left;
-    /* world_size entries follow, cache-line aligned. */
+    /*
+     * Two arrays of world_size entries follow, cache-line aligned: `node_of`,
+     * the map every PE reads, and `claim`, one word per rank that a lead takes
+     * by CAS before it writes that rank's entry of the map. The claim is what
+     * makes the map single-writer: two leads naming the same rank used to both
+     * test the map with a plain load and both store, a cross-process race that
+     * could miss the duplicate entirely (second review, atomics F6). With the
+     * claim, exactly one wins, the other is refused by name, and `node_of`
+     * stays plain data - written once by the winner, published by the seq_cst
+     * add to `joined`, and read by every put without an atomic.
+     */
 };
+
+_Static_assert(sizeof(_Atomic uint32_t) == sizeof(uint32_t),
+               "the claim array sits after node_of with the same stride");
 
 static uint64_t map_offset(void)
 {
@@ -96,7 +109,7 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
 
     snprintf(j->name, sizeof j->name, "/osoe.%llu.%u.job.%u",
              (unsigned long long)b->job, b->step, session);
-    j->bytes = map_offset() + (uint64_t)b->world_size * sizeof(uint32_t);
+    j->bytes = map_offset() + (uint64_t)b->world_size * 2 * sizeof(uint32_t);
     /* §6.2: the step's rendezvous server is the lead of node 0. */
     j->creator = b->node == 0 && b->local_id == 0;
 
@@ -153,6 +166,7 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
 
     struct osoe_job_header *h = p;
     uint32_t *node_of = (uint32_t *)((char *)p + map_offset());
+    _Atomic uint32_t *claim = (_Atomic uint32_t *)(node_of + b->world_size);
 
     if (j->creator) {
         h->magic = OSOE_JOB_MAGIC;
@@ -161,8 +175,10 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
         h->node_count = b->node_count;
         h->symmetric_size = b->symmetric_size;
         h->handler_checksum = osoe_am_table_checksum();
-        for (uint32_t i = 0; i < b->world_size; i++)
+        for (uint32_t i = 0; i < b->world_size; i++) {
             node_of[i] = OSOE_NODE_UNSET;
+            atomic_store_explicit(&claim[i], OSOE_NODE_UNSET, memory_order_release);
+        }
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
@@ -211,10 +227,14 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
         }
         for (uint32_t i = 0; i < b->local_count; i++) {
             uint32_t rank = b->gtids[i];
-            if (node_of[rank] != OSOE_NODE_UNSET && node_of[rank] != b->node) {
+            uint32_t holder = OSOE_NODE_UNSET;
+            if (!atomic_compare_exchange_strong_explicit(&claim[rank], &holder, b->node,
+                                                         memory_order_seq_cst,
+                                                         memory_order_acquire) &&
+                holder != b->node) {
                 fail_job(h);
-                osoe_fatal("rank %u is claimed by node %u and by node %u", rank,
-                           node_of[rank], b->node);
+                osoe_fatal("rank %u is claimed by node %u and by node %u", rank, holder,
+                           b->node);
             }
             node_of[rank] = b->node;
         }
