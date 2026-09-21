@@ -16,6 +16,7 @@
 #include "base/deadline.h"
 #include "base/environment.h"
 #include "base/futex.h"
+#include "base/stall-watch.h"
 #include "fatal.h"
 #include "job.h"
 
@@ -115,7 +116,10 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
     } else {
         /* The name appears before the object is sized and before the header is
          * written, so wait for the length here and for `ready` below. */
-        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+        /* Nothing moves until the object appears, so the watch is on a constant:
+         * with OSOE_NO_PROGRESS_TIMEOUT unset, this waits as long as it takes. */
+        struct osoe_stall_watch watch;
+        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         struct timespec back = { 0, 200000 };
         for (;;) {
             fd = shm_open(j->name, O_RDWR, 0);
@@ -128,9 +132,10 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
                 osoe_fatal("cannot open the job segment %s: %s", j->name,
                            strerror(errno));
             }
-            if (osoe_deadline_expired(&until))
-                osoe_fatal("timed out waiting for the lead of node 0 to create %s; it "
-                           "is the step's rendezvous point (§6.2)", j->name);
+            if (osoe_stall_watch_stalled(&watch, 0))
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the lead of node 0 has not created %s, the step's "
+                           "rendezvous point (§6.2)",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), j->name);
             nanosleep(&back, NULL);
             if (back.tv_nsec < 10000000)
                 back.tv_nsec *= 2;
@@ -161,15 +166,16 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
-        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+        struct osoe_stall_watch watch;
+        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         while (atomic_load_explicit(&h->ready, memory_order_acquire) == 0) {
             struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_futex_wait(&h->ready, 0, &sweep, OSOE_FUTEX_SHARED);
             if (atomic_load_explicit(&h->failed, memory_order_acquire))
                 osoe_fatal("the job rendezvous failed on another node");
-            if (osoe_deadline_expired(&until))
-                osoe_fatal("timed out waiting for the lead of node 0 to describe %s",
-                           j->name);
+            if (osoe_stall_watch_stalled(&watch, 0))
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the lead of node 0 has not finished describing %s",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), j->name);
         }
         if (h->magic != OSOE_JOB_MAGIC || h->layout != OSOE_JOB_LAYOUT)
             osoe_fatal("%s is not a job segment of this version (magic %#llx layout %u)",
@@ -219,7 +225,9 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
     /* Every PE waits for the map to be complete: a PE that started using it
      * early would resolve a peer's node before that peer's lead had said where
      * it was. */
-    struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, atomic_load_explicit(&h->joined, memory_order_acquire),
+                           b->no_progress_ns);
     for (;;) {
         uint32_t joined = atomic_load_explicit(&h->joined, memory_order_acquire);
         if (joined >= b->node_count)
@@ -228,9 +236,10 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
             osoe_fatal("the job rendezvous failed on another node");
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_futex_wait(&h->joined, joined, &sweep, OSOE_FUTEX_SHARED);
-        if (osoe_deadline_expired(&until))
-            osoe_fatal("timed out in the job rendezvous: %u of %u node leads have "
-                       "arrived", joined, b->node_count);
+        if (osoe_stall_watch_stalled(&watch, joined))
+            osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the job rendezvous has stayed at %u of %u node leads",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), joined,
+                       b->node_count);
     }
 
     for (uint32_t i = 0; i < b->world_size; i++)

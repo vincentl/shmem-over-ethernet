@@ -14,10 +14,12 @@
 
 #include <stdint.h>
 
-/* `routine` is an API routine name; `detail` is routine-specific - a target PE,
- * an epoch, a symmetric offset - and is whatever most helps say *what* the PE
- * is waiting for. */
-void osoe_blocked_enter(const char *routine, uint64_t detail);
+#include "node.h"
+
+/* `routine` is an API routine name; `detail` is whatever most helps say *what*
+ * the PE is waiting for - a peer node, an epoch, a symmetric offset - and
+ * `kind` says which, so a reader can print it as that. */
+void osoe_blocked_enter(const char *routine, enum osoe_blocked_detail kind, uint64_t detail);
 void osoe_blocked_leave(void);
 
 /* CLOCK_MONOTONIC nanoseconds, for the record and for the wait histograms.

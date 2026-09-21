@@ -55,8 +55,8 @@ static void run_stat(char *out, size_t len)
     pclose(f);
 }
 
-/* Does local PE 0's row - the first after the table's header - name shmem_quiet?
- * On map 0,0,1 local PE 0 of node 0 is rank 0. */
+/* Does local PE 0's row - the first after the table's header - say it is in
+ * shmem_quiet waiting on node 1? On map 0,0,1 local PE 0 of node 0 is rank 0. */
 static int pe0_blocked_in_quiet(const char *out)
 {
     const char *header = strstr(out, "blocked in\n");
@@ -67,7 +67,7 @@ static int pe0_blocked_in_quiet(const char *out)
     size_t n = end ? (size_t)(end - row) : strlen(row);
     char line[512];
     snprintf(line, sizeof line, "%.*s", (int)(n < sizeof line ? n : sizeof line - 1), row);
-    return strstr(line, "shmem_quiet") != NULL;
+    return strstr(line, "shmem_quiet (node 1)") != NULL;
 }
 
 int main(void)

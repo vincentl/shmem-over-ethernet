@@ -13,6 +13,7 @@
 
 #include "base/deadline.h"
 #include "base/futex.h"
+#include "base/stall-watch.h"
 #include "fatal.h"
 #include "connection-area.h"
 
@@ -80,15 +81,20 @@ static void check_failed(struct osoe_node *n)
  * passes. A failure wake can be missed (the failing PE stores `failed` and then
  * wakes without bumping the word), so it is noticed at the next sweep at worst.
  */
+/* Wait for a rendezvous count to reach its target; -1 once it has stopped
+ * moving for the no-progress limit (§3.15), which by default is never. */
 static int wait_count(struct osoe_node *n, _Atomic uint32_t *word, uint32_t target,
-                      const struct osoe_deadline *overall)
+                      uint64_t no_progress_ns)
 {
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, atomic_load_explicit(word, memory_order_acquire),
+                           no_progress_ns);
     for (;;) {
         uint32_t v = atomic_load_explicit(word, memory_order_acquire);
         check_failed(n);
         if (v == target)
             return 0;
-        if (osoe_deadline_expired(overall))
+        if (osoe_stall_watch_stalled(&watch, v))
             return -1;
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_futex_wait(word, v, &sweep, OSOE_FUTEX_SHARED);
@@ -296,9 +302,10 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
 
 /* A non-lead opens the control segment by name, waiting for the lead to
  * create and publish it. */
-static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session,
-                         const struct osoe_deadline *overall)
+static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
     struct timespec backoff = { 0, 1000 * 1000 };   /* 1 ms, doubling to 64 ms */
     for (;;) {
         int fd = shm_open(n->control_name, O_RDWR, 0);
@@ -320,9 +327,9 @@ static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, ui
             osoe_fatal("cannot open control segment %s: %s", n->control_name,
                        strerror(errno));
         }
-        if (osoe_deadline_expired(overall))
-            osoe_fatal("timed out waiting for the local lead to create %s "
-                       "(OSOE_BOOTSTRAP_TIMEOUT)", n->control_name);
+        if (osoe_stall_watch_stalled(&watch, 0))
+            osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not created %s",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), n->control_name);
         nanosleep(&backoff, NULL);
         if (backoff.tv_nsec < 64 * 1000 * 1000)
             backoff.tv_nsec *= 2;
@@ -333,9 +340,9 @@ static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, ui
         if (atomic_load_explicit(&n->hdr->ready, memory_order_acquire))
             break;
         check_failed(n);
-        if (osoe_deadline_expired(overall))
-            osoe_fatal("timed out waiting for the local lead to initialize %s",
-                       n->control_name);
+        if (osoe_stall_watch_stalled(&watch, 0))
+            osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not initialized %s",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), n->control_name);
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_futex_wait(&n->hdr->ready, 0, &sweep, OSOE_FUTEX_SHARED);
     }
@@ -380,7 +387,6 @@ static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, ui
 
 void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
-    struct osoe_deadline overall = osoe_deadline_in(b->timeout_ns);
     bool lead = b->local_id == 0;
 
     snprintf(n->control_name, sizeof n->control_name, "/osoe.%llu.%u.%u.%u",
@@ -399,7 +405,7 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     if (lead)
         create_control(n, b, session);
     else
-        open_control(n, b, session, &overall);
+        open_control(n, b, session);
 
     struct osoe_pe_slot *me = &n->slots[b->local_id];
     if (atomic_load_explicit(&me->phase, memory_order_acquire) != OSOE_PHASE_EMPTY)
@@ -440,11 +446,11 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     atomic_fetch_add_explicit(&n->hdr->joined, 1, memory_order_seq_cst);
     osoe_futex_wake(&n->hdr->joined, INT_MAX, OSOE_FUTEX_SHARED);
 
-    if (wait_count(n, &n->hdr->joined, b->local_count, &overall) != 0) {
+    if (wait_count(n, &n->hdr->joined, b->local_count, b->no_progress_ns) != 0) {
         char missing[256], msg[400];
         describe_missing(n, b->local_count, OSOE_PHASE_JOINED, missing, sizeof missing);
-        snprintf(msg, sizeof msg, "timed out waiting for local PEs to join "
-                 "(OSOE_BOOTSTRAP_TIMEOUT); missing local ids:%s", missing);
+        snprintf(msg, sizeof msg, "no local PE has joined for OSOE_NO_PROGRESS_TIMEOUT "
+                 "seconds; missing local ids:%s", missing);
         fail_rendezvous(n, msg);
     }
     check_agreement(n, b);
@@ -458,11 +464,12 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     /* The lead removes heap names once every PE holds a mapping, so a later
      * crash leaves no heap behind (§6.2). */
     if (lead) {
-        if (wait_count(n, &n->hdr->mapped, b->local_count, &overall) != 0) {
+        if (wait_count(n, &n->hdr->mapped, b->local_count, b->no_progress_ns) != 0) {
             char missing[256], msg[400];
             describe_missing(n, b->local_count, OSOE_PHASE_MAPPED, missing, sizeof missing);
-            snprintf(msg, sizeof msg, "timed out waiting for local PEs to map their "
-                     "siblings' heaps; missing local ids:%s", missing);
+            snprintf(msg, sizeof msg, "no local PE has finished mapping its siblings' "
+                     "heaps for OSOE_NO_PROGRESS_TIMEOUT seconds; missing local ids:%s",
+                     missing);
             fail_rendezvous(n, msg);
         }
         for (uint32_t i = 0; i < b->local_count; i++)

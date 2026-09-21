@@ -138,7 +138,7 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
              * that really sleeps (§3.14 cost rules). */
             slept = true;
             slept_since = osoe_now_ns();
-            osoe_blocked_enter(routine, offset);
+            osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_OFFSET, offset);
             osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
         }
 
@@ -340,7 +340,7 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
         if (!slept) {
             slept = true;
             slept_since = osoe_now_ns();
-            osoe_blocked_enter(w->routine, span_offset);
+            osoe_blocked_enter(w->routine, OSOE_BLOCKED_DETAIL_OFFSET, span_offset);
             osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
         }
 

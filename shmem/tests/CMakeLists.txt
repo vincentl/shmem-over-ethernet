@@ -401,7 +401,8 @@ osoe_tier2_map_test(reply-starvation 0,1,1,1,1,1,1
 # An internode quiet sweeps (§4.10; review round two, D2): node 1 is stopped,
 # PE 0 quiets toward it, PE 1 sees it blocked in osoe-stat and dies, and PE 0's
 # next sweep must end the job naming shmem_quiet. -k leaves the survivors to the
-# library. Registered disabled until the AM wait loops sweep.
+# library. Before slice 2 the quiet never swept: osoe-stat showed nothing for
+# PE 0, and the job ran to the launcher's 15 s timeout.
 add_executable(shmem_test_unswept-wait test-unswept-wait.c
   ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 target_include_directories(shmem_test_unswept-wait PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
@@ -413,8 +414,7 @@ add_test(NAME shmem.unswept-wait
           $<TARGET_FILE:shmem_test_unswept-wait>)
 set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "shmem_quiet: local PE 1 [(]rank 1"
-  FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED"
-  DISABLED TRUE)
+  FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED")
 
 # The reply descriptor pool (§3.8; review round two, D1). The review's scenario
 # at C = 2 must complete; with the target given a smaller credit than the
@@ -428,6 +428,21 @@ add_test(NAME shmem.reply-pool.overflow
           -e 7:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
 set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
+
+# A quiet waits as long as its peer does (§3.15; review round two, D3): node 1
+# stopped for 3 s, then continued, and the quiet completes with the no-progress
+# limit unset; with it at 1 s, the quiet ends the job naming the connection.
+# The slice-2 commit records a run stopped for 65 s, past the old 60 s bound.
+osoe_tier2_map_test(stopped-node 0,0,1 OSOE_TEST_STOP_MS=3000)
+set_tests_properties(shmem.stopped-node.0-0-1 PROPERTIES
+  PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
+add_test(NAME shmem.stopped-node.no-progress
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=6000 OSOE_NO_PROGRESS_TIMEOUT=1
+          $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
+          $<TARGET_FILE:shmem_test_stopped-node>)
+set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_quiet: no progress toward node 1 for [0-9]+ s"
+  FAIL_REGULAR_EXPRESSION "quiet completed")
 
 osoe_tier2_test(init)
 osoe_tier2_test(fork)

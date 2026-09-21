@@ -115,12 +115,24 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    (unsigned long long)b->symmetric_size,
                    (unsigned long long)OSOE_WATCH_MAX_REGION);
 
-    uint32_t timeout_s = OSOE_DEFAULT_BOOTSTRAP_TIMEOUT_S;
-    if (osoe_environment_u32("OSOE_BOOTSTRAP_TIMEOUT", &timeout_s) == OSOE_ENVIRONMENT_INVALID ||
-        timeout_s == 0)
-        osoe_fatal("OSOE_BOOTSTRAP_TIMEOUT='%s' is not a positive number of seconds",
-                   getenv("OSOE_BOOTSTRAP_TIMEOUT"));
-    b->timeout_ns = (uint64_t)timeout_s * UINT64_C(1000000000);
+    /*
+     * The no-progress rule (§3.15, base/stall-watch.h): a wait gives up only
+     * when what it watches has not moved for this long. 0, the default, means
+     * never. It replaced OSOE_BOOTSTRAP_TIMEOUT, a bound on waiting at all,
+     * which also bounded every internode wait and so failed a healthy quiet
+     * that simply took long (second review, D3). A job that still sets the old
+     * name is told, once, rather than left believing it is bounded.
+     */
+    uint32_t no_progress_s = 0;
+    if (osoe_environment_u32("OSOE_NO_PROGRESS_TIMEOUT", &no_progress_s) ==
+        OSOE_ENVIRONMENT_INVALID)
+        osoe_fatal("OSOE_NO_PROGRESS_TIMEOUT='%s' is not a number of seconds",
+                   getenv("OSOE_NO_PROGRESS_TIMEOUT"));
+    b->no_progress_ns = (uint64_t)no_progress_s * UINT64_C(1000000000);
+    if (getenv("OSOE_BOOTSTRAP_TIMEOUT") && b->local_id == 0 && b->rank == 0)
+        fprintf(stderr, "osoe: OSOE_BOOTSTRAP_TIMEOUT is retired and ignored; "
+                        "OSOE_NO_PROGRESS_TIMEOUT bounds a wait that stops making "
+                        "progress, and by default nothing does\n");
 
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
     if (osoe_environment_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENVIRONMENT_INVALID || watchdog > 1)

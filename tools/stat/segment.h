@@ -148,10 +148,12 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
 void osoe_segment_close(struct osoe_segment *s);
 
 /* The layout this reader was built against. Not a requirement - see above.
+ * Layout 9 added pe.blocked.detail_kind; an older segment simply lacks it and
+ * its details print raw.
  * Layout 8 only appended the AM counters, which a reader finds by name, so a
  * reader built for 7 prints them unchanged and differs only in showing the
  * watch word raw, with "encoding unknown", rather than decoded. */
-#define OSOE_SEGMENT_KNOWN_LAYOUT 8
+#define OSOE_SEGMENT_KNOWN_LAYOUT 9
 
 /* The metric of that name, or NULL. */
 const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name);
@@ -194,9 +196,15 @@ struct osoe_segment_blocked {
     bool blocked;
     uint64_t gen;
     uint64_t detail;
+    uint32_t detail_kind;       /* 0 if the segment predates layout 9 */
     uint64_t since_ns;
     char routine[64];
 };
+
+/* `detail` as its kind says - "node 3", "epoch 17", "offset 0x40" - or raw.
+ * The kinds are the segment's encoding (node.h, enum osoe_blocked_detail);
+ * this reader knows them by number, as it knows the watch word. */
+void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf, size_t len);
 
 bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe_segment_blocked *out);
 

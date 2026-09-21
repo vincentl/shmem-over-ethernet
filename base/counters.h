@@ -68,6 +68,11 @@ static inline void osoe_counter_word_max(_Atomic uint64_t *w, uint64_t v)
         atomic_store_explicit(w, v, memory_order_release);
 }
 
+static inline uint64_t osoe_counter_word_read(const _Atomic uint64_t *w)
+{
+    return atomic_load_explicit(w, memory_order_acquire);
+}
+
 /* Any thread or process. */
 static inline uint64_t osoe_counter_read(const struct osoe_counter_block *b, unsigned i)
 {

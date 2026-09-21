@@ -14,6 +14,8 @@
 #include "base/cacheline.h"
 #include "base/environment.h"
 #include "base/futex.h"
+#include "base/stall-watch.h"
+#include "base/sweep.h"
 #include "fatal.h"
 #include "wire.h"
 
@@ -160,7 +162,7 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
     read_env(w, b);
     /* The close handshake waits as long as the bootstrap does: both are "the
      * other end of this job should be here by now" (§6.2). */
-    w->close_timeout_ns = b->timeout_ns;
+    w->close_no_progress_ns = b->no_progress_ns;
 
     /* §6.2: the lower node index connects to the higher, so exactly one wire
      * exists per pair and exactly one side creates it. */
@@ -192,7 +194,8 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
          * which is before ftruncate has sized the object and before the header
          * has been written.
          */
-        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+        struct osoe_stall_watch watch;
+        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
         for (;;) {
             fd = shm_open(w->name, O_RDWR, 0);
@@ -208,9 +211,9 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
             } else if (errno != ENOENT) {
                 osoe_fatal("cannot open wire %s: %s", w->name, strerror(errno));
             }
-            if (osoe_deadline_expired(&until))
-                osoe_fatal("timed out waiting for node %u to create the wire %s", lo,
-                           w->name);
+            if (osoe_stall_watch_stalled(&watch, 0))
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u has not created the wire %s",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), lo, w->name);
             nanosleep(&back, NULL);
             if (back.tv_nsec < 10000000)
                 back.tv_nsec *= 2;
@@ -238,14 +241,15 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
-        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+        struct osoe_stall_watch watch;
+        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         while (atomic_load_explicit(&h->ready, memory_order_acquire) == 0) {
             struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_futex_wait(&h->ready, 0, &sweep, OSOE_FUTEX_SHARED);
-            if (osoe_deadline_expired(&until)) {
+            if (osoe_stall_watch_stalled(&watch, 0)) {
                 munmap(p, bytes);
-                osoe_fatal("timed out waiting for node %u to finish creating the wire %s",
-                           lo, w->name);
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u has not finished creating the wire %s",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), lo, w->name);
             }
         }
         /* Both sides must agree on the capacity, or their index arithmetic
@@ -309,21 +313,26 @@ void osoe_wire_close(struct osoe_wire *w)
     struct osoe_wire_header *h = w->map;
 
     /*
-     * The wait carries the bootstrap timeout rather than running forever: a
-     * peer that has died will never arrive, and a job that hangs in teardown
-     * looks exactly like one that hangs in a collective (§3.15).
+     * Waits for the other end, sweeping, and gives up only by the no-progress
+     * rule (§3.15): by default a peer that died mid-teardown leaves this waiting
+     * until the launcher tears the job down, which is what it is for. Remote
+     * liveness arrives with step 4.
      */
-    struct osoe_deadline until = osoe_deadline_in(w->close_timeout_ns);
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, atomic_load_explicit(&h->leaving, memory_order_acquire),
+                           w->close_no_progress_ns);
     for (;;) {
         uint32_t left = atomic_load_explicit(&h->leaving, memory_order_acquire);
         if (left >= 2)
             break;
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-        osoe_futex_wait(&h->leaving, left, &sweep, OSOE_FUTEX_SHARED);
-        if (osoe_deadline_expired(&until) &&
-            atomic_load_explicit(&h->leaving, memory_order_acquire) < 2)
-            osoe_fatal("timed out waiting for the other end of the wire %s to finish; "
-                       "that node is still running or has died mid-teardown", w->name);
+        if (osoe_futex_wait(&h->leaving, left, &sweep, OSOE_FUTEX_SHARED) == ETIMEDOUT)
+            osoe_sweep_expired("shmem_finalize");
+        if (osoe_stall_watch_stalled(&watch, atomic_load_explicit(&h->leaving,
+                                                                  memory_order_acquire)))
+            osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the other end of the wire %s has not finished; that node is "
+                       "still running or has died mid-teardown",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), w->name);
     }
 
     munmap(w->map, w->bytes);

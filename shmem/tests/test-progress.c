@@ -204,7 +204,7 @@ int main(void)
         .node = node,
         .local_id = local_id,
         .rank = my_pe,
-        .timeout_ns = UINT64_C(30000000000),
+        .no_progress_ns = UINT64_C(30000000000),  /* fail rather than hang */
     };
 
     struct osoe_connection_area area;

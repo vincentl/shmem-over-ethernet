@@ -50,9 +50,11 @@
  * deadline. A backend must not spin or block indefinitely without sweeping:
  * osoe_transport_wait, a blocking osoe_transport_get and any future blocking call sweep on
  * the same schedule as osoe_transport_watch_wait, which is the difference between a
- * hang and a clean abort. Neither osoe_transport_wait nor osoe_transport_get blocks on the
- * intranode backend, so nothing exercises this yet; it is stated here because
- * the first backend whose wait blocks will be written against this header.
+ * hang and a clean abort. A blocking call also publishes the "blocked in"
+ * record (§3.14) naming what it waits on, and gives up only by §3.15's
+ * no-progress rule - never because time has passed. The AM backend's four
+ * waits do all three (transport-am.c, struct am_wait), and shmem.unswept-wait
+ * and shmem.stopped-node.* are the tests that would see one stop.
  */
 #ifndef OSOE_TRANSPORT_H
 #define OSOE_TRANSPORT_H

@@ -1165,6 +1165,12 @@ headers would pass whenever the library agreed with itself.
   hang.
 - **Per PE:** a "blocked in" record (routine, target, and since when), its watch
   slot (§4.9), outstanding get bytes, bootstrap phase, and the abort word.
+  The target carries a kind since layout 9 — a peer node, an epoch, a heap
+  offset or a PE — so `osoe-stat` prints `shmem_quiet (node 1)` rather than
+  `shmem_quiet(+0x1)`; the kinds are part of the segment's encoding. Every
+  internode wait publishes one naming the peer node, which none did before phase
+  1 step 2 slice 2: a PE stuck in a quiet toward a dead node showed as not
+  blocked at all (second review, D2).
 
   It is the first record here with more than one word in it, so it is the first
   that can be read torn while the PE publishes its next wait. A **generation
@@ -1328,6 +1334,25 @@ case.**
 
 ### 3.15 Error model
 
+**No wait gives up because time has passed** (decided 2026-09-20). A wait may
+end the job only because what it watches has *stopped moving*: a progress word —
+a connection's acknowledged sequence, a buffer's turnover, a landing slot's wake
+word, a rendezvous count — unchanged for `OSOE_NO_PROGRESS_TIMEOUT` seconds.
+The default is 0, never. A large machine is slow in ways no bound anticipates,
+and failing a job early under contention is worse than waiting: the launcher can
+always tear a waiting job down, and nothing can bring a failed one back. This
+applies to the init waits too. Every wait still sweeps (§4.10) — the abort word
+and local liveness are checked every `OSOE_SWEEP_NS` — so a dead sibling still
+ends a wait promptly; what goes is only the fatal deadline. (`base/stall-watch.h`
+is the one helper; §3.10's absolute futex deadlines are clock instants for one
+sweep-length sleep, and stay.)
+
+The first build had a fatal deadline instead: `OSOE_BOOTSTRAP_TIMEOUT`, 60 s,
+meant for rendezvous but also bounding every internode wait. A legitimate 150 s
+quiet on 1 GbE died at 60 s, and a lead stopped for 20 s killed every PE talking
+to its node (second review, D3). The variable is retired; a job that sets it is
+told once that it is ignored.
+
 A connection dying mid-message leaves part of a payload written into the
 symmetric heap, unrecoverably. For a library where connection loss means job
 loss this is acceptable, but it is a **documented invariant**: AM's error path
@@ -1396,9 +1421,9 @@ do:
 - **No `shmem_global_exit` and no abort flood.** The abort word is written and
   read within one node by whichever PE noticed. `global_exit` (§9.1.6) needs the
   agent-calls-`exit` path above and an AM to carry the abort between nodes.
-- **Not during rendezvous.** The bootstrap waits already carry
-  `OSOE_BOOTSTRAP_TIMEOUT` and a `failed` word, and run before the slots a
-  liveness check would read are all published.
+- **Not during rendezvous.** The bootstrap waits carry a `failed` word and the
+  no-progress rule above, and run before the slots a liveness check would read
+  are all published.
 
 ### 3.16 Memory-order discipline
 
@@ -3446,9 +3471,10 @@ The sequence, as implemented:
 5. **Once `mapped == L`**, the lead removes every heap name.
 
 Any PE that fails stores a `failed` word and wakes the rendezvous words, so its
-siblings stop within one safety sweep instead of waiting out
-`OSOE_BOOTSTRAP_TIMEOUT` (60 s by default). A timeout names the local ids that
-never arrived.
+siblings stop within one safety sweep. Otherwise a rendezvous waits as long as
+its counts keep moving, and by default forever (§3.15's no-progress rule): with
+`OSOE_NO_PROGRESS_TIMEOUT` set, a count that stands still that long ends the job
+naming the local ids that never arrived.
 
 **Removing the control segment's name.** At the last finalize each PE bumps
 `finalized`. Exactly one increment reaches `L`, and that PE removes the name. The
@@ -3484,8 +3510,9 @@ it is pure string handling that would otherwise be debugged on a cluster.
 
 **Failure handling:**
 
-- Clients retry with jittered backoff until `OSOE_BOOTSTRAP_TIMEOUT`, then abort
-  naming what they were waiting for.
+- Clients retry with jittered backoff for as long as it takes, or until
+  `OSOE_NO_PROGRESS_TIMEOUT` if set, then abort naming what they were waiting
+  for (§3.15).
 - `shmem_init` raises the soft `RLIMIT_NOFILE` to the hard limit. Slurm propagates
   the submitting shell's limits, commonly a soft limit of 1,024, and a lead on a
   500-node job holds one socket per peer node.
@@ -3526,7 +3553,8 @@ mis-launched job ends up as N independent jobs, each succeeding. Every variable
 marked "Yes" above is required, and the README shows how to launch a one-node job
 by hand. *(Rejected: singleton launch when the variables are absent, as some
 implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)*
-`OSOE_BOOTSTRAP_TIMEOUT` (above) is osoe's own, read by the library.
+`OSOE_NO_PROGRESS_TIMEOUT` (§3.15) is osoe's own, read by the library; it
+replaced `OSOE_BOOTSTRAP_TIMEOUT`, which is retired.
 `OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
 turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
 library never sees it.

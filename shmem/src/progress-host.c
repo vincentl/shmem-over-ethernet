@@ -5,10 +5,13 @@
  */
 #include <stdatomic.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "base/deadline.h"
 #include "base/epoch.h"
 #include "base/futex.h"
+#include "base/stall-watch.h"
+#include "base/sweep.h"
 #include "connection-area.h"
 #include "fatal.h"
 #include "job.h"
@@ -291,13 +294,33 @@ void osoe_progress_host_start(uint32_t session)
  */
 static void flush_before_close(void)
 {
-    struct osoe_deadline until = osoe_deadline_in(osoe.bootstrap.timeout_ns);
+    /*
+     * Not a bare spin: a pass that moved nothing sleeps a moment and sweeps, as
+     * every wait does (§4.10), and the wait gives up only by the no-progress
+     * rule (§3.15) - watching this node's segments sent, which is what moves
+     * while the peers are reading. Before slice 2 it spun on the CPU and died
+     * after the bootstrap timeout (second review, atomics F7).
+     */
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, osoe_counter_word_read(&osoe.progress.metrics->segments_sent),
+                           osoe.bootstrap.no_progress_ns);
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     while (!osoe_progress_idle(&osoe.progress)) {
-        osoe_progress_poll(&osoe.progress);
-        if (osoe_deadline_expired(&until) && !osoe_progress_idle(&osoe.progress))
-            osoe_fatal("timed out flushing this node's last messages at shmem_finalize; "
-                       "a peer node has stopped reading its wire while this one still "
-                       "had something to send it");
+        if (!osoe_progress_poll(&osoe.progress)) {
+            struct timespec back = { 0, 20000 };
+            nanosleep(&back, NULL);
+        }
+        if (!osoe_deadline_expired(&sweep))
+            continue;
+        sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_sweep_expired("shmem_finalize");
+        uint64_t sent = osoe_counter_word_read(&osoe.progress.metrics->segments_sent);
+        if (osoe_stall_watch_stalled(&watch, sent))
+            osoe_fatal("shmem_finalize: no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT) "
+                       "flushing this node's last messages - segments sent has stayed at "
+                       "%llu; a peer node has stopped reading its wire",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch),
+                       (unsigned long long)sent);
     }
 }
 

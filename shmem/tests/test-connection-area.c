@@ -73,7 +73,7 @@ int main(void)
         .node = env_u32("OSOE_NODEID"),
         .local_id = env_u32("OSOE_LOCALID"),
         .rank = env_u32("OSOE_PROCID"),
-        .timeout_ns = UINT64_C(30000000000),
+        .no_progress_ns = UINT64_C(30000000000),  /* fail rather than hang */
     };
 
     /*

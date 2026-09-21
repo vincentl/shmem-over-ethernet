@@ -73,7 +73,7 @@ int main(void)
         .job = strtoull(getenv("OSOE_JOB_ID") ? getenv("OSOE_JOB_ID") : "0", NULL, 10),
         .step = env_u32("OSOE_STEP_ID"),
         .node = me,
-        .timeout_ns = UINT64_C(30000000000),
+        .no_progress_ns = UINT64_C(30000000000),  /* fail rather than hang */
     };
 
     struct osoe_wire w;

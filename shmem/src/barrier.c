@@ -79,7 +79,7 @@ static void team_sync(struct osoe_team *t, const char *routine)
 {
     uint64_t t0 = osoe_now_ns();
     osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
-    osoe_blocked_enter(routine, *t->epoch + 1);
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, *t->epoch + 1);
     sync_team(t, routine);
     osoe_blocked_leave();
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
@@ -93,7 +93,7 @@ void osoe_barrier_all(const char *routine)
     uint64_t t0 = osoe_now_ns();
     osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
     struct osoe_team *world = osoe_team_of(routine, SHMEM_TEAM_WORLD);
-    osoe_blocked_enter(routine, osoe.world_epoch + 1);
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, osoe.world_epoch + 1);
     osoe_transport_wait(osoe_transport_context_default(), NULL, 0);
     sync_team(world, routine);
     osoe_blocked_leave();

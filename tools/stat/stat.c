@@ -286,8 +286,9 @@ static void print_pe_lines(const struct osoe_segment *s)
                 char age[32] = "";
                 if (b.since_ns && now > b.since_ns)
                     print_duration(age, sizeof age, now - b.since_ns);
-                snprintf(where, sizeof where, "%s(+%#" PRIx64 ") for %s",
-                         b.routine, b.detail, age);
+                char what[48];
+                osoe_segment_blocked_detail(&b, what, sizeof what);
+                snprintf(where, sizeof where, "%s (%s) for %s", b.routine, what, age);
             }
         }
         printf("%3u %5" PRIu64 " %8" PRIu64 " %-10s %6" PRIu64 " %8" PRIu64 "  %s%s\n",
@@ -480,8 +481,10 @@ static void dump_human(const struct osoe_segment *s)
                 char age[32] = "?";
                 if (b.since_ns && now > b.since_ns)
                     print_duration(age, sizeof age, now - b.since_ns);
-                printf("    %-32s %s(+%#" PRIx64 ") for %s\n", "pe.blocked (read)",
-                       b.routine, b.detail, age);
+                char what[48];
+                osoe_segment_blocked_detail(&b, what, sizeof what);
+                printf("    %-32s %s (%s) for %s\n", "pe.blocked (read)", b.routine, what,
+                       age);
             }
         }
     }
@@ -573,8 +576,8 @@ static void dump_json(const struct osoe_segment *s)
             if (b.valid && b.blocked) {
                 printf("{\"routine\":");
                 json_str(stdout, b.routine);
-                printf(",\"detail\":%" PRIu64 ",\"since_ns\":%" PRIu64 "}", b.detail,
-                       b.since_ns);
+                printf(",\"detail\":%" PRIu64 ",\"detail_kind\":%u,\"since_ns\":%" PRIu64
+                       "}", b.detail, b.detail_kind, b.since_ns);
             } else
                 printf("null");
         }

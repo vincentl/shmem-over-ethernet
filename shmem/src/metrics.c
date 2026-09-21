@@ -144,6 +144,8 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.blocked.gen", blocked_gen, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     PE("pe.blocked.routine", blocked_routine, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
     PE("pe.blocked.detail", blocked_detail, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    /* What `detail` is: node.h's enum osoe_blocked_detail. */
+    PE("pe.blocked.detail_kind", blocked_detail_kind, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.blocked.since_ns", blocked_since_ns, OSOE_MTYPE_U64, OSOE_MKIND_STATE, "ns"),
     PE("heap.bytes_in_use", heap_in_use, OSOE_MTYPE_U64, OSOE_MKIND_GAUGE, "bytes"),
     PE("heap.bytes_high_water", heap_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, "bytes"),
@@ -318,7 +320,8 @@ uint64_t osoe_now_ns(void)
  * textbook seqlock's relaxed stores and release fence, and this needs no rule
  * the project does not already have.
  */
-static void publish(const char *routine, uint64_t detail, uint64_t since)
+static void publish(const char *routine, enum osoe_blocked_detail kind, uint64_t detail,
+                    uint64_t since)
 {
     struct osoe_pe_slot *me = &osoe.node.slots[osoe.bootstrap.local_id];
 
@@ -333,18 +336,19 @@ static void publish(const char *routine, uint64_t detail, uint64_t since)
         me->blocked_routine[0] = '\0';
     }
     atomic_store_explicit(&me->blocked_detail, detail, memory_order_release);
+    atomic_store_explicit(&me->blocked_detail_kind, (uint32_t)kind, memory_order_release);
     atomic_store_explicit(&me->blocked_since_ns, since, memory_order_release);
     atomic_fetch_add_explicit(&me->blocked_gen, 1, memory_order_seq_cst);
 }
 
-void osoe_blocked_enter(const char *routine, uint64_t detail)
+void osoe_blocked_enter(const char *routine, enum osoe_blocked_detail kind, uint64_t detail)
 {
     if (osoe.node.slots)
-        publish(routine, detail, osoe_now_ns());
+        publish(routine, kind, detail, osoe_now_ns());
 }
 
 void osoe_blocked_leave(void)
 {
     if (osoe.node.slots)
-        publish(NULL, 0, 0);
+        publish(NULL, OSOE_BLOCKED_DETAIL_NONE, 0, 0);
 }

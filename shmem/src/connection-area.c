@@ -15,6 +15,7 @@
 #include "base/deadline.h"
 #include "base/environment.h"
 #include "base/futex.h"
+#include "base/stall-watch.h"
 #include "connection-area.h"
 #include "fatal.h"
 
@@ -203,7 +204,8 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
     } else {
         /* The name appears before the object is sized and before the header is
          * written, so wait for the length here and for `ready` below (§6.2). */
-        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+        struct osoe_stall_watch watch;
+        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         struct timespec back = { 0, 200000 };
         for (;;) {
             fd = shm_open(a->name, O_RDWR, 0);
@@ -215,8 +217,9 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
             } else if (errno != ENOENT) {
                 osoe_fatal("cannot open connection area %s: %s", a->name, strerror(errno));
             }
-            if (osoe_deadline_expired(&until))
-                osoe_fatal("timed out waiting for the local lead to create %s", a->name);
+            if (osoe_stall_watch_stalled(&watch, 0))
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not created %s",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), a->name);
             nanosleep(&back, NULL);
             if (back.tv_nsec < 10000000)
                 back.tv_nsec *= 2;
@@ -280,13 +283,14 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
-        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+        struct osoe_stall_watch watch;
+        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         while (atomic_load_explicit(&h->ready, memory_order_acquire) == 0) {
             struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_futex_wait(&h->ready, 0, &sweep, OSOE_FUTEX_SHARED);
-            if (osoe_deadline_expired(&until))
-                osoe_fatal("timed out waiting for the local lead to finish creating %s",
-                           a->name);
+            if (osoe_stall_watch_stalled(&watch, 0))
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not finished creating %s",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), a->name);
         }
         if (h->magic != OSOE_CONNECTION_AREA_MAGIC || h->layout != OSOE_CONNECTION_AREA_LAYOUT ||
             h->buffer_bytes != buffer || h->chunk_bytes != config.chunk ||

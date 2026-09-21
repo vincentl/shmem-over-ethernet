@@ -26,7 +26,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 8
+#define OSOE_NODE_LAYOUT 9
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -36,6 +36,19 @@ enum osoe_phase {
 };
 
 enum { OSOE_HEAP_NAME_MAX = 96 };
+
+/*
+ * What a blocked record's `blocked_detail` is (§3.14), so that osoe-stat can
+ * print "node 3" or "epoch 17" rather than "+0x3" (second review, D-7). The
+ * values are part of the segment's encoding: changing one is a layout bump.
+ */
+enum osoe_blocked_detail {
+    OSOE_BLOCKED_DETAIL_NONE = 0,    /* nothing to add, or a reader must show it raw */
+    OSOE_BLOCKED_DETAIL_NODE,        /* a peer node, for an internode wait */
+    OSOE_BLOCKED_DETAIL_EPOCH,       /* a collective epoch */
+    OSOE_BLOCKED_DETAIL_OFFSET,      /* a symmetric-heap offset, for a point-to-point wait */
+    OSOE_BLOCKED_DETAIL_PE,          /* a PE */
+};
 
 /*
  * The predefined teams, numbered (§7.3, spec §9.4).
@@ -90,6 +103,7 @@ struct osoe_pe_slot {
     _Atomic uint64_t blocked_detail;     /* routine-specific: a PE, an epoch, an offset */
     _Atomic uint64_t blocked_since_ns;   /* CLOCK_MONOTONIC when the wait began */
     char blocked_routine[OSOE_BLOCKED_ROUTINE_MAX];
+    _Atomic uint32_t blocked_detail_kind;   /* enum osoe_blocked_detail; layout 9 */
 
     /* Liveness and progress, published by this PE (§3.14 question 1). */
     _Atomic uint64_t sweeps;             /* safety-sweep expiries: a blocked PE still moves */
@@ -285,7 +299,8 @@ struct osoe_node_header {
     /* Appended at layout 7 (§5.3). */
     struct osoe_arrival_handoff arrival[OSOE_TEAMS];
 
-    /* Appended at layout 8. Layout 8 also gave each epoch counter's line a
+    /* Appended at layout 8. Layout 9 added blocked_detail_kind to the PE slot,
+     * which moved no header field. Layout 8 also gave each epoch counter's line a
      * second word, released_at_ns (base/epoch.h), in padding it already owned:
      * no offset moved, but the line's contents changed meaning. */
     struct osoe_am_node_metrics am;

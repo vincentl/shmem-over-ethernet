@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdatomic.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -285,6 +286,10 @@ bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe
             !osoe_segment_read(s, since, pe, &out->since_ns))
             return false;
         osoe_segment_read_str(s, "pe.blocked.routine", pe, out->routine, sizeof out->routine);
+        uint64_t kind = 0;
+        const struct osoe_metric_descriptor *k = osoe_segment_metric(s, "pe.blocked.detail_kind");
+        if (k && osoe_segment_read(s, k, pe, &kind))
+            out->detail_kind = (uint32_t)kind;
         if (!osoe_segment_read(s, gen, pe, &g1))
             return false;
         if (g1 != g0)
@@ -295,6 +300,17 @@ bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe
         return true;
     }
     return true;                         /* valid stays false: say so, do not guess */
+}
+
+void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf, size_t len)
+{
+    switch (b->detail_kind) {
+    case 1:  snprintf(buf, len, "node %" PRIu64, b->detail); break;
+    case 2:  snprintf(buf, len, "epoch %" PRIu64, b->detail); break;
+    case 3:  snprintf(buf, len, "offset %#" PRIx64, b->detail); break;
+    case 4:  snprintf(buf, len, "PE %" PRIu64, b->detail); break;
+    default: snprintf(buf, len, "+%#" PRIx64, b->detail); break;
+    }
 }
 
 static int by_name(const void *a, const void *b)
