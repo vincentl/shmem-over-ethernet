@@ -219,4 +219,13 @@ uint64_t osoe_segment_now_ns(void);
  */
 int osoe_segment_list(char (*names)[OSOE_SEGMENT_NAME_MAX], int max);
 
+/* Only the segments that still have a name in /dev/shm - those kept by
+ * OSOE_KEEP_CONTROL_SEGMENT, or left by a job that died during init. These,
+ * and only these, are what --gc may remove. */
+int osoe_segment_list_named(char (*names)[OSOE_SEGMENT_NAME_MAX], int max);
+
+/* Does any process this user can inspect map /dev/shm<name>? --gc refuses to
+ * remove a segment that is still mapped, whatever its slots say. */
+bool osoe_segment_mapped(const char *name);
+
 #endif /* OSOE_STAT_SEGMENT_H */

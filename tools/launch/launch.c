@@ -133,11 +133,29 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
     _exit(127);
 }
 
-/* Remove /dev/shm/osoe.<job>.*; return how many there were. */
+/* A control segment of this job: <prefix><step>.<node>.<session>, three numbers. */
+static bool is_control_segment(const char *rest)
+{
+    unsigned step, node, session;
+    char tail;
+    return sscanf(rest, "%u.%u.%u%c", &step, &node, &session, &tail) == 3;
+}
+
+/*
+ * Remove /dev/shm/osoe.<job>.*; return how many there were. After a job that
+ * got through init there are none - the library removes every name as soon as
+ * everyone who needs it has it open (§3.14) - so anything here is a job that
+ * died during init, or a library defect. With OSOE_KEEP_CONTROL_SEGMENT=1 the
+ * control segments are kept on purpose for post-mortem reading: they are
+ * reported, and left for osoe-stat --gc, since removing them here would throw
+ * away exactly what the setting asked to keep.
+ */
 static int remove_leftovers(const char *job)
 {
     char prefix[64];
     snprintf(prefix, sizeof prefix, "osoe.%s.", job);
+    const char *keep = getenv("OSOE_KEEP_CONTROL_SEGMENT");
+    bool kept = keep && strcmp(keep, "1") == 0;
     DIR *d = opendir("/dev/shm");
     if (!d)
         return 0;
@@ -146,6 +164,11 @@ static int remove_leftovers(const char *job)
     while ((e = readdir(d)) != NULL) {
         if (strncmp(e->d_name, prefix, strlen(prefix)) != 0)
             continue;
+        if (kept && is_control_segment(e->d_name + strlen(prefix))) {
+            fprintf(stderr, "osoe-launch: kept for post-mortem reading: /dev/shm/%s\n",
+                    e->d_name);
+            continue;
+        }
         fprintf(stderr, "osoe-launch: left behind: /dev/shm/%s\n", e->d_name);
         char path[PATH_MAX];
         snprintf(path, sizeof path, "/dev/shm/%s", e->d_name);

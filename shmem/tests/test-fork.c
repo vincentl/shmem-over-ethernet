@@ -24,12 +24,15 @@ int main(void)
     CHECK(waitpid(child, &status, 0) == child);
     CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 0);
 
-    /* The node's control segment still has its name (§6.2). */
+    /* The node's control segment has no name - it was removed during init
+     * (§3.14) - and is still this job's: the child's finalizes did nothing to
+     * it, which CHECK_INVARIANTS below shows by reading it through this PE's
+     * own descriptor. */
     char path[128];
     snprintf(path, sizeof path, "/dev/shm/osoe.%s.%s.0.0", getenv("OSOE_JOB_ID"),
              getenv("OSOE_STEP_ID"));
     struct stat st;
-    CHECK(stat(path, &st) == 0);
+    CHECK(stat(path, &st) != 0);
     int flag = 0;
     shmem_query_initialized(&flag);
     CHECK(flag != 0);

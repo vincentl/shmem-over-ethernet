@@ -26,6 +26,8 @@
 #ifndef OSOE_TEST_INVARIANTS_H
 #define OSOE_TEST_INVARIANTS_H
 
+#include <dirent.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,6 +61,43 @@ static inline uint32_t osoe_test_scope_count(const struct osoe_segment *s, unsig
     case OSOE_MSCOPE_THREAD: return s->dir->block_count;
     default:                 return 0;
     }
+}
+
+/*
+ * §3.14's unlink-early rule, checked while the job runs: once init has
+ * completed, nothing this job created in /dev/shm has a name, so that no death
+ * of any process can strand it. With OSOE_KEEP_CONTROL_SEGMENT=1 the control
+ * segments keep theirs, and only those. Returns how many offenders it printed.
+ * The launcher's own check runs after the job; this one runs inside it.
+ */
+static inline int osoe_test_named_objects(void)
+{
+    const char *job = getenv("OSOE_JOB_ID"), *step = getenv("OSOE_STEP_ID");
+    const char *keep = getenv("OSOE_KEEP_CONTROL_SEGMENT");
+    bool kept = keep && strcmp(keep, "1") == 0;
+    char prefix[64];
+    snprintf(prefix, sizeof prefix, "osoe.%s.%s.", job ? job : "0", step ? step : "0");
+    DIR *d = opendir("/dev/shm");
+    if (!d)
+        return 0;
+    int bad = 0;
+    const struct dirent *e;
+    while ((e = readdir(d))) {
+        if (strncmp(e->d_name, prefix, strlen(prefix)) != 0)
+            continue;
+        /* A kept control segment is <prefix><node>.<session> - the prefix
+         * already holds the step - so two numbers and nothing after. */
+        const char *rest = e->d_name + strlen(prefix);
+        unsigned node, session;
+        char tail;
+        if (kept && sscanf(rest, "%u.%u%c", &node, &session, &tail) == 2)
+            continue;
+        fprintf(stderr, "invariants: /dev/shm/%s still has a name after init (§3.14)\n",
+                e->d_name);
+        bad++;
+    }
+    closedir(d);
+    return bad;
 }
 
 /*
@@ -113,6 +152,7 @@ static inline int osoe_invariants_ok_session(unsigned session)
         bad++;
     }
     osoe_segment_close(&s);
+    bad += osoe_test_named_objects();
     return bad == 0;
 }
 

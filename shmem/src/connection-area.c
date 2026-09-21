@@ -20,7 +20,7 @@
 #include "fatal.h"
 
 #define OSOE_CONNECTION_AREA_MAGIC UINT64_C(0x61657261656f736f)   /* "osoearea" */
-#define OSOE_CONNECTION_AREA_LAYOUT 1
+#define OSOE_CONNECTION_AREA_LAYOUT 2   /* 2: `opened` */
 
 /*
  * The frozen prefix, for the same reason the control segment has one (§3.14):
@@ -48,6 +48,15 @@ struct osoe_connection_area_header {
      * this the expensive way; the control segment has always had it (§6.2).
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t ready;
+    /*
+     * How many of the processes that must open this object have (§3.14's
+     * unlink-early rule). Whichever increment reaches the count removes the
+     * name: every process that will ever need it has it open, so from then on
+     * no death of any process can strand it. The count is exact, so nothing
+     * waits for it - the same shape as the control segment's `finalized` at the
+     * other end of a session.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t opened;
 };
 
 static uint64_t align_up(uint64_t n)
@@ -302,16 +311,17 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
                        (unsigned long long)h->chunk_bytes, h->nodes,
                        (unsigned long long)buffer, (unsigned long long)config.chunk, nodes);
     }
+    /* Every local PE opens the area; the last to have done so removes its name. */
+    if (atomic_fetch_add_explicit(&h->opened, 1, memory_order_seq_cst) + 1 == b->local_count &&
+        shm_unlink(a->name) != 0)
+        osoe_fatal("cannot remove the connection area's name %s: %s", a->name, strerror(errno));
 }
 
 void osoe_connection_area_close(struct osoe_connection_area *a)
 {
     free(a->conn);
-    if (a->map) {
-        munmap(a->map, a->bytes);
-        if (a->creator)
-            shm_unlink(a->name);
-    }
+    if (a->map)
+        munmap(a->map, a->bytes);       /* its name went when the last PE opened it */
     *a = (struct osoe_connection_area){ 0 };
 }
 

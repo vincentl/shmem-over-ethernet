@@ -640,9 +640,15 @@ static int gc_one(const char *name)
     }
     bool any_joined = false;
     bool gone = all_pes_gone(&s, &any_joined);
-    if (!gone || !any_joined) {
-        printf("%s: %s\n", s.name, gone ? "no PE has joined yet; left alone"
-                                        : "still has live PEs; left alone");
+    /* The slots are the job's word for who it is; the kernel's is who maps the
+     * object. A segment still mapped by a live process is never removed,
+     * whatever its slots say - a recycled pid or a PE that died mid-join could
+     * otherwise make a live job look dead. */
+    bool mapped = gone && any_joined && osoe_segment_mapped(s.name);
+    if (!gone || !any_joined || mapped) {
+        printf("%s: %s\n", s.name, !any_joined ? "no PE has joined yet; left alone"
+                                  : mapped ? "a live process still maps it; left alone"
+                                           : "still has live PEs; left alone");
         osoe_segment_close(&s);
         return 0;
     }
@@ -753,21 +759,54 @@ static int show(const char *name, enum mode m)
     return 0;
 }
 
+/* A bare number is a job id: every control segment of that job, one per node. */
+static bool is_job_id(const char *a)
+{
+    if (!*a)
+        return false;
+    for (; *a; a++)
+        if (!isdigit((unsigned char)*a))
+            return false;
+    return true;
+}
+
+static int show_job(const char *job, enum mode m)
+{
+    char names[64][OSOE_SEGMENT_NAME_MAX], prefix[64];
+    snprintf(prefix, sizeof prefix, "/osoe.%s.", job);
+    int found = osoe_segment_list(names, 64);
+    int rc = 0, shown = 0;
+    for (int k = 0; k < found && k < 64; k++)
+        if (strncmp(names[k], prefix, strlen(prefix)) == 0) {
+            rc |= show(names[k], m);
+            shown++;
+        }
+    if (!shown) {
+        fprintf(stderr, "osoe-stat: job %s: no such job - no named segment and no process "
+                        "of this user holds one\n", job);
+        return 1;
+    }
+    return rc;
+}
+
 static void usage(FILE *f)
 {
     fprintf(f,
-"usage: osoe-stat [options] [segment ...]\n"
+"usage: osoe-stat [options] [job | segment | path ...]\n"
 "\n"
-"Reads an osoe job's control segment from /dev/shm without the job's\n"
-"cooperation, so it works on a hung job. A segment may be named as\n"
-"/osoe.<job>.<step>.<node>.<session>, without the slash, or by its path in\n"
-"/dev/shm. With no segment named, lists what is there.\n"
+"Reads an osoe job's control segment without the job's cooperation, so it\n"
+"works on a hung job. A running job's segments have no name in /dev/shm - the\n"
+"library removes it during init - and are found through /proc, by any live PE\n"
+"of the node that holds one open. Name a job by its id, a segment as\n"
+"/osoe.<job>.<step>.<node>.<session> (or without the slash, or its /dev/shm\n"
+"path), or give any path to a segment file. With nothing named, lists them.\n"
 "\n"
 "  -c, --counters    per-PE counter totals and where each PE is blocked (default)\n"
 "  -d, --dump        every field of every record: node, PE slots, counter blocks\n"
 "  -T, --threads     one line per counter block, with its kernel CPU time\n"
 "  -l, --list        list the control segments in /dev/shm\n"
-"      --gc          remove segments whose PEs are all gone, and their heaps\n"
+"      --gc          remove named segments (OSOE_KEEP_CONTROL_SEGMENT) whose PEs\n"
+"                    are all gone and that no live process maps\n"
 "  -j, --json        JSON instead of a table\n"
 "  -z, --nonzero     omit counters that are zero\n"
 "  -n, --interval S  repeat every S seconds\n"
@@ -815,12 +854,14 @@ int main(int argc, char **argv)
                 rc |= gc_one(argv[i]);
             return rc;
         }
+        /* Only named segments: one without a name is held open by a live job,
+         * and has nothing to collect (§3.14). */
         char names[64][OSOE_SEGMENT_NAME_MAX];
-        int found = osoe_segment_list(names, 64);
+        int found = osoe_segment_list_named(names, 64);
         for (int k = 0; k < found && k < 64; k++)
             rc |= gc_one(names[k]);
         if (found == 0)
-            printf("no osoe control segments in /dev/shm\n");
+            printf("no named osoe control segments in /dev/shm\n");
         return rc;
     }
 
@@ -831,6 +872,6 @@ int main(int argc, char **argv)
         m = MODE_COUNTERS;
     int rc = 0;
     for (; i < argc; i++)
-        rc |= show(argv[i], m);
+        rc |= is_job_id(argv[i]) ? show_job(argv[i], m) : show(argv[i], m);
     return rc;
 }

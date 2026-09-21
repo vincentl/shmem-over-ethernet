@@ -13,6 +13,7 @@
  */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <fcntl.h>
 #include <liburing.h>
 #include <linux/futex.h>
 #include <netinet/in.h>
@@ -99,6 +100,56 @@ static void probe_shared_futex(void)
     CHECK("cross-process futex on memfd mapping",
           WIFEXITED(status) && WEXITSTATUS(status) == 0,
           "woke=%ld child_exit=%d", woke, WEXITSTATUS(status));
+}
+
+/*
+ * The premise osoe-stat stands on (§3.14): a shared memory object whose name
+ * has been removed can still be opened, by another process of the same user,
+ * through /proc/<pid>/fd/<n> of a process that holds it - and what it maps is
+ * the live object, not a copy. The library removes every name during init; if
+ * this fails, a running job cannot be read from outside at all.
+ */
+static void probe_unlinked_reopen(void)
+{
+    char name[64];
+    snprintf(name, sizeof name, "/osoe-probe.%d", (int)getpid());
+    int fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
+    if (fd < 0 || ftruncate(fd, 4096) != 0) {
+        CHECK("unlinked shm object reopened via /proc", 0, "shm_open: %s", strerror(errno));
+        return;
+    }
+    _Atomic uint32_t *w = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    atomic_store_explicit(w, 1, memory_order_release);
+    shm_unlink(name);                               /* from here it has no name */
+    pid_t parent = getpid();
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* Forget everything inherited: this stands for an unrelated process. */
+        munmap((void *)w, 4096);
+        close(fd);
+        char path[64];
+        snprintf(path, sizeof path, "/proc/%d/fd/%d", (int)parent, fd);
+        int rfd = open(path, O_RDONLY);
+        if (rfd < 0)
+            _exit(3);
+        const _Atomic uint32_t *r = mmap(NULL, 4096, PROT_READ, MAP_SHARED, rfd, 0);
+        if (r == MAP_FAILED || atomic_load_explicit(r, memory_order_acquire) != 1)
+            _exit(4);
+        /* Live, not a copy: the parent's next store is seen here. */
+        for (int i = 0; i < 200 && atomic_load_explicit(r, memory_order_acquire) != 2; i++)
+            usleep(10000);
+        _exit(atomic_load_explicit(r, memory_order_acquire) == 2 ? 0 : 5);
+    }
+    usleep(50000);
+    atomic_store_explicit(w, 2, memory_order_release);
+    int status;
+    waitpid(pid, &status, 0);
+    int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    CHECK("unlinked shm object reopened via /proc", code == 0,
+          "child_exit=%d (3: open /proc/<pid>/fd, 4: map or read, 5: not live)", code);
+    munmap((void *)w, 4096);
+    close(fd);
 }
 
 static void probe_uring_setup(void)
@@ -196,6 +247,7 @@ int main(void)
            sysconf(_SC_PAGESIZE), IO_URING_VERSION_MAJOR, IO_URING_VERSION_MINOR);
     probe_futex2();
     probe_shared_futex();
+    probe_unlinked_reopen();
     probe_uring_setup();
     probe_multishot();
     printf("%s (%d failures)\n", fails ? "PROBE FAILED" : "PROBE PASSED", fails);

@@ -21,7 +21,7 @@
 #include "job.h"
 
 #define OSOE_JOB_MAGIC UINT64_C(0x00626f6a656f736f)   /* "osoejob" */
-#define OSOE_JOB_LAYOUT 2     /* 2: the per-rank claim array */
+#define OSOE_JOB_LAYOUT 3     /* 2: the per-rank claim array; 3: `opened` */
 
 /* Not yet assigned to a node. The map starts full of these so that a rank no
  * lead claimed is a detectable gap rather than node 0 by accident. */
@@ -48,13 +48,14 @@ struct osoe_job_header {
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t joined;   /* leads that have published */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t failed;
     /*
-     * PEs that have finished with the segment. The name is removed by whichever
-     * leave reaches world_size, exactly as §6.2 removes the control segment's
-     * name at the last finalize and for the same reason: node 0's lead
-     * finishing first would otherwise unlink a name another PE has not opened
-     * yet, and that PE would wait for an object that can never appear.
+     * How many of the processes that must open this object have (§3.14's
+     * unlink-early rule). Whichever increment reaches the count removes the
+     * name: every process that will ever need it has it open, so from then on
+     * no death of any process can strand it. The count is exact, so nothing
+     * waits for it - the same shape as the control segment's `finalized` at the
+     * other end of a session.
      */
-    _Alignas(OSOE_CACHELINE) _Atomic uint32_t left;
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t opened;
     /*
      * Two arrays of world_size entries follow, cache-line aligned: `node_of`,
      * the map every PE reads, and `claim`, one word per rank that a lead takes
@@ -270,17 +271,17 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
         }
 
     j->node_of = node_of;
+
+    /* Every PE of the job opens this; the last to have done so removes the name. */
+    if (atomic_fetch_add_explicit(&h->opened, 1, memory_order_seq_cst) + 1 == b->world_size &&
+        shm_unlink(j->name) != 0)
+        osoe_fatal("cannot remove the job segment's name %s: %s", j->name, strerror(errno));
 }
 
 void osoe_job_leave(struct osoe_job *j)
 {
     if (!j->map)
         return;
-    struct osoe_job_header *h = j->map;
-    uint32_t left = atomic_fetch_add_explicit(&h->left, 1, memory_order_seq_cst) + 1;
-    bool last = left == j->world_size;
-    munmap(j->map, j->bytes);
-    if (last)
-        shm_unlink(j->name);
+    munmap(j->map, j->bytes);       /* its name went when the last PE opened it */
     *j = (struct osoe_job){ 0 };
 }

@@ -489,6 +489,30 @@ set_tests_properties(shmem.exit-without-finalize.start_pes PROPERTIES LABELS "ti
   PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 4 s"
   FAIL_REGULAR_EXPRESSION "BARRIER RETURNED")
 
+# No death of any process strands a named object (§3.14; review round two,
+# D13): every PE dies of SIGKILL or SIGTERM after init, on two nodes, and the
+# launcher must find nothing left behind. The kept variant leaves the control
+# segments on purpose, and osoe-stat --gc must then remove them.
+add_executable(shmem_test_kill-after-init test-kill-after-init.c)
+target_link_libraries(shmem_test_kill-after-init PRIVATE osoe)
+osoe_warnings(shmem_test_kill-after-init)
+foreach(sig KILL TERM)
+  add_test(NAME shmem.kill-after-init.${sig}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SIGNAL=${sig}
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 -k --
+            $<TARGET_FILE:shmem_test_kill-after-init>)
+  set_tests_properties(shmem.kill-after-init.${sig} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "killed by signal"
+    FAIL_REGULAR_EXPRESSION "left behind")
+endforeach()
+add_test(NAME shmem.kill-after-init.kept
+  COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 OSOE_TEST_SIGNAL=KILL \"$0\" -n 4 -m 0,0,1,1 -t 30 -k -- \"$1\"; \"$2\" --gc"
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_kill-after-init>
+          $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.kill-after-init.kept PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "kept for post-mortem reading.*removed"
+  FAIL_REGULAR_EXPRESSION "left behind")
+
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)

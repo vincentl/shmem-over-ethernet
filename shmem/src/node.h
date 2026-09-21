@@ -18,6 +18,7 @@
 #define OSOE_NODE_H
 
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "base/cacheline.h"
@@ -390,6 +391,14 @@ struct osoe_landing_slot {
 /* Process-private view of the node. */
 struct osoe_node {
     char control_name[80];
+    /*
+     * This PE's descriptor for the control segment, held for the whole session
+     * (§3.14). The name is removed during init, and this is what keeps the
+     * object findable afterwards: osoe-stat opens /proc/<pid>/fd/<n> of any
+     * live PE of the node. One descriptor per PE; -1 outside a session.
+     */
+    int control_fd;
+    bool keep_name;                 /* OSOE_KEEP_CONTROL_SEGMENT */
     struct osoe_node_header *hdr;
     struct osoe_pe_slot *slots;
     struct osoe_counter_block *blocks;   /* this node's whole pool (§3.14) */

@@ -134,6 +134,20 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                         "OSOE_NO_PROGRESS_TIMEOUT bounds a wait that stops making "
                         "progress, and by default nothing does\n");
 
+    /*
+     * §3.14: the control segment's name is removed as soon as every local PE
+     * has it open, like every other object, so that no death can strand it.
+     * This keeps the name until finalize instead, so a crashed job's segment
+     * survives for post-mortem reading - and is then the one thing a crash can
+     * leave behind, for osoe-stat --gc to remove.
+     */
+    uint32_t keep = 0;
+    if (osoe_environment_u32("OSOE_KEEP_CONTROL_SEGMENT", &keep) == OSOE_ENVIRONMENT_INVALID ||
+        keep > 1)
+        osoe_fatal("OSOE_KEEP_CONTROL_SEGMENT='%s' is not 0 or 1",
+                   getenv("OSOE_KEEP_CONTROL_SEGMENT"));
+    b->keep_control_segment = keep != 0;
+
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
     if (osoe_environment_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENVIRONMENT_INVALID || watchdog > 1)
         osoe_fatal("OSOE_WATCHDOG='%s' is not 0 or 1", getenv("OSOE_WATCHDOG"));

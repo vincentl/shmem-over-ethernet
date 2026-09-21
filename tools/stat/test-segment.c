@@ -136,7 +136,13 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
     uint64_t blocks_off = metrics_off + (uint64_t)n * sizeof table[0];
     uint64_t total = blocks_off + (uint64_t)BLOCK_COUNT * BLOCK_BYTES;
 
-    int fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
+    /* A path is a plain file, which is what this test is really about: a
+     * segment this build did not write, read through nothing but the frozen
+     * directory and the table. A bare name is a /dev/shm object, for the
+     * spellings of a name. */
+    int fd = name[0] == '/' && strchr(name + 1, '/')
+             ? open(name, O_CREAT | O_EXCL | O_RDWR, 0600)
+             : shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
     if (fd < 0 || ftruncate(fd, (off_t)total) != 0) {
         perror("shm_open");
         if (fd >= 0)
@@ -282,19 +288,29 @@ static void check_refused(const char *name, enum damage damage, bool expect_open
         CHECK(err[0] != '\0');
     }
     munmap(p, bytes);
-    shm_unlink(name);
+    unlink(name);
 }
 
 int main(void)
 {
-    char name[64];
+    char name[64], file[96];
     snprintf(name, sizeof name, "/osoe-segment-test.%d", (int)getpid());
+    snprintf(file, sizeof file, "/tmp/osoe-segment-test.%d", (int)getpid());
 
     size_t bytes = 0;
-    void *p = build(name, GOOD, &bytes);
+    void *p = build(file, GOOD, &bytes);
     CHECK(p != NULL);
     if (p) {
-        /* The three spellings of one name. */
+        check_good(file);
+        munmap(p, bytes);
+        unlink(file);
+    }
+
+    /* The three spellings of one name, on a named /dev/shm object - which is
+     * what a segment kept by OSOE_KEEP_CONTROL_SEGMENT is. */
+    p = build(name, GOOD, &bytes);
+    CHECK(p != NULL);
+    if (p) {
         check_good(name);
         check_good(name + 1);
         char path[128];
@@ -311,23 +327,23 @@ int main(void)
      * segment; this is the case that saw it (second review, premises: that
      * mutation passed every test until now).
      */
-    p = build(name, OLDER_DIRECTORY, &bytes);
+    p = build(file, OLDER_DIRECTORY, &bytes);
     CHECK(p != NULL);
     if (p) {
-        check_good(name);
+        check_good(file);
         munmap(p, bytes);
-        shm_unlink(name);
+        unlink(file);
     }
 
-    check_refused(name, BAD_MAGIC, false);
-    check_refused(name, BAD_CHECKSUM, true);
-    check_refused(name, STRANGE_DESC_SIZE, true);
+    check_refused(file, BAD_MAGIC, false);
+    check_refused(file, BAD_CHECKSUM, true);
+    check_refused(file, STRANGE_DESC_SIZE, true);
 
     /* And a segment that is not there at all. */
     struct osoe_segment s;
     char err[256] = "";
     CHECK(osoe_segment_open(&s, "/osoe.definitely.not.here.0", err, sizeof err) != 0);
-    CHECK(strstr(err, "cannot open") != NULL);
+    CHECK(strstr(err, "no such job") != NULL);
 
     return CHECK_DONE();
 }

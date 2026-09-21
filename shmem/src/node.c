@@ -251,11 +251,12 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
         osoe_fatal("cannot size control segment: %s", strerror(errno));
     }
     void *p = mmap(NULL, n->control_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd);
     if (p == MAP_FAILED) {
+        close(fd);
         shm_unlink(n->control_name);
         osoe_fatal("cannot map control segment: %s", strerror(errno));
     }
+    n->control_fd = fd;             /* kept: see struct osoe_node */
 
     /* ftruncate zeroed it: every atomic word starts at 0. */
     n->hdr = p;
@@ -316,10 +317,12 @@ static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, ui
             if (fstat(fd, &st) == 0 && (uint64_t)st.st_size >= sizeof(struct osoe_node_header)) {
                 void *p = mmap(NULL, (size_t)st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                                fd, 0);
-                close(fd);
-                if (p == MAP_FAILED)
+                if (p == MAP_FAILED) {
+                    close(fd);
                     osoe_fatal("cannot map control segment %s: %s", n->control_name,
                                strerror(errno));
+                }
+                n->control_fd = fd;     /* kept: see struct osoe_node */
                 n->hdr = p;
                 n->control_bytes = (uint64_t)st.st_size;
                 break;
@@ -390,6 +393,8 @@ static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, ui
 void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
     bool lead = b->local_id == 0;
+    n->control_fd = -1;
+    n->keep_name = b->keep_control_segment;
 
     snprintf(n->control_name, sizeof n->control_name, "/osoe.%llu.%u.%u.%u",
              (unsigned long long)b->job, b->step, b->node, session);
@@ -464,7 +469,12 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     osoe_futex_wake(&n->hdr->mapped, INT_MAX, OSOE_FUTEX_SHARED);
 
     /* The lead removes heap names once every PE holds a mapping, so a later
-     * crash leaves no heap behind (§6.2). */
+     * crash leaves no heap behind (§6.2) - and the control segment's name with
+     * them, since every local PE opened it before it could map a sibling's
+     * heap. From here nothing this node created in /dev/shm has a name: no
+     * death of any process can strand it, and osoe-stat finds the segment
+     * through a live PE's descriptor (§3.14). OSOE_KEEP_CONTROL_SEGMENT keeps
+     * the control segment's name until finalize instead. */
     if (lead) {
         if (wait_count(n, &n->hdr->mapped, b->local_count, b->no_progress_ns) != 0) {
             char missing[256], msg[400];
@@ -478,6 +488,9 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
             if (shm_unlink(n->slots[i].heap_name) != 0)
                 osoe_fatal("cannot remove heap name %s: %s", n->slots[i].heap_name,
                            strerror(errno));
+        if (!n->keep_name && shm_unlink(n->control_name) != 0)
+            osoe_fatal("cannot remove the control segment's name %s: %s", n->control_name,
+                       strerror(errno));
     }
 }
 
@@ -512,13 +525,21 @@ void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)
 
     atomic_store_explicit(&me->phase, OSOE_PHASE_FINALIZED, memory_order_release);
     uint32_t done = atomic_fetch_add_explicit(&n->hdr->finalized, 1, memory_order_seq_cst) + 1;
-    /* Exactly one PE's increment reaches L; that PE removes the name. Others
-     * may still hold mappings, which stay valid. The session number in the name
-     * keeps this from removing a segment a PE has already re-created (§6.4). */
-    if (done == b->local_count && shm_unlink(n->control_name) != 0)
+    /* With OSOE_KEEP_CONTROL_SEGMENT the name lasted until now: exactly one
+     * PE's increment reaches L, and that PE removes it. Others may still hold
+     * mappings, which stay valid. The session number in the name keeps this
+     * from removing a segment a PE has already re-created (§6.4). Otherwise the
+     * name went at init, and there is nothing to remove. ENOENT is not an error
+     * either way: someone - osoe-stat --gc, an operator - may have beaten us
+     * to it, and the object is what matters, not its name. */
+    if (n->keep_name && done == b->local_count && shm_unlink(n->control_name) != 0 &&
+        errno != ENOENT)
         osoe_fatal("cannot remove control segment %s: %s", n->control_name, strerror(errno));
 
     munmap(n->hdr, n->control_bytes);
+    if (n->control_fd >= 0)
+        close(n->control_fd);
+    n->control_fd = -1;
     n->hdr = NULL;
     n->slots = NULL;
     n->blocks = NULL;

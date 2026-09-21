@@ -53,6 +53,9 @@ struct osoe_wire_header {
      * SIGSEGV in the peer, blamed on the peer.
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t leaving;
+    /* How many of the two sides have opened the wire: the open-time twin of
+     * `leaving`. The second side's increment removes the name (§3.14). */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t opened;
     _Alignas(OSOE_CACHELINE) struct osoe_wire_direction direction[2];
 };
 
@@ -266,6 +269,14 @@ void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_
      */
     w->tx = &h->direction[w->creator ? 0 : 1];
     w->rx = &h->direction[w->creator ? 1 : 0];
+
+    /* Both leads open a wire and nobody else does: the second to have opened
+     * it removes its name (§3.14). A seq_cst add on each side, so exactly one
+     * sees 2 - the both-sides-opened handshake the name's removal needs, and
+     * nothing more than a counter. */
+    if (atomic_fetch_add_explicit(&h->opened, 1, memory_order_seq_cst) + 1 == 2 &&
+        shm_unlink(w->name) != 0)
+        osoe_fatal("cannot remove the wire's name %s: %s", w->name, strerror(errno));
 }
 
 /*
@@ -335,9 +346,7 @@ void osoe_wire_close(struct osoe_wire *w)
                        (unsigned long long)osoe_stall_watch_seconds(&watch), w->name);
     }
 
-    munmap(w->map, w->bytes);
-    if (w->creator)
-        shm_unlink(w->name);
+    munmap(w->map, w->bytes);       /* its name went when both sides had opened it */
     *w = (struct osoe_wire){ 0 };
 }
 

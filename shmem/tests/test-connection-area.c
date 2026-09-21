@@ -67,12 +67,20 @@ struct payload {
 
 int main(void)
 {
+    /* How many PEs share this node: the length of OSOE_GTIDS (§6.2). The area
+     * needs it too - the last of them to open it removes its name (§3.14). */
+    uint32_t local_count = 1;
+    for (const char *g = getenv("OSOE_GTIDS"); g && *g; g++)
+        if (*g == ',')
+            local_count++;
+
     struct osoe_bootstrap b = {
         .job = strtoull(getenv("OSOE_JOB_ID") ? getenv("OSOE_JOB_ID") : "0", NULL, 10),
         .step = env_u32("OSOE_STEP_ID"),
         .node = env_u32("OSOE_NODEID"),
         .local_id = env_u32("OSOE_LOCALID"),
         .rank = env_u32("OSOE_PROCID"),
+        .local_count = local_count,
         .no_progress_ns = UINT64_C(30000000000),  /* fail rather than hang */
     };
 
@@ -81,12 +89,6 @@ int main(void)
      * property that the global rendezvous would supply; here it is a constant,
      * since this test is about the area and not about bootstrap.
      */
-    /* How many PEs share this node: the length of OSOE_GTIDS (§6.2). */
-    uint32_t local_count = 1;
-    for (const char *g = getenv("OSOE_GTIDS"); g && *g; g++)
-        if (*g == ',')
-            local_count++;
-
     struct osoe_connection_area area;
     osoe_connection_area_open(&area, &b, NODES, 0);
 

@@ -1000,13 +1000,33 @@ that is stuck. Memory can be read without the job's cooperation.
 
 #### Where the state lives
 
-- **In the node's control segment**, `/osoe.<job>.<step>.<node>` (§6.2), which
-  **keeps its name until the last finalize** so a reader can open it while the job
-  runs. Heap names are still removed once every local PE has mapped them.
-- **A crash leaves the control segment in `/dev/shm`** — a few MB. That is also the
-  post-mortem: the state at the moment of the crash stays readable until someone
-  removes it. `osoe-stat --gc` removes segments whose recorded pids are all gone,
-  and a Slurm epilog can remove `/dev/shm/osoe.<jobid>.*`.
+- **In the node's control segment**, `/osoe.<job>.<step>.<node>.<session>` (§6.2).
+  **Its name is removed during init**, like every other object's (§6.2), and
+  **`/proc` is the rendezvous instead**: every PE keeps the segment's file
+  descriptor open for the session, and `osoe-stat` finds a job by scanning
+  `/proc/<pid>/fd` for `/dev/shm/osoe.<job>.… (deleted)` and opening *that path*
+  read-only — any live PE of the node serves, so a dead lead does not blind it.
+  The kernel opens the same object, and updates show live. A reader outside the
+  job's user sees nothing: another user's `/proc/<pid>/fd` is not readable, and
+  with `hidepid` not even listable; `osoe-stat` says which of "no such job", "not
+  visible to this user" and "/proc is restricted" it met. `/proc/<pid>/map_files/`
+  is not used: it needs `CAP_SYS_ADMIN`. This route also works where Slurm's
+  `job_container/tmpfs` gives each job a private `/dev/shm`, in which a name-based
+  reader outside the job would see nothing at all.
+- **Nothing survives a crash** — no death of any process can strand a name. The
+  decision it replaces kept the control segment's name until the last finalize,
+  so that a crash left the state readable for a post-mortem, and accepted the leak
+  (§10). But what that wanted was uncooperative diagnosis of a *live* job from
+  outside, and the name was only the rendezvous; `/proc` is a rendezvous that
+  needs no name. A name that survives a crash is at once the leak and the
+  post-mortem record — the same bytes — so only one can be the default, and the
+  default is that nothing leaks: about eight cancelled jobs used to fill a 4 GiB
+  Pi's `/dev/shm` (second review, D13). A site may clean `/dev/shm` between jobs
+  on exclusive nodes; the library does not depend on it.
+  **`OSOE_KEEP_CONTROL_SEGMENT=1`** opts back in: the name is kept until the last
+  finalize, a crash leaves the segment for post-mortem reading (`osoe-stat` takes a
+  path as well as a job), and `osoe-stat --gc` removes it once every recorded PE is
+  gone and no live process maps it. Only in this mode can anything be stranded.
 - **Mode 0600.** The segment holds connection buffers, and so application data;
   only the job's user can read it.
 - **Self-describing.** A header carries a layout version and a table of metrics —
@@ -1157,6 +1177,8 @@ headers would pass whenever the library agreed with itself.
 - **Per-peer detail only in progress-thread blocks**, one set per connection: about
   500 connections × 30 counters × 8 B ≈ 120 KB. PE-side counters aggregate across
   peers; per-PE-per-peer counters would be hundreds of MB at 256 PEs and 500 peers.
+- **One file descriptor per PE** for the whole session: the control segment's,
+  which is what keeps it findable through `/proc` once its name is gone.
 - **Timing only on slow paths:** blocking operations, waits, and once per segment.
   Never per put or AMO. `CLOCK_MONOTONIC`, through the vDSO.
 - **Histograms use log2 buckets**, about 32 per histogram. The bucket index comes
@@ -3504,15 +3526,31 @@ its counts keep moving, and by default forever (§3.15's no-progress rule): with
 `OSOE_NO_PROGRESS_TIMEOUT` set, a count that stands still that long ends the job
 naming the local ids that never arrived.
 
-**Removing the control segment's name.** At the last finalize each PE bumps
-`finalized`. Exactly one increment reaches `L`, and that PE removes the name. The
-others' mappings stay valid. The session number is what makes this safe: without
-it, a PE that had finished and immediately re-initialized could recreate the name,
-and a slower sibling would then remove the new segment. The control segment
-**keeps its name until the last finalize**, so `osoe-stat` can open it while the
-job runs (§3.14). A crash therefore leaves the control segment — a few MB, and the
-post-mortem — for `osoe-stat --gc` or a Slurm epilog to remove; a crash during
-init can also leave heap names. Where hugetlbfs is mounted and has pages, heaps use it under the same
+**Removing names: as soon as everyone who must open an object has.** Every object
+is opened only during init, and each name is removed the moment the last process
+that needs it has it open, so that after init nothing this job created in
+`/dev/shm` has a name and no death of any process can strand one (§3.14):
+
+- **Heaps and the control segment**: by the lead, once `mapped` reaches `L` —
+  every local PE opened the segment before it could map a sibling's heap.
+- **The connection area**: by whichever local PE's open brings its `opened`
+  count to `L`.
+- **The job segment**: by whichever PE's open brings its `opened` count to the
+  world size.
+- **A wire**: by the second of its two leads to open it. `opened` is the
+  open-time twin of `leaving`; a counter is all the handshake needs, since
+  exactly one of two seq_cst increments sees 2.
+
+The last opener rather than the creator removes each name, so nothing waits for
+anything, and a re-init after finalize is a fresh session with fresh names.
+`OSOE_KEEP_CONTROL_SEGMENT=1` keeps the control segment's name until the last
+finalize instead: each PE bumps `finalized`, exactly one increment reaches `L`,
+and that PE removes it. The session number keeps that safe — without it, a PE
+that finished and immediately re-initialized could recreate the name and a slower
+sibling would remove the new segment. The window that remains is init itself: a
+job killed there can leave names behind, and the next job with the same id
+reclaims them (below). Where hugetlbfs is mounted and has pages, heaps use it
+under the same names; otherwise they fall back to regular shared memory. Where hugetlbfs is mounted and has pages, heaps use it under the same
 names; otherwise they fall back to regular shared memory.
 
 **Global.** The step's rendezvous server is the lead of node 0: the task with
@@ -3590,8 +3628,10 @@ library never sees it.
 The test launcher, `tools/launch/osoe-launch`, starts L processes of a one-node
 job with these variables set. Its job id is its own pid, so concurrent launches
 never share a name. It fails on a nonzero exit, a signal, a timeout, or a clean
-job that left `/dev/shm/osoe.<job>.*` behind. That last check tests the naming
-rules above on every multi-process test.
+job that left `/dev/shm/osoe.<job>.*` behind, which it then removes (kept control
+segments excepted, for `--gc`). And every tier-2 test checks, *while the job
+runs*, that nothing of its job has a name once init has completed
+(`invariants.h`) — the naming rules above, on every multi-process test.
 
 **Bootstrap is out of band in every build, and always will be.** An RDMA
 transport cannot bootstrap itself: the GIDs, queue-pair numbers and memory keys
@@ -4378,7 +4418,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is designed but not scheduled (below) |
 | `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked, not scheduled** (§4.11). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
-| Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector, deferred until there is a reason for a third formatter. The control segment keeps its name until finalize, accepting a small leak on crash. The reader shares only the frozen directory and the metric descriptor with the writer and finds everything else by name, which a tier-1 test enforces by handing it a segment this build did not write. The flight recorder is deferred to step 2, with its design standing: its events do not exist yet |
+| Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector, deferred until there is a reason for a third formatter. **Revised in phase 1 step 2 slice 2:** the control segment's name is removed during init like every other object's, and `osoe-stat` finds a live job through `/proc/<pid>/fd` of any of its PEs; `OSOE_KEEP_CONTROL_SEGMENT=1` restores the old behaviour for post-mortem work. The original entry kept the name until finalize, accepting a small leak on crash — on the reasoning that uncooperative reading needed a name. It did not: it needed a rendezvous, and `/proc` is one that no crash can strand (§3.14). The reader shares only the frozen directory and the metric descriptor with the writer and finds everything else by name, which a tier-1 test enforces by handing it a segment this build did not write. The flight recorder is deferred to step 2, with its design standing: its events do not exist yet |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
 | Build tool | **CMake ≥ 3.25** (§1) |
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |

@@ -28,7 +28,8 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
     int n;
     if (osoe.bootstrap.have_rank && osoe.node.control_name[0])
         n = snprintf(out, sizeof out, "osoe: PE %u: %s\nosoe: PE %u: control segment "
-                     "/dev/shm%s\n", osoe.bootstrap.rank, msg, osoe.bootstrap.rank,
+                     "%s (osoe-stat %s, while any PE of this node is alive)\n",
+                     osoe.bootstrap.rank, msg, osoe.bootstrap.rank, osoe.node.control_name,
                      osoe.node.control_name);
     else if (osoe.bootstrap.have_rank)
         n = snprintf(out, sizeof out, "osoe: PE %u: %s\n", osoe.bootstrap.rank, msg);
