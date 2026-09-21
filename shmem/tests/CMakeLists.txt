@@ -516,6 +516,14 @@ set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TI
   PASS_REGULAR_EXPRESSION "shmem_quiet: no progress toward node 1 for [0-9]+ s"
   FAIL_REGULAR_EXPRESSION "quiet completed")
 
+# The other half of D-6 (diagnosability review): a blocking get waits for one
+# PE's reply, not a whole node's queue, so its no-progress fatal must name that
+# PE and not only the node. Before this fix it named neither.
+osoe_tier2_map_test(get-no-progress 0,1 OSOE_NO_PROGRESS_TIMEOUT=1)
+set_tests_properties(shmem.get-no-progress.0-1 PROPERTIES
+  PASS_REGULAR_EXPRESSION "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s"
+  FAIL_REGULAR_EXPRESSION "GET RETURNED")
+
 # A loud failure ends the job without joining a collective (§3.15; review round
 # two, conformance F1): osoe_fatal leaves through _exit, so start_pes's atexit
 # finalize - a barrier - does not run. Before slice 2 this job hung 7-8 s.
