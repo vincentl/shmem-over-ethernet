@@ -528,6 +528,26 @@ add_test(NAME shmem.leftovers.live
 set_tests_properties(shmem.leftovers.live PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "the refusal names the owner: yes")
 
+# A job never outlives its launcher: SIGTERM and SIGINT are forwarded, and a
+# SIGKILLed launcher takes its PEs with it (launch.c; review round two,
+# omissions 6). See launcher-signals.sh.
+add_executable(shmem_test_sleeper sleeper.c)
+target_link_libraries(shmem_test_sleeper PRIVATE osoe)
+osoe_warnings(shmem_test_sleeper)
+foreach(mode term int kill)
+  add_test(NAME shmem.launcher-signals.${mode}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/launcher-signals.sh
+            $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_sleeper> ${mode})
+  set_tests_properties(shmem.launcher-signals.${mode} PROPERTIES LABELS "tier2"
+    TIMEOUT 60)
+endforeach()
+set_tests_properties(shmem.launcher-signals.term PROPERTIES PASS_REGULAR_EXPRESSION
+  "launcher exited 143.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
+set_tests_properties(shmem.launcher-signals.int PROPERTIES PASS_REGULAR_EXPRESSION
+  "launcher exited 130.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
+set_tests_properties(shmem.launcher-signals.kill PROPERTIES PASS_REGULAR_EXPRESSION
+  "PEs still running: 0.*with a name: 0")
+
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
