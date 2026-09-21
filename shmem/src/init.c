@@ -5,6 +5,8 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <pshmem.h>
@@ -87,6 +89,43 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "  segment read-only and needs no cooperation from the job (§3.14).\n");
 }
 
+/*
+ * A process that leaves with the library still initialized (§6.4).
+ *
+ * An shmem_init program ends its use of the library with shmem_finalize or
+ * shmem_global_exit (spec §4); leaving without either is outside the
+ * specification, and the other PEs would wait for this one at their next
+ * collective until the launcher gives up - and the launcher gives up only on
+ * a nonzero status, so an exit(0) hung a release-build job (second review,
+ * D14). So the job ends here, loudly: this node's abort word stops its other
+ * PEs at their next sweep, and the status is made nonzero for the launcher.
+ * Remote nodes see it when their own PEs on this node's side stop answering;
+ * propagating it to them is §7.1 step 4's abort flood.
+ *
+ * start_pes programs are the exception the specification makes - they are
+ * finalized implicitly at exit (§9.1, Annex F.2.3) - and deprecated.c
+ * registers that finalize after this handler, so it runs first and this one
+ * then finds nothing initialized.
+ */
+static void exit_without_finalize(void)
+{
+    if (refcount == 0 || getpid() != init_pid)
+        return;
+    fflush(NULL);
+    char msg[256];
+    int n = snprintf(msg, sizeof msg, "osoe: PE %u: the process exited without calling "
+                     "shmem_finalize; ending the job (spec §4, §9.1.4)\n",
+                     osoe.bootstrap.rank);
+    if (n > 0) {
+        ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
+                                                                          : sizeof msg - 1);
+        (void)ignored;
+    }
+    if (osoe.node.hdr && !atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire))
+        osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
+}
+
 static void session_start(void)
 {
     osoe = (struct osoe_state){ 0 };
@@ -132,6 +171,11 @@ static void session_start(void)
     osoe_progress_host_start(session);
     osoe_agent_start(&osoe.node.slots[osoe.bootstrap.local_id]);
     init_pid = getpid();
+    static bool exit_handler;
+    if (!exit_handler) {
+        exit_handler = true;
+        atexit(exit_without_finalize);
+    }
 
     /*
      * SHMEM_DEBUG, after the rendezvous, because the two things worth knowing
@@ -191,9 +235,9 @@ OSOE_API void pshmem_finalize(void)
         return;
     }
     /* Every finalize is a barrier (spec §9.1.4, invariant 26): a non-last one
-     * only that, the last one before tearing down. Skipping it would let the
-     * world team's epoch counts diverge across PEs. */
-    osoe_barrier_all("shmem_finalize");
+     * only that, the last one before tearing down. On the finalize team's own
+     * counters, so it can never be matched by an application's barrier. */
+    osoe_barrier_finalize();
     refcount--;
     if (refcount == 0) {
         session_end();

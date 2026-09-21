@@ -16,6 +16,10 @@
 #include "base/epoch.h"
 
 /* The two predefined teams, resolved to the state a collective needs. */
+/* The library's internal finalize team (node.h, OSOE_TEAM_FINALIZE): the
+ * world's membership on counters of its own. */
+struct osoe_team *osoe_team_finalize(void);
+
 struct osoe_team {
     const char *name;
     uint32_t number;                /* enum osoe_team_number: indexes per-team state */

@@ -457,6 +457,38 @@ set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TI
   PASS_REGULAR_EXPRESSION "shmem_quiet: no progress toward node 1 for [0-9]+ s"
   FAIL_REGULAR_EXPRESSION "quiet completed")
 
+# A loud failure ends the job without joining a collective (§3.15; review round
+# two, conformance F1): osoe_fatal leaves through _exit, so start_pes's atexit
+# finalize - a barrier - does not run. Before slice 2 this job hung 7-8 s.
+add_executable(shmem_test_fatal-start-pes test-fatal-start-pes.c)
+target_link_libraries(shmem_test_fatal-start-pes PRIVATE osoe)
+osoe_warnings(shmem_test_fatal-start-pes)
+add_test(NAME shmem.fatal-start-pes
+  COMMAND osoe-launch -n 3 -t 10 -- $<TARGET_FILE:shmem_test_fatal-start-pes>)
+set_tests_properties(shmem.fatal-start-pes PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap"
+  FAIL_REGULAR_EXPRESSION "timeout after|RETURNED")
+
+# A PE leaving without shmem_finalize (§6.4; review round two, D14). See the
+# test's header for the two modes and what each must and must not do.
+add_executable(shmem_test_exit-without-finalize test-exit-without-finalize.c)
+target_link_libraries(shmem_test_exit-without-finalize PRIVATE osoe)
+osoe_warnings(shmem_test_exit-without-finalize)
+add_test(NAME shmem.exit-without-finalize.init
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MODE=init
+          $<TARGET_FILE:osoe-launch> -n 3 -t 10 -k --
+          $<TARGET_FILE:shmem_test_exit-without-finalize>)
+set_tests_properties(shmem.exit-without-finalize.init PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "PE 1: the process exited without calling shmem_finalize"
+  FAIL_REGULAR_EXPRESSION "timeout after|BARRIER RETURNED")
+add_test(NAME shmem.exit-without-finalize.start_pes
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MODE=start_pes
+          $<TARGET_FILE:osoe-launch> -n 3 -t 4 --
+          $<TARGET_FILE:shmem_test_exit-without-finalize>)
+set_tests_properties(shmem.exit-without-finalize.start_pes PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 4 s"
+  FAIL_REGULAR_EXPRESSION "BARRIER RETURNED")
+
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)

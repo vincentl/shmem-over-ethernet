@@ -5,4 +5,7 @@
 
 void osoe_barrier_all(const char *routine);
 
+/* shmem_finalize's barrier, on the finalize team (barrier.c). */
+void osoe_barrier_finalize(void);
+
 #endif /* OSOE_BARRIER_H */

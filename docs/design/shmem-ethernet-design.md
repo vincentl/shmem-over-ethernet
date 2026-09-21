@@ -1363,6 +1363,13 @@ ends a wait promptly; what goes is only the fatal deadline. (`base/stall-watch.h
 is the one helper; §3.10's absolute futex deadlines are clock instants for one
 sweep-length sleep, and stay.)
 
+**A fatal declares the node's abort**, and every wait reads the abort word at its
+next sweep in every build — only the liveness polling is the development
+watchdog. So the other PEs of a node stop within a sweep of the first fatal. A
+remote node cannot see another node's abort word: it sees the failure only when
+something it waits on stops moving, until §7.1 step 4's abort flood carries the
+word between nodes.
+
 The first build had a fatal deadline instead: `OSOE_BOOTSTRAP_TIMEOUT`, 60 s,
 meant for rendezvous but also bounding every internode wait. A legitimate 150 s
 quiet on 1 GbE died at 60 s, and a lead stopped for 20 s killed every PE talking
@@ -3631,7 +3638,25 @@ Things to get right, each of which is a silent bug otherwise:
   calls to shmem_finalize perform an operation semantically equivalent to
   shmem_barrier_all". An earlier draft only decremented the count, which skips
   completion and lets §5.4's epoch counts diverge across PEs. The last call
-  performs its implicit barrier, then tears down.
+  performs its implicit barrier, then tears down. **Finalize's barrier runs on a
+  team of its own** — the world's members on counters no application collective
+  touches (`OSOE_TEAM_FINALIZE`, layout 10). On the world's counters, a PE
+  finalizing matched another PE's `shmem_barrier_all`: under `start_pes`, a PE
+  returning from `main` ran the implicit finalize and let the others out of a
+  barrier the application never matched (second review, D14). Now the two wait
+  for each other, which is a hang in a program whose collectives do not match —
+  that program's — rather than a barrier returning that nobody matched.
+- **Leaving without finalizing ends the job.** An `shmem_init` program ends its
+  use of the library with `shmem_finalize` or `shmem_global_exit` (spec §4); the
+  specification finalizes implicitly only under `start_pes` (§9.1, Annex F.2.3).
+  An `atexit` handler registered at the first init finds a process leaving with
+  the library still initialized, prints so, declares the node's abort, and makes
+  the status nonzero, since `srun -K1` acts only on a nonzero one — an `exit(0)`
+  used to hang a release-build job until its timeout. `start_pes` registers its
+  implicit finalize after that handler, so it runs first. **No exit path runs a
+  collective the application did not call**: `osoe_fatal` leaves through `_exit`,
+  not `exit`, so it never runs `start_pes`'s finalize — which is a barrier — on its
+  way out (second review, conformance F1).
 - **The count is per process, not per thread**, and must be updated atomically.
 - **Concurrent first `shmem_init`** from two application threads passes through a
   once-gate, so bootstrap runs exactly once.

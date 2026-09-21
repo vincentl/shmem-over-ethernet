@@ -100,6 +100,25 @@ void osoe_barrier_all(const char *routine)
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
 }
 
+/*
+ * The barrier inside shmem_finalize (spec §9.1.4): a quiet, then the finalize
+ * team's own synchronization - the world's members on counters no application
+ * collective touches. So a PE finalizing while another is in
+ * shmem_barrier_all waits for it in finalize, and the other waits in its
+ * barrier: a hang in a program that does not match its collectives, which is
+ * that program's, rather than a barrier returning that nobody matched.
+ */
+void osoe_barrier_finalize(void)
+{
+    uint64_t t0 = osoe_now_ns();
+    osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
+    osoe_blocked_enter("shmem_finalize", OSOE_BLOCKED_DETAIL_EPOCH, osoe.finalize_epoch + 1);
+    osoe_transport_wait(osoe_transport_context_default(), NULL, 0);
+    sync_team(osoe_team_finalize(), "shmem_finalize");
+    osoe_blocked_leave();
+    osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
+}
+
 OSOE_API void pshmem_barrier_all(void)
 {
     osoe_barrier_all("shmem_barrier_all");

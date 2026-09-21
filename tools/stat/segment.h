@@ -149,11 +149,12 @@ void osoe_segment_close(struct osoe_segment *s);
 
 /* The layout this reader was built against. Not a requirement - see above.
  * Layout 9 added pe.blocked.detail_kind; an older segment simply lacks it and
- * its details print raw.
+ * its details print raw. Layout 10 added the finalize team's counters, found by
+ * name like the others; the watch word's encoding is unchanged.
  * Layout 8 only appended the AM counters, which a reader finds by name, so a
  * reader built for 7 prints them unchanged and differs only in showing the
  * watch word raw, with "encoding unknown", rather than decoded. */
-#define OSOE_SEGMENT_KNOWN_LAYOUT 9
+#define OSOE_SEGMENT_KNOWN_LAYOUT 10
 
 /* The metric of that name, or NULL. */
 const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name);

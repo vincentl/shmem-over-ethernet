@@ -136,6 +136,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.watch_seq", watch_seq, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.world_epoch", world_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.shared_epoch", shared_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    PE("pe.finalize_epoch", finalize_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.sweeps", sweeps, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     /* An invariant at PE scope, because the thread it describes is by
      * definition one whose counter block nobody can read. */
@@ -156,6 +157,8 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     NDEPOCH("team.shared.arrived", shared_arrived),
     NDEPOCH("team.shared.released", shared_released),
     NDEPOCH("team.shared.copied", shared_copied),
+    NDEPOCH("team.finalize.arrived", finalize_arrived),
+    NDEPOCH("team.finalize.released", finalize_released),
     /*
      * §5.3's internode arrival handoff: the epoch a local member posted for the
      * lead's agent to forward. Against `released` it is where a hung multi-node
@@ -166,6 +169,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      */
     NDARRIVAL("team.world.arrival_posted", OSOE_TEAM_WORLD),
     NDARRIVAL("team.shared.arrival_posted", OSOE_TEAM_SHARED),
+    NDARRIVAL("team.finalize.arrival_posted", OSOE_TEAM_FINALIZE),
     ND("node.aborting", aborting, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_pe", abort_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_status", abort_status, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),

@@ -298,6 +298,8 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     osoe_epoch_init(&h->shared_arrived);
     osoe_epoch_init(&h->shared_released);
     osoe_epoch_init(&h->shared_copied);
+    osoe_epoch_init(&h->finalize_arrived);
+    osoe_epoch_init(&h->finalize_released);
 }
 
 /* A non-lead opens the control segment by name, waiting for the lead to

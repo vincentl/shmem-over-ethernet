@@ -26,7 +26,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 9
+#define OSOE_NODE_LAYOUT 10
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -61,6 +61,15 @@ enum osoe_blocked_detail {
 enum osoe_team_number {
     OSOE_TEAM_WORLD = 0,
     OSOE_TEAM_SHARED = 1,
+    /*
+     * The library's own team for shmem_finalize: the world's members, its own
+     * epoch counters. A finalize must never complete together with an
+     * application's shmem_barrier_all, which a shared world epoch made
+     * possible - a PE leaving through start_pes's implicit finalize matched the
+     * others' barrier and let them past a collective the application never
+     * matched (§6.4; second review, D14). Not a team an application can name.
+     */
+    OSOE_TEAM_FINALIZE = 2,
     OSOE_TEAMS,
 };
 
@@ -109,6 +118,7 @@ struct osoe_pe_slot {
     _Atomic uint64_t sweeps;             /* safety-sweep expiries: a blocked PE still moves */
     _Atomic uint32_t world_epoch;        /* this PE's k for SHMEM_TEAM_WORLD (§5.4) */
     _Atomic uint32_t shared_epoch;       /* and for SHMEM_TEAM_SHARED */
+    _Atomic uint32_t finalize_epoch;     /* and for the finalize team (layout 10) */
 
     /*
      * Threads of this PE that found no free counter block (§3.14). It belongs
@@ -295,11 +305,16 @@ struct osoe_node_header {
     struct osoe_epoch shared_arrived;
     struct osoe_epoch shared_released;
     struct osoe_epoch shared_copied;
+    /* The finalize team's (layout 10). It has no copy phase. */
+    struct osoe_epoch finalize_arrived;
+    struct osoe_epoch finalize_released;
 
     /* Appended at layout 7 (§5.3). */
     struct osoe_arrival_handoff arrival[OSOE_TEAMS];
 
-    /* Appended at layout 8. Layout 9 added blocked_detail_kind to the PE slot,
+    /* Appended at layout 8. Layout 10 added the finalize team's counters above
+     * and grew `arrival` by one, which moved this record; readers find it by
+     * name. Layout 9 added blocked_detail_kind to the PE slot,
      * which moved no header field. Layout 8 also gave each epoch counter's line a
      * second word, released_at_ns (base/epoch.h), in padding it already owned:
      * no offset moved, but the line's contents changed meaning. */

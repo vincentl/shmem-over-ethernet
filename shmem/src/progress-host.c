@@ -105,12 +105,22 @@ static void release(void *context, uint32_t team, uint32_t epoch)
     (void)context;
     struct osoe_epoch *released;
     const char *name;
-    if (team == OSOE_TEAM_WORLD) {
+    switch (team) {
+    case OSOE_TEAM_WORLD:
         released = &osoe.node.hdr->world_released;
         name = "SHMEM_TEAM_WORLD";
-    } else {
+        break;
+    case OSOE_TEAM_SHARED:
         released = &osoe.node.hdr->shared_released;
         name = "SHMEM_TEAM_SHARED";
+        break;
+    case OSOE_TEAM_FINALIZE:
+        released = &osoe.node.hdr->finalize_released;
+        name = "shmem_finalize";
+        break;
+    default:
+        osoe_fatal("an internode release names team %u; this build has %u", team,
+                   OSOE_TEAMS);
     }
     if (!osoe_epoch_release_bump_eq(released, epoch))
         osoe_fatal("the internode release for %s arrived for epoch %u out of order: "
@@ -133,9 +143,9 @@ static void release(void *context, uint32_t team, uint32_t epoch)
  */
 static uint32_t participants(uint32_t team)
 {
-    if (team != OSOE_TEAM_WORLD)
-        osoe_fatal("team %u has no internode phase; only SHMEM_TEAM_WORLD spans nodes "
-                   "in this build", team);
+    if (team != OSOE_TEAM_WORLD && team != OSOE_TEAM_FINALIZE)
+        osoe_fatal("team %u has no internode phase; only the world and finalize teams "
+                   "span nodes in this build", team);
     return osoe.job.node_count;
 }
 

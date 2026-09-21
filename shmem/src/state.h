@@ -23,6 +23,7 @@ struct osoe_state {
     struct osoe_allocator allocator;
     uint32_t world_epoch;           /* k for SHMEM_TEAM_WORLD (§5.4) */
     uint32_t shared_epoch;          /* and for SHMEM_TEAM_SHARED */
+    uint32_t finalize_epoch;        /* and for the finalize team (team.h) */
 
     /*
      * The AM backend, present only in a job of more than one logical node
