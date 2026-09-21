@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include "shm-object.h"
@@ -96,4 +97,14 @@ bool osoe_shm_orphaned(int fd)
 {
     struct stat st;
     return fstat(fd, &st) == 0 && st.st_nlink == 0;
+}
+
+bool osoe_shm_room(uint64_t wanted, uint64_t *free_bytes)
+{
+    struct statvfs sv;
+    *free_bytes = 0;
+    if (statvfs("/dev/shm", &sv) != 0 || sv.f_blocks == 0)
+        return true;
+    *free_bytes = (uint64_t)sv.f_bavail * (uint64_t)sv.f_frsize;
+    return wanted <= *free_bytes;
 }

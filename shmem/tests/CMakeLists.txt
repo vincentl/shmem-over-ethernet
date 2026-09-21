@@ -567,6 +567,25 @@ set_tests_properties(shmem.launcher-signals.int PROPERTIES PASS_REGULAR_EXPRESSI
 set_tests_properties(shmem.launcher-signals.kill PROPERTIES PASS_REGULAR_EXPRESSION
   "PEs still running: 0.*with a name: 0")
 
+# What a core holds: this PE's heap, not its siblings' or the connection area
+# (review round two, omissions 4).
+osoe_tier2_map_test(core-exclusion 0,0,1,1)
+
+# A request larger than /dev/shm is refused at init, by name (§6.2; review round
+# two, omissions 5). See dev-shm-capacity.sh.
+add_test(NAME shmem.dev-shm-capacity.heaps
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> heaps)
+add_test(NAME shmem.dev-shm-capacity.connections
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> connections)
+set_tests_properties(shmem.dev-shm-capacity.heaps shmem.dev-shm-capacity.connections
+  PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.dev-shm-capacity.heaps PROPERTIES PASS_REGULAR_EXPRESSION
+  "/dev/shm has [0-9]+ MiB free, but this node's control segment and 2 heaps.*launcher exited 1")
+set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES PASS_REGULAR_EXPRESSION
+  "/dev/shm has [0-9]+ MiB free, but this node's connection area.*launcher exited 1")
+
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)

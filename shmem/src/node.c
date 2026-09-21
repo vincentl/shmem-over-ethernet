@@ -180,6 +180,9 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
                      (unsigned long long)s->heap_bytes, strerror(errno));
             fail_rendezvous(n, msg);
         }
+        /* A sibling's heap is in the sibling's own core; in this one it would
+         * make every core L heaps large (review round two, omissions 4). */
+        madvise(p, s->heap_bytes, MADV_DONTDUMP);
         n->heap_of[i] = p;
     }
 }
@@ -209,12 +212,6 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
 /* The lead creates and initializes the control segment. */
 static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
-    char err[256];
-    int fd = osoe_shm_create(n->control_name,
-                             (long)offsetof(struct osoe_node_header, creator_pid),
-                             err, sizeof err);
-    if (fd < 0)
-        osoe_fatal("the control segment: %s", err);
     /*
      * Four sections: the header, the PE slots, the §3.14 metric table, and the
      * counter blocks. Each starts on a cache line, so no two sections share
@@ -247,6 +244,28 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint64_t landing_offset = align_up(blocks_offset + blocks_bytes);
     uint64_t landing_bytes = (uint64_t)b->local_count * landing_slot_bytes;
     n->control_bytes = page_round(landing_offset + landing_bytes);
+
+    /*
+     * The node's whole request, checked once and before any of it exists: this
+     * segment and every local PE's heap. The lead knows L and the heap size;
+     * every PE has parsed the same size, or check_agreement fails them all.
+     */
+    uint64_t wanted = n->control_bytes + (uint64_t)b->local_count * n->heap_bytes;
+    uint64_t free_bytes;
+    if (!osoe_shm_room(wanted, &free_bytes))
+        osoe_fatal("/dev/shm has %llu MiB free, but this node's control segment and %u "
+                   "heaps of %llu MiB need %llu MiB: lower SHMEM_SYMMETRIC_SIZE, run "
+                   "fewer PEs per node, or enlarge /dev/shm",
+                   (unsigned long long)(free_bytes >> 20), b->local_count,
+                   (unsigned long long)(n->heap_bytes >> 20),
+                   (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
+
+    char err[256];
+    int fd = osoe_shm_create(n->control_name,
+                             (long)offsetof(struct osoe_node_header, creator_pid),
+                             err, sizeof err);
+    if (fd < 0)
+        osoe_fatal("the control segment: %s", err);
     if (ftruncate(fd, (off_t)n->control_bytes) != 0) {
         close(fd);
         shm_unlink(n->control_name);

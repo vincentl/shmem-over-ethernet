@@ -200,6 +200,15 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
     uint32_t peers = nodes - 1;
     int fd;
     if (a->creator) {
+        /* The node's buffers to every peer; checked before any of it exists
+         * (shm-object.h). */
+        uint64_t free_bytes;
+        if (!osoe_shm_room(a->bytes, &free_bytes))
+            osoe_fatal("/dev/shm has %llu MiB free, but this node's connection area "
+                       "for %u nodes needs %llu MiB: lower OSOE_AM_BUFFER, or enlarge "
+                       "/dev/shm",
+                       (unsigned long long)(free_bytes >> 20), nodes,
+                       (unsigned long long)((a->bytes + (1u << 20) - 1) >> 20));
         char err[256];
         fd = osoe_shm_create(a->name,
                              (long)offsetof(struct osoe_connection_area_header, creator_pid),
@@ -261,6 +270,9 @@ again:;
             shm_unlink(a->name);
         osoe_fatal("cannot map connection area %s: %s", a->name, strerror(errno));
     }
+    /* Every PE of the node maps it, and a core of each would hold the node's
+     * whole traffic (review round two, omissions 4). */
+    madvise(p, a->bytes, MADV_DONTDUMP);
     a->map = p;
 
     struct osoe_connection_area_header *h = p;

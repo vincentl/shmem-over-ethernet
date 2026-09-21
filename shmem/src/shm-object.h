@@ -19,6 +19,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* An object with nowhere to record its creator (a heap: all application
  * memory). Such a leftover is reclaimed whenever it is this user's. */
@@ -52,5 +53,18 @@ int osoe_shm_open_ours(const char *name, char *err, size_t errlen);
  * it is true.
  */
 bool osoe_shm_orphaned(int fd);
+
+/*
+ * Is there room in /dev/shm for `wanted` more bytes (§6.2, /dev/shm capacity)?
+ * Sets `*free_bytes` to what statvfs says is free. True as well when that
+ * cannot be known: statvfs failed, or the filesystem reports no size at all.
+ *
+ * Advisory, and only that: another job can take the space a moment later. What
+ * it prevents is the common case, a job asking for more than the machine has,
+ * which otherwise starts, runs, and dies of SIGBUS in whichever process first
+ * touches a page tmpfs cannot supply - often a node lead applying someone
+ * else's put, far from the cause.
+ */
+bool osoe_shm_room(uint64_t wanted, uint64_t *free_bytes);
 
 #endif /* OSOE_SHM_OBJECT_H */

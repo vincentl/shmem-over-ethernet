@@ -3527,6 +3527,26 @@ The sequence, as implemented:
    It then waits on a `ready` that will never be published, so every `ready` wait
    also checks `st_nlink`: an object with no name left has been reclaimed, and the
    opener starts again from the name.
+
+   **A request larger than `/dev/shm` is refused before anything is created.**
+   The lead adds up its node's request - the control segment and `L` heaps - and
+   compares it with `statvfs`'s free space; the connection area's creator does the
+   same for the area. Either fails by name, with both numbers. The check is
+   **advisory**: tmpfs allocates a page when it is first touched, so another job can
+   take the space after the check passes, and nothing reserves it. Reserving it
+   (`posix_fallocate`) is ruled out because it defeats the demand paging every
+   sizing decision in §3.4 and §4.1 relies on, and a 4 GiB Raspberry Pi cannot
+   afford it. When tmpfs does run out later, the failure is a SIGBUS in whichever
+   process first touches an unbacked page - often the **lead's agent applying
+   another node's put** to a local heap, so the process that dies is not the one
+   whose memory ran out. The check is compared against the nominal size, so it
+   also refuses a job that would have fitted by touching little of a large heap;
+   `SHMEM_SYMMETRIC_SIZE` is the remedy it names. (Second review, omissions 5.)
+
+   **A PE's core holds its own heap and nothing of its node-mates'.** Sibling
+   heaps and the connection area are mapped `MADV_DONTDUMP`, or every crashing PE
+   would write `L` heaps and the node's traffic. The control segment stays in: it is
+   the post-mortem state (omissions 4).
 2. **Every other PE opens the segment by name.** It polls with backoff until the
    name exists, since there is nothing to wait on before it does. It then waits on
    `ready`, checks the magic number, layout version, and job description, and maps
