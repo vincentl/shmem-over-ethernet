@@ -35,7 +35,7 @@ struct osoe_state osoe;
  */
 static pthread_mutex_t lifecycle = PTHREAD_MUTEX_INITIALIZER;
 static unsigned refcount;
-static _Atomic int initialized;
+_Atomic int osoe_initialized;       /* state.h */
 static pid_t init_pid;
 static uint32_t sessions;       /* completed or current full sessions */
 
@@ -254,7 +254,7 @@ OSOE_API void pshmem_init(void)
         session_start();
     }
     refcount++;
-    atomic_store_explicit(&initialized, 1, memory_order_release);
+    atomic_store_explicit(&osoe_initialized, 1, memory_order_release);
     pthread_mutex_unlock(&lifecycle);
 }
 
@@ -274,7 +274,7 @@ OSOE_API void pshmem_finalize(void)
     refcount--;
     if (refcount == 0) {
         session_end();
-        atomic_store_explicit(&initialized, 0, memory_order_release);
+        atomic_store_explicit(&osoe_initialized, 0, memory_order_release);
         /* A fresh session may be initialized at a different level. Until it
          * is, the answer is the one a shmem_init would give. */
         atomic_store_explicit(&thread_level, OSOE_THREAD_MAX, memory_order_release);
@@ -303,7 +303,7 @@ OSOE_API int pshmem_init_thread(int requested, int *provided)
         session_start();
     }
     refcount++;
-    atomic_store_explicit(&initialized, 1, memory_order_release);
+    atomic_store_explicit(&osoe_initialized, 1, memory_order_release);
     int level = atomic_load_explicit(&thread_level, memory_order_acquire);
     pthread_mutex_unlock(&lifecycle);
 
@@ -321,25 +321,24 @@ OSOE_API void pshmem_query_thread(int *provided)
 
 OSOE_API void pshmem_query_initialized(int *flag)
 {
-    *flag = atomic_load_explicit(&initialized, memory_order_acquire);
+    *flag = atomic_load_explicit(&osoe_initialized, memory_order_acquire);
 }
 
-/* See state.h. Same flag pshmem_query_initialized publishes, same ordering. */
-void osoe_require_initialized(const char *routine)
+/* See state.h: the cold half of osoe_require_initialized. */
+_Noreturn void osoe_not_initialized(const char *routine)
 {
-    if (!atomic_load_explicit(&initialized, memory_order_acquire))
-        osoe_fatal("%s: called before shmem_init (or shmem_init_thread), or after "
-                   "the last shmem_finalize", routine);
+    osoe_fatal("%s: called before shmem_init (or shmem_init_thread), or after "
+               "the last shmem_finalize", routine);
 }
 
 OSOE_API int pshmem_my_pe(void)
 {
-    return atomic_load_explicit(&initialized, memory_order_acquire) ? (int)osoe.bootstrap.rank : -1;
+    return atomic_load_explicit(&osoe_initialized, memory_order_acquire) ? (int)osoe.bootstrap.rank : -1;
 }
 
 OSOE_API int pshmem_n_pes(void)
 {
-    return atomic_load_explicit(&initialized, memory_order_acquire)
+    return atomic_load_explicit(&osoe_initialized, memory_order_acquire)
                ? (int)osoe.bootstrap.world_size : -1;
 }
 

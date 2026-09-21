@@ -1796,19 +1796,24 @@ local lead and again at the root.
   - **The size is exact.** It is the integer ceiling of the number times the
     multiplier, computed in integer arithmetic, so "3.1M" is the spec's 3250586
     on every machine, with no dependence on binary floating point.
-  - **Decimal notation only.** The spec says "floating point value" without
-    defining it. An exponent ("1e3"), a sign, surrounding space, or any character
-    other than a multiplier after the number is an error, which the spec lets init
-    report by terminating. Characters after the multiplier are ignored, as the spec
-    requires. Accepting `strtod`'s wider grammar would silently turn a typo such as
-    `1e` into a size.
+  - **Decimal notation, with an optional exponent.** The spec says "floating
+    point value" without defining it, and a C programmer reads `1e3` as one; an
+    earlier draft refused it, which the second review found surprised users
+    (conformance F9). The exponent is applied in the same exact integer
+    arithmetic, never through `strtod`. A sign, surrounding space, an exponent
+    with no digits (`1e`, so a typo does not become a size), or any character
+    other than a multiplier after the number is an error, which the spec lets
+    init report by terminating. Characters after the multiplier are ignored, as
+    the spec requires. `SMA_SYMMETRIC_SIZE` is read when `SHMEM_SYMMETRIC_SIZE`
+    is unset, like every other variable (Annex F).
   - **A value that does not fit in 64 bits is an error.**
   - The grammar lives in `base/size.c`, with its tier-1 test next to it.
 
 **Default size.** Without `SHMEM_SYMMETRIC_SIZE` a heap is 256 MiB. Heap objects
 commit pages only when touched, so the default costs address space: L × 256 MiB
-per process, 64 GiB at 256 local PEs. A size of 0 is valid and maps one page, so
-every allocation of nonzero size fails.
+per process, 64 GiB at 256 local PEs. A size of 0 is refused at init by name: a
+heap in which every allocation fails is never what was meant (second review,
+omissions 11).
 
 **Hints are recorded, not discarded.** An earlier note here called
 `shmem_malloc_with_hints` an alias for `shmem_malloc`, on the grounds that SOS
