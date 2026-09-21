@@ -1,0 +1,36 @@
+## A: SIGTERM to the launcher mid-job (what ctest's timeout, or kill, does)
+  before:
+  /dev/shm: 0 objects, 0 KiB resident; sleeper processes: 5
+  3 s after SIGTERM to launcher pid 825021:
+  /dev/shm: 0 objects, 0 KiB resident; sleeper processes: 0
+  35 s after (PEs have finished their sleep and finalized on their own):
+  /dev/shm: 0 objects, 0 KiB resident; sleeper processes: 0
+## B: SIGTERM to every PE at once (what scancel does to a step), launcher told to keep hands off (-k)
+  1 s after SIGTERM to all PEs:
+  /dev/shm: 0 objects, 0 KiB resident; sleeper processes: 0
+  launcher rc=143
+    osoe-launch: rank 1 killed by signal 15
+    osoe-launch: rank 0 killed by signal 15
+    osoe-launch: rank 3 killed by signal 15
+## C: one PE leaves with exit(0) and no shmem_finalize; watchdog off (the release default), -k
+  launcher rc=1
+    osoe-launch: rank 2 exited with status 1
+    osoe-launch: timeout after 15 s; killing 2 process(es)
+    osoe-launch: rank 0 killed by signal 9
+    osoe-launch: rank 1 killed by signal 9
+## C2: the same with the development watchdog on
+  launcher rc=1
+    osoe: PE 2: shmem_free: the job is aborting on behalf of PE 3; this PE cannot make progress
+    osoe: PE 2: control segment /osoe.825103.0.1.0 (osoe-stat /osoe.825103.0.1.0, while any PE of this node is alive)
+    osoe-launch: rank 2 exited with status 1
+    osoe-launch: timeout after 15 s; killing 2 process(es)
+    osoe-launch: rank 0 killed by signal 9
+    osoe-launch: rank 1 killed by signal 9
+## D: fork(), system(), popen() inside a PE, child leaves with exit()
+PE 1: system=0 popen=ok child=0 heap after child store=8
+PE 0: system=0 popen=ok child=0 heap after child store=8
+  rc=0
+## D2: the same under start_pes (an atexit finalize is registered, and the child runs it)
+PE 1: system=0 popen=ok child=0 heap after child store=8
+PE 0: system=0 popen=ok child=0 heap after child store=8
+  rc=0
