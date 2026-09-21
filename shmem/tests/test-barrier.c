@@ -2,6 +2,7 @@
  * shmem_barrier_all blocks every PE until all have arrived (spec §9.10.1), and
  * every shmem_finalize is a barrier (§9.1.4). See arrivals.h for the check.
  */
+#define _GNU_SOURCE
 #include <shmem.h>
 
 #include "arrivals.h"

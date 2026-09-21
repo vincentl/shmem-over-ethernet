@@ -7,6 +7,7 @@
 
 uint64_t osoe_symmetric_offset(const char *routine, const void *addr, uint64_t len)
 {
+    osoe_require_initialized(routine);
     uint64_t offset;
     if (!osoe_symmetric_heap_offset(addr, len, &offset))
         osoe_fatal("%s: [%p, +%llu) is not within the symmetric heap (symmetric statics "
@@ -24,6 +25,7 @@ uint64_t osoe_symmetric_word_offset(const char *routine, const void *addr, unsig
 
 void osoe_check_pe(const char *routine, int pe)
 {
+    osoe_require_initialized(routine);
     if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size)
         osoe_fatal("%s: PE %d is not in 0..%u", routine, pe, osoe.bootstrap.world_size - 1);
 }

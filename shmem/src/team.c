@@ -28,10 +28,28 @@
 #include "team.h"
 #include "transport.h"
 
-static struct osoe_team world_team, shared_team;
+static struct osoe_team world_team, shared_team, finalize_team;
+
+struct osoe_team *osoe_team_finalize(void)
+{
+    finalize_team = (struct osoe_team){
+        .name = "the finalize team",
+        .number = OSOE_TEAM_FINALIZE,
+        .members = osoe.bootstrap.world_size,
+        .local_members = osoe.bootstrap.local_count,
+        .internode = osoe.job.node_count > 1,
+        .me = osoe.bootstrap.rank,
+        .arrived = &osoe.node.hdr->finalize_arrived,
+        .released = &osoe.node.hdr->finalize_released,
+        .epoch = &osoe.finalize_epoch,
+        .published = &osoe.node.slots[osoe.bootstrap.local_id].finalize_epoch,
+    };
+    return &finalize_team;
+}
 
 struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team)
 {
+    osoe_require_initialized(routine);
     if (team == SHMEM_TEAM_INVALID)
         return NULL;
     if (team == SHMEM_TEAM_WORLD) {
@@ -96,6 +114,7 @@ static int world_to_team(const struct osoe_team *t, int world)
 
 struct osoe_transport_context *osoe_ctx_of(const char *routine, shmem_ctx_t ctx)
 {
+    osoe_require_initialized(routine);
     if (ctx == SHMEM_CTX_DEFAULT)
         return osoe_transport_context_default();
     if (ctx == SHMEM_CTX_INVALID)

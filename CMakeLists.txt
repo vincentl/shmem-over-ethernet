@@ -22,7 +22,16 @@ option(BUILD_SHARED_LIBS "Build libosoe as a shared library" ON)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS ON)
+# gnu11 by default, which is what the four presets build and every warning
+# lives under OsoeWarnings.cmake regardless. The tree also builds warning-free
+# as plain -std=c11 (portability review F12): every feature-test macro GNU's
+# default exposure was covering for is now declared per file. "if(NOT
+# DEFINED ...)" rather than a plain set(), so that a caller who passes
+# -DCMAKE_C_EXTENSIONS=OFF (cmake/CheckStrictC11.cmake does, in its own
+# scratch configure) is not silently overridden back to ON here.
+if(NOT DEFINED CMAKE_C_EXTENSIONS)
+  set(CMAKE_C_EXTENSIONS ON)
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(GNUInstallDirs)

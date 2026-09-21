@@ -138,7 +138,7 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
              * that really sleeps (§3.14 cost rules). */
             slept = true;
             slept_since = osoe_now_ns();
-            osoe_blocked_enter(routine, offset);
+            osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_OFFSET, offset);
             osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
         }
 
@@ -252,16 +252,39 @@ static bool element_satisfied(const struct osoe_wait_many *w, uint64_t base, siz
 enum many_mode { MANY_ALL, MANY_ANY, MANY_SOME };
 
 /*
+ * ANY's rotating start (conformance review F4). A scan that always began at
+ * element 0 returned the lowest satisfied index every time - correct for spec
+ * Examples 39 and 43's idiom of masking a returned index out of the set, but a
+ * starvation of any caller that does not, and a literal miss of §9.11.3 and
+ * §9.11.10: "a series of calls ... must eventually return i" for every
+ * satisfied i, not just the least one. Thread-local, advanced on every ANY
+ * call regardless of what it finds (not on the previous *result*, so a set
+ * with nothing satisfied yet still rotates for when something is), so a
+ * second thread's calls under SHMEM_THREAD_MULTIPLE never race on it (§8.2).
+ */
+static _Thread_local size_t any_start;
+
+/* The next ANY scan's starting offset, 0 <= result < nelems. */
+static size_t any_scan_start(size_t nelems)
+{
+    size_t start = any_start % nelems;
+    any_start++;
+    return start;
+}
+
+/*
  * One pass over the set. ALL answers 1 or 0, ANY an index or SIZE_MAX, SOME the
  * number of satisfied elements with their indices written out. SOME tests every
  * element of the set at least once, which spec §9.11.4 requires and which ALL
- * and ANY are free to short-circuit.
+ * and ANY are free to short-circuit; it still visits the set in ascending
+ * order; only ANY's start rotates (`start` is 0 for the other two modes).
  */
 static size_t scan(const struct osoe_wait_many *w, uint64_t base, enum many_mode mode,
-                   size_t *indices)
+                   size_t *indices, size_t start)
 {
     size_t found = 0;
-    for (size_t i = 0; i < w->nelems; i++) {
+    for (size_t k = 0; k < w->nelems; k++) {
+        size_t i = mode == MANY_ANY ? (start + k) % w->nelems : k;
         if (!in_set(w, i))
             continue;
         bool ok = element_satisfied(w, base, i);
@@ -312,6 +335,10 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
     size_t first = 0, last = 0;
     if (!unmasked_span(w, &first, &last))
         return empty_answer(mode);
+    /* Fixed for the whole call, not re-rolled on every retry through the
+     * sweep loop below: the rotation is across distinct shmem_wait_until_any
+     * calls, not across one call's internal wake-ups. */
+    size_t start = mode == MANY_ANY ? any_scan_start(w->nelems) : 0;
 
     uint64_t base = ivars_offset(w);
     /* §4.9: one watch, over the span of the unmasked elements. */
@@ -325,7 +352,7 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
 
     for (;;) {
         uint32_t seq = osoe_transport_watch_seq(watch);
-        result = scan(w, base, mode, indices);
+        result = scan(w, base, mode, indices, start);
         if (scan_done(mode, result)) {
             /* Table 6 only, so always four or eight bytes and always the
              * invariant - written through the same rule so there is one place
@@ -340,7 +367,7 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
         if (!slept) {
             slept = true;
             slept_since = osoe_now_ns();
-            osoe_blocked_enter(w->routine, span_offset);
+            osoe_blocked_enter(w->routine, OSOE_BLOCKED_DETAIL_OFFSET, span_offset);
             osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
         }
 
@@ -369,7 +396,8 @@ static size_t test_many(const struct osoe_wait_many *w, enum many_mode mode, siz
     size_t first = 0, last = 0;
     if (!unmasked_span(w, &first, &last))
         return empty_answer(mode);
-    return scan(w, ivars_offset(w), mode, indices);
+    size_t start = mode == MANY_ANY ? any_scan_start(w->nelems) : 0;
+    return scan(w, ivars_offset(w), mode, indices, start);
 }
 
 void   osoe_wait_all(const struct osoe_wait_many *w)  { wait_many(w, MANY_ALL, NULL); }

@@ -76,6 +76,7 @@ static void declare_range(uint64_t offset, uint64_t size, long hints)
 static void *allocate(const char *routine, uint64_t size, uint64_t align, long hints,
                       bool zero)
 {
+    osoe_require_initialized(routine);
     osoe_count(OSOE_C_SHMEM_MALLOC_CALLS, 1);
     void *p = NULL;
     uint64_t offset;
@@ -170,6 +171,7 @@ OSOE_API void pshmem_free(void *ptr)
 {
     if (!ptr)
         return;
+    osoe_require_initialized("shmem_free");
     osoe_count(OSOE_C_SHMEM_FREE_CALLS, 1);
     osoe_barrier_all("shmem_free");
     uint64_t offset;
@@ -196,6 +198,7 @@ OSOE_API void pshmem_free(void *ptr)
  */
 OSOE_API void *pshmem_realloc(void *ptr, size_t size)
 {
+    osoe_require_initialized("shmem_realloc");
     osoe_count(OSOE_C_SHMEM_REALLOC_CALLS, 1);
     if (!ptr)
         return pshmem_malloc(size);      /* shmem_malloc: exit barrier only */

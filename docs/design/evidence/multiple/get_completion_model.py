@@ -255,3 +255,4 @@ if __name__ == '__main__':
             print(f'   {design:<9} N = 1..3 -> {row}', flush=True)
     print()
     print('ALL AS EXPECTED' if good else 'SOME RESULT UNEXPECTED OR INCOMPLETE')
+    sys.exit(0 if good else 1)

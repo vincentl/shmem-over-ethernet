@@ -13,6 +13,7 @@
  * wire that never truncated would pass every assertion above it while proving
  * nothing about the path this exists to exercise.
  */
+#define _GNU_SOURCE
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -136,7 +137,7 @@ int main(void)
     setenv("OSOE_WIRE_SEED", "20260919", 1);
 
     struct osoe_bootstrap lo = { .job = (uint64_t)getpid(), .step = 0, .node = 0,
-                            .timeout_ns = UINT64_C(10000000000) };
+                            .no_progress_ns = UINT64_C(10000000000) };
     struct osoe_bootstrap hi = lo;
     hi.node = 1;
 

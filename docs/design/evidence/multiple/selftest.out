@@ -12,3 +12,5 @@ watch: design, one thread watches twice          reduced ok           31,920 sta
 watch: firstmatch                                reduced LOST WAKE       647 states | unreduced LOST WAKE     1,159 states  ok
 
 REDUCTIONS PRESERVE EVERY VERDICT
+
+trapped: wire reader never advances              TRAPPED         310 states  caught

@@ -52,8 +52,10 @@ struct osoe_progress_host {
      */
     void *(*resolve)(void *context, uint32_t pe, uint16_t region, uint64_t offset,
                      uint32_t length);
-    /* A local PE's landing zone (§3.12), or NULL if the PE is not local. */
-    struct osoe_landing_slot *(*landing)(void *context, uint32_t pe);
+    /* A local PE's landing zone (§3.12), or NULL if the PE is not local, and in
+     * `capacity` the bytes its data area holds - which a get reply is checked
+     * against before a byte of it is written (§3.4's trust boundary). */
+    struct osoe_landing_slot *(*landing)(void *context, uint32_t pe, uint32_t *capacity);
     /* Wake that PE's waiters whose watched range this write overlapped (§4.9). */
     void (*notify)(void *context, uint32_t pe, uint16_t region, uint64_t offset,
                    uint32_t length);
@@ -82,7 +84,17 @@ struct osoe_progress_connection {
     uint64_t next_seq;              /* assigned when a buffer becomes reservable */
     uint64_t applied;               /* highest sequence number applied from the peer */
     uint64_t acked;                 /* highest the peer says it has applied */
-    bool owe_ack;                   /* the peer asked; a segment must carry one */
+    /*
+     * §3.4's acknowledgement, split in two because it is two things (second
+     * review, C1). `owe_ack`: the peer asked, and this node's next segment pays
+     * - every segment carries the cumulative `ack = applied`, so finalizing any
+     * segment clears it. `flagged`: the highest sequence this node has sent
+     * carrying ACK_REQUESTED, so a request made after its segment was already
+     * finalized is asked once, on one header-only segment, and not every pass.
+     * What this node's writers want is in the connection (ack_wanted_through).
+     */
+    bool owe_ack;
+    uint64_t flagged;
     struct osoe_am_parser parser;
     struct osoe_reply_queues queues;
 };
@@ -108,10 +120,14 @@ struct osoe_progress {
     uint32_t participants[OSOE_TEAMS];
     uint64_t barrier_arrivals;
 
-    /* §3.14 counters, read by osoe-stat and by the tests. */
-    uint64_t segments_sent, segments_applied, messages_applied;
-    uint64_t reply_reservation_failures;        /* the fallible path, taken */
-    uint64_t acks_only;                         /* header-only segments sent */
+    /*
+     * §3.14 counters, read by osoe-stat and by the tests: the node header's
+     * `am` record when running inside a job (progress-host.c binds it), and
+     * `own_metrics` until then, so that the loop counts the same way whether
+     * or not there is a control segment to count into.
+     */
+    struct osoe_am_node_metrics *metrics;
+    struct osoe_am_node_metrics own_metrics;
 };
 
 /*
@@ -151,19 +167,8 @@ bool osoe_progress_poll(struct osoe_progress *p);
  */
 bool osoe_progress_idle(struct osoe_progress *p);
 
-/* Stop owing acknowledgements, so that a final drain does not manufacture
- * ack-only segments for peers that have already finished (§3.4). Only at
- * teardown: an owed ack has a waiter only inside quiet (§4.6), which cannot be
- * running once every PE has passed shmem_finalize's barrier. */
-void osoe_progress_forget_acks(struct osoe_progress *p);
-
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
 uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);
-
-/* Ask that the next segment toward `peer` carries an acknowledgement request,
- * which is what fence, quiet and the barriers set so that a one-way peer still
- * acknowledges (§3.4, §3.9). */
-void osoe_progress_request_ack(struct osoe_progress *p, uint32_t peer);
 
 /* The highest sequence number `peer` has applied (§4.6's completion evidence). */
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer);

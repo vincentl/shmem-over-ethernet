@@ -1,6 +1,8 @@
 # OpenSHMEM over Ethernet: Design Notes
 
-**Status:** Path-finding. No implementation. Decisions recorded with rationale so
+**Status:** Phase 1 in progress. Step 1 (one node) and step 2 (the active-message
+layer, over a shared-memory stand-in for the wire) are implemented; sockets and
+io_uring (step 3) onward are design only. Decisions recorded with rationale so
 that they are not silently reversed.
 
 **Project:** osoe (OpenSHMEM Over Ethernet) — installs `libosoe` and the spec's
@@ -22,7 +24,9 @@ that they are not silently reversed.
   scale with node count.
 - Target hardware: Raspberry Pi cluster. Design must also remain usable at 256
   PEs per node and hundreds of nodes.
-- PEs are processes. Cores are over-provisioned.
+- PEs are processes. Cores are **not** assumed spare: a Pi runs a PE per core with
+  the node's progress thread beside them, so oversubscription is the normal case
+  (§3.11, §3.12), and nothing may spin.
 - Slurm launch. No PMI link dependency (§6).
 - TCP is acceptable. io_uring is required (kernel 6.7+ for futex ops; Trixie
   ships 6.12).
@@ -66,8 +70,10 @@ liburing 2.6+: Debian 13 and Raspberry Pi OS Trixie.
 **Two checks, two failure times.** CMake requires `liburing >= 2.6` through
 pkg-config and stops at configure time, saying why. At startup the library checks
 that the *running kernel* supports what it needs — the `tools/probe` checks,
-moved into init — and aborts loudly otherwise. The first catches old headers; the
-second catches an old kernel under new headers.
+moved into init — and refuses by name otherwise, before it creates anything in
+`/dev/shm`. The first catches old headers; the second catches an old kernel under
+new headers. Init checks what the library uses: today the futex2 calls alone,
+since step 2 opens no ring; io_uring's opcode checks join them at step 3.
 
 **CMake is a build tool, not a dependency chain.** What this project exists to
 avoid is a dependency tree that does not build on the target hardware, not the
@@ -278,6 +284,22 @@ only pays above ~10–16 KB. Revisit only on a fast NIC.
 
 ### 3.4 Segment structure
 
+**The trust boundary.** All PEs of a job trust each other completely — a
+one-sided API cannot do otherwise, since any PE may write any heap. They are the
+same job and the same build, **assumed buggy but not hostile**. Other local users
+are untrusted, which mode 0600 and `O_EXCL` on every object enforce (§6.2). The
+network is trusted at the level Slurm's own traffic is; §10 records how a secret
+in the step-3 handshake would change that. What follows from "buggy": **a peer's
+bytes must never be able to write outside a heap or a landing slot**. The
+receiving node validates every length and index a segment carries before
+applying it — a message's length against what is left of its segment, the
+message count against the segment's size, a get reply's token, offset and total
+against the landing slot, an atomic's width, operation and alignment — and a
+failure is a fatal on the receiving node naming the peer. That turns a peer's bug
+into a named abort where it lands, instead of corruption where it lands. Before
+phase 1 step 2 slice 2 none of this was checked or stated, and a forged get reply
+wrote 64 bytes past a landing zone with the test passing (second review, D4).
+
 Two buffers per connection: one filling, one in flight. A third smooths nothing.
 **At most one of them is reservable at any moment** — a rule (§3.5), not a sizing
 remark.
@@ -300,9 +322,13 @@ filled by the progress thread at seal time):
   lengths. Cross-checking on receipt turns a framing bug into an immediate
   assertion rather than a garbage dispatch 50 MB later.
 
-Each message within a segment is **padded to 8-byte alignment**. On aarch64 an
-unaligned 64-bit atomic faults; an AMO payload at an odd offset crashes rather
-than degrades.
+Each message within a segment is **padded to 8-byte alignment**, so an AMO payload
+is aligned as the specification requires of an AMO target. An earlier draft said an
+unaligned 64-bit atomic faults on aarch64; *measured*, it does not on Linux, which
+leaves EL0 alignment checking off - it silently performs a misaligned, possibly
+line-straddling update (second review, portability F13). The rule stands; its
+reason is that nothing would catch the mistake, so alignment is checked on receipt
+rather than left to a trap.
 
 Buffer size must be at least 2× maximum message size, or aggregation stops
 working at the top of the range. A 64 KB message in a 64 KB buffer means one
@@ -378,13 +404,39 @@ node A only puts to B, no B→A segment exists to carry the ack, and A's `quiet`
 `barrier_all`, and finalize wait forever: the safety sweep submits only sealed
 buffers, and B has none.
 
-- A `fence`, `quiet`, or barrier flush sets *ack requested* on the segments it
-  seals.
-- On applying such a segment, B's progress thread carries the ack on the next
-  segment toward A if one is sealed or in flight, and otherwise sends a
-  **header-only segment**: acknowledgement, zero messages.
+- A `fence`, `quiet`, or barrier flush asks the peer to **acknowledge through
+  S**, where S is the highest segment sequence the caller wrote into toward it.
+  The request is a sequence number in a shared word, `ack_wanted_through`, raised
+  as a monotone maximum by CAS and never cleared; the lead reads it once a pass.
+- A segment carries *ack requested* if its own sequence is above what the peer
+  has acknowledged and at or below S — or, the **late request**, if S is still
+  unacknowledged and nothing this node has sent since asked for it. Then the
+  lead seals one header-only segment carrying the flag; its sequence is past S,
+  and since an acknowledgement is cumulative, answering it covers S. The lead
+  remembers the highest sequence it has sent flagged, so a late request is asked
+  once, not every pass.
+- On applying a flagged segment, B's progress thread owes an acknowledgement. Its
+  next segment toward A pays it — every segment carries the cumulative `ack` —
+  and if none is due it sends a **header-only segment**: acknowledgement, zero
+  messages. **A segment sealed only to pay that debt never carries the flag.**
 - Header-only segments reserve nothing, so §3.7's handler rule is untouched. They
   use the connection's single in-flight send like any other segment.
+
+*Why a sequence and not a flag (phase 1 step 2 slice 2).* The first version had
+one `owe_ack` bool meaning both "the peer asked" and "my writer asked", and a
+request word the lead took with an exchange. Two defects hid each other (second
+review, C1 and C2). Every acknowledgement was itself a request, so a quiesced
+pair exchanged ~2,500 header-only segments a second per direction forever. And
+the request rode whichever segment was finalized next — possibly one sealed
+before the write the writer was waiting for — so with the echo removed the
+obvious way, `quiet` hung (4 in 5 runs under timing injection). The echo was
+what kept `quiet` live. `docs/design/evidence/am-backend/ack_model.py` has all
+three: the old protocol fails QUIESCES, the naive split fails TERMINATES, this
+one passes both under SC and TSO and needs at most three header-only seals per
+node. A quiesced pair may still exchange one: a lead that receives a request
+must answer it, and cannot know the asker's `quiet` was already satisfied by
+some other segment's ack. What makes it the last is that the answer carries no
+flag.
 
 ### 3.5 Reservation protocol
 
@@ -636,6 +688,29 @@ share of segment bytes at zero with 16 PEs doing 64 KB gets at a realistic one-
 to two-generation round trip (review D8, `docs/reviews/evidence/transport/`). The cap
 guarantees both directions progress every generation.
 
+*As built (phase 1 step 2 slice 2).* The guard runs on every open: `flush`
+drains pending replies — control queue first, then the bulk rotation — into the
+freed buffer while it still carries the seal bit, up to half its capacity, and
+`osoe_connection_open` then publishes `filled` and `head` at the drained extent,
+seal bit last, instead of at the header. The opportunistic drain into an open
+buffer stays: it is what keeps reply latency low when there is room.
+`docs/design/evidence/am-backend/reservation_model.py` checks it, with breakages
+for an open that resets `head` over the drained replies, a drain whose `filled`
+misses the header (the accounting defect the second review measured, head 96
+against filled 64), and two that make ONCE and ORDER each the first check to
+fail.
+
+Before that slice the guard had no caller: `drain()` competed with writers
+through the ordinary reservation, and an open would have written over anything
+drained. **The starvation it guards against was not reproduced** on the
+shared-memory wire: one getter against 2-16 writers at the smallest legal
+buffer, with puts sized to leave no room for a reply, under CPU load, and with
+the writers' 20 µs backoff removed, never kept a get from completing; the worst
+cost was a 2-6 ms get against 0.3 ms idle. The lead wins the race for a freed
+buffer often enough. The guard is built because this section specifies it as the
+guarantee, and step 3's wake-on-free and real sockets change the race; it is not
+evidence of an observed hang.
+
 #### Queue bounds — three separate arguments, each independently breakable
 
 1. **AMO results:** bounded by the origin's outstanding-get cap. **Enforced at
@@ -653,6 +728,19 @@ guarantees both directions progress every generation.
 
 Size as `C + degree×max_teams + slack` per connection, drawn from the node-wide
 pool.
+
+*As built (phase 1 step 2 slice 2):* `degree` is `OSOE_COLLECTIVE_DEGREE`, 1 for
+today's star (one arrival up and one release down per team per connection; the
+tree sets it to its fan-out plus one), `max_teams` is the two predefined teams,
+and `slack` is 0 — every descriptor belongs to one of the arguments above, and a
+margin would only postpone the fatal that names the one that broke. The first
+build sized the pool at `connections × C`, with no term for the forwards, and
+dropped the request that found it empty: a node holding C gets toward a peer
+lost its own barrier arrival or a get, and the origin timed out blaming the
+wrong node (second review, D1). An empty pool is now a fatal on the node whose
+pool it is, naming the peer, the kind of request, the pool and queue depths, and
+which argument bounds it. Only a broken invariant reaches it; the test that does
+gives the target a smaller `OSOE_AM_CREDITS` than the origin.
 
 **The control queue is multi-producer** once a node runs more than one progress
 thread: a collective forward received on one shard's connection is enqueued
@@ -676,8 +764,8 @@ policy.
 
 Explicit flush on `fence` and `quiet` covers the case where there is no reverse
 traffic to clock it. The flush is a request from the application thread to the
-lead (§3.12), and it sets *ack requested* so a one-way peer still acknowledges
-(§3.4).
+lead (§3.12), and it asks the peer to acknowledge through the caller's highest
+segment so a one-way peer still acknowledges (§3.4).
 
 ### 3.10 Idle and wakeup
 
@@ -922,13 +1010,33 @@ that is stuck. Memory can be read without the job's cooperation.
 
 #### Where the state lives
 
-- **In the node's control segment**, `/osoe.<job>.<step>.<node>` (§6.2), which
-  **keeps its name until the last finalize** so a reader can open it while the job
-  runs. Heap names are still removed once every local PE has mapped them.
-- **A crash leaves the control segment in `/dev/shm`** — a few MB. That is also the
-  post-mortem: the state at the moment of the crash stays readable until someone
-  removes it. `osoe-stat --gc` removes segments whose recorded pids are all gone,
-  and a Slurm epilog can remove `/dev/shm/osoe.<jobid>.*`.
+- **In the node's control segment**, `/osoe.<job>.<step>.<node>.<session>` (§6.2).
+  **Its name is removed during init**, like every other object's (§6.2), and
+  **`/proc` is the rendezvous instead**: every PE keeps the segment's file
+  descriptor open for the session, and `osoe-stat` finds a job by scanning
+  `/proc/<pid>/fd` for `/dev/shm/osoe.<job>.… (deleted)` and opening *that path*
+  read-only — any live PE of the node serves, so a dead lead does not blind it.
+  The kernel opens the same object, and updates show live. A reader outside the
+  job's user sees nothing: another user's `/proc/<pid>/fd` is not readable, and
+  with `hidepid` not even listable; `osoe-stat` says which of "no such job", "not
+  visible to this user" and "/proc is restricted" it met. `/proc/<pid>/map_files/`
+  is not used: it needs `CAP_SYS_ADMIN`. This route also works where Slurm's
+  `job_container/tmpfs` gives each job a private `/dev/shm`, in which a name-based
+  reader outside the job would see nothing at all.
+- **Nothing survives a crash** — no death of any process can strand a name. The
+  decision it replaces kept the control segment's name until the last finalize,
+  so that a crash left the state readable for a post-mortem, and accepted the leak
+  (§10). But what that wanted was uncooperative diagnosis of a *live* job from
+  outside, and the name was only the rendezvous; `/proc` is a rendezvous that
+  needs no name. A name that survives a crash is at once the leak and the
+  post-mortem record — the same bytes — so only one can be the default, and the
+  default is that nothing leaks: about eight cancelled jobs used to fill a 4 GiB
+  Pi's `/dev/shm` (second review, D13). A site may clean `/dev/shm` between jobs
+  on exclusive nodes; the library does not depend on it.
+  **`OSOE_KEEP_CONTROL_SEGMENT=1`** opts back in: the name is kept until the last
+  finalize, a crash leaves the segment for post-mortem reading (`osoe-stat` takes a
+  path as well as a job), and `osoe-stat --gc` removes it once every recorded PE is
+  gone and no live process maps it. Only in this mode can anything be stranded.
 - **Mode 0600.** The segment holds connection buffers, and so application data;
   only the job's user can read it.
 - **Self-describing.** A header carries a layout version and a table of metrics —
@@ -1079,6 +1187,8 @@ headers would pass whenever the library agreed with itself.
 - **Per-peer detail only in progress-thread blocks**, one set per connection: about
   500 connections × 30 counters × 8 B ≈ 120 KB. PE-side counters aggregate across
   peers; per-PE-per-peer counters would be hundreds of MB at 256 PEs and 500 peers.
+- **One file descriptor per PE** for the whole session: the control segment's,
+  which is what keeps it findable through `/proc` once its name is gone.
 - **Timing only on slow paths:** blocking operations, waits, and once per segment.
   Never per put or AMO. `CLOCK_MONOTONIC`, through the vDSO.
 - **Histograms use log2 buckets**, about 32 per histogram. The bucket index comes
@@ -1103,6 +1213,12 @@ headers would pass whenever the library agreed with itself.
   hang.
 - **Per PE:** a "blocked in" record (routine, target, and since when), its watch
   slot (§4.9), outstanding get bytes, bootstrap phase, and the abort word.
+  The target carries a kind since layout 9 — a peer node, an epoch, a heap
+  offset or a PE — so `osoe-stat` prints `shmem_quiet (node 1)` rather than
+  `shmem_quiet(+0x1)`; the kinds are part of the segment's encoding. Every
+  internode wait publishes one naming the peer node, which none did before phase
+  1 step 2 slice 2: a PE stuck in a quiet toward a dead node showed as not
+  blocked at all (second review, D2).
 
   It is the first record here with more than one word in it, so it is the first
   that can be read torn while the PE publishes its next wait. A **generation
@@ -1134,6 +1250,16 @@ headers would pass whenever the library agreed with itself.
   terminations; header-only ack segments sent.
 - **Per connection, at read time:** TCP round-trip time, retransmits, and congestion
   window. These separate "the network is slow" from "osoe is slow".
+
+*As built (layout 8):* node totals, not yet per peer — `transport.am.segments_sent`,
+`header_only_sent`, `segments_applied`, `messages_applied`,
+`reply_reservation_failures`, and the high-water marks of the deepest control
+and bulk queue of any connection and of the node's descriptor pool. They are
+fields of the node header written by the lead's progress thread alone, the
+single-writer case of §3.16. They exist first because two protocols could not
+otherwise be seen working: an acknowledgement echo (§3.4) and an exhausted reply
+pool (§3.8) have no effect a test can observe except these counts. The
+per-connection scope this question asks for is the next step.
 
 **3. Are aggregation and progress healthy?**
 
@@ -1256,6 +1382,32 @@ case.**
 
 ### 3.15 Error model
 
+**No wait gives up because time has passed** (decided 2026-09-20). A wait may
+end the job only because what it watches has *stopped moving*: a progress word —
+a connection's acknowledged sequence, a buffer's turnover, a landing slot's wake
+word, a rendezvous count — unchanged for `OSOE_NO_PROGRESS_TIMEOUT` seconds.
+The default is 0, never. A large machine is slow in ways no bound anticipates,
+and failing a job early under contention is worse than waiting: the launcher can
+always tear a waiting job down, and nothing can bring a failed one back. This
+applies to the init waits too. Every wait still sweeps (§4.10) — the abort word
+and local liveness are checked every `OSOE_SWEEP_NS` — so a dead sibling still
+ends a wait promptly; what goes is only the fatal deadline. (`base/stall-watch.h`
+is the one helper; §3.10's absolute futex deadlines are clock instants for one
+sweep-length sleep, and stay.)
+
+**A fatal declares the node's abort**, and every wait reads the abort word at its
+next sweep in every build — only the liveness polling is the development
+watchdog. So the other PEs of a node stop within a sweep of the first fatal. A
+remote node cannot see another node's abort word: it sees the failure only when
+something it waits on stops moving, until §7.1 step 4's abort flood carries the
+word between nodes.
+
+The first build had a fatal deadline instead: `OSOE_BOOTSTRAP_TIMEOUT`, 60 s,
+meant for rendezvous but also bounding every internode wait. A legitimate 150 s
+quiet on 1 GbE died at 60 s, and a lead stopped for 20 s killed every PE talking
+to its node (second review, D3). The variable is retired; a job that sets it is
+told once that it is ignored.
+
 A connection dying mid-message leaves part of a payload written into the
 symmetric heap, unrecoverably. For a library where connection loss means job
 loss this is acceptable, but it is a **documented invariant**: AM's error path
@@ -1324,9 +1476,9 @@ do:
 - **No `shmem_global_exit` and no abort flood.** The abort word is written and
   read within one node by whichever PE noticed. `global_exit` (§9.1.6) needs the
   agent-calls-`exit` path above and an AM to carry the abort between nodes.
-- **Not during rendezvous.** The bootstrap waits already carry
-  `OSOE_BOOTSTRAP_TIMEOUT` and a `failed` word, and run before the slots a
-  liveness check would read are all published.
+- **Not during rendezvous.** The bootstrap waits carry a `failed` word and the
+  no-progress rule above, and run before the slots a liveness check would read
+  are all published.
 
 ### 3.16 Memory-order discipline
 
@@ -1350,9 +1502,22 @@ Rules:
 - Implicit-order calls (`atomic_load`, `atomic_store`, operator forms) and
   `memory_order_relaxed` are forbidden on protocol words, so every access shows its
   order.
-- Only the four ISO orders. GCC's header also defines `memory_order_acq_rel` and
-  `memory_order_consume`, and an earlier draft used `acq_rel`, but they are
-  extensions and buy nothing here.
+- **Four of the six orders.** ISO C11 (§7.17.3) defines `relaxed`, `consume`,
+  `acquire`, `release`, `acq_rel` and `seq_cst`, all standard. The project uses
+  `acquire`, `release` and `seq_cst` as above, and `relaxed` nowhere on a protocol
+  word. `consume` is promoted to `acquire` by every compiler and buys nothing;
+  `acq_rel` is what a CAS or `fetch_add` would otherwise name, and naming `seq_cst`
+  there keeps one order for every locked operation. (An earlier draft called the
+  last two GCC extensions. They are not; the rule stands, that reason did not.)
+- **A futex word that is its own predicate** — `ready` and `failed` in every
+  segment header, the agent's `ready` — is a third shape. One side stores the word
+  and wakes; the other loads it and sleeps on the value it saw. It is not a
+  Dekker pair: the waiter's second half is the kernel's compare, and `futex_wake`'s
+  own barrier (in its waiters check) supplies the ordering, so `release` would not
+  lose a wake. It is stored **`seq_cst`** all the same, so that its safety does
+  not rest on a detail of the kernel's futex fast path, at the cost of an `xchg`
+  on a word written a handful of times per job. The tree had used both orders for
+  it (second review, atomics F4).
 - Configure fails if the compiler defines `__STDC_NO_ATOMICS__`.
 
 **Why two-sided stores need `seq_cst`.** GCC 14 compiles both `release` and
@@ -1374,7 +1539,9 @@ this shape.
   (review, lead-verified), so invariant 15 holds.
 - **No spin-before-block** (§3.11): there is no ISO C relax hint.
 - **A serializing point** — for `fence` and `quiet` ordering memory stores (§4.8) —
-  is one `seq_cst` store in the calling thread.
+  is one `seq_cst` store in the calling thread. On x86-64 that is an `xchg`, a full
+  barrier. On aarch64 it is an `stlr`, which is *not* one; §4.6 says what that
+  means for fence.
 
 ---
 
@@ -1629,19 +1796,24 @@ local lead and again at the root.
   - **The size is exact.** It is the integer ceiling of the number times the
     multiplier, computed in integer arithmetic, so "3.1M" is the spec's 3250586
     on every machine, with no dependence on binary floating point.
-  - **Decimal notation only.** The spec says "floating point value" without
-    defining it. An exponent ("1e3"), a sign, surrounding space, or any character
-    other than a multiplier after the number is an error, which the spec lets init
-    report by terminating. Characters after the multiplier are ignored, as the spec
-    requires. Accepting `strtod`'s wider grammar would silently turn a typo such as
-    `1e` into a size.
+  - **Decimal notation, with an optional exponent.** The spec says "floating
+    point value" without defining it, and a C programmer reads `1e3` as one; an
+    earlier draft refused it, which the second review found surprised users
+    (conformance F9). The exponent is applied in the same exact integer
+    arithmetic, never through `strtod`. A sign, surrounding space, an exponent
+    with no digits (`1e`, so a typo does not become a size), or any character
+    other than a multiplier after the number is an error, which the spec lets
+    init report by terminating. Characters after the multiplier are ignored, as
+    the spec requires. `SMA_SYMMETRIC_SIZE` is read when `SHMEM_SYMMETRIC_SIZE`
+    is unset, like every other variable (Annex F).
   - **A value that does not fit in 64 bits is an error.**
   - The grammar lives in `base/size.c`, with its tier-1 test next to it.
 
 **Default size.** Without `SHMEM_SYMMETRIC_SIZE` a heap is 256 MiB. Heap objects
 commit pages only when touched, so the default costs address space: L × 256 MiB
-per process, 64 GiB at 256 local PEs. A size of 0 is valid and maps one page, so
-every allocation of nonzero size fails.
+per process, 64 GiB at 256 local PEs. A size of 0 is refused at init by name: a
+heap in which every allocation fails is never what was meant (second review,
+omissions 11).
 
 **Hints are recorded, not discarded.** An earlier note here called
 `shmem_malloc_with_hints` an alias for `shmem_malloc`, on the grounds that SOS
@@ -1737,6 +1909,24 @@ made by the calling thread (§9.12.1 and §9.12.2 Notes), and contexts created w
 In normal mode `barrier_all` already happened to conform, because its arrival
 `fetch_add` is a locked instruction. The rule makes that deliberate.
 
+**What carries rule 2 on aarch64.** A `seq_cst` store there is an `stlr` (to a
+thread-local word nothing reads, in `base/order.c`). Its release orders every
+earlier access *before* it; it does not keep a *later* plain store from passing it.
+So by the architecture, `store A; shmem_fence(); store B` — two plain stores, the
+intranode put's `memcpy` or a store through `shmem_ptr` — is not ordered by the
+`stlr` alone. Measured (`docs/design/evidence/fence-litmus/`, three threads: a
+writer, a reader, and one contending the data line), on the Apple-silicon
+development VM: with nothing between the two stores the reader saw B without A 921
+times in 40 million rounds; with the `stlr` alone, 0; with the `stlr` and then an
+acquire load, 0; with a `dmb`, 0. So this implementation orders it, and the
+architecture does not promise that another (a Cortex-A72 or A76) will. What the
+architecture does give: when the next thing after fence is a library call, that
+call's first counter update is an acquire load, and an `stlr` followed by an
+`ldar` is ordered, and the `ldar` orders everything after it — so a *put* after
+fence is ordered by architecture, incidentally. A plain store the application
+makes directly after fence is not. Whether rule 2 should become a full barrier
+(`atomic_thread_fence(memory_order_seq_cst)`, one `dmb ish`) is open (§10).
+
 #### Data structures
 
 **Thread level.** Phase 1 provides up to `SHMEM_THREAD_SERIALIZED`: `SINGLE`,
@@ -1819,7 +2009,7 @@ the entire job.)*
 ```c
 void shmem_quiet(void) {
     serializing_store();                          /* memory stores (above) */
-    request_flush(pe->dirty, pe->ndirty, ACK_REQUESTED);   /* the lead seals (§3.12) */
+    request_ack_through(pe->dirty, pe->ndirty, pe->high_seg);  /* §3.4; the lead seals */
     for (i = 0; i < pe->ndirty; i++)
         wait_until(acked[pe->dirty[i]] >= pe->high_seg[pe->dirty[i]]);
     wait_until(pe->bytes_landed == pe->bytes_issued);
@@ -1829,7 +2019,9 @@ void shmem_quiet(void) {
 
 void shmem_fence(void) {
     serializing_store();
-    request_flush(pe->dirty, pe->ndirty, ACK_REQUESTED);
+    /* peers already acknowledged through high_seg are skipped: asking again
+     * would only make the lead send another request */
+    request_ack_through(pe->dirty, pe->ndirty, pe->high_seg);
     /* does NOT clear the dirty set — those operations remain unacknowledged */
 }
 ```
@@ -2381,7 +2573,7 @@ question nobody needed. Recorded before a benchmark applies pressure for them.
 | put | Returns at local completion. Applied later; complete and visible once a covering wait returns. No ordering between puts to one PE except across a fence (spec §9.6.1.1). Notify best effort | `memcpy` into the target's mapping, applied before return, then notify | Reserve and copy into the node-pair buffer (§3.5); the dirty set records the node |
 | get | Blocking. Complete per operation: `dst` holds the bytes on return. Never fenced | `memcpy` out of the target's mapping | Request; the reply lands in the landing zone; the calling thread copies it out (§3.12) |
 | rmw | One 4- or 8-byte word. Exactly once. Exclusive against same-width rmw on the word within one atomicity domain, and against waiters and tests (spec §3.2). Fetching: complete on return. Non-fetching: as a put. Notify exact | One C11 atomic on the shared mapping (§3.16 orders), then notify | Handler-time CPU atomic at the target; a fetched value is a value descriptor (§3.8) |
-| fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then seal and flush the dirty set with ack requested (§4.6) |
+| fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then ask each dirty peer not yet acknowledged to acknowledge through its highest segment, and flush (§3.4, §4.6) |
 | wait | Every write and nonblocking get on the context — to listed PEs, or to all — is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes |
 | load | A coherent load of a word of the caller's own region, 2, 4 or 8 bytes. Exclusive against rmw on it (spec §3.2). For `shmem_test*`, the `wait_until` predicate, and `shmem_signal_fetch` | One `acquire` load of the word | The same: every writer is a CPU atomic on the shared mapping |
 | notify | Wakes a PE's waiters whose watched range a write overlaps (§4.9). Exact for rmw, best effort for puts; wakes may be spurious | §4.9 watch slot | The same function, called by the progress thread after it applies a write |
@@ -2663,7 +2855,8 @@ bytes) and a `high_seg` word per node (8 bytes per node).
   it is clear. Every operation in one segment reads the same `s`, so the CAS and the
   `fetch_or` happen about once per segment, not once per operation.
 - **Quiet**, under the item 1 mutex and after the generation bump: for each set bit,
-  load `high_seg[n]`, flush with ack requested, and wait for `acked[n] >= high_seg`.
+  load `high_seg[n]`, ask for an acknowledgement through it (§3.4), and wait for
+  `acked[n] >= high_seg`.
   Clear the bit, re-load `high_seg[n]` and `acked[n]`, and if the node is still
   behind, set the bit again and repeat.
 - **Fence** reads the bits and flushes, and never clears, so it takes no lock.
@@ -3343,6 +3536,11 @@ rendezvous** from each node's `SLURM_GTIDS` (§6.2).
 > **Local PEs meet on their node; only each node's lead crosses the network.
 > Rendezvous connections scale with node count.**
 
+The rendezvous inherits §3.4's trust boundary: the PEs of a job trust each other,
+other local users do not (every object is mode 0600, created `O_EXCL`), and the
+network is trusted as Slurm's own traffic is. The step-3 handshake authenticates
+nothing beyond the job and step ids, which are public; §10 has the open item.
+
 **Node-local.** The lead creates the node segment as a named shared memory object,
 `/osoe.<job>.<step>.<node>.<session>`, so concurrent steps on one node cannot
 collide. The session is the number of full `shmem_init` sessions this process has
@@ -3354,10 +3552,49 @@ lead waits on a futex until all `L` local PEs have arrived, then removes every h
 name, so a later crash leaves no heaps behind in `/dev/shm`.
 
 The sequence, as implemented:
-1. **The lead creates the control segment** with `O_EXCL`, mode 0600. A name that
-   already exists is a crashed job's leftover and is reported, never reused. The
+1. **The lead creates the control segment** with `O_EXCL`, mode 0600. The
    lead writes the versioned header, maps its own heap (choosing `B`, §4.1), and
    publishes `ready`.
+
+   **A name that already exists is reclaimed or refused, never reused.** Every
+   named object records its creator's pid in its header, with the first store after
+   sizing it. An existing object is *reclaimed* (unlinked, then created afresh, with a
+   line on stderr) only when `fstat` says it belongs to this uid **and** its recorded
+   creator is dead or was never recorded (a job killed between `shm_open` and that
+   first store leaves exactly this). Otherwise init fails, naming the object and the
+   creator's pid: a live creator means another job is using these job and step ids,
+   and guessing which one is the leftover would destroy a running job. The same rule
+   covers the job segment, the connection areas and the wires (`shm-object.c`).
+
+   **An object whose `st_uid` is not ours is never opened**, by creator or opener.
+   On a shared node `/dev/shm` is world-writable, so another user can pre-create a
+   name this job will use; mode 0600 on our own objects does not stop that. The fatal
+   names the owner's uid.
+
+   An opener can attach to a leftover in the window before its creator reclaims it.
+   It then waits on a `ready` that will never be published, so every `ready` wait
+   also checks `st_nlink`: an object with no name left has been reclaimed, and the
+   opener starts again from the name.
+
+   **A request larger than `/dev/shm` is refused before anything is created.**
+   The lead adds up its node's request - the control segment and `L` heaps - and
+   compares it with `statvfs`'s free space; the connection area's creator does the
+   same for the area. Either fails by name, with both numbers. The check is
+   **advisory**: tmpfs allocates a page when it is first touched, so another job can
+   take the space after the check passes, and nothing reserves it. Reserving it
+   (`posix_fallocate`) is ruled out because it defeats the demand paging every
+   sizing decision in §3.4 and §4.1 relies on, and a 4 GiB Raspberry Pi cannot
+   afford it. When tmpfs does run out later, the failure is a SIGBUS in whichever
+   process first touches an unbacked page - often the **lead's agent applying
+   another node's put** to a local heap, so the process that dies is not the one
+   whose memory ran out. The check is compared against the nominal size, so it
+   also refuses a job that would have fitted by touching little of a large heap;
+   `SHMEM_SYMMETRIC_SIZE` is the remedy it names. (Second review, omissions 5.)
+
+   **A PE's core holds its own heap and nothing of its node-mates'.** Sibling
+   heaps and the connection area are mapped `MADV_DONTDUMP`, or every crashing PE
+   would write `L` heaps and the node's traffic. The control segment stays in: it is
+   the post-mortem state (omissions 4).
 2. **Every other PE opens the segment by name.** It polls with backoff until the
    name exists, since there is nothing to wait on before it does. It then waits on
    `ready`, checks the magic number, layout version, and job description, and maps
@@ -3371,19 +3608,36 @@ The sequence, as implemented:
 5. **Once `mapped == L`**, the lead removes every heap name.
 
 Any PE that fails stores a `failed` word and wakes the rendezvous words, so its
-siblings stop within one safety sweep instead of waiting out
-`OSOE_BOOTSTRAP_TIMEOUT` (60 s by default). A timeout names the local ids that
-never arrived.
+siblings stop within one safety sweep. Otherwise a rendezvous waits as long as
+its counts keep moving, and by default forever (§3.15's no-progress rule): with
+`OSOE_NO_PROGRESS_TIMEOUT` set, a count that stands still that long ends the job
+naming the local ids that never arrived.
 
-**Removing the control segment's name.** At the last finalize each PE bumps
-`finalized`. Exactly one increment reaches `L`, and that PE removes the name. The
-others' mappings stay valid. The session number is what makes this safe: without
-it, a PE that had finished and immediately re-initialized could recreate the name,
-and a slower sibling would then remove the new segment. The control segment
-**keeps its name until the last finalize**, so `osoe-stat` can open it while the
-job runs (§3.14). A crash therefore leaves the control segment — a few MB, and the
-post-mortem — for `osoe-stat --gc` or a Slurm epilog to remove; a crash during
-init can also leave heap names. Where hugetlbfs is mounted and has pages, heaps use it under the same
+**Removing names: as soon as everyone who must open an object has.** Every object
+is opened only during init, and each name is removed the moment the last process
+that needs it has it open, so that after init nothing this job created in
+`/dev/shm` has a name and no death of any process can strand one (§3.14):
+
+- **Heaps and the control segment**: by the lead, once `mapped` reaches `L` —
+  every local PE opened the segment before it could map a sibling's heap.
+- **The connection area**: by whichever local PE's open brings its `opened`
+  count to `L`.
+- **The job segment**: by whichever PE's open brings its `opened` count to the
+  world size.
+- **A wire**: by the second of its two leads to open it. `opened` is the
+  open-time twin of `leaving`; a counter is all the handshake needs, since
+  exactly one of two seq_cst increments sees 2.
+
+The last opener rather than the creator removes each name, so nothing waits for
+anything, and a re-init after finalize is a fresh session with fresh names.
+`OSOE_KEEP_CONTROL_SEGMENT=1` keeps the control segment's name until the last
+finalize instead: each PE bumps `finalized`, exactly one increment reaches `L`,
+and that PE removes it. The session number keeps that safe — without it, a PE
+that finished and immediately re-initialized could recreate the name and a slower
+sibling would remove the new segment. The window that remains is init itself: a
+job killed there can leave names behind, and the next job with the same id
+reclaims them (below). Where hugetlbfs is mounted and has pages, heaps use it
+under the same names; otherwise they fall back to regular shared memory. Where hugetlbfs is mounted and has pages, heaps use it under the same
 names; otherwise they fall back to regular shared memory.
 
 **Global.** The step's rendezvous server is the lead of node 0: the task with
@@ -3409,8 +3663,9 @@ it is pure string handling that would otherwise be debugged on a cluster.
 
 **Failure handling:**
 
-- Clients retry with jittered backoff until `OSOE_BOOTSTRAP_TIMEOUT`, then abort
-  naming what they were waiting for.
+- Clients retry with jittered backoff for as long as it takes, or until
+  `OSOE_NO_PROGRESS_TIMEOUT` if set, then abort naming what they were waiting
+  for (§3.15).
 - `shmem_init` raises the soft `RLIMIT_NOFILE` to the hard limit. Slurm propagates
   the submitting shell's limits, commonly a soft limit of 1,024, and a lead on a
   500-node job holds one socket per peer node.
@@ -3451,7 +3706,8 @@ mis-launched job ends up as N independent jobs, each succeeding. Every variable
 marked "Yes" above is required, and the README shows how to launch a one-node job
 by hand. *(Rejected: singleton launch when the variables are absent, as some
 implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)*
-`OSOE_BOOTSTRAP_TIMEOUT` (above) is osoe's own, read by the library.
+`OSOE_NO_PROGRESS_TIMEOUT` (§3.15) is osoe's own, read by the library; it
+replaced `OSOE_BOOTSTRAP_TIMEOUT`, which is retired.
 `OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
 turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
 library never sees it.
@@ -3459,8 +3715,10 @@ library never sees it.
 The test launcher, `tools/launch/osoe-launch`, starts L processes of a one-node
 job with these variables set. Its job id is its own pid, so concurrent launches
 never share a name. It fails on a nonzero exit, a signal, a timeout, or a clean
-job that left `/dev/shm/osoe.<job>.*` behind. That last check tests the naming
-rules above on every multi-process test.
+job that left `/dev/shm/osoe.<job>.*` behind, which it then removes (kept control
+segments excepted, for `--gc`). And every tier-2 test checks, *while the job
+runs*, that nothing of its job has a name once init has completed
+(`invariants.h`) — the naming rules above, on every multi-process test.
 
 **Bootstrap is out of band in every build, and always will be.** An RDMA
 transport cannot bootstrap itself: the GIDs, queue-pair numbers and memory keys
@@ -3507,7 +3765,25 @@ Things to get right, each of which is a silent bug otherwise:
   calls to shmem_finalize perform an operation semantically equivalent to
   shmem_barrier_all". An earlier draft only decremented the count, which skips
   completion and lets §5.4's epoch counts diverge across PEs. The last call
-  performs its implicit barrier, then tears down.
+  performs its implicit barrier, then tears down. **Finalize's barrier runs on a
+  team of its own** — the world's members on counters no application collective
+  touches (`OSOE_TEAM_FINALIZE`, layout 10). On the world's counters, a PE
+  finalizing matched another PE's `shmem_barrier_all`: under `start_pes`, a PE
+  returning from `main` ran the implicit finalize and let the others out of a
+  barrier the application never matched (second review, D14). Now the two wait
+  for each other, which is a hang in a program whose collectives do not match —
+  that program's — rather than a barrier returning that nobody matched.
+- **Leaving without finalizing ends the job.** An `shmem_init` program ends its
+  use of the library with `shmem_finalize` or `shmem_global_exit` (spec §4); the
+  specification finalizes implicitly only under `start_pes` (§9.1, Annex F.2.3).
+  An `atexit` handler registered at the first init finds a process leaving with
+  the library still initialized, prints so, declares the node's abort, and makes
+  the status nonzero, since `srun -K1` acts only on a nonzero one — an `exit(0)`
+  used to hang a release-build job until its timeout. `start_pes` registers its
+  implicit finalize after that handler, so it runs first. **No exit path runs a
+  collective the application did not call**: `osoe_fatal` leaves through `_exit`,
+  not `exit`, so it never runs `start_pes`'s finalize — which is a barrier — on its
+  way out (second review, conformance F1).
 - **The count is per process, not per thread**, and must be updated atomically.
 - **Concurrent first `shmem_init`** from two application threads passes through a
   once-gate, so bootstrap runs exactly once.
@@ -4062,8 +4338,11 @@ Nothing may hardcode 4096 — including the §4.3 linker script, which aligns to
 **`tools/probe`** checks every kernel assumption this document makes and prints
 a pass/fail line for each: single-issuer rings with an explicit CQ size,
 `IORING_OP_FUTEX_WAIT` returning `-EAGAIN` on a stale value, multishot recv
-producing one CQE per provided buffer plus a terminal `-ENOBUFS`, cross-process
-futexes on a shared mapping, and the absence of 64-bit futexes. **Run it first on
+producing one CQE per provided buffer plus a terminal `-ENOBUFS`, and the absence
+of 64-bit futexes. Its futex checks use the forms the library uses: a word in a
+**named** shared-memory object, opened by name by a process that inherited nothing
+of it, woken by `futex_wake` from another process, both by `futex_wait` and by an
+`IORING_OP_FUTEX_WAIT` without `FUTEX2_PRIVATE` (§3.10's wake word). **Run it first on
 any new machine**, before debugging anything else there.
 
 ### 8.6 Reference workloads
@@ -4229,7 +4508,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is designed but not scheduled (below) |
 | `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked, not scheduled** (§4.11). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
-| Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector, deferred until there is a reason for a third formatter. The control segment keeps its name until finalize, accepting a small leak on crash. The reader shares only the frozen directory and the metric descriptor with the writer and finds everything else by name, which a tier-1 test enforces by handing it a segment this build did not write. The flight recorder is deferred to step 2, with its design standing: its events do not exist yet |
+| Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector, deferred until there is a reason for a third formatter. **Revised in phase 1 step 2 slice 2:** the control segment's name is removed during init like every other object's, and `osoe-stat` finds a live job through `/proc/<pid>/fd` of any of its PEs; `OSOE_KEEP_CONTROL_SEGMENT=1` restores the old behaviour for post-mortem work. The original entry kept the name until finalize, accepting a small leak on crash — on the reasoning that uncooperative reading needed a name. It did not: it needed a rendezvous, and `/proc` is one that no crash can strand (§3.14). The reader shares only the frozen directory and the metric descriptor with the writer and finds everything else by name, which a tier-1 test enforces by handing it a segment this build did not write. The flight recorder is deferred to step 2, with its design standing: its events do not exist yet |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |
 | Build tool | **CMake ≥ 3.25** (§1) |
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
@@ -4246,6 +4525,17 @@ Recorded rather than deleted, so they are not reopened from memory.
   remotely accessible memory" (none does). Still unchecked: the exact semantics of
   the 1.6 session routines if they are ever more than no-ops, and the routines
   beyond phase 1.
+- **Fence's serializing point on aarch64** (§4.6, §3.16). By the architecture a
+  plain store the application makes after `shmem_fence` may become visible before
+  one it made before; the development VM's cores do not reorder it, and a put after
+  fence is ordered only through the next call's counter load. Making the point
+  `atomic_thread_fence(memory_order_seq_cst)` closes it for one `dmb ish` per
+  fence and quiet (an `mfence` on x86-64 in place of the `xchg`). Decide, and run
+  `fence-litmus` on a Pi 4 and a Pi 5 either way.
+- **The `/dev/shm` capacity check refuses on the nominal size** (§6.2). Heaps are
+  demand-paged, so it refuses jobs that would have run: seven PEs at the default
+  256 MiB on the 3 GiB, 16 KiB-page VM, where the seven-PE tests now ask for
+  16 MiB. A warning instead of a fatal would keep the message and lose the refusal.
 
 ### Still open — measurement, once hardware exists
 
@@ -4333,6 +4623,16 @@ out-of-band bootstrap, and §8.1's three-way switch.
   node and no redesign.
 
 ### Still open — design, deferrable
+
+- **Authenticating the step-3 handshake.** §3.4 and §6.2 declare the network
+  trusted at Slurm's level; the handshake carries only the job and step ids,
+  which are sequential and public (`squeue`), and the port is a hash of them, so
+  any host that can reach it could join as a node and then read and write every
+  heap by design. If the cluster LAN is not trusted, the second review's
+  portability F2 has a nearly free answer: a wrapper sets
+  `OSOE_JOB_SECRET=$(head -c16 /dev/urandom | xxd -p)` before `srun`, Slurm
+  propagates the environment to every task, and the handshake carries it. Decide
+  with step 3.
 
 - Does any collective need RMA on symmetric scratch rather than AM? (Answer so
   far: no.)

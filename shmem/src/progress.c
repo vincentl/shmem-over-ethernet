@@ -29,6 +29,35 @@ uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer)
  * bytes land where they belong rather than in a reassembly buffer (§3.3). This
  * is the only place an incoming message becomes an address.
  */
+static uint32_t peer_of(const struct osoe_progress *p, uint32_t slot)
+{
+    return slot < p->node ? slot : slot + 1;
+}
+
+/*
+ * A get reply is checked before a byte of it lands (§3.4's trust boundary;
+ * second review, D4). Its token must be the one the owner armed the slot for,
+ * and its chunk must lie inside both the whole reply and the slot. A reply that
+ * fails is a peer's bug - the same job, the same build - and the landing zone
+ * sits in the control segment beside the other PEs' zones, so writing it would
+ * corrupt a sibling rather than fail. The measured case: an unsolicited reply
+ * with chunk_offset past the zone wrote 64 bytes beyond it and the test passed.
+ */
+static void check_get_reply(struct osoe_progress *p, uint32_t slot,
+                            struct osoe_landing_slot *landing, uint32_t capacity,
+                            const struct osoe_am_get_reply *m, uint32_t chunk)
+{
+    uint64_t armed = atomic_load_explicit(&landing->armed_token, memory_order_acquire);
+    if (m->token != armed)
+        osoe_fatal("a get reply from node %u for PE %u carries token %llu; that PE is "
+                   "waiting for %llu", peer_of(p, slot), m->origin_pe,
+                   (unsigned long long)m->token, (unsigned long long)armed);
+    if ((uint64_t)m->chunk_offset + chunk > m->total || m->total > capacity)
+        osoe_fatal("a get reply from node %u for PE %u puts %u bytes at offset %u of a "
+                   "%u-byte reply, into a landing zone of %u bytes", peer_of(p, slot),
+                   m->origin_pe, chunk, m->chunk_offset, m->total, capacity);
+}
+
 static void *destination(void *context, const struct osoe_message_header *header,
                          const void *fixed, uint32_t payload_bytes)
 {
@@ -44,9 +73,13 @@ static void *destination(void *context, const struct osoe_message_header *header
     if (header->kind == OSOE_AM_GET_REPLY) {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
-        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe);
+        uint32_t capacity = 0;
+        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
+                                                         &capacity);
         if (!slot)
-            return NULL;            /* not ours: the bytes are consumed and dropped */
+            osoe_fatal("a get reply from node %u names PE %u, which is not on this node",
+                       peer_of(p, a->slot), m.origin_pe);
+        check_get_reply(p, a->slot, slot, capacity, &m, payload_bytes);
         return slot->data + m.chunk_offset;
     }
     return NULL;
@@ -58,42 +91,71 @@ static void *destination(void *context, const struct osoe_message_header *header
  * reaping, which is what makes §3.7's "never reserve" satisfiable without any
  * blocking path at all.
  */
-static void enqueue(struct osoe_progress *p, struct osoe_reply_queue *q,
-                    const struct osoe_reply *value)
+/* The node-wide high-water marks (§3.14), after a push: the deepest this
+ * connection's queues have been, and the most descriptors out at once. */
+static void note_high_water(struct osoe_progress *p, uint32_t slot)
 {
-    uint32_t i = osoe_reply_take(&p->pool);
-    if (i == OSOE_REPLY_NONE) {
-        p->reply_reservation_failures++;
-        return;
+    const struct osoe_reply_queues *q = &p->connection[slot].queues;
+    osoe_counter_word_max(&p->metrics->control_queue_high_water, q->control.high_water);
+    osoe_counter_word_max(&p->metrics->bulk_queue_high_water, q->bulk.high_water);
+    osoe_counter_word_max(&p->metrics->pool_high_water, p->pool.high_water);
+}
+
+static const char *reply_kind_name(uint16_t kind)
+{
+    switch (kind) {
+    case OSOE_REPLY_AMO:     return "fetching AMO";
+    case OSOE_REPLY_GET:     return "get";
+    case OSOE_REPLY_RELEASE: return "collective release";
+    case OSOE_REPLY_ARRIVE:  return "collective arrival";
+    default:                 return "unknown";
     }
-    struct osoe_reply *r = osoe_reply_at(&p->pool, i);
-    *r = *value;
-    osoe_reply_push(&p->pool, q, i);
 }
 
 /*
- * A collective's arrival or release, which must not be dropped.
+ * The pool is empty, and it cannot be (§3.8; reply.h). Record it where
+ * osoe-stat reads it, then end the job on this node naming everything that
+ * says which invariant broke: the peer, what it asked for, how full the pool
+ * and this connection's queues are, and who enforces the bound.
  *
- * §3.8 makes an exhausted pool the fallible path for a *reply*: the origin's
- * credit bounds what can be outstanding, so running out means that distributed
- * invariant is broken, and reply.h already says such a break is "a hard
- * assertion naming the peer, not a silent drop". For a collective it is worse
- * than data loss. A dropped arrival means the root waits for a node that will
- * never arrive and a dropped release means every member of a node waits on an
- * epoch counter nothing will advance - in both cases a silent hang whose
- * symptom appears on the other nodes.
+ * Dropping is never the alternative. A dropped get request leaves its origin
+ * waiting for a reply that is not coming, and blaming the wrong node when it
+ * gives up; a dropped collective arrival leaves the root waiting for a node
+ * that has arrived, and a dropped release leaves a whole node's members on an
+ * epoch counter nothing will advance - each a hang whose symptom is elsewhere.
  */
-static void enqueue_collective(struct osoe_progress *p, struct osoe_reply_queue *q,
-                               const struct osoe_reply *value, uint32_t peer)
+static _Noreturn void pool_exhausted(struct osoe_progress *p, uint32_t slot,
+                                     const struct osoe_reply *value)
+{
+    osoe_counter_word_add(&p->metrics->reply_reservation_failures, 1);
+    const struct osoe_reply_queues *q = &p->connection[slot].queues;
+    uint32_t peer = slot < p->node ? slot : slot + 1;
+    bool collective = value->kind == OSOE_REPLY_RELEASE || value->kind == OSOE_REPLY_ARRIVE;
+    osoe_fatal("node %u: the reply descriptor pool is empty (%u of %u in use) for a %s "
+               "%s node %u; toward it the control queue is %u deep and the bulk queue %u. "
+               "%s", p->node, p->pool.in_use, p->pool.count, reply_kind_name(value->kind),
+               collective ? "toward" : "request from", peer, q->control.depth, q->bulk.depth,
+               collective ? "The pool reserves a place for every forward a blocking "
+                            "collective can have outstanding, so this is a bug in this "
+                            "node's collective bookkeeping (§3.8, argument 2)"
+                          : "Requests are bounded by the credit the origin takes, so the "
+                            "break is on that node's side: its OSOE_AM_CREDITS differs from "
+                            "this node's, or its credit accounting is wrong (§3.8, "
+                            "argument 1)");
+}
+
+static void enqueue(struct osoe_progress *p, uint32_t slot, struct osoe_reply_queue *q,
+                    const struct osoe_reply *value)
 {
     uint32_t i = osoe_reply_take(&p->pool);
     if (i == OSOE_REPLY_NONE)
-        osoe_fatal("the reply descriptor pool is empty while forwarding a collective "
-                   "toward node %u; §3.8's per-connection credit is not holding", peer);
+        pool_exhausted(p, slot, value);
     struct osoe_reply *r = osoe_reply_at(&p->pool, i);
     *r = *value;
     osoe_reply_push(&p->pool, q, i);
+    note_high_water(p, slot);
 }
+
 
 /* Publish a landing zone's completion: length or value, then ready, then the
  * wake. The waiter loads the wake word before the flag (§4.6), so a bump
@@ -111,7 +173,7 @@ static void complete(void *context, const struct osoe_message_header *header,
     struct arrival *a = context;
     struct osoe_progress *p = a->progress;
     struct osoe_progress_connection *c = &p->connection[a->slot];
-    p->messages_applied++;
+    osoe_counter_word_add(&p->metrics->messages_applied, 1);
 
     switch (header->kind) {
     case OSOE_AM_PUT: {
@@ -135,13 +197,21 @@ static void complete(void *context, const struct osoe_message_header *header,
                                 .origin_pe = m.origin_pe, .target_pe = m.target_pe,
                                 .length = m.length, .sent = 0, .offset = m.offset,
                                 .token = m.token };
-        enqueue(p, &c->queues.bulk, &r);
+        enqueue(p, a->slot, &c->queues.bulk, &r);
         break;
     }
 
     case OSOE_AM_RMW_REQUEST: {
         struct osoe_am_rmw_request m;
         memcpy(&m, fixed, sizeof m);
+        /* §3.4's trust boundary: an atomic is 4 or 8 bytes, an operation this
+         * build knows, at an address aligned to its width - checked before
+         * osoe_rmw_apply, which assumes all three (second review, D4). */
+        if ((m.width != 4 && m.width != 8) || m.op > OSOE_RMW_XOR || m.offset % m.width != 0)
+            osoe_fatal("an atomic from node %u is %u bytes wide, operation %u, at offset "
+                       "%llu; this build takes 4 or 8 bytes, a known operation, aligned to "
+                       "the width", peer_of(p, a->slot), m.width, m.op,
+                       (unsigned long long)m.offset);
         void *at = p->host.resolve(p->host.context, m.target_pe, m.region, m.offset,
                                    m.width);
         uint64_t previous = 0;
@@ -164,7 +234,7 @@ static void complete(void *context, const struct osoe_message_header *header,
             struct osoe_reply r = { .kind = OSOE_REPLY_AMO, .origin_pe = m.origin_pe,
                                     .target_pe = m.target_pe, .length = 0,
                                     .value = previous, .token = m.token };
-            enqueue(p, &c->queues.control, &r);
+            enqueue(p, a->slot, &c->queues.control, &r);
         }
         break;
     }
@@ -172,9 +242,11 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_GET_REPLY: {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
-        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe);
+        uint32_t capacity = 0;
+        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
+                                                         &capacity);
         if (!slot)
-            break;
+            break;              /* destination() has already refused it */
         /*
          * A get larger than one AM chunk arrives as several replies (§3.2), so
          * `ready` is published only once the whole thing has landed - the
@@ -229,8 +301,7 @@ static void complete(void *context, const struct osoe_message_header *header,
                 struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE,
                                         .origin_pe = m.team, .length = 0,
                                         .value = m.epoch };
-                enqueue_collective(p, &p->connection[slot].queues.control, &r,
-                                   slot < p->node ? slot : slot + 1);
+                enqueue(p, slot, &p->connection[slot].queues.control, &r);
             }
             p->host.release(p->host.context, m.team, m.epoch);
         }
@@ -252,9 +323,17 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_RMW_REPLY: {
         struct osoe_am_rmw_reply m;
         memcpy(&m, fixed, sizeof m);
-        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe);
+        uint32_t capacity = 0;
+        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
+                                                         &capacity);
         if (!slot)
-            break;
+            osoe_fatal("an atomic's reply from node %u names PE %u, which is not on this "
+                       "node", peer_of(p, a->slot), m.origin_pe);
+        uint64_t armed = atomic_load_explicit(&slot->armed_token, memory_order_acquire);
+        if (m.token != armed)
+            osoe_fatal("an atomic's reply from node %u for PE %u carries token %llu; that "
+                       "PE is waiting for %llu", peer_of(p, a->slot), m.origin_pe,
+                       (unsigned long long)m.token, (unsigned long long)armed);
         atomic_store_explicit(&slot->value, m.value, memory_order_release);
         atomic_store_explicit(&slot->token, m.token, memory_order_release);
         land(slot);
@@ -271,7 +350,7 @@ static void segment_applied(void *context, const struct osoe_am_segment_header *
     struct arrival *a = context;
     struct osoe_progress *p = a->progress;
     struct osoe_progress_connection *c = &p->connection[a->slot];
-    p->segments_applied++;
+    osoe_counter_word_add(&p->metrics->segments_applied, 1);
 
     /*
      * Applied, not merely received: §4.6 makes that the difference, because a
@@ -317,13 +396,35 @@ static bool receive(struct osoe_progress *p, uint32_t slot)
  * PE; the control queue is small and drains to empty, so it cannot starve the
  * bulk queue in practice, while the reverse would happen constantly.
  */
-static bool drain(struct osoe_progress *p, uint32_t slot)
+/*
+ * Where drained replies go (§3.8). Either the open buffer, reserved against the
+ * application's writers through the ordinary reservation - the opportunistic
+ * drain, which keeps reply latency low when there is room - or a released
+ * buffer that is still sealed and so private to this thread, just before it is
+ * opened: the pre-open drain, which is what guarantees a reply room however
+ * hard the writers write. The second is capped at half the buffer, so replies
+ * cannot starve the writers either (§3.8, round one's D8).
+ */
+struct drain_target {
+    uint32_t private_buffer;        /* OSOE_CONNECTION_NONE: the open buffer */
+    uint32_t budget;                /* bytes still allowed, for a private buffer */
+};
+
+static bool reserve_for_reply(struct osoe_connection *conn, struct drain_target *t,
+                              uint32_t len, struct osoe_reservation *r)
+{
+    if (t->private_buffer == OSOE_CONNECTION_NONE)
+        return osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK;
+    if (len > t->budget || !osoe_connection_drain_reserve(conn, t->private_buffer, len, r))
+        return false;
+    t->budget -= len;
+    return true;
+}
+
+static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_connection *conn,
+                       struct drain_target *t)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
-    struct osoe_connection *conn = osoe_connection_to(p->area, 
-                                                      slot < p->node ? slot : slot + 1);
-    if (!conn || c->open == OSOE_CONNECTION_NONE)
-        return false;
     bool moved = false;
 
     while (osoe_reply_peek(&c->queues.control) != OSOE_REPLY_NONE) {
@@ -335,8 +436,7 @@ static bool drain(struct osoe_progress *p, uint32_t slot)
         bool barrier = r->kind == OSOE_REPLY_RELEASE || r->kind == OSOE_REPLY_ARRIVE;
         uint32_t fixed_bytes = barrier ? (uint32_t)sizeof(struct osoe_am_barrier)
                                        : (uint32_t)sizeof(struct osoe_am_rmw_reply);
-        if (osoe_connection_reserve(conn, osoe_message_padded(fixed_bytes), &resv) !=
-            OSOE_RESERVATION_OK)
+        if (!reserve_for_reply(conn, t, osoe_message_padded(fixed_bytes), &resv))
             return moved;                   /* no room: try again next pass */
         uint16_t kind = r->kind == OSOE_REPLY_RELEASE ? OSOE_AM_BARRIER_RELEASE
                       : r->kind == OSOE_REPLY_ARRIVE  ? OSOE_AM_BARRIER_ARRIVE
@@ -380,7 +480,7 @@ static bool drain(struct osoe_progress *p, uint32_t slot)
             len = osoe_message_padded((uint32_t)sizeof(struct osoe_am_get_reply) + chunk);
         }
         struct osoe_reservation resv;
-        if (osoe_connection_reserve(conn, len, &resv) != OSOE_RESERVATION_OK)
+        if (!reserve_for_reply(conn, t, len, &resv))
             return moved;
         const void *source = p->host.resolve(p->host.context, r->target_pe, r->region,
                                              r->offset + r->sent, chunk);
@@ -408,6 +508,18 @@ static bool drain(struct osoe_progress *p, uint32_t slot)
     return moved;
 }
 
+/* The opportunistic drain, into the open buffer. */
+static bool drain(struct osoe_progress *p, uint32_t slot)
+{
+    struct osoe_progress_connection *c = &p->connection[slot];
+    struct osoe_connection *conn = osoe_connection_to(p->area,
+                                                      slot < p->node ? slot : slot + 1);
+    if (!conn || c->open == OSOE_CONNECTION_NONE)
+        return false;
+    struct drain_target open = { OSOE_CONNECTION_NONE, 0 };
+    return drain_into(p, slot, conn, &open);
+}
+
 /* ---- Sealing and sending ---------------------------------------------- */
 
 /*
@@ -417,8 +529,34 @@ static bool drain(struct osoe_progress *p, uint32_t slot)
  * by walking the buffer - the writers are in other processes, so the progress
  * thread never saw their reservations.
  */
+/*
+ * Does a segment finalized now carry ACK_REQUESTED (§3.4)?
+ *
+ * If its sequence is past what the peer has acknowledged and at or below what
+ * this node's writers want acknowledged - or, the late request, if what they
+ * want is still unacknowledged and no segment this node has sent yet asked for
+ * it. The late case is what a request made after its segment was finalized
+ * needs: the header-only segment flush() seals for it has a sequence past
+ * `wanted`, and its acknowledgement is cumulative, so it covers `wanted` too.
+ * (Given `seq > acked`, `seq <= wanted` implies the late condition, since
+ * segments are finalized in order; it is written out because it is the rule.)
+ *
+ * What never asks: a header-only segment sealed only because the peer asked.
+ * When nothing is wanted, both conditions are false. That is the whole fix for
+ * the echo - an answer that is itself a request - and ack_model.py's
+ * QUIESCES is the check that it holds.
+ */
+static bool asks_for_ack(const struct osoe_progress_connection *c, uint64_t seq,
+                         uint64_t wanted)
+{
+    if (seq <= c->acked)
+        return false;
+    bool late = wanted > c->acked && c->flagged < wanted;
+    return seq <= wanted || late;
+}
+
 static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connection *conn,
-                     uint32_t k, uint32_t bytes)
+                     uint32_t k, uint32_t bytes, uint64_t wanted)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
     unsigned char *base = conn->data + (size_t)k * conn->capacity;
@@ -436,15 +574,19 @@ static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connect
         off += osoe_message_padded(h.len);
         count++;
     }
+    uint64_t seq = atomic_load_explicit(&conn->s->buffer[k].seq, memory_order_acquire);
+    bool ask = asks_for_ack(c, seq, wanted);
     struct osoe_am_segment_header sh = {
-        .seq = atomic_load_explicit(&conn->s->buffer[k].seq, memory_order_acquire),
+        .seq = seq,
         .ack = c->applied,
-        .flags = c->owe_ack ? OSOE_AM_SEGMENT_ACK_REQUESTED : 0,
+        .flags = ask ? OSOE_AM_SEGMENT_ACK_REQUESTED : 0,
         .message_count = count,
         .total_len = bytes,
     };
     memcpy(base, &sh, sizeof sh);
-    c->owe_ack = false;
+    if (ask)
+        c->flagged = seq;
+    c->owe_ack = false;         /* this segment's `ack` pays any debt */
 }
 
 static bool flush(struct osoe_progress *p, uint32_t slot)
@@ -457,15 +599,12 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     bool moved = false;
 
     /*
-     * Any writer asking for an acknowledgement (§3.4). Taken before the seal
-     * below, so a request that arrived with the message it belongs to is
-     * carried by the same segment; one that arrives after this line is carried
-     * by the next, which is still correct because an acknowledgement is
-     * cumulative and quiet waits on a sequence number rather than on a
-     * particular segment.
+     * What this node's writers want acknowledged (§3.4), read once a pass and
+     * before the seal below, as the flag it decides is. A request raised after
+     * this load is seen by the next pass; the late-request rule in
+     * asks_for_ack is what makes that safe.
      */
-    if (osoe_connection_take_ack_request(conn))
-        c->owe_ack = true;
+    uint64_t wanted = osoe_connection_ack_wanted(conn);
     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
 
     /* Finish an in-flight send. A short write is the normal case (§3.3): keep
@@ -481,7 +620,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
             osoe_connection_release(conn, c->sending);
             c->state[c->sending] = OSOE_BUFFER_FREE;
             c->sending = OSOE_CONNECTION_NONE;
-            p->segments_sent++;
+            osoe_counter_word_add(&p->metrics->segments_sent, 1);
             moved = true;
         }
     }
@@ -492,7 +631,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     if (c->sending == OSOE_CONNECTION_NONE && c->sealed != OSOE_CONNECTION_NONE) {
         uint32_t bytes;
         if (osoe_connection_sendable(conn, c->sealed, &bytes)) {
-            finalize(p, slot, conn, c->sealed, bytes);
+            finalize(p, slot, conn, c->sealed, bytes, wanted);
             c->sending = c->sealed;
             c->sealed = OSOE_CONNECTION_NONE;
             c->state[c->sending] = OSOE_BUFFER_SENDING;
@@ -512,9 +651,13 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     if (c->sealed == OSOE_CONNECTION_NONE && c->open != OSOE_CONNECTION_NONE) {
         uint32_t used = OSOE_BUFFER_USED(
             atomic_load_explicit(&conn->s->buffer[c->open].head, memory_order_acquire));
-        if (used > header || c->owe_ack) {
+        /* Seal for data, to pay a debt, or for a late request that no
+         * unfinalized segment will carry - the one header-only segment the
+         * model says a quiesced pair may still exchange. */
+        bool late = wanted > c->acked && c->flagged < wanted;
+        if (used > header || c->owe_ack || late) {
             if (used == header)
-                p->acks_only++;     /* a header-only segment: §3.4's ack-only */
+                osoe_counter_word_add(&p->metrics->header_only_sent, 1);   /* §3.4's ack-only */
             osoe_connection_seal(conn, c->open);
             c->state[c->open] = OSOE_BUFFER_SEALED_STATE;
             c->sealed = c->open;
@@ -528,6 +671,11 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     if (c->open == OSOE_CONNECTION_NONE) {
         for (uint32_t k = 0; k < 2; k++)
             if (c->state[k] == OSOE_BUFFER_FREE && k != c->sealed && k != c->sending) {
+                /* The pre-open drain (§3.8): replies first, while k is still
+                 * sealed and no writer can reach it. */
+                c->state[k] = OSOE_BUFFER_DRAINING;
+                struct drain_target preopen = { k, conn->capacity / 2 };
+                drain_into(p, slot, conn, &preopen);
                 osoe_connection_open(conn, k, c->next_seq++);
                 c->state[k] = OSOE_BUFFER_OPEN;
                 c->open = k;
@@ -554,6 +702,7 @@ void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *ar
     p->node = area->node;
     p->nodes = area->nodes;
     p->host = *host;
+    p->metrics = &p->own_metrics;
     osoe_reply_pool_init(&p->pool, descriptors, descriptor_count);
 }
 
@@ -567,7 +716,7 @@ void osoe_progress_attach(struct osoe_progress *p,
         c->open = c->sealed = c->sending = OSOE_CONNECTION_NONE;
         c->next_seq = 1;
         c->state[0] = c->state[1] = OSOE_BUFFER_FREE;
-        osoe_am_parser_init(&c->parser);
+        osoe_am_parser_init(&c->parser, peer_of(p, slot));
         osoe_reply_queues_init(&c->queues);
     }
 }
@@ -605,19 +754,6 @@ bool osoe_progress_idle(struct osoe_progress *p)
             return false;
     }
     return true;
-}
-
-void osoe_progress_forget_acks(struct osoe_progress *p)
-{
-    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++)
-        p->connection[slot].owe_ack = false;
-}
-
-void osoe_progress_request_ack(struct osoe_progress *p, uint32_t peer)
-{
-    uint32_t slot = osoe_progress_slot(p, peer);
-    if (slot != OSOE_CONNECTION_NONE)
-        p->connection[slot].owe_ack = true;
 }
 
 /*
@@ -658,9 +794,14 @@ void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch
     p->participants[team] = participants;
 
     if (p->node == root) {
-        /* No message to send: this node is where the arrivals are counted. */
+        /* No message to send: this node is where the arrivals are counted -
+         * and checked as the handler checks a peer's, since this node's own
+         * arrival can be the one out of step (second review, protocols P6). */
         if (p->arrivals[team] == 0)
             p->arrival_epoch[team] = epoch;
+        else if (p->arrival_epoch[team] != epoch)
+            osoe_fatal("team %u has arrivals for epochs %u and %u at once; collective "
+                       "epochs have diverged", team, p->arrival_epoch[team], epoch);
         p->arrivals[team]++;
         p->barrier_arrivals++;
         if (p->arrivals[team] == participants) {
@@ -668,8 +809,7 @@ void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch
             for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
                 struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE, .origin_pe = team,
                                         .length = 0, .value = epoch };
-                enqueue_collective(p, &p->connection[slot].queues.control, &r,
-                                   slot < p->node ? slot : slot + 1);
+                enqueue(p, slot, &p->connection[slot].queues.control, &r);
             }
             p->host.release(p->host.context, team, epoch);
         }
@@ -688,7 +828,7 @@ void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch
         osoe_fatal("no connection to the collective root, node %u", root);
     struct osoe_reply r = { .kind = OSOE_REPLY_ARRIVE, .origin_pe = team,
                             .length = 0, .value = epoch };
-    enqueue_collective(p, &p->connection[slot].queues.control, &r, root);
+    enqueue(p, slot, &p->connection[slot].queues.control, &r);
 }
 
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer)

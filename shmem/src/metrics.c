@@ -136,6 +136,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.watch_seq", watch_seq, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.world_epoch", world_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.shared_epoch", shared_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    PE("pe.finalize_epoch", finalize_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.sweeps", sweeps, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     /* An invariant at PE scope, because the thread it describes is by
      * definition one whose counter block nobody can read. */
@@ -144,6 +145,8 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.blocked.gen", blocked_gen, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     PE("pe.blocked.routine", blocked_routine, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
     PE("pe.blocked.detail", blocked_detail, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    /* What `detail` is: node.h's enum osoe_blocked_detail. */
+    PE("pe.blocked.detail_kind", blocked_detail_kind, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.blocked.since_ns", blocked_since_ns, OSOE_MTYPE_U64, OSOE_MKIND_STATE, "ns"),
     PE("heap.bytes_in_use", heap_in_use, OSOE_MTYPE_U64, OSOE_MKIND_GAUGE, "bytes"),
     PE("heap.bytes_high_water", heap_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, "bytes"),
@@ -154,6 +157,8 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     NDEPOCH("team.shared.arrived", shared_arrived),
     NDEPOCH("team.shared.released", shared_released),
     NDEPOCH("team.shared.copied", shared_copied),
+    NDEPOCH("team.finalize.arrived", finalize_arrived),
+    NDEPOCH("team.finalize.released", finalize_released),
     /*
      * §5.3's internode arrival handoff: the epoch a local member posted for the
      * lead's agent to forward. Against `released` it is where a hung multi-node
@@ -164,6 +169,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      */
     NDARRIVAL("team.world.arrival_posted", OSOE_TEAM_WORLD),
     NDARRIVAL("team.shared.arrival_posted", OSOE_TEAM_SHARED),
+    NDARRIVAL("team.finalize.arrival_posted", OSOE_TEAM_FINALIZE),
     ND("node.aborting", aborting, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_pe", abort_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_status", abort_status, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
@@ -182,6 +188,21 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("node.failed", failed, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     NDDIR("node.local_count", local_count, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
     NDDIR("node.blocks_per_pe", blocks_per_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
+    /* The AM layer's node-wide counters (node.h, layout 8). */
+    ND("transport.am.segments_sent", am.segments_sent, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.header_only_sent", am.header_only_sent, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.segments_applied", am.segments_applied, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.messages_applied", am.messages_applied, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.reply_reservation_failures", am.reply_reservation_failures, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.control_queue_high_water", am.control_queue_high_water, OSOE_MTYPE_U64,
+       OSOE_MKIND_HIGHWATER, ""),
+    ND("transport.am.bulk_queue_high_water", am.bulk_queue_high_water, OSOE_MTYPE_U64,
+       OSOE_MKIND_HIGHWATER, ""),
+    ND("transport.am.pool_high_water", am.pool_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, ""),
 };
 
 enum {
@@ -303,7 +324,8 @@ uint64_t osoe_now_ns(void)
  * textbook seqlock's relaxed stores and release fence, and this needs no rule
  * the project does not already have.
  */
-static void publish(const char *routine, uint64_t detail, uint64_t since)
+static void publish(const char *routine, enum osoe_blocked_detail kind, uint64_t detail,
+                    uint64_t since)
 {
     struct osoe_pe_slot *me = &osoe.node.slots[osoe.bootstrap.local_id];
 
@@ -318,18 +340,19 @@ static void publish(const char *routine, uint64_t detail, uint64_t since)
         me->blocked_routine[0] = '\0';
     }
     atomic_store_explicit(&me->blocked_detail, detail, memory_order_release);
+    atomic_store_explicit(&me->blocked_detail_kind, (uint32_t)kind, memory_order_release);
     atomic_store_explicit(&me->blocked_since_ns, since, memory_order_release);
     atomic_fetch_add_explicit(&me->blocked_gen, 1, memory_order_seq_cst);
 }
 
-void osoe_blocked_enter(const char *routine, uint64_t detail)
+void osoe_blocked_enter(const char *routine, enum osoe_blocked_detail kind, uint64_t detail)
 {
     if (osoe.node.slots)
-        publish(routine, detail, osoe_now_ns());
+        publish(routine, kind, detail, osoe_now_ns());
 }
 
 void osoe_blocked_leave(void)
 {
     if (osoe.node.slots)
-        publish(NULL, 0, 0);
+        publish(NULL, OSOE_BLOCKED_DETAIL_NONE, 0, 0);
 }

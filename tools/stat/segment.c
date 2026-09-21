@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdatomic.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,6 +56,29 @@ static uint32_t checksum(const void *p, size_t n)
     return h;
 }
 
+/*
+ * How many `element_bytes`-sized records fit between `offset` and `next` (the
+ * following section's own offset, or `segment_bytes` when there is none, or
+ * `next` is itself nonsense) - clamped further by `raw`, the directory's own
+ * count, so a small honest count is never inflated (D-7). Used before a count
+ * from the directory becomes a loop bound: a single record() call already
+ * bounds one index against the mapping, but that check does nothing for a
+ * count a directory claims and a loop believes without ever landing outside
+ * the file - `local_count` or `block_count` set to four billion turns "every
+ * PE" into a loop that runs for as long as the process is left running.
+ */
+static uint32_t clamp_count(uint64_t offset, uint32_t element_bytes, uint64_t next,
+                            uint64_t segment_bytes, uint32_t raw)
+{
+    if (element_bytes == 0 || offset > segment_bytes)
+        return 0;
+    uint64_t bound = (next >= offset && next <= segment_bytes) ? next : segment_bytes;
+    uint64_t max_count = (bound - offset) / element_bytes;
+    if (max_count > UINT32_MAX)
+        max_count = UINT32_MAX;
+    return raw < (uint32_t)max_count ? raw : (uint32_t)max_count;
+}
+
 static int fail(char *err, size_t errlen, const char *fmt, ...)
     __attribute__((format(printf, 3, 4)));
 
@@ -79,14 +103,167 @@ static void normalize(const char *in, char *out, size_t len)
     snprintf(out, len, "/%s", p);
 }
 
+/* A path to open as it is, not an object name: /proc/<pid>/fd/<n>, or a plain
+ * file anywhere but /dev/shm. */
+static bool is_plain_path(const char *spec)
+{
+    return spec[0] == '/' && strchr(spec + 1, '/') && strncmp(spec, "/dev/shm/", 9) != 0;
+}
+
+/*
+ * A control segment's name: "osoe." and four decimal fields, job, step, node
+ * and session. Everything else the library names starts "osoe." too - a heap,
+ * a connection area, the job segment, a wire - and is not a control segment.
+ */
+static bool is_control_name(const char *n)
+{
+    if (strncmp(n, "osoe.", 5) != 0)
+        return false;
+    int fields = 0;
+    for (const char *p = n + 5; *p; ) {
+        if (*p < '0' || *p > '9')
+            return false;
+        while (*p >= '0' && *p <= '9')
+            p++;
+        fields++;
+        if (*p == '.')
+            p++;
+        else if (*p)
+            return false;
+    }
+    return fields == 4;
+}
+
+/* Why a search of /proc found nothing: the three cases a user has to tell apart. */
+enum proc_search { PROC_NOTHING, PROC_DENIED, PROC_RESTRICTED };
+
+/* Is /proc mounted with hidepid, which hides other users' processes entirely? */
+static bool proc_restricted(void)
+{
+    FILE *f = fopen("/proc/self/mountinfo", "r");
+    if (!f)
+        return false;
+    char line[1024];
+    bool hidden = false;
+    while (fgets(line, sizeof line, f))
+        if (strstr(line, " /proc ") && strstr(line, "hidepid=") &&
+            !strstr(line, "hidepid=0") && !strstr(line, "hidepid=off"))
+            hidden = true;
+    fclose(f);
+    return hidden;
+}
+
+/*
+ * Every file descriptor of every visible process that refers to a /dev/shm
+ * object named like a control segment - linked or not - calls `visit` with the
+ * object's name ("/osoe....") and the path that opens it ("/proc/<pid>/fd/<n>").
+ * A visit returning true stops the walk. This is how a segment is found once
+ * its name has been removed (§3.14): every PE keeps its control segment open
+ * for the life of the session, so the kernel still knows the object, and
+ * /proc/<pid>/fd/<n> opens that same object for any process allowed to see it.
+ * /proc/<pid>/map_files/ is not used: it needs CAP_SYS_ADMIN.
+ */
+static enum proc_search walk_proc(bool (*visit)(void *, const char *, const char *), void *ctx)
+{
+    DIR *procs = opendir("/proc");
+    if (!procs)
+        return PROC_RESTRICTED;
+    bool denied = false;
+    const struct dirent *p;
+    while ((p = readdir(procs))) {
+        if (p->d_name[0] < '1' || p->d_name[0] > '9')
+            continue;
+        char dir[300];
+        snprintf(dir, sizeof dir, "/proc/%.255s/fd", p->d_name);
+        DIR *fds = opendir(dir);
+        if (!fds) {
+            if (errno == EACCES)
+                denied = true;
+            continue;
+        }
+        const struct dirent *f;
+        while ((f = readdir(fds))) {
+            if (f->d_name[0] == '.')
+                continue;
+            char link[600], target[256];
+            snprintf(link, sizeof link, "%s/%.255s", dir, f->d_name);
+            ssize_t n = readlink(link, target, sizeof target - 1);
+            if (n <= 0)
+                continue;
+            target[n] = '\0';
+            if (strncmp(target, "/dev/shm/", 9) != 0)
+                continue;
+            char *deleted = strstr(target, " (deleted)");
+            if (deleted)
+                *deleted = '\0';
+            if (!is_control_name(target + 9))
+                continue;
+            if (visit(ctx, target + 8, link)) {
+                closedir(fds);
+                closedir(procs);
+                return PROC_NOTHING;
+            }
+        }
+        closedir(fds);
+    }
+    closedir(procs);
+    if (proc_restricted())
+        return PROC_RESTRICTED;
+    return denied ? PROC_DENIED : PROC_NOTHING;
+}
+
+struct find_one {
+    const char *name;
+    char path[600];
+    bool found;
+};
+
+static bool match_name(void *ctx, const char *name, const char *path)
+{
+    struct find_one *f = ctx;
+    if (strcmp(name, f->name) != 0)
+        return false;
+    snprintf(f->path, sizeof f->path, "%s", path);
+    f->found = true;
+    return true;
+}
+
 int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen)
 {
     memset(s, 0, sizeof *s);
-    normalize(name, s->name, sizeof s->name);
-
-    int fd = shm_open(s->name, O_RDONLY, 0);
-    if (fd < 0)
-        return fail(err, errlen, "cannot open /dev/shm%s: %s", s->name, strerror(errno));
+    int fd;
+    if (is_plain_path(name)) {
+        snprintf(s->name, sizeof s->name, "%s", name);
+        fd = open(name, O_RDONLY);
+        if (fd < 0)
+            return fail(err, errlen, "cannot open %s: %s", name, strerror(errno));
+    } else {
+        normalize(name, s->name, sizeof s->name);
+        /* A named object first: a segment kept by OSOE_KEEP_CONTROL_SEGMENT, or
+         * one from a library that removed names only at finalize. Then the
+         * route that works for a live job's unlinked segment: a process that
+         * holds it open, through /proc (§3.14). */
+        fd = shm_open(s->name, O_RDONLY, 0);
+        if (fd < 0 && errno == ENOENT) {
+            struct find_one f = { .name = s->name };
+            enum proc_search why = walk_proc(match_name, &f);
+            if (f.found)
+                fd = open(f.path, O_RDONLY);
+            else if (why == PROC_RESTRICTED)
+                return fail(err, errlen, "%s: not found, and /proc is restricted (hidepid), "
+                            "so only this user's processes can be searched at all", s->name);
+            else
+                /* Other users' processes cannot be looked into (their /proc/<pid>/fd
+                 * is theirs), so "not your job" is a possibility to name, never a
+                 * finding: every machine has root's processes in /proc. */
+                return fail(err, errlen, "%s: no such job - nothing in /dev/shm by that name, "
+                            "and no process of this user holds it%s", s->name,
+                            why == PROC_DENIED ? " (a job of another user would not be visible "
+                                                 "here: its processes cannot be searched)" : "");
+        }
+        if (fd < 0)
+            return fail(err, errlen, "cannot open %s: %s", s->name, strerror(errno));
+    }
     struct stat st;
     if (fstat(fd, &st) != 0) {
         close(fd);
@@ -120,6 +297,21 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
      * caller prints what it does know. That is what freezing the directory
      * bought, and refusing here would spend it.
      */
+
+    /* Clamp the two counts a caller loops over, before anything loops over
+     * them (D-7). The slots section's "next section" is metrics; the blocks
+     * section's is landing, appended at layout 6, or the end of the segment
+     * on an older directory that has none. */
+    if (OSOE_SEGMENT_HAS(s->dir, local_count))
+        s->local_count = clamp_count(s->dir->slots_offset, s->dir->slot_bytes,
+                                     s->dir->metrics_offset, s->bytes, s->dir->local_count);
+    if (OSOE_SEGMENT_HAS(s->dir, block_count)) {
+        uint64_t after_blocks = OSOE_SEGMENT_HAS(s->dir, landing_offset)
+                                 ? s->dir->landing_offset : s->bytes;
+        s->block_count = clamp_count(s->dir->blocks_offset, s->dir->block_bytes,
+                                     after_blocks, s->bytes, s->dir->block_count);
+    }
+
     /* Ask for the fields the table needs, not for the whole directory: see
      * OSOE_SEGMENT_HAS. Requiring the whole structure discarded the table of
      * every segment written by an older library. */
@@ -176,13 +368,13 @@ static const unsigned char *record(const struct osoe_segment *s, unsigned scope,
         n = s->dir->header_bytes;
         break;
     case OSOE_MSCOPE_PE:
-        if (index >= s->dir->local_count)
+        if (index >= s->local_count)
             return NULL;
         n = s->dir->slot_bytes;
         off = s->dir->slots_offset + (uint64_t)index * n;
         break;
     case OSOE_MSCOPE_THREAD:
-        if (index >= s->dir->block_count)
+        if (index >= s->block_count)
             return NULL;
         n = s->dir->block_bytes;
         off = s->dir->blocks_offset + (uint64_t)index * n;
@@ -285,6 +477,10 @@ bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe
             !osoe_segment_read(s, since, pe, &out->since_ns))
             return false;
         osoe_segment_read_str(s, "pe.blocked.routine", pe, out->routine, sizeof out->routine);
+        uint64_t kind = 0;
+        const struct osoe_metric_descriptor *k = osoe_segment_metric(s, "pe.blocked.detail_kind");
+        if (k && osoe_segment_read(s, k, pe, &kind))
+            out->detail_kind = (uint32_t)kind;
         if (!osoe_segment_read(s, gen, pe, &g1))
             return false;
         if (g1 != g0)
@@ -297,37 +493,119 @@ bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe
     return true;                         /* valid stays false: say so, do not guess */
 }
 
+void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf, size_t len)
+{
+    switch (b->detail_kind) {
+    case 1:  snprintf(buf, len, "node %" PRIu64, b->detail); break;
+    case 2:  snprintf(buf, len, "epoch %" PRIu64, b->detail); break;
+    case 3:  snprintf(buf, len, "offset %#" PRIx64, b->detail); break;
+    case 4:  snprintf(buf, len, "PE %" PRIu64, b->detail); break;
+    default: snprintf(buf, len, "+%#" PRIx64, b->detail); break;
+    }
+}
+
 static int by_name(const void *a, const void *b)
 {
     return strcmp(a, b);
 }
 
-int osoe_segment_list(char (*names)[OSOE_SEGMENT_NAME_MAX], int max)
+struct name_list {
+    char (*names)[OSOE_SEGMENT_NAME_MAX];
+    int max, found;
+};
+
+static void add_name(struct name_list *l, const char *name)
+{
+    int n = l->found < l->max ? l->found : l->max;
+    for (int i = 0; i < n; i++)
+        if (strcmp(l->names[i], name) == 0)
+            return;
+    if (l->found < l->max)
+        snprintf(l->names[l->found], OSOE_SEGMENT_NAME_MAX, "%.*s", OSOE_SEGMENT_NAME_MAX - 1,
+                 name);
+    l->found++;
+}
+
+static bool collect(void *ctx, const char *name, const char *path)
+{
+    (void)path;
+    add_name(ctx, name);
+    return false;
+}
+
+static int list_named(struct name_list *l)
 {
     DIR *d = opendir("/dev/shm");
     if (!d)
         return 0;
-    int found = 0;
     const struct dirent *e;
     while ((e = readdir(d))) {
-        /* Control segments only: a per-PE heap is <control>.heap.<id> and is
-         * gigabytes of application memory, not something to list or map. */
-        if (strncmp(e->d_name, "osoe.", 5) != 0 || strstr(e->d_name, ".heap."))
+        if (!is_control_name(e->d_name) || strlen(e->d_name) + 2 > OSOE_SEGMENT_NAME_MAX)
             continue;
-        /* A control segment's name is bounded by the library's own buffer, so
-         * anything longer is some other program's object that happens to start
-         * "osoe." - not ours, and not truncated into a name we might unlink. */
-        size_t n = strlen(e->d_name);
-        if (n + 2 > OSOE_SEGMENT_NAME_MAX)
-            continue;
-        if (found < max) {
-            names[found][0] = '/';
-            memcpy(names[found] + 1, e->d_name, n + 1);
-        }
-        found++;
+        char name[OSOE_SEGMENT_NAME_MAX];
+        snprintf(name, sizeof name, "/%.*s", OSOE_SEGMENT_NAME_MAX - 2, e->d_name);
+        add_name(l, name);
     }
     closedir(d);
-    int n = found < max ? found : max;
+    return l->found;
+}
+
+int osoe_segment_list_named(char (*names)[OSOE_SEGMENT_NAME_MAX], int max)
+{
+    struct name_list l = { names, max, 0 };
+    list_named(&l);
+    int n = l.found < max ? l.found : max;
     qsort(names, (size_t)n, OSOE_SEGMENT_NAME_MAX, by_name);
-    return found;
+    return l.found;
+}
+
+bool osoe_segment_mapped(const char *name)
+{
+    char want[OSOE_SEGMENT_NAME_MAX + 16];
+    snprintf(want, sizeof want, "/dev/shm%s", name);
+    size_t want_len = strlen(want);
+    DIR *procs = opendir("/proc");
+    if (!procs)
+        return true;                    /* cannot tell: assume the worst */
+    bool mapped = false;
+    char self[16];
+    snprintf(self, sizeof self, "%d", (int)getpid());
+    const struct dirent *p;
+    while (!mapped && (p = readdir(procs))) {
+        /* Not this process: the caller has just mapped the segment to read
+         * its slots, and that mapping says nothing about the job. */
+        if (p->d_name[0] < '1' || p->d_name[0] > '9' || strcmp(p->d_name, self) == 0)
+            continue;
+        char path[300];
+        snprintf(path, sizeof path, "/proc/%.255s/maps", p->d_name);
+        FILE *f = fopen(path, "r");
+        if (!f)
+            continue;
+        char line[1024];
+        while (fgets(line, sizeof line, f)) {
+            char *at = strstr(line, want);
+            if (at && (at[want_len] == '\n' || at[want_len] == ' ' || at[want_len] == '\0')) {
+                mapped = true;
+                break;
+            }
+        }
+        fclose(f);
+    }
+    closedir(procs);
+    return mapped;
+}
+
+int osoe_segment_list(char (*names)[OSOE_SEGMENT_NAME_MAX], int max)
+{
+    struct name_list l = { names, max, 0 };
+    /* Named segments: kept ones, and those of libraries that kept the name.
+     * A control segment's name is bounded by the library's own buffer, so
+     * anything longer is some other program's object that happens to start
+     * "osoe." - not ours, and not truncated into a name we might unlink. */
+    list_named(&l);
+    /* Live jobs, whose segments have no name: found through /proc (§3.14). */
+    walk_proc(collect, &l);
+    int n = l.found < max ? l.found : max;
+    qsort(names, (size_t)n, OSOE_SEGMENT_NAME_MAX, by_name);
+    return l.found;
 }

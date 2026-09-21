@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "base/deadline.h"
 
 struct osoe_deadline osoe_deadline_in(uint64_t ns)

@@ -60,7 +60,7 @@ static void sync_team(struct osoe_team *t, const char *routine)
              */
             osoe_progress_host_post_arrival(t->number, k + 1);
         } else {
-            if (!osoe_epoch_bump_eq(t->released, k + 1))
+            if (!osoe_epoch_release_bump_eq(t->released, k + 1))
                 osoe_fatal("%s epochs diverged at epoch %u: PEs called different numbers "
                            "of collectives", t->name, k + 1);
             osoe_epoch_wake_all(t->released);
@@ -79,7 +79,7 @@ static void team_sync(struct osoe_team *t, const char *routine)
 {
     uint64_t t0 = osoe_now_ns();
     osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
-    osoe_blocked_enter(routine, *t->epoch + 1);
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, *t->epoch + 1);
     sync_team(t, routine);
     osoe_blocked_leave();
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
@@ -93,9 +93,28 @@ void osoe_barrier_all(const char *routine)
     uint64_t t0 = osoe_now_ns();
     osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
     struct osoe_team *world = osoe_team_of(routine, SHMEM_TEAM_WORLD);
-    osoe_blocked_enter(routine, osoe.world_epoch + 1);
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, osoe.world_epoch + 1);
     osoe_transport_wait(osoe_transport_context_default(), NULL, 0);
     sync_team(world, routine);
+    osoe_blocked_leave();
+    osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
+}
+
+/*
+ * The barrier inside shmem_finalize (spec §9.1.4): a quiet, then the finalize
+ * team's own synchronization - the world's members on counters no application
+ * collective touches. So a PE finalizing while another is in
+ * shmem_barrier_all waits for it in finalize, and the other waits in its
+ * barrier: a hang in a program that does not match its collectives, which is
+ * that program's, rather than a barrier returning that nobody matched.
+ */
+void osoe_barrier_finalize(void)
+{
+    uint64_t t0 = osoe_now_ns();
+    osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
+    osoe_blocked_enter("shmem_finalize", OSOE_BLOCKED_DETAIL_EPOCH, osoe.finalize_epoch + 1);
+    osoe_transport_wait(osoe_transport_context_default(), NULL, 0);
+    sync_team(osoe_team_finalize(), "shmem_finalize");
     osoe_blocked_leave();
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
 }

@@ -35,6 +35,14 @@ int osoe_futex_wait(_Atomic uint32_t *word, uint32_t expected,
 /* Wake up to n waiters on word; INT_MAX wakes all. */
 void osoe_futex_wake(_Atomic uint32_t *word, int n, enum osoe_futex_scope scope);
 
+/*
+ * Does this kernel have the futex2 calls (Linux 6.7)? Returns 0, or the errno
+ * of the call that failed: ENOSYS on an older kernel. Makes one wake and one
+ * wait that cannot sleep, on a private word, so it is cheap enough for init
+ * (§1: the kernel is checked at start-up, before anything is created).
+ */
+int osoe_futex_check(void);
+
 /* Process-wide count of waits that ended at their deadline. */
 uint64_t osoe_futex_timeouts(void);
 

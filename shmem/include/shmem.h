@@ -666,6 +666,14 @@ void shmem_udcflush_line(void *dest);
 
 #endif /* C11 */
 
+/*
+ * Profiling control (§10.1.1). Spec §10.1: "Any user code must be able to
+ * control the profiler", and shmem.h is where user code looks - pshmem.h is
+ * only the interposition surface (conformance review F7). Defined under
+ * pshmem_pcontrol (profile.c), with shmem_pcontrol the usual weak alias.
+ */
+void shmem_pcontrol(int level, ...);
+
 #undef OSOE_AMO_DECL_STANDARD
 #undef OSOE_AMO_DECL_EXTENDED
 #undef OSOE_AMO_DECL_BITWISE

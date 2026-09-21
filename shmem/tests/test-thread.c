@@ -75,19 +75,23 @@ int main(void)
     int me = shmem_my_pe(), n = shmem_n_pes();
     right = (me + 1) % n;
     counter = shmem_malloc(sizeof *counter);
-    CHECK(counter != NULL);
+    CHECK_FATAL(counter != NULL);  /* NULL would be dereferenced just below */
     *counter = 0;
     shmem_barrier_all();
 
     /* SERIALIZED for real: two threads of this PE, never concurrent. */
+    /* A failed create leaves t undefined, and joining an undefined pthread_t
+     * below is not something continuing past can survive. */
     pthread_t t;
-    CHECK(pthread_create(&t, NULL, helper, NULL) == 0);
+    CHECK_FATAL(pthread_create(&t, NULL, helper, NULL) == 0);
     for (int i = 0; i < ROUNDS; i++) {
         pthread_mutex_lock(&serialize);
         shmem_uint64_atomic_add(counter, 1, right);
         pthread_mutex_unlock(&serialize);
     }
-    CHECK(pthread_join(t, NULL) == 0);
+    /* A failed join leaves helper() still running loose. shmem_finalize below
+     * is not one of the calls SERIALIZED lets a second thread overlap. */
+    CHECK_FATAL(pthread_join(t, NULL) == 0);
 
     shmem_barrier_all();
     /* Each PE's counter was incremented 2 * ROUNDS times by its left

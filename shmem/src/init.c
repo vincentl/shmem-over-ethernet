@@ -5,12 +5,17 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include <pshmem.h>
 #include <shmem.h>
 
 #include "agent.h"
+#include "base/futex.h"
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
@@ -30,7 +35,7 @@ struct osoe_state osoe;
  */
 static pthread_mutex_t lifecycle = PTHREAD_MUTEX_INITIALIZER;
 static unsigned refcount;
-static _Atomic int initialized;
+_Atomic int osoe_initialized;       /* state.h */
 static pid_t init_pid;
 static uint32_t sessions;       /* completed or current full sessions */
 
@@ -74,8 +79,15 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "                           whose PE has died, instead of waiting for the\n"
 "                           launcher's timeout. On in debug builds (§3.15)\n"
 "    OSOE_MAX_THREADS       counter blocks per PE, one per thread (§3.14)\n"
-"    OSOE_BOOTSTRAP_TIMEOUT seconds to wait for the other local PEs (§6.2)\n"
+"    OSOE_NO_PROGRESS_TIMEOUT\n"
+"                           seconds a wait may see no progress before it ends\n"
+"                           the job; 0, the default, means never (§3.15)\n"
 "    OSOE_HEAP_BASE         the address every PE maps its heap at (§4.1)\n"
+"    OSOE_KEEP_CONTROL_SEGMENT\n"
+"                           1: keep the control segment's name until finalize,\n"
+"                           so a crash leaves it for post-mortem reading and\n"
+"                           osoe-stat --gc; by default no name survives init\n"
+"                           (§3.14)\n"
 "\n"
 "  The bootstrap variables OSOE_PROCID, OSOE_LOCALID, OSOE_GTIDS,\n"
 "  OSOE_STEP_NUM_TASKS, OSOE_NODEID, OSOE_JOB_ID and OSOE_STEP_ID are set by\n"
@@ -83,6 +95,43 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "\n"
 "  A running or hung job is read with osoe-stat, which maps the control\n"
 "  segment read-only and needs no cooperation from the job (§3.14).\n");
+}
+
+/*
+ * A process that leaves with the library still initialized (§6.4).
+ *
+ * An shmem_init program ends its use of the library with shmem_finalize or
+ * shmem_global_exit (spec §4); leaving without either is outside the
+ * specification, and the other PEs would wait for this one at their next
+ * collective until the launcher gives up - and the launcher gives up only on
+ * a nonzero status, so an exit(0) hung a release-build job (second review,
+ * D14). So the job ends here, loudly: this node's abort word stops its other
+ * PEs at their next sweep, and the status is made nonzero for the launcher.
+ * Remote nodes see it when their own PEs on this node's side stop answering;
+ * propagating it to them is §7.1 step 4's abort flood.
+ *
+ * start_pes programs are the exception the specification makes - they are
+ * finalized implicitly at exit (§9.1, Annex F.2.3) - and deprecated.c
+ * registers that finalize after this handler, so it runs first and this one
+ * then finds nothing initialized.
+ */
+static void exit_without_finalize(void)
+{
+    if (refcount == 0 || getpid() != init_pid)
+        return;
+    fflush(NULL);
+    char msg[256];
+    int n = snprintf(msg, sizeof msg, "osoe: PE %u: the process exited without calling "
+                     "shmem_finalize; ending the job (spec §4, §9.1.4)\n",
+                     osoe.bootstrap.rank);
+    if (n > 0) {
+        ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
+                                                                          : sizeof msg - 1);
+        (void)ignored;
+    }
+    if (osoe.node.hdr && !atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire))
+        osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
 }
 
 static void session_start(void)
@@ -99,6 +148,21 @@ static void session_start(void)
                 osoe.bootstrap.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
     if (osoe.bootstrap.print_info && osoe.bootstrap.local_id == 0)
         print_info();
+    /*
+     * §1's start-up check of the running kernel, before anything is created:
+     * an old kernel is refused by name, rather than aborting mid-rendezvous
+     * with the control segment and heaps already in /dev/shm (review round two,
+     * portability F3). futex2 is all the library uses today; io_uring's checks
+     * join it at step 3, when the library first opens a ring.
+     */
+    int futex_error = osoe_futex_check();
+    if (futex_error) {
+        struct utsname u;
+        const char *release = uname(&u) == 0 ? u.release : "unknown";
+        osoe_fatal("osoe needs Linux 6.7 or later, for the futex2 calls (they fail with "
+                   "\"%s\"); this kernel is %s", strerror(futex_error), release);
+    }
+
     /* A re-init after a full teardown is a fresh session (§6.4). Every PE runs
      * the same sequence of sessions, so the numbers agree. */
     uint32_t session = sessions++;
@@ -130,6 +194,11 @@ static void session_start(void)
     osoe_progress_host_start(session);
     osoe_agent_start(&osoe.node.slots[osoe.bootstrap.local_id]);
     init_pid = getpid();
+    static bool exit_handler;
+    if (!exit_handler) {
+        exit_handler = true;
+        atexit(exit_without_finalize);
+    }
 
     /*
      * SHMEM_DEBUG, after the rendezvous, because the two things worth knowing
@@ -163,6 +232,16 @@ static void session_end(void)
     osoe_job_leave(&osoe.job);
     osoe_node_leave(&osoe.node, &osoe.bootstrap);
     osoe_bootstrap_free(&osoe.bootstrap);
+    /*
+     * Otherwise osoe.bootstrap.world_size and the heap table stay exactly as
+     * they were with the mappings behind them gone, so any routine that reads
+     * `osoe` without going through osoe_require_initialized() first - or a
+     * call from a process that never re-initializes - dereferences a stale
+     * table instead of a null one (conformance review F5). session_start()
+     * zeros it again at the next shmem_init, so this only matters for the
+     * window after the last one.
+     */
+    osoe = (struct osoe_state){ 0 };
 }
 
 OSOE_API void pshmem_init(void)
@@ -175,7 +254,7 @@ OSOE_API void pshmem_init(void)
         session_start();
     }
     refcount++;
-    atomic_store_explicit(&initialized, 1, memory_order_release);
+    atomic_store_explicit(&osoe_initialized, 1, memory_order_release);
     pthread_mutex_unlock(&lifecycle);
 }
 
@@ -189,13 +268,13 @@ OSOE_API void pshmem_finalize(void)
         return;
     }
     /* Every finalize is a barrier (spec §9.1.4, invariant 26): a non-last one
-     * only that, the last one before tearing down. Skipping it would let the
-     * world team's epoch counts diverge across PEs. */
-    osoe_barrier_all("shmem_finalize");
+     * only that, the last one before tearing down. On the finalize team's own
+     * counters, so it can never be matched by an application's barrier. */
+    osoe_barrier_finalize();
     refcount--;
     if (refcount == 0) {
         session_end();
-        atomic_store_explicit(&initialized, 0, memory_order_release);
+        atomic_store_explicit(&osoe_initialized, 0, memory_order_release);
         /* A fresh session may be initialized at a different level. Until it
          * is, the answer is the one a shmem_init would give. */
         atomic_store_explicit(&thread_level, OSOE_THREAD_MAX, memory_order_release);
@@ -224,7 +303,7 @@ OSOE_API int pshmem_init_thread(int requested, int *provided)
         session_start();
     }
     refcount++;
-    atomic_store_explicit(&initialized, 1, memory_order_release);
+    atomic_store_explicit(&osoe_initialized, 1, memory_order_release);
     int level = atomic_load_explicit(&thread_level, memory_order_acquire);
     pthread_mutex_unlock(&lifecycle);
 
@@ -242,17 +321,24 @@ OSOE_API void pshmem_query_thread(int *provided)
 
 OSOE_API void pshmem_query_initialized(int *flag)
 {
-    *flag = atomic_load_explicit(&initialized, memory_order_acquire);
+    *flag = atomic_load_explicit(&osoe_initialized, memory_order_acquire);
+}
+
+/* See state.h: the cold half of osoe_require_initialized. */
+_Noreturn void osoe_not_initialized(const char *routine)
+{
+    osoe_fatal("%s: called before shmem_init (or shmem_init_thread), or after "
+               "the last shmem_finalize", routine);
 }
 
 OSOE_API int pshmem_my_pe(void)
 {
-    return atomic_load_explicit(&initialized, memory_order_acquire) ? (int)osoe.bootstrap.rank : -1;
+    return atomic_load_explicit(&osoe_initialized, memory_order_acquire) ? (int)osoe.bootstrap.rank : -1;
 }
 
 OSOE_API int pshmem_n_pes(void)
 {
-    return atomic_load_explicit(&initialized, memory_order_acquire)
+    return atomic_load_explicit(&osoe_initialized, memory_order_acquire)
                ? (int)osoe.bootstrap.world_size : -1;
 }
 

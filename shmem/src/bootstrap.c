@@ -100,11 +100,19 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     }
 
 
-    const char *size = getenv("SHMEM_SYMMETRIC_SIZE");
+    const char *size = spec_env("SYMMETRIC_SIZE");
     b->symmetric_size = OSOE_DEFAULT_SYMMETRIC_SIZE;
     if (size && osoe_parse_size(size, &b->symmetric_size) != 0)
         osoe_fatal("SHMEM_SYMMETRIC_SIZE='%s' is invalid: expected a non-negative "
                    "decimal number with an optional k, m, g or t multiplier", size);
+    /* A zero heap is syntactically valid (§8 does not say otherwise) but never
+     * useful: every shmem_malloc then fails on every PE, and the first
+     * dereference of the NULL it returns segfaults far from the cause
+     * (conformance review F9 / omissions 11). Usually it is a script's
+     * unset-variable arithmetic gone wrong, so say so here instead. */
+    if (size && b->symmetric_size == 0)
+        osoe_fatal("SHMEM_SYMMETRIC_SIZE='%s' is 0; a job with no symmetric heap cannot "
+                   "run any OpenSHMEM program", size);
     /* The §4.9 watch word names an offset within a region, and stops filtering
      * above what it can address: a watch in a larger heap would saturate to the
      * whole region and wake on every write. Refuse the size rather than lose
@@ -115,12 +123,38 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    (unsigned long long)b->symmetric_size,
                    (unsigned long long)OSOE_WATCH_MAX_REGION);
 
-    uint32_t timeout_s = OSOE_DEFAULT_BOOTSTRAP_TIMEOUT_S;
-    if (osoe_environment_u32("OSOE_BOOTSTRAP_TIMEOUT", &timeout_s) == OSOE_ENVIRONMENT_INVALID ||
-        timeout_s == 0)
-        osoe_fatal("OSOE_BOOTSTRAP_TIMEOUT='%s' is not a positive number of seconds",
-                   getenv("OSOE_BOOTSTRAP_TIMEOUT"));
-    b->timeout_ns = (uint64_t)timeout_s * UINT64_C(1000000000);
+    /*
+     * The no-progress rule (§3.15, base/stall-watch.h): a wait gives up only
+     * when what it watches has not moved for this long. 0, the default, means
+     * never. It replaced OSOE_BOOTSTRAP_TIMEOUT, a bound on waiting at all,
+     * which also bounded every internode wait and so failed a healthy quiet
+     * that simply took long (second review, D3). A job that still sets the old
+     * name is told, once, rather than left believing it is bounded.
+     */
+    uint32_t no_progress_s = 0;
+    if (osoe_environment_u32("OSOE_NO_PROGRESS_TIMEOUT", &no_progress_s) ==
+        OSOE_ENVIRONMENT_INVALID)
+        osoe_fatal("OSOE_NO_PROGRESS_TIMEOUT='%s' is not a number of seconds",
+                   getenv("OSOE_NO_PROGRESS_TIMEOUT"));
+    b->no_progress_ns = (uint64_t)no_progress_s * UINT64_C(1000000000);
+    if (getenv("OSOE_BOOTSTRAP_TIMEOUT") && b->local_id == 0 && b->rank == 0)
+        fprintf(stderr, "osoe: OSOE_BOOTSTRAP_TIMEOUT is retired and ignored; "
+                        "OSOE_NO_PROGRESS_TIMEOUT bounds a wait that stops making "
+                        "progress, and by default nothing does\n");
+
+    /*
+     * §3.14: the control segment's name is removed as soon as every local PE
+     * has it open, like every other object, so that no death can strand it.
+     * This keeps the name until finalize instead, so a crashed job's segment
+     * survives for post-mortem reading - and is then the one thing a crash can
+     * leave behind, for osoe-stat --gc to remove.
+     */
+    uint32_t keep = 0;
+    if (osoe_environment_u32("OSOE_KEEP_CONTROL_SEGMENT", &keep) == OSOE_ENVIRONMENT_INVALID ||
+        keep > 1)
+        osoe_fatal("OSOE_KEEP_CONTROL_SEGMENT='%s' is not 0 or 1",
+                   getenv("OSOE_KEEP_CONTROL_SEGMENT"));
+    b->keep_control_segment = keep != 0;
 
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
     if (osoe_environment_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENVIRONMENT_INVALID || watchdog > 1)

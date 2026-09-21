@@ -15,11 +15,13 @@
 #include "base/deadline.h"
 #include "base/environment.h"
 #include "base/futex.h"
+#include "base/stall-watch.h"
 #include "connection-area.h"
 #include "fatal.h"
+#include "shm-object.h"
 
 #define OSOE_CONNECTION_AREA_MAGIC UINT64_C(0x61657261656f736f)   /* "osoearea" */
-#define OSOE_CONNECTION_AREA_LAYOUT 1
+#define OSOE_CONNECTION_AREA_LAYOUT 2   /* 2: `opened` */
 
 /*
  * The frozen prefix, for the same reason the control segment has one (§3.14):
@@ -32,7 +34,7 @@ struct osoe_connection_area_header {
     uint32_t layout;
     uint32_t node;
     uint32_t nodes;
-    uint32_t reserved;
+    int32_t creator_pid;        /* for reclaiming a leftover (shm-object.h) */
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
     uint64_t conns_offset;      /* nodes-1 struct osoe_connection_shared */
@@ -47,6 +49,15 @@ struct osoe_connection_area_header {
      * this the expensive way; the control segment has always had it (§6.2).
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t ready;
+    /*
+     * How many of the processes that must open this object have (§3.14's
+     * unlink-early rule). Whichever increment reaches the count removes the
+     * name: every process that will ever need it has it open, so from then on
+     * no death of any process can strand it. The count is exact, so nothing
+     * waits for it - the same shape as the control segment's `finalized` at the
+     * other end of a session.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t opened;
 };
 
 static uint64_t align_up(uint64_t n)
@@ -189,12 +200,21 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
     uint32_t peers = nodes - 1;
     int fd;
     if (a->creator) {
-        fd = shm_open(a->name, O_CREAT | O_EXCL | O_RDWR, 0600);
+        /* The node's buffers to every peer; checked before any of it exists
+         * (shm-object.h). */
+        uint64_t free_bytes;
+        if (!osoe_shm_room(a->bytes, &free_bytes))
+            osoe_fatal("/dev/shm has %llu MiB free, but this node's connection area "
+                       "for %u nodes needs %llu MiB: lower OSOE_AM_BUFFER, or enlarge "
+                       "/dev/shm",
+                       (unsigned long long)(free_bytes >> 20), nodes,
+                       (unsigned long long)((a->bytes + (1u << 20) - 1) >> 20));
+        char err[256];
+        fd = osoe_shm_create(a->name,
+                             (long)offsetof(struct osoe_connection_area_header, creator_pid),
+                             err, sizeof err);
         if (fd < 0)
-            osoe_fatal("cannot create connection area /dev/shm%s: %s%s", a->name,
-                       strerror(errno),
-                       errno == EEXIST ? "; probably left by a crashed job with the "
-                                         "same job and step ids" : "");
+            osoe_fatal("the connection area: %s", err);
         if (ftruncate(fd, (off_t)a->bytes) != 0) {
             close(fd);
             shm_unlink(a->name);
@@ -203,20 +223,24 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
     } else {
         /* The name appears before the object is sized and before the header is
          * written, so wait for the length here and for `ready` below (§6.2). */
-        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+again:;
+        struct osoe_stall_watch watch;
+        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         struct timespec back = { 0, 200000 };
         for (;;) {
-            fd = shm_open(a->name, O_RDWR, 0);
+            char err[256];
+            fd = osoe_shm_open_ours(a->name, err, sizeof err);
             if (fd >= 0) {
                 struct stat st;
                 if (fstat(fd, &st) == 0 && (uint64_t)st.st_size >= a->bytes)
                     break;
                 close(fd);
             } else if (errno != ENOENT) {
-                osoe_fatal("cannot open connection area %s: %s", a->name, strerror(errno));
+                osoe_fatal("the connection area: %s", err);
             }
-            if (osoe_deadline_expired(&until))
-                osoe_fatal("timed out waiting for the local lead to create %s", a->name);
+            if (osoe_stall_watch_stalled(&watch, 0))
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not created %s",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), a->name);
             nanosleep(&back, NULL);
             if (back.tv_nsec < 10000000)
                 back.tv_nsec *= 2;
@@ -240,12 +264,15 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
                 strerror(errno));
         p = mmap(NULL, a->bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     }
-    close(fd);
     if (p == MAP_FAILED) {
+        close(fd);
         if (a->creator)
             shm_unlink(a->name);
         osoe_fatal("cannot map connection area %s: %s", a->name, strerror(errno));
     }
+    /* Every PE of the node maps it, and a core of each would hold the node's
+     * whole traffic (review round two, omissions 4). */
+    madvise(p, a->bytes, MADV_DONTDUMP);
     a->map = p;
 
     struct osoe_connection_area_header *h = p;
@@ -272,6 +299,7 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         h->conns_offset = conns_offset;
         h->data_offset = data_offset;
         h->area_bytes = a->bytes;
+        h->creator_pid = (int32_t)getpid();
         /* Both buffers of every connection sealed, so nothing is reservable
          * until the agent opens one. Zeroed memory would say the opposite
          * (§3.5). */
@@ -280,13 +308,24 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
-        struct osoe_deadline until = osoe_deadline_in(b->timeout_ns);
+        struct osoe_stall_watch watch;
+        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         while (atomic_load_explicit(&h->ready, memory_order_acquire) == 0) {
+            /* A leftover the local lead is about to reclaim will never be
+             * ready: start over (shm-object.h). */
+            if (osoe_shm_orphaned(fd)) {
+                munmap(p, a->bytes);
+                close(fd);
+                free(a->conn);
+                a->conn = NULL;
+                a->map = NULL;
+                goto again;
+            }
             struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_futex_wait(&h->ready, 0, &sweep, OSOE_FUTEX_SHARED);
-            if (osoe_deadline_expired(&until))
-                osoe_fatal("timed out waiting for the local lead to finish creating %s",
-                           a->name);
+            if (osoe_stall_watch_stalled(&watch, 0))
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not finished creating %s",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), a->name);
         }
         if (h->magic != OSOE_CONNECTION_AREA_MAGIC || h->layout != OSOE_CONNECTION_AREA_LAYOUT ||
             h->buffer_bytes != buffer || h->chunk_bytes != config.chunk ||
@@ -298,16 +337,18 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
                        (unsigned long long)h->chunk_bytes, h->nodes,
                        (unsigned long long)buffer, (unsigned long long)config.chunk, nodes);
     }
+    close(fd);
+    /* Every local PE opens the area; the last to have done so removes its name. */
+    if (atomic_fetch_add_explicit(&h->opened, 1, memory_order_seq_cst) + 1 == b->local_count &&
+        shm_unlink(a->name) != 0)
+        osoe_fatal("cannot remove the connection area's name %s: %s", a->name, strerror(errno));
 }
 
 void osoe_connection_area_close(struct osoe_connection_area *a)
 {
     free(a->conn);
-    if (a->map) {
-        munmap(a->map, a->bytes);
-        if (a->creator)
-            shm_unlink(a->name);
-    }
+    if (a->map)
+        munmap(a->map, a->bytes);       /* its name went when the last PE opened it */
     *a = (struct osoe_connection_area){ 0 };
 }
 

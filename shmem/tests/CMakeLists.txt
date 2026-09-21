@@ -4,6 +4,14 @@ osoe_warnings(shmem_test_info)
 add_test(NAME shmem.info COMMAND shmem_test_info)
 set_tests_properties(shmem.info PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# shmem_pcontrol declared by <shmem.h> alone (F7), and <mpp/shmemx.h> (F8):
+# both are proven by compiling, not by a runtime check. See the file comment.
+add_executable(shmem_test_header_surface test-header-surface.c)
+target_link_libraries(shmem_test_header_surface PRIVATE osoe)
+osoe_warnings(shmem_test_header_surface)
+add_test(NAME shmem.header-surface COMMAND shmem_test_header_surface)
+set_tests_properties(shmem.header-surface PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 if(BUILD_SHARED_LIBS)
   add_test(NAME shmem.exports
     COMMAND ${CMAKE_COMMAND} -DLIB=$<TARGET_FILE:osoe>
@@ -18,6 +26,31 @@ if(BUILD_SHARED_LIBS)
             -P ${PROJECT_SOURCE_DIR}/cmake/CheckProfiling.cmake)
   set_tests_properties(shmem.profiling_aliases PROPERTIES LABELS "tier1" TIMEOUT 30)
 endif()
+
+# A static build is not one of the four presets (none sets BUILD_SHARED_LIBS),
+# so this proves it on its own: a nested configure and build of libosoe as a
+# static archive, then a link of a tiny consumer against that archive alone -
+# never against osoe_base, which is never installed. Portability review F10:
+# before osoe_base became an OBJECT library, this failed with over a hundred
+# undefined references.
+add_test(NAME shmem.static-link
+  COMMAND ${CMAKE_COMMAND}
+          -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/static-link-check
+          -DPROBE_SRC=${CMAKE_CURRENT_SOURCE_DIR}/static-link-probe.c
+          -DC_COMPILER=${CMAKE_C_COMPILER}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckStaticLink.cmake)
+set_tests_properties(shmem.static-link PROPERTIES LABELS "tier1" TIMEOUT 180)
+
+# None of the four presets sets CMAKE_C_EXTENSIONS, so plain -std=c11 (design
+# §1: "a C11 compiler") is otherwise never built. A nested configure and
+# build, the same shape as shmem.static-link above. Portability review F12.
+add_test(NAME shmem.strict-c11
+  COMMAND ${CMAKE_COMMAND}
+          -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/strict-c11-check
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckStrictC11.cmake)
+set_tests_properties(shmem.strict-c11 PROPERTIES LABELS "tier1" TIMEOUT 180)
 
 # The allocator on its own (tier 1): compiled in, since libosoe hides it.
 add_executable(shmem_test_allocator test-allocator.c ../src/allocator.c)
@@ -47,10 +80,12 @@ set_tests_properties(shmem.am PROPERTIES LABELS "tier1" TIMEOUT 120)
 # message, so a check that stopped firing fails here rather than going quiet.
 foreach(case_expect
     "count|carried 4 messages, its header says 5"
-    "length|was [0-9]+ bytes, its header says"
+    "length|runs past the end of segment 1 from an unnamed peer"
     "short-segment|less than its own header"
     "kind|this build knows"
-    "short-message|less than its fixed part")
+    "short-message|less than its fixed part"
+    "long-message|runs past the end of segment"
+    "empty-count|messages in no room")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 case)
   list(GET parts 1 expect)
@@ -68,7 +103,8 @@ add_test(NAME shmem.reply COMMAND shmem_test_reply)
 set_tests_properties(shmem.reply PROPERTIES LABELS "tier1" TIMEOUT 60)
 
 # The AM sizing policy (tier 1): pure arithmetic, compiled in.
-add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/connection.c)
+add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/connection.c
+  ../src/shm-object.c)
 target_include_directories(shmem_test_am_size PRIVATE ../src)
 target_link_libraries(shmem_test_am_size PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_am_size)
@@ -88,7 +124,7 @@ set_tests_properties(shmem.connection PROPERTIES LABELS "tier1" TIMEOUT 120)
 # The node-pair wire on its own (tier 1): both ends in one process, so no
 # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
 # its own osoe_fatal so a failure inside it fails the test.
-add_executable(shmem_test_wire test-wire.c ../src/wire.c)
+add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/shm-object.c)
 target_include_directories(shmem_test_wire PRIVATE ../src)
 target_link_libraries(shmem_test_wire PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_wire)
@@ -101,7 +137,7 @@ set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
 # and takes its identity straight from the launcher environment.
 # The seed is fixed: §3.14 wants an injected fault reproducible, and without it
 # the pattern would follow the launcher's pid and differ every run.
-add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c)
+add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/shm-object.c)
 target_include_directories(shmem_test_wire_pair PRIVATE ../src)
 target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_wire_pair)
@@ -122,7 +158,7 @@ set(OSOE_LAUNCH_COUNTS 1 2 4)
 # all of them - and that mutation passed a two-node test.
 add_executable(shmem_test_barrier_am test-barrier-am.c
   ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c ../src/bootstrap.c)
+  ../src/reply.c ../src/wire.c ../src/bootstrap.c ../src/shm-object.c)
 target_include_directories(shmem_test_barrier_am PRIVATE ../src)
 target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_barrier_am)
@@ -142,7 +178,7 @@ endforeach()
 # poles: one node, one PE per node, uneven sizes, and ranks not contiguous per
 # node - the last two being where two-level collectives break, and a uniform
 # map never shows it.
-add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c
+add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c ../src/shm-object.c
   ../src/am.c)
 target_include_directories(shmem_test_job PRIVATE ../src)
 target_link_libraries(shmem_test_job PRIVATE osoe_base rt)
@@ -155,6 +191,15 @@ foreach(map 0 0,0,0,0 0,1,2,3 0,0,0,1,2,2 0,1,2,0,1,0)
     COMMAND osoe-launch -n ${count} -m ${map} -t 60 -- $<TARGET_FILE:shmem_test_job>)
   set_tests_properties(shmem.job.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
+# Two node leads claiming one rank: node 1's lead is told its node holds ranks 1
+# and 0, and node 0's lead holds 0. Exactly one claim wins (a CAS per rank since
+# slice 2; a plain test-and-store before, which two simultaneous leads could
+# both pass), and the job is refused naming the rank.
+add_test(NAME shmem.job.duplicate-rank
+  COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1,0 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
 
 # The progress loop between two logical nodes (tier 2): every layer at once.
 # The wire is far smaller than a segment and its split injection is on, so the
@@ -163,7 +208,7 @@ endforeach()
 # vacuous.
 add_executable(shmem_test_progress test-progress.c
   ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c)
+  ../src/reply.c ../src/wire.c ../src/shm-object.c)
 target_include_directories(shmem_test_progress PRIVATE ../src)
 target_link_libraries(shmem_test_progress PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_progress)
@@ -173,12 +218,34 @@ add_test(NAME shmem.progress
           $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
           $<TARGET_FILE:shmem_test_progress>)
 set_tests_properties(shmem.progress PROPERTIES LABELS "tier2" TIMEOUT 90)
+# Review round two, D4: a get reply nobody asked for, pointing past the landing
+# zone, must be refused by name on the node that receives it. Before slice 2 it
+# was written, 64 bytes past the zone, and the test passed.
+add_test(NAME shmem.progress.forged-get-reply
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+          OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+          OSOE_TEST_FORGE=get-reply
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
+          $<TARGET_FILE:shmem_test_progress>)
+set_tests_properties(shmem.progress.forged-get-reply PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "osoe_fatal: a get reply from node 0"
+  FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
+add_test(NAME shmem.progress.forged-get-reply-bounds
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+          OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+          OSOE_TEST_FORGE=get-reply-bounds
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
+          $<TARGET_FILE:shmem_test_progress>)
+set_tests_properties(shmem.progress.forged-get-reply-bounds PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "osoe_fatal: a get reply from node 0 for PE 2 puts 64 bytes at offset"
+  FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
 
 # The connection area across the PEs of a node (tier 2). The local lead creates
 # it and the others open it, which is §3.12's arrangement. Not an
 # osoe_tier2_test: it does not call shmem_init, testing the area on its own
 # below the library, and it takes its identity from the launcher environment.
-add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/connection.c)
+add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/connection.c
+  ../src/shm-object.c)
 target_include_directories(shmem_test_connection_area PRIVATE ../src)
 target_link_libraries(shmem_test_connection_area PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_connection_area)
@@ -307,8 +374,11 @@ endforeach()
 # reduced, would leave nothing to compare it against - a differential test of
 # one configuration is not one - so it is left out there entirely and the other
 # three presets carry it.
-add_executable(shmem_test_differential test-differential.c)
-target_link_libraries(shmem_test_differential PRIVATE osoe)
+add_executable(shmem_test_differential test-differential.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_differential PRIVATE
+  ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_differential PRIVATE osoe rt)
 osoe_warnings(shmem_test_differential)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
 add_test(NAME shmem.differential
@@ -317,7 +387,7 @@ add_test(NAME shmem.differential
           -DEXE=$<TARGET_FILE:shmem_test_differential>
           -DNRANKS=6
           "-DMAPS=0,0,0,0,0,0;0,1,2,3,4,5;0,0,0,1,2,2;0,1,2,0,1,0"
-          "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919"
+          "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919;SHMEM_SYMMETRIC_SIZE=16m"
           -P ${PROJECT_SOURCE_DIR}/cmake/Differential.cmake)
 set_tests_properties(shmem.differential PROPERTIES LABELS "tier2" TIMEOUT 300)
 endif()
@@ -340,6 +410,244 @@ function(osoe_tier2_test name)
     set_tests_properties(shmem.${name}.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
   endforeach()
 endfunction()
+
+# A tier-2 test over a logical node map (§8.1) rather than a PE count: for
+# what only exists between nodes. Built like osoe_tier2_test, with the segment
+# reader, so it can read the control segment's metrics by name.
+function(osoe_tier2_map_test name map)
+  if(NOT TARGET shmem_test_${name})
+    add_executable(shmem_test_${name} test-${name}.c
+      ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+    target_include_directories(shmem_test_${name} PRIVATE
+      ${PROJECT_SOURCE_DIR}/tools/stat)
+    target_link_libraries(shmem_test_${name} PRIVATE osoe rt)
+    osoe_warnings(shmem_test_${name})
+  endif()
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.${name}.${label}
+    COMMAND ${CMAKE_COMMAND} -E env ${ARGN}
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_${name}>)
+  set_tests_properties(shmem.${name}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endfunction()
+
+# A quiesced pair falls silent (§3.4; review round two, C1). Before slice 2's
+# acknowledgement protocol: 1,320 header-only segments per node in the idle
+# half second.
+osoe_tier2_map_test(ack-echo 0,1)
+
+# A reply is not starved by puts (§3.8's DRAINING state; review round two, C7):
+# one getter on node 0, the get's target and five writers on node 1, the
+# smallest connection §3.4 allows, puts of 984 bytes - two tile the buffer and
+# leave no room for a reply. A guard, not a reproduction: it passed before the
+# pre-open drain too (§3.8 says why), so it holds the line against a real hang.
+#
+# These seven-PE tests size their heaps to what they use (16 MiB): at the
+# default 256 MiB, six or seven PEs on one node ask for more than a 3 GiB
+# machine's /dev/shm, which §6.2's capacity check refuses at init.
+#
+# Neither this nor shmem.reply-pool below runs under ThreadSanitizer, for the
+# reason shmem.internode gives: an agent serves a get from, or applies a put to,
+# a heap the local main thread wrote before a barrier, and that barrier's
+# ordering runs through processes tsan cannot see. Both reported exactly that
+# race, and only that, when slice 2 first ran them under tsan.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(reply-starvation 0,1,1,1,1,1,1
+    OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096 OSOE_TEST_PUT_BYTES=984
+    SHMEM_SYMMETRIC_SIZE=16m)
+endif()
+
+# An internode quiet sweeps (§4.10; review round two, D2): node 1 is stopped,
+# PE 0 quiets toward it, PE 1 sees it blocked in osoe-stat and dies, and PE 0's
+# next sweep must end the job naming shmem_quiet. -k leaves the survivors to the
+# library. Before slice 2 the quiet never swept: osoe-stat showed nothing for
+# PE 0, and the job ran to the launcher's 15 s timeout.
+add_executable(shmem_test_unswept-wait test-unswept-wait.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_unswept-wait PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_unswept-wait PRIVATE osoe rt)
+osoe_warnings(shmem_test_unswept-wait)
+add_test(NAME shmem.unswept-wait
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_WATCHDOG=1 OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+          $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 15 -k --
+          $<TARGET_FILE:shmem_test_unswept-wait>)
+set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_quiet: local PE 1 [(]rank 1"
+  FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED")
+
+# The reply descriptor pool (§3.8; review round two, D1). The review's scenario
+# at C = 2 must complete; with the target given a smaller credit than the
+# origin, the pool overflows and the target must say so by name. Before slice 2
+# sized the pool by §3.8's formula, both dropped a get request without a word
+# and timed out ("no get reply after 60 s"). The completing half is not run
+# under ThreadSanitizer (see shmem.reply-starvation); the overflow half is,
+# since its pass is the named fatal and not a clean exit.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(reply-pool 0,0,0,1 OSOE_AM_CREDITS=2 SHMEM_SYMMETRIC_SIZE=16m)
+else()
+  add_executable(shmem_test_reply-pool test-reply-pool.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_reply-pool PRIVATE
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_reply-pool PRIVATE osoe rt)
+  osoe_warnings(shmem_test_reply-pool)
+endif()
+add_test(NAME shmem.reply-pool.overflow
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow SHMEM_SYMMETRIC_SIZE=16m
+          $<TARGET_FILE:osoe-launch> -n 8 -m 0,0,0,0,0,0,0,1 -t 30
+          -e 7:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
+set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
+
+# A quiet waits as long as its peer does (§3.15; review round two, D3): node 1
+# stopped for 3 s, then continued, and the quiet completes with the no-progress
+# limit unset; with it at 1 s, the quiet ends the job naming the connection.
+# The slice-2 commit records a run stopped for 65 s, past the old 60 s bound.
+osoe_tier2_map_test(stopped-node 0,0,1 OSOE_TEST_STOP_MS=3000)
+set_tests_properties(shmem.stopped-node.0-0-1 PROPERTIES
+  PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
+add_test(NAME shmem.stopped-node.no-progress
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=6000 OSOE_NO_PROGRESS_TIMEOUT=1
+          $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
+          $<TARGET_FILE:shmem_test_stopped-node>)
+set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_quiet: no progress toward node 1 for [0-9]+ s"
+  FAIL_REGULAR_EXPRESSION "quiet completed")
+
+# The other half of D-6 (diagnosability review): a blocking get waits for one
+# PE's reply, not a whole node's queue, so its no-progress fatal must name that
+# PE and not only the node. Before this fix it named neither.
+osoe_tier2_map_test(get-no-progress 0,1 OSOE_NO_PROGRESS_TIMEOUT=1)
+set_tests_properties(shmem.get-no-progress.0-1 PROPERTIES
+  PASS_REGULAR_EXPRESSION "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s"
+  FAIL_REGULAR_EXPRESSION "GET RETURNED")
+
+# A loud failure ends the job without joining a collective (§3.15; review round
+# two, conformance F1): osoe_fatal leaves through _exit, so start_pes's atexit
+# finalize - a barrier - does not run. Before slice 2 this job hung 7-8 s.
+add_executable(shmem_test_fatal-start-pes test-fatal-start-pes.c)
+target_link_libraries(shmem_test_fatal-start-pes PRIVATE osoe)
+osoe_warnings(shmem_test_fatal-start-pes)
+add_test(NAME shmem.fatal-start-pes
+  COMMAND osoe-launch -n 3 -t 10 -- $<TARGET_FILE:shmem_test_fatal-start-pes>)
+set_tests_properties(shmem.fatal-start-pes PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap"
+  FAIL_REGULAR_EXPRESSION "timeout after|RETURNED")
+
+# A PE leaving without shmem_finalize (§6.4; review round two, D14). See the
+# test's header for the two modes and what each must and must not do.
+add_executable(shmem_test_exit-without-finalize test-exit-without-finalize.c)
+target_link_libraries(shmem_test_exit-without-finalize PRIVATE osoe)
+osoe_warnings(shmem_test_exit-without-finalize)
+add_test(NAME shmem.exit-without-finalize.init
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MODE=init
+          $<TARGET_FILE:osoe-launch> -n 3 -t 10 -k --
+          $<TARGET_FILE:shmem_test_exit-without-finalize>)
+set_tests_properties(shmem.exit-without-finalize.init PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "PE 1: the process exited without calling shmem_finalize"
+  FAIL_REGULAR_EXPRESSION "timeout after|BARRIER RETURNED")
+add_test(NAME shmem.exit-without-finalize.start_pes
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MODE=start_pes
+          $<TARGET_FILE:osoe-launch> -n 3 -t 4 --
+          $<TARGET_FILE:shmem_test_exit-without-finalize>)
+set_tests_properties(shmem.exit-without-finalize.start_pes PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 4 s"
+  FAIL_REGULAR_EXPRESSION "BARRIER RETURNED")
+
+# No death of any process strands a named object (§3.14; review round two,
+# D13): every PE dies of SIGKILL or SIGTERM after init, on two nodes, and the
+# launcher must find nothing left behind. The kept variant leaves the control
+# segments on purpose, and osoe-stat --gc must then remove them.
+add_executable(shmem_test_kill-after-init test-kill-after-init.c)
+target_link_libraries(shmem_test_kill-after-init PRIVATE osoe)
+osoe_warnings(shmem_test_kill-after-init)
+foreach(sig KILL TERM)
+  add_test(NAME shmem.kill-after-init.${sig}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SIGNAL=${sig}
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 -k --
+            $<TARGET_FILE:shmem_test_kill-after-init>)
+  set_tests_properties(shmem.kill-after-init.${sig} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "killed by signal"
+    FAIL_REGULAR_EXPRESSION "left behind")
+endforeach()
+add_test(NAME shmem.kill-after-init.kept
+  COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 OSOE_TEST_SIGNAL=KILL \"$0\" -n 4 -m 0,0,1,1 -t 30 -k -- \"$1\"; \"$2\" --gc"
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_kill-after-init>
+          $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.kill-after-init.kept PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "kept for post-mortem reading.*removed"
+  FAIL_REGULAR_EXPRESSION "left behind")
+
+# Init reclaims leftovers of a job killed during init, and refuses an object
+# whose creator is alive (§6.2; review round two, D11, D15). See leftovers.sh.
+add_test(NAME shmem.leftovers.reclaim
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_init> reclaim)
+set_tests_properties(shmem.leftovers.reclaim PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "reclaimed /dev/shm.*job exited 0.*with a name afterwards: 0")
+add_test(NAME shmem.leftovers.live
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_init> live)
+set_tests_properties(shmem.leftovers.live PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "the refusal names the owner: yes")
+
+# A job never outlives its launcher: SIGTERM and SIGINT are forwarded, and a
+# SIGKILLed launcher takes its PEs with it (launch.c; review round two,
+# omissions 6). See launcher-signals.sh.
+add_executable(shmem_test_sleeper sleeper.c)
+target_link_libraries(shmem_test_sleeper PRIVATE osoe)
+osoe_warnings(shmem_test_sleeper)
+foreach(mode term int kill)
+  add_test(NAME shmem.launcher-signals.${mode}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/launcher-signals.sh
+            $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_sleeper> ${mode})
+  set_tests_properties(shmem.launcher-signals.${mode} PROPERTIES LABELS "tier2"
+    TIMEOUT 60)
+endforeach()
+set_tests_properties(shmem.launcher-signals.term PROPERTIES PASS_REGULAR_EXPRESSION
+  "launcher exited 143.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
+set_tests_properties(shmem.launcher-signals.int PROPERTIES PASS_REGULAR_EXPRESSION
+  "launcher exited 130.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
+set_tests_properties(shmem.launcher-signals.kill PROPERTIES PASS_REGULAR_EXPRESSION
+  "PEs still running: 0.*with a name: 0")
+
+# What a core holds: this PE's heap, not its siblings' or the connection area
+# (review round two, omissions 4).
+osoe_tier2_map_test(core-exclusion 0,0,1,1)
+
+# A request larger than /dev/shm is refused at init, by name (§6.2; review round
+# two, omissions 5). See dev-shm-capacity.sh.
+add_test(NAME shmem.dev-shm-capacity.heaps
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> heaps)
+add_test(NAME shmem.dev-shm-capacity.connections
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> connections)
+set_tests_properties(shmem.dev-shm-capacity.heaps shmem.dev-shm-capacity.connections
+  PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.dev-shm-capacity.heaps PROPERTIES PASS_REGULAR_EXPRESSION
+  "/dev/shm has [0-9]+ MiB free, but this node's control segment and 2 heaps.*launcher exited 1")
+set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES PASS_REGULAR_EXPRESSION
+  "/dev/shm has [0-9]+ MiB free, but this node's connection area.*launcher exited 1")
+
+# A kernel without futex2 (Linux < 6.7) is refused at init by name, before any
+# object exists (§1; review round two, portability F3). deny-futex2 makes the
+# three calls fail with ENOSYS, as such a kernel does. Before, both PEs died of
+# SIGABRT in the rendezvous and left their heaps and control segment behind.
+# And the probe, under the same filter, fails its named-object futex checks.
+add_executable(deny-futex2 deny-futex2.c)
+osoe_warnings(deny-futex2)
+add_test(NAME shmem.refuse.old-kernel
+  COMMAND deny-futex2 $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
+          $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.refuse.old-kernel PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "needs Linux 6.7 or later, for the futex2 calls .*this kernel is"
+  FAIL_REGULAR_EXPRESSION "left behind|futex_wake failed|futex_wait failed")
+add_test(NAME env.probe.old-kernel COMMAND deny-futex2 $<TARGET_FILE:probe>)
+set_tests_properties(env.probe.old-kernel PROPERTIES LABELS "env" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "FAIL futex_wait, named shm, woken by other process")
 
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
@@ -401,7 +709,7 @@ foreach(count 2 4)
               -- $<TARGET_FILE:shmem_test_watchdog>)
     set_tests_properties(shmem.watchdog.${where}.L${count} PROPERTIES
       LABELS "tier2" TIMEOUT 60
-      PASS_REGULAR_EXPRESSION "has died; this PE would wait for it forever")
+      PASS_REGULAR_EXPRESSION "has died[;] this PE would wait for it forever")
   endforeach()
 endforeach()
 
@@ -417,7 +725,7 @@ set_tests_properties(shmem.watchdog.off PROPERTIES
 # With nothing set, the default must follow the preset: on in debug, asan and
 # tsan, off in release (§3.15).
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(osoe_watchdog_default_expect "has died; this PE would wait for it forever")
+  set(osoe_watchdog_default_expect "has died[;] this PE would wait for it forever")
 else()
   set(osoe_watchdog_default_expect "osoe-launch: timeout after 3 s")
 endif()
@@ -445,6 +753,22 @@ add_test(NAME shmem.refuse.size_mismatch
           -- $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.refuse.size_mismatch PROPERTIES
   PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE differs between PEs")
+# The deprecated SMA_ spelling (spec §8, Annex F) must be honoured the same
+# way, down to the same validation (conformance review F3): before F3's fix,
+# bootstrap.c read SHMEM_SYMMETRIC_SIZE only and SMA_SYMMETRIC_SIZE=12q was
+# silently ignored, so this job would have run instead of refusing.
+add_test(NAME shmem.refuse.bad_size_sma
+  COMMAND osoe-launch -n 2 -t 60 -e 0:SMA_SYMMETRIC_SIZE=12q -e 1:SMA_SYMMETRIC_SIZE=12q
+          -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.refuse.bad_size_sma PROPERTIES
+  PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE='12q' is invalid")
+# A zero heap is syntactically valid and never useful (conformance review F9 /
+# omissions 11): every shmem_malloc would fail on every PE.
+add_test(NAME shmem.refuse.zero_size
+  COMMAND osoe-launch -n 1 -t 60 -e 0:SHMEM_SYMMETRIC_SIZE=0
+          -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.refuse.zero_size PROPERTIES
+  PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE='0' is 0")
 # Destroying a predefined team is undefined by spec §9.4.8, and undefined is
 # loud here: no other team can exist, so every call naming one is a program bug.
 add_executable(shmem_test_bad_team test-bad-team.c)
@@ -464,5 +788,50 @@ add_test(NAME shmem.refuse.nonsymmetric_put
 set_tests_properties(shmem.refuse.nonsymmetric_put PROPERTIES
   PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap")
 set_tests_properties(shmem.refuse.no_launcher shmem.refuse.bad_size
+  shmem.refuse.bad_size_sma shmem.refuse.zero_size
   shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
   LABELS "tier2" TIMEOUT 90)
+
+# A call before shmem_init, or after the last shmem_finalize, must be a named
+# fatal rather than a segfault, a misleading message, a valid-looking wrong
+# answer, or a silent success (conformance review F5). "before" needs no
+# launcher - none of these routines reads the environment before the
+# uninitialized check fires - so it runs directly; "after" needs a real job
+# first, so it runs under osoe-launch.
+add_executable(shmem_test_uninitialized test-uninitialized.c)
+target_link_libraries(shmem_test_uninitialized PRIVATE osoe)
+osoe_warnings(shmem_test_uninitialized)
+
+foreach(case_expect
+    "malloc|shmem_malloc: called before shmem_init"
+    "free|shmem_free: called before shmem_init"
+    "wait_until|shmem_long_wait_until: called before shmem_init"
+    "barrier_all|shmem_barrier_all: called before shmem_init"
+    "putmem|shmem_putmem: called before shmem_init"
+    "team_my_pe|shmem_team_my_pe: called before shmem_init"
+    "quiet|quiet: called before shmem_init"   # shmem_quiet wraps shmem_ctx_quiet (§7.3)
+    "ptr|shmem_ptr: called before shmem_init")
+  string(REPLACE "|" ";" parts "${case_expect}")
+  list(GET parts 0 case)
+  list(GET parts 1 expect)
+  add_test(NAME shmem.refuse.uninitialized.before.${case}
+    COMMAND shmem_test_uninitialized before ${case})
+  set_tests_properties(shmem.refuse.uninitialized.before.${case} PROPERTIES
+    LABELS "tier1" TIMEOUT 30 PASS_REGULAR_EXPRESSION "${expect}")
+endforeach()
+
+# The two the conformance review measured specifically after a real
+# shmem_finalize: shmem_malloc used to segfault on the allocator's freed
+# state, and shmem_ptr used to dereference a stale heap table instead of
+# answering the NULL its own contract allows.
+foreach(case_expect
+    "malloc|shmem_malloc: called before shmem_init"
+    "ptr|shmem_ptr: called before shmem_init")
+  string(REPLACE "|" ";" parts "${case_expect}")
+  list(GET parts 0 case)
+  list(GET parts 1 expect)
+  add_test(NAME shmem.refuse.uninitialized.after.${case}
+    COMMAND osoe-launch -n 1 -t 30 -- $<TARGET_FILE:shmem_test_uninitialized> after ${case})
+  set_tests_properties(shmem.refuse.uninitialized.after.${case} PROPERTIES
+    LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
+endforeach()

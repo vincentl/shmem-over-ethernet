@@ -13,7 +13,9 @@
 
 #include "base/deadline.h"
 #include "base/futex.h"
+#include "base/stall-watch.h"
 #include "fatal.h"
+#include "shm-object.h"
 #include "connection-area.h"
 
 #include "metrics.h"
@@ -61,7 +63,8 @@ static uint64_t page_round(uint64_t n)
 _Noreturn static void fail_rendezvous(struct osoe_node *n, const char *what)
 {
     if (n->hdr) {
-        atomic_store_explicit(&n->hdr->failed, 1, memory_order_release);
+        /* seq_cst: a futex word that is its own predicate (§3.16). */
+        atomic_store_explicit(&n->hdr->failed, 1, memory_order_seq_cst);
         osoe_futex_wake(&n->hdr->ready, INT_MAX, OSOE_FUTEX_SHARED);
         osoe_futex_wake(&n->hdr->joined, INT_MAX, OSOE_FUTEX_SHARED);
         osoe_futex_wake(&n->hdr->mapped, INT_MAX, OSOE_FUTEX_SHARED);
@@ -80,15 +83,20 @@ static void check_failed(struct osoe_node *n)
  * passes. A failure wake can be missed (the failing PE stores `failed` and then
  * wakes without bumping the word), so it is noticed at the next sweep at worst.
  */
+/* Wait for a rendezvous count to reach its target; -1 once it has stopped
+ * moving for the no-progress limit (§3.15), which by default is never. */
 static int wait_count(struct osoe_node *n, _Atomic uint32_t *word, uint32_t target,
-                      const struct osoe_deadline *overall)
+                      uint64_t no_progress_ns)
 {
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, atomic_load_explicit(word, memory_order_acquire),
+                           no_progress_ns);
     for (;;) {
         uint32_t v = atomic_load_explicit(word, memory_order_acquire);
         check_failed(n);
         if (v == target)
             return 0;
-        if (osoe_deadline_expired(overall))
+        if (osoe_stall_watch_stalled(&watch, v))
             return -1;
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_futex_wait(word, v, &sweep, OSOE_FUTEX_SHARED);
@@ -110,11 +118,14 @@ static void describe_missing(struct osoe_node *n, uint32_t count, enum osoe_phas
 static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap *b,
                                 struct osoe_pe_slot *slot, uint64_t base)
 {
-    int fd = shm_open(slot->heap_name, O_CREAT | O_EXCL | O_RDWR, 0600);
+    /* A heap has nowhere to record its creator; a leftover with this name
+     * predates the control segment this node's lead has just created, and so
+     * is a dead job's, reclaimed if it is this user's. */
+    char err[256];
+    int fd = osoe_shm_create(slot->heap_name, OSOE_SHM_NO_OWNER, err, sizeof err);
     if (fd < 0) {
-        char msg[256];
-        snprintf(msg, sizeof msg, "cannot create heap %s: %s", slot->heap_name,
-                 strerror(errno));
+        char msg[320];
+        snprintf(msg, sizeof msg, "this PE's heap: %s", err);
         fail_rendezvous(n, msg);
     }
     if (ftruncate(fd, (off_t)n->heap_bytes) != 0) {
@@ -154,11 +165,12 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         if (i == b->local_id)
             continue;
         struct osoe_pe_slot *s = &n->slots[i];
-        int fd = shm_open(s->heap_name, O_RDWR, 0);
+        char err[256];
+        int fd = osoe_shm_open_ours(s->heap_name, err, sizeof err);
         if (fd < 0) {
-            char msg[256];
-            snprintf(msg, sizeof msg, "cannot open local PE %u's heap %s: %s", i,
-                     s->heap_name, strerror(errno));
+            char msg[512];
+            snprintf(msg, sizeof msg, "local PE %u's heap: %s", i,
+                     err[0] ? err : strerror(errno));
             fail_rendezvous(n, msg);
         }
         void *p = mmap(NULL, s->heap_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -169,6 +181,9 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
                      (unsigned long long)s->heap_bytes, strerror(errno));
             fail_rendezvous(n, msg);
         }
+        /* A sibling's heap is in the sibling's own core; in this one it would
+         * make every core L heaps large (review round two, omissions 4). */
+        madvise(p, s->heap_bytes, MADV_DONTDUMP);
         n->heap_of[i] = p;
     }
 }
@@ -198,15 +213,6 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
 /* The lead creates and initializes the control segment. */
 static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
-    int fd = shm_open(n->control_name, O_CREAT | O_EXCL | O_RDWR, 0600);
-    if (fd < 0) {
-        if (errno == EEXIST)
-            osoe_fatal("control segment /dev/shm%s already exists, probably left by a "
-                       "crashed job with the same job and step ids; remove it and retry",
-                       n->control_name);
-        osoe_fatal("cannot create control segment %s: %s", n->control_name,
-                   strerror(errno));
-    }
     /*
      * Four sections: the header, the PE slots, the §3.14 metric table, and the
      * counter blocks. Each starts on a cache line, so no two sections share
@@ -239,20 +245,44 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint64_t landing_offset = align_up(blocks_offset + blocks_bytes);
     uint64_t landing_bytes = (uint64_t)b->local_count * landing_slot_bytes;
     n->control_bytes = page_round(landing_offset + landing_bytes);
+
+    /*
+     * The node's whole request, checked once and before any of it exists: this
+     * segment and every local PE's heap. The lead knows L and the heap size;
+     * every PE has parsed the same size, or check_agreement fails them all.
+     */
+    uint64_t wanted = n->control_bytes + (uint64_t)b->local_count * n->heap_bytes;
+    uint64_t free_bytes;
+    if (!osoe_shm_room(wanted, &free_bytes))
+        osoe_fatal("/dev/shm has %llu MiB free, but this node's control segment and %u "
+                   "heaps of %llu MiB need %llu MiB: lower SHMEM_SYMMETRIC_SIZE, run "
+                   "fewer PEs per node, or enlarge /dev/shm",
+                   (unsigned long long)(free_bytes >> 20), b->local_count,
+                   (unsigned long long)(n->heap_bytes >> 20),
+                   (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
+
+    char err[256];
+    int fd = osoe_shm_create(n->control_name,
+                             (long)offsetof(struct osoe_node_header, creator_pid),
+                             err, sizeof err);
+    if (fd < 0)
+        osoe_fatal("the control segment: %s", err);
     if (ftruncate(fd, (off_t)n->control_bytes) != 0) {
         close(fd);
         shm_unlink(n->control_name);
         osoe_fatal("cannot size control segment: %s", strerror(errno));
     }
     void *p = mmap(NULL, n->control_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd);
     if (p == MAP_FAILED) {
+        close(fd);
         shm_unlink(n->control_name);
         osoe_fatal("cannot map control segment: %s", strerror(errno));
     }
+    n->control_fd = fd;             /* kept: see struct osoe_node */
 
     /* ftruncate zeroed it: every atomic word starts at 0. */
     n->hdr = p;
+    n->hdr->creator_pid = (int32_t)getpid();
     n->slots = (struct osoe_pe_slot *)((char *)p + slots_offset);
     struct osoe_node_header *h = n->hdr;
     h->dir.magic = OSOE_NODE_MAGIC;
@@ -292,50 +322,67 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     osoe_epoch_init(&h->shared_arrived);
     osoe_epoch_init(&h->shared_released);
     osoe_epoch_init(&h->shared_copied);
+    osoe_epoch_init(&h->finalize_arrived);
+    osoe_epoch_init(&h->finalize_released);
 }
 
 /* A non-lead opens the control segment by name, waiting for the lead to
  * create and publish it. */
-static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session,
-                         const struct osoe_deadline *overall)
+static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+again:;
     struct timespec backoff = { 0, 1000 * 1000 };   /* 1 ms, doubling to 64 ms */
     for (;;) {
-        int fd = shm_open(n->control_name, O_RDWR, 0);
+        char err[256];
+        int fd = osoe_shm_open_ours(n->control_name, err, sizeof err);
         if (fd >= 0) {
             struct stat st;
             if (fstat(fd, &st) == 0 && (uint64_t)st.st_size >= sizeof(struct osoe_node_header)) {
                 void *p = mmap(NULL, (size_t)st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                                fd, 0);
-                close(fd);
-                if (p == MAP_FAILED)
+                if (p == MAP_FAILED) {
+                    close(fd);
                     osoe_fatal("cannot map control segment %s: %s", n->control_name,
                                strerror(errno));
+                }
+                n->control_fd = fd;     /* kept: see struct osoe_node */
                 n->hdr = p;
                 n->control_bytes = (uint64_t)st.st_size;
                 break;
             }
             close(fd);          /* created but not yet sized */
         } else if (errno != ENOENT) {
-            osoe_fatal("cannot open control segment %s: %s", n->control_name,
-                       strerror(errno));
+            osoe_fatal("the control segment: %s", err);
         }
-        if (osoe_deadline_expired(overall))
-            osoe_fatal("timed out waiting for the local lead to create %s "
-                       "(OSOE_BOOTSTRAP_TIMEOUT)", n->control_name);
+        if (osoe_stall_watch_stalled(&watch, 0))
+            osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead "
+                       "has not created %s",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), n->control_name);
         nanosleep(&backoff, NULL);
         if (backoff.tv_nsec < 64 * 1000 * 1000)
             backoff.tv_nsec *= 2;
     }
 
-    /* Sized is not ready: the lead publishes `ready` after the header. */
+    /* Sized is not ready: the lead publishes `ready` after the header. What
+     * was opened may also be a leftover the lead is about to reclaim, which
+     * will never be ready (shm-object.h): then start over. */
     for (;;) {
         if (atomic_load_explicit(&n->hdr->ready, memory_order_acquire))
             break;
+        if (osoe_shm_orphaned(n->control_fd)) {
+            munmap(n->hdr, n->control_bytes);
+            close(n->control_fd);
+            n->hdr = NULL;
+            n->control_fd = -1;
+            goto again;
+        }
         check_failed(n);
-        if (osoe_deadline_expired(overall))
-            osoe_fatal("timed out waiting for the local lead to initialize %s",
-                       n->control_name);
+        if (osoe_stall_watch_stalled(&watch, 0))
+            osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead "
+                       "has not initialized %s",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), n->control_name);
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_futex_wait(&n->hdr->ready, 0, &sweep, OSOE_FUTEX_SHARED);
     }
@@ -380,8 +427,9 @@ static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, ui
 
 void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
-    struct osoe_deadline overall = osoe_deadline_in(b->timeout_ns);
     bool lead = b->local_id == 0;
+    n->control_fd = -1;
+    n->keep_name = b->keep_control_segment;
 
     snprintf(n->control_name, sizeof n->control_name, "/osoe.%llu.%u.%u.%u",
              (unsigned long long)b->job, b->step, b->node, session);
@@ -399,7 +447,7 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     if (lead)
         create_control(n, b, session);
     else
-        open_control(n, b, session, &overall);
+        open_control(n, b, session);
 
     struct osoe_pe_slot *me = &n->slots[b->local_id];
     if (atomic_load_explicit(&me->phase, memory_order_acquire) != OSOE_PHASE_EMPTY)
@@ -426,7 +474,8 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
 
     if (lead) {
         n->hdr->heap_base = base;
-        atomic_store_explicit(&n->hdr->ready, 1, memory_order_release);
+        /* seq_cst: a futex word that is its own predicate (§3.16). */
+        atomic_store_explicit(&n->hdr->ready, 1, memory_order_seq_cst);
         osoe_futex_wake(&n->hdr->ready, INT_MAX, OSOE_FUTEX_SHARED);
     }
 
@@ -440,11 +489,11 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     atomic_fetch_add_explicit(&n->hdr->joined, 1, memory_order_seq_cst);
     osoe_futex_wake(&n->hdr->joined, INT_MAX, OSOE_FUTEX_SHARED);
 
-    if (wait_count(n, &n->hdr->joined, b->local_count, &overall) != 0) {
+    if (wait_count(n, &n->hdr->joined, b->local_count, b->no_progress_ns) != 0) {
         char missing[256], msg[400];
         describe_missing(n, b->local_count, OSOE_PHASE_JOINED, missing, sizeof missing);
-        snprintf(msg, sizeof msg, "timed out waiting for local PEs to join "
-                 "(OSOE_BOOTSTRAP_TIMEOUT); missing local ids:%s", missing);
+        snprintf(msg, sizeof msg, "no local PE has joined for OSOE_NO_PROGRESS_TIMEOUT "
+                 "seconds; missing local ids:%s", missing);
         fail_rendezvous(n, msg);
     }
     check_agreement(n, b);
@@ -456,19 +505,28 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     osoe_futex_wake(&n->hdr->mapped, INT_MAX, OSOE_FUTEX_SHARED);
 
     /* The lead removes heap names once every PE holds a mapping, so a later
-     * crash leaves no heap behind (§6.2). */
+     * crash leaves no heap behind (§6.2) - and the control segment's name with
+     * them, since every local PE opened it before it could map a sibling's
+     * heap. From here nothing this node created in /dev/shm has a name: no
+     * death of any process can strand it, and osoe-stat finds the segment
+     * through a live PE's descriptor (§3.14). OSOE_KEEP_CONTROL_SEGMENT keeps
+     * the control segment's name until finalize instead. */
     if (lead) {
-        if (wait_count(n, &n->hdr->mapped, b->local_count, &overall) != 0) {
+        if (wait_count(n, &n->hdr->mapped, b->local_count, b->no_progress_ns) != 0) {
             char missing[256], msg[400];
             describe_missing(n, b->local_count, OSOE_PHASE_MAPPED, missing, sizeof missing);
-            snprintf(msg, sizeof msg, "timed out waiting for local PEs to map their "
-                     "siblings' heaps; missing local ids:%s", missing);
+            snprintf(msg, sizeof msg, "no local PE has finished mapping its siblings' "
+                     "heaps for OSOE_NO_PROGRESS_TIMEOUT seconds; missing local ids:%s",
+                     missing);
             fail_rendezvous(n, msg);
         }
         for (uint32_t i = 0; i < b->local_count; i++)
             if (shm_unlink(n->slots[i].heap_name) != 0)
                 osoe_fatal("cannot remove heap name %s: %s", n->slots[i].heap_name,
                            strerror(errno));
+        if (!n->keep_name && shm_unlink(n->control_name) != 0)
+            osoe_fatal("cannot remove the control segment's name %s: %s", n->control_name,
+                       strerror(errno));
     }
 }
 
@@ -503,13 +561,21 @@ void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)
 
     atomic_store_explicit(&me->phase, OSOE_PHASE_FINALIZED, memory_order_release);
     uint32_t done = atomic_fetch_add_explicit(&n->hdr->finalized, 1, memory_order_seq_cst) + 1;
-    /* Exactly one PE's increment reaches L; that PE removes the name. Others
-     * may still hold mappings, which stay valid. The session number in the name
-     * keeps this from removing a segment a PE has already re-created (§6.4). */
-    if (done == b->local_count && shm_unlink(n->control_name) != 0)
+    /* With OSOE_KEEP_CONTROL_SEGMENT the name lasted until now: exactly one
+     * PE's increment reaches L, and that PE removes it. Others may still hold
+     * mappings, which stay valid. The session number in the name keeps this
+     * from removing a segment a PE has already re-created (§6.4). Otherwise the
+     * name went at init, and there is nothing to remove. ENOENT is not an error
+     * either way: someone - osoe-stat --gc, an operator - may have beaten us
+     * to it, and the object is what matters, not its name. */
+    if (n->keep_name && done == b->local_count && shm_unlink(n->control_name) != 0 &&
+        errno != ENOENT)
         osoe_fatal("cannot remove control segment %s: %s", n->control_name, strerror(errno));
 
     munmap(n->hdr, n->control_bytes);
+    if (n->control_fd >= 0)
+        close(n->control_fd);
+    n->control_fd = -1;
     n->hdr = NULL;
     n->slots = NULL;
     n->blocks = NULL;

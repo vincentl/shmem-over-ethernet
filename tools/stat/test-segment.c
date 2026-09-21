@@ -88,7 +88,20 @@ static struct osoe_metric_descriptor desc(const char *name, const char *unit, un
  * Build the segment. `damage` picks a way to be wrong: 0 is a good segment.
  * Returns the mapping, with `*bytes` its length; the caller unmaps it.
  */
-enum damage { GOOD, BAD_MAGIC, BAD_CHECKSUM, STRANGE_DESC_SIZE };
+/* OLDER_DIRECTORY is not damage: it is a segment written by a library from
+ * before layout 6, whose directory stops before the landing-zone fields. A
+ * reader must still use its table (OSOE_SEGMENT_HAS). */
+/* HUGE_LOCAL_COUNT and HUGE_BLOCK_COUNT are D-7 (diagnosability review): the
+ * directory's own local_count/block_count, not the size of the mapping or of
+ * the section they name - so the segment is otherwise this same GOOD one,
+ * just lying about how many slots or blocks it holds. Before the fix, a count
+ * like this became a loop bound directly: 500-something billion iterations of
+ * "for i < local_count" is what the review's fuzz run saw as osoe-stat
+ * running silently for ten seconds and more. */
+enum damage {
+    GOOD, BAD_MAGIC, BAD_CHECKSUM, STRANGE_DESC_SIZE, OLDER_DIRECTORY,
+    HUGE_LOCAL_COUNT, HUGE_BLOCK_COUNT
+};
 
 static void *build(const char *name, enum damage damage, size_t *bytes)
 {
@@ -133,7 +146,13 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
     uint64_t blocks_off = metrics_off + (uint64_t)n * sizeof table[0];
     uint64_t total = blocks_off + (uint64_t)BLOCK_COUNT * BLOCK_BYTES;
 
-    int fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
+    /* A path is a plain file, which is what this test is really about: a
+     * segment this build did not write, read through nothing but the frozen
+     * directory and the table. A bare name is a /dev/shm object, for the
+     * spellings of a name. */
+    int fd = name[0] == '/' && strchr(name + 1, '/')
+             ? open(name, O_CREAT | O_EXCL | O_RDWR, 0600)
+             : shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
     if (fd < 0 || ftruncate(fd, (off_t)total) != 0) {
         perror("shm_open");
         if (fd >= 0)
@@ -151,12 +170,16 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
     memset(&d, 0, sizeof d);
     d.magic = damage == BAD_MAGIC ? UINT64_C(0xdeadbeef) : OSOE_SEGMENT_MAGIC;
     d.layout = 999;                         /* a layout from the future */
-    d.directory_bytes = sizeof d;
+    d.directory_bytes = damage == OLDER_DIRECTORY
+        ? (uint32_t)offsetof(struct osoe_segment_directory, landing_offset)
+        : (uint32_t)sizeof d;
     d.header_bytes = HEADER_BYTES;
     d.segment_bytes = total;
     d.slots_offset = slots_off;
     d.slot_bytes = SLOT_BYTES;
-    d.local_count = LOCAL_COUNT;
+    /* The mapping and the slots section are still LOCAL_COUNT-sized below;
+     * only the directory's count lies (D-7). */
+    d.local_count = damage == HUGE_LOCAL_COUNT ? UINT32_C(4278190096) : LOCAL_COUNT;
     d.metrics_offset = metrics_off;
     d.metrics_bytes = (uint64_t)n * sizeof table[0];
     d.metrics_count = n;
@@ -165,7 +188,8 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
                          (damage == BAD_CHECKSUM ? 1u : 0u);
     d.blocks_offset = blocks_off;
     d.blocks_bytes = (uint64_t)BLOCK_COUNT * BLOCK_BYTES;
-    d.block_count = BLOCK_COUNT;
+    /* Likewise: the blocks section is still BLOCK_COUNT-sized (D-7). */
+    d.block_count = damage == HUGE_BLOCK_COUNT ? UINT32_C(4278190096) : BLOCK_COUNT;
     d.block_bytes = BLOCK_BYTES;
     d.blocks_per_pe = BLOCKS_PER_PE;
     memcpy(p, &d, sizeof d);
@@ -277,19 +301,83 @@ static void check_refused(const char *name, enum damage damage, bool expect_open
         CHECK(err[0] != '\0');
     }
     munmap(p, bytes);
-    shm_unlink(name);
+    unlink(name);
+}
+
+/*
+ * D-7: a directory whose local_count or block_count lies about how much its
+ * section holds must not turn a loop over "every PE" or "every thread block"
+ * into one over the lie. The segment opens fine and its table is still usable
+ * - only a count is wrong, not the checksum - so this is not check_refused's
+ * case; it is segment.c clamping local_count/block_count itself to what the
+ * section can actually hold, which is what every loop bound in stat.c reads
+ * instead of the directory's own (untrusted) field.
+ */
+static void check_huge_counts(const char *name, enum damage damage)
+{
+    size_t bytes = 0;
+    void *p = build(name, damage, &bytes);
+    CHECK(p != NULL);
+    if (!p)
+        return;
+
+    struct osoe_segment s;
+    char err[256] = "";
+    CHECK(osoe_segment_open(&s, name, err, sizeof err) == 0);
+    CHECK(s.table_usable);
+
+    /* The lie is still there to see - print_identity shows it - but nothing
+     * that loops may read it. */
+    if (damage == HUGE_LOCAL_COUNT) {
+        CHECK(s.dir->local_count == UINT32_C(4278190096));
+        CHECK(s.local_count == LOCAL_COUNT);
+        CHECK(s.block_count == BLOCK_COUNT);        /* the other count: untouched */
+        CHECK(osoe_segment_read_name(&s, "pe.rank", LOCAL_COUNT - 1, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "pe.rank", LOCAL_COUNT, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "pe.rank", 1000000, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "pe.rank", UINT32_MAX, &(uint64_t){ 0 }));
+    } else {
+        CHECK(s.dir->block_count == UINT32_C(4278190096));
+        CHECK(s.block_count == BLOCK_COUNT);
+        CHECK(s.local_count == LOCAL_COUNT);         /* the other count: untouched */
+        CHECK(osoe_segment_read_name(&s, "future.gadget.calls", BLOCK_COUNT - 1,
+                                     &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "future.gadget.calls", BLOCK_COUNT, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "future.gadget.calls", 1000000, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "future.gadget.calls", UINT32_MAX, &(uint64_t){ 0 }));
+    }
+
+    /* The blocked record goes through the same clamp: an index past the real
+     * section is refused, not read as if the lie were true. */
+    struct osoe_segment_blocked b;
+    CHECK(!osoe_segment_blocked(&s, LOCAL_COUNT, &b));
+    CHECK(!b.valid);
+
+    osoe_segment_close(&s);
+    munmap(p, bytes);
+    unlink(name);
 }
 
 int main(void)
 {
-    char name[64];
+    char name[64], file[96];
     snprintf(name, sizeof name, "/osoe-segment-test.%d", (int)getpid());
+    snprintf(file, sizeof file, "/tmp/osoe-segment-test.%d", (int)getpid());
 
     size_t bytes = 0;
-    void *p = build(name, GOOD, &bytes);
+    void *p = build(file, GOOD, &bytes);
     CHECK(p != NULL);
     if (p) {
-        /* The three spellings of one name. */
+        check_good(file);
+        munmap(p, bytes);
+        unlink(file);
+    }
+
+    /* The three spellings of one name, on a named /dev/shm object - which is
+     * what a segment kept by OSOE_KEEP_CONTROL_SEGMENT is. */
+    p = build(name, GOOD, &bytes);
+    CHECK(p != NULL);
+    if (p) {
         check_good(name);
         check_good(name + 1);
         char path[128];
@@ -299,15 +387,33 @@ int main(void)
         shm_unlink(name);
     }
 
-    check_refused(name, BAD_MAGIC, false);
-    check_refused(name, BAD_CHECKSUM, true);
-    check_refused(name, STRANGE_DESC_SIZE, true);
+    /*
+     * A directory shorter than this reader's, from an older library. It holds
+     * every field the table needs, so the table must be used. The reader once
+     * required the whole structure and discarded the table of every older
+     * segment; this is the case that saw it (second review, premises: that
+     * mutation passed every test until now).
+     */
+    p = build(file, OLDER_DIRECTORY, &bytes);
+    CHECK(p != NULL);
+    if (p) {
+        check_good(file);
+        munmap(p, bytes);
+        unlink(file);
+    }
+
+    check_refused(file, BAD_MAGIC, false);
+    check_refused(file, BAD_CHECKSUM, true);
+    check_refused(file, STRANGE_DESC_SIZE, true);
+
+    check_huge_counts(file, HUGE_LOCAL_COUNT);
+    check_huge_counts(file, HUGE_BLOCK_COUNT);
 
     /* And a segment that is not there at all. */
     struct osoe_segment s;
     char err[256] = "";
     CHECK(osoe_segment_open(&s, "/osoe.definitely.not.here.0", err, sizeof err) != 0);
-    CHECK(strstr(err, "cannot open") != NULL);
+    CHECK(strstr(err, "no such job") != NULL);
 
     return CHECK_DONE();
 }

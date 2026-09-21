@@ -5,6 +5,7 @@
  * futex can watch directly and the 64-bit path is the one that forced the
  * sequence word (§4.9).
  */
+#define _GNU_SOURCE
 #include <stdint.h>
 #include <time.h>
 
@@ -30,17 +31,30 @@ int main(void)
 
     uint64_t *flag = shmem_malloc(sizeof *flag);
     uint32_t *flag32 = shmem_malloc(sizeof *flag32);
-    CHECK(flag && flag32);
+    CHECK_FATAL(flag && flag32);
     *flag = 0;
     *flag32 = 0;
     shmem_barrier_all();
 
-    /* Already satisfied: returns without blocking, and test agrees. */
-    CHECK(shmem_uint64_test(flag, SHMEM_CMP_EQ, 0) == 1);
+    /* Already satisfied: returns without blocking, and test agrees. Fatal if
+     * not, because the waits below it could then never return, and the test
+     * would report the launcher's timeout rather than this line. */
+    CHECK_FATAL(shmem_uint64_test(flag, SHMEM_CMP_EQ, 0) == 1);
     CHECK(shmem_uint64_test(flag, SHMEM_CMP_NE, 0) == 0);
     shmem_uint64_wait_until(flag, SHMEM_CMP_EQ, 0);
     shmem_uint64_wait_until(flag, SHMEM_CMP_LE, 5);
     shmem_uint32_wait_until(flag32, SHMEM_CMP_LT, 1);
+
+    /*
+     * Everyone has finished looking at an untouched flag before anyone
+     * touches one. Without this barrier a PE descheduled for longer than the
+     * ring's first sleep saw its left neighbour's bump already in place and
+     * failed the checks above - asserting something the library does not
+     * promise, namely that a PE reaches its next line within SLEEP_MS of its
+     * neighbour leaving a barrier. The review's load survey hit it in 2 of 53
+     * isolated runs under 4x oversubscription (round two, C9).
+     */
+    shmem_barrier_all();
 
     /* A ring: each PE waits for its left neighbour to bump its flag, having
      * bumped its right neighbour's. Every wait must block on the first rounds,

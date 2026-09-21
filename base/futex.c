@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/syscall.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "base/futex.h"
@@ -54,6 +55,21 @@ void osoe_futex_wake(_Atomic uint32_t *word, int n, enum osoe_futex_scope scope)
         fprintf(stderr, "osoe: futex_wake failed: %s\n", strerror(errno));
         abort();
     }
+}
+
+int osoe_futex_check(void)
+{
+    _Atomic uint32_t word = 0;
+    if (syscall(__NR_futex_wake, (void *)&word, (unsigned long)FUTEX_BITSET_MATCH_ANY, 1,
+                flags_for(OSOE_FUTEX_PRIVATE)) < 0)
+        return errno;
+    /* Expecting 1 where the word holds 0: the kernel compares and refuses. */
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    if (syscall(__NR_futex_wait, (void *)&word, 1UL, (unsigned long)FUTEX_BITSET_MATCH_ANY,
+                flags_for(OSOE_FUTEX_PRIVATE), &now, CLOCK_MONOTONIC) == 0 || errno != EAGAIN)
+        return errno ? errno : EINVAL;
+    return 0;
 }
 
 uint64_t osoe_futex_timeouts(void)

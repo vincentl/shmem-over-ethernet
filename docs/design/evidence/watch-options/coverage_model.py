@@ -264,3 +264,4 @@ if __name__ == '__main__':
             good &= run(name, filt, elems, lo, n, writes, tso, variant, expect)
     print()
     print('ALL AS EXPECTED' if good else 'SOME RESULT UNEXPECTED OR INCOMPLETE')
+    sys.exit(0 if good else 1)

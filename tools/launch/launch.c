@@ -29,6 +29,15 @@
  * library's own reaction to a dead PE rather than the launcher's; the timeout
  * still applies. It is the launcher's counterpart to Slurm's KillOnBadExit
  * (design §3.15).
+ *
+ * **A job never outlives its launcher.** SIGTERM or SIGINT to the launcher -
+ * what ctest's timeout, a kill, or ^C sends - is forwarded to every process
+ * still running, followed by SIGKILL two seconds later, and the launcher then
+ * exits 128 + that signal once they are gone, removing leftovers as always.
+ * A launcher that dies without the chance (SIGKILL) takes the job with it:
+ * each child asks for SIGKILL when its parent dies (PR_SET_PDEATHSIG). Before
+ * both, a killed launcher left its PEs running and their objects in /dev/shm
+ * (review round two, omissions 6).
  */
 #define _GNU_SOURCE
 #include <dirent.h>
@@ -40,6 +49,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -99,11 +109,20 @@ struct placement {
 };
 
 static uint32_t node_count_for_children;
+static pid_t launcher_pid;
 
 /* Runs in the child between fork and exec. */
 static void exec_rank(long rank, long n, const char *job, const struct placement *p,
                       const struct override *ov, int nov, char **argv)
 {
+    /*
+     * Die with the launcher. The setting survives exec. A launcher that died
+     * before the prctl has already re-parented this child, which the getppid
+     * check sees; one that dies after it delivers the signal.
+     */
+    if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != launcher_pid)
+        _exit(127);
+
     char buf[32];
     snprintf(buf, sizeof buf, "%ld", rank);
     setenv_or_die("OSOE_PROCID", buf);
@@ -133,11 +152,29 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
     _exit(127);
 }
 
-/* Remove /dev/shm/osoe.<job>.*; return how many there were. */
+/* A control segment of this job: <prefix><step>.<node>.<session>, three numbers. */
+static bool is_control_segment(const char *rest)
+{
+    unsigned step, node, session;
+    char tail;
+    return sscanf(rest, "%u.%u.%u%c", &step, &node, &session, &tail) == 3;
+}
+
+/*
+ * Remove /dev/shm/osoe.<job>.*; return how many there were. After a job that
+ * got through init there are none - the library removes every name as soon as
+ * everyone who needs it has it open (§3.14) - so anything here is a job that
+ * died during init, or a library defect. With OSOE_KEEP_CONTROL_SEGMENT=1 the
+ * control segments are kept on purpose for post-mortem reading: they are
+ * reported, and left for osoe-stat --gc, since removing them here would throw
+ * away exactly what the setting asked to keep.
+ */
 static int remove_leftovers(const char *job)
 {
     char prefix[64];
     snprintf(prefix, sizeof prefix, "osoe.%s.", job);
+    const char *keep = getenv("OSOE_KEEP_CONTROL_SEGMENT");
+    bool kept = keep && strcmp(keep, "1") == 0;
     DIR *d = opendir("/dev/shm");
     if (!d)
         return 0;
@@ -146,6 +183,11 @@ static int remove_leftovers(const char *job)
     while ((e = readdir(d)) != NULL) {
         if (strncmp(e->d_name, prefix, strlen(prefix)) != 0)
             continue;
+        if (kept && is_control_segment(e->d_name + strlen(prefix))) {
+            fprintf(stderr, "osoe-launch: kept for post-mortem reading: /dev/shm/%s\n",
+                    e->d_name);
+            continue;
+        }
         fprintf(stderr, "osoe-launch: left behind: /dev/shm/%s\n", e->d_name);
         char path[PATH_MAX];
         snprintf(path, sizeof path, "/dev/shm/%s", e->d_name);
@@ -256,11 +298,20 @@ int main(int argc, char **argv)
     osoe_node_map_free(&map);
     node_count_for_children = node_count;
 
-    /* SIGCHLD is consumed with sigtimedwait, so block it before any fork. */
+    /*
+     * SIGCHLD, SIGTERM and SIGINT are consumed with sigtimedwait, so block them
+     * before any fork. A signal that is blocked is queued even if its
+     * disposition is to ignore it - a shell starts a background job with SIGINT
+     * ignored - so the launcher still hears it. The children get both back at
+     * their default, or a forwarded signal would be ignored too.
+     */
     sigset_t chld;
     sigemptyset(&chld);
     sigaddset(&chld, SIGCHLD);
+    sigaddset(&chld, SIGTERM);
+    sigaddset(&chld, SIGINT);
     sigprocmask(SIG_BLOCK, &chld, NULL);
+    launcher_pid = getpid();
 
     pid_t pids[MAX_PROCS];
     bool done[MAX_PROCS] = { false };
@@ -273,6 +324,8 @@ int main(int argc, char **argv)
             return 1;
         }
         if (pids[i] == 0) {
+            signal(SIGTERM, SIG_DFL);
+            signal(SIGINT, SIG_DFL);
             sigprocmask(SIG_UNBLOCK, &chld, NULL);
             exec_rank(i, n, job, &place[i], ov, nov, prog);
         }
@@ -281,6 +334,7 @@ int main(int argc, char **argv)
     double deadline = now() + (double)timeout;
     double kill_at = 0;             /* SIGKILL time once a failure is seen */
     bool failed = false, timed_out = false;
+    int interrupted = 0;            /* SIGTERM or SIGINT received, once */
     long remaining = n;
 
     while (remaining > 0) {
@@ -337,7 +391,18 @@ int main(int argc, char **argv)
         if (wait < 0.01)
             wait = 0.01;
         struct timespec ts = { (time_t)wait, (long)((wait - (double)(time_t)wait) * 1e9) };
-        sigtimedwait(&chld, NULL, &ts);
+        int sig = sigtimedwait(&chld, NULL, &ts);
+        if ((sig == SIGTERM || sig == SIGINT) && !interrupted) {
+            interrupted = sig;
+            failed = true;
+            fprintf(stderr, "osoe-launch: %s received; forwarded to %ld process(es)\n",
+                    sig == SIGTERM ? "SIGTERM" : "SIGINT", remaining);
+            for (long j = 0; j < n; j++)
+                if (!done[j])
+                    kill(pids[j], sig);
+            if (kill_at == 0)
+                kill_at = now() + 2.0;
+        }
     }
 
     /* Test programs' own coordination tables (shmem/tests/arrivals.h) are not
@@ -357,5 +422,7 @@ int main(int argc, char **argv)
                         "object(s) were left behind\n", left);
         failed = true;
     }
+    if (interrupted)
+        return 128 + interrupted;
     return failed ? 1 : 0;
 }

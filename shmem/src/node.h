@@ -18,6 +18,7 @@
 #define OSOE_NODE_H
 
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "base/cacheline.h"
@@ -26,7 +27,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 7
+#define OSOE_NODE_LAYOUT 10
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -36,6 +37,19 @@ enum osoe_phase {
 };
 
 enum { OSOE_HEAP_NAME_MAX = 96 };
+
+/*
+ * What a blocked record's `blocked_detail` is (§3.14), so that osoe-stat can
+ * print "node 3" or "epoch 17" rather than "+0x3" (second review, D-7). The
+ * values are part of the segment's encoding: changing one is a layout bump.
+ */
+enum osoe_blocked_detail {
+    OSOE_BLOCKED_DETAIL_NONE = 0,    /* nothing to add, or a reader must show it raw */
+    OSOE_BLOCKED_DETAIL_NODE,        /* a peer node, for an internode wait */
+    OSOE_BLOCKED_DETAIL_EPOCH,       /* a collective epoch */
+    OSOE_BLOCKED_DETAIL_OFFSET,      /* a symmetric-heap offset, for a point-to-point wait */
+    OSOE_BLOCKED_DETAIL_PE,          /* a PE */
+};
 
 /*
  * The predefined teams, numbered (§7.3, spec §9.4).
@@ -48,6 +62,15 @@ enum { OSOE_HEAP_NAME_MAX = 96 };
 enum osoe_team_number {
     OSOE_TEAM_WORLD = 0,
     OSOE_TEAM_SHARED = 1,
+    /*
+     * The library's own team for shmem_finalize: the world's members, its own
+     * epoch counters. A finalize must never complete together with an
+     * application's shmem_barrier_all, which a shared world epoch made
+     * possible - a PE leaving through start_pes's implicit finalize matched the
+     * others' barrier and let them past a collective the application never
+     * matched (§6.4; second review, D14). Not a team an application can name.
+     */
+    OSOE_TEAM_FINALIZE = 2,
     OSOE_TEAMS,
 };
 
@@ -90,11 +113,13 @@ struct osoe_pe_slot {
     _Atomic uint64_t blocked_detail;     /* routine-specific: a PE, an epoch, an offset */
     _Atomic uint64_t blocked_since_ns;   /* CLOCK_MONOTONIC when the wait began */
     char blocked_routine[OSOE_BLOCKED_ROUTINE_MAX];
+    _Atomic uint32_t blocked_detail_kind;   /* enum osoe_blocked_detail; layout 9 */
 
     /* Liveness and progress, published by this PE (§3.14 question 1). */
     _Atomic uint64_t sweeps;             /* safety-sweep expiries: a blocked PE still moves */
     _Atomic uint32_t world_epoch;        /* this PE's k for SHMEM_TEAM_WORLD (§5.4) */
     _Atomic uint32_t shared_epoch;       /* and for SHMEM_TEAM_SHARED */
+    _Atomic uint32_t finalize_epoch;     /* and for the finalize team (layout 10) */
 
     /*
      * Threads of this PE that found no free counter block (§3.14). It belongs
@@ -209,6 +234,37 @@ _Static_assert(sizeof(struct osoe_arrival_handoff) == OSOE_CACHELINE,
                "each team's handoff word sits alone on its cache line, as its "
                "epoch counters do (§5.3)");
 
+/*
+ * The AM layer's node-wide counters (§3.14), exported under `transport.am.*`.
+ *
+ * Everything they count - segments, the reply pool and queues - is private to
+ * the lead's progress thread (§3.12), and until layout 8 so were the counts: a
+ * test could not see the acknowledgement protocol echo, or the reply pool run
+ * dry, except by the job misbehaving. This is the smallest export that lets a
+ * test see both. Node scope only: one record per node, written by that one
+ * thread, so every field is a single-writer publication (§3.16) and a reader
+ * accepts a value a moment stale. A per-connection scope is the next step.
+ *
+ * Zero on a node whose job never goes internode, and in any build whose
+ * backend is not AM - the fields are a backend's private counters, which §3.14
+ * gives the `transport.<backend>.*` names so they cannot be mistaken for the
+ * boundary's own.
+ */
+struct osoe_am_node_metrics {
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint64_t segments_sent;
+    _Atomic uint64_t header_only_sent;        /* §3.4's ack-only segments, among those */
+    _Atomic uint64_t segments_applied;
+    _Atomic uint64_t messages_applied;
+    /* §3.8's fallible path, taken: a request found the descriptor pool empty. */
+    _Atomic uint64_t reply_reservation_failures;
+    /* The deepest any one connection's queue has been, and the most
+     * descriptors the node-wide pool has had out at once. */
+    _Atomic uint64_t control_queue_high_water;
+    _Atomic uint64_t bulk_queue_high_water;
+    _Atomic uint64_t pool_high_water;
+};
+
 struct osoe_node_header {
     /* Written by the lead before `ready`; constant afterwards. */
     struct osoe_segment_directory dir;
@@ -219,6 +275,7 @@ struct osoe_node_header {
     uint32_t session;
     uint32_t world_size;
     uint64_t heap_base;             /* B, where every PE maps its own heap (§4.1) */
+    int32_t creator_pid;            /* the lead, for reclaiming a leftover (shm-object.h) */
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)
@@ -250,9 +307,20 @@ struct osoe_node_header {
     struct osoe_epoch shared_arrived;
     struct osoe_epoch shared_released;
     struct osoe_epoch shared_copied;
+    /* The finalize team's (layout 10). It has no copy phase. */
+    struct osoe_epoch finalize_arrived;
+    struct osoe_epoch finalize_released;
 
     /* Appended at layout 7 (§5.3). */
     struct osoe_arrival_handoff arrival[OSOE_TEAMS];
+
+    /* Appended at layout 8. Layout 10 added the finalize team's counters above
+     * and grew `arrival` by one, which moved this record; readers find it by
+     * name. Layout 9 added blocked_detail_kind to the PE slot,
+     * which moved no header field. Layout 8 also gave each epoch counter's line a
+     * second word, released_at_ns (base/epoch.h), in padding it already owned:
+     * no offset moved, but the line's contents changed meaning. */
+    struct osoe_am_node_metrics am;
 };
 
 /*
@@ -306,6 +374,14 @@ struct osoe_landing_slot {
      * Recording it makes "its" checkable rather than assumed.
      */
     _Atomic uint64_t token;
+    /*
+     * The token of the operation this slot's owner is waiting for, stored by
+     * the owner before its request is sent (layout 9). The lead refuses a reply
+     * carrying any other before writing a byte of it - an unsolicited or stale
+     * reply is a peer's bug, and landing it would corrupt this zone or, past
+     * its end, a sibling's (§3.4's trust boundary; second review, D4).
+     */
+    _Atomic uint64_t armed_token;
 
     /* The reply bytes. One AM chunk is enough: a larger get is chunked on the
      * wire (§3.2) and the origin copies each chunk out before the next lands. */
@@ -316,6 +392,14 @@ struct osoe_landing_slot {
 /* Process-private view of the node. */
 struct osoe_node {
     char control_name[80];
+    /*
+     * This PE's descriptor for the control segment, held for the whole session
+     * (§3.14). The name is removed during init, and this is what keeps the
+     * object findable afterwards: osoe-stat opens /proc/<pid>/fd/<n> of any
+     * live PE of the node. One descriptor per PE; -1 outside a session.
+     */
+    int control_fd;
+    bool keep_name;                 /* OSOE_KEEP_CONTROL_SEGMENT */
     struct osoe_node_header *hdr;
     struct osoe_pe_slot *slots;
     struct osoe_counter_block *blocks;   /* this node's whole pool (§3.14) */

@@ -21,6 +21,7 @@
  * thread and would see nothing of the cross-process case. The protocol's
  * cross-process safety rests on §3.16's orders and on the models, not here.
  */
+#define _GNU_SOURCE
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -36,15 +37,18 @@
 enum { WRITERS = 4, PER_WRITER = 200, CAP = 512, TOTAL = WRITERS * PER_WRITER };
 
 /*
- * §3.8's starvation guard: a freed buffer enters DRAINING, in which only the
- * progress thread may reserve, and becomes OPEN after. It is exercised here
- * because the rule that makes it safe - a freed buffer keeps the seal bit, so a
- * writer holding a stale buffer index cannot reserve into it - is invisible
- * without it. A driver that went FREE straight to OPEN passes whether or not
- * the rule is kept.
+ * §3.8's starvation guard, as flush() runs it: immediately before a free
+ * buffer is opened, while it still carries the seal bit, the progress thread
+ * drains a reply into it, commits it, and opens the buffer past it. It is
+ * exercised on every other open because the rule that makes it safe - a freed
+ * buffer keeps the seal bit, so a writer holding a stale buffer index cannot
+ * reserve into it - is invisible without it.
  *
  * Replies are recorded like any other message, under a writer id of their own,
- * so ONCE and ORDER cover them too.
+ * so ONCE, ORDER and STALESEQ cover them too, and the number delivered must be
+ * the number drained. Before slice 2 nothing counted them: osoe_connection_open
+ * reset the buffer over the drained reply and it was never sent, and this test
+ * passed (second review, C7).
  */
 #define REPLY_ID WRITERS
 enum { ROLES = WRITERS + 1, MAX_REPLIES = 256 };
@@ -139,9 +143,8 @@ int main(void)
     uint64_t next_seq = 1;
     uint32_t pending = OSOE_CONNECTION_NONE;       /* sealed, not yet sent */
     (void)0;
-    uint32_t draining = OSOE_CONNECTION_NONE;      /* freed, being filled with replies */
     uint64_t last_seq = 0;
-    uint32_t replies = 0;
+    uint32_t opens = 0, drained = 0;
 
     osoe_connection_init(&conn, 8);
     osoe_connection_open(&conn, 0, next_seq++);
@@ -149,7 +152,7 @@ int main(void)
 
     pthread_t th[WRITERS];
     for (uint32_t i = 0; i < WRITERS; i++)
-        CHECK(pthread_create(&th[i], NULL, writer_main, (void *)(uintptr_t)i) == 0);
+        CHECK_FATAL(pthread_create(&th[i], NULL, writer_main, (void *)(uintptr_t)i) == 0);
 
     /*
      * A stalled protocol must fail here saying what stalled, not run to the
@@ -161,7 +164,7 @@ int main(void)
     size_t last_ngot = 0;
     struct timespec moved;
     clock_gettime(CLOCK_MONOTONIC, &moved);
-    while (ngot < TOTAL) {
+    while (ngot < TOTAL + drained) {
         struct timespec now;
         clock_gettime(CLOCK_MONOTONIC, &now);
         if (ngot != last_ngot) {
@@ -172,16 +175,18 @@ int main(void)
             uint32_t h1 = atomic_load_explicit(&shared.buffer[1].head, memory_order_acquire);
             fprintf(stderr, "stalled after %zu of %d messages: "
                             "buf0 head=%#x filled=%u state=%d, "
-                            "buf1 head=%#x filled=%u state=%d, pending=%d draining=%d, "
+                            "buf1 head=%#x filled=%u state=%d, pending=%d, "
                             "writers done %u of %d\n",
                     ngot, TOTAL,
                     h0, atomic_load_explicit(&shared.buffer[0].filled, memory_order_acquire),
                     (int)state[0],
                     h1, atomic_load_explicit(&shared.buffer[1].filled, memory_order_acquire),
-                    (int)state[1], (int)pending, (int)draining,
+                    (int)state[1], (int)pending,
                     atomic_load_explicit(&writers_done, memory_order_acquire), WRITERS);
-            CHECK(false);
-            break;
+            /* Fatal, not CHECK: the writers are spinning on a buffer that will
+             * never reopen, so joining them below would hang until ctest's
+             * timeout and report that instead of this. */
+            CHECK_FATAL(false);
         }
         /* Finish a sealed buffer once every writer in it has committed. The
          * progress thread never spins here: if a writer is mid-copy it moves on
@@ -207,36 +212,9 @@ int main(void)
                 last_seq = sh.seq;
                 deliver(pending, bytes);
                 osoe_connection_release(&conn, pending);
-                /*
-                 * Every other buffer goes through DRAINING with one reply in
-                 * it, so the guard's path runs constantly rather than never.
-                 */
-                if (replies < MAX_REPLIES && (replies & 1) == 0) {
-                    state[pending] = OSOE_BUFFER_DRAINING;
-                    draining = pending;
-                } else {
-                    state[pending] = OSOE_BUFFER_FREE;
-                }
-                replies++;
+                state[pending] = OSOE_BUFFER_FREE;
                 pending = OSOE_CONNECTION_NONE;
             }
-        }
-
-        /* Fill the DRAINING buffer with one progress-thread reply, then let it
-         * open. Only the progress thread may reserve here. */
-        if (draining != OSOE_CONNECTION_NONE) {
-            struct osoe_reservation r;
-            if (osoe_connection_drain_reserve(&conn, draining,
-                                        osoe_message_padded(sizeof(struct payload)), &r)) {
-                unsigned char *at = osoe_reservation_bytes(&conn, &r);
-                struct osoe_message_header mh = { REPLY_ID, 0,
-                                              (uint32_t)sizeof(struct payload) };
-                struct payload p = { REPLY_ID, replies / 2, r.seq };
-                memcpy(at, &mh, sizeof mh);
-                memcpy(at + sizeof mh, &p, sizeof p);
-            }
-            state[draining] = OSOE_BUFFER_FREE;
-            draining = OSOE_CONNECTION_NONE;
         }
 
         /* One reservable buffer at a time: open a free one only when no other
@@ -246,7 +224,25 @@ int main(void)
         bool any_open = state[0] == OSOE_BUFFER_OPEN || state[1] == OSOE_BUFFER_OPEN;
         if (!any_open) {
             for (uint32_t k = 0; k < 2; k++)
-                if (state[k] == OSOE_BUFFER_FREE && k != pending && k != draining) {
+                if (state[k] == OSOE_BUFFER_FREE && k != pending) {
+                    /* The pre-open drain, every other open, so the path runs
+                     * constantly: one reply into k while only this thread can
+                     * reach it, committed like any writer's, and recorded with
+                     * the number k is about to be opened with. */
+                    if ((opens++ & 1) == 0 && drained < MAX_REPLIES) {
+                        struct osoe_reservation r;
+                        state[k] = OSOE_BUFFER_DRAINING;
+                        if (osoe_connection_drain_reserve(&conn, k,
+                                osoe_message_padded(sizeof(struct payload)), &r)) {
+                            unsigned char *at = osoe_reservation_bytes(&conn, &r);
+                            struct osoe_message_header mh = { REPLY_ID, 0,
+                                                              (uint32_t)sizeof(struct payload) };
+                            struct payload pl = { REPLY_ID, drained++, next_seq };
+                            memcpy(at, &mh, sizeof mh);
+                            memcpy(at + sizeof mh, &pl, sizeof pl);
+                            osoe_connection_commit(&conn, &r);
+                        }
+                    }
                     osoe_connection_open(&conn, k, next_seq++);
                     state[k] = OSOE_BUFFER_OPEN;
                     break;
@@ -293,11 +289,18 @@ int main(void)
 
     /* ONCE: every message exactly once. */
     CHECK(ngot >= TOTAL);
+    /* Every drained reply was delivered, and at least some were drained. */
+    size_t reply_count = 0;
+    for (size_t i = 0; i < ngot; i++)
+        reply_count += got[i].writer == REPLY_ID;
+    CHECK(drained > 0);
+    CHECK(reply_count == drained);
     enum { SLOTS = (int)PER_WRITER > (int)MAX_REPLIES ? (int)PER_WRITER : (int)MAX_REPLIES };
     static bool seen[ROLES][SLOTS];
     for (size_t i = 0; i < ngot; i++) {
-        CHECK(got[i].writer < ROLES && got[i].index < PER_WRITER);
-        if (got[i].writer < ROLES && got[i].index < PER_WRITER) {
+        uint32_t bound = got[i].writer == REPLY_ID ? MAX_REPLIES : PER_WRITER;
+        CHECK(got[i].writer < ROLES && got[i].index < bound);
+        if (got[i].writer < ROLES && got[i].index < bound) {
             CHECK(!seen[got[i].writer][got[i].index]);
             seen[got[i].writer][got[i].index] = true;
         }

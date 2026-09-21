@@ -78,7 +78,7 @@ struct osoe_wire {
     struct osoe_wire_direction *rx;   /* and reads here */
     uint64_t capacity;               /* bytes per direction */
     uint64_t seed;              /* split injection, derived from job and step */
-    uint64_t close_timeout_ns;  /* how long osoe_wire_close waits for the peer */
+    uint64_t close_no_progress_ns;  /* osoe_wire_close's no-progress limit (§3.15) */
     uint32_t split;             /* truncations per myriad; 0 disables */
     uint64_t sends;             /* this process's transfers, for the seed */
     uint64_t recvs;
@@ -111,7 +111,7 @@ void osoe_wire_shutdown(struct osoe_wire *w);
  * can still owe an acknowledgement (§3.4) after this side has run its last
  * collective, and unmapping first leaves it storing into an address it no
  * longer holds - a SIGSEGV on the node that did nothing wrong. Fatal if the
- * peer does not arrive within OSOE_BOOTSTRAP_TIMEOUT (§3.15).
+ * peer's end stops moving for OSOE_NO_PROGRESS_TIMEOUT (§3.15); by default never.
  */
 void osoe_wire_close(struct osoe_wire *w);
 

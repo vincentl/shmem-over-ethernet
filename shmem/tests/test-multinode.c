@@ -31,6 +31,7 @@
  * The timing check is §8.2's arrival table rather than a per-PE clock reading,
  * for the reason arrivals.h gives.
  */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -106,7 +107,7 @@ int main(void)
      * address that PE's heap and hold what that PE wrote.
      */
     long *mine = shmem_malloc(sizeof *mine);
-    CHECK(mine != NULL);
+    CHECK_FATAL(mine != NULL);  /* NULL would be dereferenced just below */
     *mine = 1000 + me;
     shmem_barrier_all();
 
@@ -137,7 +138,8 @@ int main(void)
      * above - which is how it was found.
      */
     long *flag = shmem_malloc(sizeof *flag);
-    CHECK(flag != NULL);
+    CHECK_FATAL(flag != NULL);  /* NULL would be dereferenced just below, and the
+                                 * wait_until after it would then never return */
     *flag = 0;
     shmem_barrier_all();
     CHECK(shmem_test(flag, SHMEM_CMP_EQ, 0) != 0);

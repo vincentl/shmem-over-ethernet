@@ -133,6 +133,19 @@ struct osoe_segment {
     const struct osoe_metric_descriptor *metrics;  /* NULL when metrics_count == 0 */
     uint32_t nmetrics;
     bool table_usable;                       /* checksum and element size agree */
+
+    /*
+     * `dir->local_count` and `dir->block_count`, clamped to what the slots and
+     * blocks sections can actually hold (segment_bytes and the next section's
+     * offset), so that a directory naming more records than exist cannot turn
+     * a loop over "every PE" or "every thread block" into one over four
+     * billion (diagnosability review, D-7). A single indexed read was already
+     * safe - record() bounds every offset against the mapping - but a *count*
+     * used as a loop bound never was: every "for i < local_count" and
+     * "for b < block_count" must use these, not the directory's own fields.
+     */
+    uint32_t local_count;
+    uint32_t block_count;
 };
 
 /*
@@ -147,8 +160,14 @@ struct osoe_segment {
 int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen);
 void osoe_segment_close(struct osoe_segment *s);
 
-/* The layout this reader was built against. Not a requirement - see above. */
-#define OSOE_SEGMENT_KNOWN_LAYOUT 7
+/* The layout this reader was built against. Not a requirement - see above.
+ * Layout 9 added pe.blocked.detail_kind; an older segment simply lacks it and
+ * its details print raw. Layout 10 added the finalize team's counters, found by
+ * name like the others; the watch word's encoding is unchanged.
+ * Layout 8 only appended the AM counters, which a reader finds by name, so a
+ * reader built for 7 prints them unchanged and differs only in showing the
+ * watch word raw, with "encoding unknown", rather than decoded. */
+#define OSOE_SEGMENT_KNOWN_LAYOUT 10
 
 /* The metric of that name, or NULL. */
 const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name);
@@ -191,9 +210,15 @@ struct osoe_segment_blocked {
     bool blocked;
     uint64_t gen;
     uint64_t detail;
+    uint32_t detail_kind;       /* 0 if the segment predates layout 9 */
     uint64_t since_ns;
     char routine[64];
 };
+
+/* `detail` as its kind says - "node 3", "epoch 17", "offset 0x40" - or raw.
+ * The kinds are the segment's encoding (node.h, enum osoe_blocked_detail);
+ * this reader knows them by number, as it knows the watch word. */
+void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf, size_t len);
 
 bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe_segment_blocked *out);
 
@@ -206,5 +231,14 @@ uint64_t osoe_segment_now_ns(void);
  * many were found, which may exceed `max`; at most `max` are written.
  */
 int osoe_segment_list(char (*names)[OSOE_SEGMENT_NAME_MAX], int max);
+
+/* Only the segments that still have a name in /dev/shm - those kept by
+ * OSOE_KEEP_CONTROL_SEGMENT, or left by a job that died during init. These,
+ * and only these, are what --gc may remove. */
+int osoe_segment_list_named(char (*names)[OSOE_SEGMENT_NAME_MAX], int max);
+
+/* Does any process this user can inspect map /dev/shm<name>? --gc refuses to
+ * remove a segment that is still mapped, whatever its slots say. */
+bool osoe_segment_mapped(const char *name);
 
 #endif /* OSOE_STAT_SEGMENT_H */

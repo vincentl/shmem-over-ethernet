@@ -24,7 +24,7 @@ void osoe_connection_init(struct osoe_connection *c, uint32_t credits)
          * buffer with nothing in it. */
         atomic_store_explicit(&c->s->buffer[k].head, OSOE_BUFFER_SEALED, memory_order_release);
     }
-    atomic_store_explicit(&c->s->ack_requested, 0, memory_order_release);
+    atomic_store_explicit(&c->s->ack_wanted_through, 0, memory_order_release);
     atomic_store_explicit(&c->s->acked, 0, memory_order_release);
     osoe_credit_init(&c->s->credit, credits);
 }
@@ -95,13 +95,19 @@ void osoe_connection_open(struct osoe_connection *c, uint32_t k, uint64_t seq)
      * release store, so a writer that acquires the head sees both.
      *
      * head starts past the segment header, which the progress thread fills at
-     * seal time and no writer ever reserves (§3.4).
+     * seal time and no writer ever reserves (§3.4) - or past the replies the
+     * pre-open drain already put here (§3.8), which are committed: the progress
+     * thread wrote them itself. So filled and head open at the same extent, and
+     * a writer's first reservation lands after the last reply rather than on it.
      */
-    atomic_store_explicit(&s->buffer[k].filled, (uint32_t)sizeof(struct osoe_am_segment_header),
-                          memory_order_release);
+    const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
+    uint32_t extent = OSOE_BUFFER_USED(atomic_load_explicit(&s->buffer[k].head,
+                                                            memory_order_acquire));
+    if (extent < header)
+        extent = header;
+    atomic_store_explicit(&s->buffer[k].filled, extent, memory_order_release);
     atomic_store_explicit(&s->buffer[k].seq, seq, memory_order_release);
-    atomic_store_explicit(&s->buffer[k].head, (uint32_t)sizeof(struct osoe_am_segment_header),
-                          memory_order_release);
+    atomic_store_explicit(&s->buffer[k].head, extent, memory_order_release);
 }
 
 void osoe_connection_seal(struct osoe_connection *c, uint32_t k)
@@ -151,36 +157,50 @@ bool osoe_connection_drain_reserve(struct osoe_connection *c, uint32_t k, uint32
 {
     struct osoe_connection_shared *s = c->s;
     /*
-     * Only the progress thread runs here. What keeps writers out is the seal
-     * bit the buffer still carries from osoe_connection_release: every writer CAS
-     * against it fails, and a writer scanning for an unsealed buffer skips it.
-     * The bit is kept in the stored value below, so the buffer stays closed
-     * while it fills with replies, and comes off only in osoe_connection_open.
+     * Only the progress thread runs here, on a buffer it has released and not
+     * yet opened. What keeps writers out is the seal bit osoe_connection_release
+     * left on it: every writer CAS against it fails, and a writer scanning for
+     * an unsealed buffer skips it. So nothing here races, and plain release
+     * stores are enough; the bit stays in the stored head, and only
+     * osoe_connection_open takes it off.
+     *
+     * `filled` must count the same bytes `head` does, or the buffer is never
+     * sendable (sendable is filled == used). A released buffer has head 0 and
+     * filled 0; the first reservation starts past the segment header, so
+     * filled starts there too - osoe_connection_commit then adds each message,
+     * exactly as it does for a writer. The version before slice 2 counted the
+     * messages and not the header, and left head=96 against filled=64 (second
+     * review, atomics/drain-reserve-accounting.out); nothing called it, so
+     * nothing noticed.
      */
-    uint32_t h = atomic_load_explicit(&s->buffer[k].head, memory_order_acquire);
-    uint32_t used = OSOE_BUFFER_USED(h);
-    if (used < sizeof(struct osoe_am_segment_header))
-        used = (uint32_t)sizeof(struct osoe_am_segment_header);
+    const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
+    uint32_t used = OSOE_BUFFER_USED(atomic_load_explicit(&s->buffer[k].head,
+                                                          memory_order_acquire));
+    if (used < header) {
+        used = header;
+        atomic_store_explicit(&s->buffer[k].filled, header, memory_order_release);
+    }
     if (used + len > c->capacity)
         return false;
     atomic_store_explicit(&s->buffer[k].head, (used + len) | OSOE_BUFFER_SEALED,
                           memory_order_release);
-    atomic_fetch_add_explicit(&s->buffer[k].filled, len, memory_order_seq_cst);
     r->buffer = k;
     r->off = used;
     r->len = len;
-    r->seq = atomic_load_explicit(&s->buffer[k].seq, memory_order_acquire);
+    r->seq = 0;             /* not yet assigned: osoe_connection_open does that */
     return true;
 }
 
-void osoe_connection_request_ack(struct osoe_connection *c)
+void osoe_connection_request_ack(struct osoe_connection *c, uint64_t seq)
 {
-    atomic_store_explicit(&c->s->ack_requested, 1, memory_order_seq_cst);
-}
-
-bool osoe_connection_take_ack_request(struct osoe_connection *c)
-{
-    return atomic_exchange_explicit(&c->s->ack_requested, 0, memory_order_seq_cst) != 0;
+    /* A monotone maximum: CAS, seq_cst, and nothing to do once someone has
+     * already asked for as much (§3.16; ack_model.py's design variant). */
+    uint64_t have = atomic_load_explicit(&c->s->ack_wanted_through, memory_order_acquire);
+    while (have < seq &&
+           !atomic_compare_exchange_weak_explicit(&c->s->ack_wanted_through, &have, seq,
+                                                  memory_order_seq_cst,
+                                                  memory_order_acquire))
+        ;
 }
 
 void osoe_connection_publish_acked(struct osoe_connection *c, uint64_t seq)

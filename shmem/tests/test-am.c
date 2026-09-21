@@ -146,7 +146,7 @@ static void build(uint64_t seq)
 static void feed(const uint32_t *cuts, uint32_t ncuts)
 {
     struct osoe_am_parser p;
-    osoe_am_parser_init(&p);
+    osoe_am_parser_init(&p, UINT32_MAX);
     memset(&got, 0, sizeof got);
     uint32_t from = 0;
     for (uint32_t i = 0; i < ncuts; i++) {
@@ -192,8 +192,10 @@ static int malformed(const char *which)
         sh.message_count += 1;                  /* claims a message that is not there */
     else if (strcmp(which, "length") == 0)
         /*
-         * Too *small*: the messages then run past the segment's stated end and
-         * the cross-check fires. A total_len that is too large is deliberately
+         * Too *small*: the last message then runs past the segment's stated
+         * end, and the parser refuses it before applying it (second review,
+         * D4) - which is earlier than the end-of-segment cross-check that used
+         * to catch this, and which stays as a second line. A total_len that is too large is deliberately
          * not tested here, because a stream parser cannot detect it - waiting
          * for bytes that have not arrived yet is indistinguishable from waiting
          * for bytes that never will. That is the wire's to notice, when a
@@ -213,6 +215,19 @@ static int malformed(const char *which)
         memcpy(&mh, stream + sizeof sh, sizeof mh);
         mh.len = 4;                             /* shorter than the fixed part */
         memcpy(stream + sizeof sh, &mh, sizeof mh);
+    } else if (strcmp(which, "long-message") == 0) {
+        /* A message whose own length runs past the end of its segment: the
+         * parser must refuse it before applying a byte of it (review round
+         * two, D4), not discover the overrun afterwards. */
+        struct osoe_message_header mh;
+        memcpy(&mh, stream + sizeof sh, sizeof mh);
+        mh.len = sh.total_len;
+        memcpy(stream + sizeof sh, &mh, sizeof mh);
+    } else if (strcmp(which, "empty-count") == 0) {
+        /* Messages claimed, and no room for any: a header-only segment that
+         * says it carries something. */
+        sh.total_len = (uint32_t)sizeof sh;
+        stream_len = (uint32_t)sizeof sh;
     } else {
         fprintf(stderr, "unknown malformed case '%s'\n", which);
         return 2;
@@ -220,7 +235,7 @@ static int malformed(const char *which)
     memcpy(stream, &sh, sizeof sh);
 
     struct osoe_am_parser p;
-    osoe_am_parser_init(&p);
+    osoe_am_parser_init(&p, UINT32_MAX);
     memset(&got, 0, sizeof got);
     /* Feed everything that was built, never the corrupted length: truncating
      * the feed to a bad total_len would stop the header completing and the
@@ -297,7 +312,7 @@ int main(int argc, char **argv)
     /* ---- Byte at a time: the worst case a short read can produce. ---- */
     {
         struct osoe_am_parser p;
-        osoe_am_parser_init(&p);
+        osoe_am_parser_init(&p, UINT32_MAX);
         memset(&got, 0, sizeof got);
         for (uint32_t i = 0; i < stream_len; i++)
             osoe_am_parse(&p, stream + i, 1, &sink);
@@ -315,7 +330,7 @@ int main(int argc, char **argv)
         uint32_t total = one + stream_len;
 
         struct osoe_am_parser p;
-        osoe_am_parser_init(&p);
+        osoe_am_parser_init(&p, UINT32_MAX);
         memset(&got, 0, sizeof got);
         osoe_am_parse(&p, two, total, &sink);
         CHECK(got.segments == 2);
@@ -330,7 +345,7 @@ int main(int argc, char **argv)
                                              .total_len = sizeof sh,
                                              .flags = OSOE_AM_SEGMENT_ACK_REQUESTED };
         struct osoe_am_parser p;
-        osoe_am_parser_init(&p);
+        osoe_am_parser_init(&p, UINT32_MAX);
         memset(&got, 0, sizeof got);
         osoe_am_parse(&p, &sh, sizeof sh, &sink);
         CHECK(got.segments == 1);

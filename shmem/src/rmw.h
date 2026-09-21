@@ -59,8 +59,8 @@
 
 /*
  * Apply `op` to the `width`-byte word at `at`, returning its previous value.
- * `width` is 4 or 8, and the caller has already checked alignment: on aarch64
- * an unaligned 64-bit atomic faults rather than degrading (§3.4).
+ * `width` is 4 or 8, and the caller has already checked alignment: an unaligned
+ * atomic does not fault on aarch64 Linux, it is silently misaligned (§3.4).
  */
 static inline uint64_t osoe_rmw_apply(void *at, enum osoe_rmw_op op, unsigned width,
                                       uint64_t operand, uint64_t compare, unsigned flags)

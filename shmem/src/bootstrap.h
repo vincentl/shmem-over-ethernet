@@ -22,9 +22,10 @@ struct osoe_bootstrap {
     uint64_t job;               /* OSOE_JOB_ID */
     uint32_t step;              /* OSOE_STEP_ID */
     uint64_t symmetric_size;    /* SHMEM_SYMMETRIC_SIZE, or the default */
-    uint64_t timeout_ns;        /* OSOE_BOOTSTRAP_TIMEOUT, seconds in the environment */
+    uint64_t no_progress_ns;    /* OSOE_NO_PROGRESS_TIMEOUT, seconds; 0 = never (§3.15) */
     uint64_t heap_base;         /* OSOE_HEAP_BASE, 0 if unset */
     bool watchdog;              /* OSOE_WATCHDOG, or the build default (§3.15) */
+    bool keep_control_segment;  /* OSOE_KEEP_CONTROL_SEGMENT: name kept until finalize */
 
     /* The specification's own variables (§8). Each is "Any": the value does
      * not matter, only that it is set. SMA_-prefixed spellings are deprecated
@@ -36,7 +37,6 @@ struct osoe_bootstrap {
 
 /* The default SHMEM_SYMMETRIC_SIZE: 256 MiB (§4.4). */
 #define OSOE_DEFAULT_SYMMETRIC_SIZE (UINT64_C(256) << 20)
-#define OSOE_DEFAULT_BOOTSTRAP_TIMEOUT_S 60
 
 /* Read and validate the environment; fatal on anything unusable. */
 void osoe_bootstrap_read(struct osoe_bootstrap *b);

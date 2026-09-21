@@ -218,12 +218,17 @@ static bool metric_sums(const struct osoe_metric_descriptor *m)
 static uint64_t pe_thread_value(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
                                 uint32_t pe)
 {
+    /* Clamped like local_count and block_count (D-7): more per-PE blocks than
+     * the segment has blocks at all is nonsense, and blocks_per_pe drives a
+     * loop the same way those two do. */
     uint32_t per_pe = s->dir->blocks_per_pe;
+    if (per_pe > s->block_count)
+        per_pe = s->block_count;
     uint64_t acc = 0;
     for (uint32_t i = 0; i < per_pe; i++) {
         uint64_t v;
         uint32_t block = pe * per_pe + i;
-        if (block >= s->dir->block_count || !osoe_segment_read(s, m, block, &v))
+        if (block >= s->block_count || !osoe_segment_read(s, m, block, &v))
             continue;
         if (metric_sums(m))
             acc += v;
@@ -268,7 +273,7 @@ static void print_pe_lines(const struct osoe_segment *s)
     uint64_t now = osoe_segment_now_ns();
     printf("\n%3s %5s %8s %-10s %6s %8s  %s\n",
            "PE", "rank", "pid", "phase", "epoch", "sweeps", "blocked in");
-    for (uint32_t i = 0; i < s->dir->local_count; i++) {
+    for (uint32_t i = 0; i < s->local_count; i++) {
         uint64_t rank = 0, pid = 0, phase = 0, epoch = 0, sweeps = 0;
         osoe_segment_read_name(s, "pe.rank", i, &rank);
         osoe_segment_read_name(s, "pe.pid", i, &pid);
@@ -286,8 +291,9 @@ static void print_pe_lines(const struct osoe_segment *s)
                 char age[32] = "";
                 if (b.since_ns && now > b.since_ns)
                     print_duration(age, sizeof age, now - b.since_ns);
-                snprintf(where, sizeof where, "%s(+%#" PRIx64 ") for %s",
-                         b.routine, b.detail, age);
+                char what[48];
+                osoe_segment_blocked_detail(&b, what, sizeof what);
+                snprintf(where, sizeof where, "%s (%s) for %s", b.routine, what, age);
             }
         }
         printf("%3u %5" PRIu64 " %8" PRIu64 " %-10s %6" PRIu64 " %8" PRIu64 "  %s%s\n",
@@ -303,7 +309,7 @@ static void counters_human(const struct osoe_segment *s)
     print_identity(s);
     print_pe_lines(s);
 
-    uint32_t npe = s->dir->local_count;
+    uint32_t npe = s->local_count;
     printf("\n%-40s", "counter");
     for (uint32_t p = 0; p < npe; p++)
         printf("%12s%u", "PE", p);
@@ -355,7 +361,7 @@ static void counters_human(const struct osoe_segment *s)
 
 static void counters_json(const struct osoe_segment *s)
 {
-    uint32_t npe = s->dir->local_count;
+    uint32_t npe = s->local_count;
     printf("{\"segment\":");
     json_str(stdout, s->name);
     printf(",\"layout\":%u,\"local_count\":%u,\"counters\":{", s->dir->layout, npe);
@@ -385,7 +391,7 @@ static void threads_human(const struct osoe_segment *s)
     print_identity(s);
     printf("\n%5s %3s %8s %8s %12s %12s  %s\n",
            "block", "PE", "pid", "tid", "cpu", "invol.csw", "kind");
-    for (uint32_t b = 0; b < s->dir->block_count; b++) {
+    for (uint32_t b = 0; b < s->block_count; b++) {
         uint64_t claimed = 0, tid = 0, loops = 0, pid = 0;
         if (!osoe_segment_read_name(s, "thread.claimed", b, &claimed) || !claimed)
             continue;
@@ -458,7 +464,7 @@ static void dump_human(const struct osoe_segment *s)
             print_value(s, &s->metrics[i], 0);
 
     uint64_t now = osoe_segment_now_ns();
-    for (uint32_t p = 0; p < s->dir->local_count; p++) {
+    for (uint32_t p = 0; p < s->local_count; p++) {
         printf("\n  PE %u\n", p);
         for (uint32_t i = 0; i < s->nmetrics; i++)
             if (s->metrics[i].scope == OSOE_MSCOPE_PE)
@@ -480,14 +486,16 @@ static void dump_human(const struct osoe_segment *s)
                 char age[32] = "?";
                 if (b.since_ns && now > b.since_ns)
                     print_duration(age, sizeof age, now - b.since_ns);
-                printf("    %-32s %s(+%#" PRIx64 ") for %s\n", "pe.blocked (read)",
-                       b.routine, b.detail, age);
+                char what[48];
+                osoe_segment_blocked_detail(&b, what, sizeof what);
+                printf("    %-32s %s (%s) for %s\n", "pe.blocked (read)", b.routine, what,
+                       age);
             }
         }
     }
 
     printf("\n  counter blocks\n");
-    for (uint32_t b = 0; b < s->dir->block_count; b++) {
+    for (uint32_t b = 0; b < s->block_count; b++) {
         uint64_t claimed = 0;
         if (!osoe_segment_read_name(s, "thread.claimed", b, &claimed) || !claimed)
             continue;
@@ -543,7 +551,7 @@ static void dump_json(const struct osoe_segment *s)
     printf("}");
 
     printf(",\"pes\":[");
-    for (uint32_t p = 0; p < s->dir->local_count; p++) {
+    for (uint32_t p = 0; p < s->local_count; p++) {
         printf("%s{", p ? "," : "");
         first = true;
         for (uint32_t i = 0; i < s->nmetrics; i++) {
@@ -573,8 +581,8 @@ static void dump_json(const struct osoe_segment *s)
             if (b.valid && b.blocked) {
                 printf("{\"routine\":");
                 json_str(stdout, b.routine);
-                printf(",\"detail\":%" PRIu64 ",\"since_ns\":%" PRIu64 "}", b.detail,
-                       b.since_ns);
+                printf(",\"detail\":%" PRIu64 ",\"detail_kind\":%u,\"since_ns\":%" PRIu64
+                       "}", b.detail, b.detail_kind, b.since_ns);
             } else
                 printf("null");
         }
@@ -608,7 +616,7 @@ static void dump_json(const struct osoe_segment *s)
 static bool all_pes_gone(const struct osoe_segment *s, bool *any_joined)
 {
     *any_joined = false;
-    for (uint32_t i = 0; i < s->dir->local_count; i++) {
+    for (uint32_t i = 0; i < s->local_count; i++) {
         uint64_t phase = 0, pid = 0;
         osoe_segment_read_name(s, "pe.phase", i, &phase);
         osoe_segment_read_name(s, "pe.pid", i, &pid);
@@ -637,16 +645,22 @@ static int gc_one(const char *name)
     }
     bool any_joined = false;
     bool gone = all_pes_gone(&s, &any_joined);
-    if (!gone || !any_joined) {
-        printf("%s: %s\n", s.name, gone ? "no PE has joined yet; left alone"
-                                        : "still has live PEs; left alone");
+    /* The slots are the job's word for who it is; the kernel's is who maps the
+     * object. A segment still mapped by a live process is never removed,
+     * whatever its slots say - a recycled pid or a PE that died mid-join could
+     * otherwise make a live job look dead. */
+    bool mapped = gone && any_joined && osoe_segment_mapped(s.name);
+    if (!gone || !any_joined || mapped) {
+        printf("%s: %s\n", s.name, !any_joined ? "no PE has joined yet; left alone"
+                                  : mapped ? "a live process still maps it; left alone"
+                                           : "still has live PEs; left alone");
         osoe_segment_close(&s);
         return 0;
     }
 
     /* Heaps first: their names are in the segment, so removing the segment
      * first would strand them. */
-    for (uint32_t i = 0; i < s.dir->local_count; i++) {
+    for (uint32_t i = 0; i < s.local_count; i++) {
         char heap[128];
         if (!osoe_segment_read_str(&s, "pe.heap_name", i, heap, sizeof heap) || !heap[0])
             continue;
@@ -684,7 +698,7 @@ static int list_segments(void)
             continue;
         }
         uint64_t live = 0;
-        for (uint32_t p = 0; p < s.dir->local_count; p++) {
+        for (uint32_t p = 0; p < s.local_count; p++) {
             uint64_t pid = 0, phase = 0;
             osoe_segment_read_name(&s, "pe.pid", p, &pid);
             osoe_segment_read_name(&s, "pe.phase", p, &phase);
@@ -750,21 +764,54 @@ static int show(const char *name, enum mode m)
     return 0;
 }
 
+/* A bare number is a job id: every control segment of that job, one per node. */
+static bool is_job_id(const char *a)
+{
+    if (!*a)
+        return false;
+    for (; *a; a++)
+        if (!isdigit((unsigned char)*a))
+            return false;
+    return true;
+}
+
+static int show_job(const char *job, enum mode m)
+{
+    char names[64][OSOE_SEGMENT_NAME_MAX], prefix[64];
+    snprintf(prefix, sizeof prefix, "/osoe.%s.", job);
+    int found = osoe_segment_list(names, 64);
+    int rc = 0, shown = 0;
+    for (int k = 0; k < found && k < 64; k++)
+        if (strncmp(names[k], prefix, strlen(prefix)) == 0) {
+            rc |= show(names[k], m);
+            shown++;
+        }
+    if (!shown) {
+        fprintf(stderr, "osoe-stat: job %s: no such job - no named segment and no process "
+                        "of this user holds one\n", job);
+        return 1;
+    }
+    return rc;
+}
+
 static void usage(FILE *f)
 {
     fprintf(f,
-"usage: osoe-stat [options] [segment ...]\n"
+"usage: osoe-stat [options] [job | segment | path ...]\n"
 "\n"
-"Reads an osoe job's control segment from /dev/shm without the job's\n"
-"cooperation, so it works on a hung job. A segment may be named as\n"
-"/osoe.<job>.<step>.<node>.<session>, without the slash, or by its path in\n"
-"/dev/shm. With no segment named, lists what is there.\n"
+"Reads an osoe job's control segment without the job's cooperation, so it\n"
+"works on a hung job. A running job's segments have no name in /dev/shm - the\n"
+"library removes it during init - and are found through /proc, by any live PE\n"
+"of the node that holds one open. Name a job by its id, a segment as\n"
+"/osoe.<job>.<step>.<node>.<session> (or without the slash, or its /dev/shm\n"
+"path), or give any path to a segment file. With nothing named, lists them.\n"
 "\n"
 "  -c, --counters    per-PE counter totals and where each PE is blocked (default)\n"
 "  -d, --dump        every field of every record: node, PE slots, counter blocks\n"
 "  -T, --threads     one line per counter block, with its kernel CPU time\n"
 "  -l, --list        list the control segments in /dev/shm\n"
-"      --gc          remove segments whose PEs are all gone, and their heaps\n"
+"      --gc          remove named segments (OSOE_KEEP_CONTROL_SEGMENT) whose PEs\n"
+"                    are all gone and that no live process maps\n"
 "  -j, --json        JSON instead of a table\n"
 "  -z, --nonzero     omit counters that are zero\n"
 "  -n, --interval S  repeat every S seconds\n"
@@ -812,12 +859,14 @@ int main(int argc, char **argv)
                 rc |= gc_one(argv[i]);
             return rc;
         }
+        /* Only named segments: one without a name is held open by a live job,
+         * and has nothing to collect (§3.14). */
         char names[64][OSOE_SEGMENT_NAME_MAX];
-        int found = osoe_segment_list(names, 64);
+        int found = osoe_segment_list_named(names, 64);
         for (int k = 0; k < found && k < 64; k++)
             rc |= gc_one(names[k]);
         if (found == 0)
-            printf("no osoe control segments in /dev/shm\n");
+            printf("no named osoe control segments in /dev/shm\n");
         return rc;
     }
 
@@ -828,6 +877,6 @@ int main(int argc, char **argv)
         m = MODE_COUNTERS;
     int rc = 0;
     for (; i < argc; i++)
-        rc |= show(argv[i], m);
+        rc |= is_job_id(argv[i]) ? show_job(argv[i], m) : show(argv[i], m);
     return rc;
 }

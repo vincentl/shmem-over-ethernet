@@ -68,13 +68,13 @@ int main(void)
 
     /* The application's definition runs, and forwarding works. */
     uint64_t *v = shmem_malloc(sizeof *v);
-    CHECK(v != NULL);
+    CHECK_FATAL(v != NULL);  /* NULL would be dereferenced just below */
     CHECK(mallocs == 1);
     *v = 0;
     shmem_barrier_all();
 
     unsigned char *buf = shmem_malloc(8);
-    CHECK(buf != NULL);
+    CHECK_FATAL(buf != NULL);  /* NULL would be dereferenced just below */
     CHECK(mallocs == 2);
     memset(buf, 0, 8);
     shmem_barrier_all();
@@ -91,7 +91,7 @@ int main(void)
     /* The C11 generic spelling expands to shmem_, so it is interposed too -
      * which it would not be if the macros named pshmem_. */
     unsigned long *w = shmem_malloc(sizeof *w);
-    CHECK(w != NULL);
+    CHECK_FATAL(w != NULL);  /* NULL would be dereferenced just below */
     *w = 0;
     shmem_barrier_all();
     shmem_atomic_add(w, 1UL, me);
@@ -123,7 +123,7 @@ int main(void)
      * application-facing routine. */
     int puts_before = puts_made;
     uint64_t *sig = shmem_malloc(sizeof *sig);
-    CHECK(sig != NULL);
+    CHECK_FATAL(sig != NULL);  /* NULL would be dereferenced just below */
     *sig = 0;
     shmem_barrier_all();
     shmem_putmem_signal(buf, payload, 8, sig, 1, SHMEM_SIGNAL_SET, right);

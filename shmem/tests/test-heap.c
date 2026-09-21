@@ -100,7 +100,7 @@ int main(void)
     /* ---- calloc (spec §9.3.6) ------------------------------------------ */
     unsigned char *z = NULL;
     BARRIERS(1, z = shmem_calloc(300, 7));
-    CHECK(z != NULL);
+    CHECK_FATAL(z != NULL);  /* NULL would be indexed just below */
     int nonzero = 0;
     for (size_t i = 0; i < 300 * 7; i++)
         if (z[i])
@@ -150,7 +150,7 @@ int main(void)
     {
         uint64_t mine = (uint64_t)(hinted - base), theirs = 0;
         uint64_t *slot = shmem_malloc(sizeof *slot);
-        CHECK(slot != NULL);
+        CHECK_FATAL(slot != NULL);  /* NULL would be dereferenced just below */
         *slot = mine;
         shmem_barrier_all();
         int left = (me + n - 1) % n;
@@ -165,14 +165,14 @@ int main(void)
     /* A null pointer makes it shmem_malloc: one barrier, on exit. */
     char *grow = NULL;
     BARRIERS(1, grow = shmem_realloc(NULL, 64));
-    CHECK(grow != NULL);
+    CHECK_FATAL(grow != NULL);  /* NULL would be dereferenced just below */
     memset(grow, 0x5a, 64);
 
     /* Resizing takes both barriers, and keeps the contents up to the lesser of
      * the two sizes. */
     char *grown = NULL;
     BARRIERS(2, grown = shmem_realloc(grow, 4096));
-    CHECK(grown != NULL);
+    CHECK_FATAL(grown != NULL);  /* NULL would be indexed just below */
     int kept = 1;
     for (int i = 0; i < 64; i++)
         if ((unsigned char)grown[i] != 0x5a)
@@ -195,7 +195,7 @@ int main(void)
     /* A realloc that cannot be satisfied returns NULL and leaves the block
      * alone - the caller's pointer is still good and still holds its data. */
     char *keep = shmem_malloc(128);
-    CHECK(keep != NULL);
+    CHECK_FATAL(keep != NULL);  /* NULL would be dereferenced just below */
     memset(keep, 0x3c, 128);
     BARRIERS(2, CHECK(shmem_realloc(keep, (size_t)1 << 40) == NULL));
     kept = 1;

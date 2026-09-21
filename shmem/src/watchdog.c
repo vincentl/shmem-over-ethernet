@@ -26,6 +26,7 @@
  * because production must not depend on it. OSOE_WATCHDOG=0 or 1 forces either
  * way.
  */
+#define _GNU_SOURCE
 #include <errno.h>
 #include <signal.h>
 #include <stdatomic.h>
@@ -34,6 +35,7 @@
 
 #include "base/sweep.h"
 #include "fatal.h"
+#include "metrics.h"
 #include "state.h"
 
 /*
@@ -61,14 +63,19 @@ void osoe_sweep_expired(const char *routine)
      * path that has just slept for OSOE_SWEEP_NS (§3.14). */
     atomic_fetch_add_explicit(&osoe.node.slots[osoe.bootstrap.local_id].sweeps, 1,
                               memory_order_seq_cst);
-    if (!osoe.bootstrap.watchdog)
-        return;
 
+    /* The abort word is the library's own and is read in every build: a PE
+     * that has ended the job declared it (fatal.c), and every wait must stop
+     * at its next sweep (§3.15). Only the liveness polling below is the
+     * development aid. It used to be read only with the watchdog on, so a
+     * release build ignored it (phase 1 step 2 slice 2). */
     if (atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire)) {
         uint32_t pe = atomic_load_explicit(&osoe.node.hdr->abort_pe, memory_order_acquire);
         osoe_fatal("%s: the job is aborting on behalf of PE %u; this PE cannot make "
                    "progress", routine, pe);
     }
+    if (!osoe.bootstrap.watchdog)
+        return;
 
     for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++) {
         if (i == osoe.bootstrap.local_id || !slot_dead(&osoe.node.slots[i]))
@@ -82,4 +89,12 @@ void osoe_sweep_expired(const char *routine)
                    "production the launcher tears the job down instead (srun -K1)",
                    routine, i, rank, osoe.node.slots[i].pid);
     }
+}
+
+/* base/sweep.h. The epoch waits of the barriers are base's, so they report a
+ * lost wake through this hook rather than naming a counter they cannot see. */
+void osoe_missed_wake(const char *routine)
+{
+    (void)routine;
+    osoe_count(OSOE_C_INVARIANT_MISSED_WAKE, 1);
 }

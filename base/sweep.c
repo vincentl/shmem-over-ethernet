@@ -6,3 +6,8 @@ __attribute__((weak)) void osoe_sweep_expired(const char *routine)
 {
     (void)routine;
 }
+
+__attribute__((weak)) void osoe_missed_wake(const char *routine)
+{
+    (void)routine;
+}

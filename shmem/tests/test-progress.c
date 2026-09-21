@@ -30,6 +30,7 @@
  * over several passes and the descriptor survives partial draining (§3.8) -
  * another rule a single-chunk reply never reaches.
  */
+#define _GNU_SOURCE
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -104,7 +105,13 @@ enum { PEER_PUT_BYTES = 200 };
  * care where they came from. */
 static uint32_t my_pe;
 static unsigned char heap[HEAP];
-static unsigned char landing_storage[sizeof(struct osoe_landing_slot) + HEAP];
+/* The landing zone, then memory that is not the landing zone: the canary is
+ * what a forged get reply would land on (OSOE_TEST_FORGE below). */
+static struct {
+    unsigned char zone[sizeof(struct osoe_landing_slot) + HEAP];
+    unsigned char canary[256];
+} landing_block;
+#define landing_storage landing_block.zone
 static uint64_t notifies;
 
 static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offset,
@@ -123,9 +130,10 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
     return heap + offset;
 }
 
-static struct osoe_landing_slot *landing(void *context, uint32_t pe)
+static struct osoe_landing_slot *landing(void *context, uint32_t pe, uint32_t *capacity)
 {
     (void)context;
+    *capacity = HEAP;
     return pe == my_pe ? (struct osoe_landing_slot *)landing_storage : NULL;
 }
 
@@ -198,14 +206,15 @@ int main(void)
         .node = node,
         .local_id = local_id,
         .rank = my_pe,
-        .timeout_ns = UINT64_C(30000000000),
+        .local_count = 2,           /* map 0,0,1,1: the last to open the area removes its name */
+        .no_progress_ns = UINT64_C(30000000000),  /* fail rather than hang */
     };
 
     struct osoe_connection_area area;
     osoe_connection_area_open(&area, &b, 2, 0);
 
     struct osoe_connection *c = osoe_connection_to(&area, peer);
-    CHECK(c != NULL);
+    CHECK_FATAL(c != NULL);  /* a non-lead PE dereferences it below via post() */
     arrivals_open();
 
     /*
@@ -277,6 +286,34 @@ int main(void)
     for (size_t i = 0; i < sizeof mine; i++)
         mine[i] = (unsigned char)((i ^ 0x5a) + node);
 
+    /*
+     * OSOE_TEST_FORGE=get-reply: node 0's lead first sends a get reply nobody
+     * asked for, whose token matches nothing and whose chunk_offset points past
+     * the landing zone (review round two, D4; the review's forged-get-reply
+     * patch). The receiving node must refuse it by name rather than write it -
+     * shmem.progress.forged-get-reply asserts the fatal, and the canary check
+     * at the end says so if it was written instead.
+     */
+    const char *forge = getenv("OSOE_TEST_FORGE");
+    bool bounds = forge && strcmp(forge, "get-reply-bounds") == 0;
+    /* get-reply-bounds: the receiving lead arms a known token before anything
+     * moves and never re-arms, and the forged reply carries it, so the token
+     * check passes and the offset check is the one that must refuse it. The
+     * reply is the first thing on the 0 -> 1 stream, so it arrives before any
+     * reply this lead's own requests could get. */
+    enum { FORGED_TOKEN = 0x77 };
+    if (bounds && node == 1 && lead)
+        atomic_store_explicit(&slot->armed_token, FORGED_TOKEN, memory_order_release);
+    if (forge && (strcmp(forge, "get-reply") == 0 || bounds) && node == 0 && lead) {
+        unsigned char forged[64];
+        memset(forged, 0xEE, sizeof forged);
+        struct osoe_am_get_reply lie = { .origin_pe = peer_lead, .chunk_offset = HEAP + 32,
+                                         .total = 0xffffffffu,
+                                         .token = bounds ? FORGED_TOKEN : 0xdeadbeef };
+        while (!post(c, OSOE_AM_GET_REPLY, &lie, sizeof lie, forged, sizeof forged))
+            osoe_progress_poll(&p);
+    }
+
     /* A put larger than the wire's ring, so it crosses in pieces. */
     struct osoe_am_put put = { .target_pe = peer_lead, .region = 0, .offset = PUT_AT };
     while (!post(c, OSOE_AM_PUT, &put, sizeof put, mine, sizeof mine))
@@ -284,6 +321,10 @@ int main(void)
 
     /* A get larger than one AM chunk, so its reply is drained over several
      * passes and the descriptor survives partial draining (§3.8). */
+    /* Armed before the request, as transport-am.c's arm() does: the lead
+     * refuses a reply for any other token (§3.4's trust boundary). */
+    if (!bounds)
+        atomic_store_explicit(&slot->armed_token, 1, memory_order_release);
     struct osoe_am_get_request request = { .target_pe = peer_lead, .origin_pe = my_pe,
                                            .region = 0, .length = GET_BYTES,
                                            .offset = GET_AT, .token = 1 };
@@ -315,6 +356,8 @@ int main(void)
 
     /* A fetching AMO: applied at handler time, its value carried back on the
      * control queue (§3.8). */
+    if (!bounds)
+        atomic_store_explicit(&slot->armed_token, 2, memory_order_release);
     struct osoe_am_rmw_request rmw = { .target_pe = peer_lead, .origin_pe = my_pe,
                                        .region = 0, .op = OSOE_RMW_ADD, .width = 8,
                                        .offset = RMW_AT, .operand = 7, .token = 2,
@@ -460,13 +503,23 @@ int main(void)
 
     /* Every applied rmw notifies; a put notifies best effort (§4.10). */
     CHECK(notifies >= 3);
-    CHECK(p.messages_applied >= 4);
-    CHECK(p.segments_applied >= 1);
+    CHECK(atomic_load_explicit(&p.metrics->messages_applied, memory_order_acquire) >= 4);
+    CHECK(atomic_load_explicit(&p.metrics->segments_applied, memory_order_acquire) >= 1);
     /* Acknowledgements advance: §4.6 makes a peer's acknowledgement the
      * origin's evidence that its writes are in place. */
     CHECK(osoe_progress_acked(&p, peer) > 0);
 
 done:
+    {
+        unsigned hit = 0;
+        for (size_t i = 0; i < sizeof landing_block.canary; i++)
+            hit += landing_block.canary[i] != 0;
+        if (hit) {
+            fprintf(stderr, "PE %u: FORGED REPLY WROTE PAST THE LANDING ZONE: %u bytes\n",
+                    my_pe, hit);
+            check_fails++;
+        }
+    }
     osoe_wire_close(&wire);
     osoe_connection_area_close(&area);
     arrivals_close();

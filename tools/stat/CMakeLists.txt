@@ -22,8 +22,8 @@ set_tests_properties(stat.segment PROPERTIES LABELS "tier1" TIMEOUT 30)
 # the two failures a user meets first; both must say so rather than crash.
 add_test(NAME stat.absent COMMAND osoe-stat --dump /osoe.no.such.segment.0)
 set_tests_properties(stat.absent PROPERTIES LABELS "tier1" TIMEOUT 30
-  PASS_REGULAR_EXPRESSION "cannot open /dev/shm/osoe.no.such.segment.0"
+  PASS_REGULAR_EXPRESSION "/osoe.no.such.segment.0: no such job"
   WILL_FAIL FALSE)
 add_test(NAME stat.help COMMAND osoe-stat --help)
 set_tests_properties(stat.help PROPERTIES LABELS "tier1" TIMEOUT 30
-  PASS_REGULAR_EXPRESSION "remove segments whose PEs are all gone")
+  PASS_REGULAR_EXPRESSION "remove named segments [(]OSOE_KEEP_CONTROL_SEGMENT[)] whose PEs")

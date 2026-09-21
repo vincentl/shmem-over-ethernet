@@ -53,6 +53,22 @@ int main(void)
     ok("16777215t", (UINT64_C(16777215) << 40));
     ok("16777215.99999999t", UINT64_C(18446744073709540621));   /* just under 2^64 */
 
+    /* Exponent forms (F9, omissions 11): folded through the same exact
+     * (whole, frac/scale) arithmetic as the multiplier, never strtod. */
+    ok("1e3", 1000);
+    ok("1E3", 1000);
+    ok("1e+3", 1000);
+    ok("3.1e6", 3100000);
+    ok("1.5e2", 150);
+    ok("1.5e2G", UINT64_C(150) << 30);
+    ok("2e0", 2);
+    ok("0e99", 0);
+    ok("1e-1", 1);                  /* 0.1, ceiling */
+    ok("1.5e-1", 1);                /* 0.15, ceiling */
+    ok("15e-1", 2);                 /* 1.5, ceiling */
+    ok("1e-1k", 103);               /* 0.1 * 1024 = 102.4, ceiling */
+    ok("1e19", UINT64_C(10000000000000000000));   /* just under 2^64 */
+
     bad("");
     bad(".");
     bad("k");
@@ -61,11 +77,15 @@ int main(void)
     bad(" 1");
     bad("1 ");
     bad("1x");
-    bad("1e3");
     bad("0x10");
     bad("1.2.3");
     bad("18446744073709551616");
     bad("16777216t");               /* 2^64 */
     bad("16777215.9999999999999999999t");   /* ceiling reaches 2^64 */
+    bad("e3");                      /* no mantissa */
+    bad("1e");                      /* no exponent digits */
+    bad("1e+");
+    bad("1ex");
+    bad("1e20");                    /* 10^20 > 2^64 */
     return CHECK_DONE();
 }

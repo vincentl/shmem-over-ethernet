@@ -19,6 +19,7 @@
  * check that measured each PE's own wait would fail when a PE was descheduled,
  * which is the mistake §8.2 records having made once already.
  */
+#define _GNU_SOURCE
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -55,8 +56,8 @@ static uint32_t releases, released_epoch;
 
 static void *resolve(void *c, uint32_t pe, uint16_t r, uint64_t o, uint32_t n)
 { (void)c; (void)pe; (void)r; (void)o; (void)n; return NULL; }
-static struct osoe_landing_slot *landing(void *c, uint32_t pe)
-{ (void)c; (void)pe; return NULL; }
+static struct osoe_landing_slot *landing(void *c, uint32_t pe, uint32_t *capacity)
+{ (void)c; (void)pe; *capacity = 0; return NULL; }
 static void notify(void *c, uint32_t pe, uint16_t r, uint64_t o, uint32_t n)
 { (void)c; (void)pe; (void)r; (void)o; (void)n; }
 
@@ -73,7 +74,10 @@ int main(void)
 {
     struct osoe_bootstrap b = { 0 };
     osoe_bootstrap_read(&b);
-    CHECK(b.node_count >= 3 && b.node_count <= MAX_NODES);
+    /* Out of range here overruns the fixed-size wires[MAX_NODES] below, or
+     * under-populates it against the node_count the internode phase then
+     * arrives and waits against. */
+    CHECK_FATAL(b.node_count >= 3 && b.node_count <= MAX_NODES);
 
     struct osoe_connection_area area;
     osoe_connection_area_open(&area, &b, b.node_count, 0);
@@ -95,7 +99,10 @@ int main(void)
             continue;
         osoe_wire_open(&wires[peers++], &b, n, 0);
     }
-    CHECK(peers == b.node_count - 1);
+    /* Fewer wires than nodes means the internode phase below arrives and waits
+     * against a peer count it has no wire to hear back from - a wait that
+     * cannot be satisfied by the peers it actually opened. */
+    CHECK_FATAL(peers == b.node_count - 1);
 
     static struct osoe_reply descriptors[DESCRIPTORS];
     static unsigned char scratch[SCRATCH];

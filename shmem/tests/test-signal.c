@@ -11,6 +11,7 @@
  * Then signal_add and signal_set racing a waiter, signal_fetch, and the return
  * value of signal_wait_until.
  */
+#define _GNU_SOURCE
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
@@ -31,7 +32,7 @@ int main(void)
     uint64_t *data = shmem_malloc(PAYLOAD * sizeof *data);
     uint64_t *sig = shmem_malloc(sizeof *sig);
     uint64_t *mine = shmem_malloc(PAYLOAD * sizeof *mine);
-    CHECK(data && sig && mine);
+    CHECK_FATAL(data && sig && mine);  /* NULL would be dereferenced just below */
     *sig = 0;
     memset(data, 0, PAYLOAD * sizeof *data);
     shmem_barrier_all();

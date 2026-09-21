@@ -3,6 +3,7 @@
 #ifndef OSOE_STATE_H
 #define OSOE_STATE_H
 
+#include <stdatomic.h>
 #include <stdint.h>
 
 #include <stdbool.h>
@@ -23,6 +24,7 @@ struct osoe_state {
     struct osoe_allocator allocator;
     uint32_t world_epoch;           /* k for SHMEM_TEAM_WORLD (§5.4) */
     uint32_t shared_epoch;          /* and for SHMEM_TEAM_SHARED */
+    uint32_t finalize_epoch;        /* and for the finalize team (team.h) */
 
     /*
      * The AM backend, present only in a job of more than one logical node
@@ -42,5 +44,23 @@ struct osoe_state {
 };
 
 extern struct osoe_state osoe;
+
+/*
+ * Fatal, naming `routine`, unless the library is between the first
+ * shmem_init (or shmem_init_thread) and the last shmem_finalize - everything
+ * above is undefined outside that window (Annex C), and calling in anyway is
+ * the commonest beginner mistake, not a case worth a segfault on a freed
+ * mapping instead of a diagnosis (conformance review F5). Inline: one acquire
+ * load (a plain load on x86-64, an ldar on aarch64) and a branch against the
+ * flag shmem_query_initialized already publishes, with the fatal out of line,
+ * so every routine that dereferences `osoe` can afford it.
+ */
+extern _Atomic int osoe_initialized;
+_Noreturn void osoe_not_initialized(const char *routine);
+static inline void osoe_require_initialized(const char *routine)
+{
+    if (!atomic_load_explicit(&osoe_initialized, memory_order_acquire))
+        osoe_not_initialized(routine);
+}
 
 #endif /* OSOE_STATE_H */

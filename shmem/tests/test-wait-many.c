@@ -47,7 +47,7 @@ static int me, npes;
     do {                                                                            \
         enum { N = 8 };                                                             \
         T *v = shmem_malloc(N * sizeof *v);                                         \
-        CHECK(v != NULL);                                                           \
+        CHECK_FATAL(v != NULL);   /* NULL would be indexed just below */            \
         size_t idx[N];                                                              \
         int st[N];                                                                  \
         T want[N];                                                                  \
@@ -57,12 +57,15 @@ static int me, npes;
         }                                                                           \
         shmem_barrier_all();                                                        \
                                                                                     \
-        /* Everything satisfied: the waits return without blocking. */              \
+        /* Everything satisfied: the waits return without blocking. Every index
+         * is a correct ANY answer here, and F4's rotation means which one it
+         * actually is now varies across calls - see any_fairness() below for
+         * the check that it really does. */                                       \
         CHECK(shmem_##NAME##_test_all(v, N, NULL, SHMEM_CMP_EQ, (T)1) == 1);        \
-        CHECK(shmem_##NAME##_test_any(v, N, NULL, SHMEM_CMP_EQ, (T)1) == 0);        \
+        CHECK(shmem_##NAME##_test_any(v, N, NULL, SHMEM_CMP_EQ, (T)1) < N);         \
         CHECK(shmem_##NAME##_test_some(v, N, idx, NULL, SHMEM_CMP_EQ, (T)1) == N);  \
         shmem_##NAME##_wait_until_all(v, N, NULL, SHMEM_CMP_EQ, (T)1);              \
-        CHECK(shmem_##NAME##_wait_until_any(v, N, NULL, SHMEM_CMP_EQ, (T)1) == 0);  \
+        CHECK(shmem_##NAME##_wait_until_any(v, N, NULL, SHMEM_CMP_EQ, (T)1) < N);   \
         CHECK(shmem_##NAME##_wait_until_some(v, N, idx, NULL, SHMEM_CMP_EQ, (T)1)   \
               == N);                                                                \
         for (int i = 0; i < N; i++)                                                 \
@@ -126,23 +129,23 @@ static int me, npes;
         want[5] = v[5];                                                             \
         shmem_##NAME##_wait_until_all_vector(v, N, NULL, SHMEM_CMP_EQ, want);       \
         CHECK(shmem_##NAME##_wait_until_any_vector(v, N, NULL, SHMEM_CMP_EQ, want)  \
-              == 0);                                                                \
+              < N);                                                                 \
         CHECK(shmem_##NAME##_wait_until_some_vector(v, N, idx, NULL, SHMEM_CMP_EQ,  \
                                                     want) == N);                    \
                                                                                     \
         /* The C11 forms, on every type: a missing association is a compile         \
          * error here, which is the only check a selection list admits. */          \
         CHECK(shmem_test_all(v, N, NULL, SHMEM_CMP_EQ, (T)1) == 1);                 \
-        CHECK(shmem_test_any(v, N, NULL, SHMEM_CMP_EQ, (T)1) == 0);                 \
+        CHECK(shmem_test_any(v, N, NULL, SHMEM_CMP_EQ, (T)1) < N);                  \
         CHECK(shmem_test_some(v, N, idx, NULL, SHMEM_CMP_EQ, (T)1) == N);           \
         CHECK(shmem_test_all_vector(v, N, NULL, SHMEM_CMP_EQ, want) == 1);          \
-        CHECK(shmem_test_any_vector(v, N, NULL, SHMEM_CMP_EQ, want) == 0);          \
+        CHECK(shmem_test_any_vector(v, N, NULL, SHMEM_CMP_EQ, want) < N);           \
         CHECK(shmem_test_some_vector(v, N, idx, NULL, SHMEM_CMP_EQ, want) == N);    \
         shmem_wait_until_all(v, N, NULL, SHMEM_CMP_EQ, (T)1);                       \
-        CHECK(shmem_wait_until_any(v, N, NULL, SHMEM_CMP_EQ, (T)1) == 0);           \
+        CHECK(shmem_wait_until_any(v, N, NULL, SHMEM_CMP_EQ, (T)1) < N);            \
         CHECK(shmem_wait_until_some(v, N, idx, NULL, SHMEM_CMP_EQ, (T)1) == N);     \
         shmem_wait_until_all_vector(v, N, NULL, SHMEM_CMP_EQ, want);                \
-        CHECK(shmem_wait_until_any_vector(v, N, NULL, SHMEM_CMP_EQ, want) == 0);    \
+        CHECK(shmem_wait_until_any_vector(v, N, NULL, SHMEM_CMP_EQ, want) < N);     \
         CHECK(shmem_wait_until_some_vector(v, N, idx, NULL, SHMEM_CMP_EQ, want)     \
               == N);                                                                \
                                                                                     \
@@ -159,7 +162,7 @@ static int me, npes;
 #define SHORT_COVERAGE(T, NAME)                                                     \
     do {                                                                            \
         T *v = shmem_malloc(sizeof *v);                                             \
-        CHECK(v != NULL);                                                           \
+        CHECK_FATAL(v != NULL);   /* NULL would be dereferenced just below */       \
         *v = (T)5;                                                                  \
         shmem_barrier_all();                                                        \
         CHECK(shmem_##NAME##_test(v, SHMEM_CMP_EQ, (T)5) == 1);                     \
@@ -229,8 +232,10 @@ static void watched_span(uint64_t *v)
     struct osoe_segment s;
     if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
         fprintf(stderr, "%s\n", err);
-        CHECK(0);
-        return;
+        /* Returning here skips the release AMO below, which PE 1 is already
+         * blocked in shmem_uint64_wait_until_some waiting for - it would then
+         * never return. */
+        CHECK_FATAL(0);
     }
 
     /* The array is symmetric, so its offset from the heap base is the same on
@@ -399,6 +404,47 @@ static void short_across_pes(void)
     shmem_free(v);
 }
 
+/*
+ * F4: a series of calls to shmem_test_any/shmem_wait_until_any must eventually
+ * return every satisfied index, not just the lowest one (spec §9.11.3,
+ * §9.11.10). Elements 0 and 3 both satisfy here, unmasked, so an
+ * implementation that always scans from index 0 - the bug the conformance
+ * review found - returns 0 on every one of these calls and never 3. Enough
+ * rounds that a fair rotation is certain to visit both: any_scan_start's
+ * period is at most N (wait.c), so ROUNDS = 8*N is generous.
+ */
+static void any_fairness(void)
+{
+    enum { N = 8, ROUNDS = 64 };
+    long *v = shmem_malloc(N * sizeof *v);
+    CHECK_FATAL(v != NULL);
+    for (int i = 0; i < N; i++)
+        v[i] = 0;
+    v[0] = 1;
+    v[3] = 1;
+    shmem_barrier_all();
+
+    bool saw0 = false, saw3 = false;
+    for (int i = 0; i < ROUNDS; i++) {
+        size_t r = shmem_long_test_any(v, N, NULL, SHMEM_CMP_EQ, 1);
+        CHECK(r == 0 || r == 3);
+        saw0 |= r == 0;
+        saw3 |= r == 3;
+    }
+    CHECK(saw0 && saw3);
+
+    saw0 = saw3 = false;
+    for (int i = 0; i < ROUNDS; i++) {
+        size_t r = shmem_long_wait_until_any(v, N, NULL, SHMEM_CMP_EQ, 1);
+        CHECK(r == 0 || r == 3);
+        saw0 |= r == 0;
+        saw3 |= r == 3;
+    }
+    CHECK(saw0 && saw3);
+
+    shmem_free(v);
+}
+
 int main(void)
 {
     shmem_init();
@@ -409,9 +455,10 @@ int main(void)
     OSOE_WAIT_SHORT_TYPES(SHORT_COVERAGE)
     signed_comparisons();
     short_across_pes();
+    any_fairness();
 
     uint64_t *v = shmem_malloc(SPAN_N * sizeof *v);
-    CHECK(v != NULL);
+    CHECK_FATAL(v != NULL);  /* NULL would be dereferenced throughout blocking() */
     if (npes >= 2)
         blocking(v);
     shmem_free(v);
