@@ -1395,6 +1395,14 @@ ends a wait promptly; what goes is only the fatal deadline. (`base/stall-watch.h
 is the one helper; §3.10's absolute futex deadlines are clock instants for one
 sweep-length sleep, and stay.)
 
+**A fatal writes its reason first.** The message goes to stderr, in one write,
+before the fatal publishes anything — a rendezvous's `failed` word, the node's
+abort — because anything published lets the other PEs stop, the launcher then
+sends the rest SIGTERM, and a reason not yet written is lost. It was lost once in
+30 runs of a refused rendezvous under load; `osoe_fatal_then` (`fatal.h`) is the
+form for a fatal with something to publish, and `shmem.fatal-order` and
+`shmem.job.duplicate-rank.slow-message` hold the order.
+
 **A fatal declares the node's abort**, and every wait reads the abort word at its
 next sweep in every build — only the liveness polling is the development
 watchdog. So the other PEs of a node stop within a sweep of the first fatal. A

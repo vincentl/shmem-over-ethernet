@@ -45,6 +45,16 @@
  * make a dead PE look alive, which is the hang this replaces rather than a
  * false abort on a healthy job.
  */
+/* The dead sibling the watchdog names, for declare_for_dead. A PE runs one
+ * watchdog check at a time and leaves through it, so one word is enough. */
+static uint32_t dead_rank;
+
+static void declare_for_dead(void *context)
+{
+    (void)context;
+    osoe_node_declare_abort(&osoe.node, dead_rank, 1);
+}
+
 static bool slot_dead(const struct osoe_pe_slot *s)
 {
     uint32_t phase = atomic_load_explicit(&s->phase, memory_order_acquire);
@@ -80,14 +90,14 @@ void osoe_sweep_expired(const char *routine)
     for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++) {
         if (i == osoe.bootstrap.local_id || !slot_dead(&osoe.node.slots[i]))
             continue;
-        uint32_t rank = osoe.node.slots[i].rank;
         /* Tell the siblings before dying, so they stop at their next sweep
-         * rather than each rediscovering it. */
-        osoe_node_declare_abort(&osoe.node, rank, 1);
-        osoe_fatal("%s: local PE %u (rank %u, pid %d) has died; this PE would wait for "
+         * rather than each rediscovering it - after the message (fatal.h), and
+         * naming the dead PE, which is why the abort is declared here. */
+        dead_rank = osoe.node.slots[i].rank;
+        osoe_fatal_then(declare_for_dead, NULL, "%s: local PE %u (rank %u, pid %d) has died; this PE would wait for "
                    "it forever. This is the development watchdog (OSOE_WATCHDOG); in "
                    "production the launcher tears the job down instead (srun -K1)",
-                   routine, i, rank, osoe.node.slots[i].pid);
+                   routine, i, dead_rank, osoe.node.slots[i].pid);
     }
 }
 

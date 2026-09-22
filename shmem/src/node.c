@@ -59,9 +59,11 @@ static uint64_t page_round(uint64_t n)
     return (n + page - 1) / page * page;
 }
 
-/* Publish failure so waiting siblings stop at their next sweep, then die. */
-_Noreturn static void fail_rendezvous(struct osoe_node *n, const char *what)
+/* Publish failure so waiting siblings stop at their next sweep: osoe_fatal_then's
+ * last act, after the message is out (fatal.h). */
+static void publish_failure(void *context)
 {
+    struct osoe_node *n = context;
     if (n->hdr) {
         /* release: checked by waiters at each wake and sweep (§3.16). */
         atomic_store_explicit(&n->hdr->failed, 1, memory_order_release);
@@ -69,7 +71,11 @@ _Noreturn static void fail_rendezvous(struct osoe_node *n, const char *what)
         osoe_futex_wake(&n->hdr->joined, INT_MAX, OSOE_FUTEX_SHARED);
         osoe_futex_wake(&n->hdr->mapped, INT_MAX, OSOE_FUTEX_SHARED);
     }
-    osoe_fatal("%s", what);
+}
+
+_Noreturn static void fail_rendezvous(struct osoe_node *n, const char *what)
+{
+    osoe_fatal_then(publish_failure, n, "%s", what);
 }
 
 static void check_failed(struct osoe_node *n)

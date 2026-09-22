@@ -16,14 +16,12 @@
  * writers on a pipe, which is what a test harness gives us, and is one call on
  * a terminal or a file either way.
  */
-_Noreturn void osoe_fatal(const char *fmt, ...)
+static _Noreturn void fatal(void (*publish)(void *), void *context, const char *fmt,
+                            va_list ap)
 {
     char out[2048];
     char msg[1024];
-    va_list ap;
-    va_start(ap, fmt);
     vsnprintf(msg, sizeof msg, fmt, ap);
-    va_end(ap);
 
     int n;
     if (osoe.bootstrap.have_rank && osoe.node.control_name[0])
@@ -36,20 +34,26 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
     else
         n = snprintf(out, sizeof out, "osoe: %s\n", msg);
 
-    /* Tell this node's other PEs: each stops at its next sweep rather than
-     * waiting on something this PE will now never do (§3.15). Unless an abort
-     * is already declared - then this PE is one of the ones stopping, and the
-     * word must keep naming the PE that started it. */
-    if (osoe.bootstrap.have_rank && osoe.node.hdr &&
-        !atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire))
-        osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE);
-
+    /* The reason reaches stderr before anything that lets another process end
+     * the job (fatal.h). */
     fflush(NULL);
     if (n > 0) {
         size_t len = (size_t)n < sizeof out ? (size_t)n : sizeof out - 1;
         ssize_t ignored = write(STDERR_FILENO, out, len);
         (void)ignored;
     }
+
+    if (publish)
+        publish(context);
+    /* Tell this node's other PEs: each stops at its next sweep rather than
+     * waiting on something this PE will now never do (§3.15). Unless an abort
+     * is already declared - then this PE is one of the ones stopping, or
+     * `publish` declared it for someone else, and the word must keep naming the
+     * PE that started it. */
+    if (osoe.bootstrap.have_rank && osoe.node.hdr &&
+        !atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire))
+        osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE);
+
     /*
      * _exit, not exit: exit runs atexit handlers, and start_pes registered
      * shmem_finalize as one - a barrier. A PE ending the job must not enter a
@@ -58,4 +62,18 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
      * above, which is the one thing exit would have done that is wanted here.
      */
     _exit(EXIT_FAILURE);
+}
+
+_Noreturn void osoe_fatal(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    fatal(NULL, NULL, fmt, ap);
+}
+
+_Noreturn void osoe_fatal_then(void (*publish)(void *), void *context, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    fatal(publish, context, fmt, ap);
 }
