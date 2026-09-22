@@ -35,7 +35,7 @@ static void ctx_getmem(const char *routine, shmem_ctx_t ctx, void *dest,
         return;
     osoe_check_pe(routine, pe);
     uint64_t offset = osoe_symmetric_offset(routine, source, nelems);
-    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, nelems);
+    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, nelems, 0);
 }
 
 OSOE_API void pshmem_putmem(void *dest, const void *source, size_t nelems, int pe)

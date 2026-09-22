@@ -1,15 +1,33 @@
 find_package(Threads REQUIRED)
 
+# The backend behind transport.h and internode.h (§4.10), bound at build time:
+# no table of function pointers, one implementation per build. AM is the only
+# one; the option exists so that a second is a new list here and not an edit
+# to the library's sources (second review, roce-seam F9).
+set(OSOE_BACKEND "am" CACHE STRING "The transport and internode backend (am)")
+set_property(CACHE OSOE_BACKEND PROPERTY STRINGS am)
+if(OSOE_BACKEND STREQUAL "am")
+  set(osoe_backend_sources
+    src/am.c
+    src/connection.c
+    src/connection-area.c
+    src/internode-am.c
+    src/progress.c
+    src/progress-host.c
+    src/reply.c
+    src/transport-am.c
+    src/wire.c)
+else()
+  message(FATAL_ERROR "OSOE_BACKEND=${OSOE_BACKEND}: the only backend is am")
+endif()
+
 add_library(osoe
   src/accessible.c
   src/agent.c
-  src/am.c
   src/allocator.c
   src/amo.c
   src/barrier.c
   src/bootstrap.c
-  src/connection.c
-  src/connection-area.c
   src/deprecated.c
   src/fatal.c
   src/info.c
@@ -19,22 +37,18 @@ add_library(osoe
   src/metrics.c
   src/node.c
   src/profile.c
-  src/progress.c
-  src/progress-host.c
   src/quiet.c
-  src/reply.c
   src/rma.c
   src/session.c
   src/shm-object.c
   src/signal.c
   src/symmetric.c
   src/team.c
-  src/transport-am.c
   src/transport-local.c
   src/wait.c
-  src/wire.c
   src/watch.c
-  src/watchdog.c)
+  src/watchdog.c
+  ${osoe_backend_sources})
 target_include_directories(osoe
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

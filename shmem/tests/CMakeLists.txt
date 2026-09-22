@@ -27,6 +27,15 @@ if(BUILD_SHARED_LIBS)
   set_tests_properties(shmem.profiling_aliases PROPERTIES LABELS "tier1" TIMEOUT 30)
 endif()
 
+# The backend boundary (§4.10): no file above transport.h and internode.h may
+# include, however indirectly, a header of the backend below. The two sides
+# are defined as lists in the script, and adding `#include "progress.h"` to
+# rma.c is the case it was written to fail (second review, roce-seam F6).
+add_test(NAME shmem.boundary
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckBoundary.cmake)
+set_tests_properties(shmem.boundary PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 # A static build is not one of the four presets (none sets BUILD_SHARED_LIBS),
 # so this proves it on its own: a nested configure and build of libosoe as a
 # static archive, then a link of a tiny consumer against that archive alone -

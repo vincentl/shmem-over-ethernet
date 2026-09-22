@@ -33,6 +33,7 @@
 #include <time.h>
 
 #include "am.h"
+#include "am-state.h"
 #include "base/deadline.h"
 #include "base/futex.h"
 #include "base/order.h"
@@ -87,27 +88,54 @@ static uint32_t peer_count(void)
     return osoe.job.node_count - 1;
 }
 
+/*
+ * §4.10's lifecycle. The two facts about the job come first, because the dirty
+ * set below is sized from one of them and the engine's start-up reads both;
+ * they were once set by the engine itself, after the dirty set, and the first
+ * internode put wrote through a null one. Then the engine, which must be
+ * complete before this returns: the agent thread starts next and polls it.
+ */
 void osoe_transport_init(void)
 {
+    osoe_am = (struct osoe_am_state){ 0 };
+    osoe_am.internode = osoe.job.node_count > 1;
+    osoe_am.lead = osoe.bootstrap.local_id == 0;
+
     struct osoe_transport_context *c = &default_context;
     *c = (struct osoe_transport_context){ 0 };
-    if (!osoe.internode)
-        return;
-    uint32_t peers = peer_count();
-    c->high_segment = calloc(peers, sizeof *c->high_segment);
-    c->order = calloc(peers, sizeof *c->order);
-    c->touched = calloc(peers, sizeof *c->touched);
-    if (!c->high_segment || !c->order || !c->touched)
-        osoe_fatal("out of memory for the ordering state of %u peer nodes", peers);
+    if (osoe_am.internode) {
+        uint32_t peers = peer_count();
+        c->high_segment = calloc(peers, sizeof *c->high_segment);
+        c->order = calloc(peers, sizeof *c->order);
+        c->touched = calloc(peers, sizeof *c->touched);
+        if (!c->high_segment || !c->order || !c->touched)
+            osoe_fatal("out of memory for the ordering state of %u peer nodes", peers);
+    }
+    osoe_progress_host_start(osoe.node.hdr->session);
 }
 
+/* After the agent has been joined (transport.h): the engine drains what this
+ * node owes the network, then closes. */
 void osoe_transport_fini(void)
 {
+    osoe_progress_host_stop();
     struct osoe_transport_context *c = &default_context;
     free(c->high_segment);
     free(c->order);
     free(c->touched);
     *c = (struct osoe_transport_context){ 0 };
+    osoe_am = (struct osoe_am_state){ 0 };
+}
+
+/* The agent thread, lent to this backend (transport.h, §3.12). */
+bool osoe_transport_agent_pass(void)
+{
+    return osoe_progress_host_poll();
+}
+
+uint64_t osoe_transport_agent_idle_ns(void)
+{
+    return osoe_progress_host_idle_ns();
 }
 
 struct osoe_transport_context *osoe_transport_context_default(void)
@@ -288,7 +316,7 @@ static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
  */
 static uint32_t payload_limit(struct osoe_connection *conn, uint32_t peer, uint32_t fixed_bytes)
 {
-    uint32_t chunk = (uint32_t)osoe.area.chunk_bytes;
+    uint32_t chunk = (uint32_t)osoe_am.area.chunk_bytes;
     uint32_t room = osoe_connection_payload_capacity(conn);
     if (room < chunk)
         chunk = room;
@@ -296,7 +324,7 @@ static uint32_t payload_limit(struct osoe_connection *conn, uint32_t peer, uint3
     if (chunk <= overhead)
         osoe_fatal("toward node %u: a connection buffer of %llu bytes cannot carry a "
                    "message with a %u-byte fixed part; raise OSOE_AM_BUFFER or OSOE_AM_CHUNK",
-                   peer, (unsigned long long)osoe.area.buffer_bytes, fixed_bytes);
+                   peer, (unsigned long long)osoe_am.area.buffer_bytes, fixed_bytes);
     return chunk - overhead;
 }
 
@@ -304,7 +332,7 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
                        uint64_t offset, const void *src, size_t len, unsigned flags)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
-    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
     if (!conn)
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
 
@@ -476,7 +504,7 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
                        size_t len)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
-    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
     if (!conn)
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
     struct osoe_landing_slot *slot = my_landing();
@@ -518,7 +546,7 @@ static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
                            uint64_t compare, unsigned flags)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
-    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
     if (!conn)
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
     bool fetching = (flags & OSOE_TRANSPORT_FETCH) != 0;
@@ -565,9 +593,10 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
 }
 
 void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
-                 uint64_t offset, void *dst, size_t len)
+                 uint64_t offset, void *dst, size_t len, unsigned flags)
 {
     (void)context;
+    (void)flags;                /* none defined for get yet (transport.h) */
     if (osoe_is_local(&osoe.job, (uint32_t)pe)) {
         osoe_transport_local_get(pe, region, offset, dst, len);
         return;
@@ -616,7 +645,7 @@ static void flush_dirty(struct osoe_transport_context *c)
         if (acknowledged(c, slot))
             continue;
         uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
-        struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+        struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
         /* "Acknowledge through the highest segment this context wrote into":
          * what quiet then waits for, and nothing more. */
         if (conn) {
@@ -645,7 +674,7 @@ void osoe_transport_fence(struct osoe_transport_context *context)
 {
     osoe_count(OSOE_C_TRANSPORT_FENCE_CALLS, 1);
     osoe_release_fence();
-    if (osoe.internode)
+    if (osoe_am.internode)
         flush_dirty(context);
 }
 
@@ -667,7 +696,7 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
     osoe_serializing_fence();
 
     struct osoe_transport_context *c = context;
-    if (!osoe.internode || c->count == 0) {
+    if (!osoe_am.internode || c->count == 0) {
         /* Nothing taking the intranode path is ever outstanding, so a wait that
          * finds nothing has genuinely nothing to do. The counter says so rather
          * than being omitted, because on the far path the same name means
@@ -726,4 +755,53 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
     free(wanted);
     osoe_count(OSOE_C_TRANSPORT_WAIT_DIRTY_PEERS, waited);
     osoe_count(OSOE_C_TRANSPORT_WAIT_NS, osoe_now_ns() - t0);
+}
+
+/* ---- The two entry points that are this backend's, not a path's --------- */
+
+/*
+ * These are the backend's own, whichever path an operation takes, so they live
+ * in the file a second backend replaces rather than in transport-local.c,
+ * which a second backend keeps: an RDMA backend has its own set_range, and a
+ * definition in the shared intranode file would collide with it at link time
+ * (second review, roce-seam F9).
+ */
+
+/*
+ * Every wait's predicate load (wait.c, signal.c). It follows the waiter's
+ * seq_cst publication of its watch, and the writer's half is a seq_cst store or
+ * rmw followed by notify's load of that watch: a two-sided protocol, so this
+ * load is seq_cst (§3.16). Acquire is not enough - C11 does not order a seq_cst
+ * store before a later acquire load, and GCC for Armv8.3 and later (a Pi 5's
+ * Cortex-A76) emits it as ldapr, which passes the stlr: measured, 289 to 4,449
+ * lost-wake outcomes in 2 million rounds (fence-litmus/store-buffer-litmus).
+ * A seq_cst load is an ldar on every aarch64 target and a plain mov on x86-64.
+ */
+uint64_t osoe_transport_load(enum osoe_region region, uint64_t offset, unsigned width)
+{
+    void *ptr = osoe_transport_direct((int)osoe.bootstrap.rank, region, offset);
+    switch (width) {
+    case 8:
+        return atomic_load_explicit((_Atomic uint64_t *)ptr, memory_order_seq_cst);
+    case 4:
+        return atomic_load_explicit((_Atomic uint32_t *)ptr, memory_order_seq_cst);
+    default:
+        return atomic_load_explicit((_Atomic uint16_t *)ptr, memory_order_seq_cst);
+    }
+}
+
+/*
+ * Nothing to do: every operation on this backend is a memory operation on a
+ * mapping the process already holds, so no range needs preparing (§4.10). The
+ * call is still made by the allocator, because the contract is the backend's to
+ * ignore, not the caller's to skip.
+ */
+void osoe_transport_set_range(enum osoe_region region, uint64_t offset, uint64_t len,
+                       unsigned attributes)
+{
+    (void)region;
+    (void)offset;
+    (void)len;
+    (void)attributes;
+    osoe_count(OSOE_C_TRANSPORT_SET_RANGE_CALLS, 1);
 }

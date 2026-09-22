@@ -22,7 +22,8 @@
 #include "job.h"
 
 #define OSOE_JOB_MAGIC UINT64_C(0x00626f6a656f736f)   /* "osoejob" */
-#define OSOE_JOB_LAYOUT 3     /* 2: the per-rank claim array; 3: `opened` */
+#define OSOE_JOB_LAYOUT 4     /* 2: the per-rank claim array; 3: `opened`;
+                               * 4: the per-node backend blob */
 
 /* Not yet assigned to a node. The map starts full of these so that a rank no
  * lead claimed is a detectable gap rather than node 0 by accident. */
@@ -67,16 +68,30 @@ struct osoe_job_header {
      * claim, exactly one wins, the other is refused by name, and `node_of`
      * stays plain data - written once by the winner, published by the seq_cst
      * add to `joined`, and read by every put without an atomic.
+     *
+     * Then, from layout 4, one OSOE_JOB_BACKEND_BLOB_BYTES blob per node,
+     * cache-line aligned (osoe_job_backend_blob).
      */
 };
 
 _Static_assert(sizeof(_Atomic uint32_t) == sizeof(uint32_t),
                "the claim array sits after node_of with the same stride");
 
+static uint64_t align_line(uint64_t n)
+{
+    return (n + OSOE_CACHELINE - 1) / OSOE_CACHELINE * OSOE_CACHELINE;
+}
+
 static uint64_t map_offset(void)
 {
-    return (sizeof(struct osoe_job_header) + OSOE_CACHELINE - 1) / OSOE_CACHELINE *
-           OSOE_CACHELINE;
+    return align_line(sizeof(struct osoe_job_header));
+}
+
+/* Where the per-node blobs start: after node_of and claim, world_size words
+ * each. */
+static uint64_t blob_offset(uint32_t world_size)
+{
+    return align_line(map_offset() + (uint64_t)world_size * 2 * sizeof(uint32_t));
 }
 
 /* osoe_fatal_then's last act: the message is out first (fatal.h). */
@@ -113,7 +128,8 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
 
     snprintf(j->name, sizeof j->name, "/osoe.%llu.%u.job.%u",
              (unsigned long long)b->job, b->step, session);
-    j->bytes = map_offset() + (uint64_t)b->world_size * 2 * sizeof(uint32_t);
+    j->bytes = blob_offset(b->world_size) +
+               (uint64_t)b->node_count * OSOE_JOB_BACKEND_BLOB_BYTES;
     /* §6.2: the step's rendezvous server is the lead of node 0. */
     j->creator = b->node == 0 && b->local_id == 0;
 
@@ -248,6 +264,16 @@ again:;
             }
             node_of[rank] = b->node;
         }
+        /*
+         * This node's backend blob, before `joined` publishes it (job.h). AM
+         * addresses by node number alone and has nothing to say, so it is
+         * written as zeros - written all the same, so that the blob a reader
+         * finds is always the one its lead published, never what an earlier
+         * job left in a reused object.
+         */
+        memset((char *)p + blob_offset(b->world_size) +
+                   (uint64_t)b->node * OSOE_JOB_BACKEND_BLOB_BYTES,
+               0, OSOE_JOB_BACKEND_BLOB_BYTES);
         atomic_fetch_add_explicit(&h->joined, 1, memory_order_seq_cst);
         osoe_futex_wake(&h->joined, INT_MAX, OSOE_FUTEX_SHARED);
     }
@@ -279,6 +305,7 @@ again:;
         }
 
     j->node_of = node_of;
+    j->backend_blob = (const unsigned char *)p + blob_offset(b->world_size);
 
     /* Every PE of the job opens this; the last to have done so removes the name. */
     if (atomic_fetch_add_explicit(&h->opened, 1, memory_order_seq_cst) + 1 == b->world_size &&

@@ -15,10 +15,21 @@
 
 #include "base/epoch.h"
 
-/* The two predefined teams, resolved to the state a collective needs. */
+/*
+ * Build the predefined teams for this session, and give each one that spans
+ * several nodes to the internode backend (internode.h). Called once by
+ * shmem_init after osoe_internode_init and before the agent thread starts, so
+ * the thread that will release these teams only ever reads them.
+ */
+void osoe_team_start(void);
+
 /* The library's internal finalize team (node.h, OSOE_TEAM_FINALIZE): the
  * world's membership on counters of its own. */
 struct osoe_team *osoe_team_finalize(void);
+
+/* The team with this number (enum osoe_team_number), or NULL if there is none.
+ * What internode.h's release upcall resolves its team with. */
+struct osoe_team *osoe_team_numbered(uint32_t number);
 
 struct osoe_team {
     const char *name;

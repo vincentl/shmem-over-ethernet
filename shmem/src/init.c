@@ -19,9 +19,10 @@
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
+#include "internode.h"
 #include "job.h"
-#include "progress-host.h"
 #include "state.h"
+#include "team.h"
 #include "transport.h"
 
 struct osoe_state osoe;
@@ -179,23 +180,18 @@ static void session_start(void)
      */
     osoe_job_join(&osoe.job, &osoe.bootstrap, session);
     /*
-     * Two facts about the job, settled here rather than by whichever component
-     * happens to need them first. They were set inside the AM backend's own
-     * start-up once, which put them *after* osoe_transport_init - so the
-     * boundary sized its per-context ordering state for a single-node job and
-     * the first internode put wrote through a null dirty set.
+     * The backend, then the allocator, then the teams, then the thread that
+     * runs the backend - each needs the one before it. osoe_transport_init
+     * starts whatever the backend needs (on AM, the connection area, the wires
+     * and the engine), so it is complete before the agent that polls it
+     * exists; the internode backend rides on it (internode.h); and the teams
+     * hand their node sets to that backend while nothing else can read them.
      */
-    osoe.internode = osoe.job.node_count > 1;
-    osoe.lead = osoe.bootstrap.local_id == 0;
     osoe_transport_init();
     if (osoe_allocator_init(&osoe.allocator, osoe.node.heap_size) != 0)
         osoe_fatal("out of memory");
-    /*
-     * The AM backend, before the agent thread rather than after: the lead's
-     * agent is the node's progress engine (§3.12), so what it polls has to
-     * exist before it does.
-     */
-    osoe_progress_host_start(session);
+    osoe_internode_init();
+    osoe_team_start();
     osoe_agent_start(&osoe.node.slots[osoe.bootstrap.local_id]);
     init_pid = getpid();
     static bool exit_handler;
@@ -227,10 +223,11 @@ static void session_end(void)
     /*
      * The agent first, so that nothing is polling the engine while it is taken
      * apart, and so the wire close handshake (wire.h) is not racing this node's
-     * own progress loop.
+     * own progress loop. osoe_transport_fini then drains and closes it
+     * (transport.h).
      */
     osoe_agent_stop(&osoe.node.slots[osoe.bootstrap.local_id]);
-    osoe_progress_host_stop();
+    osoe_internode_fini();
     osoe_allocator_fini(&osoe.allocator);
     osoe_transport_fini();
     osoe_job_leave(&osoe.job);

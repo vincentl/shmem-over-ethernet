@@ -2534,6 +2534,36 @@ closes a gap found against it: without it, `shmem_test` and the `wait_until`
 predicate would read the variable directly, which is incoherent on a network whose
 NIC atomics the CPU cannot see.
 
+**Its sibling, and what else crosses** (phase 1 step 2, slice 3). The seven
+operations are the whole of the *point-to-point* boundary, and they stay
+PE-addressed. Beside them `shmem/src/internode.h` carries the internode phase of
+a collective (§5.3): a team's node set given once at team creation, an arrival
+per `(team, epoch)` going down, and a release upcall per `(team, epoch)` coming
+back on the node's progress thread (§10 records why this reversed the step-2
+decision). Two more things cross that the original contract left out, and both
+are now declared in `transport.h`: the backend's **lifecycle** —
+`osoe_transport_init` starts whatever the backend needs, AM's connection area,
+wires and engine included, before the agent thread exists, and
+`osoe_transport_fini` drains and closes it after that thread is joined — and the
+**agent thread**, which the library lends the backend through
+`osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` and nothing else
+(§3.12; §10's "boundary progress call"). So `barrier.c`, `agent.c` and `init.c`
+name no AM symbol, and the sentence "the SHMEM layer calls only what is declared
+here" is true of `transport.h` plus `internode.h`. **It is enforced**: the AM
+backend's state moved out of `struct osoe_state` into `am-state.h`, and the tier-1
+test `shmem.boundary` (`cmake/CheckBoundary.cmake`) walks the includes of every
+file above the boundary and fails if one reaches a header below it. The two sides
+are two lists in that one script, and every library source file must be in
+exactly one of them or in the short list of files on the boundary itself
+(`transport-local.c`, `watch.c`, and the rendezvous files `node.c` and `job.c`,
+which still read the AM chunk size and handler checksum). The backend is chosen
+by the CMake option `OSOE_BACKEND`, whose only value is `am`. The last two small
+gaps are closed as well: `osoe_transport_get` takes `flags`, with none defined
+yet, so that `OSOE_TRANSPORT_MORE` and the nonblocking flag arrive without a
+signature change; and `osoe_transport_load` and `osoe_transport_set_range` live in
+`transport-am.c`, the file a second backend replaces, rather than in the
+intranode path's file, which it keeps.
+
 **Addressing.** A world rank, a region that exists in every PE (the heap, the
 library's internal region of §5.8, and statics with §4.3 phase 1.5), and an offset from that region's start in the
 *target*. The SHMEM layer converts an address to an offset against its own base
@@ -3210,11 +3240,14 @@ the lead is blocked in the same call regardless.
 **Release** arrives at the progress thread, which advances the team's `released`
 counter and wakes all local waiters — a divisible event, so wake-many per §3.11.
 
-**The arrival and the release are AM messages, not boundary operations.** §10
-weighed a mandatory `osoe_transport_sync` here and closed it against the code at
-§7.1 step 2: this phase addresses a *node* where §4.10 addresses a PE, and its
-release wakes futex waiters on an epoch counter where §4.10's notify wakes watch
-waiters on a range. Both arguments are there.
+**The arrival and the release cross `internode.h`, not §4.10.** The phase is
+reached through its own build-time-bound interface, beside the point-to-point
+boundary: `osoe_internode_arrive(team, epoch)` down, called by whichever member's
+increment reached the target and never blocking, and `osoe_internode_released(team,
+epoch)` up, implemented in `barrier.c` and called by the backend on the node's
+progress thread. On AM they are messages, and the AM implementation
+(`internode-am.c`) is the handoff above. §10 once closed this the other way, on
+two reasons the code contradicted; the entry there keeps the history.
 
 **The root counts, and the count is the node's, not the PE's.** Whichever local
 member's increment reaches the arrival target sends one arrival for the whole
@@ -4606,7 +4639,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 | What `OSOE_NODE_LAYOUT` covers | **The encoding of every word in the control segment, not only the offsets of fields.** A word written by one process and interpreted by another is part of the inter-process contract even when its width and position do not move; changing what its bits mean without bumping the version gives mixed builds silent lost wakes rather than the loud refusal `open_control` exists to produce. Recorded because a proposal got it wrong, arguing the §4.9 watch word could change encoding without a bump since it is "an opaque filter" — it is opaque to its *reader*, which is another process |
 | Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_transport_watch_wait` being the backend's own function |
-| A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
+| A boundary progress call | **Needed, and declared** (phase 1 step 2 slice 3): `osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` in `transport.h`, the only way the library lends the agent thread to a backend (§3.12, §4.10). *Revised.* The first answer was "not needed, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there". That was true of application threads and false of the node: the barrier blocks on an epoch counter outside any backend (`barrier.c`, `base/epoch.h`), and what moves it is the progress thread, which `agent.c` drove by calling the AM engine by name (second review, roce-seam F5). Application threads still need no progress call — the blocking calls pump their own — but the node's thread is the library's, and a backend gets it only through these two |
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 | Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
 | What orders fence and quiet, where a `seq_cst` store to a thread-local word was the answer? | **Derived from the C11 model:** a release fence for fence (W→W), a `seq_cst` fence for quiet and the barriers (W→R), and `seq_cst` on both loads of a two-sided protocol. Measured, the old store did not order quiet's W→R on aarch64, and an acquire load built as `ldapr` lost wakes (§3.16, §4.6; 2026-09-21). |
@@ -4650,42 +4683,42 @@ nonblocking-as-counters, `set_range`'s contract, §4.1's registration trap, §6.
 out-of-band bootstrap, and §8.1's three-way switch.
 
 - **`osoe_transport_sync`: does a collective's internode phase cross the boundary?**
-  §2.2 puts collectives on AM, decided when AM was the only backend; in an RDMA
-  build that sends every barrier over TCP while the data path runs on the NIC.
-  The proposal is a mandatory `osoe_transport_sync(ctx, group)` over a group of *nodes*,
-  called after the intranode phase (§5.3) by one PE per node that has a member —
-  note that is the team's local lead (§5.2), not necessarily the node lead of
-  §3.12, so it asks the node lead's agent to send rather than sending itself
-  (invariant 19). A backend with no native group barrier gets a generic tree over
-  put and watch, so it carries no capability and §4.10's rejection of capability
-  bits still holds.
+  **Reversed on 2026-09-20 and built in phase 1 step 2 slice 3: it crosses a
+  boundary of its own.** `osoe_transport_sync` stays out of `transport.h`, which
+  remains point-to-point and PE-addressed; the internode phase gets a sibling
+  interface, `internode.h`, bound at build time exactly as `transport.h` is, with
+  AM as one implementation (§4.10, §5.3). Addressed by `(team, epoch)`: the
+  node set is given once at team creation, the arrival goes down, and the
+  release comes back as an upcall on the node's progress thread.
 
-  **Decided at step 2, against the code: no.** The internode phase does not
-  cross the boundary. Writing it turned the trade from "fifteen lines now versus
-  restructuring `barrier.c` later" into two concrete obstacles, neither of which
-  was visible from the estimate:
+  *The history, kept so the decision is not reopened from memory.* §2.2 put
+  collectives on AM, decided when AM was the only backend; in an RDMA build that
+  sends every barrier over TCP while the data path runs on the NIC. The proposal
+  was a mandatory `osoe_transport_sync(ctx, group)` over a group of *nodes*,
+  called after the intranode phase by one PE per node with a member. At step 2
+  it was **closed "no"** on two reasons, both of which the code written that day
+  already contradicted (second review, D5; roce-seam F1; premises P1):
 
-  - **Addressing.** §4.10's model is `(pe, region, offset)` — its opening
-    sentence, and invariant 20 — while this phase is addressed to a *node*, and
-    the counter it moves is the node's, shared by every local member of the
-    team. A sync over a group of nodes is not one more operation in that
-    vocabulary; it is a second addressing model beside it.
-  - **The release.** §5.4 makes each epoch counter *its own futex word*, because
-    the kernel implements only 32-bit futexes, and a member waits on the counter
-    itself. Expressing the release as an rmw would need the backend to know that
-    this particular word has futex waiters — which `osoe_transport_notify` does
-    not mean: notify is §4.9's watch mechanism over watched ranges, and a
-    collective's waiters hold no watch. Making them hold one rewrites §5.4's
-    wait, which is where the bounded-skew argument lives.
+  - *"Addressing: §4.10's model is `(pe, region, offset)`, while this phase is
+    addressed to a node — a second addressing model."* **Wrong about the code.**
+    What crossed at `barrier.c` was already `(team, epoch)`, and the node set was
+    computed *below* that call. Nothing node-addressed leaked upward; the
+    interface the code had was team-addressed, and the SHMEM layer already owns
+    teams.
+  - *"The release: expressing it as an rmw would need the backend to know which
+    words have futex waiters, which notify does not mean."* **A refutation of a
+    design nobody needed.** The release was never an rmw; it was one upcall,
+    `release(context, team, epoch)`, in which the host bumped the team's counter.
+    An upcall needs no notify and no watch, and leaves §5.4's equality wait alone.
 
-  So the boundary stays point-to-point and PE-addressed, §2.2's placement of
-  collectives on AM stands, and a backend wanting a native group barrier
-  implements §5's internode phase rather than growing a new primitive. The 4–6×
-  estimate at 10^6 PEs is unchanged and still unmeasured, four orders of
-  magnitude beyond the target hardware; if a device ever makes it matter, what
-  changes is §5's internode phase, where the knowledge of nodes and epochs
-  already lives. *(Closed. The reasoning sits beside the code in
-  `shmem/src/progress.c`.)*
+  And **the price was quoted against the wrong baseline.** The entry said "the
+  4–6× estimate at 10^6 PEs is unchanged", comparing an RDMA tree with SHARP —
+  which RoCE switches do not have (*documented*). What was built was a TCP
+  *star* on node 0: against an RDMA tree that is about 500× at 4,096 nodes, or
+  about 12× once the AM phase is itself a tree (roce-seam §4.3, *arithmetic*).
+  So the AM implementation is to become a k-ary tree before step 3 (§5.3), and a
+  backend with a better way — a tree over RDMA put and atomics, or an offload
+  engine — implements `internode.h` without touching `barrier.c`.
 - **Does the AM data path stay hot in an RDMA build?** Bootstrap is out of band
   in every build (§6.2) and that is forced. Whether §3's *data* path — the
   reservation protocol, deferred reply queues, aggregation — stays running is

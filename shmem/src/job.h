@@ -45,6 +45,7 @@ struct osoe_job {
     uint32_t node;                  /* this PE's logical node */
     uint32_t me;                    /* this PE's world rank */
     const uint32_t *node_of;        /* world rank -> logical node, world_size long */
+    const unsigned char *backend_blob;  /* node_count blobs (osoe_job_backend_blob) */
     bool force_remote;              /* §8.1: deny the pointer to a node-mate */
     bool creator;                   /* node 0's lead made the object */
 };
@@ -58,6 +59,32 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
 
 /* Unmap; node 0's lead removes the name. */
 void osoe_job_leave(struct osoe_job *j);
+
+/*
+ * A backend's per-node addressing blob (§6.2; second review, roce-seam F10).
+ *
+ * An RDMA backend cannot form a single remote address until it knows each
+ * node's queue-pair or DC target number, GID, keys and registered heap base -
+ * roughly 64 bytes per node - and that has to be exchanged before the first
+ * operation, which is to say at the rendezvous. So the rendezvous carries one
+ * fixed-size opaque blob per node, published by the node's lead together with
+ * its rank list, and readable by every PE once the job has joined. Fixed-size
+ * because the rendezvous is sized before anyone has spoken; opaque because
+ * nothing above the backend may read it.
+ *
+ * AM uses none of it and publishes zeros: AM addresses a node by its number.
+ * The call that lets a backend supply its blob before the job rendezvous
+ * arrives with the backend that needs one; the space arrives now, because it is
+ * the rendezvous's layout and changing that later is a protocol revision
+ * (layout 4 of the job segment).
+ */
+enum { OSOE_JOB_BACKEND_BLOB_BYTES = 128 };
+
+static inline const void *osoe_job_backend_blob(const struct osoe_job *j, uint32_t node)
+{
+    return node < j->node_count ? j->backend_blob + (size_t)node * OSOE_JOB_BACKEND_BLOB_BYTES
+                                : NULL;
+}
 
 /* The logical node a world rank is on. */
 static inline uint32_t osoe_node_of(const struct osoe_job *j, uint32_t pe)

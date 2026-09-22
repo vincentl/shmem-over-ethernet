@@ -63,10 +63,8 @@ struct osoe_progress_host {
      * Release a team's epoch on this node: advance its `released` counter and
      * wake every local waiter (§5.3). It is a host callback rather than
      * something this file does, because the counter is the *team's* (§5.4) and
-     * the progress loop has no business knowing what a team is.
-     *
-     * It is also the reason the internode phase is not expressed over the §4.10
-     * boundary - see the note in progress.c.
+     * the progress loop has no business knowing what a team is. The host
+     * forwards it to internode.h's upcall, which is where that knowledge is.
      */
     void (*release)(void *context, uint32_t team, uint32_t epoch);
     void *context;
@@ -177,7 +175,7 @@ uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer);
  * This node's arrival at a team's internode phase (§5.3).
  *
  * Called by the lead's agent, out of the handoff word that whichever local
- * member's increment reached the arrival target left for it (progress-host.h).
+ * member's increment reached the arrival target left for it (internode-am.c).
  * Not by that member: everything here is the progress thread's private state,
  * in the lead's process, and the arriver is an application thread of any local
  * PE. An earlier draft had the arriver reserve and commit the message itself,

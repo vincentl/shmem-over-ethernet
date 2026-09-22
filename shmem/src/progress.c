@@ -758,33 +758,13 @@ bool osoe_progress_idle(struct osoe_progress *p)
 }
 
 /*
- * **Why the internode phase is not expressed over the §4.10 boundary.**
- *
- * §10 left open whether a collective's internode phase should cross the
- * boundary as a mandatory osoe_transport_sync(ctx, group), and scheduled the
- * decision for the step that writes its only caller. Writing it, two obstacles
- * are concrete rather than estimated.
- *
- * The first is addressing. §4.10's entire model is (pe, region, offset) - its
- * opening sentence, and invariant 20 - while this phase is addressed to a
- * *node*, and the counter it moves is the node's, shared by every local member
- * of the team. A sync over a group of nodes is not one more operation in that
- * vocabulary; it is a second addressing model beside it.
- *
- * The second is the release. §5.4 makes each epoch counter *its own futex
- * word*, because the kernel implements only 32-bit futexes, and a member waits
- * on the counter itself. Expressing the release as an rmw would need the
- * backend to know that this particular word has futex waiters on it - which
- * §4.10's notify does not mean: notify is §4.9's watch mechanism, over watched
- * ranges, and the collective's waiters hold no watch. Making them hold one
- * would rewrite §5.4's wait, which is where the bounded-skew argument lives.
- *
- * So the cost is not the fifteen lines §10 estimated. §2.2 put collectives on
- * AM deliberately and §4.10 keeps them outside the boundary deliberately, and
- * having now written the phase, that remains the right call: the boundary stays
- * point-to-point and PE-addressed, and a backend that wants a native group
- * barrier implements §5's internode phase rather than growing a new primitive.
- * Recorded in §10 with this reasoning.
+ * The internode phase of a collective, as the AM backend carries it. It is
+ * reached through internode.h - a sibling of §4.10's boundary, addressed by
+ * (team, epoch) - and not through transport.h, which stays point-to-point and
+ * PE-addressed. This note once argued that the phase could not cross any
+ * boundary at all, because it is addressed to nodes and its release is a futex
+ * wake; the code already passed (team, epoch) down and one release call up, and
+ * §10 records how that decision was reversed (2026-09-20).
  */
 void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch,
                           uint32_t root, uint32_t participants)

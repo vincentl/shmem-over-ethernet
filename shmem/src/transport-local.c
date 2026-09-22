@@ -61,7 +61,7 @@ void osoe_transport_local_get(int pe, enum osoe_region region, uint64_t offset,
  * same instruction the progress thread will use to apply a remote operation,
  * so the two unify. §3.16 fixes the orders: CAS and fetch_add name seq_cst, a
  * set-style write names seq_cst because the watch protocol is two-sided, and so
- * does the load below, which is the waiter's half of it.
+ * does osoe_transport_load (transport-am.c), which is the waiter's half of it.
  */
 
 uint64_t osoe_transport_local_rmw(int pe, enum osoe_region region, uint64_t offset,
@@ -79,43 +79,4 @@ uint64_t osoe_transport_local_rmw(int pe, enum osoe_region region, uint64_t offs
     /* Exact: every applied rmw notifies (§4.10). */
     osoe_transport_notify(pe, region, offset, width);
     return flags & OSOE_TRANSPORT_FETCH ? result : 0;
-}
-
-/*
- * Every wait's predicate load (wait.c, signal.c). It follows the waiter's
- * seq_cst publication of its watch, and the writer's half is a seq_cst store or
- * rmw followed by notify's load of that watch: a two-sided protocol, so this
- * load is seq_cst (§3.16). Acquire is not enough - C11 does not order a seq_cst
- * store before a later acquire load, and GCC for Armv8.3 and later (a Pi 5's
- * Cortex-A76) emits it as ldapr, which passes the stlr: measured, 289 to 4,449
- * lost-wake outcomes in 2 million rounds (fence-litmus/store-buffer-litmus).
- * A seq_cst load is an ldar on every aarch64 target and a plain mov on x86-64.
- */
-uint64_t osoe_transport_load(enum osoe_region region, uint64_t offset, unsigned width)
-{
-    void *ptr = osoe_transport_direct((int)osoe.bootstrap.rank, region, offset);
-    switch (width) {
-    case 8:
-        return atomic_load_explicit((_Atomic uint64_t *)ptr, memory_order_seq_cst);
-    case 4:
-        return atomic_load_explicit((_Atomic uint32_t *)ptr, memory_order_seq_cst);
-    default:
-        return atomic_load_explicit((_Atomic uint16_t *)ptr, memory_order_seq_cst);
-    }
-}
-
-/*
- * Nothing to do: every operation on this backend is a memory operation on a
- * mapping the process already holds, so no range needs preparing (§4.10). The
- * call is still made by the allocator, because the contract is the backend's to
- * ignore, not the caller's to skip.
- */
-void osoe_transport_set_range(enum osoe_region region, uint64_t offset, uint64_t len,
-                       unsigned attributes)
-{
-    (void)region;
-    (void)offset;
-    (void)len;
-    (void)attributes;
-    osoe_count(OSOE_C_TRANSPORT_SET_RANGE_CALLS, 1);
 }
