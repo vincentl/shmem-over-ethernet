@@ -27,7 +27,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 10
+#define OSOE_NODE_LAYOUT 11
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -263,6 +263,11 @@ struct osoe_am_node_metrics {
     _Atomic uint64_t control_queue_high_water;
     _Atomic uint64_t bulk_queue_high_water;
     _Atomic uint64_t pool_high_water;
+    /* Work discovery (layout 11): engine passes, and the connections a pass
+     * drained and flushed. Their ratio is the send side's cost per pass, which
+     * must follow the active connections and not the job's size (§3.10). */
+    _Atomic uint64_t passes;
+    _Atomic uint64_t send_visits;
 };
 
 struct osoe_node_header {
@@ -314,7 +319,8 @@ struct osoe_node_header {
     /* Appended at layout 7 (§5.3). */
     struct osoe_arrival_handoff arrival[OSOE_TEAMS];
 
-    /* Appended at layout 8. Layout 10 added the finalize team's counters above
+    /* Appended at layout 8; layout 11 appended passes and send_visits to it,
+     * which moved nothing before it. Layout 10 added the finalize team's counters above
      * and grew `arrival` by one, which moved this record; readers find it by
      * name. Layout 9 added blocked_detail_kind to the PE slot,
      * which moved no header field. Layout 8 also gave each epoch counter's line a

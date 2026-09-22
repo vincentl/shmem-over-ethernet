@@ -297,6 +297,8 @@ static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
     struct am_wait w;
     am_wait_begin(&w, routine, "the connection's buffer turnover", peer, pe, turnover(conn));
     for (;;) {
+        /* Say which connection: the lead visits only those with work (§3.10). */
+        osoe_connection_area_mark(&osoe_am.area, peer);
         poll_lead();
         if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK)
             break;
@@ -354,6 +356,11 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
         memcpy(to + sizeof h, &m, sizeof m);
         memcpy(to + sizeof h + sizeof m, at, n);
         osoe_connection_commit(conn, &r);
+        /* After every commit, not once per put: the next chunk may have to
+         * wait for room, and the lead makes room only in a connection it
+         * knows has bytes (§3.10). Marking once at the end hung every
+         * multi-chunk put that filled a buffer. */
+        osoe_connection_area_mark(&osoe_am.area, peer);
         mark(c, peer, r.seq);
         at += n;
         offset += n;
@@ -373,6 +380,8 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
      * worst and never correctness. §3.9's aggregation self-clocks off the send
      * regardless, so this is a saving in syscalls rather than in segments.
      */
+    /* Each chunk set the dirty bit whatever the flag says: it is how the lead
+     * finds these bytes at all, even on the pass the sweep forces (§3.10). */
     if (flags & OSOE_TRANSPORT_MORE) {
         osoe_count(OSOE_C_AM_WAKES_DEFERRED, 1);
         return;
@@ -497,6 +506,7 @@ static uint64_t send_message(struct osoe_connection *conn, uint32_t peer, int pe
     if (payload_bytes)
         memcpy(to + sizeof h + fixed_bytes, payload, payload_bytes);
     osoe_connection_commit(conn, &r);
+    osoe_connection_area_mark(&osoe_am.area, peer);
     return r.seq;
 }
 
@@ -650,6 +660,7 @@ static void flush_dirty(struct osoe_transport_context *c)
          * what quiet then waits for, and nothing more. */
         if (conn) {
             osoe_connection_request_ack(conn, c->high_segment[slot]);
+            osoe_connection_area_mark(&osoe_am.area, peer);
             asked = true;
         }
     }

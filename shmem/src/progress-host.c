@@ -18,6 +18,7 @@
 #include "fatal.h"
 #include "internode.h"
 #include "job.h"
+#include "metrics.h"
 #include "node.h"
 #include "progress.h"
 #include "progress-host.h"
@@ -103,14 +104,48 @@ static void release(void *context, uint32_t team, uint32_t epoch)
 
 /* ---- waking the engine (§3.12) ------------------------------------------ */
 
+/*
+ * Wake the lead only if it sleeps (§3.10; lead_wake_model.py). The caller has
+ * already set its connection's dirty bit (osoe_connection_area_mark), a seq_cst
+ * RMW; this load of the flag is the second half of the writer's side of a
+ * two-sided protocol, so it is seq_cst too (§3.16). If it reads 0 - the lead has
+ * not raised its flag, or another writer claimed this sleep's wake - the lead's
+ * seq_cst load of the bits after raising it will see this writer's bit, or the
+ * wake already claimed is on its way. If it wins the flag, the bump changes the
+ * word the lead sleeps on, so a futex_wait that has not started yet returns at
+ * once.
+ *
+ * An awake lead costs a writer one load of a line it shares with every other
+ * writer, read-mostly, instead of a locked add on it and a futex_wake syscall.
+ */
 void osoe_progress_host_wake_lead(void)
 {
     if (!osoe_am.internode)
         return;
+    /*
+     * Claim the wake: only the writer whose CAS takes the flag from 1 to 0
+     * makes the syscall; the rest see 0 and skip until the lead raises it
+     * again. Without the claim every writer during the lead's wake-up latency
+     * saw 1, and a burst of puts still woke the lead for 93% of them (the
+     * model's `every_writer`). The load first, so an awake lead's line stays
+     * shared rather than taken exclusive by every writer's CAS.
+     */
+    uint32_t sleeping = 1;
+    if (atomic_load_explicit(osoe_am.area.lead_sleeping, memory_order_seq_cst) == 0 ||
+        !atomic_compare_exchange_strong_explicit(osoe_am.area.lead_sleeping, &sleeping, 0,
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
+        osoe_count(OSOE_C_AM_WAKES_SKIPPED, 1);
+        return;
+    }
+    osoe_count(OSOE_C_AM_WAKES_SENT, 1);
     struct osoe_pe_slot *lead = &osoe.node.slots[0];
     atomic_fetch_add_explicit(&lead->agent_wake, 1, memory_order_seq_cst);
     osoe_futex_wake(&lead->agent_wake, 1, OSOE_FUTEX_SHARED);
 }
+
+/* Whether this lead has raised lead_sleeping and not lowered it. Private to the
+ * agent thread, so the flag is stored only when it changes. */
+static bool flag_raised;
 
 /*
  * Read from another process, since only the lead runs the engine. The value is
@@ -180,6 +215,7 @@ void osoe_progress_host_start(uint32_t session)
     /* Count into the control segment, where osoe-stat and the tests read it. */
     osoe_am.progress.metrics = &osoe.node.hdr->am;
     osoe_progress_attach(&osoe_am.progress, osoe_am.connection);
+    flag_raised = false;
 }
 
 /*
@@ -266,12 +302,34 @@ void osoe_progress_host_stop(void)
     osoe_am.internode = false;
 }
 
+/*
+ * The agent's pass, and the lead's half of the sleep protocol (§3.10;
+ * lead_wake_model.py). A pass that moved nothing is about to be followed by the
+ * agent's futex_wait on agent_wake, with the value it loaded before the pass.
+ * So raise lead_sleeping first - seq_cst, the store side of the two-sided
+ * protocol - and then look at the dirty bits again with seq_cst loads: a writer
+ * whose bit landed after this pass's exchange either shows here, and the agent
+ * goes round again, or read the flag as 1 and bumps agent_wake, which makes the
+ * wait return. The flag comes down at the next pass, which is after the wait.
+ */
 bool osoe_progress_host_poll(void)
 {
     if (!osoe_am.internode || !osoe_am.lead)
         return false;
+    struct osoe_connection_area *a = &osoe_am.area;
+    if (flag_raised) {
+        atomic_store_explicit(a->lead_sleeping, 0, memory_order_seq_cst);
+        flag_raised = false;
+    }
     bool moved = osoe_internode_am_take_arrivals();
-    return osoe_progress_poll(&osoe_am.progress) || moved;
+    if (osoe_progress_poll(&osoe_am.progress) || moved)
+        return true;
+    atomic_store_explicit(a->lead_sleeping, 1, memory_order_seq_cst);
+    flag_raised = true;
+    for (uint32_t w = 0; w < a->dirty_words; w++)
+        if (atomic_load_explicit(&a->dirty[w], memory_order_seq_cst) != 0)
+            return true;
+    return false;
 }
 
 uint64_t osoe_progress_host_idle_ns(void)

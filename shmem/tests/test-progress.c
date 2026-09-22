@@ -158,6 +158,12 @@ static void release(void *context, uint32_t team, uint32_t epoch)
     releases++;
 }
 
+/* The area and peer post() marks: every writer says it committed, as the
+ * library's do, because the lead drains only connections whose dirty bit is
+ * set or which it already knows are busy (§3.10). */
+static struct osoe_connection_area *mark_area;
+static uint32_t mark_peer;
+
 /* An application thread's half: reserve, copy, commit (§3.5). Never seals -
  * that is the progress thread's (§3.12). */
 static bool post(struct osoe_connection *c, uint16_t kind, const void *fixed,
@@ -174,6 +180,7 @@ static bool post(struct osoe_connection *c, uint16_t kind, const void *fixed,
     if (payload_bytes)
         memcpy(at + sizeof h + fixed_bytes, payload, payload_bytes);
     osoe_connection_commit(c, &r);
+    osoe_connection_area_mark(mark_area, mark_peer);
     return true;
 }
 
@@ -216,6 +223,8 @@ int main(void)
 
     struct osoe_connection *c = osoe_connection_to(&area, peer);
     CHECK_FATAL(c != NULL);  /* a non-lead PE dereferences it below via post() */
+    mark_area = &area;
+    mark_peer = peer;
     arrivals_open();
 
     /*

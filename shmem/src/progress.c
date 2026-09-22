@@ -730,6 +730,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
             if (used == header)
                 osoe_counter_word_add(&p->metrics->header_only_sent, 1);   /* §3.4's ack-only */
             osoe_connection_seal(conn, c->open);
+            c->carrying = false;
             c->state[c->open] = OSOE_BUFFER_SEALED_STATE;
             c->sealed = c->open;
             c->open = OSOE_CONNECTION_NONE;
@@ -746,7 +747,8 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
                  * sealed and no writer can reach it. */
                 c->state[k] = OSOE_BUFFER_DRAINING;
                 struct drain_target preopen = { k, conn->capacity / 2 };
-                drain_into(p, slot, conn, &preopen);
+                if (drain_into(p, slot, conn, &preopen))
+                    c->carrying = true;
                 osoe_connection_open(conn, k, c->next_seq++);
                 c->state[k] = OSOE_BUFFER_OPEN;
                 c->open = k;
@@ -818,14 +820,59 @@ static bool release_local(struct osoe_progress *p)
     return moved;
 }
 
+/*
+ * Does this connection have send-side work the lead already knows about,
+ * without a writer saying so? A buffer to open, one sealed or on the wire,
+ * replies queued, an acknowledgement owed, or replies the pre-open drain put in
+ * the open buffer. The last was missed at first: the pre-open drain runs after
+ * the pass's chance to seal, and the first barrier of an 8-node job hung about
+ * one run in eight with a leaf's ARRIVE sitting unsealed in its open buffer. Private state only: O(1), and no
+ * shared line touched.
+ */
+static bool busy(const struct osoe_progress *p, uint32_t slot)
+{
+    const struct osoe_progress_connection *c = &p->connection[slot];
+    return c->open == OSOE_CONNECTION_NONE || c->sending != OSOE_CONNECTION_NONE ||
+           c->sealed != OSOE_CONNECTION_NONE || c->owe_ack || c->carrying ||
+           c->queues.control.depth != 0 || c->queues.bulk.depth != 0;
+}
+
+/*
+ * One pass (§3.10, §3.12).
+ *
+ * **Receiving polls every wire**: the step-2 wire is shared memory and says
+ * nothing when bytes arrive, so the lead looks. That is O(N) per pass and
+ * step 3's completions replace it; it is not work discovery's to fix.
+ *
+ * **Sending visits only the connections with work** (phase 1 step 2 slice 3):
+ * those whose dirty bit a writer set since the last pass, those that received
+ * something this pass (an acknowledgement may be owed), and those the lead
+ * already knows are busy. The bitmap is read word by word - a load, and an
+ * exchange only if the word is nonzero - so an idle word costs one cached load:
+ * N/64 of them per pass, and O(active) connections drained and flushed. Before,
+ * every pass drained and flushed every connection (second review, D12).
+ */
 bool osoe_progress_poll(struct osoe_progress *p)
 {
     bool moved = release_local(p);     /* a release osoe_progress_arrive started */
-    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
-        moved |= receive(p, slot);
-        moved |= drain(p, slot);
-        moved |= flush(p, slot);
+    uint32_t peers = p->nodes - 1, visits = 0;
+    for (uint32_t w = 0; w * 64 < peers; w++) {
+        uint64_t bits = 0;
+        if (p->area->dirty &&
+            atomic_load_explicit(&p->area->dirty[w], memory_order_acquire) != 0)
+            bits = atomic_exchange_explicit(&p->area->dirty[w], 0, memory_order_seq_cst);
+        for (uint32_t slot = w * 64; slot < peers && slot < w * 64 + 64; slot++) {
+            bool received = receive(p, slot);
+            moved |= received;
+            if (!received && !((bits >> (slot % 64)) & 1) && !busy(p, slot))
+                continue;
+            moved |= drain(p, slot);
+            moved |= flush(p, slot);
+            visits++;
+        }
     }
+    osoe_counter_word_add(&p->metrics->passes, 1);
+    osoe_counter_word_add(&p->metrics->send_visits, visits);
     return release_local(p) || moved;
 }
 

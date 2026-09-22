@@ -21,7 +21,8 @@
 #include "shm-object.h"
 
 #define OSOE_CONNECTION_AREA_MAGIC UINT64_C(0x61657261656f736f)   /* "osoearea" */
-#define OSOE_CONNECTION_AREA_LAYOUT 2   /* 2: `opened` */
+#define OSOE_CONNECTION_AREA_LAYOUT 3   /* 2: `opened`; 3: `lead_sleeping` and the
+                                         * dirty-connection bitmap */
 
 /*
  * The frozen prefix, for the same reason the control segment has one (§3.14):
@@ -58,6 +59,14 @@ struct osoe_connection_area_header {
      * other end of a session.
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t opened;
+    /* The lead's flag (connection-area.h), on a line of its own: every writer
+     * loads it after every operation, and the lead stores it twice per sleep. */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t lead_sleeping;
+    /* Then the dirty bitmap, (nodes - 2) / 64 + 1 words from dirty_offset,
+     * before the connections. One line holds 512 connections' bits; the words
+     * share lines, since nothing yet measures contention between them (the
+     * brief's rule: a line per word only if measurement says so). */
+    uint64_t dirty_offset;
 };
 
 static uint64_t align_up(uint64_t n)
@@ -75,12 +84,18 @@ static uint32_t peer_slot(uint32_t self, uint32_t peer)
     return peer < self ? peer : peer - 1;
 }
 
+static uint64_t dirty_words(uint32_t nodes)
+{
+    return nodes < 2 ? 0 : (uint64_t)(nodes - 2) / 64 + 1;
+}
+
 uint64_t osoe_am_area_bytes(uint32_t nodes, uint64_t buffer)
 {
     if (nodes < 2)
         return 0;
     uint64_t peers = nodes - 1;
     uint64_t conns = align_up(sizeof(struct osoe_connection_area_header)) +
+                     align_up(dirty_words(nodes) * sizeof(uint64_t)) +
                      align_up(peers * sizeof(struct osoe_connection_shared));
     return conns + peers * 2 * buffer;
 }
@@ -279,10 +294,14 @@ again:;
     a->map = p;
 
     struct osoe_connection_area_header *h = p;
-    uint64_t conns_offset = align_up(sizeof *h);
+    uint64_t dirty_offset = align_up(sizeof *h);
+    uint64_t conns_offset = dirty_offset + align_up(dirty_words(nodes) * sizeof(uint64_t));
     uint64_t data_offset = conns_offset +
                            align_up((uint64_t)peers * sizeof(struct osoe_connection_shared));
 
+    a->dirty = (_Atomic uint64_t *)((char *)p + dirty_offset);
+    a->dirty_words = (uint32_t)dirty_words(nodes);
+    a->lead_sleeping = &h->lead_sleeping;
     a->conn = calloc(peers, sizeof *a->conn);
     if (!a->conn)
         osoe_fatal("out of memory for %u connection handles", peers);
@@ -300,6 +319,7 @@ again:;
         h->buffer_bytes = buffer;
         h->chunk_bytes = config.chunk;
         h->conns_offset = conns_offset;
+        h->dirty_offset = dirty_offset;
         h->data_offset = data_offset;
         h->area_bytes = a->bytes;
         h->creator_pid = (int32_t)getpid();

@@ -32,6 +32,7 @@
 #ifndef OSOE_CONNECTION_AREA_H
 #define OSOE_CONNECTION_AREA_H
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -122,6 +123,18 @@ struct osoe_connection_area {
     uint32_t credits;       /* §3.8's C, so the pool can be sized by it */
     struct osoe_connection *conn; /* nodes - 1 handles, indexed by peer_slot() */
     bool creator;           /* this PE is the node lead, so it made the object */
+    /*
+     * The send side's work discovery (§3.10, §3.12; phase 1 step 2 slice 3).
+     * `dirty` is a bitmap over peer slots, 64 per word: a writer that commits
+     * into a connection sets its bit, and the lead takes each word with an
+     * exchange and visits only the connections whose bits it took, plus those it
+     * already knows are busy. `lead_sleeping` is 1 while the lead is about to
+     * sleep or asleep, so a writer calls futex_wake only then. Both in the
+     * area's header, so every local PE sees them.
+     */
+    _Atomic uint64_t *dirty;
+    uint32_t dirty_words;
+    _Atomic uint32_t *lead_sleeping;
 };
 
 /*
@@ -134,6 +147,21 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
 
 /* Unmap; the lead also removes the name. */
 void osoe_connection_area_close(struct osoe_connection_area *a);
+
+/*
+ * A writer's half of work discovery: say that connection toward `peer` has
+ * something for the lead - committed bytes, or an acknowledgement request.
+ * A seq_cst locked or, because it is the store side of a two-sided protocol
+ * with the lead's flag (§3.16; lead_wake_model.py): the writer sets its bit and
+ * then loads lead_sleeping, the lead stores lead_sleeping and then loads the
+ * bits. Call it after the commit it announces, then osoe_progress_host_wake_lead.
+ */
+static inline void osoe_connection_area_mark(struct osoe_connection_area *a, uint32_t peer)
+{
+    uint32_t slot = peer < a->node ? peer : peer - 1;
+    atomic_fetch_or_explicit(&a->dirty[slot / 64], UINT64_C(1) << (slot % 64),
+                             memory_order_seq_cst);
+}
 
 /* This node's connection toward `peer`, or NULL if peer is this node. */
 struct osoe_connection *osoe_connection_to(struct osoe_connection_area *a, uint32_t peer);

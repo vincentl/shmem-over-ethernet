@@ -363,6 +363,20 @@ foreach(fanout 2 4)
   endforeach()
 endforeach()
 
+# Work discovery on the send side (§3.10; slice 3 part C): 16 logical nodes,
+# traffic on one connection, and a pass must drain and flush O(1) of them.
+add_executable(shmem_test_work_discovery test-work-discovery.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_work_discovery PRIVATE
+  ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_work_discovery PRIVATE osoe rt)
+osoe_warnings(shmem_test_work_discovery)
+add_test(NAME shmem.work-discovery
+  COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=16M
+          $<TARGET_FILE:osoe-launch> -n 16 -m 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -t 120
+          -- $<TARGET_FILE:shmem_test_work_discovery>)
+set_tests_properties(shmem.work-discovery PROPERTIES LABELS "tier2" TIMEOUT 150)
+
 # The same program with §8.1's force-remote flag on, which is what makes
 # osoe_transport_direct's call to the one locality function testable at all:
 # without it a PE on another node already has no mapped heap here, so the

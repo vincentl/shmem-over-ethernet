@@ -120,6 +120,13 @@ struct osoe_progress_connection {
      */
     bool owe_ack;
     uint64_t flagged;
+    /*
+     * The lead itself left bytes in the open buffer: the pre-open drain wrote
+     * replies into it just before it became reservable, after this pass's
+     * chance to seal. No writer set a dirty bit for them, so this is what keeps
+     * the connection visited until they are sealed (work discovery, §3.10).
+     */
+    bool carrying;
     struct osoe_am_parser parser;
     struct osoe_reply_queues queues;
 };

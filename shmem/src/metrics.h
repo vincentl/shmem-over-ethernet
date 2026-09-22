@@ -70,6 +70,9 @@ enum osoe_counter {
     /* Wakes OSOE_TRANSPORT_MORE held back, each one a futex syscall the
      * following operation paid for instead (§4.10). */
     OSOE_C_AM_WAKES_DEFERRED,
+    /* §3.10's wake of the lead, from the writer's side: sent because the lead
+     * was asleep, or skipped because it was awake (lead_wake_model.py). */
+    OSOE_C_AM_WAKES_SENT, OSOE_C_AM_WAKES_SKIPPED,
 
     /*
      * Must be zero at quiescence (§3.14 question 6, §8.2).

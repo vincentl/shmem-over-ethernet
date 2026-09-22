@@ -833,6 +833,47 @@ per PE to avoid one futex word).
 > rejection above stands for the shipping design, and step 3 restores the
 > blocking form and deletes the interval.
 
+**How the lead finds its work** (phase 1 step 2 slice 3; second review, D12). The
+loop above says `submit_sealed_buffers()` and `work_pending()` without saying how
+the lead learns *which* connections gained bytes; as first built, every writer
+did a locked add on the lead's one wake word and a `futex_wake` syscall, and
+every pass drained and flushed every connection — O(*N*) per wake, and *L*-way
+contention on one line. Two structures replace that, in the connection area's
+header, so every local PE sees them:
+
+- **A dirty-connection bitmap**, one bit per peer slot, 64 to a word. A writer
+  that commits into connection *s* — or asks it for an acknowledgement, or waits
+  for room in it — sets bit *s* with a `seq_cst` `fetch_or`, after every commit
+  (not once per operation: a multi-chunk put whose next chunk waits for room
+  hung until it did). The lead reads each word and exchanges it to zero only if
+  it is nonzero, and drains and flushes only the connections whose bits it took,
+  those that received something this pass, and those it privately knows are busy
+  — a buffer to open, one sealed or on the wire, replies queued, an
+  acknowledgement owed, or bytes its own pre-open drain left in the open buffer
+  (the last found by a hang: the pre-open drain runs after the pass's chance to
+  seal). Cost per pass: *N*/64 cached loads and O(active) connections visited.
+  Measured with 16 logical nodes and traffic on one connection: 0.78–0.85
+  connections drained and flushed per pass, against 15 before
+  (`shmem.work-discovery`, which exports and asserts it through
+  `transport.am.passes` and `transport.am.send_visits`).
+- **A `lead_sleeping` flag.** The lead raises it before its last check, then
+  looks at the bits again, then sleeps on its wake word at the value it loaded
+  before the pass; it lowers the flag on its next pass. A writer loads the flag
+  after setting its bit and wakes the lead only if it can **claim** the wake —
+  a CAS from 1 to 0 — so one writer makes the syscall per sleep. A two-sided
+  protocol (§3.16), modelled in `docs/design/evidence/lead-wake/`: SC and TSO,
+  claimed and unclaimed, and four broken variants that each lose a wake
+  (a `release` store on either side under TSO, no recheck, no bump). Measured,
+  the same burst of 20,000 puts made 110–334 `futex_wake` calls instead of one per
+  put; without the claim it still made 93% of them, because every put landing
+  during the lead's wake-up latency saw the flag raised.
+
+**Receiving still polls every wire** in step 2: the shared-memory wire says
+nothing when bytes arrive, so the lead looks at all *N* − 1 on every pass. That
+is O(*N*) per pass and not work discovery's to fix; step 3's receive completions
+replace it. Nothing added here touches every connection's shared state
+periodically, so it does not make lazy connection establishment harder.
+
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
 anything sealed regardless of signalling. This converts a class of hangs into a
@@ -1579,6 +1620,7 @@ outcome C11 forbids, and with what.
 | A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready` |
 | Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere |
+| Two-sided, with a claim: the writer's store is an RMW on a bitmap and the lead's a flag, and a writer that reads the flag raised takes it down with a CAS before waking (slice 3) | The store-buffering outcome - the lead's recheck misses the bit and the writer misses the flag - is forbidden only among `seq_cst` operations; the claim CAS is an RMW in *S*, and a writer that loses it read a later value of the flag, so the lead's recheck ordered after that value sees its bit | **`seq_cst`** `fetch_or`, flag store, flag load and CAS; `seq_cst` recheck loads | `osoe_connection_area_mark`, `osoe_progress_host_wake_lead`, `osoe_progress_host_poll` (`lead_wake_model.py`) |
 | `shmem_fence` over plain stores (W→W) | Nothing, for a race-free program: its flag is an AMO, a `seq_cst` store and so a release. Table 14's plain stores are a data race C11 gives no meaning; the weakest construct ordering earlier stores before later ones is a release fence | **`atomic_thread_fence(release)`** | `osoe_transport_fence` |
 | `shmem_quiet`, `pe_quiet`, the barriers (W→R) | "Visible to all PEs" on return is the store-buffering shape again; C11 forbids its bad outcome with a `seq_cst` fence between each side's store and load | **`atomic_thread_fence(seq_cst)`** | `osoe_transport_wait` |
 
@@ -4793,6 +4835,12 @@ Assert what can be asserted. Instrument the rest.
     (§5.3) A waiter that does not pass the chain on strands those behind it; a
     wake without the parity can be absorbed by a member already waiting for the
     next epoch. Both lose wakes in `chained_wake_model.py`.
+34. **A writer sets its connection's dirty bit after every commit and before it
+    loads `lead_sleeping`; the lead raises the flag before it rechecks the bits;
+    all of it `seq_cst`; and the lead visits every connection it privately knows
+    is busy.** (§3.10) Each rule dropped loses the lead's attention for committed
+    bytes: a lost wake in `lead_wake_model.py`, or - the private half - a leaf's
+    barrier arrival left unsealed, measured one run in eight.
 
 ## 10. Open Questions
 

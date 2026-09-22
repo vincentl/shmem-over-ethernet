@@ -78,10 +78,12 @@ bool osoe_internode_am_take_arrivals(void);
  * committed, sends it, and reaps what has arrived (§3.12's "a flag plus a futex
  * wake", where here the committed bytes are the flag).
  *
- * Called by an application thread after committing into a connection buffer,
- * and again by anything waiting on a peer - a writer out of room, a quiet
- * waiting for an acknowledgement - because the lead may be asleep and this is
- * the only thing that wakes it for a connection.
+ * Called by an application thread after committing into a connection buffer
+ * and setting its dirty bit (osoe_connection_area_mark), and again by anything
+ * waiting on a peer - a writer out of room, a quiet waiting for an
+ * acknowledgement. It makes the futex syscall only if the lead has raised
+ * lead_sleeping and this caller claims the wake (§3.10, lead_wake_model.py);
+ * otherwise it is one load.
  */
 void osoe_progress_host_wake_lead(void);
 

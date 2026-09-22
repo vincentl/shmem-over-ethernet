@@ -80,6 +80,8 @@ static const struct osoe_metric_descriptor thread_metrics[] = {
     T("agent.last_wake_ns", OSOE_MKIND_STATE, "ns"),
     T("am.reserve_stalls", OSOE_MKIND_COUNTER, ""),
     T("am.wakes_deferred", OSOE_MKIND_COUNTER, ""),
+    T("am.wakes_sent", OSOE_MKIND_COUNTER, ""),
+    T("am.wakes_skipped", OSOE_MKIND_COUNTER, ""),
     T("invariant.missed_wake", OSOE_MKIND_INVARIANT, ""),
     T("invariant.watch_reentered", OSOE_MKIND_INVARIANT, ""),
     T("thread.claimed", OSOE_MKIND_STATE, ""),
@@ -203,6 +205,9 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("transport.am.bulk_queue_high_water", am.bulk_queue_high_water, OSOE_MTYPE_U64,
        OSOE_MKIND_HIGHWATER, ""),
     ND("transport.am.pool_high_water", am.pool_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, ""),
+    ND("transport.am.passes", am.passes, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.send_visits", am.send_visits, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+       "conns"),
 };
 
 enum {
