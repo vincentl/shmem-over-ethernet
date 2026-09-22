@@ -60,8 +60,8 @@ void osoe_transport_local_get(int pe, enum osoe_region region, uint64_t offset,
  * rmw and load are one C11 atomic operation on the shared mapping (§4.1), the
  * same instruction the progress thread will use to apply a remote operation,
  * so the two unify. §3.16 fixes the orders: CAS and fetch_add name seq_cst, a
- * set-style write names seq_cst because the watch protocol is two-sided, and a
- * load names acquire.
+ * set-style write names seq_cst because the watch protocol is two-sided, and so
+ * does the load below, which is the waiter's half of it.
  */
 
 uint64_t osoe_transport_local_rmw(int pe, enum osoe_region region, uint64_t offset,
@@ -81,16 +81,26 @@ uint64_t osoe_transport_local_rmw(int pe, enum osoe_region region, uint64_t offs
     return flags & OSOE_TRANSPORT_FETCH ? result : 0;
 }
 
+/*
+ * Every wait's predicate load (wait.c, signal.c). It follows the waiter's
+ * seq_cst publication of its watch, and the writer's half is a seq_cst store or
+ * rmw followed by notify's load of that watch: a two-sided protocol, so this
+ * load is seq_cst (§3.16). Acquire is not enough - C11 does not order a seq_cst
+ * store before a later acquire load, and GCC for Armv8.3 and later (a Pi 5's
+ * Cortex-A76) emits it as ldapr, which passes the stlr: measured, 289 to 4,449
+ * lost-wake outcomes in 2 million rounds (fence-litmus/store-buffer-litmus).
+ * A seq_cst load is an ldar on every aarch64 target and a plain mov on x86-64.
+ */
 uint64_t osoe_transport_load(enum osoe_region region, uint64_t offset, unsigned width)
 {
     void *ptr = osoe_transport_direct((int)osoe.bootstrap.rank, region, offset);
     switch (width) {
     case 8:
-        return atomic_load_explicit((_Atomic uint64_t *)ptr, memory_order_acquire);
+        return atomic_load_explicit((_Atomic uint64_t *)ptr, memory_order_seq_cst);
     case 4:
-        return atomic_load_explicit((_Atomic uint32_t *)ptr, memory_order_acquire);
+        return atomic_load_explicit((_Atomic uint32_t *)ptr, memory_order_seq_cst);
     default:
-        return atomic_load_explicit((_Atomic uint16_t *)ptr, memory_order_acquire);
+        return atomic_load_explicit((_Atomic uint16_t *)ptr, memory_order_seq_cst);
     }
 }
 

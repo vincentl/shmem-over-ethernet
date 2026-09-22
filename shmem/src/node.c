@@ -59,17 +59,23 @@ static uint64_t page_round(uint64_t n)
     return (n + page - 1) / page * page;
 }
 
-/* Publish failure so waiting siblings stop at their next sweep, then die. */
-_Noreturn static void fail_rendezvous(struct osoe_node *n, const char *what)
+/* Publish failure so waiting siblings stop at their next sweep: osoe_fatal_then's
+ * last act, after the message is out (fatal.h). */
+static void publish_failure(void *context)
 {
+    struct osoe_node *n = context;
     if (n->hdr) {
-        /* seq_cst: a futex word that is its own predicate (§3.16). */
-        atomic_store_explicit(&n->hdr->failed, 1, memory_order_seq_cst);
+        /* release: checked by waiters at each wake and sweep (§3.16). */
+        atomic_store_explicit(&n->hdr->failed, 1, memory_order_release);
         osoe_futex_wake(&n->hdr->ready, INT_MAX, OSOE_FUTEX_SHARED);
         osoe_futex_wake(&n->hdr->joined, INT_MAX, OSOE_FUTEX_SHARED);
         osoe_futex_wake(&n->hdr->mapped, INT_MAX, OSOE_FUTEX_SHARED);
     }
-    osoe_fatal("%s", what);
+}
+
+_Noreturn static void fail_rendezvous(struct osoe_node *n, const char *what)
+{
+    osoe_fatal_then(publish_failure, n, "%s", what);
 }
 
 static void check_failed(struct osoe_node *n)
@@ -253,13 +259,16 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      */
     uint64_t wanted = n->control_bytes + (uint64_t)b->local_count * n->heap_bytes;
     uint64_t free_bytes;
-    if (!osoe_shm_room(wanted, &free_bytes))
-        osoe_fatal("/dev/shm has %llu MiB free, but this node's control segment and %u "
-                   "heaps of %llu MiB need %llu MiB: lower SHMEM_SYMMETRIC_SIZE, run "
-                   "fewer PEs per node, or enlarge /dev/shm",
-                   (unsigned long long)(free_bytes >> 20), b->local_count,
-                   (unsigned long long)(n->heap_bytes >> 20),
-                   (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
+    if (!osoe_shm_room(wanted, &free_bytes)) {
+        char msg[320];
+        snprintf(msg, sizeof msg, "/dev/shm has %llu MiB free, but this node's control "
+                 "segment and %u heaps of %llu MiB need %llu MiB: lower "
+                 "SHMEM_SYMMETRIC_SIZE, run fewer PEs per node, or enlarge /dev/shm",
+                 (unsigned long long)(free_bytes >> 20), b->local_count,
+                 (unsigned long long)(n->heap_bytes >> 20),
+                 (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
+        osoe_shm_short(b->shm_capacity_warning_only, msg);
+    }
 
     char err[256];
     int fd = osoe_shm_create(n->control_name,
@@ -474,8 +483,8 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
 
     if (lead) {
         n->hdr->heap_base = base;
-        /* seq_cst: a futex word that is its own predicate (§3.16). */
-        atomic_store_explicit(&n->hdr->ready, 1, memory_order_seq_cst);
+        /* release: a futex word that is its own predicate (§3.16). */
+        atomic_store_explicit(&n->hdr->ready, 1, memory_order_release);
         osoe_futex_wake(&n->hdr->ready, INT_MAX, OSOE_FUTEX_SHARED);
     }
 

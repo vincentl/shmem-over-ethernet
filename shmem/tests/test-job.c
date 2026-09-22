@@ -17,20 +17,48 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "bootstrap.h"
 #include "check.h"
 #include "job.h"
+
+/*
+ * The library's two fatals, in its order (fatal.h): the message, then the last
+ * act, then exit. One write(2) each, as fatal.c does, so that
+ * shmem.job.duplicate-rank.slow-message can hold the message back
+ * (slow-message.c); stdio's writes cannot be interposed.
+ */
+static void report(const char *fmt, va_list ap)
+{
+    char msg[512];
+    int n = snprintf(msg, sizeof msg, "osoe_fatal: ");
+    n += vsnprintf(msg + n, sizeof msg - (size_t)n - 1, fmt, ap);
+    if (n > (int)sizeof msg - 2)
+        n = (int)sizeof msg - 2;
+    msg[n++] = '\n';
+    ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n);
+    (void)ignored;
+}
 
 _Noreturn void osoe_fatal(const char *fmt, ...);
 _Noreturn void osoe_fatal(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    fprintf(stderr, "osoe_fatal: ");
-    vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n");
+    report(fmt, ap);
     va_end(ap);
+    exit(1);
+}
+
+_Noreturn void osoe_fatal_then(void (*publish)(void *), void *context, const char *fmt, ...);
+_Noreturn void osoe_fatal_then(void (*publish)(void *), void *context, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    report(fmt, ap);
+    va_end(ap);
+    publish(context);
     exit(1);
 }
 

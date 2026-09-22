@@ -162,7 +162,8 @@ static void enqueue(struct osoe_progress *p, uint32_t slot, struct osoe_reply_qu
  * between its load and its wait returns at once instead of sleeping stale. */
 static void land(struct osoe_landing_slot *slot)
 {
-    atomic_store_explicit(&slot->ready, 1, memory_order_seq_cst);
+    /* release: the bump after it is the waiter's futex word (§3.16). */
+    atomic_store_explicit(&slot->ready, 1, memory_order_release);
     atomic_fetch_add_explicit(&slot->wake, 1, memory_order_seq_cst);
     osoe_futex_wake(&slot->wake, INT_MAX, OSOE_FUTEX_SHARED);
 }

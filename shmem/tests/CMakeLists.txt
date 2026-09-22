@@ -178,6 +178,15 @@ endforeach()
 # poles: one node, one PE per node, uneven sizes, and ranks not contiguous per
 # node - the last two being where two-level collectives break, and a uniform
 # map never shows it.
+# A loud failure writes its reason before it publishes anything (fatal.h),
+# checked on fatal.c alone. See test-fatal-order.c.
+add_executable(shmem_test_fatal-order test-fatal-order.c ../src/fatal.c)
+target_include_directories(shmem_test_fatal-order PRIVATE ../src)
+target_link_libraries(shmem_test_fatal-order PRIVATE osoe_base)
+osoe_warnings(shmem_test_fatal-order)
+add_test(NAME shmem.fatal-order COMMAND shmem_test_fatal-order)
+set_tests_properties(shmem.fatal-order PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c ../src/shm-object.c
   ../src/am.c)
 target_include_directories(shmem_test_job PRIVATE ../src)
@@ -200,6 +209,25 @@ add_test(NAME shmem.job.duplicate-rank
           $<TARGET_FILE:shmem_test_job>)
 set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
+
+# The same refusal with its message's write held back a second (slow-message.c):
+# the reason must be on stderr before the job is told to fail, or the launcher's
+# SIGTERM can take it. Before the reason was written first, it was lost in 1 of
+# 30 runs of the test above under load, and in every run of this one. Not under
+# the sanitizers, whose runtimes must come first in the link order LD_PRELOAD
+# would change.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  add_library(slow-message SHARED slow-message.c)
+  target_link_libraries(slow-message PRIVATE ${CMAKE_DL_LIBS})
+  osoe_warnings(slow-message)
+  add_test(NAME shmem.job.duplicate-rank.slow-message
+    COMMAND ${CMAKE_COMMAND} -E env "OSOE_TEST_SLOW_TEXT=is claimed by node"
+            LD_PRELOAD=$<TARGET_FILE:slow-message>
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1,0 --
+            $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.job.duplicate-rank.slow-message PROPERTIES LABELS "tier2"
+    TIMEOUT 60 PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
+endif()
 
 # The progress loop between two logical nodes (tier 2): every layer at once.
 # The wire is far smaller than a segment and its split injection is on, so the
@@ -625,8 +653,15 @@ add_test(NAME shmem.dev-shm-capacity.heaps
 add_test(NAME shmem.dev-shm-capacity.connections
   COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
           $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> connections)
+# And OSOE_SHM_CAPACITY_CHECK=0, for testing on a small /dev/shm: the same
+# request is reported and the job runs.
+add_test(NAME shmem.dev-shm-capacity.warned
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> warned)
 set_tests_properties(shmem.dev-shm-capacity.heaps shmem.dev-shm-capacity.connections
-  PROPERTIES LABELS "tier2" TIMEOUT 60)
+  shmem.dev-shm-capacity.warned PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.dev-shm-capacity.warned PROPERTIES PASS_REGULAR_EXPRESSION
+  "and 2 heaps.*continuing, since OSOE_SHM_CAPACITY_CHECK=0.*launcher exited 0")
 set_tests_properties(shmem.dev-shm-capacity.heaps PROPERTIES PASS_REGULAR_EXPRESSION
   "/dev/shm has [0-9]+ MiB free, but this node's control segment and 2 heaps.*launcher exited 1")
 set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES PASS_REGULAR_EXPRESSION

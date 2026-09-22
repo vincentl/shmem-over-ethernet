@@ -10,6 +10,7 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
+#include "fatal.h"
 #include "shm-object.h"
 
 /* Whose is this object, and is it ours? */
@@ -98,6 +99,13 @@ bool osoe_shm_orphaned(int fd)
 {
     struct stat st;
     return fstat(fd, &st) == 0 && st.st_nlink == 0;
+}
+
+void osoe_shm_short(bool warning_only, const char *message)
+{
+    if (!warning_only)
+        osoe_fatal("%s", message);
+    fprintf(stderr, "osoe: %s; continuing, since OSOE_SHM_CAPACITY_CHECK=0\n", message);
 }
 
 bool osoe_shm_room(uint64_t wanted, uint64_t *free_bytes)

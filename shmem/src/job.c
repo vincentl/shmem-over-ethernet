@@ -79,9 +79,11 @@ static uint64_t map_offset(void)
            OSOE_CACHELINE;
 }
 
-static void fail_job(struct osoe_job_header *h)
+/* osoe_fatal_then's last act: the message is out first (fatal.h). */
+static void fail_job(void *context)
 {
-    atomic_store_explicit(&h->failed, 1, memory_order_seq_cst);
+    struct osoe_job_header *h = context;
+    atomic_store_explicit(&h->failed, 1, memory_order_release);
     osoe_futex_wake(&h->joined, INT_MAX, OSOE_FUTEX_SHARED);
     osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
 }
@@ -182,7 +184,7 @@ again:;
             node_of[i] = OSOE_NODE_UNSET;
             atomic_store_explicit(&claim[i], OSOE_NODE_UNSET, memory_order_release);
         }
-        atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
+        atomic_store_explicit(&h->ready, 1, memory_order_release);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
         struct osoe_stall_watch watch;
@@ -219,21 +221,18 @@ again:;
      */
     if (b->local_id == 0) {
         if (h->world_size != b->world_size || h->node_count != b->node_count) {
-            fail_job(h);
-            osoe_fatal("node %u was launched for a job of %u tasks on %u nodes; node 0 "
+            osoe_fatal_then(fail_job, h, "node %u was launched for a job of %u tasks on %u nodes; node 0 "
                        "says %u on %u", b->node, b->world_size, b->node_count,
                        h->world_size, h->node_count);
         }
         if (h->symmetric_size != b->symmetric_size) {
-            fail_job(h);
-            osoe_fatal("node %u has SHMEM_SYMMETRIC_SIZE %llu; node 0 has %llu: every "
+            osoe_fatal_then(fail_job, h, "node %u has SHMEM_SYMMETRIC_SIZE %llu; node 0 has %llu: every "
                        "PE of a job must agree", b->node,
                        (unsigned long long)b->symmetric_size,
                        (unsigned long long)h->symmetric_size);
         }
         if (h->handler_checksum != osoe_am_table_checksum()) {
-            fail_job(h);
-            osoe_fatal("node %u has AM handler table checksum %#x; node 0 has %#x: the "
+            osoe_fatal_then(fail_job, h, "node %u has AM handler table checksum %#x; node 0 has %#x: the "
                        "nodes are running different binaries (§3.13)", b->node,
                        osoe_am_table_checksum(), h->handler_checksum);
         }
@@ -244,8 +243,7 @@ again:;
                                                          memory_order_seq_cst,
                                                          memory_order_acquire) &&
                 holder != b->node) {
-                fail_job(h);
-                osoe_fatal("rank %u is claimed by node %u and by node %u", rank, holder,
+                osoe_fatal_then(fail_job, h, "rank %u is claimed by node %u and by node %u", rank, holder,
                            b->node);
             }
             node_of[rank] = b->node;
@@ -276,8 +274,7 @@ again:;
 
     for (uint32_t i = 0; i < b->world_size; i++)
         if (node_of[i] == OSOE_NODE_UNSET) {
-            fail_job(h);
-            osoe_fatal("rank %u was not claimed by any node after every lead arrived; "
+            osoe_fatal_then(fail_job, h, "rank %u was not claimed by any node after every lead arrived; "
                        "the launcher's rank lists do not cover the job", i);
         }
 

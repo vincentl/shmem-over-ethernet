@@ -328,8 +328,8 @@ void osoe_transport_set_range(enum osoe_region region, uint64_t offset, uint64_t
  * NOSTORE context may skip that. Orders delivery; does not wait for
  * completion, and need not send anything (§4.10).
  *
- * Intranode: one serializing store; writes are already placed.
- * AM: the serializing store, then seal and flush the dirty set with ack
+ * Intranode: one release fence; writes are already placed.
+ * AM: the release fence, then seal and flush the dirty set with ack
  * requested; the dirty set is kept (§4.6).
  */
 void osoe_transport_fence(struct osoe_transport_context *context);
@@ -344,8 +344,8 @@ void osoe_transport_fence(struct osoe_transport_context *context);
  *
  * May over-wait: a PE list may wait on gets to every PE (§4.6).
  *
- * Intranode: one serializing store; nothing is ever outstanding.
- * AM: the serializing store, flush the dirty set restricted to the listed
+ * Intranode: one serializing fence; nothing is ever outstanding.
+ * AM: the serializing fence, flush the dirty set restricted to the listed
  * PEs' nodes, wait for acknowledgements and bytes_landed == bytes_issued,
  * copy out completed gets, clear what was waited on (§4.6).
  */
@@ -389,11 +389,11 @@ void osoe_transport_unwatch(struct osoe_transport_watch *w);
  *
  * Exact for rmw. The waiter stores its watch and then loads the variable;
  * the writer stores the variable and then loads the watch. That is a
- * two-sided protocol (§3.16), and an rmw's locked instruction or seq_cst
- * store makes the writer's side sound.
+ * two-sided protocol (§3.16): both stores and both loads are seq_cst, an rmw's
+ * locked instruction counting as the store.
  *
  * Best effort for puts. A backend that sees a put calls this straight after
- * the copy, with no serializing store: on x86 a memcpy's stores can still be
+ * the copy, with no serializing fence: on x86 a memcpy's stores can still be
  * in the store buffer when the watch is loaded, and the wake can be lost. The
  * waiter's safety-sweep deadline bounds the loss. Spec 1.5 change #17
  * requires wait variables to be updated with AMOs, so only a non-conforming

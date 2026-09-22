@@ -102,7 +102,7 @@ int main(void)
     pairwise((size_t)1 << 20);
 
     /* Stores through shmem_ptr land in the target PE's heap: each PE sets its
-     * own element on every PE, and the barrier's serializing store makes the
+     * own element on every PE, and the barrier's serializing fence makes the
      * stores visible before anyone reads (§4.6). */
     int *flags = shmem_malloc(sizeof(int) * (size_t)n);
     CHECK_FATAL(flags != NULL);  /* NULL would be dereferenced (flags[w]) below */

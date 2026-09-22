@@ -203,12 +203,15 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         /* The node's buffers to every peer; checked before any of it exists
          * (shm-object.h). */
         uint64_t free_bytes;
-        if (!osoe_shm_room(a->bytes, &free_bytes))
-            osoe_fatal("/dev/shm has %llu MiB free, but this node's connection area "
-                       "for %u nodes needs %llu MiB: lower OSOE_AM_BUFFER, or enlarge "
-                       "/dev/shm",
-                       (unsigned long long)(free_bytes >> 20), nodes,
-                       (unsigned long long)((a->bytes + (1u << 20) - 1) >> 20));
+        if (!osoe_shm_room(a->bytes, &free_bytes)) {
+            char msg[256];
+            snprintf(msg, sizeof msg, "/dev/shm has %llu MiB free, but this node's "
+                     "connection area for %u nodes needs %llu MiB: lower OSOE_AM_BUFFER, "
+                     "or enlarge /dev/shm",
+                     (unsigned long long)(free_bytes >> 20), nodes,
+                     (unsigned long long)((a->bytes + (1u << 20) - 1) >> 20));
+            osoe_shm_short(b->shm_capacity_warning_only, msg);
+        }
         char err[256];
         fd = osoe_shm_create(a->name,
                              (long)offsetof(struct osoe_connection_area_header, creator_pid),
@@ -305,7 +308,7 @@ again:;
          * (§3.5). */
         for (uint32_t i = 0; i < peers; i++)
             osoe_connection_init(&a->conn[i], a->credits);
-        atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
+        atomic_store_explicit(&h->ready, 1, memory_order_release);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
         struct osoe_stall_watch watch;

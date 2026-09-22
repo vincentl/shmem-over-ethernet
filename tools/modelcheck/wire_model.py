@@ -47,8 +47,11 @@ Breakages
              it is settled here instead: the model reaches it in every
              interleaving that contains it.
 
-Every protocol store here is a locked instruction, a seq_cst store or a futex
-call, so x86-TSO adds no interleavings; runs are SC. The wire is
+`produced` and `consumed` are release stores (§3.16: message passing, not
+two-sided), which x86-TSO may hold in the store buffer, so every case runs under
+SC and under TSO. The wake is a locked add and drains the writer's buffer; the
+reader's `consumed` may sit in its buffer, which only makes the writer see less
+room for a while. The wire is
 single-producer single-consumer by construction - only the two node leads touch
 it (§3.12: non-lead agents never touch a ring or a socket) - so one writer
 thread and one reader thread is the whole configuration, not a reduction of it.
@@ -99,7 +102,7 @@ def writer(design, nbytes, cap):
                          f'wrote byte {L["p"]} over a full ring: {M[PROD] - M[CONS]} outstanding, capacity {cap}',
                          '@' + p + 'G'))]
         B += [(p + 'G', ('gpre', lambda M, L, k=k: ({SENT(k): k + 1}, {}), '@' + p + 'S')),
-              (p + 'S', ('store', lambda L: PROD, lambda L: L['p'] + 1, True, '@' + p + 'K'))]
+              (p + 'S', ('store', lambda L: PROD, lambda L: L['p'] + 1, False, '@' + p + 'K'))]
         if design == 'nowake':
             B += [(p + 'K', ('set', 'p', lambda L: DEL, nxt))]
         else:
@@ -131,14 +134,14 @@ def reader(design, nbytes, cap):
                      f'byte {L["c"]} read as {L["v"]}, written as {M[SENT(L["c"])]}',
                      '@GOT')),
           ('GOT', ('gpre', lambda M, L: ({GOT(L['c']): L['v']}, {}), '@ADV')),
-          ('ADV', ('store', lambda L: CONS, lambda L: L['c'] + 1, True, '@R')),
+          ('ADV', ('store', lambda L: CONS, lambda L: L['c'] + 1, False, '@R')),
           ('REND', ('done',))]
     if design == 'consumed_early':
         # Release the slot before the byte is out of it: the reader publishes
         # `consumed` and only then copies. The writer is free to fill that slot
         # the moment it sees the space, so the copy takes the next byte.
         B = [(lab, ins) for lab, ins in B if lab not in ('TAKE', 'ADV')]
-        B += [('ADV', ('store', lambda L: CONS, lambda L: L['c'] + 1, True, '@TAKE')),
+        B += [('ADV', ('store', lambda L: CONS, lambda L: L['c'] + 1, False, '@TAKE')),
               ('TAKE', ('load', lambda L, cap=cap: SLOT(L['c'] % cap), 'v', '@CHECK'))]
         B = [('HAVE?', ('br', lambda L: L['p'] > L['c'], '@ADV', '@SLEEP'))
              if lab == 'HAVE?' else (lab, ins) for lab, ins in B]
@@ -170,6 +173,7 @@ if __name__ == '__main__':
         name, threads, mem0 = case(design, nbytes, cap)
         if not keep(name):
             continue
-        res = explore(name, threads, mem0, max_seconds=120)
-        ok &= report(res, expect_ok=(design == 'design'))
+        for tso in (False, True):
+            res = explore(name, threads, mem0, tso=tso, max_seconds=120)
+            ok &= report(res, expect_ok=(design == 'design'), tso=tso)
     sys.exit(0 if ok else 1)
