@@ -29,8 +29,15 @@ static unsigned flags_for(enum osoe_futex_scope scope)
 int osoe_futex_wait(_Atomic uint32_t *word, uint32_t expected,
                     const struct osoe_deadline *deadline, enum osoe_futex_scope scope)
 {
+    return osoe_futex_wait_bitset(word, expected, FUTEX_BITSET_MATCH_ANY, deadline, scope);
+}
+
+int osoe_futex_wait_bitset(_Atomic uint32_t *word, uint32_t expected, uint32_t bitset,
+                           const struct osoe_deadline *deadline,
+                           enum osoe_futex_scope scope)
+{
     long r = syscall(__NR_futex_wait, (void *)word, (unsigned long)expected,
-                     (unsigned long)FUTEX_BITSET_MATCH_ANY, flags_for(scope),
+                     (unsigned long)bitset, flags_for(scope),
                      &deadline->at, CLOCK_MONOTONIC);
     if (r == 0)
         return 0;
@@ -49,7 +56,13 @@ int osoe_futex_wait(_Atomic uint32_t *word, uint32_t expected,
 
 void osoe_futex_wake(_Atomic uint32_t *word, int n, enum osoe_futex_scope scope)
 {
-    long r = syscall(__NR_futex_wake, (void *)word, (unsigned long)FUTEX_BITSET_MATCH_ANY,
+    osoe_futex_wake_bitset(word, n, FUTEX_BITSET_MATCH_ANY, scope);
+}
+
+void osoe_futex_wake_bitset(_Atomic uint32_t *word, int n, uint32_t bitset,
+                            enum osoe_futex_scope scope)
+{
+    long r = syscall(__NR_futex_wake, (void *)word, (unsigned long)bitset,
                      n, flags_for(scope));
     if (r < 0) {
         fprintf(stderr, "osoe: futex_wake failed: %s\n", strerror(errno));

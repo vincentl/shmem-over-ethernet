@@ -36,6 +36,18 @@ int osoe_futex_wait(_Atomic uint32_t *word, uint32_t expected,
 void osoe_futex_wake(_Atomic uint32_t *word, int n, enum osoe_futex_scope scope);
 
 /*
+ * The same two with futex2's bitset: a wait with bitset b is woken only by a
+ * wake whose bitset shares a bit with b (osoe_futex_wake and osoe_futex_wait
+ * pass all ones, so they meet everything). What the chained release uses to
+ * keep one epoch's wakes away from the next epoch's waiters (base/epoch.c).
+ */
+int osoe_futex_wait_bitset(_Atomic uint32_t *word, uint32_t expected, uint32_t bitset,
+                           const struct osoe_deadline *deadline,
+                           enum osoe_futex_scope scope);
+void osoe_futex_wake_bitset(_Atomic uint32_t *word, int n, uint32_t bitset,
+                            enum osoe_futex_scope scope);
+
+/*
  * Does this kernel have the futex2 calls (Linux 6.7)? Returns 0, or the errno
  * of the call that failed: ENOSYS on an older kernel. Makes one wake and one
  * wait that cannot sleep, on a private word, so it is cheap enough for init

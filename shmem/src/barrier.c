@@ -58,10 +58,19 @@ static void sync_team(struct osoe_team *t, const char *routine)
             if (!osoe_epoch_release_bump_eq(t->released, k + 1))
                 osoe_fatal("%s epochs diverged at epoch %u: PEs called different numbers "
                            "of collectives", t->name, k + 1);
+            /* The single-node release: this thread is the last arriving
+             * member, not the node's network, and on the cores this has been
+             * measured on the kernel's one-pass wake-all beats the chain
+             * (§5.3). The internode release below chains. */
             osoe_epoch_wake_all(t->released);
         }
     }
-    osoe_epoch_wait_eq(t->released, k + 1, routine);
+    /* Chained exactly when the release comes from the progress thread, which
+     * wakes two and leaves the rest to the members (base/epoch.h). */
+    if (t->internode)
+        osoe_epoch_wait_eq_chained(t->released, k + 1, routine);
+    else
+        osoe_epoch_wait_eq(t->released, k + 1, routine);
     *t->epoch = k + 1;
     /* Publish it: comparing each PE's k against the team's counters is how
      * osoe-stat says which PE has not reached a barrier, the most common real
@@ -72,7 +81,8 @@ static void sync_team(struct osoe_team *t, const char *routine)
 /*
  * internode.h's upcall: the nodes have met for (team, epoch), so release this
  * node's members. Called on the node's progress thread, once per (team,
- * epoch). A divisible event, so wake-many (§3.11).
+ * epoch). A divisible event, so wake-many (§3.11) - as a chain, so that this
+ * thread, which is the node's network, wakes two and not L (base/epoch.h).
  *
  * The bump is checked for the same reason the single-node path checks it: a
  * release that does not land exactly on k+1 means this node's members have run
@@ -93,7 +103,7 @@ void osoe_internode_released(uint32_t team, uint32_t epoch)
         osoe_fatal("the internode release for %s arrived for epoch %u out of order: "
                    "the PEs of this job called different numbers of collectives", t->name,
                    epoch);
-    osoe_epoch_wake_all(t->released);
+    osoe_epoch_release_wake(t->released, epoch);
 }
 
 /* A sync, timed and recorded, without the quiet. */

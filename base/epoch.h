@@ -52,12 +52,44 @@ bool osoe_epoch_bump_eq(struct osoe_epoch *e, uint32_t target);
  */
 bool osoe_epoch_release_bump_eq(struct osoe_epoch *e, uint32_t target);
 
-/* Wake every waiter. */
+/*
+ * Start the wake of every waiter for `target`, which the caller has just made
+ * the counter's value: the **chained** release (§5.3). This wakes two; each
+ * waiter that wait_eq wakes and that finds its target reached wakes two more
+ * before it returns. Depth O(log L), and the caller - on a multi-node job the
+ * node's progress thread - does O(1) instead of the O(L) of a wake-all.
+ *
+ * The wakes carry the target's parity as a futex bitset, and wait_eq sleeps on
+ * its target's parity. That is what makes the chain safe, and it is needed:
+ * a member released early can re-enter and sleep on this same counter waiting
+ * for target + 1, and without the bitset a wake meant for `target` could pick
+ * it - it would find nothing to do, pass nothing on, and a member still waiting
+ * for `target` would be stranded until its sweep. Bounded skew (§5.4) allows
+ * exactly those two targets on one counter at once, so parity tells them apart
+ * (docs/design/evidence/am-backend/chained_wake_model.py).
+ */
+void osoe_epoch_release_wake(struct osoe_epoch *e, uint32_t target);
+
+/*
+ * Wake every waiter, whatever it waits for: one futex_wake(INT_MAX), O(L) in
+ * the caller, which the kernel does in one pass. Measured on the 4-core VM it
+ * beats the chain at every L to 32 (§5.3) - a chain only pays when the woken
+ * threads can run in parallel - so it is the single-node release, where the
+ * caller is the last arriving member and not the node's network.
+ */
 void osoe_epoch_wake_all(struct osoe_epoch *e);
 
 /* Return once the counter equals target. Waits on the counter itself with a
  * safety-sweep deadline, so a lost wake costs latency, not a hang; `routine`
- * names the API routine for the diagnostic a sweep may print (base/sweep.h). */
+ * names the API routine for the diagnostic a sweep may print (base/sweep.h).
+ * Sleeps on its target's parity (above), so it is woken by either kind of
+ * release; for a counter released by osoe_epoch_wake_all. */
 void osoe_epoch_wait_eq(struct osoe_epoch *e, uint32_t target, const char *routine);
+
+/* The same wait for a counter released by osoe_epoch_release_wake: a wait
+ * that slept and finds its target reached passes the chained wake on. Every
+ * waiter on one counter must use the same one of the two, since the chain
+ * depends on every woken waiter passing it on. */
+void osoe_epoch_wait_eq_chained(struct osoe_epoch *e, uint32_t target, const char *routine);
 
 #endif /* OSOE_BASE_EPOCH_H */

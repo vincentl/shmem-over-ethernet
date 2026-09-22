@@ -3209,6 +3209,16 @@ Computed once at team creation, stored in the private team descriptor:
 > entirely. Fix: two-level intranode tree with fanout near core-cluster size,
 > chosen at init from local member count.
 
+*Still flat, deliberately* (phase 1 step 2 slice 3). The arrival counter was not
+sharded: the development machines have four cores, and there is no measurement at
+large *L* to size a fan-out from. Nothing in the control segment's layout prevents
+it — each team's counters are whole cache lines found by name (§3.14), and a
+sharded arrival is more lines per team and a layout bump. What would trigger it:
+on a host with 64 or more cores, `sync_all` on one node growing faster than linearly
+in *L*, or the arrival (time from the first member's `fetch_add` to the last's)
+exceeding the release at *L* ≥ 64; `shmem.barrier_ns` against *L* is the
+measurement.
+
 Each §5.4 counter must be **alone on its cache line** — false sharing between
 counters, or with the team descriptor, hurts even at four PEs, and one alignment
 attribute prevents it.
@@ -3253,7 +3263,48 @@ contribution itself (§5.5). That dependency is the price of a single writer, an
 the lead is blocked in the same call regardless.
 
 **Release** arrives at the progress thread, which advances the team's `released`
-counter and wakes all local waiters — a divisible event, so wake-many per §3.11.
+counter and wakes the local waiters — a divisible event, so wake-many per §3.11.
+*As built* (phase 1 step 2 slice 3) it wakes them as a **chain**: the progress
+thread wakes two, and every waiter that slept and finds its target reached wakes
+two more before returning (`osoe_epoch_release_wake`,
+`osoe_epoch_wait_eq_chained`). Depth O(log *L*), and the progress thread — the
+node's network — does O(1) instead of a kernel wake of all *L*. No waiter is
+stranded: a waiter that arrives late loads the counter before sleeping and never
+sleeps, one whose load raced the release is refused by the kernel's compare, the
+counter cannot move past *e* while any member still waits for *e* (the next release
+needs that member's own next arrival), and every waiter a chain wakes passes it
+on — so the chain's frontier is non-empty for as long as a waiter for *e* sleeps.
+The sweep bounds any residue, and slice 2's `invariant.missed_wake` makes residue
+visible.
+
+**One premise of that argument, as first stated, was false**, and the model is
+where it was found (`docs/design/evidence/chained-wake/`). It was that every waiter
+on a `released` counter waits for the same value. A member woken early returns,
+runs to the next barrier, arrives, and sleeps on the *same* counter waiting for
+*e* + 1 while members still asleep wait for *e*; a wake meant for *e* can pick it,
+it finds nothing to do and passes nothing on, and if both of a link's two picks are
+such members the chain ends with a member stranded (`unmasked`: a lost wake at two
+epochs, none at one). Bounded skew limits the targets to two, so waiters sleep with
+futex2 bitset 1 << (target & 1) and a chained wake carries its epoch's parity: a
+next-epoch waiter is never picked by this epoch's chain. The tests cannot see the
+unmasked defect — the kernel wakes waiters of equal priority in FIFO order, and a
+next-epoch waiter slept last — but futex2 promises no order, and waiters of
+different nice values are ordered by priority, so the mask is kept for the
+contract rather than the observation.
+
+**The single-node release keeps one wake-all**, by measurement (4-core VM,
+`sync_all`, one node, median of 7 × 2,000 rounds, before and after interleaved):
+a chain of width 2, 4 or 8 was slower at every *L* from 8 to 32 — 34 against
+20 µs at 8, 61 against 41 at 32 — because a chain only pays when the woken threads
+can run in parallel, and four cores cannot. There the releaser is the last
+arriving member, not the network, so wake-all is the right trade until a
+many-core host says otherwise; with it the single-node path is unchanged (10.9
+against 11.0 µs at *L* = 2, 42.1 against 41.6 at 32). The internode release,
+which runs on the progress thread, chains, and is not slower: 460 against 481 µs
+at 2 nodes × 4 PEs, 455 against 480 at 2 × 8 (decided with the author,
+2026-09-22). At *L* = 256 on as many cores the arithmetic reverses — a wake-all is
+roughly 256 × 1–2 µs of serial kernel work on one thread, a width-2 chain eight
+levels — and the single-node path should be measured there before it is changed.
 
 **The arrival and the release cross `internode.h`, not §4.10.** The phase is
 reached through its own build-time-bound interface, beside the point-to-point
@@ -4737,6 +4788,11 @@ Assert what can be asserted. Instrument the rest.
     No invariant above names the collective root or node 0: 25's "node 0" is the
     rendezvous server of §6.2, not the tree's root, and the two need not coincide
     for a split team.
+33. **A release by chain is waited for and passed on by every waiter of that
+    counter, and waits and wakes carry the target's parity as a futex bitset.**
+    (§5.3) A waiter that does not pass the chain on strands those behind it; a
+    wake without the parity can be absorbed by a member already waiting for the
+    next epoch. Both lose wakes in `chained_wake_model.py`.
 
 ## 10. Open Questions
 
