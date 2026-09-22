@@ -716,9 +716,14 @@ evidence of an observed hang.
 1. **AMO results:** bounded by the origin's outstanding-get cap. **Enforced at
    the origin, not locally** — a distributed invariant. A peer's accounting bug
    overflows *my* queue and the symptom appears on the wrong node.
-2. **Barrier forwards:** bounded by tree degree × concurrent teams. The epoch
-   argument: if X holds an unforwarded epoch-N arrival, the root has not
-   released, so no PE entered N+1, so no N+1 arrival can exist. **This rests on
+2. **Barrier forwards:** bounded by tree degree × concurrent teams, per *node*.
+   The epoch argument: if X holds an unforwarded epoch-N arrival, the root has not
+   released, so no PE entered N+1, so no N+1 arrival can exist. On the *k*-ary
+   tree (§5.3) it is concrete: per team a node queues either one ARRIVE toward its
+   parent or up to *k* RELEASEs toward its children, never both, because its next
+   ARRIVE needs every child's next arrival and a child has that only once the
+   RELEASE to it has left the queue. So *k* + 1 per team node-wide is a bound with
+   margin, and one per team per connection. **This rests on
    collectives being blocking.** Nonblocking collectives would dissolve it —
    write this into the code, because a future contributor adding
    `shmem_barrier_nbi` would not know to check.
@@ -726,13 +731,16 @@ evidence of an observed hang.
    (a high-water mark subsumes older ones); piggybacked or header-only (§3.4), so
    not really a queue entry.
 
-Size as `C + degree×max_teams + slack` per connection, drawn from the node-wide
-pool.
+Size the node-wide pool as `connections × (C + slack) + degree × max_teams`:
+argument 1 is per connection, argument 2 is per node.
 
-*As built (phase 1 step 2 slice 2):* `degree` is `OSOE_COLLECTIVE_DEGREE`, 1 for
-today's star (one arrival up and one release down per team per connection; the
-tree sets it to its fan-out plus one), `max_teams` is the two predefined teams,
-and `slack` is 0 — every descriptor belongs to one of the arguments above, and a
+*As built (phase 1 step 2 slice 3):* `degree` is `OSOE_COLLECTIVE_DEGREE(k)` =
+*k* + 1 for the tree's fan-out *k*, `max_teams` is `OSOE_TEAMS` (the two
+predefined teams and the finalize team). Slice 2 sized argument
+2 per connection at one per team, which was the star's shape — its root released
+every peer at once — and cost N − 1 descriptors per team on every node for a need
+only the root had; the node-wide term is O(*k*·*T*). `slack` stays 0 — every
+descriptor belongs to one of the arguments above, and a
 margin would only postpone the fatal that names the one that broke. The first
 build sized the pool at `connections × C`, with no term for the forwards, and
 dropped the request that found it empty: a node holding C gets toward a peer
@@ -3170,7 +3178,10 @@ shmem_quiet". The models check it in that form.
 
 Reduce or gather within the node in shared memory, then one internode operation
 between node leads. Internode cost becomes a function of **node count, not PE
-count** — this is the answer to the PE-scaling concern.
+count** — this is the answer to the PE-scaling concern. The internode operation
+is a *k*-ary tree over the participating nodes (§5.3), reached through
+`internode.h` so that a backend with something better replaces it without
+touching the intranode half.
 
 ### 5.2 Team accounting
 
@@ -3179,7 +3190,11 @@ Computed once at team creation, stored in the private team descriptor:
 - **Local member count** — team members *on this node*, not local PE count. A
   node with eight PEs of which three are in team T has arrival target three.
 - **Node participation** — the internode tree spans only nodes with at least one
-  member. Topology is per team.
+  member. Topology is per team. *As built:* the team hands its sorted node list to
+  `osoe_internode_team` once, at creation (`internode.h`); the backend keeps the
+  O(*k*) of it the tree needs and drops the O(*N*) list. The world and finalize
+  teams span every node; a split team (§7.3) will pass a sparse list, and the
+  topology function is tested on sparse lists already (`shmem.collective-tree`).
 - **Local lead** — lowest team rank among local members. Must be a member, since
   its `dest` is the accumulator and it is the only PE that writes that `dest`
   before release (§5.5).
@@ -3249,12 +3264,117 @@ progress thread. On AM they are messages, and the AM implementation
 (`internode-am.c`) is the handoff above. §10 once closed this the other way, on
 two reasons the code contradicted; the entry there keeps the history.
 
-**The root counts, and the count is the node's, not the PE's.** Whichever local
-member's increment reaches the arrival target sends one arrival for the whole
-node, so a node of eight members arrives once. The root releases only when every
-participating node has arrived — which at *two* nodes is indistinguishable from
-releasing on any arrival, since the single message it receives is also the last
-one. A test of this phase needs three (§8.2).
+**The count is the node's, not the PE's.** Whichever local member's increment
+reaches the arrival target posts one arrival for the whole node, so a node of
+eight members arrives once. The root releases only when every participating node
+has arrived — which at *two* nodes is indistinguishable from releasing on any
+arrival, since the single message it receives is also the last one. A test of
+this phase needs three (§8.2), and a test of the tree needs a partly filled last
+level and more than one interior node: `shmem.tree.*` runs 7, 8 and 13 nodes at
+*k* = 2 and 4, with one PE per node and uneven maps.
+
+**The internode phase is a k-ary tree over the participating nodes** (phase 1
+step 2 slice 3; `collective-tree.h`, `progress.c`). §5.2's node set is a sorted
+list; node index *i* has parent (*i* − 1)/*k* and children *k·i* + 1 … *k·i* + *k*,
+over the *index* in the list rather than the node number, so a sparse split team
+gets the same shape as the world team. *k* is `OSOE_COLLECTIVE_FANOUT`, between 2
+and 32, and its default is the **backend's** (`osoe_internode_fanout_default`, 4 on
+AM; below). Every node lead must agree on it — the job rendezvous
+checks it beside `SHMEM_SYMMETRIC_SIZE` (§6.2), because a node that disagrees
+waits for children that send elsewhere and the job hangs without a message.
+
+Per team per node the progress thread keeps the tree (O(*k*)) and the epoch in
+progress (O(1)): which epoch is open, whether the node's own members are in, and
+a bit per child that has arrived. A node **opens** an epoch at its first
+arrival, its own or a child's, and **closes** it when both are complete: it
+queues ARRIVE to its parent, or at the root starts the release. Closing resets
+the counts **before** anything is released. A node that receives RELEASE, and
+the root when it closes, queues RELEASE to every child **first**; the node's own
+release is applied at the end of that pass, after the children's connections
+have been drained and flushed, so the message is in the wire (or in the open
+buffer behind a send already in flight) before this level's O(*L*) local wake.
+Forward-first is what makes the reset-first rule load-bearing: a child released
+by the forward can be back with the next epoch before this node's members have
+been woken, and must find the epoch closed and clean. Both rules, and the
+refusals a trust boundary needs, are model-checked
+(`docs/design/evidence/am-backend/tree_barrier_model.py`): five nodes at
+*k* = 2 (depth 2), two epochs, a node with two members of which one re-enters
+early, SC and TSO. Each broken variant fails its own property first:
+forwarding before the last child and not resetting the child count release a
+node before every node has arrived; releasing locally before forwarding and
+resetting after leaves two epochs open at a node; applying a child's arrival to
+the epoch the node's own counter implies books it against a closed one.
+
+The wire message did not change: `struct osoe_am_barrier {team, epoch,
+from_node}` carries everything, and `from_node` is now checked — an ARRIVE must
+come from a child and a RELEASE from the parent, or the node ends the job naming
+the tree it disagrees about.
+
+*Costs*, with *N* participating nodes, *L* local members, *T* teams: per node per
+barrier, *k* + 1 messages handled and O(*k*) work on the progress thread (the
+star's root handled 2(*N* − 1)); depth ⌈log_*k* *N*⌉, so the critical path is
+2·⌈log_*k* *N*⌉ hops; state O(*k*·*T*) per node; setup O(*N*) once per team (the
+sortedness check of the node list, which is then dropped).
+
+*Choosing k.* The critical path is about depth × (hop latency *h* + *k* × per-message
+cost *o*) with depth ⌈log_*k* *N*⌉, so the best *k* grows with *h*/*o*; on RDMA the
+up-sweep's *k* arrivals are fetch-adds the parent's NIC applies rather than its CPU,
+which favours a wider tree still. The minimum is broad (*recalled* costs; one
+direction shown, the other is the same):
+
+| Fabric | *h*/*o* | *k* = 4 | *k* = 8 | *k* = 16 | *k* = 32 |
+|---|---|---|---|---|---|
+| RoCE, *N* = 1,000 (*h* ≈ 2 µs, *o* ≈ 0.15 µs) | ≈ 13 | *d* = 5: 13 µs | *d* = 4: 12.8 µs | *d* = 3: 13.2 µs | *d* = 2: 13.6 µs |
+| Pi TCP, *N* = 500 (*h* ≈ 100 µs, *o* ≈ 13 µs) | ≈ 8 | *d* = 5: 0.76 ms | *d* = 3: 0.61 ms | *d* = 3: 0.92 ms | *d* = 2: 1.03 ms |
+
+So *k* is a default and not a knob that must be right, and it belongs to the
+backend, which knows its *h* and *o*: AM over Ethernet uses 4 (server TCP's
+*h*/*o* ≈ 4), and an RDMA backend would use 8–16. What must never happen at
+thousands of nodes is the flat case — *N* arrivals serialized through one thread,
+or *N* atomics on one NIC. Measuring *h* and *o* at init and computing *k* is on
+§10's measurement list (decided with the author, 2026-09-22).
+
+*Measured on the step-2 wire, and why it is slower there* (phase 1 step 2 slice
+3; release build, 4-core VM, `sync_all` at one PE per logical node, median of 7
+means of 2,000 rounds, before and after interleaved). Up to five nodes, where
+*k* = 4 is depth 1, the tree equals the star (531 against 529 µs at 2 nodes, 592
+against 590 at 5). From six nodes it is slower: 932 against 613 µs at 6, 1,061
+against 636 at 8, 1,222 against 655 at 16. **Latency follows depth, not node
+count**: at 16 nodes *k* = 16 (depth 1) measures 641 µs, *k* = 4 (depth 2) 1,220
+and *k* = 2 (depth 4) 1,930, about 170–200 µs per level each way. That is the
+step-2 lead's idle poll (§3.10's stand-in, `OSOE_PROGRESS_SLEEP_NS` = 250 µs): a
+hop's bytes wait until the receiving lead next looks, because the shared-memory
+wire cannot wake it. The star paid it twice; the tree pays it 2*d* times. Step 3
+blocks in io_uring on socket completions and the futex together and deletes the
+poll, and an RDMA backend polls a completion queue on a core of its own, so no
+production path depends on a tuned sleep; the regression was recorded and
+accepted with the author on 2026-09-22 rather than engineered around in code step
+3 deletes.
+
+*Why a tree now, and what the shared-memory wire hides.* The star it replaced —
+every node's arrival to node 0, node 0's release to every node — was optimal in
+messages and serial in one thread: 2(*N* − 1) message events on node 0's
+progress thread per barrier. The step-2 wire is shared memory, where a message
+costs little more than a cache line, so that O(*N*) term is invisible below 16
+logical nodes and the tree's measured effect is a no-regression check, not proof
+of the win (§8.4's barrier row). The arithmetic for the target, per barrier on
+TCP, with its assumptions labelled — *recalled*: a small message costs about
+*t* = 5 µs of CPU per send or receive on a server core and 13 µs on a Pi 5 core;
+one-way latency *h* is about 20 µs on fast Ethernet and 100 µs on the Pi's 1 GbE;
+*assumed*: messages to different peers do not batch (§3.9 cannot), and a level's
+*k* sends are serial on one thread:
+
+| | Star: 2*h* + 2(*N* − 1)·*t* | Tree, *k* = 4: 2*d*·(*h* + *k*·*t*) | Ratio |
+|---|---|---|---|
+| Pi 1 GbE, *N* = 500 | 0.2 ms + 998 × 13 µs ≈ **13 ms** | *d* = 5: 10 × (100 + 52) µs ≈ **1.5 ms** | ≈ 9× |
+| server TCP, *N* = 500 | 0.04 ms + 998 × 5 µs ≈ **5.0 ms** | *d* = 5: 10 × 40 µs ≈ **0.4 ms** | ≈ 12× |
+| server TCP, *N* = 4,096 | 0.04 ms + 8,190 × 5 µs ≈ **41 ms** | *d* = 6: 12 × 40 µs ≈ **0.48 ms** | ≈ 85× |
+
+The star's column is its root's thread doing all 2(*N* − 1) message events; the
+tree's is its critical path, where each level costs one hop plus the
+parent's *k* sends. At 4,096 nodes the star finishes about 25 barriers per second
+job-wide and every `shmem_malloc` is one (§4.5); the tree about 2,000. Unmeasured
+until two real hosts exist (§10's measurement list).
 The progress thread never touches non-lead `dest` buffers, so it does no
 `O(members × count)` copying while other connections wait.
 
@@ -3775,9 +3895,12 @@ computes the same host under any distribution.
   job and step IDs, so a client that reaches another job's server is rejected and
   moves on.
 - **Who connects:** only node leads — one connection per node. Each sends its
-  node's rank list (`SLURM_GTIDS`), `SHMEM_SYMMETRIC_SIZE`, and handler-table
-  checksum (§3.13). The server checks agreement, then broadcasts the rank→node map
-  and node addresses.
+  node's rank list (`SLURM_GTIDS`), `SHMEM_SYMMETRIC_SIZE`, handler-table
+  checksum (§3.13) and `OSOE_COLLECTIVE_FANOUT` (§5.3: a node building a
+  different tree waits for arrivals sent elsewhere, silently). The server checks
+  agreement, then broadcasts the rank→node map and node addresses, and each
+  node's fixed-size backend blob (§4.10; zeros on AM, an RDMA backend's queue-pair
+  and key material).
 - **Node-pair connections:** the lower node index connects to the higher, so each
   pair opens exactly one stream (§3.1).
 
@@ -4606,6 +4729,14 @@ Each is independently breakable, and each failure appears far from its cause.
 Assert what can be asserted. Instrument the rest.
 
 ---
+32. **A node of the internode tree closes an epoch - resets its counts - before it
+    releases anything, and forwards a release to its children before its local
+    wake.** (§5.3) Forwarding first lets a child return with the next epoch before
+    this node's members are woken; without the reset first that arrival lands in
+    an epoch still open (`tree_barrier_model.py`, `release_first`, `wrong_epoch`).
+    No invariant above names the collective root or node 0: 25's "node 0" is the
+    rendezvous server of §6.2, not the tree's root, and the two need not coincide
+    for a split team.
 
 ## 10. Open Questions
 
@@ -4660,6 +4791,10 @@ Recorded rather than deleted, so they are not reopened from memory.
   decisions, and chunk sizing. Probably right; worth an hour to confirm rather
   than carry. Now has a home in the test suite rather than being a one-off.
 - **Pin the §1 floor ratios.** Deliberately unwritten until the harness runs.
+- **The internode tree's fan-out from measured costs** (§5.3). The default is the
+  backend's constant today; measuring the hop latency *h* and per-message cost *o*
+  at init and choosing *k* from their ratio is the next step, once a real fabric
+  exists to measure. The optimum is broad, so this is refinement, not a fix.
 
 ### Still open — the RoCE exercise of 2026-09-17
 
@@ -4716,7 +4851,7 @@ out-of-band bootstrap, and §8.1's three-way switch.
   which RoCE switches do not have (*documented*). What was built was a TCP
   *star* on node 0: against an RDMA tree that is about 500× at 4,096 nodes, or
   about 12× once the AM phase is itself a tree (roce-seam §4.3, *arithmetic*).
-  So the AM implementation is to become a k-ary tree before step 3 (§5.3), and a
+  So the AM implementation became a k-ary tree in the same slice (§5.3), and a
   backend with a better way — a tree over RDMA put and atomics, or an offload
   engine — implements `internode.h` without touching `barrier.c`.
 - **Does the AM data path stay hot in an RDMA build?** Bootstrap is out of band

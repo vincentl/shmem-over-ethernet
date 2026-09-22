@@ -34,6 +34,14 @@
 #include "check.h"
 #include "wire.h"
 
+/* bootstrap.c reads the fan-out's default from the backend (internode.h), which
+ * this test does not link; AM's value. */
+uint32_t osoe_internode_fanout_default(void);
+uint32_t osoe_internode_fanout_default(void)
+{
+    return 4;
+}
+
 _Noreturn void osoe_fatal(const char *fmt, ...);
 _Noreturn void osoe_fatal(const char *fmt, ...)
 {

@@ -28,6 +28,7 @@ add_library(osoe
   src/amo.c
   src/barrier.c
   src/bootstrap.c
+  src/collective-tree.c
   src/deprecated.c
   src/fatal.c
   src/info.c

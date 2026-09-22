@@ -68,6 +68,14 @@ osoe_warnings(shmem_test_allocator)
 add_test(NAME shmem.allocator COMMAND shmem_test_allocator)
 set_tests_properties(shmem.allocator PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# The internode tree's topology on its own (tier 1; §5.3): sparse node lists,
+# every fan-out a test uses, and the depths the tree must have.
+add_executable(shmem_test_collective_tree test-collective-tree.c ../src/collective-tree.c)
+target_include_directories(shmem_test_collective_tree PRIVATE ../src)
+osoe_warnings(shmem_test_collective_tree)
+add_test(NAME shmem.collective-tree COMMAND shmem_test_collective_tree)
+set_tests_properties(shmem.collective-tree PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The §4.9 watched-range encoding on its own (tier 1): pure logic, and the
 # property it must have is one a brute-force check can state directly.
 add_executable(shmem_test_watch_range test-watch-range.c)
@@ -166,7 +174,7 @@ set(OSOE_LAUNCH_COUNTS 1 2 4)
 # the last, so releasing on any arrival is indistinguishable from releasing on
 # all of them - and that mutation passed a two-node test.
 add_executable(shmem_test_barrier_am test-barrier-am.c
-  ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
+  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
   ../src/reply.c ../src/wire.c ../src/bootstrap.c ../src/shm-object.c)
 target_include_directories(shmem_test_barrier_am PRIVATE ../src)
 target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt)
@@ -244,7 +252,7 @@ endif()
 # inherited, so the production defaults cannot make the suite slow or the test
 # vacuous.
 add_executable(shmem_test_progress test-progress.c
-  ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
+  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
   ../src/reply.c ../src/wire.c ../src/shm-object.c)
 target_include_directories(shmem_test_progress PRIVATE ../src)
 target_link_libraries(shmem_test_progress PRIVATE osoe_base rt)
@@ -321,6 +329,38 @@ foreach(map 0,0,0,0 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
             $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
             $<TARGET_FILE:shmem_test_multinode>)
   set_tests_properties(shmem.multinode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+
+# The internode tree (§5.3), over node counts where its shape matters: 7 and
+# 13 nodes leave the last level partly filled, and 8 at k = 2 is depth 3. One
+# PE per node, where the tree is all there is, and uneven maps with several
+# PEs on some nodes, where the intranode phase and the handoff run under it.
+# The same program as shmem.multinode.*: its arrival table (arrivals.h) is what
+# says no PE left before the last arrived, and it ends by requiring every
+# invariant counter, missed_wake among them, to be zero.
+set(osoe_tree_maps
+  0,1,2,3,4,5,6
+  0,1,2,3,4,5,6,7
+  0,1,2,3,4,5,6,7,8,9,10,11,12
+  0,0,0,1,2,2,3,4,5,6
+  0,0,1,2,2,3,4,5,6,7,7
+  0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12)
+foreach(fanout 2 4)
+  foreach(map IN LISTS osoe_tree_maps)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    list(REMOVE_DUPLICATES ranks)
+    list(LENGTH ranks nodes)
+    add_test(NAME shmem.tree.k${fanout}.n${nodes}.p${count}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=${fanout}
+              OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+              SHMEM_SYMMETRIC_SIZE=16M
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 150 --
+              $<TARGET_FILE:shmem_test_multinode>)
+    set_tests_properties(shmem.tree.k${fanout}.n${nodes}.p${count}
+      PROPERTIES LABELS "tier2" TIMEOUT 180)
+  endforeach()
 endforeach()
 
 # The same program with §8.1's force-remote flag on, which is what makes
@@ -531,10 +571,16 @@ else()
   target_link_libraries(shmem_test_reply-pool PRIVATE osoe rt)
   osoe_warnings(shmem_test_reply-pool)
 endif()
+# The target's pool is C per connection plus (k + 1) x teams for the tree's
+# forwards, node-wide (§3.8): with C = 1 and k = 2 that is 1 + 3 x 3 = 10, so
+# eleven origin PEs each with a blocking get outstanding overflow it. Slice 3
+# made the forward term node-wide; at the default k = 4 it is 16, and the
+# seven origin PEs this test had until then stopped reaching it.
 add_test(NAME shmem.reply-pool.overflow
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow SHMEM_SYMMETRIC_SIZE=16m
-          $<TARGET_FILE:osoe-launch> -n 8 -m 0,0,0,0,0,0,0,1 -t 30
-          -e 7:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
+          OSOE_COLLECTIVE_FANOUT=2
+          $<TARGET_FILE:osoe-launch> -n 12 -m 0,0,0,0,0,0,0,0,0,0,0,1 -t 30
+          -e 11:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
 set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
 

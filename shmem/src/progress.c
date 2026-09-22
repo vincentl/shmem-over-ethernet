@@ -168,6 +168,93 @@ static void land(struct osoe_landing_slot *slot)
     osoe_futex_wake(&slot->wake, INT_MAX, OSOE_FUTEX_SHARED);
 }
 
+/* ---- The internode tree (§5.3) ------------------------------------------ */
+
+/* Queue one collective message toward a node of the tree. A handler may
+ * enqueue but never reserve (§3.7): the drain step writes it. */
+static void forward(struct osoe_progress *p, uint32_t team, uint32_t node, uint16_t kind,
+                    uint32_t epoch)
+{
+    uint32_t slot = osoe_progress_slot(p, node);
+    if (slot == OSOE_CONNECTION_NONE || !osoe_connection_to(p->area, node))
+        osoe_fatal("node %u: no connection toward node %u, a neighbour in team %u's tree",
+                   p->node, node, team);
+    struct osoe_reply r = { .kind = kind, .origin_pe = team, .length = 0, .value = epoch };
+    enqueue(p, slot, &p->connection[slot].queues.control, &r);
+}
+
+/*
+ * Release down: queue RELEASE to every child, then leave this node's own
+ * release for the end of the pass (release_pending). O(k).
+ */
+static void release_down(struct osoe_progress *p, uint32_t team, uint32_t epoch)
+{
+    struct osoe_progress_team *t = &p->team[team];
+    for (uint32_t j = 0; j < t->tree.children; j++)
+        forward(p, team, t->tree.child[j], OSOE_REPLY_RELEASE, epoch);
+    t->release_pending = epoch;
+}
+
+/*
+ * Book one arrival for (team, epoch): this node's own members (child ==
+ * OSOE_COLLECTIVE_TREE_NONE) or child number `child`. Closes the epoch when
+ * both are complete. Every refusal here is a node out of step with the job, and
+ * each names what it saw: an epoch already closed, two epochs at once, or the
+ * same arrival twice.
+ */
+static void book_arrival(struct osoe_progress *p, uint32_t team, uint32_t epoch,
+                         uint32_t child)
+{
+    struct osoe_progress_team *t = &p->team[team];
+    if (epoch <= t->closed)
+        osoe_fatal("node %u: team %u has an arrival for epoch %u, and has already closed "
+                   "epoch %u; collective epochs have diverged", p->node, team, epoch,
+                   t->closed);
+    if (t->open != 0 && t->open != epoch)
+        osoe_fatal("node %u: team %u has arrivals for epochs %u and %u at once; "
+                   "collective epochs have diverged", p->node, team, t->open, epoch);
+    t->open = epoch;
+    if (child == OSOE_COLLECTIVE_TREE_NONE) {
+        if (t->own)
+            osoe_fatal("node %u: team %u's members arrived twice for epoch %u", p->node,
+                       team, epoch);
+        t->own = true;
+    } else {
+        uint32_t bit = UINT32_C(1) << child;
+        if (t->arrived & bit)
+            osoe_fatal("node %u: team %u had two arrivals for epoch %u from node %u",
+                       p->node, team, epoch, t->tree.child[child]);
+        t->arrived |= bit;
+    }
+    uint32_t all = t->tree.children == 32 ? UINT32_MAX
+                                          : (UINT32_C(1) << t->tree.children) - 1;
+    if (!t->own || t->arrived != all)
+        return;
+    /* Close it, and reset, before anything is released (the struct's note). */
+    t->closed = epoch;
+    t->open = 0;
+    t->own = false;
+    t->arrived = 0;
+    if (t->tree.parent == OSOE_COLLECTIVE_TREE_NONE)
+        release_down(p, team, epoch);
+    else
+        forward(p, team, t->tree.parent, OSOE_REPLY_ARRIVE, epoch);
+}
+
+/* The team a collective message names, checked (§3.4's trust boundary). */
+static struct osoe_progress_team *barrier_team(struct osoe_progress *p, uint32_t slot,
+                                               const struct osoe_am_barrier *m,
+                                               const char *what)
+{
+    if (m->team >= OSOE_TEAMS || !p->team[m->team].registered)
+        osoe_fatal("node %u: a barrier %s from node %u names team %u, which has no "
+                   "internode phase on this node", p->node, what, peer_of(p, slot), m->team);
+    if (m->from_node != peer_of(p, slot))
+        osoe_fatal("node %u: a barrier %s on node %u's connection says it is from node %u",
+                   p->node, what, peer_of(p, slot), m->from_node);
+    return &p->team[m->team];
+}
+
 static void complete(void *context, const struct osoe_message_header *header,
                      const void *fixed, void *payload, uint32_t payload_bytes)
 {
@@ -273,51 +360,34 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_BARRIER_ARRIVE: {
         struct osoe_am_barrier m;
         memcpy(&m, fixed, sizeof m);
-        if (m.team >= OSOE_TEAMS)
-            osoe_fatal("a barrier arrival names team %u; this build has %u", m.team,
-                       OSOE_TEAMS);
-        /*
-         * The root counts arrivals for the epoch. A node that arrives for the
-         * next epoch while this one is still open cannot happen: a member
-         * cannot reach epoch k+1 without this node having been released from k
-         * (§5.4's bounded skew), which is the same argument §3.8 uses to bound
-         * the forward queue.
-         */
-        if (p->arrivals[m.team] == 0)
-            p->arrival_epoch[m.team] = m.epoch;
-        else if (p->arrival_epoch[m.team] != m.epoch)
-            osoe_fatal("team %u has arrivals for epochs %u and %u at once; collective "
-                       "epochs have diverged", m.team, p->arrival_epoch[m.team], m.epoch);
-        p->arrivals[m.team]++;
-        p->barrier_arrivals++;
-        if (p->arrivals[m.team] == p->participants[m.team]) {
-            p->arrivals[m.team] = 0;
-            /*
-             * Release everyone. A handler may enqueue but never reserve (§3.7),
-             * so each peer's release goes onto its control queue and the drain
-             * step writes it; this node's own release is applied here, because
-             * it is not a message.
-             */
-            for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
-                struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE,
-                                        .origin_pe = m.team, .length = 0,
-                                        .value = m.epoch };
-                enqueue(p, slot, &p->connection[slot].queues.control, &r);
-            }
-            p->host.release(p->host.context, m.team, m.epoch);
-        }
+        struct osoe_progress_team *t = barrier_team(p, a->slot, &m, "arrival");
+        /* §3.4's trust boundary: only a child sends ARRIVE up to this node. A
+         * node that disagrees about the tree - a different
+         * OSOE_COLLECTIVE_FANOUT, or a different node set - is named rather
+         * than counted. */
+        uint32_t child = osoe_collective_tree_child(&t->tree, m.from_node);
+        if (child == OSOE_COLLECTIVE_TREE_NONE)
+            osoe_fatal("node %u: team %u's arrival for epoch %u came from node %u, which is "
+                       "not a child of this node in its tree (fan-out %u over %u nodes); "
+                       "the nodes disagree about the tree", p->node, m.team, m.epoch,
+                       m.from_node, t->tree.fanout, t->tree.count);
+        book_arrival(p, m.team, m.epoch, child);
         break;
     }
 
     case OSOE_AM_BARRIER_RELEASE: {
         struct osoe_am_barrier m;
         memcpy(&m, fixed, sizeof m);
-        /*
-         * Applied by the progress thread, which is §5.3's rule: it advances the
-         * team's released counter and wakes all local waiters. A divisible
-         * event, so wake-many (§3.11).
-         */
-        p->host.release(p->host.context, m.team, m.epoch);
+        struct osoe_progress_team *t = barrier_team(p, a->slot, &m, "release");
+        if (m.from_node != t->tree.parent)
+            osoe_fatal("node %u: team %u's release for epoch %u came from node %u; this "
+                       "node's parent in the tree is node %u", p->node, m.team, m.epoch,
+                       m.from_node, t->tree.parent);
+        if (m.epoch != t->closed || t->open != 0 || t->release_pending != 0)
+            osoe_fatal("node %u: team %u's release for epoch %u arrived with epoch %u the "
+                       "last closed here and %u open; collective epochs have diverged",
+                       p->node, m.team, m.epoch, t->closed, t->open);
+        release_down(p, m.team, m.epoch);
         break;
     }
 
@@ -722,20 +792,49 @@ void osoe_progress_attach(struct osoe_progress *p,
     }
 }
 
-bool osoe_progress_poll(struct osoe_progress *p)
+/*
+ * The releases this pass forwarded, applied to this node's own members last.
+ * Each child's connection is drained and flushed first, so the RELEASE is in
+ * the wire - or in the open buffer behind a send already in flight - before the
+ * local wake, which is O(L) futex work on this thread (§5.3). O(k) per release.
+ */
+static bool release_local(struct osoe_progress *p)
 {
     bool moved = false;
+    for (uint32_t team = 0; team < OSOE_TEAMS; team++) {
+        struct osoe_progress_team *t = &p->team[team];
+        if (t->release_pending == 0)
+            continue;
+        for (uint32_t j = 0; j < t->tree.children; j++) {
+            uint32_t slot = osoe_progress_slot(p, t->tree.child[j]);
+            drain(p, slot);
+            flush(p, slot);
+        }
+        uint32_t epoch = t->release_pending;
+        t->release_pending = 0;
+        p->host.release(p->host.context, team, epoch);
+        moved = true;
+    }
+    return moved;
+}
+
+bool osoe_progress_poll(struct osoe_progress *p)
+{
+    bool moved = release_local(p);     /* a release osoe_progress_arrive started */
     for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
         moved |= receive(p, slot);
         moved |= drain(p, slot);
         moved |= flush(p, slot);
     }
-    return moved;
+    return release_local(p) || moved;
 }
 
 bool osoe_progress_idle(struct osoe_progress *p)
 {
     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
+    for (uint32_t team = 0; team < OSOE_TEAMS; team++)
+        if (p->team[team].release_pending != 0)
+            return false;
     for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
         struct osoe_progress_connection *c = &p->connection[slot];
         if (c->sending != OSOE_CONNECTION_NONE || c->sealed != OSOE_CONNECTION_NONE)
@@ -766,50 +865,21 @@ bool osoe_progress_idle(struct osoe_progress *p)
  * wake; the code already passed (team, epoch) down and one release call up, and
  * §10 records how that decision was reversed (2026-09-20).
  */
-void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch,
-                          uint32_t root, uint32_t participants)
+void osoe_progress_team(struct osoe_progress *p, uint32_t team,
+                        const struct osoe_collective_tree *tree)
 {
     if (team >= OSOE_TEAMS)
-        osoe_fatal("a barrier arrival names team %u; this build has %u", team,
+        osoe_fatal("team %u registered an internode phase; this build has %u", team,
                    OSOE_TEAMS);
-    p->participants[team] = participants;
+    p->team[team] = (struct osoe_progress_team){ .registered = true, .tree = *tree };
+}
 
-    if (p->node == root) {
-        /* No message to send: this node is where the arrivals are counted -
-         * and checked as the handler checks a peer's, since this node's own
-         * arrival can be the one out of step (second review, protocols P6). */
-        if (p->arrivals[team] == 0)
-            p->arrival_epoch[team] = epoch;
-        else if (p->arrival_epoch[team] != epoch)
-            osoe_fatal("team %u has arrivals for epochs %u and %u at once; collective "
-                       "epochs have diverged", team, p->arrival_epoch[team], epoch);
-        p->arrivals[team]++;
-        p->barrier_arrivals++;
-        if (p->arrivals[team] == participants) {
-            p->arrivals[team] = 0;
-            for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
-                struct osoe_reply r = { .kind = OSOE_REPLY_RELEASE, .origin_pe = team,
-                                        .length = 0, .value = epoch };
-                enqueue(p, slot, &p->connection[slot].queues.control, &r);
-            }
-            p->host.release(p->host.context, team, epoch);
-        }
-        return;
-    }
-
-    /*
-     * Reserve it onto the root's connection. This runs on the lead's agent -
-     * the same thread that will send it - so the reservation below can never
-     * wait on a seal only this thread performs. The loop is kept because
-     * osoe_connection_reserve is fallible by contract (§3.5); it cannot spin
-     * here, since no other buffer state is reachable from inside this pass.
-     */
-    uint32_t slot = osoe_progress_slot(p, root);
-    if (slot == OSOE_CONNECTION_NONE || !osoe_connection_to(p->area, root))
-        osoe_fatal("no connection to the collective root, node %u", root);
-    struct osoe_reply r = { .kind = OSOE_REPLY_ARRIVE, .origin_pe = team,
-                            .length = 0, .value = epoch };
-    enqueue(p, slot, &p->connection[slot].queues.control, &r);
+void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch)
+{
+    if (team >= OSOE_TEAMS || !p->team[team].registered)
+        osoe_fatal("node %u: team %u arrived at an internode phase it never registered",
+                   p->node, team);
+    book_arrival(p, team, epoch, OSOE_COLLECTIVE_TREE_NONE);
 }
 
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer)

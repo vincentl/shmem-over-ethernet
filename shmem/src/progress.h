@@ -35,6 +35,7 @@
 #include <stdint.h>
 
 #include "am.h"
+#include "collective-tree.h"
 #include "connection-area.h"
 #include "node.h"
 #include "reply.h"
@@ -68,6 +69,32 @@ struct osoe_progress_host {
      */
     void (*release)(void *context, uint32_t team, uint32_t epoch);
     void *context;
+};
+
+/*
+ * One team's place in the internode tree, and the epoch it is in (§5.3).
+ *
+ * A node *opens* an epoch at the first arrival booked for it - its own members'
+ * or a child's - and *closes* it when both are complete: it forwards ARRIVE to
+ * its parent, or at the root starts the release. Closing resets the counts
+ * **before** anything is released, so that a child released by this node's
+ * forward can come back with the next epoch at once and find it clean
+ * (tree_barrier_model.py, `release_first` and `wrong_epoch`).
+ */
+struct osoe_progress_team {
+    bool registered;
+    struct osoe_collective_tree tree;
+    uint32_t open;              /* the epoch in progress, or 0 */
+    uint32_t closed;            /* the last epoch closed */
+    bool own;                   /* this node's members have arrived for `open` */
+    uint32_t arrived;           /* children arrived for `open`, one bit per child */
+    /*
+     * An epoch whose release has been forwarded to the children but not yet
+     * applied to this node's members, or 0. Applied at the end of the pass,
+     * after the children's connections have been flushed, so the release
+     * leaves for the next level before this level's local wake (§5.3).
+     */
+    uint32_t release_pending;
 };
 
 /* The progress thread's private bookkeeping for one connection. Writers see
@@ -109,14 +136,12 @@ struct osoe_progress {
     struct osoe_progress_host host;
 
     /*
-     * The root node's count of internode arrivals, per team. Private to the
-     * progress thread, like everything else here. Only the root counts; every
-     * other node's lead only forwards its own arrival and applies the release.
+     * The internode tree's state, per team (§5.3): private to the progress
+     * thread, like everything else here, and O(k) per team - the topology -
+     * plus O(1) for the epoch in progress. Registered once per team before
+     * this thread runs (osoe_progress_team).
      */
-    uint32_t arrivals[OSOE_TEAMS];
-    uint32_t arrival_epoch[OSOE_TEAMS];
-    uint32_t participants[OSOE_TEAMS];
-    uint64_t barrier_arrivals;
+    struct osoe_progress_team team[OSOE_TEAMS];
 
     /*
      * §3.14 counters, read by osoe-stat and by the tests: the node header's
@@ -172,24 +197,27 @@ uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer);
 
 /*
- * This node's arrival at a team's internode phase (§5.3).
+ * A team's internode tree, computed from its node set (internode-am.c,
+ * collective-tree.h). Called before the engine's thread starts; the engine keeps
+ * the tree, O(k), and never the node set, O(N).
+ */
+void osoe_progress_team(struct osoe_progress *p, uint32_t team,
+                        const struct osoe_collective_tree *tree);
+
+/*
+ * This node's own arrival at a team's internode phase (§5.3): every local
+ * member is in.
  *
  * Called by the lead's agent, out of the handoff word that whichever local
  * member's increment reached the arrival target left for it (internode-am.c).
  * Not by that member: everything here is the progress thread's private state,
  * in the lead's process, and the arriver is an application thread of any local
- * PE. An earlier draft had the arriver reserve and commit the message itself,
- * which §3.12 does allow of an application thread in general - but it cannot
- * touch `arrivals` or `participants` below, and on the root node there is no
- * message to reserve at all.
+ * PE.
  *
- * `root` is the node that counts arrivals and sends the releases; `nodes` is
- * how many participate, which for a team is the nodes holding at least one
- * member (§5.2). On the root this is applied directly, and may complete the
- * collective and release the team before returning; elsewhere it is reserved
- * onto the root's connection for this same thread to send.
+ * Booked like a child's arrival. If it completes the epoch, the node forwards
+ * ARRIVE to its parent - queued, for this same thread's drain - or, at the
+ * root, starts the release.
  */
-void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch,
-                          uint32_t root, uint32_t participants);
+void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch);
 
 #endif /* OSOE_PROGRESS_H */

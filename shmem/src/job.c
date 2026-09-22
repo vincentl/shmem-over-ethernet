@@ -22,8 +22,9 @@
 #include "job.h"
 
 #define OSOE_JOB_MAGIC UINT64_C(0x00626f6a656f736f)   /* "osoejob" */
-#define OSOE_JOB_LAYOUT 4     /* 2: the per-rank claim array; 3: `opened`;
-                               * 4: the per-node backend blob */
+#define OSOE_JOB_LAYOUT 5     /* 2: the per-rank claim array; 3: `opened`;
+                               * 4: the per-node backend blob;
+                               * 5: collective_fanout */
 
 /* Not yet assigned to a node. The map starts full of these so that a rank no
  * lead claimed is a detectable gap rather than node 0 by accident. */
@@ -44,7 +45,7 @@ struct osoe_job_header {
      */
     uint64_t symmetric_size;
     uint32_t handler_checksum;
-    uint32_t reserved2;
+    uint32_t collective_fanout;     /* OSOE_COLLECTIVE_FANOUT (layout 5) */
 
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t ready;    /* the object is described */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t joined;   /* leads that have published */
@@ -195,6 +196,7 @@ again:;
         h->node_count = b->node_count;
         h->symmetric_size = b->symmetric_size;
         h->handler_checksum = osoe_am_table_checksum();
+        h->collective_fanout = b->collective_fanout;
         h->creator_pid = (int32_t)getpid();
         for (uint32_t i = 0; i < b->world_size; i++) {
             node_of[i] = OSOE_NODE_UNSET;
@@ -251,6 +253,11 @@ again:;
             osoe_fatal_then(fail_job, h, "node %u has AM handler table checksum %#x; node 0 has %#x: the "
                        "nodes are running different binaries (§3.13)", b->node,
                        osoe_am_table_checksum(), h->handler_checksum);
+        }
+        if (h->collective_fanout != b->collective_fanout) {
+            osoe_fatal_then(fail_job, h, "node %u has OSOE_COLLECTIVE_FANOUT=%u; node 0 has %u: "
+                       "every node must build the same internode tree (§5.3)", b->node,
+                       b->collective_fanout, h->collective_fanout);
         }
         for (uint32_t i = 0; i < b->local_count; i++) {
             uint32_t rank = b->gtids[i];

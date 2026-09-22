@@ -44,6 +44,7 @@
 #include "base/deadline.h"
 #include "bootstrap.h"
 #include "check.h"
+#include "collective-tree.h"
 #include "connection-area.h"
 #include "node.h"
 #include "progress.h"
@@ -266,6 +267,11 @@ int main(void)
     osoe_progress_init(&p, &area, &wire, descriptors, DESCRIPTORS, scratch, SCRATCH,
                        &host);
     osoe_progress_attach(&p, connections);
+    /* Two nodes, so the tree is node 0 with node 1 as its only child. */
+    static const uint32_t both[] = { 0, 1 };
+    struct osoe_collective_tree tree;
+    CHECK_FATAL(osoe_collective_tree(both, 2, b.node, 2, &tree));
+    osoe_progress_team(&p, 0, &tree);
 
     struct osoe_landing_slot *slot = (struct osoe_landing_slot *)landing_storage;
     struct osoe_deadline give_up = osoe_deadline_in(UINT64_C(25000000000));
@@ -453,15 +459,16 @@ int main(void)
         }
 
     /*
-     * The internode phase of a barrier (§5.1, §5.3). Node 0 is the root: both
-     * nodes arrive, the root counts them, and the release comes back and is
+     * The internode phase of a barrier (§5.1, §5.3). Node 0 is the root of a
+     * two-node tree: both nodes arrive, the root counts them, and the release
+     * comes back and is
      * applied by the progress thread. The epoch is arbitrary here - the point
      * is that no node is released before every node has arrived, which is the
      * only thing a barrier promises.
      */
     enum { EPOCH = 11 };
     CHECK(releases == 0);
-    osoe_progress_arrive(&p, 0, EPOCH, 0, 2);
+    osoe_progress_arrive(&p, 0, EPOCH);
     /*
      * No assertion about *when* the release happens here. The root's own
      * arrival may legitimately be the last one - the peer's may already have

@@ -2,8 +2,9 @@
  * The internode phase of a barrier, over the AM layer (§5.1, §5.3, §8.2).
  *
  * The intranode phase runs on the node's epoch counters and is step 1's. This
- * is the other half: the last local member arrives, the root counts the nodes,
- * and the release comes back and is applied by each node's progress thread.
+ * is the other half: the last local member arrives, the nodes meet up the
+ * k-ary tree, and the release comes back down it and is applied by each node's
+ * progress thread.
  *
  * **Three nodes, not two.** With two, the root's own arrival and the one
  * message it receives are the first and the last, so a root that released on
@@ -32,11 +33,20 @@
 #include "base/deadline.h"
 #include "bootstrap.h"
 #include "check.h"
+#include "collective-tree.h"
 #include "connection-area.h"
 #include "node.h"
 #include "progress.h"
 #include "reply.h"
 #include "wire.h"
+
+/* bootstrap.c reads the fan-out's default from the backend (internode.h), which
+ * this test does not link; AM's value. */
+uint32_t osoe_internode_fanout_default(void);
+uint32_t osoe_internode_fanout_default(void)
+{
+    return 4;
+}
 
 _Noreturn void osoe_fatal(const char *fmt, ...);
 _Noreturn void osoe_fatal(const char *fmt, ...)
@@ -50,7 +60,7 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
     exit(1);
 }
 
-enum { MAX_NODES = 8, DESCRIPTORS = 64, SCRATCH = 4096, ROOT = 0, TEAM = 0 };
+enum { MAX_NODES = 16, DESCRIPTORS = 64, SCRATCH = 4096, TEAM = 0 };
 
 static uint32_t releases, released_epoch;
 
@@ -113,6 +123,15 @@ int main(void)
                        &host);
     osoe_progress_attach(&p, connections);
 
+    /* The world team's tree: every node, at the fan-out the environment gives
+     * (OSOE_COLLECTIVE_FANOUT, so the same binary runs every shape). */
+    uint32_t nodes[MAX_NODES];
+    for (uint32_t n = 0; n < b.node_count; n++)
+        nodes[n] = n;
+    struct osoe_collective_tree tree;
+    CHECK_FATAL(osoe_collective_tree(nodes, b.node_count, b.node, b.collective_fanout, &tree));
+    osoe_progress_team(&p, TEAM, &tree);
+
     struct osoe_deadline give_up = osoe_deadline_in(UINT64_C(25000000000));
 
     /*
@@ -132,7 +151,7 @@ int main(void)
      */
     arrivals_arrive((int)b.rank);
     arrivals_row()[b.node] = arrivals_now();
-    osoe_progress_arrive(&p, TEAM, EPOCH, ROOT, b.node_count);
+    osoe_progress_arrive(&p, TEAM, EPOCH);
 
     while (releases == 0) {
         osoe_progress_poll(&p);

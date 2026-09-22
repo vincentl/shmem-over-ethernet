@@ -4,7 +4,8 @@
  * §6.2: local PEs meet on their node; **only each node's lead crosses the
  * network**. The lead of node 0 is the step's rendezvous server, every other
  * node's lead connects to it, each sends its node's rank list, its
- * SHMEM_SYMMETRIC_SIZE and its handler-table checksum, the server checks that
+ * SHMEM_SYMMETRIC_SIZE, its handler-table checksum and its internode tree's
+ * fan-out (OSOE_COLLECTIVE_FANOUT), the server checks that
  * they agree, and then broadcasts the rank -> node map.
  *
  * §7.1 step 2 has no sockets, so the meeting place here is a shared-memory

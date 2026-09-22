@@ -92,6 +92,19 @@
 void osoe_internode_init(void);
 void osoe_internode_fini(void);
 
+/*
+ * The internode tree's fan-out k when OSOE_COLLECTIVE_FANOUT does not set one.
+ * The backend's, because the right k depends on the fabric (§5.3): the
+ * critical path is about depth x (hop latency h + k x per-message cost o), so
+ * k grows with h/o, and on RDMA the up-sweep's k arrivals are applied by the
+ * parent's NIC rather than its CPU, which favours a wider tree still. The
+ * minimum is broad - on RoCE at 1,000 nodes every k from 4 to 32 is within
+ * about 10% - so this is a default, not a tuning knob that must be right.
+ * Read during bootstrap, before any other call here; every node lead must end
+ * up with the same k, which the job rendezvous checks (§6.2).
+ */
+uint32_t osoe_internode_fanout_default(void);
+
 /* ---- Teams ------------------------------------------------------------ */
 
 /*

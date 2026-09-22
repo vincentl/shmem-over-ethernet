@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "collective-tree.h"
+#include "internode.h"
 #include "base/environment.h"
 #include "base/size.h"
 #include "bootstrap.h"
@@ -169,6 +171,19 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         osoe_fatal("OSOE_SHM_CAPACITY_CHECK='%s' is not 0 or 1",
                    getenv("OSOE_SHM_CAPACITY_CHECK"));
     b->shm_capacity_warning_only = capacity_check == 0;
+
+    /*
+     * The internode tree's fan-out (§5.3, collective-tree.h). Every node lead
+     * must agree, and the job rendezvous checks that they do (§6.2): a node
+     * with a different k computes different children, waits for arrivals
+     * that are sent elsewhere, and hangs the job without a word.
+     */
+    b->collective_fanout = osoe_internode_fanout_default();
+    if (osoe_environment_u32("OSOE_COLLECTIVE_FANOUT", &b->collective_fanout) ==
+            OSOE_ENVIRONMENT_INVALID ||
+        b->collective_fanout < 2 || b->collective_fanout > OSOE_COLLECTIVE_FANOUT_MAX)
+        osoe_fatal("OSOE_COLLECTIVE_FANOUT='%s' is not between 2 and %u",
+                   getenv("OSOE_COLLECTIVE_FANOUT"), (unsigned)OSOE_COLLECTIVE_FANOUT_MAX);
 
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
     if (osoe_environment_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENVIRONMENT_INVALID || watchdog > 1)

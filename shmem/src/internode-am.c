@@ -2,7 +2,7 @@
  * internode.h over the AM layer (§5.3, §3.12).
  *
  * The arrival is performed by the node lead's agent, because the state it
- * moves - the tree's per-team counts and the per-connection queues - is private
+ * moves - the tree's per-team state and the per-connection queues - is private
  * to that thread, in the lead's process, and the arriver is an application
  * thread of any local PE. So osoe_internode_arrive only leaves the epoch in the
  * team's handoff word of the node header and wakes the lead; the agent takes it
@@ -18,6 +18,7 @@
 
 #include "am-state.h"
 #include "base/futex.h"
+#include "collective-tree.h"
 #include "fatal.h"
 #include "internode.h"
 #include "node.h"
@@ -32,18 +33,24 @@
  */
 static uint32_t consumed[OSOE_TEAMS];
 
-/* Which teams have an internode phase on this node (osoe_internode_team), and
- * the two things the engine's arrival needs from the node set. */
+/* Which teams have an internode phase on this node (osoe_internode_team). */
 static bool registered[OSOE_TEAMS];
-static uint32_t root[OSOE_TEAMS];
-static uint32_t participants[OSOE_TEAMS];
+
+/*
+ * 4 for AM over Ethernet: h/o is about 4 on a server's TCP (h ~ 20 us one way,
+ * o ~ 5 us per message) and about 8 on a Pi's 1 GbE, and the cost model's
+ * optimum for those is k = 4 to 6 (§5.3). An RDMA backend would choose 8-16.
+ */
+uint32_t osoe_internode_fanout_default(void)
+{
+    return 4;
+}
 
 void osoe_internode_init(void)
 {
     for (uint32_t team = 0; team < OSOE_TEAMS; team++) {
         consumed[team] = 0;
         registered[team] = false;
-        root[team] = participants[team] = 0;
     }
 }
 
@@ -58,9 +65,20 @@ void osoe_internode_team(uint32_t team, const uint32_t *nodes, uint32_t count)
                    OSOE_TEAMS);
     if (count < 2)
         osoe_fatal("team %u registered an internode phase over %u node", team, count);
+    /*
+     * The k-ary tree over the node set's index (§5.3, collective-tree.h), with
+     * the fan-out every lead agreed on at the job rendezvous (§6.2). Every PE
+     * computes it, so a node set the tree cannot be built from is refused on
+     * all of them; only the lead's engine keeps it, and it is not running yet.
+     */
+    struct osoe_collective_tree tree;
+    if (!osoe_collective_tree(nodes, count, osoe.job.node, osoe.bootstrap.collective_fanout,
+                              &tree))
+        osoe_fatal("team %u's internode node set (%u nodes) is not sorted, repeats a node, "
+                   "or leaves out node %u, which holds members", team, count, osoe.job.node);
     registered[team] = true;
-    root[team] = nodes[0];
-    participants[team] = count;
+    if (osoe_am.internode && osoe_am.lead)
+        osoe_progress_team(&osoe_am.progress, team, &tree);
 }
 
 void osoe_internode_arrive(uint32_t team, uint32_t epoch)
@@ -110,7 +128,7 @@ bool osoe_internode_am_take_arrivals(void)
         if (epoch == consumed[team])
             continue;
         consumed[team] = epoch;
-        osoe_progress_arrive(&osoe_am.progress, team, epoch, root[team], participants[team]);
+        osoe_progress_arrive(&osoe_am.progress, team, epoch);
         moved = true;
     }
     return moved;

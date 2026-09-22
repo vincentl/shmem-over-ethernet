@@ -34,13 +34,14 @@ set(OSOE_BELOW_BOUNDARY
   progress-host.h reply.c reply.h transport-am.c transport-local.h wire.c wire.h)
 
 # Neither: the boundary's own implementation that every backend keeps, and the
-# shared infrastructure both sides build on. Not checked, and listed so that
-# the classification is complete. Two of these still reach AM headers, and
+# shared infrastructure both sides build on - the internode tree's topology
+# among it, which an RDMA backend computes the same way. Not checked, and
+# listed so that the classification is complete. Two of these still reach AM headers, and
 # both are known (roce-seam §3.2): node.c sizes the landing zones from the AM
 # chunk (L5), and job.c checks the AM handler table's checksum at rendezvous
 # (L6). Both are the rendezvous's business, not the SHMEM layer's.
 set(OSOE_ON_BOUNDARY
-  transport-local.c watch.c node.c job.c shm-object.c)
+  collective-tree.c transport-local.c watch.c node.c job.c shm-object.c)
 
 if(NOT SOURCE_DIR)
   message(FATAL_ERROR "usage: cmake -DSOURCE_DIR=<repository root> -P CheckBoundary.cmake")
@@ -86,10 +87,8 @@ foreach(top IN LISTS OSOE_ABOVE_BOUNDARY)
   # so a failure names the whole chain.
   set(queue "${src}/${top}")
   set(seen "${src}/${top}")
-  set(via_${top} "${top}")
   while(queue)
     list(POP_FRONT queue file)
-    get_filename_component(file_name "${file}" NAME)
     string(MAKE_C_IDENTIFIER "${file}" key)
     if(NOT DEFINED chain_${key})
       set(chain_${key} "${top}")

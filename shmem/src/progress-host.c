@@ -142,22 +142,23 @@ void osoe_progress_host_start(uint32_t session)
 
     uint32_t peers = osoe.job.node_count - 1;
     /*
-     * §3.8's formula, per connection: C + degree x teams + slack. C bounds the
-     * replies - the origin takes a credit per get or fetching AMO and returns
-     * it when the reply lands (argument 1). degree x teams bounds the
-     * collective forwards: while collectives are blocking, a team has at most
-     * one forward outstanding per tree edge (argument 2). The pool is
-     * node-wide, so an idle connection costs nothing.
+     * §3.8's two arguments. C per connection bounds the replies - the origin
+     * takes a credit per get or fetching AMO and returns it when the reply
+     * lands (argument 1). degree x teams, node-wide, bounds the collective
+     * forwards: while collectives are blocking, a node of the internode tree
+     * has at most one ARRIVE or its k RELEASEs queued per team (argument 2,
+     * reply.h). The pool is node-wide, so an idle connection costs nothing.
      *
      * Before slice 2 this was peers x C, with no term for the forwards, so a
      * node holding C gets toward a peer had nothing left for its own barrier
-     * arrival and the request was dropped (second review, D1). No legal
-     * program can empty the pool now, and progress.c ends the job naming the
-     * peer if one does.
+     * arrival and the request was dropped (second review, D1). Slice 2 added
+     * the forwards per connection, which was the star's shape - its root
+     * released every peer at once. No legal program can empty the pool, and
+     * progress.c ends the job naming the peer if one does.
      */
-    uint32_t per_connection = osoe_am.area.credits +
-                              OSOE_COLLECTIVE_DEGREE * OSOE_TEAMS + OSOE_REPLY_SLACK;
-    uint32_t descriptors = peers * per_connection;
+    uint32_t descriptors = peers * (osoe_am.area.credits + OSOE_REPLY_SLACK) +
+                           OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) *
+                               OSOE_TEAMS;
     osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
     osoe_am.descriptor = calloc(descriptors, sizeof *osoe_am.descriptor);

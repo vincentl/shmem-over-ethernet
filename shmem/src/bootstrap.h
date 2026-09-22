@@ -27,6 +27,7 @@ struct osoe_bootstrap {
     bool watchdog;              /* OSOE_WATCHDOG, or the build default (§3.15) */
     bool keep_control_segment;  /* OSOE_KEEP_CONTROL_SEGMENT: name kept until finalize */
     bool shm_capacity_warning_only; /* OSOE_SHM_CAPACITY_CHECK=0: report, do not refuse */
+    uint32_t collective_fanout; /* OSOE_COLLECTIVE_FANOUT: k of the internode tree (§5.3) */
 
     /* The specification's own variables (§8). Each is "Any": the value does
      * not matter, only that it is set. SMA_-prefixed spellings are deprecated
