@@ -83,6 +83,6 @@ int main(void)
     CHECK(osoe_counter_read(&b, 0) == 12);
     CHECK(osoe_counter_read(&b, OSOE_COUNTERS_PER_BLOCK - 1) == 1);
 
-    osoe_serializing_store();               /* links and runs */
+    osoe_serializing_fence();               /* links and runs */
     return CHECK_DONE();
 }

@@ -81,7 +81,7 @@ static uint64_t map_offset(void)
 
 static void fail_job(struct osoe_job_header *h)
 {
-    atomic_store_explicit(&h->failed, 1, memory_order_seq_cst);
+    atomic_store_explicit(&h->failed, 1, memory_order_release);
     osoe_futex_wake(&h->joined, INT_MAX, OSOE_FUTEX_SHARED);
     osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
 }
@@ -182,7 +182,7 @@ again:;
             node_of[i] = OSOE_NODE_UNSET;
             atomic_store_explicit(&claim[i], OSOE_NODE_UNSET, memory_order_release);
         }
-        atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
+        atomic_store_explicit(&h->ready, 1, memory_order_release);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
         struct osoe_stall_watch watch;

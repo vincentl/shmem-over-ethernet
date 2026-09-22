@@ -308,7 +308,7 @@ again:;
          * (§3.5). */
         for (uint32_t i = 0; i < peers; i++)
             osoe_connection_init(&a->conn[i], a->credits);
-        atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
+        atomic_store_explicit(&h->ready, 1, memory_order_release);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
         struct osoe_stall_watch watch;

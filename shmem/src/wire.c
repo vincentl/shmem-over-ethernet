@@ -241,11 +241,11 @@ again:;
     if (w->creator) {
         /* ftruncate zeroed it: every counter and futex word starts at 0. The
          * header is written before `ready`, and `ready` is what the peer waits
-         * on - a futex word that is its own predicate, stored seq_cst (§3.16). */
+         * on - a futex word that is its own predicate, stored release (§3.16). */
         h->capacity = w->capacity;
         h->magic = OSOE_WIRE_MAGIC;
         h->creator_pid = (int32_t)getpid();
-        atomic_store_explicit(&h->ready, 1, memory_order_seq_cst);
+        atomic_store_explicit(&h->ready, 1, memory_order_release);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
         struct osoe_stall_watch watch;
@@ -400,9 +400,10 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len)
      * Publish the bytes, then the wake. This order is the protocol: a reader
      * that has loaded the wake word already will find the bytes, and one that
      * has not will find the bump. Reversing it, or reversing the reader's two
-     * loads, loses the wake (wire_model.py, the `wake_after` case).
+     * loads, loses the wake (wire_model.py, the `wake_after` case). Message
+     * passing, not two-sided: release, and the bump is the futex word (§3.16).
      */
-    atomic_store_explicit(&w->tx->produced, produced + n, memory_order_seq_cst);
+    atomic_store_explicit(&w->tx->produced, produced + n, memory_order_release);
     atomic_fetch_add_explicit(&w->tx->wake, 1, memory_order_seq_cst);
     osoe_futex_wake(&w->tx->wake, 1, OSOE_FUTEX_SHARED);
     return n;
@@ -429,7 +430,7 @@ size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len)
         memcpy((unsigned char *)buffer + first, ring(w, w->creator ? 1 : 0), n - first);
 
     /* Release the space only once the bytes are out of it. */
-    atomic_store_explicit(&w->rx->consumed, consumed + n, memory_order_seq_cst);
+    atomic_store_explicit(&w->rx->consumed, consumed + n, memory_order_release);
     return n;
 }
 

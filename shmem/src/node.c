@@ -63,8 +63,8 @@ static uint64_t page_round(uint64_t n)
 _Noreturn static void fail_rendezvous(struct osoe_node *n, const char *what)
 {
     if (n->hdr) {
-        /* seq_cst: a futex word that is its own predicate (§3.16). */
-        atomic_store_explicit(&n->hdr->failed, 1, memory_order_seq_cst);
+        /* release: checked by waiters at each wake and sweep (§3.16). */
+        atomic_store_explicit(&n->hdr->failed, 1, memory_order_release);
         osoe_futex_wake(&n->hdr->ready, INT_MAX, OSOE_FUTEX_SHARED);
         osoe_futex_wake(&n->hdr->joined, INT_MAX, OSOE_FUTEX_SHARED);
         osoe_futex_wake(&n->hdr->mapped, INT_MAX, OSOE_FUTEX_SHARED);
@@ -477,8 +477,8 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
 
     if (lead) {
         n->hdr->heap_base = base;
-        /* seq_cst: a futex word that is its own predicate (§3.16). */
-        atomic_store_explicit(&n->hdr->ready, 1, memory_order_seq_cst);
+        /* release: a futex word that is its own predicate (§3.16). */
+        atomic_store_explicit(&n->hdr->ready, 1, memory_order_release);
         osoe_futex_wake(&n->hdr->ready, INT_MAX, OSOE_FUTEX_SHARED);
     }
 

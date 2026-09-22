@@ -11,8 +11,10 @@
  * - the waiter publishes its range BEFORE its first predicate check;
  * - it loads the sequence word before the variables;
  * - the writer updates the variables before it loads the range;
- * - both publications are seq_cst, because this is a two-sided protocol
- *   (§3.16); a put's memcpy is not, so notify for puts is best effort (§4.10).
+ * - both publications are seq_cst, and so are both loads that follow them -
+ *   the writer's load of the range here, the waiter's load of the variable in
+ *   osoe_transport_load - because this is a two-sided protocol (§3.16); a
+ *   put's memcpy is not seq_cst, so notify for puts is best effort (§4.10).
  *
  * Under SHMEM_THREAD_SERIALIZED and below a PE is in at most one wait at a
  * time, so one slot needs no list and no key. §4.11 item 3's MULTIPLE design is
@@ -85,7 +87,8 @@ void osoe_transport_notify(int pe, enum osoe_region region, uint64_t offset, siz
         return;                             /* not on this node: the AM backend notifies */
     struct osoe_pe_slot *slot = &osoe.node.slots[local];
     osoe_count(OSOE_C_TRANSPORT_NOTIFY_CALLS, 1);
-    uint64_t rng = atomic_load_explicit(&slot->watch_rng, memory_order_acquire);
+    /* seq_cst: the writer's load in the two-sided protocol (§3.16). */
+    uint64_t rng = atomic_load_explicit(&slot->watch_rng, memory_order_seq_cst);
     if (!osoe_watch_covers(rng, (unsigned)region, offset, len))
         return;
     /* Against notify.calls, this is the filter's precision: every wake here

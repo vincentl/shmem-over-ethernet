@@ -1488,7 +1488,8 @@ do:
 
 Rules:
 
-- **Loads** name `memory_order_acquire`.
+- **Loads** name `memory_order_acquire`, except the load half of a two-sided
+  protocol (below), which names `memory_order_seq_cst`.
 - **CAS and `fetch_add`/`fetch_sub`** name `memory_order_seq_cst`. They compile to
   locked instructions on every target whatever order is named — `lock cmpxchg`
   and `lock xadd` on x86-64, LSE instructions or libgcc's outline helpers on
@@ -1497,30 +1498,38 @@ Rules:
   where one side stores and the other only loads.
 - **Two-sided ("Dekker-shaped") protocols** — each side stores its own word and
   then loads the other's — name `memory_order_seq_cst` on **both** stores, or use a
-  locked operation. The §4.9 watch-table insert against the `ivar` store is one;
-  `shmem_signal_set` against a signal wait is another.
+  locked operation, **and on both loads**. The §4.9 watch-table insert against the
+  `ivar` store is one; `shmem_signal_set` against a signal wait is another. It is
+  the only one in the tree today: its loads are `osoe_transport_load` (the
+  waiter's predicate) and `notify`'s load of the watch (the writer's). Message
+  passing — publish data, then a flag; read the flag, then the data — is not
+  two-sided, and release and acquire are exactly right for it.
 - Implicit-order calls (`atomic_load`, `atomic_store`, operator forms) and
   `memory_order_relaxed` are forbidden on protocol words, so every access shows its
   order.
-- **Four of the six orders.** ISO C11 (§7.17.3) defines `relaxed`, `consume`,
+- **Three of the six orders.** ISO C11 (§7.17.3) defines `relaxed`, `consume`,
   `acquire`, `release`, `acq_rel` and `seq_cst`, all standard. The project uses
   `acquire`, `release` and `seq_cst` as above, and `relaxed` nowhere on a protocol
   word. `consume` is promoted to `acquire` by every compiler and buys nothing;
   `acq_rel` is what a CAS or `fetch_add` would otherwise name, and naming `seq_cst`
   there keeps one order for every locked operation. (An earlier draft called the
   last two GCC extensions. They are not; the rule stands, that reason did not.)
-- **A futex word that is its own predicate** — `ready` and `failed` in every
-  segment header, the agent's `ready` — is a third shape. One side stores the word
-  and wakes; the other loads it and sleeps on the value it saw. It is not a
-  Dekker pair: the waiter's second half is the kernel's compare, and `futex_wake`'s
-  own barrier (in its waiters check) supplies the ordering, so `release` would not
-  lose a wake. It is stored **`seq_cst`** all the same, so that its safety does
-  not rest on a detail of the kernel's futex fast path, at the cost of an `xchg`
-  on a word written a handful of times per job. The tree had used both orders for
-  it (second review, atomics F4).
+- **A futex word that is its own predicate** — `ready` in every segment header,
+  the agent's `ready` — is a third shape, stored **`release`**. One side stores
+  the word and wakes; the other loads it and sleeps on the value it saw. It is not
+  a Dekker pair: the waiter's second half is the kernel's compare, which futex(2)
+  guarantees is "totally ordered with respect to concurrent operations performed
+  by other threads on the same futex word". C11 has no say in that; what it does
+  govern is the header written before the word, and publishing that is exactly a
+  release. The same holds for `failed` (checked by waiters sleeping on another
+  word, so a wake that races it is caught by the next sweep whatever the order)
+  and for a landing slot's `ready`, whose waiter sleeps on a separate wake word
+  bumped afterwards by a `seq_cst` RMW. (The tree had used both orders for these,
+  second review atomics F4; slice 2 unified them on `seq_cst`, and the follow-up
+  set them to the minimum, below.)
 - Configure fails if the compiler defines `__STDC_NO_ATOMICS__`.
 
-**Why two-sided stores need `seq_cst`.** GCC 14 compiles both `release` and
+**Why two-sided protocols need `seq_cst` on both sides.** GCC 14 compiles both `release` and
 `seq_cst` stores to `stlr` on aarch64, but on x86-64 a `release` store is a plain
 `mov`, which sits in the store buffer where another core cannot see it, while a
 `seq_cst` store is `xchg`, which forces it out. In a two-sided protocol, both
@@ -1530,6 +1539,47 @@ disassembly in the development VM. §3.5's earlier claim that missing orders cau
 corruption "never on x86" is true for single-writer publication and false for
 this shape.
 
+The loads need it too, and that is the language's rule before it is any
+machine's: C11 puts only `seq_cst` operations in its single total order, so a
+`seq_cst` store followed by an `acquire` load of another word may be reordered.
+An earlier draft named the loads `acquire` and was right by accident: on aarch64
+GCC emitted `ldar`, which the architecture does not let pass an earlier `stlr`
+(the two are "RCsc"). Built for Armv8.3 or later — `-mcpu=cortex-a76`, a Pi 5, or
+`-mcpu=native` there — GCC 14 emits an acquire load as `ldapr` ("RCpc"), which may
+pass it. *Measured* on the development VM, whose cores have `lrcpc`
+(`docs/design/evidence/fence-litmus/store-buffer-litmus`, 2 million rounds, three
+runs): `stlr; ldapr` showed both sides missing each other's store 289, 4,449 and
+278 times; `stlr; ldar`, 0. A `seq_cst` load is `ldar` on every aarch64 target
+and a plain `mov` on x86-64, so naming it costs nothing.
+
+**Every choice above, derived from the C11 model** (2026-09-21). The rules were
+first written from compiler output and measurement; this is the check that each
+is what the language requires and no more. The question for each shape is which
+outcome C11 forbids, and with what.
+
+| Shape | C11's requirement | Order | Where |
+|---|---|---|---|
+| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, `acked`, connection heads; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed` |
+| A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready` |
+| Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch |
+| CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere |
+| `shmem_fence` over plain stores (W→W) | Nothing, for a race-free program: its flag is an AMO, a `seq_cst` store and so a release. Table 14's plain stores are a data race C11 gives no meaning; the weakest construct ordering earlier stores before later ones is a release fence | **`atomic_thread_fence(release)`** | `osoe_transport_fence` |
+| `shmem_quiet`, `pe_quiet`, the barriers (W→R) | "Visible to all PEs" on return is the store-buffering shape again; C11 forbids its bad outcome with a `seq_cst` fence between each side's store and load | **`atomic_thread_fence(seq_cst)`** | `osoe_transport_wait` |
+
+And what changed when the tree was held to that table:
+
+| Was | Required by C11? | Now | Cost |
+|---|---|---|---|
+| Two-sided loads named `acquire` | **Yes, `seq_cst`**: an `acquire` load is outside *S*. Right by accident while GCC emitted `ldar`; built for Armv8.3+ it emits `ldapr` and lost 278–4,449 wakes in 2 M rounds (`evidence/fence-litmus/`) | `seq_cst` | none: `ldar` on aarch64, `mov` on x86-64 |
+| Quiet's point a `seq_cst` store to a thread-local word | **No, it guaranteed nothing**: C11 relates that store to no other location. On aarch64 (`stlr`) loads after quiet missed another thread's store ~3.6 M times in 6 M rounds, as often as with nothing there | `seq_cst` fence | `dmb ish`; `mfence` for `xchg` on x86-64 |
+| Fence's point the same store | **Too weak in C11, and a full fence was too strong**: fence needs W→W only | release fence | none on x86-64; `dmb ish` on aarch64 |
+| Futex words that are their own predicate at `seq_cst` (slice 2), and the landing slot's `ready` | **No**: the kernel orders the compare; C11 governs only the header before it | `release` | an `xchg` fewer per word on x86-64 |
+| The wire's `produced` and `consumed` at `seq_cst` | **No**: message passing into a separate wake word, not two-sided. `wire_model.py` now runs every case under SC and x86-TSO with both as release stores: the design holds, each broken variant is still caught | `release` | an `xchg` fewer per send and per receive on x86-64 |
+
+The measurements are evidence that the gaps are real on a shipping target, not
+the argument; the argument is the C11 column. §4.6 has the fence and quiet
+derivation in full.
+
 **Consequences:**
 
 - **Futex words** are `_Atomic uint32_t`, with a `_Static_assert` that its size
@@ -1538,10 +1588,13 @@ this shape.
   link statically from `libgcc.a`; a test binary's `NEEDED` list is libc only
   (review, lead-verified), so invariant 15 holds.
 - **No spin-before-block** (§3.11): there is no ISO C relax hint.
-- **A serializing point** — for `fence` and `quiet` ordering memory stores (§4.8) —
-  is one `seq_cst` store in the calling thread. On x86-64 that is an `xchg`, a full
-  barrier. On aarch64 it is an `stlr`, which is *not* one; §4.6 says what that
-  means for fence.
+- **Two fences** put the calling thread's plain stores under `fence` and `quiet`
+  (§4.6 rule 2, `base/order.h`): `fence` begins with
+  `atomic_thread_fence(memory_order_release)` — no instruction on x86-64, a
+  `dmb ish` on aarch64 — and `quiet`, `pe_quiet` and the barriers with
+  `atomic_thread_fence(memory_order_seq_cst)` — an `mfence`, a `dmb ish`. §4.6
+  derives each from the C11 model, and says why the `seq_cst` store to a
+  thread-local word they replace guaranteed neither.
 
 ---
 
@@ -1874,7 +1927,7 @@ Two completion domains that cannot be collapsed:
 |---|---|---|
 | Requests (put, signalled put, non-fetching AMO) | Applied at target | Peer's cumulative acknowledgement of applied segments (§3.4) |
 | Get replies | Delivered locally | Bytes landed in the landing zone, or directly in a symmetric `dest` (§3.12) |
-| Memory stores by the calling thread | Visible to other cores | A serializing store in the calling thread (below) |
+| Memory stores by the calling thread | Visible to other cores | A serializing fence in the calling thread (below) |
 
 The peer's acknowledgement of the segment containing a get *request* says only
 that the descriptor was enqueued. The reply may not have been sent.
@@ -1902,30 +1955,57 @@ made by the calling thread (§9.12.1 and §9.12.2 Notes), and contexts created w
    including a local PE under §8.1's force-remote flag. A thread's store can then never race that same thread's queued put to the
    same object: either both are local and ordered by the thread itself, or no
    pointer exists.
-2. **`fence`, `quiet`, `pe_quiet`, and the barriers begin with one `seq_cst` store in
-   the calling thread** (§3.16). It forces that thread's earlier plain stores to
-   become visible to other cores before the routine proceeds.
+2. **`fence` begins with a release fence in the calling thread, and `quiet`,
+   `pe_quiet` and the barriers with a `seq_cst` fence** (§3.16). The first orders
+   the thread's earlier stores before its later ones; the second orders every
+   earlier access before every later one.
 
 In normal mode `barrier_all` already happened to conform, because its arrival
 `fetch_add` is a locked instruction. The rule makes that deliberate.
 
-**What carries rule 2 on aarch64.** A `seq_cst` store there is an `stlr` (to a
-thread-local word nothing reads, in `base/order.c`). Its release orders every
-earlier access *before* it; it does not keep a *later* plain store from passing it.
-So by the architecture, `store A; shmem_fence(); store B` — two plain stores, the
-intranode put's `memcpy` or a store through `shmem_ptr` — is not ordered by the
-`stlr` alone. Measured (`docs/design/evidence/fence-litmus/`, three threads: a
-writer, a reader, and one contending the data line), on the Apple-silicon
-development VM: with nothing between the two stores the reader saw B without A 921
-times in 40 million rounds; with the `stlr` alone, 0; with the `stlr` and then an
-acquire load, 0; with a `dmb`, 0. So this implementation orders it, and the
-architecture does not promise that another (a Cortex-A72 or A76) will. What the
-architecture does give: when the next thing after fence is a library call, that
-call's first counter update is an acquire load, and an `stlr` followed by an
-`ldar` is ordered, and the `ldar` orders everything after it — so a *put* after
-fence is ordered by architecture, incidentally. A plain store the application
-makes directly after fence is not. Whether rule 2 should become a full barrier
-(`atomic_thread_fence(memory_order_seq_cst)`, one `dmb ish`) is open (§10).
+**Rule 2 from the C11 model.** Two shapes, and C11 says different things about
+each.
+
+- **Fence is W→W**: `store A; shmem_fence(); store B` must not let a target see B
+  without A. In a program C11 calls race-free, B — the word the target waits on —
+  is written by an AMO (spec 1.5 change #17 requires it of wait variables), which
+  is a `seq_cst` store and so a release: every store before it, A included,
+  happens-before the target's acquire load that reads it. *C11 needs nothing from
+  fence here.* What is left is Table 14's promise for plain stores — a store
+  through `shmem_ptr`, a put's `memcpy` read by a target that did not synchronize
+  — which C11 calls a data race and gives no meaning. No C11 construct can
+  guarantee that; the weakest one that orders earlier stores before later ones on
+  every mapping is **`atomic_thread_fence(memory_order_release)`**, which is what
+  fence uses: no instruction on x86-64, whose stores stay in order, and a
+  `dmb ish` on aarch64.
+- **Quiet is also W→R**: everything is "complete and visible to all PEs when
+  shmem_quiet returns" (spec §9.12.2), so a load after quiet — an atomic fetch,
+  a wait's predicate — must not be satisfied before a store before it is visible.
+  That is the store-buffering shape, and C11 forbids its bad outcome with
+  **`atomic_thread_fence(memory_order_seq_cst)`** between each side's store and
+  load (the fence rules of C11 §7.17.4 and the `seq_cst` total order). A release
+  fence does not. So quiet, `pe_quiet` and the barriers use the `seq_cst` fence:
+  an `mfence` on x86-64, a `dmb ish` on aarch64. The barriers would not need it
+  in C11 terms — their arrival RMW and release already synchronize — but the spec
+  defines `barrier_all` as a quiet and a sync, and one fence is small beside a
+  barrier.
+
+Rule 2 was once one `seq_cst` store to a thread-local word nothing reads
+(`base/order.c`). C11 relates that store to no other location, so it guaranteed
+neither shape; on x86-64 it compiles to `xchg`, which gave both by the hardware's
+courtesy, and on aarch64 to `stlr`, which orders earlier accesses before *itself*
+and nothing after it. *Measured* on the development VM
+(`docs/design/evidence/fence-litmus/`):
+
+| Shape | Nothing between | `stlr` (the old rule 2) | `dmb ish` (either fence now) |
+|---|---|---|---|
+| W→W, fence (40 M rounds; a third thread contends the data line) | 921 reordered | 0 | 0 |
+| W→R, quiet (6 M rounds) | ~3.4 M both-zero | ~3.6 M both-zero | 0 |
+
+So fence held on these cores by their implementation and not by any guarantee,
+and quiet did not hold at all for a load the application made directly after it.
+`base.serializing-fence` now checks the W→R row on every build. **Run the two
+litmus programs on a Pi 4 (Cortex-A72) and a Pi 5 (Cortex-A76)** when they exist.
 
 #### Data structures
 
@@ -1951,7 +2031,7 @@ thread, and each is already per-thread or checked:
   application to keep calls from overlapping. Any mechanism that does so is a
   synchronization under the platform's memory model, and that makes A's stores
   visible to B. This is the same argument the spec makes for memory stores, and the
-  library relies on it rather than adding a serializing store to every entry point.
+  library relies on it rather than adding a serializing fence to every entry point.
 - **Finalize and fork.** `shmem_finalize` must come from the thread that called
   `shmem_init_thread` (spec §9.2, rule 1). The fork check (§6.4) compares pids, not
   threads.
@@ -2008,7 +2088,7 @@ the entire job.)*
 
 ```c
 void shmem_quiet(void) {
-    serializing_store();                          /* memory stores (above) */
+    serializing_fence();                          /* memory stores (above) */
     request_ack_through(pe->dirty, pe->ndirty, pe->high_seg);  /* §3.4; the lead seals */
     for (i = 0; i < pe->ndirty; i++)
         wait_until(acked[pe->dirty[i]] >= pe->high_seg[pe->dirty[i]]);
@@ -2018,7 +2098,7 @@ void shmem_quiet(void) {
 }
 
 void shmem_fence(void) {
-    serializing_store();
+    serializing_fence();
     /* peers already acknowledged through high_seg are skipped: asking again
      * would only make the lead send another request */
     request_ack_through(pe->dirty, pe->ndirty, pe->high_seg);
@@ -2601,7 +2681,7 @@ RDMA, would bridge its NIC events into that call.
 
 **Notify is exact for rmw and best effort for puts.** The §4.9 protocol is
 two-sided (§3.16), and a `memcpy` does not make the writer's side sound. Making it
-sound would take a serializing store on every put, which spec 1.5 change #17 does
+sound would take a serializing fence on every put, which spec 1.5 change #17 does
 not require (§4.9). A backend whose puts the CPU never sees need not notify for them.
 
 **Atomicity is the spec's, not osoe's.** osoe gets exclusivity across atomicity
@@ -2688,9 +2768,9 @@ reductions and gets the same verdicts. Run any model as
   (§3.8), acknowledgements (§3.4), and every futex word of §3.11 already take
   concurrent writers, because PEs are processes and they already share them.
 - **The intranode backend's data path.** Operations apply in the calling thread,
-  and fence and wait are a serializing store. Only notify changes (item 3).
+  and fence and wait are a serializing fence. Only notify changes (item 3).
 - **Memory stores.** Fence and quiet order only the calling thread's stores (spec
-  §9.12.1, §9.12.2 Notes), so the per-thread serializing store of §4.6 is already
+  §9.12.1, §9.12.2 Notes), so the per-thread serializing fence of §4.6 is already
   right.
 - **Collectives and allocation.** A team may not be used concurrently for
   collectives by threads of one PE (spec §9.4, Thread Safety), and allocation is a
@@ -2719,7 +2799,7 @@ overlaps a quiet on that context and the equality wait cannot starve. The progre
 thread and agent touch only landed counters and acknowledgements, which are atomics
 already. `PRIVATE` adds one thing: the context caches its creating thread's block
 (below), so a blocking operation skips the thread-local lookup. `NOSTORE` skips the
-serializing store in either mode.
+serializing fence in either mode.
 
 Operations branch once on the mode. Programs that never request `MULTIPLE` run only
 serial mode, so phase-1 costs do not move.
@@ -2766,7 +2846,7 @@ atomic_fetch_add_explicit(&ctx->landed[pair], n, memory_order_seq_cst);
 wake_bump_and_wake(&ctx->wake);
 
 void quiet_shared(struct ctx *ctx) {
-    serializing_store();                                   /* §4.6 memory stores */
+    serializing_fence();                                   /* §4.6 memory stores */
     uint32_t e = atomic_load_explicit(&ctx->gen, memory_order_acquire);
     mutex_lock(&ctx->qlock);
     uint32_t g = atomic_load_explicit(&ctx->gen, memory_order_acquire);
@@ -3001,7 +3081,7 @@ never cancelled (§3.15); it is asserted.
 its §3.14 counter block and "blocked in" record.
 - A thread claims a block by CAS on its PE's table at its first library call, and
   caches the index in a `_Thread_local`, as `base/order.c` already does for the
-  serializing store.
+  serializing fence.
 - A `pthread_key_create` destructor releases the block at thread exit. A thread
   cannot exit inside a call, so the block's bit and slot are idle then.
 - `PRIVATE` contexts cache the creator's block.
@@ -4521,6 +4601,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 | Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
+| What orders fence and quiet, where a `seq_cst` store to a thread-local word was the answer? | **Derived from the C11 model:** a release fence for fence (W→W), a `seq_cst` fence for quiet and the barriers (W→R), and `seq_cst` on both loads of a two-sided protocol. Measured, the old store did not order quiet's W→R on aarch64, and an acquire load built as `ldapr` lost wakes (§3.16, §4.6; 2026-09-21). |
 
 ### Still open — blocking
 
@@ -4529,13 +4610,6 @@ Recorded rather than deleted, so they are not reopened from memory.
   remotely accessible memory" (none does). Still unchecked: the exact semantics of
   the 1.6 session routines if they are ever more than no-ops, and the routines
   beyond phase 1.
-- **Fence's serializing point on aarch64** (§4.6, §3.16). By the architecture a
-  plain store the application makes after `shmem_fence` may become visible before
-  one it made before; the development VM's cores do not reorder it, and a put after
-  fence is ordered only through the next call's counter load. Making the point
-  `atomic_thread_fence(memory_order_seq_cst)` closes it for one `dmb ish` per
-  fence and quiet (an `mfence` on x86-64 in place of the `xchg`). Decide, and run
-  `fence-litmus` on a Pi 4 and a Pi 5 either way.
 
 ### Still open — measurement, once hardware exists
 

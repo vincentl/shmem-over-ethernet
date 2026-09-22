@@ -447,7 +447,7 @@ static void await_reply(struct osoe_landing_slot *slot, uint64_t token, uint32_t
 static uint64_t arm(struct osoe_landing_slot *slot)
 {
     static uint64_t next_token;
-    atomic_store_explicit(&slot->ready, 0, memory_order_seq_cst);
+    atomic_store_explicit(&slot->ready, 0, memory_order_release);
     /* Published before the request goes out: the send's reservation and
      * commit order it before any reply can exist. */
     atomic_store_explicit(&slot->armed_token, ++next_token, memory_order_release);
@@ -634,15 +634,17 @@ static void flush_dirty(struct osoe_transport_context *c)
  * wait for them. Conditional sealing costs nothing extra, because the dirty set
  * already answers "which peers has this context touched".
  *
- * The serializing store comes first on both paths, and it is what puts the
- * calling thread's ordinary memory stores under fence and quiet as Table 14
- * requires (§4.6). It is not decoration: on the intranode path it is the entire
+ * A fence comes first on both paths, and it is what puts the calling thread's
+ * ordinary memory stores under fence and quiet as Table 14 requires (§4.6): a
+ * release fence here, since fence orders stores against stores, and the
+ * serializing fence in wait, since quiet also orders them against later loads
+ * (base/order.h). It is not decoration: on the intranode path it is the entire
  * implementation.
  */
 void osoe_transport_fence(struct osoe_transport_context *context)
 {
     osoe_count(OSOE_C_TRANSPORT_FENCE_CALLS, 1);
-    osoe_serializing_store();
+    osoe_release_fence();
     if (osoe.internode)
         flush_dirty(context);
 }
@@ -662,7 +664,7 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
         return;
     osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
     uint64_t t0 = osoe_now_ns();
-    osoe_serializing_store();
+    osoe_serializing_fence();
 
     struct osoe_transport_context *c = context;
     if (!osoe.internode || c->count == 0) {

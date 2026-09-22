@@ -86,7 +86,7 @@ static void team_sync(struct osoe_team *t, const char *routine)
 }
 
 /* §5.6: barrier_all is a quiet on the default context followed by a sync on the
- * world team (spec §9.10.1 Notes). The wait begins with the serializing store,
+ * world team (spec §9.10.1 Notes). The wait begins with the serializing fence,
  * which makes the calling thread's memory stores visible (§4.6). */
 void osoe_barrier_all(const char *routine)
 {

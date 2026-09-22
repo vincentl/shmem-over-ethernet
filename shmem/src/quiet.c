@@ -4,7 +4,7 @@
  *
  * Each is one call to the boundary, which is the point of §4.10 having a fence
  * and a wait rather than these three routines: fence orders delivery, wait
- * completes. On the intranode backend both are the serializing store, because
+ * completes. On the intranode backend both are a fence (base/order.h), because
  * every operation was applied in the calling thread before its call returned
  * and nothing is ever outstanding. Against the AM backend the same two calls
  * seal buffers and wait for acknowledgements. Nothing here changes.

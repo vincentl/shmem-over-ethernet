@@ -45,7 +45,7 @@ static void *agent_main(void *arg)
     struct osoe_counter_block *b = osoe_metrics_block();
     /* Published before any work, so the block is in the table by the time
      * osoe_agent_start returns (§3.14). */
-    atomic_store_explicit(&agent_ready, 1, memory_order_seq_cst);
+    atomic_store_explicit(&agent_ready, 1, memory_order_release);
     osoe_futex_wake(&agent_ready, INT_MAX, OSOE_FUTEX_PRIVATE);
     for (;;) {
         /* §3.14's progress heartbeat: two reads showing the same loop count and
