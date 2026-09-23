@@ -1,5 +1,7 @@
+#include <limits.h>
 #include <stdatomic.h>
 
+#include "base/futex.h"
 #include "fatal.h"
 #include "reply.h"
 
@@ -95,32 +97,95 @@ void osoe_reply_rotate(struct osoe_reply_pool *pool, struct osoe_reply_queue *q)
     q->tail = i;
 }
 
-bool osoe_credit_take(struct osoe_credit *c)
+/*
+ * The credit's word (reply.h): three 21-bit fields. Tickets count modulo 2^21,
+ * and at most one per local PE is ever outstanding - a PE waits for one credit
+ * at a time - so a ticket is served once the served count has passed it by less
+ * than half the range.
+ */
+enum { FIELD_BITS = 21 };
+#define FIELD_MASK ((UINT64_C(1) << FIELD_BITS) - 1)
+
+static uint32_t available_of(uint64_t s)
 {
-    /*
-     * A CAS loop. With a test and a decrement, two PEs of this node can both
-     * see the last credit and both take it: the count goes negative and the
-     * peer's descriptor pool is over-subscribed by the difference, on a node
-     * that has no way to detect it. §3.5 makes the same argument for the
-     * reservation, and the `race_take` case of the credit model is this.
-     */
+    return (uint32_t)(s & FIELD_MASK);
+}
+
+static uint32_t next_of(uint64_t s)
+{
+    return (uint32_t)((s >> FIELD_BITS) & FIELD_MASK);
+}
+
+static uint32_t served_of(uint64_t s)
+{
+    return (uint32_t)((s >> (2 * FIELD_BITS)) & FIELD_MASK);
+}
+
+static uint64_t pack(uint32_t available, uint32_t next, uint32_t served)
+{
+    return (uint64_t)available | ((uint64_t)(next & FIELD_MASK) << FIELD_BITS) |
+           ((uint64_t)(served & FIELD_MASK) << (2 * FIELD_BITS));
+}
+
+bool osoe_credit_take(struct osoe_credit *c, uint32_t *ticket)
+{
+    uint64_t s = atomic_load_explicit(&c->state, memory_order_acquire);
     for (;;) {
-        uint32_t have = atomic_load_explicit(&c->available, memory_order_acquire);
-        if (have == 0)
+        uint32_t available = available_of(s), next = next_of(s), served = served_of(s);
+        uint64_t want = available > 0 ? pack(available - 1, next, served)
+                                      : pack(available, next + 1, served);
+        if (atomic_compare_exchange_weak_explicit(&c->state, &s, want, memory_order_seq_cst,
+                                                  memory_order_acquire)) {
+            if (available > 0)
+                return true;
+            *ticket = next;
             return false;
-        if (atomic_compare_exchange_weak_explicit(&c->available, &have, have - 1,
-                                                  memory_order_seq_cst,
-                                                  memory_order_acquire))
-            return true;
+        }
     }
+}
+
+bool osoe_credit_served(const struct osoe_credit *c, uint32_t ticket)
+{
+    uint32_t served = served_of(atomic_load_explicit(&c->state, memory_order_acquire));
+    uint32_t past = (served - ticket) & (uint32_t)FIELD_MASK;
+    return past != 0 && past <= (uint32_t)(FIELD_MASK / 2);
 }
 
 void osoe_credit_give(struct osoe_credit *c)
 {
-    atomic_fetch_add_explicit(&c->available, 1, memory_order_seq_cst);
+    uint64_t s = atomic_load_explicit(&c->state, memory_order_acquire);
+    for (;;) {
+        uint32_t available = available_of(s), next = next_of(s), served = served_of(s);
+        bool queued = next != served;
+        uint64_t want = queued ? pack(available, next, served + 1)
+                               : pack(available + 1, next, served);
+        if (atomic_compare_exchange_weak_explicit(&c->state, &s, want, memory_order_seq_cst,
+                                                  memory_order_acquire)) {
+            if (!queued)
+                return;
+            /* Served first, then the word, then the wake: a waiter woken by
+             * the bump, or finding it before it sleeps, sees its ticket served
+             * (credit_wait_model.py's bump_first loses a wake). */
+            atomic_fetch_add_explicit(&c->wake, 1, memory_order_seq_cst);
+            osoe_futex_wake_bitset(&c->wake, INT_MAX, osoe_credit_bit(served),
+                                   OSOE_FUTEX_SHARED);
+            return;
+        }
+    }
 }
 
 uint32_t osoe_credit_available(const struct osoe_credit *c)
 {
-    return atomic_load_explicit(&c->available, memory_order_acquire);
+    return available_of(atomic_load_explicit(&c->state, memory_order_acquire));
+}
+
+uint32_t osoe_credit_waiting(const struct osoe_credit *c)
+{
+    uint64_t s = atomic_load_explicit(&c->state, memory_order_acquire);
+    return (next_of(s) - served_of(s)) & (uint32_t)FIELD_MASK;
+}
+
+uint32_t osoe_credit_served_count(const struct osoe_credit *c)
+{
+    return served_of(atomic_load_explicit(&c->state, memory_order_acquire));
 }

@@ -14,7 +14,7 @@ find_package(Python3 COMPONENTS Interpreter)
 
 if(Python3_Interpreter_FOUND)
   set(osoe_models wire credit arrival ack reservation blocked_record range_watch watch_list
-                  chained_wake lead_wake rendezvous wait_word)
+                  chained_wake lead_wake rendezvous wait_word credit_wait)
   if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     list(APPEND osoe_models dirty_set get_completion tree_barrier close)
   endif()

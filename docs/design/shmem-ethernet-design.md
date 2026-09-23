@@ -982,7 +982,8 @@ turnover, which a writer with no room waits on (`base/wait-word.h`,
 word is a count of registered waiters, so the agent — which moves both values on
 every acknowledgement and every open — makes the wake syscall only when someone
 waits. The count is what makes each wait two-sided (§3.16), and the model's
-breakages each lose a wake. Step 2 polled both with a 20 µs sleep (§8.4).
+breakages each lose a wake. Step 2 polled both with a 20 µs sleep (§8.4). The
+third class, reply credits, is indivisible, and has the handoff below.
 
 **Wake count tracks divisibility:**
 
@@ -1007,6 +1008,23 @@ layout** — which bits, which stores, which wakes — before implementing it, w
 the same exhaustive tooling as §3.5.
 
 Applied to **indivisible resources only**; divisible ones do not starve.
+
+*As built, for reply credits* (phase 1 step 3 slice 2; `reply.[ch]`,
+`credit_wait_model.py`). A bit alone does not do it. With a flag and a wake of
+one, a thread that registers just after the release still reaches the free
+credit before the woken waiter runs. What makes acquisition "mediated by the
+queue", as the note above asks, is to put the queue in the resource's own word:
+one 64-bit word packs the free credits, the next ticket and the tickets served.
+Whether a PE takes a free credit or a ticket is one CAS on that word, and a give
+with a ticket outstanding serves the oldest ticket — the credit passes to it
+without ever being free, which is the handoff. The free count is non-zero only
+while no ticket is outstanding. A queued PE sleeps on the credit's futex word
+with its ticket's bit (a futex bitset, one class in 32), so a give wakes only the
+served ticket's class: exactly the waiter it serves while 32 or fewer wait, and
+one in 32 of them beyond that, not a herd - with no memory per PE and no syscall
+when nobody waits. The model's breakages: the handoff without
+the queue barges, a plain wake of one or a bump before the serve loses a wake,
+and a give that also frees the credit over-subscribes it. Step 2 polled here too.
 
 **No spinning before blocking, in phase 1.** A useful spin loop needs a CPU relax
 hint, which is an intrinsic or assembly, and §3.16 allows neither. A spin without
@@ -1750,6 +1768,7 @@ outcome C11 forbids, and with what.
 | A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready` |
 | Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere |
+| A queue in one word, then a wake word: a waiter's ticket and a giver's serve are RMWs on the same word; the giver then bumps a futex word; the waiter loads that word, then checks its ticket (slice 2 of step 3) | Not store buffering: two RMWs on one word are ordered by its modification order, so a give always sees every ticket taken before it. The waiter's check needs only to follow the giver's serve when it has seen the giver's bump — a release RMW read by an `acquire` load; a bump it has not seen is the futex compare's to catch | RMWs **`seq_cst`** (the row above); the waiter's loads of the wake word and of the state **`acquire`** | `osoe_credit_take`, `_give`, `_served` (`credit_wait_model.py`) |
 | Two-sided, with a claim: the writer's store is an RMW on a bitmap and the lead's a flag, and a writer that reads the flag raised takes it down with a CAS before waking (slice 3) | The store-buffering outcome - the lead's recheck misses the bit and the writer misses the flag - is forbidden only among `seq_cst` operations; the claim CAS is an RMW in *S*, and a writer that loses it read a later value of the flag, so the lead's recheck ordered after that value sees its bit | **`seq_cst`** `fetch_or`, flag store, flag load and CAS; `seq_cst` recheck loads | `osoe_connection_area_mark`, `osoe_progress_host_wake_lead`, `osoe_progress_host_poll` (`lead_wake_model.py`) |
 | `shmem_fence` over plain stores (W→W) | Nothing, for a race-free program: its flag is an AMO, a `seq_cst` store and so a release. Table 14's plain stores are a data race C11 gives no meaning; the weakest construct ordering earlier stores before later ones is a release fence | **`atomic_thread_fence(release)`** | `osoe_transport_fence` |
 | `shmem_quiet`, `pe_quiet`, the barriers (W→R) | "Visible to all PEs" on return is the store-buffering shape again; C11 forbids its bad outcome with a `seq_cst` fence between each side's store and load | **`atomic_thread_fence(seq_cst)`** | `osoe_transport_wait` |

@@ -265,20 +265,6 @@ static void am_wait_end(void)
 }
 
 /*
- * The re-wake polling of step 2: wake the lead, sleep 20 us, look again. Quiet
- * and a writer waiting for room have their words since phase 1 step 3 slice 2
- * (below); only a wait for a reply credit still polls, and its word is the
- * next change here. At 256 PEs it is 256 locked adds and 256 syscalls per
- * period on one line (second review, atomics F3); it must not survive step 3.
- */
-static void poll_lead(void)
-{
-    osoe_progress_host_wake_lead();
-    struct timespec back = { 0, 20000 };        /* 20 us */
-    nanosleep(&back, NULL);
-}
-
-/*
  * One sleep of a wait on a wait word (base/wait-word.h): at the value loaded
  * before the caller's check, until the word moves or a sweep interval passes
  * (§3.10). True if it was the sweep.
@@ -298,11 +284,11 @@ static bool sleep_on(struct osoe_wait_word *word, uint32_t seen)
  * instant, and base/epoch.c measured how often that instant meets a sweep under
  * load. invariant.missed_wake is what every tier-2 test checks at the end.
  */
-static void count_if_lost(const struct osoe_wait_word *word, uint32_t seen, const char *routine)
+static void count_if_lost(const _Atomic uint32_t *word, uint32_t seen, const char *routine)
 {
     struct timespec margin = { 0, 10000000 };       /* 10 ms, as epoch.c's */
     nanosleep(&margin, NULL);
-    if (osoe_wait_word_load(word) == seen)
+    if (atomic_load_explicit(word, memory_order_acquire) == seen)
         osoe_missed_wake(routine);
 }
 
@@ -348,7 +334,7 @@ static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
         uint32_t seen = osoe_wait_word_load(word);
         if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK) {
             if (swept)
-                count_if_lost(word, slept_on, routine);
+                count_if_lost(&word->word, slept_on, routine);
             break;
         }
         osoe_connection_area_mark(&osoe_am.area, peer);
@@ -471,28 +457,43 @@ static uint32_t landing_capacity(void)
 }
 
 /*
- * Take a reply credit for this connection, waiting if none is free.
+ * Take a reply credit for this connection, waiting in its queue if none is
+ * free (reply.h, §3.11).
  *
  * §4.6 permits blocking rather than failing, and §3.8 needs the bound kept at
  * the origin: this is what stops the node's PEs between them putting more
  * outstanding replies on a peer than its descriptor pool holds. A PE holds its
- * credit from issue until its reply *lands*, not until it is sent.
+ * credit from issue until its reply *lands*, not until it is sent. A queued PE
+ * is served in ticket order: the PE whose reply lands next gives its credit
+ * straight to the oldest ticket and wakes that ticket's futex class, so no PE
+ * arriving meanwhile can take it (credit_wait_model.py). Step 2 polled here,
+ * waking the lead and sleeping 20 us.
  */
 static void take_credit(struct osoe_connection *conn, uint32_t peer, int pe, const char *routine)
 {
-    if (osoe_credit_take(osoe_connection_credit(conn)))
+    struct osoe_credit *credit = osoe_connection_credit(conn);
+    uint32_t ticket;
+    if (osoe_credit_take(credit, &ticket))
         return;
-    /* Credits come back as replies land, so the connection's acknowledgements
-     * are what moves while one is awaited: a peer applying nothing returns
-     * nothing. */
+    /* Credits come back as replies land, so the tickets served are what moves
+     * while one is awaited: a peer that replies to nothing serves nobody. */
     struct am_wait w;
-    am_wait_begin(&w, routine, "the peer's acknowledged sequence", peer, pe,
-                  osoe_connection_acked(conn));
+    am_wait_begin(&w, routine, "the connection's reply credits", peer, pe,
+                  osoe_credit_served_count(credit));
+    uint32_t slept_on = 0;
+    bool swept = false;
     for (;;) {
-        poll_lead();
-        if (osoe_credit_take(osoe_connection_credit(conn)))
+        uint32_t seen = atomic_load_explicit(&credit->wake, memory_order_acquire);
+        if (osoe_credit_served(credit, ticket)) {
+            if (swept)
+                count_if_lost(&credit->wake, slept_on, routine);
             break;
-        am_wait_check(&w, osoe_connection_acked(conn));
+        }
+        slept_on = seen;
+        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        swept = osoe_futex_wait_bitset(&credit->wake, seen, osoe_credit_bit(ticket), &sweep,
+                                       OSOE_FUTEX_SHARED) == ETIMEDOUT;
+        am_wait_check(&w, osoe_credit_served_count(credit));
     }
     am_wait_end();
 }
@@ -822,7 +823,7 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
                 uint32_t seen = osoe_wait_word_load(word);
                 if (acknowledged(c, slot)) {
                     if (swept)
-                        count_if_lost(word, slept_on, routine);
+                        count_if_lost(&word->word, slept_on, routine);
                     break;
                 }
                 slept_on = seen;
