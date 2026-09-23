@@ -229,9 +229,12 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     CONN("connection.acked_through", acked_through, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     CONN("connection.wanted_through", wanted_through, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     CONN("connection.sent_through", sent_through, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
-    ND("node.aborting", aborting, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
-    ND("node.abort_pe", abort_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
-    ND("node.abort_status", abort_status, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
+    ND("node.aborting", aborting, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    /* The rank again, as the word's low 32 bits - its first four bytes on the
+     * little-endian targets - under the name an osoe-stat built before layout
+     * 15 reads it by, when the rank was a field of its own. */
+    { "node.abort_pe", "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,
+      (uint32_t)offsetof(struct osoe_node_header, aborting), 0 },
     ND("node.world_size", world_size, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.job", job, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     ND("node.step", step, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),

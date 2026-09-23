@@ -25,10 +25,17 @@ struct osoe_bootstrap {
     uint64_t no_progress_ns;    /* OSOE_NO_PROGRESS_TIMEOUT, seconds; 0 = never (§3.15) */
     uint64_t heap_base;         /* OSOE_HEAP_BASE, 0 if unset */
     bool watchdog;              /* OSOE_WATCHDOG, or the build default (§3.15) */
+    bool liveness_off;          /* OSOE_LIVENESS=0: no agent watches a pidfd (liveness.h) */
     bool keep_control_segment;  /* OSOE_KEEP_CONTROL_SEGMENT: name kept until finalize */
     bool shm_capacity_warning_only; /* OSOE_SHM_CAPACITY_CHECK=0: report, do not refuse */
     uint32_t collective_fanout; /* OSOE_COLLECTIVE_FANOUT: k of the internode tree (§5.3) */
     uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
+    /* OSOE_KEEPALIVE (§3.15): TCP keepalive on every node-pair connection, as
+     * seconds idle, seconds between probes, and probes. Zero means the default,
+     * so that a bootstrap built by hand, zeroed, keeps it; `keepalive_off` is
+     * OSOE_KEEPALIVE=0. */
+    uint32_t keepalive_idle_s, keepalive_interval_s, keepalive_count;
+    bool keepalive_off;
     const char *node_list;      /* OSOE_STEP_NODELIST (§6.1), when the job spans nodes */
     bool secured;               /* OSOE_JOB_SECRET is set (§6.2, §10) */
     unsigned char secret[16];   /* its 128 bits, the key every hello's proof is made with */
@@ -40,6 +47,13 @@ struct osoe_bootstrap {
     bool print_info;            /* SHMEM_INFO */
     bool debug;                 /* SHMEM_DEBUG */
 };
+
+/* The default OSOE_KEEPALIVE (§3.15): a node that has vanished is found one to
+ * two minutes after its connections go quiet - a minute idle, then six probes
+ * ten seconds apart that nobody answers. */
+#define OSOE_DEFAULT_KEEPALIVE_IDLE_S     60
+#define OSOE_DEFAULT_KEEPALIVE_INTERVAL_S 10
+#define OSOE_DEFAULT_KEEPALIVE_COUNT      6
 
 /* The default OSOE_PORT_RANGE (§6.2): below the ephemeral ports. */
 #define OSOE_DEFAULT_PORT_LOW  17000

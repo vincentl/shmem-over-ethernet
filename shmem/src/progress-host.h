@@ -47,6 +47,13 @@ void osoe_progress_host_advertise(void *blob);
  */
 void osoe_progress_host_exit(void);
 
+/*
+ * The job is ending (osoe_transport_agent_abort): send every peer an abortive
+ * goodbye - within OSOE_ABORT_GRACE_SECONDS - before this process ends. On the
+ * agent thread. Does nothing on any other PE, or on a job of one logical node.
+ */
+void osoe_progress_host_abort(void);
+
 /* Free what start allocated. Called by osoe_transport_fini, after the agent
  * thread has been joined, so nothing is polling any more. */
 void osoe_progress_host_stop(void);

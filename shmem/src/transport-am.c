@@ -157,6 +157,11 @@ void osoe_transport_agent_exit(void)
     osoe_progress_host_exit();
 }
 
+void osoe_transport_agent_abort(void)
+{
+    osoe_progress_host_abort();
+}
+
 struct osoe_transport_context *osoe_transport_context_default(void)
 {
     return &default_context;

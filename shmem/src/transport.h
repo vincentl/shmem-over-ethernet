@@ -169,6 +169,16 @@ bool osoe_transport_agent_pass(void);
 bool osoe_transport_agent_wait(_Atomic uint32_t *wake, uint32_t seen);
 void osoe_transport_agent_exit(void);
 
+/*
+ * abort: the node's abort word is set and this process is about to end
+ * (§3.15, abort.h). The backend tells the network what only it can - on AM,
+ * the lead sends each peer an abortive goodbye, so that the job's other nodes
+ * learn the abort and its status before they see this node's streams end - and
+ * returns once it has, or once OSOE_ABORT_GRACE_SECONDS have passed. Called on
+ * the agent thread, instead of exit, and at most once.
+ */
+void osoe_transport_agent_abort(void);
+
 /* ---- Locality -------------------------------------------------------- */
 
 /*

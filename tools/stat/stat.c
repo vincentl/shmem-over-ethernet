@@ -262,7 +262,12 @@ static void print_identity(const struct osoe_segment *s)
     osoe_segment_read_name(s, "node.aborting", 0, &aborting);
     osoe_segment_read_name(s, "node.abort_pe", 0, &abort_pe);
     osoe_segment_read_name(s, "node.failed", 0, &failed);
-    if (aborting)
+    if (aborting && s->dir->layout >= 15 &&
+        (uint8_t)(aborting >> OSOE_SEGMENT_ABORT_DISPOSITION_SHIFT) ==
+            OSOE_SEGMENT_ABORT_GLOBAL_EXIT)
+        printf("  ABORTING: shmem_global_exit, exit status %u, on behalf of PE %" PRIu64 "\n",
+               (unsigned)(uint8_t)(aborting >> OSOE_SEGMENT_ABORT_STATUS_SHIFT), abort_pe);
+    else if (aborting)
         printf("  ABORTING on behalf of PE %" PRIu64 "\n", abort_pe);
     if (failed)
         printf("  a PE failed during rendezvous\n");

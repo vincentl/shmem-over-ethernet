@@ -73,6 +73,14 @@ struct osoe_progress_host {
      */
     void (*release)(void *context, uint32_t team, uint32_t epoch);
     void *context;
+    /*
+     * A peer's abortive goodbye arrived (OSOE_AM_ABORT): the job is ending, on
+     * behalf of `pe`, with `status`, as `disposition` says (1 a fatal, 2 a
+     * global exit). The host declares its node's abort - the first declarer
+     * wins - which wakes its agent to tell its own peers and end (abort.h).
+     * NULL where there is no node: the engine's own tests.
+     */
+    void (*abort)(void *context, uint32_t pe, int32_t status, uint32_t disposition);
 };
 
 /*
@@ -140,6 +148,16 @@ struct osoe_progress_connection {
      */
     enum { OSOE_GOODBYE_NONE, OSOE_GOODBYE_SEALED, OSOE_GOODBYE_SENT } goodbye;
     bool peer_goodbye;
+    /*
+     * The abort (osoe_progress_abort, abort_model.py). `abort_done`: this
+     * connection has sent its abortive goodbye and ended its stream, or has
+     * nobody to tell - its normal goodbye already went, the peer died, or the
+     * peer's own abort arrived (`peer_aborted`). `abort_sent`: bytes of the
+     * abortive goodbye the wire has taken.
+     */
+    bool abort_done;
+    bool peer_aborted;
+    uint32_t abort_sent;
     struct osoe_am_parser parser;
     struct osoe_reply_queues queues;
 };
@@ -156,6 +174,12 @@ struct osoe_progress {
      */
     uint64_t *busy;
     bool closing;                               /* osoe_progress_close has begun */
+    /* The job is ending (osoe_progress_abort): none of its own traffic goes out
+     * any more, and every connection ends with the abortive goodbye below - the
+     * same bytes for every peer, built once. */
+    bool aborting;
+    unsigned char abort_segment[64];
+    uint32_t abort_segment_bytes;
     struct osoe_progress_connection *connection;/* one per peer, by peer slot */
     struct osoe_reply_pool pool;
     struct osoe_reply *descriptors;
@@ -245,6 +269,22 @@ void osoe_progress_close(struct osoe_progress *p);
 /* Every connection has sent its goodbye and ended its stream, and seen the
  * peer's goodbye and the end of the peer's. Its sockets may then be closed. */
 bool osoe_progress_closed(const struct osoe_progress *p);
+
+/*
+ * The job is ending (§3.15; abort_model.py). From here the engine sends none of
+ * the job's own traffic. Each connection finishes the segment already on its
+ * wire, so the peer's stream stays whole, then sends its abortive goodbye - a
+ * segment flagged OSOE_AM_SEGMENT_GOODBYE carrying one OSOE_AM_ABORT - and ends
+ * its stream; unless it has nobody to tell: its normal goodbye already went, the
+ * peer died, or the peer's own abort arrived. O(N) once, what a normal goodbye
+ * costs. A connection that fails from here is a peer that is ending too, and is
+ * not a fatal; nor is a peer's end of stream without its goodbye.
+ */
+void osoe_progress_abort(struct osoe_progress *p, uint32_t pe, int32_t status,
+                         uint32_t disposition);
+
+/* Every connection has sent its abortive goodbye, or has nobody to tell. */
+bool osoe_progress_aborted(const struct osoe_progress *p);
 
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
 uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);

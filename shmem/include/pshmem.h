@@ -32,6 +32,10 @@ void pshmem_init(void);
 int pshmem_my_pe(void);
 int pshmem_n_pes(void);
 void pshmem_finalize(void);
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+_Noreturn
+#endif
+void pshmem_global_exit(int status);
 void pshmem_query_initialized(int *initialized);
 int pshmem_init_thread(int requested, int *provided);
 void pshmem_query_thread(int *provided);

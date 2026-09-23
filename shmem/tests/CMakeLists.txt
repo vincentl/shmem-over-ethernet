@@ -692,14 +692,17 @@ endif()
 # PE 0 quiets toward it, PE 1 sees it blocked in osoe-stat and dies, and PE 0's
 # next sweep must end the job naming shmem_quiet. -k leaves the survivors to the
 # library. Before slice 2 the quiet never swept: osoe-stat showed nothing for
-# PE 0, and the job ran to the launcher's 15 s timeout.
+# PE 0, and the job ran to the launcher's 15 s timeout. The agents' pidfds are
+# off (OSOE_LIVENESS=0): PE 0's would find the death first and end PE 0 from its
+# agent, and the sweep this tests would never speak.
 add_executable(shmem_test_unswept-wait test-unswept-wait.c
   ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 target_include_directories(shmem_test_unswept-wait PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
 target_link_libraries(shmem_test_unswept-wait PRIVATE osoe rt)
 osoe_warnings(shmem_test_unswept-wait)
 add_test(NAME shmem.unswept-wait
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_WATCHDOG=1 OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_WATCHDOG=1 OSOE_LIVENESS=0
+          OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
           $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 15 -k --
           $<TARGET_FILE:shmem_test_unswept-wait>)
 set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
@@ -768,6 +771,16 @@ add_test(NAME shmem.stopped-node.no-progress
 set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "shmem_quiet: no progress toward node 1 for [0-9]+ s"
   FAIL_REGULAR_EXPRESSION "quiet completed")
+# Keepalive asks whether a peer's kernel is there, and a stopped node's is
+# (§3.15, wire.c): at its tightest - a probe after 1 s idle, then three 1 s
+# apart - node 1 stopped for 6 s is still waited for, and the quiet completes.
+# tier3.*.vanished-node is the other half: a node whose link is cut is found.
+add_test(NAME shmem.stopped-node.keepalive
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=6000 OSOE_KEEPALIVE=1,1,3
+          $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
+          $<TARGET_FILE:shmem_test_stopped-node>)
+set_tests_properties(shmem.stopped-node.keepalive PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
 
 # The other half of D-6 (diagnosability review): a blocking get waits for one
 # PE's reply, not a whole node's queue, so its no-progress fatal must name that
@@ -951,10 +964,79 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
     ENVIRONMENT "OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>")
 endforeach()
 
+# A job that dies, dies everywhere (§3.15; phase 1 step 4): PE 0 calls
+# shmem_global_exit, or ends the job with a fatal, while every other PE computes
+# outside the library, where only its agent can end it. Every rank must leave
+# with the status - the caller's, or a fatal's failure - no rank may be killed
+# by the launcher or outlast its computing, and for a global exit every rank's
+# unflushed stdout must have been written (§9.1.6). See global-exit.sh. Across
+# nodes a fatal travels as the lead's end of stream, which a peer takes for a
+# death; a global exit's status travels as the abortive goodbye before it
+# (abort_model.py), and a remote rank that left with the failure status instead
+# fails these.
+add_executable(shmem_test_global-exit test-global-exit.c)
+target_link_libraries(shmem_test_global-exit PRIVATE osoe)
+osoe_warnings(shmem_test_global-exit)
+foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
+  add_test(NAME shmem.global-exit.L${count}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> ${count} - 7 7)
+  add_test(NAME shmem.global-exit.fatal.L${count}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> ${count} - fatal 1)
+  set_tests_properties(shmem.global-exit.L${count} shmem.global-exit.fatal.L${count}
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endforeach()
+foreach(map 0,1 0,0,1,1 0,1,2,0,1,0)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.global-exit.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
+  add_test(NAME shmem.global-exit.fatal.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} fatal 1)
+  set_tests_properties(shmem.global-exit.${label} shmem.global-exit.fatal.${label}
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endforeach()
+
+# OSOE_KEEPALIVE is three counts or 0, and anything else is refused by name.
+add_test(NAME shmem.keepalive.invalid
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_KEEPALIVE=5,0,3
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_global-exit> 7)
+set_tests_properties(shmem.keepalive.invalid PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_KEEPALIVE='5,0,3' is not IDLE,INTERVAL,COUNT")
+
+# A PE that dies without finalizing ends the job with the watchdog off (§3.15,
+# liveness.h): world rank DIES kills itself after a barrier while the others
+# compute or wait, and every survivor must leave with the failure status. A
+# sibling's death is the lead's pidfd to see and a lead's its siblings'; on two
+# nodes the other node learns it from the abort. See dead-pe.sh.
+add_executable(shmem_test_dead-pe test-dead-pe.c)
+target_link_libraries(shmem_test_dead-pe PRIVATE osoe)
+osoe_warnings(shmem_test_dead-pe)
+foreach(case "sibling.L2;0,0;1" "lead.L2;0,0;0" "sibling.L4;0,0,0,0;3" "lead.L4;0,0,0,0;0"
+             "sibling.0-0-1-1;0,0,1,1;1" "lead.0-0-1-1;0,0,1,1;0")
+  list(GET case 0 label)
+  list(GET case 1 map)
+  list(GET case 2 dies)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  add_test(NAME shmem.dead-pe.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_dead-pe> ${count} ${map} ${dies})
+  set_tests_properties(shmem.dead-pe.${label}
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "DEAD PE OK")
+endforeach()
+
 # The development watchdog (§3.15). Not an osoe_tier2_test: it needs -k, so the
 # launcher leaves the survivors to the library, and it asserts on output rather
 # than on an exit status. A PASS_REGULAR_EXPRESSION test ignores the exit code,
-# which is what these need: the job is meant to fail.
+# which is what these need: the job is meant to fail. With the agents' pidfds
+# off (OSOE_LIVENESS=0): since phase 1 step 4 they find the same death in every
+# build, and would race the watchdog to it; shmem.watchdog.liveness is the same
+# job with them on and the watchdog off.
 add_executable(shmem_test_watchdog test-watchdog.c)
 target_link_libraries(shmem_test_watchdog PRIVATE osoe)
 osoe_warnings(shmem_test_watchdog)
@@ -962,7 +1044,8 @@ osoe_warnings(shmem_test_watchdog)
 foreach(count 2 4)
   foreach(where barrier wait_until)
     add_test(NAME shmem.watchdog.${where}.L${count}
-      COMMAND osoe-launch -n ${count} -t 20 -k
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_LIVENESS=0
+              $<TARGET_FILE:osoe-launch> -n ${count} -t 20 -k
               -e 0:OSOE_TEST_WAIT=${where} -e 1:OSOE_TEST_WAIT=${where}
               -e 2:OSOE_TEST_WAIT=${where} -e 3:OSOE_TEST_WAIT=${where}
               -e 0:OSOE_WATCHDOG=1 -e 1:OSOE_WATCHDOG=1
@@ -975,13 +1058,23 @@ foreach(count 2 4)
 endforeach()
 
 # Turned off, the same job hangs until the launcher's timeout: this is what the
-# watchdog replaces, kept as a test so the difference stays demonstrated.
+# watchdog replaced, kept as a test so the difference stays demonstrated. And
+# with the watchdog off but the agents' pidfds on, as a release build runs, the
+# job ends without the launcher (§3.15, liveness.h).
 add_test(NAME shmem.watchdog.off
-  COMMAND osoe-launch -n 2 -t 3 -k -e 0:OSOE_WATCHDOG=0 -e 1:OSOE_WATCHDOG=0
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_LIVENESS=0
+          $<TARGET_FILE:osoe-launch> -n 2 -t 3 -k -e 0:OSOE_WATCHDOG=0 -e 1:OSOE_WATCHDOG=0
           -- $<TARGET_FILE:shmem_test_watchdog>)
 set_tests_properties(shmem.watchdog.off PROPERTIES
   LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 3 s")
+add_test(NAME shmem.watchdog.liveness
+  COMMAND osoe-launch -n 2 -t 3 -k -e 0:OSOE_WATCHDOG=0 -e 1:OSOE_WATCHDOG=0
+          -- $<TARGET_FILE:shmem_test_watchdog>)
+set_tests_properties(shmem.watchdog.liveness PROPERTIES
+  LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "has ended without finalizing"
+  FAIL_REGULAR_EXPRESSION "timeout after|has died[;] this PE would wait")
 
 # With nothing set, the default must follow the preset: on in debug, asan and
 # tsan, off in release (§3.15).
@@ -991,7 +1084,8 @@ else()
   set(osoe_watchdog_default_expect "osoe-launch: timeout after 3 s")
 endif()
 add_test(NAME shmem.watchdog.default
-  COMMAND osoe-launch -n 2 -t 3 -k -- $<TARGET_FILE:shmem_test_watchdog>)
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_LIVENESS=0
+          $<TARGET_FILE:osoe-launch> -n 2 -t 3 -k -- $<TARGET_FILE:shmem_test_watchdog>)
 set_tests_properties(shmem.watchdog.default PROPERTIES
   LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "${osoe_watchdog_default_expect}")
@@ -1111,16 +1205,21 @@ endforeach()
 # and all three of §3.11's waits through two reply credits and a 2 KiB buffer;
 # the AM barrier; a reply that full buffers must not starve; the tree at depth
 # three and at thirteen uneven nodes; the rendezvous, against the namespaces'
-# host list; the differential over §8.1's four poles; and the floor, which
-# measures the library on the shaped link. Left out are the tests that never
-# reach a socket, and those whose subject is a PE that dies or stops rather
-# than the link.
+# host list; the differential over §8.1's four poles; the floor, which
+# measures the library on the shaped link; a global exit, whose status
+# reaches the other nodes only as the abortive goodbye on the link (§3.15);
+# and a node whose link is cut, which only TCP keepalive can find. Left out are
+# the tests that never reach a socket, and those whose subject is a PE that
+# dies or stops rather than the link.
 option(OSOE_TIER3 "register the tier-3 tests, which need passwordless sudo" OFF)
 if(OSOE_TIER3 AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
   message(FATAL_ERROR "OSOE_TIER3: the multi-node data-path tests do not run under "
                       "ThreadSanitizer (shmem.internode's reason); use the tier3 preset")
 endif()
 if(OSOE_TIER3)
+  add_executable(shmem_test_vanished-node test-vanished-node.c)
+  target_link_libraries(shmem_test_vanished-node PRIVATE osoe)
+  osoe_warnings(shmem_test_vanished-node)
   set(osoe_tier3 sudo -n ${PROJECT_SOURCE_DIR}/tools/launch/tier3.sh)
   set(osoe_tier3_wire OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
       OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919)
@@ -1163,6 +1262,35 @@ if(OSOE_TIER3)
     osoe_tier3_test(job.0-1-2-3 ${shape} 0,1,2,3 shmem_test_job)
     # A 64 MiB stream: at 1 Gbit/s the default gigabyte takes nine seconds a trial.
     osoe_tier3_test(floor ${shape} 0,1 shmem_test_floor ARGS 64)
+    foreach(map 0,1 0,1,2,0,1,0)
+      string(REPLACE "," ";" ranks "${map}")
+      list(LENGTH ranks count)
+      list(REMOVE_DUPLICATES ranks)
+      list(LENGTH ranks nodes)
+      string(REPLACE "," "-" label "${map}")
+      string(REPLACE ";" " " wrap "${osoe_tier3};${shape};${nodes};--")
+      add_test(NAME tier3.${shape}.global-exit.${label}
+        COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+                sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+                $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
+      set_tests_properties(tier3.${shape}.global-exit.${label}
+        PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    endforeach()
+    # A node that vanishes - its link cut once the job is ready - is found by TCP
+    # keepalive at its tightest (§3.15, wire.c). See vanished-node.sh.
+    foreach(map 0,1 0,0,1,1)
+      string(REPLACE "," ";" ranks "${map}")
+      list(LENGTH ranks count)
+      string(REPLACE "," "-" label "${map}")
+      string(REPLACE ";" " " wrap
+             "${osoe_tier3};${shape};2;TIER3_CUT=1;OSOE_KEEPALIVE=1,1,3;--")
+      add_test(NAME tier3.${shape}.vanished-node.${label}
+        COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+                sh ${CMAKE_CURRENT_SOURCE_DIR}/vanished-node.sh $<TARGET_FILE:osoe-launch>
+                $<TARGET_FILE:shmem_test_vanished-node> ${count} ${map})
+      set_tests_properties(tier3.${shape}.vanished-node.${label}
+        PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "VANISHED NODE OK")
+    endforeach()
     add_test(NAME tier3.${shape}.differential
       COMMAND ${CMAKE_COMMAND}
               "-DWRAP=${osoe_tier3};${shape}"

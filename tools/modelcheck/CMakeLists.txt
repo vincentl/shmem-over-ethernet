@@ -7,8 +7,9 @@
 # A model is Python and gives the same verdict whichever preset built the
 # library, so running it in four presets buys nothing: every model runs in the
 # release preset only, which keeps it from being skipped. The large ones -
-# tree_barrier (five logical nodes, every node's thread real) and close (a
-# million states with the trapped-state check) - are why that preset is slow.
+# tree_barrier (five logical nodes, every node's thread real), close (a
+# million states with the trapped-state check) and abort (six minutes, a
+# fatal's case of 5.7 million states) - are why that preset is slow.
 #
 # The three that check §4.11's SHMEM_THREAD_MULTIPLE designs - dirty_set,
 # watch_list, and get_completion's generation-word cases (about 15 minutes, a
@@ -23,7 +24,8 @@ option(OSOE_MULTIPLE_MODELS "run the models of the SHMEM_THREAD_MULTIPLE designs
 
 if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   set(osoe_models wire credit arrival ack reservation blocked_record range_watch
-                  chained_wake lead_wake rendezvous wait_word credit_wait tree_barrier close)
+                  chained_wake lead_wake rendezvous wait_word credit_wait tree_barrier close
+                  abort abort_exit)
   if(OSOE_MULTIPLE_MODELS)
     list(APPEND osoe_models dirty_set get_completion watch_list)
   else()

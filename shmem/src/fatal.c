@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "abort.h"
 #include "fatal.h"
 #include "state.h"
 
@@ -50,9 +51,18 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
      * is already declared - then this PE is one of the ones stopping, or
      * `publish` declared it for someone else, and the word must keep naming the
      * PE that started it. */
-    if (osoe.bootstrap.have_rank && osoe.node.hdr &&
-        !atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire))
-        osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE);
+    if (osoe.bootstrap.have_rank && osoe.node.hdr) {
+        osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE,
+                                OSOE_ABORT_FATAL);
+        /* A global exit declared first ends this PE as it ends every other, with
+         * its caller's status: what went wrong here may be that exit's own
+         * doing - a peer gone, a reply that will not come - and §9.1.6 gives
+         * the job the caller's status (abort.h). */
+        uint32_t pe;
+        int status;
+        if (osoe_node_abort_read(&osoe.node, &pe, &status) == OSOE_ABORT_GLOBAL_EXIT)
+            osoe_abort_end();
+    }
 
     /*
      * _exit, not exit: exit runs atexit handlers, and start_pes registered

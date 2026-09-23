@@ -624,20 +624,56 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
 }
 
 /*
- * Two-step publication: the rank and status first, then the flag that makes
- * them readable. A reader loads the flag with acquire before it reads either,
- * so it never prints a rank from a half-written abort. Single-writer
- * publication (§3.16) - there is no protocol here, only a word a poller reads,
- * so no wake can be lost: a waiter that misses the store sees it one sweep
- * later, which is the whole cost.
+ * First writer wins: one CAS from zero installs the disposition, the status and
+ * the rank together (node.h), so a global exit's status is never overwritten
+ * by a fatal that follows it, and a reader's one load has all three. An
+ * earlier draft claimed the word, wrote the rank and status beside it and then
+ * published; a declarer killed between the claim and the publish would have
+ * left every reader waiting for a publish that could not come.
  */
-void osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status)
+bool osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status,
+                             enum osoe_abort_disposition how)
 {
     if (!n->hdr)
-        return;
-    atomic_store_explicit(&n->hdr->abort_pe, pe, memory_order_release);
-    atomic_store_explicit(&n->hdr->abort_status, status, memory_order_release);
-    atomic_store_explicit(&n->hdr->aborting, 1, memory_order_release);
+        return false;
+    uint64_t none = 0;
+    uint64_t word = (uint64_t)how << OSOE_ABORT_DISPOSITION_SHIFT |
+                    (uint64_t)(uint8_t)status << OSOE_ABORT_STATUS_SHIFT | pe;
+    if (!atomic_compare_exchange_strong_explicit(&n->hdr->aborting, &none, word,
+                                                 memory_order_seq_cst, memory_order_acquire))
+        return false;
+    osoe_node_wake_agents(n);
+    return true;
+}
+
+/*
+ * The stop protocol's order (agent.c): the word is stored, then each agent's
+ * wake word bumped, then woken - so an agent that loaded its wake word before
+ * the bump finds the futex compare failing, and one that loaded it after sees
+ * the word. In local-id order, so the lead's agent first: it is the one that
+ * tells the other nodes, and it wakes them all again when it does (agent.c),
+ * which covers an agent a declarer did not reach - its own agent can see the
+ * word and end the process before the declarer is done. O(L).
+ */
+void osoe_node_wake_agents(struct osoe_node *n)
+{
+    for (uint32_t i = 0; n->slots && i < n->local_count; i++) {
+        atomic_fetch_add_explicit(&n->slots[i].agent_wake, 1, memory_order_seq_cst);
+        osoe_futex_wake(&n->slots[i].agent_wake, INT_MAX, OSOE_FUTEX_SHARED);
+    }
+}
+
+enum osoe_abort_disposition osoe_node_abort_read(const struct osoe_node *n, uint32_t *pe,
+                                                 int *status)
+{
+    if (!n->hdr)
+        return OSOE_ABORT_NONE;
+    uint64_t word = atomic_load_explicit(&n->hdr->aborting, memory_order_acquire);
+    if (word != 0) {
+        *pe = (uint32_t)word;
+        *status = (uint8_t)(word >> OSOE_ABORT_STATUS_SHIFT);
+    }
+    return (enum osoe_abort_disposition)(uint8_t)(word >> OSOE_ABORT_DISPOSITION_SHIFT);
 }
 
 void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)

@@ -1,6 +1,7 @@
 /* liburing.h, through wire.h, uses POSIX types (sigset_t, AT_FDCWD) that plain
  * C11 hides (portability review F12: feature macros are declared per file). */
 #define _GNU_SOURCE
+#include <errno.h>
 #include <stdatomic.h>
 #include <limits.h>
 #include <stdbit.h>
@@ -488,6 +489,17 @@ static void complete(void *context, const struct osoe_message_header *header,
         break;
     }
 
+    case OSOE_AM_ABORT: {
+        /* A peer's abortive goodbye: its FIN follows, and is not a death (the
+         * segment's goodbye flag says so), and nothing need be told to it. */
+        struct osoe_am_abort m;
+        memcpy(&m, fixed, sizeof m);
+        c->peer_aborted = true;
+        if (p->host.abort)
+            p->host.abort(p->host.context, m.origin_pe, m.status, m.disposition);
+        break;
+    }
+
     default:
         break;
     }
@@ -551,6 +563,15 @@ static bool receive(struct osoe_progress *p, uint32_t slot)
         osoe_am_parse(&c->parser, p->scratch, n, &sink);
         moved = true;
     }
+    /* Ending anyway, the job has nothing to fear from a peer that is ending
+     * too: its connection failing, or its stream ending without a goodbye. Nor
+     * from one whose abortive goodbye has arrived, before this node's agent has
+     * begun its own: that peer's exit may reset the connection behind the
+     * goodbye, and this node is about to end with the status it carried. */
+    if ((p->aborting || c->peer_aborted) && (w->error || osoe_wire_ended(w))) {
+        c->abort_done = c->abort_done || w->error || !c->peer_goodbye;
+        return moved;
+    }
     /*
      * What only the owner of the connection can tell (am.h): that the stream
      * ended, and whether it ended where a segment did and after the peer's
@@ -559,6 +580,10 @@ static bool receive(struct osoe_progress *p, uint32_t slot)
      * naming it rather than waiting for something that node will never send
      * (§3.15, §6.4).
      */
+    if (w->error == -ETIMEDOUT)
+        osoe_fatal("node %u: node %u stopped answering: its kernel acknowledged neither "
+                   "keepalive probes nor retransmissions (§3.15). The host has vanished, or "
+                   "the network between is down", p->node, peer_of(p, slot));
     if (w->error)
         osoe_fatal("node %u: the connection to node %u failed: %s", p->node,
                    peer_of(p, slot), strerror(-w->error));
@@ -778,12 +803,64 @@ static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connect
     c->owe_ack = false;         /* this segment's `ack` pays any debt */
 }
 
+/*
+ * The abort's visit (osoe_progress_abort): finish the segment on the wire, then
+ * send the abortive goodbye and end the stream. Returns whether anything moved.
+ */
+static bool flush_aborting(struct osoe_progress *p, uint32_t slot, struct osoe_connection *conn)
+{
+    struct osoe_progress_connection *c = &p->connection[slot];
+    struct osoe_wire *w = &p->wire[slot];
+    if (c->abort_done)
+        return false;
+    if (w->error || c->peer_aborted || c->goodbye == OSOE_GOODBYE_SENT ||
+        (osoe_wire_ended(w) && !c->peer_goodbye)) {
+        c->abort_done = true;           /* nobody to tell */
+        return true;
+    }
+    bool moved = false;
+    if (c->sending != OSOE_CONNECTION_NONE) {
+        /* A segment half on the wire is finished, so that the peer's stream
+         * stays whole: the abortive goodbye is read after it, not inside it. */
+        unsigned char *base = conn->data + (size_t)c->sending * conn->capacity;
+        size_t n = osoe_wire_send(w, base + c->sent, c->sending_bytes - c->sent);
+        c->sent += (uint32_t)n;
+        if (c->sent < c->sending_bytes)
+            return n > 0;
+        c->sending = OSOE_CONNECTION_NONE;
+        if (c->goodbye == OSOE_GOODBYE_SEALED) {
+            osoe_wire_shutdown(w);      /* that was its normal goodbye */
+            c->goodbye = OSOE_GOODBYE_SENT;
+            c->abort_done = true;
+            return true;
+        }
+        moved = true;
+    }
+    size_t n = osoe_wire_send(w, p->abort_segment + c->abort_sent,
+                              p->abort_segment_bytes - c->abort_sent);
+    c->abort_sent += (uint32_t)n;
+    if (c->abort_sent == p->abort_segment_bytes) {
+        osoe_wire_shutdown(w);
+        c->abort_done = true;
+        return true;
+    }
+    return moved || n > 0;
+}
+
 static bool flush(struct osoe_progress *p, uint32_t slot)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
     struct osoe_connection *conn = osoe_connection_to(p->area,
                                                       slot < p->node ? slot : slot + 1);
     if (!conn)
+        return false;
+    if (p->aborting)
+        return flush_aborting(p, slot, conn);
+    /* A peer whose abortive goodbye has arrived is ending: nothing more of the
+     * job's goes to it, and its exit may already have reset the connection,
+     * which a send would take for a failure - a fatal on this thread, ending
+     * this node before its agent could tell its other peers. */
+    if (c->peer_aborted)
         return false;
     bool moved = false;
 
@@ -964,6 +1041,8 @@ void osoe_progress_attach(struct osoe_progress *p,
 static bool busy(const struct osoe_progress *p, uint32_t slot)
 {
     const struct osoe_progress_connection *c = &p->connection[slot];
+    if (p->aborting)
+        return !c->abort_done;
     return c->open == OSOE_CONNECTION_NONE || c->sending != OSOE_CONNECTION_NONE ||
            c->sealed != OSOE_CONNECTION_NONE || c->owe_ack || c->carrying ||
            c->queues.control.depth != 0 || c->queues.bulk.depth != 0;
@@ -1054,7 +1133,8 @@ bool osoe_progress_poll(struct osoe_progress *p)
             uint32_t slot = w * 64 + bit;
             if ((readable >> bit) & 1)
                 moved |= receive(p, slot);
-            moved |= drain(p, slot);
+            if (!p->aborting)
+                moved |= drain(p, slot);
             moved |= flush(p, slot);
             settle(p, slot);
             visits++;
@@ -1131,6 +1211,42 @@ void osoe_progress_close(struct osoe_progress *p)
     /* Every connection is visited until its goodbye has gone (O(N), once). */
     for (uint32_t slot = 0; slot + 1 < p->nodes; slot++)
         mark_busy(p, slot);
+}
+
+void osoe_progress_abort(struct osoe_progress *p, uint32_t pe, int32_t status,
+                         uint32_t disposition)
+{
+    if (p->aborting)
+        return;
+    p->aborting = true;
+    /* One segment for every peer: a header, and one message whose fixed part is
+     * the abort. Its seq and ack are the ones nothing checks at the end of a
+     * stream; the goodbye flag is what the peer's end of stream is judged by. */
+    struct osoe_message_header h = { OSOE_AM_ABORT, 0, (uint32_t)sizeof(struct osoe_am_abort) };
+    struct osoe_am_abort m = { .origin_pe = pe, .status = status, .disposition = disposition };
+    uint32_t bytes = (uint32_t)sizeof(struct osoe_am_segment_header) +
+                     osoe_message_padded((uint32_t)sizeof m);
+    struct osoe_am_segment_header sh = { .flags = OSOE_AM_SEGMENT_GOODBYE, .message_count = 1,
+                                         .total_len = bytes };
+    _Static_assert(sizeof(struct osoe_am_segment_header) + sizeof(struct osoe_message_header) +
+                   sizeof(struct osoe_am_abort) <= sizeof p->abort_segment,
+                   "the abortive goodbye fits its buffer");
+    memset(p->abort_segment, 0, sizeof p->abort_segment);
+    memcpy(p->abort_segment, &sh, sizeof sh);
+    memcpy(p->abort_segment + sizeof sh, &h, sizeof h);
+    memcpy(p->abort_segment + sizeof sh + sizeof h, &m, sizeof m);
+    p->abort_segment_bytes = bytes;
+    /* Every connection is visited until its abortive goodbye has gone (O(N), once). */
+    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++)
+        mark_busy(p, slot);
+}
+
+bool osoe_progress_aborted(const struct osoe_progress *p)
+{
+    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++)
+        if (!p->connection[slot].abort_done)
+            return false;
+    return true;
 }
 
 bool osoe_progress_closed(const struct osoe_progress *p)

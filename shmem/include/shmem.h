@@ -63,6 +63,10 @@ void shmem_init(void);
 int shmem_my_pe(void);
 int shmem_n_pes(void);
 void shmem_finalize(void);
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+_Noreturn
+#endif
+void shmem_global_exit(int status);
 void shmem_query_initialized(int *initialized);
 
 /*
