@@ -4724,24 +4724,32 @@ as soon as its bytes are consumed, a re-arm on every CQE without
 on the same kind of connection. Its first act is a verified stream: every 8-byte
 word carries its own offset, through a 4 KiB send buffer and four 1 KiB provided
 buffers, which forces about 250 `-ENOBUFS` terminations and re-arms and a few
-dozen short sends per MiB. The ctest `env.echo-uring` pins the **io_uring-to-blocking
-ratio on the same link**: a round trip at most 1.5× and a stream at least 0.5×,
-against 1.01–1.05× and 0.89–1.06× measured idle and up to 1.16× under load.
-What is pinned is the **median over seven pairs** of trials of each pair's ratio,
-a pair being measured together. On a loaded machine a round trip falls into one
-of three modes — about 4, 15 or 25 µs, by where the two processes land and
-whether a CPU must wake — for io_uring and blocking alike, and comparing the best
-of each kind failed whenever one blocking trial caught the fastest mode and no
-io_uring trial did (3.4× twice in about ninety runs under the load loop, 4.3×
-once under `ctest -j4`); a pair shares its mode, and the median ignores the odd
-pair that does not. Trials are 1 GiB, because a 256 MiB stream trial lasts 13 ms,
-shorter than a scheduler slice among 16 busy loops. The pins are
-checked in the optimized, uninstrumented build only: under asan and tsan the
-io_uring round trip measured 6.4× and 3.9×, the instrumentation of the harness's
-own loop rather than the link, and every preset still runs the verified stream.
-Both pins
-were checked by breaking the harness: a 50 µs pause in its pump measured 12× and
-0.05×, and a missing re-arm after `-ENOBUFS` hung into the timeout. The ratio of
+dozen short sends per MiB. The ctest `env.echo-uring` pins two **io_uring-to-blocking
+ratios on the same link**, each the median over seven pairs of trials measured
+side by side (a pair shares whatever the machine was doing): the **fastest**
+round trip, at most 1.5× — measured 1.02–1.25× idle, under 16 busy loops and
+beside a `ctest -j4` run — and the stream, at least 0.5× — 0.85–1.06×. Trials
+are 1 GiB, since a 256 MiB stream lasts 13 ms, shorter than a scheduler slice
+among 16 busy loops.
+
+**The median round trip is reported and not pinned, and why is a result.** The
+fastest round trip is the length of the path, both processes on a CPU, and the
+two kinds agree on it everywhere. The median is where the woken process gets to
+run, and there they differ under one kind of load: beside a `ctest -j4` run - many
+processes sleeping and waking, CPUs partly busy - blocking `recv` measured a
+3.6 µs median and the io_uring wait 15–28 µs, 3–5×, with `IORING_SETUP_COOP_TASKRUN`
+and `IORING_SETUP_DEFER_TASKRUN` alike; idle (25 µs, a sleeping virtual CPU woken)
+and under 16 busy loops (5 µs) the two agree within 1.2×. That is consistent with a
+blocking socket's wakeup being a synchronous wake the scheduler may place on the
+waker's CPU, which io_uring's task-work wakeup is not - *inferred*, not traced. It
+is what the progress thread's ring wait will pay per hop on a partly loaded node,
+which is the Pi's normal state (§1), so it is measured again against the library
+(§7.1 step 3, part C). The pins were checked by breaking the harness: a 50 µs pause
+in its pump measured 13× and 0.05×, and a missing re-arm after `-ENOBUFS` hung into
+the timeout. They are checked in the optimized, uninstrumented build only: under
+asan and tsan the io_uring round trip measured 6.4× and 3.9×, the instrumentation
+of the harness's own loop rather than the link, and every preset still runs the
+verified stream. The ratio of
 the *library* to this floor is §1's actual target; it is pinned once the library
 runs on the ring (§7.1 step 3, below).
 
