@@ -4550,7 +4550,8 @@ by hand. *(Rejected: singleton launch when the variables are absent, as some
 implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)*
 `OSOE_NO_PROGRESS_TIMEOUT` (§3.15) is osoe's own, read by the library; it
 replaced `OSOE_BOOTSTRAP_TIMEOUT`, which is retired. So, since phase 1 step 3,
-are `OSOE_PORT_RANGE` and `OSOE_JOB_SECRET` (§6.2), both optional.
+are `OSOE_PORT_RANGE` and `OSOE_JOB_SECRET` (§6.2), both optional, and since
+step 4 `OSOE_KEEPALIVE` and `OSOE_LIVENESS` (§3.15).
 `OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
 turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
 library never sees it.
@@ -4771,6 +4772,13 @@ machinery. The review's order is adopted.
    the expensive version.
 4. **Robustness.** Pidfd liveness, abort propagation, `shmem_global_exit`,
    keepalive; Slurm environment fixtures and the heap-base-shift test mode (§8.2).
+   *The first half is done (phase 1 step 4 slice 1; §3.15's four as-built
+   paragraphs): the abort crosses nodes as an abortive goodbye, every PE ends
+   when its node aborts, `shmem_global_exit`, pidfd liveness on every agent, and
+   TCP keepalive. The next slice has the Slurm fixtures and the heap-base shift,
+   and two refinements this one left open: the multi-node lead's pidfds on its
+   ring, where a completion would find a death at once rather than within a
+   sweep interval, and whether the development watchdog stays.*
 
 Symmetric statics and the compiler wrapper follow step 4 (§7.4).
 
@@ -5174,9 +5182,11 @@ with the environment tier 2 gives it. That is the node-pair wire and the
 progress engine below the library; the internode maps, where all three of
 §3.11's waits run through two reply credits and a 2 KiB buffer; the AM barrier;
 the reply-starvation guard; the tree at depth three and at thirteen uneven
-nodes; the rendezvous; the differential over §8.1's four poles; and the floor.
-Left out are the tests that never reach a socket, and those whose subject is a
-PE that dies or stops rather than the link.
+nodes; the rendezvous; the differential over §8.1's four poles; the floor; a
+global exit, whose status crosses as the abortive goodbye; and, since step 4, a
+node whose link is cut, which only keepalive can find (`TIER3_CUT`). Left out
+are the tests that never reach a socket, and those whose subject is a PE that
+dies or stops rather than the link.
 
 *What it found.* One thing loopback hid, and it was not in the transport. The
 tests below the library open their mesh without a rendezvous, and that path
