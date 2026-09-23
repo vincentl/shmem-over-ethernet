@@ -14,8 +14,12 @@
  *
  * A pidfd names the process, not the number, so a recycled pid cannot hide a
  * death, as it can from kill(pid, 0). Only a pid recycled before its pidfd was
- * opened could, and they are opened at the agent's first turns, once each PE
- * has published its pid.
+ * opened could, and they are opened at the first check after the node's
+ * rendezvous, which every PE's pid is published before. Where no pidfd can be
+ * had - out of descriptors, or a kernel or sandbox refusing the call - the PE
+ * is watched by kill(pid, 0) instead, after one line saying so, rather than the
+ * job ending for it. Like the reclaim of a dead job's objects (§6.2), this
+ * assumes the PEs of a node share a pid namespace.
  *
  * OSOE_LIVENESS=0 turns it off, for the tests of what else finds a death: the
  * development watchdog and a wait's sweep, which the agent would otherwise
@@ -24,14 +28,18 @@
 #ifndef OSOE_LIVENESS_H
 #define OSOE_LIVENESS_H
 
-/* Before the agent starts, and after it has been joined: the descriptors are
- * the agent thread's alone in between. */
+/* From the node's rendezvous, once every local PE has published its pid, to
+ * the end of the session. */
 void osoe_liveness_start(void);
 void osoe_liveness_stop(void);
 
-/* On the agent, each turn of its loop: at most once every OSOE_SWEEP_NS, one
- * poll(2) of the pidfds it holds, with no wait. O(L) descriptors on the lead,
- * one on any other PE. */
+/*
+ * At most once every OSOE_SWEEP_NS, one poll(2) of the pidfds this PE holds,
+ * with no wait: O(L) descriptors on the lead, one on any other PE. Called on
+ * one thread at a time - the agent at each turn of its loop, and until the
+ * agent runs, whatever thread is sweeping init's waits (osoe_sweep_expired),
+ * so that a death during init is found in every build too.
+ */
 void osoe_liveness_check(void);
 
 #endif /* OSOE_LIVENESS_H */

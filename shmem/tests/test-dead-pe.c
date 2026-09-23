@@ -3,6 +3,9 @@
  * slice 1, part C), in a release build as in a development one.
  *
  *   test-dead-pe RANK       world rank RANK dies of SIGKILL after a barrier
+ *   test-dead-pe 0 init     rank 0, a lead, dies of SIGALRM during shmem_init,
+ *                           after its node's rendezvous and before the job's,
+ *                           which the last node holds back by starting 5 s late
  *
  * The lead's agent holds a pidfd for every other local PE and every other
  * PE's agent one for its lead (liveness.h), so whichever of them dies, the
@@ -12,12 +15,19 @@
  * never reaches. dead-pe.sh requires every survivor to leave with the failure
  * status - none killed by the launcher at its timeout, or still computing 30 s
  * later - with the development watchdog off, so that it is not what finds it.
+ *
+ * In init, before any agent runs, the sweeps of init's own waits watch instead
+ * (liveness.h): dead-pe-init.sh requires rank 1, waiting on its lead in the
+ * job's rendezvous, to find the death and leave with the failure status. The
+ * last node's ranks, which cannot reach a dead lead, are the launcher's.
  */
 #define _GNU_SOURCE
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <shmem.h>
 
@@ -26,6 +36,14 @@ enum { COMPUTE_SECONDS = 30 };
 int main(int argc, char **argv)
 {
     int dies = argc > 1 ? atoi(argv[1]) : 1;
+    if (argc > 2 && strcmp(argv[2], "init") == 0) {
+        const char *rank = getenv("OSOE_PROCID"), *node = getenv("OSOE_NODEID");
+        const char *nodes = getenv("OSOE_STEP_NUM_NODES");
+        if (rank && atoi(rank) == dies)
+            alarm(1);                           /* SIGALRM ends it inside shmem_init */
+        if (node && nodes && atoi(node) == atoi(nodes) - 1 && atoi(nodes) > 1)
+            sleep(5);                           /* holds the job's rendezvous open */
+    }
     shmem_init();
     int me = shmem_my_pe();
     shmem_barrier_all();

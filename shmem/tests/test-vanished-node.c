@@ -6,10 +6,12 @@
  * init and a barrier - long enough for what the job last sent to be
  * acknowledged, which keepalive, probing only an idle connection, needs.
  *
- * Then the ranks of the last node compute outside the library, and every other
+ * Then the ranks of the last node sleep outside the library, and every other
  * rank waits in a barrier the last node never reaches, so every connection to
  * that node is idle when it vanishes - keepalive's case; with data in flight
- * the kernel's retransmission limit ends it instead. vanished-node.sh requires
+ * the kernel's retransmission limit ends it instead. Sleeping, not spinning:
+ * ranks that spin can hold their node's agent off the CPU long enough that an
+ * acknowledgement it owes goes out after the cut, and waits on that limit. vanished-node.sh requires
  * the job to end with a fatal saying which node stopped answering, and every
  * rank to leave with the failure status.
  */
@@ -40,10 +42,8 @@ int main(void)
         fprintf(stderr, "PE %d: BARRIER RETURNED\n", me);
         return 3;
     }
-    time_t until = time(NULL) + COMPUTE_SECONDS;
-    volatile unsigned long spins = 0;
-    while (time(NULL) < until)
-        spins++;
+    for (int s = 0; s < COMPUTE_SECONDS; s++)
+        sleep(1);
     fprintf(stderr, "PE %d: NOT TERMINATED after %d s of computing\n", me, COMPUTE_SECONDS);
     return 3;
 }

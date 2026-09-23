@@ -404,6 +404,7 @@ struct osoe_node_header {
     _Atomic uint32_t mapped;        /* PEs in OSOE_PHASE_MAPPED or later */
     _Atomic uint32_t finalized;     /* PEs whose last finalize has run */
     _Atomic uint32_t failed;        /* nonzero once any PE has failed rendezvous */
+    _Atomic uint32_t lead_agent_running;    /* lead: its agent runs, so the node can speak */
 
     /* The abort word (§3.15). Nonzero means the job is over and no wait can
      * finish; every library wait reads it at its next safety-sweep deadline

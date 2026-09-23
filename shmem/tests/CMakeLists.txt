@@ -1000,6 +1000,32 @@ foreach(map 0,1 0,0,1,1 0,1,2,0,1,0)
   set_tests_properties(shmem.global-exit.${label} shmem.global-exit.fatal.${label}
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endforeach()
+# The same ended by a non-lead, which only its lead's agent can speak for: a
+# global exit, a fatal - whose abortive goodbye then carries a fatal - and a
+# global exit straight after shmem_init, which init must not return before the
+# lead's agent runs to carry. And one ended mid-stream: the goodbye queued
+# behind a stream, with one arriving, must survive the caller's end, which is
+# a reset while input is unread, until the peer's kernel has acknowledged it.
+foreach(case "nonlead;7;7;1;compute" "fatal.nonlead;fatal;1;1;compute"
+             "immediate;7;7;1;immediate")
+  list(GET case 0 label)
+  list(GET case 1 how)
+  list(GET case 2 status)
+  list(GET case 3 caller)
+  list(GET case 4 mode)
+  add_test(NAME shmem.global-exit.${label}.0-0-1-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 ${how} ${status} ${caller} ${mode})
+  set_tests_properties(shmem.global-exit.${label}.0-0-1-1
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endforeach()
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.global-exit.stream.0-0-1-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
+  set_tests_properties(shmem.global-exit.stream.0-0-1-1
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endif()
 
 # OSOE_KEEPALIVE is three counts or 0, and anything else is refused by name.
 add_test(NAME shmem.keepalive.invalid
@@ -1029,6 +1055,13 @@ foreach(case "sibling.L2;0,0;1" "lead.L2;0,0;0" "sibling.L4;0,0,0,0;3" "lead.L4;
   set_tests_properties(shmem.dead-pe.${label}
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "DEAD PE OK")
 endforeach()
+# A lead that dies inside shmem_init, before any agent runs: its non-lead must
+# find it from init's own sweeps. See dead-pe-init.sh.
+add_test(NAME shmem.dead-pe.lead-in-init
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe-init.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_dead-pe>)
+set_tests_properties(shmem.dead-pe.lead-in-init
+  PROPERTIES LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "DEAD LEAD IN INIT OK")
 
 # The development watchdog (§3.15). Not an osoe_tier2_test: it needs -k, so the
 # launcher leaves the survivors to the library, and it asserts on output rather
@@ -1274,6 +1307,28 @@ if(OSOE_TIER3)
                 sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
                 $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
       set_tests_properties(tier3.${shape}.global-exit.${label}
+        PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    endforeach()
+    # A global exit straight after init, and one mid-stream, where the link's
+    # delay and loss are what the two orderings are for; the first again across
+    # eight nodes, whose lead's mesh takes longest to connect.
+    string(REPLACE ";" " " wrap "${osoe_tier3};${shape};8;--")
+    add_test(NAME tier3.${shape}.global-exit.immediate.0-0-1-2-3-4-5-6-7
+      COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+              sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 9 0,0,1,2,3,4,5,6,7 7 7 1 immediate)
+    set_tests_properties(tier3.${shape}.global-exit.immediate.0-0-1-2-3-4-5-6-7
+      PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    string(REPLACE ";" " " wrap "${osoe_tier3};${shape};2;--")
+    foreach(case "immediate;1;immediate" "stream;0;stream")
+      list(GET case 0 label)
+      list(GET case 1 caller)
+      list(GET case 2 mode)
+      add_test(NAME tier3.${shape}.global-exit.${label}.0-0-1-1
+        COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+                sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+                $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 ${caller} ${mode})
+      set_tests_properties(tier3.${shape}.global-exit.${label}.0-0-1-1
         PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
     endforeach()
     # A node that vanishes - its link cut once the job is ready - is found by TCP

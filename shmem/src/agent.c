@@ -119,6 +119,11 @@ static void *agent_main(void *arg)
     return NULL;
 }
 
+bool osoe_agent_running(void)
+{
+    return atomic_load_explicit(&running, memory_order_acquire) != 0;
+}
+
 bool osoe_agent_speaks(void)
 {
     return atomic_load_explicit(&running, memory_order_acquire) &&
@@ -129,8 +134,6 @@ void osoe_agent_start(struct osoe_pe_slot *slot)
 {
     atomic_store_explicit(&stop_requested, 0, memory_order_release);
     atomic_store_explicit(&agent_ready, 0, memory_order_release);
-
-    osoe_liveness_start();              /* the agent's from here until it is joined */
 
     /* Block everything but the synchronous signals, which cannot be
      * redirected to another thread and are fatal when blocked. */
@@ -169,5 +172,4 @@ void osoe_agent_stop(struct osoe_pe_slot *slot)
     if (r != 0)
         osoe_fatal("cannot join the agent thread: %s", strerror(r));
     atomic_store_explicit(&running, 0, memory_order_release);
-    osoe_liveness_stop();
 }

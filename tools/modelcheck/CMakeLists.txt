@@ -8,8 +8,9 @@
 # library, so running it in four presets buys nothing: every model runs in the
 # release preset only, which keeps it from being skipped. The large ones -
 # tree_barrier (five logical nodes, every node's thread real), close (a
-# million states with the trapped-state check) and abort (six minutes, a
-# fatal's case of 5.7 million states) - are why that preset is slow.
+# million states with the trapped-state check), abort (six minutes, a fatal's
+# case of 5.7 million states) and abort_exit (eleven minutes, a case of ten
+# million) - are why that preset is slow.
 #
 # The three that check §4.11's SHMEM_THREAD_MULTIPLE designs - dirty_set,
 # watch_list, and get_completion's generation-word cases (about 15 minutes, a

@@ -35,8 +35,10 @@
 #include <stdlib.h>
 
 #include "abort.h"
+#include "agent.h"
 #include "base/sweep.h"
 #include "fatal.h"
+#include "liveness.h"
 #include "metrics.h"
 #include "state.h"
 
@@ -93,6 +95,13 @@ void osoe_sweep_expired(const char *routine)
     atomic_fetch_add_explicit(&osoe.node.slots[osoe.bootstrap.local_id].sweeps, 1,
                               memory_order_seq_cst);
 
+    /* Liveness without the watchdog (liveness.h), in every build: the agent
+     * watches once it runs, and until then - init's own waits - the thread
+     * sweeping does, so a death during init is found too. Before stop_if_aborting,
+     * which then acts on a death declared here in this same sweep. */
+    if (!osoe_agent_running())
+        osoe_liveness_check();
+
     /* The abort word is the library's own and is read in every build: a PE
      * that has ended the job declared it (fatal.c), and every wait must stop
      * at its next sweep (§3.15). Only the liveness polling below is the
@@ -119,7 +128,7 @@ void osoe_sweep_expired(const char *routine)
         dead_rank = osoe.node.slots[i].rank;
         osoe_fatal_then(declare_for_dead, NULL, "%s: local PE %u (rank %u, pid %d) has died; this PE would wait for "
                    "it forever. This is the development watchdog (OSOE_WATCHDOG); in "
-                   "production the launcher tears the job down instead (srun -K1)",
+                   "every build the agents' pidfds find it too (§3.15)",
                    routine, i, dead_rank, osoe.node.slots[i].pid);
     }
 }

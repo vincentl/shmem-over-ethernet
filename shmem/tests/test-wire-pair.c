@@ -12,12 +12,15 @@
  * library, and needs only the bootstrap environment osoe-launch sets.
  */
 #define _GNU_SOURCE
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -88,6 +91,22 @@ int main(void)
     struct osoe_ring ring;
     osoe_wires_open(&w, &ring, &b, 0, NULL);
     osoe_ring_enable(&ring);
+
+    /* Keepalive is on, at its defaults, on every node-pair socket (wire.c,
+     * §3.15) - which only tier 3's cut link would otherwise notice gone. */
+    int keepalive = 0, idle = 0, interval = 0, count = 0;
+    socklen_t length = sizeof keepalive;
+    CHECK(getsockopt(w.fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, &length) == 0 &&
+          keepalive == 1);
+    length = sizeof idle;
+    CHECK(getsockopt(w.fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, &length) == 0 &&
+          idle == OSOE_DEFAULT_KEEPALIVE_IDLE_S);
+    length = sizeof interval;
+    CHECK(getsockopt(w.fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, &length) == 0 &&
+          interval == OSOE_DEFAULT_KEEPALIVE_INTERVAL_S);
+    length = sizeof count;
+    CHECK(getsockopt(w.fd, IPPROTO_TCP, TCP_KEEPCNT, &count, &length) == 0 &&
+          count == OSOE_DEFAULT_KEEPALIVE_COUNT);
 
     unsigned char out[CHUNK], in[CHUNK];
     size_t sent = 0, got = 0, filled = SIZE_MAX;

@@ -283,7 +283,8 @@ bool osoe_progress_closed(const struct osoe_progress *p);
 void osoe_progress_abort(struct osoe_progress *p, uint32_t pe, int32_t status,
                          uint32_t disposition);
 
-/* Every connection has sent its abortive goodbye, or has nobody to tell. */
+/* Every connection has had its abortive goodbye acknowledged by the peer's
+ * kernel, or has nobody to tell. O(N) calls to the kernel. */
 bool osoe_progress_aborted(const struct osoe_progress *p);
 
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
