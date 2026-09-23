@@ -27,6 +27,15 @@ if(BUILD_SHARED_LIBS)
   set_tests_properties(shmem.profiling_aliases PROPERTIES LABELS "tier1" TIMEOUT 30)
 endif()
 
+# The backend boundary (§4.10): no file above transport.h and internode.h may
+# include, however indirectly, a header of the backend below. The two sides
+# are defined as lists in the script, and adding `#include "progress.h"` to
+# rma.c is the case it was written to fail (second review, roce-seam F6).
+add_test(NAME shmem.boundary
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckBoundary.cmake)
+set_tests_properties(shmem.boundary PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 # A static build is not one of the four presets (none sets BUILD_SHARED_LIBS),
 # so this proves it on its own: a nested configure and build of libosoe as a
 # static archive, then a link of a tiny consumer against that archive alone -
@@ -58,6 +67,14 @@ target_include_directories(shmem_test_allocator PRIVATE ../src)
 osoe_warnings(shmem_test_allocator)
 add_test(NAME shmem.allocator COMMAND shmem_test_allocator)
 set_tests_properties(shmem.allocator PROPERTIES LABELS "tier1" TIMEOUT 60)
+
+# The internode tree's topology on its own (tier 1; §5.3): sparse node lists,
+# every fan-out a test uses, and the depths the tree must have.
+add_executable(shmem_test_collective_tree test-collective-tree.c ../src/collective-tree.c)
+target_include_directories(shmem_test_collective_tree PRIVATE ../src)
+osoe_warnings(shmem_test_collective_tree)
+add_test(NAME shmem.collective-tree COMMAND shmem_test_collective_tree)
+set_tests_properties(shmem.collective-tree PROPERTIES LABELS "tier1" TIMEOUT 60)
 
 # The §4.9 watched-range encoding on its own (tier 1): pure logic, and the
 # property it must have is one a brute-force check can state directly.
@@ -157,7 +174,7 @@ set(OSOE_LAUNCH_COUNTS 1 2 4)
 # the last, so releasing on any arrival is indistinguishable from releasing on
 # all of them - and that mutation passed a two-node test.
 add_executable(shmem_test_barrier_am test-barrier-am.c
-  ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
+  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
   ../src/reply.c ../src/wire.c ../src/bootstrap.c ../src/shm-object.c)
 target_include_directories(shmem_test_barrier_am PRIVATE ../src)
 target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt)
@@ -210,6 +227,16 @@ add_test(NAME shmem.job.duplicate-rank
 set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
 
+# A rank no lead claims: node 1's lead is told its node holds rank 1 alone,
+# though rank 2 is there too. The map is checked once, by the lead whose
+# arrival completed the rendezvous (slice 3; it was every PE's O(P) scan), and
+# the job is refused naming the rank.
+add_test(NAME shmem.job.unclaimed-rank
+  COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.unclaimed-rank PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "rank 2 was not claimed by any node")
+
 # The same refusal with its message's write held back a second (slow-message.c):
 # the reason must be on stderr before the job is told to fail, or the launcher's
 # SIGTERM can take it. Before the reason was written first, it was lost in 1 of
@@ -235,7 +262,7 @@ endif()
 # inherited, so the production defaults cannot make the suite slow or the test
 # vacuous.
 add_executable(shmem_test_progress test-progress.c
-  ../src/progress.c ../src/am.c ../src/connection.c ../src/connection-area.c
+  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
   ../src/reply.c ../src/wire.c ../src/shm-object.c)
 target_include_directories(shmem_test_progress PRIVATE ../src)
 target_link_libraries(shmem_test_progress PRIVATE osoe_base rt)
@@ -314,6 +341,52 @@ foreach(map 0,0,0,0 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
   set_tests_properties(shmem.multinode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
 
+# The internode tree (§5.3), over node counts where its shape matters: 7 and
+# 13 nodes leave the last level partly filled, and 8 at k = 2 is depth 3. One
+# PE per node, where the tree is all there is, and uneven maps with several
+# PEs on some nodes, where the intranode phase and the handoff run under it.
+# The same program as shmem.multinode.*: its arrival table (arrivals.h) is what
+# says no PE left before the last arrived, and it ends by requiring every
+# invariant counter, missed_wake among them, to be zero.
+set(osoe_tree_maps
+  0,1,2,3,4,5,6
+  0,1,2,3,4,5,6,7
+  0,1,2,3,4,5,6,7,8,9,10,11,12
+  0,0,0,1,2,2,3,4,5,6
+  0,0,1,2,2,3,4,5,6,7,7
+  0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12)
+foreach(fanout 2 4)
+  foreach(map IN LISTS osoe_tree_maps)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    list(REMOVE_DUPLICATES ranks)
+    list(LENGTH ranks nodes)
+    add_test(NAME shmem.tree.k${fanout}.n${nodes}.p${count}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=${fanout}
+              OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+              SHMEM_SYMMETRIC_SIZE=16M
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 150 --
+              $<TARGET_FILE:shmem_test_multinode>)
+    set_tests_properties(shmem.tree.k${fanout}.n${nodes}.p${count}
+      PROPERTIES LABELS "tier2" TIMEOUT 180)
+  endforeach()
+endforeach()
+
+# Work discovery on the send side (§3.10; slice 3 part C): 16 logical nodes,
+# traffic on one connection, and a pass must drain and flush O(1) of them.
+add_executable(shmem_test_work_discovery test-work-discovery.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_work_discovery PRIVATE
+  ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_work_discovery PRIVATE osoe rt)
+osoe_warnings(shmem_test_work_discovery)
+add_test(NAME shmem.work-discovery
+  COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=16M
+          $<TARGET_FILE:osoe-launch> -n 16 -m 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -t 120
+          -- $<TARGET_FILE:shmem_test_work_discovery>)
+set_tests_properties(shmem.work-discovery PROPERTIES LABELS "tier2" TIMEOUT 150)
+
 # The same program with §8.1's force-remote flag on, which is what makes
 # osoe_transport_direct's call to the one locality function testable at all:
 # without it a PE on another node already has no mapped heap here, so the
@@ -380,11 +453,34 @@ foreach(map IN LISTS osoe_internode_maps)
             $<TARGET_FILE:shmem_test_internode>)
   set_tests_properties(shmem.internode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
-# The force-remote half of this test is NOT registered yet, and the reason is an
-# open decision rather than an oversight: §8.1's flag makes a PE on *this* node
-# remote, and there is no connection from a node to itself (§3.4), so the put
-# has nowhere to be routed. shmem.multinode.force-remote.* still runs, because
-# it exercises the locality answer rather than the data path.
+# The same program under §8.1's force-remote flag (slice 3). It is registered
+# now because the flag no longer touches the route: a put to a node-mate is
+# still applied in the calling thread, and only the *pointer* is denied
+# (job.h's two predicates). Until that split, this configuration aborted with
+# "no connection toward node N" - 4 runs in 4 - which is what the test would
+# have said had it been registered, and what three comments claimed could not
+# happen. Multi-node maps only: the flag needs somewhere to be remote from, and
+# is refused at init on one logical node - which is also why these do not run
+# under ThreadSanitizer at all, where the multi-node maps of shmem.internode.*
+# are already excluded for the reason given above (the ordering that makes a
+# put safe runs through another process, and tsan reports a race it cannot
+# disprove). With the single-node map unavailable to this flag, there is
+# nothing left to run there.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.internode.force-remote.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+            OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_internode>)
+  set_tests_properties(shmem.internode.force-remote.${label} PROPERTIES LABELS "tier2"
+    TIMEOUT 90)
+endforeach()
+endif()
 
 # The differential test (§8.1): one program, §8.1's four poles of the logical
 # node map at one world size, and the transcripts must match. On the first map
@@ -505,6 +601,24 @@ set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "shmem_quiet: local PE 1 [(]rank 1"
   FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED")
 
+# Diagnosability experiment 1 (§3.14, §5.3): one PE never reaches a barrier,
+# and the node it is on is found by walking down the tree rather than by
+# visiting every node. Eight logical nodes at k = 2, so the walk is three
+# visits. PE 0 leaves without finalizing once it has the answer, which its node
+# declares and the launcher finishes; the test is judged on what it printed.
+add_executable(shmem_test_hang-walk test-hang-walk.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_hang-walk PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_hang-walk PRIVATE osoe rt)
+osoe_warnings(shmem_test_hang-walk)
+add_test(NAME shmem.hang-walk
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=2 SHMEM_SYMMETRIC_SIZE=16M
+          $<TARGET_FILE:osoe-launch> -n 8 -m 0,1,2,3,4,5,6,7 -t 12 -k --
+          $<TARGET_FILE:shmem_test_hang-walk>)
+set_tests_properties(shmem.hang-walk PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "hang walk found node 6 in [0-9]+ visits"
+  FAIL_REGULAR_EXPRESSION "CHECK[(]")
+
 # The reply descriptor pool (§3.8; review round two, D1). The review's scenario
 # at C = 2 must complete; with the target given a smaller credit than the
 # origin, the pool overflows and the target must say so by name. Before slice 2
@@ -522,10 +636,16 @@ else()
   target_link_libraries(shmem_test_reply-pool PRIVATE osoe rt)
   osoe_warnings(shmem_test_reply-pool)
 endif()
+# The target's pool is C per connection plus (k + 1) x teams for the tree's
+# forwards, node-wide (§3.8): with C = 1 and k = 2 that is 1 + 3 x 3 = 10, so
+# eleven origin PEs each with a blocking get outstanding overflow it. Slice 3
+# made the forward term node-wide; at the default k = 4 it is 16, and the
+# seven origin PEs this test had until then stopped reaching it.
 add_test(NAME shmem.reply-pool.overflow
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow SHMEM_SYMMETRIC_SIZE=16m
-          $<TARGET_FILE:osoe-launch> -n 8 -m 0,0,0,0,0,0,0,1 -t 30
-          -e 7:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
+          OSOE_COLLECTIVE_FANOUT=2
+          $<TARGET_FILE:osoe-launch> -n 12 -m 0,0,0,0,0,0,0,0,0,0,0,1 -t 30
+          -e 11:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
 set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
 

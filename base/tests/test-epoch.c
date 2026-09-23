@@ -9,7 +9,7 @@
 #include "base/order.h"
 #include "check.h"
 
-enum { THREADS = 4, ROUNDS = 2000 };
+enum { THREADS = 12, ROUNDS = 2000 };
 
 static struct osoe_epoch arrived, released;
 static _Atomic uint32_t reached[THREADS];
@@ -22,9 +22,14 @@ static void *member(void *arg)
     for (uint32_t k = 0; k < ROUNDS; k++) {
         if (osoe_epoch_bump_eq(&arrived, (k + 1) * THREADS)) {
             CHECK(osoe_epoch_bump_eq(&released, k + 1));
-            osoe_epoch_wake_all(&released);
+            /* The chained wake (§5.3): with twelve threads on four cores a
+             * member released early re-enters and sleeps on this counter for
+             * k + 2 while others still wait for k + 1 - the case the parity
+             * bitset exists for. A stranded member costs a 100 ms sweep per
+             * round, which 2,000 rounds turn into the test's timeout. */
+            osoe_epoch_release_wake(&released, k + 1);
         }
-        osoe_epoch_wait_eq(&released, k + 1, "test_epoch");
+        osoe_epoch_wait_eq_chained(&released, k + 1, "test_epoch");
         atomic_store_explicit(&reached[me], k + 1, memory_order_release);
     }
     return NULL;

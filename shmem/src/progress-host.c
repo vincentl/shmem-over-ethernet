@@ -13,15 +13,20 @@
 #include "base/futex.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
+#include "am-state.h"
 #include "connection-area.h"
 #include "fatal.h"
+#include "internode.h"
 #include "job.h"
+#include "metrics.h"
 #include "node.h"
 #include "progress.h"
 #include "progress-host.h"
 #include "state.h"
 #include "transport.h"
 #include "wire.h"
+
+struct osoe_am_state osoe_am;
 
 /*
  * How long the lead's agent sleeps between passes when nothing moved. Far
@@ -30,13 +35,6 @@
  * operation - see progress-host.h for why step 2 looks rather than waits.
  */
 #define OSOE_PROGRESS_SLEEP_NS UINT64_C(250000)     /* 250 us */
-
-/*
- * The epoch this agent has already taken out of each team's handoff word.
- * Private to the agent thread: nothing else reads or writes it, which is the
- * whole point of the word it shadows.
- */
-static uint32_t consumed[OSOE_TEAMS];
 
 /* ---- the four host callbacks (progress.h) ------------------------------ */
 
@@ -60,7 +58,7 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
     if (pe >= osoe.bootstrap.world_size)
         osoe_fatal("a peer addressed PE %u in a job of %u", pe,
                    osoe.bootstrap.world_size);
-    int32_t local = osoe.node.local_of_rank[pe];
+    int32_t local = osoe_node_local_id(&osoe.node, pe);
     if (local < 0)
         return NULL;
     if (offset > osoe.node.heap_size || length > osoe.node.heap_size - offset)
@@ -77,7 +75,7 @@ static struct osoe_landing_slot *landing(void *context, uint32_t pe, uint32_t *c
     *capacity = osoe.node.landing_slot_bytes - (uint32_t)sizeof(struct osoe_landing_slot);
     if (pe >= osoe.bootstrap.world_size)
         return NULL;
-    int32_t local = osoe.node.local_of_rank[pe];
+    int32_t local = osoe_node_local_id(&osoe.node, pe);
     return local < 0 ? NULL : osoe_node_landing(&osoe.node, (uint32_t)local);
 }
 
@@ -91,77 +89,63 @@ static void notify(void *context, uint32_t pe, uint16_t region, uint64_t offset,
 }
 
 /*
- * §5.3's release, applied on this node: advance the team's `released` counter
- * and wake every local member waiting on it. A divisible event, so wake-many
- * (§3.11).
- *
- * The bump is checked for the same reason the single-node path checks it: a
- * release that does not land exactly on k+1 means this node's members have run
- * a different number of collectives from the rest of the job, and §5.4's
- * equality waits turn that into a hang rather than an error unless it is named
- * here.
+ * §5.3's release, applied on this node. The engine knows only (team, epoch);
+ * what a release *does* - advance the team's counter and wake its members - is
+ * the collective layer's, reached through internode.h's upcall. Before slice 3
+ * this function switched on the team number and bumped the node header's
+ * counters itself, so the backend knew which futex words the SHMEM layer waits
+ * on - the knowledge §10 once said it could not do without.
  */
 static void release(void *context, uint32_t team, uint32_t epoch)
 {
     (void)context;
-    struct osoe_epoch *released;
-    const char *name;
-    switch (team) {
-    case OSOE_TEAM_WORLD:
-        released = &osoe.node.hdr->world_released;
-        name = "SHMEM_TEAM_WORLD";
-        break;
-    case OSOE_TEAM_SHARED:
-        released = &osoe.node.hdr->shared_released;
-        name = "SHMEM_TEAM_SHARED";
-        break;
-    case OSOE_TEAM_FINALIZE:
-        released = &osoe.node.hdr->finalize_released;
-        name = "shmem_finalize";
-        break;
-    default:
-        osoe_fatal("an internode release names team %u; this build has %u", team,
-                   OSOE_TEAMS);
-    }
-    if (!osoe_epoch_release_bump_eq(released, epoch))
-        osoe_fatal("the internode release for %s arrived for epoch %u out of order: "
-                   "the PEs of this job called different numbers of collectives", name,
-                   epoch);
-    osoe_epoch_wake_all(released);
+    osoe_internode_released(team, epoch);
 }
 
-/* ---- §5.2's node participation ----------------------------------------- */
+/* ---- waking the engine (§3.12) ------------------------------------------ */
 
 /*
- * The root of a team's internode tree, and how many nodes take part.
+ * Wake the lead only if it sleeps (§3.10; lead_wake_model.py). The caller has
+ * already set its connection's dirty bit (osoe_connection_area_mark), a seq_cst
+ * RMW; this load of the flag is the second half of the writer's side of a
+ * two-sided protocol, so it is seq_cst too (§3.16). If it reads 0 - the lead has
+ * not raised its flag, or another writer claimed this sleep's wake - the lead's
+ * seq_cst load of the bits after raising it will see this writer's bit, or the
+ * wake already claimed is on its way. If it wins the flag, the bump changes the
+ * word the lead sleeps on, so a futex_wait that has not started yet returns at
+ * once.
  *
- * §5.2 spans the tree over the nodes holding at least one member. For the two
- * predefined teams that needs no computation: the world team has a member on
- * every node, so every node participates and the lowest, node 0, is the root.
- * SHMEM_TEAM_SHARED is one node by definition (§4.8) and never has an
- * internode phase, so reaching here with it is a bug rather than a case.
- * shmem_team_split_* (§7.3) is what turns this into a real computation.
+ * An awake lead costs a writer one load of a line it shares with every other
+ * writer, read-mostly, instead of a locked add on it and a futex_wake syscall.
  */
-static uint32_t participants(uint32_t team)
-{
-    if (team != OSOE_TEAM_WORLD && team != OSOE_TEAM_FINALIZE)
-        osoe_fatal("team %u has no internode phase; only the world and finalize teams "
-                   "span nodes in this build", team);
-    return osoe.job.node_count;
-}
-
-#define OSOE_COLLECTIVE_ROOT 0u
-
-/* ---- the handoff, both ends (§5.3) ------------------------------------- */
-
 void osoe_progress_host_wake_lead(void)
 {
-    if (!osoe.internode)
+    if (!osoe_am.internode)
         return;
+    /*
+     * Claim the wake: only the writer whose CAS takes the flag from 1 to 0
+     * makes the syscall; the rest see 0 and skip until the lead raises it
+     * again. Without the claim every writer during the lead's wake-up latency
+     * saw 1, and a burst of puts still woke the lead for 93% of them (the
+     * model's `every_writer`). The load first, so an awake lead's line stays
+     * shared rather than taken exclusive by every writer's CAS.
+     */
+    uint32_t sleeping = 1;
+    if (atomic_load_explicit(osoe_am.area.lead_sleeping, memory_order_seq_cst) == 0 ||
+        !atomic_compare_exchange_strong_explicit(osoe_am.area.lead_sleeping, &sleeping, 0,
+                                                 memory_order_seq_cst, memory_order_seq_cst)) {
+        osoe_count(OSOE_C_AM_WAKES_SKIPPED, 1);
+        return;
+    }
+    osoe_count(OSOE_C_AM_WAKES_SENT, 1);
     struct osoe_pe_slot *lead = &osoe.node.slots[0];
     atomic_fetch_add_explicit(&lead->agent_wake, 1, memory_order_seq_cst);
     osoe_futex_wake(&lead->agent_wake, 1, OSOE_FUTEX_SHARED);
 }
+
+/* Whether this lead has raised lead_sleeping and not lowered it. Private to the
+ * agent thread, so the flag is stored only when it changes. */
+static bool flag_raised;
 
 /*
  * Read from another process, since only the lead runs the engine. The value is
@@ -171,96 +155,50 @@ void osoe_progress_host_wake_lead(void)
  */
 uint64_t osoe_progress_host_acked(uint32_t peer)
 {
-    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
     return conn ? osoe_connection_acked(conn) : 0;
-}
-
-void osoe_progress_host_post_arrival(uint32_t team, uint32_t epoch)
-{
-    struct osoe_arrival_handoff *h = &osoe.node.hdr->arrival[team];
-    /*
-     * A single-writer publication store (§3.16): only one member posts per
-     * epoch, and the release of the previous epoch orders it after the last
-     * one. Then the wake word, a locked add, which on x86-TSO also drains the
-     * store buffer so the agent cannot see the bump without the epoch.
-     */
-    atomic_store_explicit(&h->epoch, epoch, memory_order_release);
-
-    /* The lead is local id 0 (§6.2). It is the only agent that runs the
-     * engine, so it is the only one worth waking for this. */
-    struct osoe_pe_slot *lead = &osoe.node.slots[0];
-    atomic_fetch_add_explicit(&lead->agent_wake, 1, memory_order_seq_cst);
-    osoe_futex_wake(&lead->agent_wake, 1, OSOE_FUTEX_SHARED);
-}
-
-/*
- * Take whatever has been posted and perform the arrivals.
- *
- * **The epoch is recorded consumed before the arrival is performed, and from
- * the value just loaded rather than by re-reading the word.** On the root node
- * osoe_progress_arrive can complete the collective and release the team
- * immediately, so a local member can be back in the next barrier - and posting
- * its epoch here - before this function's next line would run. Re-reading the
- * word at that point marks an epoch consumed that was never forwarded, and
- * that node never arrives again: `consume_reread` in
- * docs/design/evidence/am-backend/arrival_model.py, where the whole job hangs
- * and every other node is the one that looks stuck.
- */
-static bool consume_arrivals(void)
-{
-    bool moved = false;
-    for (uint32_t team = 0; team < OSOE_TEAMS; team++) {
-        uint32_t epoch = atomic_load_explicit(&osoe.node.hdr->arrival[team].epoch,
-                                              memory_order_acquire);
-        if (epoch == consumed[team])
-            continue;
-        consumed[team] = epoch;
-        osoe_progress_arrive(&osoe.progress, team, epoch, OSOE_COLLECTIVE_ROOT,
-                             participants(team));
-        moved = true;
-    }
-    return moved;
 }
 
 /* ---- lifecycle --------------------------------------------------------- */
 
 void osoe_progress_host_start(uint32_t session)
 {
-    /* osoe.internode and osoe.lead are set by session_start, before anything
-     * that reads them - including osoe_transport_init, which sizes the dirty
-     * set from the first (init.c). */
-    if (!osoe.internode)
+    /* osoe_am.internode and osoe_am.lead are set at the start of
+     * osoe_transport_init, before anything that reads them - including the
+     * dirty set, which is sized from the first (transport-am.c). */
+    if (!osoe_am.internode)
         return;
 
     /* Every local PE maps the area: its application threads reserve into these
      * buffers like any other writer (§3.5, §3.12). */
-    osoe_connection_area_open(&osoe.area, &osoe.bootstrap, osoe.job.node_count, session);
-    if (!osoe.lead)
+    osoe_connection_area_open(&osoe_am.area, &osoe.bootstrap, osoe.job.node_count, session);
+    if (!osoe_am.lead)
         return;
 
     uint32_t peers = osoe.job.node_count - 1;
     /*
-     * §3.8's formula, per connection: C + degree x teams + slack. C bounds the
-     * replies - the origin takes a credit per get or fetching AMO and returns
-     * it when the reply lands (argument 1). degree x teams bounds the
-     * collective forwards: while collectives are blocking, a team has at most
-     * one forward outstanding per tree edge (argument 2). The pool is
-     * node-wide, so an idle connection costs nothing.
+     * §3.8's two arguments. C per connection bounds the replies - the origin
+     * takes a credit per get or fetching AMO and returns it when the reply
+     * lands (argument 1). degree x teams, node-wide, bounds the collective
+     * forwards: while collectives are blocking, a node of the internode tree
+     * has at most one ARRIVE or its k RELEASEs queued per team (argument 2,
+     * reply.h). The pool is node-wide, so an idle connection costs nothing.
      *
      * Before slice 2 this was peers x C, with no term for the forwards, so a
      * node holding C gets toward a peer had nothing left for its own barrier
-     * arrival and the request was dropped (second review, D1). No legal
-     * program can empty the pool now, and progress.c ends the job naming the
-     * peer if one does.
+     * arrival and the request was dropped (second review, D1). Slice 2 added
+     * the forwards per connection, which was the star's shape - its root
+     * released every peer at once. No legal program can empty the pool, and
+     * progress.c ends the job naming the peer if one does.
      */
-    uint32_t per_connection = osoe.area.credits +
-                              OSOE_COLLECTIVE_DEGREE * OSOE_TEAMS + OSOE_REPLY_SLACK;
-    uint32_t descriptors = peers * per_connection;
-    osoe.wire = calloc(peers, sizeof *osoe.wire);
-    osoe.connection = calloc(peers, sizeof *osoe.connection);
-    osoe.descriptor = calloc(descriptors, sizeof *osoe.descriptor);
-    osoe.scratch = malloc(osoe.area.chunk_bytes);
-    if (!osoe.wire || !osoe.connection || !osoe.descriptor || !osoe.scratch)
+    uint32_t descriptors = peers * (osoe_am.area.credits + OSOE_REPLY_SLACK) +
+                           OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) *
+                               OSOE_TEAMS;
+    osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
+    osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
+    osoe_am.descriptor = calloc(descriptors, sizeof *osoe_am.descriptor);
+    osoe_am.scratch = malloc(osoe_am.area.chunk_bytes);
+    if (!osoe_am.wire || !osoe_am.connection || !osoe_am.descriptor || !osoe_am.scratch)
         osoe_fatal("out of memory setting up the AM backend for %u peer nodes", peers);
 
     /* Peer-slot order, which is node order with this node left out - the same
@@ -268,17 +206,23 @@ void osoe_progress_host_start(uint32_t session)
     uint32_t slot = 0;
     for (uint32_t n = 0; n < osoe.job.node_count; n++)
         if (n != osoe.job.node)
-            osoe_wire_open(&osoe.wire[slot++], &osoe.bootstrap, n, session);
+            osoe_wire_open(&osoe_am.wire[slot++], &osoe.bootstrap, n, session);
 
     struct osoe_progress_host host = { resolve, landing, notify, release, NULL };
-    osoe_progress_init(&osoe.progress, &osoe.area, osoe.wire, osoe.descriptor,
-                       descriptors, osoe.scratch, (uint32_t)osoe.area.chunk_bytes,
+    osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, osoe_am.descriptor,
+                       descriptors, osoe_am.scratch, (uint32_t)osoe_am.area.chunk_bytes,
                        &host);
     /* Count into the control segment, where osoe-stat and the tests read it. */
-    osoe.progress.metrics = &osoe.node.hdr->am;
-    osoe_progress_attach(&osoe.progress, osoe.connection);
-    for (uint32_t team = 0; team < OSOE_TEAMS; team++)
-        consumed[team] = 0;
+    osoe_am.progress.metrics = &osoe.node.hdr->am;
+    /* §3.14's connection scope and the tree's per-team state, in the same
+     * segment: the engine writes them, osoe-stat and the tests read them. */
+    osoe_am.progress.connection_metrics = osoe.node.connection_metrics;
+    osoe_am.progress.collective = osoe.node.hdr->collective;
+    for (uint32_t c = 0; c < osoe.node.connection_count; c++)
+        atomic_store_explicit(&osoe.node.connection_metrics[c].peer,
+                              c < osoe.job.node ? c : c + 1, memory_order_release);
+    osoe_progress_attach(&osoe_am.progress, osoe_am.connection);
+    flag_raised = false;
 }
 
 /*
@@ -314,11 +258,11 @@ static void flush_before_close(void)
      * after the bootstrap timeout (second review, atomics F7).
      */
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, osoe_counter_word_read(&osoe.progress.metrics->segments_sent),
+    osoe_stall_watch_begin(&watch, osoe_counter_word_read(&osoe_am.progress.metrics->segments_sent),
                            osoe.bootstrap.no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-    while (!osoe_progress_idle(&osoe.progress)) {
-        if (!osoe_progress_poll(&osoe.progress)) {
+    while (!osoe_progress_idle(&osoe_am.progress)) {
+        if (!osoe_progress_poll(&osoe_am.progress)) {
             struct timespec back = { 0, 20000 };
             nanosleep(&back, NULL);
         }
@@ -326,7 +270,7 @@ static void flush_before_close(void)
             continue;
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_sweep_expired("shmem_finalize");
-        uint64_t sent = osoe_counter_word_read(&osoe.progress.metrics->segments_sent);
+        uint64_t sent = osoe_counter_word_read(&osoe_am.progress.metrics->segments_sent);
         if (osoe_stall_watch_stalled(&watch, sent))
             osoe_fatal("shmem_finalize: no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT) "
                        "flushing this node's last messages - segments sent has stayed at "
@@ -338,9 +282,9 @@ static void flush_before_close(void)
 
 void osoe_progress_host_stop(void)
 {
-    if (!osoe.internode)
+    if (!osoe_am.internode)
         return;
-    if (osoe.lead) {
+    if (osoe_am.lead) {
         flush_before_close();
         /*
          * Announce to every peer first and only then wait (wire.h), or this
@@ -349,31 +293,53 @@ void osoe_progress_host_stop(void)
          * might still poll - shmem_finalize joins that thread first.
          */
         for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-            osoe_wire_shutdown(&osoe.wire[slot]);
+            osoe_wire_shutdown(&osoe_am.wire[slot]);
         for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-            osoe_wire_close(&osoe.wire[slot]);
-        free(osoe.wire);
-        free(osoe.connection);
-        free(osoe.descriptor);
-        free(osoe.scratch);
-        osoe.wire = NULL;
-        osoe.connection = NULL;
-        osoe.descriptor = NULL;
-        osoe.scratch = NULL;
+            osoe_wire_close(&osoe_am.wire[slot]);
+        free(osoe_am.wire);
+        free(osoe_am.connection);
+        free(osoe_am.descriptor);
+        free(osoe_am.scratch);
+        osoe_am.wire = NULL;
+        osoe_am.connection = NULL;
+        osoe_am.descriptor = NULL;
+        osoe_am.scratch = NULL;
     }
-    osoe_connection_area_close(&osoe.area);
-    osoe.internode = false;
+    osoe_connection_area_close(&osoe_am.area);
+    osoe_am.internode = false;
 }
 
+/*
+ * The agent's pass, and the lead's half of the sleep protocol (§3.10;
+ * lead_wake_model.py). A pass that moved nothing is about to be followed by the
+ * agent's futex_wait on agent_wake, with the value it loaded before the pass.
+ * So raise lead_sleeping first - seq_cst, the store side of the two-sided
+ * protocol - and then look at the dirty bits again with seq_cst loads: a writer
+ * whose bit landed after this pass's exchange either shows here, and the agent
+ * goes round again, or read the flag as 1 and bumps agent_wake, which makes the
+ * wait return. The flag comes down at the next pass, which is after the wait.
+ */
 bool osoe_progress_host_poll(void)
 {
-    if (!osoe.internode || !osoe.lead)
+    if (!osoe_am.internode || !osoe_am.lead)
         return false;
-    bool moved = consume_arrivals();
-    return osoe_progress_poll(&osoe.progress) || moved;
+    struct osoe_connection_area *a = &osoe_am.area;
+    if (flag_raised) {
+        atomic_store_explicit(a->lead_sleeping, 0, memory_order_seq_cst);
+        flag_raised = false;
+    }
+    bool moved = osoe_internode_am_take_arrivals();
+    if (osoe_progress_poll(&osoe_am.progress) || moved)
+        return true;
+    atomic_store_explicit(a->lead_sleeping, 1, memory_order_seq_cst);
+    flag_raised = true;
+    for (uint32_t w = 0; w < a->dirty_words; w++)
+        if (atomic_load_explicit(&a->dirty[w], memory_order_seq_cst) != 0)
+            return true;
+    return false;
 }
 
 uint64_t osoe_progress_host_idle_ns(void)
 {
-    return osoe.internode && osoe.lead ? OSOE_PROGRESS_SLEEP_NS : OSOE_SWEEP_NS;
+    return osoe_am.internode && osoe_am.lead ? OSOE_PROGRESS_SLEEP_NS : OSOE_SWEEP_NS;
 }

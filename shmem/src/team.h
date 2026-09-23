@@ -15,10 +15,21 @@
 
 #include "base/epoch.h"
 
-/* The two predefined teams, resolved to the state a collective needs. */
+/*
+ * Build the predefined teams for this session, and give each one that spans
+ * several nodes to the internode backend (internode.h). Called once by
+ * shmem_init after osoe_internode_init and before the agent thread starts, so
+ * the thread that will release these teams only ever reads them.
+ */
+void osoe_team_start(void);
+
 /* The library's internal finalize team (node.h, OSOE_TEAM_FINALIZE): the
  * world's membership on counters of its own. */
 struct osoe_team *osoe_team_finalize(void);
+
+/* The team with this number (enum osoe_team_number), or NULL if there is none.
+ * What internode.h's release upcall resolves its team with. */
+struct osoe_team *osoe_team_numbered(uint32_t number);
 
 struct osoe_team {
     const char *name;
@@ -38,6 +49,13 @@ struct osoe_team {
      * rather than the last local arriver releasing the epoch itself.
      */
     bool internode;
+    /*
+     * A team of one member, which today is only SHMEM_TEAM_SHARED under §8.1's
+     * force-remote flag. Its sync has nobody to wait for and touches no shared
+     * counter - it must not, since every PE of the node would otherwise be
+     * counting on the same node-wide words for teams that are not the same team.
+     */
+    bool singleton;
     uint32_t me;                    /* this PE's number within it */
     struct osoe_epoch *arrived;     /* the team's own epoch counters (§5.4) */
     struct osoe_epoch *released;

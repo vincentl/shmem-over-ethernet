@@ -17,12 +17,14 @@
  * already has the branch this takes.
  */
 #include <stddef.h>
+#include <stdlib.h>
 
 #include <pshmem.h>
 #include <shmem.h>
 
 #include "export.h"
 #include "fatal.h"
+#include "internode.h"
 #include "state.h"
 #include "symmetric.h"
 #include "team.h"
@@ -30,8 +32,73 @@
 
 static struct osoe_team world_team, shared_team, finalize_team;
 
-struct osoe_team *osoe_team_finalize(void)
+/* Every team this session has, by number. Written once by osoe_team_start and
+ * only read afterwards, including by the node's progress thread through the
+ * internode release upcall (barrier.c). */
+static struct osoe_team *numbered[OSOE_TEAMS];
+
+/*
+ * Hand a team that spans several nodes to the internode backend (§5.2): the
+ * nodes holding at least one member, sorted. For the world and finalize teams
+ * that is every node, and so needs no computation; the list is built anyway,
+ * because a split team's is a real computation and the backend should not be
+ * able to tell the difference. O(N) once per team at creation, freed at once:
+ * the backend keeps O(fan-out) of it (internode.h).
+ */
+static void register_internode(const struct osoe_team *t)
 {
+    if (!t->internode)
+        return;
+    uint32_t count = osoe.job.node_count;
+    uint32_t *nodes = malloc(sizeof *nodes * count);
+    if (!nodes)
+        osoe_fatal("out of memory describing %s's %u nodes", t->name, count);
+    for (uint32_t n = 0; n < count; n++)
+        nodes[n] = n;
+    osoe_internode_team(t->number, nodes, count);
+    free(nodes);
+}
+
+void osoe_team_start(void)
+{
+    world_team = (struct osoe_team){
+        .name = "SHMEM_TEAM_WORLD",
+        .number = OSOE_TEAM_WORLD,
+        .members = osoe.bootstrap.world_size,
+        /* Every local PE is a member of the world team, so the world's local
+         * member count is the node's PE count (§5.2). */
+        .local_members = osoe.bootstrap.local_count,
+        .internode = osoe.job.node_count > 1,
+        .me = osoe.bootstrap.rank,
+        .arrived = &osoe.node.hdr->world_arrived,
+        .released = &osoe.node.hdr->world_released,
+        .epoch = &osoe.world_epoch,
+        .published = &osoe.node.slots[osoe.bootstrap.local_id].world_epoch,
+    };
+    /*
+     * SHMEM_TEAM_SHARED is the PEs whose memory this one can reach with loads
+     * and stores (spec §7), and spec §7 also requires shmem_ptr to answer
+     * non-NULL for every member of it. Under §8.1's force-remote flag a
+     * node-mate's pointer is denied, so the only member left is this PE: the
+     * team is the singleton {self}, not the node (§8.1; second review,
+     * conformance F2). Without the flag it is the node, as before.
+     */
+    bool alone = osoe.job.force_remote;
+    shared_team = (struct osoe_team){
+        .name = "SHMEM_TEAM_SHARED",
+        .number = OSOE_TEAM_SHARED,
+        .members = alone ? 1 : osoe.bootstrap.local_count,
+        /* SHMEM_TEAM_SHARED is one node by definition (§4.8), so every member
+         * is local and it has no internode phase at all. */
+        .local_members = alone ? 1 : osoe.bootstrap.local_count,
+        .internode = false,
+        .singleton = alone,
+        .me = alone ? 0 : osoe.bootstrap.local_id,
+        .arrived = &osoe.node.hdr->shared_arrived,
+        .released = &osoe.node.hdr->shared_released,
+        .epoch = &osoe.shared_epoch,
+        .published = &osoe.node.slots[osoe.bootstrap.local_id].shared_epoch,
+    };
     finalize_team = (struct osoe_team){
         .name = "the finalize team",
         .number = OSOE_TEAM_FINALIZE,
@@ -44,7 +111,21 @@ struct osoe_team *osoe_team_finalize(void)
         .epoch = &osoe.finalize_epoch,
         .published = &osoe.node.slots[osoe.bootstrap.local_id].finalize_epoch,
     };
+    numbered[OSOE_TEAM_WORLD] = &world_team;
+    numbered[OSOE_TEAM_SHARED] = &shared_team;
+    numbered[OSOE_TEAM_FINALIZE] = &finalize_team;
+    register_internode(&world_team);
+    register_internode(&finalize_team);
+}
+
+struct osoe_team *osoe_team_finalize(void)
+{
     return &finalize_team;
+}
+
+struct osoe_team *osoe_team_numbered(uint32_t number)
+{
+    return number < OSOE_TEAMS ? numbered[number] : NULL;
 }
 
 struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team)
@@ -52,40 +133,10 @@ struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team)
     osoe_require_initialized(routine);
     if (team == SHMEM_TEAM_INVALID)
         return NULL;
-    if (team == SHMEM_TEAM_WORLD) {
-        world_team = (struct osoe_team){
-            .name = "SHMEM_TEAM_WORLD",
-            .number = OSOE_TEAM_WORLD,
-            .members = osoe.bootstrap.world_size,
-            /* Every local PE is a member of the world team, so the world's
-             * local member count is the node's PE count (§5.2). */
-            .local_members = osoe.bootstrap.local_count,
-            .internode = osoe.job.node_count > 1,
-            .me = osoe.bootstrap.rank,
-            .arrived = &osoe.node.hdr->world_arrived,
-            .released = &osoe.node.hdr->world_released,
-            .epoch = &osoe.world_epoch,
-            .published = &osoe.node.slots[osoe.bootstrap.local_id].world_epoch,
-        };
+    if (team == SHMEM_TEAM_WORLD)
         return &world_team;
-    }
-    if (team == SHMEM_TEAM_SHARED) {
-        shared_team = (struct osoe_team){
-            .name = "SHMEM_TEAM_SHARED",
-            .number = OSOE_TEAM_SHARED,
-            .members = osoe.bootstrap.local_count,
-            /* SHMEM_TEAM_SHARED is one node by definition (§4.8), so every
-             * member is local and it has no internode phase at all. */
-            .local_members = osoe.bootstrap.local_count,
-            .internode = false,
-            .me = osoe.bootstrap.local_id,
-            .arrived = &osoe.node.hdr->shared_arrived,
-            .released = &osoe.node.hdr->shared_released,
-            .epoch = &osoe.shared_epoch,
-            .published = &osoe.node.slots[osoe.bootstrap.local_id].shared_epoch,
-        };
+    if (team == SHMEM_TEAM_SHARED)
         return &shared_team;
-    }
     osoe_fatal("%s: %p is not a team this library issued; only SHMEM_TEAM_WORLD and "
                "SHMEM_TEAM_SHARED exist (shmem_team_split_* is not implemented)",
                routine, (void *)team);
@@ -95,6 +146,8 @@ int osoe_team_to_world(const struct osoe_team *t, int pe)
 {
     if (pe < 0 || (uint32_t)pe >= t->members)
         return -1;
+    if (t->singleton)                   /* {self}: its only member is this PE */
+        return (int)osoe.bootstrap.rank;
     if (t == &shared_team)
         return (int)osoe.bootstrap.gtids[pe];
     return pe;                          /* the world team numbers PEs by rank */
@@ -105,8 +158,10 @@ static int world_to_team(const struct osoe_team *t, int world)
 {
     if (world < 0 || (uint32_t)world >= osoe.bootstrap.world_size)
         return -1;
+    if (t->singleton)
+        return (uint32_t)world == osoe.bootstrap.rank ? 0 : -1;
     if (t == &shared_team) {
-        int32_t local = osoe.node.local_of_rank[world];
+        int32_t local = osoe_node_local_id(&osoe.node, (uint32_t)world);
         return local;                   /* -1 when the rank is on another node */
     }
     return world;

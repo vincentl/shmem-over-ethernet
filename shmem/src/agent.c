@@ -12,7 +12,7 @@
 #include "blocked.h"
 #include "fatal.h"
 #include "metrics.h"
-#include "progress-host.h"
+#include "transport.h"
 
 static pthread_t agent;
 static _Atomic uint32_t stop_requested;     /* process-private */
@@ -55,8 +55,10 @@ static void *agent_main(void *arg)
         if (atomic_load_explicit(&stop_requested, memory_order_acquire))
             break;
         /*
-         * §3.12: the local lead's agent is the node's progress engine; every
-         * other agent is answered with false and sleeps as before.
+         * §3.12: the thread is lent to the backend, through the two calls
+         * transport.h declares for it and nothing else. On AM the local lead's
+         * agent runs the node's progress engine; every other agent is answered
+         * with false and sleeps as before.
          *
          * `seen` is loaded **before** the pass, and that ordering is the whole
          * of the wake protocol (§4.9). An arrival posted or an operation
@@ -68,9 +70,9 @@ static void *agent_main(void *arg)
          * A pass that moved something goes round again without sleeping: while
          * there is work, latency beats power (§3.10).
          */
-        if (osoe_progress_host_poll())
+        if (osoe_transport_agent_pass())
             continue;
-        struct osoe_deadline sweep = osoe_deadline_in(osoe_progress_host_idle_ns());
+        struct osoe_deadline sweep = osoe_deadline_in(osoe_transport_agent_idle_ns());
         if (osoe_futex_wait(&slot->agent_wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0) {
             osoe_counter_add(b, OSOE_C_AGENT_WAKEUPS, 1);
             osoe_counter_set(b, OSOE_C_AGENT_LAST_WAKE_NS, osoe_now_ns());

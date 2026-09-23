@@ -92,7 +92,15 @@ int main(void)
     /* The two predefined teams stop agreeing the moment a second node exists,
      * which is the whole reason they are two teams (§7.3). */
     CHECK(shmem_team_n_pes(SHMEM_TEAM_WORLD) == n);
-    CHECK(shmem_team_n_pes(SHMEM_TEAM_SHARED) == local_count);
+    /*
+     * Under §8.1's force-remote flag SHMEM_TEAM_SHARED is the singleton
+     * {self}: spec §7 requires shmem_ptr to answer non-NULL for every member,
+     * and the flag denies it to a node-mate, so the node's PEs are no longer
+     * members (§8.1). Without the flag it is the node.
+     */
+    CHECK(shmem_team_n_pes(SHMEM_TEAM_SHARED) == (forced ? 1 : local_count));
+    CHECK(shmem_team_my_pe(SHMEM_TEAM_SHARED) == (forced ? 0 : -1) ||
+          !forced);           /* rank 0 of {self} under the flag */
     CHECK(shmem_team_my_pe(SHMEM_TEAM_WORLD) == me);
     if (nodes == 1)
         CHECK(local_count == n);
@@ -129,6 +137,13 @@ int main(void)
         CHECK(shmem_team_ptr(SHMEM_TEAM_WORLD, mine, pe) == p);
     }
     CHECK(shmem_ptr(mine, me) == mine);
+    /* Spec §7: every member of SHMEM_TEAM_SHARED has a non-null pointer -
+     * which is what makes the singleton the only conforming membership under
+     * the flag. */
+    for (int i = 0; i < shmem_team_n_pes(SHMEM_TEAM_SHARED); i++)
+        CHECK(shmem_team_ptr(SHMEM_TEAM_SHARED, mine, i) != NULL);
+    /* A sync on it still works, and is over at once when it is {self}. */
+    CHECK(shmem_team_sync(SHMEM_TEAM_SHARED) == 0);
 
     /*
      * The library's own coherent load resolves through the same locality
@@ -176,6 +191,51 @@ int main(void)
         arrivals_arrive(me);
         shmem_barrier_all();
         CHECK(arrivals_left_after_all(n));
+    }
+
+    /*
+     * §5.3's tree, as the node publishes it (§3.14): this node's parent and
+     * child count must be what the k-ary tree over 0 .. nodes-1 says, computed
+     * here from the launcher's environment rather than asked of the library -
+     * which is the difference between a check and an echo. `lowest_missing` is
+     * what a hung collective is walked down by, so at rest, between
+     * collectives, nothing may be missing.
+     */
+    if (nodes > 1) {
+        const char *k_env = getenv("OSOE_COLLECTIVE_FANOUT");
+        uint32_t k = k_env ? (uint32_t)atoi(k_env) : 4;
+        uint32_t me_node = (uint32_t)atoi(getenv("OSOE_NODEID"));
+        uint64_t parent = 0, children = 0, missing = 0, own = 0, fanout = 0;
+        CHECK(osoe_test_node_metric("team.world.tree.parent", &parent));
+        CHECK(osoe_test_node_metric("team.world.tree.children", &children));
+        CHECK(osoe_test_node_metric("team.world.tree.lowest_missing", &missing));
+        CHECK(osoe_test_node_metric("team.world.tree.own_arrived", &own));
+        CHECK(osoe_test_node_metric("team.world.tree.fanout", &fanout));
+        CHECK(fanout == k);
+        if (me_node == 0)
+            CHECK(parent == UINT32_MAX);
+        else
+            CHECK(parent == (me_node - 1) / k);
+        uint32_t expect = 0;
+        for (uint32_t j = 1; j <= k; j++)
+            if (k * me_node + j < (uint32_t)nodes)
+                expect++;
+        CHECK(children == expect);
+        /*
+         * Whether an epoch is open here is not something this PE can know -
+         * another node's PEs may already be in the next collective, and their
+         * arrivals open one. What holds either way is the rule the walk needs:
+         * a child is "missing" only while an epoch is open, and a node with
+         * nothing open has nothing arrived either.
+         */
+        uint64_t open = 0;
+        CHECK(osoe_test_node_metric("team.world.tree.epoch_open", &open));
+        if (open == 0) {
+            CHECK(missing == UINT32_MAX);
+            CHECK(own == 0);
+        } else {
+            CHECK(missing == UINT32_MAX || missing < (uint64_t)nodes);
+        }
     }
 
     CHECK_INVARIANTS();

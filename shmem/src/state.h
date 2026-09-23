@@ -10,13 +10,17 @@
 
 #include "allocator.h"
 #include "bootstrap.h"
-#include "connection-area.h"
 #include "job.h"
 #include "node.h"
-#include "progress.h"
-#include "reply.h"
-#include "wire.h"
 
+/*
+ * What every part of the library may read: the job, the node, the heap and the
+ * collectives' own epoch counts. **Nothing of any backend's.** The AM layer's
+ * wires, connections, reply pool and engine are in am-state.h, which only the
+ * AM backend's files include; before slice 3 they were fields here, so every
+ * §4 file could name them, and the boundary rested on nobody doing so (second
+ * review, roce-seam F6). cmake/CheckBoundary.cmake now makes that a test.
+ */
 struct osoe_state {
     struct osoe_bootstrap bootstrap;
     struct osoe_node node;
@@ -25,22 +29,6 @@ struct osoe_state {
     uint32_t world_epoch;           /* k for SHMEM_TEAM_WORLD (§5.4) */
     uint32_t shared_epoch;          /* and for SHMEM_TEAM_SHARED */
     uint32_t finalize_epoch;        /* and for the finalize team (team.h) */
-
-    /*
-     * The AM backend, present only in a job of more than one logical node
-     * (§7.1 step 2). `area` is mapped by every local PE, whose application
-     * threads reserve into its buffers (§3.5); everything after it belongs to
-     * the local lead, because only the lead's agent runs the engine (§3.12).
-     * progress-host.c owns all of it.
-     */
-    bool internode;                 /* the job spans more than one logical node */
-    bool lead;                      /* this PE is its node's lead */
-    struct osoe_connection_area area;
-    struct osoe_wire *wire;                      /* nodes - 1, in peer-slot order */
-    struct osoe_progress_connection *connection; /* nodes - 1, in peer-slot order */
-    struct osoe_reply *descriptor;               /* the node-wide pool (§3.8) */
-    unsigned char *scratch;                      /* receive staging, one AM chunk */
-    struct osoe_progress progress;
 };
 
 extern struct osoe_state osoe;

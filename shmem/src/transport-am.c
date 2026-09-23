@@ -33,6 +33,7 @@
 #include <time.h>
 
 #include "am.h"
+#include "am-state.h"
 #include "base/deadline.h"
 #include "base/futex.h"
 #include "base/order.h"
@@ -87,27 +88,54 @@ static uint32_t peer_count(void)
     return osoe.job.node_count - 1;
 }
 
+/*
+ * §4.10's lifecycle. The two facts about the job come first, because the dirty
+ * set below is sized from one of them and the engine's start-up reads both;
+ * they were once set by the engine itself, after the dirty set, and the first
+ * internode put wrote through a null one. Then the engine, which must be
+ * complete before this returns: the agent thread starts next and polls it.
+ */
 void osoe_transport_init(void)
 {
+    osoe_am = (struct osoe_am_state){ 0 };
+    osoe_am.internode = osoe.job.node_count > 1;
+    osoe_am.lead = osoe.bootstrap.local_id == 0;
+
     struct osoe_transport_context *c = &default_context;
     *c = (struct osoe_transport_context){ 0 };
-    if (!osoe.internode)
-        return;
-    uint32_t peers = peer_count();
-    c->high_segment = calloc(peers, sizeof *c->high_segment);
-    c->order = calloc(peers, sizeof *c->order);
-    c->touched = calloc(peers, sizeof *c->touched);
-    if (!c->high_segment || !c->order || !c->touched)
-        osoe_fatal("out of memory for the ordering state of %u peer nodes", peers);
+    if (osoe_am.internode) {
+        uint32_t peers = peer_count();
+        c->high_segment = calloc(peers, sizeof *c->high_segment);
+        c->order = calloc(peers, sizeof *c->order);
+        c->touched = calloc(peers, sizeof *c->touched);
+        if (!c->high_segment || !c->order || !c->touched)
+            osoe_fatal("out of memory for the ordering state of %u peer nodes", peers);
+    }
+    osoe_progress_host_start(osoe.node.hdr->session);
 }
 
+/* After the agent has been joined (transport.h): the engine drains what this
+ * node owes the network, then closes. */
 void osoe_transport_fini(void)
 {
+    osoe_progress_host_stop();
     struct osoe_transport_context *c = &default_context;
     free(c->high_segment);
     free(c->order);
     free(c->touched);
     *c = (struct osoe_transport_context){ 0 };
+    osoe_am = (struct osoe_am_state){ 0 };
+}
+
+/* The agent thread, lent to this backend (transport.h, §3.12). */
+bool osoe_transport_agent_pass(void)
+{
+    return osoe_progress_host_poll();
+}
+
+uint64_t osoe_transport_agent_idle_ns(void)
+{
+    return osoe_progress_host_idle_ns();
 }
 
 struct osoe_transport_context *osoe_transport_context_default(void)
@@ -123,27 +151,23 @@ struct osoe_transport_context *osoe_transport_context_default(void)
  * true exactly of the intranode path, since it applies every write in the
  * calling thread. So the answer is NULL for a PE on another logical node -
  * whose heap this process never mapped, since PEs rendezvous only with the PEs
- * in their own node's OSOE_GTIDS - and also for a local PE under §8.1's
- * force-remote flag, which denies the pointer to a node-mate without changing
- * the route (§8.1) - so that a program cannot be written against the
- * shared-memory shortcut and then quietly depend on it.
+ * in their own node's OSOE_GTIDS - and also for a node-mate under §8.1's
+ * force-remote flag, which denies the pointer without changing the route.
  *
- * shmem_ptr, shmem_team_ptr and shmem_addr_accessible consult this and nothing
- * else (§4.8). Which PEs are actually carried over the AM layer is decided by
- * the node map, not by the flag.
+ * **The route is the other predicate** (job.h): the operations above dispatch on
+ * osoe_routes_in_process, so under the flag a put to a node-mate is still a
+ * memcpy in this thread. One predicate answering both questions is what sent
+ * that put to a connection that does not exist (§8.1).
+ *
+ * shmem_ptr and shmem_team_ptr consult this and nothing else (§4.8);
+ * shmem_addr_accessible does not, and must not - accessibility is reachability
+ * through OpenSHMEM, which every PE of the job has.
  */
 void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
 {
-    if (region != OSOE_REGION_HEAP)
+    if (pe < 0 || !osoe_direct_access(&osoe.job, (uint32_t)pe))
         return NULL;
-    if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size)
-        return NULL;
-    if (!osoe_is_local(&osoe.job, (uint32_t)pe))
-        return NULL;
-    int32_t local = osoe.node.local_of_rank[pe];
-    if (local < 0)
-        return NULL;
-    return (char *)osoe.node.heap_of[local] + offset;
+    return osoe_transport_local_address(pe, region, offset);
 }
 
 /* ---- The far half ------------------------------------------------------ */
@@ -269,6 +293,8 @@ static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
     struct am_wait w;
     am_wait_begin(&w, routine, "the connection's buffer turnover", peer, pe, turnover(conn));
     for (;;) {
+        /* Say which connection: the lead visits only those with work (§3.10). */
+        osoe_connection_area_mark(&osoe_am.area, peer);
         poll_lead();
         if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK)
             break;
@@ -288,7 +314,7 @@ static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
  */
 static uint32_t payload_limit(struct osoe_connection *conn, uint32_t peer, uint32_t fixed_bytes)
 {
-    uint32_t chunk = (uint32_t)osoe.area.chunk_bytes;
+    uint32_t chunk = (uint32_t)osoe_am.area.chunk_bytes;
     uint32_t room = osoe_connection_payload_capacity(conn);
     if (room < chunk)
         chunk = room;
@@ -296,7 +322,7 @@ static uint32_t payload_limit(struct osoe_connection *conn, uint32_t peer, uint3
     if (chunk <= overhead)
         osoe_fatal("toward node %u: a connection buffer of %llu bytes cannot carry a "
                    "message with a %u-byte fixed part; raise OSOE_AM_BUFFER or OSOE_AM_CHUNK",
-                   peer, (unsigned long long)osoe.area.buffer_bytes, fixed_bytes);
+                   peer, (unsigned long long)osoe_am.area.buffer_bytes, fixed_bytes);
     return chunk - overhead;
 }
 
@@ -304,7 +330,7 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
                        uint64_t offset, const void *src, size_t len, unsigned flags)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
-    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
     if (!conn)
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
 
@@ -326,6 +352,11 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
         memcpy(to + sizeof h, &m, sizeof m);
         memcpy(to + sizeof h + sizeof m, at, n);
         osoe_connection_commit(conn, &r);
+        /* After every commit, not once per put: the next chunk may have to
+         * wait for room, and the lead makes room only in a connection it
+         * knows has bytes (§3.10). Marking once at the end hung every
+         * multi-chunk put that filled a buffer. */
+        osoe_connection_area_mark(&osoe_am.area, peer);
         mark(c, peer, r.seq);
         at += n;
         offset += n;
@@ -345,6 +376,8 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
      * worst and never correctness. §3.9's aggregation self-clocks off the send
      * regardless, so this is a saving in syscalls rather than in segments.
      */
+    /* Each chunk set the dirty bit whatever the flag says: it is how the lead
+     * finds these bytes at all, even on the pass the sweep forces (§3.10). */
     if (flags & OSOE_TRANSPORT_MORE) {
         osoe_count(OSOE_C_AM_WAKES_DEFERRED, 1);
         return;
@@ -469,6 +502,7 @@ static uint64_t send_message(struct osoe_connection *conn, uint32_t peer, int pe
     if (payload_bytes)
         memcpy(to + sizeof h + fixed_bytes, payload, payload_bytes);
     osoe_connection_commit(conn, &r);
+    osoe_connection_area_mark(&osoe_am.area, peer);
     return r.seq;
 }
 
@@ -476,7 +510,7 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
                        size_t len)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
-    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
     if (!conn)
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
     struct osoe_landing_slot *slot = my_landing();
@@ -518,7 +552,7 @@ static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
                            uint64_t compare, unsigned flags)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
-    struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
     if (!conn)
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
     bool fetching = (flags & OSOE_TRANSPORT_FETCH) != 0;
@@ -555,7 +589,7 @@ static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
 void osoe_transport_put(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, const void *src, size_t len, unsigned flags)
 {
-    if (osoe_is_local(&osoe.job, (uint32_t)pe)) {
+    if (osoe_routes_in_process(&osoe.job, (uint32_t)pe)) {
         osoe_transport_local_put(pe, region, offset, src, len, flags);
         return;
     }
@@ -565,10 +599,11 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
 }
 
 void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
-                 uint64_t offset, void *dst, size_t len)
+                 uint64_t offset, void *dst, size_t len, unsigned flags)
 {
     (void)context;
-    if (osoe_is_local(&osoe.job, (uint32_t)pe)) {
+    (void)flags;                /* none defined for get yet (transport.h) */
+    if (osoe_routes_in_process(&osoe.job, (uint32_t)pe)) {
         osoe_transport_local_get(pe, region, offset, dst, len);
         return;
     }
@@ -584,7 +619,7 @@ uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum
                      uint64_t offset, enum osoe_rmw_op op, unsigned width,
                      uint64_t operand, uint64_t compare, unsigned flags)
 {
-    if (osoe_is_local(&osoe.job, (uint32_t)pe))
+    if (osoe_routes_in_process(&osoe.job, (uint32_t)pe))
         return osoe_transport_local_rmw(pe, region, offset, op, width, operand, compare,
                                         flags);
     osoe_count(OSOE_C_TRANSPORT_RMW_CALLS, 1);
@@ -616,11 +651,12 @@ static void flush_dirty(struct osoe_transport_context *c)
         if (acknowledged(c, slot))
             continue;
         uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
-        struct osoe_connection *conn = osoe_connection_to(&osoe.area, peer);
+        struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
         /* "Acknowledge through the highest segment this context wrote into":
          * what quiet then waits for, and nothing more. */
         if (conn) {
             osoe_connection_request_ack(conn, c->high_segment[slot]);
+            osoe_connection_area_mark(&osoe_am.area, peer);
             asked = true;
         }
     }
@@ -645,7 +681,7 @@ void osoe_transport_fence(struct osoe_transport_context *context)
 {
     osoe_count(OSOE_C_TRANSPORT_FENCE_CALLS, 1);
     osoe_release_fence();
-    if (osoe.internode)
+    if (osoe_am.internode)
         flush_dirty(context);
 }
 
@@ -667,7 +703,7 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
     osoe_serializing_fence();
 
     struct osoe_transport_context *c = context;
-    if (!osoe.internode || c->count == 0) {
+    if (!osoe_am.internode || c->count == 0) {
         /* Nothing taking the intranode path is ever outstanding, so a wait that
          * finds nothing has genuinely nothing to do. The counter says so rather
          * than being omitted, because on the far path the same name means
@@ -726,4 +762,56 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
     free(wanted);
     osoe_count(OSOE_C_TRANSPORT_WAIT_DIRTY_PEERS, waited);
     osoe_count(OSOE_C_TRANSPORT_WAIT_NS, osoe_now_ns() - t0);
+}
+
+/* ---- The two entry points that are this backend's, not a path's --------- */
+
+/*
+ * These are the backend's own, whichever path an operation takes, so they live
+ * in the file a second backend replaces rather than in transport-local.c,
+ * which a second backend keeps: an RDMA backend has its own set_range, and a
+ * definition in the shared intranode file would collide with it at link time
+ * (second review, roce-seam F9).
+ */
+
+/*
+ * Every wait's predicate load (wait.c, signal.c). It follows the waiter's
+ * seq_cst publication of its watch, and the writer's half is a seq_cst store or
+ * rmw followed by notify's load of that watch: a two-sided protocol, so this
+ * load is seq_cst (§3.16). Acquire is not enough - C11 does not order a seq_cst
+ * store before a later acquire load, and GCC for Armv8.3 and later (a Pi 5's
+ * Cortex-A76) emits it as ldapr, which passes the stlr: measured, 289 to 4,449
+ * lost-wake outcomes in 2 million rounds (fence-litmus/store-buffer-litmus).
+ * A seq_cst load is an ldar on every aarch64 target and a plain mov on x86-64.
+ */
+uint64_t osoe_transport_load(enum osoe_region region, uint64_t offset, unsigned width)
+{
+    /* This PE's own word: the address, not the pointer the application may
+     * have (transport-local.h). A PE is direct to itself either way, and this
+     * says so without depending on it. */
+    void *ptr = osoe_transport_local_address((int)osoe.bootstrap.rank, region, offset);
+    switch (width) {
+    case 8:
+        return atomic_load_explicit((_Atomic uint64_t *)ptr, memory_order_seq_cst);
+    case 4:
+        return atomic_load_explicit((_Atomic uint32_t *)ptr, memory_order_seq_cst);
+    default:
+        return atomic_load_explicit((_Atomic uint16_t *)ptr, memory_order_seq_cst);
+    }
+}
+
+/*
+ * Nothing to do: every operation on this backend is a memory operation on a
+ * mapping the process already holds, so no range needs preparing (§4.10). The
+ * call is still made by the allocator, because the contract is the backend's to
+ * ignore, not the caller's to skip.
+ */
+void osoe_transport_set_range(enum osoe_region region, uint64_t offset, uint64_t len,
+                       unsigned attributes)
+{
+    (void)region;
+    (void)offset;
+    (void)len;
+    (void)attributes;
+    osoe_count(OSOE_C_TRANSPORT_SET_RANGE_CALLS, 1);
 }

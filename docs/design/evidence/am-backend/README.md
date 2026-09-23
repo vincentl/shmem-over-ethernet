@@ -150,6 +150,29 @@ cannot be asked TERMINATES at all: the echo is the only thing that carries a
 late acknowledgement there, so every finite cap starves quiet, and its state
 count grows with the cap to say so.
 
+## The internode tree (phase 1 step 2 slice 3)
+
+`tree_barrier_model.py` replaces the root that `arrival_model.py` abstracted
+into one thread with real nodes: five at fan-out 2 (depth 2), every node's
+progress thread and local members, FIFO channels per tree edge, two epochs, and
+one node with two members so that one re-enters the next epoch early. Four
+properties: no node released before every node arrived (P1), each released
+exactly once per epoch in order (P2), no node with two epochs open or booking
+an arrival for one it closed (P3), and no trapped state. Designs pass under SC
+and TSO; seven nodes pass at one epoch (at two the search passed 30 million
+states without finishing in half an hour).
+
+**A broken variant is caught by whichever check the search reaches first,**
+which is a property of the search order, so each is run twice: with every check
+(it must fail), and with only its own property's check (it must fail on that
+one). `forward_early` and `no_reset` are caught first by P3's refusal of a child
+arriving for an epoch its parent already closed - the same refusal
+`progress.c` raises, and what their C mutations hit at once - while a root
+releasing before the last node arrived (P1) is equally reachable.
+`release_first` (release locally before forwarding, reset after) leaves two
+epochs open; `wrong_epoch` books a child's arrival against a closed epoch; and
+`release_twice` exists only to show that P2's check can fail at all.
+
 ## What they do not cover
 
 - The reservation protocol itself; see above.

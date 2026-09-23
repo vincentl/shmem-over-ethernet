@@ -1,8 +1,10 @@
 /*
- * Agent threads (§3.12). Every PE starts one in shmem_init. The local lead's
- * agent will become the node's progress engine; every other agent does only
- * work that must run inside its own process. In phase 1 step 1 agents have no
- * work: they start, sleep on their slot's wake word, and stop.
+ * Agent threads (§3.12). Every PE starts one in shmem_init, and lends it to
+ * the backend through transport.h's osoe_transport_agent_pass and
+ * osoe_transport_agent_idle_ns. On AM the local lead's agent is the node's
+ * progress engine; every other agent does only work that must run inside its
+ * own process, which today is none: they start, sleep on their slot's wake
+ * word, and stop.
  */
 #ifndef OSOE_AGENT_H
 #define OSOE_AGENT_H

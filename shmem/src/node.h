@@ -27,7 +27,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 10
+#define OSOE_NODE_LAYOUT 12
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -184,6 +184,18 @@ struct osoe_segment_directory {
     uint64_t landing_bytes;
     uint32_t landing_slot_bytes;     /* header plus one AM chunk */
     uint32_t landing_count;          /* local_count */
+
+    /*
+     * Appended at layout 12: one record per connection this node has toward a
+     * peer node, in peer-slot order (§3.4). The fourth metric scope
+     * (OSOE_MSCOPE_CONNECTION), which §3.14's catalogue needs to answer "which
+     * peer is this node's traffic with" without a per-PE dimension.
+     * connection_count is nodes - 1, and zero on a job of one node.
+     */
+    uint64_t connections_offset;
+    uint64_t connections_bytes;
+    uint32_t connection_bytes;       /* one record */
+    uint32_t connection_count;       /* nodes - 1 */
 };
 
 /*
@@ -263,6 +275,69 @@ struct osoe_am_node_metrics {
     _Atomic uint64_t control_queue_high_water;
     _Atomic uint64_t bulk_queue_high_water;
     _Atomic uint64_t pool_high_water;
+    /* Work discovery (layout 11): engine passes, and the connections a pass
+     * drained and flushed. Their ratio is the send side's cost per pass, which
+     * must follow the active connections and not the job's size (§3.10). */
+    _Atomic uint64_t passes;
+    _Atomic uint64_t send_visits;
+};
+
+/*
+ * One connection's counters (§3.14's fourth scope; phase 1 step 2 slice 3).
+ *
+ * Node scope answers "how much has this node sent" and PE scope "what is this
+ * PE doing"; neither answers "which peer", which is the first question about a
+ * job whose traffic is uneven or whose one slow link is the problem. Written
+ * only by the lead's progress thread, which is this data's single writer
+ * (§3.12), so every field is a single-writer publication (§3.16); a reader
+ * takes a value a moment stale. Zero on a node whose job never goes internode,
+ * and in any build whose backend is not AM.
+ *
+ * The gauges - queue depths, acknowledged and wanted sequences - are refreshed
+ * when the lead visits the connection, which since slice 3 is only when it has
+ * work (§3.10), so an idle connection's gauges are as stale as the connection
+ * is idle. That is the right trade for a diagnostic: what a hung job needs is
+ * the last state of a connection that stopped moving.
+ */
+struct osoe_am_connection_metrics {
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint32_t peer;                  /* the peer node this is toward */
+    _Atomic uint32_t control_queue_depth;   /* replies queued now */
+    _Atomic uint32_t bulk_queue_depth;
+    _Atomic uint32_t control_queue_high_water;
+    _Atomic uint32_t bulk_queue_high_water;
+    _Atomic uint64_t segments_sent;
+    _Atomic uint64_t bytes_sent;
+    _Atomic uint64_t header_only_sent;      /* §3.4's acknowledgement-only segments */
+    _Atomic uint64_t segments_applied;      /* from this peer */
+    _Atomic uint64_t bytes_applied;
+    _Atomic uint64_t messages_applied;
+    _Atomic uint64_t acked_through;         /* the peer has applied through this */
+    _Atomic uint64_t wanted_through;        /* this node's writers want this acknowledged */
+    _Atomic uint64_t sent_through;          /* the highest sequence this node has sent */
+};
+
+/*
+ * A team's place in the internode tree and the epoch it is in (§5.3), for the
+ * one question a hung collective asks: which node has not arrived?
+ *
+ * With the tree that is answered by walking *down* from the root in O(log N)
+ * visits - each node names the lowest child index that has not arrived, and
+ * `hostname` below says where to look next - rather than by visiting every
+ * node. Written by the lead's progress thread as the state changes, a handful
+ * of single-writer stores per barrier (§3.16).
+ */
+struct osoe_collective_state {
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint32_t epoch_open;         /* the epoch in progress, or 0 */
+    _Atomic uint32_t epoch_closed;       /* the last epoch this node closed */
+    _Atomic uint32_t own_arrived;        /* this node's own members are in */
+    _Atomic uint32_t children;           /* how many children this node has */
+    _Atomic uint32_t children_arrived;   /* how many of them have arrived */
+    _Atomic uint32_t lowest_missing;     /* the lowest child node not arrived, or
+                                          * UINT32_MAX when none is missing */
+    _Atomic uint32_t parent;             /* this node's parent, or UINT32_MAX at the root */
+    _Atomic uint32_t fanout;
 };
 
 struct osoe_node_header {
@@ -314,13 +389,23 @@ struct osoe_node_header {
     /* Appended at layout 7 (§5.3). */
     struct osoe_arrival_handoff arrival[OSOE_TEAMS];
 
-    /* Appended at layout 8. Layout 10 added the finalize team's counters above
+    /* Appended at layout 8; layout 11 appended passes and send_visits to it,
+     * which moved nothing before it. Layout 10 added the finalize team's counters above
      * and grew `arrival` by one, which moved this record; readers find it by
      * name. Layout 9 added blocked_detail_kind to the PE slot,
      * which moved no header field. Layout 8 also gave each epoch counter's line a
      * second word, released_at_ns (base/epoch.h), in padding it already owned:
      * no offset moved, but the line's contents changed meaning. */
     struct osoe_am_node_metrics am;
+
+    /*
+     * Appended at layout 12. `hostname` is what makes a walk down the tree
+     * actionable: the node numbers a parent names are logical, and this says
+     * which machine to run osoe-stat on next (§3.14's diagnosability walk).
+     * Written by the lead before `ready`, constant afterwards.
+     */
+    char hostname[64];
+    struct osoe_collective_state collective[OSOE_TEAMS];
 };
 
 /*
@@ -405,11 +490,28 @@ struct osoe_node {
     struct osoe_counter_block *blocks;   /* this node's whole pool (§3.14) */
     uint64_t control_bytes;
     void **heap_of;                 /* base_of[local id][OSOE_REGION_HEAP] */
-    int32_t *local_of_rank;         /* world rank -> local id, or -1 */
+    /*
+     * "Is world rank r on this node, and which local id is it?" in O(L)
+     * memory (osoe_node_local_id). Until slice 3 this was a world-sized array
+     * in every PE: 4 x P bytes per PE, 1 GiB per node at 4,096 x 256 (second
+     * review, D7). When the node's ranks are one contiguous block, in local-id
+     * order - Slurm's block distribution, and every map in the suite but the
+     * interleaved ones - it is a subtraction; otherwise a binary search over
+     * the node's ranks sorted, O(log L).
+     */
+    uint32_t local_count;
+    bool local_block;               /* gtids[i] == first_rank + i for every i */
+    uint32_t first_rank;
+    uint32_t *sorted_rank;          /* the L ranks ascending ... */
+    uint32_t *sorted_local;         /* ... and each one's local id */
     uint64_t heap_bytes;
     uint64_t heap_size;             /* the agreed SHMEM_SYMMETRIC_SIZE */
     unsigned char *landing;         /* the landing zones; index with osoe_node_landing */
     uint32_t landing_slot_bytes;
+    /* One record per peer connection, in peer-slot order, or NULL on a job of
+     * one node (§3.14's connection scope). */
+    struct osoe_am_connection_metrics *connection_metrics;
+    uint32_t connection_count;
 };
 
 /* This node's landing slot for a local PE. The slot is not a fixed-size type -
@@ -419,6 +521,23 @@ static inline struct osoe_landing_slot *osoe_node_landing(const struct osoe_node
 {
     return (struct osoe_landing_slot *)(n->landing +
                                         (size_t)local_id * n->landing_slot_bytes);
+}
+
+/* The non-block case of osoe_node_local_id. */
+int32_t osoe_node_local_search(const struct osoe_node *n, uint32_t rank);
+
+/*
+ * The local id of world rank `rank` on this node, or -1 if it is on another.
+ * On the put path (transport-am.c's osoe_transport_direct, and notify), so the
+ * common case is inline and branch-predictable.
+ */
+static inline int32_t osoe_node_local_id(const struct osoe_node *n, uint32_t rank)
+{
+    if (n->local_block) {
+        uint32_t i = rank - n->first_rank;      /* wraps for rank < first_rank */
+        return i < n->local_count ? (int32_t)i : -1;
+    }
+    return osoe_node_local_search(n, rank);
 }
 
 /* Rendezvous with the other local PEs; map every heap. Fatal on failure. */

@@ -4,7 +4,8 @@
  * §6.2: local PEs meet on their node; **only each node's lead crosses the
  * network**. The lead of node 0 is the step's rendezvous server, every other
  * node's lead connects to it, each sends its node's rank list, its
- * SHMEM_SYMMETRIC_SIZE and its handler-table checksum, the server checks that
+ * SHMEM_SYMMETRIC_SIZE, its handler-table checksum and its internode tree's
+ * fan-out (OSOE_COLLECTIVE_FANOUT), the server checks that
  * they agree, and then broadcasts the rank -> node map.
  *
  * §7.1 step 2 has no sockets, so the meeting place here is a shared-memory
@@ -45,6 +46,8 @@ struct osoe_job {
     uint32_t node;                  /* this PE's logical node */
     uint32_t me;                    /* this PE's world rank */
     const uint32_t *node_of;        /* world rank -> logical node, world_size long */
+    const unsigned char *backend_blob;  /* node_count blobs (osoe_job_backend_blob) */
+    const uint16_t *local_index;    /* world rank -> local id on its node (below) */
     bool force_remote;              /* §8.1: deny the pointer to a node-mate */
     bool creator;                   /* node 0's lead made the object */
 };
@@ -59,6 +62,51 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
 /* Unmap; node 0's lead removes the name. */
 void osoe_job_leave(struct osoe_job *j);
 
+/*
+ * A backend's per-node addressing blob (§6.2; second review, roce-seam F10).
+ *
+ * An RDMA backend cannot form a single remote address until it knows each
+ * node's queue-pair or DC target number, GID, keys and registered heap base -
+ * roughly 64 bytes per node - and that has to be exchanged before the first
+ * operation, which is to say at the rendezvous. So the rendezvous carries one
+ * fixed-size opaque blob per node, published by the node's lead together with
+ * its rank list, and readable by every PE once the job has joined. Fixed-size
+ * because the rendezvous is sized before anyone has spoken; opaque because
+ * nothing above the backend may read it.
+ *
+ * AM uses none of it and publishes zeros: AM addresses a node by its number.
+ * The call that lets a backend supply its blob before the job rendezvous
+ * arrives with the backend that needs one; the space arrives now, because it is
+ * the rendezvous's layout and changing that later is a protocol revision
+ * (layout 4 of the job segment).
+ */
+enum { OSOE_JOB_BACKEND_BLOB_BYTES = 128 };
+
+static inline const void *osoe_job_backend_blob(const struct osoe_job *j, uint32_t node)
+{
+    return node < j->node_count ? j->backend_blob + (size_t)node * OSOE_JOB_BACKEND_BLOB_BYTES
+                                : NULL;
+}
+
+/*
+ * A rank's local id on its *own* node, for any rank of the job (§6.2).
+ *
+ * The one fact about a remote PE that an RDMA backend needs and node_of cannot
+ * give: it forms a remote address as the node's registered heap base plus
+ * local index x heap size plus offset, and under Slurm's cyclic or arbitrary
+ * distributions the index is not derivable from the node map (second review,
+ * roce-seam F7). AM addresses by rank and never reads it.
+ *
+ * Shared, one copy per node, 2 bytes per rank: 2 MiB at 10^6 PEs, beside
+ * node_of's 4 MiB. O(P) per node, accepted for now; §6.2 records the
+ * range-compressed map as the next step. For this node's own ranks the
+ * library uses osoe_node_local_id, which is O(L) private.
+ */
+static inline uint32_t osoe_job_local_index(const struct osoe_job *j, uint32_t pe)
+{
+    return pe < j->world_size ? j->local_index[pe] : UINT32_MAX;
+}
+
 /* The logical node a world rank is on. */
 static inline uint32_t osoe_node_of(const struct osoe_job *j, uint32_t pe)
 {
@@ -66,37 +114,52 @@ static inline uint32_t osoe_node_of(const struct osoe_job *j, uint32_t pe)
 }
 
 /*
- * Is this PE reachable by ordinary loads and stores from here?
+ * **Two questions, not one** (§8.1; second review, roce-seam F4, premises P2).
  *
- * Same logical node, and not forced remote.
+ * "Which path carries an operation to this PE" and "may this PE's memory be
+ * handed out as a pointer" are different questions, and one predicate answered
+ * both until slice 3. §8.1's force-remote flag is about the second only - it
+ * denies the pointer to a node-mate so that a program cannot be written against
+ * the shared-memory shortcut and then quietly depend on it - but answering the
+ * first with it sent a put to a node-mate over a connection that does not
+ * exist: "no connection toward node N", 4 runs in 4, in a flag three comments
+ * said left the route alone.
  *
- * **The node map is what says which PEs are remote** (§8.1): PEs rendezvous
- * only with the PEs named in their own node's OSOE_GTIDS, so a PE never maps a
- * heap outside its logical node and there is no address to return. Running the
- * same program over both paths and diffing is two node maps, not a flag.
- *
- * §8.1's force-remote flag is the narrower thing left over: it denies the
- * *pointer* to a node-mate without changing the route, so a program cannot be
- * written against the shared-memory shortcut and then quietly depend on it, and
- * a boundary that stopped consulting this function fails a test. It is
- * consulted here, in the one locality function, or half the library would keep
- * answering from somewhere else.
- *
- * **A PE is always local to itself, force-remote or not.** There is no route
- * from a node to itself: a connection exists per node *pair* (§3.4), so
- * osoe_connection_to returns NULL for this node by construction, and an
- * operation a PE addresses to its own rank has nowhere to go. It is not a
- * special case granted to make the flag work - it is what the flag means. §8.1
- * routes traffic between PEs over the network; a PE reading and writing its own
- * symmetric memory is not traffic, and the library's own coherent load
- * (osoe_transport_load) resolves through this function on every wait_until and
- * every shmem_test.
+ * They are also the split §4.10 needs for its own reason: dispatch is per
+ * (pe, operation class), so a NIC whose atomics are not coherent with the CPU
+ * can carry one PE's rmw while put and get to that same PE stay local - which
+ * is `direct` answering non-NULL while the route for rmw is elsewhere. The two
+ * predicates are where that becomes expressible rather than claimed.
  */
-static inline bool osoe_is_local(const struct osoe_job *j, uint32_t pe)
+
+/*
+ * Does an operation to this PE execute in this process - the intranode path,
+ * applied in the calling thread (§4.1)?
+ *
+ * The node map decides it, and nothing else: PEs rendezvous only with the PEs
+ * named in their own node's OSOE_GTIDS, so a PE never maps a heap outside its
+ * logical node. A PE is always in its own process, and connections exist per
+ * node *pair* (§3.4), so there is none from a node to itself.
+ */
+static inline bool osoe_routes_in_process(const struct osoe_job *j, uint32_t pe)
 {
-    if (pe == j->me)
-        return true;
-    return !j->force_remote && osoe_node_of(j, pe) == j->node;
+    return pe == j->me || osoe_node_of(j, pe) == j->node;
+}
+
+/*
+ * May this PE's symmetric memory be reached by ordinary loads and stores from
+ * here - the answer behind shmem_ptr, shmem_team_ptr and osoe_transport_direct?
+ *
+ * The route, minus §8.1's force-remote flag, which denies a node-mate the
+ * pointer while leaving the traffic where it was. A PE is always direct to
+ * itself, flag or not: osoe_transport_load - the coherent load behind every
+ * shmem_test and wait_until - resolves through this on the caller's own rank,
+ * so a rule that made a PE remote from itself is a null dereference on the
+ * most-travelled path in the library.
+ */
+static inline bool osoe_direct_access(const struct osoe_job *j, uint32_t pe)
+{
+    return pe == j->me || (!j->force_remote && osoe_node_of(j, pe) == j->node);
 }
 
 #endif /* OSOE_JOB_H */

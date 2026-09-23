@@ -28,6 +28,11 @@ Instructions (labels starting with '@' are resolved by assemble)
   ('andn',  addr(L), bits(L), var, nxt)         locked; clears bits; var <- old value
   ('fwait', addr(L), val(L), nxt)
   ('fwake', addr(L), nxt)
+  ('fwaitm', addr(L), val(L), mask(L), nxt)       futex_wait with a bitset (futex2's mask)
+  ('fwaken', addr(L), n(L), mask(L), nxt)         wake up to n sleepers whose bitset meets
+            mask; which ones is the kernel's choice, so one successor per choice.
+            A plain fwait matches every mask, and a plain fwake wakes every
+            sleeper on the address, masked or not, as FUTEX_BITSET_MATCH_ANY does.
   ('ghost', fn(M, L) -> (mem_upd, loc_upd), nxt)   a step of its own
   ('gpre',  fn(M, L) -> (mem_upd, loc_upd), nxt)   atomic with the thread's next step
   ('gpost', fn(M, L) -> (mem_upd, loc_upd), nxt)   atomic with the thread's previous step
@@ -91,7 +96,17 @@ REDUCE = True     # False turns gpre/gpost into ordinary ghost steps and ignores
 DEL = object()
 NONE = -(1 << 62)                     # stored value of an absent local
 RUN, SLEEP = 0, 1
-SERIAL = frozenset(('add', 'cas', 'or', 'andn', 'fwait', 'fwake'))
+SERIAL = frozenset(('add', 'cas', 'or', 'andn', 'fwait', 'fwake', 'fwaitm', 'fwaken'))
+MASKED = 1 << 20          # a masked sleeper's slot: MASKED * (addr + 1) + mask
+
+
+def _sleeps_on(sl, a):
+    """(does a sleeper with slot `sl` sleep on address a, its mask or None)"""
+    if sl == a:
+        return True, None
+    if sl >= MASKED and sl // MASKED - 1 == a:
+        return True, sl % MASKED
+    return False, None
 LOCAL = frozenset(('set', 'br', 'gpost'))
 
 
@@ -358,13 +373,46 @@ class Explorer:
                 else:
                     t = ths0[:i] + ((nxt, loc, SLEEP, a, buf),) + ths0[i + 1:]
                     out.append((i, labels and f'T{i}:{pre}futex_wait {self.akeys[a]} SLEEP', (mem, t)))
+            elif op == 'fwaitm':
+                _, af, vf, mf, nxt = ins
+                a = self._addr(af(L))
+                if self._mget(mem, a) != vf(L):
+                    emit(mem, nxt, loc, lambda: f'futex_wait {self.akeys[a]} EAGAIN')
+                else:
+                    m = mf(L)
+                    t = ths0[:i] + ((nxt, loc, SLEEP, MASKED * (a + 1) + m, buf),) + ths0[i + 1:]
+                    out.append((i, labels and f'T{i}:{pre}futex_wait {self.akeys[a]} mask {m} SLEEP',
+                                (mem, t)))
+            elif op == 'fwaken':
+                _, af, nf, mf, nxt = ins
+                a = self._addr(af(L))
+                n, m = nf(L), mf(L)
+                match = []
+                for j, tj in enumerate(ths0):
+                    if tj[2] == SLEEP:
+                        on, mask = _sleeps_on(tj[3], a)
+                        if on and (mask is None or mask & m):
+                            match.append(j)
+                from itertools import combinations
+                k = min(n, len(match))
+                for chosen in combinations(match, k):
+                    t = list(ths0)
+                    for j in chosen:
+                        tj = ths0[j]
+                        t[j] = (tj[0], tj[1], RUN, -1, tj[4])
+                    t[i] = (nxt, loc, RUN, -1, buf)
+                    mm, t = self._norm(mem, tuple(t), i)
+                    for j in chosen:
+                        mm, t = self._norm(mm, t, j)
+                    out.append((i, labels and f'T{i}:{pre}futex_wake {self.akeys[a]} n={n} mask {m} '
+                                f'woke {list(chosen)}', (mm, t)))
             elif op == 'fwake':
                 _, af, nxt = ins
                 a = self._addr(af(L))
                 t = list(ths0)
                 woke = []
                 for j, tj in enumerate(ths0):
-                    if tj[2] == SLEEP and tj[3] == a:
+                    if tj[2] == SLEEP and _sleeps_on(tj[3], a)[0]:
                         t[j] = (tj[0], tj[1], RUN, -1, tj[4])
                         woke.append(j)
                 t[i] = (nxt, loc, RUN, -1, buf)

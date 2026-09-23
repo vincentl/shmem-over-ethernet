@@ -3,9 +3,14 @@
  *
  * progress.c is the engine's mechanism and knows nothing about jobs, teams or
  * heaps: it asks its *host* to resolve an address, find a landing zone, wake a
- * PE's waiters and release a team. This file is that host. It owns the wires,
- * supplies those four callbacks out of the library's own state, and holds the
- * two ends of §5.3's arrival handoff.
+ * PE's waiters and release a team. This file is that host. It owns the wires
+ * and supplies those four callbacks out of the library's own state; the
+ * release goes up through internode.h's upcall. §5.3's arrival handoff is
+ * internode-am.c's, the AM implementation of internode.h.
+ *
+ * Everything here is below the transport boundary: transport-am.c and
+ * internode-am.c call it, and nothing in the SHMEM layer does
+ * (cmake/CheckBoundary.cmake).
  *
  * **Only the local lead's agent runs the engine** (§3.12). Every other PE of
  * the node maps the connection area - its application threads reserve into the
@@ -20,14 +25,14 @@
 
 /*
  * Open the connection area, the wires and the engine, or do nothing on a job
- * of one logical node. Called from shmem_init after the job-wide rendezvous,
- * and before the agent thread starts: the agent polls what this sets up, so it
- * must be complete before that thread exists.
+ * of one logical node. Called by osoe_transport_init, after the job-wide
+ * rendezvous and before the agent thread starts: the agent polls what this sets
+ * up, so it must be complete before that thread exists.
  */
 void osoe_progress_host_start(uint32_t session);
 
-/* Reverse it. Called after the agent thread has been joined, so that nothing
- * is polling while the wires close. */
+/* Reverse it. Called by osoe_transport_fini, after the agent thread has been
+ * joined, so that nothing is polling while the wires close. */
 void osoe_progress_host_stop(void);
 
 /*
@@ -36,9 +41,8 @@ void osoe_progress_host_stop(void);
  * Returns true if anything moved, which is what tells the agent whether it may
  * sleep (§3.10).
  *
- * The caller must load its wake word **before** calling this, or a post that
- * lands during the pass is not accounted for by the futex compare that follows
- * (§4.9). agent.c does, and says so.
+ * osoe_transport_agent_pass is this, and transport.h states its caller's
+ * obligation: load the wake word before the pass (§4.9).
  */
 bool osoe_progress_host_poll(void);
 
@@ -63,23 +67,23 @@ bool osoe_progress_host_poll(void);
 uint64_t osoe_progress_host_idle_ns(void);
 
 /*
- * Leave this node's arrival at a team's internode phase for the lead's agent,
- * and wake it (§5.3). Called by whichever local member's increment reached the
- * team's arrival target - an application thread of any local PE, which is why
- * it hands the epoch over rather than performing the arrival: the state that
- * arrival moves is private to the lead's agent thread, in the lead's process.
+ * internode-am.c's half of the pass: take whatever arrivals local members have
+ * posted to the handoff words (§5.3) and perform them on the engine. Lead's
+ * agent only; returns true if it took any.
  */
-void osoe_progress_host_post_arrival(uint32_t team, uint32_t epoch);
+bool osoe_internode_am_take_arrivals(void);
 
 /*
  * Ask the local lead's agent to run a pass: it seals what writers have
  * committed, sends it, and reaps what has arrived (§3.12's "a flag plus a futex
  * wake", where here the committed bytes are the flag).
  *
- * Called by an application thread after committing into a connection buffer,
- * and again by anything waiting on a peer - a writer out of room, a quiet
- * waiting for an acknowledgement - because the lead may be asleep and this is
- * the only thing that wakes it for a connection.
+ * Called by an application thread after committing into a connection buffer
+ * and setting its dirty bit (osoe_connection_area_mark), and again by anything
+ * waiting on a peer - a writer out of room, a quiet waiting for an
+ * acknowledgement. It makes the futex syscall only if the lead has raised
+ * lead_sleeping and this caller claims the wake (§3.10, lead_wake_model.py);
+ * otherwise it is one load.
  */
 void osoe_progress_host_wake_lead(void);
 

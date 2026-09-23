@@ -64,9 +64,24 @@ void osoe_epoch_wake_all(struct osoe_epoch *e)
     osoe_futex_wake(&e->count_compare_only_by_equality, INT_MAX, OSOE_FUTEX_SHARED);
 }
 
-void osoe_epoch_wait_eq(struct osoe_epoch *e, uint32_t target, const char *routine)
+/* The chain's width: each link wakes this many (§5.3). */
+#define CHAIN_WIDTH 2
+
+/* The futex bitset for waiters of `target`: its parity (epoch.h). */
+static uint32_t parity(uint32_t target)
 {
-    bool timed_out = false;
+    return UINT32_C(1) << (target & 1);
+}
+
+void osoe_epoch_release_wake(struct osoe_epoch *e, uint32_t target)
+{
+    osoe_futex_wake_bitset(&e->count_compare_only_by_equality, CHAIN_WIDTH, parity(target),
+                           OSOE_FUTEX_SHARED);
+}
+
+static void wait_eq(struct osoe_epoch *e, uint32_t target, const char *routine, bool chained)
+{
+    bool timed_out = false, slept = false;
     struct osoe_deadline sweep;
     for (;;) {
         uint32_t v = atomic_load_explicit(&e->count_compare_only_by_equality,
@@ -76,12 +91,34 @@ void osoe_epoch_wait_eq(struct osoe_epoch *e, uint32_t target, const char *routi
              * release landed well before the deadline, its wake never came. */
             if (timed_out && wake_was_lost(e, &sweep))
                 osoe_missed_wake(routine);
+            /*
+             * Pass the chained wake on (epoch.h). Every wait that returned
+             * does, whether a wake, a changed word or a sweep ended it: which
+             * of those it was is not something the call reports, and an extra
+             * two wakes on a word nobody is left waiting on cost one syscall.
+             * A wait that found its target on the first load never slept, holds
+             * no one's wake, and owes nothing.
+             */
+            if (chained && slept)
+                osoe_epoch_release_wake(e, target);
             return;
         }
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-        timed_out = osoe_futex_wait(&e->count_compare_only_by_equality, v, &sweep,
-                                    OSOE_FUTEX_SHARED) == ETIMEDOUT;
+        slept = true;
+        timed_out = osoe_futex_wait_bitset(&e->count_compare_only_by_equality, v,
+                                           parity(target), &sweep,
+                                           OSOE_FUTEX_SHARED) == ETIMEDOUT;
         if (timed_out)
             osoe_sweep_expired(routine);
     }
+}
+
+void osoe_epoch_wait_eq(struct osoe_epoch *e, uint32_t target, const char *routine)
+{
+    wait_eq(e, target, routine, false);
+}
+
+void osoe_epoch_wait_eq_chained(struct osoe_epoch *e, uint32_t target, const char *routine)
+{
+    wait_eq(e, target, routine, true);
 }

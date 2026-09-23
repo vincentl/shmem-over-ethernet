@@ -7,9 +7,9 @@
 #include "blocked.h"
 #include "metrics.h"
 #include "base/epoch.h"
-#include "progress-host.h"
 #include "export.h"
 #include "fatal.h"
+#include "internode.h"
 #include "state.h"
 #include "team.h"
 #include "transport.h"
@@ -42,36 +42,79 @@ static void sync_team(struct osoe_team *t, const char *routine)
 {
     uint32_t k = *t->epoch;
 
+    /*
+     * A team of one (team.h): the caller is the only member, so the
+     * synchronization is over the moment it is called. It touches none of the
+     * node-wide counters, which belong to the node's team and not to this one.
+     */
+    if (t->singleton) {
+        *t->epoch = k + 1;
+        atomic_store_explicit(t->published, k + 1, memory_order_release);
+        return;
+    }
+
     if (osoe_epoch_bump_eq(t->arrived, (k + 1) * t->local_members)) {
         if (t->internode) {
             /*
              * §5.3's other half. This node has now arrived for every member of
-             * the team on it, and the release is not ours to give: the root
-             * counts the participating nodes and sends it back, and this
-             * node's progress thread applies it. So post the arrival and then
-             * wait exactly like every other member - there is no designated
-             * PE here either, and in particular this is not necessarily the
-             * lead.
-             *
-             * Posting rather than sending is progress-host.h's subject: the
-             * state an arrival moves is private to the lead's agent thread, in
-             * the lead's process, and this is an application thread of any
-             * local PE.
+             * the team on it, and the release is not ours to give: the nodes
+             * meet through internode.h, and the release comes back as its
+             * upcall below, on the node's progress thread. So hand the arrival
+             * over and then wait exactly like every other member - there is no
+             * designated PE here either, and in particular this is not
+             * necessarily the lead. The call does not block (internode.h).
              */
-            osoe_progress_host_post_arrival(t->number, k + 1);
+            osoe_internode_arrive(t->number, k + 1);
         } else {
             if (!osoe_epoch_release_bump_eq(t->released, k + 1))
                 osoe_fatal("%s epochs diverged at epoch %u: PEs called different numbers "
                            "of collectives", t->name, k + 1);
+            /* The single-node release: this thread is the last arriving
+             * member, not the node's network, and on the cores this has been
+             * measured on the kernel's one-pass wake-all beats the chain
+             * (§5.3). The internode release below chains. */
             osoe_epoch_wake_all(t->released);
         }
     }
-    osoe_epoch_wait_eq(t->released, k + 1, routine);
+    /* Chained exactly when the release comes from the progress thread, which
+     * wakes two and leaves the rest to the members (base/epoch.h). */
+    if (t->internode)
+        osoe_epoch_wait_eq_chained(t->released, k + 1, routine);
+    else
+        osoe_epoch_wait_eq(t->released, k + 1, routine);
     *t->epoch = k + 1;
     /* Publish it: comparing each PE's k against the team's counters is how
      * osoe-stat says which PE has not reached a barrier, the most common real
      * hang (§3.14 question 1). */
     atomic_store_explicit(t->published, k + 1, memory_order_release);
+}
+
+/*
+ * internode.h's upcall: the nodes have met for (team, epoch), so release this
+ * node's members. Called on the node's progress thread, once per (team,
+ * epoch). A divisible event, so wake-many (§3.11) - as a chain, so that this
+ * thread, which is the node's network, wakes two and not L (base/epoch.h).
+ *
+ * The bump is checked for the same reason the single-node path checks it: a
+ * release that does not land exactly on k+1 means this node's members have run
+ * a different number of collectives from the rest of the job, and §5.4's
+ * equality waits turn that into a hang rather than an error unless it is named
+ * here.
+ *
+ * The team is found by number (team.c), so a team is anything the table holds:
+ * nothing here, and nothing in the backend, knows how many teams exist.
+ */
+void osoe_internode_released(uint32_t team, uint32_t epoch)
+{
+    struct osoe_team *t = osoe_team_numbered(team);
+    if (!t || !t->internode)
+        osoe_fatal("an internode release names team %u, which has no internode phase "
+                   "on this node", team);
+    if (!osoe_epoch_release_bump_eq(t->released, epoch))
+        osoe_fatal("the internode release for %s arrived for epoch %u out of order: "
+                   "the PEs of this job called different numbers of collectives", t->name,
+                   epoch);
+    osoe_epoch_release_wake(t->released, epoch);
 }
 
 /* A sync, timed and recorded, without the quiet. */

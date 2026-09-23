@@ -82,7 +82,7 @@ void osoe_transport_unwatch(struct osoe_transport_watch *w)
 
 void osoe_transport_notify(int pe, enum osoe_region region, uint64_t offset, size_t len)
 {
-    int32_t local = osoe.node.local_of_rank[pe];
+    int32_t local = osoe_node_local_id(&osoe.node, (uint32_t)pe);
     if (local < 0)
         return;                             /* not on this node: the AM backend notifies */
     struct osoe_pe_slot *slot = &osoe.node.slots[local];

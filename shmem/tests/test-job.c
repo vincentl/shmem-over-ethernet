@@ -41,6 +41,14 @@ static void report(const char *fmt, va_list ap)
     (void)ignored;
 }
 
+/* bootstrap.c reads the fan-out's default from the backend (internode.h), which
+ * this test does not link; AM's value. */
+uint32_t osoe_internode_fanout_default(void);
+uint32_t osoe_internode_fanout_default(void)
+{
+    return 4;
+}
+
 _Noreturn void osoe_fatal(const char *fmt, ...);
 _Noreturn void osoe_fatal(const char *fmt, ...)
 {
@@ -83,6 +91,31 @@ int main(void)
     for (uint32_t i = 0; i < b.local_count; i++)
         CHECK(osoe_node_of(&job, b.gtids[i]) == b.node);
 
+    /*
+     * Each rank's local index on its own node (§6.2, layout 6): this node's
+     * ranks are at their position in OSOE_GTIDS, and every rank's index is
+     * below its node's rank count - which is what an RDMA backend forms a
+     * remote heap address from, for a PE whose node it has never joined.
+     */
+    for (uint32_t i = 0; i < b.local_count; i++)
+        CHECK(osoe_job_local_index(&job, b.gtids[i]) == i);
+    for (uint32_t r = 0; r < job.world_size; r++) {
+        uint32_t on_node = 0;
+        for (uint32_t q = 0; q < job.world_size; q++)
+            on_node += osoe_node_of(&job, q) == osoe_node_of(&job, r);
+        CHECK(osoe_job_local_index(&job, r) < on_node);
+    }
+    CHECK(osoe_job_local_index(&job, job.world_size) == UINT32_MAX);
+
+    /* The per-node backend blob (layout 4): AM publishes zeros. */
+    for (uint32_t n = 0; n < job.node_count; n++) {
+        const unsigned char *blob = osoe_job_backend_blob(&job, n);
+        CHECK(blob != NULL);
+        for (uint32_t k = 0; blob && k < OSOE_JOB_BACKEND_BLOB_BYTES; k++)
+            CHECK(blob[k] == 0);
+    }
+    CHECK(osoe_job_backend_blob(&job, job.node_count) == NULL);
+
     /* Every node is used. A gap would mean the node count and the segments
      * disagree, which §8.1's map parser refuses at the launcher - so finding
      * one here would mean the two disagree about what was launched. */
@@ -102,13 +135,15 @@ int main(void)
     uint32_t local_seen = 0;
     for (uint32_t r = 0; r < job.world_size; r++) {
         bool same = osoe_node_of(&job, r) == b.node;
-        CHECK(osoe_is_local(&job, r) == same);
+        CHECK(osoe_routes_in_process(&job, r) == same);
+        CHECK(osoe_direct_access(&job, r) == same);
         local_seen += same;
     }
     CHECK(local_seen == b.local_count);
 
     /* Out of range is nobody's PE, and must not answer "local". */
-    CHECK(!osoe_is_local(&job, job.world_size));
+    CHECK(!osoe_routes_in_process(&job, job.world_size));
+    CHECK(!osoe_direct_access(&job, job.world_size));
     CHECK(osoe_node_of(&job, job.world_size) == UINT32_MAX);
 
     /*
@@ -128,10 +163,17 @@ int main(void)
      */
     struct osoe_job forced = job;
     forced.force_remote = true;
-    for (uint32_t r = 0; r < job.world_size; r++)
-        CHECK(osoe_is_local(&forced, r) == (r == b.rank));
-    CHECK(osoe_is_local(&forced, b.rank));
-    CHECK(!osoe_is_local(&forced, job.world_size));     /* still nobody's PE */
+    for (uint32_t r = 0; r < job.world_size; r++) {
+        /* The pointer is denied to a node-mate ... */
+        CHECK(osoe_direct_access(&forced, r) == (r == b.rank));
+        /* ... and the route is exactly what it was without the flag, which is
+         * the half three comments claimed and the code did not do. */
+        CHECK(osoe_routes_in_process(&forced, r) ==
+              (osoe_node_of(&job, r) == b.node));
+    }
+    CHECK(osoe_direct_access(&forced, b.rank));
+    CHECK(!osoe_direct_access(&forced, job.world_size));   /* still nobody's PE */
+    CHECK(!osoe_routes_in_process(&forced, job.world_size));
 
     osoe_job_leave(&job);
     osoe_bootstrap_free(&b);

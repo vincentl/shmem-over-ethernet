@@ -2,9 +2,14 @@
  * transport.h - the boundary between the SHMEM layer and whatever carries
  * operations to other PEs (design §4.10).
  *
- * The SHMEM layer (§4) calls only what is declared here. It never calls the AM
- * layer (§2.1) directly, so a different backend - RDMA, say - replaces the
- * implementation of this header without touching §4.
+ * The SHMEM layer (§4), and the library around it (§5, §6), call only what is
+ * declared here and in internode.h, its sibling for the internode phase of a
+ * collective. They never call the AM layer (§2.1) directly, so a different
+ * backend - RDMA, say - replaces the implementation of these two headers without
+ * touching anything above them. The shmem.boundary test holds every file above
+ * to that: it fails the build's tests if one of them includes, however
+ * indirectly, a header of the backend below (cmake/CheckBoundary.cmake lists both
+ * sides).
  *
  * Addressing. Every location is (pe, region, offset): a world rank (the SHMEM
  * layer translates team-relative ranks before calling), a region
@@ -83,13 +88,54 @@ struct osoe_deadline;
 
 /* ---- Lifecycle ------------------------------------------------------- */
 
-/* Called once per session by the first shmem_init, after node-local
+/*
+ * Called once per session by the first shmem_init, after the node and job
  * rendezvous and heap mapping, and by the last shmem_finalize, after its
- * barrier (§6.4). A re-init after fini is a fresh session. */
+ * barrier and after the node's progress thread has been joined (§6.4). A
+ * re-init after fini is a fresh session.
+ *
+ * init starts whatever the backend needs - for AM, the connection area, the
+ * wires and the progress engine the agent thread will run - and it must be
+ * complete before it returns, because the progress thread starts next and polls
+ * it. fini takes all of it down, and may first drain what this node still owes
+ * the network (§6.4: a node must not stop its engine while it owes a peer
+ * bytes), which is why the thread must be joined before it is called.
+ */
 void osoe_transport_init(void);
 void osoe_transport_fini(void);
 
 struct osoe_transport_context *osoe_transport_context_default(void);
+
+/* ---- The progress thread (§3.12) ------------------------------------- */
+
+/*
+ * Every PE starts one agent thread, and the library lends it to the backend
+ * through these two calls and nothing else (agent.c). They are the boundary's
+ * progress call, which §10 once recorded as unnecessary on the ground that
+ * every place the SHMEM layer blocks is a backend function. That was true of
+ * application threads and false of the node: the barrier blocks on an epoch
+ * counter outside any backend (base/epoch.h), and what moves it is the node's
+ * progress thread, which is the library's and not the backend's.
+ *
+ * pass: one turn of whatever the backend runs on this thread - on AM, one pass
+ * of the lead's engine over every connection, and the internode arrivals posted
+ * to it (internode.h). Returns true if anything moved, which is what tells the
+ * agent whether it may sleep (§3.10). A backend with nothing to run here returns
+ * false, as AM does on every PE but the node's lead.
+ *
+ * The caller loads its wake word **before** calling pass, so that work posted
+ * during the pass fails the futex compare that follows and the agent does not
+ * sleep on it (§4.9); agent.c does, and says so.
+ *
+ * idle_ns: how long an idle agent may sleep before calling pass again. At most
+ * OSOE_SWEEP_NS; less where the backend has work it can only find by looking
+ * (AM's shared-memory wire, §3.10, until step 3).
+ *
+ * Called only on the agent thread, never concurrently with each other, and
+ * only between osoe_transport_init and osoe_transport_fini.
+ */
+bool osoe_transport_agent_pass(void);
+uint64_t osoe_transport_agent_idle_ns(void);
 
 /* ---- Locality -------------------------------------------------------- */
 
@@ -202,6 +248,13 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
  * AM: the reply lands in this PE's landing zone and the calling thread copies
  * it out (§3.12).
  *
+ * `flags`: none is defined for get yet, and every caller passes 0. The
+ * parameter exists so that the two that are coming do not change a signature
+ * every backend implements (roce-seam F9): OSOE_TRANSPORT_MORE, which a gather
+ * loop or a strided get sets so that a backend posting work requests can ring
+ * one doorbell for the batch; and the nonblocking flag below. A backend must
+ * accept flags it does not act on, exactly as for put.
+ *
  * The nonblocking form, completed by osoe_transport_wait, arrives with shmem_get_nbi.
  * It is a flag on this call, not a separate one, and it yields no handle: a
  * nonblocking operation is completed by the existing osoe_transport_wait and nothing
@@ -212,7 +265,7 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
  * applies pressure for per-operation handles.
  */
 void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
-                 uint64_t offset, void *dst, size_t len);
+                 uint64_t offset, void *dst, size_t len, unsigned flags);
 
 /* Read-modify-write operations on one word. */
 enum osoe_rmw_op {

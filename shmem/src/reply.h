@@ -63,12 +63,16 @@
 #define OSOE_REPLY_NONE UINT32_C(0xffffffff)
 
 /*
- * The collective forwards one connection can have outstanding per team: the
- * tree's degree as one edge sees it (§3.8, argument 2). The internode phase is
- * a star today - one arrival toward the root, one release back, per team - so
- * one. The tree of slice 3 sets it to its fan-out plus one.
+ * The collective forwards one *node* can have outstanding per team (§3.8,
+ * argument 2): the tree's degree, fan-out plus one. A node queues either one
+ * ARRIVE toward its parent or up to k RELEASEs toward its children, never both
+ * at once - its next ARRIVE needs every child's next arrival, and each child
+ * has that only once the RELEASE to it has left the queue - so k would do, and
+ * k + 1 is the bound that needs no argument about which comes first. Node-wide,
+ * not per connection: the star this replaced needed N - 1 releases at its root,
+ * which is what the old per-connection term of one per peer paid for.
  */
-#define OSOE_COLLECTIVE_DEGREE 1u
+#define OSOE_COLLECTIVE_DEGREE(fanout) ((fanout) + 1u)
 
 /*
  * Descriptors per connection beyond the two arguments of §3.8. Zero: every

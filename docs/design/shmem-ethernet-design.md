@@ -716,9 +716,14 @@ evidence of an observed hang.
 1. **AMO results:** bounded by the origin's outstanding-get cap. **Enforced at
    the origin, not locally** — a distributed invariant. A peer's accounting bug
    overflows *my* queue and the symptom appears on the wrong node.
-2. **Barrier forwards:** bounded by tree degree × concurrent teams. The epoch
-   argument: if X holds an unforwarded epoch-N arrival, the root has not
-   released, so no PE entered N+1, so no N+1 arrival can exist. **This rests on
+2. **Barrier forwards:** bounded by tree degree × concurrent teams, per *node*.
+   The epoch argument: if X holds an unforwarded epoch-N arrival, the root has not
+   released, so no PE entered N+1, so no N+1 arrival can exist. On the *k*-ary
+   tree (§5.3) it is concrete: per team a node queues either one ARRIVE toward its
+   parent or up to *k* RELEASEs toward its children, never both, because its next
+   ARRIVE needs every child's next arrival and a child has that only once the
+   RELEASE to it has left the queue. So *k* + 1 per team node-wide is a bound with
+   margin, and one per team per connection. **This rests on
    collectives being blocking.** Nonblocking collectives would dissolve it —
    write this into the code, because a future contributor adding
    `shmem_barrier_nbi` would not know to check.
@@ -726,13 +731,16 @@ evidence of an observed hang.
    (a high-water mark subsumes older ones); piggybacked or header-only (§3.4), so
    not really a queue entry.
 
-Size as `C + degree×max_teams + slack` per connection, drawn from the node-wide
-pool.
+Size the node-wide pool as `connections × (C + slack) + degree × max_teams`:
+argument 1 is per connection, argument 2 is per node.
 
-*As built (phase 1 step 2 slice 2):* `degree` is `OSOE_COLLECTIVE_DEGREE`, 1 for
-today's star (one arrival up and one release down per team per connection; the
-tree sets it to its fan-out plus one), `max_teams` is the two predefined teams,
-and `slack` is 0 — every descriptor belongs to one of the arguments above, and a
+*As built (phase 1 step 2 slice 3):* `degree` is `OSOE_COLLECTIVE_DEGREE(k)` =
+*k* + 1 for the tree's fan-out *k*, `max_teams` is `OSOE_TEAMS` (the two
+predefined teams and the finalize team). Slice 2 sized argument
+2 per connection at one per team, which was the star's shape — its root released
+every peer at once — and cost N − 1 descriptors per team on every node for a need
+only the root had; the node-wide term is O(*k*·*T*). `slack` stays 0 — every
+descriptor belongs to one of the arguments above, and a
 margin would only postpone the fatal that names the one that broke. The first
 build sized the pool at `connections × C`, with no term for the forwards, and
 dropped the request that found it empty: a node holding C gets toward a peer
@@ -824,6 +832,47 @@ per PE to avoid one futex word).
 > those are found by looking, at an interval far under the safety sweep. The
 > rejection above stands for the shipping design, and step 3 restores the
 > blocking form and deletes the interval.
+
+**How the lead finds its work** (phase 1 step 2 slice 3; second review, D12). The
+loop above says `submit_sealed_buffers()` and `work_pending()` without saying how
+the lead learns *which* connections gained bytes; as first built, every writer
+did a locked add on the lead's one wake word and a `futex_wake` syscall, and
+every pass drained and flushed every connection — O(*N*) per wake, and *L*-way
+contention on one line. Two structures replace that, in the connection area's
+header, so every local PE sees them:
+
+- **A dirty-connection bitmap**, one bit per peer slot, 64 to a word. A writer
+  that commits into connection *s* — or asks it for an acknowledgement, or waits
+  for room in it — sets bit *s* with a `seq_cst` `fetch_or`, after every commit
+  (not once per operation: a multi-chunk put whose next chunk waits for room
+  hung until it did). The lead reads each word and exchanges it to zero only if
+  it is nonzero, and drains and flushes only the connections whose bits it took,
+  those that received something this pass, and those it privately knows are busy
+  — a buffer to open, one sealed or on the wire, replies queued, an
+  acknowledgement owed, or bytes its own pre-open drain left in the open buffer
+  (the last found by a hang: the pre-open drain runs after the pass's chance to
+  seal). Cost per pass: *N*/64 cached loads and O(active) connections visited.
+  Measured with 16 logical nodes and traffic on one connection: 0.78–0.85
+  connections drained and flushed per pass, against 15 before
+  (`shmem.work-discovery`, which exports and asserts it through
+  `transport.am.passes` and `transport.am.send_visits`).
+- **A `lead_sleeping` flag.** The lead raises it before its last check, then
+  looks at the bits again, then sleeps on its wake word at the value it loaded
+  before the pass; it lowers the flag on its next pass. A writer loads the flag
+  after setting its bit and wakes the lead only if it can **claim** the wake —
+  a CAS from 1 to 0 — so one writer makes the syscall per sleep. A two-sided
+  protocol (§3.16), modelled in `docs/design/evidence/lead-wake/`: SC and TSO,
+  claimed and unclaimed, and four broken variants that each lose a wake
+  (a `release` store on either side under TSO, no recheck, no bump). Measured,
+  the same burst of 20,000 puts made 110–334 `futex_wake` calls instead of one per
+  put; without the claim it still made 93% of them, because every put landing
+  during the lead's wake-up latency saw the flag raised.
+
+**Receiving still polls every wire** in step 2: the shared-memory wire says
+nothing when bytes arrive, so the lead looks at all *N* − 1 on every pass. That
+is O(*N*) per pass and not work discovery's to fix; step 3's receive completions
+replace it. Nothing added here touches every connection's shared state
+periodically, so it does not make lazy connection establishment harder.
 
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
@@ -1211,6 +1260,17 @@ headers would pass whenever the library agreed with itself.
 - **Per team:** `arrived`, `released`, `copied`, and each PE's epoch counts `k` and
   `d` (§5.4). This shows which PE did not reach a barrier — the most common real
   hang.
+- **Per team, in the internode tree** (layout 12, §5.3): the epoch this node has
+  open and the last it closed, whether its own members have arrived, how many
+  children have, and **the lowest child node that has not**. With the tree that
+  last field turns "which node has not arrived" from a visit to every node into a
+  walk down from the root, O(log N) visits, and `node.hostname` — also layout 12 —
+  says which machine to ask next. `osoe-stat --summary` prints one line per node
+  and team for exactly this walk. *Measured* (`shmem.hang-walk`, and the
+  transcript in the commit): one PE of eight logical nodes never calls the second
+  barrier, and three visits find it — node 0 names child 2, node 2 names child 6,
+  node 6 has no epoch open and its own members not arrived, so its PE lines say
+  which PE and in what.
 - **Per PE:** a "blocked in" record (routine, target, and since when), its watch
   slot (§4.9), outstanding get bytes, bootstrap phase, and the abort word.
   The target carries a kind since layout 9 — a peer node, an epoch, a heap
@@ -1258,8 +1318,23 @@ and bulk queue of any connection and of the node's descriptor pool. They are
 fields of the node header written by the lead's progress thread alone, the
 single-writer case of §3.16. They exist first because two protocols could not
 otherwise be seen working: an acknowledgement echo (§3.4) and an exhausted reply
-pool (§3.8) have no effect a test can observe except these counts. The
-per-connection scope this question asks for is the next step.
+pool (§3.8) have no effect a test can observe except these counts.
+
+*As built (layout 12, phase 1 step 2 slice 3):* the **fourth scope** this
+question asked for. One record per connection toward a peer node, in peer-slot
+order, in the control segment after the landing zones, described in the metric
+table like everything else and read by index: `connection.peer`,
+`segments_sent`, `bytes_sent`, `header_only_sent`, `segments_applied`,
+`bytes_applied`, `messages_applied`, the two queue depths and their high-water
+marks, and the three sequence numbers a stuck connection is read by -
+`sent_through`, `acked_through`, `wanted_through`. `osoe-stat` prints them as a
+line per peer under the PE lines. The gauges are refreshed when the lead visits
+the connection, which since slice 3 is only when it has work (§3.10), so an idle
+connection's are as stale as it is idle - which is what a hung job wants: the
+last state of the connection that stopped. Sized by node count, never PE count:
+128 bytes per peer, 512 KiB per node at 4,096 nodes. A test reads them by name
+through the same reader (`shmem.work-discovery` checks that the per-connection
+counts add up to the node's).
 
 **3. Are aggregation and progress healthy?**
 
@@ -1571,6 +1646,7 @@ outcome C11 forbids, and with what.
 | A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready` |
 | Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere |
+| Two-sided, with a claim: the writer's store is an RMW on a bitmap and the lead's a flag, and a writer that reads the flag raised takes it down with a CAS before waking (slice 3) | The store-buffering outcome - the lead's recheck misses the bit and the writer misses the flag - is forbidden only among `seq_cst` operations; the claim CAS is an RMW in *S*, and a writer that loses it read a later value of the flag, so the lead's recheck ordered after that value sees its bit | **`seq_cst`** `fetch_or`, flag store, flag load and CAS; `seq_cst` recheck loads | `osoe_connection_area_mark`, `osoe_progress_host_wake_lead`, `osoe_progress_host_poll` (`lead_wake_model.py`) |
 | `shmem_fence` over plain stores (W→W) | Nothing, for a race-free program: its flag is an AMO, a `seq_cst` store and so a release. Table 14's plain stores are a data race C11 gives no meaning; the weakest construct ordering earlier stores before later ones is a release fence | **`atomic_thread_fence(release)`** | `osoe_transport_fence` |
 | `shmem_quiet`, `pe_quiet`, the barriers (W→R) | "Visible to all PEs" on return is the store-buffering shape again; C11 forbids its bad outcome with a `seq_cst` fence between each side's store and load | **`atomic_thread_fence(seq_cst)`** | `osoe_transport_wait` |
 
@@ -2221,8 +2297,11 @@ return `NULL` across logical nodes too.
 
 - `dest` must be a symmetric data object.
 - Returns `NULL` when direct access is not possible. **Returning `NULL`
-  unconditionally is conforming.** The intranode case is essentially free from
-  the shared heap.
+  unconditionally is conforming** — with one exception the earlier text here
+  missed: spec §7 requires a non-null pointer for every member of
+  `SHMEM_TEAM_SHARED`, which is why that team is the singleton `{self}` under
+  §8.1's force-remote flag rather than the node (second review, conformance F2).
+  The intranode case is essentially free from the shared heap.
 - `shmem_ptr` returns `NULL` for any target reached over the network, including a
   local PE under §8.1's force-remote flag, which makes the pointer unavailable
   without changing the route (§4.6, §8.1). It also returns `NULL` for an
@@ -2533,6 +2612,36 @@ decisions in it. The core-API study named six operations; the seventh, `load`,
 closes a gap found against it: without it, `shmem_test` and the `wait_until`
 predicate would read the variable directly, which is incoherent on a network whose
 NIC atomics the CPU cannot see.
+
+**Its sibling, and what else crosses** (phase 1 step 2, slice 3). The seven
+operations are the whole of the *point-to-point* boundary, and they stay
+PE-addressed. Beside them `shmem/src/internode.h` carries the internode phase of
+a collective (§5.3): a team's node set given once at team creation, an arrival
+per `(team, epoch)` going down, and a release upcall per `(team, epoch)` coming
+back on the node's progress thread (§10 records why this reversed the step-2
+decision). Two more things cross that the original contract left out, and both
+are now declared in `transport.h`: the backend's **lifecycle** —
+`osoe_transport_init` starts whatever the backend needs, AM's connection area,
+wires and engine included, before the agent thread exists, and
+`osoe_transport_fini` drains and closes it after that thread is joined — and the
+**agent thread**, which the library lends the backend through
+`osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` and nothing else
+(§3.12; §10's "boundary progress call"). So `barrier.c`, `agent.c` and `init.c`
+name no AM symbol, and the sentence "the SHMEM layer calls only what is declared
+here" is true of `transport.h` plus `internode.h`. **It is enforced**: the AM
+backend's state moved out of `struct osoe_state` into `am-state.h`, and the tier-1
+test `shmem.boundary` (`cmake/CheckBoundary.cmake`) walks the includes of every
+file above the boundary and fails if one reaches a header below it. The two sides
+are two lists in that one script, and every library source file must be in
+exactly one of them or in the short list of files on the boundary itself
+(`transport-local.c`, `watch.c`, and the rendezvous files `node.c` and `job.c`,
+which still read the AM chunk size and handler checksum). The backend is chosen
+by the CMake option `OSOE_BACKEND`, whose only value is `am`. The last two small
+gaps are closed as well: `osoe_transport_get` takes `flags`, with none defined
+yet, so that `OSOE_TRANSPORT_MORE` and the nonblocking flag arrive without a
+signature change; and `osoe_transport_load` and `osoe_transport_set_range` live in
+`transport-am.c`, the file a second backend replaces, rather than in the
+intranode path's file, which it keeps.
 
 **Addressing.** A world rank, a region that exists in every PE (the heap, the
 library's internal region of §5.8, and statics with §4.3 phase 1.5), and an offset from that region's start in the
@@ -3140,7 +3249,10 @@ shmem_quiet". The models check it in that form.
 
 Reduce or gather within the node in shared memory, then one internode operation
 between node leads. Internode cost becomes a function of **node count, not PE
-count** — this is the answer to the PE-scaling concern.
+count** — this is the answer to the PE-scaling concern. The internode operation
+is a *k*-ary tree over the participating nodes (§5.3), reached through
+`internode.h` so that a backend with something better replaces it without
+touching the intranode half.
 
 ### 5.2 Team accounting
 
@@ -3149,7 +3261,11 @@ Computed once at team creation, stored in the private team descriptor:
 - **Local member count** — team members *on this node*, not local PE count. A
   node with eight PEs of which three are in team T has arrival target three.
 - **Node participation** — the internode tree spans only nodes with at least one
-  member. Topology is per team.
+  member. Topology is per team. *As built:* the team hands its sorted node list to
+  `osoe_internode_team` once, at creation (`internode.h`); the backend keeps the
+  O(*k*) of it the tree needs and drops the O(*N*) list. The world and finalize
+  teams span every node; a split team (§7.3) will pass a sparse list, and the
+  topology function is tested on sparse lists already (`shmem.collective-tree`).
 - **Local lead** — lowest team rank among local members. Must be a member, since
   its `dest` is the accumulator and it is the only PE that writes that `dest`
   before release (§5.5).
@@ -3163,6 +3279,16 @@ Computed once at team creation, stored in the private team descriptor:
 > transfers. Negligible at four. At 64 or 256 it dominates the intranode phase
 > entirely. Fix: two-level intranode tree with fanout near core-cluster size,
 > chosen at init from local member count.
+
+*Still flat, deliberately* (phase 1 step 2 slice 3). The arrival counter was not
+sharded: the development machines have four cores, and there is no measurement at
+large *L* to size a fan-out from. Nothing in the control segment's layout prevents
+it — each team's counters are whole cache lines found by name (§3.14), and a
+sharded arrival is more lines per team and a layout bump. What would trigger it:
+on a host with 64 or more cores, `sync_all` on one node growing faster than linearly
+in *L*, or the arrival (time from the first member's `fetch_add` to the last's)
+exceeding the release at *L* ≥ 64; `shmem.barrier_ns` against *L* is the
+measurement.
 
 Each §5.4 counter must be **alone on its cache line** — false sharing between
 counters, or with the team descriptor, hurts even at four PEs, and one alignment
@@ -3208,20 +3334,169 @@ contribution itself (§5.5). That dependency is the price of a single writer, an
 the lead is blocked in the same call regardless.
 
 **Release** arrives at the progress thread, which advances the team's `released`
-counter and wakes all local waiters — a divisible event, so wake-many per §3.11.
+counter and wakes the local waiters — a divisible event, so wake-many per §3.11.
+*As built* (phase 1 step 2 slice 3) it wakes them as a **chain**: the progress
+thread wakes two, and every waiter that slept and finds its target reached wakes
+two more before returning (`osoe_epoch_release_wake`,
+`osoe_epoch_wait_eq_chained`). Depth O(log *L*), and the progress thread — the
+node's network — does O(1) instead of a kernel wake of all *L*. No waiter is
+stranded: a waiter that arrives late loads the counter before sleeping and never
+sleeps, one whose load raced the release is refused by the kernel's compare, the
+counter cannot move past *e* while any member still waits for *e* (the next release
+needs that member's own next arrival), and every waiter a chain wakes passes it
+on — so the chain's frontier is non-empty for as long as a waiter for *e* sleeps.
+The sweep bounds any residue, and slice 2's `invariant.missed_wake` makes residue
+visible.
 
-**The arrival and the release are AM messages, not boundary operations.** §10
-weighed a mandatory `osoe_transport_sync` here and closed it against the code at
-§7.1 step 2: this phase addresses a *node* where §4.10 addresses a PE, and its
-release wakes futex waiters on an epoch counter where §4.10's notify wakes watch
-waiters on a range. Both arguments are there.
+**One premise of that argument, as first stated, was false**, and the model is
+where it was found (`docs/design/evidence/chained-wake/`). It was that every waiter
+on a `released` counter waits for the same value. A member woken early returns,
+runs to the next barrier, arrives, and sleeps on the *same* counter waiting for
+*e* + 1 while members still asleep wait for *e*; a wake meant for *e* can pick it,
+it finds nothing to do and passes nothing on, and if both of a link's two picks are
+such members the chain ends with a member stranded (`unmasked`: a lost wake at two
+epochs, none at one). Bounded skew limits the targets to two, so waiters sleep with
+futex2 bitset 1 << (target & 1) and a chained wake carries its epoch's parity: a
+next-epoch waiter is never picked by this epoch's chain. The tests cannot see the
+unmasked defect — the kernel wakes waiters of equal priority in FIFO order, and a
+next-epoch waiter slept last — but futex2 promises no order, and waiters of
+different nice values are ordered by priority, so the mask is kept for the
+contract rather than the observation.
 
-**The root counts, and the count is the node's, not the PE's.** Whichever local
-member's increment reaches the arrival target sends one arrival for the whole
-node, so a node of eight members arrives once. The root releases only when every
-participating node has arrived — which at *two* nodes is indistinguishable from
-releasing on any arrival, since the single message it receives is also the last
-one. A test of this phase needs three (§8.2).
+**The single-node release keeps one wake-all**, by measurement (4-core VM,
+`sync_all`, one node, median of 7 × 2,000 rounds, before and after interleaved):
+a chain of width 2, 4 or 8 was slower at every *L* from 8 to 32 — 34 against
+20 µs at 8, 61 against 41 at 32 — because a chain only pays when the woken threads
+can run in parallel, and four cores cannot. There the releaser is the last
+arriving member, not the network, so wake-all is the right trade until a
+many-core host says otherwise; with it the single-node path is unchanged (10.9
+against 11.0 µs at *L* = 2, 42.1 against 41.6 at 32). The internode release,
+which runs on the progress thread, chains, and is not slower: 460 against 481 µs
+at 2 nodes × 4 PEs, 455 against 480 at 2 × 8 (decided with the author,
+2026-09-22). At *L* = 256 on as many cores the arithmetic reverses — a wake-all is
+roughly 256 × 1–2 µs of serial kernel work on one thread, a width-2 chain eight
+levels — and the single-node path should be measured there before it is changed.
+
+**The arrival and the release cross `internode.h`, not §4.10.** The phase is
+reached through its own build-time-bound interface, beside the point-to-point
+boundary: `osoe_internode_arrive(team, epoch)` down, called by whichever member's
+increment reached the target and never blocking, and `osoe_internode_released(team,
+epoch)` up, implemented in `barrier.c` and called by the backend on the node's
+progress thread. On AM they are messages, and the AM implementation
+(`internode-am.c`) is the handoff above. §10 once closed this the other way, on
+two reasons the code contradicted; the entry there keeps the history.
+
+**The count is the node's, not the PE's.** Whichever local member's increment
+reaches the arrival target posts one arrival for the whole node, so a node of
+eight members arrives once. The root releases only when every participating node
+has arrived — which at *two* nodes is indistinguishable from releasing on any
+arrival, since the single message it receives is also the last one. A test of
+this phase needs three (§8.2), and a test of the tree needs a partly filled last
+level and more than one interior node: `shmem.tree.*` runs 7, 8 and 13 nodes at
+*k* = 2 and 4, with one PE per node and uneven maps.
+
+**The internode phase is a k-ary tree over the participating nodes** (phase 1
+step 2 slice 3; `collective-tree.h`, `progress.c`). §5.2's node set is a sorted
+list; node index *i* has parent (*i* − 1)/*k* and children *k·i* + 1 … *k·i* + *k*,
+over the *index* in the list rather than the node number, so a sparse split team
+gets the same shape as the world team. *k* is `OSOE_COLLECTIVE_FANOUT`, between 2
+and 32, and its default is the **backend's** (`osoe_internode_fanout_default`, 4 on
+AM; below). Every node lead must agree on it — the job rendezvous
+checks it beside `SHMEM_SYMMETRIC_SIZE` (§6.2), because a node that disagrees
+waits for children that send elsewhere and the job hangs without a message.
+
+Per team per node the progress thread keeps the tree (O(*k*)) and the epoch in
+progress (O(1)): which epoch is open, whether the node's own members are in, and
+a bit per child that has arrived. A node **opens** an epoch at its first
+arrival, its own or a child's, and **closes** it when both are complete: it
+queues ARRIVE to its parent, or at the root starts the release. Closing resets
+the counts **before** anything is released. A node that receives RELEASE, and
+the root when it closes, queues RELEASE to every child **first**; the node's own
+release is applied at the end of that pass, after the children's connections
+have been drained and flushed, so the message is in the wire (or in the open
+buffer behind a send already in flight) before this level's O(*L*) local wake.
+Forward-first is what makes the reset-first rule load-bearing: a child released
+by the forward can be back with the next epoch before this node's members have
+been woken, and must find the epoch closed and clean. Both rules, and the
+refusals a trust boundary needs, are model-checked
+(`docs/design/evidence/am-backend/tree_barrier_model.py`): five nodes at
+*k* = 2 (depth 2), two epochs, a node with two members of which one re-enters
+early, SC and TSO. Each broken variant fails its own property first:
+forwarding before the last child and not resetting the child count release a
+node before every node has arrived; releasing locally before forwarding and
+resetting after leaves two epochs open at a node; applying a child's arrival to
+the epoch the node's own counter implies books it against a closed one.
+
+The wire message did not change: `struct osoe_am_barrier {team, epoch,
+from_node}` carries everything, and `from_node` is now checked — an ARRIVE must
+come from a child and a RELEASE from the parent, or the node ends the job naming
+the tree it disagrees about.
+
+*Costs*, with *N* participating nodes, *L* local members, *T* teams: per node per
+barrier, *k* + 1 messages handled and O(*k*) work on the progress thread (the
+star's root handled 2(*N* − 1)); depth ⌈log_*k* *N*⌉, so the critical path is
+2·⌈log_*k* *N*⌉ hops; state O(*k*·*T*) per node; setup O(*N*) once per team (the
+sortedness check of the node list, which is then dropped).
+
+*Choosing k.* The critical path is about depth × (hop latency *h* + *k* × per-message
+cost *o*) with depth ⌈log_*k* *N*⌉, so the best *k* grows with *h*/*o*; on RDMA the
+up-sweep's *k* arrivals are fetch-adds the parent's NIC applies rather than its CPU,
+which favours a wider tree still. The minimum is broad (*recalled* costs; one
+direction shown, the other is the same):
+
+| Fabric | *h*/*o* | *k* = 4 | *k* = 8 | *k* = 16 | *k* = 32 |
+|---|---|---|---|---|---|
+| RoCE, *N* = 1,000 (*h* ≈ 2 µs, *o* ≈ 0.15 µs) | ≈ 13 | *d* = 5: 13 µs | *d* = 4: 12.8 µs | *d* = 3: 13.2 µs | *d* = 2: 13.6 µs |
+| Pi TCP, *N* = 500 (*h* ≈ 100 µs, *o* ≈ 13 µs) | ≈ 8 | *d* = 5: 0.76 ms | *d* = 3: 0.61 ms | *d* = 3: 0.92 ms | *d* = 2: 1.03 ms |
+
+So *k* is a default and not a knob that must be right, and it belongs to the
+backend, which knows its *h* and *o*: AM over Ethernet uses 4 (server TCP's
+*h*/*o* ≈ 4), and an RDMA backend would use 8–16. What must never happen at
+thousands of nodes is the flat case — *N* arrivals serialized through one thread,
+or *N* atomics on one NIC. Measuring *h* and *o* at init and computing *k* is on
+§10's measurement list (decided with the author, 2026-09-22).
+
+*Measured on the step-2 wire, and why it is slower there* (phase 1 step 2 slice
+3; release build, 4-core VM, `sync_all` at one PE per logical node, median of 7
+means of 2,000 rounds, before and after interleaved). Up to five nodes, where
+*k* = 4 is depth 1, the tree equals the star (531 against 529 µs at 2 nodes, 592
+against 590 at 5). From six nodes it is slower: 932 against 613 µs at 6, 1,061
+against 636 at 8, 1,222 against 655 at 16. **Latency follows depth, not node
+count**: at 16 nodes *k* = 16 (depth 1) measures 641 µs, *k* = 4 (depth 2) 1,220
+and *k* = 2 (depth 4) 1,930, about 170–200 µs per level each way. That is the
+step-2 lead's idle poll (§3.10's stand-in, `OSOE_PROGRESS_SLEEP_NS` = 250 µs): a
+hop's bytes wait until the receiving lead next looks, because the shared-memory
+wire cannot wake it. The star paid it twice; the tree pays it 2*d* times. Step 3
+blocks in io_uring on socket completions and the futex together and deletes the
+poll, and an RDMA backend polls a completion queue on a core of its own, so no
+production path depends on a tuned sleep; the regression was recorded and
+accepted with the author on 2026-09-22 rather than engineered around in code step
+3 deletes.
+
+*Why a tree now, and what the shared-memory wire hides.* The star it replaced —
+every node's arrival to node 0, node 0's release to every node — was optimal in
+messages and serial in one thread: 2(*N* − 1) message events on node 0's
+progress thread per barrier. The step-2 wire is shared memory, where a message
+costs little more than a cache line, so that O(*N*) term is invisible below 16
+logical nodes and the tree's measured effect is a no-regression check, not proof
+of the win (§8.4's barrier row). The arithmetic for the target, per barrier on
+TCP, with its assumptions labelled — *recalled*: a small message costs about
+*t* = 5 µs of CPU per send or receive on a server core and 13 µs on a Pi 5 core;
+one-way latency *h* is about 20 µs on fast Ethernet and 100 µs on the Pi's 1 GbE;
+*assumed*: messages to different peers do not batch (§3.9 cannot), and a level's
+*k* sends are serial on one thread:
+
+| | Star: 2*h* + 2(*N* − 1)·*t* | Tree, *k* = 4: 2*d*·(*h* + *k*·*t*) | Ratio |
+|---|---|---|---|
+| Pi 1 GbE, *N* = 500 | 0.2 ms + 998 × 13 µs ≈ **13 ms** | *d* = 5: 10 × (100 + 52) µs ≈ **1.5 ms** | ≈ 9× |
+| server TCP, *N* = 500 | 0.04 ms + 998 × 5 µs ≈ **5.0 ms** | *d* = 5: 10 × 40 µs ≈ **0.4 ms** | ≈ 12× |
+| server TCP, *N* = 4,096 | 0.04 ms + 8,190 × 5 µs ≈ **41 ms** | *d* = 6: 12 × 40 µs ≈ **0.48 ms** | ≈ 85× |
+
+The star's column is its root's thread doing all 2(*N* − 1) message events; the
+tree's is its critical path, where each level costs one hop plus the
+parent's *k* sends. At 4,096 nodes the star finishes about 25 barriers per second
+job-wide and every `shmem_malloc` is one (§4.5); the tree about 2,000. Unmeasured
+until two real hosts exist (§10's measurement list).
 The progress thread never touches non-lead `dest` buffers, so it does no
 `O(members × count)` copying while other connections wait.
 
@@ -3742,11 +4017,36 @@ computes the same host under any distribution.
   job and step IDs, so a client that reaches another job's server is rejected and
   moves on.
 - **Who connects:** only node leads — one connection per node. Each sends its
-  node's rank list (`SLURM_GTIDS`), `SHMEM_SYMMETRIC_SIZE`, and handler-table
-  checksum (§3.13). The server checks agreement, then broadcasts the rank→node map
-  and node addresses.
+  node's rank list (`SLURM_GTIDS`), `SHMEM_SYMMETRIC_SIZE`, handler-table
+  checksum (§3.13) and `OSOE_COLLECTIVE_FANOUT` (§5.3: a node building a
+  different tree waits for arrivals sent elsewhere, silently). The server checks
+  agreement, then broadcasts the rank→node map and node addresses, and each
+  node's fixed-size backend blob (§4.10; zeros on AM, an RDMA backend's queue-pair
+  and key material).
 - **Node-pair connections:** the lower node index connects to the higher, so each
   pair opens exactly one stream (§3.1).
+
+**What the map holds, and what it costs** (phase 1 step 2 slice 3; second review,
+D7). Per rank: its node (4 bytes) and its **local index on that node** (2 bytes;
+16 bits suffice at 256 PEs per node, and `OSOE_GTIDS` longer than 65,535 is
+refused). The local index is the one fact about a *remote* PE that an RDMA
+backend cannot do without — it forms a remote heap address as the node's
+registered base plus index × heap size plus offset, and under Slurm's cyclic or
+arbitrary distributions the index is not derivable from the node map. The map is
+shared, one copy per node: 6 × 10⁶ bytes ≈ 6 MiB per node at 10⁶ PEs, accepted for
+now. A PE's own node is answered privately and in O(*L*): which local id a rank
+has is a subtraction when the node's ranks are one contiguous block in local-id
+order, and otherwise a binary search over the node's *L* ranks sorted — replacing
+a world-sized `local_of_rank` array in every PE, which was 4 × *P* bytes per PE and
+1 GiB per node at 4,096 × 256. `gtids` is sized by *L*, not *P*.
+
+**The known next step is a range-compressed map.** Under block and cyclic
+distributions the map is O(*N*) runs, not O(*P*) entries, and so is the broadcast
+that fills it — which as designed sends 4·*P* bytes to each of *N* − 1 leads from
+one NIC, O(*N*·*P*) bytes through node 0: 255 MB at 500 × 256 (about 2 s on 1 GbE),
+16 GB at 4,096 × 256 (second review, algorithmic-scaling 9). Neither is built:
+the step-2 rendezvous is a shared-memory object, and the socket rendezvous of
+step 3 is where the compressed form and a tree-shaped broadcast belong.
 
 `SLURM_STEP_NODELIST` is a compressed hostlist (`pi[01-04,07]`). Expanding it is a
 small parser — call it fifty lines — **written with unit tests in tier 1**, because
@@ -4184,14 +4484,27 @@ that no longer excludes this node — real structure, in the data path, for a
 feature no production run will ever use.
 
 **So the flag keeps only its locality half.** `OSOE_FORCE_REMOTE=1` makes
-`shmem_ptr`, `shmem_team_ptr` and `shmem_addr_accessible` answer `NULL` for a
-node-mate, while the traffic itself still takes the intranode path. That costs
-nothing, and it keeps the property worth having: a program cannot be written
-against the pointer shortcut and then quietly depend on it, and a boundary that
-stopped consulting the locality function fails a test. What it no longer claims
-is to exercise the AM path for same-node pairs — the node map does that by
-putting the pair on different nodes, which is both simpler and closer to the
-job a real cluster runs.
+`shmem_ptr` and `shmem_team_ptr` answer `NULL` for a node-mate, while the traffic
+itself still takes the intranode path. That costs nothing, and it keeps the
+property worth having: a program cannot be written against the pointer shortcut
+and then quietly depend on it, and a boundary that stopped consulting the
+locality function fails a test. What it no longer claims is to exercise the AM
+path for same-node pairs — the node map does that by putting the pair on
+different nodes, which is both simpler and closer to the job a real cluster runs.
+
+**It took two predicates to be true** (phase 1 step 2 slice 3; second review,
+roce-seam F4, premises P2). Until then one function answered both "which path
+carries this operation" and "may I hand out a pointer", so the flag changed the
+route as well: `OSOE_FORCE_REMOTE=1` with a put to a node-mate aborted with *no
+connection toward node N*, 4 runs in 4, while this section, `job.h` and commit
+`56dedff` all said the route was untouched. The split is
+`osoe_routes_in_process` (the node map, and nothing else) and
+`osoe_direct_access` (the route, minus the flag). It is also what makes §4.10's
+"dispatch is per (pe, operation class)" a thing the code can express rather than
+a claim: `direct` answering non-NULL while a class's route is elsewhere is
+exactly what a NIC with CPU-incoherent atomics needs. `shmem_addr_accessible`
+consults neither: accessibility is reachability through OpenSHMEM, which every
+PE of the job has.
 
 Two further boundaries on the flag, both consequences rather than concessions:
 
@@ -4209,13 +4522,35 @@ Two further boundaries on the flag, both consequences rather than concessions:
   but whose `shmem_ptr` lies about a machine with nowhere else to go. A job that
   wants the remote path asks the node map for it.
 
-`SHMEM_TEAM_SHARED` keeps its membership under the flag — it stays the set of
-PEs on the node, not the single PE that `shmem_ptr` still answers for. §4.8
-already states that returning `NULL` unconditionally is conforming, so a
-node-sized SHARED whose members answer `NULL` is legal; and stable membership is
-what makes the differential diff mean something, since a team whose size changed
-between the two runs would make every program using it differ for a reason that
-has nothing to do with the transport.
+**`SHMEM_TEAM_SHARED` is the singleton `{self}` under the flag**, and the
+earlier claim here — that it keeps the node's membership, since returning `NULL`
+unconditionally is conforming — was wrong. Spec §7 defines that team as the PEs
+whose memory the caller can reach with loads and stores *and* requires
+`shmem_ptr` to answer non-NULL for every one of its members; a node-sized SHARED
+whose members answer `NULL` violates it (second review, conformance F2; commit
+`de540da` recorded the mistaken reading, and §4.8 says what is actually
+conforming: `shmem_ptr` may return `NULL` for PEs that are **not** members of
+SHARED). The cost is the one the old text was avoiding — the team's size differs
+between a run with the flag and one without — so a program whose transcript
+depends on SHARED's size is not a differential candidate. That is a smaller
+price than a team whose defining property does not hold, and it is stated here
+because it is a difference a reader of a diff has to know about.
+
+**What the differential test compares, and what it cannot** (premises 11). The
+four maps run one program over every arrangement of the node map, so every
+*pair* of PEs is intranode in one run and AM in another, and the transcripts are
+diffed. What no arrangement can produce is an **all-AM run with more than one PE
+per node**: a PE's node-mates are reached in its own process, and the flag does
+not change that, because connections exist per node pair and there is none from
+a node to itself. So the AM path is never exercised with several PEs of one node
+writing into the same connection *from the origin's side* of the diff — that
+combination appears only in the mixed maps, and only for the pairs that cross
+nodes (`shmem.internode.*` and `shmem.tree.*` cover it, arrival table and all,
+but as assertions rather than as a diff). The other two gaps the review named
+stand: every compared observation is fenced by a quiet and a barrier, so the
+diff cannot see code that works only because the intranode path is stronger than
+the contract; and `put_signal`'s two halves always share a segment at the sizes
+used.
 
 **It becomes a three-way switch** — intranode, AM, and any third backend — the
 moment a second network backend exists, so the differential test extends to it
@@ -4573,6 +4908,25 @@ Each is independently breakable, and each failure appears far from its cause.
 Assert what can be asserted. Instrument the rest.
 
 ---
+32. **A node of the internode tree closes an epoch - resets its counts - before it
+    releases anything, and forwards a release to its children before its local
+    wake.** (§5.3) Forwarding first lets a child return with the next epoch before
+    this node's members are woken; without the reset first that arrival lands in
+    an epoch still open (`tree_barrier_model.py`, `release_first`, `wrong_epoch`).
+    No invariant above names the collective root or node 0: 25's "node 0" is the
+    rendezvous server of §6.2, not the tree's root, and the two need not coincide
+    for a split team.
+33. **A release by chain is waited for and passed on by every waiter of that
+    counter, and waits and wakes carry the target's parity as a futex bitset.**
+    (§5.3) A waiter that does not pass the chain on strands those behind it; a
+    wake without the parity can be absorbed by a member already waiting for the
+    next epoch. Both lose wakes in `chained_wake_model.py`.
+34. **A writer sets its connection's dirty bit after every commit and before it
+    loads `lead_sleeping`; the lead raises the flag before it rechecks the bits;
+    all of it `seq_cst`; and the lead visits every connection it privately knows
+    is busy.** (§3.10) Each rule dropped loses the lead's attention for committed
+    bytes: a lost wake in `lead_wake_model.py`, or - the private half - a leaf's
+    barrier arrival left unsealed, measured one run in eight.
 
 ## 10. Open Questions
 
@@ -4606,7 +4960,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 | What `OSOE_NODE_LAYOUT` covers | **The encoding of every word in the control segment, not only the offsets of fields.** A word written by one process and interpreted by another is part of the inter-process contract even when its width and position do not move; changing what its bits mean without bumping the version gives mixed builds silent lost wakes rather than the loud refusal `open_control` exists to produce. Recorded because a proposal got it wrong, arguing the §4.9 watch word could change encoding without a bump since it is "an opaque filter" — it is opaque to its *reader*, which is another process |
 | Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_transport_watch_wait` being the backend's own function |
-| A boundary progress call | **Not needed.** The core-API study's core has one; osoe does not, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there. A real advantage of the current shape, recorded as one |
+| A boundary progress call | **Needed, and declared** (phase 1 step 2 slice 3): `osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` in `transport.h`, the only way the library lends the agent thread to a backend (§3.12, §4.10). *Revised.* The first answer was "not needed, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there". That was true of application threads and false of the node: the barrier blocks on an epoch counter outside any backend (`barrier.c`, `base/epoch.h`), and what moves it is the progress thread, which `agent.c` drove by calling the AM engine by name (second review, roce-seam F5). Application threads still need no progress call — the blocking calls pump their own — but the node's thread is the library's, and a backend gets it only through these two |
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 | Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
 | What orders fence and quiet, where a `seq_cst` store to a thread-local word was the answer? | **Derived from the C11 model:** a release fence for fence (W→W), a `seq_cst` fence for quiet and the barriers (W→R), and `seq_cst` on both loads of a two-sided protocol. Measured, the old store did not order quiet's W→R on aarch64, and an acquire load built as `ldapr` lost wakes (§3.16, §4.6; 2026-09-21). |
@@ -4627,6 +4981,10 @@ Recorded rather than deleted, so they are not reopened from memory.
   decisions, and chunk sizing. Probably right; worth an hour to confirm rather
   than carry. Now has a home in the test suite rather than being a one-off.
 - **Pin the §1 floor ratios.** Deliberately unwritten until the harness runs.
+- **The internode tree's fan-out from measured costs** (§5.3). The default is the
+  backend's constant today; measuring the hop latency *h* and per-message cost *o*
+  at init and choosing *k* from their ratio is the next step, once a real fabric
+  exists to measure. The optimum is broad, so this is refinement, not a fix.
 
 ### Still open — the RoCE exercise of 2026-09-17
 
@@ -4644,48 +5002,56 @@ the boundary's cost one flag and one function, both now specified in §4.10, and
 they are the *same two* the core-API study arrived at from a different direction.
 Two independent searches converging on the same two gaps is the useful result.
 
-Folded in already: dispatch per `(pe, operation class)`, the sweep bound on
-blocking calls, `OSOE_TRANSPORT_MORE` with the source-ownership rule that makes it safe,
-nonblocking-as-counters, `set_range`'s contract, §4.1's registration trap, §6.2's
-out-of-band bootstrap, and §8.1's three-way switch.
+Folded in already: the sweep bound on blocking calls, `OSOE_TRANSPORT_MORE` with
+the source-ownership rule that makes it safe, nonblocking-as-counters,
+`set_range`'s contract, §4.1's registration trap, and §6.2's out-of-band
+bootstrap. Two entries of this list were *documented rather than built* until
+slice 3, and the review said so (premises P2-F3): **dispatch per `(pe, operation
+class)`** is now expressible, because the route and the pointer are two
+predicates rather than one (§8.1, `job.h`) — a backend can answer `direct`
+non-NULL for a PE whose rmw it sends elsewhere — though no backend does it yet;
+and **§8.1's "three-way switch for free"** was never true and is withdrawn: with
+the flag reduced to a pointer denial, the only routing input is the node map,
+which has two states per pair, so a third backend needs a selector of its own
+(`OSOE_BACKEND`, §4.10).
 
 - **`osoe_transport_sync`: does a collective's internode phase cross the boundary?**
-  §2.2 puts collectives on AM, decided when AM was the only backend; in an RDMA
-  build that sends every barrier over TCP while the data path runs on the NIC.
-  The proposal is a mandatory `osoe_transport_sync(ctx, group)` over a group of *nodes*,
-  called after the intranode phase (§5.3) by one PE per node that has a member —
-  note that is the team's local lead (§5.2), not necessarily the node lead of
-  §3.12, so it asks the node lead's agent to send rather than sending itself
-  (invariant 19). A backend with no native group barrier gets a generic tree over
-  put and watch, so it carries no capability and §4.10's rejection of capability
-  bits still holds.
+  **Reversed on 2026-09-20 and built in phase 1 step 2 slice 3: it crosses a
+  boundary of its own.** `osoe_transport_sync` stays out of `transport.h`, which
+  remains point-to-point and PE-addressed; the internode phase gets a sibling
+  interface, `internode.h`, bound at build time exactly as `transport.h` is, with
+  AM as one implementation (§4.10, §5.3). Addressed by `(team, epoch)`: the
+  node set is given once at team creation, the arrival goes down, and the
+  release comes back as an upcall on the node's progress thread.
 
-  **Decided at step 2, against the code: no.** The internode phase does not
-  cross the boundary. Writing it turned the trade from "fifteen lines now versus
-  restructuring `barrier.c` later" into two concrete obstacles, neither of which
-  was visible from the estimate:
+  *The history, kept so the decision is not reopened from memory.* §2.2 put
+  collectives on AM, decided when AM was the only backend; in an RDMA build that
+  sends every barrier over TCP while the data path runs on the NIC. The proposal
+  was a mandatory `osoe_transport_sync(ctx, group)` over a group of *nodes*,
+  called after the intranode phase by one PE per node with a member. At step 2
+  it was **closed "no"** on two reasons, both of which the code written that day
+  already contradicted (second review, D5; roce-seam F1; premises P1):
 
-  - **Addressing.** §4.10's model is `(pe, region, offset)` — its opening
-    sentence, and invariant 20 — while this phase is addressed to a *node*, and
-    the counter it moves is the node's, shared by every local member of the
-    team. A sync over a group of nodes is not one more operation in that
-    vocabulary; it is a second addressing model beside it.
-  - **The release.** §5.4 makes each epoch counter *its own futex word*, because
-    the kernel implements only 32-bit futexes, and a member waits on the counter
-    itself. Expressing the release as an rmw would need the backend to know that
-    this particular word has futex waiters — which `osoe_transport_notify` does
-    not mean: notify is §4.9's watch mechanism over watched ranges, and a
-    collective's waiters hold no watch. Making them hold one rewrites §5.4's
-    wait, which is where the bounded-skew argument lives.
+  - *"Addressing: §4.10's model is `(pe, region, offset)`, while this phase is
+    addressed to a node — a second addressing model."* **Wrong about the code.**
+    What crossed at `barrier.c` was already `(team, epoch)`, and the node set was
+    computed *below* that call. Nothing node-addressed leaked upward; the
+    interface the code had was team-addressed, and the SHMEM layer already owns
+    teams.
+  - *"The release: expressing it as an rmw would need the backend to know which
+    words have futex waiters, which notify does not mean."* **A refutation of a
+    design nobody needed.** The release was never an rmw; it was one upcall,
+    `release(context, team, epoch)`, in which the host bumped the team's counter.
+    An upcall needs no notify and no watch, and leaves §5.4's equality wait alone.
 
-  So the boundary stays point-to-point and PE-addressed, §2.2's placement of
-  collectives on AM stands, and a backend wanting a native group barrier
-  implements §5's internode phase rather than growing a new primitive. The 4–6×
-  estimate at 10^6 PEs is unchanged and still unmeasured, four orders of
-  magnitude beyond the target hardware; if a device ever makes it matter, what
-  changes is §5's internode phase, where the knowledge of nodes and epochs
-  already lives. *(Closed. The reasoning sits beside the code in
-  `shmem/src/progress.c`.)*
+  And **the price was quoted against the wrong baseline.** The entry said "the
+  4–6× estimate at 10^6 PEs is unchanged", comparing an RDMA tree with SHARP —
+  which RoCE switches do not have (*documented*). What was built was a TCP
+  *star* on node 0: against an RDMA tree that is about 500× at 4,096 nodes, or
+  about 12× once the AM phase is itself a tree (roce-seam §4.3, *arithmetic*).
+  So the AM implementation became a k-ary tree in the same slice (§5.3), and a
+  backend with a better way — a tree over RDMA put and atomics, or an offload
+  engine — implements `internode.h` without touching `barrier.c`.
 - **Does the AM data path stay hot in an RDMA build?** Bootstrap is out of band
   in every build (§6.2) and that is forced. Whether §3's *data* path — the
   reservation protocol, deferred reply queues, aggregation — stays running is
