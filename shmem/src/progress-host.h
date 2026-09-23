@@ -20,6 +20,7 @@
 #ifndef OSOE_PROGRESS_HOST_H
 #define OSOE_PROGRESS_HOST_H
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -31,8 +32,16 @@
  */
 void osoe_progress_host_start(uint32_t session);
 
-/* Reverse it. Called by osoe_transport_fini, after the agent thread has been
- * joined, so that nothing is polling while the wires close. */
+/*
+ * The lead's last turn on its agent thread (osoe_transport_agent_exit): put
+ * everything this node still owes the network on the wire, then close every
+ * wire. On the agent thread because the engine's resources are that thread's
+ * (transport.h). Does nothing on any other PE, or on a job of one logical node.
+ */
+void osoe_progress_host_exit(void);
+
+/* Free what start allocated. Called by osoe_transport_fini, after the agent
+ * thread has been joined, so nothing is polling any more. */
 void osoe_progress_host_stop(void);
 
 /*
@@ -47,9 +56,10 @@ void osoe_progress_host_stop(void);
 bool osoe_progress_host_poll(void);
 
 /*
- * How long an idle agent may sleep. OSOE_SWEEP_NS for an agent with nothing to
- * poll; **much less for the lead's agent in a multi-node job**, which is the
- * one place step 2 departs from §3.10.
+ * The agent's idle wait (osoe_transport_agent_wait): until the wake word moves
+ * past `seen`, or a sweep interval passes - **much less than a sweep for the
+ * lead's agent in a multi-node job**, which is the one place step 2 departs
+ * from §3.10.
  *
  * §3.10's idle loop blocks on a single io_uring submission carrying both the
  * socket completions and an `IORING_OP_FUTEX_WAIT` on the agent's wake word -
@@ -62,9 +72,9 @@ bool osoe_progress_host_poll(void);
  *
  * §3.10 rejects a sleep loop for the shipping design, and that stands - this is
  * a stand-in for a ring that does not exist yet, not a choice between the two,
- * and step 3 restores the blocking form and deletes this.
+ * and step 3 restores the blocking form and deletes the interval.
  */
-uint64_t osoe_progress_host_idle_ns(void);
+bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen);
 
 /*
  * internode-am.c's half of the pass: take whatever arrivals local members have

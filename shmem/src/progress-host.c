@@ -227,7 +227,8 @@ void osoe_progress_host_start(uint32_t session)
 
 /*
  * Put everything this node still owes the network on the wire, before the
- * engine that would have sent it goes away.
+ * engine that would have sent it goes away. On the agent thread, in its exit
+ * (transport.h), whose engine this is.
  *
  * **A node must not stop its engine while it owes a peer bytes** (§6.4), and
  * the barrier does not establish that it does not. §5.3's root releases its own
@@ -245,8 +246,8 @@ void osoe_progress_host_start(uint32_t session)
  * cleanly; every other rank was killed at the launcher's timeout, which is the
  * signature to recognise it by.
  *
- * The agent has been joined by the time this runs, so this thread is the only
- * one touching the engine and may poll it (§3.12).
+ * This is the agent's last turn, so it is the only thread touching the engine
+ * and polls it directly (§3.12).
  */
 static void flush_before_close(void)
 {
@@ -280,22 +281,27 @@ static void flush_before_close(void)
     }
 }
 
+void osoe_progress_host_exit(void)
+{
+    if (!osoe_am.internode || !osoe_am.lead)
+        return;
+    flush_before_close();
+    /*
+     * Announce to every peer first and only then wait (wire.h), or this node's
+     * teardown costs one peer's latency after another. The engine stopped with
+     * the flush above: nothing polls while the wires close.
+     */
+    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
+        osoe_wire_shutdown(&osoe_am.wire[slot]);
+    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
+        osoe_wire_close(&osoe_am.wire[slot]);
+}
+
 void osoe_progress_host_stop(void)
 {
     if (!osoe_am.internode)
         return;
     if (osoe_am.lead) {
-        flush_before_close();
-        /*
-         * Announce to every peer first and only then wait (wire.h), or this
-         * node's teardown costs one peer's latency after another. Both ends of
-         * a wire wait for each other, so none of this may run while the agent
-         * might still poll - shmem_finalize joins that thread first.
-         */
-        for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-            osoe_wire_shutdown(&osoe_am.wire[slot]);
-        for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-            osoe_wire_close(&osoe_am.wire[slot]);
         free(osoe_am.wire);
         free(osoe_am.connection);
         free(osoe_am.descriptor);
@@ -339,7 +345,9 @@ bool osoe_progress_host_poll(void)
     return false;
 }
 
-uint64_t osoe_progress_host_idle_ns(void)
+bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen)
 {
-    return osoe_am.internode && osoe_am.lead ? OSOE_PROGRESS_SLEEP_NS : OSOE_SWEEP_NS;
+    struct osoe_deadline sweep = osoe_deadline_in(
+        osoe_am.internode && osoe_am.lead ? OSOE_PROGRESS_SLEEP_NS : OSOE_SWEEP_NS);
+    return osoe_futex_wait(wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0;
 }

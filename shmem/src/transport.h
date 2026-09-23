@@ -64,6 +64,7 @@
 #ifndef OSOE_TRANSPORT_H
 #define OSOE_TRANSPORT_H
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -97,9 +98,10 @@ struct osoe_deadline;
  * init starts whatever the backend needs - for AM, the connection area, the
  * wires and the progress engine the agent thread will run - and it must be
  * complete before it returns, because the progress thread starts next and polls
- * it. fini takes all of it down, and may first drain what this node still owes
- * the network (§6.4: a node must not stop its engine while it owes a peer
- * bytes), which is why the thread must be joined before it is called.
+ * it. fini takes the rest down once that thread has been joined. What this node
+ * still owes the network is drained before then, on the thread, by
+ * osoe_transport_agent_exit (§6.4: a node must not stop its engine while it owes
+ * a peer bytes).
  */
 void osoe_transport_init(void);
 void osoe_transport_fini(void);
@@ -110,7 +112,7 @@ struct osoe_transport_context *osoe_transport_context_default(void);
 
 /*
  * Every PE starts one agent thread, and the library lends it to the backend
- * through these two calls and nothing else (agent.c). They are the boundary's
+ * through these three calls and nothing else (agent.c). They are the boundary's
  * progress call, which §10 once recorded as unnecessary on the ground that
  * every place the SHMEM layer blocks is a backend function. That was true of
  * application threads and false of the node: the barrier blocks on an epoch
@@ -123,19 +125,36 @@ struct osoe_transport_context *osoe_transport_context_default(void);
  * agent whether it may sleep (§3.10). A backend with nothing to run here returns
  * false, as AM does on every PE but the node's lead.
  *
- * The caller loads its wake word **before** calling pass, so that work posted
- * during the pass fails the futex compare that follows and the agent does not
+ * wait: sleep until the agent's wake word no longer holds `seen`, until the
+ * backend has work for this thread, or until at most OSOE_SWEEP_NS has passed.
+ * Returns true if it was woken rather than timed out, which the agent counts
+ * (§3.14). The caller loads its wake word into `seen` **before** calling pass,
+ * so that work posted during the pass fails the compare and the agent does not
  * sleep on it (§4.9); agent.c does, and says so.
  *
- * idle_ns: how long an idle agent may sleep before calling pass again. At most
- * OSOE_SWEEP_NS; less where the backend has work it can only find by looking
- * (AM's shared-memory wire, §3.10, until step 3).
+ * The backend owns the wait because only the backend can wait on its own events
+ * and the wake word in one call. §3.10's lead blocks in one io_uring submission
+ * carrying both its socket completions and an IORING_OP_FUTEX_WAIT on the word;
+ * an RDMA backend sleeping on a completion channel is the same shape. Until
+ * phase 1 step 3 this was `idle_ns` - how long agent.c's own futex_wait may
+ * sleep - which is the step-2 stand-in's shape and no ring's (a finding about
+ * the seam, recorded in §10).
+ *
+ * exit: the library takes the thread back. Called once, on the agent thread,
+ * after its last pass and before it returns. The backend finishes whatever it
+ * runs there - on AM, what this node still owes the network (§6.4) and the
+ * close of every connection - because what the thread owns only the thread can
+ * finish: a ring created with IORING_SETUP_SINGLE_ISSUER refuses every other
+ * thread's submissions (-EEXIST), and when its submitter exits, its armed
+ * receives are cancelled with the bytes left in the socket (both measured on
+ * 6.12). A backend with nothing to finish returns at once.
  *
  * Called only on the agent thread, never concurrently with each other, and
  * only between osoe_transport_init and osoe_transport_fini.
  */
 bool osoe_transport_agent_pass(void);
-uint64_t osoe_transport_agent_idle_ns(void);
+bool osoe_transport_agent_wait(_Atomic uint32_t *wake, uint32_t seen);
+void osoe_transport_agent_exit(void);
 
 /* ---- Locality -------------------------------------------------------- */
 

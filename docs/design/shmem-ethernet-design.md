@@ -2624,10 +2624,14 @@ decision). Two more things cross that the original contract left out, and both
 are now declared in `transport.h`: the backend's **lifecycle** —
 `osoe_transport_init` starts whatever the backend needs, AM's connection area,
 wires and engine included, before the agent thread exists, and
-`osoe_transport_fini` drains and closes it after that thread is joined — and the
+`osoe_transport_fini` frees what is left after that thread is joined — and the
 **agent thread**, which the library lends the backend through
-`osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` and nothing else
-(§3.12; §10's "boundary progress call"). So `barrier.c`, `agent.c` and `init.c`
+`osoe_transport_agent_pass`, `osoe_transport_agent_wait` and
+`osoe_transport_agent_exit` and nothing else (§3.12; §10's "boundary progress
+call"). The backend owns the agent's idle wait, because only it can wait on its
+own events and the wake word in one call, and it gets a last turn on the thread
+before the thread returns, because what the thread owns only it can finish
+(phase 1 step 3; the §10 entry has why the first shape was wrong). So `barrier.c`, `agent.c` and `init.c`
 name no AM symbol, and the sentence "the SHMEM layer calls only what is declared
 here" is true of `transport.h` plus `internode.h`. **It is enforced**: the AM
 backend's state moved out of `struct osoe_state` into `am-state.h`, and the tier-1
@@ -4187,7 +4191,9 @@ Things to get right, each of which is a silent bug otherwise:
   `shmem_finalize` and stop the agent while the message every other node is
   waiting for is still in a buffer only that agent sends — and every other node
   then waits for a node that has already exited. The lead therefore drains the
-  engine to idle after its agent is joined and before its wires close. Measured
+  engine to idle before its wires close — since phase 1 step 3 on the agent
+  thread itself, as its last turn (`osoe_transport_agent_exit`), because the
+  engine's ring is that thread's (§4.10). Measured
   at 3 hangs in 12 runs of the suite without it and 0 in 25 with it; the
   signature is that the root's non-lead PEs exit cleanly while every other rank
   is killed at the launcher's timeout.
@@ -5026,7 +5032,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 | What `OSOE_NODE_LAYOUT` covers | **The encoding of every word in the control segment, not only the offsets of fields.** A word written by one process and interpreted by another is part of the inter-process contract even when its width and position do not move; changing what its bits mean without bumping the version gives mixed builds silent lost wakes rather than the loud refusal `open_control` exists to produce. Recorded because a proposal got it wrong, arguing the §4.9 watch word could change encoding without a bump since it is "an opaque filter" — it is opaque to its *reader*, which is another process |
 | Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_transport_watch_wait` being the backend's own function |
-| A boundary progress call | **Needed, and declared** (phase 1 step 2 slice 3): `osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` in `transport.h`, the only way the library lends the agent thread to a backend (§3.12, §4.10). *Revised.* The first answer was "not needed, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there". That was true of application threads and false of the node: the barrier blocks on an epoch counter outside any backend (`barrier.c`, `base/epoch.h`), and what moves it is the progress thread, which `agent.c` drove by calling the AM engine by name (second review, roce-seam F5). Application threads still need no progress call — the blocking calls pump their own — but the node's thread is the library's, and a backend gets it only through these two |
+| A boundary progress call | **Needed, and declared** (phase 1 step 2 slice 3): `osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` in `transport.h`, the only way the library lends the agent thread to a backend (§3.12, §4.10). *Revised.* The first answer was "not needed, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there". That was true of application threads and false of the node: the barrier blocks on an epoch counter outside any backend (`barrier.c`, `base/epoch.h`), and what moves it is the progress thread, which `agent.c` drove by calling the AM engine by name (second review, roce-seam F5). Application threads still need no progress call — the blocking calls pump their own — but the node's thread is the library's, and a backend gets it only through these calls. *Revised again* (phase 1 step 3 slice 1, decided with the author 2026-09-22): the two calls were `pass` and `idle_ns`, how long `agent.c`'s own `futex_wait` might sleep — the review's fix shape ("same code, boundary-named"), and exactly the step-2 stand-in's poll. They could not carry the backend they were declared for: §3.10's lead waits in one io_uring submission on its sockets *and* the wake word, which a futex_wait in `agent.c` cannot, and a `SINGLE_ISSUER` ring refuses every thread but its submitter (`-EEXIST`), while `session_end` joined the agent and only then drained the engine on the main thread. So `idle_ns` became `osoe_transport_agent_wait(wake, seen)`, the backend's own wait, and `osoe_transport_agent_exit()` gives the backend a last turn on the thread for its drain and close. An RDMA backend sleeping on a completion channel needs the first for the same reason. Both were edits above the boundary forced by the seam, not by the backend |
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 | Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
 | What orders fence and quiet, where a `seq_cst` store to a thread-local word was the answer? | **Derived from the C11 model:** a release fence for fence (W→W), a `seq_cst` fence for quiet and the barriers (W→R), and `seq_cst` on both loads of a two-sided protocol. Measured, the old store did not order quiet's W→R on aarch64, and an acquire load built as `ldapr` lost wakes (§3.16, §4.6; 2026-09-21). |

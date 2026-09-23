@@ -72,12 +72,17 @@ static void *agent_main(void *arg)
          */
         if (osoe_transport_agent_pass())
             continue;
-        struct osoe_deadline sweep = osoe_deadline_in(osoe_transport_agent_idle_ns());
-        if (osoe_futex_wait(&slot->agent_wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0) {
+        /* The backend's wait, on the word and on whatever else it waits for
+         * (transport.h): on the lead of a multi-node job, its ring. */
+        if (osoe_transport_agent_wait(&slot->agent_wake, seen)) {
             osoe_counter_add(b, OSOE_C_AGENT_WAKEUPS, 1);
             osoe_counter_set(b, OSOE_C_AGENT_LAST_WAKE_NS, osoe_now_ns());
         }
     }
+    /* The thread goes back to the library: the backend finishes on it what only
+     * this thread can (transport.h), which on the lead is the node's last bytes
+     * and the close of every connection. */
+    osoe_transport_agent_exit();
     return NULL;
 }
 

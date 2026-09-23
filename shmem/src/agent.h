@@ -1,7 +1,7 @@
 /*
  * Agent threads (§3.12). Every PE starts one in shmem_init, and lends it to
- * the backend through transport.h's osoe_transport_agent_pass and
- * osoe_transport_agent_idle_ns. On AM the local lead's agent is the node's
+ * the backend through transport.h's osoe_transport_agent_pass, _wait and
+ * _exit. On AM the local lead's agent is the node's
  * progress engine; every other agent does only work that must run inside its
  * own process, which today is none: they start, sleep on their slot's wake
  * word, and stop.

@@ -114,8 +114,9 @@ void osoe_transport_init(void)
     osoe_progress_host_start(osoe.node.hdr->session);
 }
 
-/* After the agent has been joined (transport.h): the engine drains what this
- * node owes the network, then closes. */
+/* After the agent has been joined (transport.h). The engine drained what this
+ * node owed the network and closed its connections on that thread, in
+ * osoe_transport_agent_exit; what is left is memory. */
 void osoe_transport_fini(void)
 {
     osoe_progress_host_stop();
@@ -133,9 +134,14 @@ bool osoe_transport_agent_pass(void)
     return osoe_progress_host_poll();
 }
 
-uint64_t osoe_transport_agent_idle_ns(void)
+bool osoe_transport_agent_wait(_Atomic uint32_t *wake, uint32_t seen)
 {
-    return osoe_progress_host_idle_ns();
+    return osoe_progress_host_wait(wake, seen);
+}
+
+void osoe_transport_agent_exit(void)
+{
+    osoe_progress_host_exit();
 }
 
 struct osoe_transport_context *osoe_transport_context_default(void)

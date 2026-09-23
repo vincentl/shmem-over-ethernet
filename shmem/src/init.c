@@ -225,10 +225,10 @@ static void session_start(void)
 static void session_end(void)
 {
     /*
-     * The agent first, so that nothing is polling the engine while it is taken
-     * apart, and so the wire close handshake (wire.h) is not racing this node's
-     * own progress loop. osoe_transport_fini then drains and closes it
-     * (transport.h).
+     * The agent first: its last act is the backend's exit (transport.h), which
+     * on AM drains what the node still owes the network and closes every wire
+     * on the thread that owns them. osoe_transport_fini then frees what is left,
+     * with nothing polling it.
      */
     osoe_agent_stop(&osoe.node.slots[osoe.bootstrap.local_id]);
     osoe_internode_fini();
