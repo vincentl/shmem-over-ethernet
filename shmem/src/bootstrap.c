@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "collective-tree.h"
 #include "internode.h"
 #include "base/environment.h"
+#include "base/hostlist.h"
 #include "base/size.h"
 #include "bootstrap.h"
 #include "fatal.h"
@@ -200,6 +202,74 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         b->collective_fanout < 2 || b->collective_fanout > OSOE_COLLECTIVE_FANOUT_MAX)
         osoe_fatal("OSOE_COLLECTIVE_FANOUT='%s' is not between 2 and %u",
                    getenv("OSOE_COLLECTIVE_FANOUT"), (unsigned)OSOE_COLLECTIVE_FANOUT_MAX);
+
+    /*
+     * The ports a node lead may listen on (§6.2's "configurable range"). Each
+     * lead binds the first free port of a candidate sequence hashed from (job,
+     * step, node) inside it, and another lead finds it by trying the same
+     * sequence (listener.h). The default sits below Linux's ephemeral range
+     * (32768-60999), so an outgoing connection's local port never takes a
+     * candidate, and above the privileged ports.
+     */
+    b->port_low = OSOE_DEFAULT_PORT_LOW;
+    b->port_high = OSOE_DEFAULT_PORT_HIGH;
+    const char *range = getenv("OSOE_PORT_RANGE");
+    if (range) {
+        unsigned low, high;
+        int used = 0;
+        if (sscanf(range, "%u-%u%n", &low, &high, &used) != 2 || range[used] != '\0' ||
+            low < 1024 || high > 65535 || low > high)
+            osoe_fatal("OSOE_PORT_RANGE='%s' is not LOW-HIGH with 1024 <= LOW <= HIGH <= 65535",
+                       range);
+        b->port_low = (uint16_t)low;
+        b->port_high = (uint16_t)high;
+    }
+
+    /*
+     * The step's hosts (§6.1), which SLURM_NODEID indexes and so the node map
+     * does too: where each node's lead listens, for the rendezvous (§6.2).
+     * Needed only when the job spans nodes; osoe-launch gives §8.1's logical
+     * nodes one loopback address each, 127.0.0.[1-N].
+     */
+    b->node_list = getenv("OSOE_STEP_NODELIST");
+    if (b->node_count > 1) {
+        uint32_t hosts = 0;
+        char why[128];
+        if (!b->node_list)
+            osoe_fatal("OSOE_STEP_NODELIST is not set, and a job of %u nodes needs it: it "
+                       "names each node's host (§6.1)", b->node_count);
+        if (!osoe_hostlist_count(b->node_list, &hosts, why, sizeof why))
+            osoe_fatal("OSOE_STEP_NODELIST='%s' is not a host list: %s", b->node_list, why);
+        if (hosts != b->node_count)
+            osoe_fatal("OSOE_STEP_NODELIST='%s' names %u hosts for a job of %u nodes",
+                       b->node_list, hosts, b->node_count);
+    }
+
+    /*
+     * A secret every lead proves it knows in each hello (§6.2; §10's
+     * "authenticating the step-3 handshake", decided with step 3): optional,
+     * since the network is trusted as Slurm's own traffic is (§3.4), and cheap
+     * when a cluster's is not - a wrapper sets it before srun and Slurm carries
+     * it to every task. 128 bits as 32 hex digits.
+     */
+    const char *secret = getenv("OSOE_JOB_SECRET");
+    b->secured = false;
+    if (secret && *secret) {            /* set but empty is unset */
+        bool hex = strlen(secret) == 32;
+        for (size_t i = 0; hex && i < 32; i++) {
+            char c = secret[i];
+            hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        }
+        if (!hex)
+            osoe_fatal("OSOE_JOB_SECRET is not 32 hexadecimal digits (128 bits); make one "
+                       "with: head -c16 /dev/urandom | od -An -tx1 | tr -d ' \\n'");
+        for (size_t i = 0; i < 16; i++) {
+            unsigned byte;
+            sscanf(secret + 2 * i, "%2x", &byte);
+            b->secret[i] = (unsigned char)byte;
+        }
+        b->secured = true;
+    }
 
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
     if (osoe_environment_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENVIRONMENT_INVALID || watchdog > 1)

@@ -266,6 +266,15 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("transport.am.passes", am.passes, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     ND("transport.am.send_visits", am.send_visits, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
        "conns"),
+    /* The ring's counters (node.h, layout 13; §3.3). */
+    ND("transport.am.completions", am.completions, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.receive_buffers", am.receive_buffers, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+       ""),
+    ND("transport.am.receive_enobufs", am.receive_enobufs, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+       ""),
+    ND("transport.am.receive_rearms", am.receive_rearms, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.sends", am.sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.short_sends", am.short_sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
 };
 
 enum {

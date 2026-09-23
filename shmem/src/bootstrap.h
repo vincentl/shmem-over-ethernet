@@ -28,6 +28,10 @@ struct osoe_bootstrap {
     bool keep_control_segment;  /* OSOE_KEEP_CONTROL_SEGMENT: name kept until finalize */
     bool shm_capacity_warning_only; /* OSOE_SHM_CAPACITY_CHECK=0: report, do not refuse */
     uint32_t collective_fanout; /* OSOE_COLLECTIVE_FANOUT: k of the internode tree (§5.3) */
+    uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
+    const char *node_list;      /* OSOE_STEP_NODELIST (§6.1), when the job spans nodes */
+    bool secured;               /* OSOE_JOB_SECRET is set (§6.2, §10) */
+    unsigned char secret[16];   /* its 128 bits, the key every hello's proof is made with */
 
     /* The specification's own variables (§8). Each is "Any": the value does
      * not matter, only that it is set. SMA_-prefixed spellings are deprecated
@@ -36,6 +40,10 @@ struct osoe_bootstrap {
     bool print_info;            /* SHMEM_INFO */
     bool debug;                 /* SHMEM_DEBUG */
 };
+
+/* The default OSOE_PORT_RANGE (§6.2): below the ephemeral ports. */
+#define OSOE_DEFAULT_PORT_LOW  17000
+#define OSOE_DEFAULT_PORT_HIGH 26999
 
 /* The default SHMEM_SYMMETRIC_SIZE: 256 MiB (§4.4). */
 #define OSOE_DEFAULT_SYMMETRIC_SIZE (UINT64_C(256) << 20)

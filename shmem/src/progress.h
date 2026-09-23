@@ -39,7 +39,11 @@
 #include "connection-area.h"
 #include "node.h"
 #include "reply.h"
-#include "wire.h"
+
+/* The engine holds these by pointer; wire.h and ring.h bring liburing.h, whose
+ * POSIX types a strict-C11 file would then have to ask for. */
+struct osoe_wire;
+struct osoe_ring;
 
 /* What the progress loop asks of the PE it runs inside. */
 struct osoe_progress_host {
@@ -127,6 +131,15 @@ struct osoe_progress_connection {
      * the connection visited until they are sealed (work discovery, §3.10).
      */
     bool carrying;
+    /*
+     * The close (§6.4, close_model.py). `goodbye`: this node has sealed its
+     * goodbye toward the peer - the last segment it sends there, header-only
+     * and flagged - then sent it, then ended its stream. `peer_goodbye`: the
+     * peer's has arrived, so the end of its stream is a peer that finished and
+     * not one that died.
+     */
+    enum { OSOE_GOODBYE_NONE, OSOE_GOODBYE_SEALED, OSOE_GOODBYE_SENT } goodbye;
+    bool peer_goodbye;
     struct osoe_am_parser parser;
     struct osoe_reply_queues queues;
 };
@@ -134,6 +147,15 @@ struct osoe_progress_connection {
 struct osoe_progress {
     struct osoe_connection_area *area;
     struct osoe_wire *wire;                     /* one per peer, by peer slot */
+    struct osoe_ring *ring;                     /* carries every wire (ring.h) */
+    /*
+     * One bit per peer slot: the connections with send-side work the lead
+     * already knows about (busy()), kept current as that work appears and
+     * goes, so that a pass finds them in N/64 words instead of asking every
+     * connection. Private, like the rest of this struct.
+     */
+    uint64_t *busy;
+    bool closing;                               /* osoe_progress_close has begun */
     struct osoe_progress_connection *connection;/* one per peer, by peer slot */
     struct osoe_reply_pool pool;
     struct osoe_reply *descriptors;
@@ -171,13 +193,15 @@ struct osoe_progress {
 
 /*
  * Set up for a node of `nodes` logical nodes. `wires` is one wire per peer in
- * peer-slot order, `descriptors` the node-wide pool backing every connection's
- * queues (§3.8), and `scratch` a staging buffer at least one AM chunk long.
+ * peer-slot order, all carried by `ring`; `descriptors` the node-wide pool
+ * backing every connection's queues (§3.8), and `scratch` a staging buffer at
+ * least one AM chunk long.
  */
 void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *area,
-                        struct osoe_wire *wires, struct osoe_reply *descriptors,
-                        uint32_t descriptor_count, unsigned char *scratch,
-                        uint32_t scratch_bytes, const struct osoe_progress_host *host);
+                        struct osoe_wire *wires, struct osoe_ring *ring,
+                        struct osoe_reply *descriptors, uint32_t descriptor_count,
+                        unsigned char *scratch, uint32_t scratch_bytes,
+                        const struct osoe_progress_host *host);
 
 /*
  * One pass. Returns true if anything moved, which is what tells the idle loop
@@ -186,10 +210,11 @@ void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *ar
  * costs latency rather than the job.
  */
 /* Bind the per-connection state, one entry per peer in peer-slot order, and
- * put every connection into its starting state. Separate from init because the
- * caller owns the array: the loop never allocates. */
+ * the busy bitmap, (nodes - 1 + 63) / 64 words, and put every connection into
+ * its starting state. Separate from init because the caller owns the arrays:
+ * the loop never allocates. */
 void osoe_progress_attach(struct osoe_progress *p,
-                          struct osoe_progress_connection *connections);
+                          struct osoe_progress_connection *connections, uint64_t *busy);
 
 bool osoe_progress_poll(struct osoe_progress *p);
 
@@ -205,6 +230,21 @@ bool osoe_progress_poll(struct osoe_progress *p);
  * hangs every other node (§6.4).
  */
 bool osoe_progress_idle(struct osoe_progress *p);
+
+/*
+ * Close every connection (§6.4, close_model.py): each one, once it owes the
+ * peer nothing, sends its goodbye - a header-only segment flagged
+ * OSOE_AM_SEGMENT_GOODBYE, the last it will send - and then ends its stream;
+ * the passes that follow keep receiving until every peer's stream has ended
+ * too. Called once the engine is idle (osoe_progress_idle). An end of stream
+ * that arrives before its goodbye is a peer that died, and ends the job then
+ * as at any other time.
+ */
+void osoe_progress_close(struct osoe_progress *p);
+
+/* Every connection has sent its goodbye and ended its stream, and seen the
+ * peer's goodbye and the end of the peer's. Its sockets may then be closed. */
+bool osoe_progress_closed(const struct osoe_progress *p);
 
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
 uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);

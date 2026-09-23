@@ -15,6 +15,7 @@ if(OSOE_BACKEND STREQUAL "am")
     src/progress.c
     src/progress-host.c
     src/reply.c
+    src/ring.c
     src/transport-am.c
     src/wire.c)
 else()
@@ -34,11 +35,14 @@ add_library(osoe
   src/info.c
   src/init.c
   src/job.c
+  src/listener.c
   src/malloc.c
   src/metrics.c
   src/node.c
   src/profile.c
   src/quiet.c
+  src/rank-map.c
+  src/rendezvous.c
   src/rma.c
   src/session.c
   src/shm-object.c
@@ -56,7 +60,9 @@ target_include_directories(osoe
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   PRIVATE
     src)
-target_link_libraries(osoe PRIVATE osoe_base Threads::Threads)
+# liburing is the one library §1's budget allows beside libc (invariant 15);
+# the AM backend's ring is its first user (phase 1 step 3).
+target_link_libraries(osoe PRIVATE osoe_base Threads::Threads PkgConfig::LIBURING)
 
 # The development watchdog (§3.15) is a development aid, not the release path:
 # on in the debug, asan and tsan presets, which all build Debug, and off in

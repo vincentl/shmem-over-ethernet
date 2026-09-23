@@ -11,11 +11,17 @@ add_library(osoe_base OBJECT
   node-map.c
   epoch.c
   futex.c
+  hostlist.c
   order.c
+  ring-check.c
+  siphash.c
   size.c
   stall-watch.c
   sweep.c)
 target_include_directories(osoe_base PUBLIC ${PROJECT_SOURCE_DIR})
+# ring-check.c asks the running kernel for io_uring (§1): liburing, the one
+# library beside libc that §1 allows, comes with it to whatever links base.
+target_link_libraries(osoe_base PUBLIC PkgConfig::LIBURING)
 set_target_properties(osoe_base PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   C_VISIBILITY_PRESET hidden)

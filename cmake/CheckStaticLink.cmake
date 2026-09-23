@@ -9,10 +9,15 @@ cmake_minimum_required(VERSION 3.25)
 # static variant - none of the four presets sets BUILD_SHARED_LIBS - so this
 # runs its own nested configure rather than relying on the caller's build.
 #
+# Since phase 1 step 3 libosoe uses liburing, which a consumer of the static
+# archive links itself, exactly as it would for any static library with a
+# dependency; the distribution's liburing is the one §1 allows (invariant 15).
+#
 #   cmake -DSOURCE_DIR=<repo root> -DSCRATCH_DIR=<scratch build dir>
-#         -DPROBE_SRC=<probe.c> -DC_COMPILER=<cc> -P CheckStaticLink.cmake
+#         -DPROBE_SRC=<probe.c> -DC_COMPILER=<cc> -DURING_LIBRARIES=<liburing>
+#         -P CheckStaticLink.cmake
 
-foreach(var SOURCE_DIR SCRATCH_DIR PROBE_SRC C_COMPILER)
+foreach(var SOURCE_DIR SCRATCH_DIR PROBE_SRC C_COMPILER URING_LIBRARIES)
   if(NOT DEFINED ${var})
     message(FATAL_ERROR "${var} is required")
   endif()
@@ -57,7 +62,8 @@ if(NOT rc EQUAL 0)
 endif()
 
 execute_process(
-  COMMAND "${C_COMPILER}" "${probe_object}" "${archive}" -pthread -o "${probe_exe}"
+  COMMAND "${C_COMPILER}" "${probe_object}" "${archive}" ${URING_LIBRARIES} -pthread
+          -o "${probe_exe}"
   OUTPUT_VARIABLE link_out ERROR_VARIABLE link_err RESULT_VARIABLE rc)
 if(NOT rc EQUAL 0)
   message(FATAL_ERROR "Linking a program against libosoe.a alone failed (F10):\n${link_out}\n${link_err}")
@@ -68,4 +74,5 @@ if(NOT rc EQUAL 0)
   message(FATAL_ERROR "The program linked against libosoe.a alone exited ${rc}")
 endif()
 
-message(STATUS "libosoe.a alone (no separate osoe_base archive) links and runs a consumer")
+message(STATUS "libosoe.a alone (no separate osoe_base archive), with the distribution's "
+               "liburing, links and runs a consumer")

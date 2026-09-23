@@ -4,8 +4,10 @@
  * See progress-host.h for what this is and why it is separate from progress.c.
  */
 #define _GNU_SOURCE
+#include <netinet/in.h>
 #include <stdatomic.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "base/deadline.h"
@@ -18,6 +20,7 @@
 #include "fatal.h"
 #include "internode.h"
 #include "job.h"
+#include "listener.h"
 #include "metrics.h"
 #include "node.h"
 #include "progress.h"
@@ -27,14 +30,6 @@
 #include "wire.h"
 
 struct osoe_am_state osoe_am;
-
-/*
- * How long the lead's agent sleeps between passes when nothing moved. Far
- * under OSOE_SWEEP_NS, because this is the interval at which *arriving* bytes
- * are noticed and it therefore lands on the latency of every internode
- * operation - see progress-host.h for why step 2 looks rather than waits.
- */
-#define OSOE_PROGRESS_SLEEP_NS UINT64_C(250000)     /* 250 us */
 
 /* ---- the four host callbacks (progress.h) ------------------------------ */
 
@@ -161,6 +156,18 @@ uint64_t osoe_progress_host_acked(uint32_t peer)
 
 /* ---- lifecycle --------------------------------------------------------- */
 
+/* This lead's node-pair listener, from advertise to the mesh (osoe_wires_open
+ * closes it). Outside osoe_am, which osoe_transport_init starts afresh after the
+ * rendezvous that carried its port. */
+static struct osoe_listener mesh_listener = { .fd = -1 };
+
+void osoe_progress_host_advertise(void *blob)
+{
+    osoe_listener_open_any_port(&mesh_listener, &osoe.bootstrap, osoe.node.hdr->session, NULL);
+    uint16_t port = mesh_listener.port;
+    memcpy(blob, &port, sizeof port);
+}
+
 void osoe_progress_host_start(uint32_t session)
 {
     /* osoe_am.internode and osoe_am.lead are set at the start of
@@ -196,22 +203,39 @@ void osoe_progress_host_start(uint32_t session)
                                OSOE_TEAMS;
     osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
+    osoe_am.busy = calloc((peers + 63) / 64, sizeof *osoe_am.busy);
     osoe_am.descriptor = calloc(descriptors, sizeof *osoe_am.descriptor);
     osoe_am.scratch = malloc(osoe_am.area.chunk_bytes);
-    if (!osoe_am.wire || !osoe_am.connection || !osoe_am.descriptor || !osoe_am.scratch)
+    if (!osoe_am.wire || !osoe_am.connection || !osoe_am.busy || !osoe_am.descriptor ||
+        !osoe_am.scratch)
         osoe_fatal("out of memory setting up the AM backend for %u peer nodes", peers);
 
-    /* Peer-slot order, which is node order with this node left out - the same
-     * order osoe_progress_slot computes (§3.4). */
-    uint32_t slot = 0;
-    for (uint32_t n = 0; n < osoe.job.node_count; n++)
-        if (n != osoe.job.node)
-            osoe_wire_open(&osoe_am.wire[slot++], &osoe.bootstrap, n, session);
+    /*
+     * The node-pair connections, one per peer in peer-slot order - node order
+     * with this node left out, as osoe_progress_slot computes it (§3.4) - and the
+     * ring that carries them, disabled until this lead's agent enables it on its
+     * first pass: the agent is its only submitter (ring.h). Each peer's address
+     * is the rendezvous's, and its port the one its blob advertised (§6.2).
+     * O(N) once, for the eager mesh.
+     */
+    struct sockaddr_in *peers_address = calloc(osoe.job.node_count, sizeof *peers_address);
+    if (!peers_address)
+        osoe_fatal("out of memory for %u node addresses", osoe.job.node_count);
+    for (uint32_t n = 0; n < osoe.job.node_count; n++) {
+        uint16_t port;
+        memcpy(&port, osoe_job_backend_blob(&osoe.job, n), sizeof port);
+        peers_address[n] = (struct sockaddr_in){ .sin_family = AF_INET,
+                                                 .sin_port = htons(port),
+                                                 .sin_addr.s_addr = osoe_job_node_address(&osoe.job, n) };
+    }
+    struct osoe_mesh mesh = { &mesh_listener, peers_address };
+    osoe_wires_open(osoe_am.wire, &osoe_am.ring, &osoe.bootstrap, session, &mesh);
+    free(peers_address);
 
     struct osoe_progress_host host = { resolve, landing, notify, release, NULL };
-    osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, osoe_am.descriptor,
-                       descriptors, osoe_am.scratch, (uint32_t)osoe_am.area.chunk_bytes,
-                       &host);
+    osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, &osoe_am.ring,
+                       osoe_am.descriptor, descriptors, osoe_am.scratch,
+                       (uint32_t)osoe_am.area.chunk_bytes, &host);
     /* Count into the control segment, where osoe-stat and the tests read it. */
     osoe_am.progress.metrics = &osoe.node.hdr->am;
     /* §3.14's connection scope and the tree's per-team state, in the same
@@ -221,13 +245,14 @@ void osoe_progress_host_start(uint32_t session)
     for (uint32_t c = 0; c < osoe.node.connection_count; c++)
         atomic_store_explicit(&osoe.node.connection_metrics[c].peer,
                               c < osoe.job.node ? c : c + 1, memory_order_release);
-    osoe_progress_attach(&osoe_am.progress, osoe_am.connection);
+    osoe_progress_attach(&osoe_am.progress, osoe_am.connection, osoe_am.busy);
     flag_raised = false;
 }
 
 /*
  * Put everything this node still owes the network on the wire, before the
- * engine that would have sent it goes away.
+ * engine that would have sent it goes away. On the agent thread, in its exit
+ * (transport.h), whose engine this is.
  *
  * **A node must not stop its engine while it owes a peer bytes** (§6.4), and
  * the barrier does not establish that it does not. §5.3's root releases its own
@@ -245,8 +270,8 @@ void osoe_progress_host_start(uint32_t session)
  * cleanly; every other rank was killed at the launcher's timeout, which is the
  * signature to recognise it by.
  *
- * The agent has been joined by the time this runs, so this thread is the only
- * one touching the engine and may poll it (§3.12).
+ * This is the agent's last turn, so it is the only thread touching the engine
+ * and polls it directly (§3.12).
  */
 static void flush_before_close(void)
 {
@@ -262,10 +287,8 @@ static void flush_before_close(void)
                            osoe.bootstrap.no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     while (!osoe_progress_idle(&osoe_am.progress)) {
-        if (!osoe_progress_poll(&osoe_am.progress)) {
-            struct timespec back = { 0, 20000 };
-            nanosleep(&back, NULL);
-        }
+        if (!osoe_progress_poll(&osoe_am.progress))
+            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
         if (!osoe_deadline_expired(&sweep))
             continue;
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
@@ -280,28 +303,66 @@ static void flush_before_close(void)
     }
 }
 
+/*
+ * The close (§6.4, close_model.py): every connection sends its goodbye and ends
+ * its stream, and the lead keeps reading - and applying, since a peer may still
+ * be paying an acknowledgement - until every peer's stream has ended after its
+ * own goodbye. Only then are the sockets closed: closing one while the peer
+ * still sends makes the kernel reset it, and the peer's send fails on a node
+ * that did nothing wrong. The no-progress rule watches how many connections
+ * have ended (§3.15); by default a peer that never finalizes is waited for.
+ */
+static void close_connections(void)
+{
+    uint32_t peers = osoe.job.node_count - 1;
+    osoe_progress_close(&osoe_am.progress);
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, 0, osoe.bootstrap.no_progress_ns);
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+    while (!osoe_progress_closed(&osoe_am.progress)) {
+        if (!osoe_progress_poll(&osoe_am.progress))
+            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
+        if (!osoe_deadline_expired(&sweep))
+            continue;
+        sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_sweep_expired("shmem_finalize");
+        uint32_t ended = 0;
+        for (uint32_t slot = 0; slot < peers; slot++)
+            ended += osoe_wire_ended(&osoe_am.wire[slot]);
+        if (osoe_stall_watch_stalled(&watch, ended))
+            osoe_fatal("shmem_finalize: no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT) "
+                       "closing this node's connections - %u of %u peers have ended theirs; "
+                       "the others have not finalized",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), ended, peers);
+    }
+    for (uint32_t slot = 0; slot < peers; slot++)
+        osoe_wire_close(&osoe_am.wire[slot]);
+    osoe_ring_close(&osoe_am.ring);
+}
+
+void osoe_progress_host_exit(void)
+{
+    if (!osoe_am.internode || !osoe_am.lead)
+        return;
+    if (!osoe_am.ring.enabled)          /* an agent stopped before its first pass */
+        osoe_ring_enable(&osoe_am.ring);
+    flush_before_close();
+    close_connections();
+}
+
 void osoe_progress_host_stop(void)
 {
     if (!osoe_am.internode)
         return;
     if (osoe_am.lead) {
-        flush_before_close();
-        /*
-         * Announce to every peer first and only then wait (wire.h), or this
-         * node's teardown costs one peer's latency after another. Both ends of
-         * a wire wait for each other, so none of this may run while the agent
-         * might still poll - shmem_finalize joins that thread first.
-         */
-        for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-            osoe_wire_shutdown(&osoe_am.wire[slot]);
-        for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-            osoe_wire_close(&osoe_am.wire[slot]);
         free(osoe_am.wire);
         free(osoe_am.connection);
+        free(osoe_am.busy);
         free(osoe_am.descriptor);
         free(osoe_am.scratch);
         osoe_am.wire = NULL;
         osoe_am.connection = NULL;
+        osoe_am.busy = NULL;
         osoe_am.descriptor = NULL;
         osoe_am.scratch = NULL;
     }
@@ -312,17 +373,22 @@ void osoe_progress_host_stop(void)
 /*
  * The agent's pass, and the lead's half of the sleep protocol (§3.10;
  * lead_wake_model.py). A pass that moved nothing is about to be followed by the
- * agent's futex_wait on agent_wake, with the value it loaded before the pass.
- * So raise lead_sleeping first - seq_cst, the store side of the two-sided
+ * agent's wait on agent_wake - in the ring, at the value it loaded before the
+ * pass. So raise lead_sleeping first - seq_cst, the store side of the two-sided
  * protocol - and then look at the dirty bits again with seq_cst loads: a writer
  * whose bit landed after this pass's exchange either shows here, and the agent
- * goes round again, or read the flag as 1 and bumps agent_wake, which makes the
- * wait return. The flag comes down at the next pass, which is after the wait.
+ * goes round again, or read the flag as 1 and bumps agent_wake and wakes it,
+ * which completes the ring's armed wait. The flag comes down at the next pass,
+ * which is after the wait.
  */
 bool osoe_progress_host_poll(void)
 {
     if (!osoe_am.internode || !osoe_am.lead)
         return false;
+    /* The first pass is on the agent thread, which enabling makes the ring's only
+     * submitter (ring.h). */
+    if (!osoe_am.ring.enabled)
+        osoe_ring_enable(&osoe_am.ring);
     struct osoe_connection_area *a = &osoe_am.area;
     if (flag_raised) {
         atomic_store_explicit(a->lead_sleeping, 0, memory_order_seq_cst);
@@ -339,7 +405,13 @@ bool osoe_progress_host_poll(void)
     return false;
 }
 
-uint64_t osoe_progress_host_idle_ns(void)
+bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen)
 {
-    return osoe_am.internode && osoe_am.lead ? OSOE_PROGRESS_SLEEP_NS : OSOE_SWEEP_NS;
+    /* The lead of a multi-node job waits in its ring, on its sockets and the
+     * word at once (§3.10); every other agent has only the word. Either way
+     * the wait ends by a sweep interval at the latest (§4.10). */
+    if (osoe_am.internode && osoe_am.lead)
+        return osoe_ring_wait_wake(&osoe_am.ring, wake, seen, OSOE_SWEEP_NS);
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+    return osoe_futex_wait(wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0;
 }

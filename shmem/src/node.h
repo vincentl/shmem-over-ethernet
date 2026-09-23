@@ -27,7 +27,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 12
+#define OSOE_NODE_LAYOUT 13
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -280,6 +280,19 @@ struct osoe_am_node_metrics {
      * must follow the active connections and not the job's size (§3.10). */
     _Atomic uint64_t passes;
     _Atomic uint64_t send_visits;
+    /*
+     * The ring (layout 13; §3.3, ring.h): completions reaped, receive buffers
+     * filled, multishot receives ended by -ENOBUFS and re-armed after any end,
+     * sends submitted and the ones the kernel took only part of. -ENOBUFS and
+     * short sends are normal under load; a rate far above the traffic's is a
+     * receive-buffer ring too small for the peers sending at once (§3.3).
+     */
+    _Atomic uint64_t completions;
+    _Atomic uint64_t receive_buffers;
+    _Atomic uint64_t receive_enobufs;
+    _Atomic uint64_t receive_rearms;
+    _Atomic uint64_t sends;
+    _Atomic uint64_t short_sends;
 };
 
 /*
@@ -390,7 +403,8 @@ struct osoe_node_header {
     struct osoe_arrival_handoff arrival[OSOE_TEAMS];
 
     /* Appended at layout 8; layout 11 appended passes and send_visits to it,
-     * which moved nothing before it. Layout 10 added the finalize team's counters above
+     * and layout 13 the ring's six counters, which moved nothing before it
+     * (what follows moved, and is found by name). Layout 10 added the finalize team's counters above
      * and grew `arrival` by one, which moved this record; readers find it by
      * name. Layout 9 added blocked_detail_kind to the PE slot,
      * which moved no header field. Layout 8 also gave each epoch counter's line a

@@ -2,6 +2,7 @@
  * Initialization lifecycle (§6.4): shmem_init, shmem_finalize,
  * shmem_query_initialized, shmem_my_pe, shmem_n_pes.
  */
+#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdatomic.h>
@@ -16,6 +17,7 @@
 
 #include "agent.h"
 #include "base/futex.h"
+#include "base/ring-check.h"
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
@@ -171,6 +173,19 @@ static void session_start(void)
         osoe_fatal("osoe needs Linux 6.7 or later, for the futex2 calls (they fail with "
                    "\"%s\"); this kernel is %s", strerror(futex_error), release);
     }
+    /* io_uring's checks join it for a job that spans nodes, the one kind that
+     * opens a ring (§1: init checks what the library uses). */
+    const char *facility;
+    int ring_error = osoe.bootstrap.node_count > 1 ? osoe_ring_check(&facility) : 0;
+    if (ring_error) {
+        struct utsname u;
+        const char *release = uname(&u) == 0 ? u.release : "unknown";
+        osoe_fatal("osoe needs io_uring with %s for a job of %u nodes (it fails with "
+                   "\"%s\"%s); this kernel is %s", facility, osoe.bootstrap.node_count,
+                   strerror(ring_error),
+                   ring_error == EPERM ? ", which usually means the kernel.io_uring_disabled "
+                                         "sysctl is set" : "", release);
+    }
 
     /* A re-init after a full teardown is a fresh session (§6.4). Every PE runs
      * the same sequence of sessions, so the numbers agree. */
@@ -225,10 +240,10 @@ static void session_start(void)
 static void session_end(void)
 {
     /*
-     * The agent first, so that nothing is polling the engine while it is taken
-     * apart, and so the wire close handshake (wire.h) is not racing this node's
-     * own progress loop. osoe_transport_fini then drains and closes it
-     * (transport.h).
+     * The agent first: its last act is the backend's exit (transport.h), which
+     * on AM drains what the node still owes the network and closes every wire
+     * on the thread that owns them. osoe_transport_fini then frees what is left,
+     * with nothing polling it.
      */
     osoe_agent_stop(&osoe.node.slots[osoe.bootstrap.local_id]);
     osoe_internode_fini();

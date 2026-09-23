@@ -47,6 +47,29 @@ Breakages, each losing a wake
                    A wake that lands before the lead's futex_wait is lost, and
                    the wait sleeps on an unchanged value. Loses a wake under SC.
 
+The ring (phase 1 step 3, design §3.10)
+  ring             the lead no longer sleeps in futex_wait: it waits in one
+                   io_uring submission that carries its sockets' completions
+                   and **at most one armed IORING_OP_FUTEX_WAIT** on the wake
+                   word. Arming compares and registers at once - the value
+                   differs, and the wait completes at once with -EAGAIN - and a
+                   futex_wake completes a registered wait whatever its value.
+                   The lead arms only when none is armed, so a wait armed in an
+                   earlier idle period, on an older value, is the one it sleeps
+                   on after a socket completion woke it: §3.10's claim is that
+                   this stays correct, because every bump of the word is
+                   followed by a futex_wake, which completes it. Socket
+                   completions are modelled as spurious wakes of the lead, up
+                   to two, which is what leaves a wait armed across periods.
+  ring_every_idle  arms a new wait on every idle pass while one is still armed
+                   - the earlier draft that armed 1,881 and overflowed the
+                   completion queue (review D3). Fails AT MOST ONE ARMED, the
+                   assumption the CQ bound rests on (§3.3).
+  ring_no_bump     the claimed wake calls futex_wake without bumping the word.
+                   A wake that lands before the arm finds nothing registered,
+                   and the arm then compares an unchanged value: still a lost
+                   wake, with the ring as without it.
+
 The property is liveness: every commit is handled by the lead, which exits when
 it has handled them all. A lost wake shows as LOST WAKE (the lead asleep with a
 bit set and nothing left to wake it). The sweep is not modelled - in the library
@@ -62,6 +85,18 @@ from engine import DEL, assemble, explore, report, select
 DIRTY = ('dirty',)
 SLEEPING = ('lead_sleeping',)
 WAKE = ('wake',)
+# The ring's armed futex wait, a kernel object (the ring designs only): ARMED is
+# 1 while one is registered, CQE while its completion waits to be reaped, and
+# SOCKET the socket completions still to come.
+ARMED = ('$armed',)
+CQE = ('$futex_cqe',)
+SOCKET = ('$socket_completions',)
+RING = ('ring', 'ring_every_idle', 'ring_no_bump')
+
+
+def complete_armed(M, L):
+    """A futex_wake completes the registered wait, if any, whatever its value."""
+    return ({ARMED: 0, CQE: 1}, {}) if M[ARMED] else ({}, {})
 
 
 def data(s):
@@ -93,11 +128,16 @@ def writer(design, connection, ops):
             B += [(p + 'Q', ('cas', lambda L: SLEEPING, lambda L: 1, lambda L: 0, 'z',
                              '@' + p + 'C2')),
                   (p + 'C2', ('br', lambda L: L['z'], '@' + p + 'K', '@' + p + 'X'))]
-        if design == 'no_bump':
-            B += [(p + 'K', ('fwake', lambda L: WAKE, '@' + p + 'X'))]
+        if design in ('no_bump', 'ring_no_bump'):
+            B += [(p + 'K', ('fwake', lambda L: WAKE, '@' + p + 'KG'))]
         else:
             B += [(p + 'K', ('add', lambda L: WAKE, lambda L: 1, '_', '@' + p + 'F')),
-                  (p + 'F', ('fwake', lambda L: WAKE, '@' + p + 'X'))]
+                  (p + 'F', ('fwake', lambda L: WAKE, '@' + p + 'KG'))]
+        # The same futex_wake completes the ring's armed wait (the ring designs).
+        if design in RING:
+            B += [(p + 'KG', ('gpost', complete_armed, '@' + p + 'X'))]
+        else:
+            B += [(p + 'KG', ('set', 'z', lambda L: L['z'], '@' + p + 'X'))]
         B += [(p + 'X', ('set', 'z', lambda L: DEL, nxt))]
     B += [('WEND', ('done',))]
     return assemble(B)
@@ -146,9 +186,37 @@ def lead(design, connections, total):
         B += [(f'RE{connections}', ('set', '_', lambda L: 0, '@DECIDE'))]
     else:
         B += [('RE', ('load', lambda L: DIRTY, 'again', '@DECIDE'))]
-    B += [('DECIDE', ('br', lambda L: L['again'] != 0, '@AWAKE', '@SLEEP')),
-          ('SLEEP', ('fwait', lambda L: WAKE, lambda L: L['w'], '@AWAKE')),
-          ('AWAKE', ('store', lambda L: SLEEPING, lambda L: 0, serial, '@TOP')),
+    B += [('DECIDE', ('br', lambda L: L['again'] != 0, '@AWAKE', '@SLEEP'))]
+    if design not in RING:
+        B += [('SLEEP', ('fwait', lambda L: WAKE, lambda L: L['w'], '@AWAKE'))]
+    else:
+        # §3.10's loop: arm only if nothing is armed (every_idle: always), then
+        # wait for a completion - the futex's, or a socket's.
+        def arm(M, L):
+            if M[ARMED] or M[CQE]:
+                return [({'$two_armed': 1}, {'armed': 1}, 'arm a second futex wait')]
+            if M[WAKE] != L['w']:
+                return [({CQE: 1}, {'armed': 1}, 'arm: the value moved, -EAGAIN at once')]
+            return [({ARMED: 1}, {'armed': 1}, f'arm FUTEX_WAIT(wake, {L["w"]})')]
+
+        def wait(M, L):
+            out = []
+            if M[CQE]:
+                out.append(({CQE: 0}, {'armed': 0}, 'reap the futex completion'))
+            if M[SOCKET]:
+                out.append(({SOCKET: M[SOCKET] - 1}, {}, 'a socket completion'))
+            return out                      # blocked while neither: asleep
+
+        def one_armed(M, L):
+            return ('AT MOST ONE ARMED: a second IORING_OP_FUTEX_WAIT was armed while '
+                    'one was outstanding' if M['$two_armed'] else None)
+
+        B += [('SLEEP', ('br', lambda L: L['armed'] == 1 and design != 'ring_every_idle',
+                         '@RWAIT', '@ARM')),
+              ('ARM', ('nd', arm, '@ONE')),
+              ('ONE', ('check', one_armed, '@RWAIT')),
+              ('RWAIT', ('nd', wait, '@AWAKE'))]
+    B += [('AWAKE', ('store', lambda L: SLEEPING, lambda L: 0, serial, '@TOP')),
           ('LEND', ('done',))]
     return assemble(B)
 
@@ -158,7 +226,7 @@ def case(design, layout):
     connections = max(c for c, _ in layout) + 1
     total = sum(n for _, n in layout)
     threads = [writer(design, c, n) for c, n in layout] + [lead(design, connections, total)]
-    mem = {DIRTY: 0, SLEEPING: 0, WAKE: 0}
+    mem = {DIRTY: 0, SLEEPING: 0, WAKE: 0, ARMED: 0, CQE: 0, SOCKET: 2, '$two_armed': 0}
     for s in range(connections):
         mem[data(s)] = 0
         mem[('mark', s)] = 0
@@ -182,6 +250,13 @@ CASES = [
     ('writer_plain', [(0, 1), (1, 1)], True, False),
     ('no_recheck', [(0, 1), (1, 1)], False, False),
     ('no_bump', [(0, 1), (1, 1)], False, False),
+
+    ('ring', [(0, 1), (1, 1)], False, True),
+    ('ring', [(0, 1), (1, 1)], True, True),
+    ('ring', [(0, 2), (1, 2)], True, True),
+    ('ring', [(0, 1), (1, 1), (0, 1)], True, True),
+    ('ring_every_idle', [(0, 1), (1, 1)], False, False),
+    ('ring_no_bump', [(0, 1), (1, 1)], False, False),
 ]
 
 if __name__ == '__main__':

@@ -48,6 +48,7 @@ add_test(NAME shmem.static-link
           -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/static-link-check
           -DPROBE_SRC=${CMAKE_CURRENT_SOURCE_DIR}/static-link-probe.c
           -DC_COMPILER=${CMAKE_C_COMPILER}
+          "-DURING_LIBRARIES=${LIBURING_LINK_LIBRARIES}"
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStaticLink.cmake)
 set_tests_properties(shmem.static-link PROPERTIES LABELS "tier1" TIMEOUT 180)
 
@@ -138,12 +139,21 @@ osoe_warnings(shmem_test_connection)
 add_test(NAME shmem.connection COMMAND shmem_test_connection)
 set_tests_properties(shmem.connection PROPERTIES LABELS "tier1" TIMEOUT 120)
 
+# The compressed rank map on its own (tier 1): progressions, runs, lookups against
+# the uncompressed map, the refusals, and the sizes at 4,096 x 256 (§6.2).
+add_executable(shmem_test_rank-map test-rank-map.c ../src/rank-map.c)
+target_include_directories(shmem_test_rank-map PRIVATE ../src)
+osoe_warnings(shmem_test_rank-map)
+add_test(NAME shmem.rank-map COMMAND shmem_test_rank-map)
+set_tests_properties(shmem.rank-map PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The node-pair wire on its own (tier 1): both ends in one process, so no
 # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
 # its own osoe_fatal so a failure inside it fails the test.
-add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/shm-object.c)
+add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/ring.c ../src/listener.c
+  ../src/shm-object.c)
 target_include_directories(shmem_test_wire PRIVATE ../src)
-target_link_libraries(shmem_test_wire PRIVATE osoe_base rt)
+target_link_libraries(shmem_test_wire PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_wire)
 add_test(NAME shmem.wire COMMAND shmem_test_wire)
 set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
@@ -154,9 +164,10 @@ set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
 # and takes its identity straight from the launcher environment.
 # The seed is fixed: §3.14 wants an injected fault reproducible, and without it
 # the pattern would follow the launcher's pid and differ every run.
-add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/shm-object.c)
+add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/ring.c
+  ../src/listener.c ../src/shm-object.c)
 target_include_directories(shmem_test_wire_pair PRIVATE ../src)
-target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt)
+target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_wire_pair)
 add_test(NAME shmem.wire-pair
   COMMAND ${CMAKE_COMMAND} -E env OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000
@@ -175,9 +186,10 @@ set(OSOE_LAUNCH_COUNTS 1 2 4)
 # all of them - and that mutation passed a two-node test.
 add_executable(shmem_test_barrier_am test-barrier-am.c
   ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c ../src/bootstrap.c ../src/shm-object.c)
+  ../src/reply.c ../src/wire.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
+  ../src/shm-object.c)
 target_include_directories(shmem_test_barrier_am PRIVATE ../src)
-target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt)
+target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_barrier_am)
 foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
   string(REPLACE "," ";" ranks "${map}")
@@ -205,7 +217,7 @@ add_test(NAME shmem.fatal-order COMMAND shmem_test_fatal-order)
 set_tests_properties(shmem.fatal-order PROPERTIES LABELS "tier1" TIMEOUT 30)
 
 add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c ../src/shm-object.c
-  ../src/am.c)
+  ../src/am.c ../src/rendezvous.c ../src/rank-map.c ../src/listener.c)
 target_include_directories(shmem_test_job PRIVATE ../src)
 target_link_libraries(shmem_test_job PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_job)
@@ -218,9 +230,10 @@ foreach(map 0 0,0,0,0 0,1,2,3 0,0,0,1,2,2 0,1,2,0,1,0)
   set_tests_properties(shmem.job.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
 # Two node leads claiming one rank: node 1's lead is told its node holds ranks 1
-# and 0, and node 0's lead holds 0. Exactly one claim wins (a CAS per rank since
-# slice 2; a plain test-and-store before, which two simultaneous leads could
-# both pass), and the job is refused naming the rank.
+# and 0, and node 0's lead holds 0. The rendezvous's root checks every node's
+# ranks once, as it builds the map (rank-map.c), and the job is refused naming
+# the rank and both nodes. (Step 2 had each lead claim its ranks by CAS in a
+# job-wide array; a plain test-and-store before slice 2 let two leads both pass.)
 add_test(NAME shmem.job.duplicate-rank
   COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1,0 --
           $<TARGET_FILE:shmem_test_job>)
@@ -228,9 +241,9 @@ set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 
   PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
 
 # A rank no lead claims: node 1's lead is told its node holds rank 1 alone,
-# though rank 2 is there too. The map is checked once, by the lead whose
-# arrival completed the rendezvous (slice 3; it was every PE's O(P) scan), and
-# the job is refused naming the rank.
+# though rank 2 is there too. The root checks the map once as it builds it
+# (it was every PE's O(P) scan before slice 3), and the job is refused naming
+# the rank.
 add_test(NAME shmem.job.unclaimed-rank
   COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1 --
           $<TARGET_FILE:shmem_test_job>)
@@ -256,6 +269,76 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
     TIMEOUT 60 PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
 endif()
 
+# The values every node must agree on are checked up the rendezvous tree, each
+# by the parent that sees the disagreement, naming both nodes (§6.2). Node 2's
+# parent is node 0 at the tree's fan-out of 8.
+add_test(NAME shmem.job.disagree.symmetric-size
+  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 2:SHMEM_SYMMETRIC_SIZE=64M --
+          $<TARGET_FILE:shmem_test_job>)
+add_test(NAME shmem.job.disagree.fanout
+  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 2:OSOE_COLLECTIVE_FANOUT=2 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.disagree.symmetric-size shmem.job.disagree.fanout
+  PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.job.disagree.symmetric-size PROPERTIES PASS_REGULAR_EXPRESSION
+  "node 2 [(]or a node below it[)] has SHMEM_SYMMETRIC_SIZE [0-9]+; node 0 has")
+set_tests_properties(shmem.job.disagree.fanout PROPERTIES PASS_REGULAR_EXPRESSION
+  "node 2 [(]or a node below it[)] has OSOE_COLLECTIVE_FANOUT=2; node 0 has 4")
+
+# The node count is the value that shapes the waits: a lead expects children by
+# its own count, so one given too many waits for children that do not exist.
+# The hello carries the count and a lead calls its parent before it waits for
+# its children, so the first edge that disagrees refuses the job, rather than
+# every lead waiting with no message (tools/modelcheck/rendezvous_model.py).
+# Node 1 given 10 nodes expects a child 9; node 0 given 9 expects 1 to 8.
+add_test(NAME shmem.job.disagree.node-count
+  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 1:OSOE_STEP_NUM_NODES=10
+          -e 1:OSOE_STEP_NODELIST=127.0.0.[1-10] -- $<TARGET_FILE:shmem_test_job>)
+add_test(NAME shmem.job.disagree.root-node-count
+  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 0:OSOE_STEP_NUM_NODES=9
+          -e 0:OSOE_STEP_NODELIST=127.0.0.[1-9] -- $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.disagree.node-count shmem.job.disagree.root-node-count
+  PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.job.disagree.node-count PROPERTIES PASS_REGULAR_EXPRESSION
+  "node 0, launched for 3 tasks on 3 nodes, was called by node 1, launched for 3 tasks on 10 nodes")
+set_tests_properties(shmem.job.disagree.root-node-count PROPERTIES PASS_REGULAR_EXPRESSION
+  "node 0, launched for 3 tasks on 9 nodes, was called by node [12], launched for 3 tasks on 3 nodes")
+
+# OSOE_JOB_SECRET (§6.2, §10): leads that share it meet; a lead that has none,
+# or a different one, is refused by name - by the proof in the hello, which a
+# lead that does not know the secret cannot make.
+set(osoe_secret 0123456789abcdef0123456789abcdef)
+add_test(NAME shmem.job.secret
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+add_test(NAME shmem.job.secret.missing
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
+          $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 -e 1:OSOE_JOB_SECRET= --
+          $<TARGET_FILE:shmem_test_job>)
+add_test(NAME shmem.job.secret.different
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
+          $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30
+          -e 1:OSOE_JOB_SECRET=fedcba9876543210fedcba9876543210 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.secret shmem.job.secret.missing shmem.job.secret.different
+  PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.job.secret.missing PROPERTIES
+  PASS_REGULAR_EXPRESSION "node 0 has an OSOE_JOB_SECRET and node 1 has none")
+set_tests_properties(shmem.job.secret.different PROPERTIES
+  PASS_REGULAR_EXPRESSION "a proof of a different OSOE_JOB_SECRET")
+
+# The lead's half of the secret (tier 1): a caller whose hello is right in every
+# field but who cannot prove the secret - replaying the answer's own proof - is
+# refused and not counted, and the lead goes on listening. Only a caller that
+# lies reaches this check, so test-listener.c is one, and includes listener.c
+# for the hello's layout.
+add_executable(shmem_test_listener test-listener.c)
+target_include_directories(shmem_test_listener PRIVATE ../src)
+target_link_libraries(shmem_test_listener PRIVATE osoe_base Threads::Threads)
+osoe_warnings(shmem_test_listener)
+add_test(NAME shmem.listener.secret COMMAND shmem_test_listener)
+set_tests_properties(shmem.listener.secret PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The progress loop between two logical nodes (tier 2): every layer at once.
 # The wire is far smaller than a segment and its split injection is on, so the
 # stream really arrives in pieces (§8.2). Sizes are pinned rather than
@@ -263,9 +346,9 @@ endif()
 # vacuous.
 add_executable(shmem_test_progress test-progress.c
   ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c ../src/shm-object.c)
+  ../src/reply.c ../src/wire.c ../src/ring.c ../src/listener.c ../src/shm-object.c)
 target_include_directories(shmem_test_progress PRIVATE ../src)
-target_link_libraries(shmem_test_progress PRIVATE osoe_base rt)
+target_link_libraries(shmem_test_progress PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_progress)
 add_test(NAME shmem.progress
   COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048

@@ -48,6 +48,7 @@
 #include "connection-area.h"
 #include "node.h"
 #include "progress.h"
+#include "ring.h"
 #include "reply.h"
 #include "wire.h"
 
@@ -84,10 +85,25 @@ enum { HEAP = 8192, DESCRIPTORS = 32, SCRATCH = 4096, PAYLOAD = 600 };
 static void drain(struct osoe_progress *p, const struct osoe_deadline *give_up)
 {
     while (!osoe_progress_idle(p)) {
-        osoe_progress_poll(p);
+        if (!osoe_progress_poll(p))
+            osoe_ring_wait(p->ring, UINT64_C(1000000));
         if (osoe_deadline_expired(give_up))
             return;
     }
+}
+
+/*
+ * Then close as a lead does (§6.4, close_model.py): goodbye, end of stream, and
+ * read until the peer's has ended - which is also what keeps this node reading
+ * until the peer has taken everything it was owed.
+ */
+static void close_connections(struct osoe_progress *p, const struct osoe_deadline *give_up)
+{
+    osoe_progress_close(p);
+    while (!osoe_progress_closed(p) && !osoe_deadline_expired(give_up))
+        if (!osoe_progress_poll(p))
+            osoe_ring_wait(p->ring, UINT64_C(1000000));
+    CHECK(osoe_progress_closed(p));
 }
 
 /*
@@ -215,7 +231,10 @@ int main(void)
         .local_id = local_id,
         .rank = my_pe,
         .local_count = 2,           /* map 0,0,1,1: the last to open the area removes its name */
+        .node_count = 2,
         .no_progress_ns = UINT64_C(30000000000),  /* fail rather than hang */
+        .port_low = OSOE_DEFAULT_PORT_LOW,
+        .port_high = OSOE_DEFAULT_PORT_HIGH,
     };
 
     struct osoe_connection_area area;
@@ -265,17 +284,22 @@ int main(void)
         return CHECK_DONE();
     }
 
-    struct osoe_wire wire;
-    osoe_wire_open(&wire, &b, peer, 0);
+    /* The lead's connection to the other node, and the ring it drives it with
+     * (§6.2, ring.h). */
+    static struct osoe_wire wire;
+    static struct osoe_ring ring;
+    osoe_wires_open(&wire, &ring, &b, 0, NULL);
+    osoe_ring_enable(&ring);
 
     static struct osoe_reply descriptors[DESCRIPTORS];
     static unsigned char scratch[SCRATCH];
     static struct osoe_progress_connection connections[1];
+    static uint64_t busy[1];
     struct osoe_progress_host host = { resolve, landing, notify, release, NULL };
     struct osoe_progress p;
-    osoe_progress_init(&p, &area, &wire, descriptors, DESCRIPTORS, scratch, SCRATCH,
+    osoe_progress_init(&p, &area, &wire, &ring, descriptors, DESCRIPTORS, scratch, SCRATCH,
                        &host);
-    osoe_progress_attach(&p, connections);
+    osoe_progress_attach(&p, connections, busy);
     /* Two nodes, so the tree is node 0 with node 1 as its only child. */
     static const uint32_t both[] = { 0, 1 };
     struct osoe_collective_tree tree;
@@ -516,6 +540,7 @@ int main(void)
      * the library's own teardown uses.
      */
     drain(&p, &give_up);
+    close_connections(&p, &give_up);
 
     /* Every applied rmw notifies; a put notifies best effort (§4.10). */
     CHECK(notifies >= 3);
@@ -537,6 +562,7 @@ done:
         }
     }
     osoe_wire_close(&wire);
+    osoe_ring_close(&ring);
     osoe_connection_area_close(&area);
     arrivals_close();
     return CHECK_DONE();

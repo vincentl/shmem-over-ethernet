@@ -3,5 +3,6 @@
 # (§3.14) rather than in someone's build tree.
 add_subdirectory(modelcheck)
 add_subdirectory(probe)
+add_subdirectory(echo-uring)
 add_subdirectory(launch)
 add_subdirectory(stat)

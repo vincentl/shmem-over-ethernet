@@ -12,6 +12,9 @@
  *
  * A second backend replaces this file and keeps barrier.c.
  */
+/* liburing.h, through am-state.h and ring.h, uses POSIX types that plain C11
+ * hides (portability review F12: feature macros are declared per file). */
+#define _GNU_SOURCE
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>

@@ -72,8 +72,12 @@ pkg-config and stops at configure time, saying why. At startup the library check
 that the *running kernel* supports what it needs — the `tools/probe` checks,
 moved into init — and refuses by name otherwise, before it creates anything in
 `/dev/shm`. The first catches old headers; the second catches an old kernel under
-new headers. Init checks what the library uses: today the futex2 calls alone,
-since step 2 opens no ring; io_uring's opcode checks join them at step 3.
+new headers. Init checks what the library uses: the futex2 calls always, and
+since phase 1 step 3, for a job that spans nodes - the one kind that opens a ring
+- an io_uring created `SINGLE_ISSUER`, `R_DISABLED` and with an explicit CQ size,
+a registered provided-buffer ring, and the `RECV`, `SEND` and `FUTEX_WAIT` opcodes
+(`base/ring-check.c`). A one-node job on a machine whose `kernel.io_uring_disabled`
+sysctl forbids io_uring still runs.
 
 **CMake is a build tool, not a dependency chain.** What this project exists to
 avoid is a dependency tree that does not build on the target hardware, not the
@@ -106,11 +110,14 @@ Targets are stated against a local, reproducible floor instead:
 
 Each floor is a harness in this repository (§8.4), so it runs on any machine
 with nothing installed, reproduces identically on x86 and aarch64, and cannot
-rot the way a third-party build can. **The constant factors are deliberately not
-written down yet** — they are pinned by the first run of the echo harness, and
-pinning them before measuring would be
-inventing a target rather than choosing one. Track all three per commit through
-the §3.14 counters.
+rot the way a third-party build can. **The constant factors were deliberately not
+written down before the echo harness first ran**, since pinning them before
+measuring would be inventing a target rather than choosing one. The harness has
+now run (§8.4, phase 1 step 3 slice 1) and its own io_uring-to-blocking ratio is
+pinned. The library's ratios to it are measured (§8.4: 2.05× for a get), and
+are pinned once quiet and a full buffer stop polling, since two of them still
+measure a step-2 stand-in.
+Track all three per commit through the §3.14 counters.
 
 ---
 
@@ -282,6 +289,49 @@ peer's delayed ACK it can sit on a segment for tens of milliseconds.
 **Not used:** `IORING_OP_SEND_ZC`. Two CQEs, buffer stability requirement, and
 only pays above ~10–16 KB. Revisit only on a fast NIC.
 
+*As built* (phase 1 step 3 slice 1; `ring.[ch]`, `wire.[ch]`, `listener.[ch]`).
+One ring per progress thread, created `IORING_SETUP_SINGLE_ISSUER |
+IORING_SETUP_R_DISABLED | IORING_SETUP_CQSIZE` on the thread that makes the
+node's connections and **enabled by the lead's agent on its first pass**, which
+makes the agent the one task the kernel lets submit: invariant 19 enforced by the
+kernel, not by convention (another thread's submission fails `-EEXIST`, measured
+on 6.12). Both bounds are computed and asserted at open: the SQ holds `2 × wires +
+1`, a re-arm and a send per wire and the futex wait, and the CQ `buffers + 2 ×
+wires + 1` — one completion per provided buffer, because a buffer is refilled
+only after the pass that emptied it; a terminal completion per armed receive; a
+send per wire; the futex wait. A submission that finds the SQ full is a fatal
+naming the broken bound, not a retry.
+
+**One provided-buffer ring for every wire**, `OSOE_WIRE_BUFFERS` of
+`OSOE_WIRE_BYTES` (default 64 × 16 KiB), so the memory a node holds for
+receiving does not grow with its peers; a multishot recv per wire selects from
+it. The reap queues each filled buffer on its wire, oldest first, and marks the
+wire readable; the pass then takes every byte of every readable wire through
+`osoe_wire_recv`, recycling each buffer the moment it is emptied. So a buffer is
+held from one reap to the end of that pass and never across the next reap, and
+the next reap **checks**: a buffer still queued is a fatal naming invariant 23,
+which is how "never hold a provided buffer" became assertable rather than
+remembered. Every completion without `IORING_CQE_F_MORE` re-arms, `-ENOBUFS`
+included; the re-arm is submitted at the end of the pass, after the buffers the
+reap queued have been recycled.
+
+**Send references the sealed connection buffer itself** — no staging copy, since
+a sealed buffer is already stable until released. That is the one change to the
+wire's contract: `osoe_wire_send`'s first offer starts the send and returns 0, and
+an offer after its completion has been reaped returns what the kernel took, which
+the caller then offers the rest after. The engine already behaved that way — it
+releases a buffer only once every byte has been accepted, and re-offers from where
+the count ended — so `progress.c` did not change for it; the wire checks that
+bytes offered while a send is in flight are the ones in flight. `MSG_NOSIGNAL` on
+every send: a peer that has gone is a completion with `-EPIPE`, not a signal.
+
+**Split injection survives the socket.** `OSOE_WIRE_SPLIT` and `OSOE_WIRE_SEED`
+truncate sends (to at least one byte — a send truncated to nothing would wait for
+a completion that is not coming) and receives, hash-derived as before (§3.14), and
+a small `OSOE_WIRE_BYTES` now makes the kernel itself split a segment across
+provided buffers. `shmem.wire` asserts that short sends, short receives and
+`-ENOBUFS` re-arms all happened (64-byte buffers, four of them).
+
 ### 3.4 Segment structure
 
 **The trust boundary.** All PEs of a job trust each other completely — a
@@ -289,8 +339,11 @@ one-sided API cannot do otherwise, since any PE may write any heap. They are the
 same job and the same build, **assumed buggy but not hostile**. Other local users
 are untrusted, which mode 0600 and `O_EXCL` on every object enforce (§6.2). The
 network is trusted at the level Slurm's own traffic is; §10 records how a secret
-in the step-3 handshake would change that. What follows from "buggy": **a peer's
-bytes must never be able to write outside a heap or a landing slot**. The
+in the step-3 handshake would change that. *(Built in phase 1 step 3: the
+optional `OSOE_JOB_SECRET` keeps hosts that do not know it out of the job's
+hellos, §6.2; it does not encrypt the traffic that follows.)* What follows from
+"buggy": **a peer's bytes must never be able to write outside a heap or a
+landing slot**. The
 receiving node validates every length and index a segment carries before
 applying it — a message's length against what is left of its segment, the
 message count against the segment's size, a get reply's token, offset and total
@@ -820,18 +873,32 @@ latency-neutral, since the Pi will not honour a 10 µs `nanosleep` and a 1 ms
 sleep roughly doubles round-trip latency); `IORING_OP_MSG_RING` (requires a ring
 per PE to avoid one futex word).
 
-> **§7.1 step 2 polls, and that is a stand-in rather than a change of mind.**
+> **§7.1 step 2 polled, and that was a stand-in rather than a change of mind.**
 > The loop above waits on *one* submission that carries both the socket
 > completions and the futex — that is the whole trick, and `IORING_OP_FUTEX_WAIT`
-> is in `tools/probe` because of it. Step 2 has no ring: its wire is shared
-> memory, and a plain `futex_wait` takes one address, so the lead's agent can
+> is in `tools/probe` because of it. Step 2 had no ring: its wire was shared
+> memory, and a plain `futex_wait` takes one address, so the lead's agent could
 > wait on its wake word or on one peer's wire, but not on both, and with several
-> peers not on all the wires. Outbound traffic is unaffected — an application
-> thread bumps the wake word, which is an address the agent is already waiting
-> on (§3.12) — so only *arriving* bytes have no way to announce themselves, and
-> those are found by looking, at an interval far under the safety sweep. The
-> rejection above stands for the shipping design, and step 3 restores the
-> blocking form and deletes the interval.
+> peers not on all the wires. Arriving bytes were found by looking, every 250 µs.
+
+*As built* (phase 1 step 3 slice 1; `osoe_ring_wait_wake`). The loop above, with
+three facts it did not state. **The backend owns the wait**: `agent.c` calls
+`osoe_transport_agent_wait(wake, seen)`, and the lead's implementation arms the
+ring's futex wait and calls `io_uring_submit_and_wait_timeout` with a sweep
+interval; every other agent keeps a plain `futex_wait` (§4.10; the seam's first
+shape, `idle_ns`, could not carry this). **The claimed wake of slice 3 is kept
+unchanged**: the lead raises `lead_sleeping`, rechecks the dirty bits, and only
+then waits; a writer that claims the flag bumps the word and wakes it, which
+completes the armed wait. **A wait armed in an earlier idle period may be the one
+slept on**: a socket completion ends a wait without completing the futex, so the
+armed flag survives into the next idle period with an older value, and that is
+correct because every bump of the word — the claimed wake, a posted arrival, the
+agent's stop — is followed by a `futex_wake`, which completes a registered wait
+whatever its value. `lead_wake_model.py` checks it: the `ring` design passes under
+SC and TSO with the trapped-state check, including a lead woken twice by sockets
+with its wait still armed; arming on every idle pass breaks "at most one armed"
+(the 1,881); a wake without its bump is still a lost wake, ring or not. The
+250 µs interval (`OSOE_PROGRESS_SLEEP_NS`) is deleted.
 
 **How the lead finds its work** (phase 1 step 2 slice 3; second review, D12). The
 loop above says `submit_sealed_buffers()` and `work_pending()` without saying how
@@ -868,11 +935,17 @@ header, so every local PE sees them:
   put; without the claim it still made 93% of them, because every put landing
   during the lead's wake-up latency saw the flag raised.
 
-**Receiving still polls every wire** in step 2: the shared-memory wire says
-nothing when bytes arrive, so the lead looks at all *N* − 1 on every pass. That
-is O(*N*) per pass and not work discovery's to fix; step 3's receive completions
-replace it. Nothing added here touches every connection's shared state
-periodically, so it does not make lazy connection establishment harder.
+**Receiving polled every wire** in step 2: the shared-memory wire said nothing
+when bytes arrived, so the lead looked at all *N* − 1 on every pass, O(*N*) per
+pass. *Replaced in phase 1 step 3*: the ring's reap marks the wires something
+arrived on, and a pass receives from those and no others — the receive side's
+equal of the dirty bitmap. The send side's "privately known busy" half was still
+asked of every connection (O(1) each, but O(*N*) per pass), so it is now a
+private bitmap too, set where the work appears (a reply or collective forward
+queued toward a connection) and settled after each visit. A pass costs *N*/64
+loads of each bitmap and O(active) connections visited. Nothing added touches
+every connection's shared state periodically, so lazy connection establishment
+is no harder.
 
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
@@ -1319,6 +1392,17 @@ fields of the node header written by the lead's progress thread alone, the
 single-writer case of §3.16. They exist first because two protocols could not
 otherwise be seen working: an acknowledgement echo (§3.4) and an exhausted reply
 pool (§3.8) have no effect a test can observe except these counts.
+
+*As built (layout 13, phase 1 step 3 slice 1):* the ring's own counts, node
+totals written by the progress thread once a pass - `transport.am.completions`,
+`receive_buffers` (provided buffers filled), `receive_enobufs`,
+`receive_rearms` (every multishot end, `-ENOBUFS` or not), `sends` and
+`short_sends`. `-ENOBUFS` and short sends are normal under load; a rate far
+above the traffic's is a provided-buffer ring too small for the peers sending
+at once (§3.3). Per peer they wait, as the rest of this list does. An
+`osoe-stat` from before layout 13 finds every metric by name through the
+segment's own table, so it prints these too; it decodes nothing whose encoding
+it does not know.
 
 *As built (layout 12, phase 1 step 2 slice 3):* the **fourth scope** this
 question asked for. One record per connection toward a peer node, in peer-slot
@@ -2623,10 +2707,14 @@ decision). Two more things cross that the original contract left out, and both
 are now declared in `transport.h`: the backend's **lifecycle** —
 `osoe_transport_init` starts whatever the backend needs, AM's connection area,
 wires and engine included, before the agent thread exists, and
-`osoe_transport_fini` drains and closes it after that thread is joined — and the
+`osoe_transport_fini` frees what is left after that thread is joined — and the
 **agent thread**, which the library lends the backend through
-`osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` and nothing else
-(§3.12; §10's "boundary progress call"). So `barrier.c`, `agent.c` and `init.c`
+`osoe_transport_agent_pass`, `osoe_transport_agent_wait` and
+`osoe_transport_agent_exit` and nothing else (§3.12; §10's "boundary progress
+call"). The backend owns the agent's idle wait, because only it can wait on its
+own events and the wake word in one call, and it gets a last turn on the thread
+before the thread returns, because what the thread owns only it can finish
+(phase 1 step 3; the §10 entry has why the first shape was wrong). So `barrier.c`, `agent.c` and `init.c`
 name no AM symbol, and the sentence "the SHMEM layer calls only what is declared
 here" is true of `transport.h` plus `internode.h`. **It is enforced**: the AM
 backend's state moved out of `struct osoe_state` into `am-state.h`, and the tier-1
@@ -3473,6 +3561,20 @@ production path depends on a tuned sleep; the regression was recorded and
 accepted with the author on 2026-09-22 rather than engineered around in code step
 3 deletes.
 
+*Measured on sockets* (phase 1 step 3 slice 1, part C; the same program, build
+type and VM, with the step-2 tree at `3926a60` and this one interleaved per
+repetition, median of 7 means of 2,000 rounds). The poll is gone and so is the
+regression. At *k* = 4 the barrier measures 60 µs at 2 nodes (516 on the step-2
+wire), 63 at 5 (592), 76 at 6 (929), 86 at 8 (1,055) and 109 at 16 (1,231): 9 to
+12 times faster. The step-2 column reproduces slice 3's numbers within 5%. At 16
+nodes, *k* = 16 (depth 1) measures 108 µs, *k* = 4 (depth 2) 109 and *k* = 2
+(depth 4) 131. That is about 11 µs a level, up and down together, where the poll
+cost 170–200 µs a level each way: **latency now follows hops and per-message work,
+not poll intervals.** On four cores running sixteen nodes' agents and PEs, a
+one-level tree's fifteen arrivals, serialized through the root, cost as much as a
+second level does (108 against 109 µs). The target's trade-off between depth and
+fan-out is the arithmetic above, not this machine's.
+
 *Why a tree now, and what the shared-memory wire hides.* The star it replaced —
 every node's arrival to node 0, node 0's release to every node — was optimal in
 messages and serial in one thread: 2(*N* − 1) message events on node 0's
@@ -3903,6 +4005,7 @@ The rendezvous inherits §3.4's trust boundary: the PEs of a job trust each othe
 other local users do not (every object is mode 0600, created `O_EXCL`), and the
 network is trusted as Slurm's own traffic is. The step-3 handshake authenticates
 nothing beyond the job and step ids, which are public; §10 has the open item.
+*(Decided and built in phase 1 step 3: an optional `OSOE_JOB_SECRET`, below.)*
 
 **Node-local.** The lead creates the node segment as a named shared memory object,
 `/osoe.<job>.<step>.<node>.<session>`, so concurrent steps on one node cannot
@@ -4009,7 +4112,8 @@ names; otherwise they fall back to regular shared memory.
 **Global.** The step's rendezvous server is the lead of node 0: the task with
 `SLURM_NODEID == 0` and `SLURM_LOCALID == 0`, on the first host of
 `SLURM_STEP_NODELIST`. That is the same list `SLURM_NODEID` indexes, so every task
-computes the same host under any distribution.
+computes the same host under any distribution. *(As written, a star; built in
+phase 1 step 3 as a tree rooted at that lead - "The rendezvous as built", below.)*
 
 - **Port:** a deterministic sequence of candidate ports hashed from the job and
   step IDs, within a configurable range. The server binds the first free
@@ -4026,6 +4130,40 @@ computes the same host under any distribution.
 - **Node-pair connections:** the lower node index connects to the higher, so each
   pair opens exactly one stream (§3.1).
 
+*Node-pair connections as built* (phase 1 step 3 slice 1; `listener.[ch]`,
+`osoe_wires_open`). **Every lead listens, not only node 0's**, on the first free
+port of a candidate sequence hashed from (job, step, **node**) inside
+`OSOE_PORT_RANGE` (default 17000–26999, below Linux's ephemeral range), and
+another lead finds it by trying the same sequence and asking whoever answers who
+it is. With the node in the hash every lead has a listener another can find —
+what the node-pair mesh needs, and what a tree-shaped rendezvous needs (below) —
+and on one host, where §8.1's logical nodes all live, two leads' sequences start
+in different places. No `SO_REUSEADDR`: a candidate in `TIME_WAIT` is skipped
+like one in use.
+
+**The hello is three steps**: the caller's hello (job, step, session, both node
+numbers, and what the connection is for), the answer, and the caller's
+confirmation. A caller that gets no answer within a second — a stranger's port
+that accepted and says nothing — closes and tries the next candidate, and the
+whole sequence again after a backoff; with two steps the answering lead could not
+tell that caller from one it now owns, and would count a peer whose socket is
+already closed. It counts a connection only on the confirmation. The second's
+wait is not a time bound on the job (§3.15): giving up on a candidate retries.
+
+**Each lead accepts every lower node, then connects to every higher one.** A lead
+answers its callers the whole time it waits for them, so no lead waits on one that
+is itself waiting to be answered; the last lead is connected to after about *N*
+connection times, not after a chain of them. The listen backlog is `min(N, 4096)`,
+every lower node at once, capped by `net.core.somaxconn`; past 4,096 nodes a
+connection waits in SYN retries rather than failing. The listener is closed once
+the lower nodes are in, so a stranger probing a candidate afterwards is refused
+rather than left unanswered. In a job the mesh does not probe at all: each lead
+listens on a port the kernel chooses, **advertises it in its backend blob**
+(`osoe_transport_advertise`, the call the blob was waiting for), and the others
+connect to the address and port the rendezvous carried (below). The port rule's
+probing remains for the rendezvous's own parent connection, and for the tests
+below the library that make a mesh without a rendezvous.
+
 **What the map holds, and what it costs** (phase 1 step 2 slice 3; second review,
 D7). Per rank: its node (4 bytes) and its **local index on that node** (2 bytes;
 16 bits suffice at 256 PEs per node, and `OSOE_GTIDS` longer than 65,535 is
@@ -4040,17 +4178,124 @@ order, and otherwise a binary search over the node's *L* ranks sorted — replac
 a world-sized `local_of_rank` array in every PE, which was 4 × *P* bytes per PE and
 1 GiB per node at 4,096 × 256. `gtids` is sized by *L*, not *P*.
 
-**The known next step is a range-compressed map.** Under block and cyclic
+**The known next step was a range-compressed map.** Under block and cyclic
 distributions the map is O(*N*) runs, not O(*P*) entries, and so is the broadcast
-that fills it — which as designed sends 4·*P* bytes to each of *N* − 1 leads from
+that fills it — which as designed sent 4·*P* bytes to each of *N* − 1 leads from
 one NIC, O(*N*·*P*) bytes through node 0: 255 MB at 500 × 256 (about 2 s on 1 GbE),
-16 GB at 4,096 × 256 (second review, algorithmic-scaling 9). Neither is built:
-the step-2 rendezvous is a shared-memory object, and the socket rendezvous of
-step 3 is where the compressed form and a tree-shaped broadcast belong.
+16 GB at 4,096 × 256 (second review, algorithmic-scaling 9). Built with the socket
+rendezvous (below).
 
 `SLURM_STEP_NODELIST` is a compressed hostlist (`pi[01-04,07]`). Expanding it is a
 small parser — call it fifty lines — **written with unit tests in tier 1**, because
 it is pure string handling that would otherwise be debugged on a cluster.
+*Built* (`base/hostlist.c`, `base.hostlist`): prefix, one bracketed list of
+numbers and ranges keeping the lower bound's width, suffix; Slurm's multi-bracket
+names are refused by name rather than guessed. Nothing expands the list: a lead
+asks for its own entry and its parent's, O(length of the string) each.
+
+**The rendezvous as built** (phase 1 step 3 slice 1; `rendezvous.[ch]`, `job.[ch]`;
+decided with the author 2026-09-22). **A tree, not a star.** Node *i*'s lead
+connects to its parent, (*i* − 1)/8, in a tree of fan-out 8 over the node indices
+rooted at node 0, found by the port rule on the address its host-list entry names;
+each lead listens on its own entry's address. §6.2's star put every connection
+into one listener and every lead's copy of the job's tables through one NIC —
+O(*N*) connections and O(*N*²) bytes out of node 0: 2.2 GB at 4,096 nodes for
+the addresses and blobs alone, even with the map compressed (2.6 GB with a
+block map's runs). In the tree a lead has one connection up and at most eight down, and sends each child
+the tables once: O(*N*) bytes per edge, depth ⌈log₈ *N*⌉ — 4 at 4,096 nodes. The
+fan-out is a constant, so no setting can make two leads disagree about who is
+whose parent.
+
+**The node count is the value that shapes the waits**, because a lead expects
+children by its own count: one given too large a count waits for children that
+do not exist. The order first written — accept the children, read their
+reports, only then call the parent — let it do that before its parent had heard
+from it, and then nobody could ever say why: its parent waited for it, the root
+for the parent, every other lead for the root's tables, and no lead refused
+anything (`tools/modelcheck/rendezvous_model.py`, STUCK; and
+`shmem.job.disagree.node-count` hung until its timeout, written to show it). So
+**a lead calls its parent before it accepts its children**, and **the hello
+carries the node count and the job's size**, checked by the lead that answers:
+a disagreement about the tree's shape is refused on the first edge it crosses,
+before either end waits on it. The model shows both rules are needed — the
+count in the hello without the order is STUCK too — and that with them every
+case in which one lead differs ends in a refusal, with the trapped-state check
+on. What no rendezvous can catch is two *groups* of leads that each agree
+among themselves: the root's group completes a smaller job while the other
+waits for a listener that has closed. That is two launches sharing one job's
+ids, indistinguishable from one slow launch without a time limit, which §3.15
+rules out; the no-progress rule is the answer there.
+
+Every read and write of the rendezvous waits as long as its peer takes,
+sweeping, and ends the job naming the peer only by the no-progress rule
+(§3.15) — a write too, since the tables are larger than a socket buffer. A lead
+that refuses the job ends it by a fatal, which the launcher turns into the
+job's end (`srun -K1`, §3.15; `osoe-launch` does the same), and a neighbour
+waiting on its socket names it ("the rendezvous lost node 9, its child…").
+
+*Up the tree* goes each subtree's report: per node its address, its ranks as
+arithmetic progressions in local-id order (one under block, one under cyclic;
+`rank-map.h`) and its blob; and the values every node must agree on — the job's
+size, `SHMEM_SYMMETRIC_SIZE`, the handler checksum, `OSOE_COLLECTIVE_FANOUT` —
+which each parent checks against its own, so a disagreement is refused by the
+lead that sees it, naming both nodes (`shmem.job.disagree.*`). *At the root* the
+map is built: the progressions are expanded once, into O(*P*) scratch on that one
+node, to check that every rank is claimed exactly once (`shmem.job.duplicate-rank`,
+`unclaimed-rank` keep their messages), then compressed into **runs** — stretches
+of consecutive ranks whose node and local id advance by constant steps: one run
+per node under block, one per round under cyclic. *Down the tree* goes the runs,
+every node's address and every node's blob; each lead writes them into a
+**node-local** object, `/osoe.<job>.<step>.<node>.job.<session>`, which its PEs
+open like the control segment and the last of them unlinks. The step-2 job-wide
+segment, which only worked on one host, is gone. A job of one node meets no one
+and opens no socket: a machine with no network runs it.
+
+*What it costs*, per node: O(*R* + *N*) shared — *R* runs (4,096 under block at
+4,096 × 256, 256 under cyclic; 24 bytes each), and *N* addresses and blobs (132
+bytes each, 540 KB at 4,096 nodes) — where the per-rank map was 6 MiB at 10⁶ PEs.
+Which node a rank is on is a binary search, O(log *R*), and only the network path
+asks it; whether a rank is on *this* node — the question every put and get asks
+first (`osoe_routes_in_process`) — is this node's own rank set, O(1) when its
+ranks are one progression: a subtraction for block, a division for cyclic, a
+binary search over *L* otherwise. The root's O(*P*) scratch is once per job, as
+the step-2 check of the whole map was. `shmem.rank-map` checks lookups against the
+uncompressed map on §8.1's four poles, and the run counts at 4,096 × 256.
+
+**`OSOE_JOB_SECRET`: decided, and built** (§10's open item). Optional, 128 bits as
+32 hexadecimal digits, which a wrapper sets before `srun` and Slurm carries to every
+task. With it, every hello — the rendezvous's and the mesh's — carries a fresh
+nonce from each side, and each side proves it knows the secret with a SipHash-2-4
+digest (`base/siphash.c`, checked against the published vectors) over the hello
+and both nonces, without sending it: so a host that can reach a listener but does
+not know the secret cannot join the job, and a proof overheard on one connection
+answers no other. A caller that cannot prove it is refused and not counted; a lead
+whose peer has no secret, or another one, ends the job naming both
+(`shmem.job.secret.*`). What it does not do is protect a connection from a host
+that can see and inject its packets after the hello: that would take encrypting
+the traffic, and the network is still trusted that far, as Slurm's own is (§3.4).
+Off by default, since §3.4's trust boundary is unchanged.
+
+**The mesh is still eager, and what on-demand would need.** Every lead connects
+to every higher node at init: *N*(*N* − 1)/2 connections job-wide, 8.4 M at 4,096
+nodes, and a listen backlog of *N* − 1 (capped by `somaxconn`), which at 4,096
+nodes turns the last connections into SYN retries rather than failures. Nothing
+in this slice made laziness harder. On-demand would need: a connection opened at
+the first operation toward a node, which the per-connection state already allows
+— a wire, a ring slot and the connection area's buffers are all per peer slot, and
+the dirty set and the busy bitmap only visit what has work; the lead's listener
+kept open for the life of the job, served by a multishot accept on the ring
+rather than closed after init; a writer that finds no connection toward a node
+posting a request to the lead rather than reserving, since only the lead
+connects (§3.12); and a rule for two leads that connect to each other at once —
+the lower node's connection wins, as §6.2's direction already says. The ring's
+bounds would then follow the active peers rather than *N*.
+
+**`set_range` is not acted on here** (§4.10, §7.1 step 3). A TCP backend has
+nothing to prepare before the network touches memory: it receives into its own
+provided buffers and copies, and sends from connection buffers, so it neither
+registers memory nor needs to know which words take atomics. The claim that step
+3's backend is the first to act on it was wrong for this backend; the first that
+must is an RDMA one.
 
 **Failure handling:**
 
@@ -4084,7 +4329,7 @@ the bootstrap runs in every test rather than only on a cluster. The names mirror
 | `OSOE_NODEID` | `SLURM_NODEID` | Yes |
 | `OSOE_LOCALID` | `SLURM_LOCALID` | Yes |
 | `OSOE_GTIDS` | `SLURM_GTIDS` | Yes |
-| `OSOE_STEP_NODELIST` | `SLURM_STEP_NODELIST` | No: one node needs no host list |
+| `OSOE_STEP_NODELIST` | `SLURM_STEP_NODELIST` | No: one node needs no host list. *Since phase 1 step 3, required when there is more than one node*: the leads' addresses |
 | `OSOE_JOB_ID` | `SLURM_JOB_ID` | Yes, in segment names |
 | `OSOE_STEP_ID` | `SLURM_STEP_ID` | Yes, in segment names |
 
@@ -4098,7 +4343,8 @@ marked "Yes" above is required, and the README shows how to launch a one-node jo
 by hand. *(Rejected: singleton launch when the variables are absent, as some
 implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)*
 `OSOE_NO_PROGRESS_TIMEOUT` (§3.15) is osoe's own, read by the library; it
-replaced `OSOE_BOOTSTRAP_TIMEOUT`, which is retired.
+replaced `OSOE_BOOTSTRAP_TIMEOUT`, which is retired. So, since phase 1 step 3,
+are `OSOE_PORT_RANGE` and `OSOE_JOB_SECRET` (§6.2), both optional.
 `OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
 turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
 library never sees it.
@@ -4186,7 +4432,9 @@ Things to get right, each of which is a silent bug otherwise:
   `shmem_finalize` and stop the agent while the message every other node is
   waiting for is still in a buffer only that agent sends — and every other node
   then waits for a node that has already exited. The lead therefore drains the
-  engine to idle after its agent is joined and before its wires close. Measured
+  engine to idle before its wires close — since phase 1 step 3 on the agent
+  thread itself, as its last turn (`osoe_transport_agent_exit`), because the
+  engine's ring is that thread's (§4.10). Measured
   at 3 hangs in 12 runs of the suite without it and 0 in 25 with it; the
   signature is that the root's non-lead PEs exit cleanly while every other rank
   is killed at the launcher's timeout.
@@ -4196,6 +4444,23 @@ Things to get right, each of which is a silent bug otherwise:
   after this side has run its last collective, and unmapping first turns that
   into a SIGSEGV on the node that did nothing wrong. Announcing and waiting are
   separate calls, so a lead tells every peer before waiting on any.
+
+  *On a socket* (phase 1 step 3 slice 1; `tools/modelcheck/close_model.py`) the
+  same rule has three parts, each a way to lose something. **A lead drains, then
+  sends a goodbye, then ends its stream**: the goodbye is a header-only segment
+  flagged `OSOE_AM_SEGMENT_GOODBYE`, sealed only once the connection owes the peer
+  nothing, and the last segment the lead sends there; `shutdown(SHUT_WR)` follows
+  its send. **An end of stream without a goodbye is a peer that died**, since a
+  crashed process's kernel closes its sockets with the same FIN, so it ends the
+  job naming the peer — a remote death that step 2 could only wait out. **A lead
+  closes a socket only once the peer's end of stream has arrived**: closing while
+  the peer still sends makes the kernel reset the connection, and the peer's send
+  fails on the node that did nothing wrong. Nothing is lost by refusing to send
+  after the goodbye: past the final barrier no lead needs anything from another
+  but the barrier's releases, which drain before it. The model checks all of it
+  over three nodes with an interior one, trapped-state check on; a goodbye that
+  does not wait for the drain strands a child, a FIN without a goodbye trips the
+  dead-peer check, and a close before the peer's FIN sends into a reset.
 - **A child created by `fork()`** after init inherits the mappings but no agent
   threads (§3.12). It must not call OpenSHMEM, and teardown code compares the
   current pid with the initializing pid and does nothing in a child.
@@ -4271,11 +4536,19 @@ machinery. The review's order is adopted.
    transport's smallest reproducer. Then io_uring with the repaired reservation
    protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
    reply credits and DRAINING caps, and the global rendezvous with its timeout.
+   *(Slice 1 built the harness, the ring, the idle loop and the rendezvous, and
+   measured what is left: quiet's wait and a writer's wait for a full buffer
+   still poll the step-2 way, waking the lead and sleeping 20 µs, and that is
+   what holds a put and quiet at 4× the floor and a stream at 3% of it, §8.4.
+   The per-class wake words are the fix.)*
 
    The first backend that *acts* on `osoe_transport_set_range` is here — it is the
    first that must prepare memory before the network can touch it — but the hook
    and its allocator call site landed at step 2 (§4.10), because the call site is
-   in the allocator rather than in a backend. The allocator half — recording
+   in the allocator rather than in a backend. *(Wrong for this backend, found
+   building it: TCP receives into its own buffers and sends from connection
+   buffers, so it has nothing to prepare. The first backend that must act on
+   the call is an RDMA one; §6.2.)* The allocator half — recording
    hints and growing hinted allocations from the opposite end — is older still,
    from step 1, because retrofitting hint plumbing into a finished allocator is
    the expensive version.
@@ -4460,6 +4733,58 @@ worth stating:
   own node's `OSOE_GTIDS`, so a PE never maps a heap outside its logical node and
   the function has no address to return.
 
+A third, since phase 1 step 3, holds the same way: **an address per logical
+node.** `osoe-launch` sets `OSOE_STEP_NODELIST=127.0.0.[1-N]`, so logical node
+*i*'s lead listens on 127.0.0.*i*+1 — Linux routes all of 127/8 to `lo` with no
+setup — and the rendezvous and the mesh find each other by address and port, as
+they do between hosts, rather than by a probe that only a single host could
+answer. A lead that bound or dialled the wrong entry would meet nobody, so the
+tests catch it. The launcher refuses more than 254 nodes, which one bracketed
+octet cannot name.
+
+**What a logical node is now, and what that tests** (phase 1 step 3 slice 1).
+Until step 3 two logical nodes on one host talked through a shared-memory
+stand-in for a wire. Now they talk over TCP on loopback, each lead on its own
+address, and everything between two leads is the code a cluster runs: the
+rendezvous tree and its hellos, the mesh on advertised ports, the ring with
+multishot receive over provided buffers, one send in flight per connection,
+the goodbye and the end of stream. Short sends, receives that split a segment,
+`-ENOBUFS` and its re-arm, and a peer's FIN are real events on this path, not
+simulated ones. The fault injection that makes loopback produce them on every
+run (`OSOE_WIRE_BYTES`, `OSOE_WIRE_SPLIT`, `OSOE_WIRE_SEED`) is kept, since
+loopback's large buffers would otherwise hide them, and the tests that use it
+are unchanged. **The four poles stand as they were**, and so do the tests this
+step was told not to touch — the differential test, `shmem.internode.*`,
+`shmem.tree.*`, `shmem.hang-walk`: their programs and registrations are the
+same as when the step began, and only `osoe-launch` changed, to give each
+logical node its address.
+
+What loopback does not test, each named so no test is mistaken for it:
+
+- **The link's time.** A loopback round trip is about 25 µs in the development
+  VM, and nearly all of it is system calls and wakeups (§8.4). A real link adds
+  serialization and a switch; a Pi adds slower cores. No test here checks a
+  latency or bandwidth claim about a link. §8.4's ratios are measured over veth
+  with `netem`, and its pins compare two ways of using the *same* link.
+- **Loss, delay and a small MTU.** Loopback drops nothing, delays nothing and
+  segments at 64 KiB, and TCP hides reordering from an application anyway.
+  Tier 3 is where the transport meets these. It runs `echo-uring` today
+  (`netem-sweep.sh`), not the library's tests, and running the tier-2
+  multi-node tests in network namespaces is the next step, not a done one.
+- **Separate kernels.** Every logical node shares one kernel, one clock, one
+  `/dev/shm` and one page cache. The library is not meant to rely on any of
+  them: objects are named by logical node (above), and addresses come from the
+  host list. But no test on one host can show that it does not; only tier 4
+  can.
+- **Names.** `osoe-launch`'s host list is numeric, so only a cluster resolves
+  host names. The same parser and one `getaddrinfo` per entry a lead needs
+  handle a list of names.
+- **A host with several addresses.** A lead listens on the address its entry
+  names, and refuses by name one that is not local (`EADDRNOTAVAIL`). Which
+  interface a cluster's host list names is the site's configuration.
+- **IPv6**, which is not supported: an entry that resolves only to IPv6 is
+  refused when it is resolved.
+
 Plus a **force-remote flag**. An earlier draft had it route even
 same-logical-node traffic over the network, and called that the strongest
 differential test available. Implementing it showed the claim was built on a
@@ -4578,8 +4903,8 @@ runs in seconds at tier 1.
 | Tier | Environment | Catches |
 |---|---|---|
 | 1 | In-process AM backend, queues not sockets, single-threaded, deterministic | Most semantic bugs. Runs in CI anywhere |
-| 2 | Logical nodes over loopback | Integration, threading |
-| 3 | Logical nodes in netns over veth with netem | Most transport bugs |
+| 2 | Logical nodes over loopback — since phase 1 step 3 over real sockets, each node on its own address (§8.1) | Integration, threading, the socket path |
+| 3 | Logical nodes in netns over veth with netem — the floor harness only, so far (§8.1) | Most transport bugs |
 | 4 | Real cluster | Everything else |
 
 > **ThreadSanitizer cannot see a happens-before that runs through another
@@ -4664,7 +4989,9 @@ magnitude" — copy into staging, futex over spin, generous chunking — is leas
 defensible when network and cores are fast. Holding on modern x86 loopback means
 holding on a Pi with room to spare. Sweep netem delay from zero to Pi-like and
 watch where the constants stop working; a better experiment than one point
-measurement on real hardware.
+measurement on real hardware. (`tools/echo-uring/netem-sweep.sh` does it for the
+floor harness, and §8.4 has the result: on aarch64 loopback too, bandwidth is the
+half of the assumption that fails.)
 
 **What x86 cannot give: weak memory ordering.** Every missing release store and
 acquire load in the buffer protocol passes on x86 and fails on aarch64, and
@@ -4704,6 +5031,126 @@ that stops being an assumption.
 
 **Pin the constants after the first run, then treat regressions as failures.**
 Ratios, not absolute times, so the thresholds survive a hardware change.
+
+*As built* (phase 1 step 3 slice 1). `tools/echo-uring` runs both ends on
+loopback by default, or one end each with `--server` and `--client` across two
+hosts. It uses exactly §3.3's shapes — a `SINGLE_ISSUER` ring whose CQ is sized
+from its provided-buffer ring, multishot recv with every provided buffer recycled
+as soon as its bytes are consumed, a re-arm on every CQE without
+`IORING_CQE_F_MORE`, one send in flight with a short send resubmitted,
+`TCP_NODELAY` — and times the same two exchanges over blocking `send` and `recv`
+on the same kind of connection. Its first act is a verified stream: every 8-byte
+word carries its own offset, through a 4 KiB send buffer and four 1 KiB provided
+buffers, which forces about 250 `-ENOBUFS` terminations and re-arms and a few
+dozen short sends per MiB. The ctest `env.echo-uring` pins two **io_uring-to-blocking
+ratios on the same link**, each the median over seven pairs of trials measured
+side by side (a pair shares whatever the machine was doing): the **fastest**
+round trip, at most 1.5× — measured 1.02–1.25× idle, under 16 busy loops and
+beside a `ctest -j4` run — and the stream, at least 0.5× — 0.85–1.06×. Trials
+are 1 GiB, since a 256 MiB stream lasts 13 ms, shorter than a scheduler slice
+among 16 busy loops.
+
+**The median round trip is reported and not pinned, and why is a result.** The
+fastest round trip is the length of the path, both processes on a CPU, and the
+two kinds agree on it everywhere in the median of seven side-by-side pairs, which
+is what the pin takes. A single pair can differ 4–5×: measured idle in phase 1
+step 3 slice 1, part C, one kind's fastest trip in a pair was 15 µs where the
+other's was 3, a virtual CPU asleep for one set of trials and not the other.
+The median is where the woken process gets to
+run, and there they differ under one kind of load: beside a `ctest -j4` run - many
+processes sleeping and waking, CPUs partly busy - blocking `recv` measured a
+3.6 µs median and the io_uring wait 15–28 µs, 3–5×, with `IORING_SETUP_COOP_TASKRUN`
+and `IORING_SETUP_DEFER_TASKRUN` alike; idle (25 µs, a sleeping virtual CPU woken)
+and under 16 busy loops (5 µs) the two agree within 1.2×. That is consistent with a
+blocking socket's wakeup being a synchronous wake the scheduler may place on the
+waker's CPU, which io_uring's task-work wakeup is not - *inferred*, not traced. It
+is what the progress thread's ring wait will pay per hop on a partly loaded node,
+which is the Pi's normal state (§1), so it is measured again against the library
+(§7.1 step 3, part C). The pins were checked by breaking the harness: a 50 µs pause
+in its pump measured 13× and 0.05×, and a missing re-arm after `-ENOBUFS` hung into
+the timeout. They are checked in the optimized, uninstrumented build only: under
+asan and tsan the io_uring round trip measured 6.4× and 3.9×, the instrumentation
+of the harness's own loop rather than the link, and every preset still runs the
+verified stream. The ratio of
+the *library* to this floor is §1's actual target; it is pinned once the library
+runs on the ring (§7.1 step 3, below).
+
+*Measured* (4-core aarch64 VM on Apple silicon, kernel 6.12, median of 5,000 or
+20,000 round trips; `tools/echo-uring/netem-sweep.sh`, which runs the two ends in
+two network namespaces over a veth pair shaped by `netem`, §8.3's sweep):
+
+| Link | 8-byte round trip, io_uring / blocking | Stream | One-way latency ÷ intranode put | Copy ÷ stream bandwidth |
+|---|---|---|---|---|
+| loopback | 26.3 / 25.0 µs | 19.0 / 20.2 GiB/s | ≈ 1,200 | **1.7** |
+| veth at 1 Gbit/s | 32.9 / 31.9 µs | 114 / 114 MiB/s | ≈ 1,500 | ≈ 170 |
+| … plus 25 µs each way | 96.3 / 95.6 µs | 114 MiB/s | ≈ 4,400 | ≈ 170 |
+| … plus 50 µs each way | 162.8 / 161.6 µs | 114 MiB/s | ≈ 7,400 | ≈ 175 |
+| … plus 100 µs each way, about a Pi on 1 GbE (§5.3) | 289.3 / 286.5 µs | 114 MiB/s | ≈ 13,000 | ≈ 175 |
+
+"Intranode put" is the library's `shmem_putmem` of 8 bytes, 11.0 ns in the same
+VM (§8.4's third floor, measured in phase 1 step 2 slice 3); the harness's own
+proxy, an 8-byte store and a `seq_cst` fence, is 0.5–1.0 ns and makes every
+latency ratio 10–20× larger still. "Copy" is `memcpy` in 64 KiB chunks over a
+64 MiB working set, measured in the same run: 19–33 GiB/s, the spread being which
+of the host's core types ran the VM's CPU, which is also the noise in every
+absolute number here. And the idle loopback round trip is mostly the VM waking a
+sleeping virtual CPU: with every CPU kept busy (the load loop), the same exchange
+measures about 5 µs, which puts loopback's latency ratio nearer 230 than 1,200 —
+still two orders.
+
+**What it says about §10's assumption.** Wire *latency* dominates by three to
+four orders of magnitude at every point of the sweep, loopback included, so
+nothing decided on it — futex over spin (§3.11), deferring the wake
+(`OSOE_TRANSPORT_MORE`), the sweep interval — is in question. Wire *bandwidth*
+dominates by about 170× at 1 Gbit/s on this host, and not at all on loopback,
+where a stream is itself a kernel `memcpy` and an extra copy costs about 60% of
+the transfer. That is the adversarial case §8.3 predicted, not a surprise, and it
+is the one the copy decisions (§3.5's copy into the connection buffer, §3.3's
+copy out of a provided buffer) are measured against when the library runs on
+the ring. A Pi's `memcpy` is slower than this host's, so its copy-to-wire ratio on
+1 GbE is lower — tens rather than hundreds, *recalled*, unmeasured until the
+harness runs there.
+
+**The library against its floor** (phase 1 step 3 slice 1, part C; release
+build, idle VM, two logical nodes of one PE each on loopback, `echo-uring` and
+the library interleaved, the median over 7 repetitions of 20,000 operations;
+`build/scratch`'s `internode-bench`, not yet a test).
+
+| Operation | Library | ÷ `echo-uring` (25.3 µs, 17.7 GiB/s) |
+|---|---|---|
+| 8-byte get | 51.9 µs | **2.05×** (2.03–2.06) |
+| 8-byte fetch-add | 51.9 µs | **2.05×** |
+| 8-byte put, then quiet | 101 µs | 4.0× |
+| 1 GiB of 64 KiB puts, then quiet | 547 MiB/s | 0.031× |
+
+**A round trip is two wakes dearer than the harness's**, and that is the whole
+factor for a get. The harness's round trip wakes two threads, the server and
+then the client. The library's wakes four: the caller wakes its lead, the lead
+at the other end wakes to the request, the caller's lead wakes to the reply, and
+the lead wakes the caller. On loopback a wake is most of what a round trip costs:
+the harness's fastest trips take 3–4 µs against its 25 µs median.
+
+**The other two rows measure a step-2 stand-in, not the ring.** Quiet waiting for
+an acknowledgement, and a writer waiting for a full connection buffer to turn
+over, still wake the lead and then sleep 20 µs before looking again (`poll_lead`
+in `transport-am.c`). Step 2 had no word for the lead to bump, and the code says
+the stand-in must not survive step 3. The counters show one segment each way per
+put and quiet, so nothing extra is sent: the time is the sleep, which Linux's
+default 50 µs timer slack can stretch to 70 µs. *Measured*: with a yield in
+place of the sleep, in a scratch build, a put and quiet takes 27.5 µs (1.1×)
+and the stream runs at 6.0–10.5 GiB/s (0.34–0.6×). The waits get their words
+with §7.1 step 3's per-class wake words, and the library's ratios are pinned
+after that, not before: a pin now would pin the stand-in.
+
+**Under load, the library's round trip is its wake count.** The wakeup finding
+above promised this measurement. Beside a `ctest -j4` of the debug suite (load
+average 6–16 on four CPUs, the models left out), the harness's median round
+trip falls to about 4 µs, since no CPU sleeps, and io_uring and blocking agree
+within 1.1× this time. So the 3–5× depends on the mix of load, and this mix did
+not reproduce it. The library's get does not fall with the harness: 31 µs
+median (10–38 across repetitions), about 7× the harness's, because each of its
+four wakes now waits for a CPU. A partly loaded node is the Pi's normal state
+(§1), so its round trips there will cost the wakes they need, not the wire.
 
 ### 8.5 Development environment
 
@@ -4927,6 +5374,11 @@ Assert what can be asserted. Instrument the rest.
     is busy.** (§3.10) Each rule dropped loses the lead's attention for committed
     bytes: a lost wake in `lead_wake_model.py`, or - the private half - a leaf's
     barrier arrival left unsealed, measured one run in eight.
+35. **A lead seals its goodbye only once the connection owes the peer nothing,
+    ends its stream only after the goodbye has gone, and closes a socket only
+    after the peer's stream has ended.** (§6.4) Dropping each strands a child
+    waiting for its release, makes a finished peer look dead, or resets a
+    connection the peer is still sending on (`close_model.py`).
 
 ## 10. Open Questions
 
@@ -4960,9 +5412,10 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 | What `OSOE_NODE_LAYOUT` covers | **The encoding of every word in the control segment, not only the offsets of fields.** A word written by one process and interpreted by another is part of the inter-process contract even when its width and position do not move; changing what its bits mean without bumping the version gives mixed builds silent lost wakes rather than the loud refusal `open_control` exists to produce. Recorded because a proposal got it wrong, arguing the §4.9 watch word could change encoding without a bump since it is "an opaque filter" — it is opaque to its *reader*, which is another process |
 | Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_transport_watch_wait` being the backend's own function |
-| A boundary progress call | **Needed, and declared** (phase 1 step 2 slice 3): `osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` in `transport.h`, the only way the library lends the agent thread to a backend (§3.12, §4.10). *Revised.* The first answer was "not needed, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there". That was true of application threads and false of the node: the barrier blocks on an epoch counter outside any backend (`barrier.c`, `base/epoch.h`), and what moves it is the progress thread, which `agent.c` drove by calling the AM engine by name (second review, roce-seam F5). Application threads still need no progress call — the blocking calls pump their own — but the node's thread is the library's, and a backend gets it only through these two |
+| A boundary progress call | **Needed, and declared** (phase 1 step 2 slice 3): `osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` in `transport.h`, the only way the library lends the agent thread to a backend (§3.12, §4.10). *Revised.* The first answer was "not needed, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there". That was true of application threads and false of the node: the barrier blocks on an epoch counter outside any backend (`barrier.c`, `base/epoch.h`), and what moves it is the progress thread, which `agent.c` drove by calling the AM engine by name (second review, roce-seam F5). Application threads still need no progress call — the blocking calls pump their own — but the node's thread is the library's, and a backend gets it only through these calls. *Revised again* (phase 1 step 3 slice 1, decided with the author 2026-09-22): the two calls were `pass` and `idle_ns`, how long `agent.c`'s own `futex_wait` might sleep — the review's fix shape ("same code, boundary-named"), and exactly the step-2 stand-in's poll. They could not carry the backend they were declared for: §3.10's lead waits in one io_uring submission on its sockets *and* the wake word, which a futex_wait in `agent.c` cannot, and a `SINGLE_ISSUER` ring refuses every thread but its submitter (`-EEXIST`), while `session_end` joined the agent and only then drained the engine on the main thread. So `idle_ns` became `osoe_transport_agent_wait(wake, seen)`, the backend's own wait, and `osoe_transport_agent_exit()` gives the backend a last turn on the thread for its drain and close. An RDMA backend sleeping on a completion channel needs the first for the same reason. Both were edits above the boundary forced by the seam, not by the backend |
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 | Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
+| Authenticating the step-3 handshake | **An optional `OSOE_JOB_SECRET`, proved and never sent** (§6.2; phase 1 step 3 slice 1). The open item: the handshake carried only the job and step ids, which are sequential and public (`squeue`), and the port is a hash of them, so any host that could reach it could join as a node and then read and write every heap by design; the second review's portability F2 proposed a wrapper setting `OSOE_JOB_SECRET=$(head -c16 /dev/urandom \| xxd -p)` before `srun`, which Slurm propagates, and the handshake carrying it. Built so, except that the secret is *proved* rather than carried: a SipHash-2-4 digest over the hello and a fresh nonce from each end, so neither an eavesdropper nor a listener the caller reached by mistake learns it, and a proof replays nowhere. Unset, nothing changes; set on some nodes and not others, the job ends naming both. It authenticates the hello, not the traffic after it |
 | What orders fence and quiet, where a `seq_cst` store to a thread-local word was the answer? | **Derived from the C11 model:** a release fence for fence (W→W), a `seq_cst` fence for quiet and the barriers (W→R), and `seq_cst` on both loads of a two-sided protocol. Measured, the old store did not order quiet's W→R on aarch64, and an acquire load built as `ldapr` lost wakes (§3.16, §4.6; 2026-09-21). |
 
 ### Still open — blocking
@@ -4978,9 +5431,19 @@ Recorded rather than deleted, so they are not reopened from memory.
 - **8-byte round trip and small-message rate, two nodes** (§8.4). Everything
   above assumes wire latency dominates memory bandwidth by two orders of
   magnitude. **This assumption is load-bearing** for copy decisions, futex
-  decisions, and chunk sizing. Probably right; worth an hour to confirm rather
-  than carry. Now has a home in the test suite rather than being a one-off.
-- **Pin the §1 floor ratios.** Deliberately unwritten until the harness runs.
+  decisions, and chunk sizing. *Measured in part* (phase 1 step 3 slice 1,
+  `echo-uring`, §8.4): on loopback and on a veth pair shaped to 1 Gbit/s with 0–100
+  µs of delay each way, the latency half holds by three to four orders of
+  magnitude everywhere, and the bandwidth half holds at 1 Gbit/s (≈ 170× on the
+  development host) and fails on loopback (1.7×), as §8.3 predicted. Still owed:
+  two real hosts, and a Pi, whose slower `memcpy` puts its copy-to-wire ratio in
+  the tens, *recalled*. The small-message *rate* is not measured yet.
+- **Pin the §1 floor ratios.** The harness's own ratio (io_uring against blocking
+  sockets on the same link) is pinned (§8.4). The library-to-floor ratios are
+  measured (§8.4, phase 1 step 3 slice 1): a get 2.05×, a put and quiet 4.0×, a
+  stream 0.031×. The last two measure `poll_lead`'s 20 µs sleep, and a yield in
+  its place takes them to 1.1× and 0.34–0.6×. They are pinned once §7.1 step 3's
+  per-class wake words replace it.
 - **The internode tree's fan-out from measured costs** (§5.3). The default is the
   backend's constant today; measuring the hop latency *h* and per-message cost *o*
   at init and choosing *k* from their ratio is the next step, once a real fabric
@@ -5071,16 +5534,6 @@ which has two states per pair, so a third backend needs a selector of its own
   node and no redesign.
 
 ### Still open — design, deferrable
-
-- **Authenticating the step-3 handshake.** §3.4 and §6.2 declare the network
-  trusted at Slurm's level; the handshake carries only the job and step ids,
-  which are sequential and public (`squeue`), and the port is a hash of them, so
-  any host that can reach it could join as a node and then read and write every
-  heap by design. If the cluster LAN is not trusted, the second review's
-  portability F2 has a nearly free answer: a wrapper sets
-  `OSOE_JOB_SECRET=$(head -c16 /dev/urandom | xxd -p)` before `srun`, Slurm
-  propagates the environment to every task, and the handshake carries it. Decide
-  with step 3.
 
 - Does any collective need RMA on symmetric scratch rather than AM? (Answer so
   far: no.)

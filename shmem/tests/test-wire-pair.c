@@ -1,23 +1,15 @@
 /*
- * The node-pair wire between two real processes (§3.1, §7.1 step 2).
+ * The node-pair wire between two real processes (§3.1; phase 1 step 3).
  *
  * shmem.wire drives both ends from one thread, which settles the stream
- * arithmetic - wrap, short writes, partial reads - but cannot see a
- * publication-ordering defect, because nothing races. This one runs the two
- * ends in the two processes they will really be in, streaming both ways at
- * once, so the writer is filling the ring while the reader is draining it.
+ * arithmetic - short sends, partial reads, buffers that end mid-message - but
+ * cannot see what only two processes racing can. This one runs the two ends in
+ * the two processes they will really be in, each with its own ring, streaming
+ * both ways at once, and makes its connection the way a lead does: node 0
+ * finds node 1's listener by the port rule (listener.h) and says hello.
  *
- * That is what catches a reader publishing `consumed` before the bytes are out
- * of the ring, or a writer publishing `produced` before the bytes are in it:
- * both are invisible without a concurrent peer, and both corrupt the stream
- * under load. Under the tsan preset the same race is reported directly, with
- * the caveat §8.2 states - ThreadSanitizer instruments one process, so it sees
- * this PE's own threads and not the peer's, and the cross-process race is
- * caught here by the payload check rather than by tsan.
- *
- * It does not call shmem_init: a job of two logical nodes is still refused
- * until the backend lands (§7.1 step 2), and the wire needs only the bootstrap
- * environment osoe-launch already sets.
+ * It does not call shmem_init: it tests the wire on its own, below the
+ * library, and needs only the bootstrap environment osoe-launch sets.
  */
 #define _GNU_SOURCE
 #include <stdarg.h>
@@ -32,6 +24,7 @@
 #include "base/deadline.h"
 #include "bootstrap.h"
 #include "check.h"
+#include "ring.h"
 #include "wire.h"
 
 /* bootstrap.c reads the fan-out's default from the backend (internode.h), which
@@ -82,129 +75,91 @@ int main(void)
         .job = strtoull(getenv("OSOE_JOB_ID") ? getenv("OSOE_JOB_ID") : "0", NULL, 10),
         .step = env_u32("OSOE_STEP_ID"),
         .node = me,
+        .node_count = 2,
         .no_progress_ns = UINT64_C(30000000000),  /* fail rather than hang */
+        .port_low = OSOE_DEFAULT_PORT_LOW,
+        .port_high = OSOE_DEFAULT_PORT_HIGH,
     };
 
+    /* One wire, toward the other node, and the ring that carries it: the same
+     * connection a lead makes (§6.2: node 0 connects, node 1 accepts). */
     struct osoe_wire w;
-    osoe_wire_open(&w, &b, peer, 0);
+    struct osoe_ring ring;
+    osoe_wires_open(&w, &ring, &b, 0, NULL);
+    osoe_ring_enable(&ring);
 
     unsigned char out[CHUNK], in[CHUNK];
-    size_t sent = 0, got = 0;
-    bool stalled = false;
+    size_t sent = 0, got = 0, filled = SIZE_MAX;
     /*
-     * A deadline, not a spin budget. This was `idle > 100000` iterations, which
-     * looks like a timeout and is not one: with this node's own receive already
-     * complete the loop below skips the recv block entirely - and with it the
-     * futex wait - so it spins on send alone at roughly ten million iterations
-     * a second. A hundred thousand of them is about ten milliseconds, and on a
-     * loaded machine the peer simply has not been scheduled in that time. It
-     * failed about one run in forty under load and never otherwise, which is
-     * exactly the shape of a spin count standing in for a clock.
+     * A deadline, not a spin budget: an iteration count stands in for a clock
+     * badly on a loaded machine, and failed one run in forty under load when
+     * the step-2 version of this test used one.
      */
     struct osoe_deadline give_up = osoe_deadline_in(UINT64_C(20000000000));
 
     /*
-     * Both directions at once: this process fills its ring while the peer
-     * drains it, and drains the peer's while the peer fills it. A one-way
-     * version would leave one side's publication order untested.
+     * Both directions at once: this process sends while the peer receives, and
+     * receives while the peer sends. One send in flight at a time, whose bytes
+     * stay put until the wire reports them taken (wire.h).
      */
     while (sent < PAYLOAD || got < PAYLOAD) {
-        size_t sent_was = sent, got_was = got;
-
+        bool moved = false;
         if (sent < PAYLOAD) {
-            size_t want = PAYLOAD - sent;
-            if (want > CHUNK)
-                want = CHUNK;
-            for (size_t i = 0; i < want; i++)
-                out[i] = pattern(me, sent + i);
-            sent += osoe_wire_send(&w, out, want);
+            size_t want = PAYLOAD - sent < CHUNK ? PAYLOAD - sent : CHUNK;
+            if (filled != sent) {
+                for (size_t i = 0; i < want; i++)
+                    out[i] = pattern(me, sent + i);
+                filled = sent;
+            }
+            size_t n = osoe_wire_send(&w, out, want);
+            sent += n;
+            moved |= n > 0;
         }
-
-        if (got < PAYLOAD) {
-            /* The wake value before draining (§4.6), then sleep on it if the
-             * peer has sent nothing - with a deadline, so a lost wake costs
-             * latency and not the job (§3.10). */
-            uint32_t seq = osoe_wire_seq(&w);
-            size_t want = PAYLOAD - got;
-            if (want > CHUNK)
-                want = CHUNK;
-            size_t n = osoe_wire_recv(&w, in, want);
+        osoe_ring_reap(&ring);
+        /* Empty the wire before the next reap, as the engine does (§3.3). */
+        for (;;) {
+            size_t n = osoe_wire_recv(&w, in, sizeof in);
+            if (n == 0)
+                break;
             for (size_t i = 0; i < n; i++)
                 if (in[i] != pattern(peer, got + i)) {
                     fprintf(stderr, "node %u: byte %zu is 0x%02x, expected 0x%02x "
                                     "(from node %u)\n", me, got + i, in[i],
                             pattern(peer, got + i), peer);
-                    CHECK(false);
-                    osoe_wire_close(&w);
-                    return CHECK_DONE();
+                    CHECK_FATAL(false);
                 }
             got += n;
-            if (n == 0 && sent == sent_was) {
-                struct osoe_deadline d = osoe_deadline_in(OSOE_SWEEP_NS);
-                osoe_wire_wait(&w, seq, &d);
-            }
+            moved = true;
         }
-
-        if (sent == sent_was && got == got_was) {
-            /*
-             * Yield rather than spin. The peer needs a core to drain the ring
-             * this node is waiting on, and on a machine with more runnable
-             * threads than cores, spinning here is what keeps it from getting
-             * one - the test was creating the stall it then reported.
-             */
-            struct timespec pause = { 0, 100000 };      /* 100 us */
-            nanosleep(&pause, NULL);
+        if (!moved) {
+            /* Sleep on the ring, not a spin: the peer needs a core to send what
+             * this node is waiting for (§3.11's rule against spinning). */
+            osoe_ring_wait(&ring, UINT64_C(1000000));
             if (osoe_deadline_expired(&give_up)) {
                 fprintf(stderr, "node %u stalled: %zu of %d sent, %zu received\n", me,
                         sent, PAYLOAD, got);
-                CHECK(false);
-                stalled = true;
-                break;
+                CHECK_FATAL(false);
             }
         }
     }
-
     CHECK(sent == PAYLOAD);
     CHECK(got == PAYLOAD);
 
     /*
-     * **Stop here if the exchange failed, rather than carrying on.** CHECK only
-     * counts; it does not return. So a node that gave up above used to fall
-     * through into the acknowledgement below and put 0xA5 into a ring the peer
-     * was still reading as payload - which the peer duly reported as a wrong
-     * byte, at the exact index this node had stopped sending at. That made a
-     * one-sided timeout look like a stream corruption on the other node, and it
-     * is the reason this took three reproductions to read correctly. Closing
-     * rather than returning bare also lets the peer's own close finish at once
-     * instead of waiting out its timeout.
+     * The close: end this side's stream, then read until the peer's ends, and
+     * only then close the socket - closing first would make the kernel reset a
+     * connection the peer is still sending on (close_model.py). No bytes may
+     * arrive after the payload.
      */
-    if (stalled || CHECK_DONE()) {
-        osoe_wire_close(&w);
-        return CHECK_DONE();
-    }
-
-    /*
-     * Both sides must finish before either unmaps: the creator removes the
-     * name on close, and a peer still mapped would keep streaming into a
-     * segment nobody can open again. One more exchange is enough, since each
-     * side only gets here having received everything.
-     */
-    unsigned char bye = 0xA5, ack = 0;
-    while (osoe_wire_send(&w, &bye, 1) == 0)
-        ;
+    osoe_wire_shutdown(&w);
     struct osoe_deadline d = osoe_deadline_in(UINT64_C(10000000000));
-    while (osoe_wire_recv(&w, &ack, 1) == 0) {
-        uint32_t seq = osoe_wire_seq(&w);
-        if (osoe_wire_recv(&w, &ack, 1) == 1)
-            break;
-        if (!osoe_wire_wait(&w, seq, &d) && osoe_deadline_expired(&d)) {
-            fprintf(stderr, "node %u: peer never acknowledged\n", me);
-            CHECK(false);
-            break;
-        }
+    while (!osoe_wire_ended(&w) && !osoe_deadline_expired(&d)) {
+        osoe_ring_reap(&ring);
+        CHECK(osoe_wire_recv(&w, in, sizeof in) == 0);
+        osoe_ring_wait(&ring, UINT64_C(1000000));
     }
-    CHECK(ack == 0xA5);
-
+    CHECK(osoe_wire_ended(&w));
     osoe_wire_close(&w);
+    osoe_ring_close(&ring);
     return CHECK_DONE();
 }
