@@ -57,22 +57,15 @@ bool osoe_progress_host_poll(void);
 
 /*
  * The agent's idle wait (osoe_transport_agent_wait): until the wake word moves
- * past `seen`, or a sweep interval passes - **much less than a sweep for the
- * lead's agent in a multi-node job**, which is the one place step 2 departs
- * from §3.10.
+ * past `seen`, or a sweep interval passes (§4.10) - and, for the lead of a
+ * multi-node job, until anything completes on its ring. That is §3.10's loop:
+ * one io_uring submission carries the sockets' completions and an armed
+ * IORING_OP_FUTEX_WAIT on the word, so the lead waits on both in one call.
  *
- * §3.10's idle loop blocks on a single io_uring submission carrying both the
- * socket completions and an `IORING_OP_FUTEX_WAIT` on the agent's wake word -
- * which is why tools/probe checks for that opcode. Step 2 has no ring, and a
- * futex wait takes one address, so the lead can wait on its wake word or on a
- * peer's wire but not on both, and with several peers not even on all the
- * wires. Outbound traffic is unaffected: an application thread bumps the wake
- * word, which is an address this agent is waiting on. Only bytes *arriving*
- * have no way to announce themselves, so those are found by looking.
- *
- * §3.10 rejects a sleep loop for the shipping design, and that stands - this is
- * a stand-in for a ring that does not exist yet, not a choice between the two,
- * and step 3 restores the blocking form and deletes the interval.
+ * Step 2 could not: its wire was shared memory and a futex wait takes one
+ * address, so arriving bytes were found by looking every 250 us, which cost
+ * the internode tree one interval per hop (§5.3). Phase 1 step 3 deleted the
+ * interval with the stand-in.
  */
 bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen);
 

@@ -36,6 +36,7 @@
 #define OSOE_RING_H
 
 #include <liburing.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -90,6 +91,14 @@ void osoe_ring_submit(struct osoe_ring *r);
  * passes. Returns true if one arrived. The reap that follows handles it.
  */
 bool osoe_ring_wait(struct osoe_ring *r, uint64_t timeout_ns);
+
+/*
+ * The same, and also until `*wake` no longer holds `seen`: the progress
+ * thread's idle wait (§3.10), with at most one IORING_OP_FUTEX_WAIT armed on
+ * the word at a time (ring.c says why an older one still serves).
+ */
+bool osoe_ring_wait_wake(struct osoe_ring *r, _Atomic uint32_t *wake, uint32_t seen,
+                         uint64_t timeout_ns);
 
 /* Take, and clear, the readable bits of wires 64*word .. 64*word+63. */
 uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t word);

@@ -28,14 +28,6 @@
 
 struct osoe_am_state osoe_am;
 
-/*
- * How long the lead's agent sleeps between passes when nothing moved. Far
- * under OSOE_SWEEP_NS, because this is the interval at which *arriving* bytes
- * are noticed and it therefore lands on the latency of every internode
- * operation - see progress-host.h for why step 2 looks rather than waits.
- */
-#define OSOE_PROGRESS_SLEEP_NS UINT64_C(250000)     /* 250 us */
-
 /* ---- the four host callbacks (progress.h) ------------------------------ */
 
 /*
@@ -268,7 +260,7 @@ static void flush_before_close(void)
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     while (!osoe_progress_idle(&osoe_am.progress)) {
         if (!osoe_progress_poll(&osoe_am.progress))
-            osoe_ring_wait(&osoe_am.ring, OSOE_PROGRESS_SLEEP_NS);
+            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
         if (!osoe_deadline_expired(&sweep))
             continue;
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
@@ -301,7 +293,7 @@ static void close_connections(void)
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     while (!osoe_progress_closed(&osoe_am.progress)) {
         if (!osoe_progress_poll(&osoe_am.progress))
-            osoe_ring_wait(&osoe_am.ring, OSOE_PROGRESS_SLEEP_NS);
+            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
         if (!osoe_deadline_expired(&sweep))
             continue;
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
@@ -353,12 +345,13 @@ void osoe_progress_host_stop(void)
 /*
  * The agent's pass, and the lead's half of the sleep protocol (§3.10;
  * lead_wake_model.py). A pass that moved nothing is about to be followed by the
- * agent's futex_wait on agent_wake, with the value it loaded before the pass.
- * So raise lead_sleeping first - seq_cst, the store side of the two-sided
+ * agent's wait on agent_wake - in the ring, at the value it loaded before the
+ * pass. So raise lead_sleeping first - seq_cst, the store side of the two-sided
  * protocol - and then look at the dirty bits again with seq_cst loads: a writer
  * whose bit landed after this pass's exchange either shows here, and the agent
- * goes round again, or read the flag as 1 and bumps agent_wake, which makes the
- * wait return. The flag comes down at the next pass, which is after the wait.
+ * goes round again, or read the flag as 1 and bumps agent_wake and wakes it,
+ * which completes the ring's armed wait. The flag comes down at the next pass,
+ * which is after the wait.
  */
 bool osoe_progress_host_poll(void)
 {
@@ -386,7 +379,11 @@ bool osoe_progress_host_poll(void)
 
 bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen)
 {
-    struct osoe_deadline sweep = osoe_deadline_in(
-        osoe_am.internode && osoe_am.lead ? OSOE_PROGRESS_SLEEP_NS : OSOE_SWEEP_NS);
+    /* The lead of a multi-node job waits in its ring, on its sockets and the
+     * word at once (§3.10); every other agent has only the word. Either way
+     * the wait ends by a sweep interval at the latest (§4.10). */
+    if (osoe_am.internode && osoe_am.lead)
+        return osoe_ring_wait_wake(&osoe_am.ring, wake, seen, OSOE_SWEEP_NS);
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     return osoe_futex_wait(wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0;
 }

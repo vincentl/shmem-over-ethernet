@@ -868,18 +868,32 @@ latency-neutral, since the Pi will not honour a 10 µs `nanosleep` and a 1 ms
 sleep roughly doubles round-trip latency); `IORING_OP_MSG_RING` (requires a ring
 per PE to avoid one futex word).
 
-> **§7.1 step 2 polls, and that is a stand-in rather than a change of mind.**
+> **§7.1 step 2 polled, and that was a stand-in rather than a change of mind.**
 > The loop above waits on *one* submission that carries both the socket
 > completions and the futex — that is the whole trick, and `IORING_OP_FUTEX_WAIT`
-> is in `tools/probe` because of it. Step 2 has no ring: its wire is shared
-> memory, and a plain `futex_wait` takes one address, so the lead's agent can
+> is in `tools/probe` because of it. Step 2 had no ring: its wire was shared
+> memory, and a plain `futex_wait` takes one address, so the lead's agent could
 > wait on its wake word or on one peer's wire, but not on both, and with several
-> peers not on all the wires. Outbound traffic is unaffected — an application
-> thread bumps the wake word, which is an address the agent is already waiting
-> on (§3.12) — so only *arriving* bytes have no way to announce themselves, and
-> those are found by looking, at an interval far under the safety sweep. The
-> rejection above stands for the shipping design, and step 3 restores the
-> blocking form and deletes the interval.
+> peers not on all the wires. Arriving bytes were found by looking, every 250 µs.
+
+*As built* (phase 1 step 3 slice 1; `osoe_ring_wait_wake`). The loop above, with
+three facts it did not state. **The backend owns the wait**: `agent.c` calls
+`osoe_transport_agent_wait(wake, seen)`, and the lead's implementation arms the
+ring's futex wait and calls `io_uring_submit_and_wait_timeout` with a sweep
+interval; every other agent keeps a plain `futex_wait` (§4.10; the seam's first
+shape, `idle_ns`, could not carry this). **The claimed wake of slice 3 is kept
+unchanged**: the lead raises `lead_sleeping`, rechecks the dirty bits, and only
+then waits; a writer that claims the flag bumps the word and wakes it, which
+completes the armed wait. **A wait armed in an earlier idle period may be the one
+slept on**: a socket completion ends a wait without completing the futex, so the
+armed flag survives into the next idle period with an older value, and that is
+correct because every bump of the word — the claimed wake, a posted arrival, the
+agent's stop — is followed by a `futex_wake`, which completes a registered wait
+whatever its value. `lead_wake_model.py` checks it: the `ring` design passes under
+SC and TSO with the trapped-state check, including a lead woken twice by sockets
+with its wait still armed; arming on every idle pass breaks "at most one armed"
+(the 1,881); a wake without its bump is still a lost wake, ring or not. The
+250 µs interval (`OSOE_PROGRESS_SLEEP_NS`) is deleted.
 
 **How the lead finds its work** (phase 1 step 2 slice 3; second review, D12). The
 loop above says `submit_sealed_buffers()` and `work_pending()` without saying how

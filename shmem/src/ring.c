@@ -3,13 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <linux/futex.h>
+
 #include "fatal.h"
 #include "ring.h"
 #include "wire.h"
 
 /* What a completion is for, in its user data's low byte; the wire's slot is
- * the rest. */
-enum { RECEIVE = 1, SEND };
+ * the rest (0 for the futex wait, which is the ring's, not a wire's). */
+enum { RECEIVE = 1, SEND, FUTEX };
 
 static uint64_t tag(uint32_t slot, unsigned kind)
 {
@@ -170,6 +172,13 @@ void osoe_ring_reap(struct osoe_ring *r)
     io_uring_for_each_cqe(&r->uring, head, cqe) {
         seen++;
         uint64_t data = io_uring_cqe_get_data64(cqe);
+        if ((data & 0xff) == FUTEX) {
+            /* Woken, or refused at arming because the word had moved (-EAGAIN),
+             * or cancelled: either way nothing is armed now, and the next idle
+             * wait arms again (§3.10). */
+            r->futex_armed = false;
+            continue;
+        }
         uint32_t slot = (uint32_t)(data >> 8);
         if (slot >= r->wire_count)
             osoe_fatal("an io_uring completion names connection %u of %u", slot, r->wire_count);
@@ -210,6 +219,39 @@ bool osoe_ring_wait(struct osoe_ring *r, uint64_t timeout_ns)
     if (e < 0)
         osoe_fatal("waiting on the io_uring failed: %s", strerror(-e));
     return true;
+}
+
+/*
+ * §3.10's idle wait: one submission that carries the sockets' completions and
+ * the wake word together, so whichever comes first ends it.
+ *
+ * **At most one armed IORING_OP_FUTEX_WAIT per ring** (invariant 12). A wait
+ * armed in an earlier idle period may still be armed - a socket completion
+ * ended that period - and on an older value; it is the one this wait sleeps on,
+ * and it stays correct because every bump of the word is followed by a
+ * futex_wake (internode-am.c, agent.c, progress-host.c: the claimed wake),
+ * which completes it whatever value it was armed with. An earlier draft armed
+ * one per idle pass and one futex_wake completed 1,881 of them at once,
+ * overflowing the completion queue (review D3). lead_wake_model.py checks the
+ * rule and both breakages.
+ *
+ * Arming compares the word with `seen` - loaded by the caller before its pass
+ * (§4.9) - and registers the wait in one step, so a bump since then completes
+ * it at once with -EAGAIN rather than sleeping on a stale value.
+ */
+bool osoe_ring_wait_wake(struct osoe_ring *r, _Atomic uint32_t *wake, uint32_t seen,
+                         uint64_t timeout_ns)
+{
+    if (!r->futex_armed) {
+        struct io_uring_sqe *sqe = osoe_ring_entry(r);
+        /* Shared, not FUTEX2_PRIVATE: the word is in the node segment, and the
+         * wakers are other processes (tools/probe checks this form). */
+        io_uring_prep_futex_wait(sqe, (uint32_t *)(void *)wake, seen, FUTEX_BITSET_MATCH_ANY,
+                                 FUTEX2_SIZE_U32, 0);
+        io_uring_sqe_set_data64(sqe, tag(0, FUTEX));
+        r->futex_armed = true;
+    }
+    return osoe_ring_wait(r, timeout_ns);
 }
 
 uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t word)
