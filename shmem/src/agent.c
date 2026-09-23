@@ -12,6 +12,7 @@
 #include "base/futex.h"
 #include "blocked.h"
 #include "fatal.h"
+#include "liveness.h"
 #include "metrics.h"
 #include "state.h"
 #include "transport.h"
@@ -57,6 +58,14 @@ static void *agent_main(void *arg)
         uint32_t seen = atomic_load_explicit(&slot->agent_wake, memory_order_acquire);
         if (atomic_load_explicit(&stop_requested, memory_order_acquire))
             break;
+        /*
+         * Liveness without the watchdog (liveness.h): at most once a sweep
+         * interval, a death this agent can see - the lead's of any other local
+         * PE, any other PE's of its lead - declares the node's abort, which the
+         * check below then acts on in this same turn. Every wait of this loop
+         * ends by a sweep interval, so the check runs at least that often.
+         */
+        osoe_liveness_check();
         /*
          * The node's abort ends this process whatever its main thread is doing
          * (§3.15, abort.h): a PE computing outside the library never sweeps, so
@@ -121,6 +130,8 @@ void osoe_agent_start(struct osoe_pe_slot *slot)
     atomic_store_explicit(&stop_requested, 0, memory_order_release);
     atomic_store_explicit(&agent_ready, 0, memory_order_release);
 
+    osoe_liveness_start();              /* the agent's from here until it is joined */
+
     /* Block everything but the synchronous signals, which cannot be
      * redirected to another thread and are fatal when blocked. */
     sigset_t all, old;
@@ -158,4 +169,5 @@ void osoe_agent_stop(struct osoe_pe_slot *slot)
     if (r != 0)
         osoe_fatal("cannot join the agent thread: %s", strerror(r));
     atomic_store_explicit(&running, 0, memory_order_release);
+    osoe_liveness_stop();
 }

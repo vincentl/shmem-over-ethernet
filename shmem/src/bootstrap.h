@@ -25,6 +25,7 @@ struct osoe_bootstrap {
     uint64_t no_progress_ns;    /* OSOE_NO_PROGRESS_TIMEOUT, seconds; 0 = never (§3.15) */
     uint64_t heap_base;         /* OSOE_HEAP_BASE, 0 if unset */
     bool watchdog;              /* OSOE_WATCHDOG, or the build default (§3.15) */
+    bool liveness_off;          /* OSOE_LIVENESS=0: no agent watches a pidfd (liveness.h) */
     bool keep_control_segment;  /* OSOE_KEEP_CONTROL_SEGMENT: name kept until finalize */
     bool shm_capacity_warning_only; /* OSOE_SHM_CAPACITY_CHECK=0: report, do not refuse */
     uint32_t collective_fanout; /* OSOE_COLLECTIVE_FANOUT: k of the internode tree (§5.3) */

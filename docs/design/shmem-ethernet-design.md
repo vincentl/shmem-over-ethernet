@@ -1737,6 +1737,30 @@ checksum). An abort during §6.4's close needs no abortive goodbye, the model
 found: after the final barrier no PE can call `shmem_global_exit`, and a fatal's
 status is a failure anyway.
 
+*As built: liveness without the watchdog* (phase 1 step 4 slice 1, part C;
+`liveness.[ch]`). Every PE's agent watches the deaths it can see: the lead's
+agent holds a pidfd for every other local PE, and every other agent one for its
+lead. At most once a sweep interval each agent polls the pidfds it holds, with
+no wait — one `poll(2)` every `OSOE_SWEEP_NS`, O(L) descriptors on the lead and
+one elsewhere — and a PE whose process has ended before its last finalize is a
+death: the agent writes one line naming it, then declares the node's abort as a
+fatal naming it, which the abort carries to every PE of the job (above). Not if
+the word is already set: a PE that an abort ended is dead too, and its death is
+the abort's own (`abort_exit_model.py`). A pidfd names a process rather than a
+number, so, unlike `kill(pid, 0)`, a recycled pid cannot hide a death; only a
+pid recycled before its pidfd opened could, and they open at the agent's first
+turns, once each PE has published its pid. The design put the lead's pidfds on
+its ring, which a single-node job does not have, and had non-leads check the
+lead with `kill(pid, 0)` at a library wait's sweep, which a computing PE never
+reaches; the agent's own sweep serves both, the same way on every job. It is up
+to one sweep interval late, and a completion on the ring would not be — a
+refinement the multi-node lead can take later — but the model showed the check
+also makes an abort prompt: a declarer's own agent can end its process before
+the declarer has woken the lead, and then the lead's pidfd is what wakes it
+within a sweep interval (`abort_exit_model.py`, Part B alone). `shmem.dead-pe`
+kills a lead or a sibling, on one node and on two, with the watchdog off: every
+survivor leaves with the failure status, the computing ones included.
+
 #### The development watchdog
 
 > **A development aid, not the release path: on in the `debug`, `asan` and `tsan`
@@ -1767,8 +1791,8 @@ ships. Off in `release` is what keeps that honest. What it deliberately does not
 do:
 
 - **No pidfd polling.** Detection is a poll at a sweep, so it is up to one sweep
-  late, and it cannot see a PE that is alive but wedged. The lead's ring holding
-  a pidfd per local PE is step 4's answer.
+  late, and it cannot see a PE that is alive but wedged. Since step 4 the
+  library's own liveness does this in every build, with pidfds (above).
 - **No cross-node detection.** One node's PEs check one node's pids. A vanished
   peer node is TCP keepalive's business, and there is no TCP yet.
 - **No `shmem_global_exit` and no abort between nodes.** The watchdog writes the
@@ -1778,6 +1802,22 @@ do:
 - **Not during rendezvous.** The bootstrap waits carry a `failed` word and the
   no-progress rule above, and run before the slots a liveness check would read
   are all published.
+
+*What the watchdog still adds, since step 4.* Detection is the library's now:
+the agents' pidfds find any local death in every build, and the abort ends every
+PE. The watchdog adds two things. Its message names the routine the PE was
+waiting in, where the agents can only name the dead PE; and every waiting PE
+checks every sibling, where the agents check the lead and the lead checks the
+rest, so a lead that is wedged but alive still has its siblings' deaths found.
+Neither is needed for a job to end, and the first is now mostly unseen: the
+agents usually find a death first, and end their PEs before any sweep speaks,
+so the watchdog's message appears only when it wins the race. It stays in the
+development presets until a slice decides between retiring it and having the
+ending agent name the routine its PE is blocked in, which the PE's blocked
+record already holds; it costs a pass over the slots at each sweep of a waiting
+PE, and nothing on a wake. `OSOE_LIVENESS=0` turns the agents' pidfds off, for
+the tests of the watchdog and of a wait's sweep, which they would otherwise
+pre-empt.
 
 ### 3.16 Memory-order discipline
 

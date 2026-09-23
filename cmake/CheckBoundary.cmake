@@ -23,7 +23,7 @@ cmake_minimum_required(VERSION 3.25)
 # Each of these, and everything each includes, is checked.
 set(OSOE_ABOVE_BOUNDARY
   abort.c accessible.c agent.c allocator.c amo.c barrier.c bootstrap.c deprecated.c
-  fatal.c info.c init.c malloc.c metrics.c profile.c quiet.c rma.c session.c
+  fatal.c info.c init.c liveness.c malloc.c metrics.c profile.c quiet.c rma.c session.c
   signal.c symmetric.c team.c wait.c watchdog.c)
 
 # The AM backend (§3): the files a second backend replaces. No file above may

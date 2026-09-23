@@ -692,14 +692,17 @@ endif()
 # PE 0 quiets toward it, PE 1 sees it blocked in osoe-stat and dies, and PE 0's
 # next sweep must end the job naming shmem_quiet. -k leaves the survivors to the
 # library. Before slice 2 the quiet never swept: osoe-stat showed nothing for
-# PE 0, and the job ran to the launcher's 15 s timeout.
+# PE 0, and the job ran to the launcher's 15 s timeout. The agents' pidfds are
+# off (OSOE_LIVENESS=0): PE 0's would find the death first and end PE 0 from its
+# agent, and the sweep this tests would never speak.
 add_executable(shmem_test_unswept-wait test-unswept-wait.c
   ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 target_include_directories(shmem_test_unswept-wait PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
 target_link_libraries(shmem_test_unswept-wait PRIVATE osoe rt)
 osoe_warnings(shmem_test_unswept-wait)
 add_test(NAME shmem.unswept-wait
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_WATCHDOG=1 OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_WATCHDOG=1 OSOE_LIVENESS=0
+          OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
           $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 15 -k --
           $<TARGET_FILE:shmem_test_unswept-wait>)
 set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
@@ -988,10 +991,35 @@ foreach(map 0,1 0,0,1,1 0,1,2,0,1,0)
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endforeach()
 
+# A PE that dies without finalizing ends the job with the watchdog off (§3.15,
+# liveness.h): world rank DIES kills itself after a barrier while the others
+# compute or wait, and every survivor must leave with the failure status. A
+# sibling's death is the lead's pidfd to see and a lead's its siblings'; on two
+# nodes the other node learns it from the abort. See dead-pe.sh.
+add_executable(shmem_test_dead-pe test-dead-pe.c)
+target_link_libraries(shmem_test_dead-pe PRIVATE osoe)
+osoe_warnings(shmem_test_dead-pe)
+foreach(case "sibling.L2;0,0;1" "lead.L2;0,0;0" "sibling.L4;0,0,0,0;3" "lead.L4;0,0,0,0;0"
+             "sibling.0-0-1-1;0,0,1,1;1" "lead.0-0-1-1;0,0,1,1;0")
+  list(GET case 0 label)
+  list(GET case 1 map)
+  list(GET case 2 dies)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  add_test(NAME shmem.dead-pe.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_dead-pe> ${count} ${map} ${dies})
+  set_tests_properties(shmem.dead-pe.${label}
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "DEAD PE OK")
+endforeach()
+
 # The development watchdog (§3.15). Not an osoe_tier2_test: it needs -k, so the
 # launcher leaves the survivors to the library, and it asserts on output rather
 # than on an exit status. A PASS_REGULAR_EXPRESSION test ignores the exit code,
-# which is what these need: the job is meant to fail.
+# which is what these need: the job is meant to fail. With the agents' pidfds
+# off (OSOE_LIVENESS=0): since phase 1 step 4 they find the same death in every
+# build, and would race the watchdog to it; shmem.watchdog.liveness is the same
+# job with them on and the watchdog off.
 add_executable(shmem_test_watchdog test-watchdog.c)
 target_link_libraries(shmem_test_watchdog PRIVATE osoe)
 osoe_warnings(shmem_test_watchdog)
@@ -999,7 +1027,8 @@ osoe_warnings(shmem_test_watchdog)
 foreach(count 2 4)
   foreach(where barrier wait_until)
     add_test(NAME shmem.watchdog.${where}.L${count}
-      COMMAND osoe-launch -n ${count} -t 20 -k
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_LIVENESS=0
+              $<TARGET_FILE:osoe-launch> -n ${count} -t 20 -k
               -e 0:OSOE_TEST_WAIT=${where} -e 1:OSOE_TEST_WAIT=${where}
               -e 2:OSOE_TEST_WAIT=${where} -e 3:OSOE_TEST_WAIT=${where}
               -e 0:OSOE_WATCHDOG=1 -e 1:OSOE_WATCHDOG=1
@@ -1012,13 +1041,23 @@ foreach(count 2 4)
 endforeach()
 
 # Turned off, the same job hangs until the launcher's timeout: this is what the
-# watchdog replaces, kept as a test so the difference stays demonstrated.
+# watchdog replaced, kept as a test so the difference stays demonstrated. And
+# with the watchdog off but the agents' pidfds on, as a release build runs, the
+# job ends without the launcher (§3.15, liveness.h).
 add_test(NAME shmem.watchdog.off
-  COMMAND osoe-launch -n 2 -t 3 -k -e 0:OSOE_WATCHDOG=0 -e 1:OSOE_WATCHDOG=0
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_LIVENESS=0
+          $<TARGET_FILE:osoe-launch> -n 2 -t 3 -k -e 0:OSOE_WATCHDOG=0 -e 1:OSOE_WATCHDOG=0
           -- $<TARGET_FILE:shmem_test_watchdog>)
 set_tests_properties(shmem.watchdog.off PROPERTIES
   LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 3 s")
+add_test(NAME shmem.watchdog.liveness
+  COMMAND osoe-launch -n 2 -t 3 -k -e 0:OSOE_WATCHDOG=0 -e 1:OSOE_WATCHDOG=0
+          -- $<TARGET_FILE:shmem_test_watchdog>)
+set_tests_properties(shmem.watchdog.liveness PROPERTIES
+  LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "has ended without finalizing"
+  FAIL_REGULAR_EXPRESSION "timeout after|has died[;] this PE would wait")
 
 # With nothing set, the default must follow the preset: on in debug, asan and
 # tsan, off in release (§3.15).
@@ -1028,7 +1067,8 @@ else()
   set(osoe_watchdog_default_expect "osoe-launch: timeout after 3 s")
 endif()
 add_test(NAME shmem.watchdog.default
-  COMMAND osoe-launch -n 2 -t 3 -k -- $<TARGET_FILE:shmem_test_watchdog>)
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_LIVENESS=0
+          $<TARGET_FILE:osoe-launch> -n 2 -t 3 -k -- $<TARGET_FILE:shmem_test_watchdog>)
 set_tests_properties(shmem.watchdog.default PROPERTIES
   LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "${osoe_watchdog_default_expect}")

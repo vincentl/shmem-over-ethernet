@@ -1,26 +1,26 @@
 /*
  * The development watchdog (§3.12, §3.15).
  *
- * A PE blocked in a wait_until or a barrier whose sibling has died waits until
- * the launcher's timeout. In production that is the right answer: the launcher
- * tears the job down (`srun -K1`, §3.15), and §7.1 step 4 adds pidfd liveness
- * and abort propagation to make the library's own detection complete. This is
- * the development aid until then - a loud failure naming the dead PE, the
- * routine, and the control segment, instead of a hang.
+ * A PE blocked in a wait_until or a barrier whose sibling has died used to
+ * wait until the launcher's timeout. Since phase 1 step 4 the library finds
+ * the death in every build (liveness.h: each agent's pidfds) and ends the job
+ * (abort.h). This is the development aid it was before that, and what it still
+ * adds is its message - a loud failure naming the dead PE, the routine it was
+ * waiting in, and the control segment - and a check of every sibling from
+ * every waiting PE (§3.15).
  *
  * It runs only when a library wait's safety-sweep deadline expires
  * (base/sweep.h), never on the wake path, so a healthy wait pays nothing: no
  * load, no branch, no syscall. A wait that is simply slow pays one pass over
  * the local slots every OSOE_SWEEP_NS.
  *
- * What it does NOT do, deliberately (§3.15, §7.1 step 4):
- *   - no pidfd polling: liveness is kill(pid, 0) at a sweep, not an event on
- *     the lead's ring, so detection is up to one sweep late and cannot see a PE
- *     that is alive but wedged;
+ * What it does NOT do, deliberately (§3.15):
+ *   - no pidfd polling: liveness is kill(pid, 0) at a sweep, so it cannot see
+ *     a PE that is alive but wedged - the agents' pidfds are the library's;
  *   - no cross-node detection: a vanished peer node surfaces through TCP
  *     keepalive, which does not exist yet;
- *   - no shmem_global_exit and no abort flood: the abort word is set and read
- *     within one node, and the PE that sets it is the one that noticed.
+ *   - no abort between nodes: the abort word is set and read within one node,
+ *     and the abortive goodbye (abort_model.py) is what carries it further.
  *
  * It is on by default in the debug, asan and tsan presets and off in release,
  * because production must not depend on it. OSOE_WATCHDOG=0 or 1 forces either
