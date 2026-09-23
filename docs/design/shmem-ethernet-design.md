@@ -1389,7 +1389,16 @@ headers would pass whenever the library agreed with itself.
   `shmem_quiet(+0x1)`; the kinds are part of the segment's encoding. Every
   internode wait publishes one naming the peer node, which none did before phase
   1 step 2 slice 2: a PE stuck in a quiet toward a dead node showed as not
-  blocked at all (second review, D2).
+  blocked at all (second review, D2). Since layout 14 (phase 1 step 3 slice 2)
+  the kind also says which of the connection's words the wait sleeps on
+  (§3.11) — its acknowledgement, its buffer turnover, a reply credit, or the
+  reply itself on the PE's landing slot — so `osoe-stat` prints `shmem_quiet
+  (acknowledgement from node 1)`, and counts for each connection the PEs asleep
+  on each word: the per-connection "waiters per wake word" below, read from
+  records the job writes anyway, so the job keeps no count and pays nothing for
+  it. `shmem.unswept-wait` checks both against a PE held in a quiet toward a
+  stopped node. A reader built for an older layout prints the new kinds raw,
+  and still reads everything it finds by name.
 
   It is the first record here with more than one word in it, so it is the first
   that can be read torn while the PE publishes its next wait. A **generation
@@ -1410,8 +1419,8 @@ headers would pass whenever the library agreed with itself.
   a PE spinning through satisfied waits shows no record; it is also not blocked.
 - **Per connection:** sequence numbers sent, acknowledged as applied, and received
   and applied; the age of the in-flight send; each buffer's reserved and filled
-  counts and seal bit; reply queue depths; credits left; waiters per wake word; the
-  armed-futex flag.
+  counts and seal bit; reply queue depths; credits left; waiters per wake word
+  (counted from the per-PE records, below); the armed-futex flag.
 
 **2. Is the network the bottleneck?**
 

@@ -224,9 +224,10 @@ struct am_wait {
 };
 
 /* `pe` is the specific PE this wait is for, or -1 when there is none - a
- * quiet's wait is over a whole node's queue, not one PE's (§4.10, D-6). */
-static void am_wait_begin(struct am_wait *w, const char *routine, const char *watching,
-                          uint32_t peer, int pe, uint64_t progress)
+ * quiet's wait is over a whole node's queue, not one PE's (§4.10, D-6). `kind`
+ * names the word the wait sleeps on, for the "blocked in" record (node.h). */
+static void am_wait_begin(struct am_wait *w, const char *routine, enum osoe_blocked_detail kind,
+                          const char *watching, uint32_t peer, int pe, uint64_t progress)
 {
     w->routine = routine;
     w->watching = watching;
@@ -234,7 +235,7 @@ static void am_wait_begin(struct am_wait *w, const char *routine, const char *wa
     w->pe = pe;
     w->sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     osoe_stall_watch_begin(&w->watch, progress, osoe.bootstrap.no_progress_ns);
-    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_NODE, peer);
+    osoe_blocked_enter(routine, kind, peer);
 }
 
 /* Called on every turn of a wait's loop with the progress word as it stands.
@@ -326,7 +327,8 @@ static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
     struct osoe_wait_word *word = osoe_connection_turnover_wait(conn);
     struct am_wait w;
-    am_wait_begin(&w, routine, "the connection's buffer turnover", peer, pe, turnover(conn));
+    am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_TURNOVER, "the connection's buffer turnover",
+                  peer, pe, turnover(conn));
     osoe_wait_word_enter(word);
     uint32_t slept_on = 0;
     bool swept = false;
@@ -478,8 +480,8 @@ static void take_credit(struct osoe_connection *conn, uint32_t peer, int pe, con
     /* Credits come back as replies land, so the tickets served are what moves
      * while one is awaited: a peer that replies to nothing serves nobody. */
     struct am_wait w;
-    am_wait_begin(&w, routine, "the connection's reply credits", peer, pe,
-                  osoe_credit_served_count(credit));
+    am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_CREDIT, "the connection's reply credits",
+                  peer, pe, osoe_credit_served_count(credit));
     uint32_t slept_on = 0;
     bool swept = false;
     for (;;) {
@@ -523,7 +525,8 @@ static void await_reply(struct osoe_landing_slot *slot, uint64_t token, uint32_t
         /* The slot's wake word is bumped by every landing, so it is also the
          * progress word: it stands still only while nothing arrives here. */
         if (!waiting) {
-            am_wait_begin(&w, routine, "the landing slot's wake word", peer, pe, seen);
+            am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_REPLY, "the landing slot's wake word",
+                          peer, pe, seen);
             waiting = true;
         }
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
@@ -814,7 +817,8 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
             struct am_wait w;
             /* No single PE: a quiet waits for a whole node's queue, not one
              * PE's (D-6). */
-            am_wait_begin(&w, routine, "the peer's acknowledged sequence", peer, -1,
+            am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_ACKNOWLEDGEMENT,
+                          "the peer's acknowledged sequence", peer, -1,
                           osoe_progress_host_acked(peer));
             osoe_wait_word_enter(word);
             uint32_t slept_on = 0;

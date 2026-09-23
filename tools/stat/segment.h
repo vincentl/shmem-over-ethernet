@@ -228,9 +228,26 @@ struct osoe_segment_blocked {
     char routine[64];
 };
 
-/* `detail` as its kind says - "node 3", "epoch 17", "offset 0x40" - or raw.
- * The kinds are the segment's encoding (node.h, enum osoe_blocked_detail);
- * this reader knows them by number, as it knows the watch word. */
+/*
+ * The kinds of `detail`: the segment's encoding (node.h, enum
+ * osoe_blocked_detail), which this reader knows by number, as it knows the
+ * watch word. Layout 14 added the four that name which of a connection's words
+ * an internode wait sleeps on (§3.11), the detail being the peer node; an older
+ * segment's internode waits are all DETAIL_NODE.
+ */
+enum osoe_segment_detail {
+    OSOE_SEGMENT_DETAIL_NODE = 1,
+    OSOE_SEGMENT_DETAIL_EPOCH,
+    OSOE_SEGMENT_DETAIL_OFFSET,
+    OSOE_SEGMENT_DETAIL_PE,
+    OSOE_SEGMENT_DETAIL_ACKNOWLEDGEMENT,
+    OSOE_SEGMENT_DETAIL_TURNOVER,
+    OSOE_SEGMENT_DETAIL_CREDIT,
+    OSOE_SEGMENT_DETAIL_REPLY,
+};
+
+/* `detail` as its kind says - "node 3", "epoch 17", "offset 0x40",
+ * "acknowledgement from node 3" - or raw. */
 void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf, size_t len);
 
 bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe_segment_blocked *out);

@@ -505,12 +505,23 @@ bool osoe_segment_blocked(const struct osoe_segment *s, uint32_t pe, struct osoe
 
 void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf, size_t len)
 {
+    uint64_t d = b->detail;
     switch (b->detail_kind) {
-    case 1:  snprintf(buf, len, "node %" PRIu64, b->detail); break;
-    case 2:  snprintf(buf, len, "epoch %" PRIu64, b->detail); break;
-    case 3:  snprintf(buf, len, "offset %#" PRIx64, b->detail); break;
-    case 4:  snprintf(buf, len, "PE %" PRIu64, b->detail); break;
-    default: snprintf(buf, len, "+%#" PRIx64, b->detail); break;
+    case OSOE_SEGMENT_DETAIL_NODE:   snprintf(buf, len, "node %" PRIu64, d); break;
+    case OSOE_SEGMENT_DETAIL_EPOCH:  snprintf(buf, len, "epoch %" PRIu64, d); break;
+    case OSOE_SEGMENT_DETAIL_OFFSET: snprintf(buf, len, "offset %#" PRIx64, d); break;
+    case OSOE_SEGMENT_DETAIL_PE:     snprintf(buf, len, "PE %" PRIu64, d); break;
+    case OSOE_SEGMENT_DETAIL_ACKNOWLEDGEMENT:
+        snprintf(buf, len, "acknowledgement from node %" PRIu64, d);
+        break;
+    case OSOE_SEGMENT_DETAIL_TURNOVER:
+        snprintf(buf, len, "buffer turnover toward node %" PRIu64, d);
+        break;
+    case OSOE_SEGMENT_DETAIL_CREDIT:
+        snprintf(buf, len, "reply credit toward node %" PRIu64, d);
+        break;
+    case OSOE_SEGMENT_DETAIL_REPLY:  snprintf(buf, len, "reply from node %" PRIu64, d); break;
+    default:                         snprintf(buf, len, "+%#" PRIx64, d); break;
     }
 }
 
