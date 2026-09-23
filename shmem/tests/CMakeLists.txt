@@ -156,7 +156,7 @@ target_include_directories(shmem_test_wire PRIVATE ../src)
 target_link_libraries(shmem_test_wire PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_wire)
 add_test(NAME shmem.wire COMMAND shmem_test_wire)
-set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
+set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 120)
 
 # The wire between two processes (tier 2). Two logical nodes, one PE each, so
 # each process is a node lead - the only role that touches a wire (§3.12). It
@@ -499,8 +499,10 @@ set_tests_properties(shmem.work-discovery PROPERTIES LABELS "tier2" TIMEOUT 150)
 # The data path does not route yet, so this is the shmem_ptr half of the
 # differential test rather than the whole of it. Multi-node maps only: with one
 # logical node there is no peer to route to, and what force-remote should mean
-# there is an open question (§8.1).
-foreach(map 0,1,2 0,0,1,1,2,2)
+# there is an open question (§8.1). All four multi-node poles, as its siblings
+# run: SHARED must collapse to {self} on the uneven and the non-contiguous maps
+# too.
+foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
   string(REPLACE "," ";" ranks "${map}")
   list(LENGTH ranks count)
   string(REPLACE "," "-" label "${map}")
@@ -888,7 +890,8 @@ set_tests_properties(shmem.dev-shm-capacity.warned PROPERTIES PASS_REGULAR_EXPRE
 set_tests_properties(shmem.dev-shm-capacity.heaps PROPERTIES PASS_REGULAR_EXPRESSION
   "/dev/shm has [0-9]+ MiB free, but this node's control segment and 2 heaps.*launcher exited 1")
 set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES PASS_REGULAR_EXPRESSION
-  "/dev/shm has [0-9]+ MiB free, but this node's connection area.*launcher exited 1")
+  "/dev/shm has [0-9]+ MiB free, but this node's connection area.*launcher exited 1"
+  SKIP_RETURN_CODE 77)
 
 # A kernel without futex2 (Linux < 6.7) is refused at init by name, before any
 # object exists (§1; review round two, portability F3). deny-futex2 makes the

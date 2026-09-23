@@ -7,7 +7,8 @@
  * it an arrival, so the walk is from the root down, O(log N) visits.
  *
  * Eight logical nodes, one PE each, and node CULPRIT never calls the second
- * barrier. PE 0 waits for the others to be in it, then walks: start at node 0
+ * barrier. PE 0 walks - until the walk lands, which it may not while the
+ * others are still arriving; no fixed sleep - starting at node 0
  * and follow `team.world.tree.lowest_missing` while the node it names has an
  * epoch open; the walk ends at the node whose own members have not arrived -
  * which is the culprit's - and that node's PE lines say which PE and in what.
@@ -22,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <shmem.h>
@@ -29,7 +31,7 @@
 #include "check.h"
 #include "invariants.h"
 
-enum { CULPRIT = 6, NODES = 8, MAX_VISITS = 16 };
+enum { CULPRIT = 6, NODES = 8, MAX_VISITS = 16, SETTLE_SECONDS = 8 };
 
 /* One node's tree state, read from its control segment by name. */
 static int read_node(unsigned node, uint64_t *open, uint64_t *own, uint64_t *missing,
@@ -53,6 +55,36 @@ static int read_node(unsigned node, uint64_t *open, uint64_t *own, uint64_t *mis
     return ok;
 }
 
+/*
+ * One walk from the root: follow lowest_missing while the node it names has an
+ * epoch open. Returns 1 if it ended where a walk must once the tree has
+ * settled - at a node whose own members have not arrived - 0 if it ended at a
+ * node whose members have (an arrival still on its way up), and -1 if a
+ * segment could not be read or the walk ran too long. Prints each visit if
+ * `print`.
+ */
+static int walk(unsigned *at_out, unsigned *visits_out, int print)
+{
+    unsigned at = 0, visits = 0;
+    for (;;) {
+        uint64_t open = 0, own = 0, missing = 0;
+        char host[72] = "?";
+        if (++visits > MAX_VISITS || !read_node(at, &open, &own, &missing, host, sizeof host))
+            return -1;
+        if (print)
+            printf("visit %u: node %u (%s) epoch_open %llu own_arrived %llu lowest_missing %lld\n",
+                   visits, at, host, (unsigned long long)open, (unsigned long long)own,
+                   missing == UINT32_MAX ? -1LL : (long long)missing);
+        if (open != 0 && missing != UINT32_MAX) {
+            at = (unsigned)missing;     /* the child that owes this node */
+            continue;
+        }
+        *at_out = at;
+        *visits_out = visits;
+        return own == 0;
+    }
+}
+
 int main(void)
 {
     shmem_init();
@@ -70,29 +102,27 @@ int main(void)
         return 0;
     }
 
-    /* Give the others time to be in the barrier and to have forwarded what
-     * they can. Their arrivals are what makes the walk's answer the culprit's
-     * node rather than whichever node is slowest to start. */
-    sleep(3);
-
+    /*
+     * Walk until the walk lands on the culprit's node, not for a fixed time.
+     * Until every other PE is in the barrier and its arrival has come up the
+     * tree, a walk can end at a node that is merely slow to start, which a
+     * fixed sleep only made unlikely. Bounded inside the launcher's 12 s, so a
+     * tree whose walk never finds the culprit fails here and says so; what is
+     * checked below is that it does, and in how many visits.
+     */
+    struct timespec tick = { 0, 10 * 1000 * 1000 };
+    time_t give_up = time(NULL) + SETTLE_SECONDS;
     unsigned at = 0, visits = 0;
     for (;;) {
-        uint64_t open = 0, own = 0, missing = 0;
-        char host[72] = "?";
-        visits++;
-        CHECK_FATAL(visits <= MAX_VISITS);
-        CHECK_FATAL(read_node(at, &open, &own, &missing, host, sizeof host));
-        printf("visit %u: node %u (%s) epoch_open %llu own_arrived %llu lowest_missing %lld\n",
-               visits, at, host, (unsigned long long)open, (unsigned long long)own,
-               missing == UINT32_MAX ? -1LL : (long long)missing);
-        if (open != 0 && missing != UINT32_MAX) {
-            at = (unsigned)missing;     /* the child that owes this node */
-            continue;
-        }
-        /* Nothing missing below: this node's own members are what is awaited. */
-        CHECK(own == 0);
-        break;
+        int settled = walk(&at, &visits, 0);
+        CHECK_FATAL(settled >= 0);
+        if (settled && at == CULPRIT)
+            break;
+        CHECK_FATAL(time(NULL) < give_up);
+        nanosleep(&tick, NULL);
     }
+    /* The settled walk, printed: the visits a person with osoe-stat would make. */
+    CHECK_FATAL(walk(&at, &visits, 1) == 1);
     printf("hang walk found node %u in %u visits, of %u nodes\n", at, visits, NODES);
     CHECK(at == CULPRIT);
     CHECK(visits <= 4);                 /* log_2 8 + 1; never all eight */
