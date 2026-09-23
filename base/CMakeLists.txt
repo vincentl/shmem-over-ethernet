@@ -14,6 +14,7 @@ add_library(osoe_base OBJECT
   hostlist.c
   order.c
   ring-check.c
+  siphash.c
   size.c
   stall-watch.c
   sweep.c)

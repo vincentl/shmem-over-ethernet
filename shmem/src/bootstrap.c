@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "collective-tree.h"
 #include "internode.h"
@@ -242,6 +243,32 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         if (hosts != b->node_count)
             osoe_fatal("OSOE_STEP_NODELIST='%s' names %u hosts for a job of %u nodes",
                        b->node_list, hosts, b->node_count);
+    }
+
+    /*
+     * A secret every lead proves it knows in each hello (§6.2; §10's
+     * "authenticating the step-3 handshake", decided with step 3): optional,
+     * since the network is trusted as Slurm's own traffic is (§3.4), and cheap
+     * when a cluster's is not - a wrapper sets it before srun and Slurm carries
+     * it to every task. 128 bits as 32 hex digits.
+     */
+    const char *secret = getenv("OSOE_JOB_SECRET");
+    b->secured = false;
+    if (secret && *secret) {            /* set but empty is unset */
+        bool hex = strlen(secret) == 32;
+        for (size_t i = 0; hex && i < 32; i++) {
+            char c = secret[i];
+            hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        }
+        if (!hex)
+            osoe_fatal("OSOE_JOB_SECRET is not 32 hexadecimal digits (128 bits); make one "
+                       "with: head -c16 /dev/urandom | od -An -tx1 | tr -d ' \\n'");
+        for (size_t i = 0; i < 16; i++) {
+            unsigned byte;
+            sscanf(secret + 2 * i, "%2x", &byte);
+            b->secret[i] = (unsigned char)byte;
+        }
+        b->secured = true;
     }
 
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;

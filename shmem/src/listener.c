@@ -9,11 +9,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/random.h>
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "base/deadline.h"
+#include "base/siphash.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "fatal.h"
@@ -36,7 +38,8 @@ enum { CANDIDATES = 32 };
 #define HELLO_NS  UINT64_C(100000000)           /* 0.1 s for a hello */
 
 #define HELLO_MAGIC   UINT64_C(0x6f6c6568656f736f)   /* "osoehelo", little-endian */
-#define HELLO_VERSION 2         /* 2: the launch's shape */
+#define HELLO_VERSION 3         /* 2: the launch's shape;
+                                 * 3: nonces and proofs (OSOE_JOB_SECRET) */
 
 struct hello {
     uint64_t magic;
@@ -53,6 +56,7 @@ struct hello {
      * first appears, before either end waits on it (rendezvous.h). */
     uint32_t node_count;
     uint32_t world_size;
+    uint64_t nonce;             /* the caller's, fresh for this connection */
 };
 
 enum verdict {
@@ -66,13 +70,70 @@ struct answer {
     uint32_t version;
     uint32_t verdict;           /* enum verdict */
     uint32_t node;              /* who answered */
-    uint32_t reserved;
+    uint32_t secured;           /* it holds an OSOE_JOB_SECRET */
+    uint64_t nonce;             /* the answerer's, fresh for this connection */
+    uint64_t proof;             /* with a secret: that it knows it (below) */
 };
 
 /* The caller's third step (listener.h): only after this does a lead count it. */
 struct confirmation {
     uint64_t magic;
+    uint64_t proof;             /* with a secret: that the caller knows it */
 };
+
+/*
+ * OSOE_JOB_SECRET (§6.2; §10's "authenticating the step-3 handshake"). With a
+ * secret, each side proves it knows it without sending it: a SipHash-2-4 digest,
+ * keyed by the secret, of the hello and both sides' nonces, one tag for the
+ * answer and another for the confirmation. The nonces are fresh per connection,
+ * so a proof overheard on one connection answers no other; a host that can
+ * connect but does not know the secret cannot join a job, read its heaps or
+ * write them. What it does not do is protect a connection from a host that can
+ * see and inject its packets after the hello - the network is still trusted
+ * that far, as Slurm's own is (§3.4).
+ */
+enum { ANSWER_TAG = 0x616e73, CONFIRM_TAG = 0x636f6e };
+
+static uint64_t proof(const struct osoe_bootstrap *b, uint32_t tag, const struct hello *h,
+                      uint64_t answer_nonce)
+{
+    unsigned char m[4 + sizeof *h + 8];
+    memcpy(m, &tag, 4);
+    memcpy(m + 4, h, sizeof *h);
+    memcpy(m + 4 + sizeof *h, &answer_nonce, 8);
+    return osoe_siphash(b->secret, m, sizeof m);
+}
+
+static uint64_t fresh_nonce(void)
+{
+    uint64_t n = 0;
+    if (getrandom(&n, sizeof n, 0) != (ssize_t)sizeof n) {
+        struct timespec t;
+        clock_gettime(CLOCK_MONOTONIC, &t);
+        n = (uint64_t)t.tv_nsec ^ ((uint64_t)t.tv_sec << 30) ^ ((uint64_t)getpid() << 48);
+    }
+    return n;
+}
+
+/*
+ * The caller's check of an ACCEPTED answer, which came from a node of this job,
+ * session and purpose (the answerer checked that before answering): a secret on
+ * one side and not the other, or two different ones, is a launch that gave the
+ * job's PEs different environments, and ends it. Returns the confirmation.
+ */
+static struct confirmation confirm(const struct osoe_bootstrap *b, const struct hello *h,
+                                   const struct answer *a)
+{
+    if ((a->secured != 0) != b->secured)
+        osoe_fatal("node %u %s OSOE_JOB_SECRET and node %u %s: every PE of a job must be "
+                   "given the same", a->node, a->secured ? "has an" : "has no", b->node,
+                   b->secured ? "has one" : "has none");
+    if (b->secured && a->proof != proof(b, ANSWER_TAG, h, a->nonce))
+        osoe_fatal("node %u answered node %u with a proof of a different OSOE_JOB_SECRET: "
+                   "every PE of a job must be given the same", a->node, b->node);
+    return (struct confirmation){ HELLO_MAGIC,
+                                  b->secured ? proof(b, CONFIRM_TAG, h, a->nonce) : 0 };
+}
 
 /* ---- the port rule --------------------------------------------------- */
 
@@ -299,7 +360,8 @@ int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpos
             close(fd);                  /* a stranger, or a caller that gave up */
             continue;
         }
-        struct answer a = { HELLO_MAGIC, HELLO_VERSION, ACCEPTED, l->node, 0 };
+        struct answer a = { HELLO_MAGIC, HELLO_VERSION, ACCEPTED, l->node, b->secured,
+                            fresh_nonce(), 0 };
         if (h.job != b->job || h.step != b->step || h.session != l->session ||
             h.to_node != l->node)
             a.verdict = NOT_THIS_NODE;
@@ -313,6 +375,8 @@ int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpos
         else if (h.from_node >= b->node_count || h.from_node == l->node)
             osoe_fatal("node %u was called by a lead claiming to be node %u of a job of %u "
                        "nodes", l->node, h.from_node, b->node_count);
+        if (a.verdict == ACCEPTED && b->secured)
+            a.proof = proof(b, ANSWER_TAG, &h, a.nonce);
         bool sent = write_all(b, fd, &a, sizeof a, h.from_node);
         if (a.verdict != ACCEPTED || !sent) {
             close(fd);
@@ -321,6 +385,14 @@ int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpos
         struct confirmation c;
         if (!read_all(b, fd, &c, sizeof c, 0, h.from_node) || c.magic != HELLO_MAGIC) {
             close(fd);                  /* the caller gave up before our answer came */
+            continue;
+        }
+        /* A caller that cannot prove the secret is not counted, and not
+         * answered further: whatever it is, it is not a lead of this job. */
+        if (b->secured && c.proof != proof(b, CONFIRM_TAG, &h, a.nonce)) {
+            fprintf(stderr, "osoe: node %u refused a caller claiming to be node %u of this "
+                            "job: it does not know OSOE_JOB_SECRET\n", l->node, h.from_node);
+            close(fd);
             continue;
         }
         *peer = h.from_node;
@@ -367,7 +439,8 @@ int osoe_listener_connect_port(const struct osoe_bootstrap *b, uint32_t session,
     struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
     for (;;) {
         struct hello h = { HELLO_MAGIC, HELLO_VERSION, (uint32_t)purpose, b->job, b->step,
-                           session, b->node, node, b->node_count, b->world_size };
+                           session, b->node, node, b->node_count, b->world_size,
+                           fresh_nonce() };
         int fd = dial(host, port);
         if (fd >= 0) {
             struct answer a;
@@ -381,7 +454,7 @@ int osoe_listener_connect_port(const struct osoe_bootstrap *b, uint32_t session,
                            "or a stranger there (verdict %u): the nodes disagree about the job",
                            b->node, node, port, a.node, a.verdict);
             } else if (a.verdict == ACCEPTED) {
-                struct confirmation c = { HELLO_MAGIC };
+                struct confirmation c = confirm(b, &h, &a);
                 if (write_all(b, fd, &c, sizeof c, node))
                     return fd;
                 close(fd);
@@ -427,7 +500,8 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
     for (;;) {
         for (uint32_t i = 0; i < CANDIDATES; i++) {
             struct hello h = { HELLO_MAGIC, HELLO_VERSION, (uint32_t)purpose, b->job, b->step,
-                               session, b->node, node, b->node_count, b->world_size };
+                               session, b->node, node, b->node_count, b->world_size,
+                               fresh_nonce() };
             int fd = dial(host, osoe_listener_candidate(b, node, i));
             if (fd < 0)
                 continue;
@@ -439,7 +513,7 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
                 continue;
             }
             if (a.verdict == ACCEPTED && a.node == node) {
-                struct confirmation c = { HELLO_MAGIC };
+                struct confirmation c = confirm(b, &h, &a);
                 if (write_all(b, fd, &c, sizeof c, node))
                     return fd;
                 close(fd);

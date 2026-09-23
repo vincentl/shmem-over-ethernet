@@ -304,6 +304,41 @@ set_tests_properties(shmem.job.disagree.node-count PROPERTIES PASS_REGULAR_EXPRE
 set_tests_properties(shmem.job.disagree.root-node-count PROPERTIES PASS_REGULAR_EXPRESSION
   "node 0, launched for 3 tasks on 9 nodes, was called by node [12], launched for 3 tasks on 3 nodes")
 
+# OSOE_JOB_SECRET (§6.2, §10): leads that share it meet; a lead that has none,
+# or a different one, is refused by name - by the proof in the hello, which a
+# lead that does not know the secret cannot make.
+set(osoe_secret 0123456789abcdef0123456789abcdef)
+add_test(NAME shmem.job.secret
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+add_test(NAME shmem.job.secret.missing
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
+          $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 -e 1:OSOE_JOB_SECRET= --
+          $<TARGET_FILE:shmem_test_job>)
+add_test(NAME shmem.job.secret.different
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
+          $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30
+          -e 1:OSOE_JOB_SECRET=fedcba9876543210fedcba9876543210 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.secret shmem.job.secret.missing shmem.job.secret.different
+  PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.job.secret.missing PROPERTIES
+  PASS_REGULAR_EXPRESSION "node 0 has an OSOE_JOB_SECRET and node 1 has none")
+set_tests_properties(shmem.job.secret.different PROPERTIES
+  PASS_REGULAR_EXPRESSION "a proof of a different OSOE_JOB_SECRET")
+
+# The lead's half of the secret (tier 1): a caller whose hello is right in every
+# field but who cannot prove the secret - replaying the answer's own proof - is
+# refused and not counted, and the lead goes on listening. Only a caller that
+# lies reaches this check, so test-listener.c is one, and includes listener.c
+# for the hello's layout.
+add_executable(shmem_test_listener test-listener.c)
+target_include_directories(shmem_test_listener PRIVATE ../src)
+target_link_libraries(shmem_test_listener PRIVATE osoe_base Threads::Threads)
+osoe_warnings(shmem_test_listener)
+add_test(NAME shmem.listener.secret COMMAND shmem_test_listener)
+set_tests_properties(shmem.listener.secret PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The progress loop between two logical nodes (tier 2): every layer at once.
 # The wire is far smaller than a segment and its split injection is on, so the
 # stream really arrives in pieces (§8.2). Sizes are pinned rather than

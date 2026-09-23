@@ -339,8 +339,11 @@ one-sided API cannot do otherwise, since any PE may write any heap. They are the
 same job and the same build, **assumed buggy but not hostile**. Other local users
 are untrusted, which mode 0600 and `O_EXCL` on every object enforce (§6.2). The
 network is trusted at the level Slurm's own traffic is; §10 records how a secret
-in the step-3 handshake would change that. What follows from "buggy": **a peer's
-bytes must never be able to write outside a heap or a landing slot**. The
+in the step-3 handshake would change that. *(Built in phase 1 step 3: the
+optional `OSOE_JOB_SECRET` keeps hosts that do not know it out of the job's
+hellos, §6.2; it does not encrypt the traffic that follows.)* What follows from
+"buggy": **a peer's bytes must never be able to write outside a heap or a
+landing slot**. The
 receiving node validates every length and index a segment carries before
 applying it — a message's length against what is left of its segment, the
 message count against the segment's size, a get reply's token, offset and total
@@ -4002,6 +4005,7 @@ The rendezvous inherits §3.4's trust boundary: the PEs of a job trust each othe
 other local users do not (every object is mode 0600, created `O_EXCL`), and the
 network is trusted as Slurm's own traffic is. The step-3 handshake authenticates
 nothing beyond the job and step ids, which are public; §10 has the open item.
+*(Decided and built in phase 1 step 3: an optional `OSOE_JOB_SECRET`, below.)*
 
 **Node-local.** The lead creates the node segment as a named shared memory object,
 `/osoe.<job>.<step>.<node>.<session>`, so concurrent steps on one node cannot
@@ -4257,6 +4261,20 @@ binary search over *L* otherwise. The root's O(*P*) scratch is once per job, as
 the step-2 check of the whole map was. `shmem.rank-map` checks lookups against the
 uncompressed map on §8.1's four poles, and the run counts at 4,096 × 256.
 
+**`OSOE_JOB_SECRET`: decided, and built** (§10's open item). Optional, 128 bits as
+32 hexadecimal digits, which a wrapper sets before `srun` and Slurm carries to every
+task. With it, every hello — the rendezvous's and the mesh's — carries a fresh
+nonce from each side, and each side proves it knows the secret with a SipHash-2-4
+digest (`base/siphash.c`, checked against the published vectors) over the hello
+and both nonces, without sending it: so a host that can reach a listener but does
+not know the secret cannot join the job, and a proof overheard on one connection
+answers no other. A caller that cannot prove it is refused and not counted; a lead
+whose peer has no secret, or another one, ends the job naming both
+(`shmem.job.secret.*`). What it does not do is protect a connection from a host
+that can see and inject its packets after the hello: that would take encrypting
+the traffic, and the network is still trusted that far, as Slurm's own is (§3.4).
+Off by default, since §3.4's trust boundary is unchanged.
+
 **The mesh is still eager, and what on-demand would need.** Every lead connects
 to every higher node at init: *N*(*N* − 1)/2 connections job-wide, 8.4 M at 4,096
 nodes, and a listen backlog of *N* − 1 (capped by `somaxconn`), which at 4,096
@@ -4326,7 +4344,7 @@ by hand. *(Rejected: singleton launch when the variables are absent, as some
 implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)*
 `OSOE_NO_PROGRESS_TIMEOUT` (§3.15) is osoe's own, read by the library; it
 replaced `OSOE_BOOTSTRAP_TIMEOUT`, which is retired. So, since phase 1 step 3,
-is `OSOE_PORT_RANGE` (§6.2), which is optional.
+are `OSOE_PORT_RANGE` and `OSOE_JOB_SECRET` (§6.2), both optional.
 `OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
 turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
 library never sees it.
@@ -5350,6 +5368,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | A boundary progress call | **Needed, and declared** (phase 1 step 2 slice 3): `osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` in `transport.h`, the only way the library lends the agent thread to a backend (§3.12, §4.10). *Revised.* The first answer was "not needed, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there". That was true of application threads and false of the node: the barrier blocks on an epoch counter outside any backend (`barrier.c`, `base/epoch.h`), and what moves it is the progress thread, which `agent.c` drove by calling the AM engine by name (second review, roce-seam F5). Application threads still need no progress call — the blocking calls pump their own — but the node's thread is the library's, and a backend gets it only through these calls. *Revised again* (phase 1 step 3 slice 1, decided with the author 2026-09-22): the two calls were `pass` and `idle_ns`, how long `agent.c`'s own `futex_wait` might sleep — the review's fix shape ("same code, boundary-named"), and exactly the step-2 stand-in's poll. They could not carry the backend they were declared for: §3.10's lead waits in one io_uring submission on its sockets *and* the wake word, which a futex_wait in `agent.c` cannot, and a `SINGLE_ISSUER` ring refuses every thread but its submitter (`-EEXIST`), while `session_end` joined the agent and only then drained the engine on the main thread. So `idle_ns` became `osoe_transport_agent_wait(wake, seen)`, the backend's own wait, and `osoe_transport_agent_exit()` gives the backend a last turn on the thread for its drain and close. An RDMA backend sleeping on a completion channel needs the first for the same reason. Both were edits above the boundary forced by the seam, not by the backend |
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 | Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
+| Authenticating the step-3 handshake | **An optional `OSOE_JOB_SECRET`, proved and never sent** (§6.2; phase 1 step 3 slice 1). The open item: the handshake carried only the job and step ids, which are sequential and public (`squeue`), and the port is a hash of them, so any host that could reach it could join as a node and then read and write every heap by design; the second review's portability F2 proposed a wrapper setting `OSOE_JOB_SECRET=$(head -c16 /dev/urandom \| xxd -p)` before `srun`, which Slurm propagates, and the handshake carrying it. Built so, except that the secret is *proved* rather than carried: a SipHash-2-4 digest over the hello and a fresh nonce from each end, so neither an eavesdropper nor a listener the caller reached by mistake learns it, and a proof replays nowhere. Unset, nothing changes; set on some nodes and not others, the job ends naming both. It authenticates the hello, not the traffic after it |
 | What orders fence and quiet, where a `seq_cst` store to a thread-local word was the answer? | **Derived from the C11 model:** a release fence for fence (W→W), a `seq_cst` fence for quiet and the barriers (W→R), and `seq_cst` on both loads of a two-sided protocol. Measured, the old store did not order quiet's W→R on aarch64, and an acquire load built as `ldapr` lost wakes (§3.16, §4.6; 2026-09-21). |
 
 ### Still open — blocking
@@ -5468,16 +5487,6 @@ which has two states per pair, so a third backend needs a selector of its own
   node and no redesign.
 
 ### Still open — design, deferrable
-
-- **Authenticating the step-3 handshake.** §3.4 and §6.2 declare the network
-  trusted at Slurm's level; the handshake carries only the job and step ids,
-  which are sequential and public (`squeue`), and the port is a hash of them, so
-  any host that can reach it could join as a node and then read and write every
-  heap by design. If the cluster LAN is not trusted, the second review's
-  portability F2 has a nearly free answer: a wrapper sets
-  `OSOE_JOB_SECRET=$(head -c16 /dev/urandom | xxd -p)` before `srun`, Slurm
-  propagates the environment to every task, and the handshake carries it. Decide
-  with step 3.
 
 - Does any collective need RMA on symmetric scratch rather than AM? (Answer so
   far: no.)

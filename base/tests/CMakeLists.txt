@@ -1,6 +1,6 @@
 find_package(Threads REQUIRED)
 
-foreach(name size environment node-map futex epoch stall-watch hostlist)
+foreach(name size environment node-map futex epoch stall-watch hostlist siphash)
   add_executable(base_test_${name} test-${name}.c)
   target_link_libraries(base_test_${name} PRIVATE osoe_base Threads::Threads)
   osoe_warnings(base_test_${name})
