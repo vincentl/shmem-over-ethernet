@@ -75,15 +75,25 @@ void osoe_team_start(void)
         .epoch = &osoe.world_epoch,
         .published = &osoe.node.slots[osoe.bootstrap.local_id].world_epoch,
     };
+    /*
+     * SHMEM_TEAM_SHARED is the PEs whose memory this one can reach with loads
+     * and stores (spec §7), and spec §7 also requires shmem_ptr to answer
+     * non-NULL for every member of it. Under §8.1's force-remote flag a
+     * node-mate's pointer is denied, so the only member left is this PE: the
+     * team is the singleton {self}, not the node (§8.1; second review,
+     * conformance F2). Without the flag it is the node, as before.
+     */
+    bool alone = osoe.job.force_remote;
     shared_team = (struct osoe_team){
         .name = "SHMEM_TEAM_SHARED",
         .number = OSOE_TEAM_SHARED,
-        .members = osoe.bootstrap.local_count,
+        .members = alone ? 1 : osoe.bootstrap.local_count,
         /* SHMEM_TEAM_SHARED is one node by definition (§4.8), so every member
          * is local and it has no internode phase at all. */
-        .local_members = osoe.bootstrap.local_count,
+        .local_members = alone ? 1 : osoe.bootstrap.local_count,
         .internode = false,
-        .me = osoe.bootstrap.local_id,
+        .singleton = alone,
+        .me = alone ? 0 : osoe.bootstrap.local_id,
         .arrived = &osoe.node.hdr->shared_arrived,
         .released = &osoe.node.hdr->shared_released,
         .epoch = &osoe.shared_epoch,
@@ -136,6 +146,8 @@ int osoe_team_to_world(const struct osoe_team *t, int pe)
 {
     if (pe < 0 || (uint32_t)pe >= t->members)
         return -1;
+    if (t->singleton)                   /* {self}: its only member is this PE */
+        return (int)osoe.bootstrap.rank;
     if (t == &shared_team)
         return (int)osoe.bootstrap.gtids[pe];
     return pe;                          /* the world team numbers PEs by rank */
@@ -146,6 +158,8 @@ static int world_to_team(const struct osoe_team *t, int world)
 {
     if (world < 0 || (uint32_t)world >= osoe.bootstrap.world_size)
         return -1;
+    if (t->singleton)
+        return (uint32_t)world == osoe.bootstrap.rank ? 0 : -1;
     if (t == &shared_team) {
         int32_t local = osoe_node_local_id(&osoe.node, (uint32_t)world);
         return local;                   /* -1 when the rank is on another node */

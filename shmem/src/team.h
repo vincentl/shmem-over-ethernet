@@ -49,6 +49,13 @@ struct osoe_team {
      * rather than the last local arriver releasing the epoch itself.
      */
     bool internode;
+    /*
+     * A team of one member, which today is only SHMEM_TEAM_SHARED under §8.1's
+     * force-remote flag. Its sync has nobody to wait for and touches no shared
+     * counter - it must not, since every PE of the node would otherwise be
+     * counting on the same node-wide words for teams that are not the same team.
+     */
+    bool singleton;
     uint32_t me;                    /* this PE's number within it */
     struct osoe_epoch *arrived;     /* the team's own epoch counters (§5.4) */
     struct osoe_epoch *released;

@@ -135,13 +135,15 @@ int main(void)
     uint32_t local_seen = 0;
     for (uint32_t r = 0; r < job.world_size; r++) {
         bool same = osoe_node_of(&job, r) == b.node;
-        CHECK(osoe_is_local(&job, r) == same);
+        CHECK(osoe_routes_in_process(&job, r) == same);
+        CHECK(osoe_direct_access(&job, r) == same);
         local_seen += same;
     }
     CHECK(local_seen == b.local_count);
 
     /* Out of range is nobody's PE, and must not answer "local". */
-    CHECK(!osoe_is_local(&job, job.world_size));
+    CHECK(!osoe_routes_in_process(&job, job.world_size));
+    CHECK(!osoe_direct_access(&job, job.world_size));
     CHECK(osoe_node_of(&job, job.world_size) == UINT32_MAX);
 
     /*
@@ -161,10 +163,17 @@ int main(void)
      */
     struct osoe_job forced = job;
     forced.force_remote = true;
-    for (uint32_t r = 0; r < job.world_size; r++)
-        CHECK(osoe_is_local(&forced, r) == (r == b.rank));
-    CHECK(osoe_is_local(&forced, b.rank));
-    CHECK(!osoe_is_local(&forced, job.world_size));     /* still nobody's PE */
+    for (uint32_t r = 0; r < job.world_size; r++) {
+        /* The pointer is denied to a node-mate ... */
+        CHECK(osoe_direct_access(&forced, r) == (r == b.rank));
+        /* ... and the route is exactly what it was without the flag, which is
+         * the half three comments claimed and the code did not do. */
+        CHECK(osoe_routes_in_process(&forced, r) ==
+              (osoe_node_of(&job, r) == b.node));
+    }
+    CHECK(osoe_direct_access(&forced, b.rank));
+    CHECK(!osoe_direct_access(&forced, job.world_size));   /* still nobody's PE */
+    CHECK(!osoe_routes_in_process(&forced, job.world_size));
 
     osoe_job_leave(&job);
     osoe_bootstrap_free(&b);

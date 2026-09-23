@@ -114,37 +114,52 @@ static inline uint32_t osoe_node_of(const struct osoe_job *j, uint32_t pe)
 }
 
 /*
- * Is this PE reachable by ordinary loads and stores from here?
+ * **Two questions, not one** (§8.1; second review, roce-seam F4, premises P2).
  *
- * Same logical node, and not forced remote.
+ * "Which path carries an operation to this PE" and "may this PE's memory be
+ * handed out as a pointer" are different questions, and one predicate answered
+ * both until slice 3. §8.1's force-remote flag is about the second only - it
+ * denies the pointer to a node-mate so that a program cannot be written against
+ * the shared-memory shortcut and then quietly depend on it - but answering the
+ * first with it sent a put to a node-mate over a connection that does not
+ * exist: "no connection toward node N", 4 runs in 4, in a flag three comments
+ * said left the route alone.
  *
- * **The node map is what says which PEs are remote** (§8.1): PEs rendezvous
- * only with the PEs named in their own node's OSOE_GTIDS, so a PE never maps a
- * heap outside its logical node and there is no address to return. Running the
- * same program over both paths and diffing is two node maps, not a flag.
- *
- * §8.1's force-remote flag is the narrower thing left over: it denies the
- * *pointer* to a node-mate without changing the route, so a program cannot be
- * written against the shared-memory shortcut and then quietly depend on it, and
- * a boundary that stopped consulting this function fails a test. It is
- * consulted here, in the one locality function, or half the library would keep
- * answering from somewhere else.
- *
- * **A PE is always local to itself, force-remote or not.** There is no route
- * from a node to itself: a connection exists per node *pair* (§3.4), so
- * osoe_connection_to returns NULL for this node by construction, and an
- * operation a PE addresses to its own rank has nowhere to go. It is not a
- * special case granted to make the flag work - it is what the flag means. §8.1
- * routes traffic between PEs over the network; a PE reading and writing its own
- * symmetric memory is not traffic, and the library's own coherent load
- * (osoe_transport_load) resolves through this function on every wait_until and
- * every shmem_test.
+ * They are also the split §4.10 needs for its own reason: dispatch is per
+ * (pe, operation class), so a NIC whose atomics are not coherent with the CPU
+ * can carry one PE's rmw while put and get to that same PE stay local - which
+ * is `direct` answering non-NULL while the route for rmw is elsewhere. The two
+ * predicates are where that becomes expressible rather than claimed.
  */
-static inline bool osoe_is_local(const struct osoe_job *j, uint32_t pe)
+
+/*
+ * Does an operation to this PE execute in this process - the intranode path,
+ * applied in the calling thread (§4.1)?
+ *
+ * The node map decides it, and nothing else: PEs rendezvous only with the PEs
+ * named in their own node's OSOE_GTIDS, so a PE never maps a heap outside its
+ * logical node. A PE is always in its own process, and connections exist per
+ * node *pair* (§3.4), so there is none from a node to itself.
+ */
+static inline bool osoe_routes_in_process(const struct osoe_job *j, uint32_t pe)
 {
-    if (pe == j->me)
-        return true;
-    return !j->force_remote && osoe_node_of(j, pe) == j->node;
+    return pe == j->me || osoe_node_of(j, pe) == j->node;
+}
+
+/*
+ * May this PE's symmetric memory be reached by ordinary loads and stores from
+ * here - the answer behind shmem_ptr, shmem_team_ptr and osoe_transport_direct?
+ *
+ * The route, minus §8.1's force-remote flag, which denies a node-mate the
+ * pointer while leaving the traffic where it was. A PE is always direct to
+ * itself, flag or not: osoe_transport_load - the coherent load behind every
+ * shmem_test and wait_until - resolves through this on the caller's own rank,
+ * so a rule that made a PE remote from itself is a null dereference on the
+ * most-travelled path in the library.
+ */
+static inline bool osoe_direct_access(const struct osoe_job *j, uint32_t pe)
+{
+    return pe == j->me || (!j->force_remote && osoe_node_of(j, pe) == j->node);
 }
 
 #endif /* OSOE_JOB_H */

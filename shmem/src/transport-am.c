@@ -151,27 +151,23 @@ struct osoe_transport_context *osoe_transport_context_default(void)
  * true exactly of the intranode path, since it applies every write in the
  * calling thread. So the answer is NULL for a PE on another logical node -
  * whose heap this process never mapped, since PEs rendezvous only with the PEs
- * in their own node's OSOE_GTIDS - and also for a local PE under §8.1's
- * force-remote flag, which denies the pointer to a node-mate without changing
- * the route (§8.1) - so that a program cannot be written against the
- * shared-memory shortcut and then quietly depend on it.
+ * in their own node's OSOE_GTIDS - and also for a node-mate under §8.1's
+ * force-remote flag, which denies the pointer without changing the route.
  *
- * shmem_ptr, shmem_team_ptr and shmem_addr_accessible consult this and nothing
- * else (§4.8). Which PEs are actually carried over the AM layer is decided by
- * the node map, not by the flag.
+ * **The route is the other predicate** (job.h): the operations above dispatch on
+ * osoe_routes_in_process, so under the flag a put to a node-mate is still a
+ * memcpy in this thread. One predicate answering both questions is what sent
+ * that put to a connection that does not exist (§8.1).
+ *
+ * shmem_ptr and shmem_team_ptr consult this and nothing else (§4.8);
+ * shmem_addr_accessible does not, and must not - accessibility is reachability
+ * through OpenSHMEM, which every PE of the job has.
  */
 void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
 {
-    if (region != OSOE_REGION_HEAP)
+    if (pe < 0 || !osoe_direct_access(&osoe.job, (uint32_t)pe))
         return NULL;
-    if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size)
-        return NULL;
-    if (!osoe_is_local(&osoe.job, (uint32_t)pe))
-        return NULL;
-    int32_t local = osoe_node_local_id(&osoe.node, (uint32_t)pe);
-    if (local < 0)
-        return NULL;
-    return (char *)osoe.node.heap_of[local] + offset;
+    return osoe_transport_local_address(pe, region, offset);
 }
 
 /* ---- The far half ------------------------------------------------------ */
@@ -593,7 +589,7 @@ static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
 void osoe_transport_put(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, const void *src, size_t len, unsigned flags)
 {
-    if (osoe_is_local(&osoe.job, (uint32_t)pe)) {
+    if (osoe_routes_in_process(&osoe.job, (uint32_t)pe)) {
         osoe_transport_local_put(pe, region, offset, src, len, flags);
         return;
     }
@@ -607,7 +603,7 @@ void osoe_transport_get(struct osoe_transport_context *context, int pe, enum oso
 {
     (void)context;
     (void)flags;                /* none defined for get yet (transport.h) */
-    if (osoe_is_local(&osoe.job, (uint32_t)pe)) {
+    if (osoe_routes_in_process(&osoe.job, (uint32_t)pe)) {
         osoe_transport_local_get(pe, region, offset, dst, len);
         return;
     }
@@ -623,7 +619,7 @@ uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum
                      uint64_t offset, enum osoe_rmw_op op, unsigned width,
                      uint64_t operand, uint64_t compare, unsigned flags)
 {
-    if (osoe_is_local(&osoe.job, (uint32_t)pe))
+    if (osoe_routes_in_process(&osoe.job, (uint32_t)pe))
         return osoe_transport_local_rmw(pe, region, offset, op, width, operand, compare,
                                         flags);
     osoe_count(OSOE_C_TRANSPORT_RMW_CALLS, 1);
@@ -790,7 +786,10 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
  */
 uint64_t osoe_transport_load(enum osoe_region region, uint64_t offset, unsigned width)
 {
-    void *ptr = osoe_transport_direct((int)osoe.bootstrap.rank, region, offset);
+    /* This PE's own word: the address, not the pointer the application may
+     * have (transport-local.h). A PE is direct to itself either way, and this
+     * says so without depending on it. */
+    void *ptr = osoe_transport_local_address((int)osoe.bootstrap.rank, region, offset);
     switch (width) {
     case 8:
         return atomic_load_explicit((_Atomic uint64_t *)ptr, memory_order_seq_cst);

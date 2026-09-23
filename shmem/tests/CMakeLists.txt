@@ -453,11 +453,34 @@ foreach(map IN LISTS osoe_internode_maps)
             $<TARGET_FILE:shmem_test_internode>)
   set_tests_properties(shmem.internode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
-# The force-remote half of this test is NOT registered yet, and the reason is an
-# open decision rather than an oversight: §8.1's flag makes a PE on *this* node
-# remote, and there is no connection from a node to itself (§3.4), so the put
-# has nowhere to be routed. shmem.multinode.force-remote.* still runs, because
-# it exercises the locality answer rather than the data path.
+# The same program under §8.1's force-remote flag (slice 3). It is registered
+# now because the flag no longer touches the route: a put to a node-mate is
+# still applied in the calling thread, and only the *pointer* is denied
+# (job.h's two predicates). Until that split, this configuration aborted with
+# "no connection toward node N" - 4 runs in 4 - which is what the test would
+# have said had it been registered, and what three comments claimed could not
+# happen. Multi-node maps only: the flag needs somewhere to be remote from, and
+# is refused at init on one logical node - which is also why these do not run
+# under ThreadSanitizer at all, where the multi-node maps of shmem.internode.*
+# are already excluded for the reason given above (the ordering that makes a
+# put safe runs through another process, and tsan reports a race it cannot
+# disprove). With the single-node map unavailable to this flag, there is
+# nothing left to run there.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.internode.force-remote.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+            OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_internode>)
+  set_tests_properties(shmem.internode.force-remote.${label} PROPERTIES LABELS "tier2"
+    TIMEOUT 90)
+endforeach()
+endif()
 
 # The differential test (§8.1): one program, §8.1's four poles of the logical
 # node map at one world size, and the transcripts must match. On the first map

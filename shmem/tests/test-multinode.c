@@ -92,7 +92,15 @@ int main(void)
     /* The two predefined teams stop agreeing the moment a second node exists,
      * which is the whole reason they are two teams (§7.3). */
     CHECK(shmem_team_n_pes(SHMEM_TEAM_WORLD) == n);
-    CHECK(shmem_team_n_pes(SHMEM_TEAM_SHARED) == local_count);
+    /*
+     * Under §8.1's force-remote flag SHMEM_TEAM_SHARED is the singleton
+     * {self}: spec §7 requires shmem_ptr to answer non-NULL for every member,
+     * and the flag denies it to a node-mate, so the node's PEs are no longer
+     * members (§8.1). Without the flag it is the node.
+     */
+    CHECK(shmem_team_n_pes(SHMEM_TEAM_SHARED) == (forced ? 1 : local_count));
+    CHECK(shmem_team_my_pe(SHMEM_TEAM_SHARED) == (forced ? 0 : -1) ||
+          !forced);           /* rank 0 of {self} under the flag */
     CHECK(shmem_team_my_pe(SHMEM_TEAM_WORLD) == me);
     if (nodes == 1)
         CHECK(local_count == n);
@@ -129,6 +137,13 @@ int main(void)
         CHECK(shmem_team_ptr(SHMEM_TEAM_WORLD, mine, pe) == p);
     }
     CHECK(shmem_ptr(mine, me) == mine);
+    /* Spec §7: every member of SHMEM_TEAM_SHARED has a non-null pointer -
+     * which is what makes the singleton the only conforming membership under
+     * the flag. */
+    for (int i = 0; i < shmem_team_n_pes(SHMEM_TEAM_SHARED); i++)
+        CHECK(shmem_team_ptr(SHMEM_TEAM_SHARED, mine, i) != NULL);
+    /* A sync on it still works, and is over at once when it is {self}. */
+    CHECK(shmem_team_sync(SHMEM_TEAM_SHARED) == 0);
 
     /*
      * The library's own coherent load resolves through the same locality

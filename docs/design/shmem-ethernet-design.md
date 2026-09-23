@@ -2297,8 +2297,11 @@ return `NULL` across logical nodes too.
 
 - `dest` must be a symmetric data object.
 - Returns `NULL` when direct access is not possible. **Returning `NULL`
-  unconditionally is conforming.** The intranode case is essentially free from
-  the shared heap.
+  unconditionally is conforming** — with one exception the earlier text here
+  missed: spec §7 requires a non-null pointer for every member of
+  `SHMEM_TEAM_SHARED`, which is why that team is the singleton `{self}` under
+  §8.1's force-remote flag rather than the node (second review, conformance F2).
+  The intranode case is essentially free from the shared heap.
 - `shmem_ptr` returns `NULL` for any target reached over the network, including a
   local PE under §8.1's force-remote flag, which makes the pointer unavailable
   without changing the route (§4.6, §8.1). It also returns `NULL` for an
@@ -4481,14 +4484,27 @@ that no longer excludes this node — real structure, in the data path, for a
 feature no production run will ever use.
 
 **So the flag keeps only its locality half.** `OSOE_FORCE_REMOTE=1` makes
-`shmem_ptr`, `shmem_team_ptr` and `shmem_addr_accessible` answer `NULL` for a
-node-mate, while the traffic itself still takes the intranode path. That costs
-nothing, and it keeps the property worth having: a program cannot be written
-against the pointer shortcut and then quietly depend on it, and a boundary that
-stopped consulting the locality function fails a test. What it no longer claims
-is to exercise the AM path for same-node pairs — the node map does that by
-putting the pair on different nodes, which is both simpler and closer to the
-job a real cluster runs.
+`shmem_ptr` and `shmem_team_ptr` answer `NULL` for a node-mate, while the traffic
+itself still takes the intranode path. That costs nothing, and it keeps the
+property worth having: a program cannot be written against the pointer shortcut
+and then quietly depend on it, and a boundary that stopped consulting the
+locality function fails a test. What it no longer claims is to exercise the AM
+path for same-node pairs — the node map does that by putting the pair on
+different nodes, which is both simpler and closer to the job a real cluster runs.
+
+**It took two predicates to be true** (phase 1 step 2 slice 3; second review,
+roce-seam F4, premises P2). Until then one function answered both "which path
+carries this operation" and "may I hand out a pointer", so the flag changed the
+route as well: `OSOE_FORCE_REMOTE=1` with a put to a node-mate aborted with *no
+connection toward node N*, 4 runs in 4, while this section, `job.h` and commit
+`56dedff` all said the route was untouched. The split is
+`osoe_routes_in_process` (the node map, and nothing else) and
+`osoe_direct_access` (the route, minus the flag). It is also what makes §4.10's
+"dispatch is per (pe, operation class)" a thing the code can express rather than
+a claim: `direct` answering non-NULL while a class's route is elsewhere is
+exactly what a NIC with CPU-incoherent atomics needs. `shmem_addr_accessible`
+consults neither: accessibility is reachability through OpenSHMEM, which every
+PE of the job has.
 
 Two further boundaries on the flag, both consequences rather than concessions:
 
@@ -4506,13 +4522,35 @@ Two further boundaries on the flag, both consequences rather than concessions:
   but whose `shmem_ptr` lies about a machine with nowhere else to go. A job that
   wants the remote path asks the node map for it.
 
-`SHMEM_TEAM_SHARED` keeps its membership under the flag — it stays the set of
-PEs on the node, not the single PE that `shmem_ptr` still answers for. §4.8
-already states that returning `NULL` unconditionally is conforming, so a
-node-sized SHARED whose members answer `NULL` is legal; and stable membership is
-what makes the differential diff mean something, since a team whose size changed
-between the two runs would make every program using it differ for a reason that
-has nothing to do with the transport.
+**`SHMEM_TEAM_SHARED` is the singleton `{self}` under the flag**, and the
+earlier claim here — that it keeps the node's membership, since returning `NULL`
+unconditionally is conforming — was wrong. Spec §7 defines that team as the PEs
+whose memory the caller can reach with loads and stores *and* requires
+`shmem_ptr` to answer non-NULL for every one of its members; a node-sized SHARED
+whose members answer `NULL` violates it (second review, conformance F2; commit
+`de540da` recorded the mistaken reading, and §4.8 says what is actually
+conforming: `shmem_ptr` may return `NULL` for PEs that are **not** members of
+SHARED). The cost is the one the old text was avoiding — the team's size differs
+between a run with the flag and one without — so a program whose transcript
+depends on SHARED's size is not a differential candidate. That is a smaller
+price than a team whose defining property does not hold, and it is stated here
+because it is a difference a reader of a diff has to know about.
+
+**What the differential test compares, and what it cannot** (premises 11). The
+four maps run one program over every arrangement of the node map, so every
+*pair* of PEs is intranode in one run and AM in another, and the transcripts are
+diffed. What no arrangement can produce is an **all-AM run with more than one PE
+per node**: a PE's node-mates are reached in its own process, and the flag does
+not change that, because connections exist per node pair and there is none from
+a node to itself. So the AM path is never exercised with several PEs of one node
+writing into the same connection *from the origin's side* of the diff — that
+combination appears only in the mixed maps, and only for the pairs that cross
+nodes (`shmem.internode.*` and `shmem.tree.*` cover it, arrival table and all,
+but as assertions rather than as a diff). The other two gaps the review named
+stand: every compared observation is fenced by a quiet and a barrier, so the
+diff cannot see code that works only because the intranode path is stronger than
+the contract; and `put_signal`'s two halves always share a segment at the sizes
+used.
 
 **It becomes a three-way switch** — intranode, AM, and any third backend — the
 moment a second network backend exists, so the differential test extends to it
@@ -4964,10 +5002,18 @@ the boundary's cost one flag and one function, both now specified in §4.10, and
 they are the *same two* the core-API study arrived at from a different direction.
 Two independent searches converging on the same two gaps is the useful result.
 
-Folded in already: dispatch per `(pe, operation class)`, the sweep bound on
-blocking calls, `OSOE_TRANSPORT_MORE` with the source-ownership rule that makes it safe,
-nonblocking-as-counters, `set_range`'s contract, §4.1's registration trap, §6.2's
-out-of-band bootstrap, and §8.1's three-way switch.
+Folded in already: the sweep bound on blocking calls, `OSOE_TRANSPORT_MORE` with
+the source-ownership rule that makes it safe, nonblocking-as-counters,
+`set_range`'s contract, §4.1's registration trap, and §6.2's out-of-band
+bootstrap. Two entries of this list were *documented rather than built* until
+slice 3, and the review said so (premises P2-F3): **dispatch per `(pe, operation
+class)`** is now expressible, because the route and the pointer are two
+predicates rather than one (§8.1, `job.h`) — a backend can answer `direct`
+non-NULL for a PE whose rmw it sends elsewhere — though no backend does it yet;
+and **§8.1's "three-way switch for free"** was never true and is withdrawn: with
+the flag reduced to a pointer denial, the only routing input is the node map,
+which has two states per pair, so a third backend needs a selector of its own
+(`OSOE_BACKEND`, §4.10).
 
 - **`osoe_transport_sync`: does a collective's internode phase cross the boundary?**
   **Reversed on 2026-09-20 and built in phase 1 step 2 slice 3: it crosses a

@@ -42,6 +42,17 @@ static void sync_team(struct osoe_team *t, const char *routine)
 {
     uint32_t k = *t->epoch;
 
+    /*
+     * A team of one (team.h): the caller is the only member, so the
+     * synchronization is over the moment it is called. It touches none of the
+     * node-wide counters, which belong to the node's team and not to this one.
+     */
+    if (t->singleton) {
+        *t->epoch = k + 1;
+        atomic_store_explicit(t->published, k + 1, memory_order_release);
+        return;
+    }
+
     if (osoe_epoch_bump_eq(t->arrived, (k + 1) * t->local_members)) {
         if (t->internode) {
             /*
