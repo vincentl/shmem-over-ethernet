@@ -4823,9 +4823,9 @@ What loopback does not test, each named so no test is mistaken for it:
   with `netem`, and its pins compare two ways of using the *same* link.
 - **Loss, delay and a small MTU.** Loopback drops nothing, delays nothing and
   segments at 64 KiB, and TCP hides reordering from an application anyway.
-  Tier 3 is where the transport meets these. It runs `echo-uring` today
-  (`netem-sweep.sh`), not the library's tests, and running the tier-2
-  multi-node tests in network namespaces is the next step, not a done one.
+  Tier 3 is where the transport meets these, and since phase 1 step 3 slice 2
+  it runs the multi-node tests there, each logical node in a network namespace
+  of its own (§8.2, "Tier 3 as built").
 - **Separate kernels.** Every logical node shares one kernel, one clock, one
   `/dev/shm` and one page cache. The library is not meant to rely on any of
   them: objects are named by logical node (above), and addresses come from the
@@ -4959,7 +4959,7 @@ runs in seconds at tier 1.
 |---|---|---|
 | 1 | In-process AM backend, queues not sockets, single-threaded, deterministic | Most semantic bugs. Runs in CI anywhere |
 | 2 | Logical nodes over loopback — since phase 1 step 3 over real sockets, each node on its own address (§8.1) | Integration, threading, the socket path |
-| 3 | Logical nodes in netns over veth with netem — the floor harness only, so far (§8.1) | Most transport bugs |
+| 3 | Logical nodes in network namespaces over veth with netem — the floor harness's sweep, and the multi-node tests (the `tier3` preset; below) | Most transport bugs |
 | 4 | Real cluster | Everything else |
 
 > **ThreadSanitizer cannot see a happens-before that runs through another
@@ -4986,6 +4986,44 @@ namespaces over veth with `netem` for delay, loss, and small MTU. `netem` reorde
 is invisible to a TCP application — the kernel reorders before delivery — so it
 tests TCP, not osoe. A Pi handles four namespaces; the setup is a shell script
 written once.
+
+*Tier 3 as built* (phase 1 step 3 slice 2). `osoe-launch -N PREFIX` starts
+logical node *i*'s ranks in the network namespace `PREFIX`*i*, and `-H` gives
+them the host list those namespaces' addresses make, in place of
+`127.0.0.[1-N]`. `tools/launch/tier3.sh` makes the namespaces, one per node and
+one more holding a bridge, joins each to the bridge by a veth pair, and shapes
+each node's egress with `netem`. There are three shapes: a Pi-like link (1 Gbit/s
+and 100 µs each way, §5.3), the same dropping 0.1% of packets, and a 1,280-byte
+MTU at 25 µs each way. Segmentation offloads are off, so `netem` delays, paces
+and drops packets of the MTU's size, as a wire would, and not the 64 KiB bursts a
+veth pair otherwise carries whole. Entering a namespace needs root, so the
+script runs under `sudo -n`. Each rank enters its namespace between fork and
+exec, then drops to the invoking user with that user's groups, so the job runs
+as it would anywhere else. Namespaces are named by the script's pid, so runs
+never meet. They are removed on exit, on failure and on a signal, and
+`tier3.sh clean` removes any a killed run left. What stays behind is what
+`netem-sweep.sh` leaves: the `/run/netns` mount point and the loaded modules.
+
+The tests are not a default `ctest`: they change the machine's network state
+while they run and need passwordless `sudo`, which §8.5's VM has. The `tier3`
+preset registers them (`cmake --workflow --preset tier3`). The subset is every
+tier-2 test whose traffic crosses a node boundary through the transport, each
+with the environment tier 2 gives it. That is the node-pair wire and the
+progress engine below the library; the internode maps, where all three of
+§3.11's waits run through two reply credits and a 2 KiB buffer; the AM barrier;
+the reply-starvation guard; the tree at depth three and at thirteen uneven
+nodes; the rendezvous; the differential over §8.1's four poles; and the floor.
+Left out are the tests that never reach a socket, and those whose subject is a
+PE that dies or stops rather than the link.
+
+*What it found.* One thing loopback hid, and it was not in the transport. The
+tests below the library open their mesh without a rendezvous, and that path
+dialled `127.0.0.1` for every peer. On one host that reaches every lead; in a
+namespace it reaches only the node's own, so the AM barrier test retried
+forever. That path now dials each peer's host-list address, as the rendezvous
+does (`osoe_listener_node_address`), and no library code assumes one host.
+Everything else passed on all three shapes the first time. The library's ratios
+to its floor there are in §8.4.
 
 **Tests the review found missing:**
 
@@ -5266,6 +5304,24 @@ wait: 0.21–0.43× with the word, 0.037–0.055× with the poll. At 1 MiB a wri
 seldom waits, and the poll measured 0.35–0.64× against the word's 0.52–0.69×,
 inside the noise. A stream pin at a large buffer would not have caught the
 stand-in this slice removed.
+
+*On a shaped link* (tier 3, §8.2: the same test, one logical node per network
+namespace, 64 MiB streams). There the wire dominates the wakes, as §10's
+assumption says it should:
+
+| Link | Fastest trip ÷ floor | Median ÷ floor | Stream ÷ floor |
+|---|---|---|---|
+| Loopback (tier 2, above) | 1.4–2.2 | 1.8–1.9 | 0.21–0.43 |
+| 1 Gbit/s, 100 µs each way (Pi-like) | 1.02–1.06 | 1.01–1.05 | 1.00, at 114 MiB/s |
+| The same, dropping 0.1% | 1.03–1.05 | 1.08 | 1.00, at about 108 MiB/s |
+| 1,280-byte MTU, 25 µs each way | 1.28–1.33 | 1.25 | 1.00, at 113 MiB/s |
+
+A library round trip needs two wakes more than the floor's. On 200 µs of wire
+they add 2–6% (5–9 µs); at 25 µs each way, about 25 µs, 30%; on loopback, where
+the wire is nothing, they double the trip. The default buffer's stream, 0.21×
+on loopback, runs at line rate on every shaped link, since a 1 Gbit/s link
+takes a millisecond to carry one 128 KiB buffer and a turnover's wake is far
+shorter.
 
 ### 8.5 Development environment
 

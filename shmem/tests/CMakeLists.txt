@@ -1093,3 +1093,82 @@ foreach(case_expect
   set_tests_properties(shmem.refuse.uninitialized.after.${case} PROPERTIES
     LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
 endforeach()
+
+# Tier 3 (design §8.2, §8.3): tier 2's multi-node tests with each logical node
+# in a network namespace of its own, over veth links netem shapes - a Pi-like
+# link, the same with loss, and a small MTU (tools/launch/tier3.sh). They need
+# root and change the machine's network state while they run, so they are
+# registered only when asked for, in a build directory of their own - the tier3
+# preset, `cmake --workflow --preset tier3` - and each runs the launcher through
+# sudo -n, which returns every rank to the invoking user before the program.
+#
+# The subset is the tests whose traffic crosses a node boundary through the
+# transport, each with the environment tier 2 gives it: the node-pair wire and
+# the progress engine below the library; the internode maps, every operation
+# and all three of §3.11's waits through two reply credits and a 2 KiB buffer;
+# the AM barrier; a reply that full buffers must not starve; the tree at depth
+# three and at thirteen uneven nodes; the rendezvous, against the namespaces'
+# host list; the differential over §8.1's four poles; and the floor, which
+# measures the library on the shaped link. Left out are the tests that never
+# reach a socket, and those whose subject is a PE that dies or stops rather
+# than the link.
+option(OSOE_TIER3 "register the tier-3 tests, which need passwordless sudo" OFF)
+if(OSOE_TIER3 AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  message(FATAL_ERROR "OSOE_TIER3: the multi-node data-path tests do not run under "
+                      "ThreadSanitizer (shmem.internode's reason); use the tier3 preset")
+endif()
+if(OSOE_TIER3)
+  set(osoe_tier3 sudo -n ${PROJECT_SOURCE_DIR}/tools/launch/tier3.sh)
+  set(osoe_tier3_wire OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
+      OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919)
+  # tier3.<shape>.<name>: PROGRAM [ARGS...] launched on MAP, with ENV's NAME=VALUE
+  # pairs in the job's environment.
+  function(osoe_tier3_test name shape map program)
+    cmake_parse_arguments(PARSE_ARGV 4 tier3 "" "" "ENV;ARGS")
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    list(REMOVE_DUPLICATES ranks)
+    list(LENGTH ranks nodes)
+    add_test(NAME tier3.${shape}.${name}
+      COMMAND ${osoe_tier3} ${shape} ${nodes} ${tier3_ENV}
+              -- $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 300 --
+              $<TARGET_FILE:${program}> ${tier3_ARGS})
+    set_tests_properties(tier3.${shape}.${name} PROPERTIES LABELS "tier3" TIMEOUT 400)
+  endfunction()
+  foreach(shape pi lossy small)
+    osoe_tier3_test(wire-pair ${shape} 0,1 shmem_test_wire_pair
+                    ENV OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919)
+    osoe_tier3_test(progress ${shape} 0,0,1,1 shmem_test_progress
+                    ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
+                        OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919)
+    foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+      string(REPLACE "," "-" label "${map}")
+      osoe_tier3_test(internode.${label} ${shape} ${map} shmem_test_internode
+                      ENV ${osoe_tier3_wire} OSOE_AM_CREDITS=2)
+    endforeach()
+    osoe_tier3_test(barrier-am.0-1-2 ${shape} 0,1,2 shmem_test_barrier_am
+                    ENV ${osoe_tier3_wire})
+    osoe_tier3_test(reply-starvation.0-1-1-1-1-1-1 ${shape} 0,1,1,1,1,1,1
+                    shmem_test_reply-starvation
+                    ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096
+                        OSOE_TEST_PUT_BYTES=984 SHMEM_SYMMETRIC_SIZE=16m)
+    osoe_tier3_test(tree.k2.n8.p8 ${shape} 0,1,2,3,4,5,6,7 shmem_test_multinode
+                    ENV OSOE_COLLECTIVE_FANOUT=2 ${osoe_tier3_wire} SHMEM_SYMMETRIC_SIZE=16M)
+    osoe_tier3_test(tree.k4.n13.p16 ${shape} 0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12
+                    shmem_test_multinode
+                    ENV OSOE_COLLECTIVE_FANOUT=4 ${osoe_tier3_wire} SHMEM_SYMMETRIC_SIZE=16M)
+    osoe_tier3_test(job.0-1-2-3 ${shape} 0,1,2,3 shmem_test_job)
+    # A 64 MiB stream: at 1 Gbit/s the default gigabyte takes nine seconds a trial.
+    osoe_tier3_test(floor ${shape} 0,1 shmem_test_floor ARGS 64)
+    add_test(NAME tier3.${shape}.differential
+      COMMAND ${CMAKE_COMMAND}
+              "-DWRAP=${osoe_tier3};${shape}"
+              -DLAUNCH=$<TARGET_FILE:osoe-launch>
+              -DEXE=$<TARGET_FILE:shmem_test_differential>
+              -DNRANKS=6 -DTIMEOUT=300
+              "-DMAPS=0,0,0,0,0,0;0,1,2,3,4,5;0,0,0,1,2,2;0,1,2,0,1,0"
+              "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919;SHMEM_SYMMETRIC_SIZE=16m"
+              -P ${PROJECT_SOURCE_DIR}/cmake/Differential.cmake)
+    set_tests_properties(tier3.${shape}.differential PROPERTIES LABELS "tier3" TIMEOUT 1300)
+  endforeach()
+endif()

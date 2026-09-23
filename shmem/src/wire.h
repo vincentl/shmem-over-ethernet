@@ -98,8 +98,8 @@ struct osoe_mesh {
  * ring that carries them (disabled until the driving thread enables it). §6.2's
  * rule: the lower node index connects to the higher, so each pair has exactly
  * one stream. With a mesh, each connection goes to the port its peer advertised;
- * without one (NULL), every node is on this host and each lead is found by the
- * port rule (listener.h), which is how the tests below the library meet.
+ * without one (NULL), each lead is found at its host-list address by the port
+ * rule (listener.h), which is how the tests below the library meet.
  * `wires` has node_count - 1 entries, in peer-slot order. Fatal on failure
  * (§3.15).
  */

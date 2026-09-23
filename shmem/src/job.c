@@ -20,6 +20,7 @@
 #include "base/sweep.h"
 #include "fatal.h"
 #include "job.h"
+#include "listener.h"
 #include "rendezvous.h"
 #include "shm-object.h"
 #include "transport.h"
@@ -93,7 +94,7 @@ static void bind_tables(struct osoe_job *j, const struct osoe_job_header *h)
 static void lead(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t session)
 {
     struct sockaddr_in address;
-    osoe_rendezvous_address(b, b->node, &address);
+    osoe_listener_node_address(b, b->node, &address);
     /* The backend readies what peers need to reach this node - on AM, its
      * node-pair listener - and describes it in the blob (transport.h). */
     unsigned char blob[OSOE_JOB_BACKEND_BLOB_BYTES];

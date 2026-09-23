@@ -76,6 +76,7 @@ int main(void)
         .step = env_u32("OSOE_STEP_ID"),
         .node = me,
         .node_count = 2,
+        .node_list = getenv("OSOE_STEP_NODELIST"),  /* where the other node listens */
         .no_progress_ns = UINT64_C(30000000000),  /* fail rather than hang */
         .port_low = OSOE_DEFAULT_PORT_LOW,
         .port_high = OSOE_DEFAULT_PORT_HIGH,

@@ -232,6 +232,7 @@ int main(void)
         .rank = my_pe,
         .local_count = 2,           /* map 0,0,1,1: the last to open the area removes its name */
         .node_count = 2,
+        .node_list = getenv("OSOE_STEP_NODELIST"),  /* where the other node listens */
         .no_progress_ns = UINT64_C(30000000000),  /* fail rather than hang */
         .port_low = OSOE_DEFAULT_PORT_LOW,
         .port_high = OSOE_DEFAULT_PORT_HIGH,

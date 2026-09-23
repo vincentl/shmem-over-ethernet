@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
-#include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +7,6 @@
 #include <unistd.h>
 
 #include "am.h"
-#include "base/hostlist.h"
 #include "fatal.h"
 #include "job.h"
 #include "listener.h"
@@ -70,23 +68,6 @@ static void report_add(struct report *r, const struct node_record *records, uint
     memcpy(r->progressions + r->progression_count, progressions, sizeof *progressions * m);
     r->record_count += n;
     r->progression_count += m;
-}
-
-void osoe_rendezvous_address(const struct osoe_bootstrap *b, uint32_t node,
-                             struct sockaddr_in *out)
-{
-    char host[256];
-    if (!b->node_list || !osoe_hostlist_entry(b->node_list, node, host, sizeof host))
-        osoe_fatal("OSOE_STEP_NODELIST='%s' has no usable entry for node %u",
-                   b->node_list ? b->node_list : "", node);
-    struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM }, *found;
-    int e = getaddrinfo(host, NULL, &hints, &found);
-    if (e != 0)
-        osoe_fatal("cannot resolve %s, node %u's host in OSOE_STEP_NODELIST: %s", host, node,
-                   gai_strerror(e));
-    *out = *(const struct sockaddr_in *)found->ai_addr;
-    out->sin_port = 0;
-    freeaddrinfo(found);
 }
 
 /* A child's value against this node's, by name. */
@@ -268,7 +249,7 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
     if (b->node != 0) {
         parent = (b->node - 1) / OSOE_RENDEZVOUS_FANOUT;
         struct sockaddr_in there;
-        osoe_rendezvous_address(b, parent, &there);
+        osoe_listener_node_address(b, parent, &there);
         up = osoe_listener_connect(b, session, &there, parent, OSOE_HELLO_RENDEZVOUS);
     }
 

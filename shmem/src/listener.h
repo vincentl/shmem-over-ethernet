@@ -73,6 +73,14 @@ int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpos
                          uint32_t *peer);
 
 /*
+ * Node `node`'s address from the host list: OSOE_STEP_NODELIST, which mirrors
+ * SLURM_STEP_NODELIST (§6.1), resolved to IPv4, with no port. Fatal naming the
+ * entry if the list or the name is bad.
+ */
+void osoe_listener_node_address(const struct osoe_bootstrap *b, uint32_t node,
+                                struct sockaddr_in *out);
+
+/*
  * Connect to node `node`'s listener at `host` (whose port is ignored), trying
  * its candidates in order until one answers as that node of this job and
  * session, for `purpose`. Retries the sequence with backoff while nobody has
