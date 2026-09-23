@@ -5,14 +5,17 @@
  * that is, in the case that matters, wedged. A test that only ran it against a
  * job about to exit would demonstrate none of that, so this test makes a PE sit
  * in a wait that nothing will satisfy until the observer says so, and checks
- * the two things that make such a job diagnosable:
+ * the three things that make such a job diagnosable:
  *
  *   - the **"blocked in" record** names the routine that PE is stuck in, read
  *     from another process under the generation protocol while that PE is still
  *     there to be read;
  *   - the **heartbeat** rises. `pe.sweeps` is the difference between "this PE is
  *     asleep" and "this PE is dead": a blocked PE's safety sweep still expires
- *     every OSOE_SWEEP_NS, so its sweep count climbs while it waits.
+ *     every OSOE_SWEEP_NS, so its sweep count climbs while it waits;
+ *   - the **watch word** is decoded into the range that PE is waiting on, and
+ *     not printed raw with "encoding unknown", which is what osoe-stat did
+ *     for every job from layout 11 to 13 while this test still passed.
  *
  * The observer reads the segment two ways, deliberately. The precise assertions
  * go through the same reader osoe-stat uses (segment.h), because grepping a
@@ -24,6 +27,8 @@
  * is what lets the observer index the segment's slots by `shmem_my_pe`.
  */
 #define _GNU_SOURCE
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,6 +67,29 @@ static int run_stat(const char *args, const char *segment, char *out, size_t len
     size_t n = fread(out, 1, len - 1, f);
     out[n] = '\0';
     return pclose(f);
+}
+
+/*
+ * What osoe-stat's dump shows for `field` in local PE `pe`'s section, without
+ * the padding before it or the newline after. A section runs from its
+ * "  PE <n>" line to the blank line that ends it.
+ */
+static bool dump_value(const char *out, uint32_t pe, const char *field, char *buf, size_t len)
+{
+    char header[32];
+    snprintf(header, sizeof header, "\n  PE %u\n", pe);
+    const char *section = strstr(out, header);
+    if (!section)
+        return false;
+    section += strlen(header);
+    const char *end = strstr(section, "\n\n");
+    const char *p = strstr(section, field);
+    if (!p || (end && p > end))
+        return false;
+    p += strlen(field);
+    p += strspn(p, " ");
+    snprintf(buf, len, "%.*s", (int)strcspn(p, "\n"), p);
+    return true;
 }
 
 /* What the tool must say about any job it can read at all. */
@@ -142,6 +170,25 @@ static void observe_stalled(const char *segment, uint32_t who)
     char out[64 * 1024];
     CHECK(run_stat("-c", segment, out, sizeof out) == 0);
     CHECK(strstr(out, "shmem_uint64_wait_until") != NULL);
+
+    /*
+     * Including the range it waits on. The raw word above came through the
+     * reader; the decode is osoe-stat's own, gated on the segment's layout, and
+     * this is the only place it meets a PE that is waiting. The expected range
+     * comes from the blocked record, not from decoding the word a second time
+     * here: a point-to-point wait publishes the heap offset it watches as the
+     * record's detail, and this PE waits on one uint64_t.
+     */
+    char watch[128] = "", want[128];
+    CHECK(run_stat("-d", segment, out, sizeof out) == 0);
+    CHECK(dump_value(out, who, "pe.watch (decoded)", watch, sizeof watch));
+    CHECK(b.detail_kind == 3);                  /* OSOE_BLOCKED_DETAIL_OFFSET */
+    snprintf(want, sizeof want, "heap +%#" PRIx64 "..+%#" PRIx64, b.detail,
+             b.detail + sizeof(uint64_t));
+    if (strcmp(watch, want) != 0)
+        fprintf(stderr, "osoe-stat -d shows PE %u's watch word as \"%s\", not \"%s\"\n", who,
+                watch, want);
+    CHECK(strcmp(watch, want) == 0);
 
     osoe_segment_close(&s);
 }
