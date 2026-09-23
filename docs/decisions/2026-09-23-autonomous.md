@@ -12,8 +12,8 @@ There is no git remote, so every merge here is local and nothing was pushed.
 ## Where things stand, and what needs you
 
 On main: step 3 slice 2 (36b05fe), the osoe-stat branch (a0cded6), the test
-review (fd7c07e), and step 4 slice 1 (92309a7), with this log and the second
-slice's brief after it. On branch `phase1-step4-slice2`, not merged: the
+review (fd7c07e), step 4 slice 1 (92309a7) and the fixes its review found
+(9d9251e), with this log and the second slice's brief among them. On branch `phase1-step4-slice2`, not merged: the
 heap-base shift (its Part A). Nothing was pushed; there is no remote.
 
 Decisions to confirm or reverse, most consequential first:
@@ -30,7 +30,15 @@ Decisions to confirm or reverse, most consequential first:
 6. Parts A, C and D verified together rather than one by one (15).
 7. Slurm: where to capture fixtures, and building the Slurm path they need,
    which does not exist yet (19, 20).
-8. Merging the second slice's Part A alone, or waiting for the rest.
+8. Merging the second slice's Part A alone, or waiting for the rest. Its
+   branch predates the review's fixes and needs a rebase first.
+9. What the review left as designed rather than fixed (22): `exit` from the
+   agent runs handlers beside a live main thread, and a fatal ends at once
+   rather than through the agent.
+
+After the merge, two adversarial reviews found four bugs in step 4 slice 1,
+and verifying their fixes found a fifth. All five are fixed, verified and
+merged (22).
 
 Found on the way and left as suggested tasks: `progress.c` names every
 `struct osoe_connection *` parameter `conn`, which CLAUDE.md's naming rule
@@ -310,6 +318,44 @@ name is gone when `shmem_init` returns, and under load a non-lead can return
 before its lead has removed it. It fails the same way without the shift and
 on the tree before step 4, so it was left as a suggested task rather than
 fixed inside the heap shift.
+
+**22. The merged slice was reviewed adversarially, and four of the findings
+were bugs, fixed and merged (`9d9251e`).** Two reviewers read
+it, since the same author wrote the brief, the code and both models. Each
+finding was checked against the code before it was acted on.
+
+- A non-lead could return from `shmem_init` before its lead's agent ran, so
+  a global exit straight after init told no node.
+- A goodbye counted once the kernel took it, and a reset at the process's end
+  could drop it.
+- `shmem_finalize` stood aside by returning on any thread, into a second
+  `exit`.
+- The pidfds started too late to see a death during init.
+
+Verifying the fixes found a fifth. The atexit handler and `shmem_global_exit`
+read the lifecycle mutex's count without holding it, and an exit straight
+after init raced them under tsan.
+
+A test pins each fix, except the first. An exit straight after init passed
+with the init wait removed, even across eight nodes at tier 3, because a
+lead's mesh setup takes about a millisecond. The exit model pins it instead,
+with a case in which the lead's agent starts late.
+
+The exit model could not see the third: it made the agent's end one step,
+the claim together with exit itself, so no other thread ever saw the gap
+between them. It now has the gap and fails the variant.
+
+Kept rather than fixed:
+
+- `exit` from the agent runs the process's handlers and destructors while
+  its main thread still runs. The alternative, `fflush` then `_exit`, skips
+  the handlers §9.1.6's "normal termination" implies. The author may prefer
+  it.
+- A fatal still ends at once rather than through the agent. That is harmless
+  on the full mesh and must change with on-demand connections.
+
+The notes had overclaimed in three places: the one-thread rule, the pidfd's
+part in a prompt abort, and a paused VM. All three now say what is built.
 
 **What step 4 builds on** (surveyed 2026-09-23). The node's abort word
 (`node.h`: `aborting`, `abort_pe`, `abort_status`) is set by
