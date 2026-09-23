@@ -3,12 +3,14 @@
  * shmem_query_initialized, shmem_my_pe, shmem_n_pes.
  */
 #include <errno.h>
+#include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 
@@ -17,13 +19,16 @@
 
 #include "abort.h"
 #include "agent.h"
+#include "base/deadline.h"
 #include "base/futex.h"
 #include "base/ring-check.h"
+#include "base/sweep.h"
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
 #include "internode.h"
 #include "job.h"
+#include "liveness.h"
 #include "state.h"
 #include "team.h"
 #include "transport.h"
@@ -127,10 +132,10 @@ SHMEM_VENDOR_STRING " environment variables\n"
  * specification, and the other PEs would wait for this one at their next
  * collective until the launcher gives up - and the launcher gives up only on
  * a nonzero status, so an exit(0) hung a release-build job (second review,
- * D14). So the job ends here, loudly: this node's abort word stops its other
- * PEs at their next sweep, and the status is made nonzero for the launcher.
- * Remote nodes see it when their own PEs on this node's side stop answering;
- * propagating it to them is §7.1 step 4's abort flood.
+ * D14). So the job ends here, loudly: this node's abort word ends its other
+ * PEs, computing or not (abort.h), and the status is made nonzero for the
+ * launcher. The other nodes take this node's end of stream for a death, or,
+ * if its lead's agent speaks first, read its abortive goodbye (§3.15).
  *
  * start_pes programs are the exception the specification makes - they are
  * finalized implicitly at exit (§9.1, Annex F.2.3) - and deprecated.c
@@ -139,8 +144,25 @@ SHMEM_VENDOR_STRING " environment variables\n"
  */
 static void exit_without_finalize(void)
 {
-    if (refcount == 0 || getpid() != init_pid || osoe_abort_ending())
+    /* osoe_initialized, not refcount, which the mutex guards: this may run on
+     * the agent, ending the process while the main thread is still finishing
+     * shmem_init; and init_pid only once that acquire load has found it set,
+     * after init_pid was written. */
+    if (atomic_load_explicit(&osoe_initialized, memory_order_acquire) == 0 ||
+        getpid() != init_pid || osoe_abort_stand_aside())
         return;
+    /* A global exit already declared is what this exit is part of: the agent
+     * ends the process with its status (abort.h), and this thread, inside exit
+     * already, waits for that rather than call exit again. */
+    uint32_t pe;
+    int status;
+    if (osoe_node_abort_read(&osoe.node, &pe, &status) == OSOE_ABORT_GLOBAL_EXIT) {
+        if (osoe_agent_speaks())
+            for (;;)
+                pause();
+        fflush(NULL);
+        _exit(status);
+    }
     fflush(NULL);
     char msg[256];
     int n = snprintf(msg, sizeof msg, "osoe: PE %u: the process exited without calling "
@@ -169,6 +191,19 @@ static void session_start(void)
                 osoe.bootstrap.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
     if (osoe.bootstrap.print_info && osoe.bootstrap.local_id == 0)
         print_info();
+    /*
+     * §6.2: init raises the soft RLIMIT_NOFILE to the hard limit, before any
+     * socket or pidfd is opened. Slurm passes on the submitting shell's
+     * limits, often a soft 1,024, and a lead holds a socket per peer node and
+     * a pidfd per other local PE (liveness.h): at 256 PEs a node, 1,024 runs
+     * out short of 800 nodes. A program that ran before cannot fail for it:
+     * only a descriptor it could not have had lands above the old limit.
+     */
+    struct rlimit files;
+    if (getrlimit(RLIMIT_NOFILE, &files) == 0 && files.rlim_cur < files.rlim_max) {
+        files.rlim_cur = files.rlim_max;
+        (void)setrlimit(RLIMIT_NOFILE, &files);
+    }
     /*
      * §1's start-up check of the running kernel, before anything is created:
      * an old kernel is refused by name, rather than aborting mid-rendezvous
@@ -201,6 +236,9 @@ static void session_start(void)
      * the same sequence of sessions, so the numbers agree. */
     uint32_t session = sessions++;
     osoe_node_join(&osoe.node, &osoe.bootstrap, session);
+    /* Every local PE has published its pid: from here a death is watched for,
+     * by the sweeps of init's own waits until the agent takes over (liveness.h). */
+    osoe_liveness_start();
     /*
      * Then the job-wide rendezvous (§6.2): only node leads take part, and it is
      * what produces the rank -> node map that every later addressing decision
@@ -222,6 +260,30 @@ static void session_start(void)
     osoe_internode_init();
     osoe_team_start();
     osoe_agent_start(&osoe.node.slots[osoe.bootstrap.local_id]);
+    /*
+     * No PE returns from init before its node's lead can speak for the node
+     * (§3.15). A non-lead is done once the connection area is open, while its
+     * lead may still be connecting to the other nodes, with no agent - and an
+     * abort started then, a shmem_global_exit straight after init, would end
+     * the lead from its main thread, telling no node: those connected would
+     * take its end of stream for a death, those still dialling would retry
+     * forever. So the lead says its agent runs, and every other PE waits for
+     * that, sweeping, so that a lead that dies meanwhile is found and ends the
+     * wait (liveness.h). A futex word that is its own predicate (§3.16). O(1)
+     * per PE, once a session.
+     */
+    _Atomic uint32_t *speaks = &osoe.node.hdr->lead_agent_running;
+    if (osoe.bootstrap.local_id == 0) {
+        atomic_store_explicit(speaks, 1, memory_order_release);
+        osoe_futex_wake(speaks, INT_MAX, OSOE_FUTEX_SHARED);
+    } else {
+        while (atomic_load_explicit(speaks, memory_order_acquire) == 0) {
+            struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+            osoe_futex_wait(speaks, 0, &sweep, OSOE_FUTEX_SHARED);
+            if (osoe_deadline_expired(&sweep))
+                osoe_sweep_expired("shmem_init");
+        }
+    }
     init_pid = getpid();
     static bool exit_handler;
     if (!exit_handler) {
@@ -256,6 +318,7 @@ static void session_end(void)
      * with nothing polling it.
      */
     osoe_agent_stop(&osoe.node.slots[osoe.bootstrap.local_id]);
+    osoe_liveness_stop();
     osoe_internode_fini();
     osoe_allocator_fini(&osoe.allocator);
     osoe_transport_fini();
@@ -292,8 +355,9 @@ OSOE_API void pshmem_finalize(void)
 {
     /* A process ending on an abort runs no collective on the way out: a
      * program's own atexit(shmem_finalize) would wait for PEs that are
-     * exiting (abort.h; the rule of conformance F1). */
-    if (osoe_abort_ending())
+     * exiting (abort.h; the rule of conformance F1). Only the thread ending the
+     * process returns; any other waits for that end here. */
+    if (osoe_abort_stand_aside())
         return;
     pthread_mutex_lock(&lifecycle);
     /* A child forked after init inherits the mappings but no agent, and must
@@ -328,7 +392,9 @@ OSOE_API void pshmem_finalize(void)
  */
 OSOE_API void pshmem_global_exit(int status)
 {
-    if (refcount == 0 || getpid() != init_pid)
+    /* Unlocked, like exit_without_finalize: osoe_initialized, then init_pid. */
+    if (atomic_load_explicit(&osoe_initialized, memory_order_acquire) == 0 ||
+        getpid() != init_pid)
         exit(status);
     osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, status, OSOE_ABORT_GLOBAL_EXIT);
     osoe_abort_end();

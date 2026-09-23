@@ -1364,7 +1364,9 @@ headers would pass whenever the library agreed with itself.
   500 connections × 30 counters × 8 B ≈ 120 KB. PE-side counters aggregate across
   peers; per-PE-per-peer counters would be hundreds of MB at 256 PEs and 500 peers.
 - **One file descriptor per PE** for the whole session: the control segment's,
-  which is what keeps it findable through `/proc` once its name is gone.
+  which is what keeps it findable through `/proc` once its name is gone. (The
+  agents' pidfds, §3.15, are one more on a PE that is not a lead and L − 1 on a
+  lead.)
 - **Timing only on slow paths:** blocking operations, waits, and once per segment.
   Never per put or AMO. `CLOCK_MONOTONIC`, through the vDSO.
 - **Histograms use log2 buckets**, about 32 per histogram. The bucket index comes
@@ -1663,7 +1665,8 @@ The policy is right; an earlier draft lacked **detection and propagation**:
   loudly". The lead's agent holds a **pidfd for every local PE**, polled on its
   ring, using the pids recorded at local rendezvous (§6.2). A pidfd completion for
   a PE that has not finalized aborts the job. Non-lead PEs detect a dead lead when
-  a wait deadline expires (§3.12).
+  a wait deadline expires (§3.12). *(As built, every agent watches with pidfds,
+  polled at its sweep, and init's waits do until the agents run: below.)*
 - **A vanished peer node** surfaces through TCP keepalive on every node-pair
   connection, as a connection error — which aborts. Not `TCP_USER_TIMEOUT`, which
   would declare a merely stopped peer dead (as built, below).
@@ -1694,8 +1697,27 @@ one is a barrier and the other would declare an abort that already is. Because
 holds, `_exit(status)` follows after `OSOE_ABORT_GRACE_SECONDS` (10). That is
 not a wait that gives up because time passed: it ends a process that is already
 ending. On a fatal the agent says so once and `_exit`s with the declarer's
-status. Exactly one thread of a process ends it, and while the agent runs it is
-the agent; any other thread that finds the word waits for it.
+status. On a global exit exactly one thread of a process ends it, and while the
+agent runs it is the agent; any other thread that finds the word waits for it —
+including one that reaches `shmem_finalize` or the library's atexit handler
+meanwhile, which stand aside by returning only on the thread ending the process:
+on any other they would return into a second `exit`, main's own beside the
+agent's, which C leaves undefined and which could end the process with main's
+status (found in review; `abort_exit_model.py`, `finalize_returns`). A fatal
+ends at once, on whichever thread finds it, as it did before: its status is a
+failure whoever ends the process, and on the eager mesh every node reads the
+dying lead's end of stream itself. With on-demand connections a fatal will need
+the agent's goodbye too. `exit` from the agent runs the process's atexit
+handlers and destructors while its main thread still runs; a handler that calls
+into the library then waits out the grace, which ends the process with its
+status but without exit's flush. No PE returns from `shmem_init` before its
+node's lead's agent runs, which the lead publishes in the node's rendezvous
+words: a non-lead is otherwise done once the connection area is open, and a
+global exit straight after init found its lead still connecting the mesh, with
+no agent to tell anyone — the nodes it had reached took its end of stream for a
+death, and those still dialling retried forever (found in review;
+`abort_exit_model.py`, `no_init_wait` — the tests' immediate exits did not hit
+the window, which a lead's mesh setup keeps to about a millisecond).
 `shmem_global_exit(status)` declares the word as a global exit and ends through
 the same path. A library wait that sweeps into a global exit ends the same way,
 not through a fatal that would change the status, and so does a fatal whose own
@@ -1730,13 +1752,18 @@ whose peer died, or whose peer's own abortive goodbye has arrived — and a peer
 whose abortive goodbye has arrived is sent nothing more of the job's, since its
 exit may already have reset the connection. From the moment the engine aborts, a
 failed connection or an end of stream without a goodbye is a peer that is ending
-too, not a fatal. The send is bounded by `OSOE_ABORT_GRACE_SECONDS`: a peer
-stopped with a full receive window could hold the bytes forever, and this
-process is ending either way; a peer told nothing takes its end of stream for a
-death. The one new message kind is `OSOE_AM_ABORT` (§3.13's table, and so its
-checksum). An abort during §6.4's close needs no abortive goodbye, the model
-found: after the final barrier no PE can call `shmem_global_exit`, and a fatal's
-status is a failure anyway.
+too, not a fatal. A goodbye counts as told once the peer's kernel has
+acknowledged it (`SIOCOUTQ` at 0), the engine receiving meanwhile: this
+process's end with input unread is a reset, and a reset drops whatever is still
+queued — the goodbye among it, behind a stream or waiting on a retransmission —
+so that the peer would read a reset without a goodbye and end with a failure
+(found in review; `shmem.global-exit.stream`). The wait is bounded by
+`OSOE_ABORT_GRACE_SECONDS`: a peer stopped with a full receive window could hold
+the bytes forever, and this process is ending either way; a peer told nothing
+takes its end of stream for a death. The one new message kind is `OSOE_AM_ABORT`
+(§3.13's table, and so its checksum). An abort during §6.4's close needs no
+abortive goodbye, the model found: after the final barrier no PE can call
+`shmem_global_exit`, and a fatal's status is a failure anyway.
 
 *As built: liveness without the watchdog* (phase 1 step 4 slice 1, part C;
 `liveness.[ch]`). Every PE's agent watches the deaths it can see: the lead's
@@ -1749,18 +1776,27 @@ fatal naming it, which the abort carries to every PE of the job (above). Not if
 the word is already set: a PE that an abort ended is dead too, and its death is
 the abort's own (`abort_exit_model.py`). A pidfd names a process rather than a
 number, so, unlike `kill(pid, 0)`, a recycled pid cannot hide a death; only a
-pid recycled before its pidfd opened could, and they open at the agent's first
-turns, once each PE has published its pid. The design put the lead's pidfds on
+pid recycled before its pidfd opened could, and they open at the first check
+after the node's rendezvous, which every PE's pid is published before. Until the
+agent runs, the sweeps of init's own waits do the checking, so a death during
+init is found in every build: first built, a lead that died in the job's
+rendezvous left its non-leads waiting there for the launcher (found in review;
+`shmem.dead-pe.lead-in-init`). Where no pidfd can be had — out of descriptors,
+or a kernel or sandbox refusing the call — the PE is watched by `kill(pid, 0)`
+instead, after one line saying so, rather than the job ending for it; and init
+raises the soft `RLIMIT_NOFILE` to the hard limit, as §6.2 always said it did
+and the code had not. Like the reclaim of a dead job's objects (§6.2), this
+assumes a node's PEs share a pid namespace. The design put the lead's pidfds on
 its ring, which a single-node job does not have, and had non-leads check the
 lead with `kill(pid, 0)` at a library wait's sweep, which a computing PE never
 reaches; the agent's own sweep serves both, the same way on every job. It is up
 to one sweep interval late, and a completion on the ring would not be — a
-refinement the multi-node lead can take later — but the model showed the check
-also makes an abort prompt: a declarer's own agent can end its process before
-the declarer has woken the lead, and then the lead's pidfd is what wakes it
-within a sweep interval (`abort_exit_model.py`, Part B alone). `shmem.dead-pe`
-kills a lead or a sibling, on one node and on two, with the watchdog off: every
-survivor leaves with the failure status, the computing ones included.
+refinement the multi-node lead can take later, at the price of a seam function.
+The model's `pidfd` option is that ring version, a completion that wakes the
+lead at once; as built, the lead's own sweep wakes it within a sweep interval,
+and that is what the model's Part B case checks. `shmem.dead-pe` kills a lead or
+a sibling, on one node and on two, with the watchdog off: every survivor leaves
+with the failure status, the computing ones included.
 
 *As built: keepalive* (phase 1 step 4 slice 1, part D; `wire.c`). Every
 node-pair socket sets `SO_KEEPALIVE` with `TCP_KEEPIDLE` 60 s, `TCP_KEEPINTVL`
@@ -1771,24 +1807,25 @@ without a FIN — power lost, a cable cut, a partition — is found one to two
 minutes after its connections go quiet. Keepalive asks whether the peer's
 *kernel* is there, which contention does not stop: a stopped node's kernel still
 acknowledges, so a stopped node is waited for, as the no-fatal-timeouts decision
-requires, and `shmem.stopped-node.keepalive` stops one for 6 s against
-keepalive's tightest setting, 4 s, and the quiet completes. `TCP_USER_TIMEOUT`
-is not set. It bounds how long sent data may go unacknowledged, and Linux
-applies it to zero-window probing too, so a peer merely stopped with a full
-receive buffer would be declared dead after it: a fatal timeout by another name.
-With data in flight to a vanished node the kernel's own retransmission limit
-ends the connection instead, `tcp_retries2`, about fifteen minutes by default —
-slow, and a site that wants it faster lowers that sysctl, which bounds the same
-retransmissions for every connection on the host.
-`OSOE_KEEPALIVE=IDLE,INTERVAL,COUNT` overrides the values, and 0 turns keepalive
-off; tests make it short. `tier3.*.vanished-node` cuts a node's link in both
-directions once the job is ready and quiet — no FIN, no reset — while the other
-node waits on it idle, and the job ends within keepalive's bound, every rank
-with the failure status. Quiet matters: the first run cut the lossy link while
-one side still had a retransmission outstanding, and that side, correctly,
-waited on `tcp_retries2` rather than keepalive (TCP probes only a connection
-with nothing unacknowledged); the cut now comes two seconds after the job is
-ready.
+requires. A host that answers nothing at all is declared dead: powered off,
+partitioned, or a virtual machine paused for longer than keepalive's bound.
+`shmem.stopped-node.keepalive` stops one for 6 s against keepalive's tightest
+setting, 4 s, and the quiet completes. `TCP_USER_TIMEOUT` is not set. It bounds
+how long sent data may go unacknowledged, and Linux applies it to zero-window
+probing too, so a peer merely stopped with a full receive buffer would be
+declared dead after it: a fatal timeout by another name. With data in flight to
+a vanished node the kernel's own retransmission limit ends the connection
+instead, `tcp_retries2`, about fifteen minutes by default — slow, and a site
+that wants it faster lowers that sysctl, which bounds the same retransmissions
+for every connection on the host. `OSOE_KEEPALIVE=IDLE,INTERVAL,COUNT` overrides
+the values, and 0 turns keepalive off; tests make it short.
+`tier3.*.vanished-node` cuts a node's link in both directions once the job is
+ready and quiet — no FIN, no reset — while the other node waits on it idle, and
+the job ends within keepalive's bound, every rank with the failure status. Quiet
+matters: the first run cut the lossy link while one side still had a
+retransmission outstanding, and that side, correctly, waited on `tcp_retries2`
+rather than keepalive (TCP probes only a connection with nothing
+unacknowledged); the cut now comes two seconds after the job is ready.
 
 #### The development watchdog
 
@@ -1927,10 +1964,10 @@ outcome C11 forbids, and with what.
 
 | Shape | C11's requirement | Order | Where |
 |---|---|---|---|
-| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed`. *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
-| A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready` |
+| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed`; the agent's `running` (phase 1 step 4). *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
+| A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready`; the node's `lead_agent_running` (phase 1 step 4) |
 | Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count |
-| CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere |
+| CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere; among them the abort word, installed whole by one CAS, and `ending`, the claim on ending a process (phase 1 step 4) |
 | A queue in one word, then a wake word: a waiter's ticket and a giver's serve are RMWs on the same word; the giver then bumps a futex word; the waiter loads that word, then checks its ticket (slice 2 of step 3) | Not store buffering: two RMWs on one word are ordered by its modification order, so a give always sees every ticket taken before it. The waiter's check needs only to follow the giver's serve when it has seen the giver's bump — a release RMW read by an `acquire` load; a bump it has not seen is the futex compare's to catch | RMWs **`seq_cst`** (the row above); the waiter's loads of the wake word and of the state **`acquire`** | `osoe_credit_take`, `_give`, `_served` (`credit_wait_model.py`) |
 | Two-sided, with a claim: the writer's store is an RMW on a bitmap and the lead's a flag, and a writer that reads the flag raised takes it down with a CAS before waking (slice 3) | The store-buffering outcome - the lead's recheck misses the bit and the writer misses the flag - is forbidden only among `seq_cst` operations; the claim CAS is an RMW in *S*, and a writer that loses it read a later value of the flag, so the lead's recheck ordered after that value sees its bit | **`seq_cst`** `fetch_or`, flag store, flag load and CAS; `seq_cst` recheck loads | `osoe_connection_area_mark`, `osoe_progress_host_wake_lead`, `osoe_progress_host_poll` (`lead_wake_model.py`) |
 | `shmem_fence` over plain stores (W→W) | Nothing, for a race-free program: its flag is an AMO, a `seq_cst` store and so a release. Table 14's plain stores are a data race C11 gives no meaning; the weakest construct ordering earlier stores before later ones is a release fence | **`atomic_thread_fence(release)`** | `osoe_transport_fence` |
@@ -5732,13 +5769,16 @@ Assert what can be asserted. Instrument the rest.
     after the peer's stream has ended.** (§6.4) Dropping each strands a child
     waiting for its release, makes a finished peer look dead, or resets a
     connection the peer is still sending on (`close_model.py`).
-36. **A lead whose node aborts sends its abortive goodbye on every connection
-    that still has someone to tell before its process ends, and while its agent
-    runs, nothing but the agent ends that process.** (§3.15) Sent any slower -
-    along the tree - or after the process has ended, the goodbye loses the race
-    with the end of stream it should precede, and a node that reads the end of
-    stream first ends with a failure where a caller of `shmem_global_exit` gave a
-    status (`abort_model.py`, `abort_exit_model.py`).
+36. **A lead whose node aborts has its abortive goodbye acknowledged on every
+    connection that still has someone to tell before its process ends; on a
+    global exit, while its agent runs, nothing but the agent ends that process;
+    and no PE returns from `shmem_init` before its lead's agent runs.** (§3.15)
+    Sent any slower - along the tree - or after the process has ended, the
+    goodbye loses the race with the end of stream it should precede, and a node
+    that reads the end of stream first ends with a failure where a caller of
+    `shmem_global_exit` gave a status (`abort_model.py`, `abort_exit_model.py`);
+    sent but unacknowledged, it dies in the reset of a process that ends with
+    input unread.
 
 ## 10. Open Questions
 

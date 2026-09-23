@@ -18,6 +18,9 @@ void osoe_agent_start(struct osoe_pe_slot *slot);
 /* Ask the agent to stop and join it. */
 void osoe_agent_stop(struct osoe_pe_slot *slot);
 
+/* Whether this PE's agent is running: started, and not yet joined. */
+bool osoe_agent_running(void);
+
 /* Whether this PE's agent is running and the calling thread is not it: then
  * the agent, not the caller, ends the process on an abort (abort.h), since it
  * may have the network to tell first. */

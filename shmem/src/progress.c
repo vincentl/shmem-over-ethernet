@@ -1243,9 +1243,24 @@ void osoe_progress_abort(struct osoe_progress *p, uint32_t pe, int32_t status,
 
 bool osoe_progress_aborted(const struct osoe_progress *p)
 {
-    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++)
-        if (!p->connection[slot].abort_done)
+    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
+        const struct osoe_progress_connection *c = &p->connection[slot];
+        if (!c->abort_done)
             return false;
+        /*
+         * Sent is not received. A process whose end finds input it has not read
+         * resets the connection, and a reset drops whatever is still queued -
+         * the goodbye among it, behind the bulk of a stream or waiting on a
+         * retransmission - so a peer not yet ending would read a reset without
+         * a goodbye, and end with a failure. So a goodbye counts once the peer's
+         * kernel has acknowledged it, and the engine keeps receiving until then
+         * (the host's grace bounds it). Not where nobody was told, nor once the
+         * peer is ending too.
+         */
+        if (c->abort_sent == p->abort_segment_bytes && !c->peer_aborted &&
+            !p->wire[slot].error && osoe_wire_unacknowledged(&p->wire[slot]))
+            return false;
+    }
     return true;
 }
 

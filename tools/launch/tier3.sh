@@ -42,6 +42,7 @@ if [ "${1:-}" = clean ]; then
     for ns in $(ip netns list | awk '/^osoe-tier3-/ { print $1 }'); do
         ip netns del "$ns"
     done
+    rm -f /tmp/osoe-tier3-*-ready     # a killed run's cutter then finds none, and gives up
     exit 0
 fi
 if [ $# -lt 4 ]; then
@@ -69,7 +70,10 @@ PREFIX=osoe-tier3-$$-
 SWITCH=${PREFIX}switch
 CUTTER=
 cleanup() {
-    [ -z "$CUTTER" ] || kill "$CUTTER" 2>/dev/null || true
+    if [ -n "$CUTTER" ]; then
+        pkill -P "$CUTTER" 2>/dev/null || true      # its sleep, or its tc
+        kill "$CUTTER" 2>/dev/null || true
+    fi
     rm -f "/tmp/${PREFIX}ready"
     i=0
     while [ $i -lt "$NODES" ]; do
@@ -119,7 +123,13 @@ if [ -n "$CUT" ]; then
     [ "$CUT" -lt "$NODES" ] || { echo "tier3.sh: TIER3_CUT=$CUT of $NODES nodes" >&2; exit 2; }
     export OSOE_TEST_READY="/tmp/${PREFIX}ready"
     # Egress on the node's side and on the bridge's, so nothing arrives either.
-    ( while [ ! -e "$OSOE_TEST_READY" ]; do sleep 0.1; done
+    # Bounded: a job that never gets ready leaves no cutter polling for good.
+    ( waited=0
+      while [ ! -e "$OSOE_TEST_READY" ]; do
+          sleep 0.1
+          waited=$((waited + 1))
+          [ "$waited" -lt 3000 ] || exit 0
+      done
       sleep 2
       ip netns exec "$PREFIX$CUT" tc qdisc change dev link0 root netem loss 100%
       ip netns exec "$SWITCH" tc qdisc add dev "port$CUT" root netem loss 100%

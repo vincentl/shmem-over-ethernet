@@ -34,9 +34,21 @@ enum { OSOE_ABORT_GRACE_SECONDS = 10 };
 /* Whether the node has aborted: one acquire load, for the agent's loop. */
 bool osoe_abort_pending(void);
 
-/* Whether this process is ending because of an abort, for the library's atexit
- * handlers to stand aside. */
+/* Whether this process is ending because of an abort. */
 bool osoe_abort_ending(void);
+
+/*
+ * For the library's own exit paths - shmem_finalize, and its atexit handlers -
+ * while an abort ends this process: they run no collective then, since the
+ * other PEs are ending too (the rule of conformance F1). On the thread ending
+ * the process, which is running exit's handlers, this returns true, and the
+ * caller returns. Any other thread waits here for the end: returning, it would
+ * go on into a second exit - main's own, beside the agent's - which C leaves
+ * undefined and which could end the process with main's status instead of the
+ * abort's (abort_exit_model.py, finalize_returns). False when no abort is
+ * ending the process.
+ */
+bool osoe_abort_stand_aside(void);
 
 /* End this process as the node's abort says. */
 _Noreturn void osoe_abort_end(void);

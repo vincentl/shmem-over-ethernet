@@ -1,5 +1,7 @@
 #define _GNU_SOURCE
+#include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +14,7 @@
 #include "state.h"
 
 static _Atomic uint32_t ending;         /* process-private: a thread is ending it */
+static _Thread_local bool this_thread_ends;     /* ...and it is this one */
 static int grace_status;
 
 bool osoe_abort_pending(void)
@@ -25,11 +28,32 @@ bool osoe_abort_ending(void)
     return atomic_load_explicit(&ending, memory_order_acquire) != 0;
 }
 
+bool osoe_abort_stand_aside(void)
+{
+    if (!osoe_abort_ending())
+        return false;
+    if (this_thread_ends)
+        return true;
+    for (;;)
+        pause();
+}
+
+/*
+ * The bound on exit (abort.h). Every signal blocked, so none is delivered here
+ * and none cuts the sleep short; and an absolute deadline, so an interrupted
+ * sleep resumes for what is left rather than starting over or giving up.
+ */
 static void *grace(void *unused)
 {
     (void)unused;
-    struct timespec t = { OSOE_ABORT_GRACE_SECONDS, 0 };
-    nanosleep(&t, NULL);
+    sigset_t all;
+    sigfillset(&all);
+    pthread_sigmask(SIG_BLOCK, &all, NULL);
+    struct timespec until;
+    clock_gettime(CLOCK_MONOTONIC, &until);
+    until.tv_sec += OSOE_ABORT_GRACE_SECONDS;
+    while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &until, NULL) == EINTR)
+        ;
     _exit(grace_status);
 }
 
@@ -50,10 +74,15 @@ _Noreturn void osoe_abort_end(void)
                                                  memory_order_acquire))
         for (;;)
             pause();                    /* another thread is ending this process */
+    this_thread_ends = true;
     grace_status = status;
+    /* With no thread to spare, the bound is SIGALRM's default action instead:
+     * the process still ends, though by a signal and not with its status. */
     pthread_t t;
     if (pthread_create(&t, NULL, grace, NULL) == 0)
         pthread_detach(t);
+    else
+        alarm(2 * OSOE_ABORT_GRACE_SECONDS);
     if (how == OSOE_ABORT_GLOBAL_EXIT)
         exit(status);
     /* A fatal elsewhere on the node (or across the job): say so, once, for a PE

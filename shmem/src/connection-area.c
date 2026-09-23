@@ -16,6 +16,7 @@
 #include "base/environment.h"
 #include "base/futex.h"
 #include "base/stall-watch.h"
+#include "base/sweep.h"
 #include "connection-area.h"
 #include "fatal.h"
 #include "shm-object.h"
@@ -348,6 +349,10 @@ again:;
             }
             struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_futex_wait(&h->ready, 0, &sweep, OSOE_FUTEX_SHARED);
+            /* §4.10: every wait sweeps, and this one had not - a local lead that
+             * died before creating the area left its siblings here forever. */
+            if (osoe_deadline_expired(&sweep))
+                osoe_sweep_expired("shmem_init");
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not finished creating %s",
                            (unsigned long long)osoe_stall_watch_seconds(&watch), a->name);

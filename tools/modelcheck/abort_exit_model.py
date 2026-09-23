@@ -29,9 +29,14 @@ word - which a peer takes for a death, ending with a failure. So:
     then checks its siblings' pids, and a dead one is a fatal - unless the word
     is set by then, since a PE an abort ended is dead too. A fatal whose own
     declaration loses to a global exit ends as that global exit does.
-  * The lead's ring holds a pidfd per local PE (Part C): a PE that ends is a
-    completion for the lead's agent, which declares a fatal naming it. That
-    declaration loses to an abort already declared, and does nothing more.
+  * A pidfd per local PE (Part C): a PE that ends is found by the lead's
+    agent, which declares a fatal naming it. That declaration loses to an
+    abort already declared, and does nothing more.
+
+The code sends no abortive goodbye to a peer whose own has arrived; the model
+sends one anyway, a superset of the code's sends. The model's end of stream
+follows what was queued, as TCP's FIN does; the code makes that so for a reset
+too, by counting a goodbye only once the peer's kernel has acknowledged it.
 
 Model: nodes A and B, each a lead process (L) and one other (P), and B a
 third (Q), so five processes; A and B share one connection, each direction a
@@ -48,10 +53,20 @@ Cases
             has it, and with it this case is ten times the size).
 
   on_b      B's P calls it with 5, B having a third process, Q.
+  finish    A's P calls it with 5 while A's lead's main thread calls
+            shmem_finalize, at any moment.
+  early     A's P calls it with 5 as soon as its shmem_init returns, while
+            A's lead's main thread may still be connecting its mesh, with no
+            agent running.
 
 Options
-  pidfd     the lead's ring holds its siblings' pidfds (Part C). On in every
-            case but two, which are Part B as committed before Part C.
+  pidfd     a sibling's death is a completion that wakes the lead's agent at
+            once: the pidfds on the lead's ring, which the design has and the
+            build does not yet (the second slice's Part C). As built, the
+            agents poll their pidfds at their sweeps, which the `sweeps` option
+            models - so Part B's two cases below are also the build's: with
+            sweeps it passes, and the ring version is what would let it pass
+            without them. On in every case but those two.
   sweeps    an agent's wait also ends at every sweep (OSOE_SWEEP_NS), as every
             wait of the library's does. Off unless named, so that a case that
             passes shows the design ends promptly without one. Part B alone
@@ -78,6 +93,14 @@ Variants (each breaks one rule above)
   wake_first        a declarer bumps the wake words before the CAS: an agent
                     can take the bump, find the word still clear, and sleep on
                     the new value. STUCK.
+  finalize_returns  shmem_finalize stands aside by returning, on any thread:
+                    a main thread that reaches it once its agent is ending
+                    the process returns into main's exit(0), a second exit
+                    beside the agent's (phase 1 step 4's review). STATUS.
+  no_init_wait      shmem_init returns before the lead's agent runs: a caller
+                    straight after init finds its lead still connecting, and
+                    the lead's main thread ends it with nobody sent a goodbye
+                    (phase 1 step 4's review). STATUS.
   no_rewake         the lead's agent does not wake the others again: with the
                     declarer's own agent ending its process right after the
                     CAS, the lead is woken by its pidfd and the others by
@@ -123,6 +146,7 @@ def SENT(x, y):     return ('$sent', x, y)
 def HEARD(x, y):    return ('$heard', x, y)        # x read y's ABORT: y's end of stream is no death
 def EOF(x, y):      return ('$eof', x, y)
 def REAPED(p):      return ('$reaped', p)          # the lead's agent has had p's pidfd completion
+def AGENT_UP(p):    return ('$agent_up', p)        # p's agent has started (init.c)
 
 
 def disposition(word):
@@ -181,7 +205,8 @@ def finish_declaring(L):
 
 # ---- the agent --------------------------------------------------------------
 
-(PC_TOP, PC_WORD, PC_WORK, PC_WAIT, PC_REWAKE, PC_SEND, PC_END, PC_PAUSE) = range(8)
+(PC_TOP, PC_WORD, PC_WORK, PC_WAIT, PC_REWAKE, PC_SEND, PC_END, PC_PAUSE,
+ PC_EXITING) = range(9)
 
 
 def agent(variant, local, p, options):
@@ -207,6 +232,8 @@ def agent(variant, local, p, options):
         if d is not None:
             return d
         if pc == PC_TOP:
+            if not M[AGENT_UP(p)]:
+                return []               # not started yet: its main thread is still in init
             return [({}, {'pc': PC_WORD, 'seen': M[WAKE(p)]}, f'{name}: loads its wake word')]
         if pc == PC_WORD:
             w = M[WORD(x)]
@@ -270,12 +297,14 @@ def agent(variant, local, p, options):
                          f'{name}: sends {y} the abortive goodbye')]
             return [({}, {'pc': PC_END}, f'{name}: has told every peer')]
         if pc == PC_END:
-            # osoe_abort_end from the agent: claim the process, and end it.
+            # osoe_abort_end from the agent: claim the process, then end it -
+            # two steps, since exit runs the process's handlers and flushes
+            # before it is gone, and other threads run meanwhile.
             if M[ENDING(p)]:
                 return [({}, {'pc': PC_PAUSE}, f'{name}: another thread ends this process')]
-            u, _, lbl = end_process(M, p, exit_status(M[WORD(x)]), 'its agent')
-            u[ENDING(p)] = 1
-            return [(u, {}, lbl)]
+            return [({ENDING(p): 1}, {'pc': PC_EXITING}, f'{name}: claims the process and calls exit')]
+        if pc == PC_EXITING:
+            return [end_process(M, p, exit_status(M[WORD(x)]), 'its agent')]
         if pc == PC_PAUSE:
             return []                   # until the process ends
         raise AssertionError(pc)
@@ -379,6 +408,92 @@ def waiter(variant, local, p):
     return step, PC_SWEEP
 
 
+PC_FINALIZE = 30
+
+
+def finisher(variant, local, p):
+    """A main thread that calls shmem_finalize, at any moment, while the job
+    may be ending: its final barrier sweeps like any wait, and it may also find
+    this process already ending on an abort. The library's exit paths stand
+    aside then (abort.h). Only the thread ending the process may return - it is
+    running exit's handlers - and any other waits for that end; returning into
+    main's own exit(0) beside the agent's exit(s) is a second exit, which C
+    leaves undefined and which the model takes at its worst, the second
+    status."""
+    x = NODE_OF[p]
+    name = f'{p}\'s main thread'
+
+    def step(M, L):
+        if not M[ALIVE(p)]:
+            return [({}, {'finished': 1}, f'{name}: its process has ended')]
+        pc = L['pc']
+        if pc == PC_FINALIZE:
+            if M[ENDING(p)]:
+                if variant == 'finalize_returns':
+                    u, _, lbl = end_process(M, p, 0, 'shmem_finalize returned into exit(0)')
+                    return [(u, {}, lbl)]
+                return [({}, {'pc': PC_PAUSE}, f'{name}: finalize stands aside; waits for the end')]
+            w = M[WORD(x)]
+            if w and disposition(w) == GLOBAL:
+                return main_end(variant, M, p, name)
+            return [({}, {}, f'{name}: in the final barrier, which does not complete')]
+        if pc == PC_PAUSE:
+            return []
+        raise AssertionError(pc)
+
+    return step, PC_FINALIZE
+
+
+PC_CONNECTING, PC_EARLY_CALL = 40, 41
+
+
+def connecting_lead(variant, local, p):
+    """A lead's main thread still in shmem_init, connecting its node's mesh, its
+    agent not yet started. Its connection loop sweeps: a global exit it finds
+    there it ends itself, since no agent runs to speak for it (running is 0:
+    osoe_agent_speaks is false) and no engine exists yet to send a goodbye.
+    Otherwise it finishes, starts its agent and computes."""
+    x = NODE_OF[p]
+    name = f'{p}\'s main thread'
+
+    def step(M, L):
+        if not M[ALIVE(p)]:
+            return [({}, {'finished': 1}, f'{name}: its process has ended')]
+        pc = L['pc']
+        if pc == PC_CONNECTING:
+            w = M[WORD(x)]
+            if w and disposition(w) == GLOBAL:
+                u, _, lbl = end_process(M, p, exit_status(w), 'its main thread, no agent yet')
+                u[ENDING(p)] = 1
+                return [(u, {}, lbl)]
+            return [({AGENT_UP(p): 1}, {'finished': 1},
+                     f'{name}: has connected the mesh and starts its agent')]
+        raise AssertionError(pc)
+
+    return step, PC_CONNECTING
+
+
+def early_caller(variant, local, p, status):
+    """A non-lead that calls shmem_global_exit as soon as its own shmem_init
+    returns. Init waits for its lead's agent (init.c: lead_agent_running);
+    the variant no_init_wait returns before it."""
+    x = NODE_OF[p]
+    lead = local[x][0]
+    name = f'{p}\'s main thread'
+    inner_step, _ = caller(variant, local, p, status)
+
+    def step(M, L):
+        if not M[ALIVE(p)]:
+            return [({}, {'finished': 1}, f'{name}: its process has ended')]
+        if L['pc'] == PC_EARLY_CALL:
+            if variant != 'no_init_wait' and not M[AGENT_UP(lead)]:
+                return []               # still in init: its lead's agent does not run yet
+            return [({}, {'pc': PC_CALL}, f'{name}: returns from shmem_init')]
+        return inner_step(M, L)
+
+    return step, PC_EARLY_CALL
+
+
 # ---- assembly -------------------------------------------------------------------
 
 def thread(step, initial, callers):
@@ -406,6 +521,9 @@ CASES_OF = {
     'lead': {'callers': {'LA': 5}, 'waiters': (), 'local': LOCAL},
     'both': {'callers': {'PA': 5, 'PB': 6}, 'waiters': (), 'local': LOCAL},
     'on_b': {'callers': {'PB': 5}, 'waiters': (), 'local': LOCAL_WITH_Q},
+    'finish': {'callers': {'PA': 5}, 'waiters': (), 'finishers': ('LA',), 'local': LOCAL},
+    'early': {'callers': {}, 'early_callers': {'PA': 5}, 'waiters': (), 'connecting': ('LA',),
+              'local': LOCAL},
 }
 
 
@@ -413,7 +531,7 @@ def case(variant, which, options):
     shape = CASES_OF[which]
     local = shape['local']
     processes = [p for x in NODES for p in local[x]]
-    callers = set(shape['callers'].values())
+    callers = set(shape['callers'].values()) | set(shape.get('early_callers', {}).values())
     threads = []
     for p in processes:
         step, initial = agent(variant, local, p, options)
@@ -421,8 +539,18 @@ def case(variant, which, options):
     for p, status in shape['callers'].items():
         step, initial = caller(variant, local, p, status)
         threads.append(thread(step, initial, callers))
+    callers |= set(shape.get('early_callers', {}).values())
     for p in shape['waiters']:
         step, initial = waiter(variant, local, p)
+        threads.append(thread(step, initial, callers))
+    for p in shape.get('finishers', ()):
+        step, initial = finisher(variant, local, p)
+        threads.append(thread(step, initial, callers))
+    for p in shape.get('connecting', ()):
+        step, initial = connecting_lead(variant, local, p)
+        threads.append(thread(step, initial, callers))
+    for p, status in shape.get('early_callers', {}).items():
+        step, initial = early_caller(variant, local, p, status)
         threads.append(thread(step, initial, callers))
     mem = {}
     for x in NODES:
@@ -436,6 +564,7 @@ def case(variant, which, options):
         mem[ALIVE(p)] = 1
         mem[STAT(p)] = 0
         mem[REAPED(p)] = 0
+        mem[AGENT_UP(p)] = 0 if p in shape.get('connecting', ()) else 1
     flags = ','.join(k for k, v in sorted(options.items()) if v)
     return f'abort_exit/{variant} [{which}; {flags}]', threads, mem, processes
 
@@ -465,6 +594,10 @@ CASES = [
     ('pidfd_fatal', 'nonlead', BUILT, False),
     ('wake_first', 'nonlead', BUILT, False),
     ('no_rewake', 'on_b', {'pidfd': True, 'sweeps': False}, False),
+    ('built', 'finish', BUILT, True),
+    ('finalize_returns', 'finish', BUILT, False),
+    ('built', 'early', BUILT, True),
+    ('no_init_wait', 'early', BUILT, False),
 ]
 
 if __name__ == '__main__':

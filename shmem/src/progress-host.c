@@ -355,11 +355,14 @@ static void close_connections(void)
 
 /*
  * The job is ending: tell every peer - an abortive goodbye on each connection
- * that still has someone to tell - before this process ends (abort.h). Bounded
- * by OSOE_ABORT_GRACE_SECONDS, since a peer that is stopped with a full receive
- * window could hold the bytes forever, and this process is ending either way:
- * a peer told nothing takes its end of stream for a death, which is what it is
- * for that peer. Called on the agent thread, whose ring this is.
+ * that still has someone to tell - before this process ends (abort.h), and
+ * keep receiving until each peer's kernel has acknowledged it, since this
+ * process's end with input unread is a reset, which would drop it
+ * (osoe_progress_aborted). Bounded by OSOE_ABORT_GRACE_SECONDS, since a peer
+ * that is stopped with a full receive window could hold the bytes forever, and
+ * this process is ending either way: a peer told nothing takes its end of
+ * stream for a death, which is what it is for that peer. Called on the agent
+ * thread, whose ring this is.
  */
 void osoe_progress_host_abort(void)
 {
