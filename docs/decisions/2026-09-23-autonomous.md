@@ -9,6 +9,34 @@ work met them.
 
 There is no git remote, so every merge here is local and nothing was pushed.
 
+## Where things stand, and what needs you
+
+On main: step 3 slice 2 (36b05fe), the osoe-stat branch (a0cded6), the test
+review (fd7c07e), and step 4 slice 1 (92309a7), with this log and the second
+slice's brief after it. On branch `phase1-step4-slice2`, not merged: the
+heap-base shift (its Part A). Nothing was pushed; there is no remote.
+
+Decisions to confirm or reverse, most consequential first:
+
+1. The abort crosses nodes as an abortive goodbye rather than along the tree
+   (12). This changes §3.15's "flood" design, on the strength of a model.
+2. Keepalive's values, 60/10/6, and no `TCP_USER_TIMEOUT` (17).
+3. The development watchdog: retire it, or have the ending agent name the
+   routine its PE is blocked in (16).
+4. Pidfds from every agent's loop rather than the lead's ring (16), and
+   whether the ring version is worth a new seam function (20).
+5. `OSOE_LIVENESS=0`, a second off-switch beside `OSOE_WATCHDOG`, for the
+   tests of the watchdog and the sweep (18).
+6. Parts A, C and D verified together rather than one by one (15).
+7. Slurm: where to capture fixtures, and building the Slurm path they need,
+   which does not exist yet (19, 20).
+8. Merging the second slice's Part A alone, or waiting for the rest.
+
+Found on the way and left as suggested tasks: `progress.c` names every
+`struct osoe_connection *` parameter `conn`, which CLAUDE.md's naming rule
+forbids (the new code followed the file rather than start a second style);
+and `shmem.fork.L4` flakes under load in tsan, since before step 4 (21).
+
 ## Phase 1 step 3 slice 2
 
 **1. The brief's stop threshold was hit, and the work went on** (commit
@@ -259,6 +287,29 @@ Debian's `slurm-wlm` is available, but installing and running Slurm daemons
 in the author's VM is his call, as is a real cluster, or fixtures written
 from the documentation and marked as such. The brief says to stop there and
 ask.
+
+**20. Two premises of the second slice's brief were false, and both parts
+wait for the author.** The brief is left as it was written. Part B assumed a
+Slurm path to feed fixtures into. There is none: `osoe_bootstrap_read`
+refuses a Slurm environment ("launch under Slurm is not yet supported"), and
+reads only the `OSOE_` names the launcher sets. So Part B is first the Slurm
+path, §6.1's table read with the prefix replaced, and only then the fixtures
+that test it, which still need a Slurm to capture from. Part C assumed the
+lead's pidfds could simply go on its ring. The ring is the AM backend's,
+below §4.10, and `liveness.c` is above it, so arming a pidfd there needs a
+new seam function, and an RDMA backend would need its own. That is a seam
+decision, and what it buys is the ≤ 100 ms a sweep-interval poll can take.
+Part A, the heap-base shift, needed neither and is done on branch
+`phase1-step4-slice2` (`a9aeba1`), not merged. It found two one-base
+assumptions, a test comparing addresses and `shmem_align` deciding from the
+PE's own base; the whole of tier 2 passes shifted.
+
+**21. `shmem.fork.L4` flakes under load in tsan, and did before step 4.**
+Found running tier 2 shifted: the test checks that the control segment's
+name is gone when `shmem_init` returns, and under load a non-lead can return
+before its lead has removed it. It fails the same way without the shift and
+on the tree before step 4, so it was left as a suggested task rather than
+fixed inside the heap shift.
 
 **What step 4 builds on** (surveyed 2026-09-23). The node's abort word
 (`node.h`: `aborting`, `abort_pe`, `abort_status`) is set by
