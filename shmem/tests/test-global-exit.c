@@ -28,11 +28,24 @@
  *              reset, which drops what is queued unless the goodbye has been
  *              acknowledged first. With a quiet each time the senders stall
  *              and the receiver drains, and the end is a clean FIN
+ *   start-pes  every PE starts with start_pes, and every other PE returns from
+ *              main after a barrier, so its main thread is inside exit, in
+ *              start_pes's finalize - a barrier the caller never reaches -
+ *              when the caller ends the job 300 ms later
+ *   returned   every other PE returns from main after a barrier, without
+ *              finalizing, and its main thread is inside exit, in a handler of
+ *              the program's that takes 1.5 s, when the caller ends the job
+ *              200 ms later: its agent's exit is then waiting on the main
+ *              thread before the library's own handler runs
+ *
+ * In the last two, exit's lock (glibc 2.41) is held by the main thread, which
+ * must end the process itself: the agent's exit can only wait on it.
  *
  * global-exit.sh runs the job and requires every rank to have left with the
  * status - the caller's, or a fatal's failure - and, for a global exit, every
  * line to have been written. A PE still computing after 30 s says so and
- * leaves with a status of its own, which fails the script.
+ * leaves with a status of its own, which fails the script. The caller says
+ * when it ends the job, for the script to time the end.
  */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -46,11 +59,20 @@ enum { COMPUTE_SECONDS = 30, STREAM_BYTES = 1 << 20 };
 
 static void end_the_job(const char *how)
 {
+    struct timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    fprintf(stderr, "ending the job at %lld.%09ld\n", (long long)now.tv_sec, now.tv_nsec);
     if (strcmp(how, "fatal") == 0) {
         int private_word = 0;               /* not symmetric: a fatal (§3.15) */
         shmem_putmem(&private_word, &private_word, sizeof private_word, 0);
     }
     shmem_global_exit(atoi(how));
+}
+
+static void slow_handler(void)
+{
+    struct timespec slow = { 1, 500 * 1000 * 1000 };
+    nanosleep(&slow, NULL);
 }
 
 static double seconds(void)
@@ -65,11 +87,25 @@ int main(int argc, char **argv)
     const char *how = argc > 1 ? argv[1] : "7";
     int caller = argc > 2 ? atoi(argv[2]) : 0;
     const char *mode = argc > 3 ? argv[3] : "compute";
-    shmem_init();
+    if (strcmp(mode, "start-pes") == 0)
+        start_pes(0);
+    else
+        shmem_init();
     int me = shmem_my_pe(), npes = shmem_n_pes();
     printf("PE %d: computing\n", me);           /* buffered: flushed only by exit */
     if (me == caller && strcmp(mode, "immediate") == 0)
         end_the_job(how);
+
+    if (strcmp(mode, "start-pes") == 0 || strcmp(mode, "returned") == 0) {
+        if (me != caller && strcmp(mode, "returned") == 0)
+            atexit(slow_handler);
+        shmem_barrier_all();
+        if (me != caller)
+            return 0;                           /* into exit, holding its lock */
+        struct timespec settle = { 0, (strcmp(mode, "start-pes") == 0 ? 300 : 200) * 1000 * 1000 };
+        nanosleep(&settle, NULL);
+        end_the_job(how);
+    }
 
     /* The stream: 1 MiB at a time to the PE half the job away, which is on
      * another node in every map this runs on. */

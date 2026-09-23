@@ -4,8 +4,9 @@
  *
  *   test-dead-pe RANK       world rank RANK dies of SIGKILL after a barrier
  *   test-dead-pe 0 init     rank 0, a lead, dies of SIGALRM during shmem_init,
- *                           after its node's rendezvous and before the job's,
- *                           which the last node holds back by starting 5 s late
+ *                           3 s in: after its node's rendezvous, however loaded
+ *                           the host, and before the job's, which the last node
+ *                           holds back by starting 8 s late
  *
  * The lead's agent holds a pidfd for every other local PE and every other
  * PE's agent one for its lead (liveness.h), so whichever of them dies, the
@@ -40,9 +41,9 @@ int main(int argc, char **argv)
         const char *rank = getenv("OSOE_PROCID"), *node = getenv("OSOE_NODEID");
         const char *nodes = getenv("OSOE_STEP_NUM_NODES");
         if (rank && atoi(rank) == dies)
-            alarm(1);                           /* SIGALRM ends it inside shmem_init */
+            alarm(3);                           /* SIGALRM ends it inside shmem_init */
         if (node && nodes && atoi(node) == atoi(nodes) - 1 && atoi(nodes) > 1)
-            sleep(5);                           /* holds the job's rendezvous open */
+            sleep(8);                           /* holds the job's rendezvous open */
     }
     shmem_init();
     int me = shmem_my_pe();

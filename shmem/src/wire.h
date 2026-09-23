@@ -138,7 +138,8 @@ void osoe_wire_shutdown(struct osoe_wire *w);
 bool osoe_wire_ended(const struct osoe_wire *w);
 
 /* Whether the peer's kernel has yet to acknowledge anything sent on this wire:
- * SIOCOUTQ, bytes sent or queued and not acknowledged. False with no socket. */
+ * SIOCOUTQ, bytes sent or queued and not acknowledged. False with no socket,
+ * and once the connection has closed - a reset - since nothing will be. */
 bool osoe_wire_unacknowledged(const struct osoe_wire *w);
 
 /* Close the socket; the caller has sent its end of stream and seen the peer's. */
