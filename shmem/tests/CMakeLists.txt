@@ -139,6 +139,14 @@ osoe_warnings(shmem_test_connection)
 add_test(NAME shmem.connection COMMAND shmem_test_connection)
 set_tests_properties(shmem.connection PROPERTIES LABELS "tier1" TIMEOUT 120)
 
+# The compressed rank map on its own (tier 1): progressions, runs, lookups against
+# the uncompressed map, the refusals, and the sizes at 4,096 x 256 (§6.2).
+add_executable(shmem_test_rank-map test-rank-map.c ../src/rank-map.c)
+target_include_directories(shmem_test_rank-map PRIVATE ../src)
+osoe_warnings(shmem_test_rank-map)
+add_test(NAME shmem.rank-map COMMAND shmem_test_rank-map)
+set_tests_properties(shmem.rank-map PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The node-pair wire on its own (tier 1): both ends in one process, so no
 # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
 # its own osoe_fatal so a failure inside it fails the test.

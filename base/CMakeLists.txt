@@ -11,6 +11,7 @@ add_library(osoe_base OBJECT
   node-map.c
   epoch.c
   futex.c
+  hostlist.c
   order.c
   ring-check.c
   size.c

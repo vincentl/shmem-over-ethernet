@@ -40,9 +40,11 @@ set(OSOE_BELOW_BOUNDARY
 # listed so that the classification is complete. Two of these still reach AM headers, and
 # both are known (roce-seam §3.2): node.c sizes the landing zones from the AM
 # chunk (L5), and job.c checks the AM handler table's checksum at rendezvous
-# (L6). Both are the rendezvous's business, not the SHMEM layer's.
+# (L6). Both are the rendezvous's business, not the SHMEM layer's. The rank
+# map (rank-map.c) is every build's: bootstrap is out of band (§6.2).
 set(OSOE_ON_BOUNDARY
-  collective-tree.c transport-local.c watch.c node.c job.c shm-object.c)
+  collective-tree.c transport-local.c watch.c node.c job.c shm-object.c
+  rank-map.c)
 
 if(NOT SOURCE_DIR)
   message(FATAL_ERROR "usage: cmake -DSOURCE_DIR=<repository root> -P CheckBoundary.cmake")

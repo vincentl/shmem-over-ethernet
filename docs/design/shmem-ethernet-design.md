@@ -4180,6 +4180,9 @@ step 3 is where the compressed form and a tree-shaped broadcast belong.
 `SLURM_STEP_NODELIST` is a compressed hostlist (`pi[01-04,07]`). Expanding it is a
 small parser — call it fifty lines — **written with unit tests in tier 1**, because
 it is pure string handling that would otherwise be debugged on a cluster.
+*Built* (`base/hostlist.c`, `base.hostlist`): prefix, one bracketed list of
+numbers and ranges keeping the lower bound's width, suffix; Slurm's multi-bracket
+names are refused by name rather than guessed.
 
 **Failure handling:**
 

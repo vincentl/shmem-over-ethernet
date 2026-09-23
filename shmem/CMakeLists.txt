@@ -41,6 +41,7 @@ add_library(osoe
   src/node.c
   src/profile.c
   src/quiet.c
+  src/rank-map.c
   src/rma.c
   src/session.c
   src/shm-object.c
