@@ -106,11 +106,12 @@ Targets are stated against a local, reproducible floor instead:
 
 Each floor is a harness in this repository (§8.4), so it runs on any machine
 with nothing installed, reproduces identically on x86 and aarch64, and cannot
-rot the way a third-party build can. **The constant factors are deliberately not
-written down yet** — they are pinned by the first run of the echo harness, and
-pinning them before measuring would be
-inventing a target rather than choosing one. Track all three per commit through
-the §3.14 counters.
+rot the way a third-party build can. **The constant factors were deliberately not
+written down before the echo harness first ran**, since pinning them before
+measuring would be inventing a target rather than choosing one. The harness has
+now run (§8.4, phase 1 step 3 slice 1) and its own io_uring-to-blocking ratio is
+pinned; the library's ratios to it are pinned once the library runs on the ring.
+Track all three per commit through the §3.14 counters.
 
 ---
 
@@ -4664,7 +4665,9 @@ magnitude" — copy into staging, futex over spin, generous chunking — is leas
 defensible when network and cores are fast. Holding on modern x86 loopback means
 holding on a Pi with room to spare. Sweep netem delay from zero to Pi-like and
 watch where the constants stop working; a better experiment than one point
-measurement on real hardware.
+measurement on real hardware. (`tools/echo-uring/netem-sweep.sh` does it for the
+floor harness, and §8.4 has the result: on aarch64 loopback too, bandwidth is the
+half of the assumption that fails.)
 
 **What x86 cannot give: weak memory ordering.** Every missing release store and
 acquire load in the buffer protocol passes on x86 and fails on aarch64, and
@@ -4704,6 +4707,65 @@ that stops being an assumption.
 
 **Pin the constants after the first run, then treat regressions as failures.**
 Ratios, not absolute times, so the thresholds survive a hardware change.
+
+*As built* (phase 1 step 3 slice 1). `tools/echo-uring` runs both ends on
+loopback by default, or one end each with `--server` and `--client` across two
+hosts. It uses exactly §3.3's shapes — a `SINGLE_ISSUER` ring whose CQ is sized
+from its provided-buffer ring, multishot recv with every provided buffer recycled
+as soon as its bytes are consumed, a re-arm on every CQE without
+`IORING_CQE_F_MORE`, one send in flight with a short send resubmitted,
+`TCP_NODELAY` — and times the same two exchanges over blocking `send` and `recv`
+on the same kind of connection. Its first act is a verified stream: every 8-byte
+word carries its own offset, through a 4 KiB send buffer and four 1 KiB provided
+buffers, which forces about 250 `-ENOBUFS` terminations and re-arms and a few
+dozen short sends per MiB. The ctest `env.echo-uring` pins the **io_uring-to-blocking
+ratio on the same link**: a round trip at most 1.5× and a stream at least 0.5×,
+best of seven interleaved trials of each, against 1.01–1.05× and 0.89–1.06×
+measured idle. Seven, because under the load loop's 4× oversubscription a round
+trip is bimodal for io_uring and blocking alike — about 5 or about 15 µs by where
+the two processes land — and with three trials all three of one kind landed slow
+twice in about ninety runs (3.4×); and 1 GiB, because a 256 MiB stream trial
+lasts 13 ms, shorter than a scheduler slice among 16 busy loops. Both pins
+were checked by breaking the harness: a 50 µs pause in its pump measured 12× and
+0.05×, and a missing re-arm after `-ENOBUFS` hung into the timeout. The ratio of
+the *library* to this floor is §1's actual target; it is pinned once the library
+runs on the ring (§7.1 step 3, below).
+
+*Measured* (4-core aarch64 VM on Apple silicon, kernel 6.12, median of 5,000 or
+20,000 round trips; `tools/echo-uring/netem-sweep.sh`, which runs the two ends in
+two network namespaces over a veth pair shaped by `netem`, §8.3's sweep):
+
+| Link | 8-byte round trip, io_uring / blocking | Stream | One-way latency ÷ intranode put | Copy ÷ stream bandwidth |
+|---|---|---|---|---|
+| loopback | 26.3 / 25.0 µs | 19.0 / 20.2 GiB/s | ≈ 1,200 | **1.7** |
+| veth at 1 Gbit/s | 32.9 / 31.9 µs | 114 / 114 MiB/s | ≈ 1,500 | ≈ 170 |
+| … plus 25 µs each way | 96.3 / 95.6 µs | 114 MiB/s | ≈ 4,400 | ≈ 170 |
+| … plus 50 µs each way | 162.8 / 161.6 µs | 114 MiB/s | ≈ 7,400 | ≈ 175 |
+| … plus 100 µs each way, about a Pi on 1 GbE (§5.3) | 289.3 / 286.5 µs | 114 MiB/s | ≈ 13,000 | ≈ 175 |
+
+"Intranode put" is the library's `shmem_putmem` of 8 bytes, 11.0 ns in the same
+VM (§8.4's third floor, measured in phase 1 step 2 slice 3); the harness's own
+proxy, an 8-byte store and a `seq_cst` fence, is 0.5–1.0 ns and makes every
+latency ratio 10–20× larger still. "Copy" is `memcpy` in 64 KiB chunks over a
+64 MiB working set, measured in the same run: 19–33 GiB/s, the spread being which
+of the host's core types ran the VM's CPU, which is also the noise in every
+absolute number here. And the idle loopback round trip is mostly the VM waking a
+sleeping virtual CPU: with every CPU kept busy (the load loop), the same exchange
+measures about 5 µs, which puts loopback's latency ratio nearer 230 than 1,200 —
+still two orders.
+
+**What it says about §10's assumption.** Wire *latency* dominates by three to
+four orders of magnitude at every point of the sweep, loopback included, so
+nothing decided on it — futex over spin (§3.11), deferring the wake
+(`OSOE_TRANSPORT_MORE`), the sweep interval — is in question. Wire *bandwidth*
+dominates by about 170× at 1 Gbit/s on this host, and not at all on loopback,
+where a stream is itself a kernel `memcpy` and an extra copy costs about 60% of
+the transfer. That is the adversarial case §8.3 predicted, not a surprise, and it
+is the one the copy decisions (§3.5's copy into the connection buffer, §3.3's
+copy out of a provided buffer) are measured against when the library runs on
+the ring. A Pi's `memcpy` is slower than this host's, so its copy-to-wire ratio on
+1 GbE is lower — tens rather than hundreds, *recalled*, unmeasured until the
+harness runs there.
 
 ### 8.5 Development environment
 
@@ -4978,9 +5040,16 @@ Recorded rather than deleted, so they are not reopened from memory.
 - **8-byte round trip and small-message rate, two nodes** (§8.4). Everything
   above assumes wire latency dominates memory bandwidth by two orders of
   magnitude. **This assumption is load-bearing** for copy decisions, futex
-  decisions, and chunk sizing. Probably right; worth an hour to confirm rather
-  than carry. Now has a home in the test suite rather than being a one-off.
-- **Pin the §1 floor ratios.** Deliberately unwritten until the harness runs.
+  decisions, and chunk sizing. *Measured in part* (phase 1 step 3 slice 1,
+  `echo-uring`, §8.4): on loopback and on a veth pair shaped to 1 Gbit/s with 0–100
+  µs of delay each way, the latency half holds by three to four orders of
+  magnitude everywhere, and the bandwidth half holds at 1 Gbit/s (≈ 170× on the
+  development host) and fails on loopback (1.7×), as §8.3 predicted. Still owed:
+  two real hosts, and a Pi, whose slower `memcpy` puts its copy-to-wire ratio in
+  the tens, *recalled*. The small-message *rate* is not measured yet.
+- **Pin the §1 floor ratios.** The harness's own ratio (io_uring against blocking
+  sockets on the same link) is pinned (§8.4). The library-to-floor ratios are
+  pinned once the library runs on the ring.
 - **The internode tree's fan-out from measured costs** (§5.3). The default is the
   backend's constant today; measuring the hop latency *h* and per-message cost *o*
   at init and choosing *k* from their ratio is the next step, once a real fabric
