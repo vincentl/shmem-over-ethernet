@@ -123,6 +123,32 @@ equality wait) still runs. Turn the option on when §4.11 is scheduled, or
 when `engine.py` changes (`model.selftest` covers the engine's own
 reductions, not these state spaces).
 
+**10a. `echo-uring`'s pin was flaky, and the fix is interleaving, not a
+looser pin.** The other session reported the fastest-trip pin failing at
+3–4.7× about one run in ten idle. Loosening it to 5× would have kept it
+green and made it nearly blind (a 50 µs pause measured 13×). The same cause
+as the floor test's noise, a CPU asleep for one block of trips and not the
+other, has the same fix: the two kinds alternate within each trial. The
+first form of the fix forked a server process per connection so both could
+be open at once, and the load loop failed it once in 30 (2.3x): under 16
+busy loops one of a pair's two servers ran badly placed for whole trials.
+One server thread now serves both connections in the client's order, so the
+two kinds share every scheduling decision on both ends; 30 of 30 under load
+after that.
+
+**10b. `shmem.hang-walk` walks until it lands, not after a 3 s sleep.** The
+first attempt waited for every other node's `own_arrived`, which failed: a
+node's own-arrived flag resets once its arrival has gone up the tree. Polling
+the walk until it ends at the culprit, bounded inside the launcher's 12 s,
+keeps both assertions (it finds the culprit, in at most four visits) without
+the timing bet.
+
+**10c. The capacity script skips rather than capping the node count.** The
+reviewer proposed capping the node count at 16 for large machines. With the
+buffer at its 1 GiB maximum, that makes the test unable to exceed a large
+`/dev/shm`, so it would fail for the wrong reason. Past 33 nodes the 64 GiB
+budget refuses first, and the test now says so and skips.
+
 ## Step 4, first slice
 
 **11. Step 4's first slice was briefed without the author**
@@ -146,6 +172,93 @@ goodbye already costs, and it will shrink with on-demand connections. Also
 found by the model: an abort during the close needs no abortive goodbye,
 since after the final barrier only a fatal can start one and a fatal's
 status is a failure anyway.
+
+**13. Part B's choices.** The agent ends its PE's process, and any other
+thread that finds the abort waits for it, because a lead's main thread
+exiting first would take the only thread that can tell the network. The
+abort word becomes one 64-bit word - how the job ends, the exit status's low
+eight bits (all `exit` passes on) and the rank - installed by one CAS from
+zero (layout 15), so the first declarer wins and a fatal cannot overwrite a
+global exit's status. A first draft claimed the word, wrote the rank and the
+status beside it, then published; a declarer killed between claim and
+publish would have left every reader waiting forever, so it was replaced
+before it was committed. `exit` from the agent gets a 10 s grace before
+`_exit`, which is teardown, not a wait that gives up. `shmem_finalize` and
+the library's atexit handlers stand aside during an abort's exit, since
+`exit` runs them and one of them is a barrier.
+
+**14. Two paths that turned a global exit into a failure, found reading
+Part B before committing it and pinned by a model.** The development
+watchdog, sweeping, could read the word before a global exit was declared
+and then find a sibling that exit had already ended: it called that a death,
+and the PE left with a failure - on a lead, before its agent could tell the
+other nodes. It now reads the word again before calling any death a fatal.
+And a fatal whose own declaration loses to a global exit now ends as that
+exit does, since what went wrong may be the exit's own doing. The brief
+asked for the exit ordering to be modelled; `abort_exit_model.py` does, and
+shows either defence alone is enough for the watchdog's case, and neither is
+not. It also showed a wake a declarer can miss: its own agent can end its
+process before it has woken the rest. The lead's agent, woken first, now
+wakes every local agent again when it starts the abort (O(L) once per
+node).
+
+**15. Parts A, C and D were verified together, at the head of the series.**
+Each commit is built warning-free on its own, and each part's mutation fails
+its tests. But the four presets, the load loop and tier 3 ran once, on the
+tree with all three. The VM is the bottleneck, and one run each would have
+cost about three more hours of the eight. The run's only failures were tests
+whose premise Part C had changed (entry 18), so nothing needed bisecting. To
+undo: re-run `presets-tree.sh` at each commit.
+
+**16. Part C watches from every agent's loop, not the lead's ring.** The
+brief said the lead's pidfds go on its ring and non-leads check the lead with
+`kill(pid, 0)` at a library wait's sweep. A single-node job has no ring, and a
+computing PE never reaches a library wait's sweep. The agent's own loop,
+whose every wait ends by a sweep, serves both on every job. It uses pidfds
+for the lead too, since a pidfd cannot be fooled by a recycled pid. The cost
+is up to one sweep interval (100 ms) of latency where a ring completion would
+have none; the multi-node lead can take that refinement later. The model
+also showed the check makes an abort prompt, not only a crash visible (entry
+14). The development watchdog stays in the debug presets. Its one remaining
+value is its message, which names the routine the PE was waiting in, and the
+agents now usually find a death first and end their PEs before any sweep
+speaks, so that message appears only when the watchdog wins the race. Two
+ways on, for the author: retire the watchdog, or have the ending agent name
+the routine its PE is blocked in (its blocked record already says).
+
+**17. Keepalive is 60 s idle, 10 s between probes, 6 probes, and
+`TCP_USER_TIMEOUT` is not set.** A vanished node is found one to two minutes
+after its connections go quiet. A stopped node is never found dead, because
+its kernel answers the probes. `TCP_USER_TIMEOUT` would bound unacknowledged
+data, and Linux applies it to zero-window probing too, so it would declare a
+stopped peer with a full receive buffer dead: a fatal timeout. With data in
+flight, the kernel's `tcp_retries2` (about 15 minutes) is the bound. The values
+are a judgement for the author to confirm: shorter finds a vanished node
+sooner and turns a longer network partition into a failed job.
+`OSOE_KEEPALIVE` overrides them.
+
+**18. `OSOE_LIVENESS=0` exists for the tests of what else finds a death.**
+Part C's pidfds find a local death in every build, so they race the
+development watchdog to it. The agent then ends its PE itself, before a
+waiting PE's sweep can say which routine it was in. Six tests failed in the
+first combined run: the watchdog's four (whose message they check),
+`shmem.watchdog.off` (a job that was meant to hang), and `shmem.unswept-wait`,
+which exists to show that an internode quiet sweeps. Loosening their
+patterns to accept the pidfds' message would have stopped them testing the
+watchdog and the sweep at all. Instead they set `OSOE_LIVENESS=0` and test
+exactly what they tested. `shmem.watchdog.liveness` is the same job with the
+watchdog off and the pidfds on, and `shmem.dead-pe` covers the pidfds
+themselves. The switch is a second off-switch beside `OSOE_WATCHDOG`; drop
+both if the watchdog is retired.
+
+**19. Step 4's second slice is briefed, and its Slurm part waits for the
+author** (`docs/prompts/phase1-step4-slice2-prompt.md`). It covers the
+heap-base shift, the Slurm fixtures, and the multi-node lead's pidfds on its
+ring. The fixtures must be *captured* from `srun`, and the VM has no Slurm.
+Debian's `slurm-wlm` is available, but installing and running Slurm daemons
+in the author's VM is his call, as is a real cluster, or fixtures written
+from the documentation and marked as such. The brief says to stop there and
+ask.
 
 **What step 4 builds on** (surveyed 2026-09-23). The node's abort word
 (`node.h`: `aborting`, `abort_pe`, `abort_status`) is set by
