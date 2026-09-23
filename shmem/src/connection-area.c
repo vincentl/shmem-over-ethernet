@@ -312,13 +312,13 @@ again:;
     a->dirty = (_Atomic uint64_t *)((char *)p + dirty_offset);
     a->dirty_words = (uint32_t)dirty_words(nodes);
     a->lead_sleeping = &h->lead_sleeping;
-    a->conn = calloc(peers, sizeof *a->conn);
-    if (!a->conn)
+    a->connection = calloc(peers, sizeof *a->connection);
+    if (!a->connection)
         osoe_fatal("out of memory for %u connection handles", peers);
     for (uint32_t i = 0; i < peers; i++) {
-        a->conn[i].s = (struct osoe_connection_shared *)((char *)p + conns_offset) + i;
-        a->conn[i].data = (unsigned char *)p + data_offset + (uint64_t)i * 2 * buffer;
-        a->conn[i].capacity = (uint32_t)buffer;
+        a->connection[i].s = (struct osoe_connection_shared *)((char *)p + conns_offset) + i;
+        a->connection[i].data = (unsigned char *)p + data_offset + (uint64_t)i * 2 * buffer;
+        a->connection[i].capacity = (uint32_t)buffer;
     }
 
     if (a->creator) {
@@ -337,7 +337,7 @@ again:;
          * until the agent opens one. Zeroed memory would say the opposite
          * (§3.5). */
         for (uint32_t i = 0; i < peers; i++)
-            osoe_connection_init(&a->conn[i], a->credits);
+            osoe_connection_init(&a->connection[i], a->credits);
         atomic_store_explicit(&h->ready, 1, memory_order_release);
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
@@ -349,8 +349,8 @@ again:;
             if (osoe_shm_orphaned(fd)) {
                 munmap(p, a->bytes);
                 close(fd);
-                free(a->conn);
-                a->conn = NULL;
+                free(a->connection);
+                a->connection = NULL;
                 a->map = NULL;
                 goto again;
             }
@@ -383,7 +383,7 @@ again:;
 
 void osoe_connection_area_close(struct osoe_connection_area *a)
 {
-    free(a->conn);
+    free(a->connection);
     if (a->map)
         munmap(a->map, a->bytes);       /* its name went when the last PE opened it */
     *a = (struct osoe_connection_area){ 0 };
@@ -391,7 +391,7 @@ void osoe_connection_area_close(struct osoe_connection_area *a)
 
 struct osoe_connection *osoe_connection_to(struct osoe_connection_area *a, uint32_t peer)
 {
-    if (peer == a->node || peer >= a->nodes || !a->conn)
+    if (peer == a->node || peer >= a->nodes || !a->connection)
         return NULL;
-    return &a->conn[peer_slot(a->node, peer)];
+    return &a->connection[peer_slot(a->node, peer)];
 }

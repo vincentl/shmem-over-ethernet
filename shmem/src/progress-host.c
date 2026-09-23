@@ -163,8 +163,8 @@ static bool flag_raised;
  */
 uint64_t osoe_progress_host_acked(uint32_t peer)
 {
-    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
-    return conn ? osoe_connection_acked(conn) : 0;
+    struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
+    return connection ? osoe_connection_acked(connection) : 0;
 }
 
 /* ---- lifecycle --------------------------------------------------------- */

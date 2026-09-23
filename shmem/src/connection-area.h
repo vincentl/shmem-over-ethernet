@@ -121,7 +121,7 @@ struct osoe_connection_area {
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
     uint32_t credits;       /* §3.8's C, so the pool can be sized by it */
-    struct osoe_connection *conn; /* nodes - 1 handles, indexed by peer_slot() */
+    struct osoe_connection *connection; /* nodes - 1 handles, indexed by peer_slot() */
     bool creator;           /* this PE is the node lead, so it made the object */
     /*
      * The send side's work discovery (§3.10, §3.12; phase 1 step 2 slice 3).
