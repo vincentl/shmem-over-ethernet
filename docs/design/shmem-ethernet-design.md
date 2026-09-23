@@ -114,9 +114,12 @@ rot the way a third-party build can. **The constant factors were deliberately no
 written down before the echo harness first ran**, since pinning them before
 measuring would be inventing a target rather than choosing one. The harness has
 now run (§8.4, phase 1 step 3 slice 1) and its own io_uring-to-blocking ratio is
-pinned. The library's ratios to it are measured (§8.4: 2.05× for a get), and
-are pinned once quiet and a full buffer stop polling, since two of them still
-measure a step-2 stand-in.
+pinned. So are the library's ratios to it (§8.4, phase 1 step 3 slice 2;
+`shmem.floor`): a get's, a fetch-add's and a put and quiet's fastest round
+trip at most 3× the floor's, measured 1.4–2.2×; a put and quiet and a
+fetch-add at most 1.5× a get, measured 0.98–1.00×, the pin a wait that polls
+fails; and a stream at the default connection buffer at least 0.1× the
+floor's, measured 0.21–0.43×.
 Track all three per commit through the §3.14 counters.
 
 ---
@@ -5220,6 +5223,50 @@ Beside a `ctest -j4`, a get, a fetch-add and a put and quiet each take about
 30 µs. Spinning before the futex would take the idle round trip to 1.14×, and
 §3.11 says why it is not done.
 
+**Pinned** (phase 1 step 3 slice 2, part B; `shmem.floor`, checked in the
+release preset beside `env.echo-uring`). One job of two logical nodes, one PE
+each, times the floor itself: a trivial io_uring echo and stream on a raw TCP
+connection between its two processes, dialled at node 1's host-list address,
+so it crosses the link the library does. In each of seven pairs, 2,000 rounds
+each time one floor round trip, one get, one put and quiet and one fetch-add,
+in an order that rotates. Then a 1 GiB stream of 64 KiB pieces on each. Each
+pin is the median over the pairs of a ratio taken within a pair. Twelve runs
+unbroken (four idle, four beside a `ctest -j4`, four under 16 busy loops), and
+nine with step 2's poll put back into quiet's and a writer's waits:
+
+| Pin | Bound | Measured | With the poll |
+|---|---|---|---|
+| Fastest get, fetch-add, put and quiet ÷ the floor's fastest | ≤ 3 | 1.4–2.2 | put and quiet 2.1–2.7 idle, 3.0–5.7 loaded |
+| Put and quiet, and fetch-add, median ÷ a get's | ≤ 1.5 | 0.98–1.00 | put and quiet 1.8–2.1 idle, 2.7–14 loaded |
+| Stream ÷ the floor's, default buffer | ≥ 0.1 | 0.21–0.43 | 0.037–0.055 |
+
+Reported, not pinned: a get's median trip is 1.8–1.9× the floor's idle and
+beside the build, 1.3–1.9× under the busy loops (idle, 55 µs against 29 µs).
+The library's stream, 3.0 GiB/s idle against the floor's 14, is 0.21×. With
+a 1 MiB buffer it is 0.52–0.69×.
+
+*What the fastest trip can see, and what it cannot.* It is the length of a
+path, and between `echo-uring`'s two kinds — one path of the same length — it
+is what holds still. Between the library and the floor it compares four wakes
+with two. Timed one kind after another, 2,000 trips each, it moved between
+1.7× and 4.1× in the median of pairs over eighteen runs, and a single pair
+from 0.5× to 12×: one kind's trips met a sleeping CPU and the next kind's a
+waking one. Interleaving
+the kinds within each round is what made it hold still, at 1.4–2.2×, since a
+round's four trips share whatever the CPUs are doing. It still cannot see
+step 2's poll. That poll slept 20 µs, about as long as an idle round trip, so
+a put and quiet's fastest trip with it measured what one without it did. The
+pin that sees the poll compares two library operations that need the same
+wakes: a put and quiet against a get, 1.00× with the words and 1.8× or more
+with the poll, whatever the load.
+
+*Why the stream is pinned at the default buffer.* The stream exercises a
+writer's turnover wait, and at 128 KiB every other 64 KiB put makes that
+wait: 0.21–0.43× with the word, 0.037–0.055× with the poll. At 1 MiB a writer
+seldom waits, and the poll measured 0.35–0.64× against the word's 0.52–0.69×,
+inside the noise. A stream pin at a large buffer would not have caught the
+stand-in this slice removed.
+
 ### 8.5 Development environment
 
 Development happens on an Apple Silicon Mac, which has neither io_uring nor
@@ -5484,6 +5531,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 | Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
 | Authenticating the step-3 handshake | **An optional `OSOE_JOB_SECRET`, proved and never sent** (§6.2; phase 1 step 3 slice 1). The open item: the handshake carried only the job and step ids, which are sequential and public (`squeue`), and the port is a hash of them, so any host that could reach it could join as a node and then read and write every heap by design; the second review's portability F2 proposed a wrapper setting `OSOE_JOB_SECRET=$(head -c16 /dev/urandom \| xxd -p)` before `srun`, which Slurm propagates, and the handshake carrying it. Built so, except that the secret is *proved* rather than carried: a SipHash-2-4 digest over the hello and a fresh nonce from each end, so neither an eavesdropper nor a listener the caller reached by mistake learns it, and a proof replays nowhere. Unset, nothing changes; set on some nodes and not others, the job ends naming both. It authenticates the hello, not the traffic after it |
+| Pin the §1 floor ratios | **Pinned** (phase 1 step 3 slice 2; §8.4, `shmem.floor`). Only once quiet and a full buffer stopped polling, since until then two of the three ratios measured step 2's stand-in. Three pins, each the median of seven side-by-side pairs: a get's, a fetch-add's and a put and quiet's fastest trip within 3× the floor's; a put and quiet and a fetch-add within 1.5× a get; a stream at the default buffer at least 0.1× the floor's. Checked by putting the stand-in back, which the second and third fail and the first cannot see |
 | What orders fence and quiet, where a `seq_cst` store to a thread-local word was the answer? | **Derived from the C11 model:** a release fence for fence (W→W), a `seq_cst` fence for quiet and the barriers (W→R), and `seq_cst` on both loads of a two-sided protocol. Measured, the old store did not order quiet's W→R on aarch64, and an acquire load built as `ldapr` lost wakes (§3.16, §4.6; 2026-09-21). |
 
 ### Still open — blocking
@@ -5506,12 +5554,6 @@ Recorded rather than deleted, so they are not reopened from memory.
   development host) and fails on loopback (1.7×), as §8.3 predicted. Still owed:
   two real hosts, and a Pi, whose slower `memcpy` puts its copy-to-wire ratio in
   the tens, *recalled*. The small-message *rate* is not measured yet.
-- **Pin the §1 floor ratios.** The harness's own ratio (io_uring against blocking
-  sockets on the same link) is pinned (§8.4). The library-to-floor ratios are
-  measured (§8.4, phase 1 step 3 slice 1): a get 2.05×, a put and quiet 4.0×, a
-  stream 0.031×. The last two measure `poll_lead`'s 20 µs sleep, and a yield in
-  its place takes them to 1.1× and 0.34–0.6×. They are pinned once §7.1 step 3's
-  per-class wake words replace it.
 - **The internode tree's fan-out from measured costs** (§5.3). The default is the
   backend's constant today; measuring the hop latency *h* and per-message cost *o*
   at init and choosing *k* from their ratio is the next step, once a real fabric

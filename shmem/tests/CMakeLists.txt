@@ -327,6 +327,26 @@ set_tests_properties(shmem.job.secret.missing PROPERTIES
 set_tests_properties(shmem.job.secret.different PROPERTIES
   PASS_REGULAR_EXPRESSION "a proof of a different OSOE_JOB_SECRET")
 
+# The library against its floor (§1, §8.4): in each of seven pairs, 8-byte
+# io_uring round trips on a raw connection between the job's two processes
+# interleaved with the library's get, put and quiet and fetch-add, then a
+# stream on each. The pins (test-floor.c) are checked in the optimized,
+# uninstrumented build only; the other presets run the paths and the
+# invariants. Not under ThreadSanitizer, for shmem.internode's reason below:
+# the lead's agent applies PE 0's puts to a heap whose owner last touched it
+# before a barrier that runs through another process.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_executable(shmem_test_floor test-floor.c ${PROJECT_SOURCE_DIR}/base/hostlist.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_floor PRIVATE ${PROJECT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_floor PRIVATE osoe rt PkgConfig::LIBURING)
+  osoe_warnings(shmem_test_floor)
+  add_test(NAME shmem.floor
+    COMMAND osoe-launch -n 2 -m 0,1 -t 150 -- $<TARGET_FILE:shmem_test_floor>)
+  set_tests_properties(shmem.floor PROPERTIES LABELS "tier2" TIMEOUT 180)
+endif()
+
 # The lead's half of the secret (tier 1): a caller whose hello is right in every
 # field but who cannot prove the secret - replaying the answer's own proof - is
 # refused and not counted, and the lead goes on listening. Only a caller that
