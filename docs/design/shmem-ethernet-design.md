@@ -5090,8 +5090,10 @@ cross-process race that TSan would otherwise report can pass the `tsan` preset
 silently.
 - **A 32-bit wait path.** Phase-1 AMOs were all `uint64`, which never exercises it;
   step 1 includes one 32-bit AMO type (§7.1).
-- **The probe's receive check** asserts only more than one completion; tighten it to
-  the verified shape of one per provided buffer plus a terminal `-ENOBUFS`.
+- **The probe's receive check.** *Done* (test review, 2026-09-23). It asserted
+  only more than one completion; it now requires the verified shape, one
+  completion per provided buffer, each saying more follows, then one terminal
+  `-ENOBUFS`.
 
 ### 8.3 Without Pi hardware
 
@@ -5156,7 +5158,15 @@ word carries its own offset, through a 4 KiB send buffer and four 1 KiB provided
 buffers, which forces about 250 `-ENOBUFS` terminations and re-arms and a few
 dozen short sends per MiB. The ctest `env.echo-uring` pins two **io_uring-to-blocking
 ratios on the same link**, each the median over seven pairs of trials measured
-side by side (a pair shares whatever the machine was doing): the **fastest**
+side by side (a pair shares whatever the machine was doing), and within a pair
+the two kinds of round trip alternate exchange by exchange, on two connections
+open at once that one thread on each end serves in turn. Timed as two blocks, a
+virtual CPU asleep through one block and awake through the other failed the
+round-trip pin at 3–4.7× in about one run in ten; interleaving is what §8.4's
+library floor showed holds it still. Served by a process per connection, the
+two kinds did not share the server's scheduling, and under 16 busy loops one of
+a pair's servers ran badly placed through whole trials: 2.3× once in 30 runs
+(test review, 2026-09-23). The pins: the **fastest**
 round trip, at most 1.5× — measured 1.02–1.25× idle, under 16 busy loops and
 beside a `ctest -j4` run — and the stream, at least 0.5× — 0.85–1.06×. Trials
 are 1 GiB, since a 256 MiB stream lasts 13 ms, shorter than a scheduler slice

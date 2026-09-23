@@ -18,6 +18,10 @@ set -u
 LAUNCHER=$1 PROGRAM=$2 MODE=$3
 free=$(df --output=avail -B1 /dev/shm | tail -1 | tr -d ' ')
 echo "free in /dev/shm: $free bytes"
+if [ "${free:-0}" -le 0 ]; then
+    echo "no free space in /dev/shm to size a request from"
+    exit 1
+fi
 case $MODE in
 heaps)
     "$LAUNCHER" -n 2 -t 30 -e 0:SHMEM_SYMMETRIC_SIZE=$free \
@@ -30,6 +34,13 @@ warned)
 connections)
     gib=1073741824
     nodes=$((free / (2 * gib) + 2))
+    # 1 GiB is the largest buffer, and 2 GiB a peer against a 64 GiB budget is
+    # 33 nodes: a /dev/shm with more free than that is refused for the budget,
+    # not for the space, so there is nothing here to test.
+    if [ $nodes -gt 33 ]; then
+        echo "skipped: $free bytes free is more than a connection area can ask for"
+        exit 77
+    fi
     map=0; i=1
     while [ $i -lt $nodes ]; do map="$map,$i"; i=$((i + 1)); done
     OSOE_AM_BUFFER=$gib OSOE_AM_BUFFER_BUDGET=$((64 * gib)) SHMEM_SYMMETRIC_SIZE=1m \

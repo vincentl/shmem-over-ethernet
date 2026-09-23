@@ -284,16 +284,20 @@ static void probe_multishot(void)
         if (send(cs, msg, sizeof msg, 0) < 0) break;
     usleep(200000);
 
-    int ncqe = 0, more = 0, enobufs = 0;
+    int ncqe = 0, more = 0, data = 0, enobufs = 0, last = 0;
     struct io_uring_cqe *cqe;
     while (io_uring_peek_cqe(&ring, &cqe) == 0) {
         ncqe++;
         if (cqe->flags & IORING_CQE_F_MORE) more++;
-        if (cqe->res == -ENOBUFS) enobufs = 1;
+        if (cqe->res > 0) data++;
+        if (cqe->res == -ENOBUFS) enobufs++;
+        last = cqe->res;
         io_uring_cqe_seen(&ring, cqe);
     }
-    CHECK("multishot recv: >1 CQE from one SQE", ncqe > 1, "cqes=%d with_F_MORE=%d", ncqe, more);
-    CHECK("buffer ring exhaustion -> -ENOBUFS", enobufs, "(re-arm path exists)");
+    CHECK("multishot recv: one CQE per provided buffer", data == NBUF && more == NBUF,
+          "data=%d with_F_MORE=%d buffers=%d", data, more, NBUF);
+    CHECK("buffer ring exhaustion -> one terminal -ENOBUFS",
+          enobufs == 1 && last == -ENOBUFS && ncqe == NBUF + 1, "cqes=%d last=%d", ncqe, last);
 
     close(cs); close(ss); close(ls);
     io_uring_queue_exit(&ring);

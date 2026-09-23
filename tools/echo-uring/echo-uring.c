@@ -17,7 +17,10 @@
  * same kind of connection. Both measure the same link, so their ratio does not
  * depend on the hardware; those ratios - the fastest round trip, and the
  * stream - each the median over seven pairs of trials measured side by side,
- * are what the ctest pins (§8.4: ratios, not absolute times). A small run verifies the stream word by word through a
+ * are what the ctest pins (§8.4: ratios, not absolute times). Within a trial
+ * the two kinds of round trip alternate exchange by exchange, on two
+ * connections open at once that one thread on each end serves in turn. A small
+ * run verifies the stream word by word through a
  * 4 KiB send buffer and four 1 KiB provided buffers, which forces short sends,
  * -ENOBUFS and re-arms, and words split across buffers.
  *
@@ -302,25 +305,21 @@ static void sink_arrived(struct endpoint *e, const unsigned char *bytes, size_t 
     s->received += n;
 }
 
+/* One stream: count what arrives, verifying it on the small run, and send the
+ * count back. */
 static void serve(int fd, const struct hello *h)
 {
     bool small = h->mode == STREAM_SMALL;
     tune(fd, small);
-    if (h->mode == PING_BLOCKING || h->mode == STREAM_BLOCKING) {
+    if (h->mode == STREAM_BLOCKING) {
         static unsigned char buffer[64 << 10];
         uint64_t total = 0;
-        if (h->mode == PING_BLOCKING)
-            for (uint64_t i = 0; i < h->count; i++) {
-                read_all(fd, buffer, 8);
-                write_all(fd, buffer, 8);
-            }
-        else
-            while (total < h->count) {
-                ssize_t k = recv(fd, buffer, sizeof buffer, 0);
-                if (k <= 0)
-                    fail("recv", k == 0 ? ECONNRESET : errno);
-                total += (uint64_t)k;
-            }
+        while (total < h->count) {
+            ssize_t k = recv(fd, buffer, sizeof buffer, 0);
+            if (k <= 0)
+                fail("recv", k == 0 ? ECONNRESET : errno);
+            total += (uint64_t)k;
+        }
         write_all(fd, &total, sizeof total);
         close(fd);
         return;
@@ -328,44 +327,72 @@ static void serve(int fd, const struct hello *h)
 
     struct endpoint e;
     endpoint_open(&e, fd, small ? 4 : 64, small ? 1024 : 16 << 10);
-    struct echo_state echo = { .have = 0 };
     struct sink_state sink = { .expected = h->count, .verify = small };
-    if (h->mode == PING_URING) {
-        e.arrived = echo_arrived;
-        e.context = &echo;
-    } else {
-        e.arrived = sink_arrived;
-        e.context = &sink;
-    }
+    e.arrived = sink_arrived;
+    e.context = &sink;
     arm_receive(&e);
-    static unsigned char outgoing[64];
-    for (uint64_t echoed = 0; h->mode == PING_URING ? echoed < h->count * 8
-                                                    : sink.received < sink.expected; ) {
+    while (sink.received < sink.expected) {
         endpoint_pump(&e);
         if (e.closed)
             fail("client closed early", ECONNRESET);
-        if (h->mode == PING_URING && !e.sending && echo.have > 0) {
-            memcpy(outgoing, echo.pending, echo.have);
-            endpoint_send(&e, outgoing, echo.have);
-            echoed += echo.have;
-            echo.have = 0;
-        }
     }
     static uint64_t total;
     total = sink.received;
+    endpoint_send(&e, &total, sizeof total);
     while (e.sending)
         endpoint_pump(&e);
-    if (h->mode != PING_URING) {
-        endpoint_send(&e, &total, sizeof total);
-        while (e.sending)
-            endpoint_pump(&e);
-    }
     if (small && (e.short_sends + e.enobufs + e.rearms == 0))
         fprintf(stderr, "echo-uring: note: the small run forced no -ENOBUFS\n");
     if (small)
         printf("small enobufs=%llu rearms=%llu\n", (unsigned long long)e.enobufs,
                (unsigned long long)e.rearms);
     fflush(stdout);
+    endpoint_close(&e);
+}
+
+/*
+ * A trial's two round trips (ping_pair): the blocking connection with read and
+ * write, the io_uring one through its ring, an exchange at a time in the
+ * client's order, by this one thread. The client alternates on one thread too,
+ * so both kinds share every scheduling decision on both ends. Served by a
+ * process each, they did not: under 16 busy loops one of a pair's two servers
+ * could run badly placed through a whole trial, and one kind's fastest trip was
+ * 2.5x the other's in four pairs of seven (test review, 2026-09-23).
+ */
+static void serve_pair(int blocking, int uring, uint64_t total)
+{
+    tune(blocking, false);
+    tune(uring, false);
+    struct endpoint e;
+    endpoint_open(&e, uring, 64, 16 << 10);
+    struct echo_state echo = { .have = 0 };
+    e.arrived = echo_arrived;
+    e.context = &echo;
+    arm_receive(&e);
+    static unsigned char outgoing[8];
+    for (uint64_t i = 0; i < total; i++)
+        for (unsigned k = 0; k < 2; k++) {
+            if (((i + k) & 1) == 0) {               /* ping_pair's order: 0 is io_uring */
+                while (echo.have < 8) {
+                    endpoint_pump(&e);
+                    if (e.closed)
+                        fail("client closed early", ECONNRESET);
+                }
+                if (echo.have != 8)
+                    fail("an exchange of more than one word", EPROTO);
+                memcpy(outgoing, echo.pending, 8);
+                echo.have = 0;
+                endpoint_send(&e, outgoing, 8);
+                while (e.sending)
+                    endpoint_pump(&e);
+            } else {
+                unsigned char word[8];
+                read_all(blocking, word, 8);
+                write_all(blocking, word, 8);
+            }
+        }
+    write_all(blocking, &total, sizeof total);     /* the count ends the client's trial */
+    close(blocking);
     endpoint_close(&e);
 }
 
@@ -383,7 +410,19 @@ static void server_loop(int listener)
             close(fd);
             return;
         }
-        serve(fd, &h);
+        if (h.mode != PING_BLOCKING) {
+            serve(fd, &h);
+            continue;
+        }
+        /* A trial's blocking round trips; its io_uring connection is the next. */
+        int uring = accept(listener, NULL, NULL);
+        if (uring < 0)
+            fail("accept", errno);
+        struct hello second;
+        read_all(uring, &second, sizeof second);
+        if (second.magic != HELLO_MAGIC || second.mode != PING_URING || second.count != h.count)
+            fail("hello", EPROTO);
+        serve_pair(fd, uring, h.count);
     }
 }
 
@@ -430,51 +469,67 @@ static int dial(enum mode mode, uint64_t count)
     return fd;
 }
 
-/* Median round trip in ns over `rounds`, after a warm-up of a tenth; the
- * fastest one in *fastest. */
-static double ping(enum mode mode, uint64_t rounds, double *fastest)
+/* One kind's samples, sorted and printed; its median in ns, its fastest in
+ * *fastest. */
+static double summarize(const char *kind, uint64_t *sample, uint64_t rounds, double *fastest)
+{
+    qsort(sample, rounds, sizeof *sample, compare);
+    printf("%s round_trip_ns min=%llu median=%llu p99=%llu rounds=%llu\n", kind,
+           (unsigned long long)sample[0], (unsigned long long)sample[rounds / 2],
+           (unsigned long long)sample[rounds * 99 / 100], (unsigned long long)rounds);
+    *fastest = (double)sample[0];
+    return (double)sample[rounds / 2];
+}
+
+/*
+ * One trial of both round trips over `rounds`, after a warm-up of a tenth, on
+ * an io_uring connection and a blocking one open at once, which the server
+ * serves as a pair (serve_pair). Each round times one exchange of each kind,
+ * in an order that alternates, so that the two share whatever the machine is
+ * doing: timed as two blocks, a virtual CPU asleep through one block and awake
+ * through the other made one kind's fastest trip 3-5x the other's in a pair
+ * (§8.4). Medians in ns into *uring and *blocking, fastest into *uring_fastest
+ * and *blocking_fastest.
+ */
+static void ping_pair(uint64_t rounds, double *uring, double *uring_fastest,
+                      double *blocking, double *blocking_fastest)
 {
     uint64_t warm = rounds / 10, total = warm + rounds;
-    uint64_t *sample = malloc(rounds * sizeof *sample);
-    int fd = dial(mode, total);
+    uint64_t *sample[2] = { malloc(rounds * sizeof(uint64_t)), malloc(rounds * sizeof(uint64_t)) };
+    if (!sample[0] || !sample[1])
+        fail("samples", ENOMEM);
+    int fd = dial(PING_BLOCKING, total);
+    struct endpoint e;
+    struct client_state s;
+    endpoint_open(&e, dial(PING_URING, total), 8, 4096);
+    e.arrived = ping_arrived;
+    e.context = &s;
+    arm_receive(&e);
     uint64_t word = 0x0123456789abcdef;
-    if (mode == PING_BLOCKING) {
-        for (uint64_t i = 0; i < total; i++) {
+    for (uint64_t i = 0; i < total; i++) {
+        for (unsigned k = 0; k < 2; k++) {
+            unsigned kind = (unsigned)((i + k) & 1);    /* 0 io_uring, 1 blocking */
             uint64_t t0 = now_ns();
-            write_all(fd, &word, 8);
-            read_all(fd, &word, 8);
+            if (kind == 0) {
+                s.awaited = 8;
+                endpoint_send(&e, &word, 8);
+                while (s.awaited > 0 || e.sending)
+                    endpoint_pump(&e);
+            } else {
+                write_all(fd, &word, 8);
+                read_all(fd, &word, 8);
+            }
             if (i >= warm)
-                sample[i - warm] = now_ns() - t0;
+                sample[kind][i - warm] = now_ns() - t0;
         }
-        read_all(fd, &word, 8);                /* the server's count */
-        close(fd);
-    } else {
-        struct endpoint e;
-        struct client_state s;
-        endpoint_open(&e, fd, 8, 4096);
-        e.arrived = ping_arrived;
-        e.context = &s;
-        arm_receive(&e);
-        for (uint64_t i = 0; i < total; i++) {
-            uint64_t t0 = now_ns();
-            s.awaited = 8;
-            endpoint_send(&e, &word, 8);
-            while (s.awaited > 0 || e.sending)
-                endpoint_pump(&e);
-            if (i >= warm)
-                sample[i - warm] = now_ns() - t0;
-        }
-        endpoint_close(&e);
     }
-    qsort(sample, rounds, sizeof *sample, compare);
-    printf("%s round_trip_ns min=%llu median=%llu p99=%llu rounds=%llu\n",
-           mode == PING_URING ? "uring" : "blocking", (unsigned long long)sample[0],
-           (unsigned long long)sample[rounds / 2], (unsigned long long)sample[rounds * 99 / 100],
-           (unsigned long long)rounds);
-    double median = (double)sample[rounds / 2];
-    *fastest = (double)sample[0];
-    free(sample);
-    return median;
+    read_all(fd, &word, 8);                    /* the server's count */
+    close(fd);
+    endpoint_close(&e);
+    *uring = summarize("uring", sample[0], rounds, uring_fastest);
+    *blocking = summarize("blocking", sample[1], rounds, blocking_fastest);
+    free(sample[0]);
+    free(sample[1]);
 }
 
 /* Bytes per second from the first send to the server's count coming back. */
@@ -639,7 +694,10 @@ int main(int argc, char **argv)
      * Then TRIALS pairs of trials, each io_uring measurement beside its blocking
      * one, and the pinned ratios are medians over the pairs of the ratio within
      * each: a pair is measured together and shares whatever the machine was
-     * doing.
+     * doing. The round trips go further and alternate within the pair
+     * (ping_pair), since a pair timed as two blocks could still put a sleeping
+     * CPU under one and not the other: the pin failed at 3-4.7x in about one
+     * run in ten that way (test review, 2026-09-23).
      *
      * **The round trip pinned is the fastest one, not the median.** The fastest
      * is the length of the path - both processes on a CPU - and is the same
@@ -655,8 +713,8 @@ int main(int argc, char **argv)
     double uring = 1e300, blocking = 1e300, uring_rate = 0, blocking_rate = 0;
     double median_ratio[TRIALS], fastest_ratio[TRIALS], bandwidth_ratio[TRIALS];
     for (int trial = 0; trial < TRIALS; trial++) {
-        double uf, bf;
-        double u = ping(PING_URING, rounds, &uf), b = ping(PING_BLOCKING, rounds, &bf);
+        double u, uf, b, bf;
+        ping_pair(rounds, &u, &uf, &b, &bf);
         double ur = stream(STREAM_URING, mebibytes << 20);
         double br = stream(STREAM_BLOCKING, mebibytes << 20);
         median_ratio[trial] = u / b;

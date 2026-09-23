@@ -9,7 +9,11 @@ osoe_warnings(echo-uring)
 # exchanges over blocking send and recv on the same link.
 #
 # The pins (phase 1 step 3 slice 1, 4-core aarch64 VM) are two ratios, each the
-# median over seven pairs of trials measured side by side: the *fastest* round
+# median over seven pairs of trials measured side by side - the round trips
+# alternating exchange by exchange within a pair, one thread on each end serving
+# both, since the test review of 2026-09-23, when trips timed as two blocks
+# failed the first pin at 3-4.7x about one run in ten, a CPU asleep for one
+# block and not the other: the *fastest* round
 # trip, io_uring over blocking, at most 1.5x - measured 1.02-1.25x idle, under
 # 16 busy loops and beside a ctest -j4 run - and the stream at least 0.5x -
 # measured 0.85-1.06x. The fastest round trip is the length of the path; the

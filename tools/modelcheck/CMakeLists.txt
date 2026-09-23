@@ -4,19 +4,33 @@
 # noticed in a design review. Every model is registered, and selftest.py, which
 # holds the engine's own checks to cases they must catch (second review, F6).
 #
-# The large ones - get_completion (about 15 minutes, a case of 19 million
-# states), dirty_set and tree_barrier (five logical nodes, every node's thread
-# real), close (a million states with the trapped-state check) - run in the
-# release preset only. A model is Python and
-# gives the same verdict whichever preset built the library, so running it four
-# times buys nothing; one preset keeps it from being skipped.
+# A model is Python and gives the same verdict whichever preset built the
+# library, so running it in four presets buys nothing: every model runs in the
+# release preset only, which keeps it from being skipped. The large ones -
+# tree_barrier (five logical nodes, every node's thread real) and close (a
+# million states with the trapped-state check) - are why that preset is slow.
+#
+# The three that check §4.11's SHMEM_THREAD_MULTIPLE designs - dirty_set,
+# watch_list, and get_completion's generation-word cases (about 15 minutes, a
+# case of 19 million states) - run only with OSOE_MULTIPLE_MODELS=ON: phase 1
+# ships up to SERIALIZED, and together they were three quarters of every
+# release run (test review, 2026-09-23). Turn it on when §4.11 is scheduled or
+# engine.py changes; model.selftest holds the engine to its own cases, not to
+# these state spaces. get_completion's one case of what phase 1 ships, §4.6's
+# equality wait, runs regardless.
 find_package(Python3 COMPONENTS Interpreter)
+option(OSOE_MULTIPLE_MODELS "run the models of the SHMEM_THREAD_MULTIPLE designs (§4.11)" OFF)
 
-if(Python3_Interpreter_FOUND)
-  set(osoe_models wire credit arrival ack reservation blocked_record range_watch watch_list
-                  chained_wake lead_wake rendezvous wait_word credit_wait)
-  if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    list(APPEND osoe_models dirty_set get_completion tree_barrier close)
+if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  set(osoe_models wire credit arrival ack reservation blocked_record range_watch
+                  chained_wake lead_wake rendezvous wait_word credit_wait tree_barrier close)
+  if(OSOE_MULTIPLE_MODELS)
+    list(APPEND osoe_models dirty_set get_completion watch_list)
+  else()
+    add_test(NAME model.get_completion.equality
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/get_completion_model.py
+              equality)
+    set_tests_properties(model.get_completion.equality PROPERTIES LABELS "tier1" TIMEOUT 600)
   endif()
   foreach(name IN LISTS osoe_models)
     add_test(NAME model.${name}
@@ -26,6 +40,6 @@ if(Python3_Interpreter_FOUND)
   add_test(NAME model.selftest
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/selftest.py)
   set_tests_properties(model.selftest PROPERTIES LABELS "tier1" TIMEOUT 600)
-else()
+elseif(NOT Python3_Interpreter_FOUND)
   message(STATUS "python3 not found: the concurrency models will not run as tests")
 endif()

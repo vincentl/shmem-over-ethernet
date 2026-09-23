@@ -42,6 +42,7 @@ int main(void)
 
     /* The defaults are the floor: everything but aggregation pushes down. */
     CHECK(OSOE_AM_DEFAULT_CHUNK == KB(64));
+    CHECK(OSOE_AM_DEFAULT_BUDGET == budget);
 
     /*
      * The supported range, §1's "hundreds of nodes". Nothing is shrunk, so

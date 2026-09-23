@@ -12,6 +12,13 @@ were run. Develop new models here.
 | `get_completion_model.py`, `dirty_set_model.py`, `watch_list_model.py` | Worked models: each checks a design and deliberately broken variants |
 | `selftest.py` | Checks that the reductions change no verdict; rerun it after changing the engine |
 
+**Where they run.** Every model is a ctest in the release preset only: a model
+is Python and gives the same verdict whichever preset built the library. The
+three of §4.11's `SHMEM_THREAD_MULTIPLE` designs (`get_completion` but for its
+phase-1 case, `dirty_set`, `watch_list`) run only with `OSOE_MULTIPLE_MODELS=ON`,
+since phase 1 ships up to `SERIALIZED` and they were three quarters of every
+release run; turn it on when §4.11 is scheduled or `engine.py` changes.
+
 ## Writing a model
 
 1. **Threads are programs.** A program is a list of `(label, instruction)` pairs
