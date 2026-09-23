@@ -52,7 +52,9 @@ unflushed, and four smaller things; those are fixed and merged too
 Found on the way and left as suggested tasks: `progress.c` names every
 `struct osoe_connection *` parameter `conn`, which CLAUDE.md's naming rule
 forbids (the new code followed the file rather than start a second style);
-and `shmem.fork.L4` flakes under load in tsan, since before step 4 (21).
+and `shmem.fork.L4` flaked under load in tsan, since before step 4 (21) - on
+main, the review's first fix turned out to have closed it; branch
+`fork-l4-flake` makes that order deliberate.
 
 ## Phase 1 step 3 slice 2
 
@@ -328,6 +330,14 @@ name is gone when `shmem_init` returns, and under load a non-lead can return
 before its lead has removed it. It fails the same way without the shift and
 on the tree before step 4, so it was left as a suggested task rather than
 fixed inside the heap shift.
+
+*Resolved since, on branch `fork-l4-flake`, not merged.* The review's first fix
+(22) had already closed it on main: init's wait for the lead's agent holds every
+non-lead until a store the lead makes after removing the names. Beside 16 busy
+loops in tsan, 30 runs each: 8 failures on the tree before that fix, 0 on main,
+and 6 on main with only that wait removed. The order was an accident of where
+the wait went, so the branch says it at both sites and in §6.2 and §3.16, and
+the test checks the heaps' names too.
 
 **22. The merged slice was reviewed adversarially, and four of the findings
 were bugs, fixed and merged (`9d9251e`).** Two reviewers read

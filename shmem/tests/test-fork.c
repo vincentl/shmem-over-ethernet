@@ -24,15 +24,22 @@ int main(void)
     CHECK(waitpid(child, &status, 0) == child);
     CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 0);
 
-    /* The node's control segment has no name - it was removed during init
-     * (§3.14) - and is still this job's: the child's finalizes did nothing to
-     * it, which CHECK_INVARIANTS below shows by reading it through this PE's
-     * own descriptor. */
-    char path[128];
-    snprintf(path, sizeof path, "/dev/shm/osoe.%s.%s.0.0", getenv("OSOE_JOB_ID"),
-             getenv("OSOE_STEP_ID"));
+    /* Neither the node's control segment nor any of its heaps has a name, as
+     * soon as this PE's own init has returned - no barrier needed: the lead
+     * removes them before it publishes that its agent runs, and every other
+     * PE waits for that before it returns (§6.2, §3.15). The segment is still
+     * this job's: the child's finalizes did nothing to it, which
+     * CHECK_INVARIANTS below shows by reading it through this PE's own
+     * descriptor. */
+    char name[OSOE_SEGMENT_NAME_MAX], path[OSOE_SEGMENT_NAME_MAX + 32];
+    osoe_test_segment_name(name, sizeof name, 0);
     struct stat st;
+    snprintf(path, sizeof path, "/dev/shm%s", name);
     CHECK(stat(path, &st) != 0);
+    for (int i = 0; i < shmem_team_n_pes(SHMEM_TEAM_SHARED); i++) {
+        snprintf(path, sizeof path, "/dev/shm%s.heap.%d", name, i);
+        CHECK(stat(path, &st) != 0);
+    }
     int flag = 0;
     shmem_query_initialized(&flag);
     CHECK(flag != 0);

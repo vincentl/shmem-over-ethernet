@@ -267,6 +267,15 @@ static void session_start(void)
      * that, sweeping, so that a lead that dies meanwhile is found and ends the
      * wait (liveness.h). A futex word that is its own predicate (§3.16). O(1)
      * per PE, once a session.
+     *
+     * The same word carries the node's names (§6.2). The lead removed its
+     * heaps' and control segment's names in osoe_node_join, before this store,
+     * so a PE whose acquire load reads the store returns from init with them
+     * gone - what shmem.fork.* checks. The removal is a system call, which
+     * C11 does not see; what orders it is that shm_unlink had returned before
+     * the release store was made, the load that reads the store comes after
+     * it, and a name an unlink has removed is gone for every lookup begun
+     * after the call returned.
      */
     _Atomic uint32_t *speaks = &osoe.node.hdr->lead_agent_running;
     if (osoe.bootstrap.local_id == 0) {
