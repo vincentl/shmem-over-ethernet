@@ -32,9 +32,8 @@ Decisions to confirm or reverse, most consequential first:
 7. Slurm: where to capture fixtures, and building the Slurm path they need,
    which does not exist yet (19, 20).
 8. Merging the second slice's Part A alone, or waiting for the rest. Its
-   branch is on main as of `e7ecfb9`, and verified there; it merges cleanly
-   onto today's main (`567d02f`), which touches `init.c` and the tests'
-   `CMakeLists.txt` as it does, but was not verified on it.
+   branch (`83a3fbd`) is on today's main, after the third review's fixes,
+   and verified there.
 9. What the review left as designed rather than fixed (22): `exit` from the
    agent runs handlers beside a live main thread, and a fatal ends at once
    rather than through the agent.
@@ -318,8 +317,8 @@ below §4.10, and `liveness.c` is above it, so arming a pidfd there needs a
 new seam function, and an RDMA backend would need its own. That is a seam
 decision, and what it buys is the ≤ 100 ms a sweep-interval poll can take.
 Part A, the heap-base shift, needed neither and is done on branch
-`phase1-step4-slice2` (`d755f8d`, on main after the review's fixes and
-verified there), not merged. It found two one-base
+`phase1-step4-slice2` (`83a3fbd`, on main after the third review's fixes
+and verified there), not merged. It found two one-base
 assumptions, a test comparing addresses and `shmem_align` deciding from the
 PE's own base; the whole of tier 2 passes shifted.
 
