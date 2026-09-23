@@ -1024,10 +1024,10 @@ without ever being free, which is the handoff. The free count is non-zero only
 while no ticket is outstanding. A queued PE sleeps on the credit's futex word
 with its ticket's bit (a futex bitset, one class in 32), so a give wakes only the
 served ticket's class: exactly the waiter it serves while 32 or fewer wait, and
-one in 32 of them beyond that, not a herd - with no memory per PE and no syscall
-when nobody waits. The model's breakages: the handoff without
-the queue barges, a plain wake of one or a bump before the serve loses a wake,
-and a give that also frees the credit over-subscribes it. Step 2 polled here too.
+one in 32 of them beyond that, not a herd — with no memory per PE and no
+syscall when nobody waits. The model's breakages: the handoff without the queue
+barges, a plain wake of one or a bump before the serve loses a wake, and a give
+that also frees the credit over-subscribes it. Step 2 polled here too.
 
 **No spinning before blocking, in phase 1.** A useful spin loop needs a CPU relax
 hint, which is an intrinsic or assembly, and §3.16 allows neither. A spin without
@@ -4591,11 +4591,17 @@ machinery. The review's order is adopted.
    transport's smallest reproducer. Then io_uring with the repaired reservation
    protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
    reply credits and DRAINING caps, and the global rendezvous with its timeout.
-   *(Slice 1 built the harness, the ring, the idle loop and the rendezvous, and
-   measured what is left: quiet's wait and a writer's wait for a full buffer
-   still poll the step-2 way, waking the lead and sleeping 20 µs, and that is
-   what holds a put and quiet at 4× the floor and a stream at 3% of it, §8.4.
-   The per-class wake words are the fix.)*
+   *(Done, in two slices. Slice 1 built the harness, the ring, the idle loop
+   and the rendezvous, and measured what was left: quiet's wait and a writer's
+   wait for a full buffer still polled the step-2 way, waking the lead and
+   sleeping 20 µs. Slice 2 built the per-class wake words (§3.11): quiet and a
+   writer with no room sleep on words the agent bumps only when someone waits,
+   and a PE waiting for a reply credit takes a ticket in the credit's own word.
+   Then it pinned the library to its floor (§8.4), and ran the multi-node
+   tests over a link that delays, drops and fragments (tier 3, §8.2). The
+   rendezvous's timeout is the no-progress rule, never by default (§3.15).
+   Carried forward, deliberately: the mesh is eager, and §6.2 says what
+   on-demand connections would need.)*
 
    The first backend that *acts* on `osoe_transport_set_range` is here — it is the
    first that must prepare memory before the network can touch it — but the hook
