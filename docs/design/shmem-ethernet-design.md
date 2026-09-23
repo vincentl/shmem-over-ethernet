@@ -5052,7 +5052,11 @@ among 16 busy loops.
 
 **The median round trip is reported and not pinned, and why is a result.** The
 fastest round trip is the length of the path, both processes on a CPU, and the
-two kinds agree on it everywhere. The median is where the woken process gets to
+two kinds agree on it everywhere in the median of seven side-by-side pairs, which
+is what the pin takes. A single pair can differ 4–5×: measured idle in phase 1
+step 3 slice 1, part C, one kind's fastest trip in a pair was 15 µs where the
+other's was 3, a virtual CPU asleep for one set of trials and not the other.
+The median is where the woken process gets to
 run, and there they differ under one kind of load: beside a `ctest -j4` run - many
 processes sleeping and waking, CPUs partly busy - blocking `recv` measured a
 3.6 µs median and the io_uring wait 15–28 µs, 3–5×, with `IORING_SETUP_COOP_TASKRUN`
