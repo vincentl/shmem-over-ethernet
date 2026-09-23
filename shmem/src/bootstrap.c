@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "collective-tree.h"
 #include "internode.h"
@@ -323,6 +324,19 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
             osoe_fatal("OSOE_HEAP_BASE='%s' is not a nonzero address", base);
         b->heap_base = v;
     }
+
+    /*
+     * §8.2's heap-base shift, a test mode: each PE maps its own heap at
+     * B + rank x OSOE_HEAP_SHIFT instead of at B, so that no two PEs of the job
+     * hold a symmetric object at the same address, and code that uses an
+     * address where it should use an offset fails (invariant 7). A size, as
+     * SHMEM_SYMMETRIC_SIZE takes one, and a whole number of pages.
+     */
+    const char *shift = getenv("OSOE_HEAP_SHIFT");
+    long page = sysconf(_SC_PAGESIZE);
+    if (shift && (osoe_parse_size(shift, &b->heap_shift) != 0 || page <= 0 ||
+                  b->heap_shift % (uint64_t)page != 0))
+        osoe_fatal("OSOE_HEAP_SHIFT='%s' is not a whole number of %ld-byte pages", shift, page);
 }
 
 void osoe_bootstrap_free(struct osoe_bootstrap *b)

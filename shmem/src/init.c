@@ -92,6 +92,9 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "                           seconds a wait may see no progress before it ends\n"
 "                           the job; 0, the default, means never (§3.15)\n"
 "    OSOE_HEAP_BASE         the address every PE maps its heap at (§4.1)\n"
+"    OSOE_HEAP_SHIFT        a test mode: each PE maps its own heap this many\n"
+"                           bytes times its rank past that address, so no two\n"
+"                           PEs share a symmetric address (§8.2)\n"
 "    OSOE_KEEP_CONTROL_SEGMENT\n"
 "                           1: keep the control segment's name until finalize,\n"
 "                           so a crash leaves it for post-mortem reading and\n"
@@ -299,7 +302,7 @@ static void session_start(void)
                 osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
                 osoe.bootstrap.local_count, osoe.node.control_name,
                 (unsigned long long)osoe.node.heap_size,
-                (unsigned long long)osoe.node.hdr->heap_base,
+                (unsigned long long)(uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id],
                 osoe.bootstrap.watchdog ? "on" : "off",
                 osoe.job.node, osoe.job.node_count,
                 osoe.job.force_remote ? ", force-remote" : "");

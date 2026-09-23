@@ -152,15 +152,18 @@ OSOE_API void *pshmem_align(size_t alignment, size_t size)
                    "of sizeof(void *) (%zu)", alignment, sizeof(void *));
     /*
      * The allocator aligns heap *offsets*, and the caller was promised an
-     * aligned *address*. The two agree only while the heap's base B is itself a
-     * multiple of the alignment, which every candidate base is for anything up
-     * to a terabyte (§4.1). Beyond that, say the allocation failed rather than
-     * return an address that is not what was asked for; a failure is a return
-     * value the spec defines, and every PE reaches it identically because B is
-     * the same number on all of them.
+     * aligned *address*. The two agree only while this PE's heap base is itself
+     * a multiple of the alignment: the node's B, which every candidate base is
+     * for anything up to 64 GiB (§4.1), plus - under §8.2's heap-base shift -
+     * this PE's rank times OSOE_HEAP_SHIFT. Beyond that, say the allocation
+     * failed rather than return an address that is not what was asked for; a
+     * failure is a return value the spec defines. It is decided from B and the
+     * shift, which every PE shares, and not from this PE's own base, which the
+     * shift makes different on every PE: read from that, a 4 MiB alignment
+     * under a 2 MiB shift failed on the odd ranks and succeeded on the even.
      */
-    uintptr_t base = (uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id];
-    if (base % alignment != 0)
+    uint64_t base = osoe.node.hdr->heap_base, shift = osoe.bootstrap.heap_shift;
+    if (base % alignment != 0 || shift % alignment != 0)
         return allocate("shmem_align", UINT64_MAX, OSOE_ALLOCATOR_ALIGN, 0, false);
     return allocate("shmem_align", size, alignment, 0, false);
 }
