@@ -15,8 +15,9 @@
  *
  * The same two exchanges are timed over plain blocking send and recv on the
  * same kind of connection. Both measure the same link, so their ratio does not
- * depend on the hardware; that ratio, best of seven interleaved trials of
- * each, is what the ctest pins (§8.4: ratios, not absolute times). A small run verifies the stream word by word through a
+ * depend on the hardware; that ratio, the median over seven pairs of trials
+ * each measured beside the other, is what the ctest pins (§8.4: ratios, not
+ * absolute times). A small run verifies the stream word by word through a
  * 4 KiB send buffer and four 1 KiB provided buffers, which forces short sends,
  * -ENOBUFS and re-arms, and words split across buffers.
  *
@@ -117,7 +118,7 @@ static void endpoint_open(struct endpoint *e, int fd, unsigned buffer_count,
     e->buffer_ring = io_uring_setup_buf_ring(&e->ring, buffer_count, GROUP, 0, &r);
     if (!e->buffer_ring)
         fail("io_uring_setup_buf_ring", -r);
-    e->buffers = aligned_alloc(4096, (size_t)buffer_count * buffer_bytes);
+    e->buffers = malloc((size_t)buffer_count * buffer_bytes);
     if (!e->buffers)
         fail("provided buffers", ENOMEM);
     for (unsigned i = 0; i < buffer_count; i++)
@@ -403,6 +404,18 @@ static int compare(const void *a, const void *b)
     return x < y ? -1 : x > y;
 }
 
+static int compare_doubles(const void *a, const void *b)
+{
+    double x = *(const double *)a, y = *(const double *)b;
+    return x < y ? -1 : x > y;
+}
+
+static double median_of(double *values, int n)
+{
+    qsort(values, (size_t)n, sizeof *values, compare_doubles);
+    return values[n / 2];
+}
+
 static struct sockaddr_storage peer;
 static socklen_t peer_length;
 
@@ -621,21 +634,27 @@ int main(int argc, char **argv)
 
     /*
      * Correctness first: a failure here is an io_uring bug, not a slow link.
-     * Then TRIALS trials of each measurement, interleaved, keeping the best of
-     * each: the ratio compares two things measured at different moments. On an
-     * oversubscribed machine (the load loop: 16 busy loops on 4 CPUs) a round
-     * trip is bimodal for io_uring and blocking alike, about 5 or about 15 us by
-     * where the two processes land, and with three trials all of one kind's
-     * landed slow and one of the other's fast twice in about ninety runs - 3.4x.
-     * With seven, that is about one run in five thousand.
+     * Then TRIALS pairs of trials, each io_uring measurement beside its blocking
+     * one, and the pinned ratio is the median over the pairs of the ratio within
+     * each. On an oversubscribed machine (the load loop: 16 busy loops on 4 CPUs;
+     * or ctest -j4 beside other tests) a round trip falls into one of three
+     * modes, about 4, 15 or 25 us by where the two processes land and whether a
+     * CPU must wake, for io_uring and blocking alike. Comparing the best of
+     * each kind failed when one blocking trial caught the fastest mode and no
+     * io_uring trial did (4.3x); a pair measured together shares its mode, and
+     * the median of seven pairs ignores the odd pair that does not. The best of
+     * each kind is still what the report prints.
      */
     enum { TRIALS = 7 };
     stream(STREAM_SMALL, (uint64_t)1 << 20);
     double uring = 1e300, blocking = 1e300, uring_rate = 0, blocking_rate = 0;
+    double latency_ratio[TRIALS], bandwidth_ratio[TRIALS];
     for (int trial = 0; trial < TRIALS; trial++) {
         double u = ping(PING_URING, rounds), b = ping(PING_BLOCKING, rounds);
         double ur = stream(STREAM_URING, mebibytes << 20);
         double br = stream(STREAM_BLOCKING, mebibytes << 20);
+        latency_ratio[trial] = u / b;
+        bandwidth_ratio[trial] = ur / br;
         uring = u < uring ? u : uring;
         blocking = b < blocking ? b : blocking;
         uring_rate = ur > uring_rate ? ur : uring_rate;
@@ -650,8 +669,10 @@ int main(int argc, char **argv)
     printf("memory copy_mib_per_s=%.1f copy8_seq_cst_fence_ns=%.2f\n", copy / (1 << 20), fence);
     printf("ratio one_way_latency_over_copy8=%.0f copy_bandwidth_over_stream=%.2f\n",
            uring / 2 / fence, copy / uring_rate);
-    printf("ratio uring_over_blocking round_trip=%.3f stream=%.3f\n", uring / blocking,
-           uring_rate / blocking_rate);
+    double latency = median_of(latency_ratio, TRIALS);
+    double bandwidth = median_of(bandwidth_ratio, TRIALS);
+    printf("ratio uring_over_blocking round_trip=%.3f stream=%.3f (median of %d pairs)\n",
+           latency, bandwidth, TRIALS);
 
     /*
      * The pins measure the io_uring path, so they hold only where the harness's
@@ -669,14 +690,14 @@ int main(int argc, char **argv)
         printf("pins not checked: an instrumented or unoptimized build measures itself\n");
         return 0;
     }
-    if (max_latency_ratio > 0 && uring / blocking > max_latency_ratio) {
-        printf("FAIL: io_uring round trip %.3fx blocking, pinned at most %.3fx\n",
-               uring / blocking, max_latency_ratio);
+    if (max_latency_ratio > 0 && latency > max_latency_ratio) {
+        printf("FAIL: io_uring round trip %.3fx blocking, pinned at most %.3fx\n", latency,
+               max_latency_ratio);
         return 1;
     }
-    if (min_bandwidth_ratio > 0 && uring_rate / blocking_rate < min_bandwidth_ratio) {
-        printf("FAIL: io_uring stream %.3fx blocking, pinned at least %.3fx\n",
-               uring_rate / blocking_rate, min_bandwidth_ratio);
+    if (min_bandwidth_ratio > 0 && bandwidth < min_bandwidth_ratio) {
+        printf("FAIL: io_uring stream %.3fx blocking, pinned at least %.3fx\n", bandwidth,
+               min_bandwidth_ratio);
         return 1;
     }
     return 0;

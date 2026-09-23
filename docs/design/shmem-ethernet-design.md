@@ -4726,12 +4726,16 @@ word carries its own offset, through a 4 KiB send buffer and four 1 KiB provided
 buffers, which forces about 250 `-ENOBUFS` terminations and re-arms and a few
 dozen short sends per MiB. The ctest `env.echo-uring` pins the **io_uring-to-blocking
 ratio on the same link**: a round trip at most 1.5× and a stream at least 0.5×,
-best of seven interleaved trials of each, against 1.01–1.05× and 0.89–1.06×
-measured idle. Seven, because under the load loop's 4× oversubscription a round
-trip is bimodal for io_uring and blocking alike — about 5 or about 15 µs by where
-the two processes land — and with three trials all three of one kind landed slow
-twice in about ninety runs (3.4×); and 1 GiB, because a 256 MiB stream trial
-lasts 13 ms, shorter than a scheduler slice among 16 busy loops. The pins are
+against 1.01–1.05× and 0.89–1.06× measured idle and up to 1.16× under load.
+What is pinned is the **median over seven pairs** of trials of each pair's ratio,
+a pair being measured together. On a loaded machine a round trip falls into one
+of three modes — about 4, 15 or 25 µs, by where the two processes land and
+whether a CPU must wake — for io_uring and blocking alike, and comparing the best
+of each kind failed whenever one blocking trial caught the fastest mode and no
+io_uring trial did (3.4× twice in about ninety runs under the load loop, 4.3×
+once under `ctest -j4`); a pair shares its mode, and the median ignores the odd
+pair that does not. Trials are 1 GiB, because a 256 MiB stream trial lasts 13 ms,
+shorter than a scheduler slice among 16 busy loops. The pins are
 checked in the optimized, uninstrumented build only: under asan and tsan the
 io_uring round trip measured 6.4× and 3.9×, the instrumentation of the harness's
 own loop rather than the link, and every preset still runs the verified stream.
