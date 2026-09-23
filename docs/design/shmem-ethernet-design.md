@@ -4742,6 +4742,49 @@ answer. A lead that bound or dialled the wrong entry would meet nobody, so the
 tests catch it. The launcher refuses more than 254 nodes, which one bracketed
 octet cannot name.
 
+**What a logical node is now, and what that tests** (phase 1 step 3 slice 1).
+Until step 3 two logical nodes on one host talked through a shared-memory
+stand-in for a wire. Now they talk over TCP on loopback, each lead on its own
+address, and everything between two leads is the code a cluster runs: the
+rendezvous tree and its hellos, the mesh on advertised ports, the ring with
+multishot receive over provided buffers, one send in flight per connection,
+the goodbye and the end of stream. Short sends, receives that split a segment,
+`-ENOBUFS` and its re-arm, and a peer's FIN are real events on this path, not
+simulated ones. The fault injection that makes loopback produce them on every
+run (`OSOE_WIRE_BYTES`, `OSOE_WIRE_SPLIT`, `OSOE_WIRE_SEED`) is kept, since
+loopback's large buffers would otherwise hide them, and the tests that use it
+are unchanged. **The four poles stand as they were**, and so do the tests this
+step was told not to touch — the differential test, `shmem.internode.*`,
+`shmem.tree.*`, `shmem.hang-walk`: their programs and registrations are the
+same as when the step began, and only `osoe-launch` changed, to give each
+logical node its address.
+
+What loopback does not test, each named so no test is mistaken for it:
+
+- **The link's time.** A loopback round trip is about 25 µs in the development
+  VM, and nearly all of it is system calls and wakeups (§8.4). A real link adds
+  serialization and a switch; a Pi adds slower cores. No test here checks a
+  latency or bandwidth claim about a link. §8.4's ratios are measured over veth
+  with `netem`, and its pins compare two ways of using the *same* link.
+- **Loss, delay and a small MTU.** Loopback drops nothing, delays nothing and
+  segments at 64 KiB, and TCP hides reordering from an application anyway.
+  Tier 3 is where the transport meets these. It runs `echo-uring` today
+  (`netem-sweep.sh`), not the library's tests, and running the tier-2
+  multi-node tests in network namespaces is the next step, not a done one.
+- **Separate kernels.** Every logical node shares one kernel, one clock, one
+  `/dev/shm` and one page cache. The library is not meant to rely on any of
+  them: objects are named by logical node (above), and addresses come from the
+  host list. But no test on one host can show that it does not; only tier 4
+  can.
+- **Names.** `osoe-launch`'s host list is numeric, so only a cluster resolves
+  host names. The same parser and one `getaddrinfo` per entry a lead needs
+  handle a list of names.
+- **A host with several addresses.** A lead listens on the address its entry
+  names, and refuses by name one that is not local (`EADDRNOTAVAIL`). Which
+  interface a cluster's host list names is the site's configuration.
+- **IPv6**, which is not supported: an entry that resolves only to IPv6 is
+  refused when it is resolved.
+
 Plus a **force-remote flag**. An earlier draft had it route even
 same-logical-node traffic over the network, and called that the strongest
 differential test available. Implementing it showed the claim was built on a
@@ -4860,8 +4903,8 @@ runs in seconds at tier 1.
 | Tier | Environment | Catches |
 |---|---|---|
 | 1 | In-process AM backend, queues not sockets, single-threaded, deterministic | Most semantic bugs. Runs in CI anywhere |
-| 2 | Logical nodes over loopback | Integration, threading |
-| 3 | Logical nodes in netns over veth with netem | Most transport bugs |
+| 2 | Logical nodes over loopback — since phase 1 step 3 over real sockets, each node on its own address (§8.1) | Integration, threading, the socket path |
+| 3 | Logical nodes in netns over veth with netem — the floor harness only, so far (§8.1) | Most transport bugs |
 | 4 | Real cluster | Everything else |
 
 > **ThreadSanitizer cannot see a happens-before that runs through another
