@@ -3,7 +3,7 @@
  * step would, for tests. Not installed.
  *
  *   osoe-launch -n L [-m MAP] [-t SECONDS] [-k] [-e RANK:NAME=VALUE]...
- *               -- PROGRAM [ARGS]...
+ *               [-N NAMESPACE_PREFIX] [-H HOST_LIST] -- PROGRAM [ARGS]...
  *
  * Each process gets the OSOE_ bootstrap variables of design §6.2. Without -m
  * the job has one node and L tasks: rank i is local id i. The job id is this
@@ -38,11 +38,25 @@
  * each child asks for SIGKILL when its parent dies (PR_SET_PDEATHSIG). Before
  * both, a killed launcher left its PEs running and their objects in /dev/shm
  * (review round two, omissions 6).
+ *
+ * **Tier 3 (design §8.2): -N and -H.** Every logical node's ranks normally run
+ * in this machine's one network namespace, each lead on its own loopback
+ * address (§8.1). -N PREFIX starts logical node i's ranks in the network
+ * namespace PREFIX<i> instead - /run/netns/PREFIX<i>, made and joined by veth
+ * links with netem on them by tools/launch/tier3.sh - and -H names the host list
+ * those namespaces' addresses make, in place of 127.0.0.[1-N]. Entering a
+ * namespace needs root, so tier 3 runs this launcher under sudo; each rank
+ * enters its namespace between fork and exec and then returns to the user sudo
+ * was run by (SUDO_USER, SUDO_UID, SUDO_GID), so that the job itself runs as it
+ * would anywhere else.
  */
 #define _GNU_SOURCE
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <grp.h>
 #include <limits.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -66,7 +80,8 @@ struct override {
 static void usage(void)
 {
     fprintf(stderr, "usage: osoe-launch -n L [-m NODE_MAP] [-t SECONDS] [-k] "
-                    "[-e RANK:NAME=VALUE]... -- PROGRAM [ARGS]...\n");
+                    "[-e RANK:NAME=VALUE]... [-N NAMESPACE_PREFIX] [-H HOST_LIST] "
+                    "-- PROGRAM [ARGS]...\n");
     exit(2);
 }
 
@@ -110,6 +125,39 @@ struct placement {
 
 static uint32_t node_count_for_children;
 static pid_t launcher_pid;
+static const char *namespace_prefix;    /* -N: tier 3's per-node network namespaces */
+static const char *host_list;           /* -H: their addresses, as OSOE_STEP_NODELIST */
+
+/*
+ * Tier 3 (-N): put this rank in its logical node's network namespace, then give
+ * up root for the user sudo ran the launcher for - that user's uid, gid and
+ * groups. In the child between fork and exec, like everything else here;
+ * initgroups reads the group database, which is safe there because the launcher
+ * has one thread. The parent-death signal is cleared by the change of user
+ * (prctl(2)), so it is asked for again.
+ */
+static void enter_namespace(uint32_t node)
+{
+    char path[PATH_MAX];
+    snprintf(path, sizeof path, "/run/netns/%s%u", namespace_prefix, node);
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0 || setns(fd, CLONE_NEWNET) != 0) {
+        fprintf(stderr, "osoe-launch: cannot enter %s: %s\n", path, strerror(errno));
+        _exit(127);
+    }
+    close(fd);
+    const char *user = getenv("SUDO_USER");
+    const char *uid = getenv("SUDO_UID"), *gid = getenv("SUDO_GID");
+    if (geteuid() != 0 || !uid || !gid)
+        return;
+    int groups = user ? initgroups(user, (gid_t)atol(gid)) : setgroups(0, NULL);
+    if (groups != 0 || setgid((gid_t)atol(gid)) != 0 || setuid((uid_t)atol(uid)) != 0) {
+        perror("osoe-launch: return to the invoking user");
+        _exit(127);
+    }
+    if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != launcher_pid)
+        _exit(127);
+}
 
 /* Runs in the child between fork and exec. */
 static void exec_rank(long rank, long n, const char *job, const struct placement *p,
@@ -122,6 +170,8 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
      */
     if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != launcher_pid)
         _exit(127);
+    if (namespace_prefix)
+        enter_namespace(p->node);
 
     char buf[32];
     snprintf(buf, sizeof buf, "%ld", rank);
@@ -149,7 +199,7 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
     host[sizeof host - 1] = '\0';
     if (node_count_for_children > 1)
         snprintf(host, sizeof host, "127.0.0.[1-%u]", node_count_for_children);
-    setenv_or_die("OSOE_STEP_NODELIST", host);
+    setenv_or_die("OSOE_STEP_NODELIST", host_list ? host_list : host);
 
     for (int i = 0; i < nov; i++)
         if (ov[i].rank == rank && putenv(ov[i].assignment) != 0)
@@ -216,7 +266,7 @@ int main(int argc, char **argv)
     int nov = 0;
 
     int opt;
-    while ((opt = getopt(argc, argv, "+n:m:t:ke:")) != -1) {
+    while ((opt = getopt(argc, argv, "+n:m:t:ke:N:H:")) != -1) {
         switch (opt) {
         case 'n':
             n = parse_long(optarg, 1, MAX_PROCS, "process count");
@@ -240,6 +290,12 @@ int main(int argc, char **argv)
             nov++;
             break;
         }
+        case 'N':
+            namespace_prefix = optarg;
+            break;
+        case 'H':
+            host_list = optarg;
+            break;
         default:
             usage();
         }
@@ -306,7 +362,7 @@ int main(int argc, char **argv)
     osoe_node_map_free(&map);
     node_count_for_children = node_count;
     /* One loopback address per logical node (exec_rank): 127.0.0.1 to .254. */
-    if (node_count > 254) {
+    if (node_count > 254 && !host_list) {
         fprintf(stderr, "osoe-launch: %u logical nodes; at most 254 get a loopback address "
                         "each\n", node_count);
         return 1;

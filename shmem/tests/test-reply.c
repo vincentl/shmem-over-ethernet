@@ -20,6 +20,7 @@
  * against the real CAS as well.
  */
 #include <pthread.h>
+#include <sched.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -90,13 +91,18 @@ static _Atomic uint32_t over_limit;
 
 /* Take, hold briefly, return. A credit handed out twice shows as more holders
  * than credits - which is exactly the over-subscription the peer's pool would
- * suffer, on a node with no way to detect it (§3.8's distributed invariant). */
+ * suffer, on a node with no way to detect it (§3.8's distributed invariant).
+ * A take that finds none free joins the queue, and the credit is this
+ * thread's once its ticket is served: it spins for that here, where the
+ * library sleeps on the credit's word (transport-am.c). */
 static void *hammer(void *unused)
 {
     (void)unused;
     for (int r = 0; r < ROUNDS; r++) {
-        if (!osoe_credit_take(&shared_credit))
-            continue;                    /* none free: the issuer would block */
+        uint32_t ticket;
+        if (!osoe_credit_take(&shared_credit, &ticket))
+            while (!osoe_credit_served(&shared_credit, ticket))
+                sched_yield();
         uint32_t held = atomic_fetch_add(&concurrently_held, 1) + 1;
         if (held > CREDITS)
             atomic_fetch_add(&over_limit, 1);
@@ -230,17 +236,30 @@ int main(void)
 
     /* ---- CREDIT ---- */
     struct osoe_credit credit;
+    uint32_t ticket, first, second;
     osoe_credit_init(&credit, 3);
     CHECK(osoe_credit_available(&credit) == 3);
-    CHECK(osoe_credit_take(&credit) && osoe_credit_take(&credit) &&
-          osoe_credit_take(&credit));
+    CHECK(osoe_credit_take(&credit, &ticket) && osoe_credit_take(&credit, &ticket) &&
+          osoe_credit_take(&credit, &ticket));
     CHECK(osoe_credit_available(&credit) == 0);
-    /* Exhausted blocks the issuer rather than failing the call (§4.6). */
-    CHECK(!osoe_credit_take(&credit));
+    /* Exhausted queues the issuer rather than failing the call (§4.6)... */
+    CHECK(!osoe_credit_take(&credit, &first) && !osoe_credit_take(&credit, &second));
+    CHECK(first != second && osoe_credit_waiting(&credit) == 2);
+    CHECK(!osoe_credit_served(&credit, first) && !osoe_credit_served(&credit, second));
+    /* ...and a give goes to the oldest ticket, never through the pool, so
+     * nothing arriving meanwhile can take it (§3.11's handoff). */
+    osoe_credit_give(&credit);
+    CHECK(osoe_credit_served(&credit, first) && !osoe_credit_served(&credit, second));
+    CHECK(osoe_credit_available(&credit) == 0 && !osoe_credit_take(&credit, &ticket));
+    osoe_credit_give(&credit);
+    CHECK(osoe_credit_served(&credit, second) && !osoe_credit_served(&credit, ticket));
+    osoe_credit_give(&credit);
+    CHECK(osoe_credit_served(&credit, ticket) && osoe_credit_waiting(&credit) == 0);
+    /* With nobody queued, a give returns the credit to the pool. */
     osoe_credit_give(&credit);
     CHECK(osoe_credit_available(&credit) == 1);
-    CHECK(osoe_credit_take(&credit));
-    CHECK(!osoe_credit_take(&credit));
+    CHECK(osoe_credit_take(&credit, &ticket));
+    CHECK(osoe_credit_available(&credit) == 0);
 
     /*
      * Under contention, which is the only configuration where the credit binds
@@ -268,6 +287,7 @@ int main(void)
     CHECK(atomic_load(&over_limit) == 0);
     CHECK(atomic_load(&concurrently_held) == 0);
     CHECK(osoe_credit_available(&shared_credit) == CREDITS);
+    CHECK(osoe_credit_waiting(&shared_credit) == 0);
 
     return CHECK_DONE();
 }

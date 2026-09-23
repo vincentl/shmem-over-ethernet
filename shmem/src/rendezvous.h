@@ -64,12 +64,4 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
                      const struct sockaddr_in *address, const void *blob,
                      struct osoe_rendezvous_result *out);
 
-/*
- * Node `node`'s address from the host list: OSOE_STEP_NODELIST, which mirrors
- * SLURM_STEP_NODELIST (§6.1), resolved to IPv4. Fatal naming the entry if the
- * list or the name is bad.
- */
-void osoe_rendezvous_address(const struct osoe_bootstrap *b, uint32_t node,
-                             struct sockaddr_in *out);
-
 #endif /* OSOE_RENDEZVOUS_H */

@@ -114,9 +114,12 @@ rot the way a third-party build can. **The constant factors were deliberately no
 written down before the echo harness first ran**, since pinning them before
 measuring would be inventing a target rather than choosing one. The harness has
 now run (§8.4, phase 1 step 3 slice 1) and its own io_uring-to-blocking ratio is
-pinned. The library's ratios to it are measured (§8.4: 2.05× for a get), and
-are pinned once quiet and a full buffer stop polling, since two of them still
-measure a step-2 stand-in.
+pinned. So are the library's ratios to it (§8.4, phase 1 step 3 slice 2;
+`shmem.floor`): a get's, a fetch-add's and a put and quiet's fastest round
+trip at most 3× the floor's, measured 1.4–2.2×; a put and quiet and a
+fetch-add at most 1.5× a get, measured 0.98–1.00×, the pin a wait that polls
+fails; and a stream at the default connection buffer at least 0.1× the
+floor's, measured 0.21–0.43×.
 Track all three per commit through the §3.14 counters.
 
 ---
@@ -975,6 +978,16 @@ reply credits and descriptors (indivisible), and the wait for a reservable buffe
 wake-one can reach the wrong class's waiter; with §3.10's deadlines that is a
 latency spike rather than a hang, but it is avoidable (review C4).
 
+*As built (phase 1 step 3 slice 2).* Two of the classes have their words: a
+connection's acknowledged sequence, which quiet waits on, and its buffer
+turnover, which a writer with no room waits on (`base/wait-word.h`,
+`wait_word_model.py`). Both are divisible and wake every waiter. Beside each
+word is a count of registered waiters, so the agent — which moves both values on
+every acknowledgement and every open — makes the wake syscall only when someone
+waits. The count is what makes each wait two-sided (§3.16), and the model's
+breakages each lose a wake. Step 2 polled both with a 20 µs sleep (§8.4). The
+third class, reply credits, is indivisible, and has the handoff below.
+
 **Wake count tracks divisibility:**
 
 - Buffer becomes `OPEN` (divisible: 192 KB free, 30 waiters needing 200 B each)
@@ -999,12 +1012,40 @@ the same exhaustive tooling as §3.5.
 
 Applied to **indivisible resources only**; divisible ones do not starve.
 
+*As built, for reply credits* (phase 1 step 3 slice 2; `reply.[ch]`,
+`credit_wait_model.py`). A bit alone does not do it. With a flag and a wake of
+one, a thread that registers just after the release still reaches the free
+credit before the woken waiter runs. What makes acquisition "mediated by the
+queue", as the note above asks, is to put the queue in the resource's own word:
+one 64-bit word packs the free credits, the next ticket and the tickets served.
+Whether a PE takes a free credit or a ticket is one CAS on that word, and a give
+with a ticket outstanding serves the oldest ticket — the credit passes to it
+without ever being free, which is the handoff. The free count is non-zero only
+while no ticket is outstanding. A queued PE sleeps on the credit's futex word
+with its ticket's bit (a futex bitset, one class in 32), so a give wakes only the
+served ticket's class: exactly the waiter it serves while 32 or fewer wait, and
+one in 32 of them beyond that, not a herd — with no memory per PE and no
+syscall when nobody waits. The model's breakages: the handoff without the queue
+barges, a plain wake of one or a bump before the serve loses a wake, and a give
+that also frees the credit over-subscribes it. Step 2 polled here too.
+
 **No spinning before blocking, in phase 1.** A useful spin loop needs a CPU relax
 hint, which is an intrinsic or assembly, and §3.16 allows neither. A spin without
 one burns power and, on x86 with SMT, slows the sibling thread. Waits therefore go
 straight to the futex. Under oversubscription — the Pi's normal case — a spin
 would be wrong anyway, since it takes a core a progress thread or mid-copy writer
 needs. Revisit only with measurements.
+
+*Measured, and kept* (phase 1 step 3 slice 2). With the waits on their words, a
+put and quiet costs one library round trip, the same four wakes as a get: 2.06×
+the floor idle. A spin of up to 50 µs of `sched_yield` before the futex took it
+to 1.14×, and a get with it, and on a lightly loaded node a get fell from 30 µs
+to 8. Beside 16 busy loops on four cores — oversubscribed, the Pi's normal case
+— the same spin held a put and quiet at 4–7 ms in two runs of three and a
+1 GiB stream at about 10 MiB/s, against 9–26 µs and 0.5–1.1 GiB/s without it:
+the spinner took the core the agent needed, as this paragraph said it would. A
+spin is `sched_yield`, a syscall and not an intrinsic, so §3.16 would have
+allowed it. The measurement is what rules it out.
 
 **No real-time priority anywhere.** It is tempting on an oversubscribed Pi and
 would introduce unbounded priority inversion. Where isolation is needed, place
@@ -1351,7 +1392,16 @@ headers would pass whenever the library agreed with itself.
   `shmem_quiet(+0x1)`; the kinds are part of the segment's encoding. Every
   internode wait publishes one naming the peer node, which none did before phase
   1 step 2 slice 2: a PE stuck in a quiet toward a dead node showed as not
-  blocked at all (second review, D2).
+  blocked at all (second review, D2). Since layout 14 (phase 1 step 3 slice 2)
+  the kind also says which of the connection's words the wait sleeps on
+  (§3.11) — its acknowledgement, its buffer turnover, a reply credit, or the
+  reply itself on the PE's landing slot — so `osoe-stat` prints `shmem_quiet
+  (acknowledgement from node 1)`, and counts for each connection the PEs asleep
+  on each word: the per-connection "waiters per wake word" below, read from
+  records the job writes anyway, so the job keeps no count and pays nothing for
+  it. `shmem.unswept-wait` checks both against a PE held in a quiet toward a
+  stopped node. A reader built for an older layout prints the new kinds raw,
+  and still reads everything it finds by name.
 
   It is the first record here with more than one word in it, so it is the first
   that can be read torn while the PE publishes its next wait. A **generation
@@ -1372,8 +1422,8 @@ headers would pass whenever the library agreed with itself.
   a PE spinning through satisfied waits shows no record; it is also not blocked.
 - **Per connection:** sequence numbers sent, acknowledged as applied, and received
   and applied; the age of the in-flight send; each buffer's reserved and filled
-  counts and seal bit; reply queue depths; credits left; waiters per wake word; the
-  armed-futex flag.
+  counts and seal bit; reply queue depths; credits left; waiters per wake word
+  (counted from the per-PE records, below); the armed-futex flag.
 
 **2. Is the network the bottleneck?**
 
@@ -1726,10 +1776,11 @@ outcome C11 forbids, and with what.
 
 | Shape | C11's requirement | Order | Where |
 |---|---|---|---|
-| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, `acked`, connection heads; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed` |
+| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed`. *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
 | A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready` |
-| Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch |
+| Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere |
+| A queue in one word, then a wake word: a waiter's ticket and a giver's serve are RMWs on the same word; the giver then bumps a futex word; the waiter loads that word, then checks its ticket (slice 2 of step 3) | Not store buffering: two RMWs on one word are ordered by its modification order, so a give always sees every ticket taken before it. The waiter's check needs only to follow the giver's serve when it has seen the giver's bump — a release RMW read by an `acquire` load; a bump it has not seen is the futex compare's to catch | RMWs **`seq_cst`** (the row above); the waiter's loads of the wake word and of the state **`acquire`** | `osoe_credit_take`, `_give`, `_served` (`credit_wait_model.py`) |
 | Two-sided, with a claim: the writer's store is an RMW on a bitmap and the lead's a flag, and a writer that reads the flag raised takes it down with a CAS before waking (slice 3) | The store-buffering outcome - the lead's recheck misses the bit and the writer misses the flag - is forbidden only among `seq_cst` operations; the claim CAS is an RMW in *S*, and a writer that loses it read a later value of the flag, so the lead's recheck ordered after that value sees its bit | **`seq_cst`** `fetch_or`, flag store, flag load and CAS; `seq_cst` recheck loads | `osoe_connection_area_mark`, `osoe_progress_host_wake_lead`, `osoe_progress_host_poll` (`lead_wake_model.py`) |
 | `shmem_fence` over plain stores (W→W) | Nothing, for a race-free program: its flag is an AMO, a `seq_cst` store and so a release. Table 14's plain stores are a data race C11 gives no meaning; the weakest construct ordering earlier stores before later ones is a release fence | **`atomic_thread_fence(release)`** | `osoe_transport_fence` |
 | `shmem_quiet`, `pe_quiet`, the barriers (W→R) | "Visible to all PEs" on return is the store-buffering shape again; C11 forbids its bad outcome with a `seq_cst` fence between each side's store and load | **`atomic_thread_fence(seq_cst)`** | `osoe_transport_wait` |
@@ -2237,7 +2288,11 @@ may fragment replies freely.
 waitable counter has a companion 32-bit wake word. The progress thread adds landed
 bytes, then bumps the wake word, then wakes; the waiter loads the wake word, then
 compares the counters, then waits on the wake word. The per-connection `acked`
-value that `quiet` waits on follows the same pattern.
+value that `quiet` waits on follows the same pattern. *As built* (phase 1 step 3
+slice 2): `acked` has its word, with a count of registered waiters beside it, so
+the agent wakes only when a quiet waits (`base/wait-word.h`, §3.11). Its store
+and the waiter's load are `seq_cst`, since the count makes the wait two-sided
+(§3.16).
 
 **Blocking gets and fetching AMOs** do need per-operation completion: the caller
 waits for *its* reply, not for a byte count. Up to `SERIALIZED` a PE has at most one
@@ -4536,11 +4591,17 @@ machinery. The review's order is adopted.
    transport's smallest reproducer. Then io_uring with the repaired reservation
    protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
    reply credits and DRAINING caps, and the global rendezvous with its timeout.
-   *(Slice 1 built the harness, the ring, the idle loop and the rendezvous, and
-   measured what is left: quiet's wait and a writer's wait for a full buffer
-   still poll the step-2 way, waking the lead and sleeping 20 µs, and that is
-   what holds a put and quiet at 4× the floor and a stream at 3% of it, §8.4.
-   The per-class wake words are the fix.)*
+   *(Done, in two slices. Slice 1 built the harness, the ring, the idle loop
+   and the rendezvous, and measured what was left: quiet's wait and a writer's
+   wait for a full buffer still polled the step-2 way, waking the lead and
+   sleeping 20 µs. Slice 2 built the per-class wake words (§3.11): quiet and a
+   writer with no room sleep on words the agent bumps only when someone waits,
+   and a PE waiting for a reply credit takes a ticket in the credit's own word.
+   Then it pinned the library to its floor (§8.4), and ran the multi-node
+   tests over a link that delays, drops and fragments (tier 3, §8.2). The
+   rendezvous's timeout is the no-progress rule, never by default (§3.15).
+   Carried forward, deliberately: the mesh is eager, and §6.2 says what
+   on-demand connections would need.)*
 
    The first backend that *acts* on `osoe_transport_set_range` is here — it is the
    first that must prepare memory before the network can touch it — but the hook
@@ -4768,9 +4829,9 @@ What loopback does not test, each named so no test is mistaken for it:
   with `netem`, and its pins compare two ways of using the *same* link.
 - **Loss, delay and a small MTU.** Loopback drops nothing, delays nothing and
   segments at 64 KiB, and TCP hides reordering from an application anyway.
-  Tier 3 is where the transport meets these. It runs `echo-uring` today
-  (`netem-sweep.sh`), not the library's tests, and running the tier-2
-  multi-node tests in network namespaces is the next step, not a done one.
+  Tier 3 is where the transport meets these, and since phase 1 step 3 slice 2
+  it runs the multi-node tests there, each logical node in a network namespace
+  of its own (§8.2, "Tier 3 as built").
 - **Separate kernels.** Every logical node shares one kernel, one clock, one
   `/dev/shm` and one page cache. The library is not meant to rely on any of
   them: objects are named by logical node (above), and addresses come from the
@@ -4904,7 +4965,7 @@ runs in seconds at tier 1.
 |---|---|---|
 | 1 | In-process AM backend, queues not sockets, single-threaded, deterministic | Most semantic bugs. Runs in CI anywhere |
 | 2 | Logical nodes over loopback — since phase 1 step 3 over real sockets, each node on its own address (§8.1) | Integration, threading, the socket path |
-| 3 | Logical nodes in netns over veth with netem — the floor harness only, so far (§8.1) | Most transport bugs |
+| 3 | Logical nodes in network namespaces over veth with netem — the floor harness's sweep, and the multi-node tests (the `tier3` preset; below) | Most transport bugs |
 | 4 | Real cluster | Everything else |
 
 > **ThreadSanitizer cannot see a happens-before that runs through another
@@ -4931,6 +4992,44 @@ namespaces over veth with `netem` for delay, loss, and small MTU. `netem` reorde
 is invisible to a TCP application — the kernel reorders before delivery — so it
 tests TCP, not osoe. A Pi handles four namespaces; the setup is a shell script
 written once.
+
+*Tier 3 as built* (phase 1 step 3 slice 2). `osoe-launch -N PREFIX` starts
+logical node *i*'s ranks in the network namespace `PREFIX`*i*, and `-H` gives
+them the host list those namespaces' addresses make, in place of
+`127.0.0.[1-N]`. `tools/launch/tier3.sh` makes the namespaces, one per node and
+one more holding a bridge, joins each to the bridge by a veth pair, and shapes
+each node's egress with `netem`. There are three shapes: a Pi-like link (1 Gbit/s
+and 100 µs each way, §5.3), the same dropping 0.1% of packets, and a 1,280-byte
+MTU at 25 µs each way. Segmentation offloads are off, so `netem` delays, paces
+and drops packets of the MTU's size, as a wire would, and not the 64 KiB bursts a
+veth pair otherwise carries whole. Entering a namespace needs root, so the
+script runs under `sudo -n`. Each rank enters its namespace between fork and
+exec, then drops to the invoking user with that user's groups, so the job runs
+as it would anywhere else. Namespaces are named by the script's pid, so runs
+never meet. They are removed on exit, on failure and on a signal, and
+`tier3.sh clean` removes any a killed run left. What stays behind is what
+`netem-sweep.sh` leaves: the `/run/netns` mount point and the loaded modules.
+
+The tests are not a default `ctest`: they change the machine's network state
+while they run and need passwordless `sudo`, which §8.5's VM has. The `tier3`
+preset registers them (`cmake --workflow --preset tier3`). The subset is every
+tier-2 test whose traffic crosses a node boundary through the transport, each
+with the environment tier 2 gives it. That is the node-pair wire and the
+progress engine below the library; the internode maps, where all three of
+§3.11's waits run through two reply credits and a 2 KiB buffer; the AM barrier;
+the reply-starvation guard; the tree at depth three and at thirteen uneven
+nodes; the rendezvous; the differential over §8.1's four poles; and the floor.
+Left out are the tests that never reach a socket, and those whose subject is a
+PE that dies or stops rather than the link.
+
+*What it found.* One thing loopback hid, and it was not in the transport. The
+tests below the library open their mesh without a rendezvous, and that path
+dialled `127.0.0.1` for every peer. On one host that reaches every lead; in a
+namespace it reaches only the node's own, so the AM barrier test retried
+forever. That path now dials each peer's host-list address, as the rendezvous
+does (`osoe_listener_node_address`), and no library code assumes one host.
+Everything else passed on all three shapes the first time. The library's ratios
+to its floor there are in §8.4.
 
 **Tests the review found missing:**
 
@@ -5147,10 +5246,88 @@ above promised this measurement. Beside a `ctest -j4` of the debug suite (load
 average 6–16 on four CPUs, the models left out), the harness's median round
 trip falls to about 4 µs, since no CPU sleeps, and io_uring and blocking agree
 within 1.1× this time. So the 3–5× depends on the mix of load, and this mix did
-not reproduce it. The library's get does not fall with the harness: 31 µs
-median (10–38 across repetitions), about 7× the harness's, because each of its
-four wakes now waits for a CPU. A partly loaded node is the Pi's normal state
-(§1), so its round trips there will cost the wakes they need, not the wire.
+not reproduce it. The library's get does not fall with the harness: about 30 µs
+in six repetitions of seven, whether the harness's median was 4 µs (four
+repetitions, 8–9×) or 16 µs (three, about 2×), because each of its four wakes
+now waits for a CPU. *(Corrected in slice 2: this said "about 7×", a ratio of
+medians taken across repetitions whose load differed.)* A partly loaded node is
+the Pi's normal state (§1), so its round trips there will cost the wakes they
+need, not the wire.
+
+**With the waits' words** (phase 1 step 3 slice 2, part A; the same method).
+A put and quiet takes 52.2 µs idle, 2.06× the floor: one library round trip,
+the same four wakes as a get, where `poll_lead` cost 101 µs. The stream runs at
+3.1 GiB/s (0.18×) at the default buffer, and the rest of its shortfall is the
+buffer. Each 64 KiB put fills half of a 128 KiB buffer, so a writer waits for a
+turnover on every other put, and a wake is what each wait costs. With
+`OSOE_AM_BUFFER` at 256 KiB the stream runs at 8.6 GiB/s (0.49×), and at 512 KiB
+to 2 MiB at 9.5–10.1 GiB/s (about 0.56×). The default stays the floor (§3.4): a
+larger buffer is memory per connection, which the eager mesh multiplies by *N*.
+Beside a `ctest -j4`, a get, a fetch-add and a put and quiet each take about
+30 µs. Spinning before the futex would take the idle round trip to 1.14×, and
+§3.11 says why it is not done.
+
+**Pinned** (phase 1 step 3 slice 2, part B; `shmem.floor`, checked in the
+release preset beside `env.echo-uring`). One job of two logical nodes, one PE
+each, times the floor itself: a trivial io_uring echo and stream on a raw TCP
+connection between its two processes, dialled at node 1's host-list address,
+so it crosses the link the library does. In each of seven pairs, 2,000 rounds
+each time one floor round trip, one get, one put and quiet and one fetch-add,
+in an order that rotates. Then a 1 GiB stream of 64 KiB pieces on each. Each
+pin is the median over the pairs of a ratio taken within a pair. Twelve runs
+unbroken (four idle, four beside a `ctest -j4`, four under 16 busy loops), and
+nine with step 2's poll put back into quiet's and a writer's waits:
+
+| Pin | Bound | Measured | With the poll |
+|---|---|---|---|
+| Fastest get, fetch-add, put and quiet ÷ the floor's fastest | ≤ 3 | 1.4–2.2 | put and quiet 2.1–2.7 idle, 3.0–5.7 loaded |
+| Put and quiet, and fetch-add, median ÷ a get's | ≤ 1.5 | 0.98–1.00 | put and quiet 1.8–2.1 idle, 2.7–14 loaded |
+| Stream ÷ the floor's, default buffer | ≥ 0.1 | 0.21–0.43 | 0.037–0.055 |
+
+Reported, not pinned: a get's median trip is 1.8–1.9× the floor's idle and
+beside the build, 1.3–1.9× under the busy loops (idle, 55 µs against 29 µs).
+The library's stream, 3.0 GiB/s idle against the floor's 14, is 0.21×. With
+a 1 MiB buffer it is 0.52–0.69×.
+
+*What the fastest trip can see, and what it cannot.* It is the length of a
+path, and between `echo-uring`'s two kinds — one path of the same length — it
+is what holds still. Between the library and the floor it compares four wakes
+with two. Timed one kind after another, 2,000 trips each, it moved between
+1.7× and 4.1× in the median of pairs over eighteen runs, and a single pair
+from 0.5× to 12×: one kind's trips met a sleeping CPU and the next kind's a
+waking one. Interleaving
+the kinds within each round is what made it hold still, at 1.4–2.2×, since a
+round's four trips share whatever the CPUs are doing. It still cannot see
+step 2's poll. That poll slept 20 µs, about as long as an idle round trip, so
+a put and quiet's fastest trip with it measured what one without it did. The
+pin that sees the poll compares two library operations that need the same
+wakes: a put and quiet against a get, 1.00× with the words and 1.8× or more
+with the poll, whatever the load.
+
+*Why the stream is pinned at the default buffer.* The stream exercises a
+writer's turnover wait, and at 128 KiB every other 64 KiB put makes that
+wait: 0.21–0.43× with the word, 0.037–0.055× with the poll. At 1 MiB a writer
+seldom waits, and the poll measured 0.35–0.64× against the word's 0.52–0.69×,
+inside the noise. A stream pin at a large buffer would not have caught the
+stand-in this slice removed.
+
+*On a shaped link* (tier 3, §8.2: the same test, one logical node per network
+namespace, 64 MiB streams). There the wire dominates the wakes, as §10's
+assumption says it should:
+
+| Link | Fastest trip ÷ floor | Median ÷ floor | Stream ÷ floor |
+|---|---|---|---|
+| Loopback (tier 2, above) | 1.4–2.2 | 1.8–1.9 | 0.21–0.43 |
+| 1 Gbit/s, 100 µs each way (Pi-like) | 1.02–1.06 | 1.01–1.05 | 1.00, at 114 MiB/s |
+| The same, dropping 0.1% | 1.03–1.05 | 1.08 | 1.00, at about 108 MiB/s |
+| 1,280-byte MTU, 25 µs each way | 1.28–1.33 | 1.25 | 1.00, at 113 MiB/s |
+
+A library round trip needs two wakes more than the floor's. On 200 µs of wire
+they add 2–6% (5–9 µs); at 25 µs each way, about 25 µs, 30%; on loopback, where
+the wire is nothing, they double the trip. The default buffer's stream, 0.21×
+on loopback, runs at line rate on every shaped link, since a 1 Gbit/s link
+takes a millisecond to carry one 128 KiB buffer and a turnover's wake is far
+shorter.
 
 ### 8.5 Development environment
 
@@ -5416,6 +5593,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 | Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
 | Authenticating the step-3 handshake | **An optional `OSOE_JOB_SECRET`, proved and never sent** (§6.2; phase 1 step 3 slice 1). The open item: the handshake carried only the job and step ids, which are sequential and public (`squeue`), and the port is a hash of them, so any host that could reach it could join as a node and then read and write every heap by design; the second review's portability F2 proposed a wrapper setting `OSOE_JOB_SECRET=$(head -c16 /dev/urandom \| xxd -p)` before `srun`, which Slurm propagates, and the handshake carrying it. Built so, except that the secret is *proved* rather than carried: a SipHash-2-4 digest over the hello and a fresh nonce from each end, so neither an eavesdropper nor a listener the caller reached by mistake learns it, and a proof replays nowhere. Unset, nothing changes; set on some nodes and not others, the job ends naming both. It authenticates the hello, not the traffic after it |
+| Pin the §1 floor ratios | **Pinned** (phase 1 step 3 slice 2; §8.4, `shmem.floor`). Only once quiet and a full buffer stopped polling, since until then two of the three ratios measured step 2's stand-in. Three pins, each the median of seven side-by-side pairs: a get's, a fetch-add's and a put and quiet's fastest trip within 3× the floor's; a put and quiet and a fetch-add within 1.5× a get; a stream at the default buffer at least 0.1× the floor's. Checked by putting the stand-in back, which the second and third fail and the first cannot see |
 | What orders fence and quiet, where a `seq_cst` store to a thread-local word was the answer? | **Derived from the C11 model:** a release fence for fence (W→W), a `seq_cst` fence for quiet and the barriers (W→R), and `seq_cst` on both loads of a two-sided protocol. Measured, the old store did not order quiet's W→R on aarch64, and an acquire load built as `ldapr` lost wakes (§3.16, §4.6; 2026-09-21). |
 
 ### Still open — blocking
@@ -5438,12 +5616,6 @@ Recorded rather than deleted, so they are not reopened from memory.
   development host) and fails on loopback (1.7×), as §8.3 predicted. Still owed:
   two real hosts, and a Pi, whose slower `memcpy` puts its copy-to-wire ratio in
   the tens, *recalled*. The small-message *rate* is not measured yet.
-- **Pin the §1 floor ratios.** The harness's own ratio (io_uring against blocking
-  sockets on the same link) is pinned (§8.4). The library-to-floor ratios are
-  measured (§8.4, phase 1 step 3 slice 1): a get 2.05×, a put and quiet 4.0×, a
-  stream 0.031×. The last two measure `poll_lead`'s 20 µs sleep, and a yield in
-  its place takes them to 1.1× and 0.34–0.6×. They are pinned once §7.1 step 3's
-  per-class wake words replace it.
 - **The internode tree's fan-out from measured costs** (§5.3). The default is the
   backend's constant today; measuring the hop latency *h* and per-message cost *o*
   at init and choosing *k* from their ratio is the next step, once a real fabric

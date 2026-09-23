@@ -136,8 +136,6 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
                      const struct osoe_bootstrap *b, uint32_t session,
                      const struct osoe_mesh *mesh)
 {
-    struct sockaddr_in loopback = { .sin_family = AF_INET,
-                                    .sin_addr.s_addr = htonl(INADDR_LOOPBACK) };
     /*
      * §6.2: the lower node index connects to the higher, so each pair has one
      * stream (§3.1). Every lower node first, then every higher one: a lead is
@@ -163,11 +161,21 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
         osoe_wire_attach(&wires[slot], ring, slot, fd, peer, b);
     }
     osoe_listener_close(l);
+    /* Without a rendezvous's mesh - the tests below the library - each peer is
+     * found at its host-list address on its candidate ports, as the rendezvous
+     * finds its parent. Not at loopback: a node in a network namespace of its
+     * own (tier 3, §8.2) reaches only itself there. */
     for (uint32_t peer = b->node + 1; peer < b->node_count; peer++) {
-        int fd = mesh ? osoe_listener_connect_port(b, session, &mesh->peers[peer],
-                                                   ntohs(mesh->peers[peer].sin_port), peer,
-                                                   OSOE_HELLO_MESH)
-                      : osoe_listener_connect(b, session, &loopback, peer, OSOE_HELLO_MESH);
+        int fd;
+        if (mesh) {
+            fd = osoe_listener_connect_port(b, session, &mesh->peers[peer],
+                                            ntohs(mesh->peers[peer].sin_port), peer,
+                                            OSOE_HELLO_MESH);
+        } else {
+            struct sockaddr_in at;
+            osoe_listener_node_address(b, peer, &at);
+            fd = osoe_listener_connect(b, session, &at, peer, OSOE_HELLO_MESH);
+        }
         osoe_wire_attach(&wires[peer - 1], ring, peer - 1, fd, peer, b);
     }
     osoe_wire_ring_open(ring, wires, peers, b);

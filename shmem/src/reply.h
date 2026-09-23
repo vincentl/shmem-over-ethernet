@@ -197,15 +197,29 @@ void osoe_reply_rotate(struct osoe_reply_pool *pool, struct osoe_reply_queue *q)
 /* ---- The credit ------------------------------------------------------ */
 
 /*
- * The origin's credits for one connection, shared by the node's PEs.
+ * The origin's credits for one connection, shared by the node's PEs, and the
+ * queue of those waiting for one (§3.11; tools/modelcheck/credit_wait_model.py).
  *
- * Take is a CAS loop, not a test and a decrement: the two steps are not one, so
- * two PEs of a node can both pass the test and both decrement, and the count
- * goes negative while the peer's pool is over-subscribed by the difference.
- * Same argument §3.5 makes for the reservation itself.
+ * A credit is indivisible, so a give wakes one waiter rather than a herd - and
+ * "wake order is not acquire order": a thread already running could take a
+ * returned credit in the window before the woken one runs, and at 256 PEs on
+ * four cores that window is not theoretical. So once anyone waits, the queue is
+ * the only way in. One word packs the free credits, the next ticket and the
+ * tickets served; whether a PE takes a free credit or joins the queue is one
+ * CAS on it. A give with a ticket outstanding serves it - the credit passes to
+ * that ticket without ever being free, which is §3.11's handoff - and wakes the
+ * waiters whose ticket shares its futex bit, one class in 32; a give with no
+ * queue returns the credit to the pool with no syscall. The free count is
+ * non-zero only while no ticket is outstanding.
+ *
+ * Every step is a CAS and not a test and a decrement: with two steps, two PEs
+ * of a node could both see the last credit and both take it, over-subscribing
+ * the peer's pool by the difference on a node with no way to detect it (§3.5
+ * makes the same argument for the reservation; the credit model's race_take).
  */
 struct osoe_credit {
-    _Atomic uint32_t available;
+    _Atomic uint64_t state;         /* available | next ticket << 21 | served << 42 */
+    _Atomic uint32_t wake;          /* a queued PE sleeps here, on its ticket's bit */
 };
 
 /* Set the count before anyone else can see the connection. Inline, so that
@@ -213,19 +227,41 @@ struct osoe_credit {
  * the tier-1 tests of the connection compile it on its own. */
 static inline void osoe_credit_init(struct osoe_credit *c, uint32_t credits)
 {
-    atomic_store_explicit(&c->available, credits, memory_order_release);
+    atomic_store_explicit(&c->wake, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->state, credits, memory_order_release);
 }
 
-/* True if a credit was taken. False means none is free, and §4.6 permits the
- * issuing PE to block until one is. */
-bool osoe_credit_take(struct osoe_credit *c);
+/*
+ * Take a free credit (true), or a place in the queue (false, with *ticket set):
+ * §4.6 permits the issuing PE to block rather than fail. A queued PE waits until
+ * osoe_credit_served(ticket), sleeping on `wake` with osoe_credit_bit(ticket);
+ * the credit is then its own, taken by the give that served it.
+ */
+bool osoe_credit_take(struct osoe_credit *c, uint32_t *ticket);
 
-/* Return one. Called when the reply **lands**, not when it is sent: the two
- * differ only once gets are nonblocking, and the difference is the origin's
- * landing zone rather than the target's pool (§3.12, and the on_drain case of
- * the credit model). */
+/* Has the queue reached past `ticket`? Load `wake` first and check this after
+ * (the order of every wait, §4.6); acquire, since the give that served the
+ * ticket bumped `wake` with a release after it. */
+bool osoe_credit_served(const struct osoe_credit *c, uint32_t ticket);
+
+/* The futex bitset a PE queued with this ticket sleeps on. */
+static inline uint32_t osoe_credit_bit(uint32_t ticket)
+{
+    return UINT32_C(1) << (ticket & 31);
+}
+
+/* Return one: to the oldest ticket if any is queued, and wake it; otherwise to
+ * the pool. Called when the reply **lands**, not when it is sent: the two differ
+ * only once gets are nonblocking, and the difference is the origin's landing
+ * zone rather than the target's pool (§3.12, and the on_drain case of the credit
+ * model). */
 void osoe_credit_give(struct osoe_credit *c);
 
 uint32_t osoe_credit_available(const struct osoe_credit *c);
+
+/* Tickets waiting, and tickets served so far: the progress a queued PE's wait
+ * is watched by (§3.15). */
+uint32_t osoe_credit_waiting(const struct osoe_credit *c);
+uint32_t osoe_credit_served_count(const struct osoe_credit *c);
 
 #endif /* OSOE_REPLY_H */

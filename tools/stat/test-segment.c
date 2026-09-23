@@ -358,8 +358,36 @@ static void check_huge_counts(const char *name, enum damage damage)
     unlink(name);
 }
 
+/* A blocked record's detail as its kind says (segment.h). The layout-14 kinds
+ * name a connection's word and the peer node; a kind this reader does not know
+ * prints raw. shmem.unswept-wait checks the same text against the library's. */
+static void check_details(void)
+{
+    static const struct {
+        uint32_t kind;
+        const char *want;
+    } cases[] = {
+        { OSOE_SEGMENT_DETAIL_NODE, "node 3" },
+        { OSOE_SEGMENT_DETAIL_EPOCH, "epoch 3" },
+        { OSOE_SEGMENT_DETAIL_ACKNOWLEDGEMENT, "acknowledgement from node 3" },
+        { OSOE_SEGMENT_DETAIL_TURNOVER, "buffer turnover toward node 3" },
+        { OSOE_SEGMENT_DETAIL_CREDIT, "reply credit toward node 3" },
+        { OSOE_SEGMENT_DETAIL_REPLY, "reply from node 3" },
+        { 99, "+0x3" },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        struct osoe_segment_blocked b = { .valid = true, .blocked = true, .detail = 3,
+                                          .detail_kind = cases[i].kind };
+        char buf[64];
+        osoe_segment_blocked_detail(&b, buf, sizeof buf);
+        CHECK(strcmp(buf, cases[i].want) == 0);
+    }
+}
+
 int main(void)
 {
+    check_details();
+
     char name[64], file[96];
     snprintf(name, sizeof name, "/osoe-segment-test.%d", (int)getpid());
     snprintf(file, sizeof file, "/tmp/osoe-segment-test.%d", (int)getpid());

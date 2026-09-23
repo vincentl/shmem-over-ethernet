@@ -11,7 +11,13 @@
 # of its ranks in whatever order they happen to run; the program is written so
 # that every line is independent of the map (see its header).
 #
-# Expects: LAUNCH, EXE, MAPS (semicolon-separated), NRANKS, and optionally ENVS.
+# Expects: LAUNCH, EXE, MAPS (semicolon-separated), NRANKS, and optionally ENVS,
+# TIMEOUT (the launcher's, in seconds; 60 by default) and WRAP. WRAP is a
+# command that runs the launcher for each map, given the map's node count, ENVS
+# as NAME=VALUE arguments and `--` before the launcher's own command line: tier
+# 3's tools/launch/tier3.sh under sudo, which starts each logical node in a
+# network namespace of its own (design §8.2). sudo resets the environment, so
+# ENVS travel as arguments there rather than through `cmake -E env`.
 
 cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0007 NEW)       # keep empty list elements out of the sort
@@ -20,13 +26,24 @@ if(NOT DEFINED LAUNCH OR NOT DEFINED EXE OR NOT DEFINED MAPS OR NOT DEFINED NRAN
   message(FATAL_ERROR "Differential.cmake: LAUNCH, EXE, MAPS and NRANKS are required")
 endif()
 
+if(NOT DEFINED TIMEOUT)
+  set(TIMEOUT 60)
+endif()
+
 set(reference "")
 set(reference_map "")
 
 foreach(map IN LISTS MAPS)
+  if(DEFINED WRAP)
+    string(REPLACE "," ";" nodes "${map}")
+    list(REMOVE_DUPLICATES nodes)
+    list(LENGTH nodes node_count)
+    set(launch ${WRAP} ${node_count} ${ENVS} -- ${LAUNCH})
+  else()
+    set(launch ${CMAKE_COMMAND} -E env ${ENVS} ${LAUNCH})
+  endif()
   execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env ${ENVS}
-            ${LAUNCH} -n ${NRANKS} -m ${map} -t 60 -- ${EXE}
+    COMMAND ${launch} -n ${NRANKS} -m ${map} -t ${TIMEOUT} -- ${EXE}
     OUTPUT_VARIABLE out
     ERROR_VARIABLE err
     RESULT_VARIABLE status)

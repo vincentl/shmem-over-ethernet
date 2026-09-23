@@ -22,6 +22,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "base/hostlist.h"
 #include "bootstrap.h"
 #include "check.h"
 #include "job.h"
@@ -128,10 +129,17 @@ int main(void)
     }
     CHECK(osoe_job_backend_blob(&job, job.node_count) == NULL);
 
-    /* Each node's address, as the rendezvous learned it from the host list
-     * osoe-launch gives logical nodes: 127.0.0.[1-N] (§8.1, §6.2). */
-    for (uint32_t n = 0; job.node_count > 1 && n < job.node_count; n++)
-        CHECK(osoe_job_node_address(&job, n) == htonl(INADDR_LOOPBACK + n));
+    /* Each node's address, as the rendezvous learned it from the host list:
+     * osoe-launch gives logical nodes 127.0.0.[1-N] (§8.1, §6.2), and tier 3
+     * its namespaces' addresses (tools/launch/tier3.sh). */
+    const char *list = getenv("OSOE_STEP_NODELIST");
+    for (uint32_t n = 0; job.node_count > 1 && n < job.node_count; n++) {
+        char host[64];
+        struct in_addr want = { 0 };
+        CHECK(list && osoe_hostlist_entry(list, n, host, sizeof host) &&
+              inet_pton(AF_INET, host, &want) == 1);
+        CHECK(osoe_job_node_address(&job, n) == want.s_addr);
+    }
 
     /* Every node is used. A gap would mean the node count and the segments
      * disagree, which §8.1's map parser refuses at the launcher - so finding

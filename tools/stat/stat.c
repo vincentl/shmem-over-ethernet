@@ -302,17 +302,38 @@ static void print_pe_lines(const struct osoe_segment *s)
     }
 }
 
+/* A local PE asleep on one of a connection's words (§3.11), from its record. */
+struct word_waiter {
+    uint64_t peer;
+    uint32_t kind;          /* OSOE_SEGMENT_DETAIL_ACKNOWLEDGEMENT to _REPLY */
+};
+
 /*
  * One line per connection toward a peer node (§3.14's connection scope).
  * Printed after the PE lines, because "which peer" is the first question about
  * a job whose traffic is uneven or whose one link has stopped: `acked` far
  * behind `sent` is a peer that is not applying, and `wanted` ahead of `acked`
  * is a quiet still waiting for it.
+ *
+ * Then, for each connection this node's PEs are asleep on, how many wait on
+ * which of its words - §3.14's "waiters per wake word" - counted from the
+ * "blocked in" records, which name the word since layout 14. The job keeps no
+ * count of its own, so this costs it nothing; each record is read once, and a
+ * segment of an older layout, whose records name only the node, shows none.
  */
 static void print_connection_lines(const struct osoe_segment *s)
 {
     if (s->connection_count == 0)
         return;
+    struct word_waiter *waiting = calloc(s->local_count ? s->local_count : 1, sizeof *waiting);
+    uint32_t asleep = 0;
+    for (uint32_t p = 0; waiting && p < s->local_count; p++) {
+        struct osoe_segment_blocked b;
+        if (osoe_segment_blocked(s, p, &b) && b.valid && b.blocked &&
+            b.detail_kind >= OSOE_SEGMENT_DETAIL_ACKNOWLEDGEMENT &&
+            b.detail_kind <= OSOE_SEGMENT_DETAIL_REPLY)
+            waiting[asleep++] = (struct word_waiter){ b.detail, b.detail_kind };
+    }
     printf("\n%5s %10s %10s %10s %10s %7s %7s %10s %10s %10s\n",
            "peer", "seg sent", "bytes", "seg appl", "bytes", "ctrlq", "bulkq",
            "sent thru", "acked", "wanted");
@@ -332,6 +353,21 @@ static void print_connection_lines(const struct osoe_segment *s)
                " %7" PRIu64 " %7" PRIu64 " %10" PRIu64 " %10" PRIu64 " %10" PRIu64 "\n",
                peer, ss, bs, sa, ba, cq, bq, st, ack, want);
     }
+    for (uint32_t c = 0; asleep > 0 && c < s->connection_count; c++) {
+        uint64_t peer = 0;
+        uint32_t count[OSOE_SEGMENT_DETAIL_REPLY - OSOE_SEGMENT_DETAIL_ACKNOWLEDGEMENT + 1] = { 0 };
+        bool any = false;
+        osoe_segment_read_name(s, "connection.peer", c, &peer);
+        for (uint32_t w = 0; w < asleep; w++)
+            if (waiting[w].peer == peer) {
+                count[waiting[w].kind - OSOE_SEGMENT_DETAIL_ACKNOWLEDGEMENT]++;
+                any = true;
+            }
+        if (any)
+            printf("waiting toward node %" PRIu64 ": acknowledgement %u, turnover %u, "
+                   "credit %u, reply %u\n", peer, count[0], count[1], count[2], count[3]);
+    }
+    free(waiting);
 }
 
 /* ---- the summary view -------------------------------------------------- */

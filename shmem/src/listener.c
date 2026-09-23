@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
@@ -15,6 +16,7 @@
 #include <unistd.h>
 
 #include "base/deadline.h"
+#include "base/hostlist.h"
 #include "base/siphash.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
@@ -487,6 +489,23 @@ bool osoe_listener_write(const struct osoe_bootstrap *b, int fd, const void *byt
                          uint32_t peer)
 {
     return write_all(b, fd, bytes, n, peer);
+}
+
+void osoe_listener_node_address(const struct osoe_bootstrap *b, uint32_t node,
+                                struct sockaddr_in *out)
+{
+    char host[256];
+    if (!b->node_list || !osoe_hostlist_entry(b->node_list, node, host, sizeof host))
+        osoe_fatal("OSOE_STEP_NODELIST='%s' has no usable entry for node %u",
+                   b->node_list ? b->node_list : "", node);
+    struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM }, *found;
+    int e = getaddrinfo(host, NULL, &hints, &found);
+    if (e != 0)
+        osoe_fatal("cannot resolve %s, node %u's host in OSOE_STEP_NODELIST: %s", host, node,
+                   gai_strerror(e));
+    *out = *(const struct sockaddr_in *)found->ai_addr;
+    out->sin_port = 0;
+    freeaddrinfo(found);
 }
 
 int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,

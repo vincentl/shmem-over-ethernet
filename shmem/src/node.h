@@ -27,7 +27,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 13
+#define OSOE_NODE_LAYOUT 14
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -49,6 +49,17 @@ enum osoe_blocked_detail {
     OSOE_BLOCKED_DETAIL_EPOCH,       /* a collective epoch */
     OSOE_BLOCKED_DETAIL_OFFSET,      /* a symmetric-heap offset, for a point-to-point wait */
     OSOE_BLOCKED_DETAIL_PE,          /* a PE */
+    /*
+     * Layout 14: an internode wait says which of the connection's words it
+     * sleeps on (§3.11), the detail being the peer node. A reader counts a
+     * connection's waiters per word from the records it already reads - §3.14's
+     * "waiters per wake word" - and the job pays nothing for it: the record is
+     * written only when a wait is about to sleep, as before.
+     */
+    OSOE_BLOCKED_DETAIL_ACKNOWLEDGEMENT,  /* quiet: the peer's acknowledged sequence */
+    OSOE_BLOCKED_DETAIL_TURNOVER,         /* a writer with no room: the buffer turnover */
+    OSOE_BLOCKED_DETAIL_CREDIT,           /* a get or fetching AMO: a reply credit */
+    OSOE_BLOCKED_DETAIL_REPLY,            /* the reply itself, on the PE's landing slot */
 };
 
 /*

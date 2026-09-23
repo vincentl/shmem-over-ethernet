@@ -10,10 +10,12 @@
  * Node 1's only PE stops itself (SIGSTOP), which stops node 1's lead and with it
  * every acknowledgement node 1 would send. PE 0 then writes to it and quiets:
  * the quiet can never finish. PE 1 runs the real osoe-stat on its node until PE
- * 0 shows as blocked in shmem_quiet, then kills itself. PE 0's next sweep must
- * find the dead sibling and end the job, naming the routine it was in; ctest
- * checks the message, and the launcher's short timeout is the bound on "next
- * sweep".
+ * 0 shows as blocked in shmem_quiet on node 1's acknowledgement, and the
+ * connection toward node 1 as having one PE asleep on that word (§3.14's
+ * waiters per wake word, since layout 14), then kills itself. PE 0's next sweep
+ * must find the dead sibling and end the job, naming the routine it was in;
+ * ctest checks the message, and the launcher's short timeout is the bound on
+ * "next sweep".
  *
  * **The stopped node is killed only after PE 0 has gone** (phase 1 step 3).
  * On a socket its death is not silent: its kernel resets the connection that
@@ -81,7 +83,9 @@ static void run_stat(char *out, size_t len)
 }
 
 /* Does local PE 0's row - the first after the table's header - say it is in
- * shmem_quiet waiting on node 1? On map 0,0,1 local PE 0 of node 0 is rank 0. */
+ * shmem_quiet waiting on node 1's acknowledgement, and the connection toward
+ * node 1 that one PE waits on that word and none on its others? On map 0,0,1
+ * local PE 0 of node 0 is rank 0, and PE 1, running this, waits on nothing. */
 static int pe0_blocked_in_quiet(const char *out)
 {
     const char *header = strstr(out, "blocked in\n");
@@ -92,7 +96,9 @@ static int pe0_blocked_in_quiet(const char *out)
     size_t n = end ? (size_t)(end - row) : strlen(row);
     char line[512];
     snprintf(line, sizeof line, "%.*s", (int)(n < sizeof line ? n : sizeof line - 1), row);
-    return strstr(line, "shmem_quiet (node 1)") != NULL;
+    return strstr(line, "shmem_quiet (acknowledgement from node 1)") != NULL &&
+           strstr(out, "waiting toward node 1: acknowledgement 1, turnover 0, credit 0, "
+                       "reply 0\n") != NULL;
 }
 
 int main(void)
