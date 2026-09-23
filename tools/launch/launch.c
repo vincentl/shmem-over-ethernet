@@ -138,9 +138,17 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
     setenv_or_die("OSOE_STEP_ID", "0");
     setenv_or_die("OSOE_GTIDS", p->gtids);
 
+    /*
+     * The step's hosts, in node order (§6.1). One node: this host's name. More:
+     * one loopback address per logical node - all of 127.0.0.0/8 is loopback on
+     * Linux - so each node's lead listens on its own address, as on a cluster,
+     * and the rendezvous resolves a host list rather than a special case (§8.1).
+     */
     char host[HOST_NAME_MAX + 1] = "localhost";
     gethostname(host, sizeof host);
     host[sizeof host - 1] = '\0';
+    if (node_count_for_children > 1)
+        snprintf(host, sizeof host, "127.0.0.[1-%u]", node_count_for_children);
     setenv_or_die("OSOE_STEP_NODELIST", host);
 
     for (int i = 0; i < nov; i++)
@@ -297,6 +305,12 @@ int main(int argc, char **argv)
     free(ranks);
     osoe_node_map_free(&map);
     node_count_for_children = node_count;
+    /* One loopback address per logical node (exec_rank): 127.0.0.1 to .254. */
+    if (node_count > 254) {
+        fprintf(stderr, "osoe-launch: %u logical nodes; at most 254 get a loopback address "
+                        "each\n", node_count);
+        return 1;
+    }
 
     /*
      * SIGCHLD, SIGTERM and SIGINT are consumed with sigtimedwait, so block them

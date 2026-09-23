@@ -8,9 +8,12 @@
  * node maps - including the two §8.1 calls out as the ones that break things:
  * uneven node sizes, and ranks that are not contiguous per node.
  *
- * It does not call shmem_init: the rendezvous runs before a job is usable, and
- * a multi-node job is still refused until the internode barrier lands.
+ * It does not call shmem_init: the rendezvous runs before a job is usable. Since
+ * phase 1 step 3 its leads meet over sockets, in a tree (rendezvous.h), on the
+ * loopback address osoe-launch gives each logical node.
  */
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -47,6 +50,14 @@ uint32_t osoe_internode_fanout_default(void);
 uint32_t osoe_internode_fanout_default(void)
 {
     return 4;
+}
+
+/* The backend's blob (transport.h): this test has no backend, so it describes
+ * nothing, and the blobs every node learns stay zero. */
+void osoe_transport_advertise(void *blob);
+void osoe_transport_advertise(void *blob)
+{
+    (void)blob;
 }
 
 _Noreturn void osoe_fatal(const char *fmt, ...);
@@ -107,7 +118,8 @@ int main(void)
     }
     CHECK(osoe_job_local_index(&job, job.world_size) == UINT32_MAX);
 
-    /* The per-node backend blob (layout 4): AM publishes zeros. */
+    /* The per-node backend blob (layout 4): this test's backend describes
+     * nothing, so every node's arrives as zeros. */
     for (uint32_t n = 0; n < job.node_count; n++) {
         const unsigned char *blob = osoe_job_backend_blob(&job, n);
         CHECK(blob != NULL);
@@ -115,6 +127,11 @@ int main(void)
             CHECK(blob[k] == 0);
     }
     CHECK(osoe_job_backend_blob(&job, job.node_count) == NULL);
+
+    /* Each node's address, as the rendezvous learned it from the host list
+     * osoe-launch gives logical nodes: 127.0.0.[1-N] (§8.1, §6.2). */
+    for (uint32_t n = 0; job.node_count > 1 && n < job.node_count; n++)
+        CHECK(osoe_job_node_address(&job, n) == htonl(INADDR_LOOPBACK + n));
 
     /* Every node is used. A gap would mean the node count and the segments
      * disagree, which §8.1's map parser refuses at the launcher - so finding

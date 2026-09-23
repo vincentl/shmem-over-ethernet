@@ -134,7 +134,7 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, i
 
 void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
                      const struct osoe_bootstrap *b, uint32_t session,
-                     const struct sockaddr_in *hosts)
+                     const struct osoe_mesh *mesh)
 {
     struct sockaddr_in loopback = { .sin_family = AF_INET,
                                     .sin_addr.s_addr = htonl(INADDR_LOOPBACK) };
@@ -148,11 +148,12 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
     uint32_t peers = b->node_count - 1;
     for (uint32_t slot = 0; slot < peers; slot++)
         wires[slot] = (struct osoe_wire){ .fd = -1 };
-    struct osoe_listener l;
-    osoe_listener_open(&l, b, session);
+    struct osoe_listener own, *l = mesh ? mesh->listener : &own;
+    if (!mesh)
+        osoe_listener_open(&own, b, session, NULL);
     for (uint32_t accepted = 0; accepted < b->node; accepted++) {
         uint32_t peer;
-        int fd = osoe_listener_accept(&l, OSOE_HELLO_MESH, &peer);
+        int fd = osoe_listener_accept(l, OSOE_HELLO_MESH, &peer);
         if (peer >= b->node)
             osoe_fatal("node %u was connected to by node %u, which is not a lower node",
                        b->node, peer);
@@ -161,10 +162,12 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
             osoe_fatal("node %u was connected to twice by node %u", b->node, peer);
         osoe_wire_attach(&wires[slot], ring, slot, fd, peer, b);
     }
-    osoe_listener_close(&l);
+    osoe_listener_close(l);
     for (uint32_t peer = b->node + 1; peer < b->node_count; peer++) {
-        const struct sockaddr_in *host = hosts ? &hosts[peer] : &loopback;
-        int fd = osoe_listener_connect(b, session, host, peer, OSOE_HELLO_MESH);
+        int fd = mesh ? osoe_listener_connect_port(b, session, &mesh->peers[peer],
+                                                   ntohs(mesh->peers[peer].sin_port), peer,
+                                                   OSOE_HELLO_MESH)
+                      : osoe_listener_connect(b, session, &loopback, peer, OSOE_HELLO_MESH);
         osoe_wire_attach(&wires[peer - 1], ring, peer - 1, fd, peer, b);
     }
     osoe_wire_ring_open(ring, wires, peers, b);

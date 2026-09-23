@@ -217,7 +217,7 @@ add_test(NAME shmem.fatal-order COMMAND shmem_test_fatal-order)
 set_tests_properties(shmem.fatal-order PROPERTIES LABELS "tier1" TIMEOUT 30)
 
 add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c ../src/shm-object.c
-  ../src/am.c)
+  ../src/am.c ../src/rendezvous.c ../src/rank-map.c ../src/listener.c)
 target_include_directories(shmem_test_job PRIVATE ../src)
 target_link_libraries(shmem_test_job PRIVATE osoe_base rt)
 osoe_warnings(shmem_test_job)
@@ -230,9 +230,10 @@ foreach(map 0 0,0,0,0 0,1,2,3 0,0,0,1,2,2 0,1,2,0,1,0)
   set_tests_properties(shmem.job.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
 # Two node leads claiming one rank: node 1's lead is told its node holds ranks 1
-# and 0, and node 0's lead holds 0. Exactly one claim wins (a CAS per rank since
-# slice 2; a plain test-and-store before, which two simultaneous leads could
-# both pass), and the job is refused naming the rank.
+# and 0, and node 0's lead holds 0. The rendezvous's root checks every node's
+# ranks once, as it builds the map (rank-map.c), and the job is refused naming
+# the rank and both nodes. (Step 2 had each lead claim its ranks by CAS in a
+# job-wide array; a plain test-and-store before slice 2 let two leads both pass.)
 add_test(NAME shmem.job.duplicate-rank
   COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1,0 --
           $<TARGET_FILE:shmem_test_job>)
@@ -240,9 +241,9 @@ set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 
   PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
 
 # A rank no lead claims: node 1's lead is told its node holds rank 1 alone,
-# though rank 2 is there too. The map is checked once, by the lead whose
-# arrival completed the rendezvous (slice 3; it was every PE's O(P) scan), and
-# the job is refused naming the rank.
+# though rank 2 is there too. The root checks the map once as it builds it
+# (it was every PE's O(P) scan before slice 3), and the job is refused naming
+# the rank.
 add_test(NAME shmem.job.unclaimed-rank
   COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1 --
           $<TARGET_FILE:shmem_test_job>)
@@ -267,6 +268,41 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
   set_tests_properties(shmem.job.duplicate-rank.slow-message PROPERTIES LABELS "tier2"
     TIMEOUT 60 PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
 endif()
+
+# The values every node must agree on are checked up the rendezvous tree, each
+# by the parent that sees the disagreement, naming both nodes (§6.2). Node 2's
+# parent is node 0 at the tree's fan-out of 8.
+add_test(NAME shmem.job.disagree.symmetric-size
+  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 2:SHMEM_SYMMETRIC_SIZE=64M --
+          $<TARGET_FILE:shmem_test_job>)
+add_test(NAME shmem.job.disagree.fanout
+  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 2:OSOE_COLLECTIVE_FANOUT=2 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.disagree.symmetric-size shmem.job.disagree.fanout
+  PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.job.disagree.symmetric-size PROPERTIES PASS_REGULAR_EXPRESSION
+  "node 2 [(]or a node below it[)] has SHMEM_SYMMETRIC_SIZE [0-9]+; node 0 has")
+set_tests_properties(shmem.job.disagree.fanout PROPERTIES PASS_REGULAR_EXPRESSION
+  "node 2 [(]or a node below it[)] has OSOE_COLLECTIVE_FANOUT=2; node 0 has 4")
+
+# The node count is the value that shapes the waits: a lead expects children by
+# its own count, so one given too many waits for children that do not exist.
+# The hello carries the count and a lead calls its parent before it waits for
+# its children, so the first edge that disagrees refuses the job, rather than
+# every lead waiting with no message (tools/modelcheck/rendezvous_model.py).
+# Node 1 given 10 nodes expects a child 9; node 0 given 9 expects 1 to 8.
+add_test(NAME shmem.job.disagree.node-count
+  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 1:OSOE_STEP_NUM_NODES=10
+          -e 1:OSOE_STEP_NODELIST=127.0.0.[1-10] -- $<TARGET_FILE:shmem_test_job>)
+add_test(NAME shmem.job.disagree.root-node-count
+  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 0:OSOE_STEP_NUM_NODES=9
+          -e 0:OSOE_STEP_NODELIST=127.0.0.[1-9] -- $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.disagree.node-count shmem.job.disagree.root-node-count
+  PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.job.disagree.node-count PROPERTIES PASS_REGULAR_EXPRESSION
+  "node 0, launched for 3 tasks on 3 nodes, was called by node 1, launched for 3 tasks on 10 nodes")
+set_tests_properties(shmem.job.disagree.root-node-count PROPERTIES PASS_REGULAR_EXPRESSION
+  "node 0, launched for 3 tasks on 9 nodes, was called by node [12], launched for 3 tasks on 3 nodes")
 
 # The progress loop between two logical nodes (tier 2): every layer at once.
 # The wire is far smaller than a segment and its split injection is on, so the

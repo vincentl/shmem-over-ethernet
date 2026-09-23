@@ -4108,7 +4108,8 @@ names; otherwise they fall back to regular shared memory.
 **Global.** The step's rendezvous server is the lead of node 0: the task with
 `SLURM_NODEID == 0` and `SLURM_LOCALID == 0`, on the first host of
 `SLURM_STEP_NODELIST`. That is the same list `SLURM_NODEID` indexes, so every task
-computes the same host under any distribution.
+computes the same host under any distribution. *(As written, a star; built in
+phase 1 step 3 as a tree rooted at that lead - "The rendezvous as built", below.)*
 
 - **Port:** a deterministic sequence of candidate ports hashed from the job and
   step IDs, within a configurable range. The server binds the first free
@@ -4152,8 +4153,12 @@ connection times, not after a chain of them. The listen backlog is `min(N, 4096)
 every lower node at once, capped by `net.core.somaxconn`; past 4,096 nodes a
 connection waits in SYN retries rather than failing. The listener is closed once
 the lower nodes are in, so a stranger probing a candidate afterwards is refused
-rather than left unanswered. Every logical node is on the local host until the
-socket rendezvous gives addresses (below).
+rather than left unanswered. In a job the mesh does not probe at all: each lead
+listens on a port the kernel chooses, **advertises it in its backend blob**
+(`osoe_transport_advertise`, the call the blob was waiting for), and the others
+connect to the address and port the rendezvous carried (below). The port rule's
+probing remains for the rendezvous's own parent connection, and for the tests
+below the library that make a mesh without a rendezvous.
 
 **What the map holds, and what it costs** (phase 1 step 2 slice 3; second review,
 D7). Per rank: its node (4 bytes) and its **local index on that node** (2 bytes;
@@ -4169,20 +4174,110 @@ order, and otherwise a binary search over the node's *L* ranks sorted — replac
 a world-sized `local_of_rank` array in every PE, which was 4 × *P* bytes per PE and
 1 GiB per node at 4,096 × 256. `gtids` is sized by *L*, not *P*.
 
-**The known next step is a range-compressed map.** Under block and cyclic
+**The known next step was a range-compressed map.** Under block and cyclic
 distributions the map is O(*N*) runs, not O(*P*) entries, and so is the broadcast
-that fills it — which as designed sends 4·*P* bytes to each of *N* − 1 leads from
+that fills it — which as designed sent 4·*P* bytes to each of *N* − 1 leads from
 one NIC, O(*N*·*P*) bytes through node 0: 255 MB at 500 × 256 (about 2 s on 1 GbE),
-16 GB at 4,096 × 256 (second review, algorithmic-scaling 9). Neither is built:
-the step-2 rendezvous is a shared-memory object, and the socket rendezvous of
-step 3 is where the compressed form and a tree-shaped broadcast belong.
+16 GB at 4,096 × 256 (second review, algorithmic-scaling 9). Built with the socket
+rendezvous (below).
 
 `SLURM_STEP_NODELIST` is a compressed hostlist (`pi[01-04,07]`). Expanding it is a
 small parser — call it fifty lines — **written with unit tests in tier 1**, because
 it is pure string handling that would otherwise be debugged on a cluster.
 *Built* (`base/hostlist.c`, `base.hostlist`): prefix, one bracketed list of
 numbers and ranges keeping the lower bound's width, suffix; Slurm's multi-bracket
-names are refused by name rather than guessed.
+names are refused by name rather than guessed. Nothing expands the list: a lead
+asks for its own entry and its parent's, O(length of the string) each.
+
+**The rendezvous as built** (phase 1 step 3 slice 1; `rendezvous.[ch]`, `job.[ch]`;
+decided with the author 2026-09-22). **A tree, not a star.** Node *i*'s lead
+connects to its parent, (*i* − 1)/8, in a tree of fan-out 8 over the node indices
+rooted at node 0, found by the port rule on the address its host-list entry names;
+each lead listens on its own entry's address. §6.2's star put every connection
+into one listener and every lead's copy of the job's tables through one NIC —
+O(*N*) connections and O(*N*²) bytes out of node 0: 2.2 GB at 4,096 nodes for
+the addresses and blobs alone, even with the map compressed (2.6 GB with a
+block map's runs). In the tree a lead has one connection up and at most eight down, and sends each child
+the tables once: O(*N*) bytes per edge, depth ⌈log₈ *N*⌉ — 4 at 4,096 nodes. The
+fan-out is a constant, so no setting can make two leads disagree about who is
+whose parent.
+
+**The node count is the value that shapes the waits**, because a lead expects
+children by its own count: one given too large a count waits for children that
+do not exist. The order first written — accept the children, read their
+reports, only then call the parent — let it do that before its parent had heard
+from it, and then nobody could ever say why: its parent waited for it, the root
+for the parent, every other lead for the root's tables, and no lead refused
+anything (`tools/modelcheck/rendezvous_model.py`, STUCK; and
+`shmem.job.disagree.node-count` hung until its timeout, written to show it). So
+**a lead calls its parent before it accepts its children**, and **the hello
+carries the node count and the job's size**, checked by the lead that answers:
+a disagreement about the tree's shape is refused on the first edge it crosses,
+before either end waits on it. The model shows both rules are needed — the
+count in the hello without the order is STUCK too — and that with them every
+case in which one lead differs ends in a refusal, with the trapped-state check
+on. What no rendezvous can catch is two *groups* of leads that each agree
+among themselves: the root's group completes a smaller job while the other
+waits for a listener that has closed. That is two launches sharing one job's
+ids, indistinguishable from one slow launch without a time limit, which §3.15
+rules out; the no-progress rule is the answer there.
+
+Every read and write of the rendezvous waits as long as its peer takes,
+sweeping, and ends the job naming the peer only by the no-progress rule
+(§3.15) — a write too, since the tables are larger than a socket buffer. A lead
+that refuses the job ends it by a fatal, which the launcher turns into the
+job's end (`srun -K1`, §3.15; `osoe-launch` does the same), and a neighbour
+waiting on its socket names it ("the rendezvous lost node 9, its child…").
+
+*Up the tree* goes each subtree's report: per node its address, its ranks as
+arithmetic progressions in local-id order (one under block, one under cyclic;
+`rank-map.h`) and its blob; and the values every node must agree on — the job's
+size, `SHMEM_SYMMETRIC_SIZE`, the handler checksum, `OSOE_COLLECTIVE_FANOUT` —
+which each parent checks against its own, so a disagreement is refused by the
+lead that sees it, naming both nodes (`shmem.job.disagree.*`). *At the root* the
+map is built: the progressions are expanded once, into O(*P*) scratch on that one
+node, to check that every rank is claimed exactly once (`shmem.job.duplicate-rank`,
+`unclaimed-rank` keep their messages), then compressed into **runs** — stretches
+of consecutive ranks whose node and local id advance by constant steps: one run
+per node under block, one per round under cyclic. *Down the tree* goes the runs,
+every node's address and every node's blob; each lead writes them into a
+**node-local** object, `/osoe.<job>.<step>.<node>.job.<session>`, which its PEs
+open like the control segment and the last of them unlinks. The step-2 job-wide
+segment, which only worked on one host, is gone. A job of one node meets no one
+and opens no socket: a machine with no network runs it.
+
+*What it costs*, per node: O(*R* + *N*) shared — *R* runs (4,096 under block at
+4,096 × 256, 256 under cyclic; 24 bytes each), and *N* addresses and blobs (132
+bytes each, 540 KB at 4,096 nodes) — where the per-rank map was 6 MiB at 10⁶ PEs.
+Which node a rank is on is a binary search, O(log *R*), and only the network path
+asks it; whether a rank is on *this* node — the question every put and get asks
+first (`osoe_routes_in_process`) — is this node's own rank set, O(1) when its
+ranks are one progression: a subtraction for block, a division for cyclic, a
+binary search over *L* otherwise. The root's O(*P*) scratch is once per job, as
+the step-2 check of the whole map was. `shmem.rank-map` checks lookups against the
+uncompressed map on §8.1's four poles, and the run counts at 4,096 × 256.
+
+**The mesh is still eager, and what on-demand would need.** Every lead connects
+to every higher node at init: *N*(*N* − 1)/2 connections job-wide, 8.4 M at 4,096
+nodes, and a listen backlog of *N* − 1 (capped by `somaxconn`), which at 4,096
+nodes turns the last connections into SYN retries rather than failures. Nothing
+in this slice made laziness harder. On-demand would need: a connection opened at
+the first operation toward a node, which the per-connection state already allows
+— a wire, a ring slot and the connection area's buffers are all per peer slot, and
+the dirty set and the busy bitmap only visit what has work; the lead's listener
+kept open for the life of the job, served by a multishot accept on the ring
+rather than closed after init; a writer that finds no connection toward a node
+posting a request to the lead rather than reserving, since only the lead
+connects (§3.12); and a rule for two leads that connect to each other at once —
+the lower node's connection wins, as §6.2's direction already says. The ring's
+bounds would then follow the active peers rather than *N*.
+
+**`set_range` is not acted on here** (§4.10, §7.1 step 3). A TCP backend has
+nothing to prepare before the network touches memory: it receives into its own
+provided buffers and copies, and sends from connection buffers, so it neither
+registers memory nor needs to know which words take atomics. The claim that step
+3's backend is the first to act on it was wrong for this backend; the first that
+must is an RDMA one.
 
 **Failure handling:**
 
@@ -4216,7 +4311,7 @@ the bootstrap runs in every test rather than only on a cluster. The names mirror
 | `OSOE_NODEID` | `SLURM_NODEID` | Yes |
 | `OSOE_LOCALID` | `SLURM_LOCALID` | Yes |
 | `OSOE_GTIDS` | `SLURM_GTIDS` | Yes |
-| `OSOE_STEP_NODELIST` | `SLURM_STEP_NODELIST` | No: one node needs no host list |
+| `OSOE_STEP_NODELIST` | `SLURM_STEP_NODELIST` | No: one node needs no host list. *Since phase 1 step 3, required when there is more than one node*: the leads' addresses |
 | `OSOE_JOB_ID` | `SLURM_JOB_ID` | Yes, in segment names |
 | `OSOE_STEP_ID` | `SLURM_STEP_ID` | Yes, in segment names |
 
@@ -4230,7 +4325,8 @@ marked "Yes" above is required, and the README shows how to launch a one-node jo
 by hand. *(Rejected: singleton launch when the variables are absent, as some
 implementations do. It saves typing `osoe-launch -n 1` and hides the mistake above.)*
 `OSOE_NO_PROGRESS_TIMEOUT` (§3.15) is osoe's own, read by the library; it
-replaced `OSOE_BOOTSTRAP_TIMEOUT`, which is retired.
+replaced `OSOE_BOOTSTRAP_TIMEOUT`, which is retired. So, since phase 1 step 3,
+is `OSOE_PORT_RANGE` (§6.2), which is optional.
 `OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
 turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
 library never sees it.
@@ -4431,7 +4527,10 @@ machinery. The review's order is adopted.
    The first backend that *acts* on `osoe_transport_set_range` is here — it is the
    first that must prepare memory before the network can touch it — but the hook
    and its allocator call site landed at step 2 (§4.10), because the call site is
-   in the allocator rather than in a backend. The allocator half — recording
+   in the allocator rather than in a backend. *(Wrong for this backend, found
+   building it: TCP receives into its own buffers and sends from connection
+   buffers, so it has nothing to prepare. The first backend that must act on
+   the call is an RDMA one; §6.2.)* The allocator half — recording
    hints and growing hinted allocations from the opposite end — is older still,
    from step 1, because retrofitting hint plumbing into a finished allocator is
    the expensive version.
@@ -4615,6 +4714,15 @@ worth stating:
   that everything else consults. PEs rendezvous only with the PEs named in their
   own node's `OSOE_GTIDS`, so a PE never maps a heap outside its logical node and
   the function has no address to return.
+
+A third, since phase 1 step 3, holds the same way: **an address per logical
+node.** `osoe-launch` sets `OSOE_STEP_NODELIST=127.0.0.[1-N]`, so logical node
+*i*'s lead listens on 127.0.0.*i*+1 — Linux routes all of 127/8 to `lo` with no
+setup — and the rendezvous and the mesh find each other by address and port, as
+they do between hosts, rather than by a probe that only a single host could
+answer. A lead that bound or dialled the wrong entry would meet nobody, so the
+tests catch it. The launcher refuses more than 254 nodes, which one bracketed
+octet cannot name.
 
 Plus a **force-remote flag**. An earlier draft had it route even
 same-logical-node traffic over the network, and called that the strongest

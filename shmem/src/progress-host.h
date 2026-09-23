@@ -33,6 +33,13 @@
 void osoe_progress_host_start(uint32_t session);
 
 /*
+ * osoe_transport_advertise's AM half: open this lead's node-pair listener on a
+ * port the kernel chooses, and write the port into the blob (a uint16_t at its
+ * start) for the rendezvous to carry to every node (§6.2).
+ */
+void osoe_progress_host_advertise(void *blob);
+
+/*
  * The lead's last turn on its agent thread (osoe_transport_agent_exit): put
  * everything this node still owes the network on the wire, then close every
  * wire. On the agent thread because the engine's resources are that thread's

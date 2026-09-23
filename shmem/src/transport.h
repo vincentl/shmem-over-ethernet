@@ -108,6 +108,19 @@ void osoe_transport_fini(void);
 
 struct osoe_transport_context *osoe_transport_context_default(void);
 
+/*
+ * Ready what another node's lead needs to reach this node, and describe it in
+ * `blob`: OSOE_JOB_BACKEND_BLOB_BYTES long (job.h), zeroed. Called by this
+ * node's lead during the job rendezvous, before osoe_transport_init, and only in
+ * a job of more than one node. The rendezvous carries every node's blob to every
+ * node (osoe_job_backend_blob) - out of band, as §6.2 says an RDMA backend's
+ * queue-pair and key material must travel. AM listens for its node-pair
+ * connections here and writes the listener's port. This is the call the job
+ * rendezvous's blob was left waiting for "with the backend that needs one" (job.h
+ * at step 2); it adds to the seam rather than changing it.
+ */
+void osoe_transport_advertise(void *blob);
+
 /* ---- The progress thread (§3.12) ------------------------------------- */
 
 /*

@@ -43,6 +43,7 @@
 
 #include "base/deadline.h"
 #include "bootstrap.h"
+#include "listener.h"
 #include "ring.h"
 
 /*
@@ -83,16 +84,28 @@ struct osoe_wire {
 };
 
 /*
+ * Where every node's lead listens for its node-pair connections, as the
+ * rendezvous taught it (§6.2): `peers[n]` is node n's address and port, and
+ * `listener` is this lead's own, already listening since it advertised its port.
+ */
+struct osoe_mesh {
+    struct osoe_listener *listener;
+    const struct sockaddr_in *peers;
+};
+
+/*
  * Establish this lead's node-pair connections, one per peer node, and open the
  * ring that carries them (disabled until the driving thread enables it). §6.2's
  * rule: the lower node index connects to the higher, so each pair has exactly
- * one stream. `hosts[n]` is node n's address; NULL means every node is on this
- * host, which is how §8.1's logical nodes run. `wires` has node_count - 1
- * entries, in peer-slot order. Fatal on failure (§3.15).
+ * one stream. With a mesh, each connection goes to the port its peer advertised;
+ * without one (NULL), every node is on this host and each lead is found by the
+ * port rule (listener.h), which is how the tests below the library meet.
+ * `wires` has node_count - 1 entries, in peer-slot order. Fatal on failure
+ * (§3.15).
  */
 void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
                      const struct osoe_bootstrap *b, uint32_t session,
-                     const struct sockaddr_in *hosts);
+                     const struct osoe_mesh *mesh);
 
 /*
  * The two halves of osoe_wires_open, for a caller that makes its own

@@ -128,6 +128,17 @@ void osoe_transport_fini(void)
     osoe_am = (struct osoe_am_state){ 0 };
 }
 
+/*
+ * §6.2's blob, on AM: the port this lead's node-pair listener took. The
+ * listener is opened here, before the rendezvous, so its port can ride in the
+ * blob to every node; the connections are made in osoe_transport_init, once the
+ * rendezvous has said where every node is (osoe_wires_open).
+ */
+void osoe_transport_advertise(void *blob)
+{
+    osoe_progress_host_advertise(blob);
+}
+
 /* The agent thread, lent to this backend (transport.h, §3.12). */
 bool osoe_transport_agent_pass(void)
 {

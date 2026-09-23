@@ -12,7 +12,6 @@ if(OSOE_BACKEND STREQUAL "am")
     src/connection.c
     src/connection-area.c
     src/internode-am.c
-    src/listener.c
     src/progress.c
     src/progress-host.c
     src/reply.c
@@ -36,12 +35,14 @@ add_library(osoe
   src/info.c
   src/init.c
   src/job.c
+  src/listener.c
   src/malloc.c
   src/metrics.c
   src/node.c
   src/profile.c
   src/quiet.c
   src/rank-map.c
+  src/rendezvous.c
   src/rma.c
   src/session.c
   src/shm-object.c

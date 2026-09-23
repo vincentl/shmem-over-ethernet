@@ -2,18 +2,24 @@
  * The job-wide rendezvous, and the one locality function (§6.2, §8.1).
  *
  * §6.2: local PEs meet on their node; **only each node's lead crosses the
- * network**. The lead of node 0 is the step's rendezvous server, every other
- * node's lead connects to it, each sends its node's rank list, its
- * SHMEM_SYMMETRIC_SIZE, its handler-table checksum and its internode tree's
- * fan-out (OSOE_COLLECTIVE_FANOUT), the server checks that
- * they agree, and then broadcasts the rank -> node map.
+ * network**. Since phase 1 step 3 the leads meet over sockets, in a tree rooted
+ * at node 0 (rendezvous.h), and each checks that the node below it agrees about
+ * the job - its size, SHMEM_SYMMETRIC_SIZE, the handler table's checksum and
+ * OSOE_COLLECTIVE_FANOUT - before the root builds the rank -> node map and every
+ * lead learns it, with every node's address and backend blob.
  *
- * §7.1 step 2 has no sockets, so the meeting place here is a shared-memory
- * object rather than a listener, and the leads meet in memory. Everything else
- * is the same shape: only leads take part, each publishes exactly the three
- * things §6.2 says it publishes, the agreement checks are the same checks, and
- * the result is the same map. Step 3 replaces the object with the socket and
- * the handshake; nothing above this header changes.
+ * **What a lead learns it shares with its node, not its job.** The step-2
+ * stand-in kept the map in one job-wide shared-memory object every PE of the
+ * job mapped, which only works on one host. Now each lead writes what it learned
+ * into a node-local object, /osoe.<job>.<step>.<node>.job.<session>, which its
+ * node's PEs open by name like the control segment, and whose name the last of
+ * them removes (§6.2's unlink-early rule).
+ *
+ * **The map is runs, not ranks** (rank-map.h): O(N) under block, O(L) under
+ * cyclic, where it was 6 bytes per rank - 6 MiB per node at 10^6 PEs. Which node
+ * a rank is on is then a binary search, O(log R), which only the network path
+ * asks; whether a rank is on *this* node - the question every put asks - is
+ * this node's own rank set, O(1) when its ranks are one progression.
  *
  * **Bootstrap is out of band in every build, and always will be** (§6.2). An
  * RDMA transport cannot bootstrap itself, and neither can this one: the map
@@ -35,32 +41,7 @@
 #include <stdint.h>
 
 #include "bootstrap.h"
-
-/* Process-private view of the job. */
-struct osoe_job {
-    char name[96];
-    void *map;
-    uint64_t bytes;
-    uint32_t world_size;
-    uint32_t node_count;
-    uint32_t node;                  /* this PE's logical node */
-    uint32_t me;                    /* this PE's world rank */
-    const uint32_t *node_of;        /* world rank -> logical node, world_size long */
-    const unsigned char *backend_blob;  /* node_count blobs (osoe_job_backend_blob) */
-    const uint16_t *local_index;    /* world rank -> local id on its node (below) */
-    bool force_remote;              /* §8.1: deny the pointer to a node-mate */
-    bool creator;                   /* node 0's lead made the object */
-};
-
-/*
- * Meet the other nodes' leads and learn the map. Every PE calls it; only leads
- * publish, as §6.2 requires, and the others read what their own lead wrote.
- * Fatal on disagreement or timeout (§3.15).
- */
-void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t session);
-
-/* Unmap; node 0's lead removes the name. */
-void osoe_job_leave(struct osoe_job *j);
+#include "rank-map.h"
 
 /*
  * A backend's per-node addressing blob (§6.2; second review, roce-seam F10).
@@ -72,15 +53,39 @@ void osoe_job_leave(struct osoe_job *j);
  * fixed-size opaque blob per node, published by the node's lead together with
  * its rank list, and readable by every PE once the job has joined. Fixed-size
  * because the rendezvous is sized before anyone has spoken; opaque because
- * nothing above the backend may read it.
- *
- * AM uses none of it and publishes zeros: AM addresses a node by its number.
- * The call that lets a backend supply its blob before the job rendezvous
- * arrives with the backend that needs one; the space arrives now, because it is
- * the rendezvous's layout and changing that later is a protocol revision
- * (layout 4 of the job segment).
+ * nothing above the backend may read it. The backend fills it through
+ * osoe_transport_advertise (transport.h) - on AM since step 3, the port of the
+ * lead's node-pair listener.
  */
 enum { OSOE_JOB_BACKEND_BLOB_BYTES = 128 };
+
+/* Process-private view of the job. */
+struct osoe_job {
+    char name[96];
+    void *map;                      /* the node-local object, or NULL on one node */
+    uint64_t bytes;
+    uint32_t world_size;
+    uint32_t node_count;
+    uint32_t node;                  /* this PE's logical node */
+    uint32_t me;                    /* this PE's world rank */
+    const struct osoe_rank_run *runs;   /* the rank map (rank-map.h), in rank order */
+    uint32_t run_count;
+    const uint32_t *ipv4;           /* each node's address, network order; NULL on one node */
+    const unsigned char *backend_blob;  /* node_count blobs (osoe_job_backend_blob) */
+    struct osoe_rank_set here;      /* this node's ranks: the locality question */
+    struct osoe_rank_run *owned_runs;   /* the map of a job of one node, freed at leave */
+    bool force_remote;              /* §8.1: deny the pointer to a node-mate */
+};
+
+/*
+ * Meet the other nodes' leads and learn the map. Every PE calls it; only leads
+ * take part, as §6.2 requires, and the others read what their own lead wrote.
+ * Fatal on disagreement, and on no progress for OSOE_NO_PROGRESS_TIMEOUT (§3.15).
+ */
+void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t session);
+
+/* Unmap; free what the join built. */
+void osoe_job_leave(struct osoe_job *j);
 
 static inline const void *osoe_job_backend_blob(const struct osoe_job *j, uint32_t node)
 {
@@ -88,29 +93,37 @@ static inline const void *osoe_job_backend_blob(const struct osoe_job *j, uint32
                                 : NULL;
 }
 
+/* Node `node`'s address, IPv4 in network order, as the rendezvous learned it
+ * from its host-list entry; 0 on a job of one node. */
+static inline uint32_t osoe_job_node_address(const struct osoe_job *j, uint32_t node)
+{
+    return j->ipv4 && node < j->node_count ? j->ipv4[node] : 0;
+}
+
 /*
  * A rank's local id on its *own* node, for any rank of the job (§6.2).
  *
- * The one fact about a remote PE that an RDMA backend needs and node_of cannot
- * give: it forms a remote address as the node's registered heap base plus
- * local index x heap size plus offset, and under Slurm's cyclic or arbitrary
- * distributions the index is not derivable from the node map (second review,
- * roce-seam F7). AM addresses by rank and never reads it.
- *
- * Shared, one copy per node, 2 bytes per rank: 2 MiB at 10^6 PEs, beside
- * node_of's 4 MiB. O(P) per node, accepted for now; §6.2 records the
- * range-compressed map as the next step. For this node's own ranks the
- * library uses osoe_node_local_id, which is O(L) private.
+ * The one fact about a remote PE that an RDMA backend needs and the node alone
+ * cannot give: it forms a remote address as the node's registered heap base
+ * plus local index x heap size plus offset, and under Slurm's cyclic or
+ * arbitrary distributions the index is not derivable from the node (second
+ * review, roce-seam F7). AM addresses by rank and never reads it. O(log R).
  */
 static inline uint32_t osoe_job_local_index(const struct osoe_job *j, uint32_t pe)
 {
-    return pe < j->world_size ? j->local_index[pe] : UINT32_MAX;
+    const struct osoe_rank_run *r = pe < j->world_size
+                                    ? osoe_rank_run_find(j->runs, j->run_count, pe) : NULL;
+    return r ? r->first_local + (uint32_t)((int64_t)(pe - r->first_rank) * r->local_step)
+             : UINT32_MAX;
 }
 
-/* The logical node a world rank is on. */
+/* The logical node a world rank is on. O(log R): the network path's question. */
 static inline uint32_t osoe_node_of(const struct osoe_job *j, uint32_t pe)
 {
-    return pe < j->world_size ? j->node_of[pe] : UINT32_MAX;
+    const struct osoe_rank_run *r = pe < j->world_size
+                                    ? osoe_rank_run_find(j->runs, j->run_count, pe) : NULL;
+    return r ? r->first_node + (uint32_t)((int64_t)(pe - r->first_rank) * r->node_step)
+             : UINT32_MAX;
 }
 
 /*
@@ -139,11 +152,13 @@ static inline uint32_t osoe_node_of(const struct osoe_job *j, uint32_t pe)
  * The node map decides it, and nothing else: PEs rendezvous only with the PEs
  * named in their own node's OSOE_GTIDS, so a PE never maps a heap outside its
  * logical node. A PE is always in its own process, and connections exist per
- * node *pair* (§3.4), so there is none from a node to itself.
+ * node *pair* (§3.4), so there is none from a node to itself. On every put and
+ * get, so it asks this node's rank set - O(1) for a block or cyclic node - and
+ * not the job's map.
  */
 static inline bool osoe_routes_in_process(const struct osoe_job *j, uint32_t pe)
 {
-    return pe == j->me || osoe_node_of(j, pe) == j->node;
+    return pe == j->me || osoe_rank_set_index(&j->here, pe) >= 0;
 }
 
 /*
@@ -159,7 +174,7 @@ static inline bool osoe_routes_in_process(const struct osoe_job *j, uint32_t pe)
  */
 static inline bool osoe_direct_access(const struct osoe_job *j, uint32_t pe)
 {
-    return pe == j->me || (!j->force_remote && osoe_node_of(j, pe) == j->node);
+    return pe == j->me || (!j->force_remote && osoe_rank_set_index(&j->here, pe) >= 0);
 }
 
 #endif /* OSOE_JOB_H */

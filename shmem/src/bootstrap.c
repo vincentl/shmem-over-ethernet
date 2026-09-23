@@ -4,6 +4,7 @@
 #include "collective-tree.h"
 #include "internode.h"
 #include "base/environment.h"
+#include "base/hostlist.h"
 #include "base/size.h"
 #include "bootstrap.h"
 #include "fatal.h"
@@ -221,6 +222,26 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                        range);
         b->port_low = (uint16_t)low;
         b->port_high = (uint16_t)high;
+    }
+
+    /*
+     * The step's hosts (§6.1), which SLURM_NODEID indexes and so the node map
+     * does too: where each node's lead listens, for the rendezvous (§6.2).
+     * Needed only when the job spans nodes; osoe-launch gives §8.1's logical
+     * nodes one loopback address each, 127.0.0.[1-N].
+     */
+    b->node_list = getenv("OSOE_STEP_NODELIST");
+    if (b->node_count > 1) {
+        uint32_t hosts = 0;
+        char why[128];
+        if (!b->node_list)
+            osoe_fatal("OSOE_STEP_NODELIST is not set, and a job of %u nodes needs it: it "
+                       "names each node's host (§6.1)", b->node_count);
+        if (!osoe_hostlist_count(b->node_list, &hosts, why, sizeof why))
+            osoe_fatal("OSOE_STEP_NODELIST='%s' is not a host list: %s", b->node_list, why);
+        if (hosts != b->node_count)
+            osoe_fatal("OSOE_STEP_NODELIST='%s' names %u hosts for a job of %u nodes",
+                       b->node_list, hosts, b->node_count);
     }
 
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;

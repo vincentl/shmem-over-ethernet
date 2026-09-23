@@ -4,8 +4,10 @@
  * See progress-host.h for what this is and why it is separate from progress.c.
  */
 #define _GNU_SOURCE
+#include <netinet/in.h>
 #include <stdatomic.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "base/deadline.h"
@@ -18,6 +20,7 @@
 #include "fatal.h"
 #include "internode.h"
 #include "job.h"
+#include "listener.h"
 #include "metrics.h"
 #include "node.h"
 #include "progress.h"
@@ -153,6 +156,18 @@ uint64_t osoe_progress_host_acked(uint32_t peer)
 
 /* ---- lifecycle --------------------------------------------------------- */
 
+/* This lead's node-pair listener, from advertise to the mesh (osoe_wires_open
+ * closes it). Outside osoe_am, which osoe_transport_init starts afresh after the
+ * rendezvous that carried its port. */
+static struct osoe_listener mesh_listener = { .fd = -1 };
+
+void osoe_progress_host_advertise(void *blob)
+{
+    osoe_listener_open_any_port(&mesh_listener, &osoe.bootstrap, osoe.node.hdr->session, NULL);
+    uint16_t port = mesh_listener.port;
+    memcpy(blob, &port, sizeof port);
+}
+
 void osoe_progress_host_start(uint32_t session)
 {
     /* osoe_am.internode and osoe_am.lead are set at the start of
@@ -199,10 +214,23 @@ void osoe_progress_host_start(uint32_t session)
      * The node-pair connections, one per peer in peer-slot order - node order
      * with this node left out, as osoe_progress_slot computes it (§3.4) - and the
      * ring that carries them, disabled until this lead's agent enables it on its
-     * first pass: the agent is its only submitter (ring.h). Every logical node
-     * is on this host until the rendezvous gives addresses (§8.1, §6.2).
+     * first pass: the agent is its only submitter (ring.h). Each peer's address
+     * is the rendezvous's, and its port the one its blob advertised (§6.2).
+     * O(N) once, for the eager mesh.
      */
-    osoe_wires_open(osoe_am.wire, &osoe_am.ring, &osoe.bootstrap, session, NULL);
+    struct sockaddr_in *peers_address = calloc(osoe.job.node_count, sizeof *peers_address);
+    if (!peers_address)
+        osoe_fatal("out of memory for %u node addresses", osoe.job.node_count);
+    for (uint32_t n = 0; n < osoe.job.node_count; n++) {
+        uint16_t port;
+        memcpy(&port, osoe_job_backend_blob(&osoe.job, n), sizeof port);
+        peers_address[n] = (struct sockaddr_in){ .sin_family = AF_INET,
+                                                 .sin_port = htons(port),
+                                                 .sin_addr.s_addr = osoe_job_node_address(&osoe.job, n) };
+    }
+    struct osoe_mesh mesh = { &mesh_listener, peers_address };
+    osoe_wires_open(osoe_am.wire, &osoe_am.ring, &osoe.bootstrap, session, &mesh);
+    free(peers_address);
 
     struct osoe_progress_host host = { resolve, landing, notify, release, NULL };
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, &osoe_am.ring,

@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
@@ -35,7 +36,7 @@ enum { CANDIDATES = 32 };
 #define HELLO_NS  UINT64_C(100000000)           /* 0.1 s for a hello */
 
 #define HELLO_MAGIC   UINT64_C(0x6f6c6568656f736f)   /* "osoehelo", little-endian */
-#define HELLO_VERSION 1
+#define HELLO_VERSION 2         /* 2: the launch's shape */
 
 struct hello {
     uint64_t magic;
@@ -46,6 +47,12 @@ struct hello {
     uint32_t session;
     uint32_t from_node;
     uint32_t to_node;
+    /* The launch's shape, checked by the lead that answers. The node count is
+     * the one value that shapes a rendezvous's waits - a lead expects children
+     * by it - so a disagreement about it must be refused on the edge where it
+     * first appears, before either end waits on it (rendezvous.h). */
+    uint32_t node_count;
+    uint32_t world_size;
 };
 
 enum verdict {
@@ -96,11 +103,31 @@ static uint64_t now_ns(void)
     return (uint64_t)t.tv_sec * UINT64_C(1000000000) + (uint64_t)t.tv_nsec;
 }
 
-/* Read exactly n bytes, or return false on end of stream, on an error, or once
- * `limit_ns` has passed without them (0: no limit, sweeping). */
-static bool read_all(int fd, void *bytes, size_t n, uint64_t limit_ns, const char *routine)
+/*
+ * A wait with no time limit, at its sweep (§3.15): the watchdog, then the
+ * no-progress rule on `moved`, the bytes that have crossed so far - so a
+ * rendezvous that is slow but moving is never stalled, and one whose peer has
+ * stopped ends naming it after OSOE_NO_PROGRESS_TIMEOUT (by default, never).
+ */
+static void swept(const struct osoe_bootstrap *b, struct osoe_stall_watch *watch,
+                  uint64_t moved, uint32_t peer, const char *what)
 {
-    uint64_t start = now_ns();
+    osoe_sweep_expired("shmem_init");
+    if (osoe_stall_watch_stalled(watch, moved))
+        osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u is waiting for "
+                   "node %u %s", (unsigned long long)osoe_stall_watch_seconds(watch), b->node,
+                   peer, what);
+}
+
+/* Read exactly n bytes from node `peer`, or return false on end of stream, on an
+ * error, or once `limit_ns` has passed without them. With no limit (0) it waits
+ * as long as the peer takes, sweeping (swept). */
+static bool read_all(const struct osoe_bootstrap *b, int fd, void *bytes, size_t n,
+                     uint64_t limit_ns, uint32_t peer)
+{
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    uint64_t start = now_ns(), moved = 0;
     for (char *at = bytes; n > 0; ) {
         uint64_t wait_ns = OSOE_SWEEP_NS;
         if (limit_ns) {
@@ -116,7 +143,7 @@ static bool read_all(int fd, void *bytes, size_t n, uint64_t limit_ns, const cha
             return false;
         if (r <= 0) {
             if (!limit_ns)
-                osoe_sweep_expired(routine);
+                swept(b, &watch, moved, peer, "to send");
             continue;
         }
         ssize_t k = recv(fd, at, n, MSG_DONTWAIT);
@@ -129,62 +156,108 @@ static bool read_all(int fd, void *bytes, size_t n, uint64_t limit_ns, const cha
         }
         at += k;
         n -= (size_t)k;
+        moved += (uint64_t)k;
     }
     return true;
 }
 
-/* A small write on a fresh connection: the socket buffer takes it whole. */
-static bool write_all(int fd, const void *bytes, size_t n)
+/*
+ * Write exactly n bytes to node `peer`, or return false on an error. A hello
+ * fits any socket buffer, but the rendezvous's tables are O(N) bytes - over
+ * 600 KB at 4,096 nodes - so a write waits for its reader as a read waits for
+ * its writer: sweeping, with no limit (swept).
+ */
+static bool write_all(const struct osoe_bootstrap *b, int fd, const void *bytes, size_t n,
+                      uint32_t peer)
 {
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    uint64_t moved = 0;
     for (const char *at = bytes; n > 0; ) {
-        ssize_t k = send(fd, at, n, MSG_NOSIGNAL);
-        if (k < 0) {
-            if (errno == EINTR)
-                continue;
-            return false;
+        ssize_t k = send(fd, at, n, MSG_NOSIGNAL | MSG_DONTWAIT);
+        if (k >= 0) {
+            at += k;
+            n -= (size_t)k;
+            moved += (uint64_t)k;
+            continue;
         }
-        at += k;
-        n -= (size_t)k;
+        if (errno == EINTR)
+            continue;
+        if (errno != EAGAIN)
+            return false;
+        struct pollfd p = { .fd = fd, .events = POLLOUT };
+        int r = poll(&p, 1, (int)(OSOE_SWEEP_NS / 1000000));
+        if (r < 0 && errno != EINTR)
+            return false;
+        if (r <= 0)
+            swept(b, &watch, moved, peer, "to receive");
     }
     return true;
 }
 
 /* ---- listening -------------------------------------------------------- */
 
+/* Bind and listen on address:port, or return false if the port is taken. */
+static bool try_listen(struct osoe_listener *l, const struct sockaddr_in *address,
+                       uint16_t port)
+{
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+    if (fd < 0)
+        osoe_fatal("cannot create a listening socket: %s", strerror(errno));
+    /*
+     * No SO_REUSEADDR: a candidate still in TIME_WAIT from an earlier job is
+     * skipped like one in use, which is what the sequence is for, and a
+     * listener that could share a port with a stranger's would receive its
+     * connections.
+     */
+    struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons(port),
+                             .sin_addr.s_addr = htonl(INADDR_ANY) };
+    if (address)
+        a.sin_addr = address->sin_addr;
+    /* A backlog for every lower node at once: the eager mesh's worst case
+     * (§6.2), capped by the kernel at net.core.somaxconn. */
+    const struct osoe_bootstrap *b = l->bootstrap;
+    if (bind(fd, (struct sockaddr *)&a, sizeof a) == 0 &&
+        listen(fd, (int)(b->node_count < 4096 ? b->node_count : 4096)) == 0) {
+        socklen_t length = sizeof a;
+        getsockname(fd, (struct sockaddr *)&a, &length);
+        l->fd = fd;
+        l->port = ntohs(a.sin_port);
+        return true;
+    }
+    int error = errno;
+    close(fd);
+    if (error == EADDRNOTAVAIL) {
+        char ip[INET_ADDRSTRLEN] = "?";
+        inet_ntop(AF_INET, &a.sin_addr, ip, sizeof ip);
+        osoe_fatal("node %u cannot listen on %s, the address its host list entry names: it "
+                   "is not an address of this host", b->node, ip);
+    }
+    if (error != EADDRINUSE && error != EACCES)
+        osoe_fatal("cannot listen on port %u: %s", port, strerror(error));
+    return false;
+}
+
 void osoe_listener_open(struct osoe_listener *l, const struct osoe_bootstrap *b,
-                        uint32_t session)
+                        uint32_t session, const struct sockaddr_in *address)
 {
     *l = (struct osoe_listener){ .fd = -1, .node = b->node, .session = session,
                                  .bootstrap = b };
-    for (uint32_t i = 0; i < CANDIDATES; i++) {
-        uint16_t port = osoe_listener_candidate(b, b->node, i);
-        int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-        if (fd < 0)
-            osoe_fatal("cannot create a listening socket: %s", strerror(errno));
-        /*
-         * No SO_REUSEADDR: a candidate still in TIME_WAIT from an earlier job is
-         * skipped like one in use, which is what the sequence is for, and a
-         * listener that could share a port with a stranger's would receive its
-         * connections.
-         */
-        struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons(port),
-                                 .sin_addr.s_addr = htonl(INADDR_ANY) };
-        /* A backlog for every lower node at once: the eager mesh's worst case
-         * (§6.2), capped by the kernel at net.core.somaxconn. */
-        if (bind(fd, (struct sockaddr *)&a, sizeof a) == 0 &&
-            listen(fd, (int)(b->node_count < 4096 ? b->node_count : 4096)) == 0) {
-            l->fd = fd;
-            l->port = port;
+    for (uint32_t i = 0; i < CANDIDATES; i++)
+        if (try_listen(l, address, osoe_listener_candidate(b, b->node, i)))
             return;
-        }
-        int error = errno;
-        close(fd);
-        if (error != EADDRINUSE && error != EACCES)
-            osoe_fatal("cannot listen on port %u: %s", port, strerror(error));
-    }
     osoe_fatal("node %u found none of its %u candidate ports free in OSOE_PORT_RANGE=%u-%u; "
                "choose a range this host does not use", b->node, CANDIDATES,
                b->port_low, b->port_high);
+}
+
+void osoe_listener_open_any_port(struct osoe_listener *l, const struct osoe_bootstrap *b,
+                                 uint32_t session, const struct sockaddr_in *address)
+{
+    *l = (struct osoe_listener){ .fd = -1, .node = b->node, .session = session,
+                                 .bootstrap = b };
+    if (!try_listen(l, address, 0))
+        osoe_fatal("node %u could not listen on any port", b->node);
 }
 
 void osoe_listener_close(struct osoe_listener *l)
@@ -221,7 +294,7 @@ int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpos
             osoe_fatal("accepting a connection on port %u: %s", l->port, strerror(errno));
         }
         struct hello h;
-        if (!read_all(fd, &h, sizeof h, HELLO_NS, "shmem_init") ||
+        if (!read_all(b, fd, &h, sizeof h, HELLO_NS, UINT32_MAX) ||
             h.magic != HELLO_MAGIC || h.version != HELLO_VERSION) {
             close(fd);                  /* a stranger, or a caller that gave up */
             continue;
@@ -230,18 +303,23 @@ int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpos
         if (h.job != b->job || h.step != b->step || h.session != l->session ||
             h.to_node != l->node)
             a.verdict = NOT_THIS_NODE;
+        else if (h.node_count != b->node_count || h.world_size != b->world_size)
+            osoe_fatal("node %u, launched for %u tasks on %u nodes, was called by node %u, "
+                       "launched for %u tasks on %u nodes: every lead must be given the same",
+                       l->node, b->world_size, b->node_count, h.from_node, h.world_size,
+                       h.node_count);
         else if (h.purpose != (uint32_t)purpose)
             a.verdict = NOT_YET;
         else if (h.from_node >= b->node_count || h.from_node == l->node)
             osoe_fatal("node %u was called by a lead claiming to be node %u of a job of %u "
                        "nodes", l->node, h.from_node, b->node_count);
-        bool sent = write_all(fd, &a, sizeof a);
+        bool sent = write_all(b, fd, &a, sizeof a, h.from_node);
         if (a.verdict != ACCEPTED || !sent) {
             close(fd);
             continue;
         }
         struct confirmation c;
-        if (!read_all(fd, &c, sizeof c, 0, "shmem_init") || c.magic != HELLO_MAGIC) {
+        if (!read_all(b, fd, &c, sizeof c, 0, h.from_node) || c.magic != HELLO_MAGIC) {
             close(fd);                  /* the caller gave up before our answer came */
             continue;
         }
@@ -279,6 +357,65 @@ static int dial(const struct sockaddr_in *host, uint16_t port)
     return fd;
 }
 
+int osoe_listener_connect_port(const struct osoe_bootstrap *b, uint32_t session,
+                               const struct sockaddr_in *host, uint16_t port, uint32_t node,
+                               enum osoe_hello_purpose purpose)
+{
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+    struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
+    for (;;) {
+        struct hello h = { HELLO_MAGIC, HELLO_VERSION, (uint32_t)purpose, b->job, b->step,
+                           session, b->node, node, b->node_count, b->world_size };
+        int fd = dial(host, port);
+        if (fd >= 0) {
+            struct answer a;
+            /* Told this port, so whoever answers is the peer or a
+             * disagreement; no time limit on the answer, sweeping. */
+            if (!write_all(b, fd, &h, sizeof h, node) || !read_all(b, fd, &a, sizeof a, 0, node)) {
+                close(fd);
+            } else if (a.magic != HELLO_MAGIC || a.version != HELLO_VERSION ||
+                       a.verdict == NOT_THIS_NODE || a.node != node) {
+                osoe_fatal("node %u reached node %u's advertised port %u and found node %u "
+                           "or a stranger there (verdict %u): the nodes disagree about the job",
+                           b->node, node, port, a.node, a.verdict);
+            } else if (a.verdict == ACCEPTED) {
+                struct confirmation c = { HELLO_MAGIC };
+                if (write_all(b, fd, &c, sizeof c, node))
+                    return fd;
+                close(fd);
+            } else {
+                close(fd);              /* NOT_YET: the peer is busy with another purpose */
+            }
+        }
+        if (osoe_deadline_expired(&sweep)) {
+            sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+            osoe_sweep_expired("shmem_init");
+            if (osoe_stall_watch_stalled(&watch, 0))
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u has "
+                           "not answered node %u on its port %u",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), node, b->node,
+                           port);
+        }
+        nanosleep(&back, NULL);
+        if (back.tv_nsec < 10000000)
+            back.tv_nsec *= 2;
+    }
+}
+
+bool osoe_listener_read(const struct osoe_bootstrap *b, int fd, void *bytes, size_t n,
+                        uint32_t peer)
+{
+    return read_all(b, fd, bytes, n, 0, peer);
+}
+
+bool osoe_listener_write(const struct osoe_bootstrap *b, int fd, const void *bytes, size_t n,
+                         uint32_t peer)
+{
+    return write_all(b, fd, bytes, n, peer);
+}
+
 int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
                           const struct sockaddr_in *host, uint32_t node,
                           enum osoe_hello_purpose purpose)
@@ -287,23 +424,23 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
     osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
-    struct hello h = { HELLO_MAGIC, HELLO_VERSION, (uint32_t)purpose, b->job, b->step,
-                       session, b->node, node };
     for (;;) {
         for (uint32_t i = 0; i < CANDIDATES; i++) {
+            struct hello h = { HELLO_MAGIC, HELLO_VERSION, (uint32_t)purpose, b->job, b->step,
+                               session, b->node, node, b->node_count, b->world_size };
             int fd = dial(host, osoe_listener_candidate(b, node, i));
             if (fd < 0)
                 continue;
             struct answer a;
-            if (!write_all(fd, &h, sizeof h) ||
-                !read_all(fd, &a, sizeof a, PROBE_NS, "shmem_init") ||
+            if (!write_all(b, fd, &h, sizeof h, node) ||
+                !read_all(b, fd, &a, sizeof a, PROBE_NS, node) ||
                 a.magic != HELLO_MAGIC || a.version != HELLO_VERSION) {
                 close(fd);
                 continue;
             }
             if (a.verdict == ACCEPTED && a.node == node) {
                 struct confirmation c = { HELLO_MAGIC };
-                if (write_all(fd, &c, sizeof c))
+                if (write_all(b, fd, &c, sizeof c, node))
                     return fd;
                 close(fd);
                 continue;
@@ -318,8 +455,9 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u has "
                            "not answered node %u on any of its %u candidate ports in "
-                           "OSOE_PORT_RANGE=%u-%u", (unsigned long long)osoe_stall_watch_seconds(&watch),
-                           node, b->node, CANDIDATES, b->port_low, b->port_high);
+                           "OSOE_PORT_RANGE=%u-%u",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch), node, b->node,
+                           CANDIDATES, b->port_low, b->port_high);
         }
         nanosleep(&back, NULL);
         if (back.tv_nsec < 10000000)

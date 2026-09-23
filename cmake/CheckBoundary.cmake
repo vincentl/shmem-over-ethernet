@@ -30,21 +30,22 @@ set(OSOE_ABOVE_BOUNDARY
 # reach any header here.
 set(OSOE_BELOW_BOUNDARY
   am.c am.h am-state.h connection.c connection.h connection-area.c
-  connection-area.h internode-am.c listener.c listener.h progress.c progress.h
-  progress-host.c progress-host.h reply.c reply.h ring.c ring.h transport-am.c
-  transport-local.h wire.c wire.h)
+  connection-area.h internode-am.c progress.c progress.h progress-host.c
+  progress-host.h reply.c reply.h ring.c ring.h transport-am.c transport-local.h wire.c
+  wire.h)
 
 # Neither: the boundary's own implementation that every backend keeps, and the
 # shared infrastructure both sides build on - the internode tree's topology
 # among it, which an RDMA backend computes the same way. Not checked, and
 # listed so that the classification is complete. Two of these still reach AM headers, and
 # both are known (roce-seam §3.2): node.c sizes the landing zones from the AM
-# chunk (L5), and job.c checks the AM handler table's checksum at rendezvous
-# (L6). Both are the rendezvous's business, not the SHMEM layer's. The rank
-# map (rank-map.c) is every build's: bootstrap is out of band (§6.2).
+# chunk (L5), and the rendezvous (job.c, and since phase 1 step 3 rendezvous.c)
+# checks the AM handler table's checksum (L6). Both are the rendezvous's
+# business, not the SHMEM layer's. The rendezvous's sockets (listener.c) and the
+# rank map (rank-map.c) are every build's: bootstrap is out of band (§6.2).
 set(OSOE_ON_BOUNDARY
   collective-tree.c transport-local.c watch.c node.c job.c shm-object.c
-  rank-map.c)
+  rank-map.c rendezvous.c listener.c)
 
 if(NOT SOURCE_DIR)
   message(FATAL_ERROR "usage: cmake -DSOURCE_DIR=<repository root> -P CheckBoundary.cmake")
