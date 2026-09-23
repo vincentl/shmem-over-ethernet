@@ -18,7 +18,7 @@
  *   - no pidfd polling: liveness is kill(pid, 0) at a sweep, so it cannot see
  *     a PE that is alive but wedged - the agents' pidfds are the library's;
  *   - no cross-node detection: a vanished peer node surfaces through TCP
- *     keepalive, which does not exist yet;
+ *     keepalive (wire.c);
  *   - no abort between nodes: the abort word is set and read within one node,
  *     and the abortive goodbye (abort_model.py) is what carries it further.
  *

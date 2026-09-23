@@ -1664,8 +1664,9 @@ The policy is right; an earlier draft lacked **detection and propagation**:
   ring, using the pids recorded at local rendezvous (§6.2). A pidfd completion for
   a PE that has not finalized aborts the job. Non-lead PEs detect a dead lead when
   a wait deadline expires (§3.12).
-- **A vanished peer node** surfaces through TCP keepalive with `TCP_USER_TIMEOUT`
-  on every node-pair connection, as a connection error — which aborts.
+- **A vanished peer node** surfaces through TCP keepalive on every node-pair
+  connection, as a connection error — which aborts. Not `TCP_USER_TIMEOUT`, which
+  would declare a merely stopped peer dead (as built, below).
 - **Slurm's `KillOnBadExit` defaults to 0**, so one PE exiting nonzero does not by
   itself stop the others. Document `srun -K1`. The spec does not define crash
   behaviour, so this is operability, not conformance.
@@ -1761,6 +1762,34 @@ within a sweep interval (`abort_exit_model.py`, Part B alone). `shmem.dead-pe`
 kills a lead or a sibling, on one node and on two, with the watchdog off: every
 survivor leaves with the failure status, the computing ones included.
 
+*As built: keepalive* (phase 1 step 4 slice 1, part D; `wire.c`). Every
+node-pair socket sets `SO_KEEPALIVE` with `TCP_KEEPIDLE` 60 s, `TCP_KEEPINTVL`
+10 s and `TCP_KEEPCNT` 6: a connection idle for a minute is probed every ten
+seconds, and six probes nobody answers end it with `ETIMEDOUT`, which ends the
+job with a fatal saying which node stopped answering. A node that vanishes
+without a FIN — power lost, a cable cut, a partition — is found one to two
+minutes after its connections go quiet. Keepalive asks whether the peer's
+*kernel* is there, which contention does not stop: a stopped node's kernel still
+acknowledges, so a stopped node is waited for, as the no-fatal-timeouts decision
+requires, and `shmem.stopped-node.keepalive` stops one for 6 s against
+keepalive's tightest setting, 4 s, and the quiet completes. `TCP_USER_TIMEOUT`
+is not set. It bounds how long sent data may go unacknowledged, and Linux
+applies it to zero-window probing too, so a peer merely stopped with a full
+receive buffer would be declared dead after it: a fatal timeout by another name.
+With data in flight to a vanished node the kernel's own retransmission limit
+ends the connection instead, `tcp_retries2`, about fifteen minutes by default —
+slow, and a site that wants it faster lowers that sysctl, which bounds the same
+retransmissions for every connection on the host.
+`OSOE_KEEPALIVE=IDLE,INTERVAL,COUNT` overrides the values, and 0 turns keepalive
+off; tests make it short. `tier3.*.vanished-node` cuts a node's link in both
+directions once the job is ready and quiet — no FIN, no reset — while the other
+node waits on it idle, and the job ends within keepalive's bound, every rank
+with the failure status. Quiet matters: the first run cut the lossy link while
+one side still had a retransmission outstanding, and that side, correctly,
+waited on `tcp_retries2` rather than keepalive (TCP probes only a connection
+with nothing unacknowledged); the cut now comes two seconds after the job is
+ready.
+
 #### The development watchdog
 
 > **A development aid, not the release path: on in the `debug`, `asan` and `tsan`
@@ -1794,7 +1823,7 @@ do:
   late, and it cannot see a PE that is alive but wedged. Since step 4 the
   library's own liveness does this in every build, with pidfds (above).
 - **No cross-node detection.** One node's PEs check one node's pids. A vanished
-  peer node is TCP keepalive's business, and there is no TCP yet.
+  peer node is TCP keepalive's business (above).
 - **No `shmem_global_exit` and no abort between nodes.** The watchdog writes the
   abort word within one node and reads it there. Carrying it further is the
   library's in every build since step 4: the agent ends its PE, and the abortive

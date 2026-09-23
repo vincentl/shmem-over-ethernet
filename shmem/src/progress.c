@@ -1,6 +1,7 @@
 /* liburing.h, through wire.h, uses POSIX types (sigset_t, AT_FDCWD) that plain
  * C11 hides (portability review F12: feature macros are declared per file). */
 #define _GNU_SOURCE
+#include <errno.h>
 #include <stdatomic.h>
 #include <limits.h>
 #include <stdbit.h>
@@ -579,6 +580,10 @@ static bool receive(struct osoe_progress *p, uint32_t slot)
      * naming it rather than waiting for something that node will never send
      * (§3.15, §6.4).
      */
+    if (w->error == -ETIMEDOUT)
+        osoe_fatal("node %u: node %u stopped answering: its kernel acknowledged neither "
+                   "keepalive probes nor retransmissions (§3.15). The host has vanished, or "
+                   "the network between is down", p->node, peer_of(p, slot));
     if (w->error)
         osoe_fatal("node %u: the connection to node %u failed: %s", p->node,
                    peer_of(p, slot), strerror(-w->error));

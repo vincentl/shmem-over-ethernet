@@ -21,6 +21,16 @@
 # arguments. Each run has its own namespaces and its own bridge, named by this
 # script's pid, so runs can overlap and their identical addresses never meet.
 #
+# TIER3_CUT=NODE among the NAME=VALUE arguments is this script's, not the
+# job's: once the job has created the file OSOE_TEST_READY names in its
+# environment - which this script sets - and two seconds later, node NODE's
+# link drops everything in both directions, as a cut cable or a powered-off
+# host does. No FIN, no reset: the vanished node that only TCP keepalive can
+# find (§3.15). The two seconds let what the job last sent be acknowledged,
+# retransmissions on the lossy link included: TCP probes only a connection with
+# nothing unacknowledged, and one cut with data in flight waits out the
+# kernel's retransmission limit instead, some fifteen minutes.
+#
 # Needs root: run it with sudo -n (§8.5's VM user has it without a password).
 # It changes the network state only inside the namespaces it creates, and
 # removes them on exit, on failure and on a signal. The launcher returns each
@@ -57,7 +67,10 @@ fi
 
 PREFIX=osoe-tier3-$$-
 SWITCH=${PREFIX}switch
+CUTTER=
 cleanup() {
+    [ -z "$CUTTER" ] || kill "$CUTTER" 2>/dev/null || true
+    rm -f "/tmp/${PREFIX}ready"
     i=0
     while [ $i -lt "$NODES" ]; do
         ip netns del "$PREFIX$i" 2>/dev/null || true
@@ -91,10 +104,28 @@ while [ $i -lt "$NODES" ]; do
     i=$((i + 1))
 done
 
+CUT=
 while [ $# -gt 0 ] && [ "$1" != "--" ]; do
-    export "$1"
+    case $1 in
+        TIER3_CUT=*) CUT=${1#TIER3_CUT=} ;;
+        *)           export "$1" ;;
+    esac
     shift
 done
+if [ -n "$CUT" ]; then
+    case $CUT in
+        ''|*[!0-9]*) echo "tier3.sh: TIER3_CUT '$CUT' is not a node" >&2; exit 2 ;;
+    esac
+    [ "$CUT" -lt "$NODES" ] || { echo "tier3.sh: TIER3_CUT=$CUT of $NODES nodes" >&2; exit 2; }
+    export OSOE_TEST_READY="/tmp/${PREFIX}ready"
+    # Egress on the node's side and on the bridge's, so nothing arrives either.
+    ( while [ ! -e "$OSOE_TEST_READY" ]; do sleep 0.1; done
+      sleep 2
+      ip netns exec "$PREFIX$CUT" tc qdisc change dev link0 root netem loss 100%
+      ip netns exec "$SWITCH" tc qdisc add dev "port$CUT" root netem loss 100%
+      echo "tier3.sh: node $CUT's link now drops everything" >&2 ) &
+    CUTTER=$!
+fi
 [ $# -gt 1 ] || { echo "tier3.sh: no launcher after --" >&2; exit 2; }
 shift
 LAUNCHER=$1

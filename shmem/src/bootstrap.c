@@ -226,6 +226,28 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     }
 
     /*
+     * TCP keepalive on the node-pair connections (§3.15, wire.c): "IDLE,
+     * INTERVAL,COUNT" - seconds without traffic before the first probe,
+     * seconds between probes, and how many go unanswered before the peer is
+     * dead - or 0 for none. Tests make it short; nothing else should need to.
+     */
+    const char *keepalive = getenv("OSOE_KEEPALIVE");
+    if (keepalive && strcmp(keepalive, "0") == 0) {
+        b->keepalive_off = true;
+    } else if (keepalive) {
+        unsigned idle, interval, count;
+        int used = 0;
+        if (sscanf(keepalive, "%u,%u,%u%n", &idle, &interval, &count, &used) != 3 ||
+            keepalive[used] != '\0' || idle < 1 || interval < 1 || count < 1 ||
+            idle > 32767 || interval > 32767 || count > 127)
+            osoe_fatal("OSOE_KEEPALIVE='%s' is not IDLE,INTERVAL,COUNT (seconds, seconds, "
+                       "probes: 1 to 32767, 1 to 32767, 1 to 127) or 0", keepalive);
+        b->keepalive_idle_s = idle;
+        b->keepalive_interval_s = interval;
+        b->keepalive_count = count;
+    }
+
+    /*
      * The step's hosts (§6.1), which SLURM_NODEID indexes and so the node map
      * does too: where each node's lead listens, for the rendezvous (§6.2).
      * Needed only when the job spans nodes; osoe-launch gives §8.1's logical

@@ -771,6 +771,16 @@ add_test(NAME shmem.stopped-node.no-progress
 set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "shmem_quiet: no progress toward node 1 for [0-9]+ s"
   FAIL_REGULAR_EXPRESSION "quiet completed")
+# Keepalive asks whether a peer's kernel is there, and a stopped node's is
+# (§3.15, wire.c): at its tightest - a probe after 1 s idle, then three 1 s
+# apart - node 1 stopped for 6 s is still waited for, and the quiet completes.
+# tier3.*.vanished-node is the other half: a node whose link is cut is found.
+add_test(NAME shmem.stopped-node.keepalive
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=6000 OSOE_KEEPALIVE=1,1,3
+          $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
+          $<TARGET_FILE:shmem_test_stopped-node>)
+set_tests_properties(shmem.stopped-node.keepalive PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
 
 # The other half of D-6 (diagnosability review): a blocking get waits for one
 # PE's reply, not a whole node's queue, so its no-progress fatal must name that
@@ -991,6 +1001,13 @@ foreach(map 0,1 0,0,1,1 0,1,2,0,1,0)
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endforeach()
 
+# OSOE_KEEPALIVE is three counts or 0, and anything else is refused by name.
+add_test(NAME shmem.keepalive.invalid
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_KEEPALIVE=5,0,3
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_global-exit> 7)
+set_tests_properties(shmem.keepalive.invalid PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_KEEPALIVE='5,0,3' is not IDLE,INTERVAL,COUNT")
+
 # A PE that dies without finalizing ends the job with the watchdog off (§3.15,
 # liveness.h): world rank DIES kills itself after a barrier while the others
 # compute or wait, and every survivor must leave with the failure status. A
@@ -1189,16 +1206,20 @@ endforeach()
 # the AM barrier; a reply that full buffers must not starve; the tree at depth
 # three and at thirteen uneven nodes; the rendezvous, against the namespaces'
 # host list; the differential over §8.1's four poles; the floor, which
-# measures the library on the shaped link; and a global exit, whose status
-# reaches the other nodes only as the abortive goodbye on the link (§3.15).
-# Left out are the tests that never reach a socket, and those whose subject is
-# a PE that dies or stops rather than the link.
+# measures the library on the shaped link; a global exit, whose status
+# reaches the other nodes only as the abortive goodbye on the link (§3.15);
+# and a node whose link is cut, which only TCP keepalive can find. Left out are
+# the tests that never reach a socket, and those whose subject is a PE that
+# dies or stops rather than the link.
 option(OSOE_TIER3 "register the tier-3 tests, which need passwordless sudo" OFF)
 if(OSOE_TIER3 AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
   message(FATAL_ERROR "OSOE_TIER3: the multi-node data-path tests do not run under "
                       "ThreadSanitizer (shmem.internode's reason); use the tier3 preset")
 endif()
 if(OSOE_TIER3)
+  add_executable(shmem_test_vanished-node test-vanished-node.c)
+  target_link_libraries(shmem_test_vanished-node PRIVATE osoe)
+  osoe_warnings(shmem_test_vanished-node)
   set(osoe_tier3 sudo -n ${PROJECT_SOURCE_DIR}/tools/launch/tier3.sh)
   set(osoe_tier3_wire OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
       OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919)
@@ -1254,6 +1275,21 @@ if(OSOE_TIER3)
                 $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
       set_tests_properties(tier3.${shape}.global-exit.${label}
         PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    endforeach()
+    # A node that vanishes - its link cut once the job is ready - is found by TCP
+    # keepalive at its tightest (§3.15, wire.c). See vanished-node.sh.
+    foreach(map 0,1 0,0,1,1)
+      string(REPLACE "," ";" ranks "${map}")
+      list(LENGTH ranks count)
+      string(REPLACE "," "-" label "${map}")
+      string(REPLACE ";" " " wrap
+             "${osoe_tier3};${shape};2;TIER3_CUT=1;OSOE_KEEPALIVE=1,1,3;--")
+      add_test(NAME tier3.${shape}.vanished-node.${label}
+        COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+                sh ${CMAKE_CURRENT_SOURCE_DIR}/vanished-node.sh $<TARGET_FILE:osoe-launch>
+                $<TARGET_FILE:shmem_test_vanished-node> ${count} ${map})
+      set_tests_properties(tier3.${shape}.vanished-node.${label}
+        PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "VANISHED NODE OK")
     endforeach()
     add_test(NAME tier3.${shape}.differential
       COMMAND ${CMAKE_COMMAND}

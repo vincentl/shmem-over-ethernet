@@ -130,6 +130,33 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, i
     int one = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one) != 0)
         osoe_fatal("cannot set TCP_NODELAY toward node %u: %s", peer, strerror(errno));
+
+    /*
+     * TCP keepalive (§3.15). A peer host that vanishes without a FIN - power
+     * lost, a cable cut, a partition - leaves an idle connection open forever,
+     * and no wait gives up because time passed. Keepalive asks whether the
+     * peer's *kernel* is there, which contention does not stop: a stopped
+     * node's kernel still acknowledges, so a stopped node is waited for. After
+     * IDLE seconds without traffic, COUNT unanswered probes INTERVAL seconds
+     * apart end the connection with ETIMEDOUT, and the job with it
+     * (progress.c). Not TCP_USER_TIMEOUT, which bounds how long sent data may
+     * go unacknowledged and which Linux applies to zero-window probing too: a
+     * peer merely stopped with a full receive buffer would be declared dead
+     * after it, a fatal timeout. With data in flight the kernel's own
+     * retransmission limit ends a vanished peer's connection instead
+     * (tcp_retries2: about fifteen minutes by default).
+     */
+    if (b->keepalive_off)
+        return;
+    int idle = (int)(b->keepalive_idle_s ? b->keepalive_idle_s : OSOE_DEFAULT_KEEPALIVE_IDLE_S);
+    int interval = (int)(b->keepalive_interval_s ? b->keepalive_interval_s
+                                                 : OSOE_DEFAULT_KEEPALIVE_INTERVAL_S);
+    int count = (int)(b->keepalive_count ? b->keepalive_count : OSOE_DEFAULT_KEEPALIVE_COUNT);
+    if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof one) != 0 ||
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof idle) != 0 ||
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof interval) != 0 ||
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof count) != 0)
+        osoe_fatal("cannot set TCP keepalive toward node %u: %s", peer, strerror(errno));
 }
 
 void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
