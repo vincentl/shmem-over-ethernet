@@ -27,6 +27,7 @@
  * the job's size.
  */
 #define _GNU_SOURCE
+#include <errno.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,7 @@
 #include "base/order.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
+#include "base/wait-word.h"
 #include "blocked.h"
 #include "connection-area.h"
 #include "fatal.h"
@@ -263,17 +265,45 @@ static void am_wait_end(void)
 }
 
 /*
- * The re-wake polling in the loops below: wake the lead, sleep 20 us, look
- * again. A step-2 stand-in, kept until step 3 gives these waits a word the lead
- * bumps when it frees a buffer, returns a credit or lands an acknowledgement.
- * At 256 PEs in one quiet it is 256 locked adds and 256 syscalls per period on
- * one line (second review, atomics F3); it must not survive step 3.
+ * The re-wake polling of step 2: wake the lead, sleep 20 us, look again. Quiet
+ * and a writer waiting for room have their words since phase 1 step 3 slice 2
+ * (below); only a wait for a reply credit still polls, and its word is the
+ * next change here. At 256 PEs it is 256 locked adds and 256 syscalls per
+ * period on one line (second review, atomics F3); it must not survive step 3.
  */
 static void poll_lead(void)
 {
     osoe_progress_host_wake_lead();
     struct timespec back = { 0, 20000 };        /* 20 us */
     nanosleep(&back, NULL);
+}
+
+/*
+ * One sleep of a wait on a wait word (base/wait-word.h): at the value loaded
+ * before the caller's check, until the word moves or a sweep interval passes
+ * (§3.10). True if it was the sweep.
+ */
+static bool sleep_on(struct osoe_wait_word *word, uint32_t seen)
+{
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+    return osoe_futex_wait(&word->word, seen, &sweep, OSOE_FUTEX_SHARED) == ETIMEDOUT;
+}
+
+/*
+ * A sweep expired, and then the caller's check passed. The wake was lost if
+ * the word still holds the value slept on a margin later: every move that can
+ * make a registered waiter's check pass bumps the word, and this waiter was
+ * registered (base/wait-word.h). The margin lets a bump that is on its way land
+ * - an agent descheduled between its store and its bump looks the same for an
+ * instant, and base/epoch.c measured how often that instant meets a sweep under
+ * load. invariant.missed_wake is what every tier-2 test checks at the end.
+ */
+static void count_if_lost(const struct osoe_wait_word *word, uint32_t seen, const char *routine)
+{
+    struct timespec margin = { 0, 10000000 };       /* 10 ms, as epoch.c's */
+    nanosleep(&margin, NULL);
+    if (osoe_wait_word_load(word) == seen)
+        osoe_missed_wake(routine);
 }
 
 /* How far a connection has turned over: the newest sequence either buffer has
@@ -289,17 +319,18 @@ static uint64_t turnover(const struct osoe_connection *conn)
 /*
  * Reserve, waiting for room.
  *
- * Only the lead's agent frees space here, by sealing the buffer and sending it
- * (§3.5, §3.12), so a writer that finds none asks for a seal and tries again.
- * **It must not spin without asking**: the lead may be asleep, and the only
- * thing that wakes it for this connection is the bump below.
+ * Only the lead's agent makes room here, by sealing the buffer, sending it and
+ * opening it again (§3.5, §3.12). So a writer that finds none asks for a seal -
+ * it marks the connection and wakes the lead, which visits only connections
+ * with work (§3.10) - and waits on the connection's turnover word, which the
+ * agent bumps when it opens a buffer and anyone is registered
+ * (base/wait-word.h, §3.11). Every waiter is woken: room is divisible, and each
+ * has its own reservation to retry. It asks again before every sleep, since
+ * the buffer that just opened may have filled before this writer got to it.
  *
- * §7.1 step 2 backs off with a short sleep rather than blocking on a word the
- * lead bumps when it frees a buffer. That word would be a second wake protocol,
- * and this step's policy is slow mode first (§3.14) - so the cost is a
- * scheduler round trip on a full buffer, counted by am.reserve_stalls so that
- * it is visible rather than assumed rare. A buffer that stays full is a stall
- * the counter names; step 3 is where it becomes a wait.
+ * Step 2 slept 20 us and looked again instead, which on the ring held a stream
+ * to 3% of the floor (§8.4). am.reserve_stalls counts every wait, so a buffer
+ * that is often full is visible rather than assumed rare.
  */
 static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
                             const char *routine, uint32_t len, struct osoe_reservation *r)
@@ -307,16 +338,26 @@ static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
     if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK)
         return;
     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
+    struct osoe_wait_word *word = osoe_connection_turnover_wait(conn);
     struct am_wait w;
     am_wait_begin(&w, routine, "the connection's buffer turnover", peer, pe, turnover(conn));
+    osoe_wait_word_enter(word);
+    uint32_t slept_on = 0;
+    bool swept = false;
     for (;;) {
-        /* Say which connection: the lead visits only those with work (§3.10). */
-        osoe_connection_area_mark(&osoe_am.area, peer);
-        poll_lead();
-        if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK)
+        uint32_t seen = osoe_wait_word_load(word);
+        if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK) {
+            if (swept)
+                count_if_lost(word, slept_on, routine);
             break;
+        }
+        osoe_connection_area_mark(&osoe_am.area, peer);
+        osoe_progress_host_wake_lead();
+        slept_on = seen;
+        swept = sleep_on(word, seen);
         am_wait_check(&w, turnover(conn));
     }
+    osoe_wait_word_leave(word);
     am_wait_end();
 }
 
@@ -759,17 +800,36 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
         }
         waited++;
         if (!acknowledged(c, slot)) {
+            /* flush_dirty has asked for the acknowledgement and woken the lead;
+             * the agent bumps this connection's acknowledgement word when one
+             * lands and anyone is registered (base/wait-word.h). Every waiter
+             * is woken, each checking its own writes. */
             uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
+            struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
+            if (!conn)
+                osoe_fatal("no connection toward node %u, which this context wrote to", peer);
+            struct osoe_wait_word *word = osoe_connection_acked_wait(conn);
+            const char *routine = pes ? "shmem_pe_quiet" : "shmem_quiet";
             struct am_wait w;
             /* No single PE: a quiet waits for a whole node's queue, not one
              * PE's (D-6). */
-            am_wait_begin(&w, pes ? "shmem_pe_quiet" : "shmem_quiet",
-                          "the peer's acknowledged sequence", peer, -1,
+            am_wait_begin(&w, routine, "the peer's acknowledged sequence", peer, -1,
                           osoe_progress_host_acked(peer));
-            while (!acknowledged(c, slot)) {
-                poll_lead();
+            osoe_wait_word_enter(word);
+            uint32_t slept_on = 0;
+            bool swept = false;
+            for (;;) {
+                uint32_t seen = osoe_wait_word_load(word);
+                if (acknowledged(c, slot)) {
+                    if (swept)
+                        count_if_lost(word, slept_on, routine);
+                    break;
+                }
+                slept_on = seen;
+                swept = sleep_on(word, seen);
                 am_wait_check(&w, osoe_progress_host_acked(peer));
             }
+            osoe_wait_word_leave(word);
             am_wait_end();
         }
         c->touched[slot] = false;

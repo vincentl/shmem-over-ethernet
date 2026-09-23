@@ -21,8 +21,10 @@
 #include "shm-object.h"
 
 #define OSOE_CONNECTION_AREA_MAGIC UINT64_C(0x61657261656f736f)   /* "osoearea" */
-#define OSOE_CONNECTION_AREA_LAYOUT 3   /* 2: `opened`; 3: `lead_sleeping` and the
-                                         * dirty-connection bitmap */
+#define OSOE_CONNECTION_AREA_LAYOUT 4   /* 2: `opened`; 3: `lead_sleeping` and the
+                                         * dirty-connection bitmap; 4: each
+                                         * connection's acknowledgement and
+                                         * turnover wait words */
 
 /*
  * The frozen prefix, for the same reason the control segment has one (§3.14):

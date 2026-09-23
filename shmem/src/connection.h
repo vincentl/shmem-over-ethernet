@@ -61,6 +61,7 @@
 #include <stdint.h>
 
 #include "base/cacheline.h"
+#include "base/wait-word.h"
 #include "reply.h"
 
 /*
@@ -176,13 +177,21 @@ struct osoe_connection_shared {
      *
      * It is shared for the same reason ack_wanted_through is, from the other side:
      * the evidence quiet waits on has to be readable by the PE that is waiting,
-     * and the lead's own copy of it lives in the lead's process. Single-writer
-     * publication - only the lead's agent ever stores here - so a release store
-     * against an acquire load, not a two-sided protocol (§3.16). A reader that
-     * sees a stale value waits one more round, which is why this needs no
-     * handshake of its own.
+     * and the lead's own copy of it lives in the lead's process. Only the lead's
+     * agent ever stores here. **Since phase 1 step 3 slice 2 it is also the value
+     * of a two-sided protocol**: a quiet that has to wait registers on
+     * `acked_wait` and sleeps there, and the agent wakes it only if one is
+     * registered (base/wait-word.h), so the store and the waiter's load are
+     * seq_cst. Step 2 had no word here, and its waiters polled.
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint64_t acked;
+    struct osoe_wait_word acked_wait;   /* on the same line: one miss for all three */
+    /*
+     * A writer that found no room waits here for a buffer to turn over - to be
+     * opened again, which only the lead's agent does (§3.5, §3.11). Open's
+     * hand-over store is the value.
+     */
+    _Alignas(OSOE_CACHELINE) struct osoe_wait_word turnover_wait;
     /*
      * §3.8's reply credit, shared by the PEs of this node.
      *
@@ -299,10 +308,23 @@ void osoe_connection_open(struct osoe_connection *c, uint32_t k, uint64_t seq);
 /* Publish what the peer has acknowledged applying. The lead's agent only. */
 void osoe_connection_publish_acked(struct osoe_connection *c, uint64_t seq);
 
-/* Read it, from any local PE. */
+/* Read it, from any local PE: seq_cst, since a waiting quiet's check of it is
+ * the load half of the wait word's two-sided protocol (base/wait-word.h). */
 static inline uint64_t osoe_connection_acked(const struct osoe_connection *c)
 {
-    return atomic_load_explicit(&c->s->acked, memory_order_acquire);
+    return atomic_load_explicit(&c->s->acked, memory_order_seq_cst);
+}
+
+/* What a quiet waits on while the peer's acknowledgement is behind its writes,
+ * and what a writer waits on while no buffer has room (base/wait-word.h). */
+static inline struct osoe_wait_word *osoe_connection_acked_wait(struct osoe_connection *c)
+{
+    return &c->s->acked_wait;
+}
+
+static inline struct osoe_wait_word *osoe_connection_turnover_wait(struct osoe_connection *c)
+{
+    return &c->s->turnover_wait;
 }
 
 /*

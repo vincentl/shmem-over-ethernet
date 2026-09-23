@@ -975,6 +975,15 @@ reply credits and descriptors (indivisible), and the wait for a reservable buffe
 wake-one can reach the wrong class's waiter; with §3.10's deadlines that is a
 latency spike rather than a hang, but it is avoidable (review C4).
 
+*As built (phase 1 step 3 slice 2).* Two of the classes have their words: a
+connection's acknowledged sequence, which quiet waits on, and its buffer
+turnover, which a writer with no room waits on (`base/wait-word.h`,
+`wait_word_model.py`). Both are divisible and wake every waiter. Beside each
+word is a count of registered waiters, so the agent — which moves both values on
+every acknowledgement and every open — makes the wake syscall only when someone
+waits. The count is what makes each wait two-sided (§3.16), and the model's
+breakages each lose a wake. Step 2 polled both with a 20 µs sleep (§8.4).
+
 **Wake count tracks divisibility:**
 
 - Buffer becomes `OPEN` (divisible: 192 KB free, 30 waiters needing 200 B each)
@@ -1005,6 +1014,17 @@ one burns power and, on x86 with SMT, slows the sibling thread. Waits therefore 
 straight to the futex. Under oversubscription — the Pi's normal case — a spin
 would be wrong anyway, since it takes a core a progress thread or mid-copy writer
 needs. Revisit only with measurements.
+
+*Measured, and kept* (phase 1 step 3 slice 2). With the waits on their words, a
+put and quiet costs one library round trip, the same four wakes as a get: 2.06×
+the floor idle. A spin of up to 50 µs of `sched_yield` before the futex took it
+to 1.14×, and a get with it, and on a lightly loaded node a get fell from 30 µs
+to 8. Beside 16 busy loops on four cores — oversubscribed, the Pi's normal case
+— the same spin held a put and quiet at 4–7 ms in two runs of three and a
+1 GiB stream at about 10 MiB/s, against 9–26 µs and 0.5–1.1 GiB/s without it:
+the spinner took the core the agent needed, as this paragraph said it would. A
+spin is `sched_yield`, a syscall and not an intrinsic, so §3.16 would have
+allowed it. The measurement is what rules it out.
 
 **No real-time priority anywhere.** It is tempting on an oversubscribed Pi and
 would introduce unbounded priority inversion. Where isolation is needed, place
@@ -1726,9 +1746,9 @@ outcome C11 forbids, and with what.
 
 | Shape | C11's requirement | Order | Where |
 |---|---|---|---|
-| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, `acked`, connection heads; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed` |
+| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed`. *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
 | A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready` |
-| Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch |
+| Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere |
 | Two-sided, with a claim: the writer's store is an RMW on a bitmap and the lead's a flag, and a writer that reads the flag raised takes it down with a CAS before waking (slice 3) | The store-buffering outcome - the lead's recheck misses the bit and the writer misses the flag - is forbidden only among `seq_cst` operations; the claim CAS is an RMW in *S*, and a writer that loses it read a later value of the flag, so the lead's recheck ordered after that value sees its bit | **`seq_cst`** `fetch_or`, flag store, flag load and CAS; `seq_cst` recheck loads | `osoe_connection_area_mark`, `osoe_progress_host_wake_lead`, `osoe_progress_host_poll` (`lead_wake_model.py`) |
 | `shmem_fence` over plain stores (W→W) | Nothing, for a race-free program: its flag is an AMO, a `seq_cst` store and so a release. Table 14's plain stores are a data race C11 gives no meaning; the weakest construct ordering earlier stores before later ones is a release fence | **`atomic_thread_fence(release)`** | `osoe_transport_fence` |
@@ -2237,7 +2257,11 @@ may fragment replies freely.
 waitable counter has a companion 32-bit wake word. The progress thread adds landed
 bytes, then bumps the wake word, then wakes; the waiter loads the wake word, then
 compares the counters, then waits on the wake word. The per-connection `acked`
-value that `quiet` waits on follows the same pattern.
+value that `quiet` waits on follows the same pattern. *As built* (phase 1 step 3
+slice 2): `acked` has its word, with a count of registered waiters beside it, so
+the agent wakes only when a quiet waits (`base/wait-word.h`, §3.11). Its store
+and the waiter's load are `seq_cst`, since the count makes the wait two-sided
+(§3.16).
 
 **Blocking gets and fetching AMOs** do need per-operation completion: the caller
 waits for *its* reply, not for a byte count. Up to `SERIALIZED` a PE has at most one
@@ -5147,10 +5171,26 @@ above promised this measurement. Beside a `ctest -j4` of the debug suite (load
 average 6–16 on four CPUs, the models left out), the harness's median round
 trip falls to about 4 µs, since no CPU sleeps, and io_uring and blocking agree
 within 1.1× this time. So the 3–5× depends on the mix of load, and this mix did
-not reproduce it. The library's get does not fall with the harness: 31 µs
-median (10–38 across repetitions), about 7× the harness's, because each of its
-four wakes now waits for a CPU. A partly loaded node is the Pi's normal state
-(§1), so its round trips there will cost the wakes they need, not the wire.
+not reproduce it. The library's get does not fall with the harness: about 30 µs
+in six repetitions of seven, whether the harness's median was 4 µs (four
+repetitions, 8–9×) or 16 µs (three, about 2×), because each of its four wakes
+now waits for a CPU. *(Corrected in slice 2: this said "about 7×", a ratio of
+medians taken across repetitions whose load differed.)* A partly loaded node is
+the Pi's normal state (§1), so its round trips there will cost the wakes they
+need, not the wire.
+
+**With the waits' words** (phase 1 step 3 slice 2, part A; the same method).
+A put and quiet takes 52.2 µs idle, 2.06× the floor: one library round trip,
+the same four wakes as a get, where `poll_lead` cost 101 µs. The stream runs at
+3.1 GiB/s (0.18×) at the default buffer, and the rest of its shortfall is the
+buffer. Each 64 KiB put fills half of a 128 KiB buffer, so a writer waits for a
+turnover on every other put, and a wake is what each wait costs. With
+`OSOE_AM_BUFFER` at 256 KiB the stream runs at 8.6 GiB/s (0.49×), and at 512 KiB
+to 2 MiB at 9.5–10.1 GiB/s (about 0.56×). The default stays the floor (§3.4): a
+larger buffer is memory per connection, which the eager mesh multiplies by *N*.
+Beside a `ctest -j4`, a get, a fetch-add and a put and quiet each take about
+30 µs. Spinning before the futex would take the idle round trip to 1.14×, and
+§3.11 says why it is not done.
 
 ### 8.5 Development environment
 

@@ -26,6 +26,8 @@ void osoe_connection_init(struct osoe_connection *c, uint32_t credits)
     }
     atomic_store_explicit(&c->s->ack_wanted_through, 0, memory_order_release);
     atomic_store_explicit(&c->s->acked, 0, memory_order_release);
+    c->s->acked_wait = (struct osoe_wait_word){ 0 };
+    c->s->turnover_wait = (struct osoe_wait_word){ 0 };
     osoe_credit_init(&c->s->credit, credits);
 }
 
@@ -42,7 +44,11 @@ enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c, 
          */
         uint32_t k = OSOE_CONNECTION_NONE, h = 0;
         for (uint32_t i = 0; i < 2; i++) {
-            uint32_t v = atomic_load_explicit(&s->buffer[i].head, memory_order_acquire);
+            /* seq_cst: a writer that finds no room checks again here after
+             * registering on turnover_wait, and this is that check - the load
+             * half of the wait word's two-sided protocol (base/wait-word.h).
+             * Free on x86-64, and the same ldar on aarch64's default target. */
+            uint32_t v = atomic_load_explicit(&s->buffer[i].head, memory_order_seq_cst);
             if (!(v & OSOE_BUFFER_SEALED)) {
                 k = i;
                 h = v;
@@ -107,7 +113,12 @@ void osoe_connection_open(struct osoe_connection *c, uint32_t k, uint64_t seq)
         extent = header;
     atomic_store_explicit(&s->buffer[k].filled, extent, memory_order_release);
     atomic_store_explicit(&s->buffer[k].seq, seq, memory_order_release);
-    atomic_store_explicit(&s->buffer[k].head, extent, memory_order_release);
+    /* The hand-over, and the value writers waiting for room are waiting on:
+     * seq_cst, then wake them if any registered (base/wait-word.h). A release
+     * store here lets the agent read the count before its store is visible and
+     * a writer check the old head - wait_word_model.py's release_level. */
+    atomic_store_explicit(&s->buffer[k].head, extent, memory_order_seq_cst);
+    osoe_wait_word_wake_all(&s->turnover_wait);
 }
 
 void osoe_connection_seal(struct osoe_connection *c, uint32_t k)
@@ -205,5 +216,8 @@ void osoe_connection_request_ack(struct osoe_connection *c, uint64_t seq)
 
 void osoe_connection_publish_acked(struct osoe_connection *c, uint64_t seq)
 {
-    atomic_store_explicit(&c->s->acked, seq, memory_order_release);
+    /* seq_cst, then the count: a quiet that registered after the count was
+     * loaded checks acked after this store (base/wait-word.h). */
+    atomic_store_explicit(&c->s->acked, seq, memory_order_seq_cst);
+    osoe_wait_word_wake_all(&c->s->acked_wait);
 }
