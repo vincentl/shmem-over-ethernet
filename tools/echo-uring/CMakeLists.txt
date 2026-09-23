@@ -19,7 +19,10 @@ osoe_warnings(echo-uring)
 # best of each, and a round trip more than 1.5x the blocking one, or a stream
 # below 0.5x of it, is a regression of the io_uring path rather than noise. A
 # 50 us pause in the pump measured 12x and 0.05x; a missing re-arm after
-# -ENOBUFS hung.
+# -ENOBUFS hung. The pins are checked only in an optimized build without a
+# sanitizer (the release preset): under asan and tsan the io_uring round trip
+# measured 6.4x and 3.9x, which is the instrumentation of the harness's own
+# loop, not the link. Every preset still runs the verified stream.
 add_test(NAME env.echo-uring
   COMMAND echo-uring --rounds 3000 --mebibytes 1024 --check 1.5 0.5)
 set_tests_properties(env.echo-uring PROPERTIES LABELS "env" TIMEOUT 120)

@@ -653,6 +653,22 @@ int main(int argc, char **argv)
     printf("ratio uring_over_blocking round_trip=%.3f stream=%.3f\n", uring / blocking,
            uring_rate / blocking_rate);
 
+    /*
+     * The pins measure the io_uring path, so they hold only where the harness's
+     * own code runs as it will ship. Under asan or tsan, or unoptimized, the
+     * io_uring side - whose loop is mostly the harness's code - slows and the
+     * blocking side - mostly the kernel's - does not: 6.4x and 3.9x round trips
+     * in the first sanitizer runs, measuring the instrumentation.
+     */
+#if defined(__OPTIMIZE__) && !defined(__SANITIZE_ADDRESS__) && !defined(__SANITIZE_THREAD__)
+    bool pinned = true;
+#else
+    bool pinned = false;
+#endif
+    if (!pinned && (max_latency_ratio > 0 || min_bandwidth_ratio > 0)) {
+        printf("pins not checked: an instrumented or unoptimized build measures itself\n");
+        return 0;
+    }
     if (max_latency_ratio > 0 && uring / blocking > max_latency_ratio) {
         printf("FAIL: io_uring round trip %.3fx blocking, pinned at most %.3fx\n",
                uring / blocking, max_latency_ratio);

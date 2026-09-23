@@ -4725,7 +4725,11 @@ measured idle. Seven, because under the load loop's 4× oversubscription a round
 trip is bimodal for io_uring and blocking alike — about 5 or about 15 µs by where
 the two processes land — and with three trials all three of one kind landed slow
 twice in about ninety runs (3.4×); and 1 GiB, because a 256 MiB stream trial
-lasts 13 ms, shorter than a scheduler slice among 16 busy loops. Both pins
+lasts 13 ms, shorter than a scheduler slice among 16 busy loops. The pins are
+checked in the optimized, uninstrumented build only: under asan and tsan the
+io_uring round trip measured 6.4× and 3.9×, the instrumentation of the harness's
+own loop rather than the link, and every preset still runs the verified stream.
+Both pins
 were checked by breaking the harness: a 50 µs pause in its pump measured 12× and
 0.05×, and a missing re-arm after `-ENOBUFS` hung into the timeout. The ratio of
 the *library* to this floor is §1's actual target; it is pinned once the library
