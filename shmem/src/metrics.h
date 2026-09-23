@@ -142,6 +142,7 @@ enum osoe_metric_scope {
     OSOE_MSCOPE_NODE = 0,     /* a field of the header */
     OSOE_MSCOPE_PE,           /* a field of a PE's slot */
     OSOE_MSCOPE_THREAD,       /* a counter in a thread's block */
+    OSOE_MSCOPE_CONNECTION,   /* a field of one connection's record (§3.14) */
 };
 
 struct osoe_metric_descriptor {

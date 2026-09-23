@@ -168,7 +168,7 @@ void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
         return NULL;
     if (!osoe_is_local(&osoe.job, (uint32_t)pe))
         return NULL;
-    int32_t local = osoe.node.local_of_rank[pe];
+    int32_t local = osoe_node_local_id(&osoe.node, (uint32_t)pe);
     if (local < 0)
         return NULL;
     return (char *)osoe.node.heap_of[local] + offset;

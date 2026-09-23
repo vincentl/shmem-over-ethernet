@@ -58,7 +58,7 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
     if (pe >= osoe.bootstrap.world_size)
         osoe_fatal("a peer addressed PE %u in a job of %u", pe,
                    osoe.bootstrap.world_size);
-    int32_t local = osoe.node.local_of_rank[pe];
+    int32_t local = osoe_node_local_id(&osoe.node, pe);
     if (local < 0)
         return NULL;
     if (offset > osoe.node.heap_size || length > osoe.node.heap_size - offset)
@@ -75,7 +75,7 @@ static struct osoe_landing_slot *landing(void *context, uint32_t pe, uint32_t *c
     *capacity = osoe.node.landing_slot_bytes - (uint32_t)sizeof(struct osoe_landing_slot);
     if (pe >= osoe.bootstrap.world_size)
         return NULL;
-    int32_t local = osoe.node.local_of_rank[pe];
+    int32_t local = osoe_node_local_id(&osoe.node, pe);
     return local < 0 ? NULL : osoe_node_landing(&osoe.node, (uint32_t)local);
 }
 
@@ -214,6 +214,13 @@ void osoe_progress_host_start(uint32_t session)
                        &host);
     /* Count into the control segment, where osoe-stat and the tests read it. */
     osoe_am.progress.metrics = &osoe.node.hdr->am;
+    /* §3.14's connection scope and the tree's per-team state, in the same
+     * segment: the engine writes them, osoe-stat and the tests read them. */
+    osoe_am.progress.connection_metrics = osoe.node.connection_metrics;
+    osoe_am.progress.collective = osoe.node.hdr->collective;
+    for (uint32_t c = 0; c < osoe.node.connection_count; c++)
+        atomic_store_explicit(&osoe.node.connection_metrics[c].peer,
+                              c < osoe.job.node ? c : c + 1, memory_order_release);
     osoe_progress_attach(&osoe_am.progress, osoe_am.connection);
     flag_raised = false;
 }

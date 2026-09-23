@@ -147,7 +147,7 @@ static int world_to_team(const struct osoe_team *t, int world)
     if (world < 0 || (uint32_t)world >= osoe.bootstrap.world_size)
         return -1;
     if (t == &shared_team) {
-        int32_t local = osoe.node.local_of_rank[world];
+        int32_t local = osoe_node_local_id(&osoe.node, (uint32_t)world);
         return local;                   /* -1 when the rank is on another node */
     }
     return world;

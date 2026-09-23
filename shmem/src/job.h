@@ -47,6 +47,7 @@ struct osoe_job {
     uint32_t me;                    /* this PE's world rank */
     const uint32_t *node_of;        /* world rank -> logical node, world_size long */
     const unsigned char *backend_blob;  /* node_count blobs (osoe_job_backend_blob) */
+    const uint16_t *local_index;    /* world rank -> local id on its node (below) */
     bool force_remote;              /* §8.1: deny the pointer to a node-mate */
     bool creator;                   /* node 0's lead made the object */
 };
@@ -85,6 +86,25 @@ static inline const void *osoe_job_backend_blob(const struct osoe_job *j, uint32
 {
     return node < j->node_count ? j->backend_blob + (size_t)node * OSOE_JOB_BACKEND_BLOB_BYTES
                                 : NULL;
+}
+
+/*
+ * A rank's local id on its *own* node, for any rank of the job (§6.2).
+ *
+ * The one fact about a remote PE that an RDMA backend needs and node_of cannot
+ * give: it forms a remote address as the node's registered heap base plus
+ * local index x heap size plus offset, and under Slurm's cyclic or arbitrary
+ * distributions the index is not derivable from the node map (second review,
+ * roce-seam F7). AM addresses by rank and never reads it.
+ *
+ * Shared, one copy per node, 2 bytes per rank: 2 MiB at 10^6 PEs, beside
+ * node_of's 4 MiB. O(P) per node, accepted for now; §6.2 records the
+ * range-compressed map as the next step. For this node's own ranks the
+ * library uses osoe_node_local_id, which is O(L) private.
+ */
+static inline uint32_t osoe_job_local_index(const struct osoe_job *j, uint32_t pe)
+{
+    return pe < j->world_size ? j->local_index[pe] : UINT32_MAX;
 }
 
 /* The logical node a world rank is on. */

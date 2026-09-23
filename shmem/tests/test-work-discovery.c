@@ -86,6 +86,34 @@ int main(void)
                passes ? (double)visits / (double)passes : 0.0, n - 1,
                (unsigned long long)(sent1 - sent0), (unsigned long long)(skipped1 - skipped0),
                BURST);
+        /*
+         * §3.14's connection scope: one record per peer, and this node's
+         * traffic is on exactly one of them. The per-connection counters must
+         * account for the node's own total, which is what makes them a
+         * decomposition rather than a second, disagreeing count.
+         */
+        uint32_t conns = osoe_test_connection_count();
+        CHECK(conns == (uint32_t)n - 1);
+        uint64_t node_sent = 0, per_conn_total = 0, busiest = 0, busiest_peer = UINT64_MAX;
+        CHECK(osoe_test_node_metric("transport.am.segments_sent", &node_sent));
+        for (uint32_t c = 0; c < conns; c++) {
+            uint64_t peer = 0, sent = 0;
+            CHECK(osoe_test_scoped_metric("connection.peer", OSOE_MSCOPE_CONNECTION, c, &peer));
+            CHECK(osoe_test_scoped_metric("connection.segments_sent", OSOE_MSCOPE_CONNECTION,
+                                          c, &sent));
+            CHECK(peer != 0);                   /* never this node itself */
+            per_conn_total += sent;
+            if (sent > busiest) {
+                busiest = sent;
+                busiest_peer = peer;
+            }
+        }
+        CHECK(per_conn_total == node_sent);
+        CHECK(busiest_peer == 1);               /* the PE the burst went to */
+        printf("work discovery: %llu of %llu segments went to node %llu\n",
+               (unsigned long long)busiest, (unsigned long long)node_sent,
+               (unsigned long long)busiest_peer);
+
         CHECK(passes > 0);
         CHECK(visits <= 2 * passes);
         /* Every put asked for the lead, one way or the other. */

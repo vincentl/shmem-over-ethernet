@@ -158,6 +158,15 @@ struct osoe_progress {
      */
     struct osoe_am_node_metrics *metrics;
     struct osoe_am_node_metrics own_metrics;
+    /*
+     * §3.14's connection scope and the tree's per-team state, in the control
+     * segment where osoe-stat and the tests read them (progress-host.c binds
+     * them). NULL outside a job - the engine's own tests run without a control
+     * segment - and every write to them is guarded, because a diagnostic must
+     * not decide whether the loop can run.
+     */
+    struct osoe_am_connection_metrics *connection_metrics;
+    struct osoe_collective_state *collective;
 };
 
 /*

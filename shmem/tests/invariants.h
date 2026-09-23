@@ -59,6 +59,7 @@ static inline uint32_t osoe_test_scope_count(const struct osoe_segment *s, unsig
     case OSOE_MSCOPE_NODE:   return 1;
     case OSOE_MSCOPE_PE:     return s->dir->local_count;
     case OSOE_MSCOPE_THREAD: return s->dir->block_count;
+    case OSOE_MSCOPE_CONNECTION: return s->connection_count;
     default:                 return 0;
     }
 }
@@ -183,6 +184,44 @@ static inline int osoe_test_node_metric(const char *metric, uint64_t *value)
         fprintf(stderr, "node metric %s: not a readable node-scope metric of %s\n", metric, s.name);
     osoe_segment_close(&s);
     return ok;
+}
+
+/*
+ * One metric of a given scope and index of this PE's own node, by name: the
+ * connection scope (§3.14) has one record per peer, so a test that wants "this
+ * node's traffic toward node 3" names the metric and the peer slot.
+ */
+static inline int osoe_test_scoped_metric(const char *metric, unsigned scope, uint32_t index,
+                                          uint64_t *value)
+{
+    char name[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(name, sizeof name, 0);
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, name, err, sizeof err) != 0) {
+        fprintf(stderr, "metric %s: %s\n", metric, err);
+        return 0;
+    }
+    const struct osoe_metric_descriptor *m = s.table_usable ? osoe_segment_metric(&s, metric)
+                                                            : NULL;
+    int ok = m && m->scope == scope && osoe_segment_read(&s, m, index, value);
+    if (!ok)
+        fprintf(stderr, "metric %s: not readable at scope %u index %u of %s\n", metric,
+                scope, index, s.name);
+    osoe_segment_close(&s);
+    return ok;
+}
+
+/* How many records this node's connection scope has (0 on a one-node job). */
+static inline uint32_t osoe_test_connection_count(void)
+{
+    char name[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(name, sizeof name, 0);
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, name, err, sizeof err) != 0)
+        return 0;
+    uint32_t n = s.connection_count;
+    osoe_segment_close(&s);
+    return n;
 }
 
 #define CHECK_INVARIANTS() CHECK(osoe_invariants_ok())

@@ -29,7 +29,9 @@
  * appended, and never otherwise.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 136, "frozen by §3.14; 136 at layouts 6 and 7");
+_Static_assert(sizeof(struct osoe_segment_directory) == 160,
+               "frozen by §3.14: append only. 136 at layouts 6 and 7; 160 at layout 12, "
+               "with the connections section");
 
 /*
  * Candidate heap bases, tried in order by the lead; the first where its own
@@ -250,7 +252,17 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
         align_up(sizeof(struct osoe_landing_slot) + am.chunk);
     uint64_t landing_offset = align_up(blocks_offset + blocks_bytes);
     uint64_t landing_bytes = (uint64_t)b->local_count * landing_slot_bytes;
-    n->control_bytes = page_round(landing_offset + landing_bytes);
+
+    /*
+     * One record per connection toward a peer node (§3.14's connection scope,
+     * layout 12). Sized by node count, never by PE count (§1): 128 bytes per
+     * peer, so 512 KiB per node at 4,096 nodes, in the segment every PE of the
+     * node already maps. A job of one node has none.
+     */
+    uint64_t connections_offset = align_up(landing_offset + landing_bytes);
+    uint64_t connection_count = b->node_count > 1 ? b->node_count - 1 : 0;
+    uint64_t connections_bytes = connection_count * sizeof(struct osoe_am_connection_metrics);
+    n->control_bytes = page_round(connections_offset + connections_bytes);
 
     /*
      * The node's whole request, checked once and before any of it exists: this
@@ -320,11 +332,27 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->dir.landing_bytes = landing_bytes;
     h->dir.landing_slot_bytes = (uint32_t)landing_slot_bytes;
     h->dir.landing_count = b->local_count;
+    h->dir.connections_offset = connections_offset;
+    h->dir.connections_bytes = connections_bytes;
+    h->dir.connection_bytes = (uint32_t)sizeof(struct osoe_am_connection_metrics);
+    h->dir.connection_count = (uint32_t)connection_count;
     h->dir.block_bytes = (uint32_t)sizeof(struct osoe_counter_block);
     memcpy((char *)p + metrics_offset, metrics, metrics_bytes);
     n->blocks = (struct osoe_counter_block *)((char *)p + blocks_offset);
     n->landing = (unsigned char *)p + landing_offset;
     n->landing_slot_bytes = (uint32_t)landing_slot_bytes;
+    n->connection_metrics = connection_count
+        ? (struct osoe_am_connection_metrics *)((char *)p + connections_offset) : NULL;
+    n->connection_count = (uint32_t)connection_count;
+    /*
+     * Which machine this logical node is on (§3.14): the node numbers a
+     * hung collective names are logical, and a walk down the tree needs the
+     * host to run osoe-stat on next. Truncation is not an error - it is a
+     * label - so the result is terminated by hand.
+     */
+    if (gethostname(h->hostname, sizeof h->hostname) != 0)
+        snprintf(h->hostname, sizeof h->hostname, "unknown");
+    h->hostname[sizeof h->hostname - 1] = '\0';
     osoe_epoch_init(&h->world_arrived);
     osoe_epoch_init(&h->world_released);
     osoe_epoch_init(&h->world_copied);
@@ -410,6 +438,7 @@ again:;
                    b->world_size, session);
     if (h->dir.slots_offset + (uint64_t)h->dir.local_count * h->dir.slot_bytes > n->control_bytes ||
         h->dir.blocks_offset + h->dir.blocks_bytes > n->control_bytes ||
+        h->dir.connections_offset + h->dir.connections_bytes > n->control_bytes ||
         h->dir.metrics_offset + h->dir.metrics_bytes > n->control_bytes)
         osoe_fatal("control segment %s is too small for its own directory",
                    n->control_name);
@@ -420,6 +449,10 @@ again:;
      * different builds, which is what the frozen directory exists to prevent. */
     n->landing = (unsigned char *)n->hdr + h->dir.landing_offset;
     n->landing_slot_bytes = h->dir.landing_slot_bytes;
+    n->connection_metrics = h->dir.connection_count
+        ? (struct osoe_am_connection_metrics *)((char *)n->hdr + h->dir.connections_offset)
+        : NULL;
+    n->connection_count = h->dir.connection_count;
 
     /* The metric table is fixed for a build, so a mismatch is a mixed-library
      * job that the layout check above did not catch (§3.13's argument for
@@ -434,6 +467,61 @@ again:;
                    osoe_metric_checksum(want, want_count));
 }
 
+/*
+ * The O(L) answer to "which local id is world rank r" (node.h). O(L log L)
+ * once at init - an insertion sort would be L^2 = 65,536 steps at 256, which
+ * is also fine, but qsort says what it does.
+ */
+static int compare_rank(const void *a, const void *b)
+{
+    uint32_t x = ((const uint32_t *)a)[0], y = ((const uint32_t *)b)[0];
+    return x < y ? -1 : x > y;
+}
+
+static void build_local_index(struct osoe_node *n, const struct osoe_bootstrap *b)
+{
+    uint32_t count = b->local_count;
+    n->local_count = count;
+    n->first_rank = count ? b->gtids[0] : 0;
+    n->local_block = true;
+    for (uint32_t i = 0; i < count; i++)
+        if (b->gtids[i] != n->first_rank + i)
+            n->local_block = false;
+    n->sorted_rank = NULL;
+    n->sorted_local = NULL;
+    if (n->local_block)
+        return;
+    uint32_t (*pairs)[2] = malloc(sizeof *pairs * count);
+    n->sorted_rank = malloc(sizeof *n->sorted_rank * count);
+    n->sorted_local = malloc(sizeof *n->sorted_local * count);
+    if (!pairs || !n->sorted_rank || !n->sorted_local)
+        osoe_fatal("out of memory");
+    for (uint32_t i = 0; i < count; i++) {
+        pairs[i][0] = b->gtids[i];
+        pairs[i][1] = i;
+    }
+    qsort(pairs, count, sizeof *pairs, compare_rank);
+    for (uint32_t i = 0; i < count; i++) {
+        n->sorted_rank[i] = pairs[i][0];
+        n->sorted_local[i] = pairs[i][1];
+    }
+    free(pairs);
+}
+
+int32_t osoe_node_local_search(const struct osoe_node *n, uint32_t rank)
+{
+    uint32_t lo = 0, hi = n->local_count;
+    while (lo < hi) {
+        uint32_t mid = lo + (hi - lo) / 2;
+        if (n->sorted_rank[mid] < rank)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+    return lo < n->local_count && n->sorted_rank[lo] == rank ? (int32_t)n->sorted_local[lo]
+                                                             : -1;
+}
+
 void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
 {
     bool lead = b->local_id == 0;
@@ -445,13 +533,9 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     n->heap_size = b->symmetric_size;
     n->heap_bytes = page_round(b->symmetric_size ? b->symmetric_size : 1);
     n->heap_of = calloc(b->local_count, sizeof *n->heap_of);
-    n->local_of_rank = malloc(sizeof *n->local_of_rank * b->world_size);
-    if (!n->heap_of || !n->local_of_rank)
+    if (!n->heap_of)
         osoe_fatal("out of memory");
-    for (uint32_t r = 0; r < b->world_size; r++)
-        n->local_of_rank[r] = -1;
-    for (uint32_t i = 0; i < b->local_count; i++)
-        n->local_of_rank[b->gtids[i]] = (int32_t)i;
+    build_local_index(n, b);
 
     if (lead)
         create_control(n, b, session);
@@ -565,8 +649,11 @@ void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)
             munmap(n->heap_of[i], n->slots[i].heap_bytes);
     free(n->heap_of);
     n->heap_of = NULL;
-    free(n->local_of_rank);
-    n->local_of_rank = NULL;
+    free(n->sorted_rank);
+    free(n->sorted_local);
+    n->sorted_rank = n->sorted_local = NULL;
+    n->local_block = false;
+    n->local_count = 0;
 
     atomic_store_explicit(&me->phase, OSOE_PHASE_FINALIZED, memory_order_release);
     uint32_t done = atomic_fetch_add_explicit(&n->hdr->finalized, 1, memory_order_seq_cst) + 1;

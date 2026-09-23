@@ -35,7 +35,8 @@
  * rather than the job.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 136, "frozen by §3.14; 136 at layout 6");
+_Static_assert(sizeof(struct osoe_segment_directory) == 160,
+               "frozen by §3.14: append only. 136 at layout 6; 160 at layout 12");
 
 uint64_t osoe_segment_now_ns(void)
 {
@@ -305,6 +306,9 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
     if (OSOE_SEGMENT_HAS(s->dir, local_count))
         s->local_count = clamp_count(s->dir->slots_offset, s->dir->slot_bytes,
                                      s->dir->metrics_offset, s->bytes, s->dir->local_count);
+    if (OSOE_SEGMENT_HAS(s->dir, connection_count))
+        s->connection_count = clamp_count(s->dir->connections_offset, s->dir->connection_bytes,
+                                          s->bytes, s->bytes, s->dir->connection_count);
     if (OSOE_SEGMENT_HAS(s->dir, block_count)) {
         uint64_t after_blocks = OSOE_SEGMENT_HAS(s->dir, landing_offset)
                                  ? s->dir->landing_offset : s->bytes;
@@ -378,6 +382,12 @@ static const unsigned char *record(const struct osoe_segment *s, unsigned scope,
             return NULL;
         n = s->dir->block_bytes;
         off = s->dir->blocks_offset + (uint64_t)index * n;
+        break;
+    case OSOE_MSCOPE_CONNECTION:
+        if (index >= s->connection_count)
+            return NULL;
+        n = s->dir->connection_bytes;
+        off = s->dir->connections_offset + (uint64_t)index * n;
         break;
     default:
         return NULL;

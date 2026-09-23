@@ -106,6 +106,19 @@ _Static_assert(sizeof thread_metrics / sizeof thread_metrics[0] == OSOE_COUNTER_
       (uint16_t)sizeof(((struct osoe_segment_directory *)0)->field),        \
       (uint32_t)(offsetof(struct osoe_node_header, dir) +                   \
                  offsetof(struct osoe_segment_directory, field)), 0 }
+/* One connection's record (§3.14's fourth scope): the index is the peer slot,
+ * so a reader loops over dir.connection_count of them. */
+#define CONN(name, field, type, kind, unit)                                 \
+    { name, unit, type, kind, OSOE_MSCOPE_CONNECTION,                       \
+      (uint16_t)sizeof(((struct osoe_am_connection_metrics *)0)->field),    \
+      (uint32_t)offsetof(struct osoe_am_connection_metrics, field), 0 }
+/* A team's tree state, one set of fields per team (§5.3). Node scope, because
+ * there is one of each per node, and named per team as the epoch counters are. */
+#define NDTREE(name, team, field)                                           \
+    { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,      \
+      (uint32_t)(offsetof(struct osoe_node_header, collective) +            \
+                 (team) * sizeof(struct osoe_collective_state) +            \
+                 offsetof(struct osoe_collective_state, field)), 0 }
 /* An epoch counter's value is a word inside a cache-line-padded structure, and
  * the word is what a reader loads. */
 #define NDEPOCH(name, field)                                                \
@@ -172,6 +185,50 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     NDARRIVAL("team.world.arrival_posted", OSOE_TEAM_WORLD),
     NDARRIVAL("team.shared.arrival_posted", OSOE_TEAM_SHARED),
     NDARRIVAL("team.finalize.arrival_posted", OSOE_TEAM_FINALIZE),
+    /*
+     * The internode tree, per team (§5.3): where this node is in it and how far
+     * the epoch in progress has got. `tree.lowest_missing` is the one a hung
+     * collective is walked down by - the lowest child node that owes this node
+     * an arrival - and `node.hostname` says which machine to ask next.
+     */
+    NDTREE("team.world.tree.epoch_open", OSOE_TEAM_WORLD, epoch_open),
+    NDTREE("team.world.tree.epoch_closed", OSOE_TEAM_WORLD, epoch_closed),
+    NDTREE("team.world.tree.own_arrived", OSOE_TEAM_WORLD, own_arrived),
+    NDTREE("team.world.tree.children", OSOE_TEAM_WORLD, children),
+    NDTREE("team.world.tree.children_arrived", OSOE_TEAM_WORLD, children_arrived),
+    NDTREE("team.world.tree.lowest_missing", OSOE_TEAM_WORLD, lowest_missing),
+    NDTREE("team.world.tree.parent", OSOE_TEAM_WORLD, parent),
+    NDTREE("team.world.tree.fanout", OSOE_TEAM_WORLD, fanout),
+    NDTREE("team.finalize.tree.epoch_open", OSOE_TEAM_FINALIZE, epoch_open),
+    NDTREE("team.finalize.tree.epoch_closed", OSOE_TEAM_FINALIZE, epoch_closed),
+    NDTREE("team.finalize.tree.own_arrived", OSOE_TEAM_FINALIZE, own_arrived),
+    NDTREE("team.finalize.tree.children", OSOE_TEAM_FINALIZE, children),
+    NDTREE("team.finalize.tree.children_arrived", OSOE_TEAM_FINALIZE, children_arrived),
+    NDTREE("team.finalize.tree.lowest_missing", OSOE_TEAM_FINALIZE, lowest_missing),
+    NDTREE("team.finalize.tree.parent", OSOE_TEAM_FINALIZE, parent),
+    /* One record per connection toward a peer node, in peer-slot order. */
+    CONN("connection.peer", peer, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    CONN("connection.segments_sent", segments_sent, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    CONN("connection.bytes_sent", bytes_sent, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, "bytes"),
+    CONN("connection.header_only_sent", header_only_sent, OSOE_MTYPE_U64,
+         OSOE_MKIND_COUNTER, ""),
+    CONN("connection.segments_applied", segments_applied, OSOE_MTYPE_U64,
+         OSOE_MKIND_COUNTER, ""),
+    CONN("connection.bytes_applied", bytes_applied, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+         "bytes"),
+    CONN("connection.messages_applied", messages_applied, OSOE_MTYPE_U64,
+         OSOE_MKIND_COUNTER, ""),
+    CONN("connection.control_queue_depth", control_queue_depth, OSOE_MTYPE_U32,
+         OSOE_MKIND_GAUGE, ""),
+    CONN("connection.bulk_queue_depth", bulk_queue_depth, OSOE_MTYPE_U32,
+         OSOE_MKIND_GAUGE, ""),
+    CONN("connection.control_queue_high_water", control_queue_high_water, OSOE_MTYPE_U32,
+         OSOE_MKIND_HIGHWATER, ""),
+    CONN("connection.bulk_queue_high_water", bulk_queue_high_water, OSOE_MTYPE_U32,
+         OSOE_MKIND_HIGHWATER, ""),
+    CONN("connection.acked_through", acked_through, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    CONN("connection.wanted_through", wanted_through, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    CONN("connection.sent_through", sent_through, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     ND("node.aborting", aborting, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_pe", abort_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.abort_status", abort_status, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
@@ -205,6 +262,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("transport.am.bulk_queue_high_water", am.bulk_queue_high_water, OSOE_MTYPE_U64,
        OSOE_MKIND_HIGHWATER, ""),
     ND("transport.am.pool_high_water", am.pool_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, ""),
+    ND("node.hostname", hostname, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
     ND("transport.am.passes", am.passes, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     ND("transport.am.send_visits", am.send_visits, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
        "conns"),

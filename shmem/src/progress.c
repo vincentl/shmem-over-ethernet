@@ -91,6 +91,27 @@ static void *destination(void *context, const struct osoe_message_header *header
  * reaping, which is what makes §3.7's "never reserve" satisfiable without any
  * blocking path at all.
  */
+/* This connection's record in the control segment (§3.14), or NULL. */
+static struct osoe_am_connection_metrics *conn_metrics(struct osoe_progress *p, uint32_t slot)
+{
+    return p->connection_metrics ? &p->connection_metrics[slot] : NULL;
+}
+
+/* The queue gauges of one connection, published where osoe-stat reads them.
+ * Called where they change and when the lead visits the connection. */
+static void publish_queues(struct osoe_progress *p, uint32_t slot)
+{
+    struct osoe_am_connection_metrics *cm = conn_metrics(p, slot);
+    if (!cm)
+        return;
+    const struct osoe_reply_queues *q = &p->connection[slot].queues;
+    atomic_store_explicit(&cm->control_queue_depth, q->control.depth, memory_order_release);
+    atomic_store_explicit(&cm->bulk_queue_depth, q->bulk.depth, memory_order_release);
+    atomic_store_explicit(&cm->control_queue_high_water, q->control.high_water,
+                          memory_order_release);
+    atomic_store_explicit(&cm->bulk_queue_high_water, q->bulk.high_water, memory_order_release);
+}
+
 /* The node-wide high-water marks (§3.14), after a push: the deepest this
  * connection's queues have been, and the most descriptors out at once. */
 static void note_high_water(struct osoe_progress *p, uint32_t slot)
@@ -99,6 +120,7 @@ static void note_high_water(struct osoe_progress *p, uint32_t slot)
     osoe_counter_word_max(&p->metrics->control_queue_high_water, q->control.high_water);
     osoe_counter_word_max(&p->metrics->bulk_queue_high_water, q->bulk.high_water);
     osoe_counter_word_max(&p->metrics->pool_high_water, p->pool.high_water);
+    publish_queues(p, slot);
 }
 
 static const char *reply_kind_name(uint16_t kind)
@@ -170,6 +192,42 @@ static void land(struct osoe_landing_slot *slot)
 
 /* ---- The internode tree (§5.3) ------------------------------------------ */
 
+/*
+ * Publish a team's tree state where a hung collective is read from (§3.14).
+ *
+ * `lowest_missing` is the point of it: with the tree, the node that has not
+ * arrived is found by walking down from the root, each node naming the lowest
+ * child that owes it an arrival, in O(log N) visits instead of N. A few
+ * single-writer stores (§3.16) per barrier, by the only thread that owns this
+ * state.
+ */
+static void publish_team(struct osoe_progress *p, uint32_t team)
+{
+    if (!p->collective)
+        return;
+    const struct osoe_progress_team *t = &p->team[team];
+    struct osoe_collective_state *c = &p->collective[team];
+    uint32_t missing = OSOE_COLLECTIVE_TREE_NONE, arrived = 0;
+    /* Only while an epoch is open: between collectives the counts are reset,
+     * and naming a child then would say "has not arrived" of an epoch nobody
+     * has begun. A node at rest owes nothing, and the walk that reaches it
+     * reads epoch_open 0 and looks at its own PEs instead. */
+    for (uint32_t j = 0; t->open && j < t->tree.children; j++) {
+        if (t->arrived & (UINT32_C(1) << j))
+            arrived++;
+        else if (missing == OSOE_COLLECTIVE_TREE_NONE)
+            missing = t->tree.child[j];
+    }
+    atomic_store_explicit(&c->epoch_open, t->open, memory_order_release);
+    atomic_store_explicit(&c->epoch_closed, t->closed, memory_order_release);
+    atomic_store_explicit(&c->own_arrived, t->own ? 1 : 0, memory_order_release);
+    atomic_store_explicit(&c->children, t->tree.children, memory_order_release);
+    atomic_store_explicit(&c->children_arrived, arrived, memory_order_release);
+    atomic_store_explicit(&c->lowest_missing, missing, memory_order_release);
+    atomic_store_explicit(&c->parent, t->tree.parent, memory_order_release);
+    atomic_store_explicit(&c->fanout, t->tree.fanout, memory_order_release);
+}
+
 /* Queue one collective message toward a node of the tree. A handler may
  * enqueue but never reserve (§3.7): the drain step writes it. */
 static void forward(struct osoe_progress *p, uint32_t team, uint32_t node, uint16_t kind,
@@ -228,13 +286,16 @@ static void book_arrival(struct osoe_progress *p, uint32_t team, uint32_t epoch,
     }
     uint32_t all = t->tree.children == 32 ? UINT32_MAX
                                           : (UINT32_C(1) << t->tree.children) - 1;
-    if (!t->own || t->arrived != all)
+    if (!t->own || t->arrived != all) {
+        publish_team(p, team);          /* who is still owed (§3.14) */
         return;
+    }
     /* Close it, and reset, before anything is released (the struct's note). */
     t->closed = epoch;
     t->open = 0;
     t->own = false;
     t->arrived = 0;
+    publish_team(p, team);
     if (t->tree.parent == OSOE_COLLECTIVE_TREE_NONE)
         release_down(p, team, epoch);
     else
@@ -262,6 +323,8 @@ static void complete(void *context, const struct osoe_message_header *header,
     struct osoe_progress *p = a->progress;
     struct osoe_progress_connection *c = &p->connection[a->slot];
     osoe_counter_word_add(&p->metrics->messages_applied, 1);
+    if (conn_metrics(p, a->slot))
+        osoe_counter_word_add(&conn_metrics(p, a->slot)->messages_applied, 1);
 
     switch (header->kind) {
     case OSOE_AM_PUT: {
@@ -422,6 +485,11 @@ static void segment_applied(void *context, const struct osoe_am_segment_header *
     struct osoe_progress *p = a->progress;
     struct osoe_progress_connection *c = &p->connection[a->slot];
     osoe_counter_word_add(&p->metrics->segments_applied, 1);
+    struct osoe_am_connection_metrics *cm = conn_metrics(p, a->slot);
+    if (cm) {
+        osoe_counter_word_add(&cm->segments_applied, 1);
+        osoe_counter_word_add(&cm->bytes_applied, segment->total_len);
+    }
 
     /*
      * Applied, not merely received: §4.6 makes that the difference, because a
@@ -677,6 +745,17 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
      */
     uint64_t wanted = osoe_connection_ack_wanted(conn);
     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
+    struct osoe_am_connection_metrics *cm = conn_metrics(p, slot);
+    if (cm) {
+        /* The three sequences a stuck connection is read by (§3.14): what the
+         * peer has acknowledged, what this node's writers are waiting to have
+         * acknowledged, and how far this node has sent. */
+        atomic_store_explicit(&cm->acked_through, c->acked, memory_order_release);
+        atomic_store_explicit(&cm->wanted_through, wanted, memory_order_release);
+        atomic_store_explicit(&cm->sent_through, c->next_seq ? c->next_seq - 1 : 0,
+                              memory_order_release);
+        publish_queues(p, slot);
+    }
 
     /* Finish an in-flight send. A short write is the normal case (§3.3): keep
      * the remainder and offer it again. */
@@ -692,6 +771,10 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
             c->state[c->sending] = OSOE_BUFFER_FREE;
             c->sending = OSOE_CONNECTION_NONE;
             osoe_counter_word_add(&p->metrics->segments_sent, 1);
+            if (cm) {
+                osoe_counter_word_add(&cm->segments_sent, 1);
+                osoe_counter_word_add(&cm->bytes_sent, c->sending_bytes);
+            }
             moved = true;
         }
     }
@@ -727,8 +810,11 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
          * model says a quiesced pair may still exchange. */
         bool late = wanted > c->acked && c->flagged < wanted;
         if (used > header || c->owe_ack || late) {
-            if (used == header)
+            if (used == header) {
                 osoe_counter_word_add(&p->metrics->header_only_sent, 1);   /* §3.4's ack-only */
+                if (conn_metrics(p, slot))
+                    osoe_counter_word_add(&conn_metrics(p, slot)->header_only_sent, 1);
+            }
             osoe_connection_seal(conn, c->open);
             c->carrying = false;
             c->state[c->open] = OSOE_BUFFER_SEALED_STATE;
@@ -919,6 +1005,7 @@ void osoe_progress_team(struct osoe_progress *p, uint32_t team,
         osoe_fatal("team %u registered an internode phase; this build has %u", team,
                    OSOE_TEAMS);
     p->team[team] = (struct osoe_progress_team){ .registered = true, .tree = *tree };
+    publish_team(p, team);
 }
 
 void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch)

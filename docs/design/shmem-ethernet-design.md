@@ -1260,6 +1260,17 @@ headers would pass whenever the library agreed with itself.
 - **Per team:** `arrived`, `released`, `copied`, and each PE's epoch counts `k` and
   `d` (§5.4). This shows which PE did not reach a barrier — the most common real
   hang.
+- **Per team, in the internode tree** (layout 12, §5.3): the epoch this node has
+  open and the last it closed, whether its own members have arrived, how many
+  children have, and **the lowest child node that has not**. With the tree that
+  last field turns "which node has not arrived" from a visit to every node into a
+  walk down from the root, O(log N) visits, and `node.hostname` — also layout 12 —
+  says which machine to ask next. `osoe-stat --summary` prints one line per node
+  and team for exactly this walk. *Measured* (`shmem.hang-walk`, and the
+  transcript in the commit): one PE of eight logical nodes never calls the second
+  barrier, and three visits find it — node 0 names child 2, node 2 names child 6,
+  node 6 has no epoch open and its own members not arrived, so its PE lines say
+  which PE and in what.
 - **Per PE:** a "blocked in" record (routine, target, and since when), its watch
   slot (§4.9), outstanding get bytes, bootstrap phase, and the abort word.
   The target carries a kind since layout 9 — a peer node, an epoch, a heap
@@ -1307,8 +1318,23 @@ and bulk queue of any connection and of the node's descriptor pool. They are
 fields of the node header written by the lead's progress thread alone, the
 single-writer case of §3.16. They exist first because two protocols could not
 otherwise be seen working: an acknowledgement echo (§3.4) and an exhausted reply
-pool (§3.8) have no effect a test can observe except these counts. The
-per-connection scope this question asks for is the next step.
+pool (§3.8) have no effect a test can observe except these counts.
+
+*As built (layout 12, phase 1 step 2 slice 3):* the **fourth scope** this
+question asked for. One record per connection toward a peer node, in peer-slot
+order, in the control segment after the landing zones, described in the metric
+table like everything else and read by index: `connection.peer`,
+`segments_sent`, `bytes_sent`, `header_only_sent`, `segments_applied`,
+`bytes_applied`, `messages_applied`, the two queue depths and their high-water
+marks, and the three sequence numbers a stuck connection is read by -
+`sent_through`, `acked_through`, `wanted_through`. `osoe-stat` prints them as a
+line per peer under the PE lines. The gauges are refreshed when the lead visits
+the connection, which since slice 3 is only when it has work (§3.10), so an idle
+connection's are as stale as it is idle - which is what a hung job wants: the
+last state of the connection that stopped. Sized by node count, never PE count:
+128 bytes per peer, 512 KiB per node at 4,096 nodes. A test reads them by name
+through the same reader (`shmem.work-discovery` checks that the per-connection
+counts add up to the node's).
 
 **3. Are aggregation and progress healthy?**
 
@@ -3996,6 +4022,28 @@ computes the same host under any distribution.
   and key material).
 - **Node-pair connections:** the lower node index connects to the higher, so each
   pair opens exactly one stream (§3.1).
+
+**What the map holds, and what it costs** (phase 1 step 2 slice 3; second review,
+D7). Per rank: its node (4 bytes) and its **local index on that node** (2 bytes;
+16 bits suffice at 256 PEs per node, and `OSOE_GTIDS` longer than 65,535 is
+refused). The local index is the one fact about a *remote* PE that an RDMA
+backend cannot do without — it forms a remote heap address as the node's
+registered base plus index × heap size plus offset, and under Slurm's cyclic or
+arbitrary distributions the index is not derivable from the node map. The map is
+shared, one copy per node: 6 × 10⁶ bytes ≈ 6 MiB per node at 10⁶ PEs, accepted for
+now. A PE's own node is answered privately and in O(*L*): which local id a rank
+has is a subtraction when the node's ranks are one contiguous block in local-id
+order, and otherwise a binary search over the node's *L* ranks sorted — replacing
+a world-sized `local_of_rank` array in every PE, which was 4 × *P* bytes per PE and
+1 GiB per node at 4,096 × 256. `gtids` is sized by *L*, not *P*.
+
+**The known next step is a range-compressed map.** Under block and cyclic
+distributions the map is O(*N*) runs, not O(*P*) entries, and so is the broadcast
+that fills it — which as designed sends 4·*P* bytes to each of *N* − 1 leads from
+one NIC, O(*N*·*P*) bytes through node 0: 255 MB at 500 × 256 (about 2 s on 1 GbE),
+16 GB at 4,096 × 256 (second review, algorithmic-scaling 9). Neither is built:
+the step-2 rendezvous is a shared-memory object, and the socket rendezvous of
+step 3 is where the compressed form and a tree-shaped broadcast belong.
 
 `SLURM_STEP_NODELIST` is a compressed hostlist (`pi[01-04,07]`). Expanding it is a
 small parser — call it fifty lines — **written with unit tests in tier 1**, because

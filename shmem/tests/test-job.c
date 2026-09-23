@@ -91,6 +91,31 @@ int main(void)
     for (uint32_t i = 0; i < b.local_count; i++)
         CHECK(osoe_node_of(&job, b.gtids[i]) == b.node);
 
+    /*
+     * Each rank's local index on its own node (§6.2, layout 6): this node's
+     * ranks are at their position in OSOE_GTIDS, and every rank's index is
+     * below its node's rank count - which is what an RDMA backend forms a
+     * remote heap address from, for a PE whose node it has never joined.
+     */
+    for (uint32_t i = 0; i < b.local_count; i++)
+        CHECK(osoe_job_local_index(&job, b.gtids[i]) == i);
+    for (uint32_t r = 0; r < job.world_size; r++) {
+        uint32_t on_node = 0;
+        for (uint32_t q = 0; q < job.world_size; q++)
+            on_node += osoe_node_of(&job, q) == osoe_node_of(&job, r);
+        CHECK(osoe_job_local_index(&job, r) < on_node);
+    }
+    CHECK(osoe_job_local_index(&job, job.world_size) == UINT32_MAX);
+
+    /* The per-node backend blob (layout 4): AM publishes zeros. */
+    for (uint32_t n = 0; n < job.node_count; n++) {
+        const unsigned char *blob = osoe_job_backend_blob(&job, n);
+        CHECK(blob != NULL);
+        for (uint32_t k = 0; blob && k < OSOE_JOB_BACKEND_BLOB_BYTES; k++)
+            CHECK(blob[k] == 0);
+    }
+    CHECK(osoe_job_backend_blob(&job, job.node_count) == NULL);
+
     /* Every node is used. A gap would mean the node count and the segments
      * disagree, which §8.1's map parser refuses at the launcher - so finding
      * one here would mean the two disagree about what was launched. */

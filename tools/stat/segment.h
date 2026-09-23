@@ -73,6 +73,14 @@ struct osoe_segment_directory {
     uint64_t landing_bytes;
     uint32_t landing_slot_bytes;
     uint32_t landing_count;
+
+    /* Appended at layout 12: one record per connection toward a peer node,
+     * the fourth metric scope. A reader built before them asks and finds the
+     * fields absent, exactly as with the landing zones. */
+    uint64_t connections_offset;
+    uint64_t connections_bytes;
+    uint32_t connection_bytes;
+    uint32_t connection_count;
 };
 
 /*
@@ -121,6 +129,7 @@ enum osoe_metric_scope {
     OSOE_MSCOPE_NODE = 0,
     OSOE_MSCOPE_PE,
     OSOE_MSCOPE_THREAD,
+    OSOE_MSCOPE_CONNECTION,
 };
 
 /* ---- An opened segment --------------------------------------------- */
@@ -146,6 +155,10 @@ struct osoe_segment {
      */
     uint32_t local_count;
     uint32_t block_count;
+    /* Clamped the same way: connection records between their offset and the
+     * end of the segment. Zero on a job of one node, and on any segment
+     * written before layout 12. */
+    uint32_t connection_count;
 };
 
 /*

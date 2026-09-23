@@ -32,7 +32,7 @@
 
 #include "segment.h"
 
-enum mode { MODE_LIST, MODE_COUNTERS, MODE_THREADS, MODE_DUMP, MODE_GC };
+enum mode { MODE_LIST, MODE_COUNTERS, MODE_THREADS, MODE_DUMP, MODE_GC, MODE_SUMMARY };
 
 static bool opt_json;
 static bool opt_nonzero;
@@ -302,12 +302,122 @@ static void print_pe_lines(const struct osoe_segment *s)
     }
 }
 
+/*
+ * One line per connection toward a peer node (§3.14's connection scope).
+ * Printed after the PE lines, because "which peer" is the first question about
+ * a job whose traffic is uneven or whose one link has stopped: `acked` far
+ * behind `sent` is a peer that is not applying, and `wanted` ahead of `acked`
+ * is a quiet still waiting for it.
+ */
+static void print_connection_lines(const struct osoe_segment *s)
+{
+    if (s->connection_count == 0)
+        return;
+    printf("\n%5s %10s %10s %10s %10s %7s %7s %10s %10s %10s\n",
+           "peer", "seg sent", "bytes", "seg appl", "bytes", "ctrlq", "bulkq",
+           "sent thru", "acked", "wanted");
+    for (uint32_t c = 0; c < s->connection_count; c++) {
+        uint64_t peer = 0, ss = 0, bs = 0, sa = 0, ba = 0, cq = 0, bq = 0, st = 0, ack = 0, want = 0;
+        osoe_segment_read_name(s, "connection.peer", c, &peer);
+        osoe_segment_read_name(s, "connection.segments_sent", c, &ss);
+        osoe_segment_read_name(s, "connection.bytes_sent", c, &bs);
+        osoe_segment_read_name(s, "connection.segments_applied", c, &sa);
+        osoe_segment_read_name(s, "connection.bytes_applied", c, &ba);
+        osoe_segment_read_name(s, "connection.control_queue_depth", c, &cq);
+        osoe_segment_read_name(s, "connection.bulk_queue_depth", c, &bq);
+        osoe_segment_read_name(s, "connection.sent_through", c, &st);
+        osoe_segment_read_name(s, "connection.acked_through", c, &ack);
+        osoe_segment_read_name(s, "connection.wanted_through", c, &want);
+        printf("%5" PRIu64 " %10" PRIu64 " %10" PRIu64 " %10" PRIu64 " %10" PRIu64
+               " %7" PRIu64 " %7" PRIu64 " %10" PRIu64 " %10" PRIu64 " %10" PRIu64 "\n",
+               peer, ss, bs, sa, ba, cq, bq, st, ack, want);
+    }
+}
+
+/* ---- the summary view -------------------------------------------------- */
+
+/*
+ * One line per node, for walking a hung collective down the tree (§3.14, §5.3).
+ *
+ * It answers, for each team with an internode phase: which epoch this node has
+ * open, whether its own members are in, how many children have arrived, and
+ * **the lowest child that has not**. That last is the next node to look at, and
+ * `host` says where. A node with `own` no is one whose own PEs have not all
+ * called the collective, and the PE lines of *that* node say which.
+ */
+static void summary_line(const struct osoe_segment *s)
+{
+    char host[72] = "?";
+    osoe_segment_read_str(s, "node.hostname", 0, host, sizeof host);
+    uint64_t node = 0, live = 0;
+    osoe_segment_read_name(s, "node.id", 0, &node);
+    for (uint32_t i = 0; i < s->local_count; i++) {
+        uint64_t pid = 0;
+        osoe_segment_read_name(s, "pe.pid", i, &pid);
+        if ((int64_t)pid > 0 && !(kill((pid_t)(int64_t)pid, 0) != 0 && errno == ESRCH))
+            live++;
+    }
+    /* Which PE of this node is blocked longest, and in what. */
+    uint64_t now = osoe_segment_now_ns(), worst = 0;
+    char where[192] = "-";
+    for (uint32_t i = 0; i < s->local_count; i++) {
+        struct osoe_segment_blocked b;
+        if (!osoe_segment_blocked(s, i, &b) || !b.valid || !b.blocked)
+            continue;
+        uint64_t age = b.since_ns && now > b.since_ns ? now - b.since_ns : 0;
+        if (age < worst)
+            continue;
+        worst = age;
+        char what[48], d[32] = "?";
+        osoe_segment_blocked_detail(&b, what, sizeof what);
+        if (age)
+            print_duration(d, sizeof d, age);
+        snprintf(where, sizeof where, "PE%u %s (%s) %s", i, b.routine, what, d);
+    }
+
+    for (unsigned t = 0; t < 2; t++) {
+        const char *team = t == 0 ? "world" : "finalize";
+        char name[64];
+        uint64_t open = 0, closed = 0, own = 0, kids = 0, arrived = 0, missing = 0, parent = 0;
+        snprintf(name, sizeof name, "team.%s.tree.epoch_open", team);
+        if (!osoe_segment_read_name(s, name, 0, &open))
+            return;                     /* older layout: no tree state to show */
+        snprintf(name, sizeof name, "team.%s.tree.epoch_closed", team);
+        osoe_segment_read_name(s, name, 0, &closed);
+        snprintf(name, sizeof name, "team.%s.tree.own_arrived", team);
+        osoe_segment_read_name(s, name, 0, &own);
+        snprintf(name, sizeof name, "team.%s.tree.children", team);
+        osoe_segment_read_name(s, name, 0, &kids);
+        snprintf(name, sizeof name, "team.%s.tree.children_arrived", team);
+        osoe_segment_read_name(s, name, 0, &arrived);
+        snprintf(name, sizeof name, "team.%s.tree.lowest_missing", team);
+        osoe_segment_read_name(s, name, 0, &missing);
+        snprintf(name, sizeof name, "team.%s.tree.parent", team);
+        osoe_segment_read_name(s, name, 0, &parent);
+        /* A team that has not run says nothing: the finalize team is
+         * registered from init and only moves at shmem_finalize. */
+        if (open == 0 && closed == 0 && t == 1)
+            continue;
+        char missing_s[16] = "-", parent_s[16] = "root";
+        if (missing != UINT32_MAX)
+            snprintf(missing_s, sizeof missing_s, "%" PRIu64, missing);
+        if (parent != UINT32_MAX)
+            snprintf(parent_s, sizeof parent_s, "%" PRIu64, parent);
+        printf("node %-3" PRIu64 " %-16s %2" PRIu64 "/%-2u live  %-8s epoch %" PRIu64
+               "/%-3" PRIu64 " own %-3s kids %" PRIu64 "/%-2" PRIu64
+               " next %-4s parent %-4s  %s\n",
+               node, host, live, s->local_count, team, open, closed, own ? "yes" : "no",
+               arrived, kids, missing_s, parent_s, where);
+    }
+}
+
 /* ---- the counter view ------------------------------------------------- */
 
 static void counters_human(const struct osoe_segment *s)
 {
     print_identity(s);
     print_pe_lines(s);
+    print_connection_lines(s);
 
     uint32_t npe = s->local_count;
     printf("\n%-40s", "counter");
@@ -457,6 +567,9 @@ static void dump_human(const struct osoe_segment *s)
            s->dir->metrics_count, s->dir->metric_descriptor_bytes);
     printf("    %-32s %" PRIu64 " + %u * %u (%u per PE)\n", "blocks", s->dir->blocks_offset,
            s->dir->block_count, s->dir->block_bytes, s->dir->blocks_per_pe);
+    if (OSOE_SEGMENT_HAS(s->dir, connection_count))
+        printf("    %-32s %" PRIu64 " + %u * %u\n", "connections", s->dir->connections_offset,
+               s->dir->connection_count, s->dir->connection_bytes);
 
     printf("\n  node\n");
     for (uint32_t i = 0; i < s->nmetrics; i++)
@@ -492,6 +605,13 @@ static void dump_human(const struct osoe_segment *s)
                        age);
             }
         }
+    }
+
+    for (uint32_t c = 0; c < s->connection_count; c++) {
+        printf("\n  connection %u\n", c);
+        for (uint32_t i = 0; i < s->nmetrics; i++)
+            if (s->metrics[i].scope == OSOE_MSCOPE_CONNECTION)
+                print_value(s, &s->metrics[i], c);
     }
 
     printf("\n  counter blocks\n");
@@ -752,6 +872,7 @@ static int show(const char *name, enum mode m)
         switch (m) {
         case MODE_DUMP:     opt_json ? dump_json(&s) : dump_human(&s); break;
         case MODE_THREADS:  threads_human(&s); break;
+        case MODE_SUMMARY:  summary_line(&s); break;
         default:            opt_json ? counters_json(&s) : counters_human(&s); break;
         }
         if (!opt_interval)
@@ -809,6 +930,10 @@ static void usage(FILE *f)
 "  -c, --counters    per-PE counter totals and where each PE is blocked (default)\n"
 "  -d, --dump        every field of every record: node, PE slots, counter blocks\n"
 "  -T, --threads     one line per counter block, with its kernel CPU time\n"
+"      --summary     one line per node and team: the collective epoch in\n"
+"                    progress, whether this node's own members arrived, and the\n"
+"                    lowest child that has not - walk a hung collective down\n"
+"                    from the root by it (§5.3)\n"
 "  -l, --list        list the control segments in /dev/shm\n"
 "      --gc          remove named segments (OSOE_KEEP_CONTROL_SEGMENT) whose PEs\n"
 "                    are all gone and that no live process maps\n"
@@ -837,6 +962,8 @@ int main(int argc, char **argv)
             m = MODE_THREADS; mode_set = true;
         } else if (!strcmp(a, "-l") || !strcmp(a, "--list")) {
             m = MODE_LIST; mode_set = true;
+        } else if (!strcmp(a, "--summary")) {
+            m = MODE_SUMMARY; mode_set = true;
         } else if (!strcmp(a, "--gc")) {
             m = MODE_GC; mode_set = true;
         } else if (!strcmp(a, "-j") || !strcmp(a, "--json")) {

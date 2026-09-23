@@ -227,6 +227,16 @@ add_test(NAME shmem.job.duplicate-rank
 set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
 
+# A rank no lead claims: node 1's lead is told its node holds rank 1 alone,
+# though rank 2 is there too. The map is checked once, by the lead whose
+# arrival completed the rendezvous (slice 3; it was every PE's O(P) scan), and
+# the job is refused naming the rank.
+add_test(NAME shmem.job.unclaimed-rank
+  COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.unclaimed-rank PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "rank 2 was not claimed by any node")
+
 # The same refusal with its message's write held back a second (slow-message.c):
 # the reason must be on stderr before the job is told to fail, or the launcher's
 # SIGTERM can take it. Before the reason was written first, it was lost in 1 of
@@ -567,6 +577,24 @@ add_test(NAME shmem.unswept-wait
 set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "shmem_quiet: local PE 1 [(]rank 1"
   FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED")
+
+# Diagnosability experiment 1 (§3.14, §5.3): one PE never reaches a barrier,
+# and the node it is on is found by walking down the tree rather than by
+# visiting every node. Eight logical nodes at k = 2, so the walk is three
+# visits. PE 0 leaves without finalizing once it has the answer, which its node
+# declares and the launcher finishes; the test is judged on what it printed.
+add_executable(shmem_test_hang-walk test-hang-walk.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_hang-walk PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_hang-walk PRIVATE osoe rt)
+osoe_warnings(shmem_test_hang-walk)
+add_test(NAME shmem.hang-walk
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=2 SHMEM_SYMMETRIC_SIZE=16M
+          $<TARGET_FILE:osoe-launch> -n 8 -m 0,1,2,3,4,5,6,7 -t 12 -k --
+          $<TARGET_FILE:shmem_test_hang-walk>)
+set_tests_properties(shmem.hang-walk PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "hang walk found node 6 in [0-9]+ visits"
+  FAIL_REGULAR_EXPRESSION "CHECK[(]")
 
 # The reply descriptor pool (§3.8; review round two, D1). The review's scenario
 # at C = 2 must complete; with the target given a smaller credit than the
