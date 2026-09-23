@@ -14,8 +14,8 @@
  * and enforces it by including nothing from shmem/src. Every value here is
  * found through the metric table by name. The two exceptions are marked: the
  * frozen directory, and the §4.9 watch word, whose encoding is part of what the
- * directory's `layout` version covers - so it is decoded only for the layout
- * this tool knows, and printed raw otherwise.
+ * directory's `layout` version covers - so it is decoded only for the layouts
+ * this tool knows to share its encoding, and printed raw otherwise.
  */
 #define _GNU_SOURCE
 #include <ctype.h>
@@ -93,10 +93,10 @@ static void json_str(FILE *f, const char *s)
 /*
  * The one field whose *encoding* this tool knows, rather than finding it by
  * name. The directory's `layout` version covers the encoding of every word in
- * the segment (§10), so decoding is gated on the layout this tool was built
- * against; any other layout prints the raw word and says nothing it cannot
- * support. Kept deliberately small, and a copy rather than a shared header,
- * because sharing the header would be sharing shmem/src.
+ * the segment (§10), so decoding is gated on the layouts known to share this
+ * encoding, which segment.h lists; any other layout prints the raw word and
+ * says nothing it cannot support. Kept deliberately small, and a copy rather
+ * than a shared header, because sharing the header would be sharing shmem/src.
  */
 static void describe_watch(char *buf, size_t len, uint32_t layout, uint64_t word)
 {
@@ -104,7 +104,8 @@ static void describe_watch(char *buf, size_t len, uint32_t layout, uint64_t word
         snprintf(buf, len, "-");
         return;
     }
-    if (layout != OSOE_SEGMENT_KNOWN_LAYOUT) {
+    if (layout < OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT ||
+        layout > OSOE_SEGMENT_NEWEST_LAYOUT) {
         snprintf(buf, len, "%#" PRIx64 " (layout %u: encoding unknown)", word, layout);
         return;
     }

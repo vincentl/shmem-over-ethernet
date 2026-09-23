@@ -1222,7 +1222,9 @@ that is stuck. Memory can be read without the job's cooperation.
   described by the table; something has to be the floor. The directory carries
   `metric_descriptor_bytes` so that a reader *checks* this assumption rather than
   making it, and a reader that meets a descriptor size it does not know prints
-  the directory and stops, which is the same behaviour as an unknown `layout`.
+  the directory and stops. An unknown `layout` is not that case: the table still
+  describes every field, so a reader finds everything by name as usual, and the
+  layout decides only whether the watch word is decoded (`osoe-stat`, below).
   Two structures, both frozen, both checked: that is the whole contract between
   a job and a tool from another commit.
 
@@ -1292,10 +1294,21 @@ Readers load with `memory_order_acquire` and accept values a moment stale.
 
 **One field is decoded, not merely printed: the §4.9 watch word.** Its encoding
 is part of what `layout` covers (§10), so the tool carries its own small copy of
-the decode and uses it only when the segment's layout is the one it was built
-against; any other layout gets the raw word and a note. That is what a layout
-version is *for*, and it is the only place the tool knows an encoding rather
-than an offset.
+the decode and uses it only for the layouts known to share that encoding: from
+the first layout that had it, 4, to the newest the tool was built against. Any
+other layout gets the raw word and a note, and nothing else changes — every
+other field is still found by name, and no segment is refused for its layout.
+The range has a top because a newer layout may change the encoding, and a raw
+word is better than a confident wrong range; raising the top is a check that
+the new layout did not. That is what a layout version is *for*, and it is the
+only place the tool knows an encoding rather than an offset.
+
+It was a single layout rather than a range until layouts 11 to 13 each left it
+behind, and every job printed its watch word raw with nothing failing.
+`shmem.stat` now checks the decode against a PE that is waiting, so a layout
+bump that leaves the tool behind fails a test instead, and `stat.segment` runs
+the tool on a hand-written segment either side of each end of the range, which
+no job of this tree's own layout can show.
 
 **Deferred, and why.** *Prometheus output* is a third formatter over the same
 table and waits for a reason to exist; node_exporter's textfile collector is

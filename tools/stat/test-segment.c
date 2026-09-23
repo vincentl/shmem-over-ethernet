@@ -13,7 +13,9 @@
  *
  * and requires the reader to find every value it does know, by name, anyway.
  * Only the frozen directory and the metric descriptor are shared, which is
- * exactly the contract segment.h states.
+ * exactly the contract segment.h states. It then runs osoe-stat itself against
+ * the segment at the layouts either side of the range whose watch word the tool
+ * decodes: the one encoding it knows, rather than finds by name.
  *
  * It also checks the refusals, because a reader that is willing to follow a
  * bad offset into a mapping is worse than one that cannot read at all: a
@@ -22,6 +24,7 @@
  */
 #define _GNU_SOURCE
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,11 +54,18 @@ enum {
     PE_SINCE   = 24,            /* u64 */
     PE_ROUTINE = 32,            /* char[32] */
     PE_SWEEPS  = 64,            /* u64 */
+    PE_WATCH   = 72,            /* u64, the §4.9 watch word */
 
     TH_CALLS   = 0,             /* u64, in a block */
     TH_BAD     = 8,             /* u64, an invariant */
     TH_CLAIMED = 16,            /* u64 */
 };
+
+/* PE 0's watch word: 8 bytes at heap offset 0x40, in the encoding segment.h
+ * says osoe-stat decodes - region 0 in bits 63..62, the first 4-byte grain in
+ * 61..22, the length in grains in 21..0 - and what the tool shows for it. */
+#define WATCH_WORD    ((UINT64_C(0x40) / 4) << 22 | 2)
+#define WATCH_DECODED "heap +0x40..+0x48"
 
 static uint32_t fnv1a(const void *p, size_t n)
 {
@@ -130,6 +140,8 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
              TH_CLAIMED),
         desc("pe.sweeps", "", OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, OSOE_MSCOPE_PE, 8,
              PE_SWEEPS),
+        desc("pe.watch_rng", "", OSOE_MTYPE_U64, OSOE_MKIND_STATE, OSOE_MSCOPE_PE, 8,
+             PE_WATCH),
         /* Two that must be refused rather than followed: one that runs off the
          * end of its record, and one whose offset is not a multiple of its
          * width. Neither can be dereferenced safely, and both are what a
@@ -210,6 +222,7 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
     *(uint64_t *)(s0 + PE_DETAIL) = 0x1234;
     *(uint64_t *)(s0 + PE_SINCE) = 42;
     memcpy(s0 + PE_ROUTINE, "shmem_future_wait", sizeof "shmem_future_wait");
+    *(uint64_t *)(s0 + PE_WATCH) = WATCH_WORD;
 
     for (uint32_t b = 0; b < BLOCK_COUNT; b++) {
         unsigned char *blk = p + blocks_off + (uint64_t)b * BLOCK_BYTES;
@@ -277,6 +290,60 @@ static void check_good(const char *name)
     CHECK(!osoe_segment_read_str(&s, "pe.rank", 0, buf, sizeof buf));
 
     osoe_segment_close(&s);
+}
+
+/*
+ * osoe-stat itself against this segment, its layout rewritten to either side of
+ * each end of the range whose watch word the tool decodes (segment.h). The
+ * library only ever writes its own layout, so no tier-2 test can show one
+ * outside that range; this is the test that a layout which may have changed the
+ * encoding shows the raw word rather than a confident wrong range - and that
+ * the segment is still read, since everything else is found by name. The tool's
+ * path comes from OSOE_TEST_STAT, as it does for shmem.stat.
+ */
+static void check_watch_gate(const char *file, void *map)
+{
+    const char *tool = getenv("OSOE_TEST_STAT");
+    if (!tool) {
+        fprintf(stderr, "OSOE_TEST_STAT is not set\n");
+        CHECK(0);
+        return;
+    }
+    const struct {
+        uint32_t layout;
+        bool decoded;
+    } cases[] = {
+        { OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT - 1, false },   /* before the encoding */
+        { OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT, true },
+        { OSOE_SEGMENT_NEWEST_LAYOUT, true },
+        { OSOE_SEGMENT_NEWEST_LAYOUT + 1, false },                 /* newer than the tool */
+        { 999, false },
+    };
+    struct osoe_segment_directory *dir = map;
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        dir->layout = cases[i].layout;
+
+        char cmd[512], out[32 * 1024], want[96];
+        snprintf(cmd, sizeof cmd, "'%s' -d '%s' 2>&1", tool, file);
+        FILE *f = popen(cmd, "r");
+        CHECK(f != NULL);
+        if (!f)
+            return;
+        size_t n = fread(out, 1, sizeof out - 1, f);
+        out[n] = '\0';
+        CHECK(pclose(f) == 0);
+
+        if (cases[i].decoded)
+            snprintf(want, sizeof want, "%s", WATCH_DECODED);
+        else
+            snprintf(want, sizeof want, "%#" PRIx64 " (layout %u: encoding unknown)",
+                     WATCH_WORD, cases[i].layout);
+        if (!strstr(out, want))
+            fprintf(stderr, "layout %u: osoe-stat -d does not show \"%s\"\n", cases[i].layout,
+                    want);
+        CHECK(strstr(out, want) != NULL);
+        CHECK(strstr(out, "shmem_future_wait") != NULL);   /* read by name all the same */
+    }
 }
 
 static void check_refused(const char *name, enum damage damage, bool expect_open)
@@ -397,6 +464,7 @@ int main(void)
     CHECK(p != NULL);
     if (p) {
         check_good(file);
+        check_watch_gate(file, p);
         munmap(p, bytes);
         unlink(file);
     }

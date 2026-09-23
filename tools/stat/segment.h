@@ -166,21 +166,50 @@ struct osoe_segment {
  * or "/dev/shm/osoe.1.0.0.0"; all three name the same object.
  *
  * Returns 0, or -1 with a reason in `err`. A segment whose magic is wrong is
- * refused. A segment whose *layout* is unknown is **not**: the directory is
- * frozen precisely so that such a segment can still be printed, so it opens
- * with `table_usable` false and the caller says what it found.
+ * refused. A segment whose *layout* is unknown is **not**, and is read like any
+ * other: everything past the frozen directory is found by name, so the layout
+ * decides only whether the watch word is decoded (below). What leaves
+ * `table_usable` false is a table this reader cannot check - a descriptor size
+ * it does not know, a table outside the mapping, a checksum that fails - and
+ * then the caller prints the directory and says what it found.
  */
 int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen);
 void osoe_segment_close(struct osoe_segment *s);
 
-/* The layout this reader was built against. Not a requirement - see above.
- * Layout 9 added pe.blocked.detail_kind; an older segment simply lacks it and
- * its details print raw. Layout 10 added the finalize team's counters, found by
- * name like the others; the watch word's encoding is unchanged.
- * Layout 8 only appended the AM counters, which a reader finds by name, so a
- * reader built for 7 prints them unchanged and differs only in showing the
- * watch word raw, with "encoding unknown", rather than decoded. */
-#define OSOE_SEGMENT_KNOWN_LAYOUT 10
+/*
+ * The layouts whose watch word this reader decodes: from the first layout with
+ * the encoding it knows to the newest layout it was built against. Neither is a
+ * requirement - see above. Outside them the word prints raw, with the layout,
+ * and everything found by name is read as usual.
+ *
+ * `layout` covers the encoding of every word in the segment, not only where
+ * fields sit (§10), and the watch word is the one word this reader decodes
+ * rather than finds by name. So the range has a top: a layout newer than this
+ * reader may have changed the encoding, and must show the raw word rather than
+ * a confident wrong range. Raising the top means checking that the new layout
+ * did not; shmem.stat, which checks the decode against a waiting PE, fails for
+ * a job whose layout is above it.
+ *
+ *    4  the watch word became a range: region, first 4-byte grain, length
+ *    5  the metric table, and this reader's first layout - the first in which
+ *       it can find pe.watch_rng at all
+ *    6  the landing zones, appended to the directory
+ *    7  the arrival handoff, appended
+ *    8  the AM layer's node counters, appended
+ *    9  pe.blocked.detail_kind; an older segment lacks it, and its blocked
+ *       details print raw
+ *   10  the finalize team's counters
+ *   11  transport.am.passes and send_visits, appended
+ *   12  per-team tree state and one record per connection, appended; the
+ *       directory grew 136 -> 160 bytes to say where the records are
+ *   13  the ring's counters, appended
+ *   14  blocked-record detail kinds 5 to 8, the word an internode wait
+ *       sleeps on (enum osoe_segment_detail, below)
+ *
+ * None of 5 to 14 changed the watch word's encoding.
+ */
+#define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
+#define OSOE_SEGMENT_NEWEST_LAYOUT               14
 
 /* The metric of that name, or NULL. */
 const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name);

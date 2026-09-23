@@ -293,10 +293,11 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
                     "(magic %#llx)", shown, magic);
     }
     /*
-     * From here on nothing is refused. An unknown layout, a short directory, a
-     * table this reader cannot parse: each leaves `table_usable` false and the
-     * caller prints what it does know. That is what freezing the directory
-     * bought, and refusing here would spend it.
+     * From here on nothing is refused. An unknown layout is read like any
+     * other, since everything past the directory is found by name; a short
+     * directory or a table this reader cannot parse leaves `table_usable` false
+     * and the caller prints what it does know. That is what freezing the
+     * directory bought, and refusing here would spend it.
      */
 
     /* Clamp the two counts a caller loops over, before anything loops over
