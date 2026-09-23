@@ -6,7 +6,8 @@
 #
 # The large ones - get_completion (about 15 minutes, a case of 19 million
 # states), dirty_set and tree_barrier (five logical nodes, every node's thread
-# real) - run in the release preset only. A model is Python and
+# real), close (a million states with the trapped-state check) - run in the
+# release preset only. A model is Python and
 # gives the same verdict whichever preset built the library, so running it four
 # times buys nothing; one preset keeps it from being skipped.
 find_package(Python3 COMPONENTS Interpreter)
@@ -15,7 +16,7 @@ if(Python3_Interpreter_FOUND)
   set(osoe_models wire credit arrival ack reservation blocked_record range_watch watch_list
                   chained_wake lead_wake)
   if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    list(APPEND osoe_models dirty_set get_completion tree_barrier)
+    list(APPEND osoe_models dirty_set get_completion tree_barrier close)
   endif()
   foreach(name IN LISTS osoe_models)
     add_test(NAME model.${name}
