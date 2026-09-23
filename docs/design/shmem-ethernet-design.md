@@ -114,7 +114,9 @@ rot the way a third-party build can. **The constant factors were deliberately no
 written down before the echo harness first ran**, since pinning them before
 measuring would be inventing a target rather than choosing one. The harness has
 now run (§8.4, phase 1 step 3 slice 1) and its own io_uring-to-blocking ratio is
-pinned; the library's ratios to it are pinned once the library runs on the ring.
+pinned. The library's ratios to it are measured (§8.4: 2.05× for a get), and
+are pinned once quiet and a full buffer stop polling, since two of them still
+measure a step-2 stand-in.
 Track all three per commit through the §3.14 counters.
 
 ---
@@ -3556,6 +3558,20 @@ production path depends on a tuned sleep; the regression was recorded and
 accepted with the author on 2026-09-22 rather than engineered around in code step
 3 deletes.
 
+*Measured on sockets* (phase 1 step 3 slice 1, part C; the same program, build
+type and VM, with the step-2 tree at `3926a60` and this one interleaved per
+repetition, median of 7 means of 2,000 rounds). The poll is gone and so is the
+regression. At *k* = 4 the barrier measures 60 µs at 2 nodes (516 on the step-2
+wire), 63 at 5 (592), 76 at 6 (929), 86 at 8 (1,055) and 109 at 16 (1,231): 9 to
+12 times faster. The step-2 column reproduces slice 3's numbers within 5%. At 16
+nodes, *k* = 16 (depth 1) measures 108 µs, *k* = 4 (depth 2) 109 and *k* = 2
+(depth 4) 131. That is about 11 µs a level, up and down together, where the poll
+cost 170–200 µs a level each way: **latency now follows hops and per-message work,
+not poll intervals.** On four cores running sixteen nodes' agents and PEs, a
+one-level tree's fifteen arrivals, serialized through the root, cost as much as a
+second level does (108 against 109 µs). The target's trade-off between depth and
+fan-out is the arithmetic above, not this machine's.
+
 *Why a tree now, and what the shared-memory wire hides.* The star it replaced —
 every node's arrival to node 0, node 0's release to every node — was optimal in
 messages and serial in one thread: 2(*N* − 1) message events on node 0's
@@ -4403,6 +4419,11 @@ machinery. The review's order is adopted.
    transport's smallest reproducer. Then io_uring with the repaired reservation
    protocol, stream-parsed receive, the armed-flag idle loop, per-class wake words,
    reply credits and DRAINING caps, and the global rendezvous with its timeout.
+   *(Slice 1 built the harness, the ring, the idle loop and the rendezvous, and
+   measured what is left: quiet's wait and a writer's wait for a full buffer
+   still poll the step-2 way, waking the lead and sleeping 20 µs, and that is
+   what holds a put and quiet at 4× the floor and a stream at 3% of it, §8.4.
+   The per-class wake words are the fix.)*
 
    The first backend that *acts* on `osoe_transport_set_range` is here — it is the
    first that must prepare memory before the network can touch it — but the hook
@@ -4914,6 +4935,47 @@ the ring. A Pi's `memcpy` is slower than this host's, so its copy-to-wire ratio 
 1 GbE is lower — tens rather than hundreds, *recalled*, unmeasured until the
 harness runs there.
 
+**The library against its floor** (phase 1 step 3 slice 1, part C; release
+build, idle VM, two logical nodes of one PE each on loopback, `echo-uring` and
+the library interleaved, the median over 7 repetitions of 20,000 operations;
+`build/scratch`'s `internode-bench`, not yet a test).
+
+| Operation | Library | ÷ `echo-uring` (25.3 µs, 17.7 GiB/s) |
+|---|---|---|
+| 8-byte get | 51.9 µs | **2.05×** (2.03–2.06) |
+| 8-byte fetch-add | 51.9 µs | **2.05×** |
+| 8-byte put, then quiet | 101 µs | 4.0× |
+| 1 GiB of 64 KiB puts, then quiet | 547 MiB/s | 0.031× |
+
+**A round trip is two wakes dearer than the harness's**, and that is the whole
+factor for a get. The harness's round trip wakes two threads, the server and
+then the client. The library's wakes four: the caller wakes its lead, the lead
+at the other end wakes to the request, the caller's lead wakes to the reply, and
+the lead wakes the caller. On loopback a wake is most of what a round trip costs:
+the harness's fastest trips take 3–4 µs against its 25 µs median.
+
+**The other two rows measure a step-2 stand-in, not the ring.** Quiet waiting for
+an acknowledgement, and a writer waiting for a full connection buffer to turn
+over, still wake the lead and then sleep 20 µs before looking again (`poll_lead`
+in `transport-am.c`). Step 2 had no word for the lead to bump, and the code says
+the stand-in must not survive step 3. The counters show one segment each way per
+put and quiet, so nothing extra is sent: the time is the sleep, which Linux's
+default 50 µs timer slack can stretch to 70 µs. *Measured*: with a yield in
+place of the sleep, in a scratch build, a put and quiet takes 27.5 µs (1.1×)
+and the stream runs at 6.0–10.5 GiB/s (0.34–0.6×). The waits get their words
+with §7.1 step 3's per-class wake words, and the library's ratios are pinned
+after that, not before: a pin now would pin the stand-in.
+
+**Under load, the library's round trip is its wake count.** The wakeup finding
+above promised this measurement. Beside a `ctest -j4` of the debug suite (load
+average 6–16 on four CPUs, the models left out), the harness's median round
+trip falls to about 4 µs, since no CPU sleeps, and io_uring and blocking agree
+within 1.1× this time. So the 3–5× depends on the mix of load, and this mix did
+not reproduce it. The library's get does not fall with the harness: 31 µs
+median (10–38 across repetitions), about 7× the harness's, because each of its
+four wakes now waits for a CPU. A partly loaded node is the Pi's normal state
+(§1), so its round trips there will cost the wakes they need, not the wire.
+
 ### 8.5 Development environment
 
 Development happens on an Apple Silicon Mac, which has neither io_uring nor
@@ -5201,7 +5263,10 @@ Recorded rather than deleted, so they are not reopened from memory.
   the tens, *recalled*. The small-message *rate* is not measured yet.
 - **Pin the §1 floor ratios.** The harness's own ratio (io_uring against blocking
   sockets on the same link) is pinned (§8.4). The library-to-floor ratios are
-  pinned once the library runs on the ring.
+  measured (§8.4, phase 1 step 3 slice 1): a get 2.05×, a put and quiet 4.0×, a
+  stream 0.031×. The last two measure `poll_lead`'s 20 µs sleep, and a yield in
+  its place takes them to 1.1× and 0.34–0.6×. They are pinned once §7.1 step 3's
+  per-class wake words replace it.
 - **The internode tree's fan-out from measured costs** (§5.3). The default is the
   backend's constant today; measuring the hop latency *h* and per-message cost *o*
   at init and choosing *k* from their ratio is the next step, once a real fabric
