@@ -23,6 +23,7 @@ else()
 endif()
 
 add_library(osoe
+  src/abort.c
   src/accessible.c
   src/agent.c
   src/allocator.c

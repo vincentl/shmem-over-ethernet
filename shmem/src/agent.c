@@ -6,12 +6,14 @@
 #include <signal.h>
 #include <string.h>
 
+#include "abort.h"
 #include "agent.h"
 #include "base/deadline.h"
 #include "base/futex.h"
 #include "blocked.h"
 #include "fatal.h"
 #include "metrics.h"
+#include "state.h"
 #include "transport.h"
 
 static pthread_t agent;
@@ -54,6 +56,24 @@ static void *agent_main(void *arg)
         uint32_t seen = atomic_load_explicit(&slot->agent_wake, memory_order_acquire);
         if (atomic_load_explicit(&stop_requested, memory_order_acquire))
             break;
+        /*
+         * The node's abort ends this process whatever its main thread is doing
+         * (§3.15, abort.h): a PE computing outside the library never sweeps, so
+         * its agent is the only part of it that can. Loaded after `seen`, as
+         * stop_requested is and for the same reason - a declarer stores the
+         * word, then bumps every agent's wake word, then wakes (node.c).
+         *
+         * The lead's agent first wakes every local agent again. A declarer
+         * wakes them in local-id order, the lead's first, but its own agent can
+         * see the word and end its process before it has woken the rest; the
+         * lead's agent, woken first, is the one that closes that gap for all of
+         * them, at O(L) once per node.
+         */
+        if (osoe_abort_pending()) {
+            if (slot == &osoe.node.slots[0])
+                osoe_node_wake_agents(&osoe.node);
+            osoe_abort_end();
+        }
         /*
          * §3.12: the thread is lent to the backend, through the two calls
          * transport.h declares for it and nothing else. On AM the local lead's

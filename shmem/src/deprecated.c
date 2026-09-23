@@ -33,7 +33,7 @@ static bool started;
 
 static void finalize_at_exit(void)
 {
-    pshmem_finalize();
+    pshmem_finalize();              /* stands aside on an abort's exit (abort.h) */
 }
 
 OSOE_API void start_pes(int npes)

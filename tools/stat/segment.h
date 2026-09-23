@@ -205,11 +205,27 @@ void osoe_segment_close(struct osoe_segment *s);
  *   13  the ring's counters, appended
  *   14  blocked-record detail kinds 5 to 8, the word an internode wait
  *       sleeps on (enum osoe_segment_detail, below)
+ *   15  the abort word says how the job ends, with the status and the rank
+ *       (enum osoe_segment_abort, below), where it had been 0 or 1 beside a
+ *       field for the rank
  *
- * None of 5 to 14 changed the watch word's encoding.
+ * None of 5 to 15 changed the watch word's encoding.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               14
+#define OSOE_SEGMENT_NEWEST_LAYOUT               15
+
+/* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
+ * rank in its low 32 bits, the exit status's low eight bits, then how the job is
+ * ending. Before it, any nonzero value was an abort of no stated kind, and
+ * node.abort_pe a field of its own; since, node.abort_pe names the word's low
+ * half, so a reader of either finds the rank there. */
+enum osoe_segment_abort {
+    OSOE_SEGMENT_ABORT_NONE = 0,
+    OSOE_SEGMENT_ABORT_FATAL,
+    OSOE_SEGMENT_ABORT_GLOBAL_EXIT,
+};
+#define OSOE_SEGMENT_ABORT_STATUS_SHIFT      32
+#define OSOE_SEGMENT_ABORT_DISPOSITION_SHIFT 40
 
 /* The metric of that name, or NULL. */
 const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segment *s, const char *name);

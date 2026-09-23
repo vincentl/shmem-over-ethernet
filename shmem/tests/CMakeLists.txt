@@ -951,6 +951,38 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
     ENVIRONMENT "OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>")
 endforeach()
 
+# A job that dies, dies everywhere (§3.15; phase 1 step 4): PE 0 calls
+# shmem_global_exit, or ends the job with a fatal, while every other PE computes
+# outside the library, where only its agent can end it. Every rank must leave
+# with the status - the caller's, or a fatal's failure - no rank may be killed
+# by the launcher or outlast its computing, and for a global exit every rank's
+# unflushed stdout must have been written (§9.1.6). See global-exit.sh. Across
+# nodes a fatal already travels as the lead's end of stream, which a peer takes
+# for a death; a global exit's status does not, and waits for the abort message.
+add_executable(shmem_test_global-exit test-global-exit.c)
+target_link_libraries(shmem_test_global-exit PRIVATE osoe)
+osoe_warnings(shmem_test_global-exit)
+foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
+  add_test(NAME shmem.global-exit.L${count}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> ${count} - 7 7)
+  add_test(NAME shmem.global-exit.fatal.L${count}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> ${count} - fatal 1)
+  set_tests_properties(shmem.global-exit.L${count} shmem.global-exit.fatal.L${count}
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endforeach()
+foreach(map 0,1 0,0,1,1 0,1,2,0,1,0)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.global-exit.fatal.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} fatal 1)
+  set_tests_properties(shmem.global-exit.fatal.${label}
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endforeach()
+
 # The development watchdog (§3.15). Not an osoe_tier2_test: it needs -k, so the
 # launcher leaves the survivors to the library, and it asserts on output rather
 # than on an exit status. A PASS_REGULAR_EXPRESSION test ignores the exit code,

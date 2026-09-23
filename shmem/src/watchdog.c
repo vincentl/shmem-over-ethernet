@@ -32,7 +32,9 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
+#include "abort.h"
 #include "base/sweep.h"
 #include "fatal.h"
 #include "metrics.h"
@@ -52,7 +54,24 @@ static uint32_t dead_rank;
 static void declare_for_dead(void *context)
 {
     (void)context;
-    osoe_node_declare_abort(&osoe.node, dead_rank, 1);
+    osoe_node_declare_abort(&osoe.node, dead_rank, EXIT_FAILURE, OSOE_ABORT_FATAL);
+}
+
+/*
+ * If the node has aborted, end this PE as the word says: a global exit with the
+ * caller's status, the way its agent would (abort.h), and anything else as a
+ * fatal here too.
+ */
+static void stop_if_aborting(const char *routine)
+{
+    uint32_t pe = 0;
+    int status = EXIT_FAILURE;
+    enum osoe_abort_disposition how = osoe_node_abort_read(&osoe.node, &pe, &status);
+    if (how == OSOE_ABORT_GLOBAL_EXIT)
+        osoe_abort_end();
+    if (how != OSOE_ABORT_NONE)
+        osoe_fatal("%s: the job is aborting on behalf of PE %u; this PE cannot make "
+                   "progress", routine, pe);
 }
 
 static bool slot_dead(const struct osoe_pe_slot *s)
@@ -79,17 +98,21 @@ void osoe_sweep_expired(const char *routine)
      * at its next sweep (§3.15). Only the liveness polling below is the
      * development aid. It used to be read only with the watchdog on, so a
      * release build ignored it (phase 1 step 2 slice 2). */
-    if (atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire)) {
-        uint32_t pe = atomic_load_explicit(&osoe.node.hdr->abort_pe, memory_order_acquire);
-        osoe_fatal("%s: the job is aborting on behalf of PE %u; this PE cannot make "
-                   "progress", routine, pe);
-    }
+    stop_if_aborting(routine);
     if (!osoe.bootstrap.watchdog)
         return;
 
     for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++) {
         if (i == osoe.bootstrap.local_id || !slot_dead(&osoe.node.slots[i]))
             continue;
+        /* A PE that an abort ended is dead too, and its death is the abort's
+         * own: this sweep may have read the word before it was declared and
+         * found the PE gone after. The word was declared before that PE could
+         * see it and end, and its death is seen through the kernel after, so
+         * reading the word again finds it - and a global exit must not become
+         * a fatal here, with a failure status and, on a lead, no one told
+         * (abort_exit_model.py, watchdog_unchecked). */
+        stop_if_aborting(routine);
         /* Tell the siblings before dying, so they stop at their next sweep
          * rather than each rediscovering it - after the message (fatal.h), and
          * naming the dead PE, which is why the abort is declared here. */

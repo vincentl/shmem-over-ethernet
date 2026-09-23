@@ -10,7 +10,9 @@
  * calls osoe_fatal_then with a `publish` that writes a marker to stderr, and
  * the stub writes another; the parent reads the child's stderr and requires
  * the reason, then the publication, then the abort. And the same for
- * osoe_fatal, which has no publication: the reason, then the abort.
+ * osoe_fatal, which has no publication: the reason, then the abort. And a
+ * fatal that finds a global exit declared first ends as that exit ends every
+ * PE, through osoe_abort_end and with its status, after the reason.
  */
 #include <stdbool.h>
 #include <stdio.h>
@@ -19,6 +21,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "abort.h"
 #include "check.h"
 #include "fatal.h"
 #include "state.h"
@@ -32,10 +35,32 @@ static void mark(const char *what)
     (void)ignored;
 }
 
-void osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status)
+bool osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status,
+                             enum osoe_abort_disposition how)
 {
-    (void)n; (void)pe; (void)status;
+    (void)n; (void)pe; (void)status; (void)how;
     mark("DECLARED\n");
+    return true;
+}
+
+/* What the word says after the stub's declaration: the fatal it declared, or a
+ * global exit with status GLOBAL_STATUS that someone declared first. */
+enum { GLOBAL_STATUS = 5 };
+static enum osoe_abort_disposition word = OSOE_ABORT_FATAL;
+
+enum osoe_abort_disposition osoe_node_abort_read(const struct osoe_node *n, uint32_t *pe,
+                                                 int *status)
+{
+    (void)n;
+    *pe = 7;
+    *status = word == OSOE_ABORT_GLOBAL_EXIT ? GLOBAL_STATUS : EXIT_FAILURE;
+    return word;
+}
+
+_Noreturn void osoe_abort_end(void)
+{
+    mark("ENDED AS THE GLOBAL EXIT\n");
+    _exit(GLOBAL_STATUS);
 }
 
 static void publish(void *context)
@@ -44,8 +69,9 @@ static void publish(void *context)
     mark("PUBLISHED\n");
 }
 
-/* Run `with_publish` ? osoe_fatal_then : osoe_fatal in a child; its stderr. */
-static void child_output(bool with_publish, char *out, size_t len)
+/* Run `with_publish` ? osoe_fatal_then : osoe_fatal in a child; its stderr. It
+ * must leave with `expected`. */
+static void child_output(bool with_publish, int expected, char *out, size_t len)
 {
     int fds[2];
     CHECK_FATAL(pipe(fds) == 0);
@@ -70,7 +96,7 @@ static void child_output(bool with_publish, char *out, size_t len)
     close(fds[0]);
     int status;
     waitpid(pid, &status, 0);
-    CHECK(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_FAILURE);
+    CHECK(WIFEXITED(status) && WEXITSTATUS(status) == expected);
 }
 
 static bool in_order(const char *out, const char *first, const char *second)
@@ -82,15 +108,24 @@ static bool in_order(const char *out, const char *first, const char *second)
 int main(void)
 {
     char out[4096];
-    child_output(true, out, sizeof out);
+    child_output(true, EXIT_FAILURE, out, sizeof out);
     if (!in_order(out, "THE REASON", "PUBLISHED") || !in_order(out, "PUBLISHED", "DECLARED"))
         fprintf(stderr, "osoe_fatal_then wrote, in this order:\n%s", out);
     CHECK(in_order(out, "THE REASON", "PUBLISHED"));
     CHECK(in_order(out, "PUBLISHED", "DECLARED"));
 
-    child_output(false, out, sizeof out);
+    child_output(false, EXIT_FAILURE, out, sizeof out);
     if (!in_order(out, "THE REASON", "DECLARED"))
         fprintf(stderr, "osoe_fatal wrote, in this order:\n%s", out);
     CHECK(in_order(out, "THE REASON", "DECLARED"));
+    CHECK(strstr(out, "ENDED AS THE GLOBAL EXIT") == NULL);
+
+    word = OSOE_ABORT_GLOBAL_EXIT;
+    child_output(false, GLOBAL_STATUS, out, sizeof out);
+    if (!in_order(out, "THE REASON", "DECLARED") ||
+        !in_order(out, "DECLARED", "ENDED AS THE GLOBAL EXIT"))
+        fprintf(stderr, "osoe_fatal during a global exit wrote, in this order:\n%s", out);
+    CHECK(in_order(out, "THE REASON", "DECLARED"));
+    CHECK(in_order(out, "DECLARED", "ENDED AS THE GLOBAL EXIT"));
     return CHECK_DONE();
 }

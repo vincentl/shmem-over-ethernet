@@ -15,6 +15,7 @@
 #include <pshmem.h>
 #include <shmem.h>
 
+#include "abort.h"
 #include "agent.h"
 #include "base/futex.h"
 #include "base/ring-check.h"
@@ -128,7 +129,7 @@ SHMEM_VENDOR_STRING " environment variables\n"
  */
 static void exit_without_finalize(void)
 {
-    if (refcount == 0 || getpid() != init_pid)
+    if (refcount == 0 || getpid() != init_pid || osoe_abort_ending())
         return;
     fflush(NULL);
     char msg[256];
@@ -140,8 +141,7 @@ static void exit_without_finalize(void)
                                                                           : sizeof msg - 1);
         (void)ignored;
     }
-    if (osoe.node.hdr && !atomic_load_explicit(&osoe.node.hdr->aborting, memory_order_acquire))
-        osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE);
+    osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE, OSOE_ABORT_FATAL);
     _exit(EXIT_FAILURE);
 }
 
@@ -280,6 +280,11 @@ OSOE_API void pshmem_init(void)
 
 OSOE_API void pshmem_finalize(void)
 {
+    /* A process ending on an abort runs no collective on the way out: a
+     * program's own atexit(shmem_finalize) would wait for PEs that are
+     * exiting (abort.h; the rule of conformance F1). */
+    if (osoe_abort_ending())
+        return;
     pthread_mutex_lock(&lifecycle);
     /* A child forked after init inherits the mappings but no agent, and must
      * not tear down what its parent still uses (§3.12, §6.4). */
@@ -300,6 +305,23 @@ OSOE_API void pshmem_finalize(void)
         atomic_store_explicit(&thread_level, OSOE_THREAD_MAX, memory_order_release);
     }
     pthread_mutex_unlock(&lifecycle);
+}
+
+/*
+ * spec §9.1.6: end every PE of the job with `status`, whatever each is doing
+ * (design §3.15, phase 1 step 4). This PE declares its node's abort as a global
+ * exit - the first declarer on a node wins, and the specification allows any
+ * caller's status - which wakes every local agent to end its process (abort.h),
+ * and then ends its own the same way: exit(status), so standard I/O is flushed.
+ * Before init, or in a child forked after it, there is no job to end but this
+ * process.
+ */
+OSOE_API void pshmem_global_exit(int status)
+{
+    if (refcount == 0 || getpid() != init_pid)
+        exit(status);
+    osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, status, OSOE_ABORT_GLOBAL_EXIT);
+    osoe_abort_end();
 }
 
 /*
@@ -365,6 +387,7 @@ OSOE_API int pshmem_n_pes(void)
 /* The weak `shmem_` aliases (export.h). */
 OSOE_ALIAS(init)
 OSOE_ALIAS(finalize)
+OSOE_ALIAS(global_exit)
 OSOE_ALIAS(init_thread)
 OSOE_ALIAS(query_thread)
 OSOE_ALIAS(query_initialized)

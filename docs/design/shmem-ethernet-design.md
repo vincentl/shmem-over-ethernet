@@ -1669,6 +1669,42 @@ The policy is right; an earlier draft lacked **detection and propagation**:
   itself stop the others. Document `srun -K1`. The spec does not define crash
   behaviour, so this is operability, not conformance.
 
+*As built: every PE ends when its node aborts* (phase 1 step 4 slice 1, part B;
+`abort.[ch]`). The abort word says how the job is ending — a fatal, or a global
+exit — with the exit status and the rank that ended it, packed in 64 bits, and
+the first declarer wins it: one CAS from zero installs all three, so a fatal
+that follows a global exit cannot overwrite its status, and no reader sees one
+without the others or waits for them (layout 15; `osoe-stat` names the kind and
+the status, and one built before it still finds the rank by the name it reads it
+by). The status kept is its low eight bits, which is all `exit` passes on.
+Declaring wakes every local agent in local-id order, the lead's first, and every
+agent reads the word at each turn of its loop, after its wake word — the stop
+protocol's order — so a PE ends whatever its main thread is doing, including
+computing outside the library, where nothing else of it runs. The lead's agent,
+finding the word, first wakes every local agent again: a declarer's own agent
+can end its process before the declarer has woken the rest, and the lead's
+agent, woken first, closes that gap for all of them (O(L) once per node;
+`abort_exit_model.py`, `no_rewake`). The agent ends the process. On a global
+exit it calls `exit(status)`, which flushes standard I/O as §9.1.6 asks, with
+the library's own atexit handlers and `shmem_finalize` standing aside, since the
+one is a barrier and the other would declare an abort that already is. Because
+`exit` from a thread that is not main can block on a stdio lock the main thread
+holds, `_exit(status)` follows after `OSOE_ABORT_GRACE_SECONDS` (10). That is
+not a wait that gives up because time passed: it ends a process that is already
+ending. On a fatal the agent says so once and `_exit`s with the declarer's
+status. Exactly one thread of a process ends it, and while the agent runs it is
+the agent; any other thread that finds the word waits for it.
+`shmem_global_exit(status)` declares the word as a global exit and ends through
+the same path. A library wait that sweeps into a global exit ends the same way,
+not through a fatal that would change the status, and so does a fatal whose own
+declaration loses to a global exit, since what went wrong may be that exit's own
+doing. The development watchdog reads the word again before it calls a dead
+sibling a fatal: a PE a global exit ended is dead too, and a sweep that read the
+word before the exit was declared would otherwise end its PE with a failure — on
+a lead, before its agent could tell the other nodes. `abort_exit_model.py`
+checks this ordering: every process ends, each with a status a caller gave, and
+each of these rules broken fails it.
+
 #### The development watchdog
 
 > **A development aid, not the release path: on in the `debug`, `asan` and `tsan`

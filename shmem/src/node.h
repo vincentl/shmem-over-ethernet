@@ -27,7 +27,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 14
+#define OSOE_NODE_LAYOUT 15
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -61,6 +61,27 @@ enum osoe_blocked_detail {
     OSOE_BLOCKED_DETAIL_CREDIT,           /* a get or fetching AMO: a reply credit */
     OSOE_BLOCKED_DETAIL_REPLY,            /* the reply itself, on the PE's landing slot */
 };
+
+/*
+ * How the job is ending (§3.15), as the abort word says it. The values are
+ * part of the segment's encoding: layout 15 gave the word its dispositions,
+ * where it had been 0 or 1.
+ */
+enum osoe_abort_disposition {
+    OSOE_ABORT_NONE = 0,
+    OSOE_ABORT_FATAL,           /* a fatal, or a death: every PE leaves with a failure */
+    OSOE_ABORT_GLOBAL_EXIT,     /* shmem_global_exit: every PE exits with its status */
+};
+
+/*
+ * The abort word's fields (layout 15): the world rank in the low 32 bits, then
+ * the status as the environment will see it - exit keeps only its low eight
+ * bits, and so does the word - then the disposition. One CAS from zero
+ * installs all three, so the first declarer wins them together and no reader
+ * ever sees a rank without its status.
+ */
+#define OSOE_ABORT_STATUS_SHIFT      32
+#define OSOE_ABORT_DISPOSITION_SHIFT 40
 
 /*
  * The predefined teams, numbered (§7.3, spec §9.4).
@@ -386,12 +407,13 @@ struct osoe_node_header {
 
     /* The abort word (§3.15). Nonzero means the job is over and no wait can
      * finish; every library wait reads it at its next safety-sweep deadline
-     * (base/sweep.h). Phase 1 step 1 sets it only from the development
-     * watchdog; shmem_global_exit and the AM abort flood set it in step 4. */
+     * (base/sweep.h), and every agent at each turn of its loop (agent.c), so a
+     * PE ends whatever it is doing. It holds how the job ends, the status and
+     * the rank that ended it (OSOE_ABORT_*_SHIFT, layout 15); the first
+     * declarer wins it (osoe_node_declare_abort). Not a futex word: nothing
+     * sleeps on it, the declarer wakes each agent on the agent's own. */
     _Alignas(OSOE_CACHELINE)
-    _Atomic uint32_t aborting;      /* 0, or 1 once any PE has declared the job over */
-    _Atomic uint32_t abort_pe;      /* the world rank the abort names */
-    _Atomic int32_t abort_status;   /* the status to exit with (§9.1.6) */
+    _Atomic uint64_t aborting;
 
     /*
      * Each predefined team's epoch counters (§5.4), each on its own line.
@@ -572,8 +594,22 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
  * control segment's name. */
 void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b);
 
-/* Declare the job over: publish the abort word so every other local PE stops at
- * its next safety sweep. Does not itself terminate the caller. */
-void osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status);
+/* Declare the job over: publish the abort word, and wake every local agent,
+ * so every other local PE ends - at its agent's next turn, or at its next
+ * sweep if it is waiting (abort.h). Does not itself terminate the caller. The
+ * first declarer wins and true says it was this one; a later one changes
+ * nothing, since the rank, the status and the disposition must stay the
+ * first's. */
+bool osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status,
+                             enum osoe_abort_disposition how);
+
+/* Wake every local agent, the lead's first, so each finds the abort word at
+ * once rather than at its next sweep. O(L). */
+void osoe_node_wake_agents(struct osoe_node *n);
+
+/* The abort word's disposition, with the rank and status it names when it is
+ * not OSOE_ABORT_NONE. One load. */
+enum osoe_abort_disposition osoe_node_abort_read(const struct osoe_node *n, uint32_t *pe,
+                                                 int *status);
 
 #endif /* OSOE_NODE_H */
