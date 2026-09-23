@@ -25,8 +25,9 @@
  * bytes than ever arrive leaves the parser waiting, and waiting for bytes that
  * have not come yet is indistinguishable from waiting for bytes that never
  * will. Only the layer that owns the connection can tell those apart, by
- * noticing that it ended with a segment still open - so that check belongs with
- * the socket in §7.1 step 3, not here. Everything the bytes themselves can
+ * noticing that it ended with a segment still open - so that check is the
+ * engine's, when the socket's stream ends (progress.c, receive), using
+ * osoe_am_parser_between_segments below. Everything the bytes themselves can
  * contradict is caught here and at once.
  *
  * **The handler table is fixed at init.** Identifiers are a compile-time enum
@@ -213,6 +214,16 @@ struct osoe_am_parser {
 /* `peer` is the node the bytes come from, or UINT32_MAX when there is none to
  * name (a test feeding the parser directly). */
 void osoe_am_parser_init(struct osoe_am_parser *p, uint32_t peer);
+
+/*
+ * Is the parser between segments - nothing of a segment consumed? What the
+ * owner of a connection asks when the stream ends: anywhere else, the peer
+ * stopped mid-segment (see the note on truncation above).
+ */
+static inline bool osoe_am_parser_between_segments(const struct osoe_am_parser *p)
+{
+    return p->stage == OSOE_AM_STAGE_SEGMENT && p->have == 0;
+}
 
 /*
  * Feed bytes from the wire. Every byte is consumed: a parser that could refuse

@@ -2,6 +2,7 @@
  * Initialization lifecycle (§6.4): shmem_init, shmem_finalize,
  * shmem_query_initialized, shmem_my_pe, shmem_n_pes.
  */
+#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdatomic.h>
@@ -16,6 +17,7 @@
 
 #include "agent.h"
 #include "base/futex.h"
+#include "base/ring-check.h"
 #include "barrier.h"
 #include "export.h"
 #include "fatal.h"
@@ -170,6 +172,19 @@ static void session_start(void)
         const char *release = uname(&u) == 0 ? u.release : "unknown";
         osoe_fatal("osoe needs Linux 6.7 or later, for the futex2 calls (they fail with "
                    "\"%s\"); this kernel is %s", strerror(futex_error), release);
+    }
+    /* io_uring's checks join it for a job that spans nodes, the one kind that
+     * opens a ring (§1: init checks what the library uses). */
+    const char *facility;
+    int ring_error = osoe.bootstrap.node_count > 1 ? osoe_ring_check(&facility) : 0;
+    if (ring_error) {
+        struct utsname u;
+        const char *release = uname(&u) == 0 ? u.release : "unknown";
+        osoe_fatal("osoe needs io_uring with %s for a job of %u nodes (it fails with "
+                   "\"%s\"%s); this kernel is %s", facility, osoe.bootstrap.node_count,
+                   strerror(ring_error),
+                   ring_error == EPERM ? ", which usually means the kernel.io_uring_disabled "
+                                         "sysctl is set" : "", release);
     }
 
     /* A re-init after a full teardown is a fresh session (§6.4). Every PE runs

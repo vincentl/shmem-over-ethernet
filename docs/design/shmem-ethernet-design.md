@@ -72,8 +72,12 @@ pkg-config and stops at configure time, saying why. At startup the library check
 that the *running kernel* supports what it needs — the `tools/probe` checks,
 moved into init — and refuses by name otherwise, before it creates anything in
 `/dev/shm`. The first catches old headers; the second catches an old kernel under
-new headers. Init checks what the library uses: today the futex2 calls alone,
-since step 2 opens no ring; io_uring's opcode checks join them at step 3.
+new headers. Init checks what the library uses: the futex2 calls always, and
+since phase 1 step 3, for a job that spans nodes - the one kind that opens a ring
+- an io_uring created `SINGLE_ISSUER`, `R_DISABLED` and with an explicit CQ size,
+a registered provided-buffer ring, and the `RECV`, `SEND` and `FUTEX_WAIT` opcodes
+(`base/ring-check.c`). A one-node job on a machine whose `kernel.io_uring_disabled`
+sysctl forbids io_uring still runs.
 
 **CMake is a build tool, not a dependency chain.** What this project exists to
 avoid is a dependency tree that does not build on the target hardware, not the
@@ -282,6 +286,49 @@ peer's delayed ACK it can sit on a segment for tens of milliseconds.
 
 **Not used:** `IORING_OP_SEND_ZC`. Two CQEs, buffer stability requirement, and
 only pays above ~10–16 KB. Revisit only on a fast NIC.
+
+*As built* (phase 1 step 3 slice 1; `ring.[ch]`, `wire.[ch]`, `listener.[ch]`).
+One ring per progress thread, created `IORING_SETUP_SINGLE_ISSUER |
+IORING_SETUP_R_DISABLED | IORING_SETUP_CQSIZE` on the thread that makes the
+node's connections and **enabled by the lead's agent on its first pass**, which
+makes the agent the one task the kernel lets submit: invariant 19 enforced by the
+kernel, not by convention (another thread's submission fails `-EEXIST`, measured
+on 6.12). Both bounds are computed and asserted at open: the SQ holds `2 × wires +
+1`, a re-arm and a send per wire and the futex wait, and the CQ `buffers + 2 ×
+wires + 1` — one completion per provided buffer, because a buffer is refilled
+only after the pass that emptied it; a terminal completion per armed receive; a
+send per wire; the futex wait. A submission that finds the SQ full is a fatal
+naming the broken bound, not a retry.
+
+**One provided-buffer ring for every wire**, `OSOE_WIRE_BUFFERS` of
+`OSOE_WIRE_BYTES` (default 64 × 16 KiB), so the memory a node holds for
+receiving does not grow with its peers; a multishot recv per wire selects from
+it. The reap queues each filled buffer on its wire, oldest first, and marks the
+wire readable; the pass then takes every byte of every readable wire through
+`osoe_wire_recv`, recycling each buffer the moment it is emptied. So a buffer is
+held from one reap to the end of that pass and never across the next reap, and
+the next reap **checks**: a buffer still queued is a fatal naming invariant 23,
+which is how "never hold a provided buffer" became assertable rather than
+remembered. Every completion without `IORING_CQE_F_MORE` re-arms, `-ENOBUFS`
+included; the re-arm is submitted at the end of the pass, after the buffers the
+reap queued have been recycled.
+
+**Send references the sealed connection buffer itself** — no staging copy, since
+a sealed buffer is already stable until released. That is the one change to the
+wire's contract: `osoe_wire_send`'s first offer starts the send and returns 0, and
+an offer after its completion has been reaped returns what the kernel took, which
+the caller then offers the rest after. The engine already behaved that way — it
+releases a buffer only once every byte has been accepted, and re-offers from where
+the count ended — so `progress.c` did not change for it; the wire checks that
+bytes offered while a send is in flight are the ones in flight. `MSG_NOSIGNAL` on
+every send: a peer that has gone is a completion with `-EPIPE`, not a signal.
+
+**Split injection survives the socket.** `OSOE_WIRE_SPLIT` and `OSOE_WIRE_SEED`
+truncate sends (to at least one byte — a send truncated to nothing would wait for
+a completion that is not coming) and receives, hash-derived as before (§3.14), and
+a small `OSOE_WIRE_BYTES` now makes the kernel itself split a segment across
+provided buffers. `shmem.wire` asserts that short sends, short receives and
+`-ENOBUFS` re-arms all happened (64-byte buffers, four of them).
 
 ### 3.4 Segment structure
 
@@ -869,11 +916,17 @@ header, so every local PE sees them:
   put; without the claim it still made 93% of them, because every put landing
   during the lead's wake-up latency saw the flag raised.
 
-**Receiving still polls every wire** in step 2: the shared-memory wire says
-nothing when bytes arrive, so the lead looks at all *N* − 1 on every pass. That
-is O(*N*) per pass and not work discovery's to fix; step 3's receive completions
-replace it. Nothing added here touches every connection's shared state
-periodically, so it does not make lazy connection establishment harder.
+**Receiving polled every wire** in step 2: the shared-memory wire said nothing
+when bytes arrived, so the lead looked at all *N* − 1 on every pass, O(*N*) per
+pass. *Replaced in phase 1 step 3*: the ring's reap marks the wires something
+arrived on, and a pass receives from those and no others — the receive side's
+equal of the dirty bitmap. The send side's "privately known busy" half was still
+asked of every connection (O(1) each, but O(*N*) per pass), so it is now a
+private bitmap too, set where the work appears (a reply or collective forward
+queued toward a connection) and settled after each visit. A pass costs *N*/64
+loads of each bitmap and O(active) connections visited. Nothing added touches
+every connection's shared state periodically, so lazy connection establishment
+is no harder.
 
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
@@ -1320,6 +1373,17 @@ fields of the node header written by the lead's progress thread alone, the
 single-writer case of §3.16. They exist first because two protocols could not
 otherwise be seen working: an acknowledgement echo (§3.4) and an exhausted reply
 pool (§3.8) have no effect a test can observe except these counts.
+
+*As built (layout 13, phase 1 step 3 slice 1):* the ring's own counts, node
+totals written by the progress thread once a pass - `transport.am.completions`,
+`receive_buffers` (provided buffers filled), `receive_enobufs`,
+`receive_rearms` (every multishot end, `-ENOBUFS` or not), `sends` and
+`short_sends`. `-ENOBUFS` and short sends are normal under load; a rate far
+above the traffic's is a provided-buffer ring too small for the peers sending
+at once (§3.3). Per peer they wait, as the rest of this list does. An
+`osoe-stat` from before layout 13 finds every metric by name through the
+segment's own table, so it prints these too; it decodes nothing whose encoding
+it does not know.
 
 *As built (layout 12, phase 1 step 2 slice 3):* the **fourth scope** this
 question asked for. One record per connection toward a peer node, in peer-slot
@@ -4031,6 +4095,36 @@ computes the same host under any distribution.
 - **Node-pair connections:** the lower node index connects to the higher, so each
   pair opens exactly one stream (§3.1).
 
+*Node-pair connections as built* (phase 1 step 3 slice 1; `listener.[ch]`,
+`osoe_wires_open`). **Every lead listens, not only node 0's**, on the first free
+port of a candidate sequence hashed from (job, step, **node**) inside
+`OSOE_PORT_RANGE` (default 17000–26999, below Linux's ephemeral range), and
+another lead finds it by trying the same sequence and asking whoever answers who
+it is. With the node in the hash every lead has a listener another can find —
+what the node-pair mesh needs, and what a tree-shaped rendezvous needs (below) —
+and on one host, where §8.1's logical nodes all live, two leads' sequences start
+in different places. No `SO_REUSEADDR`: a candidate in `TIME_WAIT` is skipped
+like one in use.
+
+**The hello is three steps**: the caller's hello (job, step, session, both node
+numbers, and what the connection is for), the answer, and the caller's
+confirmation. A caller that gets no answer within a second — a stranger's port
+that accepted and says nothing — closes and tries the next candidate, and the
+whole sequence again after a backoff; with two steps the answering lead could not
+tell that caller from one it now owns, and would count a peer whose socket is
+already closed. It counts a connection only on the confirmation. The second's
+wait is not a time bound on the job (§3.15): giving up on a candidate retries.
+
+**Each lead accepts every lower node, then connects to every higher one.** A lead
+answers its callers the whole time it waits for them, so no lead waits on one that
+is itself waiting to be answered; the last lead is connected to after about *N*
+connection times, not after a chain of them. The listen backlog is `min(N, 4096)`,
+every lower node at once, capped by `net.core.somaxconn`; past 4,096 nodes a
+connection waits in SYN retries rather than failing. The listener is closed once
+the lower nodes are in, so a stranger probing a candidate afterwards is refused
+rather than left unanswered. Every logical node is on the local host until the
+socket rendezvous gives addresses (below).
+
 **What the map holds, and what it costs** (phase 1 step 2 slice 3; second review,
 D7). Per rank: its node (4 bytes) and its **local index on that node** (2 bytes;
 16 bits suffice at 256 PEs per node, and `OSOE_GTIDS` longer than 65,535 is
@@ -4203,6 +4297,23 @@ Things to get right, each of which is a silent bug otherwise:
   after this side has run its last collective, and unmapping first turns that
   into a SIGSEGV on the node that did nothing wrong. Announcing and waiting are
   separate calls, so a lead tells every peer before waiting on any.
+
+  *On a socket* (phase 1 step 3 slice 1; `tools/modelcheck/close_model.py`) the
+  same rule has three parts, each a way to lose something. **A lead drains, then
+  sends a goodbye, then ends its stream**: the goodbye is a header-only segment
+  flagged `OSOE_AM_SEGMENT_GOODBYE`, sealed only once the connection owes the peer
+  nothing, and the last segment the lead sends there; `shutdown(SHUT_WR)` follows
+  its send. **An end of stream without a goodbye is a peer that died**, since a
+  crashed process's kernel closes its sockets with the same FIN, so it ends the
+  job naming the peer — a remote death that step 2 could only wait out. **A lead
+  closes a socket only once the peer's end of stream has arrived**: closing while
+  the peer still sends makes the kernel reset the connection, and the peer's send
+  fails on the node that did nothing wrong. Nothing is lost by refusing to send
+  after the goodbye: past the final barrier no lead needs anything from another
+  but the barrier's releases, which drain before it. The model checks all of it
+  over three nodes with an interior one, trapped-state check on; a goodbye that
+  does not wait for the drain strands a child, a FIN without a goodbye trips the
+  dead-peer check, and a close before the peer's FIN sends into a reset.
 - **A child created by `fork()`** after init inherits the mappings but no agent
   threads (§3.12). It must not call OpenSHMEM, and teardown code compares the
   current pid with the initializing pid and does nothing in a child.
@@ -5011,6 +5122,11 @@ Assert what can be asserted. Instrument the rest.
     is busy.** (§3.10) Each rule dropped loses the lead's attention for committed
     bytes: a lost wake in `lead_wake_model.py`, or - the private half - a leaf's
     barrier arrival left unsealed, measured one run in eight.
+35. **A lead seals its goodbye only once the connection owes the peer nothing,
+    ends its stream only after the goodbye has gone, and closes a socket only
+    after the peer's stream has ended.** (§6.4) Dropping each strands a child
+    waiting for its release, makes a finished peer look dead, or resets a
+    connection the peer is still sending on (`close_model.py`).
 
 ## 10. Open Questions
 

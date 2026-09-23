@@ -1,0 +1,109 @@
+/*
+ * The progress thread's io_uring (§3.3, §3.10, §3.12; phase 1 step 3).
+ *
+ * One ring per progress thread, and only that thread submits: the ring is
+ * created with IORING_SETUP_SINGLE_ISSUER and IORING_SETUP_R_DISABLED, set up
+ * on the thread that opens the job's connections, and enabled by the thread
+ * that will drive it, which is then the only one the kernel lets submit
+ * (invariant 19, enforced by the kernel rather than by convention).
+ *
+ * It carries every wire's receive and send, and later the agent's futex wait:
+ *
+ * - **Receive: one multishot recv per wire over one provided-buffer ring** that
+ *   every wire shares, so the buffers a node holds do not grow with its peers.
+ *   A reap queues each filled buffer on the wire it arrived for, oldest first,
+ *   and marks that wire readable; the engine's pass then takes every byte of it
+ *   (osoe_wire_recv), recycling each buffer the moment it is emptied. **No
+ *   buffer is held across reaps** (§3.3, invariant 23): a reap that finds one
+ *   still queued ends the job, since that is the path to the deadlock §3.3
+ *   describes. -ENOBUFS, and any other completion without IORING_CQE_F_MORE,
+ *   re-arms: both are normal.
+ * - **Send: one in flight per wire** (§3.3, invariant 2), started by
+ *   osoe_wire_send and finished by the reap.
+ *
+ * **Both bounds are asserted at open** (§3.3). The submission queue holds what
+ * one pass can queue between two submits - a re-arm and a send per wire, and the
+ * futex wait - and the completion queue what can complete between two reaps:
+ * one completion per provided buffer (a buffer is refilled only after the pass
+ * has emptied it), one terminal completion per armed recv, one per send, and
+ * the futex wait. Sized that way neither can overflow, so nothing depends on
+ * the kernel's overflow list.
+ *
+ * Private to the thread that drives it, like the rest of the engine (§3.12):
+ * nothing here is shared memory, so nothing here is atomic.
+ */
+#ifndef OSOE_RING_H
+#define OSOE_RING_H
+
+#include <liburing.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+struct osoe_wire;
+
+/* Provided buffers: OSOE_WIRE_BUFFERS of OSOE_WIRE_BYTES each (wire.h). */
+struct osoe_ring {
+    struct io_uring uring;
+    struct io_uring_buf_ring *buffer_ring;
+    unsigned char *buffer_memory;
+    uint32_t buffer_count;          /* a power of two */
+    uint32_t buffer_bytes;
+    uint32_t *next;                 /* per buffer: the next one queued on its wire */
+    uint32_t *filled;               /* per buffer: the bytes the kernel put in it */
+    struct osoe_wire *wires;        /* by slot */
+    uint32_t wire_count;
+    uint64_t *readable;             /* one bit per wire: something arrived */
+    uint32_t held;                  /* buffers queued on wires, not yet emptied */
+    uint32_t submission_bound, completion_bound;
+    bool enabled;
+    bool futex_armed;               /* §3.10: at most one armed wait per ring */
+    /* §3.14, the node's `am` record when inside a job; the engine binds it. */
+    struct osoe_ring_counts {
+        uint64_t completions, receives, enobufs, rearms, sends, short_sends;
+    } counts;
+};
+
+/* A provided buffer's number, or none (a wire's empty queue). */
+#define OSOE_RING_NONE UINT32_MAX
+
+/*
+ * Create the ring for `wire_count` wires with `buffer_count` provided buffers
+ * of `buffer_bytes` each, disabled until osoe_ring_enable. Fatal if the kernel
+ * gives smaller queues than the bounds above.
+ */
+void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_count,
+                    uint32_t buffer_count, uint32_t buffer_bytes);
+
+/* On the thread that will drive it, once: enable the ring, which makes this
+ * thread its only submitter, and arm every wire's receive. */
+void osoe_ring_enable(struct osoe_ring *r);
+
+/* Submit what is queued, and handle every completion there is: receives are
+ * queued on their wires and marked readable, sends are finished. Never waits. */
+void osoe_ring_reap(struct osoe_ring *r);
+
+/* Submit what is queued, without looking at completions (end of a pass). */
+void osoe_ring_submit(struct osoe_ring *r);
+
+/*
+ * Submit what is queued and sleep until a completion arrives or `timeout_ns`
+ * passes. Returns true if one arrived. The reap that follows handles it.
+ */
+bool osoe_ring_wait(struct osoe_ring *r, uint64_t timeout_ns);
+
+/* Take, and clear, the readable bits of wires 64*word .. 64*word+63. */
+uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t word);
+
+/* Give a provided buffer back to the kernel (wire.c, when a buffer is empty). */
+void osoe_ring_recycle(struct osoe_ring *r, uint32_t buffer);
+
+/* A submission queue entry; fatal if there is none, since the bound above
+ * says there always is. */
+struct io_uring_sqe *osoe_ring_entry(struct osoe_ring *r);
+
+/* Arm wire `slot`'s multishot receive. */
+void osoe_ring_arm_receive(struct osoe_ring *r, uint32_t slot);
+
+void osoe_ring_close(struct osoe_ring *r);
+
+#endif /* OSOE_RING_H */

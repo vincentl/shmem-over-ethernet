@@ -77,6 +77,10 @@ enum {
      * header-only segment, or one-way traffic is never acknowledged at all and
      * quiet waits forever (§3.4). */
     OSOE_AM_SEGMENT_ACK_REQUESTED = 1u << 0,
+    /* The sender's last segment on this connection: its end of stream follows
+     * and nothing else does. An end of stream without it is a peer that died
+     * (§6.4, close_model.py). Header-only. */
+    OSOE_AM_SEGMENT_GOODBYE = 1u << 1,
 };
 
 struct osoe_am_segment_header {

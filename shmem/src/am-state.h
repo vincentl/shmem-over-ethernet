@@ -17,6 +17,7 @@
 #include "connection-area.h"
 #include "progress.h"
 #include "reply.h"
+#include "ring.h"
 #include "wire.h"
 
 struct osoe_am_state {
@@ -31,7 +32,9 @@ struct osoe_am_state {
     bool lead;                      /* this PE is its node's lead */
     struct osoe_connection_area area;
     struct osoe_wire *wire;                      /* nodes - 1, in peer-slot order */
+    struct osoe_ring ring;                       /* carries every wire (ring.h) */
     struct osoe_progress_connection *connection; /* nodes - 1, in peer-slot order */
+    uint64_t *busy;                              /* (nodes - 1 + 63) / 64 words */
     struct osoe_reply *descriptor;               /* the node-wide pool (§3.8) */
     unsigned char *scratch;                      /* receive staging, one AM chunk */
     struct osoe_progress progress;

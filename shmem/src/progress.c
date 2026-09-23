@@ -1,11 +1,17 @@
+/* liburing.h, through wire.h, uses POSIX types (sigset_t, AT_FDCWD) that plain
+ * C11 hides (portability review F12: feature macros are declared per file). */
+#define _GNU_SOURCE
 #include <stdatomic.h>
 #include <limits.h>
+#include <stdbit.h>
 #include <string.h>
 
 #include "base/futex.h"
 #include "fatal.h"
 #include "progress.h"
+#include "ring.h"
 #include "rmw.h"
+#include "wire.h"
 
 /* The sink is bound to one connection: a reply must be enqueued on the queues
  * of the connection its request arrived on, and the parser does not know which
@@ -166,6 +172,13 @@ static _Noreturn void pool_exhausted(struct osoe_progress *p, uint32_t slot,
                             "argument 1)");
 }
 
+/* The connection has send-side work (busy()): visit it on the passes to come.
+ * Its bit is cleared by the visit that finds it idle. */
+static void mark_busy(struct osoe_progress *p, uint32_t slot)
+{
+    p->busy[slot / 64] |= UINT64_C(1) << (slot % 64);
+}
+
 static void enqueue(struct osoe_progress *p, uint32_t slot, struct osoe_reply_queue *q,
                     const struct osoe_reply *value)
 {
@@ -176,6 +189,7 @@ static void enqueue(struct osoe_progress *p, uint32_t slot, struct osoe_reply_qu
     *r = *value;
     osoe_reply_push(&p->pool, q, i);
     note_high_water(p, slot);
+    mark_busy(p, slot);         /* possibly another connection than the one being read */
 }
 
 
@@ -500,6 +514,10 @@ static void segment_applied(void *context, const struct osoe_am_segment_header *
     c->applied = segment->seq;
     if (segment->flags & OSOE_AM_SEGMENT_ACK_REQUESTED)
         c->owe_ack = true;
+    /* Its last segment: the end of stream that follows is a peer that finished
+     * (§6.4). Header-only, so nothing of it is applied but this. */
+    if (segment->flags & OSOE_AM_SEGMENT_GOODBYE)
+        c->peer_goodbye = true;
     if (segment->ack > c->acked) {
         c->acked = segment->ack;
         /* Publish it where a waiting PE can see it: quiet runs in whichever
@@ -513,18 +531,46 @@ static void segment_applied(void *context, const struct osoe_am_segment_header *
 
 /* ---- Receiving -------------------------------------------------------- */
 
+/*
+ * Take everything that has arrived on the connection. Called for every wire the
+ * ring's reap marked readable, and it must empty it: a provided buffer left
+ * queued would be held across the next reap, which the ring refuses (§3.3,
+ * invariant 23).
+ */
 static bool receive(struct osoe_progress *p, uint32_t slot)
 {
     struct arrival a = { p, slot };
     struct osoe_am_sink sink = { destination, complete, segment_applied, &a };
+    struct osoe_wire *w = &p->wire[slot];
+    struct osoe_progress_connection *c = &p->connection[slot];
     bool moved = false;
     for (;;) {
-        size_t n = osoe_wire_recv(&p->wire[slot], p->scratch, p->scratch_bytes);
+        size_t n = osoe_wire_recv(w, p->scratch, p->scratch_bytes);
         if (n == 0)
-            return moved;
-        osoe_am_parse(&p->connection[slot].parser, p->scratch, n, &sink);
+            break;
+        osoe_am_parse(&c->parser, p->scratch, n, &sink);
         moved = true;
     }
+    /*
+     * What only the owner of the connection can tell (am.h): that the stream
+     * ended, and whether it ended where a segment did and after the peer's
+     * goodbye. A crashed lead's kernel closes its sockets, so without the
+     * goodbye an end of stream is a peer that died, and the job ends here
+     * naming it rather than waiting for something that node will never send
+     * (§3.15, §6.4).
+     */
+    if (w->error)
+        osoe_fatal("node %u: the connection to node %u failed: %s", p->node,
+                   peer_of(p, slot), strerror(-w->error));
+    if (osoe_wire_ended(w)) {
+        if (!osoe_am_parser_between_segments(&c->parser))
+            osoe_fatal("node %u: node %u's stream ended in the middle of a segment: its "
+                       "lead has exited or died mid-send", p->node, peer_of(p, slot));
+        if (!c->peer_goodbye)
+            osoe_fatal("node %u: node %u ended its connection without its goodbye: its "
+                       "lead has exited or died (§6.4)", p->node, peer_of(p, slot));
+    }
+    return moved;
 }
 
 /* ---- Draining replies into the open buffer ---------------------------- */
@@ -714,11 +760,15 @@ static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connect
         count++;
     }
     uint64_t seq = atomic_load_explicit(&conn->s->buffer[k].seq, memory_order_acquire);
-    bool ask = asks_for_ack(c, seq, wanted);
+    /* The goodbye is sealed last and alone (flush), so the sealed buffer is it
+     * once one has been sealed; it asks nothing, since no answer could follow. */
+    bool goodbye = c->goodbye == OSOE_GOODBYE_SEALED;
+    bool ask = !goodbye && asks_for_ack(c, seq, wanted);
     struct osoe_am_segment_header sh = {
         .seq = seq,
         .ack = c->applied,
-        .flags = ask ? OSOE_AM_SEGMENT_ACK_REQUESTED : 0,
+        .flags = (ask ? OSOE_AM_SEGMENT_ACK_REQUESTED : 0) |
+                 (goodbye ? OSOE_AM_SEGMENT_GOODBYE : 0),
         .message_count = count,
         .total_len = bytes,
     };
@@ -770,6 +820,11 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
             osoe_connection_release(conn, c->sending);
             c->state[c->sending] = OSOE_BUFFER_FREE;
             c->sending = OSOE_CONNECTION_NONE;
+            /* That was the goodbye (nothing is sealed after it): end the stream. */
+            if (c->goodbye == OSOE_GOODBYE_SEALED && c->sealed == OSOE_CONNECTION_NONE) {
+                osoe_wire_shutdown(&p->wire[slot]);
+                c->goodbye = OSOE_GOODBYE_SENT;
+            }
             osoe_counter_word_add(&p->metrics->segments_sent, 1);
             if (cm) {
                 osoe_counter_word_add(&cm->segments_sent, 1);
@@ -802,14 +857,23 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
      * outstanding the buffer keeps accumulating, and the batch grows under
      * load. Nothing waits for a buffer to fill.
      */
-    if (c->sealed == OSOE_CONNECTION_NONE && c->open != OSOE_CONNECTION_NONE) {
+    if (c->sealed == OSOE_CONNECTION_NONE && c->open != OSOE_CONNECTION_NONE &&
+        c->goodbye == OSOE_GOODBYE_NONE) {
         uint32_t used = OSOE_BUFFER_USED(
             atomic_load_explicit(&conn->s->buffer[c->open].head, memory_order_acquire));
         /* Seal for data, to pay a debt, or for a late request that no
          * unfinalized segment will carry - the one header-only segment the
          * model says a quiesced pair may still exchange. */
         bool late = wanted > c->acked && c->flagged < wanted;
-        if (used > header || c->owe_ack || late) {
+        /* Or, closing, for the goodbye: once the connection owes the peer
+         * nothing - nothing sealed or on the wire, no replies queued, nothing in
+         * the open buffer - and never before (close_model.py, goodbye_early). */
+        bool goodbye = p->closing && c->sending == OSOE_CONNECTION_NONE && used == header &&
+                       !c->carrying && c->queues.control.depth == 0 &&
+                       c->queues.bulk.depth == 0;
+        if (goodbye)
+            c->goodbye = OSOE_GOODBYE_SEALED;
+        if (used > header || c->owe_ack || late || goodbye) {
             if (used == header) {
                 osoe_counter_word_add(&p->metrics->header_only_sent, 1);   /* §3.4's ack-only */
                 if (conn_metrics(p, slot))
@@ -826,7 +890,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
 
     /* At most one reservable buffer (§3.5): open a free one only when none is
      * open, and never the one being sealed or sent. */
-    if (c->open == OSOE_CONNECTION_NONE) {
+    if (c->open == OSOE_CONNECTION_NONE && c->goodbye == OSOE_GOODBYE_NONE) {
         for (uint32_t k = 0; k < 2; k++)
             if (c->state[k] == OSOE_BUFFER_FREE && k != c->sealed && k != c->sending) {
                 /* The pre-open drain (§3.8): replies first, while k is still
@@ -848,13 +912,15 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
 /* ---- The pass --------------------------------------------------------- */
 
 void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *area,
-                        struct osoe_wire *wires, struct osoe_reply *descriptors,
-                        uint32_t descriptor_count, unsigned char *scratch,
-                        uint32_t scratch_bytes, const struct osoe_progress_host *host)
+                        struct osoe_wire *wires, struct osoe_ring *ring,
+                        struct osoe_reply *descriptors, uint32_t descriptor_count,
+                        unsigned char *scratch, uint32_t scratch_bytes,
+                        const struct osoe_progress_host *host)
 {
     memset(p, 0, sizeof *p);
     p->area = area;
     p->wire = wires;
+    p->ring = ring;
     p->descriptors = descriptors;
     p->scratch = scratch;
     p->scratch_bytes = scratch_bytes;
@@ -866,9 +932,15 @@ void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *ar
 }
 
 void osoe_progress_attach(struct osoe_progress *p,
-                          struct osoe_progress_connection *connections)
+                          struct osoe_progress_connection *connections, uint64_t *busy)
 {
     p->connection = connections;
+    p->busy = busy;
+    /* Every connection starts busy - it has no buffer open yet - so the first
+     * pass visits each once (O(N), once), and after that only what is active. */
+    memset(busy, 0, (size_t)((p->nodes - 1 + 63) / 64) * sizeof *busy);
+    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++)
+        mark_busy(p, slot);
     for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
         struct osoe_progress_connection *c = &p->connection[slot];
         memset(c, 0, sizeof *c);
@@ -878,32 +950,6 @@ void osoe_progress_attach(struct osoe_progress *p,
         osoe_am_parser_init(&c->parser, peer_of(p, slot));
         osoe_reply_queues_init(&c->queues);
     }
-}
-
-/*
- * The releases this pass forwarded, applied to this node's own members last.
- * Each child's connection is drained and flushed first, so the RELEASE is in
- * the wire - or in the open buffer behind a send already in flight - before the
- * local wake, which is O(L) futex work on this thread (§5.3). O(k) per release.
- */
-static bool release_local(struct osoe_progress *p)
-{
-    bool moved = false;
-    for (uint32_t team = 0; team < OSOE_TEAMS; team++) {
-        struct osoe_progress_team *t = &p->team[team];
-        if (t->release_pending == 0)
-            continue;
-        for (uint32_t j = 0; j < t->tree.children; j++) {
-            uint32_t slot = osoe_progress_slot(p, t->tree.child[j]);
-            drain(p, slot);
-            flush(p, slot);
-        }
-        uint32_t epoch = t->release_pending;
-        t->release_pending = 0;
-        p->host.release(p->host.context, team, epoch);
-        moved = true;
-    }
-    return moved;
 }
 
 /*
@@ -923,43 +969,106 @@ static bool busy(const struct osoe_progress *p, uint32_t slot)
            c->queues.control.depth != 0 || c->queues.bulk.depth != 0;
 }
 
+/* After a visit: keep the connection's bit while it is busy, clear it once not. */
+static void settle(struct osoe_progress *p, uint32_t slot)
+{
+    uint64_t bit = UINT64_C(1) << (slot % 64);
+    if (busy(p, slot))
+        p->busy[slot / 64] |= bit;
+    else
+        p->busy[slot / 64] &= ~bit;
+}
+
+/*
+ * The releases this pass forwarded, applied to this node's own members last.
+ * Each child's connection is drained and flushed first, so the RELEASE is in
+ * the wire - or in the open buffer behind a send already in flight - before the
+ * local wake, which is O(L) futex work on this thread (§5.3). O(k) per release.
+ */
+static bool release_local(struct osoe_progress *p)
+{
+    bool moved = false;
+    for (uint32_t team = 0; team < OSOE_TEAMS; team++) {
+        struct osoe_progress_team *t = &p->team[team];
+        if (t->release_pending == 0)
+            continue;
+        for (uint32_t j = 0; j < t->tree.children; j++) {
+            uint32_t slot = osoe_progress_slot(p, t->tree.child[j]);
+            drain(p, slot);
+            flush(p, slot);
+            settle(p, slot);
+        }
+        uint32_t epoch = t->release_pending;
+        t->release_pending = 0;
+        p->host.release(p->host.context, team, epoch);
+        moved = true;
+    }
+    return moved;
+}
+
+/* The ring's counts since the last pass, into the node's record (§3.14). */
+static void publish_ring(struct osoe_progress *p)
+{
+    struct osoe_ring_counts *k = &p->ring->counts;
+    if (k->completions == 0 && k->sends == 0)
+        return;
+    osoe_counter_word_add(&p->metrics->completions, k->completions);
+    osoe_counter_word_add(&p->metrics->receive_buffers, k->receives);
+    osoe_counter_word_add(&p->metrics->receive_enobufs, k->enobufs);
+    osoe_counter_word_add(&p->metrics->receive_rearms, k->rearms);
+    osoe_counter_word_add(&p->metrics->sends, k->sends);
+    osoe_counter_word_add(&p->metrics->short_sends, k->short_sends);
+    *k = (struct osoe_ring_counts){ 0 };
+}
+
 /*
  * One pass (§3.10, §3.12).
  *
- * **Receiving polls every wire**: the step-2 wire is shared memory and says
- * nothing when bytes arrive, so the lead looks. That is O(N) per pass and
- * step 3's completions replace it; it is not work discovery's to fix.
+ * **Both sides visit only the connections with work** (phase 1 step 3). The
+ * ring's reap says which wires have received something - bytes, or the end of
+ * a stream - and a pass takes all of it from those and no others: the receive
+ * side found by completions, which on the step-2 wire was a look at every one
+ * of N - 1 connections per pass. The send side is as slice 3 made it: the
+ * connections whose dirty bit a writer set since the last pass, those that
+ * received something (an acknowledgement may be owed), and those the lead
+ * already knows are busy - now kept in a private bitmap as that work comes and
+ * goes, rather than asked of every connection. Each bitmap is read a word at a
+ * time, so a pass costs N/64 loads of each and O(active) connections visited.
  *
- * **Sending visits only the connections with work** (phase 1 step 2 slice 3):
- * those whose dirty bit a writer set since the last pass, those that received
- * something this pass (an acknowledgement may be owed), and those the lead
- * already knows are busy. The bitmap is read word by word - a load, and an
- * exchange only if the word is nonzero - so an idle word costs one cached load:
- * N/64 of them per pass, and O(active) connections drained and flushed. Before,
- * every pass drained and flushed every connection (second review, D12).
+ * The pass ends with a submit, so that the sends and re-arms it queued go to
+ * the kernel now rather than at the next reap.
  */
 bool osoe_progress_poll(struct osoe_progress *p)
 {
     bool moved = release_local(p);     /* a release osoe_progress_arrive started */
+    osoe_ring_reap(p->ring);
     uint32_t peers = p->nodes - 1, visits = 0;
     for (uint32_t w = 0; w * 64 < peers; w++) {
-        uint64_t bits = 0;
+        uint64_t dirty = 0;
         if (p->area->dirty &&
             atomic_load_explicit(&p->area->dirty[w], memory_order_acquire) != 0)
-            bits = atomic_exchange_explicit(&p->area->dirty[w], 0, memory_order_seq_cst);
-        for (uint32_t slot = w * 64; slot < peers && slot < w * 64 + 64; slot++) {
-            bool received = receive(p, slot);
-            moved |= received;
-            if (!received && !((bits >> (slot % 64)) & 1) && !busy(p, slot))
-                continue;
+            dirty = atomic_exchange_explicit(&p->area->dirty[w], 0, memory_order_seq_cst);
+        uint64_t readable = osoe_ring_take_readable(p->ring, w);
+        for (uint64_t visit = dirty | readable | p->busy[w]; visit != 0; visit &= visit - 1) {
+            uint32_t bit = (uint32_t)stdc_trailing_zeros(visit);
+            uint32_t slot = w * 64 + bit;
+            if ((readable >> bit) & 1)
+                moved |= receive(p, slot);
             moved |= drain(p, slot);
             moved |= flush(p, slot);
+            settle(p, slot);
             visits++;
         }
     }
+    /* A release this pass received is forwarded before the submit, so the
+     * children's RELEASE goes to the kernel now and not at the next pass - or,
+     * with nothing more to do, after the idle wait. */
+    moved |= release_local(p);
+    osoe_ring_submit(p->ring);
+    publish_ring(p);
     osoe_counter_word_add(&p->metrics->passes, 1);
     osoe_counter_word_add(&p->metrics->send_visits, visits);
-    return release_local(p) || moved;
+    return moved;
 }
 
 bool osoe_progress_idle(struct osoe_progress *p)
@@ -1014,6 +1123,25 @@ void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch
         osoe_fatal("node %u: team %u arrived at an internode phase it never registered",
                    p->node, team);
     book_arrival(p, team, epoch, OSOE_COLLECTIVE_TREE_NONE);
+}
+
+void osoe_progress_close(struct osoe_progress *p)
+{
+    p->closing = true;
+    /* Every connection is visited until its goodbye has gone (O(N), once). */
+    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++)
+        mark_busy(p, slot);
+}
+
+bool osoe_progress_closed(const struct osoe_progress *p)
+{
+    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
+        const struct osoe_progress_connection *c = &p->connection[slot];
+        if (c->goodbye != OSOE_GOODBYE_SENT || !c->peer_goodbye ||
+            !osoe_wire_ended(&p->wire[slot]))
+            return false;
+    }
+    return true;
 }
 
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer)

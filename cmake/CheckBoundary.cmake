@@ -30,8 +30,9 @@ set(OSOE_ABOVE_BOUNDARY
 # reach any header here.
 set(OSOE_BELOW_BOUNDARY
   am.c am.h am-state.h connection.c connection.h connection-area.c
-  connection-area.h internode-am.c progress.c progress.h progress-host.c
-  progress-host.h reply.c reply.h transport-am.c transport-local.h wire.c wire.h)
+  connection-area.h internode-am.c listener.c listener.h progress.c progress.h
+  progress-host.c progress-host.h reply.c reply.h ring.c ring.h transport-am.c
+  transport-local.h wire.c wire.h)
 
 # Neither: the boundary's own implementation that every backend keeps, and the
 # shared infrastructure both sides build on - the internode tree's topology

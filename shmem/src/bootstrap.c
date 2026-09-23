@@ -201,6 +201,28 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         osoe_fatal("OSOE_COLLECTIVE_FANOUT='%s' is not between 2 and %u",
                    getenv("OSOE_COLLECTIVE_FANOUT"), (unsigned)OSOE_COLLECTIVE_FANOUT_MAX);
 
+    /*
+     * The ports a node lead may listen on (§6.2's "configurable range"). Each
+     * lead binds the first free port of a candidate sequence hashed from (job,
+     * step, node) inside it, and another lead finds it by trying the same
+     * sequence (listener.h). The default sits below Linux's ephemeral range
+     * (32768-60999), so an outgoing connection's local port never takes a
+     * candidate, and above the privileged ports.
+     */
+    b->port_low = OSOE_DEFAULT_PORT_LOW;
+    b->port_high = OSOE_DEFAULT_PORT_HIGH;
+    const char *range = getenv("OSOE_PORT_RANGE");
+    if (range) {
+        unsigned low, high;
+        int used = 0;
+        if (sscanf(range, "%u-%u%n", &low, &high, &used) != 2 || range[used] != '\0' ||
+            low < 1024 || high > 65535 || low > high)
+            osoe_fatal("OSOE_PORT_RANGE='%s' is not LOW-HIGH with 1024 <= LOW <= HIGH <= 65535",
+                       range);
+        b->port_low = (uint16_t)low;
+        b->port_high = (uint16_t)high;
+    }
+
     uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
     if (osoe_environment_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENVIRONMENT_INVALID || watchdog > 1)
         osoe_fatal("OSOE_WATCHDOG='%s' is not 0 or 1", getenv("OSOE_WATCHDOG"));

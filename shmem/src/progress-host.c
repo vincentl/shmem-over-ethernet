@@ -196,22 +196,26 @@ void osoe_progress_host_start(uint32_t session)
                                OSOE_TEAMS;
     osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
+    osoe_am.busy = calloc((peers + 63) / 64, sizeof *osoe_am.busy);
     osoe_am.descriptor = calloc(descriptors, sizeof *osoe_am.descriptor);
     osoe_am.scratch = malloc(osoe_am.area.chunk_bytes);
-    if (!osoe_am.wire || !osoe_am.connection || !osoe_am.descriptor || !osoe_am.scratch)
+    if (!osoe_am.wire || !osoe_am.connection || !osoe_am.busy || !osoe_am.descriptor ||
+        !osoe_am.scratch)
         osoe_fatal("out of memory setting up the AM backend for %u peer nodes", peers);
 
-    /* Peer-slot order, which is node order with this node left out - the same
-     * order osoe_progress_slot computes (§3.4). */
-    uint32_t slot = 0;
-    for (uint32_t n = 0; n < osoe.job.node_count; n++)
-        if (n != osoe.job.node)
-            osoe_wire_open(&osoe_am.wire[slot++], &osoe.bootstrap, n, session);
+    /*
+     * The node-pair connections, one per peer in peer-slot order - node order
+     * with this node left out, as osoe_progress_slot computes it (§3.4) - and the
+     * ring that carries them, disabled until this lead's agent enables it on its
+     * first pass: the agent is its only submitter (ring.h). Every logical node
+     * is on this host until the rendezvous gives addresses (§8.1, §6.2).
+     */
+    osoe_wires_open(osoe_am.wire, &osoe_am.ring, &osoe.bootstrap, session, NULL);
 
     struct osoe_progress_host host = { resolve, landing, notify, release, NULL };
-    osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, osoe_am.descriptor,
-                       descriptors, osoe_am.scratch, (uint32_t)osoe_am.area.chunk_bytes,
-                       &host);
+    osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, &osoe_am.ring,
+                       osoe_am.descriptor, descriptors, osoe_am.scratch,
+                       (uint32_t)osoe_am.area.chunk_bytes, &host);
     /* Count into the control segment, where osoe-stat and the tests read it. */
     osoe_am.progress.metrics = &osoe.node.hdr->am;
     /* §3.14's connection scope and the tree's per-team state, in the same
@@ -221,7 +225,7 @@ void osoe_progress_host_start(uint32_t session)
     for (uint32_t c = 0; c < osoe.node.connection_count; c++)
         atomic_store_explicit(&osoe.node.connection_metrics[c].peer,
                               c < osoe.job.node ? c : c + 1, memory_order_release);
-    osoe_progress_attach(&osoe_am.progress, osoe_am.connection);
+    osoe_progress_attach(&osoe_am.progress, osoe_am.connection, osoe_am.busy);
     flag_raised = false;
 }
 
@@ -263,10 +267,8 @@ static void flush_before_close(void)
                            osoe.bootstrap.no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     while (!osoe_progress_idle(&osoe_am.progress)) {
-        if (!osoe_progress_poll(&osoe_am.progress)) {
-            struct timespec back = { 0, 20000 };
-            nanosleep(&back, NULL);
-        }
+        if (!osoe_progress_poll(&osoe_am.progress))
+            osoe_ring_wait(&osoe_am.ring, OSOE_PROGRESS_SLEEP_NS);
         if (!osoe_deadline_expired(&sweep))
             continue;
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
@@ -281,20 +283,51 @@ static void flush_before_close(void)
     }
 }
 
+/*
+ * The close (§6.4, close_model.py): every connection sends its goodbye and ends
+ * its stream, and the lead keeps reading - and applying, since a peer may still
+ * be paying an acknowledgement - until every peer's stream has ended after its
+ * own goodbye. Only then are the sockets closed: closing one while the peer
+ * still sends makes the kernel reset it, and the peer's send fails on a node
+ * that did nothing wrong. The no-progress rule watches how many connections
+ * have ended (§3.15); by default a peer that never finalizes is waited for.
+ */
+static void close_connections(void)
+{
+    uint32_t peers = osoe.job.node_count - 1;
+    osoe_progress_close(&osoe_am.progress);
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin(&watch, 0, osoe.bootstrap.no_progress_ns);
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+    while (!osoe_progress_closed(&osoe_am.progress)) {
+        if (!osoe_progress_poll(&osoe_am.progress))
+            osoe_ring_wait(&osoe_am.ring, OSOE_PROGRESS_SLEEP_NS);
+        if (!osoe_deadline_expired(&sweep))
+            continue;
+        sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_sweep_expired("shmem_finalize");
+        uint32_t ended = 0;
+        for (uint32_t slot = 0; slot < peers; slot++)
+            ended += osoe_wire_ended(&osoe_am.wire[slot]);
+        if (osoe_stall_watch_stalled(&watch, ended))
+            osoe_fatal("shmem_finalize: no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT) "
+                       "closing this node's connections - %u of %u peers have ended theirs; "
+                       "the others have not finalized",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), ended, peers);
+    }
+    for (uint32_t slot = 0; slot < peers; slot++)
+        osoe_wire_close(&osoe_am.wire[slot]);
+    osoe_ring_close(&osoe_am.ring);
+}
+
 void osoe_progress_host_exit(void)
 {
     if (!osoe_am.internode || !osoe_am.lead)
         return;
+    if (!osoe_am.ring.enabled)          /* an agent stopped before its first pass */
+        osoe_ring_enable(&osoe_am.ring);
     flush_before_close();
-    /*
-     * Announce to every peer first and only then wait (wire.h), or this node's
-     * teardown costs one peer's latency after another. The engine stopped with
-     * the flush above: nothing polls while the wires close.
-     */
-    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-        osoe_wire_shutdown(&osoe_am.wire[slot]);
-    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-        osoe_wire_close(&osoe_am.wire[slot]);
+    close_connections();
 }
 
 void osoe_progress_host_stop(void)
@@ -304,10 +337,12 @@ void osoe_progress_host_stop(void)
     if (osoe_am.lead) {
         free(osoe_am.wire);
         free(osoe_am.connection);
+        free(osoe_am.busy);
         free(osoe_am.descriptor);
         free(osoe_am.scratch);
         osoe_am.wire = NULL;
         osoe_am.connection = NULL;
+        osoe_am.busy = NULL;
         osoe_am.descriptor = NULL;
         osoe_am.scratch = NULL;
     }
@@ -329,6 +364,10 @@ bool osoe_progress_host_poll(void)
 {
     if (!osoe_am.internode || !osoe_am.lead)
         return false;
+    /* The first pass is on the agent thread, which enabling makes the ring's only
+     * submitter (ring.h). */
+    if (!osoe_am.ring.enabled)
+        osoe_ring_enable(&osoe_am.ring);
     struct osoe_connection_area *a = &osoe_am.area;
     if (flag_raised) {
         atomic_store_explicit(a->lead_sleeping, 0, memory_order_seq_cst);

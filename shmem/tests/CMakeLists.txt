@@ -48,6 +48,7 @@ add_test(NAME shmem.static-link
           -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/static-link-check
           -DPROBE_SRC=${CMAKE_CURRENT_SOURCE_DIR}/static-link-probe.c
           -DC_COMPILER=${CMAKE_C_COMPILER}
+          "-DURING_LIBRARIES=${LIBURING_LINK_LIBRARIES}"
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStaticLink.cmake)
 set_tests_properties(shmem.static-link PROPERTIES LABELS "tier1" TIMEOUT 180)
 
@@ -141,9 +142,10 @@ set_tests_properties(shmem.connection PROPERTIES LABELS "tier1" TIMEOUT 120)
 # The node-pair wire on its own (tier 1): both ends in one process, so no
 # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
 # its own osoe_fatal so a failure inside it fails the test.
-add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/shm-object.c)
+add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/ring.c ../src/listener.c
+  ../src/shm-object.c)
 target_include_directories(shmem_test_wire PRIVATE ../src)
-target_link_libraries(shmem_test_wire PRIVATE osoe_base rt)
+target_link_libraries(shmem_test_wire PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_wire)
 add_test(NAME shmem.wire COMMAND shmem_test_wire)
 set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
@@ -154,9 +156,10 @@ set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 60)
 # and takes its identity straight from the launcher environment.
 # The seed is fixed: §3.14 wants an injected fault reproducible, and without it
 # the pattern would follow the launcher's pid and differ every run.
-add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/shm-object.c)
+add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/ring.c
+  ../src/listener.c ../src/shm-object.c)
 target_include_directories(shmem_test_wire_pair PRIVATE ../src)
-target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt)
+target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_wire_pair)
 add_test(NAME shmem.wire-pair
   COMMAND ${CMAKE_COMMAND} -E env OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000
@@ -175,9 +178,10 @@ set(OSOE_LAUNCH_COUNTS 1 2 4)
 # all of them - and that mutation passed a two-node test.
 add_executable(shmem_test_barrier_am test-barrier-am.c
   ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c ../src/bootstrap.c ../src/shm-object.c)
+  ../src/reply.c ../src/wire.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
+  ../src/shm-object.c)
 target_include_directories(shmem_test_barrier_am PRIVATE ../src)
-target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt)
+target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_barrier_am)
 foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
   string(REPLACE "," ";" ranks "${map}")
@@ -263,9 +267,9 @@ endif()
 # vacuous.
 add_executable(shmem_test_progress test-progress.c
   ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c ../src/shm-object.c)
+  ../src/reply.c ../src/wire.c ../src/ring.c ../src/listener.c ../src/shm-object.c)
 target_include_directories(shmem_test_progress PRIVATE ../src)
-target_link_libraries(shmem_test_progress PRIVATE osoe_base rt)
+target_link_libraries(shmem_test_progress PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_progress)
 add_test(NAME shmem.progress
   COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048

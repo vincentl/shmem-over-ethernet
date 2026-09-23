@@ -1,147 +1,130 @@
 /*
- * The node-pair wire (§3.1, §3.10, §7.1 step 2).
+ * The node-pair wire (§3.1, §3.3; phase 1 step 3).
  *
- * §7.1 step 2 runs the AM layer's queues in memory rather than on sockets, so
- * that every internode semantic is validated before a socket exists. This is
- * what stands in for the socket: one shared-memory object per node pair,
- * holding a single-producer single-consumer byte ring in each direction, with a
- * futex word so the reader sleeps rather than spins. Step 3 replaces it with
- * io_uring over TCP and nothing above it changes.
+ * One TCP connection per node pair, carried by the progress thread's io_uring
+ * (ring.h). §7.1 step 2 ran the same interface over a shared-memory stand-in,
+ * so that every internode semantic was validated before a socket existed; this
+ * replaces the stand-in, and the engine above it did not change: send and recv
+ * mean what they meant.
  *
- * **It is a byte stream, not a message queue, and that is the whole point.**
- * osoe_wire_send accepts a prefix of what it was offered and says how much;
- * osoe_wire_recv delivers whatever has arrived, which may be a fraction of a
- * segment or several segments' worth. §3.3's receive path is written against
- * exactly that - a parse cursor per connection, headers accumulated in a small
- * per-connection area, payload copied straight to its destination as it
- * arrives - and §8.2 warns that loopback "will never produce a short write or
- * partial read", which is where the most common defect in hand-rolled TCP
- * framing lives. A wire that handed over whole segments would leave §3.3's
- * parser meeting its first partial read on real hardware in step 3. This one
- * produces them on purpose: the ring is small, and OSOE_WIRE_SPLIT truncates
- * transfers besides, deterministically (§3.14's hash-derived injection, so the
- * same seed gives the same splits and a failing case is a permanent regression
- * case rather than a story about a bad afternoon).
+ * **It is a byte stream, not a message queue.** osoe_wire_send accepts a prefix
+ * of what it was offered and says how much; osoe_wire_recv delivers whatever has
+ * arrived, which may be a fraction of a segment or several segments' worth.
+ * §3.3's parser is written against exactly that - a parse cursor per connection,
+ * headers accumulated in a small per-connection area, payload copied straight to
+ * its destination as it arrives - and §8.2 warns that loopback "will never
+ * produce a short write or partial read", which is where the most common defect
+ * in hand-rolled TCP framing lives. So this wire produces them on purpose:
+ * OSOE_WIRE_SPLIT truncates sends and receives, deterministically (§3.14's
+ * hash-derived injection, so the same seed gives the same splits and a failing
+ * case is a permanent regression case), and a small OSOE_WIRE_BYTES makes the
+ * kernel split a segment across provided buffers besides.
  *
- * Only the two node leads touch a wire (§3.12: non-lead agents never touch a
- * ring or a socket), so each direction has exactly one writer and one reader.
- * The lower node index creates the object and the higher opens it, matching
- * §6.2's rule that the lower node index connects to the higher, so each pair
- * has exactly one wire.
+ * **Sending is asynchronous, and that is the one change of contract.** Offered
+ * bytes go to the kernel by reference - the sealed connection buffer itself, with
+ * no copy - so they must stay unchanged until they are reported accepted, and
+ * the caller offers the rest again from where the report ended, exactly as §3.3
+ * says of a short send ("advance past a short send and resubmit the
+ * remainder"). The first offer starts the send and returns 0; an offer after
+ * the completion has been reaped returns what the kernel took. The engine
+ * already behaved this way - a buffer is released only once every byte of it
+ * has been accepted - so nothing above had to change; the wire checks it.
  *
- * The wake protocol is §4.6's, the one used for every counter a waiter blocks
- * on: the reader loads the wake word **before** the data it guards, and the
- * writer publishes the data **before** bumping the word. The kernel closes what
- * remains, as §3.10 says of the io_uring form - futex_wait compares the word,
- * so a bump between the reader's load and its wait returns at once instead of
- * sleeping on a stale value. Reversing those two loads is a hung job, and is
- * the `wake_after` case in docs/design/evidence/am-backend/wire_model.py.
- *
- * Use it the way §4.9's watch is used, and for the same reason:
- *
- *     for (;;) {
- *         uint32_t seq = osoe_wire_seq(w);       // BEFORE draining
- *         n = osoe_wire_recv(w, buffer, sizeof buffer);
- *         if (n > 0) { parse(buffer, n); continue; }
- *         osoe_wire_wait(w, seq, &sweep_deadline);
- *     }
+ * Only the node's lead touches a wire (§3.12, invariant 19), on the thread that
+ * drives the ring.
  */
 #ifndef OSOE_WIRE_H
 #define OSOE_WIRE_H
 
+#include <netinet/in.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "base/deadline.h"
 #include "bootstrap.h"
+#include "ring.h"
 
 /*
- * Ring capacity per direction, and the split rate, both OSOE_ (§6.2) because
- * they are this implementation's, not the specification's.
- *
- * The default capacity is deliberately far below a socket's buffer: it is
- * chosen so that a full-sized segment (§3.2 chunks at 64 KB) cannot be written
- * in one go, so every test exercises the short-write path rather than only the
- * tests that thought to.
+ * Provided buffers: OSOE_WIRE_BUFFERS of OSOE_WIRE_BYTES each, shared by every
+ * wire of the ring, so the memory a node holds for receiving does not grow with
+ * its peers. The count is what bounds the completion queue (§3.3); the size
+ * only how finely a segment is split. A small size is how the tests make the
+ * kernel split what a sender wrote whole.
  */
-#define OSOE_WIRE_DEFAULT_BYTES  (UINT64_C(16) << 10)
-#define OSOE_WIRE_MIN_BYTES      UINT64_C(64)
-#define OSOE_WIRE_MAX_BYTES      (UINT64_C(64) << 20)
+#define OSOE_WIRE_DEFAULT_BYTES    (UINT32_C(16) << 10)
+#define OSOE_WIRE_MIN_BYTES        UINT32_C(64)
+#define OSOE_WIRE_MAX_BYTES        (UINT32_C(1) << 20)
+#define OSOE_WIRE_DEFAULT_BUFFERS  UINT32_C(64)
+#define OSOE_WIRE_MAX_BUFFERS      UINT32_C(32768)
 
-/* Process-private handle. */
 struct osoe_wire {
-    char name[96];
-    void *map;                  /* the whole shared object */
-    uint64_t bytes;             /* its mapped length */
-    struct osoe_wire_direction *tx;   /* this node writes here */
-    struct osoe_wire_direction *rx;   /* and reads here */
-    uint64_t capacity;               /* bytes per direction */
-    uint64_t seed;              /* split injection, derived from job and step */
-    uint64_t close_no_progress_ns;  /* osoe_wire_close's no-progress limit (§3.15) */
+    int fd;
+    uint32_t peer;              /* the node at the other end */
+    uint32_t slot;              /* its place in the ring's wires */
+    struct osoe_ring *ring;
+    /* Receiving: provided buffers the reap queued here, oldest first. */
+    uint32_t first, last;       /* buffer numbers, or OSOE_RING_NONE */
+    uint32_t offset;            /* bytes of `first` already delivered */
+    uint64_t queued;            /* bytes in all of them, not yet delivered */
+    bool receiving;             /* its multishot recv is armed */
+    bool ended;                 /* the peer's end of stream has arrived */
+    int error;                  /* a completion on it failed: -errno, or 0 */
+    /* Sending: one in flight (§3.3, invariant 2). */
+    const unsigned char *send_at;
+    uint32_t send_bytes;        /* what was submitted */
+    bool sending;               /* submitted, and not yet reported to the caller */
+    int32_t sent;               /* its completion's result, or -1 until it is reaped */
+    bool shut;                  /* this side's end of stream has been sent */
+    /* §3.14's fault injection, stateless and hash-derived. */
+    uint64_t seed;
     uint32_t split;             /* truncations per myriad; 0 disables */
-    uint64_t sends;             /* this process's transfers, for the seed */
-    uint64_t recvs;
-    bool creator;               /* this node created it, so it removes the name */
-    bool left;                  /* this side has announced that it has stopped writing */
+    uint64_t sends, recvs;      /* this wire's transfers, for the hash */
 };
 
 /*
- * Open the wire between this node and `peer`, creating it if this node's index
- * is the lower of the two. Fatal on failure (§3.15: a transport failure aborts
- * the job).
+ * Establish this lead's node-pair connections, one per peer node, and open the
+ * ring that carries them (disabled until the driving thread enables it). §6.2's
+ * rule: the lower node index connects to the higher, so each pair has exactly
+ * one stream. `hosts[n]` is node n's address; NULL means every node is on this
+ * host, which is how §8.1's logical nodes run. `wires` has node_count - 1
+ * entries, in peer-slot order. Fatal on failure (§3.15).
  */
-void osoe_wire_open(struct osoe_wire *w, const struct osoe_bootstrap *b, uint32_t peer,
-                    uint32_t session);
+void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
+                     const struct osoe_bootstrap *b, uint32_t session,
+                     const struct sockaddr_in *hosts);
 
 /*
- * Announce that this side has stopped writing, and wake the peer. Idempotent.
- *
- * Call it on every wire before closing any of them: a lead with several peers
- * would otherwise wait out one peer's teardown before telling the next, and a
- * caller holding *both* ends of a wire cannot close them one after the other
- * at all, since the first close waits for a side it has not reached yet.
+ * The two halves of osoe_wires_open, for a caller that makes its own
+ * connections - a test holding both ends of one in a single process. The ring
+ * for `count` wires, sized from OSOE_WIRE_BYTES and OSOE_WIRE_BUFFERS and
+ * disabled until enabled; and a connected socket made wire `slot` of it, toward
+ * node `peer`.
  */
-void osoe_wire_shutdown(struct osoe_wire *w);
+void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
+                         const struct osoe_bootstrap *b);
+void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,
+                      uint32_t peer, const struct osoe_bootstrap *b);
 
 /*
- * Announce if not already announced, wait for the peer's announcement, then
- * unmap; the creating node also removes the name. **Both ends must close**,
- * and the wait is why: a barrier orders arrival, not the last byte, so a peer
- * can still owe an acknowledgement (§3.4) after this side has run its last
- * collective, and unmapping first leaves it storing into an address it no
- * longer holds - a SIGSEGV on the node that did nothing wrong. Fatal if the
- * peer's end stops moving for OSOE_NO_PROGRESS_TIMEOUT (§3.15); by default never.
- */
-void osoe_wire_close(struct osoe_wire *w);
-
-/*
- * Write up to len bytes. Returns how many were accepted, which may be 0 and is
- * often less than len: a short write is the normal case, not an error. The
- * caller keeps the remainder and offers it again, exactly as §3.3 says of a
- * short send on a real socket ("advance past a short send and resubmit the
- * remainder").
+ * Write up to len bytes. Returns how many the kernel has accepted, which may be
+ * 0 and is often less than len; the caller keeps the rest and offers it again,
+ * unchanged, from where the count ended. See above for why the bytes offered
+ * must stay put until then.
  */
 size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len);
 
 /* Read up to len bytes. Returns how many were delivered, which may be 0. */
 size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len);
 
-/*
- * The receive side's wake value. Load it BEFORE draining, and pass it to
- * osoe_wire_wait: that ordering is what makes the wait safe (§4.6).
- */
-uint32_t osoe_wire_seq(const struct osoe_wire *w);
+/* Send this side's end of stream, once it has nothing more to send. */
+void osoe_wire_shutdown(struct osoe_wire *w);
 
-/*
- * Sleep until the peer writes, or until the deadline. Returns false on a
- * deadline expiry, which the caller counts and treats as a safety sweep
- * (§3.10): every blocking call here sweeps at least every OSOE_SWEEP_NS,
- * whether or not anything arrives.
- */
-bool osoe_wire_wait(struct osoe_wire *w, uint32_t seq, const struct osoe_deadline *deadline);
+/* The peer's end of stream has arrived and every byte before it has been
+ * delivered. */
+bool osoe_wire_ended(const struct osoe_wire *w);
 
-/* Bytes this direction can hold, for a caller sizing its own staging. */
-uint64_t osoe_wire_capacity(const struct osoe_wire *w);
+/* Close the socket; the caller has sent its end of stream and seen the peer's. */
+void osoe_wire_close(struct osoe_wire *w);
 
 #endif /* OSOE_WIRE_H */

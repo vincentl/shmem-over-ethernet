@@ -102,26 +102,24 @@ int main(void)
         return CHECK_DONE();
     }
 
+    /* This lead's connections to every other node, and the ring that carries
+     * them - the mesh a lead makes (§6.2). This thread drives the engine, so
+     * it enables the ring and is its only submitter (ring.h). */
     static struct osoe_wire wires[MAX_NODES];
-    uint32_t peers = 0;
-    for (uint32_t n = 0; n < b.node_count; n++) {
-        if (n == b.node)
-            continue;
-        osoe_wire_open(&wires[peers++], &b, n, 0);
-    }
-    /* Fewer wires than nodes means the internode phase below arrives and waits
-     * against a peer count it has no wire to hear back from - a wait that
-     * cannot be satisfied by the peers it actually opened. */
-    CHECK_FATAL(peers == b.node_count - 1);
+    static struct osoe_ring ring;
+    uint32_t peers = b.node_count - 1;
+    osoe_wires_open(wires, &ring, &b, 0, NULL);
+    osoe_ring_enable(&ring);
 
     static struct osoe_reply descriptors[DESCRIPTORS];
     static unsigned char scratch[SCRATCH];
     static struct osoe_progress_connection connections[MAX_NODES];
+    static uint64_t busy[(MAX_NODES + 63) / 64];
     struct osoe_progress_host host = { resolve, landing, notify, release, NULL };
     struct osoe_progress p;
-    osoe_progress_init(&p, &area, wires, descriptors, DESCRIPTORS, scratch, SCRATCH,
+    osoe_progress_init(&p, &area, wires, &ring, descriptors, DESCRIPTORS, scratch, SCRATCH,
                        &host);
-    osoe_progress_attach(&p, connections);
+    osoe_progress_attach(&p, connections, busy);
 
     /* The world team's tree: every node, at the fan-out the environment gives
      * (OSOE_COLLECTIVE_FANOUT, so the same binary runs every shape). */
@@ -154,7 +152,8 @@ int main(void)
     osoe_progress_arrive(&p, TEAM, EPOCH);
 
     while (releases == 0) {
-        osoe_progress_poll(&p);
+        if (!osoe_progress_poll(&p))
+            osoe_ring_wait(&ring, UINT64_C(1000000));
         if (osoe_deadline_expired(&give_up)) {
             fprintf(stderr, "node %u: the barrier never released\n", b.node);
             CHECK(false);
@@ -191,9 +190,21 @@ int main(void)
             break;
     }
 
+    /*
+     * Then the close a lead makes (§6.4, close_model.py): goodbye, end of
+     * stream, and read until every peer's has ended - which is also what keeps
+     * this node reading until the nodes it releases have taken their release.
+     */
+    osoe_progress_close(&p);
+    while (!osoe_progress_closed(&p) && !osoe_deadline_expired(&give_up))
+        if (!osoe_progress_poll(&p))
+            osoe_ring_wait(&ring, UINT64_C(1000000));
+    CHECK(osoe_progress_closed(&p));
+
 done:
     for (uint32_t i = 0; i < peers; i++)
         osoe_wire_close(&wires[i]);
+    osoe_ring_close(&ring);
     osoe_connection_area_close(&area);
     osoe_bootstrap_free(&b);
     return CHECK_DONE();
