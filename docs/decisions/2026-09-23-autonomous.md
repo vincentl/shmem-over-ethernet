@@ -35,10 +35,17 @@ Decisions to confirm or reverse, most consequential first:
 9. What the review left as designed rather than fixed (22): `exit` from the
    agent runs handlers beside a live main thread, and a fatal ends at once
    rather than through the agent.
+10. The third review's open finding (23): a peer's send error on the ending
+    node's reset can end it before its engine reads the goodbye, which its
+    kernel holds. Closing it changes how the wire treats an error in either
+    direction.
 
 After the merge, two adversarial reviews found four bugs in step 4 slice 1,
 and verifying their fixes found a fifth. All five are fixed, verified and
-merged (22).
+merged (22). A third review, of those fixes, found that glibc 2.41's `exit`
+lock left a process whose main thread was inside `exit` to end at the grace,
+unflushed, and four smaller things; those are fixed too, and one transport
+finding is left for you (23).
 
 Found on the way and left as suggested tasks: `progress.c` names every
 `struct osoe_connection *` parameter `conn`, which CLAUDE.md's naming rule
@@ -357,6 +364,75 @@ Kept rather than fixed:
 
 The notes had overclaimed in three places: the one-thread rule, the pidfd's
 part in a prompt abort, and a paused VM. All three now say what is built.
+
+**23. A third reviewer read the fixes (`11faa12`), and found one more bug
+that matters, fixed and merged here, and one it takes a transport change to
+close, left for the author.** Each finding was checked against the code, and
+the first against the VM's glibc, before anything was changed.
+
+- *`exit` holds a lock for good, since glibc 2.41* (BZ 31997; Debian 13's
+  glibc is 2.41). A second thread's `exit` then waits forever: shown in the VM
+  with a two-thread program, which also showed that a handler calling `exit`
+  again on its own thread ends the process with the second status, handlers
+  run and stdio flushed. A PE whose main thread had returned from `main` —
+  in start_pes's finalize, or in the handler for a program that left without
+  finalizing — when a global exit came left its agent's `exit(status)`
+  waiting on it until the grace, 10 s, and the grace's `_exit` lost its
+  buffered output. **Fixed:** the library's atexit handlers mark their thread
+  inside `exit`; that thread waits for the agent's claim, which follows the
+  goodbyes, then calls `exit(status)` again itself, and the agent, seeing the
+  mark, leaves `exit` to it. The exit model gains the case (`exiting`) with
+  exit's lock in it, and fails both ways of getting it wrong: the thread
+  waiting like any other (STUCK) and not waiting for the claim (STATUS: the
+  lead's process ends before its goodbye). Tests: `shmem.global-exit.start-pes`
+  and `.returned`, which end in about 0 and 1.3 s, and at 10 s with the fix
+  undone. *Beside it:* the grace thread now flushes stdout before its `_exit`
+  when no thread holds it, so that a program's own handler in a library wait
+  — which nothing marks, and which still ends at the grace — keeps its
+  output. *To reverse:* revert the commit; the alternative is `fflush` then
+  `_exit` on the marked thread, which skips the handlers still to run.
+- *The goodbye reaches the peer's kernel, not its engine.* Once the ending
+  node resets the connection, a peer still streaming to it gets a send error,
+  stops re-arming its receive and ends on "the connection failed", with the
+  goodbye unread in its kernel whenever its ring had no buffer free for it.
+  **Not fixed** — it wants the wire to keep receiving after a send error until
+  the receive side ends, which changes how the ring and the engine treat an
+  error on either direction, and it has not been seen in any run (the
+  reviewer's reproduction is two wire buffers or a starved CPU). Scoped: the
+  wire has one `error` for both directions (`wire.h`), set by a failed receive
+  and a failed send alike (`ring.c`), and it stops the receive's re-arming,
+  ends the node in `receive()`, and ends it again in `osoe_wire_send`, which
+  every flush calls. So the change is a send error that is a reset
+  (`EPIPE`, `ECONNRESET`) stopping the sends without ending the node, the
+  receive re-armed regardless, and the node judged when the receive side ends
+  — by the goodbye, read or not, and with the send's error in the message if
+  not; any other send error ending the node as now. That is a protocol
+  change of the engine's, which wants `abort_model.py` to carry a send error
+  first. The design notes say so where they describe the wait. *Question for
+  the author* (10 above).
+- *The connection area's first wait never swept*, so a lead dying before
+  sizing the area left its siblings there in a release build, while the
+  notes said init's waits all swept. **Fixed**, and the notes now say which
+  waits check: those after the node's rendezvous. A lead dying inside that
+  rendezvous is still the launcher's to find.
+- *A reset leaves `SIOCOUTQ` above 0 for good*, so a peer that reset the
+  connection held the goodbye's wait for its whole grace. **Fixed:** a closed
+  connection counts as told. The notes now give the bound as it is, twice the
+  grace: the goodbyes', then exit's.
+- *`shmem.global-exit.fatal.nonlead` could not fail on a lost goodbye*, since
+  an end of stream without one also ends a node with the failure. **Fixed:**
+  where the caller's lead speaks for it, every end must name the caller and no
+  node may report a lost goodbye; with no goodbye sent at all it now fails.
+  An immediate exit now requires the caller's own line, which its agent's
+  `exit` flushes.
+- *`shmem.dead-pe.lead-in-init` assumed a lead through its node's rendezvous
+  within one second.* The alarm is now at 3 s, node 1 starts 8 s late, and the
+  launcher's limit is 12 s.
+- *Kept:* neither of the second review's first two fixes is pinned by a test
+  in the four presets — the exit model pins the first, tier 3 the second —
+  and the grace's `alarm` fallback, for a process that cannot start a thread,
+  bounds nothing if the program handles or blocks `SIGALRM`, which the
+  comment now says.
 
 **What step 4 builds on** (surveyed 2026-09-23). The node's abort word
 (`node.h`: `aborting`, `abort_pe`, `abort_status`) is set by

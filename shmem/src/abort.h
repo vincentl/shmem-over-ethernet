@@ -19,7 +19,19 @@
  *   a fatal         _exit with the declarer's status, as a fatal does.
  *
  * Exactly one thread of a process ends it; any other that gets here waits for
- * that to happen.
+ * that to happen - but for a thread already inside exit, running one of the
+ * library's handlers. Since glibc 2.41 (BZ 31997) exit takes a lock it never
+ * gives back, so a second thread's exit waits for good: the agent's exit(s)
+ * would wait on a main thread that returned from main and is in start_pes's
+ * finalize, or in the handler for a program that left without finalizing. Such
+ * a thread ends the process itself, calling exit(s) again once the agent has
+ * sent its goodbyes, and the agent leaves exit to it (osoe_abort_inside_exit).
+ * A program's own handler that is in a library wait when a global exit comes
+ * is not known to be inside exit: its process ends at the grace instead, with
+ * the status, flushing stdout if no thread holds it.
+ *
+ * The goodbyes take OSOE_ABORT_GRACE_SECONDS at most (progress-host.c) before
+ * the grace starts, so a process ends within twice that of the abort.
  */
 #ifndef OSOE_ABORT_H
 #define OSOE_ABORT_H
@@ -34,9 +46,6 @@ enum { OSOE_ABORT_GRACE_SECONDS = 10 };
 /* Whether the node has aborted: one acquire load, for the agent's loop. */
 bool osoe_abort_pending(void);
 
-/* Whether this process is ending because of an abort. */
-bool osoe_abort_ending(void);
-
 /*
  * For the library's own exit paths - shmem_finalize, and its atexit handlers -
  * while an abort ends this process: they run no collective then, since the
@@ -49,6 +58,13 @@ bool osoe_abort_ending(void);
  * ending the process.
  */
 bool osoe_abort_stand_aside(void);
+
+/*
+ * Says that this thread is inside exit: called first by the library's atexit
+ * handlers, whose thread, if an abort ends the process, ends it itself rather
+ * than wait for a thread whose exit would wait on it.
+ */
+void osoe_abort_inside_exit(void);
 
 /* End this process as the node's abort says. */
 _Noreturn void osoe_abort_end(void);

@@ -27,12 +27,14 @@
 #include <pshmem.h>
 #include <shmem.h>
 
+#include "abort.h"
 #include "export.h"
 
 static bool started;
 
 static void finalize_at_exit(void)
 {
+    osoe_abort_inside_exit();
     pshmem_finalize();              /* stands aside on an abort's exit (abort.h) */
 }
 

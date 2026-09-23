@@ -144,6 +144,7 @@ SHMEM_VENDOR_STRING " environment variables\n"
  */
 static void exit_without_finalize(void)
 {
+    osoe_abort_inside_exit();
     /* osoe_initialized, not refcount, which the mutex guards: this may run on
      * the agent, ending the process while the main thread is still finishing
      * shmem_init; and init_pid only once that acquire load has found it set,
@@ -151,18 +152,13 @@ static void exit_without_finalize(void)
     if (atomic_load_explicit(&osoe_initialized, memory_order_acquire) == 0 ||
         getpid() != init_pid || osoe_abort_stand_aside())
         return;
-    /* A global exit already declared is what this exit is part of: the agent
-     * ends the process with its status (abort.h), and this thread, inside exit
-     * already, waits for that rather than call exit again. */
+    /* A global exit already declared is what this exit is part of: it ends
+     * the process with its status, and this thread, inside exit, is the one to
+     * end it once the agent has told the other nodes (abort.h). */
     uint32_t pe;
     int status;
-    if (osoe_node_abort_read(&osoe.node, &pe, &status) == OSOE_ABORT_GLOBAL_EXIT) {
-        if (osoe_agent_speaks())
-            for (;;)
-                pause();
-        fflush(NULL);
-        _exit(status);
-    }
+    if (osoe_node_abort_read(&osoe.node, &pe, &status) == OSOE_ABORT_GLOBAL_EXIT)
+        osoe_abort_end();
     fflush(NULL);
     char msg[256];
     int n = snprintf(msg, sizeof msg, "osoe: PE %u: the process exited without calling "
@@ -356,7 +352,8 @@ OSOE_API void pshmem_finalize(void)
     /* A process ending on an abort runs no collective on the way out: a
      * program's own atexit(shmem_finalize) would wait for PEs that are
      * exiting (abort.h; the rule of conformance F1). Only the thread ending the
-     * process returns; any other waits for that end here. */
+     * process returns; any other waits for that end here - or, inside exit,
+     * ends the process itself (abort.h). */
     if (osoe_abort_stand_aside())
         return;
     pthread_mutex_lock(&lifecycle);

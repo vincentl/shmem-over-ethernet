@@ -288,7 +288,15 @@ bool osoe_wire_ended(const struct osoe_wire *w)
 bool osoe_wire_unacknowledged(const struct osoe_wire *w)
 {
     int queued = 0;
-    return w->fd >= 0 && ioctl(w->fd, SIOCOUTQ, &queued) == 0 && queued > 0;
+    if (w->fd < 0 || ioctl(w->fd, SIOCOUTQ, &queued) != 0 || queued == 0)
+        return false;
+    /* A reset purges the send queue without moving what SIOCOUTQ subtracts,
+     * so it never reads 0 after one: a closed connection has nothing more to
+     * be acknowledged. */
+    struct tcp_info info;
+    socklen_t len = sizeof info;
+    return getsockopt(w->fd, IPPROTO_TCP, TCP_INFO, &info, &len) != 0 ||
+           info.tcpi_state != TCP_CLOSE;
 }
 
 void osoe_wire_close(struct osoe_wire *w)

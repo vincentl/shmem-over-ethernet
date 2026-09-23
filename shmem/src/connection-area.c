@@ -248,6 +248,7 @@ again:;
         struct osoe_stall_watch watch;
         osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         struct timespec back = { 0, 200000 };
+        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         for (;;) {
             char err[256];
             fd = osoe_shm_open_ours(a->name, err, sizeof err);
@@ -262,6 +263,12 @@ again:;
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not created %s",
                            (unsigned long long)osoe_stall_watch_seconds(&watch), a->name);
+            /* §4.10: every wait sweeps - a local lead that died before sizing
+             * the area would leave its siblings here for good. */
+            if (osoe_deadline_expired(&sweep)) {
+                osoe_sweep_expired("shmem_init");
+                sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+            }
             nanosleep(&back, NULL);
             if (back.tv_nsec < 10000000)
                 back.tv_nsec *= 2;
@@ -349,8 +356,8 @@ again:;
             }
             struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_futex_wait(&h->ready, 0, &sweep, OSOE_FUTEX_SHARED);
-            /* §4.10: every wait sweeps, and this one had not - a local lead that
-             * died before creating the area left its siblings here forever. */
+            /* §4.10: every wait sweeps - a local lead that died before
+             * finishing the area would leave its siblings here for good. */
             if (osoe_deadline_expired(&sweep))
                 osoe_sweep_expired("shmem_init");
             if (osoe_stall_watch_stalled(&watch, 0))
