@@ -12,8 +12,9 @@ There is no git remote, so every merge here is local and nothing was pushed.
 ## Where things stand, and what needs you
 
 On main: step 3 slice 2 (36b05fe), the osoe-stat branch (a0cded6), the test
-review (fd7c07e), step 4 slice 1 (92309a7) and the fixes its review found
-(9d9251e), with this log and the second slice's brief among them. On branch `phase1-step4-slice2`, not merged: the
+review (fd7c07e), step 4 slice 1 (92309a7), the fixes its review found
+(9d9251e) and those a third review then found (567d02f), with this log and the
+second slice's brief among them. On branch `phase1-step4-slice2`, not merged: the
 heap-base shift (its Part A). Nothing was pushed; there is no remote.
 
 Decisions to confirm or reverse, most consequential first:
@@ -31,7 +32,9 @@ Decisions to confirm or reverse, most consequential first:
 7. Slurm: where to capture fixtures, and building the Slurm path they need,
    which does not exist yet (19, 20).
 8. Merging the second slice's Part A alone, or waiting for the rest. Its
-   branch is on today's main, and verified there.
+   branch is on main as of `e7ecfb9`, and verified there; it merges cleanly
+   onto today's main (`567d02f`), which touches `init.c` and the tests'
+   `CMakeLists.txt` as it does, but was not verified on it.
 9. What the review left as designed rather than fixed (22): `exit` from the
    agent runs handlers beside a live main thread, and a fatal ends at once
    rather than through the agent.
@@ -44,8 +47,8 @@ After the merge, two adversarial reviews found four bugs in step 4 slice 1,
 and verifying their fixes found a fifth. All five are fixed, verified and
 merged (22). A third review, of those fixes, found that glibc 2.41's `exit`
 lock left a process whose main thread was inside `exit` to end at the grace,
-unflushed, and four smaller things; those are fixed too, and one transport
-finding is left for you (23).
+unflushed, and four smaller things; those are fixed and merged too
+(`567d02f`), and one transport finding is left for you (23).
 
 Found on the way and left as suggested tasks: `progress.c` names every
 `struct osoe_connection *` parameter `conn`, which CLAUDE.md's naming rule
