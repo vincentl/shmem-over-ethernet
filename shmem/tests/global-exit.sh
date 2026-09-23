@@ -7,11 +7,14 @@
 # been killed or to have outlasted its computing, and, for a global exit, every
 # rank's unflushed line to have been written by exit's flush (§9.1.6). MAP is
 # the node map, or - for one node. -k leaves the survivors to the library.
+# WRAP, if set, is a command the launcher runs under: tier 3 runs it through
+# tools/launch/tier3.sh, so that each node has a network namespace and a shaped
+# link of its own (shmem/tests/CMakeLists.txt).
 LAUNCHER=$1 PROGRAM=$2 RANKS=$3 MAP=$4 HOW=$5 STATUS=$6
 if [ "$MAP" = - ]; then
-    out=$("$LAUNCHER" -n "$RANKS" -t 60 -k -- "$PROGRAM" "$HOW" 2>&1)
+    out=$(${WRAP:-} "$LAUNCHER" -n "$RANKS" -t 60 -k -- "$PROGRAM" "$HOW" 2>&1)
 else
-    out=$("$LAUNCHER" -n "$RANKS" -m "$MAP" -t 60 -k -- "$PROGRAM" "$HOW" 2>&1)
+    out=$(${WRAP:-} "$LAUNCHER" -n "$RANKS" -m "$MAP" -t 60 -k -- "$PROGRAM" "$HOW" 2>&1)
 fi
 echo "$out"
 exited=$(printf '%s\n' "$out" | grep -c "exited with status $STATUS\$")

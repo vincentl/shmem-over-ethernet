@@ -1628,9 +1628,9 @@ form for a fatal with something to publish, and `shmem.fatal-order` and
 **A fatal declares the node's abort**, and every wait reads the abort word at its
 next sweep in every build — only the liveness polling is the development
 watchdog. So the other PEs of a node stop within a sweep of the first fatal. A
-remote node cannot see another node's abort word: it sees the failure only when
-something it waits on stops moving, until §7.1 step 4's abort flood carries the
-word between nodes.
+remote node cannot see another node's abort word: it learns of the abort from
+the abortive goodbye on its connection to that node (as built, below), or, from
+a node that died, as an end of stream without one.
 
 The first build had a fatal deadline instead: `OSOE_BOOTSTRAP_TIMEOUT`, 60 s,
 meant for rendezvous but also bounding every internode wait. A legitimate 150 s
@@ -1648,7 +1648,8 @@ The policy is right; an earlier draft lacked **detection and propagation**:
 - **`shmem_global_exit(status)`** (§9.1.6) must terminate every PE "regardless of
   their current execution state" — including PEs deep in computation that never
   call the library.
-  1. The calling PE's lead floods an abort AM to every node.
+  1. The calling PE's lead sends the abort to every node — as built, as an
+     abortive goodbye on every open connection, not along the tree (below).
   2. Each lead sets an **abort word** in its node segment and wakes every local
      agent.
   3. Each agent calls `exit(status)` in its own process (§3.12), so the status
@@ -1705,6 +1706,37 @@ a lead, before its agent could tell the other nodes. `abort_exit_model.py`
 checks this ordering: every process ends, each with a status a caller gave, and
 each of these rules broken fails it.
 
+*As built: the abort crosses nodes* (phase 1 step 4 slice 1, part A;
+`abort_model.py`). A lead whose node aborts sends, on every open connection, an
+**abortive goodbye**: a last segment flagged `OSOE_AM_SEGMENT_GOODBYE` that
+carries one `OSOE_AM_ABORT` message — the rank, the status and the disposition —
+after finishing the segment already on the wire, so the peer's stream stays
+whole, and then it ends its stream. A peer reads it before the end of stream it
+precedes, so that end of stream is the job ending, not a death; the peer
+declares its own node's abort with the same rank, status and disposition — the
+first declarer wins — and its lead does the same in turn. The model put two
+designs to it. Sent along the world team's tree — O(k) a node, O(log N) hops —
+the abort loses the status: the eager mesh already carries a death in one hop,
+as an end of stream without a goodbye, and a node that reads a dying node's end
+of stream before the tree's message reaches it ends with a failure where
+`shmem_global_exit`'s caller gave a status. The abortive goodbye is read first
+by construction. It costs O(open connections) a node, once: the eager mesh's N,
+which is what a normal goodbye costs too, and O(k + active peers) with on-demand
+connections (§6.2), which still reach every node through the tree's own
+connections. At 4,096 nodes that is 4,095 segments of 56 bytes from each lead. A
+connection with nobody to tell is skipped: one whose normal goodbye has gone,
+whose peer died, or whose peer's own abortive goodbye has arrived — and a peer
+whose abortive goodbye has arrived is sent nothing more of the job's, since its
+exit may already have reset the connection. From the moment the engine aborts, a
+failed connection or an end of stream without a goodbye is a peer that is ending
+too, not a fatal. The send is bounded by `OSOE_ABORT_GRACE_SECONDS`: a peer
+stopped with a full receive window could hold the bytes forever, and this
+process is ending either way; a peer told nothing takes its end of stream for a
+death. The one new message kind is `OSOE_AM_ABORT` (§3.13's table, and so its
+checksum). An abort during §6.4's close needs no abortive goodbye, the model
+found: after the final barrier no PE can call `shmem_global_exit`, and a fatal's
+status is a failure anyway.
+
 #### The development watchdog
 
 > **A development aid, not the release path: on in the `debug`, `asan` and `tsan`
@@ -1739,9 +1771,10 @@ do:
   a pidfd per local PE is step 4's answer.
 - **No cross-node detection.** One node's PEs check one node's pids. A vanished
   peer node is TCP keepalive's business, and there is no TCP yet.
-- **No `shmem_global_exit` and no abort flood.** The abort word is written and
-  read within one node by whichever PE noticed. `global_exit` (§9.1.6) needs the
-  agent-calls-`exit` path above and an AM to carry the abort between nodes.
+- **No `shmem_global_exit` and no abort between nodes.** The watchdog writes the
+  abort word within one node and reads it there. Carrying it further is the
+  library's in every build since step 4: the agent ends its PE, and the abortive
+  goodbye crosses nodes (above).
 - **Not during rendezvous.** The bootstrap waits carry a `failed` word and the
   no-progress rule above, and run before the slots a liveness check would read
   are all published.
@@ -4565,6 +4598,11 @@ Things to get right, each of which is a silent bug otherwise:
   over three nodes with an interior one, trapped-state check on; a goodbye that
   does not wait for the drain strands a child, a FIN without a goodbye trips the
   dead-peer check, and a close before the peer's FIN sends into a reset.
+  **A lead whose node aborts ends each stream with an abortive goodbye instead**
+  (§3.15, as built; `abort_model.py`): the same flag on a segment that carries
+  one `OSOE_AM_ABORT`, sent without waiting for the drain, since the job's own
+  traffic has stopped. A peer takes the end of stream after it for the job
+  ending, not a death, and ends with the status it carried.
 - **A child created by `fork()`** after init inherits the mappings but no agent
   threads (§3.12). It must not call OpenSHMEM, and teardown code compares the
   current pid with the initializing pid and does nothing in a child.
@@ -5615,6 +5653,13 @@ Assert what can be asserted. Instrument the rest.
     after the peer's stream has ended.** (§6.4) Dropping each strands a child
     waiting for its release, makes a finished peer look dead, or resets a
     connection the peer is still sending on (`close_model.py`).
+36. **A lead whose node aborts sends its abortive goodbye on every connection
+    that still has someone to tell before its process ends, and while its agent
+    runs, nothing but the agent ends that process.** (§3.15) Sent any slower -
+    along the tree - or after the process has ended, the goodbye loses the race
+    with the end of stream it should precede, and a node that reads the end of
+    stream first ends with a failure where a caller of `shmem_global_exit` gave a
+    status (`abort_model.py`, `abort_exit_model.py`).
 
 ## 10. Open Questions
 

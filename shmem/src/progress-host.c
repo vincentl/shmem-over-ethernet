@@ -15,6 +15,7 @@
 #include "base/futex.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
+#include "abort.h"
 #include "am-state.h"
 #include "connection-area.h"
 #include "fatal.h"
@@ -95,6 +96,18 @@ static void release(void *context, uint32_t team, uint32_t epoch)
 {
     (void)context;
     osoe_internode_released(team, epoch);
+}
+
+/* A peer's abortive goodbye (progress.h): this node aborts too, on behalf of
+ * the same PE and with the same status and disposition - unless it already has,
+ * and then the first declaration stands (node.c) - and its agent, woken by the
+ * declaration, tells its own peers and ends (abort.h). */
+static void abort_arrived(void *context, uint32_t pe, int32_t status, uint32_t disposition)
+{
+    (void)context;
+    osoe_node_declare_abort(&osoe.node, pe, status,
+                            disposition == OSOE_ABORT_GLOBAL_EXIT ? OSOE_ABORT_GLOBAL_EXIT
+                                                                  : OSOE_ABORT_FATAL);
 }
 
 /* ---- waking the engine (§3.12) ------------------------------------------ */
@@ -232,7 +245,7 @@ void osoe_progress_host_start(uint32_t session)
     osoe_wires_open(osoe_am.wire, &osoe_am.ring, &osoe.bootstrap, session, &mesh);
     free(peers_address);
 
-    struct osoe_progress_host host = { resolve, landing, notify, release, NULL };
+    struct osoe_progress_host host = { resolve, landing, notify, release, NULL, abort_arrived };
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, &osoe_am.ring,
                        osoe_am.descriptor, descriptors, osoe_am.scratch,
                        (uint32_t)osoe_am.area.chunk_bytes, &host);
@@ -338,6 +351,30 @@ static void close_connections(void)
     for (uint32_t slot = 0; slot < peers; slot++)
         osoe_wire_close(&osoe_am.wire[slot]);
     osoe_ring_close(&osoe_am.ring);
+}
+
+/*
+ * The job is ending: tell every peer - an abortive goodbye on each connection
+ * that still has someone to tell - before this process ends (abort.h). Bounded
+ * by OSOE_ABORT_GRACE_SECONDS, since a peer that is stopped with a full receive
+ * window could hold the bytes forever, and this process is ending either way:
+ * a peer told nothing takes its end of stream for a death, which is what it is
+ * for that peer. Called on the agent thread, whose ring this is.
+ */
+void osoe_progress_host_abort(void)
+{
+    if (!osoe_am.internode || !osoe_am.lead)
+        return;
+    uint32_t pe = 0;
+    int status = EXIT_FAILURE;
+    enum osoe_abort_disposition how = osoe_node_abort_read(&osoe.node, &pe, &status);
+    if (!osoe_am.ring.enabled)
+        osoe_ring_enable(&osoe_am.ring);
+    osoe_progress_abort(&osoe_am.progress, pe, status, (uint32_t)how);
+    struct osoe_deadline grace = osoe_deadline_in(UINT64_C(1000000000) * OSOE_ABORT_GRACE_SECONDS);
+    while (!osoe_progress_aborted(&osoe_am.progress) && !osoe_deadline_expired(&grace))
+        if (!osoe_progress_poll(&osoe_am.progress))
+            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
 }
 
 void osoe_progress_host_exit(void)

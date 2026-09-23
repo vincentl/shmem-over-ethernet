@@ -18,6 +18,7 @@
 
 static pthread_t agent;
 static _Atomic uint32_t stop_requested;     /* process-private */
+static _Atomic uint32_t running;            /* process-private: started, not yet joined */
 /*
  * Set once the agent has claimed its counter block, and waited for by
  * osoe_agent_start before it returns.
@@ -67,11 +68,14 @@ static void *agent_main(void *arg)
          * wakes them in local-id order, the lead's first, but its own agent can
          * see the word and end its process before it has woken the rest; the
          * lead's agent, woken first, is the one that closes that gap for all of
-         * them, at O(L) once per node.
+         * them, at O(L) once per node. Then the backend tells the network what
+         * only it can - on AM, the lead's abortive goodbye to every peer - and
+         * only then does the process end, since its end closes the sockets.
          */
         if (osoe_abort_pending()) {
             if (slot == &osoe.node.slots[0])
                 osoe_node_wake_agents(&osoe.node);
+            osoe_transport_agent_abort();
             osoe_abort_end();
         }
         /*
@@ -106,6 +110,12 @@ static void *agent_main(void *arg)
     return NULL;
 }
 
+bool osoe_agent_speaks(void)
+{
+    return atomic_load_explicit(&running, memory_order_acquire) &&
+           !pthread_equal(pthread_self(), agent);
+}
+
 void osoe_agent_start(struct osoe_pe_slot *slot)
 {
     atomic_store_explicit(&stop_requested, 0, memory_order_release);
@@ -126,6 +136,7 @@ void osoe_agent_start(struct osoe_pe_slot *slot)
     pthread_sigmask(SIG_SETMASK, &old, NULL);
     if (r != 0)
         osoe_fatal("cannot start the agent thread: %s", strerror(r));
+    atomic_store_explicit(&running, 1, memory_order_release);
 
     /* Wait for it to be in the metric table before anyone can look (above). */
     struct osoe_deadline until = osoe_deadline_in(OSOE_SWEEP_NS * 100);
@@ -146,4 +157,5 @@ void osoe_agent_stop(struct osoe_pe_slot *slot)
     int r = pthread_join(agent, NULL);
     if (r != 0)
         osoe_fatal("cannot join the agent thread: %s", strerror(r));
+    atomic_store_explicit(&running, 0, memory_order_release);
 }

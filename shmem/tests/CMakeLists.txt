@@ -957,8 +957,10 @@ endforeach()
 # with the status - the caller's, or a fatal's failure - no rank may be killed
 # by the launcher or outlast its computing, and for a global exit every rank's
 # unflushed stdout must have been written (§9.1.6). See global-exit.sh. Across
-# nodes a fatal already travels as the lead's end of stream, which a peer takes
-# for a death; a global exit's status does not, and waits for the abort message.
+# nodes a fatal travels as the lead's end of stream, which a peer takes for a
+# death; a global exit's status travels as the abortive goodbye before it
+# (abort_model.py), and a remote rank that left with the failure status instead
+# fails these.
 add_executable(shmem_test_global-exit test-global-exit.c)
 target_link_libraries(shmem_test_global-exit PRIVATE osoe)
 osoe_warnings(shmem_test_global-exit)
@@ -976,10 +978,13 @@ foreach(map 0,1 0,0,1,1 0,1,2,0,1,0)
   string(REPLACE "," ";" ranks "${map}")
   list(LENGTH ranks count)
   string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.global-exit.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
   add_test(NAME shmem.global-exit.fatal.${label}
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
             $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} fatal 1)
-  set_tests_properties(shmem.global-exit.fatal.${label}
+  set_tests_properties(shmem.global-exit.${label} shmem.global-exit.fatal.${label}
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endforeach()
 
@@ -1143,10 +1148,11 @@ endforeach()
 # and all three of §3.11's waits through two reply credits and a 2 KiB buffer;
 # the AM barrier; a reply that full buffers must not starve; the tree at depth
 # three and at thirteen uneven nodes; the rendezvous, against the namespaces'
-# host list; the differential over §8.1's four poles; and the floor, which
-# measures the library on the shaped link. Left out are the tests that never
-# reach a socket, and those whose subject is a PE that dies or stops rather
-# than the link.
+# host list; the differential over §8.1's four poles; the floor, which
+# measures the library on the shaped link; and a global exit, whose status
+# reaches the other nodes only as the abortive goodbye on the link (§3.15).
+# Left out are the tests that never reach a socket, and those whose subject is
+# a PE that dies or stops rather than the link.
 option(OSOE_TIER3 "register the tier-3 tests, which need passwordless sudo" OFF)
 if(OSOE_TIER3 AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
   message(FATAL_ERROR "OSOE_TIER3: the multi-node data-path tests do not run under "
@@ -1195,6 +1201,20 @@ if(OSOE_TIER3)
     osoe_tier3_test(job.0-1-2-3 ${shape} 0,1,2,3 shmem_test_job)
     # A 64 MiB stream: at 1 Gbit/s the default gigabyte takes nine seconds a trial.
     osoe_tier3_test(floor ${shape} 0,1 shmem_test_floor ARGS 64)
+    foreach(map 0,1 0,1,2,0,1,0)
+      string(REPLACE "," ";" ranks "${map}")
+      list(LENGTH ranks count)
+      list(REMOVE_DUPLICATES ranks)
+      list(LENGTH ranks nodes)
+      string(REPLACE "," "-" label "${map}")
+      string(REPLACE ";" " " wrap "${osoe_tier3};${shape};${nodes};--")
+      add_test(NAME tier3.${shape}.global-exit.${label}
+        COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+                sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+                $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
+      set_tests_properties(tier3.${shape}.global-exit.${label}
+        PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    endforeach()
     add_test(NAME tier3.${shape}.differential
       COMMAND ${CMAKE_COMMAND}
               "-DWRAP=${osoe_tier3};${shape}"

@@ -296,7 +296,7 @@ int main(void)
     static unsigned char scratch[SCRATCH];
     static struct osoe_progress_connection connections[1];
     static uint64_t busy[1];
-    struct osoe_progress_host host = { resolve, landing, notify, release, NULL };
+    struct osoe_progress_host host = { resolve, landing, notify, release, NULL, NULL };
     struct osoe_progress p;
     osoe_progress_init(&p, &area, &wire, &ring, descriptors, DESCRIPTORS, scratch, SCRATCH,
                        &host);

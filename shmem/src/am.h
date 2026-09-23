@@ -61,6 +61,14 @@ enum osoe_am_handler {
      */
     OSOE_AM_BARRIER_ARRIVE,
     OSOE_AM_BARRIER_RELEASE,
+    /*
+     * The job is ending (§3.15; phase 1 step 4): the one message of the last
+     * segment a dying lead sends on a connection, flagged as its goodbye - an
+     * abortive goodbye. The peer reads it before the end of stream it precedes,
+     * so it knows the stream ends because the job does, and with which status,
+     * where a bare end of stream is a death (abort_model.py).
+     */
+    OSOE_AM_ABORT,
     OSOE_AM_HANDLER_COUNT
 };
 
@@ -133,7 +141,16 @@ struct osoe_am_barrier {
     uint32_t reserved;
 };
 
+/* The job is ending: who ended it, how, and the status every PE leaves with. */
+struct osoe_am_abort {
+    uint32_t origin_pe;         /* the world rank the abort names */
+    int32_t status;
+    uint32_t disposition;       /* 1 a fatal, 2 a global exit (node.h's enum) */
+    uint32_t reserved;
+};
+
 _Static_assert(sizeof(struct osoe_am_put) % 8 == 0, "a fixed part must keep the payload 8-byte aligned");
+_Static_assert(sizeof(struct osoe_am_abort) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_barrier) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_get_request) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_get_reply) % 8 == 0, "as above");

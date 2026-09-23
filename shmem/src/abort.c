@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "abort.h"
+#include "agent.h"
 #include "state.h"
 
 static _Atomic uint32_t ending;         /* process-private: a thread is ending it */
@@ -34,6 +35,13 @@ static void *grace(void *unused)
 
 _Noreturn void osoe_abort_end(void)
 {
+    /* While this PE's agent runs, it ends the process: it may have the network
+     * to tell first (osoe_transport_agent_abort), and a process that another
+     * thread ended would take the agent with it, untold. It was woken when the
+     * word was set, and looks at it every turn. */
+    if (osoe_agent_speaks())
+        for (;;)
+            pause();
     uint32_t pe = 0;
     int status = EXIT_FAILURE;
     enum osoe_abort_disposition how = osoe_node_abort_read(&osoe.node, &pe, &status);
