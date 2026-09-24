@@ -14,8 +14,10 @@ of specification Tables 6–8, the C11 type-generic interfaces of both, the
 point-to-point waits and tests including the multiple-element forms,
 signalling operations, memory ordering, `shmem_barrier_all`, `shmem_sync_all`
 and `shmem_team_sync`, the team-based reductions of every operator and type of
-specification Table 10 and broadcast, with their C11 interfaces,
-`shmem_global_exit`, and the mandatory surface of §7.4
+specification Table 10 and broadcast, with their C11 interfaces, the deprecated
+active-set forms - the `_to_all` reductions of Table 11, `shmem_broadcast32` and
+`64`, `shmem_barrier` and `shmem_sync` - over the whole job, which is the only
+active set they accept, `shmem_global_exit`, and the mandatory surface of §7.4
 including the `pshmem_` profiling interface. A PE or a node that dies ends the
 whole job (§3.15).
 

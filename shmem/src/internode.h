@@ -267,7 +267,10 @@ void osoe_internode_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t c
  * `buffer` holds the `bytes` the root's node held on entry. `root_index` is the
  * root's node's position in the node set the team was registered with
  * (osoe_internode_team) - addressing stays by team. On other nodes `buffer`'s
- * contents on entry are not read. Called as osoe_internode_reduce is.
+ * contents on entry are not read; on the root's node `buffer` is only read,
+ * never written - it may be the root's own source, when a deprecated broadcast
+ * leaves the root's dest alone (collectives.c). Called as osoe_internode_reduce
+ * is.
  */
 void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index, void *buffer,
                               size_t bytes, const char *routine);

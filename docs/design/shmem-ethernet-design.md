@@ -5024,9 +5024,11 @@ machinery. The review's order is adopted.
    *The first slice has reductions and broadcast on the teams that exist, with
    `OSOE_REGION_INTERNAL` built for their internode phase (§5.5, §5.8, as
    built). The second puts that phase behind `internode.h`, with the generic
-   implementation every backend may call (§5.8). collect, fcollect, alltoall and
-   alltoalls follow, each with the design §5.5 says it needs first, and each
-   crossing the same seam.*
+   implementation every backend may call (§5.8). The third gives the deprecated
+   active-set routines - `_to_all`, `broadcast32`/`64`, `shmem_barrier` and
+   `shmem_sync` - over the whole job, the only active set they accept (§7.4).
+   collect, fcollect, alltoall and alltoalls follow, each with the design §5.5
+   says it needs first.*
 
 Symmetric statics and the compiler wrapper follow step 5 (§7.4).
 
@@ -5112,7 +5114,7 @@ it.
 | `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1, and not stubs. Every PE of an osoe job runs the same executable by construction, so `pe_accessible` is whether `pe` names a PE of this job. `addr_accessible` additionally requires the address to be in the symmetric heap, so a static or automatic address answers 0 — the known non-conformance below, stated by the query rather than discovered at the first put |
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
 | Name-shifted deprecated routines | §10 item 1 wants a `pshmem_` entry point for every function | **Not done**, and recorded as known non-conformance below: the spec does not say how to shift a name that never had a `shmem_` prefix, and guessing wrong helps nobody |
-| Deprecated active-set constants (F.2.8) | `SHMEM_SYNC_VALUE` and the `pSync` sizes | Step 1: **the constants, and not the routines that take them.** A program that declares `static long pSync[SHMEM_BARRIER_SYNC_SIZE]` must compile; a program that then calls `shmem_barrier(...)` must fail at the link rather than reach a routine whose machinery — active sets, `pSync` ownership, the reuse rules — does not exist. A wrong answer is worse than a missing symbol |
+| Deprecated active-set constants (F.2.8) and routines | `SHMEM_SYNC_VALUE` and the `pSync` sizes; `shmem_barrier`, `shmem_sync`, `shmem_broadcast32`/`64`, the `_to_all` reductions of Table 11 | The constants at step 1. **The routines at step 5, over the whole job and nothing else** (the author's decision of 2026-09-24, so that the corpus runs): an active set of every PE - `PE_start` 0, `logPE_stride` 0, `PE_size` the job's - is the world team, and any other ends the job by name. Step 1 had refused the routines at the link, on the grounds that a wrong answer is worse than a missing symbol; that still holds, and a named refusal at run time is neither. It is the active set every corpus program that still calls these passes (ISx, PRK, bale and hclib's copies), where forming a group for an arbitrary set of PEs is machinery osoe does not have. `pSync` and `pWrk` are neither read nor written, which leaves `pSync` as the spec requires it to be found afterwards and makes the reuse rules hold trivially. `broadcast32`/`64` leave the root's own `dest` alone, as the spec says; when the root is its node's lead, the node's copy is the root's `source`, read by the internode phase and the copy-outs and never written (`collectives.c`). collect, fcollect and alltoall's active-set forms follow their team forms, under the same rule |
 | `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TRANSPORT_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
 
 **Known non-conformance: the deprecated routines have no name-shifted entry
@@ -5144,7 +5146,8 @@ together, immediately after step 4.
 ### 7.5 Deferred (mechanical)
 
 collect/fcollect/alltoall/alltoalls, locks. *(Reductions and broadcast are
-built: §7.1 step 5, §5.5 as built.)*
+built, and the deprecated active-set routines over the whole job: §7.1 step 5,
+§5.5 as built, §7.4.)*
 
 **RMA's full type/operation cross product, strided transfers and nonblocking
 variants are implemented** (§9.6, §9.8.3-§9.8.4): every standard RMA type of

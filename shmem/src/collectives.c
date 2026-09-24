@@ -68,11 +68,12 @@ static uint32_t root_index(const struct osoe_team *t, int root_rank, const char 
 
 /*
  * One data collective on `t`: a reduction if `reduction` is given, else a
- * broadcast from team rank `root`. §5.5, as the file's comment walks through.
+ * broadcast from team rank `root`, which leaves the root's own dest alone if
+ * `root_keeps_dest`. §5.5, as the file's comment walks through.
  */
 static int data_collective(const char *routine, shmem_team_t team, void *dest,
                            const void *source, size_t nelems, size_t width,
-                           const struct reduction *reduction, int root)
+                           const struct reduction *reduction, int root, bool root_keeps_dest)
 {
     struct osoe_team *t = osoe_team_of(routine, team);
     if (!t)
@@ -86,6 +87,8 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
     uint64_t dest_offset = osoe_symmetric_offset(routine, dest, bytes);
     uint64_t source_offset = osoe_symmetric_offset(routine, source, bytes);
     int root_rank = root >= 0 ? osoe_team_to_world(t, root) : -1;
+    /* A deprecated broadcast's root keeps its dest as it was (broadcast.c). */
+    bool keep_mine = root_keeps_dest && (uint32_t)root_rank == osoe.job.me;
 
     uint32_t k = *t->epoch, d = *t->data_epoch, members = t->local_members;
 
@@ -93,7 +96,7 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
      * result, and it touches none of the node-wide counters - they belong to
      * the node's team, not to this one, as for its sync (barrier.c). */
     if (t->singleton) {
-        if (source != dest)
+        if (source != dest && !keep_mine)
             memmove(dest, source, bytes);
         *t->epoch = k + 1;
         *t->data_epoch = d + 1;
@@ -102,6 +105,15 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
     }
 
     bool lead = osoe.bootstrap.local_id == 0;
+    /*
+     * Where this node's copy of the result is: the lead's dest - or, when a
+     * deprecated broadcast's root is the lead itself, whose dest must stay as
+     * it was, the lead's source, which already holds the data and which the
+     * internode phase and the members' copy-outs only read.
+     */
+    bool lead_keeps_dest = root_keeps_dest && root_rank >= 0 &&
+                           osoe_node_local_id(&osoe.node, (uint32_t)root_rank) == 0;
+    uint64_t result_offset = lead_keeps_dest ? source_offset : dest_offset;
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
 
     /*
@@ -115,7 +127,7 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
 
     if (lead) {
         osoe_epoch_wait_eq(t->arrived, (k + 1) * members, routine);
-        unsigned char *accumulator = dest;
+        unsigned char *accumulator = (unsigned char *)osoe.node.heap_of[0] + result_offset;
         if (reduction) {
             /* In place, the lead's source already is its dest. */
             if (source != dest)
@@ -124,7 +136,7 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
                 reduction->combine(accumulator,
                                    (const unsigned char *)osoe.node.heap_of[m] + source_offset,
                                    nelems);
-        } else {
+        } else if (!lead_keeps_dest) {
             int32_t root_local = osoe_node_local_id(&osoe.node, (uint32_t)root_rank);
             if (root_local >= 0 &&
                 !((uint32_t)root_local == osoe.bootstrap.local_id && source == dest))
@@ -149,7 +161,8 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
             osoe_epoch_wait_eq(t->copied, (d + 1) * (members - 1), routine);
     } else {
         osoe_epoch_wait_eq(t->released, k + 1, routine);
-        memcpy(dest, (const unsigned char *)osoe.node.heap_of[0] + dest_offset, bytes);
+        if (!keep_mine)
+            memcpy(dest, (const unsigned char *)osoe.node.heap_of[0] + result_offset, bytes);
         if (osoe_epoch_release_bump_eq(t->copied, (d + 1) * (members - 1)))  /* stamped: as arrived */
             osoe_epoch_wake_all(t->copied);
     }
@@ -169,13 +182,27 @@ int osoe_reduce(const char *routine, shmem_team_t team, void *dest, const void *
     if (!r.combine)
         osoe_fatal("%s: no reduction %d over elements of kind %d and width %u", routine,
                    (int)operation, (int)element.kind, element.width);
-    return data_collective(routine, team, dest, source, nelems, element.width, &r, -1);
+    return data_collective(routine, team, dest, source, nelems, element.width, &r, -1, false);
 }
 
 int osoe_broadcast(const char *routine, shmem_team_t team, void *dest, const void *source,
-                   size_t nelems, size_t width, int root)
+                   size_t nelems, size_t width, int root, bool root_keeps_dest)
 {
     if (root < 0)
         osoe_fatal("%s: PE_root %d is not a PE number", routine, root);
-    return data_collective(routine, team, dest, source, nelems, width, NULL, root);
+    return data_collective(routine, team, dest, source, nelems, width, NULL, root,
+                           root_keeps_dest);
+}
+
+void osoe_active_set_whole_job(const char *routine, int PE_start, int logPE_stride,
+                               int PE_size)
+{
+    int npes = (int)osoe.bootstrap.world_size;
+    if (PE_start == 0 && PE_size == npes && logPE_stride >= 0 &&
+        (logPE_stride == 0 || PE_size == 1))
+        return;
+    osoe_fatal("%s: the active set (PE_start %d, logPE_stride %d, PE_size %d) is not the "
+               "whole job of %d PEs, and osoe runs the deprecated active-set routines over "
+               "the whole job only (design §7.4)", routine, PE_start, logPE_stride, PE_size,
+               npes);
 }

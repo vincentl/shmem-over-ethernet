@@ -116,6 +116,8 @@ void pshmem_ctx_pe_quiet(shmem_ctx_t ctx, const int *target_pes, size_t npes);
 void pshmem_barrier_all(void);
 void pshmem_sync_all(void);
 int pshmem_team_sync(shmem_team_t team);
+void pshmem_barrier(int PE_start, int logPE_stride, int PE_size, long *pSync);
+void pshmem_sync(int PE_start, int logPE_stride, int PE_size, long *pSync);
 
 /* Library information (§9.1.11, §9.1.12) */
 void pshmem_info_get_version(int *major, int *minor);
@@ -212,6 +214,18 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_PDECL_ARITHMETIC)
 OSOE_RMA_STANDARD_TYPES(OSOE_BROADCAST_PDECL)
 int pshmem_broadcastmem(shmem_team_t team, void *dest, const void *source, size_t nelems,
                         int PE_root);
+void pshmem_broadcast32(void *dest, const void *source, size_t nelems, int PE_root,
+                        int PE_start, int logPE_stride, int PE_size, long *pSync);
+void pshmem_broadcast64(void *dest, const void *source, size_t nelems, int PE_root,
+                        int PE_start, int logPE_stride, int PE_size, long *pSync);
+
+/* The deprecated active-set reductions (Table 11). */
+#define OSOE_TO_ALL_PDECL_INTEGER(T, NAME) OSOE_TO_ALL_DECL_INTEGER_P(pshmem_, T, NAME)
+#define OSOE_TO_ALL_PDECL_FLOATING(T, NAME) OSOE_TO_ALL_DECL_FLOATING_P(pshmem_, T, NAME)
+#define OSOE_TO_ALL_PDECL_COMPLEX(T, NAME) OSOE_TO_ALL_DECL_COMPLEX_P(pshmem_, T, NAME)
+OSOE_TO_ALL_INTEGER_TYPES(OSOE_TO_ALL_PDECL_INTEGER)
+OSOE_TO_ALL_FLOATING_TYPES(OSOE_TO_ALL_PDECL_FLOATING)
+OSOE_TO_ALL_COMPLEX_TYPES(OSOE_TO_ALL_PDECL_COMPLEX)
 
 #undef OSOE_AMO_PDECL_STANDARD
 #undef OSOE_AMO_PDECL_EXTENDED
@@ -237,6 +251,9 @@ int pshmem_broadcastmem(shmem_team_t team, void *dest, const void *source, size_
 #undef OSOE_REDUCE_PDECL_ORDERED
 #undef OSOE_REDUCE_PDECL_ARITHMETIC
 #undef OSOE_BROADCAST_PDECL
+#undef OSOE_TO_ALL_PDECL_INTEGER
+#undef OSOE_TO_ALL_PDECL_FLOATING
+#undef OSOE_TO_ALL_PDECL_COMPLEX
 
 /* Profiling control (§10.1.1). shmem_pcontrol is declared by shmem.h, which is
  * where user code looks (conformance review F7); this header only adds the

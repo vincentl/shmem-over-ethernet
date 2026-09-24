@@ -8,6 +8,12 @@
  * from, so a type appears once. The arithmetic is combine.c's, per element, and
  * the internode phase's is the backend's (internode.h).
  *
+ * The deprecated active-set forms, shmem_TYPENAME_OP_to_all over Table 11,
+ * are the same reductions over the whole job (collectives.h): each checks its
+ * active set is the job and calls the team form's engine on SHMEM_TEAM_WORLD.
+ * pWrk and pSync are neither read nor written, which leaves pSync as the spec
+ * requires it to be found afterwards, and makes no demand on pWrk's size.
+ *
  * Complexity: O(1) here; the reduction's own in collectives.c.
  */
 #include <stddef.h>
@@ -18,6 +24,7 @@
 
 #include "collectives.h"
 #include "export.h"
+#include "fatal.h"
 #include "internode.h"
 
 /* The element of a C type in each of Table 10's families. An integer's kind is
@@ -77,3 +84,60 @@ OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_ALIAS_ORDERED)
 OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_ALIAS_ARITHMETIC)
 OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_ALIAS_ARITHMETIC)
 OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_ALIAS_ARITHMETIC)
+
+/* The deprecated active-set forms (Annex F; Table 11), over the whole job. */
+static void to_all(const char *routine, void *dest, const void *source, int nreduce,
+                   int PE_start, int logPE_stride, int PE_size,
+                   enum osoe_reduction_operation operation, struct osoe_element element)
+{
+    osoe_active_set_whole_job(routine, PE_start, logPE_stride, PE_size);
+    if (nreduce < 0)
+        osoe_fatal("%s: nreduce %d is negative", routine, nreduce);
+    osoe_reduce(routine, SHMEM_TEAM_WORLD, dest, source, (size_t)nreduce, operation, element);
+}
+
+#define OSOE_TO_ALL_DEFINE(T, NAME, OPERATOR, OPERATION, ELEMENT)                     \
+    OSOE_API void OSOE_FN(pshmem_, NAME, _##OPERATOR##_to_all)(T *dest, const T *source, \
+        int nreduce, int PE_start, int logPE_stride, int PE_size, T *pWrk, long *pSync) \
+    {                                                                                 \
+        (void)pWrk;                                                                   \
+        (void)pSync;                                                                  \
+        to_all("shmem_" #NAME "_" #OPERATOR "_to_all", dest, source, nreduce, PE_start, \
+               logPE_stride, PE_size, OPERATION, ELEMENT);                            \
+    }
+
+#define OSOE_TO_ALL_DEFINE_INTEGER(T, NAME)                                           \
+    OSOE_TO_ALL_DEFINE(T, NAME, and, OSOE_REDUCTION_AND, OSOE_INTEGER_ELEMENT(T))     \
+    OSOE_TO_ALL_DEFINE(T, NAME, or, OSOE_REDUCTION_OR, OSOE_INTEGER_ELEMENT(T))       \
+    OSOE_TO_ALL_DEFINE(T, NAME, xor, OSOE_REDUCTION_XOR, OSOE_INTEGER_ELEMENT(T))     \
+    OSOE_TO_ALL_DEFINE(T, NAME, max, OSOE_REDUCTION_MAXIMUM, OSOE_INTEGER_ELEMENT(T)) \
+    OSOE_TO_ALL_DEFINE(T, NAME, min, OSOE_REDUCTION_MINIMUM, OSOE_INTEGER_ELEMENT(T)) \
+    OSOE_TO_ALL_DEFINE(T, NAME, sum, OSOE_REDUCTION_SUM, OSOE_INTEGER_ELEMENT(T))     \
+    OSOE_TO_ALL_DEFINE(T, NAME, prod, OSOE_REDUCTION_PRODUCT, OSOE_INTEGER_ELEMENT(T))
+#define OSOE_TO_ALL_DEFINE_FLOATING(T, NAME)                                          \
+    OSOE_TO_ALL_DEFINE(T, NAME, max, OSOE_REDUCTION_MAXIMUM, OSOE_FLOATING_ELEMENT(T)) \
+    OSOE_TO_ALL_DEFINE(T, NAME, min, OSOE_REDUCTION_MINIMUM, OSOE_FLOATING_ELEMENT(T)) \
+    OSOE_TO_ALL_DEFINE(T, NAME, sum, OSOE_REDUCTION_SUM, OSOE_FLOATING_ELEMENT(T))    \
+    OSOE_TO_ALL_DEFINE(T, NAME, prod, OSOE_REDUCTION_PRODUCT, OSOE_FLOATING_ELEMENT(T))
+#define OSOE_TO_ALL_DEFINE_COMPLEX(T, NAME)                                           \
+    OSOE_TO_ALL_DEFINE(T, NAME, sum, OSOE_REDUCTION_SUM, OSOE_COMPLEX_ELEMENT(T))     \
+    OSOE_TO_ALL_DEFINE(T, NAME, prod, OSOE_REDUCTION_PRODUCT, OSOE_COMPLEX_ELEMENT(T))
+
+OSOE_TO_ALL_INTEGER_TYPES(OSOE_TO_ALL_DEFINE_INTEGER)
+OSOE_TO_ALL_FLOATING_TYPES(OSOE_TO_ALL_DEFINE_FLOATING)
+OSOE_TO_ALL_COMPLEX_TYPES(OSOE_TO_ALL_DEFINE_COMPLEX)
+
+#define OSOE_TO_ALL_ALIAS_INTEGER(T, NAME)                                            \
+    OSOE_ALIAS(NAME##_and_to_all) OSOE_ALIAS(NAME##_or_to_all)                        \
+    OSOE_ALIAS(NAME##_xor_to_all) OSOE_ALIAS(NAME##_max_to_all)                       \
+    OSOE_ALIAS(NAME##_min_to_all) OSOE_ALIAS(NAME##_sum_to_all)                       \
+    OSOE_ALIAS(NAME##_prod_to_all)
+#define OSOE_TO_ALL_ALIAS_FLOATING(T, NAME)                                           \
+    OSOE_ALIAS(NAME##_max_to_all) OSOE_ALIAS(NAME##_min_to_all)                       \
+    OSOE_ALIAS(NAME##_sum_to_all) OSOE_ALIAS(NAME##_prod_to_all)
+#define OSOE_TO_ALL_ALIAS_COMPLEX(T, NAME)                                            \
+    OSOE_ALIAS(NAME##_sum_to_all) OSOE_ALIAS(NAME##_prod_to_all)
+
+OSOE_TO_ALL_INTEGER_TYPES(OSOE_TO_ALL_ALIAS_INTEGER)
+OSOE_TO_ALL_FLOATING_TYPES(OSOE_TO_ALL_ALIAS_FLOATING)
+OSOE_TO_ALL_COMPLEX_TYPES(OSOE_TO_ALL_ALIAS_COMPLEX)

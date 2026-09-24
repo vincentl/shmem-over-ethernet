@@ -1077,6 +1077,20 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   endforeach()
 endif()
 
+# The deprecated active-set collectives, over the whole job (design §7.4;
+# test-active-set.c), on one node and across nodes; and an active set one PE
+# short of the job, which must end it by name.
+osoe_tier2_test(active-set)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(active-set 0,0,1,1)
+  osoe_tier2_map_test(active-set 0,1,2,0,1,0)
+endif()
+add_test(NAME shmem.active-set.partial
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_PARTIAL=1
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_active-set>)
+set_tests_properties(shmem.active-set.partial PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "is not the whole job of 2 PEs")
+
 # PEs that call different collectives end the job by name, from the piece
 # headers of the generic internode phase (internode-generic.c): node 1's PE
 # broadcasts where the others reduce, and node 0's lead finds node 1's slot
@@ -1456,6 +1470,7 @@ if(OSOE_TIER3)
     # The leads' tree of the reductions and broadcast, over the shaped link.
     osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
     osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)
+    osoe_tier3_test(active-set.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_active-set)
     if(shape STREQUAL "pi")
       osoe_tier3_test(reduce.0-1-2-3-4.k2 pi 0,1,2,3,4 shmem_test_reduce
                       ENV OSOE_COLLECTIVE_FANOUT=2)
