@@ -15,6 +15,15 @@
  * duplicated, as test-amo.c's contended_fetch_add checks for the blocking
  * form.
  *
+ * The first phase runs twice: on each PE's own word, then on its right
+ * neighbour's, which crosses a node on the map tests - the path a nonblocking
+ * AMO that really waited for the next quiet would change. Each PE's copy is
+ * written by one PE only, and every check reads the target's word with a
+ * blocking fetch. `fetch` is set to a value no step expects before every call,
+ * so a routine that never stores is seen; and with OSOE_TEST_AMO_NBI_MISUSE
+ * set, one call on a word outside the symmetric heap must end the job naming
+ * the nonblocking routine rather than the blocking one beneath it.
+ *
  * shmem_barrier_all separates every phase from the next, so no PE reads a
  * word a neighbour is still changing (an earlier atomics test raced exactly
  * that way).
@@ -31,16 +40,18 @@
 
 enum { ROUNDS = 500 };
 
+/* The target's copy of a[i], read as the checks need it: with a blocking
+ * fetch, since on the second pass the word is another PE's. */
+#define TARGET_WORD(a, i) shmem_atomic_fetch(&(a)[i], target)
+
 /* ---- Table 6 and the integer part of Table 7 --------------------------- */
 
 /*
  * fetch_nbi doesn't change a[0]; swap_nbi, compare_swap_nbi, fetch_inc_nbi
  * and fetch_add_nbi each do, once per spelling, so the expected value after
  * every step is worked out by hand below rather than re-derived at runtime.
- * Every op targets `me`'s own copy of `a`, so no other PE ever touches it and
- * no ring hand-off is needed (unlike test-amo-types.c's blocking version,
- * which uses shmem_..._atomic_set to seed a neighbour - a routine _nbi has no
- * equivalent of).
+ * Every op targets `target`'s copy of `a`, which every PE seeds alike before
+ * the barrier, and which only one PE ever changes.
  */
 #define STANDARD_AND_EXTENDED_NBI(T, NAME)                                         \
     do {                                                                          \
@@ -53,166 +64,222 @@ enum { ROUNDS = 500 };
         shmem_barrier_all();                                                      \
                                                                                     \
         /* fetch_nbi: typed plain, typed ctx, generic plain, generic ctx. */      \
-        shmem_##NAME##_atomic_fetch_nbi(&fetch, a, me);                           \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_fetch_nbi(&fetch, a, target);                           \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)1);                                                     \
-        shmem_ctx_##NAME##_atomic_fetch_nbi(ctx, &fetch, a, me);                  \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_fetch_nbi(ctx, &fetch, a, target);                  \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)1);                                                     \
-        shmem_atomic_fetch_nbi(&fetch, a, me);                                    \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_nbi(&fetch, a, target);                                    \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)1);                                                     \
-        shmem_atomic_fetch_nbi(ctx, &fetch, a, me);                               \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_nbi(ctx, &fetch, a, target);                               \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)1);                                                     \
-        CHECK(a[0] == (T)1);                                                      \
+        CHECK(TARGET_WORD(a, 0) == (T)1);                                                      \
                                                                                     \
         /* swap_nbi: 1 -> 2 -> 3 -> 4 -> 5. */                                    \
-        shmem_##NAME##_atomic_swap_nbi(&fetch, a, (T)2, me);                      \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_swap_nbi(&fetch, a, (T)2, target);                      \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)1);                                                     \
-        CHECK(a[0] == (T)2);                                                      \
-        shmem_ctx_##NAME##_atomic_swap_nbi(ctx, &fetch, a, (T)3, me);             \
+        CHECK(TARGET_WORD(a, 0) == (T)2);                                                      \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_swap_nbi(ctx, &fetch, a, (T)3, target);             \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)2);                                                     \
-        CHECK(a[0] == (T)3);                                                      \
-        shmem_atomic_swap_nbi(&fetch, a, (T)4, me);                               \
+        CHECK(TARGET_WORD(a, 0) == (T)3);                                                      \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_swap_nbi(&fetch, a, (T)4, target);                               \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)3);                                                     \
-        CHECK(a[0] == (T)4);                                                      \
-        shmem_atomic_swap_nbi(ctx, &fetch, a, (T)5, me);                          \
+        CHECK(TARGET_WORD(a, 0) == (T)4);                                                      \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_swap_nbi(ctx, &fetch, a, (T)5, target);                          \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)4);                                                     \
-        CHECK(a[0] == (T)5);                                                      \
+        CHECK(TARGET_WORD(a, 0) == (T)5);                                                      \
                                                                                     \
-        /* compare_swap_nbi: holds, doesn't hold, holds, doesn't hold. */         \
-        shmem_##NAME##_atomic_compare_swap_nbi(&fetch, a, (T)5, (T)9, me);        \
-        shmem_quiet();                                                            \
-        CHECK(fetch == (T)5);                          /* condition held */      \
-        CHECK(a[0] == (T)9);                                                      \
-        shmem_ctx_##NAME##_atomic_compare_swap_nbi(ctx, &fetch, a, (T)100,        \
-                                                   (T)999, me);                   \
-        shmem_quiet();                                                            \
-        CHECK(fetch == (T)9);                     /* condition did not hold */    \
-        CHECK(a[0] == (T)9);                                                      \
-        shmem_atomic_compare_swap_nbi(&fetch, a, (T)9, (T)11, me);                \
-        shmem_quiet();                                                            \
-        CHECK(fetch == (T)9);                          /* condition held */      \
-        CHECK(a[0] == (T)11);                                                     \
-        shmem_atomic_compare_swap_nbi(ctx, &fetch, a, (T)100, (T)999, me);        \
-        shmem_quiet();                                                            \
-        CHECK(fetch == (T)11);                    /* condition did not hold */    \
-        CHECK(a[0] == (T)11);                                                     \
+        /* compare_swap_nbi: each spelling once where the condition holds and       \
+         * once where it does not, 5 -> 6 -> 7 -> 8 -> 11: a routine that swapped   \
+         * cond and value, or ignored cond, fails where it holds. */                \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_compare_swap_nbi(&fetch, a, (T)5, (T)6, target);      \
+        shmem_quiet();                                                              \
+        CHECK(fetch == (T)5);                                                       \
+        CHECK(TARGET_WORD(a, 0) == (T)6);                                                        \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_compare_swap_nbi(&fetch, a, (T)100, (T)999, target);  \
+        shmem_quiet();                                                              \
+        CHECK(fetch == (T)6);                                                       \
+        CHECK(TARGET_WORD(a, 0) == (T)6);                                                        \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_compare_swap_nbi(ctx, &fetch, a, (T)6, (T)7, target); \
+        shmem_quiet();                                                              \
+        CHECK(fetch == (T)6);                                                       \
+        CHECK(TARGET_WORD(a, 0) == (T)7);                                                        \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_compare_swap_nbi(ctx, &fetch, a, (T)100, (T)999, target); \
+        shmem_quiet();                                                              \
+        CHECK(fetch == (T)7);                                                       \
+        CHECK(TARGET_WORD(a, 0) == (T)7);                                                        \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_compare_swap_nbi(&fetch, a, (T)7, (T)8, target);               \
+        shmem_quiet();                                                              \
+        CHECK(fetch == (T)7);                                                       \
+        CHECK(TARGET_WORD(a, 0) == (T)8);                                                        \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_compare_swap_nbi(&fetch, a, (T)100, (T)999, target);           \
+        shmem_quiet();                                                              \
+        CHECK(fetch == (T)8);                                                       \
+        CHECK(TARGET_WORD(a, 0) == (T)8);                                                        \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_compare_swap_nbi(ctx, &fetch, a, (T)8, (T)11, target);         \
+        shmem_quiet();                                                              \
+        CHECK(fetch == (T)8);                                                       \
+        CHECK(TARGET_WORD(a, 0) == (T)11);                                                       \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_compare_swap_nbi(ctx, &fetch, a, (T)100, (T)999, target);      \
+        shmem_quiet();                                                              \
+        CHECK(fetch == (T)11);                                                      \
+        CHECK(TARGET_WORD(a, 0) == (T)11);                                                       \
                                                                                     \
         /* fetch_inc_nbi: +1 four times, 11 -> 15. */                             \
-        shmem_##NAME##_atomic_fetch_inc_nbi(&fetch, a, me);                       \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_fetch_inc_nbi(&fetch, a, target);                       \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)11);                                                    \
-        CHECK(a[0] == (T)12);                                                     \
-        shmem_ctx_##NAME##_atomic_fetch_inc_nbi(ctx, &fetch, a, me);              \
+        CHECK(TARGET_WORD(a, 0) == (T)12);                                                     \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_fetch_inc_nbi(ctx, &fetch, a, target);              \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)12);                                                    \
-        CHECK(a[0] == (T)13);                                                     \
-        shmem_atomic_fetch_inc_nbi(&fetch, a, me);                                \
+        CHECK(TARGET_WORD(a, 0) == (T)13);                                                     \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_inc_nbi(&fetch, a, target);                                \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)13);                                                    \
-        CHECK(a[0] == (T)14);                                                     \
-        shmem_atomic_fetch_inc_nbi(ctx, &fetch, a, me);                           \
+        CHECK(TARGET_WORD(a, 0) == (T)14);                                                     \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_inc_nbi(ctx, &fetch, a, target);                           \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)14);                                                    \
-        CHECK(a[0] == (T)15);                                                     \
+        CHECK(TARGET_WORD(a, 0) == (T)15);                                                     \
                                                                                     \
         /* fetch_add_nbi: +5, +3, +2, +1, 15 -> 26. */                            \
-        shmem_##NAME##_atomic_fetch_add_nbi(&fetch, a, (T)5, me);                 \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_fetch_add_nbi(&fetch, a, (T)5, target);                 \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)15);                                                    \
-        CHECK(a[0] == (T)20);                                                     \
-        shmem_ctx_##NAME##_atomic_fetch_add_nbi(ctx, &fetch, a, (T)3, me);        \
+        CHECK(TARGET_WORD(a, 0) == (T)20);                                                     \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_fetch_add_nbi(ctx, &fetch, a, (T)3, target);        \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)20);                                                    \
-        CHECK(a[0] == (T)23);                                                     \
-        shmem_atomic_fetch_add_nbi(&fetch, a, (T)2, me);                          \
+        CHECK(TARGET_WORD(a, 0) == (T)23);                                                     \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_add_nbi(&fetch, a, (T)2, target);                          \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)23);                                                    \
-        CHECK(a[0] == (T)25);                                                     \
-        shmem_atomic_fetch_add_nbi(ctx, &fetch, a, (T)1, me);                     \
+        CHECK(TARGET_WORD(a, 0) == (T)25);                                                     \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_add_nbi(ctx, &fetch, a, (T)1, target);                     \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)25);                                                    \
-        CHECK(a[0] == (T)26);                                                     \
+        CHECK(TARGET_WORD(a, 0) == (T)26);                                                     \
                                                                                     \
-        CHECK(a[1] == (T)0x5a);                   /* nothing spilled */          \
+        CHECK(TARGET_WORD(a, 1) == (T)0x5a);                   /* nothing spilled */          \
         shmem_free(a);                                                            \
     } while (0)
 
 /* ---- Table 8 ------------------------------------------------------------ */
 
 /* fetch_or_nbi, fetch_and_nbi, fetch_xor_nbi, each once per spelling; the bit
- * pattern after every step is again worked out by hand. */
+ * pattern after every step is again worked out by hand. At every step the
+ * operator under test gives a result the other two do not, so a routine that
+ * applied the wrong one fails at every spelling: an or that set only clear
+ * bits would pass as an xor, and an and of a word with itself as an or. */
 #define BITWISE_NBI(T, NAME)                                                       \
     do {                                                                          \
         shmem_ctx_t ctx = SHMEM_CTX_DEFAULT;                                      \
         T *a = shmem_malloc(2 * sizeof *a);                                       \
         T fetch;                                                                  \
         CHECK_FATAL(a != NULL);      /* NULL would be dereferenced just below */  \
-        a[0] = (T)0;                                                              \
+        a[0] = (T)0x01;                                                           \
         a[1] = (T)0x5a;                                                           \
         shmem_barrier_all();                                                      \
                                                                                     \
-        /* fetch_or_nbi: 0x00 -> 0x0f -> 0x1f -> 0x3f -> 0x7f. */                 \
-        shmem_##NAME##_atomic_fetch_or_nbi(&fetch, a, (T)0x0f, me);               \
+        /* fetch_or_nbi: 0x01 -> 0x0f -> 0x1f -> 0x3f -> 0x7f. */                 \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_fetch_or_nbi(&fetch, a, (T)0x0f, target);               \
         shmem_quiet();                                                            \
-        CHECK(fetch == (T)0x00);                                                  \
-        CHECK(a[0] == (T)0x0f);                                                   \
-        shmem_ctx_##NAME##_atomic_fetch_or_nbi(ctx, &fetch, a, (T)0x10, me);      \
+        CHECK(fetch == (T)0x01);                                                  \
+        CHECK(TARGET_WORD(a, 0) == (T)0x0f);                                                   \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_fetch_or_nbi(ctx, &fetch, a, (T)0x18, target);      \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0x0f);                                                  \
-        CHECK(a[0] == (T)0x1f);                                                   \
-        shmem_atomic_fetch_or_nbi(&fetch, a, (T)0x20, me);                        \
+        CHECK(TARGET_WORD(a, 0) == (T)0x1f);                                                   \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_or_nbi(&fetch, a, (T)0x30, target);                        \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0x1f);                                                  \
-        CHECK(a[0] == (T)0x3f);                                                   \
-        shmem_atomic_fetch_or_nbi(ctx, &fetch, a, (T)0x40, me);                   \
+        CHECK(TARGET_WORD(a, 0) == (T)0x3f);                                                   \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_or_nbi(ctx, &fetch, a, (T)0x7f, target);                   \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0x3f);                                                  \
-        CHECK(a[0] == (T)0x7f);                                                   \
+        CHECK(TARGET_WORD(a, 0) == (T)0x7f);                                                   \
                                                                                     \
         /* fetch_and_nbi: 0x7f -> 0x55 -> 0x11 -> 0x11 -> 0x01. */                \
-        shmem_##NAME##_atomic_fetch_and_nbi(&fetch, a, (T)0x55, me);              \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_fetch_and_nbi(&fetch, a, (T)0x55, target);              \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0x7f);                                                  \
-        CHECK(a[0] == (T)0x55);                                                   \
-        shmem_ctx_##NAME##_atomic_fetch_and_nbi(ctx, &fetch, a, (T)0x33, me);     \
+        CHECK(TARGET_WORD(a, 0) == (T)0x55);                                                   \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_fetch_and_nbi(ctx, &fetch, a, (T)0x33, target);     \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0x55);                                                  \
-        CHECK(a[0] == (T)0x11);                                                   \
-        shmem_atomic_fetch_and_nbi(&fetch, a, (T)0x11, me);                       \
+        CHECK(TARGET_WORD(a, 0) == (T)0x11);                                                   \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_and_nbi(&fetch, a, (T)0x13, target);                       \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0x11);                                                  \
-        CHECK(a[0] == (T)0x11);                                                   \
-        shmem_atomic_fetch_and_nbi(ctx, &fetch, a, (T)0x01, me);                  \
+        CHECK(TARGET_WORD(a, 0) == (T)0x11);                                                   \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_and_nbi(ctx, &fetch, a, (T)0x01, target);                  \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0x11);                                                  \
-        CHECK(a[0] == (T)0x01);                                                   \
+        CHECK(TARGET_WORD(a, 0) == (T)0x01);                                                   \
                                                                                     \
         /* fetch_xor_nbi: 0x01 -> 0xfe -> 0xf1 -> 0x01 -> 0x00. */                \
-        shmem_##NAME##_atomic_fetch_xor_nbi(&fetch, a, (T)0xff, me);              \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_fetch_xor_nbi(&fetch, a, (T)0xff, target);              \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0x01);                                                  \
-        CHECK(a[0] == (T)0xfe);                                                   \
-        shmem_ctx_##NAME##_atomic_fetch_xor_nbi(ctx, &fetch, a, (T)0x0f, me);     \
+        CHECK(TARGET_WORD(a, 0) == (T)0xfe);                                                   \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_fetch_xor_nbi(ctx, &fetch, a, (T)0x0f, target);     \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0xfe);                                                  \
-        CHECK(a[0] == (T)0xf1);                                                   \
-        shmem_atomic_fetch_xor_nbi(&fetch, a, (T)0xf0, me);                       \
+        CHECK(TARGET_WORD(a, 0) == (T)0xf1);                                                   \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_xor_nbi(&fetch, a, (T)0xf0, target);                       \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0xf1);                                                  \
-        CHECK(a[0] == (T)0x01);                                                   \
-        shmem_atomic_fetch_xor_nbi(ctx, &fetch, a, (T)0x01, me);                  \
+        CHECK(TARGET_WORD(a, 0) == (T)0x01);                                                   \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_xor_nbi(ctx, &fetch, a, (T)0x01, target);                  \
         shmem_quiet();                                                            \
         CHECK(fetch == (T)0x01);                                                  \
-        CHECK(a[0] == (T)0x00);                                                   \
+        CHECK(TARGET_WORD(a, 0) == (T)0x00);                                                   \
                                                                                     \
-        CHECK(a[1] == (T)0x5a);                                                   \
+        CHECK(TARGET_WORD(a, 1) == (T)0x5a);                                                   \
         shmem_free(a);                                                            \
     } while (0)
 
@@ -233,42 +300,50 @@ enum { ROUNDS = 500 };
         a[1] = (T)-3.25;                                                          \
         shmem_barrier_all();                                                      \
                                                                                     \
-        shmem_##NAME##_atomic_fetch_nbi(&fetch, a, me);                           \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_fetch_nbi(&fetch, a, target);                           \
         shmem_quiet();                                                            \
         CHECK(fetch == (V0));                                                     \
-        shmem_ctx_##NAME##_atomic_fetch_nbi(ctx, &fetch, a, me);                  \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_fetch_nbi(ctx, &fetch, a, target);                  \
         shmem_quiet();                                                            \
         CHECK(fetch == (V0));                                                     \
-        shmem_atomic_fetch_nbi(&fetch, a, me);                                    \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_nbi(&fetch, a, target);                                    \
         shmem_quiet();                                                            \
         CHECK(fetch == (V0));                                                     \
-        shmem_atomic_fetch_nbi(ctx, &fetch, a, me);                               \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_fetch_nbi(ctx, &fetch, a, target);                               \
         shmem_quiet();                                                            \
         CHECK(fetch == (V0));                                                     \
-        CHECK(a[0] == (V0));                                                      \
+        CHECK(TARGET_WORD(a, 0) == (V0));                                                      \
                                                                                     \
-        shmem_##NAME##_atomic_swap_nbi(&fetch, a, (V1), me);                      \
+        fetch = (T)0x7e;                                                            \
+        shmem_##NAME##_atomic_swap_nbi(&fetch, a, (V1), target);                      \
         shmem_quiet();                                                            \
         CHECK(fetch == (V0));                                                     \
-        CHECK(a[0] == (V1));                                                      \
-        shmem_ctx_##NAME##_atomic_swap_nbi(ctx, &fetch, a, (V2), me);             \
+        CHECK(TARGET_WORD(a, 0) == (V1));                                                      \
+        fetch = (T)0x7e;                                                            \
+        shmem_ctx_##NAME##_atomic_swap_nbi(ctx, &fetch, a, (V2), target);             \
         shmem_quiet();                                                            \
         CHECK(fetch == (V1));                                                     \
-        CHECK(a[0] == (V2));                                                      \
-        shmem_atomic_swap_nbi(&fetch, a, (V3), me);                               \
+        CHECK(TARGET_WORD(a, 0) == (V2));                                                      \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_swap_nbi(&fetch, a, (V3), target);                               \
         shmem_quiet();                                                            \
         CHECK(fetch == (V2));                                                     \
-        CHECK(a[0] == (V3));                                                      \
-        shmem_atomic_swap_nbi(ctx, &fetch, a, (V4), me);                          \
+        CHECK(TARGET_WORD(a, 0) == (V3));                                                      \
+        fetch = (T)0x7e;                                                            \
+        shmem_atomic_swap_nbi(ctx, &fetch, a, (V4), target);                          \
         shmem_quiet();                                                            \
         CHECK(fetch == (V3));                                                     \
-        CHECK(a[0] == (V4));                                                      \
+        CHECK(TARGET_WORD(a, 0) == (V4));                                                      \
                                                                                     \
-        CHECK(a[1] == (T)-3.25);                                                  \
+        CHECK(TARGET_WORD(a, 1) == (T)-3.25);                                                  \
         shmem_free(a);                                                            \
     } while (0)
 
-static void semantics(int me)
+static void semantics(int target)
 {
     STANDARD_AND_EXTENDED_NBI(int, int);
     STANDARD_AND_EXTENDED_NBI(long, long);
@@ -330,7 +405,12 @@ int main(void)
 {
     shmem_init();
     int me = shmem_my_pe(), n = shmem_n_pes();
+    if (getenv("OSOE_TEST_AMO_NBI_MISUSE")) {
+        long outside = 0, fetch;
+        shmem_long_atomic_fetch_add_nbi(&fetch, &outside, 1, (me + 1) % n);
+    }
     semantics(me);
+    semantics((me + 1) % n);
     contended_nbi(me, n);
     CHECK_INVARIANTS();
     shmem_finalize();

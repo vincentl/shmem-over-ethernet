@@ -632,8 +632,9 @@ void shmem_sync(int PE_start, int logPE_stride, int PE_size, long *pSync);
  * bitwise operators on the unsigned and exact-width integer types; the ordered
  * operators on those, the signed integer types and the floating types; the
  * arithmetic operators on those and, where the C translation environment has
- * them, the two complex types (the spec permits leaving them out otherwise,
- * and C++ has no _Complex). Each returns 0 on success.
+ * them, the two complex types (the spec permits leaving them out otherwise;
+ * C++ sees them only where its compiler takes _Complex, below). Each returns 0
+ * on success.
  */
 #define OSOE_REDUCE_BITWISE_TYPES(X)                                         \
     X(unsigned char, uchar) X(unsigned short, ushort) X(unsigned int, uint)  \
@@ -651,15 +652,22 @@ void shmem_sync(int PE_start, int logPE_stride, int PE_size, long *pSync);
     X(float, float) X(double, double) X(long double, longdouble)
 
 /*
- * C has _Complex; C++ does not, but GCC and Clang both accept it in C++ as an
- * extension with the same layout as C's - defined(__GNUC__) is true for both
- * g++ and clang++ - and SOS's C++ test suite calls shmem_double_sum_reduce and
- * shmem_complexd_sum_reduce and needs both declared. So the guard admits
- * __GNUC__ in C++ too, and excludes only a C++ compiler that does not accept
- * the extension.
+ * C has _Complex; ISO C++ does not, but g++ and clang++ both take it as an
+ * extension with C's layout, and SOS's C++ tests call the complex reductions.
+ * So C++ sees them where the compiler is one of those two: __GNUC__, less the
+ * front ends that define it without being either - EDG's, in NVIDIA's nvc++
+ * and CUDA's, which may not take the type. clang++ also reports it under
+ * -Wpedantic (-Wc99-extensions), where g++ is silent; the declaration lists
+ * that can carry it silence that for themselves alone, so a real ISO
+ * violation elsewhere in the headers still fails a strict build.
  */
+#if defined(__cplusplus) && defined(__GNUC__) && !defined(__EDG__) &&        \
+    !defined(__NVCOMPILER) && !defined(__CUDACC__)
+#define OSOE_CXX_COMPLEX 1
+#endif
+
 #if (!defined(__cplusplus) && !defined(__STDC_NO_COMPLEX__)) ||              \
-    (defined(__cplusplus) && defined(__GNUC__))
+    defined(OSOE_CXX_COMPLEX)
 #define OSOE_REDUCE_COMPLEX_TYPES(X)                                         \
     X(double _Complex, complexd) X(float _Complex, complexf)
 #else
@@ -693,16 +701,13 @@ OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DECL_ORDERED)
 OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DECL_ORDERED)
 OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
 OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
-/* _Complex in a C++ declaration is a GNU extension (above), and -Wpedantic
- * says so even where it changes nothing else about the translation - silenced
- * for exactly this one declaration list rather than for the file, so a real
- * ISO violation elsewhere in either header still fails the strict build. */
-#if defined(__cplusplus) && defined(__GNUC__)
+/* clang++'s -Wpedantic and _Complex (above), for this list alone. */
+#ifdef OSOE_CXX_COMPLEX
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
 OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
-#if defined(__cplusplus) && defined(__GNUC__)
+#ifdef OSOE_CXX_COMPLEX
 #pragma GCC diagnostic pop
 #endif
 
@@ -718,7 +723,7 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
     X(float, float) X(double, double) X(long double, longdouble)
 /* C++ and _Complex: as OSOE_REDUCE_COMPLEX_TYPES above. */
 #if (!defined(__cplusplus) && !defined(__STDC_NO_COMPLEX__)) ||              \
-    (defined(__cplusplus) && defined(__GNUC__))
+    defined(OSOE_CXX_COMPLEX)
 #define OSOE_TO_ALL_COMPLEX_TYPES(X)                                         \
     X(double _Complex, complexd) X(float _Complex, complexf)
 #else
@@ -748,13 +753,13 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
 
 OSOE_TO_ALL_INTEGER_TYPES(OSOE_TO_ALL_DECL_INTEGER)
 OSOE_TO_ALL_FLOATING_TYPES(OSOE_TO_ALL_DECL_FLOATING)
-/* -Wpedantic and _Complex in C++, as the reductions above. */
-#if defined(__cplusplus) && defined(__GNUC__)
+/* clang++'s -Wpedantic and _Complex, as the reductions above. */
+#ifdef OSOE_CXX_COMPLEX
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
 OSOE_TO_ALL_COMPLEX_TYPES(OSOE_TO_ALL_DECL_COMPLEX)
-#if defined(__cplusplus) && defined(__GNUC__)
+#ifdef OSOE_CXX_COMPLEX
 #pragma GCC diagnostic pop
 #endif
 
@@ -991,19 +996,24 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
 #define OSOE_G_FETCH_3(ctx, source, pe)                                           \
     (_Generic((source) OSOE_AMO_G_EXTENDED(OSOE_AMO_GCX, fetch))((ctx), (source), (pe)))
 #define shmem_atomic_fetch(...)                                                   \
-    OSOE_PICK3(__VA_ARGS__, OSOE_G_FETCH_3, OSOE_G_FETCH_2, )(__VA_ARGS__)
+    OSOE_PICK3(__VA_ARGS__, OSOE_G_FETCH_3, OSOE_G_FETCH_2,                       \
+               osoe_shmem_atomic_fetch_takes_two_or_three_arguments, )(__VA_ARGS__)
 #define OSOE_G_SET_3(dest, value, pe)                                             \
     (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_G, set))((dest), (value), (pe)))
 #define OSOE_G_SET_4(ctx, dest, value, pe)                                        \
     (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_GX, set))((ctx), (dest), (value), (pe)))
 #define shmem_atomic_set(...)                                                     \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_SET_4, OSOE_G_SET_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_SET_4, OSOE_G_SET_3,                           \
+               osoe_shmem_atomic_set_takes_three_or_four_arguments,               \
+               osoe_shmem_atomic_set_takes_three_or_four_arguments, )(__VA_ARGS__)
 #define OSOE_G_SWAP_3(dest, value, pe)                                            \
     (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_G, swap))((dest), (value), (pe)))
 #define OSOE_G_SWAP_4(ctx, dest, value, pe)                                       \
     (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_GX, swap))((ctx), (dest), (value), (pe)))
 #define shmem_atomic_swap(...)                                                    \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_SWAP_4, OSOE_G_SWAP_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_SWAP_4, OSOE_G_SWAP_3,                         \
+               osoe_shmem_atomic_swap_takes_three_or_four_arguments,              \
+               osoe_shmem_atomic_swap_takes_three_or_four_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_CSWAP_4(dest, cond, value, pe)                                     \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, compare_swap))               \
@@ -1012,25 +1022,32 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, compare_swap))              \
         ((ctx), (dest), (cond), (value), (pe)))
 #define shmem_atomic_compare_swap(...)                                            \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_CSWAP_5, OSOE_G_CSWAP_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_CSWAP_5, OSOE_G_CSWAP_4,                       \
+               osoe_shmem_atomic_compare_swap_takes_four_or_five_arguments,       \
+               osoe_shmem_atomic_compare_swap_takes_four_or_five_arguments,       \
+               osoe_shmem_atomic_compare_swap_takes_four_or_five_arguments, )(__VA_ARGS__)
 #define OSOE_G_INC_2(dest, pe)                                                    \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, inc))((dest), (pe)))
 #define OSOE_G_INC_3(ctx, dest, pe)                                               \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, inc))((ctx), (dest), (pe)))
 #define shmem_atomic_inc(...)                                                     \
-    OSOE_PICK3(__VA_ARGS__, OSOE_G_INC_3, OSOE_G_INC_2, )(__VA_ARGS__)
+    OSOE_PICK3(__VA_ARGS__, OSOE_G_INC_3, OSOE_G_INC_2,                           \
+               osoe_shmem_atomic_inc_takes_two_or_three_arguments, )(__VA_ARGS__)
 #define OSOE_G_FINC_2(dest, pe)                                                   \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_inc))((dest), (pe)))
 #define OSOE_G_FINC_3(ctx, dest, pe)                                              \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, fetch_inc))((ctx), (dest), (pe)))
 #define shmem_atomic_fetch_inc(...)                                               \
-    OSOE_PICK3(__VA_ARGS__, OSOE_G_FINC_3, OSOE_G_FINC_2, )(__VA_ARGS__)
+    OSOE_PICK3(__VA_ARGS__, OSOE_G_FINC_3, OSOE_G_FINC_2,                         \
+               osoe_shmem_atomic_fetch_inc_takes_two_or_three_arguments, )(__VA_ARGS__)
 #define OSOE_G_ADD_3(dest, value, pe)                                             \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, add))((dest), (value), (pe)))
 #define OSOE_G_ADD_4(ctx, dest, value, pe)                                        \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, add))((ctx), (dest), (value), (pe)))
 #define shmem_atomic_add(...)                                                     \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_ADD_4, OSOE_G_ADD_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_ADD_4, OSOE_G_ADD_3,                           \
+               osoe_shmem_atomic_add_takes_three_or_four_arguments,               \
+               osoe_shmem_atomic_add_takes_three_or_four_arguments, )(__VA_ARGS__)
 #define OSOE_G_FADD_3(dest, value, pe)                                            \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_add))                  \
         ((dest), (value), (pe)))
@@ -1038,7 +1055,9 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, fetch_add))                 \
         ((ctx), (dest), (value), (pe)))
 #define shmem_atomic_fetch_add(...)                                               \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_FADD_4, OSOE_G_FADD_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FADD_4, OSOE_G_FADD_3,                         \
+               osoe_shmem_atomic_fetch_add_takes_three_or_four_arguments,         \
+               osoe_shmem_atomic_fetch_add_takes_three_or_four_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_AND_3(dest, value, pe)                                         \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, and))((dest), (value), (pe)))
@@ -1046,42 +1065,54 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, and))                    \
         ((ctx), (dest), (value), (pe)))
 #define shmem_atomic_and(...)                                                 \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_AND_4, OSOE_G_AND_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_AND_4, OSOE_G_AND_3,                       \
+               osoe_shmem_atomic_and_takes_three_or_four_arguments,           \
+               osoe_shmem_atomic_and_takes_three_or_four_arguments, )(__VA_ARGS__)
 #define OSOE_G_FAND_3(dest, value, pe)                                         \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_and))((dest), (value), (pe)))
 #define OSOE_G_FAND_4(ctx, dest, value, pe)                                    \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_and))                    \
         ((ctx), (dest), (value), (pe)))
 #define shmem_atomic_fetch_and(...)                                                 \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_FAND_4, OSOE_G_FAND_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FAND_4, OSOE_G_FAND_3,                           \
+               osoe_shmem_atomic_fetch_and_takes_three_or_four_arguments,           \
+               osoe_shmem_atomic_fetch_and_takes_three_or_four_arguments, )(__VA_ARGS__)
 #define OSOE_G_OR_3(dest, value, pe)                                         \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, or))((dest), (value), (pe)))
 #define OSOE_G_OR_4(ctx, dest, value, pe)                                    \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, or))                    \
         ((ctx), (dest), (value), (pe)))
 #define shmem_atomic_or(...)                                                 \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_OR_4, OSOE_G_OR_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_OR_4, OSOE_G_OR_3,                        \
+               osoe_shmem_atomic_or_takes_three_or_four_arguments,           \
+               osoe_shmem_atomic_or_takes_three_or_four_arguments, )(__VA_ARGS__)
 #define OSOE_G_FOR_3(dest, value, pe)                                         \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_or))((dest), (value), (pe)))
 #define OSOE_G_FOR_4(ctx, dest, value, pe)                                    \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_or))                    \
         ((ctx), (dest), (value), (pe)))
 #define shmem_atomic_fetch_or(...)                                                 \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_FOR_4, OSOE_G_FOR_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FOR_4, OSOE_G_FOR_3,                            \
+               osoe_shmem_atomic_fetch_or_takes_three_or_four_arguments,           \
+               osoe_shmem_atomic_fetch_or_takes_three_or_four_arguments, )(__VA_ARGS__)
 #define OSOE_G_XOR_3(dest, value, pe)                                         \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, xor))((dest), (value), (pe)))
 #define OSOE_G_XOR_4(ctx, dest, value, pe)                                    \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, xor))                    \
         ((ctx), (dest), (value), (pe)))
 #define shmem_atomic_xor(...)                                                 \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_XOR_4, OSOE_G_XOR_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_XOR_4, OSOE_G_XOR_3,                       \
+               osoe_shmem_atomic_xor_takes_three_or_four_arguments,           \
+               osoe_shmem_atomic_xor_takes_three_or_four_arguments, )(__VA_ARGS__)
 #define OSOE_G_FXOR_3(dest, value, pe)                                         \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_xor))((dest), (value), (pe)))
 #define OSOE_G_FXOR_4(ctx, dest, value, pe)                                    \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_xor))                    \
         ((ctx), (dest), (value), (pe)))
 #define shmem_atomic_fetch_xor(...)                                                 \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_FXOR_4, OSOE_G_FXOR_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FXOR_4, OSOE_G_FXOR_3,                           \
+               osoe_shmem_atomic_fetch_xor_takes_three_or_four_arguments,           \
+               osoe_shmem_atomic_fetch_xor_takes_three_or_four_arguments, )(__VA_ARGS__)
 
 /*
  * The nonblocking fetching AMOs' C11 spellings (§9.7.2), built the same way:
@@ -1098,7 +1129,9 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((source) OSOE_AMO_G_EXTENDED(OSOE_AMO_GCX, fetch_nbi))             \
         ((ctx), (fetch), (source), (pe)))
 #define shmem_atomic_fetch_nbi(...)                                              \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_FETCH_NBI_4, OSOE_G_FETCH_NBI_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FETCH_NBI_4, OSOE_G_FETCH_NBI_3,              \
+               osoe_shmem_atomic_fetch_nbi_takes_three_or_four_arguments,        \
+               osoe_shmem_atomic_fetch_nbi_takes_three_or_four_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_SWAP_NBI_4(fetch, dest, value, pe)                                \
     (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_G, swap_nbi))                  \
@@ -1107,7 +1140,10 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_GX, swap_nbi))                 \
         ((ctx), (fetch), (dest), (value), (pe)))
 #define shmem_atomic_swap_nbi(...)                                               \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_SWAP_NBI_5, OSOE_G_SWAP_NBI_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_SWAP_NBI_5, OSOE_G_SWAP_NBI_4,                \
+               osoe_shmem_atomic_swap_nbi_takes_four_or_five_arguments,          \
+               osoe_shmem_atomic_swap_nbi_takes_four_or_five_arguments,          \
+               osoe_shmem_atomic_swap_nbi_takes_four_or_five_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_CSWAP_NBI_5(fetch, dest, cond, value, pe)                         \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, compare_swap_nbi))          \
@@ -1116,7 +1152,11 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, compare_swap_nbi))         \
         ((ctx), (fetch), (dest), (cond), (value), (pe)))
 #define shmem_atomic_compare_swap_nbi(...)                                       \
-    OSOE_PICK6(__VA_ARGS__, OSOE_G_CSWAP_NBI_6, OSOE_G_CSWAP_NBI_5, , , , )(__VA_ARGS__)
+    OSOE_PICK6(__VA_ARGS__, OSOE_G_CSWAP_NBI_6, OSOE_G_CSWAP_NBI_5,              \
+               osoe_shmem_atomic_compare_swap_nbi_takes_five_or_six_arguments,   \
+               osoe_shmem_atomic_compare_swap_nbi_takes_five_or_six_arguments,   \
+               osoe_shmem_atomic_compare_swap_nbi_takes_five_or_six_arguments,   \
+               osoe_shmem_atomic_compare_swap_nbi_takes_five_or_six_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_FINC_NBI_3(fetch, dest, pe)                                       \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_inc_nbi))             \
@@ -1125,7 +1165,9 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, fetch_inc_nbi))            \
         ((ctx), (fetch), (dest), (pe)))
 #define shmem_atomic_fetch_inc_nbi(...)                                          \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_FINC_NBI_4, OSOE_G_FINC_NBI_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FINC_NBI_4, OSOE_G_FINC_NBI_3,                \
+               osoe_shmem_atomic_fetch_inc_nbi_takes_three_or_four_arguments,    \
+               osoe_shmem_atomic_fetch_inc_nbi_takes_three_or_four_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_FADD_NBI_4(fetch, dest, value, pe)                                \
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_add_nbi))             \
@@ -1134,7 +1176,10 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, fetch_add_nbi))            \
         ((ctx), (fetch), (dest), (value), (pe)))
 #define shmem_atomic_fetch_add_nbi(...)                                          \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_FADD_NBI_5, OSOE_G_FADD_NBI_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_FADD_NBI_5, OSOE_G_FADD_NBI_4,                \
+               osoe_shmem_atomic_fetch_add_nbi_takes_four_or_five_arguments,     \
+               osoe_shmem_atomic_fetch_add_nbi_takes_four_or_five_arguments,     \
+               osoe_shmem_atomic_fetch_add_nbi_takes_four_or_five_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_FAND_NBI_4(fetch, dest, value, pe)                                \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_and_nbi))              \
@@ -1143,7 +1188,10 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_and_nbi))             \
         ((ctx), (fetch), (dest), (value), (pe)))
 #define shmem_atomic_fetch_and_nbi(...)                                          \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_FAND_NBI_5, OSOE_G_FAND_NBI_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_FAND_NBI_5, OSOE_G_FAND_NBI_4,                \
+               osoe_shmem_atomic_fetch_and_nbi_takes_four_or_five_arguments,     \
+               osoe_shmem_atomic_fetch_and_nbi_takes_four_or_five_arguments,     \
+               osoe_shmem_atomic_fetch_and_nbi_takes_four_or_five_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_FOR_NBI_4(fetch, dest, value, pe)                                 \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_or_nbi))               \
@@ -1152,7 +1200,10 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_or_nbi))              \
         ((ctx), (fetch), (dest), (value), (pe)))
 #define shmem_atomic_fetch_or_nbi(...)                                           \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_FOR_NBI_5, OSOE_G_FOR_NBI_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_FOR_NBI_5, OSOE_G_FOR_NBI_4,                  \
+               osoe_shmem_atomic_fetch_or_nbi_takes_four_or_five_arguments,      \
+               osoe_shmem_atomic_fetch_or_nbi_takes_four_or_five_arguments,      \
+               osoe_shmem_atomic_fetch_or_nbi_takes_four_or_five_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_FXOR_NBI_4(fetch, dest, value, pe)                                \
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_xor_nbi))              \
@@ -1161,7 +1212,10 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_xor_nbi))             \
         ((ctx), (fetch), (dest), (value), (pe)))
 #define shmem_atomic_fetch_xor_nbi(...)                                          \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_FXOR_NBI_5, OSOE_G_FXOR_NBI_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_FXOR_NBI_5, OSOE_G_FXOR_NBI_4,                \
+               osoe_shmem_atomic_fetch_xor_nbi_takes_four_or_five_arguments,     \
+               osoe_shmem_atomic_fetch_xor_nbi_takes_four_or_five_arguments,     \
+               osoe_shmem_atomic_fetch_xor_nbi_takes_four_or_five_arguments, )(__VA_ARGS__)
 
 /*
  * The deprecated C11 generic spellings (Annex F.2.12): shmem_fetch, shmem_set,
@@ -1249,7 +1303,10 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, put))                      \
         ((ctx), (dest), (source), (nelems), (pe)))
 #define shmem_put(...)                                                           \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_PUT_5, OSOE_G_PUT_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_PUT_5, OSOE_G_PUT_4,                          \
+               osoe_shmem_put_takes_four_or_five_arguments,                      \
+               osoe_shmem_put_takes_four_or_five_arguments,                      \
+               osoe_shmem_put_takes_four_or_five_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_GET_4(dest, source, nelems, pe)                                   \
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, get))((dest), (source), (nelems), (pe)))
@@ -1257,21 +1314,27 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, get))                      \
         ((ctx), (dest), (source), (nelems), (pe)))
 #define shmem_get(...)                                                           \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_GET_5, OSOE_G_GET_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_GET_5, OSOE_G_GET_4,                          \
+               osoe_shmem_get_takes_four_or_five_arguments,                      \
+               osoe_shmem_get_takes_four_or_five_arguments,                      \
+               osoe_shmem_get_takes_four_or_five_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_P_3(dest, value, pe)                                              \
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, p))((dest), (value), (pe)))
 #define OSOE_G_P_4(ctx, dest, value, pe)                                         \
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, p))((ctx), (dest), (value), (pe)))
 #define shmem_p(...)                                                             \
-    OSOE_PICK4(__VA_ARGS__, OSOE_G_P_4, OSOE_G_P_3, , )(__VA_ARGS__)
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_P_4, OSOE_G_P_3,                              \
+               osoe_shmem_p_takes_three_or_four_arguments,                       \
+               osoe_shmem_p_takes_three_or_four_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_G_2(source, pe)                                                   \
     (_Generic((source) OSOE_RMA_G_STANDARD(OSOE_RMA_GC, g))((source), (pe)))
 #define OSOE_G_G_3(ctx, source, pe)                                              \
     (_Generic((source) OSOE_RMA_G_STANDARD(OSOE_RMA_GCX, g))((ctx), (source), (pe)))
 #define shmem_g(...)                                                             \
-    OSOE_PICK3(__VA_ARGS__, OSOE_G_G_3, OSOE_G_G_2, )(__VA_ARGS__)
+    OSOE_PICK3(__VA_ARGS__, OSOE_G_G_3, OSOE_G_G_2,                              \
+               osoe_shmem_g_takes_two_or_three_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_IPUT_6(dest, source, dst, sst, nelems, pe)                        \
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, iput))                      \
@@ -1280,7 +1343,12 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, iput))                     \
         ((ctx), (dest), (source), (dst), (sst), (nelems), (pe)))
 #define shmem_iput(...)                                                          \
-    OSOE_PICK7(__VA_ARGS__, OSOE_G_IPUT_7, OSOE_G_IPUT_6, , , , , )(__VA_ARGS__)
+    OSOE_PICK7(__VA_ARGS__, OSOE_G_IPUT_7, OSOE_G_IPUT_6,                        \
+               osoe_shmem_iput_takes_six_or_seven_arguments,                     \
+               osoe_shmem_iput_takes_six_or_seven_arguments,                     \
+               osoe_shmem_iput_takes_six_or_seven_arguments,                     \
+               osoe_shmem_iput_takes_six_or_seven_arguments,                     \
+               osoe_shmem_iput_takes_six_or_seven_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_IGET_6(dest, source, dst, sst, nelems, pe)                        \
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, iget))                      \
@@ -1289,7 +1357,12 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, iget))                     \
         ((ctx), (dest), (source), (dst), (sst), (nelems), (pe)))
 #define shmem_iget(...)                                                          \
-    OSOE_PICK7(__VA_ARGS__, OSOE_G_IGET_7, OSOE_G_IGET_6, , , , , )(__VA_ARGS__)
+    OSOE_PICK7(__VA_ARGS__, OSOE_G_IGET_7, OSOE_G_IGET_6,                        \
+               osoe_shmem_iget_takes_six_or_seven_arguments,                     \
+               osoe_shmem_iget_takes_six_or_seven_arguments,                     \
+               osoe_shmem_iget_takes_six_or_seven_arguments,                     \
+               osoe_shmem_iget_takes_six_or_seven_arguments,                     \
+               osoe_shmem_iget_takes_six_or_seven_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_PUT_NBI_4(dest, source, nelems, pe)                               \
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, put_nbi))                   \
@@ -1298,7 +1371,10 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, put_nbi))                  \
         ((ctx), (dest), (source), (nelems), (pe)))
 #define shmem_put_nbi(...)                                                       \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_PUT_NBI_5, OSOE_G_PUT_NBI_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_PUT_NBI_5, OSOE_G_PUT_NBI_4,                  \
+               osoe_shmem_put_nbi_takes_four_or_five_arguments,                  \
+               osoe_shmem_put_nbi_takes_four_or_five_arguments,                  \
+               osoe_shmem_put_nbi_takes_four_or_five_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_GET_NBI_4(dest, source, nelems, pe)                               \
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, get_nbi))                   \
@@ -1307,7 +1383,10 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, get_nbi))                  \
         ((ctx), (dest), (source), (nelems), (pe)))
 #define shmem_get_nbi(...)                                                       \
-    OSOE_PICK5(__VA_ARGS__, OSOE_G_GET_NBI_5, OSOE_G_GET_NBI_4, , , )(__VA_ARGS__)
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_GET_NBI_5, OSOE_G_GET_NBI_4,                  \
+               osoe_shmem_get_nbi_takes_four_or_five_arguments,                  \
+               osoe_shmem_get_nbi_takes_four_or_five_arguments,                  \
+               osoe_shmem_get_nbi_takes_four_or_five_arguments, )(__VA_ARGS__)
 
 /* The two signalling routines the spec gives a C11 generic SYNOPSIS (§9.8.3,
  * §9.8.4). */
@@ -1318,7 +1397,13 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, put_signal))               \
         ((ctx), (dest), (source), (nelems), (sig_addr), (signal), (sig_op), (pe)))
 #define shmem_put_signal(...)                                                    \
-    OSOE_PICK8(__VA_ARGS__, OSOE_G_PUT_SIGNAL_8, OSOE_G_PUT_SIGNAL_7, , , , , , )(__VA_ARGS__)
+    OSOE_PICK8(__VA_ARGS__, OSOE_G_PUT_SIGNAL_8, OSOE_G_PUT_SIGNAL_7,            \
+               osoe_shmem_put_signal_takes_seven_or_eight_arguments,             \
+               osoe_shmem_put_signal_takes_seven_or_eight_arguments,             \
+               osoe_shmem_put_signal_takes_seven_or_eight_arguments,             \
+               osoe_shmem_put_signal_takes_seven_or_eight_arguments,             \
+               osoe_shmem_put_signal_takes_seven_or_eight_arguments,             \
+               osoe_shmem_put_signal_takes_seven_or_eight_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_PUT_SIGNAL_NBI_7(dest, source, nelems, sig_addr, signal, sig_op, pe) \
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, put_signal_nbi))            \
@@ -1327,8 +1412,13 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, put_signal_nbi))           \
         ((ctx), (dest), (source), (nelems), (sig_addr), (signal), (sig_op), (pe)))
 #define shmem_put_signal_nbi(...)                                                \
-    OSOE_PICK8(__VA_ARGS__, OSOE_G_PUT_SIGNAL_NBI_8, OSOE_G_PUT_SIGNAL_NBI_7, , , , , , ) \
-        (__VA_ARGS__)
+    OSOE_PICK8(__VA_ARGS__, OSOE_G_PUT_SIGNAL_NBI_8, OSOE_G_PUT_SIGNAL_NBI_7,    \
+               osoe_shmem_put_signal_nbi_takes_seven_or_eight_arguments,         \
+               osoe_shmem_put_signal_nbi_takes_seven_or_eight_arguments,         \
+               osoe_shmem_put_signal_nbi_takes_seven_or_eight_arguments,         \
+               osoe_shmem_put_signal_nbi_takes_seven_or_eight_arguments,         \
+               osoe_shmem_put_signal_nbi_takes_seven_or_eight_arguments,         \
+               osoe_shmem_put_signal_nbi_takes_seven_or_eight_arguments, )(__VA_ARGS__)
 
 
 /* ---- Collectives (spec §9.10.7, §9.10.9) ------------------------------ */

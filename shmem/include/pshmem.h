@@ -241,14 +241,14 @@ OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_PDECL_ORDERED)
 OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_PDECL_ORDERED)
 OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_PDECL_ARITHMETIC)
 OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_PDECL_ARITHMETIC)
-/* _Complex in a C++ declaration is a GNU extension (shmem.h's guard comment);
- * -Wpedantic says so for this list too, silenced the same way. */
-#if defined(__cplusplus) && defined(__GNUC__)
+/* clang++'s -Wpedantic and _Complex in C++ (shmem.h, OSOE_CXX_COMPLEX), for
+ * this list alone. */
+#ifdef OSOE_CXX_COMPLEX
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
 OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_PDECL_ARITHMETIC)
-#if defined(__cplusplus) && defined(__GNUC__)
+#ifdef OSOE_CXX_COMPLEX
 #pragma GCC diagnostic pop
 #endif
 OSOE_RMA_STANDARD_TYPES(OSOE_BROADCAST_PDECL)
@@ -294,13 +294,13 @@ void pshmem_alltoalls64(void *dest, const void *source, ptrdiff_t dst, ptrdiff_t
 #define OSOE_TO_ALL_PDECL_COMPLEX(T, NAME) OSOE_TO_ALL_DECL_COMPLEX_P(pshmem_, T, NAME)
 OSOE_TO_ALL_INTEGER_TYPES(OSOE_TO_ALL_PDECL_INTEGER)
 OSOE_TO_ALL_FLOATING_TYPES(OSOE_TO_ALL_PDECL_FLOATING)
-/* -Wpedantic and _Complex in C++, as the reductions above. */
-#if defined(__cplusplus) && defined(__GNUC__)
+/* clang++'s -Wpedantic and _Complex, as the reductions above. */
+#ifdef OSOE_CXX_COMPLEX
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
 OSOE_TO_ALL_COMPLEX_TYPES(OSOE_TO_ALL_PDECL_COMPLEX)
-#if defined(__cplusplus) && defined(__GNUC__)
+#ifdef OSOE_CXX_COMPLEX
 #pragma GCC diagnostic pop
 #endif
 
