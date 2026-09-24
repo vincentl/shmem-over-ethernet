@@ -672,6 +672,14 @@ add_test(NAME shmem.heap-shift.invalid
           $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
 set_tests_properties(shmem.heap-shift.invalid PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "OSOE_HEAP_SHIFT='100' is not a whole number of")
+# So is an OSOE_HEAP_BASE off a page boundary, which would otherwise fail to map
+# and be reported as a base that is not free. 2 KiB past a boundary is off one
+# at every page size.
+add_test(NAME shmem.refuse.heap_base_unaligned
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_BASE=0x100000000800
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.refuse.heap_base_unaligned PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_HEAP_BASE='0x100000000800' is not a multiple of the")
 
 # The differential test (§8.1): one program, §8.1's four poles of the logical
 # node map at one world size, and the transcripts must match. On the first map

@@ -28,7 +28,8 @@ sinfo -V
 
 Keep the output: it goes in the notes with the results.
 - osoe needs Linux 6.7 or newer, and `probe` below checks the rest.
-- A Pi 5's kernel uses 16 KiB pages where the VM's uses 4 KiB. osoe sizes every mapping by the page it is given (design §8.5), and this is the first run that proves it.
+- A Pi 5's kernel uses 16 KiB pages where the VM's uses 4 KiB. osoe sizes every mapping by the page it is given (design §8.5), and this is the first run that proves it. `OSOE_HEAP_BASE`, if you set it, must be a multiple of that page.
+- Memory: a node's four PEs hold about 1 GiB of `/dev/shm` at the default heap, 256 MiB a PE, touched only as it is used, and under 2 MiB besides. A 16 GB node's `/dev/shm` is 8 GB by default.
 - The governor matters to every time below: `ondemand` clocks a core down between trips, so write down which one ran.
 - The fifth line shows what each node's own name resolves to there. On this cluster the image's `/etc/hosts` maps each name to its 10.0.1.N address. A stock Raspberry Pi OS maps a host's own name to 127.0.1.1, which its peers cannot reach; osoe then listens at the node's address toward the others instead (design §6.1), and `SHMEM_DEBUG=1` says so per node.
 

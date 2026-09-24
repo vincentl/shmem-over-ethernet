@@ -121,7 +121,7 @@ There is no single-PE default.
 | `OSOE_STEP_ID` | yes | A number; `0` is fine |
 | `SHMEM_SYMMETRIC_SIZE` | no | Heap size per PE, e.g. `64m` or `2g`; default 256 MiB. Must agree across PEs |
 | `OSOE_NO_PROGRESS_TIMEOUT` | no | Seconds a wait may go without progress before it ends the job naming what it waited for; unset, no wait gives up (design §3.15). Replaces `OSOE_BOOTSTRAP_TIMEOUT`, which is retired |
-| `OSOE_HEAP_BASE` | no | Address for each PE's own heap, e.g. `0x100000000000`, if the defaults are taken |
+| `OSOE_HEAP_BASE` | no | Address for each PE's own heap, e.g. `0x100000000000`, if the defaults are taken. A multiple of the page size, which is 16 KiB on a Raspberry Pi 5 |
 | `OSOE_HEAP_SHIFT` | no | A test mode: a size, a whole number of pages, e.g. `2m`. Each PE maps its own heap that far times its rank past the base, so no two PEs share a symmetric address (design §8.2) |
 | `OSOE_KEEPALIVE` | no | `IDLE,INTERVAL,COUNT` or `0`: TCP keepalive on the connections between nodes, in seconds, seconds and probes; default `60,10,6` (design §3.15). Jobs of more than one node only |
 

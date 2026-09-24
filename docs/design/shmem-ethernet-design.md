@@ -2101,7 +2101,9 @@ to all three, but it does not exist in a 39-bit or x86-64 address space. So:
 - **Every other PE maps its own heap at the published `B`**, and fails loudly if it
   cannot. All local PEs run the same binary, so the lead's choice suits them.
 - **`OSOE_HEAP_BASE` replaces the list** for systems where none of the candidates
-  is free. Beside it, `OSOE_HEAP_SHIFT` is §8.2's heap-base-shift test mode: each
+  is free. It must be a multiple of the page, which the mapping needs, and one
+  that is not is refused by name - a Pi 5's page is 16 KiB, so a base chosen on
+  a 4 KiB machine may not do. Beside it, `OSOE_HEAP_SHIFT` is §8.2's heap-base-shift test mode: each
   PE's own heap past `B` by its rank times the shift.
 
 *(Rejected: a compile-time `B` selected by sanitizer macros. It gives each build one

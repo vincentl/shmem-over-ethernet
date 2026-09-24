@@ -336,12 +336,19 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     b->print_info = spec_env("INFO") != NULL;
     b->debug = spec_env("DEBUG") != NULL;
 
+    /* The heap is mapped at the base with MAP_FIXED_NOREPLACE, which needs a
+     * page-aligned address: one that is not is refused here by name, not left
+     * to fail as a base that is not free. A Raspberry Pi 5's kernel uses
+     * 16 KiB pages, so an address that suits a 4 KiB machine may not suit it. */
+    long page = sysconf(_SC_PAGESIZE);
     const char *base = getenv("OSOE_HEAP_BASE");
     if (base) {
         char *end;
         unsigned long long v = strtoull(base, &end, 0);
         if (*base == '\0' || *end != '\0' || v == 0)
             osoe_fatal("OSOE_HEAP_BASE='%s' is not a nonzero address", base);
+        if (page <= 0 || v % (unsigned long long)page != 0)
+            osoe_fatal("OSOE_HEAP_BASE='%s' is not a multiple of the %ld-byte page", base, page);
         b->heap_base = v;
     }
 
@@ -353,7 +360,6 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
      * SHMEM_SYMMETRIC_SIZE takes one, and a whole number of pages.
      */
     const char *shift = getenv("OSOE_HEAP_SHIFT");
-    long page = sysconf(_SC_PAGESIZE);
     if (shift && (osoe_parse_size(shift, &b->heap_shift) != 0 || page <= 0 ||
                   b->heap_shift % (uint64_t)page != 0))
         osoe_fatal("OSOE_HEAP_SHIFT='%s' is not a whole number of %ld-byte pages", shift, page);
