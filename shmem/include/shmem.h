@@ -287,6 +287,71 @@ OSOE_AMO_FLOAT_TYPES(OSOE_AMO_DECL_CTX_EXTENDED)
 OSOE_AMO_BITWISE_TYPES(OSOE_AMO_DECL_CTX_BITWISE)
 
 /*
+ * The nonblocking fetching AMOs (§9.7.2): the same eight operations as
+ * above - fetch, swap, compare_swap, fetch_inc, fetch_add, fetch_and,
+ * fetch_or, fetch_xor - each with a leading `fetch` output parameter in place
+ * of the blocking form's return value, over the same three type lists.
+ * amo.c says what "nonblocking" means for osoe's definitions and why storing
+ * through *fetch before return is conforming.
+ */
+#define OSOE_AMO_DECL_STANDARD_NBI_P(P, T, NAME)                             \
+    void OSOE_FN(P, NAME, _atomic_compare_swap_nbi)(T *fetch, T *dest, T cond, \
+                                                    T value, int pe);         \
+    void OSOE_FN(P, NAME, _atomic_fetch_inc_nbi)(T *fetch, T *dest, int pe); \
+    void OSOE_FN(P, NAME, _atomic_fetch_add_nbi)(T *fetch, T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_EXTENDED_NBI_P(P, T, NAME)                             \
+    void OSOE_FN(P, NAME, _atomic_fetch_nbi)(T *fetch, const T *source, int pe); \
+    void OSOE_FN(P, NAME, _atomic_swap_nbi)(T *fetch, T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_BITWISE_NBI_P(P, T, NAME)                              \
+    void OSOE_FN(P, NAME, _atomic_fetch_and_nbi)(T *fetch, T *dest, T value, int pe); \
+    void OSOE_FN(P, NAME, _atomic_fetch_or_nbi)(T *fetch, T *dest, T value, int pe); \
+    void OSOE_FN(P, NAME, _atomic_fetch_xor_nbi)(T *fetch, T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_CTX_STANDARD_NBI_P(P, T, NAME)                         \
+    void OSOE_FN(P, ctx_##NAME, _atomic_compare_swap_nbi)(shmem_ctx_t ctx,   \
+                                                          T *fetch, T *dest, \
+                                                          T cond, T value, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_fetch_inc_nbi)(shmem_ctx_t ctx, T *fetch, \
+                                                       T *dest, int pe);      \
+    void OSOE_FN(P, ctx_##NAME, _atomic_fetch_add_nbi)(shmem_ctx_t ctx, T *fetch, \
+                                                       T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_CTX_EXTENDED_NBI_P(P, T, NAME)                         \
+    void OSOE_FN(P, ctx_##NAME, _atomic_fetch_nbi)(shmem_ctx_t ctx, T *fetch, \
+                                                   const T *source, int pe);  \
+    void OSOE_FN(P, ctx_##NAME, _atomic_swap_nbi)(shmem_ctx_t ctx, T *fetch, \
+                                                  T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_CTX_BITWISE_NBI_P(P, T, NAME)                          \
+    void OSOE_FN(P, ctx_##NAME, _atomic_fetch_and_nbi)(shmem_ctx_t ctx, T *fetch, \
+                                                       T *dest, T value, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_fetch_or_nbi)(shmem_ctx_t ctx, T *fetch, \
+                                                      T *dest, T value, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _atomic_fetch_xor_nbi)(shmem_ctx_t ctx, T *fetch, \
+                                                       T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_STANDARD_NBI(T, NAME) OSOE_AMO_DECL_STANDARD_NBI_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_EXTENDED_NBI(T, NAME) OSOE_AMO_DECL_EXTENDED_NBI_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_BITWISE_NBI(T, NAME) OSOE_AMO_DECL_BITWISE_NBI_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_CTX_STANDARD_NBI(T, NAME) \
+    OSOE_AMO_DECL_CTX_STANDARD_NBI_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_CTX_EXTENDED_NBI(T, NAME) \
+    OSOE_AMO_DECL_CTX_EXTENDED_NBI_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_CTX_BITWISE_NBI(T, NAME) \
+    OSOE_AMO_DECL_CTX_BITWISE_NBI_P(shmem_, T, NAME)
+
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_STANDARD_NBI)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_EXTENDED_NBI)
+OSOE_AMO_FLOAT_TYPES(OSOE_AMO_DECL_EXTENDED_NBI)
+OSOE_AMO_BITWISE_TYPES(OSOE_AMO_DECL_BITWISE_NBI)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_CTX_STANDARD_NBI)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_DECL_CTX_EXTENDED_NBI)
+OSOE_AMO_FLOAT_TYPES(OSOE_AMO_DECL_CTX_EXTENDED_NBI)
+OSOE_AMO_BITWISE_TYPES(OSOE_AMO_DECL_CTX_BITWISE_NBI)
+
+/*
  * Point-to-point synchronization (spec §9.11).
  *
  * The wait and test routines take the standard AMO types of Table 6. The
@@ -585,7 +650,16 @@ void shmem_sync(int PE_start, int logPE_stride, int PE_size, long *pSync);
 #define OSOE_REDUCE_FLOATING_TYPES(X)                                        \
     X(float, float) X(double, double) X(long double, longdouble)
 
-#if !defined(__cplusplus) && !defined(__STDC_NO_COMPLEX__)
+/*
+ * C has _Complex; C++ does not, but GCC and Clang both accept it in C++ as an
+ * extension with the same layout as C's - defined(__GNUC__) is true for both
+ * g++ and clang++ - and SOS's C++ test suite calls shmem_double_sum_reduce and
+ * shmem_complexd_sum_reduce and needs both declared. So the guard admits
+ * __GNUC__ in C++ too, and excludes only a C++ compiler that does not accept
+ * the extension.
+ */
+#if (!defined(__cplusplus) && !defined(__STDC_NO_COMPLEX__)) ||              \
+    (defined(__cplusplus) && defined(__GNUC__))
 #define OSOE_REDUCE_COMPLEX_TYPES(X)                                         \
     X(double _Complex, complexd) X(float _Complex, complexf)
 #else
@@ -619,7 +693,18 @@ OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DECL_ORDERED)
 OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DECL_ORDERED)
 OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
 OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
+/* _Complex in a C++ declaration is a GNU extension (above), and -Wpedantic
+ * says so even where it changes nothing else about the translation - silenced
+ * for exactly this one declaration list rather than for the file, so a real
+ * ISO violation elsewhere in either header still fails the strict build. */
+#if defined(__cplusplus) && defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
 OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
+#if defined(__cplusplus) && defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 /*
  * The deprecated active-set reductions (Annex F; Table 11), over the whole job
@@ -631,7 +716,9 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
     X(short, short) X(int, int) X(long, long) X(long long, longlong)
 #define OSOE_TO_ALL_FLOATING_TYPES(X)                                        \
     X(float, float) X(double, double) X(long double, longdouble)
-#if !defined(__cplusplus) && !defined(__STDC_NO_COMPLEX__)
+/* C++ and _Complex: as OSOE_REDUCE_COMPLEX_TYPES above. */
+#if (!defined(__cplusplus) && !defined(__STDC_NO_COMPLEX__)) ||              \
+    (defined(__cplusplus) && defined(__GNUC__))
 #define OSOE_TO_ALL_COMPLEX_TYPES(X)                                         \
     X(double _Complex, complexd) X(float _Complex, complexf)
 #else
@@ -661,7 +748,15 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
 
 OSOE_TO_ALL_INTEGER_TYPES(OSOE_TO_ALL_DECL_INTEGER)
 OSOE_TO_ALL_FLOATING_TYPES(OSOE_TO_ALL_DECL_FLOATING)
+/* -Wpedantic and _Complex in C++, as the reductions above. */
+#if defined(__cplusplus) && defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
 OSOE_TO_ALL_COMPLEX_TYPES(OSOE_TO_ALL_DECL_COMPLEX)
+#if defined(__cplusplus) && defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 /* Broadcast (§9.10.7), team-based, over every standard RMA type of Table 5, and
  * its byte form. The dest is updated on every PE of the team, PE_root's
@@ -867,6 +962,8 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
 #define OSOE_PICK3(_1, _2, _3, NAME, ...) NAME
 #define OSOE_PICK4(_1, _2, _3, _4, NAME, ...) NAME
 #define OSOE_PICK5(_1, _2, _3, _4, _5, NAME, ...) NAME
+/* shmem_atomic_compare_swap_nbi (5 or 6 arguments) needs this one. */
+#define OSOE_PICK6(_1, _2, _3, _4, _5, _6, NAME, ...) NAME
 /* iput/iget (6 or 7 arguments) and put_signal (7 or 8) need two wider ones. */
 #define OSOE_PICK7(_1, _2, _3, _4, _5, _6, _7, NAME, ...) NAME
 #define OSOE_PICK8(_1, _2, _3, _4, _5, _6, _7, _8, NAME, ...) NAME
@@ -985,6 +1082,86 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
         ((ctx), (dest), (value), (pe)))
 #define shmem_atomic_fetch_xor(...)                                                 \
     OSOE_PICK4(__VA_ARGS__, OSOE_G_FXOR_4, OSOE_G_FXOR_3, , )(__VA_ARGS__)
+
+/*
+ * The nonblocking fetching AMOs' C11 spellings (§9.7.2), built the same way:
+ * one selector per operation, picking on argument count between the plain and
+ * ctx forms, and within each on the type of the pointer the blocking form
+ * dispatches on - *source for fetch_nbi, *dest for the rest. compare_swap_nbi's
+ * two forms are five and six arguments, one wider than any blocking AMO
+ * reaches, hence OSOE_PICK6 above.
+ */
+#define OSOE_G_FETCH_NBI_3(fetch, source, pe)                                    \
+    (_Generic((source) OSOE_AMO_G_EXTENDED(OSOE_AMO_GC, fetch_nbi))              \
+        ((fetch), (source), (pe)))
+#define OSOE_G_FETCH_NBI_4(ctx, fetch, source, pe)                               \
+    (_Generic((source) OSOE_AMO_G_EXTENDED(OSOE_AMO_GCX, fetch_nbi))             \
+        ((ctx), (fetch), (source), (pe)))
+#define shmem_atomic_fetch_nbi(...)                                              \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FETCH_NBI_4, OSOE_G_FETCH_NBI_3, , )(__VA_ARGS__)
+
+#define OSOE_G_SWAP_NBI_4(fetch, dest, value, pe)                                \
+    (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_G, swap_nbi))                  \
+        ((fetch), (dest), (value), (pe)))
+#define OSOE_G_SWAP_NBI_5(ctx, fetch, dest, value, pe)                           \
+    (_Generic((dest) OSOE_AMO_G_EXTENDED(OSOE_AMO_GX, swap_nbi))                 \
+        ((ctx), (fetch), (dest), (value), (pe)))
+#define shmem_atomic_swap_nbi(...)                                               \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_SWAP_NBI_5, OSOE_G_SWAP_NBI_4, , , )(__VA_ARGS__)
+
+#define OSOE_G_CSWAP_NBI_5(fetch, dest, cond, value, pe)                         \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, compare_swap_nbi))          \
+        ((fetch), (dest), (cond), (value), (pe)))
+#define OSOE_G_CSWAP_NBI_6(ctx, fetch, dest, cond, value, pe)                    \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, compare_swap_nbi))         \
+        ((ctx), (fetch), (dest), (cond), (value), (pe)))
+#define shmem_atomic_compare_swap_nbi(...)                                       \
+    OSOE_PICK6(__VA_ARGS__, OSOE_G_CSWAP_NBI_6, OSOE_G_CSWAP_NBI_5, , , , )(__VA_ARGS__)
+
+#define OSOE_G_FINC_NBI_3(fetch, dest, pe)                                       \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_inc_nbi))             \
+        ((fetch), (dest), (pe)))
+#define OSOE_G_FINC_NBI_4(ctx, fetch, dest, pe)                                  \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, fetch_inc_nbi))            \
+        ((ctx), (fetch), (dest), (pe)))
+#define shmem_atomic_fetch_inc_nbi(...)                                          \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_FINC_NBI_4, OSOE_G_FINC_NBI_3, , )(__VA_ARGS__)
+
+#define OSOE_G_FADD_NBI_4(fetch, dest, value, pe)                                \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_G, fetch_add_nbi))             \
+        ((fetch), (dest), (value), (pe)))
+#define OSOE_G_FADD_NBI_5(ctx, fetch, dest, value, pe)                           \
+    (_Generic((dest) OSOE_AMO_G_STANDARD(OSOE_AMO_GX, fetch_add_nbi))            \
+        ((ctx), (fetch), (dest), (value), (pe)))
+#define shmem_atomic_fetch_add_nbi(...)                                          \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_FADD_NBI_5, OSOE_G_FADD_NBI_4, , , )(__VA_ARGS__)
+
+#define OSOE_G_FAND_NBI_4(fetch, dest, value, pe)                                \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_and_nbi))              \
+        ((fetch), (dest), (value), (pe)))
+#define OSOE_G_FAND_NBI_5(ctx, fetch, dest, value, pe)                           \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_and_nbi))             \
+        ((ctx), (fetch), (dest), (value), (pe)))
+#define shmem_atomic_fetch_and_nbi(...)                                          \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_FAND_NBI_5, OSOE_G_FAND_NBI_4, , , )(__VA_ARGS__)
+
+#define OSOE_G_FOR_NBI_4(fetch, dest, value, pe)                                 \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_or_nbi))               \
+        ((fetch), (dest), (value), (pe)))
+#define OSOE_G_FOR_NBI_5(ctx, fetch, dest, value, pe)                            \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_or_nbi))              \
+        ((ctx), (fetch), (dest), (value), (pe)))
+#define shmem_atomic_fetch_or_nbi(...)                                           \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_FOR_NBI_5, OSOE_G_FOR_NBI_4, , , )(__VA_ARGS__)
+
+#define OSOE_G_FXOR_NBI_4(fetch, dest, value, pe)                                \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_G, fetch_xor_nbi))              \
+        ((fetch), (dest), (value), (pe)))
+#define OSOE_G_FXOR_NBI_5(ctx, fetch, dest, value, pe)                           \
+    (_Generic((dest) OSOE_AMO_G_BITWISE(OSOE_AMO_GX, fetch_xor_nbi))             \
+        ((ctx), (fetch), (dest), (value), (pe)))
+#define shmem_atomic_fetch_xor_nbi(...)                                          \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_FXOR_NBI_5, OSOE_G_FXOR_NBI_4, , , )(__VA_ARGS__)
 
 /*
  * The deprecated C11 generic spellings (Annex F.2.12): shmem_fetch, shmem_set,
@@ -1324,6 +1501,12 @@ void shmem_pcontrol(int level, ...);
 #undef OSOE_AMO_DECL_CTX_STANDARD
 #undef OSOE_AMO_DECL_CTX_EXTENDED
 #undef OSOE_AMO_DECL_CTX_BITWISE
+#undef OSOE_AMO_DECL_STANDARD_NBI
+#undef OSOE_AMO_DECL_EXTENDED_NBI
+#undef OSOE_AMO_DECL_BITWISE_NBI
+#undef OSOE_AMO_DECL_CTX_STANDARD_NBI
+#undef OSOE_AMO_DECL_CTX_EXTENDED_NBI
+#undef OSOE_AMO_DECL_CTX_BITWISE_NBI
 #undef OSOE_AMO_DECL_DEPRECATED_EXTENDED
 #undef OSOE_AMO_DECL_DEPRECATED_STANDARD
 #undef OSOE_WAIT_DECL_SCALAR

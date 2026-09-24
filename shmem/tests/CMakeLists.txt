@@ -645,7 +645,7 @@ endif()
 # preset; the whole of tier 2 runs shifted with OSOE_HEAP_SHIFT in ctest's
 # environment. 2 MiB keeps every PE of these jobs within a few MiB of the
 # candidates each sanitizer allows.
-foreach(name rma amo amo-types wait wait-many signal team malloc barrier)
+foreach(name rma amo amo-types amo-nbi wait wait-many signal team malloc barrier)
   add_test(NAME shmem.heap-shift.${name}.L4
     COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_SHIFT=2m
             $<TARGET_FILE:osoe-launch> -n 4 -t 60 -- $<TARGET_FILE:shmem_test_${name}>)
@@ -1046,6 +1046,19 @@ osoe_tier2_test(amo-deprecated)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(amo-deprecated 0,0,1,1)
   osoe_tier2_map_test(amo-deprecated 0,1,2,0,1,0)
+endif()
+
+# shmem.amo-nbi (§9.7.2; test-amo-nbi.c), over a logical node map (§8.1): its
+# contended phase has every PE issue fetch_inc_nbi/fetch_add_nbi at PE 0, which
+# is same-node for some PEs and remote for others depending on the map, as
+# shmem.amo-deprecated's right-neighbour targets are just above. Excluded
+# under ThreadSanitizer for the same reason: the ordering that makes a
+# cross-node AMO's completion visible runs through another process, which
+# tsan cannot see.
+osoe_tier2_test(amo-nbi)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(amo-nbi 0,0,1,1)
+  osoe_tier2_map_test(amo-nbi 0,1,2,0,1,0)
 endif()
 
 osoe_tier2_test(typed-rma)
