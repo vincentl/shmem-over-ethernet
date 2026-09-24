@@ -48,7 +48,7 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
                      uint32_t length)
 {
     (void)context;
-    if (region != OSOE_REGION_HEAP)
+    if (region != OSOE_REGION_HEAP && region != OSOE_REGION_INTERNAL)
         osoe_fatal("a peer addressed region %u, which this build does not carry; "
                    "the nodes are running different libraries", region);
     if (pe >= osoe.bootstrap.world_size)
@@ -57,6 +57,17 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
     int32_t local = osoe_node_local_id(&osoe.node, pe);
     if (local < 0)
         return NULL;
+    if (region == OSOE_REGION_INTERNAL) {
+        /* The library's own region, the tail of the same mapping
+         * (internal-region.h): sized by the fan-out every node agrees on. */
+        if (offset > osoe.node.internal_bytes || length > osoe.node.internal_bytes - offset)
+            osoe_fatal("a peer addressed %u bytes at offset %llu of PE %u's internal "
+                       "region, which is %llu bytes; the nodes disagree about "
+                       "OSOE_COLLECTIVE_FANOUT or run different libraries", length,
+                       (unsigned long long)offset, pe,
+                       (unsigned long long)osoe.node.internal_bytes);
+        return (char *)osoe.node.heap_of[local] + osoe.node.internal_offset + offset;
+    }
     if (offset > osoe.node.heap_size || length > osoe.node.heap_size - offset)
         osoe_fatal("a peer addressed %u bytes at offset %llu of PE %u's heap, which is "
                    "%llu bytes; the nodes disagree about SHMEM_SYMMETRIC_SIZE",

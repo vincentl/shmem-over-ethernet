@@ -26,13 +26,14 @@
 #include "transport.h"
 
 #define OSOE_JOB_MAGIC UINT64_C(0x00626f6a656f736f)   /* "osoejob" */
-#define OSOE_JOB_LAYOUT 7     /* 2: the per-rank claim array; 3: `opened`;
+#define OSOE_JOB_LAYOUT 8     /* 2: the per-rank claim array; 3: `opened`;
                                * 4: the per-node backend blob;
                                * 5: collective_fanout;
                                * 6: the per-rank local index;
                                * 7 (phase 1 step 3): node-local, written by the
                                * lead from the socket rendezvous: the map as
-                               * runs, each node's address, each node's blob */
+                               * runs, each node's address, each node's blob;
+                               * 8 (phase 1 step 5): each node's lead */
 
 /*
  * The node-local object a lead writes what the rendezvous taught it into, for
@@ -51,7 +52,7 @@ struct osoe_job_header {
     /* How many of this node's PEs have it open: the last removes the name. */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t opened;
     /* Then, each cache-line aligned: run_count runs, node_count addresses,
-     * node_count blobs. */
+     * node_count blobs, node_count leads. */
 };
 
 static uint64_t align_line(uint64_t n)
@@ -74,10 +75,57 @@ static uint64_t blobs_offset(uint32_t run_count, uint32_t node_count)
     return align_line(addresses_offset(run_count) + (uint64_t)node_count * sizeof(uint32_t));
 }
 
+static uint64_t leads_offset(uint32_t run_count, uint32_t node_count)
+{
+    return align_line(blobs_offset(run_count, node_count) +
+                      (uint64_t)node_count * OSOE_JOB_BACKEND_BLOB_BYTES);
+}
+
 static uint64_t object_bytes(uint32_t run_count, uint32_t node_count)
 {
-    return blobs_offset(run_count, node_count) +
-           (uint64_t)node_count * OSOE_JOB_BACKEND_BLOB_BYTES;
+    return leads_offset(run_count, node_count) + (uint64_t)node_count * sizeof(uint32_t);
+}
+
+/*
+ * Each node's lead - its rank with local id 0 - from the runs, into
+ * lead[node_count]: O(R + N). A run is an arithmetic progression in node and
+ * local id, so it holds at most one rank with local id 0, unless its local id
+ * is 0 throughout, when every rank of it is the lead of a different node; all
+ * the runs together hold exactly N leads. False if a node is left without one,
+ * which the rank map's own checks (rank-map.c) should make impossible.
+ */
+static bool find_leads(const struct osoe_rank_run *runs, uint32_t run_count,
+                       uint32_t node_count, uint32_t *lead)
+{
+    for (uint32_t n = 0; n < node_count; n++)
+        lead[n] = UINT32_MAX;
+    for (uint32_t i = 0; i < run_count; i++) {
+        const struct osoe_rank_run *r = &runs[i];
+        uint32_t first, last;               /* the run's leads are k in [first, last) */
+        if (r->local_step == 0) {
+            if (r->first_local != 0)
+                continue;
+            first = 0;
+            last = r->node_step == 0 && r->count > 0 ? 1 : r->count;
+        } else {
+            if ((int64_t)r->first_local % r->local_step != 0)
+                continue;
+            int64_t k = -(int64_t)r->first_local / r->local_step;
+            if (k < 0 || k >= (int64_t)r->count)
+                continue;
+            first = (uint32_t)k;
+            last = first + 1;
+        }
+        for (uint32_t k = first; k < last; k++) {
+            int64_t node = (int64_t)r->first_node + (int64_t)k * r->node_step;
+            if (node >= 0 && node < (int64_t)node_count)
+                lead[node] = r->first_rank + k;
+        }
+    }
+    for (uint32_t n = 0; n < node_count; n++)
+        if (lead[n] == UINT32_MAX)
+            return false;
+    return true;
 }
 
 /* Point the job at the tables in the mapping. */
@@ -88,6 +136,7 @@ static void bind_tables(struct osoe_job *j, const struct osoe_job_header *h)
     j->run_count = h->run_count;
     j->ipv4 = (const uint32_t *)(p + addresses_offset(h->run_count));
     j->backend_blob = p + blobs_offset(h->run_count, h->node_count);
+    j->node_lead = (const uint32_t *)(p + leads_offset(h->run_count, h->node_count));
 }
 
 /* The lead: meet the other leads, and write what it learned for its node. */
@@ -133,6 +182,9 @@ static void lead(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t se
     memcpy(base + addresses_offset(r.run_count), r.ipv4, sizeof *r.ipv4 * b->node_count);
     memcpy(base + blobs_offset(r.run_count, b->node_count), r.blobs,
            (size_t)b->node_count * OSOE_JOB_BACKEND_BLOB_BYTES);
+    if (!find_leads(r.runs, r.run_count, b->node_count,
+                    (uint32_t *)(base + leads_offset(r.run_count, b->node_count))))
+        osoe_fatal("the job's rank map leaves a node without a PE of local id 0");
     free(r.runs);
     free(r.ipv4);
     free(r.blobs);
@@ -246,6 +298,7 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
             osoe_fatal("%s", why);
         j->runs = j->owned_runs;
         j->backend_blob = no_blob;
+        j->one_node_lead = b->gtids[0];         /* gtids are in local-id order */
         return;
     }
 

@@ -42,10 +42,10 @@ static struct osoe_transport_watch the_watch;      /* one wait at a time (§4.6)
 
 struct osoe_transport_watch *osoe_transport_watch(enum osoe_region region, uint64_t offset, size_t len)
 {
-    /* Only the heap has waiters today. The encoding names the region, so
-     * OSOE_REGION_INTERNAL (§5.8) and statics (§4.3 phase 1.5) need this guard
-     * removed and nothing else - not a second layout version. */
-    if (region != OSOE_REGION_HEAP)
+    /* The heap and OSOE_REGION_INTERNAL have waiters: the encoding names the
+     * region, so the internal region needed this guard widened and nothing
+     * else, as statics (§4.3 phase 1.5) will. */
+    if (region != OSOE_REGION_HEAP && region != OSOE_REGION_INTERNAL)
         osoe_fatal("watching region %d is not supported", (int)region);
     struct osoe_pe_slot *slot = &osoe.node.slots[osoe.bootstrap.local_id];
     osoe_count(OSOE_C_TRANSPORT_WATCH_CALLS, 1);

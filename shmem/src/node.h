@@ -605,8 +605,12 @@ struct osoe_node {
     uint32_t first_rank;
     uint32_t *sorted_rank;          /* the L ranks ascending ... */
     uint32_t *sorted_local;         /* ... and each one's local id */
-    uint64_t heap_bytes;
+    uint64_t heap_bytes;            /* mapped: the heap, then the internal region */
     uint64_t heap_size;             /* the agreed SHMEM_SYMMETRIC_SIZE */
+    /* OSOE_REGION_INTERNAL (internal-region.h): where in each heap mapping it
+     * starts - the page-rounded heap size - and how long it is. */
+    uint64_t internal_offset;
+    uint64_t internal_bytes;
     unsigned char *landing;         /* the landing zones; index with osoe_node_landing */
     uint32_t landing_slot_bytes;    /* a PE's whole zone, since layout 16 */
     uint32_t landing_data_bytes;    /* the blocking slot's data: one AM chunk */

@@ -128,8 +128,9 @@ rate.
 ## 6. The benchmark
 
 `osoe-bench` prints one measurement a line: put and quiet and get latency by
-size, stream bandwidth, fetch-add latency, barrier time, and every PE
-streaming at once (`tools/bench/osoe-bench.c`).
+size, stream bandwidth, fetch-add latency, barrier time, a reduction's and a
+broadcast's time at 8 bytes and 64 KiB, and every PE streaming at once
+(`tools/bench/osoe-bench.c`).
 
 ```sh
 B=build/release/tools/bench/osoe-bench

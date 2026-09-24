@@ -72,6 +72,8 @@ struct osoe_job {
     uint32_t run_count;
     const uint32_t *ipv4;           /* each node's address, network order; NULL on one node */
     const unsigned char *backend_blob;  /* node_count blobs (osoe_job_backend_blob) */
+    const uint32_t *node_lead;      /* node_count leads' ranks; NULL on one node */
+    uint32_t one_node_lead;         /* the lead's rank on one node */
     struct osoe_rank_set here;      /* this node's ranks: the locality question */
     struct osoe_rank_run *owned_runs;   /* the map of a job of one node, freed at leave */
     bool force_remote;              /* §8.1: deny the pointer to a node-mate */
@@ -115,6 +117,21 @@ static inline uint32_t osoe_job_local_index(const struct osoe_job *j, uint32_t p
                                     ? osoe_rank_run_find(j->runs, j->run_count, pe) : NULL;
     return r ? r->first_local + (uint32_t)((int64_t)(pe - r->first_rank) * r->local_step)
              : UINT32_MAX;
+}
+
+/*
+ * The world rank of node `node`'s lead - its PE with local id 0 - or UINT32_MAX
+ * if there is no such node. O(1): the node's lead writes every node's lead into
+ * the node-local object at the rendezvous (job.c), found from the runs once in
+ * O(R + N), so that a broadcast can re-root its tree on every call
+ * (collectives.c) without a scan of the map. N words, one copy per node, beside
+ * the node_count addresses and blobs already there.
+ */
+static inline uint32_t osoe_job_node_lead(const struct osoe_job *j, uint32_t node)
+{
+    if (node >= j->node_count)
+        return UINT32_MAX;
+    return j->node_lead ? j->node_lead[node] : j->one_node_lead;
 }
 
 /* The logical node a world rank is on. O(log R): the network path's question. */

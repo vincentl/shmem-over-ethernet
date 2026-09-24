@@ -1049,6 +1049,51 @@ endif()
 # the maps for shmem.internode.*'s reason: the lead writes the reply from
 # another process.
 osoe_tier2_test(get-nbi)
+
+# The reductions and broadcast (§5.5, phase 1 step 5; test-reduce.c,
+# test-broadcast.c): on one node at 1, 2 and 4 PEs, where only the intranode
+# accumulator runs; across nodes on a block and an interleaved map; and on five
+# nodes at fan-out 2, where the leads' tree has an interior node that both
+# combines its children's pieces and passes the result on. tsan is left out of
+# the maps for shmem.internode.*'s reason.
+foreach(collective reduce broadcast)
+  osoe_tier2_test(${collective})
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    osoe_tier2_map_test(${collective} 0,0,1,1)
+    osoe_tier2_map_test(${collective} 0,1,2,0,1,0)
+    osoe_tier2_map_test(${collective} 0,1,2,3,4 OSOE_COLLECTIVE_FANOUT=2)
+  endif()
+endforeach()
+# Under OSOE_FORCE_REMOTE, SHMEM_TEAM_SHARED collapses to the PE itself: the
+# data collectives' team of one (collectives.c), which no other map reaches.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  foreach(collective reduce broadcast)
+    add_test(NAME shmem.${collective}.force-remote.0-0-1-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+              $<TARGET_FILE:shmem_test_${collective}>)
+    set_tests_properties(shmem.${collective}.force-remote.0-0-1-1 PROPERTIES
+      LABELS "tier2" TIMEOUT 90)
+  endforeach()
+endif()
+
+# OSOE_REGION_INTERNAL itself (test-internal-region.c): between node-mates, a
+# path no collective takes, across nodes, and both. White-box: it calls the
+# transport, so the library's own sources are compiled into it.
+get_target_property(osoe_library_sources osoe SOURCES)
+list(TRANSFORM osoe_library_sources PREPEND ${PROJECT_SOURCE_DIR}/shmem/)
+add_executable(shmem_test_internal-region test-internal-region.c ${osoe_library_sources})
+target_include_directories(shmem_test_internal-region PRIVATE ../src ../include)
+target_link_libraries(shmem_test_internal-region PRIVATE osoe_base rt Threads::Threads
+  PkgConfig::LIBURING)
+osoe_warnings(shmem_test_internal-region)
+add_test(NAME shmem.internal-region.L2
+  COMMAND osoe-launch -n 2 -t 60 -- $<TARGET_FILE:shmem_test_internal-region>)
+set_tests_properties(shmem.internal-region.L2 PROPERTIES LABELS "tier2" TIMEOUT 90)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(internal-region 0,1)
+  osoe_tier2_map_test(internal-region 0,0,1,1)
+endif()
 set(osoe_get_nbi_small OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
@@ -1392,6 +1437,13 @@ if(OSOE_TIER3)
     osoe_tier3_test(get-nbi.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_get-nbi
                     ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
                         OSOE_AM_CREDITS=2)
+    # The leads' tree of the reductions and broadcast, over the shaped link.
+    osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
+    osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)
+    if(shape STREQUAL "pi")
+      osoe_tier3_test(reduce.0-1-2-3-4.k2 pi 0,1,2,3,4 shmem_test_reduce
+                      ENV OSOE_COLLECTIVE_FANOUT=2)
+    endif()
     osoe_tier3_test(reply-starvation.0-1-1-1-1-1-1 ${shape} 0,1,1,1,1,1,1
                     shmem_test_reply-starvation
                     ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096

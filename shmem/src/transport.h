@@ -73,7 +73,8 @@
 enum osoe_region {
     OSOE_REGION_HEAP = 0,   /* the PE's symmetric heap (§4.1) */
     OSOE_REGION_INTERNAL,   /* library scratch and collective control words
-                             * (§5.8); never visible to the application */
+                             * (§5.8); never visible to the application. The
+                             * tail of the heap mapping (internal-region.h) */
     /* OSOE_REGION_STATICS arrives with §4.3 phase 1.5 */
     OSOE_REGION_COUNT
 };

@@ -72,7 +72,9 @@ void osoe_team_start(void)
         .me = osoe.bootstrap.rank,
         .arrived = &osoe.node.hdr->world_arrived,
         .released = &osoe.node.hdr->world_released,
+        .copied = &osoe.node.hdr->world_copied,
         .epoch = &osoe.world_epoch,
+        .data_epoch = &osoe.world_data_epoch,
         .published = &osoe.node.slots[osoe.bootstrap.local_id].world_epoch,
     };
     /*
@@ -96,7 +98,9 @@ void osoe_team_start(void)
         .me = alone ? 0 : osoe.bootstrap.local_id,
         .arrived = &osoe.node.hdr->shared_arrived,
         .released = &osoe.node.hdr->shared_released,
+        .copied = &osoe.node.hdr->shared_copied,
         .epoch = &osoe.shared_epoch,
+        .data_epoch = &osoe.shared_data_epoch,
         .published = &osoe.node.slots[osoe.bootstrap.local_id].shared_epoch,
     };
     finalize_team = (struct osoe_team){
