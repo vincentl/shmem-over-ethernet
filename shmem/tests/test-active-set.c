@@ -1,8 +1,9 @@
 /*
  * The deprecated active-set collectives (Annex F; design §7.4) over the whole
  * job, the only active set osoe runs them over: every _to_all operator on each
- * of Table 11's types, at one element and several, with negative values where
- * the order is signed, and in place; shmem_broadcast32 and shmem_broadcast64
+ * of Table 11's types - the integers at one element and several, the floating
+ * and complex types at several - with negative values where the order is
+ * signed, and in place; shmem_broadcast32 and shmem_broadcast64
  * from every root - the root's dest left exactly as it was, every other PE's
  * updated - at a size that goes through the internode phase in pieces, and in
  * place; shmem_barrier and shmem_sync, beside the C11 shmem_sync(team) that
@@ -187,8 +188,8 @@ static void broadcasts(void)
 {
     int32_t *src32 = shmem_malloc(LARGE * sizeof *src32);
     int32_t *dst32 = shmem_malloc(LARGE * sizeof *dst32);
-    int64_t *buf64 = shmem_malloc(SEVERAL * sizeof *buf64);
-    CHECK_FATAL(src32 && dst32 && buf64);
+    int64_t *buffer = shmem_malloc(SEVERAL * sizeof *buffer);
+    CHECK_FATAL(src32 && dst32 && buffer);
     size_t sizes[] = { 1, SEVERAL, LARGE };
     for (size_t s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {
         for (int root = 0; root < npes; root++) {
@@ -212,30 +213,45 @@ static void broadcasts(void)
      * are overwritten. */
     for (int root = 0; root < npes; root++) {
         for (int i = 0; i < SEVERAL; i++)
-            buf64[i] = (int64_t)value(me, i, 1);
-        shmem_broadcast64(buf64, buf64, SEVERAL, root, 0, 0, npes, pSync);
+            buffer[i] = (int64_t)value(me, i, 1);
+        shmem_broadcast64(buffer, buffer, SEVERAL, root, 0, 0, npes, pSync);
         for (int i = 0; i < SEVERAL; i++)
-            CHECK(buf64[i] == (int64_t)value(root, i, 1));
+            CHECK(buffer[i] == (int64_t)value(root, i, 1));
     }
     shmem_free(src32);
     shmem_free(dst32);
-    shmem_free(buf64);
+    shmem_free(buffer);
 }
 
-/* The active-set barrier and sync, and the C11 shmem_sync(team) beside them. */
+/*
+ * The active-set barrier and sync, each on its own. shmem_barrier completes the
+ * PE's puts before it synchronizes - the quiet a sync does not have - so the
+ * left neighbour's put is here when this PE's barrier returns; across nodes,
+ * where the put and the barrier travel different paths, a barrier without the
+ * quiet would be caught. The deprecated sync is checked alone, after the quiet
+ * its caller owes it and with nothing after it that synchronizes, so a sync
+ * that did nothing would be caught too. The C11 shmem_sync(team) that shares
+ * its name, last.
+ */
 static void barriers(void)
 {
-    int *flag = shmem_malloc(sizeof *flag);
-    CHECK_FATAL(flag);
+    int *flag = shmem_malloc(sizeof *flag), *mark = shmem_malloc(sizeof *mark);
+    CHECK_FATAL(flag && mark);
+    *flag = *mark = -1;
+    shmem_barrier_all();
+    int right = (me + 1) % npes;
     for (int round = 0; round < 6; round++) {
-        *flag = round;
+        shmem_int_p(flag, round, right);
         shmem_barrier(0, 0, npes, pSync);
-        int right = (me + 1) % npes;
-        CHECK(shmem_int_g(flag, right) == round);
+        CHECK(*flag == round);
+        shmem_int_p(mark, round, right);
+        shmem_quiet();
         shmem_sync(0, 0, npes, pSync);
-        CHECK(shmem_sync(SHMEM_TEAM_WORLD) == 0);
+        CHECK(*mark == round);
     }
+    CHECK(shmem_sync(SHMEM_TEAM_WORLD) == 0);
     shmem_free(flag);
+    shmem_free(mark);
 }
 
 int main(void)

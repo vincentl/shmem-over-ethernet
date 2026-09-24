@@ -197,6 +197,9 @@ int osoe_broadcast(const char *routine, shmem_team_t team, void *dest, const voi
 void osoe_active_set_whole_job(const char *routine, int PE_start, int logPE_stride,
                                int PE_size)
 {
+    /* Before or after the library's life the job's size is 0, and "not the
+     * whole job of 0 PEs" would be a wrong reason for the right refusal. */
+    osoe_require_initialized(routine);
     int npes = (int)osoe.bootstrap.world_size;
     if (PE_start == 0 && PE_size == npes && logPE_stride >= 0 &&
         (logPE_stride == 0 || PE_size == 1))

@@ -35,6 +35,12 @@ static void call(const char *routine)
         shmem_quiet();
     } else if (strcmp(routine, "ptr") == 0) {
         shmem_ptr(&dummy, 0);
+    } else if (strcmp(routine, "barrier") == 0) {
+        static long pSync[SHMEM_BARRIER_SYNC_SIZE];
+        shmem_barrier(0, 0, 1, pSync);
+    } else if (strcmp(routine, "sum_to_all") == 0) {
+        static long pSync[SHMEM_REDUCE_SYNC_SIZE], pWrk[SHMEM_REDUCE_MIN_WRKDATA_SIZE];
+        shmem_long_sum_to_all(&ivar, &ivar, 1, 0, 0, 1, pWrk, pSync);
     }
 }
 

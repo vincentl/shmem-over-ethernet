@@ -1078,11 +1078,16 @@ void shmem_udcflush_line(void *dest);
 /* spec §9.10.3's shmem_sync(team), beside the deprecated active-set shmem_sync
  * of four arguments (declared above): the count picks, as it does between the
  * forms with and without a context, and the deprecated one is called by its
- * parenthesized name, which no function-like macro expands. */
+ * parenthesized name, which no function-like macro expands. Two or three
+ * arguments name an identifier nothing declares, so the mistake does not
+ * compile - where an empty choice would have compiled to a sync that never
+ * happened. */
 #define OSOE_SYNC_1(team) shmem_team_sync(team)
 #define OSOE_SYNC_4(PE_start, logPE_stride, PE_size, pSync)                      \
     (shmem_sync)((PE_start), (logPE_stride), (PE_size), (pSync))
-#define shmem_sync(...) OSOE_PICK4(__VA_ARGS__, OSOE_SYNC_4, , , OSOE_SYNC_1, )(__VA_ARGS__)
+#define shmem_sync(...)                                                          \
+    OSOE_PICK4(__VA_ARGS__, OSOE_SYNC_4, osoe_shmem_sync_takes_one_or_four_arguments,  \
+               osoe_shmem_sync_takes_one_or_four_arguments, OSOE_SYNC_1, )(__VA_ARGS__)
 
 
 /* ---- Point-to-point synchronization (spec §9.11) --------------------- */
