@@ -1085,7 +1085,8 @@ space:
   (§4.3), applied in FIFO order per PE;
 - copying completed **nonblocking get** replies from the landing zone into a
   private destination, so landing-zone space is released without waiting for the
-  application to call `quiet`;
+  application to call `quiet` *(not built: the issuing thread copies them at its
+  next wait, or when the zone is full - §4.6, as built)*;
 - **`shmem_global_exit` and job abort**: the agent ends its own process with the
   status - with `exit(status)` on the caller's PE, and `fflush` and
   `_exit(status)` on every other (§3.15, as built).
@@ -1109,13 +1110,15 @@ which is a hang rather than a short read. One slot per PE is enough while gets
 and fetching AMOs are blocking, since `SERIALIZED` allows one outstanding (§4.6),
 so the zone is sized by `L` and not by node count; nonblocking gets change that,
 and the `bytes_issued`/`bytes_landed` pair beside it is already the shape §4.6
-specifies for them. The progress thread writes reply chunks and fetching-AMO results
+specifies for them. *(They did, at layout 16: each zone now also holds its PE's
+nonblocking gets in flight, records and an arena, §4.6 as built.)* The progress thread writes reply chunks and fetching-AMO results
 there, and the *origin* copies into `dest`:
 
 - blocking get or fetching AMO: the calling thread, already waiting in the
   library;
 - nonblocking get: that PE's agent, or the application thread at `quiet`,
-  whichever comes first.
+  whichever comes first *(as built, the thread at its next wait, or at an issue
+  that finds the zone full; §4.6)*.
 
 This corrects the earlier claim that "the origin side never needs a helper." It
 never needs one *for progress*; it does need its private memory written by a
@@ -2493,6 +2496,50 @@ waits for *its* reply, not for a byte count. Up to `SERIALIZED` a PE has at most
 such operation outstanding, so its landing zone holds one completion slot with its
 own wake word.
 
+*As built: nonblocking gets* (after phase 1 step 4, the author's decision on
+the strided forms, 2026-09-24). A PE's landing zone holds, after its blocking
+slot, `OSOE_GETS_IN_FLIGHT` request records (default 64) and an arena of
+`OSOE_GET_LANDING_BYTES` (default 256 KiB) that their replies share (control
+segment layout 16). A nonblocking get asks and returns: each piece - no larger
+than a chunk, the wire's limit or the arena - takes a record and a range of the
+arena, writes the range into the record and then its token, with release,
+adds its bytes to `bytes_issued`, takes a reply credit and goes out. The token
+carries the record's index in its low 16 bits and a top bit that no blocking
+token has, so **the wire format is unchanged**: the reply echoes the token, and
+the lead finds the record by it and refuses a reply whose token is not the
+record's or whose bytes would fall outside the record's range, as it refuses an
+unarmed reply to the blocking slot (§3.4's trust boundary). The lead lands the
+bytes in the arena, then adds the reply's length to `bytes_landed` - seq_cst,
+since it is the value half of the two-sided wait on the wake word beside it
+(base/wait-word.h: a wake only while the PE waits) - and **returns the credit
+as the reply lands**, where a blocking operation's caller returns it after
+reading its slot: the PE copies nonblocking replies out only at its next wait,
+and holding their credits until then would keep its node-mates' gets queued
+behind replies long delivered. That is the return point the credit's own
+comment has named since the credits were built (reply.h), and the credit
+model's take and give are the same operations whoever gives. Every wait -
+quiet, pe_quiet whatever PEs it names, and a barrier's opening quiet - waits
+for `bytes_landed == bytes_issued` and copies each reply to its `dst`, and so
+does finalize's barrier; an iget ends with a wait for its gets alone
+(`osoe_transport_wait_gets`), since a whole wait would also complete, and pay
+the acknowledgement of, the writes to that PE's node, which an iget does not
+promise. The lead retires a record as its reply lands, so a duplicate reply is
+refused, and checks a reply with no bytes as it checks one with some - the
+parser hands only replies with bytes to `destination()`, which is where the
+check had lived, for the blocking slot too (review of the nonblocking gets). A
+count of landed bytes past those issued is fatal rather than a wait that can
+never end. **An issue that finds the records or the arena used up completes
+what is in flight first**, which bounds the zone without anything failing; the
+design's other release, the PE's agent copying replies out early, is not built.
+The record's fields and the counters use release, acquire and seq_cst, never
+relaxed, as §3.16 asks of every protocol word.
+A get to a node-mate is a `memcpy` before it returns, as ever. The simple
+equality is right while one thread issues and completes; `MULTIPLE` needs the
+generation scheme below (§4.6, `get_completion_model.py`). Packed replies,
+rather than a chunk-sized slot per get, are for the corpus's one CPU user of
+`get_nbi`, bale's getput, which issues many one-word gets to random PEs before
+a barrier: with slots of a chunk each, 256 KiB would hold four of them.
+
 **Peer scan — dirty set.** Each PE keeps the node indices it has touched since
 its last `quiet`, plus its highest segment per node. Cost tracks the
 application's communication degree, not job size: a halo exchange scans six
@@ -2976,7 +3023,7 @@ which still read the AM chunk size and handler checksum). The backend is chosen
 by the CMake option `OSOE_BACKEND`, whose only value is `am`. The last two small
 gaps are closed as well: `osoe_transport_get` takes `flags`, with none defined
 yet, so that `OSOE_TRANSPORT_MORE` and the nonblocking flag arrive without a
-signature change; and `osoe_transport_load` and `osoe_transport_set_range` live in
+signature change *(both did, with the nonblocking gets: §4.6, as built)*; and `osoe_transport_load` and `osoe_transport_set_range` live in
 `transport-am.c`, the file a second backend replaces, rather than in the
 intranode path's file, which it keeps.
 
@@ -3105,10 +3152,11 @@ question nobody needed. Recorded before a benchmark applies pressure for them.
 | Operation | Guarantee | Intranode backend | AM backend |
 |---|---|---|---|
 | put | Returns at local completion. Applied later; complete and visible once a covering wait returns. No ordering between puts to one PE except across a fence (spec §9.6.1.1). Notify best effort | `memcpy` into the target's mapping, applied before return, then notify | Reserve and copy into the node-pair buffer (§3.5); the dirty set records the node |
-| get | Blocking. Complete per operation: `dst` holds the bytes on return. Never fenced | `memcpy` out of the target's mapping | Request; the reply lands in the landing zone; the calling thread copies it out (§3.12) |
+| get | Blocking. Complete per operation: `dst` holds the bytes on return. With `OSOE_TRANSPORT_NONBLOCKING`, complete at the PE's next wait instead. Never fenced | `memcpy` out of the target's mapping, nonblocking or not | Request; a blocking get's reply lands in the landing slot and the calling thread copies it out (§3.12); a nonblocking one's in the landing arena, copied out by the wait (§4.6, as built) |
 | rmw | One 4- or 8-byte word. Exactly once. Exclusive against same-width rmw on the word within one atomicity domain, and against waiters and tests (spec §3.2). Fetching: complete on return. Non-fetching: as a put. Notify exact | One C11 atomic on the shared mapping (§3.16 orders), then notify | Handler-time CPU atomic at the target; a fetched value is a value descriptor (§3.8) |
 | fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then ask each dirty peer not yet acknowledged to acknowledge through its highest segment, and flush (§3.4, §4.6) |
-| wait | Every write and nonblocking get on the context — to listed PEs, or to all — is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes |
+| wait | Every write on the context — to listed PEs, or to all — and every nonblocking get the PE has issued is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes, after the nonblocking gets |
+| wait for gets | Every nonblocking get the PE has issued is complete; writes are left for the next wait. An iget's end | Nothing: none is ever in flight | The gets half of the wait (§4.6, as built) |
 | load | A coherent load of a word of the caller's own region, 2, 4 or 8 bytes. Exclusive against rmw on it (spec §3.2). For `shmem_test*`, the `wait_until` predicate, and `shmem_signal_fetch` | One `acquire` load of the word | The same: every writer is a CPU atomic on the shared mapping |
 | notify | Wakes a PE's waiters whose watched range a write overlaps (§4.9). Exact for rmw, best effort for puts; wakes may be spurious | §4.9 watch slot | The same function, called by the progress thread after it applies a write |
 
@@ -5006,9 +5054,9 @@ implementation may complete a nonblocking operation before it returns, and the
 blocking forms give no less than the nonblocking ones promise on either
 backend: a put returns at local completion and completes remotely at quiet,
 which is `put_nbi`'s contract already, and a get completes before it returns,
-which `get_nbi` permits. What a real nonblocking get would add is overlap -
-several requests in flight across the network before one wait - through the
-nonblocking flag §4.10 reserves on `osoe_transport_get`; nothing takes it yet.
+which `get_nbi` permits. Nonblocking gets across nodes are real: several in
+flight before one wait, through `OSOE_TRANSPORT_NONBLOCKING` on
+`osoe_transport_get` (§4.6, as built).
 The strided forms are a loop of single-element transfers, and stay one: no
 transport osoe targets has a remote-strided operation to map a whole `iput`
 onto - RDMA's scatter/gather list describes the local side only, and a vendor's
@@ -5019,8 +5067,9 @@ author's decision, 2026-09-24: no strided operation at the boundary). What the
 loop can use is batching. An `iput`'s elements but the last carry
 `OSOE_TRANSPORT_MORE` (§4.10), its second caller, so across nodes they cost one
 wake of the lead rather than one each, and an RDMA backend would post them
-under one doorbell. An `iget` across nodes is still n round trips, one after
-another, until the nonblocking get flag lets them be in flight together.
+under one doorbell. An `iget`'s elements are nonblocking gets, all but the last
+with `OSOE_TRANSPORT_MORE`, completed by one wait on its PE that names the
+routine: in flight together, up to the landing zone's records.
 Block-strided `ibput`/`ibget` (§9.6.1.4, §9.6.1.8) remain deferred; see §7.6.
 
 The collectives are mechanical *given* §5.5's rules, which they must inherit: the

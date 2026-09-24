@@ -65,6 +65,31 @@ static void check_get_reply(struct osoe_progress *p, uint32_t slot,
                    m->origin_pe, chunk, m->chunk_offset, m->total, capacity);
 }
 
+/*
+ * Where a nonblocking get's reply lands - its PE's arena, in the range its
+ * record names - checked as the blocking slot's reply is (check_get_reply): a
+ * token that names no get of that PE's in flight, or bytes outside its range,
+ * are a peer's bug and fatal before anything is written or counted.
+ */
+static unsigned char *nonblocking_landing(struct osoe_progress *p, uint32_t slot,
+                                          const struct osoe_am_get_reply *m,
+                                          uint32_t payload_bytes)
+{
+    uint32_t length = 0;
+    unsigned char *at = p->host.landing_request
+        ? p->host.landing_request(p->host.context, m->origin_pe, m->token, &length)
+        : NULL;
+    if (!at)
+        osoe_fatal("a get reply from node %u for PE %u carries token %#llx, which names no "
+                   "get of that PE's in flight", peer_of(p, slot), m->origin_pe,
+                   (unsigned long long)m->token);
+    if ((uint64_t)m->chunk_offset + payload_bytes > m->total || m->total != length)
+        osoe_fatal("a get reply from node %u for PE %u puts %u bytes at offset %u of a "
+                   "%u-byte reply, for a get of %u bytes", peer_of(p, slot), m->origin_pe,
+                   payload_bytes, m->chunk_offset, m->total, length);
+    return at;
+}
+
 static void *destination(void *context, const struct osoe_message_header *header,
                          const void *fixed, uint32_t payload_bytes)
 {
@@ -80,6 +105,8 @@ static void *destination(void *context, const struct osoe_message_header *header
     if (header->kind == OSOE_AM_GET_REPLY) {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
+        if (m.token & OSOE_LANDING_NONBLOCKING)
+            return nonblocking_landing(p, a->slot, &m, payload_bytes) + m.chunk_offset;
         uint32_t capacity = 0;
         struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
                                                          &capacity);
@@ -408,11 +435,42 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_GET_REPLY: {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
+        if (m.token & OSOE_LANDING_NONBLOCKING) {
+            /* destination() has placed and checked any bytes; a reply with none
+             * never passed through it, so it is checked here, before it counts
+             * a byte or returns a credit - and every piece is, since the record
+             * it names must still be live. Nothing is published until the whole
+             * reply is in: the counters are the PE's only view of it. */
+            (void)nonblocking_landing(p, a->slot, &m, payload_bytes);
+            if (m.chunk_offset + payload_bytes >= m.total) {
+                p->host.landed(p->host.context, m.origin_pe, m.token, m.total);
+                /*
+                 * §3.8's credit comes back as the reply lands, which is here:
+                 * the PE copies it out only at its next quiet, and holding the
+                 * credit until then would keep its node-mates' gets waiting on
+                 * replies delivered long ago (reply.h). A blocking operation's
+                 * credit its caller returns, once it has read the slot.
+                 */
+                struct osoe_connection *connection =
+                    osoe_connection_to(p->area, peer_of(p, a->slot));
+                if (!connection)
+                    osoe_fatal("a get reply arrived from node %u, toward which this node "
+                               "has no connection", peer_of(p, a->slot));
+                osoe_credit_give(osoe_connection_credit(connection));
+            }
+            break;
+        }
         uint32_t capacity = 0;
         struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
                                                          &capacity);
+        /* destination() has checked a reply with bytes; one with none never
+         * passed through it, so every reply is checked here again before it
+         * lands anything (§3.4's trust boundary; review of the nonblocking
+         * gets, 2026-09-24 - the gap predated them). */
         if (!slot)
-            break;              /* destination() has already refused it */
+            osoe_fatal("a get reply from node %u names PE %u, which is not on this node",
+                       peer_of(p, a->slot), m.origin_pe);
+        check_get_reply(p, a->slot, slot, capacity, &m, payload_bytes);
         /*
          * A get larger than one AM chunk arrives as several replies (§3.2), so
          * `ready` is published only once the whole thing has landed - the

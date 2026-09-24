@@ -522,6 +522,9 @@ void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf
         snprintf(buf, len, "reply credit toward node %" PRIu64, d);
         break;
     case OSOE_SEGMENT_DETAIL_REPLY:  snprintf(buf, len, "reply from node %" PRIu64, d); break;
+    case OSOE_SEGMENT_DETAIL_GETS_IN_FLIGHT:
+        snprintf(buf, len, "nonblocking gets, %" PRIu64 " bytes in flight", d);
+        break;
     default:                         snprintf(buf, len, "+%#" PRIx64, d); break;
     }
 }

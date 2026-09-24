@@ -26,21 +26,19 @@
  *     OSOE_TRANSPORT_MORE, so across nodes they cost one wake of the lead,
  *     not one each. No transport has a remote-strided operation to map a
  *     whole iput onto - RDMA's gather list is the local side's only - so this
- *     is also what an RDMA backend would do. An iget across nodes is still n
- *     round trips, one after another, until the nonblocking get flag
- *     transport.h reserves lets them be in flight together (design notes
- *     §7.5).
+ *     is also what an RDMA backend would do. An iget's elements are
+ *     nonblocking gets, in flight together across nodes up to the landing
+ *     zone's records, completed by one wait for the gets alone (design notes
+ *     §7.5, §4.6).
  *
  * nbi. Spec §9.6.2: the nonblocking routines "return after initiating the
  * operation", and the operation is complete after a subsequent shmem_quiet;
- * completing sooner is permitted. The blocking forms already give put_nbi all
- * it promises and more: osoe_transport_put returns at local completion, with
- * remote completion left to quiet, on both backends (transport.h). A blocking
- * get completes before it returns, which get_nbi permits. So the nonblocking
- * forms call exactly the blocking code. The overlap a nonblocking get could
- * buy - several requests in flight before one wait - is the nonblocking flag
- * transport.h reserves on osoe_transport_get, not taken yet; when it is, only
- * the calls below change, never the declarations above them.
+ * completing sooner is permitted. A put already returns at local completion,
+ * with remote completion left to quiet, on both backends (transport.h), which
+ * is all put_nbi promises, so the nonblocking puts call the blocking code. The
+ * nonblocking gets pass OSOE_TRANSPORT_NONBLOCKING: across nodes they return
+ * once asked, and the next wait completes them (§4.6, as built); to a
+ * node-mate a get is applied before it returns either way.
  */
 #include <stddef.h>
 #include <stdint.h>
@@ -97,61 +95,70 @@ static void strided_get(const char *routine, shmem_ctx_t ctx, void *dest, const 
     char *d = dest;
     const char *s = source;
     ptrdiff_t w = (ptrdiff_t)width;
+    /* Every element's get is nonblocking and all but the last say more follows,
+     * so across nodes they are in flight together, up to the landing zone's
+     * records - not one round trip each - and the wait for them after is for
+     * the gets alone: iget is a blocking routine, but promises nothing about
+     * the writes before it (§4.6, as built). */
+    if (nelems == 0)
+        return;
     for (size_t i = 0; i < nelems; i++)
         osoe_rma_get(routine, ctx, d + (ptrdiff_t)i * dst * w, s + (ptrdiff_t)i * sst * w, 1,
-                     width, pe, 0);
+                     width, pe,
+                     OSOE_TRANSPORT_NONBLOCKING | (i + 1 < nelems ? OSOE_TRANSPORT_MORE : 0));
+    osoe_rma_complete_gets(routine, ctx);
 }
 
 /* ---- Typed put/get, block (spec §9.6.1.1, §9.6.1.5) -------------------- */
 
-#define OSOE_RMA_PUT_GET(T, NAME)                                                        \
-    OSOE_API void OSOE_FN(pshmem_, ctx_##NAME, _put)(shmem_ctx_t ctx, T *dest,           \
+#define OSOE_RMA_PUT_GET(T, NAME)                                                         \
+    OSOE_API void OSOE_FN(pshmem_, ctx_##NAME, _put)(shmem_ctx_t ctx, T *dest,            \
                                     const T *source, size_t nelems, int pe)               \
     {                                                                                     \
         osoe_rma_put("shmem_ctx_" #NAME "_put", ctx, dest, source, nelems, sizeof(T), pe, 0); \
     }                                                                                     \
-    OSOE_API void OSOE_FN(pshmem_, NAME, _put)(T *dest, const T *source, size_t nelems,  \
+    OSOE_API void OSOE_FN(pshmem_, NAME, _put)(T *dest, const T *source, size_t nelems,   \
                                               int pe)                                     \
     {                                                                                     \
         osoe_rma_put("shmem_" #NAME "_put", SHMEM_CTX_DEFAULT, dest, source, nelems,      \
-                     sizeof(T), pe, 0);                                                      \
+                     sizeof(T), pe, 0);                                                   \
     }                                                                                     \
-    OSOE_API void OSOE_FN(pshmem_, ctx_##NAME, _get)(shmem_ctx_t ctx, T *dest,           \
+    OSOE_API void OSOE_FN(pshmem_, ctx_##NAME, _get)(shmem_ctx_t ctx, T *dest,            \
                                     const T *source, size_t nelems, int pe)               \
     {                                                                                     \
         osoe_rma_get("shmem_ctx_" #NAME "_get", ctx, dest, source, nelems, sizeof(T), pe, 0); \
     }                                                                                     \
-    OSOE_API void OSOE_FN(pshmem_, NAME, _get)(T *dest, const T *source, size_t nelems,  \
+    OSOE_API void OSOE_FN(pshmem_, NAME, _get)(T *dest, const T *source, size_t nelems,   \
                                               int pe)                                     \
     {                                                                                     \
         osoe_rma_get("shmem_" #NAME "_get", SHMEM_CTX_DEFAULT, dest, source, nelems,      \
-                     sizeof(T), pe, 0);                                                      \
+                     sizeof(T), pe, 0);                                                   \
     }
 
 /* ---- Typed p/g, single element (spec §9.6.1.2, §9.6.1.6) --------------- */
 
 #define OSOE_RMA_P_G(T, NAME)                                                             \
     OSOE_API void OSOE_FN(pshmem_, ctx_##NAME, _p)(shmem_ctx_t ctx, T *dest, T value,     \
-                                                  int pe)                                  \
+                                                  int pe)                                 \
     {                                                                                     \
-        osoe_rma_put("shmem_ctx_" #NAME "_p", ctx, dest, &value, 1, sizeof(T), pe, 0);       \
+        osoe_rma_put("shmem_ctx_" #NAME "_p", ctx, dest, &value, 1, sizeof(T), pe, 0);    \
     }                                                                                     \
     OSOE_API void OSOE_FN(pshmem_, NAME, _p)(T *dest, T value, int pe)                    \
     {                                                                                     \
         osoe_rma_put("shmem_" #NAME "_p", SHMEM_CTX_DEFAULT, dest, &value, 1, sizeof(T),  \
-                     pe, 0);                                                                 \
+                     pe, 0);                                                              \
     }                                                                                     \
-    OSOE_API T OSOE_FN(pshmem_, ctx_##NAME, _g)(shmem_ctx_t ctx, const T *source, int pe)  \
+    OSOE_API T OSOE_FN(pshmem_, ctx_##NAME, _g)(shmem_ctx_t ctx, const T *source, int pe) \
     {                                                                                     \
         T value;                                                                          \
-        osoe_rma_get("shmem_ctx_" #NAME "_g", ctx, &value, source, 1, sizeof(T), pe, 0);     \
+        osoe_rma_get("shmem_ctx_" #NAME "_g", ctx, &value, source, 1, sizeof(T), pe, 0);  \
         return value;                                                                     \
     }                                                                                     \
     OSOE_API T OSOE_FN(pshmem_, NAME, _g)(const T *source, int pe)                        \
     {                                                                                     \
         T value;                                                                          \
         osoe_rma_get("shmem_" #NAME "_g", SHMEM_CTX_DEFAULT, &value, source, 1,           \
-                     sizeof(T), pe, 0);                                                      \
+                     sizeof(T), pe, 0);                                                   \
         return value;                                                                     \
     }
 
@@ -192,25 +199,25 @@ static void strided_get(const char *routine, shmem_ctx_t ctx, void *dest, const 
                             const T *source, size_t nelems, int pe)                       \
     {                                                                                     \
         osoe_rma_put("shmem_ctx_" #NAME "_put_nbi", ctx, dest, source, nelems, sizeof(T), \
-                     pe, 0);                                                                 \
+                     pe, 0);                                                              \
     }                                                                                     \
     OSOE_API void OSOE_FN(pshmem_, NAME, _put_nbi)(T *dest, const T *source,              \
                                                   size_t nelems, int pe)                  \
     {                                                                                     \
         osoe_rma_put("shmem_" #NAME "_put_nbi", SHMEM_CTX_DEFAULT, dest, source, nelems,  \
-                     sizeof(T), pe, 0);                                                      \
+                     sizeof(T), pe, 0);                                                   \
     }                                                                                     \
     OSOE_API void OSOE_FN(pshmem_, ctx_##NAME, _get_nbi)(shmem_ctx_t ctx, T *dest,        \
                             const T *source, size_t nelems, int pe)                       \
     {                                                                                     \
         osoe_rma_get("shmem_ctx_" #NAME "_get_nbi", ctx, dest, source, nelems, sizeof(T), \
-                     pe, 0);                                                                 \
+                     pe, OSOE_TRANSPORT_NONBLOCKING);                                     \
     }                                                                                     \
     OSOE_API void OSOE_FN(pshmem_, NAME, _get_nbi)(T *dest, const T *source,              \
                                                   size_t nelems, int pe)                  \
     {                                                                                     \
         osoe_rma_get("shmem_" #NAME "_get_nbi", SHMEM_CTX_DEFAULT, dest, source, nelems,  \
-                     sizeof(T), pe, 0);                                                      \
+                     sizeof(T), pe, OSOE_TRANSPORT_NONBLOCKING);                          \
     }
 
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_PUT_GET)
@@ -226,22 +233,22 @@ OSOE_RMA_STANDARD_TYPES(OSOE_RMA_NBI)
     OSOE_API void pshmem_ctx_put##SIZE(shmem_ctx_t ctx, void *dest, const void *source,   \
                                        size_t nelems, int pe)                             \
     {                                                                                     \
-        osoe_rma_put("shmem_ctx_put" #SIZE, ctx, dest, source, nelems, SIZE / 8, pe, 0);     \
+        osoe_rma_put("shmem_ctx_put" #SIZE, ctx, dest, source, nelems, SIZE / 8, pe, 0);  \
     }                                                                                     \
     OSOE_API void pshmem_put##SIZE(void *dest, const void *source, size_t nelems, int pe) \
     {                                                                                     \
         osoe_rma_put("shmem_put" #SIZE, SHMEM_CTX_DEFAULT, dest, source, nelems,          \
-                     SIZE / 8, pe, 0);                                                       \
+                     SIZE / 8, pe, 0);                                                    \
     }                                                                                     \
     OSOE_API void pshmem_ctx_get##SIZE(shmem_ctx_t ctx, void *dest, const void *source,   \
                                        size_t nelems, int pe)                             \
     {                                                                                     \
-        osoe_rma_get("shmem_ctx_get" #SIZE, ctx, dest, source, nelems, SIZE / 8, pe, 0);     \
+        osoe_rma_get("shmem_ctx_get" #SIZE, ctx, dest, source, nelems, SIZE / 8, pe, 0);  \
     }                                                                                     \
     OSOE_API void pshmem_get##SIZE(void *dest, const void *source, size_t nelems, int pe) \
     {                                                                                     \
         osoe_rma_get("shmem_get" #SIZE, SHMEM_CTX_DEFAULT, dest, source, nelems,          \
-                     SIZE / 8, pe, 0);                                                       \
+                     SIZE / 8, pe, 0);                                                    \
     }                                                                                     \
     OSOE_API void pshmem_ctx_iput##SIZE(shmem_ctx_t ctx, void *dest, const void *source,  \
                                         ptrdiff_t dst, ptrdiff_t sst, size_t nelems,      \
@@ -273,25 +280,25 @@ OSOE_RMA_STANDARD_TYPES(OSOE_RMA_NBI)
                                              const void *source, size_t nelems, int pe)   \
     {                                                                                     \
         osoe_rma_put("shmem_ctx_put" #SIZE "_nbi", ctx, dest, source, nelems, SIZE / 8,   \
-                     pe, 0);                                                                 \
+                     pe, 0);                                                              \
     }                                                                                     \
     OSOE_API void pshmem_put##SIZE##_nbi(void *dest, const void *source, size_t nelems,   \
                                          int pe)                                          \
     {                                                                                     \
         osoe_rma_put("shmem_put" #SIZE "_nbi", SHMEM_CTX_DEFAULT, dest, source, nelems,   \
-                     SIZE / 8, pe, 0);                                                       \
+                     SIZE / 8, pe, 0);                                                    \
     }                                                                                     \
     OSOE_API void pshmem_ctx_get##SIZE##_nbi(shmem_ctx_t ctx, void *dest,                 \
                                              const void *source, size_t nelems, int pe)   \
     {                                                                                     \
         osoe_rma_get("shmem_ctx_get" #SIZE "_nbi", ctx, dest, source, nelems, SIZE / 8,   \
-                     pe, 0);                                                                 \
+                     pe, OSOE_TRANSPORT_NONBLOCKING);                                     \
     }                                                                                     \
     OSOE_API void pshmem_get##SIZE##_nbi(void *dest, const void *source, size_t nelems,   \
                                          int pe)                                          \
     {                                                                                     \
         osoe_rma_get("shmem_get" #SIZE "_nbi", SHMEM_CTX_DEFAULT, dest, source, nelems,   \
-                     SIZE / 8, pe, 0);                                                       \
+                     SIZE / 8, pe, OSOE_TRANSPORT_NONBLOCKING);                           \
     }
 
 OSOE_RMA_SIZES(OSOE_RMA_SIZED)
@@ -312,12 +319,14 @@ OSOE_API void pshmem_putmem_nbi(void *dest, const void *source, size_t nelems, i
 OSOE_API void pshmem_ctx_getmem_nbi(shmem_ctx_t ctx, void *dest, const void *source,
                                     size_t nelems, int pe)
 {
-    osoe_rma_get("shmem_ctx_getmem_nbi", ctx, dest, source, nelems, 1, pe, 0);
+    osoe_rma_get("shmem_ctx_getmem_nbi", ctx, dest, source, nelems, 1, pe,
+                 OSOE_TRANSPORT_NONBLOCKING);
 }
 
 OSOE_API void pshmem_getmem_nbi(void *dest, const void *source, size_t nelems, int pe)
 {
-    osoe_rma_get("shmem_getmem_nbi", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, pe, 0);
+    osoe_rma_get("shmem_getmem_nbi", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, pe,
+                 OSOE_TRANSPORT_NONBLOCKING);
 }
 
 /*

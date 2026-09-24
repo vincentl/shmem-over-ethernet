@@ -173,6 +173,18 @@ void osoe_am_config_read(struct osoe_am_config *c)
     if (osoe_environment_u32("OSOE_AM_HUGEPAGES", &huge) == OSOE_ENVIRONMENT_INVALID || huge > 1)
         osoe_fatal("OSOE_AM_HUGEPAGES='%s' is not 0 or 1", getenv("OSOE_AM_HUGEPAGES"));
     c->hugepages = huge != 0;
+
+    /* Tunable for the same reason as the credits: a test reaches a full landing
+     * arena only by making it small. */
+    uint32_t in_flight = OSOE_DEFAULT_GETS_IN_FLIGHT;
+    if (osoe_environment_u32("OSOE_GETS_IN_FLIGHT", &in_flight) == OSOE_ENVIRONMENT_INVALID ||
+        in_flight < 1 || in_flight > OSOE_MAX_GETS_IN_FLIGHT)
+        osoe_fatal("OSOE_GETS_IN_FLIGHT='%s' is not between 1 and %u",
+                   getenv("OSOE_GETS_IN_FLIGHT"), OSOE_MAX_GETS_IN_FLIGHT);
+    c->gets_in_flight = in_flight;
+    c->get_landing_bytes = env_bytes("OSOE_GET_LANDING_BYTES", OSOE_DEFAULT_GET_LANDING_BYTES,
+                                     OSOE_MIN_GET_LANDING_BYTES, OSOE_MAX_GET_LANDING_BYTES,
+                                     false);
 }
 
 void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe_bootstrap *b,
