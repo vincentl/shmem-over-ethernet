@@ -131,6 +131,9 @@ Rules:
   collide, and the second fails at init.
 - `OSOE_GTIDS[OSOE_LOCALID]` must equal `OSOE_PROCID`.
 - The names mirror Slurm's `SLURM_PROCID`, `SLURM_GTIDS`, and so on (design §6.1, §6.2).
+- `OSOE_WATCHDOG` and `OSOE_LIVENESS` are retired and ignored, with a notice: every
+  build watches for a local PE's death with pidfds, and a PE the job's end finds
+  waiting names the routine it waited in (design §3.15).
 
 For example, two PEs from a shell:
 
@@ -143,6 +146,15 @@ wait
 
 A job that crashes can leave `/dev/shm/osoe.<job>.*` behind. Remove it before
 reusing the same job id.
+
+### How a job ends
+
+A PE that dies, or a node that vanishes, ends the whole job with a failure
+(design §3.15). `shmem_global_exit(status)` ends every PE with `status`: the
+calling PE with `exit`, so its `atexit` handlers run and its streams are
+flushed, as the specification asks; every other PE with its standard I/O
+flushed and then `_exit`, so its handlers do not run - it is usually still
+computing - and output it holds in a buffer of its own, outside stdio, is lost.
 
 ## Documentation
 
