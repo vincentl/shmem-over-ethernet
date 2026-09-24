@@ -216,6 +216,15 @@ osoe_warnings(shmem_test_fatal-order)
 add_test(NAME shmem.fatal-order COMMAND shmem_test_fatal-order)
 set_tests_properties(shmem.fatal-order PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# Where a node listens when its own name resolves to a loopback address, as
+# Debian's /etc/hosts maps a host's own name to 127.0.1.1 (§6.2, listener.h).
+add_executable(shmem_test_own-address test-own-address.c)
+target_include_directories(shmem_test_own-address PRIVATE ../src)
+osoe_warnings(shmem_test_own-address)
+add_test(NAME shmem.own-address COMMAND shmem_test_own-address)
+set_tests_properties(shmem.own-address PROPERTIES LABELS "tier1" TIMEOUT 30
+  PASS_REGULAR_EXPRESSION "OWN ADDRESS OK")
+
 # The bootstrap against launcher environments (§6.1, §8.2): each fixture in
 # slurm-fixtures/ is one task's environment - captured from a real srun, or
 # written from Slurm's documentation and marked so - replayed with nothing of

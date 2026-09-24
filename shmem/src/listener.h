@@ -25,7 +25,9 @@
 #ifndef OSOE_LISTENER_H
 #define OSOE_LISTENER_H
 
+#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "bootstrap.h"
@@ -79,6 +81,28 @@ int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpos
  */
 void osoe_listener_node_address(const struct osoe_bootstrap *b, uint32_t node,
                                 struct sockaddr_in *out);
+
+/*
+ * This node's own address, to listen at and to tell its peers (§6.2): its host
+ * list entry, resolved - unless that entry is a name this host resolves to a
+ * loopback address, as Debian's /etc/hosts does a host's own name (127.0.1.1),
+ * in a job of several nodes, which could never reach it there. Then the address
+ * this host would send from toward another node of the job. An IP literal is
+ * taken as given: osoe-launch's logical nodes are 127.0.0.[1-N] on purpose.
+ */
+void osoe_listener_own_address(const struct osoe_bootstrap *b, struct sockaddr_in *out);
+
+/* The rule osoe_listener_own_address applies: the host list's `entry` for this
+ * node, `resolved` as this host resolves it, is a name, not an IP literal, that
+ * lands on 127.0.0.0/8 in a job of several nodes. */
+static inline bool osoe_listener_self_is_loopback(const char *entry,
+                                                  const struct sockaddr_in *resolved,
+                                                  uint32_t node_count)
+{
+    struct in_addr literal;
+    return node_count > 1 && inet_pton(AF_INET, entry, &literal) != 1 &&
+           (ntohl(resolved->sin_addr.s_addr) >> 24) == 127;
+}
 
 /*
  * Connect to node `node`'s listener at `host` (whose port is ignored), trying

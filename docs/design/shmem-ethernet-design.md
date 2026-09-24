@@ -4283,7 +4283,11 @@ a Slurm allocation, whose environment holds both, is the launcher's job and not
 the allocation's. A task in a Slurm job but in no step of it — a program run
 straight from a batch script — is refused, naming `srun`. The node list is
 Slurm's compressed form (`pi-[001-004]`), each entry resolved by
-`getaddrinfo`. `osoe-launch -s` sets `srun`'s names, so the Slurm path runs at
+`getaddrinfo` — and a node whose own name its host resolves to a loopback
+address, as Debian's `/etc/hosts` maps a host's own name to 127.0.1.1, listens
+and is advertised at the address its host would send from toward another node
+instead, since its peers could never reach it at loopback; an IP literal is
+taken as given (`listener.h`, `shmem.own-address`). `osoe-launch -s` sets `srun`'s names, so the Slurm path runs at
 every tier on one machine (`shmem.slurm.*`), and `shmem.bootstrap.*` replays
 real and documented `srun` environments (`shmem/tests/slurm-fixtures/`), which
 `tools/launch/capture-slurm-fixtures.sh` captures.

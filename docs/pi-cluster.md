@@ -18,11 +18,21 @@ Each compute node must have Linux 6.7 or newer and io_uring enabled:
 
 ```sh
 srun -N4 --ntasks-per-node=1 uname -r
+srun -N4 --ntasks-per-node=1 getconf PAGESIZE                          # 16384 on a Pi 5's kernel
 srun -N4 --ntasks-per-node=1 cat /proc/sys/kernel/io_uring_disabled   # 0
+srun -N4 --ntasks-per-node=1 sh -c 'echo "$(hostname): $(getent ahostsv4 $(hostname) | head -1)"'
 sinfo -V
 ```
 
-Keep the output: it goes in the notes with the results. Trixie gives kernel 6.12
+The third line shows what each node's own name resolves to there. Raspberry
+Pi OS maps a host's own name to 127.0.1.1 in `/etc/hosts`, which its peers
+cannot reach; the library then listens at the node's address toward the
+others instead (design §6.1), and `SHMEM_DEBUG=1` says so per node. If the
+names resolve to the nodes' LAN addresses everywhere, nothing changes.
+
+Keep the output: it goes in the notes with the results. A Pi 5's kernel uses
+16 KiB pages where the VM's uses 4 KiB; osoe sizes every mapping by the page it
+is given (design §8.5), and this is the first run that proves it. Trixie gives kernel 6.12
 and Slurm 24.11; Bookworm's may be too old for osoe (6.6), which `probe` below
 says plainly.
 
@@ -46,8 +56,11 @@ cores - a task gets one by default, and every process the tests start would
 share it:
 
 ```sh
-srun -N1 -n1 -c4 ctest --test-dir build/release -L 'tier1|tier2' -j4 --timeout 300
+srun -N1 -n1 -c4 ctest --test-dir build/release -L 'tier1|tier2' -E '^model\.' -j4 --timeout 300
 ```
+
+The models (`model.*`) are left out: they check designs, not this machine,
+and take the better part of an hour on a Pi.
 
 The floor pins (`shmem.floor`) and `echo-uring`'s were set on the VM's CPU and
 may fail on a Pi. That is a finding to keep, not a reason to stop.
