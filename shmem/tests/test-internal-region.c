@@ -21,8 +21,8 @@
 #include <shmem.h>
 
 #include "check.h"
-#include "state.h"
 #include "region-wait.h"
+#include "state.h"
 #include "transport.h"
 
 int main(void)

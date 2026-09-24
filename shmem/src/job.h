@@ -124,7 +124,7 @@ static inline uint32_t osoe_job_local_index(const struct osoe_job *j, uint32_t p
  * if there is no such node. O(1): the node's lead writes every node's lead into
  * the node-local object at the rendezvous (job.c), found from the runs once in
  * O(R + N), so that a broadcast can re-root its tree on every call
- * (collectives.c) without a scan of the map. N words, one copy per node, beside
+ * (internode-generic.c) without a scan of the map. N words, one copy per node, beside
  * the node_count addresses and blobs already there.
  */
 static inline uint32_t osoe_job_node_lead(const struct osoe_job *j, uint32_t node)

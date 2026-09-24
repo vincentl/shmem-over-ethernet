@@ -1,6 +1,8 @@
 /*
- * The point-to-point wait loop (§4.9), shared by shmem_wait_until, shmem_test,
- * their multiple-element forms and the signal routines (spec §9.11, §9.8).
+ * The point-to-point waits and tests (§4.9), shared by shmem_wait_until,
+ * shmem_test, their multiple-element forms and the signal routines (spec
+ * §9.11, §9.8): the spec's side of them, over the region wait below the API
+ * (region-wait.h), which holds the loop itself.
  *
  * `routine` names the caller in diagnostics. `width` is the variable's width in
  * bytes - 2, 4 or 8 - and values are carried as uint64_t, which is what the

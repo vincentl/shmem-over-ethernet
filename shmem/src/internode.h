@@ -22,8 +22,10 @@
  * **Addressing is by team and epoch, never by node or PE.** The SHMEM layer
  * owns teams (§5.2); it tells the backend once, at team creation, which nodes
  * take part, and from then on names the team only. What a backend does with
- * the node set - which node is the root, who forwards to whom - is its own
- * business and does not cross this header.
+ * the node set - which node its trees are rooted at, who forwards to whom - is
+ * its own business and does not cross this header; the one exception is a
+ * broadcast's root, which the data half names by its node's position in the
+ * registered set, since the data starts there.
  *
  * **The release is an upcall.** The backend calls osoe_internode_released when
  * the group has been released, on its own thread; the SHMEM layer advances its
@@ -68,7 +70,9 @@
  *     rule 3), because floating sum and product are not associative;
  *   - integer sum and product wrap modulo 2^(8 x width), as two's complement;
  *   - a floating element as wide as long double is this platform's long
- *     double, whatever its format;
+ *     double, whatever its format - which every node of the job must share:
+ *     nothing checks it, and x86-64's extended format against aarch64's
+ *     quadruple one would reduce to garbage;
  *   - the buffer is the backend's only between the call and its return: nothing
  *     reads it by reference afterwards (§5.5's hazard), because the lead
  *     releases its members, and they may reuse their dest, as soon as it returns.
@@ -80,7 +84,20 @@
  * so nothing above this header asks what a backend supports (§4.10). That is
  * the difference from the negotiated collective offload the RoCE review rejects
  * (docs/reviews/roce-transport.md §8.4): this is a mandatory operation with a
- * generic fallback. AM hands every call to it.
+ * generic fallback. AM hands every call to it. **The choice must be the same
+ * on every node**: a function of the call's arguments - team, count or bytes,
+ * operation, element - and of configuration every node agreed at the
+ * rendezvous, as the fan-out is (§6.2), and never of anything local, such as
+ * an engine's free resources. A node that offloads while another falls back
+ * waits for it in a different place, and both wait forever.
+ *
+ * **The buffer is the lead's dest**: symmetric, in the heap, at the same offset
+ * on every node that receives into it, so a backend may address a peer's
+ * buffer by its own offset - an RDMA backend writing the result straight into
+ * each child's buffer, where the generic implementation stages it through its
+ * slots. It stays the lead's own memory: nothing but this call writes it
+ * before the lead's release (§5.5, invariant 16), and nothing reads it by
+ * reference afterwards (above).
  *
  * What an RDMA backend does with each call (§4.10's discipline: say it, so the
  * interface is checked against more than the one backend it has):
@@ -160,7 +177,10 @@ uint32_t osoe_internode_fanout_default(void);
  * same handoff an arrival takes (§5.3). No split team exists yet.
  *
  * The array is only read during the call. A backend must not keep it: the node
- * set is O(N), and what a tree needs from it is O(fan-out) (§5.3).
+ * set is O(N), and what a tree with a fixed root needs from it is O(fan-out)
+ * (§5.3). A broadcast re-rooted at every call needs node positions the set
+ * gives: the world team's are the node numbers, and a split team's will need
+ * the set, or a way to search it, kept (§7.3).
  */
 void osoe_internode_team(uint32_t team, const uint32_t *nodes, uint32_t count);
 
@@ -173,8 +193,11 @@ void osoe_internode_team(uint32_t team, const uint32_t *nodes, uint32_t count);
  * registered. Does not block.
  *
  * Epochs are the team's §5.4 epoch count, k + 1 for the k-th collective on the
- * team, and consecutive. Bounded skew holds across this call exactly as within
- * a node: no node arrives for epoch k + 1 before it has been released from k.
+ * team: increasing, but not consecutive, since the data half below numbers its
+ * collectives from the same sequence - a barrier, a reduction and a barrier
+ * arrive here as 3 and then 5. Bounded skew holds across this call exactly as
+ * within a node: no node arrives for a later epoch before it has been released
+ * from this one.
  */
 void osoe_internode_arrive(uint32_t team, uint32_t epoch);
 

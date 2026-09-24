@@ -272,6 +272,52 @@ static void generics_teams_and_rounds(void)
     shmem_free(dst);
 }
 
+/*
+ * One reduction per element of the combine table that the tests above leave
+ * alone, each with values that tell a wrong element apart: a char maximum over
+ * 0x7f and 0x80, whose answer is the platform's char's (unsigned on the Pis);
+ * signed minima over negatives, which an unsigned element gets wrong; one- and
+ * two-byte sums and products that wrap, which a wider element does not; size_t
+ * and ptrdiff_t; a long double sum and a complex float product. Every expected
+ * value is folded here in the same C type, so it is the element's own answer.
+ */
+#define ELEMENT_CHECK(T, NAME, OPERATOR, VALUE, FOLD)                                 \
+    do {                                                                              \
+        T *src = shmem_malloc(sizeof *src), *dst = shmem_malloc(sizeof *dst);         \
+        CHECK_FATAL(src && dst);                                                      \
+        T want = 0;                                                                   \
+        for (int p = 0; p < npes; p++) {                                              \
+            T v = (T)(VALUE);                                                         \
+            want = p == 0 ? v : (T)(FOLD);                                            \
+        }                                                                             \
+        { int p = me; (void)p; *src = (T)(VALUE); }                                  \
+        CHECK(shmem_##NAME##_##OPERATOR##_reduce(SHMEM_TEAM_WORLD, dst, src, 1) == 0); \
+        if (*dst != want)                                                             \
+            fprintf(stderr, "PE %d: shmem_" #NAME "_" #OPERATOR "_reduce is wrong\n", me); \
+        CHECK(*dst == want);                                                          \
+        shmem_free(src);                                                              \
+        shmem_free(dst);                                                              \
+    } while (0)
+
+static void every_element(void)
+{
+    ELEMENT_CHECK(char, char, max, p % 2 ? 0x80 : 0x7f, want > v ? want : v);
+    ELEMENT_CHECK(signed char, schar, min, -(p + 1), want < v ? want : v);
+    ELEMENT_CHECK(unsigned char, uchar, sum, 200, want + v);
+    ELEMENT_CHECK(short, short, min, -(p * 1000) - 1, want < v ? want : v);
+    ELEMENT_CHECK(short, short, sum, 30000, want + v);
+    ELEMENT_CHECK(unsigned short, ushort, max, 65535 - p, want > v ? want : v);
+    ELEMENT_CHECK(int8_t, int8, sum, 100, want + v);
+    ELEMENT_CHECK(int16_t, int16, prod, 3 + p, want * v);
+    ELEMENT_CHECK(uint16_t, uint16, sum, 40000, want + v);
+    ELEMENT_CHECK(size_t, size, sum, (size_t)p * 1000000007u, want + v);
+    ELEMENT_CHECK(ptrdiff_t, ptrdiff, min, -(ptrdiff_t)p * 1000, want < v ? want : v);
+    ELEMENT_CHECK(long double, longdouble, sum, p + 0.5L, want + v);
+#if !defined(__STDC_NO_COMPLEX__)
+    ELEMENT_CHECK(float _Complex, complexf, prod, 1.0f + 1.0f * I, want * v);
+#endif
+}
+
 int main(void)
 {
     shmem_init();
@@ -281,6 +327,7 @@ int main(void)
     integer_reductions();
     floating_reductions();
     generics_teams_and_rounds();
+    every_element();
 
     shmem_barrier_all();
     CHECK_INVARIANTS();

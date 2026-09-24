@@ -12,6 +12,8 @@ if(OSOE_BACKEND STREQUAL "am")
     src/connection.c
     src/connection-area.c
     src/internode-am.c
+    # The generic internode phase, which AM hands the data collectives to; any
+    # backend may compile it (it is on the boundary, cmake/CheckBoundary.cmake).
     src/internode-generic.c
     src/progress.c
     src/progress-host.c

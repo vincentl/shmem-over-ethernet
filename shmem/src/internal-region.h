@@ -10,7 +10,8 @@
  * shmem_ptr nor any RMA, AMO or wait names it. A plain store past the end of
  * the heap still can, which is why the slots come first (below).
  *
- * Its layout is the collectives' (collectives.c): fan-out + 1 slots, one for
+ * Its layout is the generic internode phase's (internode-generic.c), which is
+ * its only user: fan-out + 1 slots, one for
  * each child's partial result and one for what the parent sends down, then a
  * page of control words - per team, two eight-byte words, each on its own
  * cache line, counting the internode phase's pieces arrived and released.
@@ -18,7 +19,10 @@
  * four-byte word would put every arrival of a RoCE backend on its slow path.
  * The slots first because a program's store that runs off the end of its heap
  * then lands in scratch that means something only while a collective has it,
- * rather than in a count the next collective would wait on forever. Its size is
+ * rather than in a count the next collective would wait on forever. Every PE's
+ * heap carries one and only its node's lead ever touches it; the pages of the
+ * others are never written, so they cost address space and the /dev/shm
+ * capacity check's share, not memory. Its size is
  * fixed by the fan-out, which every node agrees on (§5.3), and by the slot,
  * which is a constant rather than a setting for the same reason: two nodes that
  * disagreed about either would put into each other's slots at different

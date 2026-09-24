@@ -14,7 +14,7 @@
 #include "region-wait.h"
 #include "transport.h"
 
-uint64_t osoe_region_extend(uint64_t value, unsigned width, bool is_signed)
+uint64_t osoe_region_wait_extend(uint64_t value, unsigned width, bool is_signed)
 {
     switch (width) {
     case 8: return value;
@@ -27,7 +27,7 @@ uint64_t osoe_region_extend(uint64_t value, unsigned width, bool is_signed)
     }
 }
 
-bool osoe_region_satisfied(enum osoe_comparison comparison, uint64_t have, uint64_t want,
+bool osoe_region_wait_satisfied(enum osoe_comparison comparison, uint64_t have, uint64_t want,
                            bool is_signed)
 {
     if (is_signed) {
@@ -60,7 +60,7 @@ bool osoe_region_satisfied(enum osoe_comparison comparison, uint64_t have, uint6
  * every AMO type is four or eight bytes wide. So at those widths a sweep that
  * expires on an already-true predicate means a wake was lost by the mechanism
  * that must not lose one, and the counter is an invariant (§8.2). The internal
- * region's words are four bytes and only ever updated by rmw, so the same holds
+ * region's words are eight bytes and only ever updated by rmw, so the same holds
  * for them.
  *
  * At two bytes there is no AMO type - the deprecated short waits of Table 12
@@ -69,7 +69,7 @@ bool osoe_region_satisfied(enum osoe_comparison comparison, uint64_t have, uint6
  * finish. Counting that as an invariant violation would make the oracle
  * unusable for the one case it is known to be wrong about.
  */
-enum osoe_counter osoe_region_late_wake_counter(unsigned width)
+enum osoe_counter osoe_region_wait_late_wake_counter(unsigned width)
 {
     return width >= 4 ? OSOE_C_INVARIANT_MISSED_WAKE : OSOE_C_TRANSPORT_WATCH_LATE_WAKE;
 }
@@ -78,7 +78,7 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
                           unsigned width, bool is_signed, enum osoe_comparison comparison,
                           uint64_t want, enum osoe_blocked_detail kind, uint64_t detail)
 {
-    want = osoe_region_extend(want, width, is_signed);
+    want = osoe_region_wait_extend(want, width, is_signed);
     struct osoe_transport_watch *w = osoe_transport_watch(region, offset, width);
     uint64_t have, slept_since = 0;
     bool slept = false, woken = false, timed_out = false;
@@ -86,13 +86,13 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
     for (;;) {
         uint32_t seq = osoe_transport_watch_seq(w);
         have = osoe_transport_load(region, offset, width);
-        if (osoe_region_satisfied(comparison, osoe_region_extend(have, width, is_signed), want,
+        if (osoe_region_wait_satisfied(comparison, osoe_region_wait_extend(have, width, is_signed), want,
                                   is_signed)) {
             /* The condition was already true when the sweep expired, so the
              * update landed while this PE slept and no wake arrived (§4.9).
              * Which counter that is depends on the width: see above. */
             if (timed_out)
-                osoe_count(osoe_region_late_wake_counter(width), 1);
+                osoe_count(osoe_region_wait_late_wake_counter(width), 1);
             break;
         }
         if (woken)

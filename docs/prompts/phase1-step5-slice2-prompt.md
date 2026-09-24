@@ -112,9 +112,13 @@ the author's review.*
    implementation's future crossover to a ring (§5.8's large reductions) is
    made inside it.
 9. **Every piece carries a header its receiver checks** - the team's epoch, the
-   piece's number and bytes, and what the collective is - so that PEs calling
+   piece's number and bytes, and which collective it is - so that PEs calling
    different collectives, or the same one with different arguments, end the
-   job by name. The first slice's review found that no epoch crossed nodes in a
+   job by name where their pieces meet. (Not everywhere: collectives whose trees
+   share no edge wait in different places, a hang the blocked records name;
+   broadcasts from two roots on one node carry the same root position; and a
+   node's members are not compared. The review of this slice found the first
+   claim too broad.) The first slice's review found that no epoch crossed nodes in a
    data collective, where §5.5 says it is asserted on receipt; the generic
    implementation's slot layout is this slice's, so the fix is too. The four
    waits still record one blocked detail, the epoch: telling them apart is a

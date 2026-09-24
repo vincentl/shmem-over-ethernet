@@ -2999,7 +2999,10 @@ PE-addressed. Beside them `shmem/src/internode.h` carries the internode phase of
 a collective (§5.3): a team's node set given once at team creation, an arrival
 per `(team, epoch)` going down, and a release upcall per `(team, epoch)` coming
 back on the node's progress thread (§10 records why this reversed the step-2
-decision). Two more things cross that the original contract left out, and both
+decision) - and, since phase 1 step 5's second slice, the data collectives'
+internode phase as a blocking call carrying the operation and the element, with
+a generic implementation over this boundary that every backend may call
+(§5.8). Two more things cross that the original contract left out, and both
 are now declared in `transport.h`: the backend's **lifecycle** —
 `osoe_transport_init` starts whatever the backend needs, AM's connection area,
 wires and engine included, before the agent thread exists, and
@@ -3016,15 +3019,19 @@ here" is true of `transport.h` plus `internode.h`. **It is enforced**: the AM
 backend's state moved out of `struct osoe_state` into `am-state.h`, and the tier-1
 test `shmem.boundary` (`cmake/CheckBoundary.cmake`) walks the includes of every
 file above the boundary and fails if one reaches a header below it. The layers
-are four lists in that one script - the API, the runtime, the files on the
-boundary and the backend - and every library source file must be in exactly one
-of them. On the boundary are `transport-local.c`, `watch.c`, the collectives'
-shared files, and the rendezvous files `node.c` and `job.c`, which still read
-the AM chunk size and handler checksum. *(Since phase 1 step 5 slice 2 a second
-walk checks that nothing outside the API includes an API header or a public
-one: dependencies run from the OpenSHMEM layer down to the runtime and never
-back, which was already true and is what a second API beside this one on the
-same runtime would need.)* The backend is chosen
+are five lists in that one script - the API, the runtime, the files on the
+boundary, the backend, and the one header only a backend includes - and every
+library source file and header must be in exactly one of them. An include is
+judged by the file it resolves to, quoted or angled, so no spelling of a
+forbidden header gets past. Three files on the boundary reach an AM header, each
+known: `node.c` sizes the landing zones from AM's chunk, `rendezvous.c` checks
+AM's handler checksum, and `transport-local.c` shares a header with AM; every
+other file on the boundary is held to the same rule as the files above it.
+*(Since phase 1 step 5 slice 2 a second walk checks that nothing outside the API
+includes an API header or a public one: the includes run from the OpenSHMEM
+layer down to the runtime and never back - the backend's one call up is the
+release upcall `internode.h` declares - which was already true and is what a
+second API beside this one on the same runtime would need.)* The backend is chosen
 by the CMake option `OSOE_BACKEND`, whose only value is `am`. The last two small
 gaps are closed as well: `osoe_transport_get` takes `flags`, with none defined
 yet, so that `OSOE_TRANSPORT_MORE` and the nonblocking flag arrive without a
@@ -4010,10 +4017,12 @@ values are unobservable by any conforming program. For barrier and sync the
 epoch number travels in the internode AM and is asserted on receipt — the
 collective analogue of §3.13's handler-table checksum. The data collectives'
 internode phase does the same with a header on every piece - the epoch, the
-piece, its bytes and what the collective is - checked by the lead that
-receives it (`internode-generic.c`), so PEs that call different collectives,
-or the same one with different arguments, end the job by name rather than
-with a wrong result or a hang (`shmem.collective-divergence`).
+piece, its bytes and which collective it is - checked by the lead that
+receives it (`internode-generic.c`, `shmem.collective-divergence`). It names a
+divergence where the pieces meet, and only there: collectives whose trees share
+no edge wait in different places, a hang whose blocked records name each PE's
+routine; broadcasts from two roots on one node carry the same root position;
+and a node's members are not compared with each other at all.
 
 **Why a single writer.** An earlier draft had local members combine into the
 lead's `dest` as they arrived. That fails three ways:
@@ -4139,7 +4148,7 @@ words are compared for equality and never reset (§5.4), and trees differing
 from one collective to the next cannot disturb them: the root releases a piece
 only when every node has arrived for it, and a node arrives only after its own
 wait for its children, so an early arrival for the next piece or collective
-only ever counts toward that one (`collectives.c` walks it through). Every PE
+only ever counts toward that one (`internode-generic.c` walks it through). Every PE
 ends with the same bits, each element combined once along the tree (§5.8 rule
 3). Integer sums and products wrap, through unsigned arithmetic, where C would
 make a signed overflow undefined. Costs, with *N* nodes, *L* local members, *k*

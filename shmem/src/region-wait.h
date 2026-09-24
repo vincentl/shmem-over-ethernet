@@ -36,15 +36,15 @@ enum osoe_comparison {
 
 /* A value `width` bytes wide (2, 4 or 8), as the 64-bit number its type says it
  * is. */
-uint64_t osoe_region_extend(uint64_t value, unsigned width, bool is_signed);
+uint64_t osoe_region_wait_extend(uint64_t value, unsigned width, bool is_signed);
 
 /* Which counter a wait that sweeps into an already-true predicate belongs in,
  * by the width of what it waits on: the rule in region-wait.c, shared with
  * wait.c's multiple-element forms so that one place decides. */
-enum osoe_counter osoe_region_late_wake_counter(unsigned width);
+enum osoe_counter osoe_region_wait_late_wake_counter(unsigned width);
 
 /* Whether `have` stands in `comparison` to `want`, both already extended. */
-bool osoe_region_satisfied(enum osoe_comparison comparison, uint64_t have, uint64_t want,
+bool osoe_region_wait_satisfied(enum osoe_comparison comparison, uint64_t have, uint64_t want,
                            bool is_signed);
 
 /*

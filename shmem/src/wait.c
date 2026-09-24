@@ -56,7 +56,7 @@
 /* A width-byte value, as the 64-bit number its type says it is (region-wait.h). */
 static uint64_t extend(uint64_t v, unsigned width, bool sgn)
 {
-    return osoe_region_extend(v, width, sgn);
+    return osoe_region_wait_extend(v, width, sgn);
 }
 
 /* The spec's comparison constant as the wait's own: the wait below the API has
@@ -77,7 +77,7 @@ static enum osoe_comparison comparison_of(int cmp, const char *routine)
 
 static bool satisfied(int cmp, uint64_t have, uint64_t want, bool sgn, const char *routine)
 {
-    return osoe_region_satisfied(comparison_of(cmp, routine), have, want, sgn);
+    return osoe_region_wait_satisfied(comparison_of(cmp, routine), have, want, sgn);
 }
 
 /* ---- the scalar forms -------------------------------------------------- */
@@ -291,7 +291,7 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
              * invariant - written through the same rule so there is one place
              * that decides. */
             if (timed_out)
-                osoe_count(osoe_region_late_wake_counter(w->width), 1);
+                osoe_count(osoe_region_wait_late_wake_counter(w->width), 1);
             break;
         }
         if (woken)

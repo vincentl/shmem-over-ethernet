@@ -21,12 +21,16 @@
  * **A vector larger than a slot goes through the tree in slot-sized pieces**,
  * each piece a full pass up and down (§5.5's "chunk through fixed scratch").
  * **Each piece carries a header** - the team's epoch, the piece's number and
- * bytes, and what the collective is - which the lead receiving it checks, so
- * that nodes whose PEs called different collectives, or the same one with
- * different arguments, end the job by name rather than with a wrong result or
- * a hang (§5.5's "asserted on receipt"). A reduction's pieces carry one up and
- * every piece carries one down; a broadcast's arrivals carry nothing, so a
+ * bytes, and which collective it is - which the lead receiving it checks
+ * (§5.5's "asserted on receipt"). A reduction's pieces carry one up and every
+ * piece carries one down; a broadcast's arrivals carry nothing, so a
  * reduction's lead that counted one as its child's finds out from the slot.
+ * **It names a divergence where the pieces meet, and only there.** Nodes whose
+ * PEs called collectives whose trees share no edge - a reduction against a
+ * broadcast rooted elsewhere, or a data collective against a barrier - wait in
+ * different places: a hang, whose blocked records name each PE's routine.
+ * Broadcasts from two roots on one node carry the same root position and are
+ * not told apart. And within a node, members' calls are not compared at all.
  * A broadcast's pieces go up empty: a child's arrival says its release slot is
  * free, since its last piece has been copied out of it, and only then does the
  * parent write the next.
@@ -85,8 +89,8 @@
 /* The internal region's layout (internal-region.h): the slots, then the control
  * words, per team an eight-byte arrival word (children's pieces in) and release
  * word (the parent's pieces down), each on a cache line of its own. */
-enum { WORDS_PER_TEAM = 2 * OSOE_CACHELINE };
-_Static_assert(OSOE_TEAMS * WORDS_PER_TEAM <= OSOE_INTERNAL_WORDS_BYTES,
+enum { TEAM_WORDS_BYTES = 2 * OSOE_CACHELINE };
+_Static_assert(OSOE_TEAMS * TEAM_WORDS_BYTES <= OSOE_INTERNAL_WORDS_BYTES,
                "every team's words fit the internal region's page of them");
 
 /* Slot `position` holds that child's partial result; the one after the last
@@ -104,7 +108,7 @@ static uint64_t release_slot(void)
 
 static uint64_t arrivals_word(uint32_t team)
 {
-    return child_slot(osoe.bootstrap.collective_fanout + 1) + (uint64_t)team * WORDS_PER_TEAM;
+    return child_slot(osoe.bootstrap.collective_fanout + 1) + (uint64_t)team * TEAM_WORDS_BYTES;
 }
 
 static uint64_t release_word(uint32_t team)
@@ -165,14 +169,20 @@ void osoe_internode_generic_team(uint32_t team, const uint32_t *nodes, uint32_t 
     g->every_node = count == osoe.job.node_count;
 }
 
+/*
+ * The team's state, for the world team only: the slots are the world team's,
+ * and so is the lead a node's local id 0 is - a split team (§7.3) spanning
+ * every node would pass a check on its node set and still write into the
+ * wrong PE's region and share the world's slots, so the refusal is by team.
+ */
 static struct generic_team *registered_team(uint32_t team, const char *routine)
 {
     if (team >= OSOE_TEAMS || !teams[team].registered)
         osoe_fatal("%s: team %u has no internode phase registered", routine, team);
     struct generic_team *g = &teams[team];
-    if (!g->every_node)
+    if (team != OSOE_TEAM_WORLD || !g->every_node)
         osoe_fatal("%s: team %u spans %u of the job's %u nodes, and the generic internode "
-                   "phase has a tree over every node only (§7.3)", routine, team, g->count,
+                   "phase runs the world team's only (§7.3)", routine, team, g->count,
                    osoe.job.node_count);
     return g;
 }
@@ -219,15 +229,15 @@ static void find_lead_tree(const struct generic_team *g, uint32_t root, struct l
 struct piece_header {
     uint32_t epoch;                     /* the team's epoch of the collective */
     uint32_t piece;                     /* which of its pieces */
-    uint32_t what;                      /* the collective: reduction_what, or the root */
+    uint32_t collective;                /* which: reduction_identity, or the root */
     uint32_t bytes;                     /* this piece's */
 };
 enum { HEADER_BYTES = 16 };
 _Static_assert(sizeof(struct piece_header) == HEADER_BYTES, "a piece's header is 16 bytes");
 
-/* A reduction's `what`, its top bit set; a broadcast's is its root's index. */
-static uint32_t reduction_what(enum osoe_reduction_operation operation,
-                               struct osoe_element element)
+/* A reduction's `collective`, its top bit set; a broadcast's is its root's index. */
+static uint32_t reduction_identity(enum osoe_reduction_operation operation,
+                                   struct osoe_element element)
 {
     return UINT32_C(1) << 31 | (uint32_t)operation << 16 | (uint32_t)element.kind << 8 |
            (element.width & 0xff);
@@ -261,29 +271,31 @@ static void describe(const struct piece_header *h, char *out, size_t size)
 {
     if (h->epoch == 0)
         snprintf(out, size, "nothing: no piece was put there");
-    else if (h->what >> 31)
+    else if (h->collective >> 31)
         snprintf(out, size, "piece %u (%u bytes) of epoch %u's %s of %u-byte %s", h->piece,
-                 h->bytes, h->epoch, operation_name((h->what >> 16) & 0x7fff), h->what & 0xff,
-                 kind_name((h->what >> 8) & 0xff));
+                 h->bytes, h->epoch, operation_name((h->collective >> 16) & 0x7fff), h->collective & 0xff,
+                 kind_name((h->collective >> 8) & 0xff));
     else
         snprintf(out, size, "piece %u (%u bytes) of epoch %u's broadcast from the node at "
-                 "index %u", h->piece, h->bytes, h->epoch, h->what);
+                 "index %u", h->piece, h->bytes, h->epoch, h->collective);
 }
 
-/* The slot at `slot` holds the piece `expected` says, or the job ends. */
+/* The slot at `slot` holds the piece `expected` says, or the job ends: `from`
+ * says what it should hold, and `sender` whose it is. */
 static void check_piece(const unsigned char *slot, const struct piece_header *expected,
-                        const char *from, const char *routine)
+                        const char *from, uint32_t sender, const char *routine)
 {
     struct piece_header got;
     memcpy(&got, slot, sizeof got);
     if (got.epoch == expected->epoch && got.piece == expected->piece &&
-        got.what == expected->what && got.bytes == expected->bytes)
+        got.collective == expected->collective && got.bytes == expected->bytes)
         return;
     char want[160], found[160];
     describe(expected, want, sizeof want);
     describe(&got, found, sizeof found);
-    osoe_fatal("%s: %s should be %s, and is %s: PEs called different collectives, or the "
-               "same one with different arguments", routine, from, want, found);
+    osoe_fatal("%s: %s, from node %u's lead (PE %u), should be %s, and is %s: PEs called "
+               "different collectives, or the same one with different arguments", routine,
+               from, osoe_node_of(&osoe.job, sender), sender, want, found);
 }
 
 /*
@@ -307,7 +319,8 @@ static void lead_piece(struct generic_team *g, uint32_t team, const struct piece
         if (combine)
             for (uint32_t c = 0; c < tree->children; c++) {
                 const unsigned char *slot = internal(child_slot(c));
-                check_piece(slot, expected, "a child's partial result", routine);
+                check_piece(slot, expected, "a child's partial result", tree->child[c],
+                            routine);
                 combine(at, slot + HEADER_BYTES, bytes / width);
             }
     }
@@ -327,7 +340,7 @@ static void lead_piece(struct generic_team *g, uint32_t team, const struct piece
                          OSOE_COMPARISON_EQUAL, g->releases_expected,
                          OSOE_BLOCKED_DETAIL_EPOCH, expected->epoch);
         const unsigned char *slot = internal(release_slot());
-        check_piece(slot, expected, "the result from the parent", routine);
+        check_piece(slot, expected, "the result from the parent", tree->parent, routine);
         memcpy(at, slot + HEADER_BYTES, bytes);
     }
     for (uint32_t c = 0; c < tree->children; c++) {
@@ -344,7 +357,7 @@ static void lead_piece(struct generic_team *g, uint32_t team, const struct piece
 
 /* The whole buffer, piece by piece, each a whole number of elements that fits
  * a slot behind its header. */
-static void in_pieces(struct generic_team *g, uint32_t team, uint32_t epoch, uint32_t what,
+static void in_pieces(struct generic_team *g, uint32_t team, uint32_t epoch, uint32_t collective,
                       const struct lead_tree *tree, unsigned char *buffer, size_t bytes,
                       size_t width, osoe_combine_function combine, const char *routine)
 {
@@ -354,7 +367,7 @@ static void in_pieces(struct generic_team *g, uint32_t team, uint32_t epoch, uin
         struct piece_header expected = {
             .epoch = epoch,
             .piece = number,
-            .what = what,
+            .collective = collective,
             .bytes = (uint32_t)(bytes - done < piece ? bytes - done : piece),
         };
         lead_piece(g, team, &expected, tree, buffer + done, width, combine, routine);
@@ -374,7 +387,7 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
         find_lead_tree(g, 0, &g->reduction_tree, routine);
         g->reduction_tree_known = true;
     }
-    in_pieces(g, team, epoch, reduction_what(operation, element), &g->reduction_tree, buffer,
+    in_pieces(g, team, epoch, reduction_identity(operation, element), &g->reduction_tree, buffer,
               count * element.width, element.width, combine, routine);
 }
 
