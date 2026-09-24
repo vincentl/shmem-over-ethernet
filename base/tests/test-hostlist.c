@@ -48,6 +48,7 @@ int main(void)
     expect("pi01", "pi01");
     expect("pi[01-04,07]", "pi01 pi02 pi03 pi04 pi07");
     expect("pi[1-3],login,x[08-10]", "pi1 pi2 pi3 login x08 x09 x10");
+    expect("pi-[001-004]", "pi-001 pi-002 pi-003 pi-004");     /* the author's cluster */
     expect("rack[1-2]-a", "rack1-a rack2-a");
     expect("n[9-11]", "n9 n10 n11");                  /* width follows the lower bound */
     expect("127.0.0.[1-4]", "127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4");  /* osoe-launch's */

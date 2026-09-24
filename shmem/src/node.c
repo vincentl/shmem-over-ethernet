@@ -215,8 +215,9 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
         }
         if (n->slots[i].rank != b->gtids[i]) {
             char msg[256];
-            snprintf(msg, sizeof msg, "local PE %u joined as rank %u, but OSOE_GTIDS "
-                     "names rank %u", i, n->slots[i].rank, b->gtids[i]);
+            snprintf(msg, sizeof msg, "local PE %u joined as rank %u, but %sGTIDS "
+                     "names rank %u", i, n->slots[i].rank,
+                     b->launcher ? b->launcher : "OSOE_", b->gtids[i]);
             fail_rendezvous(n, msg);
         }
     }
@@ -547,8 +548,12 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
         open_control(n, b, session);
 
     struct osoe_pe_slot *me = &n->slots[b->local_id];
-    if (atomic_load_explicit(&me->phase, memory_order_acquire) != OSOE_PHASE_EMPTY)
-        fail_rendezvous(n, "another process already joined with this OSOE_LOCALID");
+    if (atomic_load_explicit(&me->phase, memory_order_acquire) != OSOE_PHASE_EMPTY) {
+        char msg[128];
+        snprintf(msg, sizeof msg, "another process already joined with this %sLOCALID",
+                 b->launcher ? b->launcher : "OSOE_");
+        fail_rendezvous(n, msg);
+    }
     int len = snprintf(me->heap_name, sizeof me->heap_name, "%s.heap.%u", n->control_name,
                        b->local_id);
     if (len < 0 || (size_t)len >= sizeof me->heap_name)

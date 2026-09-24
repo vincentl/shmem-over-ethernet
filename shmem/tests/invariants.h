@@ -35,19 +35,21 @@
 #include <shmem.h>
 
 #include "check.h"
+#include "launcher.h"
 #include "segment.h"
 
 /*
- * The control segment's name, rebuilt from the launcher environment (§6.2):
+ * The control segment's name, rebuilt from the launcher environment (§6.2,
+ * launcher.h):
  * /osoe.<job>.<step>.<node>.<session>, session 0 for a single init/finalize
  * pair. A test that re-initializes would have to say which session it means,
  * which none does yet.
  */
 static inline void osoe_test_segment_name(char *buf, size_t len, unsigned session)
 {
-    const char *job = getenv("OSOE_JOB_ID");
-    const char *step = getenv("OSOE_STEP_ID");
-    const char *node = getenv("OSOE_NODEID");
+    const char *job = osoe_test_launcher("JOB_ID");
+    const char *step = osoe_test_launcher("STEP_ID");
+    const char *node = osoe_test_launcher("NODEID");
     snprintf(buf, len, "/osoe.%s.%s.%s.%u", job ? job : "0", step ? step : "0",
              node ? node : "0", session);
 }
@@ -73,7 +75,7 @@ static inline uint32_t osoe_test_scope_count(const struct osoe_segment *s, unsig
  */
 static inline int osoe_test_named_objects(void)
 {
-    const char *job = getenv("OSOE_JOB_ID"), *step = getenv("OSOE_STEP_ID");
+    const char *job = osoe_test_launcher("JOB_ID"), *step = osoe_test_launcher("STEP_ID");
     const char *keep = getenv("OSOE_KEEP_CONTROL_SEGMENT");
     bool kept = keep && strcmp(keep, "1") == 0;
     char prefix[64];

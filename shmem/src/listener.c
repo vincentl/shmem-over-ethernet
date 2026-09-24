@@ -496,16 +496,54 @@ void osoe_listener_node_address(const struct osoe_bootstrap *b, uint32_t node,
 {
     char host[256];
     if (!b->node_list || !osoe_hostlist_entry(b->node_list, node, host, sizeof host))
-        osoe_fatal("OSOE_STEP_NODELIST='%s' has no usable entry for node %u",
-                   b->node_list ? b->node_list : "", node);
+        osoe_fatal("%sSTEP_NODELIST='%s' has no usable entry for node %u",
+                   b->launcher ? b->launcher : "OSOE_", b->node_list ? b->node_list : "",
+                   node);
     struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM }, *found;
     int e = getaddrinfo(host, NULL, &hints, &found);
     if (e != 0)
-        osoe_fatal("cannot resolve %s, node %u's host in OSOE_STEP_NODELIST: %s", host, node,
+        osoe_fatal("cannot resolve %s, node %u's host in %sSTEP_NODELIST: %s", host, node,
+                   b->launcher ? b->launcher : "OSOE_",
                    gai_strerror(e));
     *out = *(const struct sockaddr_in *)found->ai_addr;
     out->sin_port = 0;
     freeaddrinfo(found);
+}
+
+void osoe_listener_own_address(const struct osoe_bootstrap *b, struct sockaddr_in *out)
+{
+    osoe_listener_node_address(b, b->node, out);
+    char host[256];
+    if (!osoe_hostlist_entry(b->node_list, b->node, host, sizeof host) ||
+        !osoe_listener_self_is_loopback(host, out, b->node_count))
+        return;
+    /* Another node, and the address this host would send to it from: a UDP
+     * socket connected to it, which sends nothing. */
+    uint32_t other = b->node == 0 ? 1 : 0;
+    struct sockaddr_in toward, local;
+    osoe_listener_node_address(b, other, &toward);
+    if ((ntohl(toward.sin_addr.s_addr) >> 24) == 127)
+        return;                         /* every node here: one host's logical nodes */
+    toward.sin_port = htons(9);
+    socklen_t len = sizeof local;
+    int fd = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+    bool found = fd >= 0 && connect(fd, (struct sockaddr *)&toward, sizeof toward) == 0 &&
+                 getsockname(fd, (struct sockaddr *)&local, &len) == 0;
+    if (fd >= 0)
+        close(fd);
+    char self_ip[INET_ADDRSTRLEN], local_ip[INET_ADDRSTRLEN] = "?";
+    inet_ntop(AF_INET, &out->sin_addr, self_ip, sizeof self_ip);
+    if (!found)
+        osoe_fatal("node %u's host %s resolves here to %s, a loopback address its peers "
+                   "cannot reach, and no route toward node %u was found: map the name to "
+                   "this host's address in /etc/hosts (design §6.2)", b->node, host, self_ip,
+                   other);
+    out->sin_addr = local.sin_addr;
+    inet_ntop(AF_INET, &local.sin_addr, local_ip, sizeof local_ip);
+    if (b->debug)
+        fprintf(stderr, "osoe: node %u: %s resolves here to %s, a loopback address; "
+                "listening at %s, this host's address toward node %u\n", b->node, host,
+                self_ip, local_ip, other);
 }
 
 int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,

@@ -2,10 +2,13 @@
  * osoe-launch - start L processes of one job on this machine, the way a Slurm
  * step would, for tests. Not installed.
  *
- *   osoe-launch -n L [-m MAP] [-t SECONDS] [-k] [-e RANK:NAME=VALUE]...
+ *   osoe-launch -n L [-m MAP] [-t SECONDS] [-k] [-s] [-e RANK:NAME=VALUE]...
  *               [-N NAMESPACE_PREFIX] [-H HOST_LIST] -- PROGRAM [ARGS]...
  *
- * Each process gets the OSOE_ bootstrap variables of design §6.2. Without -m
+ * Each process gets the OSOE_ bootstrap variables of design §6.2 - or, with
+ * -s, the same variables named as srun names them, SLURM_ in place of OSOE_,
+ * so that the job takes the bootstrap's Slurm path (§6.1) the way a real step
+ * does, on one machine and at every tier. Without -m
  * the job has one node and L tasks: rank i is local id i. The job id is this
  * launcher's pid, so concurrent launches never share a shared-memory name. -e
  * sets or overrides one variable for one rank, for tests that need PEs to
@@ -79,7 +82,7 @@ struct override {
 
 static void usage(void)
 {
-    fprintf(stderr, "usage: osoe-launch -n L [-m NODE_MAP] [-t SECONDS] [-k] "
+    fprintf(stderr, "usage: osoe-launch -n L [-m NODE_MAP] [-t SECONDS] [-k] [-s] "
                     "[-e RANK:NAME=VALUE]... [-N NAMESPACE_PREFIX] [-H HOST_LIST] "
                     "-- PROGRAM [ARGS]...\n");
     exit(2);
@@ -127,6 +130,15 @@ static uint32_t node_count_for_children;
 static pid_t launcher_pid;
 static const char *namespace_prefix;    /* -N: tier 3's per-node network namespaces */
 static const char *host_list;           /* -H: their addresses, as OSOE_STEP_NODELIST */
+static const char *launcher_prefix = "OSOE_";  /* -s: "SLURM_", srun's names (§6.1) */
+
+/* One of the bootstrap's launcher variables, under this launch's names. */
+static void set_launcher_variable(const char *suffix, const char *value)
+{
+    char name[40];
+    snprintf(name, sizeof name, "%s%s", launcher_prefix, suffix);
+    setenv_or_die(name, value);
+}
 
 /*
  * Tier 3 (-N): put this rank in its logical node's network namespace, then give
@@ -173,20 +185,24 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
     if (namespace_prefix)
         enter_namespace(p->node);
 
+    /* Under srun's names, nothing of ours may be left for the bootstrap to
+     * prefer: OSOE_PROCID decides which names it reads (§6.1). */
+    if (strcmp(launcher_prefix, "OSOE_") != 0)
+        unsetenv("OSOE_PROCID");
     char buf[32];
     snprintf(buf, sizeof buf, "%ld", rank);
-    setenv_or_die("OSOE_PROCID", buf);
+    set_launcher_variable("PROCID", buf);
     snprintf(buf, sizeof buf, "%u", p->local_id);
-    setenv_or_die("OSOE_LOCALID", buf);
+    set_launcher_variable("LOCALID", buf);
     snprintf(buf, sizeof buf, "%ld", n);
-    setenv_or_die("OSOE_STEP_NUM_TASKS", buf);
+    set_launcher_variable("STEP_NUM_TASKS", buf);
     snprintf(buf, sizeof buf, "%u", p->node);
-    setenv_or_die("OSOE_NODEID", buf);
+    set_launcher_variable("NODEID", buf);
     snprintf(buf, sizeof buf, "%u", node_count_for_children);
-    setenv_or_die("OSOE_STEP_NUM_NODES", buf);
-    setenv_or_die("OSOE_JOB_ID", job);
-    setenv_or_die("OSOE_STEP_ID", "0");
-    setenv_or_die("OSOE_GTIDS", p->gtids);
+    set_launcher_variable("STEP_NUM_NODES", buf);
+    set_launcher_variable("JOB_ID", job);
+    set_launcher_variable("STEP_ID", "0");
+    set_launcher_variable("GTIDS", p->gtids);
 
     /*
      * The step's hosts, in node order (§6.1). One node: this host's name. More:
@@ -199,7 +215,7 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
     host[sizeof host - 1] = '\0';
     if (node_count_for_children > 1)
         snprintf(host, sizeof host, "127.0.0.[1-%u]", node_count_for_children);
-    setenv_or_die("OSOE_STEP_NODELIST", host_list ? host_list : host);
+    set_launcher_variable("STEP_NODELIST", host_list ? host_list : host);
 
     for (int i = 0; i < nov; i++)
         if (ov[i].rank == rank && putenv(ov[i].assignment) != 0)
@@ -266,7 +282,7 @@ int main(int argc, char **argv)
     int nov = 0;
 
     int opt;
-    while ((opt = getopt(argc, argv, "+n:m:t:ke:N:H:")) != -1) {
+    while ((opt = getopt(argc, argv, "+n:m:t:kse:N:H:")) != -1) {
         switch (opt) {
         case 'n':
             n = parse_long(optarg, 1, MAX_PROCS, "process count");
@@ -279,6 +295,9 @@ int main(int argc, char **argv)
             break;
         case 'k':
             keep = true;
+            break;
+        case 's':
+            launcher_prefix = "SLURM_";
             break;
         case 'e': {
             char *colon = strchr(optarg, ':');

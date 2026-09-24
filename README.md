@@ -4,17 +4,21 @@ OpenSHMEM Over Ethernet: an implementation of OpenSHMEM 1.6 for commodity Ethern
 designed to build entirely from a Linux distribution's own packages — no fabric
 libraries.
 
-**Status:** phase 1 in progress. **A single node is complete** (design §7.1 step
-1): initialization and thread levels, teams and contexts, the symmetric heap
-allocator in full, RMA, `shmem_ptr`, every atomic type of specification Tables
+**Status:** phase 1, step 4 of 4 (design §7.1). Jobs run on one node or across
+nodes over TCP and io_uring, started by `srun` or by `osoe-launch`:
+initialization and thread levels up to `SHMEM_THREAD_SERIALIZED`, the symmetric
+heap allocator in full, contiguous RMA (`shmem_putmem`, `shmem_getmem`,
+`shmem_putmem_signal`), `shmem_ptr`, every atomic type of specification Tables
 6–8 with the C11 type-generic interfaces, the point-to-point waits and tests
 including the multiple-element forms, signalling operations, memory ordering,
-`shmem_barrier_all` and `shmem_sync_all`, and the mandatory surface of §7.4
-including the `pshmem_` profiling interface. 526 routines; 82 tests in tiers 1
-and 2.
+`shmem_barrier_all`, `shmem_sync_all` and `shmem_team_sync`,
+`shmem_global_exit`, and the mandatory surface of §7.4 including the `pshmem_`
+profiling interface. A PE or a node that dies ends the whole job (§3.15).
 
-Not yet: anything between nodes. The network backend is §7.1 step 2 onward.
-Symmetric statics are not supported and are refused with a diagnostic (§4.3).
+Not yet: symmetric statics, which are refused with a diagnostic (§4.3);
+collectives other than the barriers - broadcast, reductions, collect and
+alltoall; typed and strided RMA and the nonblocking forms; locks; contexts
+other than the default; and `SHMEM_THREAD_MULTIPLE` (§7.5, §4.11).
 
 ## Requirements
 
@@ -59,17 +63,40 @@ from the repository root start in the same directory inside the VM, and
 
 ## Running a program
 
-**Status:** one node only. A job whose environment describes more than one node
-fails at `shmem_init` with a message saying so, as does a Slurm launch.
+### With `srun`
+
+```sh
+srun -N4 --ntasks-per-node=4 ./my_program
+```
+
+No PMI plugin is involved: each node's lead finds the others over TCP, on a
+port it derives from the job and step ids (`OSOE_PORT_RANGE`, default
+17000–26999), and then connects to each on a port the kernel chooses, so TCP
+must be open between the nodes, not only that range. Every node must resolve
+the names in the step's node list, and the program must be at the same path on
+every node. Use `srun -K1` (or `KillOnBadExit=1`), so that a task that fails
+at start-up ends the rest rather than leaving them waiting (design §3.15), and
+`OSOE_NO_PROGRESS_TIMEOUT=60` while a cluster is new, so that a wait that stops
+moving says what it waits for. `OSOE_JOB_SECRET`, 32 hexadecimal digits
+exported before `srun`, keeps other hosts out of the job's rendezvous (design
+§6.2). A program run straight from a batch script, not through `srun`, is
+refused, since it is no task of a step. `tools/launch/capture-slurm-fixtures.sh`
+records a step's environment for the bootstrap's tests (design §6.1, §8.2).
 
 ### With `osoe-launch` (development and tests)
 
-`build/<preset>/tools/launch/osoe-launch` starts L processes of a one-node job and
-sets every bootstrap variable for them:
+`build/<preset>/tools/launch/osoe-launch` starts the processes of a job on this
+machine and sets every bootstrap variable for them:
 
 ```sh
 build/debug/tools/launch/osoe-launch -n 4 -- ./my_program
+build/debug/tools/launch/osoe-launch -n 6 -m 0,0,1,1,2,2 -- ./my_program
 ```
+
+`-m` is a logical node map (design §8.1): one node id per rank, each node's
+lead listening on its own loopback address, so one machine runs a job of
+several nodes. `-s` names the variables as `srun` does, so the job takes the
+bootstrap's Slurm path.
 
 It fails if any process fails, if the timeout (`-t SECONDS`, default 60)
 expires, or if the job leaves shared memory behind. `-e RANK:NAME=VALUE` sets a

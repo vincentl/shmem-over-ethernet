@@ -32,6 +32,22 @@ static const char *spec_env(const char *suffix)
     return getenv(name);
 }
 
+/*
+ * The launcher's names (§6.1). srun sets Slurm's; osoe-launch sets the same
+ * names with OSOE_ in place of SLURM_, and so can a test or a job started by
+ * hand. OSOE_PROCID decides which are read: set, every one with OSOE_; unset
+ * inside a step of a Slurm job, every one with SLURM_ - never a mixture, which
+ * could pair one launcher's rank with the other's node.
+ */
+static const char *launcher = "OSOE_";
+
+static const char *launcher_name(const char *suffix)
+{
+    static char name[40];
+    snprintf(name, sizeof name, "%s%s", launcher, suffix);
+    return name;
+}
+
 static uint32_t need_u32(const char *name)
 {
     uint32_t v;
@@ -50,38 +66,56 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
 {
     *b = (struct osoe_bootstrap){ 0 };
 
+    launcher = "OSOE_";
     if (!getenv("OSOE_PROCID")) {
-        if (getenv("SLURM_JOB_ID"))
-            osoe_fatal("launch under Slurm is not yet supported; set the OSOE_ "
-                       "bootstrap variables (design §6.2) or use osoe-launch");
-        osoe_fatal("no launcher environment: OSOE_PROCID is not set. Start "
-                   "programs with osoe-launch, or set the OSOE_ bootstrap "
-                   "variables of design §6.2");
+        if (getenv("SLURM_PROCID") && getenv("SLURM_STEP_ID"))
+            launcher = "SLURM_";
+        else if (getenv("SLURM_JOB_ID"))
+            osoe_fatal("inside Slurm job %s but not in a step of it: start the program "
+                       "with srun (design §6.1)", getenv("SLURM_JOB_ID"));
+        else
+            osoe_fatal("no launcher environment: neither OSOE_PROCID nor SLURM_PROCID is "
+                       "set. Start programs with srun or osoe-launch, or set the OSOE_ "
+                       "bootstrap variables of design §6.2");
     }
+    const char *prefix = launcher;
+    b->launcher = launcher;
 
-    b->rank = need_u32("OSOE_PROCID");
+    b->rank = need_u32(launcher_name("PROCID"));
     b->have_rank = true;
-    b->world_size = need_u32("OSOE_STEP_NUM_TASKS");
-    b->node = need_u32("OSOE_NODEID");
-    b->node_count = need_u32("OSOE_STEP_NUM_NODES");
-    b->local_id = need_u32("OSOE_LOCALID");
-    b->step = need_u32("OSOE_STEP_ID");
-    switch (osoe_environment_u64("OSOE_JOB_ID", &b->job)) {
+    b->world_size = need_u32(launcher_name("STEP_NUM_TASKS"));
+    b->node = need_u32(launcher_name("NODEID"));
+    b->node_count = need_u32(launcher_name("STEP_NUM_NODES"));
+    b->local_id = need_u32(launcher_name("LOCALID"));
+    b->step = need_u32(launcher_name("STEP_ID"));
+    /* Steps Slurm runs for itself - a batch script's, an interactive
+     * allocation's, the extern step - have ids of 0xfffffff0 and up, and each
+     * component of a heterogeneous job reads as a job of its own. Neither has
+     * been captured (§8.2), and a program run in one would be a job of the
+     * wrong shape, so both are refused until they are. */
+    if (strcmp(prefix, "SLURM_") == 0 && b->step >= UINT32_C(0xfffffff0))
+        osoe_fatal("SLURM_STEP_ID=%u is one of Slurm's own steps, not one srun started: "
+                   "start the program with srun (design §6.1)", b->step);
+    if (strcmp(prefix, "SLURM_") == 0 && getenv("SLURM_HET_SIZE"))
+        osoe_fatal("a heterogeneous Slurm job (SLURM_HET_SIZE=%s) is not supported yet "
+                   "(design §6.1)", getenv("SLURM_HET_SIZE"));
+    switch (osoe_environment_u64(launcher_name("JOB_ID"), &b->job)) {
     case OSOE_ENVIRONMENT_OK: break;
-    case OSOE_ENVIRONMENT_UNSET: osoe_fatal("OSOE_JOB_ID is not set");
-    default: osoe_fatal("OSOE_JOB_ID='%s' is not a decimal number", getenv("OSOE_JOB_ID"));
+    case OSOE_ENVIRONMENT_UNSET: osoe_fatal("%sJOB_ID is not set", prefix);
+    default: osoe_fatal("%sJOB_ID='%s' is not a decimal number", prefix,
+                        getenv(launcher_name("JOB_ID")));
     }
 
     if (b->node_count == 0 || b->node >= b->node_count)
-        osoe_fatal("OSOE_NODEID=%u is not below OSOE_STEP_NUM_NODES=%u", b->node,
+        osoe_fatal("%sNODEID=%u is not below %sSTEP_NUM_NODES=%u", prefix, b->node, prefix,
                    b->node_count);
     if (b->world_size == 0 || b->rank >= b->world_size)
-        osoe_fatal("OSOE_PROCID=%u is not below OSOE_STEP_NUM_TASKS=%u", b->rank,
+        osoe_fatal("%sPROCID=%u is not below %sSTEP_NUM_TASKS=%u", prefix, b->rank, prefix,
                    b->world_size);
 
-    const char *gtids = getenv("OSOE_GTIDS");
+    const char *gtids = getenv(launcher_name("GTIDS"));
     if (!gtids)
-        osoe_fatal("OSOE_GTIDS is not set");
+        osoe_fatal("%sGTIDS is not set", prefix);
     /*
      * Sized by the list, which is this node's L ranks, and not by the job: at
      * 4,096 x 256 a world-sized array is 4 MiB of address space per PE for 1 KiB
@@ -92,31 +126,31 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     for (const char *c = gtids; *c; c++)
         entries += *c == ',';
     if (entries > b->world_size)
-        osoe_fatal("OSOE_GTIDS='%s' names %zu ranks in a job of %u", gtids, entries,
+        osoe_fatal("%sGTIDS='%s' names %zu ranks in a job of %u", prefix, gtids, entries,
                    b->world_size);
     /* §6.2's per-rank local index in the job map is 16 bits (job.h). */
     if (entries > UINT16_MAX)
-        osoe_fatal("OSOE_GTIDS names %zu ranks on one node; osoe supports at most %u",
+        osoe_fatal("%sGTIDS names %zu ranks on one node; osoe supports at most %u", prefix,
                    entries, (unsigned)UINT16_MAX);
     b->gtids = malloc(sizeof *b->gtids * entries);
     if (!b->gtids)
         osoe_fatal("out of memory");
     size_t n;
     if (osoe_parse_u32_list(gtids, b->gtids, entries, &n) != 0)
-        osoe_fatal("OSOE_GTIDS='%s' is not a list of at most %u ranks", gtids,
+        osoe_fatal("%sGTIDS='%s' is not a list of at most %u ranks", prefix, gtids,
                    b->world_size);
     b->local_count = (uint32_t)n;
 
     if (b->local_id >= b->local_count || b->gtids[b->local_id] != b->rank)
-        osoe_fatal("OSOE_LOCALID=%u does not name OSOE_PROCID=%u in OSOE_GTIDS='%s'",
-                   b->local_id, b->rank, gtids);
+        osoe_fatal("%sLOCALID=%u does not name %sPROCID=%u in %sGTIDS='%s'", prefix,
+                   b->local_id, prefix, b->rank, prefix, gtids);
     for (uint32_t i = 0; i < b->local_count; i++) {
         if (b->gtids[i] >= b->world_size)
-            osoe_fatal("OSOE_GTIDS='%s' names rank %u, not below %u", gtids, b->gtids[i],
+            osoe_fatal("%sGTIDS='%s' names rank %u, not below %u", prefix, gtids, b->gtids[i],
                        b->world_size);
         for (uint32_t j = 0; j < i; j++)
             if (b->gtids[j] == b->gtids[i])
-                osoe_fatal("OSOE_GTIDS='%s' names rank %u twice", gtids, b->gtids[i]);
+                osoe_fatal("%sGTIDS='%s' names rank %u twice", prefix, gtids, b->gtids[i]);
     }
 
 
@@ -258,17 +292,17 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
      * Needed only when the job spans nodes; osoe-launch gives §8.1's logical
      * nodes one loopback address each, 127.0.0.[1-N].
      */
-    b->node_list = getenv("OSOE_STEP_NODELIST");
+    b->node_list = getenv(launcher_name("STEP_NODELIST"));
     if (b->node_count > 1) {
         uint32_t hosts = 0;
         char why[128];
         if (!b->node_list)
-            osoe_fatal("OSOE_STEP_NODELIST is not set, and a job of %u nodes needs it: it "
-                       "names each node's host (§6.1)", b->node_count);
+            osoe_fatal("%sSTEP_NODELIST is not set, and a job of %u nodes needs it: it "
+                       "names each node's host (§6.1)", prefix, b->node_count);
         if (!osoe_hostlist_count(b->node_list, &hosts, why, sizeof why))
-            osoe_fatal("OSOE_STEP_NODELIST='%s' is not a host list: %s", b->node_list, why);
+            osoe_fatal("%sSTEP_NODELIST='%s' is not a host list: %s", prefix, b->node_list, why);
         if (hosts != b->node_count)
-            osoe_fatal("OSOE_STEP_NODELIST='%s' names %u hosts for a job of %u nodes",
+            osoe_fatal("%sSTEP_NODELIST='%s' names %u hosts for a job of %u nodes", prefix,
                        b->node_list, hosts, b->node_count);
     }
 

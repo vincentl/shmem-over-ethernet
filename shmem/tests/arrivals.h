@@ -38,6 +38,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "launcher.h"
+
 enum { ARRIVALS_MAX = 256, ARRIVALS_ROUNDS = 64, ARRIVALS_STAGGER_MS = 20 };
 
 static double *arrivals_table;      /* ARRIVALS_ROUNDS rows of ARRIVALS_MAX */
@@ -62,7 +64,7 @@ static inline double arrivals_now(void)
 
 static inline void arrivals_open(void)
 {
-    snprintf(arrivals_name, sizeof arrivals_name, "/osoetest.%s", getenv("OSOE_JOB_ID"));
+    snprintf(arrivals_name, sizeof arrivals_name, "/osoetest.%s", osoe_test_launcher("JOB_ID"));
     int fd = shm_open(arrivals_name, O_CREAT | O_RDWR, 0600);
     if (fd < 0 || ftruncate(fd, (off_t)ARRIVALS_BYTES) != 0) {
         perror("arrivals_open");

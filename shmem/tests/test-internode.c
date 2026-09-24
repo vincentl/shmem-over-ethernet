@@ -36,7 +36,7 @@ enum { SMALL = 64, CHUNKED = 5000, TINY = 1, PATTERN_MOD = 251 };
 
 static int me, npes, local_id;
 
-/* The world ranks on this node, from the launcher's OSOE_GTIDS (§6.2), so the
+/* The world ranks on this node, from the launcher's GTIDS (§6.2, launcher.h), so the
  * test can tell a node-mate from a peer without asking the library. */
 enum { LOCAL_MAX = 256 };
 static int local_ranks[LOCAL_MAX];
@@ -44,7 +44,7 @@ static int local_count;
 
 static void read_local_ranks(void)
 {
-    const char *gtids = getenv("OSOE_GTIDS");
+    const char *gtids = osoe_test_launcher("GTIDS");
     if (!gtids)
         return;
     for (const char *at = gtids; *at; ) {
@@ -109,7 +109,7 @@ int main(void)
     shmem_init();
     me = shmem_my_pe();
     npes = shmem_n_pes();
-    local_id = atoi(getenv("OSOE_LOCALID") ? getenv("OSOE_LOCALID") : "0");
+    local_id = atoi(osoe_test_launcher("LOCALID") ? osoe_test_launcher("LOCALID") : "0");
     read_local_ranks();
 
     /* One inbox per origin, so every PE may write concurrently without two
@@ -160,7 +160,8 @@ int main(void)
      * correct answer rather than a missing check - which is why this asserts a
      * different thing in the two cases instead of being skipped in one.
      */
-    int nodes = atoi(getenv("OSOE_STEP_NUM_NODES") ? getenv("OSOE_STEP_NUM_NODES") : "1");
+    const char *step_nodes = osoe_test_launcher("STEP_NUM_NODES");
+    int nodes = atoi(step_nodes ? step_nodes : "1");
     uint64_t dirty = counter("transport.wait.dirty_peers");
     CHECK(dirty != UINT64_MAX);
     if (nodes > 1)

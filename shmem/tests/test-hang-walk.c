@@ -37,7 +37,7 @@ enum { CULPRIT = 6, NODES = 8, MAX_VISITS = 16, SETTLE_SECONDS = 8 };
 static int read_node(unsigned node, uint64_t *open, uint64_t *own, uint64_t *missing,
                      char *host, size_t hostlen)
 {
-    const char *job = getenv("OSOE_JOB_ID"), *step = getenv("OSOE_STEP_ID");
+    const char *job = osoe_test_launcher("JOB_ID"), *step = osoe_test_launcher("STEP_ID");
     char name[OSOE_SEGMENT_NAME_MAX], err[256];
     snprintf(name, sizeof name, "/osoe.%s.%s.%u.0", job ? job : "0", step ? step : "0", node);
     struct osoe_segment s;

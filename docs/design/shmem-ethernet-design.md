@@ -4243,6 +4243,24 @@ rendezvous** from each node's `SLURM_GTIDS` (§6.2).
 `SLURM_NODEID` is still the locality input, which is the shape §8.1 wants:
 `OSOE_NODE_MAP` overrides it, and both paths share one code path.
 
+*As built* (phase 1 step 4, the second slice's Part B): the bootstrap reads
+these names as `srun` sets them, or as `osoe-launch` mirrors them with `OSOE_`
+in place of `SLURM_`. `OSOE_PROCID` decides which, and every name is then read
+with that prefix, never a mixture — so a test that `osoe-launch` starts inside
+a Slurm allocation, whose environment holds both, is the launcher's job and not
+the allocation's. A task in a Slurm job but in no step of it — a program run
+straight from a batch script — is refused, naming `srun`. The node list is
+Slurm's compressed form (`pi-[001-004]`), each entry resolved by
+`getaddrinfo` — and a node whose own name its host resolves to a loopback
+address, as Debian's `/etc/hosts` maps a host's own name to 127.0.1.1, listens
+and is advertised at the address its host would send from toward another node
+instead, since its peers could never reach it at loopback; an IP literal is
+taken as given (`listener.h`, `shmem.own-address`). `osoe-launch -s` sets
+`srun`'s names, so the Slurm path runs at tier 2 on one machine
+(`shmem.slurm.*`), and `shmem.bootstrap.*` replays
+real and documented `srun` environments (`shmem/tests/slurm-fixtures/`), which
+`tools/launch/capture-slurm-fixtures.sh` captures.
+
 ### 6.2 Rendezvous
 
 > **Local PEs meet on their node; only each node's lead crosses the network.
@@ -4570,10 +4588,13 @@ must is an RDMA one.
 - `shmem_init` raises the soft `RLIMIT_NOFILE` to the hard limit. Slurm propagates
   the submitting shell's limits, commonly a soft limit of 1,024, and a lead on a
   500-node job holds one socket per peer node.
-- **Bare `sbatch` launch.** If `SLURM_JOB_ID` is set but `SLURM_STEP_NUM_TASKS` is
-  not, the program was started directly by a batch script rather than by `srun`.
+- **Bare `sbatch` launch.** If `SLURM_JOB_ID` is set but `SLURM_STEP_ID` is not,
+  the program was started directly by a batch script rather than by `srun`.
   Fail at once with that message rather than waiting for peers that will never
-  start.
+  start. *(As built, keyed on the step id: Slurm 24.11's batch script has
+  `SLURM_PROCID` and `SLURM_GTIDS` but no step id, captured in
+  `shmem/tests/slurm-fixtures/`. Slurm's own steps, ids of 0xfffffff0 and up,
+  and heterogeneous jobs are refused too, until captured.)*
 
 *(Rejected: every PE connecting to rank 0 — about 77,000 connections into one
 listener at 256 PEs × 300 nodes, violating §1, and failing at the 1,021st
@@ -4582,7 +4603,8 @@ an earlier draft proposed — there is no channel to publish on without a KVS or
 shared filesystem.)*
 
 **Non-Slurm launch** (plain `ssh`, a test harness) sets the same variables under
-the `OSOE_` prefix, which take precedence. The `SHMEM_` prefix is the
+the `OSOE_` prefix. `OSOE_PROCID` decides which set is read, and then all of it:
+the names are never mixed (§6.1, as built). The `SHMEM_` prefix is the
 specification's, not ours. The tier-1 and tier-2 harnesses of §8 use this path, so
 the bootstrap runs in every test rather than only on a cluster. The names mirror
 §6.1 exactly:
