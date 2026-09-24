@@ -53,6 +53,11 @@ void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *
                        flags);
 }
 
+void osoe_rma_complete(const char *routine, shmem_ctx_t ctx, int pe)
+{
+    osoe_transport_wait(osoe_ctx_of(routine, ctx), &pe, 1, routine);
+}
+
 OSOE_API void pshmem_putmem(void *dest, const void *source, size_t nelems, int pe)
 {
     osoe_rma_put("shmem_putmem", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, pe, 0);

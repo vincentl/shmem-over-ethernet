@@ -115,7 +115,8 @@ int main(void)
     static unsigned char scratch[SCRATCH];
     static struct osoe_progress_connection connections[MAX_NODES];
     static uint64_t busy[(MAX_NODES + 63) / 64];
-    struct osoe_progress_host host = { resolve, landing, notify, release, NULL, NULL };
+    struct osoe_progress_host host = { resolve, landing, notify, release, NULL, NULL, NULL,
+                                       NULL };
     struct osoe_progress p;
     osoe_progress_init(&p, &area, wires, &ring, descriptors, DESCRIPTORS, scratch, SCRATCH,
                        &host);

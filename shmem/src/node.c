@@ -253,8 +253,13 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      */
     struct osoe_am_config am;
     osoe_am_config_read(&am);
-    uint64_t landing_slot_bytes =
-        align_up(sizeof(struct osoe_landing_slot) + am.chunk);
+    /* Since layout 16 a zone also holds the PE's nonblocking gets in flight:
+     * their records, then the arena their replies land in (§4.6, as built). */
+    uint64_t landing_requests_offset = align_up(sizeof(struct osoe_landing_slot) + am.chunk);
+    uint64_t landing_arena_offset =
+        align_up(landing_requests_offset +
+                 (uint64_t)am.gets_in_flight * sizeof(struct osoe_landing_request));
+    uint64_t landing_slot_bytes = align_up(landing_arena_offset + am.get_landing_bytes);
     uint64_t landing_offset = align_up(blocks_offset + blocks_bytes);
     uint64_t landing_bytes = (uint64_t)b->local_count * landing_slot_bytes;
 
@@ -344,8 +349,18 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->dir.block_bytes = (uint32_t)sizeof(struct osoe_counter_block);
     memcpy((char *)p + metrics_offset, metrics, metrics_bytes);
     n->blocks = (struct osoe_counter_block *)((char *)p + blocks_offset);
+    h->landing_data_bytes = (uint32_t)am.chunk;
+    h->landing_requests = am.gets_in_flight;
+    h->landing_requests_offset = (uint32_t)landing_requests_offset;
+    h->landing_arena_offset = (uint32_t)landing_arena_offset;
+    h->landing_arena_bytes = (uint32_t)am.get_landing_bytes;
     n->landing = (unsigned char *)p + landing_offset;
     n->landing_slot_bytes = (uint32_t)landing_slot_bytes;
+    n->landing_data_bytes = h->landing_data_bytes;
+    n->landing_requests = h->landing_requests;
+    n->landing_requests_offset = h->landing_requests_offset;
+    n->landing_arena_offset = h->landing_arena_offset;
+    n->landing_arena_bytes = h->landing_arena_bytes;
     n->connection_metrics = connection_count
         ? (struct osoe_am_connection_metrics *)((char *)p + connections_offset) : NULL;
     n->connection_count = (uint32_t)connection_count;
@@ -454,6 +469,11 @@ again:;
      * different builds, which is what the frozen directory exists to prevent. */
     n->landing = (unsigned char *)n->hdr + h->dir.landing_offset;
     n->landing_slot_bytes = h->dir.landing_slot_bytes;
+    n->landing_data_bytes = h->landing_data_bytes;
+    n->landing_requests = h->landing_requests;
+    n->landing_requests_offset = h->landing_requests_offset;
+    n->landing_arena_offset = h->landing_arena_offset;
+    n->landing_arena_bytes = h->landing_arena_bytes;
     n->connection_metrics = h->dir.connection_count
         ? (struct osoe_am_connection_metrics *)((char *)n->hdr + h->dir.connections_offset)
         : NULL;

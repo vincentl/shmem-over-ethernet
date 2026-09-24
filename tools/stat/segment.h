@@ -208,11 +208,14 @@ void osoe_segment_close(struct osoe_segment *s);
  *   15  the abort word says how the job ends, with the status and the rank
  *       (enum osoe_segment_abort, below), where it had been 0 or 1 beside a
  *       field for the rank
+ *   16  each PE's landing zone also holds its nonblocking gets in flight -
+ *       records and an arena after its blocking slot - so the directory's
+ *       landing_slot_bytes is now a whole zone rather than a slot and a chunk
  *
- * None of 5 to 15 changed the watch word's encoding.
+ * None of 5 to 16 changed the watch word's encoding.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               15
+#define OSOE_SEGMENT_NEWEST_LAYOUT               16
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is

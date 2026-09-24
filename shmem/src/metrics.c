@@ -82,6 +82,8 @@ static const struct osoe_metric_descriptor thread_metrics[] = {
     T("am.wakes_deferred", OSOE_MKIND_COUNTER, ""),
     T("am.wakes_sent", OSOE_MKIND_COUNTER, ""),
     T("am.wakes_skipped", OSOE_MKIND_COUNTER, ""),
+    T("am.gets_nonblocking", OSOE_MKIND_COUNTER, ""),
+    T("am.landing_full", OSOE_MKIND_COUNTER, ""),
     T("invariant.missed_wake", OSOE_MKIND_INVARIANT, ""),
     T("invariant.watch_reentered", OSOE_MKIND_INVARIANT, ""),
     T("thread.claimed", OSOE_MKIND_STATE, ""),

@@ -253,7 +253,11 @@ static void am_wait_check(struct am_wait *w, uint64_t progress)
     osoe_sweep_expired(w->routine);
     if (!osoe_stall_watch_stalled(&w->watch, progress))
         return;
-    if (w->pe >= 0)
+    if (w->peer == UINT32_MAX)
+        osoe_fatal("%s: no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): %s has stayed "
+                   "at %llu", w->routine, (unsigned long long)osoe_stall_watch_seconds(&w->watch),
+                   w->watching, (unsigned long long)progress);
+    else if (w->pe >= 0)
         osoe_fatal("%s: no progress toward node %u (PE %d) for %llu s "
                    "(OSOE_NO_PROGRESS_TIMEOUT): %s has stayed at %llu", w->routine, w->peer,
                    w->pe, (unsigned long long)osoe_stall_watch_seconds(&w->watch), w->watching,
@@ -461,7 +465,7 @@ static struct osoe_landing_slot *my_landing(void)
 
 static uint32_t landing_capacity(void)
 {
-    return osoe.node.landing_slot_bytes - (uint32_t)sizeof(struct osoe_landing_slot);
+    return osoe.node.landing_data_bytes;
 }
 
 /*
@@ -485,7 +489,10 @@ static void take_credit(struct osoe_connection *connection, uint32_t peer, int p
     if (osoe_credit_take(credit, &ticket))
         return;
     /* Credits come back as replies land, so the tickets served are what moves
-     * while one is awaited: a peer that replies to nothing serves nobody. */
+     * while one is awaited: a peer that replies to nothing serves nobody. A wait
+     * submits whatever this PE has held back (OSOE_TRANSPORT_MORE, transport.h):
+     * its own requests may be what the credits it waits for are out on. */
+    osoe_progress_host_wake_lead();
     struct am_wait w;
     am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_CREDIT, "the connection's reply credits",
                   peer, pe, osoe_credit_served_count(credit));
@@ -615,6 +622,159 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
     }
 }
 
+/*
+ * This PE's nonblocking gets in flight (§4.6, as built). Private: under
+ * SERIALIZED one thread issues them and completes them, and the lead sees only
+ * the landing records. `copy` holds, per record, where its reply goes once it
+ * has landed - a `dst` the lead's process may not be able to see (§3.12).
+ */
+struct in_flight_copy {
+    void *dst;
+    uint32_t offset;            /* into the landing arena */
+    uint32_t length;
+};
+
+static struct {
+    uint32_t count;             /* records in use, from index 0 */
+    uint32_t arena_used;        /* bytes of the arena handed out */
+    uint64_t sequence;          /* the count of tokens made */
+    uint32_t capacity;          /* entries in `copy` */
+    struct in_flight_copy *copy;
+} in_flight;
+
+/*
+ * Complete every nonblocking get this PE has in flight: wait until the lead has
+ * landed as many bytes as the PE asked for (§4.6's counters), then copy each
+ * reply out and give its record back. A wait calls it - a quiet, and all that
+ * completes as one - and so does an issue that finds the records or the arena
+ * used up, which is how the landing zone stays bounded without anything
+ * failing.
+ */
+static void complete_gets(const char *routine)
+{
+    if (in_flight.count == 0)
+        return;
+    struct osoe_landing_slot *slot = my_landing();
+    uint64_t issued = atomic_load_explicit(&slot->bytes_issued, memory_order_relaxed);
+    if (atomic_load_explicit(&slot->bytes_landed, memory_order_seq_cst) != issued) {
+        /* Whatever this PE held back goes out before it waits (transport.h). The
+         * gets may be toward any number of nodes, so the wait names none. */
+        osoe_progress_host_wake_lead();
+        struct am_wait w;
+        am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_NONE,
+                      "the bytes its nonblocking gets have landed", UINT32_MAX, -1,
+                      atomic_load_explicit(&slot->bytes_landed, memory_order_relaxed));
+        osoe_wait_word_enter(&slot->counter_wake);
+        uint32_t slept_on = 0;
+        bool swept = false;
+        for (;;) {
+            uint32_t seen = osoe_wait_word_load(&slot->counter_wake);
+            uint64_t landed = atomic_load_explicit(&slot->bytes_landed, memory_order_seq_cst);
+            if (landed == issued) {
+                if (swept)
+                    count_if_lost(&slot->counter_wake.word, slept_on, routine);
+                break;
+            }
+            slept_on = seen;
+            swept = sleep_on(&slot->counter_wake, seen);
+            am_wait_check(&w, landed);
+        }
+        osoe_wait_word_leave(&slot->counter_wake);
+        am_wait_end();
+    }
+    const unsigned char *arena = osoe_node_landing_arena(&osoe.node, osoe.bootstrap.local_id);
+    struct osoe_landing_request *records =
+        osoe_node_landing_requests(&osoe.node, osoe.bootstrap.local_id);
+    for (uint32_t i = 0; i < in_flight.count; i++) {
+        memcpy(in_flight.copy[i].dst, arena + in_flight.copy[i].offset, in_flight.copy[i].length);
+        /* From here the lead refuses any reply that names it (progress-host.c). */
+        atomic_store_explicit(&records[i].token, 0, memory_order_relaxed);
+    }
+    in_flight.count = 0;
+    in_flight.arena_used = 0;
+}
+
+/*
+ * A nonblocking get (§4.6, as built): ask, and return. Each piece - no larger
+ * than the blocking slot's chunk, the wire's limit and the arena - takes a
+ * record and a range of the landing arena, publishes them with its token, and
+ * goes out; the lead lands its reply there, counts it and returns its credit,
+ * and the next wait copies it into `dst`. A piece that finds no record or no
+ * room completes what is in flight first.
+ *
+ * The request holds its credit, like any get: §3.8's bound on replies in
+ * flight toward this node is unchanged. What is new is who returns it - the
+ * lead, as the reply lands, rather than the caller after reading it - which
+ * reply.h has said the difference would be since the credits were built.
+ */
+static void remote_get_nonblocking(int pe, enum osoe_region region, uint64_t offset, void *dst,
+                                   size_t len, unsigned flags)
+{
+    uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
+    struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
+    if (!connection)
+        osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
+    uint32_t requests = osoe.node.landing_requests;
+    uint32_t arena_bytes = osoe.node.landing_arena_bytes;
+    if (in_flight.capacity != requests) {
+        complete_gets("shmem_get_nbi");         /* a new session's zone; empty in practice */
+        free(in_flight.copy);
+        in_flight.copy = calloc(requests, sizeof *in_flight.copy);
+        if (!in_flight.copy)
+            osoe_fatal("out of memory for %u nonblocking gets in flight", requests);
+        in_flight.capacity = requests;
+    }
+    uint32_t limit = landing_capacity();
+    if (limit > arena_bytes)
+        limit = arena_bytes;
+    uint32_t wire = payload_limit(connection, peer, (uint32_t)sizeof(struct osoe_am_get_reply));
+    if (limit > wire)
+        limit = wire;
+
+    struct osoe_landing_slot *slot = my_landing();
+    struct osoe_landing_request *records =
+        osoe_node_landing_requests(&osoe.node, osoe.bootstrap.local_id);
+    unsigned char *at = dst;
+    while (len > 0) {
+        uint32_t n = len > limit ? limit : (uint32_t)len;
+        if (in_flight.count == requests || in_flight.arena_used + (uint64_t)n > arena_bytes) {
+            osoe_count(OSOE_C_AM_LANDING_FULL, 1);
+            complete_gets("shmem_get_nbi");
+        }
+        uint32_t index = in_flight.count++;
+        uint32_t place = in_flight.arena_used;
+        /* Each reply starts 8-byte aligned, for the copy out. */
+        in_flight.arena_used += (n + 7u) & ~7u;
+        uint64_t token = OSOE_LANDING_NONBLOCKING | (++in_flight.sequence << 16) | index;
+        atomic_store_explicit(&records[index].offset, place, memory_order_relaxed);
+        atomic_store_explicit(&records[index].length, n, memory_order_relaxed);
+        /* Published before the request goes out: the send's reservation and
+         * commit order it before any reply can exist (as arm() for the slot). */
+        atomic_store_explicit(&records[index].token, token, memory_order_release);
+        in_flight.copy[index] = (struct in_flight_copy){ at, place, n };
+        atomic_fetch_add_explicit(&slot->bytes_issued, n, memory_order_relaxed);
+
+        take_credit(connection, peer, pe, "shmem_get_nbi");
+        struct osoe_am_get_request m = { .target_pe = (uint32_t)pe,
+                                         .origin_pe = osoe.bootstrap.rank,
+                                         .region = (uint16_t)region, .flags = 0,
+                                         .length = n, .offset = offset,
+                                         .token = token };
+        send_message(connection, peer, pe, "shmem_get_nbi", OSOE_AM_GET_REQUEST, &m,
+                     (uint32_t)sizeof m, NULL, 0);
+        osoe_count(OSOE_C_AM_GETS_NONBLOCKING, 1);
+        at += n;
+        offset += n;
+        len -= n;
+        /* More pieces, or more gets (OSOE_TRANSPORT_MORE), follow: hold the wake
+         * for the last, as a put does. */
+        if (len > 0 || (flags & OSOE_TRANSPORT_MORE))
+            osoe_count(OSOE_C_AM_WAKES_DEFERRED, 1);
+        else
+            osoe_progress_host_wake_lead();
+    }
+}
+
 static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
                            enum osoe_region region, uint64_t offset,
                            enum osoe_rmw_op op, unsigned width, uint64_t operand,
@@ -671,13 +831,18 @@ void osoe_transport_get(struct osoe_transport_context *context, int pe, enum oso
                  uint64_t offset, void *dst, size_t len, unsigned flags)
 {
     (void)context;
-    (void)flags;                /* none defined for get yet (transport.h) */
     if (osoe_routes_in_process(&osoe.job, (uint32_t)pe)) {
+        /* Applied before it returns, nonblocking or not: complete early, which
+         * a nonblocking get may be (transport.h). */
         osoe_transport_local_get(pe, region, offset, dst, len);
         return;
     }
     osoe_count(OSOE_C_TRANSPORT_GET_CALLS, 1);
     osoe_count(OSOE_C_TRANSPORT_GET_BYTES, len);
+    if (flags & OSOE_TRANSPORT_NONBLOCKING) {
+        remote_get_nonblocking(pe, region, offset, dst, len, flags);
+        return;
+    }
     /* A blocking get is complete on return, so it never joins the dirty set:
      * §4.6 makes gets a quiet-only concern and there is nothing left for a
      * quiet to wait for once the bytes are in dst. */
@@ -763,13 +928,17 @@ void osoe_transport_fence(struct osoe_transport_context *context)
  * `pes == NULL` means every PE; a non-NULL list with npes == 0 has already
  * returned in quiet.c, where the spec says it (§9.12.3).
  */
-void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes)
+void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes,
+                         const char *routine)
 {
     if (pes && npes == 0)
         return;
     osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
     uint64_t t0 = osoe_now_ns();
     osoe_serializing_fence();
+    /* This PE's nonblocking gets, every one of them, whatever PEs the wait
+     * names: their completion is counted per PE, not per target (§4.6). */
+    complete_gets(routine);
 
     struct osoe_transport_context *c = context;
     if (!osoe_am.internode || c->count == 0) {
@@ -820,7 +989,6 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
             if (!connection)
                 osoe_fatal("no connection toward node %u, which this context wrote to", peer);
             struct osoe_wait_word *word = osoe_connection_acked_wait(connection);
-            const char *routine = pes ? "shmem_pe_quiet" : "shmem_quiet";
             struct am_wait w;
             /* No single PE: a quiet waits for a whole node's queue, not one
              * PE's (D-6). */

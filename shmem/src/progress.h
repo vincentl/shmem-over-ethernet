@@ -81,6 +81,18 @@ struct osoe_progress_host {
      * NULL where there is no node: the engine's own tests.
      */
     void (*abort)(void *context, uint32_t pe, int32_t status, uint32_t disposition);
+    /*
+     * A local PE's nonblocking get `token`, in flight (§4.6, as built): where
+     * its reply lands, and in `length` the bytes it asked for - or NULL if the
+     * PE is not local or has no such get in flight, which is a peer's bug
+     * (§3.4's trust boundary). NULL, as a callback, where nothing issues
+     * nonblocking gets: the engine's own tests.
+     */
+    unsigned char *(*landing_request)(void *context, uint32_t pe, uint64_t token,
+                                      uint32_t *length);
+    /* That get's reply has landed whole: count it toward the PE's next quiet
+     * (§4.6's counters), and wake the PE if it waits there. */
+    void (*landed)(void *context, uint32_t pe, uint32_t bytes);
 };
 
 /*

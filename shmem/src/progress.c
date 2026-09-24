@@ -80,6 +80,23 @@ static void *destination(void *context, const struct osoe_message_header *header
     if (header->kind == OSOE_AM_GET_REPLY) {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
+        if (m.token & OSOE_LANDING_NONBLOCKING) {
+            /* A nonblocking get's reply lands in its PE's arena, in the range
+             * that get's record names - checked as the blocking slot's is. */
+            uint32_t length = 0;
+            unsigned char *at = p->host.landing_request
+                ? p->host.landing_request(p->host.context, m.origin_pe, m.token, &length)
+                : NULL;
+            if (!at)
+                osoe_fatal("a get reply from node %u for PE %u carries token %#llx, which "
+                           "names no get of that PE's in flight", peer_of(p, a->slot),
+                           m.origin_pe, (unsigned long long)m.token);
+            if ((uint64_t)m.chunk_offset + payload_bytes > m.total || m.total != length)
+                osoe_fatal("a get reply from node %u for PE %u puts %u bytes at offset %u of a "
+                           "%u-byte reply, for a get of %u bytes", peer_of(p, a->slot),
+                           m.origin_pe, payload_bytes, m.chunk_offset, m.total, length);
+            return at + m.chunk_offset;
+        }
         uint32_t capacity = 0;
         struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
                                                          &capacity);
@@ -408,6 +425,26 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_GET_REPLY: {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
+        if (m.token & OSOE_LANDING_NONBLOCKING) {
+            /* destination() has placed its bytes, and refused it if they had
+             * nowhere to go. Nothing is published until the whole reply is
+             * in: the counters are the PE's only view of it. */
+            if (m.chunk_offset + payload_bytes >= m.total) {
+                p->host.landed(p->host.context, m.origin_pe, m.total);
+                /*
+                 * §3.8's credit comes back as the reply lands, which is here:
+                 * the PE copies it out only at its next quiet, and holding the
+                 * credit until then would keep its node-mates' gets waiting on
+                 * replies delivered long ago (reply.h). A blocking operation's
+                 * credit its caller returns, once it has read the slot.
+                 */
+                struct osoe_connection *connection =
+                    osoe_connection_to(p->area, peer_of(p, a->slot));
+                if (connection)
+                    osoe_credit_give(osoe_connection_credit(connection));
+            }
+            break;
+        }
         uint32_t capacity = 0;
         struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
                                                          &capacity);

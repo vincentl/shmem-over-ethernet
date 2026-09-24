@@ -44,7 +44,7 @@ OSOE_API void pshmem_ctx_quiet(shmem_ctx_t ctx)
     if (ctx == SHMEM_CTX_INVALID)
         return;
     osoe_count(OSOE_C_SHMEM_QUIET_CALLS, 1);
-    osoe_transport_wait(osoe_ctx_of("shmem_ctx_quiet", ctx), NULL, 0);
+    osoe_transport_wait(osoe_ctx_of("shmem_ctx_quiet", ctx), NULL, 0, "shmem_quiet");
 }
 
 OSOE_API void pshmem_fence(void)
@@ -75,7 +75,8 @@ OSOE_API void pshmem_ctx_pe_quiet(shmem_ctx_t ctx, const int *target_pes, size_t
     osoe_count(OSOE_C_SHMEM_PE_QUIET_CALLS, 1);
     for (size_t i = 0; i < npes; i++)
         osoe_check_pe("shmem_ctx_pe_quiet", target_pes[i]);
-    osoe_transport_wait(osoe_ctx_of("shmem_ctx_pe_quiet", ctx), target_pes, npes);
+    osoe_transport_wait(osoe_ctx_of("shmem_ctx_pe_quiet", ctx), target_pes, npes,
+                        "shmem_pe_quiet");
 }
 
 OSOE_API void pshmem_pe_quiet(const int *target_pes, size_t npes)

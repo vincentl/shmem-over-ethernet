@@ -68,11 +68,54 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
 static struct osoe_landing_slot *landing(void *context, uint32_t pe, uint32_t *capacity)
 {
     (void)context;
-    *capacity = osoe.node.landing_slot_bytes - (uint32_t)sizeof(struct osoe_landing_slot);
+    *capacity = osoe.node.landing_data_bytes;
     if (pe >= osoe.bootstrap.world_size)
         return NULL;
     int32_t local = osoe_node_local_id(&osoe.node, pe);
     return local < 0 ? NULL : osoe_node_landing(&osoe.node, (uint32_t)local);
+}
+
+/* A local PE's nonblocking get `token`, in flight: found by the index its token
+ * carries, and only if the record there holds that very token - a reply to a
+ * get already copied out, or to none, is refused (progress.h). */
+static unsigned char *landing_request(void *context, uint32_t pe, uint64_t token,
+                                      uint32_t *length)
+{
+    (void)context;
+    if (pe >= osoe.bootstrap.world_size)
+        return NULL;
+    int32_t local = osoe_node_local_id(&osoe.node, pe);
+    uint64_t index = token & OSOE_LANDING_REQUEST_MASK;
+    if (local < 0 || index >= osoe.node.landing_requests)
+        return NULL;
+    struct osoe_landing_request *r =
+        &osoe_node_landing_requests(&osoe.node, (uint32_t)local)[index];
+    if (atomic_load_explicit(&r->token, memory_order_acquire) != token)
+        return NULL;
+    uint32_t offset = atomic_load_explicit(&r->offset, memory_order_relaxed);
+    uint32_t bytes = atomic_load_explicit(&r->length, memory_order_relaxed);
+    if ((uint64_t)offset + bytes > osoe.node.landing_arena_bytes)
+        return NULL;
+    *length = bytes;
+    return osoe_node_landing_arena(&osoe.node, (uint32_t)local) + offset;
+}
+
+/*
+ * A nonblocking get's reply has landed whole. The counter is the value half of
+ * base/wait-word.h's two-sided wait: a seq_cst add, then the wake only if the
+ * PE is registered as waiting - so a burst of replies costs no syscall while
+ * nobody quiets. The add also releases the reply's bytes, which the parser
+ * wrote before this call, to the quiet that reads the counter and then them.
+ */
+static void landed(void *context, uint32_t pe, uint32_t bytes)
+{
+    (void)context;
+    int32_t local = osoe_node_local_id(&osoe.node, pe);
+    if (local < 0)
+        return;                 /* landing_request has already refused it */
+    struct osoe_landing_slot *slot = osoe_node_landing(&osoe.node, (uint32_t)local);
+    atomic_fetch_add_explicit(&slot->bytes_landed, bytes, memory_order_seq_cst);
+    osoe_wait_word_wake_all(&slot->counter_wake);
 }
 
 /* §4.9's watch half. The same function the intranode backend calls, for the
@@ -245,7 +288,8 @@ void osoe_progress_host_start(uint32_t session)
     osoe_wires_open(osoe_am.wire, &osoe_am.ring, &osoe.bootstrap, session, &mesh);
     free(peers_address);
 
-    struct osoe_progress_host host = { resolve, landing, notify, release, NULL, abort_arrived };
+    struct osoe_progress_host host = { resolve, landing, notify, release, NULL, abort_arrived,
+                                       landing_request, landed };
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, &osoe_am.ring,
                        osoe_am.descriptor, descriptors, osoe_am.scratch,
                        (uint32_t)osoe_am.area.chunk_bytes, &host);

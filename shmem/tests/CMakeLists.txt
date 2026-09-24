@@ -1041,6 +1041,21 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(typed-rma 0,1,2,0,1,0)
 endif()
 
+# Nonblocking gets (§4.6, as built; test-get-nbi.c): on one node, where every
+# get is applied before it returns; and across nodes with the landing records
+# and arena small, so that an issue finds them used up and completes what is in
+# flight first, and with two reply credits, so that the lead's return of each
+# credit as its reply lands is what lets the next get out. tsan is left out of
+# the maps for shmem.internode.*'s reason: the lead writes the reply from
+# another process.
+osoe_tier2_test(get-nbi)
+set(osoe_get_nbi_small OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
+    OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(get-nbi 0,0,1,1 ${osoe_get_nbi_small})
+  osoe_tier2_map_test(get-nbi 0,1,2,0,1,0 ${osoe_get_nbi_small})
+endif()
+
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
 # §4.9 watch word to check the unmasked-span refinement, which is the one place
 # a test needs the encoding itself rather than a name in the metric table.
@@ -1374,6 +1389,9 @@ if(OSOE_TIER3)
     endforeach()
     osoe_tier3_test(barrier-am.0-1-2 ${shape} 0,1,2 shmem_test_barrier_am
                     ENV ${osoe_tier3_wire})
+    osoe_tier3_test(get-nbi.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_get-nbi
+                    ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
+                        OSOE_AM_CREDITS=2)
     osoe_tier3_test(reply-starvation.0-1-1-1-1-1-1 ${shape} 0,1,1,1,1,1,1
                     shmem_test_reply-starvation
                     ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096

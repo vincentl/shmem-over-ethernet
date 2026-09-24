@@ -73,6 +73,10 @@ enum osoe_counter {
     /* §3.10's wake of the lead, from the writer's side: sent because the lead
      * was asleep, or skipped because it was awake (lead_wake_model.py). */
     OSOE_C_AM_WAKES_SENT, OSOE_C_AM_WAKES_SKIPPED,
+    /* Nonblocking gets (§4.6, as built): the requests issued, one per piece,
+     * and the times an issue found the landing records or arena used up and
+     * completed what was in flight first - the zone's bound, working. */
+    OSOE_C_AM_GETS_NONBLOCKING, OSOE_C_AM_LANDING_FULL,
 
     /*
      * Must be zero at quiescence (§3.14 question 6, §8.2).

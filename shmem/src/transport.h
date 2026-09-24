@@ -256,6 +256,17 @@ enum {
      * but the last.
      */
     OSOE_TRANSPORT_MORE = 1u << 2,
+
+    /*
+     * get only: the call may return before dst holds the bytes. They are there
+     * once an osoe_transport_wait on this PE has returned - any wait, whatever
+     * PEs it names, since a PE's nonblocking gets complete together (§4.6) -
+     * and until then dst must stay valid and unread. No handle: the spec
+     * completes _nbi operations only at quiet. A backend that completes the get
+     * before it returns is correct, which is how the intranode path, and the AM
+     * path's blocking code, would implement it (§4.6, as built).
+     */
+    OSOE_TRANSPORT_NONBLOCKING = 1u << 3,
 };
 
 /*
@@ -283,30 +294,29 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
  * Get: read len bytes from (pe, region, offset) into dst.
  *
  * Blocking, and complete per operation: dst holds the bytes when the call
- * returns, whether dst is private or symmetric memory. The bytes may be
- * sampled at any moment between the call and its return; a get racing a
- * write to the same bytes is undefined (§4.6 deferred sampling). Gets are
- * never fenced (spec §9.12.1).
+ * returns, whether dst is private or symmetric memory - unless
+ * OSOE_TRANSPORT_NONBLOCKING is set, when they are there after the PE's next
+ * osoe_transport_wait. The bytes may be sampled at any moment between the call
+ * and its completion; a get racing a write to the same bytes is undefined
+ * (§4.6 deferred sampling). Gets are never fenced (spec §9.12.1).
  *
- * Intranode: memcpy out of the target's heap mapping.
- * AM: the reply lands in this PE's landing zone and the calling thread copies
- * it out (§3.12).
+ * Intranode: memcpy out of the target's heap mapping, nonblocking or not.
+ * AM: a blocking get's reply lands in this PE's landing slot and the calling
+ * thread copies it out (§3.12); a nonblocking get's lands in the PE's landing
+ * arena, and the wait that completes it copies it out (§4.6, as built).
  *
- * `flags`: none is defined for get yet, and every caller passes 0. The
- * parameter exists so that the two that are coming do not change a signature
- * every backend implements (roce-seam F9): OSOE_TRANSPORT_MORE, which a gather
- * loop or a strided get sets so that a backend posting work requests can ring
- * one doorbell for the batch; and the nonblocking flag below. A backend must
- * accept flags it does not act on, exactly as for put.
+ * `flags`: OSOE_TRANSPORT_NONBLOCKING, and OSOE_TRANSPORT_MORE, which a gather
+ * loop or a strided get sets on every nonblocking get but its last, so that a
+ * backend may send them together - one wake of the lead on the AM path, one
+ * doorbell for a backend posting work requests. A backend must accept flags it
+ * does not act on, exactly as for put.
  *
- * The nonblocking form, completed by osoe_transport_wait, arrives with shmem_get_nbi.
- * It is a flag on this call, not a separate one, and it yields no handle: a
- * nonblocking operation is completed by the existing osoe_transport_wait and nothing
- * else. The spec defines _nbi completion only at quiet, so there is no
- * per-operation wait call to serve, §4.6's bytes_issued/bytes_landed pair is
- * already this design, and the core-API study found counters sufficient in all
- * six production transports it surveyed. Recorded here before a benchmark
- * applies pressure for per-operation handles.
+ * The nonblocking form is a flag on this call, not a separate one, and it
+ * yields no handle: a nonblocking operation is completed by the existing
+ * osoe_transport_wait and nothing else. The spec defines _nbi completion only at
+ * quiet, so there is no per-operation wait call to serve, §4.6's
+ * bytes_issued/bytes_landed pair is this design, and the core-API study found
+ * counters sufficient in all six production transports it surveyed.
  */
 void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, void *dst, size_t len, unsigned flags);
@@ -432,21 +442,27 @@ void osoe_transport_set_range(enum osoe_region region, uint64_t offset, uint64_t
 void osoe_transport_fence(struct osoe_transport_context *context);
 
 /*
- * Wait: return once every write and nonblocking get issued on context - to the
- * listed PEs, or to every PE if pes is NULL - is complete, and visible to
+ * Wait: return once every write issued on context - to the listed PEs, or to
+ * every PE if pes is NULL - and every nonblocking get this PE has issued is
+ * complete, and visible to
  * every PE; and, on contexts without SHMEM_CTX_NOSTORE, the calling thread's
  * earlier memory stores are visible to other cores (spec §9.12.2, §9.12.3). With pes non-NULL and npes 0, returns
  * at once. shmem_quiet and shmem_pe_quiet; shmem_barrier_all begins with it
  * on the default context (§5.6).
  *
- * May over-wait: a PE list may wait on gets to every PE (§4.6).
+ * May over-wait: a PE list waits on gets to every PE (§4.6).
+ *
+ * `routine` is the API routine the caller is in, for the blocked record and
+ * any no-progress diagnostic: "shmem_quiet", or "shmem_int_iget" for the wait
+ * that completes an iget's gets.
  *
  * Intranode: one serializing fence; nothing is ever outstanding.
- * AM: the serializing fence, flush the dirty set restricted to the listed
- * PEs' nodes, wait for acknowledgements and bytes_landed == bytes_issued,
- * copy out completed gets, clear what was waited on (§4.6).
+ * AM: the serializing fence; wait for bytes_landed == bytes_issued and copy the
+ * nonblocking gets out; flush the dirty set restricted to the listed PEs'
+ * nodes, wait for acknowledgements, clear what was waited on (§4.6).
  */
-void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes);
+void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes,
+                         const char *routine);
 
 /* ---- Notification (§4.9) --------------------------------------------- */
 
