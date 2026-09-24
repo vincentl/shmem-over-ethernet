@@ -42,10 +42,12 @@ add_test(NAME wrapper.compile-then-link
   COMMAND sh -c "mkdir -p ${work} && ${oshcc} -c -o ${work}/hello.o ${CMAKE_CURRENT_SOURCE_DIR}/hello.c && ${oshcc} -o ${work}/hello-linked ${work}/hello.o && $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 -- ${work}/hello-linked")
 # -show: a compile-only call gets the header path and -fno-pie, and not the
 # library; a program's link gets the library, -no-pie and the statics script; a
-# shared library's link gets the library and neither of the other two.
+# shared library's or a relocatable link, the library and neither of the other
+# two. --showme:link names the library; -static is refused by name; a query of
+# the compiler, --version, answers as the compiler.
 set(script ${CMAKE_CURRENT_SOURCE_DIR}/osoe-statics.ld)
 add_test(NAME wrapper.show
-  COMMAND sh -c "${oshcc} -show -c x.c | grep -q -- '-I${PROJECT_SOURCE_DIR}/shmem/include -fno-pie' && ! ${oshcc} -show -c x.c | grep -q -- -losoe && ${oshcc} -show -o x x.c | grep -q -- '-no-pie -Wl,-T,${script} .*-losoe' && ! ${oshcc} -show -shared -o x.so x.c | grep -q -- -no-pie && ! ${oshcc} -show -shared -o x.so x.c | grep -q -- -T, && ${oshcc} -show -shared -o x.so x.c | grep -q -- -losoe")
+  COMMAND sh -c "${oshcc} -show -c x.c | grep -q -- '-I${PROJECT_SOURCE_DIR}/shmem/include -fno-pie' && ! ${oshcc} -show -c x.c | grep -q -- -losoe && ${oshcc} -show -o x x.c | grep -q -- '-no-pie -Xlinker -T -Xlinker ${script} .*-losoe' && ! ${oshcc} -show -shared -o x.so x.c | grep -q -- -no-pie && ! ${oshcc} -show -shared -o x.so x.c | grep -q -- '-Xlinker -T' && ${oshcc} -show -shared -o x.so x.c | grep -q -- -losoe && ! ${oshcc} -show -r -o x.o y.o | grep -q -- -no-pie && ${oshcc} --showme:link | grep -q -- -losoe && ! ${oshcc} -static -o x x.c 2>/dev/null && ${oshcc} -static -o x x.c 2>&1 | grep -q 'link dynamically' && ${oshcc} --version > /dev/null")
 # A program with static data, built with nothing but the wrapper: ISx's reduce
 # into a static total with a static pSync, across two nodes.
 add_test(NAME wrapper.statics

@@ -66,21 +66,21 @@ static uint32_t root_index(const struct osoe_team *t, int root_rank, const char 
     return osoe_node_of(&osoe.job, (uint32_t)root_rank);
 }
 
+/* Local PE m's copy of a symmetric object, at the place it has in its region
+ * on every PE: every local PE's heap and statics are mapped in this process
+ * (§4.1, §4.3), this PE's own statics where its program has them. */
+static unsigned char *member_copy(uint32_t m, struct osoe_symmetric_location at)
+{
+    if (at.region == OSOE_REGION_STATICS)
+        return osoe_node_statics_at(&osoe.node, m, m == osoe.bootstrap.local_id, at.offset);
+    return (unsigned char *)osoe.node.heap_of[m] + at.offset;
+}
+
 /*
  * One data collective on `t`: a reduction if `reduction` is given, else a
  * broadcast from team rank `root`, which leaves the root's own dest alone if
  * `root_keeps_dest`. §5.5, as the file's comment walks through.
  */
-/* Local PE m's copy of a symmetric object, at the place it has in its region
- * on every PE: every local PE's heap and statics are mapped in this process
- * (§4.1, §4.3). */
-static unsigned char *member_copy(uint32_t m, struct osoe_symmetric_location at)
-{
-    void *base = at.region == OSOE_REGION_STATICS ? osoe.node.statics_of[m]
-                                                  : osoe.node.heap_of[m];
-    return (unsigned char *)base + at.offset;
-}
-
 static int data_collective(const char *routine, shmem_team_t team, void *dest,
                            const void *source, size_t nelems, size_t width,
                            const struct reduction *reduction, int root, bool root_keeps_dest)

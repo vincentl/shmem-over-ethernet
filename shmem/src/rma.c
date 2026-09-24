@@ -96,10 +96,6 @@ OSOE_API void *pshmem_ptr(const void *dest, int pe)
     if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size ||
         !osoe_symmetric_find(dest, 1, &at))
         return NULL;
-    /* This PE's own object is dest: the program's own address for a static,
-     * not the library's alias of it, and the same as ever for the heap. */
-    if ((uint32_t)pe == osoe.bootstrap.rank)
-        return (void *)dest;
     return osoe_transport_direct(pe, at.region, at.offset);
 }
 

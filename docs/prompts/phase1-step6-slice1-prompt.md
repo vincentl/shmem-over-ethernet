@@ -66,9 +66,12 @@ below are Claude's, for the author's review.*
    program not built with `oshcc` has none, and statics stay refused, now with
    the fix named): each PE creates its statics object beside its heap, copies
    the region's current contents in, and maps it over the region with
-   `MAP_FIXED | MAP_SHARED`, before any other thread exists; node-mates map it,
-   as they map the heaps, and the names are removed as early. `.bss`'s part is
-   created zero and needs no copy of its zeros.
+   `MAP_FIXED | MAP_SHARED`, before any thread of the library's exists and with
+   signals blocked; node-mates map it, as they map the heaps, and the names are
+   removed as early. `.bss`'s part is created zero and needs no copy of its
+   zeros. *(An application thread started before `shmem_init` is not stopped
+   for it: the review of the slice named the window's remaining limits, which
+   §4.3 lists.)*
 5. **Every symmetric address becomes `(region, offset)`.** `symmetric.c` finds
    the region an address is in; RMA, AMOs, waits and signals pass the region
    through; the collectives' intranode phase reads a member's source through

@@ -674,6 +674,21 @@ static inline unsigned char *osoe_node_landing_arena(const struct osoe_node *n,
     return (unsigned char *)osoe_node_landing(n, local_id) + n->landing_arena_offset;
 }
 
+/*
+ * Local PE `local_id`'s statics at `offset` (§4.3), in this process: a
+ * node-mate's through its object's mapping, and this PE's own - `own` - at
+ * the program's own addresses, not the alias, so that a transfer between two
+ * of its statics that overlap is one memmove over one set of addresses.
+ */
+static inline unsigned char *osoe_node_statics_at(const struct osoe_node *n, uint32_t local_id,
+                                                  bool own, uint64_t offset)
+{
+    if (!own)
+        return (unsigned char *)n->statics_of[local_id] + offset;
+    return offset < n->statics_data_bytes ? n->statics_data + offset
+                                          : n->statics_bss + (offset - n->statics_data_bytes);
+}
+
 /* The non-block case of osoe_node_local_id. */
 int32_t osoe_node_local_search(const struct osoe_node *n, uint32_t rank);
 

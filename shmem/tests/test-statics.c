@@ -18,17 +18,28 @@
  *   - one PE sends the address of a static to another, which finds its own
  *     static there: -no-pie puts every PE's statics at one address;
  *   - a second session: the globals keep their values across shmem_finalize,
- *     and are symmetric again after the next shmem_init.
+ *     and are symmetric again after the next shmem_init, a marker in every
+ *     page of the large .bss copied through both;
+ *   - a put and a get from one static to an overlapping part of itself, on
+ *     this PE, which must move as memmove would;
+ *   - a variable in a section of its own, which the linker places between the
+ *     two ranges, so that they are not adjacent and the bss range's offsets
+ *     start after the data range's end rather than at its address;
+ *   - a wait on a static, as a node-mate's "blocked in" record names it.
  * Across nodes on the maps, where every one of them crosses the wire by
- * (region, offset).
+ * (region, offset). Built a second way, -fpie and -pie with the script
+ * (OSOE_TEST_STATICS_PIE): every PE's statics at a different address, where
+ * only the address agreement is not expected to hold.
  *
  * With OSOE_TEST_STATICS_MISUSE=stack a PE puts to its stack, which must end
  * the job naming both regions (shmem.statics.misuse).
  */
+#define _POSIX_C_SOURCE 200809L       /* nanosleep, under -std=c11 too */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <shmem.h>
 
@@ -55,10 +66,58 @@ static char big[BIG];
 
 static int me, npes, left, right;
 
+/* Between the two ranges: a writable section of its own, which the linker
+ * places after the data it gathers and before the bss (osoe-statics.ld). */
+__attribute__((section("osoe_between"), used)) static int between = 1;
+static char overlap[4096];
+static long blocked_on;
+
+/* The script's brackets, which the test reads to know the ranges' places. */
+extern unsigned char __osoe_statics_data_start[] __attribute__((weak));
+extern unsigned char __osoe_statics_data_end[] __attribute__((weak));
+extern unsigned char __osoe_statics_bss_start[] __attribute__((weak));
+
+/* A marker in every 4 KiB of `big` - no page size is smaller - and on each
+ * side of every boundary between them, written before shmem_init; below the
+ * last two MiB, which puts_and_gets overwrites. */
+enum { MARKED = BIG - (2 << 20) };
+static char marker(size_t at)
+{
+    return (char)((at / 4096) % 251 + 1);
+}
+
+static void mark_big(void)
+{
+    for (size_t at = 4096; at < MARKED; at += 4096) {
+        big[at - 1] = marker(at - 1);
+        big[at] = marker(at);
+        big[at + (at / 4096) % 4000] = marker(at);
+    }
+}
+
+static size_t big_unmarked(const char *copy)
+{
+    size_t wrong = 0;
+    for (size_t at = 4096; at < MARKED; at += 4096)
+        wrong += copy[at - 1] != marker(at - 1) || copy[at] != marker(at) ||
+                 copy[at + (at / 4096) % 4000] != marker(at);
+    return wrong;
+}
+
 static void before_and_after_init(void)
 {
     CHECK(written_before_init == 1234);
     CHECK(big[BIG - 1] == 7);
+    CHECK(big_unmarked(big) == 0);
+    char *copy = malloc(BIG);
+    CHECK_FATAL(copy);
+    shmem_getmem(copy, big, BIG, right);
+    CHECK(big_unmarked(copy) == 0);
+    free(copy);
+    /* The section between keeps the ranges apart, so the bss range's offsets
+     * are computed, not the data range's run on. */
+    CHECK(between == 1);
+    CHECK((const void *)__osoe_statics_data_end != (const void *)__osoe_statics_bss_start);
     CHECK(initialized[2] == 33);
     shmem_barrier_all();
     CHECK(shmem_int_g(&written_before_init, right) == 1234);
@@ -104,6 +163,75 @@ static void puts_and_gets(void)
         wrong += signalled[i] != left * 100 + i;
     CHECK(wrong == 0);
     CHECK(shmem_signal_fetch(&signal_word) == 1);
+    shmem_barrier_all();
+}
+
+/* To this PE's own statics, from overlapping bytes of the same static: the
+ * transport must see one address range, as memmove needs, not the program's
+ * and the library's alias of it. */
+static void overlapping(void)
+{
+    for (size_t i = 0; i < sizeof overlap; i++)
+        overlap[i] = (char)(i % 199);
+    shmem_putmem(overlap + 1, overlap, 2048, me);
+    shmem_quiet();
+    size_t wrong = 0;
+    for (size_t i = 0; i < 2048; i++)
+        wrong += overlap[i + 1] != (char)(i % 199);
+    for (size_t i = 0; i < sizeof overlap; i++)
+        overlap[i] = (char)(i % 199);
+    shmem_getmem(overlap + 7, overlap, 3000, me);
+    for (size_t i = 0; i < 3000; i++)
+        wrong += overlap[i + 7] != (char)(i % 199);
+    if (wrong)
+        fprintf(stderr, "PE %d: %zu bytes wrong after an overlapping transfer\n", me, wrong);
+    CHECK(wrong == 0);
+    shmem_barrier_all();
+}
+
+/* PE 1 waits on a static; PE 0, its node-mate, reads the wait's record, which
+ * names the static's offset among the statics, then releases it. */
+static void blocked_record(void)
+{
+    blocked_on = 0;
+    shmem_barrier_all();
+    if (npes < 2 || !shmem_ptr(&blocked_on, 1) || !shmem_ptr(&blocked_on, 0)) {
+        shmem_barrier_all();
+        return;                         /* PEs 0 and 1 are not node-mates */
+    }
+    if (me == 1)
+        shmem_long_wait_until(&blocked_on, SHMEM_CMP_EQ, 1);
+    if (me == 0) {
+        unsigned char *at = (unsigned char *)&blocked_on;
+        uint64_t data_bytes = (uint64_t)(__osoe_statics_data_end - __osoe_statics_data_start);
+        uint64_t offset = at >= __osoe_statics_bss_start
+                              ? data_bytes + (uint64_t)(at - __osoe_statics_bss_start)
+                              : (uint64_t)(at - __osoe_statics_data_start);
+        char segment[OSOE_SEGMENT_NAME_MAX], err[256];
+        osoe_test_segment_name(segment, sizeof segment, 0);
+        struct osoe_segment s;
+        if (osoe_segment_open(&s, segment, err, sizeof err) == 0) {
+            struct osoe_segment_blocked b = { 0 };
+            int waited = 0;
+            /* Its wait's record, not the barrier's before it, which a PE
+             * slow to leave may still be publishing. */
+            for (; waited < 5000; waited++) {
+                if (osoe_segment_blocked(&s, 1, &b) && b.valid && b.blocked &&
+                    strcmp(b.routine, "shmem_long_wait_until") == 0)
+                    break;
+                struct timespec ts = { 0, 1000 * 1000 };
+                nanosleep(&ts, NULL);
+            }
+            CHECK(waited < 5000);
+            CHECK(b.detail_kind == OSOE_SEGMENT_DETAIL_STATICS_OFFSET);
+            CHECK(b.detail == offset);
+            osoe_segment_close(&s);
+        } else {
+            fprintf(stderr, "%s\n", err);
+            CHECK(0);
+        }
+        shmem_long_atomic_set(&blocked_on, 1, 1);
+    }
     shmem_barrier_all();
 }
 
@@ -204,11 +332,14 @@ static void pointers(void)
         CHECK(initialized[1] == 1000 + left);
     shmem_barrier_all();
 
-    /* The same address in every PE: the one sent is this PE's own. */
+    /* The same address in every PE, -no-pie's promise: the one sent is this
+     * PE's own. */
     uintptr_t mine = (uintptr_t)&flag;
     shmem_putmem(&address_of_flag, &mine, sizeof mine, right);
     shmem_barrier_all();
+#ifndef OSOE_TEST_STATICS_PIE
     CHECK(address_of_flag == (uintptr_t)&flag);
+#endif
     shmem_barrier_all();
 }
 
@@ -242,6 +373,7 @@ static void second_session(void)
 
     shmem_init();
     CHECK(flag == 100 + me);
+    CHECK(big_unmarked(big) == 0);      /* copied from the last session's object */
     shmem_barrier_all();
     CHECK(shmem_long_g(&flag, right) == 100 + right);
     shmem_barrier_all();
@@ -255,6 +387,7 @@ int main(void)
 {
     written_before_init = 1234;
     big[BIG - 1] = 7;
+    mark_big();
 
     shmem_init();
     me = shmem_my_pe();
@@ -274,6 +407,8 @@ int main(void)
     isx();
     broadcasts();
     waits();
+    overlapping();
+    blocked_record();
     pointers();
     segment_says();
     CHECK_INVARIANTS();

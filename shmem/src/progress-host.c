@@ -78,7 +78,8 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
                        "statics, which are %llu bytes; the nodes run different programs, "
                        "or one not linked with oshcc", length,
                        (unsigned long long)offset, pe, (unsigned long long)bytes);
-        return (char *)osoe.node.statics_of[local] + offset;
+        return osoe_node_statics_at(&osoe.node, (uint32_t)local,
+                                    (uint32_t)local == osoe.bootstrap.local_id, offset);
     }
     if (offset > osoe.node.heap_size || length > osoe.node.heap_size - offset)
         osoe_fatal("a peer addressed %u bytes at offset %llu of PE %u's heap, which is "

@@ -1146,6 +1146,24 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(statics 0,0,1,1)
   osoe_tier2_map_test(statics 0,1,2,0,1,0)
 endif()
+# The same test built -fpie and -pie with the script: every PE's statics at an
+# address of its own, which symmetric operations must not care about.
+add_executable(shmem_test_statics-pie test-statics.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_statics-pie PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_statics-pie PRIVATE osoe rt)
+target_compile_definitions(shmem_test_statics-pie PRIVATE OSOE_TEST_STATICS_PIE)
+target_compile_options(shmem_test_statics-pie PRIVATE -fpie)
+target_link_options(shmem_test_statics-pie PRIVATE -pie
+  "LINKER:-T,${PROJECT_SOURCE_DIR}/tools/wrapper/osoe-statics.ld")
+osoe_warnings(shmem_test_statics-pie)
+add_test(NAME shmem.statics.pie.L2
+  COMMAND osoe-launch -n 2 -t 60 -- $<TARGET_FILE:shmem_test_statics-pie>)
+set_tests_properties(shmem.statics.pie.L2 PROPERTIES LABELS "tier2" TIMEOUT 90)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.statics.pie.0-0-1-1
+    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_statics-pie>)
+  set_tests_properties(shmem.statics.pie.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
+endif()
 add_test(NAME shmem.statics.misuse
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STATICS_MISUSE=stack
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_statics>)

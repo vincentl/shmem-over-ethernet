@@ -167,8 +167,95 @@ connections idle, keepalive ends the job one to two minutes after the cut; with
 data in flight toward the lost node, the kernel's retransmission limit
 (`tcp_retries2`) decides instead, about fifteen minutes (design §3.15).
 
-## 8. What to bring back
+## 8. Programs from the corpus
 
-- the outputs of steps 1, 5, 6 and 7;
+Built with nothing but `oshcc`, as a user would build them, in copies under
+`/home` - never in `corpus/` itself. `oshcc` is the build tree's
+(`build/release/tools/wrapper/oshcc`); it makes each program's global and
+static variables symmetric (design §4.3), which most of these need.
+
+```sh
+W=~/osoe-corpus; OSHCC=$PWD/build/release/tools/wrapper/oshcc
+rm -rf $W && mkdir -p $W
+cp -R corpus/openshmem-npbs/C $W/npb
+cp -R corpus/prk $W/prk && : > $W/prk/common/make.defs
+cp -R corpus/openshmem-examples/c $W/examples
+```
+
+NPB IS, class A on sixteen PEs. Its make takes the PE count at build time;
+`is.c` includes `mpi.h` without calling anything in it, so an empty one stands
+in; and it is C of the 1990s - `main` with no return type - which GCC 14
+refuses unless `-fpermissive` makes that a warning again:
+
+```sh
+cd $W/npb && mkdir -p stub && : > stub/mpi.h
+sed -e "s|^SHMEMCC.*|SHMEMCC = $OSHCC|" -e 's|^CFLAGS.*|CFLAGS = -O2 -g -fpermissive|' \
+    -e 's|^CLINKFLAGS.*|CLINKFLAGS = -O2 -g|' -e "s|^CMPI_INC.*|CMPI_INC = -I$W/npb/stub|" \
+    config/make.def.template > config/make.def
+make is CLASS=A NPROCS=16
+srun -K1 -N4 --ntasks-per-node=4 bin/is.A.16 | tee ~/is-A-16.txt   # "Verification = SUCCESSFUL"
+make is CLASS=B NPROCS=16
+srun -K1 -N4 --ntasks-per-node=4 bin/is.B.16 | tee ~/is-B-16.txt
+```
+
+Its timer counts whole seconds (`common/c_timers.c` returns `tv_sec`), so a
+class that finishes in under one reports 0 seconds and "inf" Mop/s; class B is
+the one to time.
+
+PRK's stencil, synch_p2p and transpose, each on 4 × 4:
+
+```sh
+cd $W/prk/SHMEM
+for k in Stencil:stencil Synch_p2p:p2p Transpose:transpose; do
+  (cd ${k%%:*} && make SHMEMCC="$OSHCC -std=gnu11" DEFAULT_OPT_FLAGS=-O2 LIBS=-lm ${k##*:})
+done
+srun -K1 -N4 --ntasks-per-node=4 Stencil/stencil 20 2000 | tee ~/prk-stencil.txt
+srun -K1 -N4 --ntasks-per-node=4 Synch_p2p/p2p 10 2000 2000 | tee ~/prk-p2p.txt
+srun -K1 -N4 --ntasks-per-node=4 Transpose/transpose 10 2048 | tee ~/prk-transpose.txt
+```
+
+Each must print "Solution validates". And the examples, each on 4 × 2, one
+line of verdict per program:
+
+```sh
+cd $W/examples
+for src in *.c; do
+  p=${src%.c}
+  $OSHCC -std=gnu11 -O1 $src -o $p -lm 2> $p.build || { echo "$p: build failed"; continue; }
+  timeout 120 srun -K1 -N4 --ntasks-per-node=2 ./$p > $p.out 2>&1 < /dev/null
+  echo "$p: exit $?"
+done | tee ~/examples.txt
+```
+
+The same programs ran under `osoe-launch` in the development VM, four PEs on
+two logical nodes, on 2026-09-24. **What to expect** from that run:
+- PRK's three kernels validate.
+- Of the 72 examples, all but the following exit 0.
+  - `bar_pair` and `bcast4` pass an active set smaller than the job, which osoe
+    refuses by name (design §7.4).
+  - `nullput` puts to a null pointer. `just-a-shmalloc` and `shmem_2dheat`
+    exit without `shmem_finalize`, which only a `start_pes` program may do
+    (the latter calls `exit` on the line before its finalize). `addr-accessible`
+    reports its own stack check as a failure: its test is inverted. osoe
+    names each of the first three as such.
+  - `global_exit` exits 1 where the program asks for 99: `osoe-launch` reports
+    the job's failure, not the status (§7 above checks the status under
+    `srun`). It calls `shmem_global_exit` straight after `shmem_init`, and can
+    leave the job's names in `/dev/shm` behind it - the window design §6.2
+    accepts, which `osoe-stat --gc` clears.
+  - Until locks and the collects are merged, the examples that call them
+    (`lock`, `test_lock`, `dtrand`; `collect32`, `collect64`, `fcollect`,
+    `fcollect32`, `fcollect64`, `shmem_fcollect`) do not build.
+- NPB IS verifies, classes S and A, on four PEs over two logical nodes and
+  over four.
+- ISx needs `shmem_fcollect`, which the collects' merge brings, and builds
+  only with `CFLAGS="-O2 -std=gnu99"` - it asks for `-std=c99`, under which
+  glibc's `time.h` has no `struct timespec`.
+
+A program that passed there and fails here is the finding.
+
+## 9. What to bring back
+
+- the outputs of steps 1, 5, 6, 7 and 8;
 - the fixtures step 3 captured, to commit with the tests they feed;
 - anything that failed, with its output, and the node it failed on.

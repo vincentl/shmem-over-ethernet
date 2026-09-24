@@ -2184,68 +2184,105 @@ more fragile than generating the script.
 **As built (phase 1 step 6, slice 1; `docs/prompts/phase1-step6-slice1-prompt.md`).**
 Phase 2 directly: phase 1.5 would have been slow by design and thrown away, and
 the wrapper it waited for exists. The decisions are Claude's, for the author's
-review.
+review; the adversarial review of the slice corrected several claims below.
 
 - **The script gathers all of the executable's writable data, not the user's
   objects.** `tools/wrapper/osoe-statics.ld`, which `oshcc` passes to every
   link of a program, is an `INSERT` augmentation of the linker's default
-  script: every `.data` and `.bss` input section, from any object or archive
-  member, goes into `.osoe_statics_data` or `.osoe_statics_bss`, each starting
-  and ending on `MAXPAGESIZE` and bracketed by `__osoe_statics_{data,bss}_{start,end}`.
+  script: every `.data` and `.bss` input section (and x86-64's large-model
+  `.ldata` and `.lbss`), from any object or archive member, goes into
+  `.osoe_statics_data` or `.osoe_statics_bss`, each starting and ending on
+  `MAXPAGESIZE` and bracketed by `__osoe_statics_{data,bss}_{start,end}`.
   Gathering by name rather than by object makes the script independent of how
   the program was built - one command or many, archives or not - and the
-  wrapper need not know which objects are the user's. A crt object's data in
-  the region is harmless, because the region is not shared the way the
-  rejected alternative shared it: **each PE maps its own object** over its own
-  ranges, and node-mates map it only to serve SHMEM operations that name an
-  offset in it. What stays out, and must stay out, are other names: `.tdata`
-  and `.tbss`, the GOT, the constructor tables and `.dynbss`, the linker's
-  copies of a shared library's variables (`stdout`), all per-process addresses.
-  Proved in the VM before anything depended on it: gathered sections, the
-  brackets, PIE, a static archive, one-command builds, TLS left out, and a
-  64 MiB `.bss` that adds nothing to the file.
+  wrapper need not know which objects are the user's. What else is gathered is
+  harmless, because the region is not shared the way the rejected alternative
+  shared it: **each PE maps its own object** over its own ranges, and
+  node-mates map it only to serve SHMEM operations that name an offset in it.
+  Since an INSERT script's statements are matched before the default script's,
+  `.data.*` also takes `.data.rel.ro` - read-only data with relocations, and
+  GNU ld's copies of shared libraries' read-only objects - which so loses
+  RELRO's protection: hardening, not correctness. `.tdata` and `.tbss`, the
+  GOT, the constructor tables and GNU ld's copies of shared libraries' writable
+  variables (`.dynbss`: `stdout`, `environ`) stay out. Tested with GNU ld; lld
+  puts those copies in `.bss`, where they are gathered, and gold and mold do
+  not take INSERT. Proved in the VM before anything depended on it: gathered
+  sections, the brackets, PIE, a static archive, one-command builds, TLS left
+  out, and a 64 MiB `.bss` that adds nothing to the file.
 - **At `shmem_init`**, if the brackets are there (weak, default visibility -
   a hidden weak reference would be settled when the library is linked), each
   PE creates `<control>.statics.<local id>` beside its heap, writes into it the
   ranges' pages that hold a nonzero byte - an untouched `.bss` page is the
-  kernel's zero page, so a large `.bss` costs no copy and no `/dev/shm` until
-  written - and maps it `MAP_SHARED | MAP_FIXED` over the two ranges, the data
-  at offset 0 and the bss after it, with an alias of the whole object for the
-  transport. Nothing between the copy and the mapping writes the ranges: the
-  application is inside `shmem_init`, the library's threads start later, and
-  with a static `libosoe` - whose own globals are then in the ranges - the code
-  in that window keeps its results in locals. Node-mates map each other's
-  objects as they map the heaps; the lead removes the names with the heaps'
-  (§6.2); the capacity check counts them; and the rendezvous refuses local PEs
+  kernel's zero page, so a large `.bss` costs neither a copy nor `/dev/shm`
+  until the program touches it (on tmpfs a read allocates a page too) - and
+  maps it `MAP_SHARED | MAP_FIXED` over the two ranges, the data at offset 0
+  and the bss after it, with an alias of the whole object for the transport.
+  **The window between the copy and the mapping** must write nothing in the
+  ranges, or the write lands in the pages the mapping hides: the application
+  is inside `shmem_init`, the library's threads start later, signals are
+  blocked across it so a handler's write cannot be lost, and with a static
+  `libosoe` - whose own globals are then in the ranges - the code in it keeps
+  its results in locals. The two mappings are made by the system call itself,
+  since a sanitizer intercepting `mmap` would reset the shadow of the
+  program's globals. A PE's lead publishes `ready` before its own copy, so no
+  PE waits on another's. Node-mates map each other's objects as they map the
+  heaps; the lead removes the names with the heaps' (§6.2); the capacity check
+  counts them, and its refusal names them; and the rendezvous refuses local PEs
   whose statics differ in size, which is PEs running different programs.
 - **`OSOE_REGION_STATICS`** at the boundary (§4.10): `symmetric.c` finds the
   region an address is in, heap first, and every API path passes `(region,
-  offset)` - RMA, AMOs, signals, waits, the collectives' intranode phase
-  (a member's source read through its statics mapping, as through its heap) -
-  so the wire and both transport paths carry statics exactly as they carry the
-  heap. `shmem_ptr` and `shmem_addr_accessible` answer for statics as for the
-  heap; `shmem_ptr` on the calling PE returns `dest` itself, not the alias. The
-  control segment (layout 17) has each PE's `pe.statics_bytes` and
-  `pe.statics_name`, which `osoe-stat --gc` removes with the heaps, and a wait
-  on a static records `OSOE_BLOCKED_DETAIL_STATICS_OFFSET`.
+  offset)` - RMA, AMOs, signals, waits, the collectives' intranode phase (a
+  member's source read through its statics mapping, as through its heap) - so
+  the wire and both transport paths carry statics exactly as they carry the
+  heap. A PE's own statics are addressed at the program's own addresses, never
+  the alias, so that a transfer between overlapping parts of one static is one
+  `memmove` over one range - through the alias, `memmove` saw two ranges and
+  copied forward (the review's first finding). `shmem_ptr` and
+  `shmem_addr_accessible` answer for statics as for the heap. The control
+  segment (layout 17) has each PE's `pe.statics_bytes` and `pe.statics_name`,
+  which `osoe-stat --gc` removes with the heaps, and a wait on a static records
+  `OSOE_BLOCKED_DETAIL_STATICS_OFFSET`.
 - **`-no-pie` stays**, for a program that sends a static's address to another
   PE as data - the addresses agree only when the executable does not move.
-  Every SHMEM operation is by offset and would work under PIE too, and a later
-  `-fpie`/`-pie` of the caller's own wins over the wrapper's.
+  Every SHMEM operation is by offset and works under PIE too (a test builds the
+  statics test `-fpie -pie`), and a caller's own `-fpie` with `-pie` wins over
+  the wrapper's. **`-static` is refused**: it would gather the C library's own
+  state - its allocator's arenas, stdio, loader locks - which a `fork()` in the
+  child writes before it returns.
 - **A program linked without the script has no symmetric statics**, and a
   static passed where a symmetric address is required is refused by name,
   saying it was not linked with `oshcc`.
 - **Sessions.** At the last `shmem_finalize` a PE unmaps its node-mates'
   objects and its alias, but not its own mapping over the ranges, which is
-  where its globals now live; the next `shmem_init` copies them from there into
-  a new object, and the old one goes with its last mapping.
+  where its globals now live - so the sharing outlives the library. The next
+  `shmem_init` copies them into a new object, reading only the parts of the old
+  one that hold data (`SEEK_DATA`, `SEEK_HOLE`): reading a hole of a tmpfs
+  mapping allocates it, and a scan of every page had made the old object whole
+  just before it was freed.
+- **Costs.** Initialized `.data` that no PE writes used to be the page cache's,
+  one copy a node; now it is one copy a PE, in `/dev/shm`. A 200 MiB table
+  written at initialization costs 50 GiB on a node of 256 PEs; the capacity
+  check says so.
 - **Known limits.** A child made by `fork()` after `shmem_init` shares its
   parent's statics, as it shares the heaps (§6.4): its writes to globals are
-  the parent's. `fork` followed by `exec` - `system`, `popen`, `posix_spawn` -
-  writes none. An application thread writing a global while another thread is
-  in `shmem_init` may lose that write to the copy. Not in this slice: statics
-  of shared libraries the program loads, and statics under an RDMA backend's
-  registration (they register as the heap does, when there is one).
+  the parent's, and a child that calls `exit()` rather than `_exit()` runs the
+  program's `atexit` handlers and destructors on them; `fork` followed by
+  `exec` - `system`, `popen`, `posix_spawn` - writes none. The window above is
+  closed to signals but not to a thread the application, or a library it
+  linked statically, started before `shmem_init` - a thread pool whose
+  workers take a lock in their statics could lose the unlock - nor to a later
+  session's threads. Pages set up before `shmem_init` lose that setup: a
+  static buffer registered for DMA or with io_uring keeps the old pages,
+  `mlock`, `madvise` and `mprotect` settings are gone, and a `PROT_NONE` guard
+  page in the ranges faults in the copy. A `MAP_FIXED` that fails after
+  unmapping, as older kernels may, leaves a static `libosoe` in a hole, where
+  the message cannot be printed. Not in this slice: statics of shared
+  libraries the program loads, and statics under an RDMA backend's
+  registration (they register as the heap does, when there is one). *A
+  structural alternative the review offered: remap once at load time, from an
+  `.preinit_array` entry `oshcc` adds, into an unnamed object that
+  `shmem_init` names - which closes the window and makes every session's copy
+  unnecessary, at the price of a remap in every program `oshcc` builds.*
 
 ### 4.4 Allocator
 
@@ -5187,7 +5224,7 @@ it.
 | `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1, and not stubs. Every PE of an osoe job runs the same executable by construction, so `pe_accessible` is whether `pe` names a PE of this job. `addr_accessible` additionally requires the address to be symmetric: in the heap, or since step 6 among the statics of a program linked with `oshcc` (§4.3). An automatic address answers 0, and so does a static in a program built without the wrapper - stated by the query rather than discovered at the first put |
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
 | Name-shifted deprecated routines | §10 item 1 wants a `pshmem_` entry point for every function | **Not done**, and recorded as known non-conformance below: the spec does not say how to shift a name that never had a `shmem_` prefix, and guessing wrong helps nobody |
-| Deprecated active-set constants (F.2.8) and routines | `SHMEM_SYNC_VALUE` and the `pSync` sizes; `shmem_barrier`, `shmem_sync`, `shmem_broadcast32`/`64`, the `_to_all` reductions of Table 11 | The constants at step 1. **The routines at step 5, over the whole job and nothing else** - at the author's direction of 2026-09-24 to implement them so that corpus programs can be tested against osoe, with the whole-job rule and its scope Claude's decisions for the author's review (`docs/prompts/phase1-step5-slice3-prompt.md`): an active set of every PE - `PE_start` 0, `logPE_stride` 0, `PE_size` the job's - is the world team, and any other ends the job by name. Step 1 had refused the routines at the link, on the grounds that a wrong answer is worse than a missing symbol; that still holds, and a named refusal at run time is neither. It is the active set every corpus program that still calls these passes (ISx, PRK, bale and hclib's copies) - of which PRK's and bale's run on heap data, where ISx and hclib's reduce symmetric statics, which osoe still refuses (§4.3) - and forming a group for an arbitrary set of PEs is machinery osoe does not have. `pSync` and `pWrk` are neither read nor written, which leaves `pSync` as the spec requires it to be found afterwards and makes the reuse rules hold trivially. `broadcast32`/`64` leave the root's own `dest` alone, as the spec says; when the root is its node's lead, the node's copy is the root's `source`, read by the internode phase and the copy-outs and never written (`collectives.c`). The active-set forms of collect, fcollect, alltoall and alltoalls follow their team forms, under the same rule |
+| Deprecated active-set constants (F.2.8) and routines | `SHMEM_SYNC_VALUE` and the `pSync` sizes; `shmem_barrier`, `shmem_sync`, `shmem_broadcast32`/`64`, the `_to_all` reductions of Table 11 | The constants at step 1. **The routines at step 5, over the whole job and nothing else** - at the author's direction of 2026-09-24 to implement them so that corpus programs can be tested against osoe, with the whole-job rule and its scope Claude's decisions for the author's review (`docs/prompts/phase1-step5-slice3-prompt.md`): an active set of every PE - `PE_start` 0, `logPE_stride` 0, `PE_size` the job's - is the world team, and any other ends the job by name. Step 1 had refused the routines at the link, on the grounds that a wrong answer is worse than a missing symbol; that still holds, and a named refusal at run time is neither. It is the active set every corpus program that still calls these passes (ISx, PRK, bale and hclib's copies) - of which PRK's and bale's run on heap data, where ISx and hclib's reduce symmetric statics, which osoe has for a program linked with `oshcc` since step 6 (§4.3) - and forming a group for an arbitrary set of PEs is machinery osoe does not have. `pSync` and `pWrk` are neither read nor written, which leaves `pSync` as the spec requires it to be found afterwards and makes the reuse rules hold trivially. `broadcast32`/`64` leave the root's own `dest` alone, as the spec says; when the root is its node's lead, the node's copy is the root's `source`, read by the internode phase and the copy-outs and never written (`collectives.c`). The active-set forms of collect, fcollect, alltoall and alltoalls follow their team forms, under the same rule |
 | `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TRANSPORT_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
 
 **Known non-conformance: the deprecated routines have no name-shifted entry

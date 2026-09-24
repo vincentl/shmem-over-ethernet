@@ -2,6 +2,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -109,13 +111,14 @@ static void find_statics(struct osoe_node *n)
 /*
  * The copy reads whole pages of the program's data, which under
  * AddressSanitizer include the poisoned redzones between its globals: this
- * scan is not instrumented, and copy_into writes by the system call itself
- * rather than through the sanitizer's pwrite, which checks its buffer. Neither
- * is a read of a variable, only of the pages that hold them.
+ * scan is not instrumented - nor for ThreadSanitizer, whose shadow for a large
+ * .bss it would commit - and copy_into writes by the system call itself rather
+ * than through the sanitizer's pwrite, which checks its buffer. Neither is a
+ * read of a variable, only of the pages that hold them.
  */
 typedef uint64_t __attribute__((may_alias)) any_word;   /* reads bytes of any type */
 
-__attribute__((no_sanitize_address))
+__attribute__((no_sanitize_address, no_sanitize_thread))
 static bool page_is_zero(const unsigned char *p, uint64_t len)
 {
     const any_word *word = (const any_word *)(const void *)p;   /* page-aligned */
@@ -263,15 +266,78 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap
 }
 
 /*
+ * The object the program's statics are mapped from, once a session has made
+ * one: kept open, since a later session copies from it, and closed when that
+ * session's object replaces it. -1 before the first. A static like any other -
+ * with the library linked statically it is among the statics - so it is read
+ * and written only outside the window below.
+ */
+static int statics_mapped_from = -1;
+
+/* Where object offset `offset` is in the program. */
+static unsigned char *statics_address(const struct osoe_node *n, uint64_t offset)
+{
+    return offset < n->statics_data_bytes ? n->statics_data + offset
+                                          : n->statics_bss + (offset - n->statics_data_bytes);
+}
+
+/*
+ * Copy the program's statics into the object `fd`. The first session reads the
+ * ranges whole: their pages are the program's own - file pages and, for an
+ * untouched .bss, the kernel's zero page - so copy_into's scan costs reads and
+ * nothing more. A later session's ranges are the earlier object, where reading
+ * a hole would allocate it: tmpfs has no zero page to share. So only the parts
+ * of `previous` that hold data are read, found by SEEK_DATA and SEEK_HOLE, and
+ * the holes, zero, are left as the new object's. False, with errno, on a
+ * failure.
+ */
+static bool copy_statics(int fd, int previous, const struct osoe_node *n)
+{
+    uint64_t data_bytes = n->statics_data_bytes, total = n->statics_bytes;
+    if (previous < 0)
+        return copy_into(fd, n->statics_data, data_bytes, 0) &&
+               copy_into(fd, n->statics_bss, n->statics_bss_bytes, data_bytes);
+    uint64_t page = (uint64_t)sysconf(_SC_PAGESIZE);
+    uint64_t at = 0;
+    while (at < total) {
+        off_t data = lseek(previous, (off_t)at, SEEK_DATA);
+        if (data < 0)
+            return errno == ENXIO;              /* nothing but a hole from here */
+        off_t hole = lseek(previous, data, SEEK_HOLE);
+        if (hole < 0)
+            return false;
+        uint64_t start = (uint64_t)data / page * page;
+        uint64_t stop = ((uint64_t)hole + page - 1) / page * page;
+        if (stop > total)
+            stop = total;
+        /* The two ranges are two runs of program addresses: split at the seam. */
+        while (start < stop) {
+            uint64_t end = start < data_bytes && stop > data_bytes ? data_bytes : stop;
+            if (!copy_into(fd, statics_address(n, start), end - start, start))
+                return false;
+            start = end;
+        }
+        at = stop;
+    }
+    return true;
+}
+
+/*
  * Create this PE's statics object, copy the program's statics into it, and map
- * it over them (§4.3), with an alias of the whole object for the transport.
+ * it over them (§4.3), with an alias of the whole object for node-mates' use
+ * of it through the transport.
  *
- * Nothing between the copy and the mapping writes memory in the ranges: a
- * write there would land in the pages the mapping then hides. The program's
- * code is not running - it is in shmem_init, and the library's own threads are
- * started after this - and when the library is linked statically its own
- * globals are in the ranges too, so this keeps what it computes in locals
- * until the mapping is in place, and stores it in `n` only then.
+ * Nothing between the copy and the mapping may write memory in the ranges: a
+ * write there would land in the pages the mapping then hides. The program is
+ * inside shmem_init, the library's own threads start after this, and signals
+ * are blocked across it, so that a handler setting a global cannot lose its
+ * write; a thread of the application's own, or of a library it linked
+ * statically, is what remains (§4.3, known limits). With the library linked
+ * statically its own globals are in the ranges too, so the code here keeps
+ * what it computes in locals until the mapping is in place. The two mappings
+ * over the ranges are made by the system call itself, not through a
+ * sanitizer's interception of mmap, which would reset the shadow of the
+ * program's globals - the redzones that let it find an overflow of one.
  */
 static void create_own_statics(struct osoe_node *n, const struct osoe_bootstrap *b,
                                struct osoe_pe_slot *slot)
@@ -298,30 +364,40 @@ static void create_own_statics(struct osoe_node *n, const struct osoe_bootstrap 
 
     unsigned char *data = n->statics_data, *bss = n->statics_bss;
     uint64_t data_bytes = n->statics_data_bytes, bss_bytes = n->statics_bss_bytes;
-    bool copied = copy_into(fd, data, data_bytes, 0) &&
-                  copy_into(fd, bss, bss_bytes, data_bytes);
+    int previous = statics_mapped_from;
+    sigset_t every, before;
+    sigfillset(&every);
+    pthread_sigmask(SIG_SETMASK, &every, &before);
+    bool copied = copy_statics(fd, previous, n);
     int copy_error = copied ? 0 : errno;
-    void *over_data = copied && data_bytes
-        ? mmap(data, data_bytes, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0)
-        : (void *)data;
-    void *over_bss = copied && over_data == (void *)data && bss_bytes
-        ? mmap(bss, bss_bytes, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
-               (off_t)data_bytes)
-        : (void *)bss;
-    void *alias = mmap(NULL, n->statics_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    long over_data = copied && data_bytes
+        ? syscall(SYS_mmap, data, data_bytes, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
+                  fd, (off_t)0)
+        : (long)(uintptr_t)data;
+    long over_bss = copied && over_data == (long)(uintptr_t)data && bss_bytes
+        ? syscall(SYS_mmap, bss, bss_bytes, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
+                  fd, (off_t)data_bytes)
+        : (long)(uintptr_t)bss;
     int map_error = errno;
-    close(fd);
+    pthread_sigmask(SIG_SETMASK, &before, NULL);
+    void *alias = mmap(NULL, n->statics_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (alias == MAP_FAILED)
+        map_error = errno;
 
-    if (!copied || over_data != (void *)data || over_bss != (void *)bss ||
+    if (!copied || over_data != (long)(uintptr_t)data || over_bss != (long)(uintptr_t)bss ||
         alias == MAP_FAILED) {
         char msg[320];
         snprintf(msg, sizeof msg, "cannot %s the program's statics (%llu bytes) %s %s: %s",
                  !copied ? "copy" : "map", (unsigned long long)n->statics_bytes,
                  !copied ? "into" : "from", slot->statics_name,
                  strerror(!copied ? copy_error : map_error));
+        close(fd);
         shm_unlink(slot->statics_name);
         fail_rendezvous(n, msg);
     }
+    if (previous >= 0)
+        close(previous);                        /* its last mapping is gone */
+    statics_mapped_from = fd;
     /* The ranges are this PE's statics in its core already. */
     madvise(alias, n->statics_bytes, MADV_DONTDUMP);
     n->statics_of[b->local_id] = alias;
@@ -467,13 +543,17 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
                       (uint64_t)b->local_count * (n->heap_bytes + n->statics_bytes);
     uint64_t free_bytes;
     if (!osoe_shm_room(wanted, &free_bytes)) {
-        char msg[320];
+        char msg[512];
+        char statics[96] = "";
+        if (n->statics_bytes)
+            snprintf(statics, sizeof statics, " and as many copies of the program's %llu MiB "
+                     "of statics", (unsigned long long)((n->statics_bytes + (1u << 20) - 1) >> 20));
         snprintf(msg, sizeof msg, "/dev/shm has %llu MiB free, but this node's control "
                  "segment and %u heaps of %llu MiB%s need %llu MiB: lower "
-                 "SHMEM_SYMMETRIC_SIZE, run fewer PEs per node, or enlarge /dev/shm",
-                 (unsigned long long)(free_bytes >> 20), b->local_count,
-                 (unsigned long long)(n->heap_bytes >> 20),
-                 n->statics_bytes ? " with their statics" : "",
+                 "SHMEM_SYMMETRIC_SIZE, run fewer PEs per node, or enlarge /dev/shm - or, "
+                 "since pages cost only once written, OSOE_SHM_CAPACITY_CHECK=0 reports "
+                 "this without refusing", (unsigned long long)(free_bytes >> 20),
+                 b->local_count, (unsigned long long)(n->heap_bytes >> 20), statics,
                  (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
         osoe_shm_short(b->shm_capacity_warning_only, msg);
     }
@@ -792,8 +872,6 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
         fail_rendezvous(n, msg);
     }
     n->heap_of[b->local_id] = (void *)(uintptr_t)(base + b->heap_shift * b->rank);
-    if (n->statics_bytes)
-        create_own_statics(n, b, me);
 
     if (lead) {
         n->hdr->heap_base = base;
@@ -801,6 +879,10 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
         atomic_store_explicit(&n->hdr->ready, 1, memory_order_release);
         osoe_futex_wake(&n->hdr->ready, INT_MAX, OSOE_FUTEX_SHARED);
     }
+    /* After the lead's `ready`, so that no PE waits on the lead's copy to
+     * begin its own. */
+    if (n->statics_bytes)
+        create_own_statics(n, b, me);
 
     /* Publish this PE's slot, then count it. */
     me->rank = b->rank;
