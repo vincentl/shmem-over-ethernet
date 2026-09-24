@@ -159,3 +159,9 @@ void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index
 {
     osoe_internode_generic_broadcast(team, epoch, root_index, buffer, bytes, routine);
 }
+
+void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
+                            const char *routine)
+{
+    osoe_internode_generic_collect(team, epoch, buffer, bytes, routine);
+}

@@ -16,16 +16,18 @@ deprecated atomic names of Annex F.2.12, the point-to-point waits and tests
 including the multiple-element forms,
 signalling operations, memory ordering, `shmem_barrier_all`, `shmem_sync_all`
 and `shmem_team_sync`, the team-based reductions of every operator and type of
-specification Table 10 and broadcast, with their C11 interfaces, the deprecated
+specification Table 10, broadcast, collect, fcollect, alltoall and alltoalls,
+with their C11 interfaces, the deprecated
 active-set forms - the `_to_all` reductions of Table 11, `shmem_broadcast32` and
-`64`, `shmem_barrier` and `shmem_sync` - over the whole job, which is the only
-active set they accept, the first-come, first-served distributed locks,
-`shmem_global_exit`, the mandatory surface of §7.4 including the `pshmem_`
-profiling interface, and symmetric statics - a program's global and static
-variables as symmetric objects - in a program built with the `oshcc` wrapper
-(§4.3). A PE or a node that dies ends the whole job (§3.15).
+`64`, the collects, fcollects and alltoalls of 32 and 64 bits, `shmem_barrier`
+and `shmem_sync` - over the whole job, which is the only active set they
+accept, the first-come, first-served distributed locks, `shmem_global_exit`,
+the mandatory surface of §7.4 including the `pshmem_` profiling interface, and
+symmetric statics - a program's global and static variables as symmetric
+objects - in a program built with the `oshcc` wrapper (§4.3). A PE or a node
+that dies ends the whole job (§3.15).
 
-Not yet: collect, fcollect, alltoall and alltoalls; the block-strided `shmem_ibput` and
+Not yet: the scans (`shmem_sum_inscan`, `shmem_sum_exscan`); the block-strided `shmem_ibput` and
 `shmem_ibget`; contexts
 other than the default; and `SHMEM_THREAD_MULTIPLE` (§7.5, §7.6, §4.11).
 Nonblocking gets across nodes overlap, many in flight before the quiet that

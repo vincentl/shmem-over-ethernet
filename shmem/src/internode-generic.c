@@ -243,6 +243,15 @@ static uint32_t reduction_identity(enum osoe_reduction_operation operation,
            (element.width & 0xff);
 }
 
+/* A gather's: the or over unsigned words that it runs as, with the next bit
+ * set too, so that one is not taken for an application's or of the same
+ * length - a divergence the pieces would otherwise hide. */
+enum { GATHER_BIT = 30 };
+static uint32_t gather_identity(struct osoe_element element)
+{
+    return reduction_identity(OSOE_REDUCTION_OR, element) | UINT32_C(1) << GATHER_BIT;
+}
+
 static const char *operation_name(uint32_t operation)
 {
     static const char *const names[] = {
@@ -271,6 +280,9 @@ static void describe(const struct piece_header *h, char *out, size_t size)
 {
     if (h->epoch == 0)
         snprintf(out, size, "nothing: no piece was put there");
+    else if (h->collective >> 31 && (h->collective >> GATHER_BIT & 1))
+        snprintf(out, size, "piece %u (%u bytes) of epoch %u's collect", h->piece, h->bytes,
+                 h->epoch);
     else if (h->collective >> 31)
         snprintf(out, size, "piece %u (%u bytes) of epoch %u's %s of %u-byte %s", h->piece,
                  h->bytes, h->epoch, operation_name((h->collective >> 16) & 0x7fff), h->collective & 0xff,
@@ -389,6 +401,29 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
     }
     in_pieces(g, team, epoch, reduction_identity(operation, element), &g->reduction_tree, buffer,
               count * element.width, element.width, combine, routine);
+}
+
+/*
+ * internode.h's gather, as the or of every node's buffer: blocks at disjoint
+ * places, zero elsewhere, or'd to their concatenation, over the reduction's
+ * tree - no protocol of its own, and nothing written in another node but its
+ * internal region. In eight-byte words when the buffer allows, which it does
+ * alike on every node: its length is the same everywhere, and its place is,
+ * being symmetric in a page-aligned region.
+ */
+void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
+                                    const char *routine)
+{
+    struct generic_team *g = registered_team(team, routine);
+    uint32_t width = bytes % 8 == 0 && (uintptr_t)buffer % 8 == 0 ? 8 : 1;
+    struct osoe_element element = { OSOE_ELEMENT_UNSIGNED_INTEGER, width };
+    osoe_combine_function combine = osoe_combine_lookup(OSOE_REDUCTION_OR, element);
+    if (!g->reduction_tree_known) {
+        find_lead_tree(g, 0, &g->reduction_tree, routine);
+        g->reduction_tree_known = true;
+    }
+    in_pieces(g, team, epoch, gather_identity(element), &g->reduction_tree, buffer, bytes,
+              width, combine, routine);
 }
 
 void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index,

@@ -278,4 +278,22 @@ void osoe_internode_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t c
 void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index, void *buffer,
                               size_t bytes, const char *routine);
 
+/*
+ * The internode phase of a gather - fcollect's and collect's (spec §9.10.8):
+ * on entry `buffer` holds this node's members' blocks at their places in the
+ * team's result and zero everywhere else; on return, every participating
+ * node's blocks at theirs, the same bytes on every node. `bytes` is the whole
+ * result's length, the same on every node. Called as osoe_internode_reduce
+ * is.
+ *
+ * Its own operation, although the generic implementation is a reduction -
+ * blocks at disjoint places and zero elsewhere, or'd, are their concatenation
+ * - so that a backend with an allgather can do one, moving each block once,
+ * where the or moves the whole result up and down the tree: about 2k times
+ * the bytes a gather must, with k the fan-out. The zeros are the reduction's,
+ * and a backend doing an allgather may ignore them.
+ */
+void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
+                            const char *routine);
+
 #endif /* OSOE_INTERNODE_H */

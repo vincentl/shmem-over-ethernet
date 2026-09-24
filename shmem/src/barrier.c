@@ -144,6 +144,14 @@ void osoe_barrier_all(const char *routine)
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
 }
 
+void osoe_team_barrier(struct osoe_team *t, const char *routine)
+{
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, *t->epoch + 1);
+    osoe_transport_wait(osoe_transport_context_default(), NULL, 0, "shmem_quiet");
+    sync_team(t, routine);
+    osoe_blocked_leave();
+}
+
 /*
  * The barrier inside shmem_finalize (spec §9.1.4): a quiet, then the finalize
  * team's own synchronization - the world's members on counters no application

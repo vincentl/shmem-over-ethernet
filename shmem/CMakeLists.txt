@@ -30,6 +30,7 @@ add_library(osoe
   src/accessible.c
   src/agent.c
   src/allocator.c
+  src/alltoall.c
   src/amo.c
   src/barrier.c
   src/bootstrap.c
@@ -55,6 +56,7 @@ add_library(osoe
   src/combine.c
   src/reductions.c
   src/broadcast.c
+  src/collect.c
   src/session.c
   src/shm-object.c
   src/signal.c

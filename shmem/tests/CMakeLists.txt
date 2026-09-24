@@ -1194,6 +1194,24 @@ foreach(case_expect
     PASS_REGULAR_EXPRESSION "${expect}")
 endforeach()
 
+# collect and fcollect, alltoall and alltoalls (spec §9.10.5, §9.10.6,
+# §9.10.8; test-collect.c, test-alltoall.c): on one node, and across nodes on a
+# block map and an interleaved one; and an fcollect64 over an active set one PE
+# short of the job, which must end it by name.
+foreach(name collect alltoall)
+  osoe_tier2_test(${name})
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    osoe_tier2_map_test(${name} 0,0,1,1)
+    osoe_tier2_map_test(${name} 0,1,2,0,1,0)
+  endif()
+endforeach()
+add_test(NAME shmem.collect.partial
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_PARTIAL=1
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_collect>)
+set_tests_properties(shmem.collect.partial PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+  "shmem_fcollect64: the active set \\(PE_start 0, logPE_stride 0, PE_size 1\\) is not the whole job of 2 PEs")
+
 # PEs that call different collectives end the job by name, from the piece
 # headers of the generic internode phase (internode-generic.c): node 1's PE
 # broadcasts where the others reduce, and node 0's lead finds node 1's slot
@@ -1579,6 +1597,8 @@ if(OSOE_TIER3)
     osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
     osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)
     osoe_tier3_test(active-set.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_active-set)
+    osoe_tier3_test(collect.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_collect)
+    osoe_tier3_test(alltoall.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_alltoall)
     osoe_tier3_test(statics.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_statics)
     osoe_tier3_test(lock.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_lock)
     if(shape STREQUAL "pi")
