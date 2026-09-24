@@ -71,6 +71,16 @@ static uint32_t root_index(const struct osoe_team *t, int root_rank, const char 
  * broadcast from team rank `root`, which leaves the root's own dest alone if
  * `root_keeps_dest`. §5.5, as the file's comment walks through.
  */
+/* Local PE m's copy of a symmetric object, at the place it has in its region
+ * on every PE: every local PE's heap and statics are mapped in this process
+ * (§4.1, §4.3). */
+static unsigned char *member_copy(uint32_t m, struct osoe_symmetric_location at)
+{
+    void *base = at.region == OSOE_REGION_STATICS ? osoe.node.statics_of[m]
+                                                  : osoe.node.heap_of[m];
+    return (unsigned char *)base + at.offset;
+}
+
 static int data_collective(const char *routine, shmem_team_t team, void *dest,
                            const void *source, size_t nelems, size_t width,
                            const struct reduction *reduction, int root, bool root_keeps_dest)
@@ -84,8 +94,8 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
     size_t bytes = osoe_rma_bytes(routine, nelems, width);
     if (bytes == 0)
         return 0;                       /* every member passes the same count: nothing to do */
-    uint64_t dest_offset = osoe_symmetric_offset(routine, dest, bytes);
-    uint64_t source_offset = osoe_symmetric_offset(routine, source, bytes);
+    struct osoe_symmetric_location dest_at = osoe_symmetric_locate(routine, dest, bytes);
+    struct osoe_symmetric_location source_at = osoe_symmetric_locate(routine, source, bytes);
     int root_rank = root >= 0 ? osoe_team_to_world(t, root) : -1;
     /* A deprecated broadcast's root keeps its dest as it was (broadcast.c). */
     bool keep_mine = root_keeps_dest && (uint32_t)root_rank == osoe.job.me;
@@ -113,7 +123,7 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
      */
     bool lead_keeps_dest = root_keeps_dest && root_rank >= 0 &&
                            osoe_node_local_id(&osoe.node, (uint32_t)root_rank) == 0;
-    uint64_t result_offset = lead_keeps_dest ? source_offset : dest_offset;
+    struct osoe_symmetric_location result_at = lead_keeps_dest ? source_at : dest_at;
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
 
     /*
@@ -127,21 +137,18 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
 
     if (lead) {
         osoe_epoch_wait_eq(t->arrived, (k + 1) * members, routine);
-        unsigned char *accumulator = (unsigned char *)osoe.node.heap_of[0] + result_offset;
+        unsigned char *accumulator = member_copy(0, result_at);
         if (reduction) {
             /* In place, the lead's source already is its dest. */
             if (source != dest)
                 memcpy(accumulator, source, bytes);
             for (uint32_t m = 1; m < members; m++)
-                reduction->combine(accumulator,
-                                   (const unsigned char *)osoe.node.heap_of[m] + source_offset,
-                                   nelems);
+                reduction->combine(accumulator, member_copy(m, source_at), nelems);
         } else if (!lead_keeps_dest) {
             int32_t root_local = osoe_node_local_id(&osoe.node, (uint32_t)root_rank);
             if (root_local >= 0 &&
                 !((uint32_t)root_local == osoe.bootstrap.local_id && source == dest))
-                memcpy(accumulator, (const unsigned char *)osoe.node.heap_of[root_local] +
-                                source_offset, bytes);
+                memcpy(accumulator, member_copy((uint32_t)root_local, source_at), bytes);
         }
         if (t->internode) {
             if (reduction)
@@ -162,7 +169,7 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
     } else {
         osoe_epoch_wait_eq(t->released, k + 1, routine);
         if (!keep_mine)
-            memcpy(dest, (const unsigned char *)osoe.node.heap_of[0] + result_offset, bytes);
+            memcpy(dest, member_copy(0, result_at), bytes);
         if (osoe_epoch_release_bump_eq(t->copied, (d + 1) * (members - 1)))  /* stamped: as arrived */
             osoe_epoch_wake_all(t->copied);
     }

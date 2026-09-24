@@ -36,8 +36,8 @@ void osoe_rma_put(const char *routine, shmem_ctx_t ctx, void *dest, const void *
         return;
     size_t len = osoe_rma_bytes(routine, nelems, width);
     osoe_check_pe(routine, pe);
-    uint64_t offset = osoe_symmetric_offset(routine, dest, len);
-    osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source, len,
+    struct osoe_symmetric_location at = osoe_symmetric_locate(routine, dest, len);
+    osoe_transport_put(osoe_ctx_of(routine, ctx), pe, at.region, at.offset, source, len,
                        flags);
 }
 
@@ -48,8 +48,8 @@ void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *
         return;
     size_t len = osoe_rma_bytes(routine, nelems, width);
     osoe_check_pe(routine, pe);
-    uint64_t offset = osoe_symmetric_offset(routine, source, len);
-    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, len,
+    struct osoe_symmetric_location at = osoe_symmetric_locate(routine, source, len);
+    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, at.region, at.offset, dest, len,
                        flags);
 }
 
@@ -85,18 +85,22 @@ OSOE_API void pshmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
  * (§4.8). Returning NULL is always conforming. */
 OSOE_API void *pshmem_ptr(const void *dest, int pe)
 {
-    /* Bypasses osoe_check_pe/osoe_symmetric_offset - both fatal in ways this
+    /* Bypasses osoe_check_pe/osoe_symmetric_locate - both fatal in ways this
      * routine's own contract forbids (an out-of-range pe or a non-symmetric
      * address is a defined NULL here, not an error) - so it needs its own
      * check (conformance review F5): otherwise a call after the last
      * shmem_finalize dereferences whatever osoe_transport_direct finds in a
      * heap table that used to be real. */
     osoe_require_initialized("shmem_ptr");
-    uint64_t offset;
+    struct osoe_symmetric_location at;
     if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size ||
-        !osoe_symmetric_heap_offset(dest, 1, &offset))
+        !osoe_symmetric_find(dest, 1, &at))
         return NULL;
-    return osoe_transport_direct(pe, OSOE_REGION_HEAP, offset);
+    /* This PE's own object is dest: the program's own address for a static,
+     * not the library's alias of it, and the same as ever for the heap. */
+    if ((uint32_t)pe == osoe.bootstrap.rank)
+        return (void *)dest;
+    return osoe_transport_direct(pe, at.region, at.offset);
 }
 
 /* The weak `shmem_` aliases (export.h). */

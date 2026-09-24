@@ -149,6 +149,10 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * built. Everything else in the segment is found by name; the names of the
      * other objects a job owns should be too. */
     PE("pe.heap_name", heap_name, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
+    /* The program's symmetric statics (§4.3, layout 17): 0 bytes and no name
+     * for a program linked without oshcc's script. */
+    PE("pe.statics_bytes", statics_bytes, OSOE_MTYPE_U64, OSOE_MKIND_STATE, "bytes"),
+    PE("pe.statics_name", statics_name, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
     PE("pe.watch_rng", watch_rng, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     PE("pe.watch_seq", watch_seq, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.world_epoch", world_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),

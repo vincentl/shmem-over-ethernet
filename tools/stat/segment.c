@@ -525,6 +525,9 @@ void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf
     case OSOE_SEGMENT_DETAIL_GETS_IN_FLIGHT:
         snprintf(buf, len, "nonblocking gets, %" PRIu64 " bytes in flight", d);
         break;
+    case OSOE_SEGMENT_DETAIL_STATICS_OFFSET:
+        snprintf(buf, len, "statics offset %#" PRIx64, d);
+        break;
     default:                         snprintf(buf, len, "+%#" PRIx64, d); break;
     }
 }

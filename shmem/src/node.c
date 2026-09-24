@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -60,6 +61,95 @@ static uint64_t page_round(uint64_t n)
     if (n > UINT64_MAX - (page - 1))
         osoe_fatal("size %llu too large to map", (unsigned long long)n);
     return (n + page - 1) / page * page;
+}
+
+/*
+ * The executable's symmetric statics (§4.3). oshcc's linker script gathers the
+ * program's .data and .bss input sections into two output sections, each
+ * beginning and ending on the linker's largest page, and brackets them with
+ * these symbols. Weak, so a program linked without the script has none and
+ * each is NULL; default visibility, because the library is built hidden, and a
+ * hidden weak reference is settled when the library is linked - to nothing -
+ * rather than bound to the executable's definition when the program is loaded.
+ */
+extern unsigned char __osoe_statics_data_start[] __attribute__((weak, visibility("default")));
+extern unsigned char __osoe_statics_data_end[] __attribute__((weak, visibility("default")));
+extern unsigned char __osoe_statics_bss_start[] __attribute__((weak, visibility("default")));
+extern unsigned char __osoe_statics_bss_end[] __attribute__((weak, visibility("default")));
+
+/*
+ * The two ranges, or none. The script puts the data before the bss and both on
+ * page boundaries; bounds that are not so come from some other script, and
+ * their region could be neither mapped over nor made symmetric in full, so
+ * they are fatal rather than half used.
+ */
+static void find_statics(struct osoe_node *n)
+{
+    unsigned char *data = __osoe_statics_data_start, *data_end = __osoe_statics_data_end;
+    unsigned char *bss = __osoe_statics_bss_start, *bss_end = __osoe_statics_bss_end;
+    n->statics_data = n->statics_bss = NULL;
+    n->statics_data_bytes = n->statics_bss_bytes = n->statics_bytes = 0;
+    if (!data && !data_end && !bss && !bss_end)
+        return;
+    uintptr_t page = (uintptr_t)sysconf(_SC_PAGESIZE);
+    if (!data || !data_end || !bss || !bss_end || data_end < data || bss < data_end ||
+        bss_end < bss ||
+        ((uintptr_t)data | (uintptr_t)data_end | (uintptr_t)bss | (uintptr_t)bss_end) % page)
+        osoe_fatal("the program's symmetric statics are bracketed at data [%p, %p) and bss "
+                   "[%p, %p), which are not the page-aligned ranges, data first, that "
+                   "oshcc's linker script makes; link the program with oshcc",
+                   (void *)data, (void *)data_end, (void *)bss, (void *)bss_end);
+    n->statics_data = data;
+    n->statics_data_bytes = (uint64_t)(data_end - data);
+    n->statics_bss = bss;
+    n->statics_bss_bytes = (uint64_t)(bss_end - bss);
+    n->statics_bytes = n->statics_data_bytes + n->statics_bss_bytes;
+}
+
+/*
+ * The copy reads whole pages of the program's data, which under
+ * AddressSanitizer include the poisoned redzones between its globals: this
+ * scan is not instrumented, and copy_into writes by the system call itself
+ * rather than through the sanitizer's pwrite, which checks its buffer. Neither
+ * is a read of a variable, only of the pages that hold them.
+ */
+typedef uint64_t __attribute__((may_alias)) any_word;   /* reads bytes of any type */
+
+__attribute__((no_sanitize_address))
+static bool page_is_zero(const unsigned char *p, uint64_t len)
+{
+    const any_word *word = (const any_word *)(const void *)p;   /* page-aligned */
+    for (uint64_t i = 0; i < len / sizeof *word; i++)
+        if (word[i])
+            return false;
+    return true;
+}
+
+/*
+ * Write `bytes` of this process's memory at `from` into the object `fd` at
+ * `offset`, the pages holding a nonzero byte only: the object is zero where it
+ * is not written, and an untouched .bss page reads as the kernel's zero page,
+ * so a large .bss costs neither a copy nor a page of /dev/shm until the
+ * program writes it. False, with errno set, if a write fails.
+ */
+static bool copy_into(int fd, const unsigned char *from, uint64_t bytes, uint64_t offset)
+{
+    uint64_t page = (uint64_t)sysconf(_SC_PAGESIZE);
+    for (uint64_t at = 0; at < bytes; at += page) {
+        if (page_is_zero(from + at, page))
+            continue;
+        uint64_t done = 0;
+        while (done < page) {
+            long w = syscall(SYS_pwrite64, fd, from + at + done, (size_t)(page - done),
+                             (off_t)(offset + at + done));
+            if (w < 0 && errno == EINTR)
+                continue;
+            if (w <= 0)
+                return false;
+            done += (uint64_t)w;
+        }
+    }
+    return true;
 }
 
 /* Publish failure so waiting siblings stop at their next sweep: osoe_fatal_then's
@@ -172,6 +262,71 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap
     return mapped_at;
 }
 
+/*
+ * Create this PE's statics object, copy the program's statics into it, and map
+ * it over them (§4.3), with an alias of the whole object for the transport.
+ *
+ * Nothing between the copy and the mapping writes memory in the ranges: a
+ * write there would land in the pages the mapping then hides. The program's
+ * code is not running - it is in shmem_init, and the library's own threads are
+ * started after this - and when the library is linked statically its own
+ * globals are in the ranges too, so this keeps what it computes in locals
+ * until the mapping is in place, and stores it in `n` only then.
+ */
+static void create_own_statics(struct osoe_node *n, const struct osoe_bootstrap *b,
+                               struct osoe_pe_slot *slot)
+{
+    int len = snprintf(slot->statics_name, sizeof slot->statics_name, "%s.statics.%u",
+                       n->control_name, b->local_id);
+    if (len < 0 || (size_t)len >= sizeof slot->statics_name)
+        fail_rendezvous(n, "statics object name too long");
+    char err[256];
+    int fd = osoe_shm_create(slot->statics_name, OSOE_SHM_NO_OWNER, err, sizeof err);
+    if (fd < 0) {
+        char msg[320];
+        snprintf(msg, sizeof msg, "this PE's statics: %s", err);
+        fail_rendezvous(n, msg);
+    }
+    if (ftruncate(fd, (off_t)n->statics_bytes) != 0) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "cannot size statics %s to %llu bytes: %s",
+                 slot->statics_name, (unsigned long long)n->statics_bytes, strerror(errno));
+        close(fd);
+        shm_unlink(slot->statics_name);
+        fail_rendezvous(n, msg);
+    }
+
+    unsigned char *data = n->statics_data, *bss = n->statics_bss;
+    uint64_t data_bytes = n->statics_data_bytes, bss_bytes = n->statics_bss_bytes;
+    bool copied = copy_into(fd, data, data_bytes, 0) &&
+                  copy_into(fd, bss, bss_bytes, data_bytes);
+    int copy_error = copied ? 0 : errno;
+    void *over_data = copied && data_bytes
+        ? mmap(data, data_bytes, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0)
+        : (void *)data;
+    void *over_bss = copied && over_data == (void *)data && bss_bytes
+        ? mmap(bss, bss_bytes, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
+               (off_t)data_bytes)
+        : (void *)bss;
+    void *alias = mmap(NULL, n->statics_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    int map_error = errno;
+    close(fd);
+
+    if (!copied || over_data != (void *)data || over_bss != (void *)bss ||
+        alias == MAP_FAILED) {
+        char msg[320];
+        snprintf(msg, sizeof msg, "cannot %s the program's statics (%llu bytes) %s %s: %s",
+                 !copied ? "copy" : "map", (unsigned long long)n->statics_bytes,
+                 !copied ? "into" : "from", slot->statics_name,
+                 strerror(!copied ? copy_error : map_error));
+        shm_unlink(slot->statics_name);
+        fail_rendezvous(n, msg);
+    }
+    /* The ranges are this PE's statics in its core already. */
+    madvise(alias, n->statics_bytes, MADV_DONTDUMP);
+    n->statics_of[b->local_id] = alias;
+}
+
 static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
 {
     for (uint32_t i = 0; i < b->local_count; i++) {
@@ -198,6 +353,26 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
          * make every core L heaps large (review round two, omissions 4). */
         madvise(p, s->heap_bytes, MADV_DONTDUMP);
         n->heap_of[i] = p;
+
+        if (!n->statics_bytes)
+            continue;
+        fd = osoe_shm_open_ours(s->statics_name, err, sizeof err);
+        if (fd < 0) {
+            char msg[512];
+            snprintf(msg, sizeof msg, "local PE %u's statics: %s", i,
+                     err[0] ? err : strerror(errno));
+            fail_rendezvous(n, msg);
+        }
+        p = mmap(NULL, n->statics_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        close(fd);
+        if (p == MAP_FAILED) {
+            char msg[256];
+            snprintf(msg, sizeof msg, "cannot map local PE %u's statics (%llu bytes): %s", i,
+                     (unsigned long long)n->statics_bytes, strerror(errno));
+            fail_rendezvous(n, msg);
+        }
+        madvise(p, n->statics_bytes, MADV_DONTDUMP);
+        n->statics_of[i] = p;
     }
 }
 
@@ -212,6 +387,14 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
                      "%u has %llu bytes, this PE has %llu", i,
                      (unsigned long long)n->slots[i].symmetric_size,
                      (unsigned long long)b->symmetric_size);
+            fail_rendezvous(n, msg);
+        }
+        if (n->slots[i].statics_bytes != n->statics_bytes) {
+            char msg[256];
+            snprintf(msg, sizeof msg, "the PEs run different programs: local PE %u's "
+                     "symmetric statics are %llu bytes, this PE's %llu (§4.3)", i,
+                     (unsigned long long)n->slots[i].statics_bytes,
+                     (unsigned long long)n->statics_bytes);
             fail_rendezvous(n, msg);
         }
         if (n->slots[i].rank != b->gtids[i]) {
@@ -280,15 +463,17 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * segment and every local PE's heap. The lead knows L and the heap size;
      * every PE has parsed the same size, or check_agreement fails them all.
      */
-    uint64_t wanted = n->control_bytes + (uint64_t)b->local_count * n->heap_bytes;
+    uint64_t wanted = n->control_bytes +
+                      (uint64_t)b->local_count * (n->heap_bytes + n->statics_bytes);
     uint64_t free_bytes;
     if (!osoe_shm_room(wanted, &free_bytes)) {
         char msg[320];
         snprintf(msg, sizeof msg, "/dev/shm has %llu MiB free, but this node's control "
-                 "segment and %u heaps of %llu MiB need %llu MiB: lower "
+                 "segment and %u heaps of %llu MiB%s need %llu MiB: lower "
                  "SHMEM_SYMMETRIC_SIZE, run fewer PEs per node, or enlarge /dev/shm",
                  (unsigned long long)(free_bytes >> 20), b->local_count,
                  (unsigned long long)(n->heap_bytes >> 20),
+                 n->statics_bytes ? " with their statics" : "",
                  (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
         osoe_shm_short(b->shm_capacity_warning_only, msg);
     }
@@ -565,6 +750,13 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     n->heap_of = calloc(b->local_count, sizeof *n->heap_of);
     if (!n->heap_of)
         osoe_fatal("out of memory");
+    find_statics(n);
+    n->statics_of = NULL;
+    if (n->statics_bytes) {
+        n->statics_of = calloc(b->local_count, sizeof *n->statics_of);
+        if (!n->statics_of)
+            osoe_fatal("out of memory");
+    }
     build_local_index(n, b);
 
     if (lead)
@@ -600,6 +792,8 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
         fail_rendezvous(n, msg);
     }
     n->heap_of[b->local_id] = (void *)(uintptr_t)(base + b->heap_shift * b->rank);
+    if (n->statics_bytes)
+        create_own_statics(n, b, me);
 
     if (lead) {
         n->hdr->heap_base = base;
@@ -614,6 +808,7 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     me->tid = (int32_t)gettid();
     me->symmetric_size = b->symmetric_size;
     me->heap_bytes = n->heap_bytes;
+    me->statics_bytes = n->statics_bytes;
     atomic_store_explicit(&me->phase, OSOE_PHASE_JOINED, memory_order_release);
     atomic_fetch_add_explicit(&n->hdr->joined, 1, memory_order_seq_cst);
     osoe_futex_wake(&n->hdr->joined, INT_MAX, OSOE_FUTEX_SHARED);
@@ -633,8 +828,8 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     atomic_fetch_add_explicit(&n->hdr->mapped, 1, memory_order_seq_cst);
     osoe_futex_wake(&n->hdr->mapped, INT_MAX, OSOE_FUTEX_SHARED);
 
-    /* The lead removes heap names once every PE holds a mapping, so a later
-     * crash leaves no heap behind (§6.2) - and the control segment's name with
+    /* The lead removes heap and statics names once every PE holds a mapping,
+     * so a later crash leaves neither behind (§6.2) - and the control segment's name with
      * them, since every local PE opened it before it could map a sibling's
      * heap. From here nothing this node created in /dev/shm has a name: no
      * death of any process can strand it, and osoe-stat finds the segment
@@ -655,10 +850,14 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
                      missing);
             fail_rendezvous(n, msg);
         }
-        for (uint32_t i = 0; i < b->local_count; i++)
+        for (uint32_t i = 0; i < b->local_count; i++) {
             if (shm_unlink(n->slots[i].heap_name) != 0)
                 osoe_fatal("cannot remove heap name %s: %s", n->slots[i].heap_name,
                            strerror(errno));
+            if (n->statics_bytes && shm_unlink(n->slots[i].statics_name) != 0)
+                osoe_fatal("cannot remove statics name %s: %s", n->slots[i].statics_name,
+                           strerror(errno));
+        }
         if (!n->keep_name && shm_unlink(n->control_name) != 0)
             osoe_fatal("cannot remove the control segment's name %s: %s", n->control_name,
                        strerror(errno));
@@ -727,6 +926,14 @@ void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)
             munmap(n->heap_of[i], n->slots[i].heap_bytes);
     free(n->heap_of);
     n->heap_of = NULL;
+    /* The object's mappings over the program's own statics stay: they are
+     * where its globals now live, and a later session copies them from there
+     * into its own object (§6.4). */
+    for (uint32_t i = 0; n->statics_of && i < b->local_count; i++)
+        if (n->statics_of[i])
+            munmap(n->statics_of[i], n->statics_bytes);
+    free(n->statics_of);
+    n->statics_of = NULL;
     free(n->sorted_rank);
     free(n->sorted_local);
     n->sorted_rank = n->sorted_local = NULL;

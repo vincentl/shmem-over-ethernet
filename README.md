@@ -4,7 +4,8 @@ OpenSHMEM Over Ethernet: an implementation of OpenSHMEM 1.6 for commodity Ethern
 designed to build entirely from a Linux distribution's own packages — no fabric
 libraries.
 
-**Status:** phase 1, step 5, collectives (design §7.1). Jobs run on one node or across
+**Status:** phase 1, step 6, symmetric statics and the compiler wrapper (design
+§7.1). Jobs run on one node or across
 nodes over TCP and io_uring, started by `srun` or by `osoe-launch`:
 initialization and thread levels up to `SHMEM_THREAD_SERIALIZED`, the symmetric
 heap allocator in full, RMA - `shmem_putmem` and `shmem_getmem`, and every type
@@ -18,12 +19,13 @@ and `shmem_team_sync`, the team-based reductions of every operator and type of
 specification Table 10 and broadcast, with their C11 interfaces, the deprecated
 active-set forms - the `_to_all` reductions of Table 11, `shmem_broadcast32` and
 `64`, `shmem_barrier` and `shmem_sync` - over the whole job, which is the only
-active set they accept, `shmem_global_exit`, and the mandatory surface of §7.4
-including the `pshmem_` profiling interface. A PE or a node that dies ends the
-whole job (§3.15).
+active set they accept, `shmem_global_exit`, the mandatory surface of §7.4
+including the `pshmem_` profiling interface, and symmetric statics - a
+program's global and static variables as symmetric objects - in a program
+built with the `oshcc` wrapper (§4.3). A PE or a node that dies ends the whole
+job (§3.15).
 
-Not yet: symmetric statics, which are refused with a diagnostic (§4.3);
-collect, fcollect, alltoall and alltoalls; the block-strided `shmem_ibput` and
+Not yet: collect, fcollect, alltoall and alltoalls; the block-strided `shmem_ibput` and
 `shmem_ibget`; locks; contexts
 other than the default; and `SHMEM_THREAD_MULTIPLE` (§7.5, §7.6, §4.11).
 Nonblocking gets across nodes overlap, many in flight before the quiet that
@@ -70,6 +72,25 @@ limactl shell osoe cmake --workflow --preset debug # run from the repository roo
 The VM mounts the repository at the same path it has on the Mac, so commands run
 from the repository root start in the same directory inside the VM, and
 `build/debug/compile_commands.json` works with an editor on the Mac.
+
+## Building a program
+
+`oshcc` compiles and links an OpenSHMEM program against osoe, as other
+implementations' wrappers do, so build systems that expect one work unchanged
+(`CC=oshcc`, `SHMEMCC=oshcc`). It is `build/<preset>/tools/wrapper/oshcc` in a
+build tree and `bin/oshcc` once installed:
+
+```sh
+oshcc -O2 -o my_program my_program.c
+oshcc -show -o my_program my_program.c    # print the command instead
+```
+
+It adds osoe's headers, and when it links a program, the library, a run path to
+it, and what makes the program's global and static variables symmetric:
+`-fno-pie`, `-no-pie` and osoe's linker script (design §4.3). A program linked
+some other way runs, but its statics are not symmetric, and passing one where a
+symmetric address is required ends the job with a message saying so. `OSOE_CC`
+names another C compiler.
 
 ## Running a program
 

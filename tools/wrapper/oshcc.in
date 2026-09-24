@@ -3,19 +3,23 @@
 #
 # The C compiler osoe was built with - or $OSOE_CC - given osoe's headers, and,
 # when it links, osoe's library and a run path to it. A compile-only call (-c,
-# -S, -E, -M, -MM, -fsyntax-only) gets the header path alone, so object files
-# build as they would with any other oshcc. `oshcc -show ...` prints the command
-# it would run instead of running it.
+# -S, -E, -M, -MM, -fsyntax-only) gets the header path and -fno-pie, so object
+# files build as they would with any other oshcc. `oshcc -show ...` prints the
+# command it would run instead of running it.
 #
-# Symmetric statics are not yet supported (design §4.3): a program that passes
-# a global or static variable where a symmetric address is required is refused
-# at run time by name. When they are, this is where -fno-pie, -no-pie and the
-# linker script that gathers the program's data go, since the wrapper is what
-# knows which objects are the program's own.
+# Symmetric statics (design §4.3): every compile gets -fno-pie and every link
+# of a program -no-pie and osoe's linker script, which gathers the program's
+# global and static variables where shmem_init can map them. -no-pie puts them
+# at the same address in every PE, which a program sending one's address to
+# another PE needs; a later -fpie, -fPIC or -pie of the caller's own wins, and
+# the statics are then symmetric by offset still. A shared library (-shared) is
+# linked as asked: its data is its own, not the program's.
 compiler=${OSOE_CC:-@OSOE_WRAPPER_COMPILER@}
 include='@OSOE_WRAPPER_INCLUDE@'
 library='@OSOE_WRAPPER_LIBRARY@'
 libraries='@OSOE_WRAPPER_LIBRARIES@'
+link_flags='@OSOE_WRAPPER_LINK_FLAGS@'
+statics='@OSOE_WRAPPER_STATICS_SCRIPT@'
 
 show=no
 if [ "$1" = -show ]; then
@@ -23,15 +27,20 @@ if [ "$1" = -show ]; then
     shift
 fi
 link=yes
+program=yes
 for argument in "$@"; do
     case $argument in
         -c|-S|-E|-M|-MM|-fsyntax-only) link=no ;;
+        -shared) program=no ;;
     esac
 done
-if [ $link = yes ]; then
-    set -- -I"$include" "$@" -L"$library" $libraries -Wl,-rpath,"$library"
+if [ $link = no ]; then
+    set -- -I"$include" -fno-pie "$@"
+elif [ $program = yes ]; then
+    set -- -I"$include" -fno-pie -no-pie -Wl,-T,"$statics" $link_flags "$@" \
+        -L"$library" $libraries -Wl,-rpath,"$library"
 else
-    set -- -I"$include" "$@"
+    set -- -I"$include" $link_flags "$@" -L"$library" $libraries -Wl,-rpath,"$library"
 fi
 if [ $show = yes ]; then
     echo "$compiler" "$@"

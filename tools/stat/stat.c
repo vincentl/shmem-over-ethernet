@@ -114,7 +114,10 @@ static void describe_watch(char *buf, size_t len, uint32_t layout, uint64_t word
     unsigned region = (unsigned)(word >> (OFF_BITS + LEN_BITS));
     uint64_t grains = word & len_max;
     uint64_t first = (word >> LEN_BITS) & ((UINT64_C(1) << OFF_BITS) - 1);
-    const char *rname = region == 0 ? "heap" : region == 1 ? "internal" : "?";
+    const char *rname = region == 0   ? "heap"
+                        : region == 1 ? "internal"
+                        : region == 2 ? "statics"
+                                      : "?";
 
     if (grains == len_max)
         snprintf(buf, len, "%s +%#" PRIx64 "..end", rname, first * GRAIN);
@@ -820,17 +823,20 @@ static int gc_one(const char *name)
         return 0;
     }
 
-    /* Heaps first: their names are in the segment, so removing the segment
-     * first would strand them. */
-    for (uint32_t i = 0; i < s.local_count; i++) {
-        char heap[128];
-        if (!osoe_segment_read_str(&s, "pe.heap_name", i, heap, sizeof heap) || !heap[0])
-            continue;
-        if (shm_unlink(heap) == 0)
-            printf("%s: removed\n", heap);
-        else if (errno != ENOENT)
-            fprintf(stderr, "osoe-stat: cannot remove %s: %s\n", heap, strerror(errno));
-    }
+    /* Heaps and statics first: their names are in the segment, so removing
+     * the segment first would strand them. A segment older than layout 17 has
+     * no statics names, and the read says so by failing. */
+    static const char *const owned[] = { "pe.heap_name", "pe.statics_name" };
+    for (uint32_t i = 0; i < s.local_count; i++)
+        for (size_t k = 0; k < sizeof owned / sizeof owned[0]; k++) {
+            char object[128];
+            if (!osoe_segment_read_str(&s, owned[k], i, object, sizeof object) || !object[0])
+                continue;
+            if (shm_unlink(object) == 0)
+                printf("%s: removed\n", object);
+            else if (errno != ENOENT)
+                fprintf(stderr, "osoe-stat: cannot remove %s: %s\n", object, strerror(errno));
+        }
     char name_copy[OSOE_SEGMENT_NAME_MAX];
     snprintf(name_copy, sizeof name_copy, "%s", s.name);
     osoe_segment_close(&s);

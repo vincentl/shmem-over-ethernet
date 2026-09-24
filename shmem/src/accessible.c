@@ -12,10 +12,10 @@
  * whether `pe` names a PE of this job at all.
  *
  * `shmem_addr_accessible` additionally asks whether `addr` is a symmetric
- * object. Symmetric statics are not supported until §4.3's phase 1.5, so an
- * address outside the heap is not accessible and says so - which §7.4 records
- * as the known non-conformance, and which is a far better answer than 1
- * followed by a fault at the first put.
+ * object: in the symmetric heap, or among the program's global and static
+ * variables (§4.3). A program not linked with oshcc has no symmetric statics,
+ * so there a static's address is not accessible and says so - a far better
+ * answer than 1 followed by a refusal at the first put.
  */
 #include <stdint.h>
 
@@ -33,8 +33,8 @@ OSOE_API int pshmem_pe_accessible(int pe)
 
 OSOE_API int pshmem_addr_accessible(const void *addr, int pe)
 {
-    uint64_t offset;
-    return pshmem_pe_accessible(pe) && osoe_symmetric_heap_offset(addr, 1, &offset);
+    struct osoe_symmetric_location at;
+    return pshmem_pe_accessible(pe) && osoe_symmetric_find(addr, 1, &at);
 }
 
 /* The weak `shmem_` aliases (export.h). */

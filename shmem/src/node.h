@@ -28,7 +28,7 @@
 #include "bootstrap.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 16
+#define OSOE_NODE_LAYOUT 17
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -65,6 +65,10 @@ enum osoe_blocked_detail {
      * the bytes of them still in flight when it began - not a connection's
      * word, so not counted among them. */
     OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
+    /* Layout 17: a point-to-point wait on the program's statics (§4.3), the
+     * detail being the offset into them, as OSOE_BLOCKED_DETAIL_OFFSET's is
+     * into the heap. */
+    OSOE_BLOCKED_DETAIL_STATICS_OFFSET,
 };
 
 /*
@@ -131,6 +135,12 @@ struct osoe_pe_slot {
     uint64_t symmetric_size;        /* SHMEM_SYMMETRIC_SIZE as this PE parsed it */
     uint64_t heap_bytes;            /* mapped length of the heap object */
     char heap_name[OSOE_HEAP_NAME_MAX];
+    /* Layout 17: this PE's symmetric statics (§4.3) - the object holding the
+     * executable's data, which oshcc's linker script gathers, and which is
+     * mapped over it - its length, 0 for a program built without the script,
+     * and its name, as for the heap. */
+    uint64_t statics_bytes;
+    char statics_name[OSOE_HEAP_NAME_MAX];
 
     /*
      * The §3.14 "blocked in" record, so a hung job says where each PE is
@@ -611,6 +621,22 @@ struct osoe_node {
      * starts - the page-rounded heap size - and how long it is. */
     uint64_t internal_offset;
     uint64_t internal_bytes;
+    /*
+     * OSOE_REGION_STATICS (§4.3): the executable's data as oshcc's linker
+     * script gathers it, two page-aligned ranges - initialized data, then
+     * zero-initialized - and the object holding them, the first range at
+     * offset 0 and the second after it. Each local PE's object is mapped whole
+     * at statics_of[local id]; this PE's own is also mapped over the two
+     * ranges, which is where the program's code reads and writes it. For a
+     * program built without the script the ranges are empty, statics_bytes is
+     * 0 and statics_of is NULL.
+     */
+    unsigned char *statics_data;
+    uint64_t statics_data_bytes;
+    unsigned char *statics_bss;
+    uint64_t statics_bss_bytes;
+    uint64_t statics_bytes;
+    void **statics_of;
     unsigned char *landing;         /* the landing zones; index with osoe_node_landing */
     uint32_t landing_slot_bytes;    /* a PE's whole zone, since layout 16 */
     uint32_t landing_data_bytes;    /* the blocking slot's data: one AM chunk */
