@@ -75,8 +75,13 @@ int main(void)
     int me = shmem_my_pe(), n = shmem_n_pes();
 
     /* Symmetry: the same allocation sequence, including out-of-order frees,
-     * yields the same addresses on every PE. Every PE puts its list into row
-     * `me` of a table on every PE; each then compares all rows with its own. */
+     * yields the same layout on every PE - each object at the same offset from
+     * another symmetric object, which is what the specification promises. The
+     * same address too, until §8.2's heap-base shift (OSOE_HEAP_SHIFT) gives
+     * every PE's heap a base of its own: an earlier form of this check
+     * compared addresses, and was the first thing that mode found. Every PE
+     * puts its offsets into row `me` of a table on every PE; each then compares
+     * all rows with its own. */
     uintptr_t addr[ALLOCS];
     for (int i = 0; i < ALLOCS; i++)
         addr[i] = (uintptr_t)shmem_malloc((size_t)(i * 37 % 500 + 1));
@@ -84,14 +89,17 @@ int main(void)
         shmem_free((void *)addr[i]);
     for (int i = 0; i < ALLOCS; i += 3)
         addr[i] = (uintptr_t)shmem_malloc((size_t)(i * 11 % 300 + 1));
-    uintptr_t *table = shmem_malloc(sizeof addr * (size_t)n);
+    intptr_t *table = shmem_malloc(sizeof(intptr_t) * ALLOCS * (size_t)n);
     CHECK_FATAL(table != NULL);  /* NULL would be dereferenced by the puts and the
                                   * memcmp below */
+    intptr_t offset[ALLOCS];
+    for (int i = 0; i < ALLOCS; i++)
+        offset[i] = (intptr_t)(addr[i] - (uintptr_t)table);
     for (int t = 0; t < n; t++)
-        shmem_putmem(table + me * ALLOCS, addr, sizeof addr, t);
+        shmem_putmem(table + me * ALLOCS, offset, sizeof offset, t);
     shmem_barrier_all();
     for (int w = 0; w < n; w++)
-        CHECK(memcmp(table + w * ALLOCS, addr, sizeof addr) == 0);
+        CHECK(memcmp(table + w * ALLOCS, offset, sizeof offset) == 0);
     shmem_free(table);
     for (int i = ALLOCS - 1; i >= 0; i--)
         shmem_free((void *)addr[i]);

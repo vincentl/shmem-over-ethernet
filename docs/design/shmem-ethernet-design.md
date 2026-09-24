@@ -2120,7 +2120,8 @@ to all three, but it does not exist in a 39-bit or x86-64 address space. So:
 - **Every other PE maps its own heap at the published `B`**, and fails loudly if it
   cannot. All local PEs run the same binary, so the lead's choice suits them.
 - **`OSOE_HEAP_BASE` replaces the list** for systems where none of the candidates
-  is free. It is also the hook for §8.2's heap-base-shift test mode.
+  is free. Beside it, `OSOE_HEAP_SHIFT` is §8.2's heap-base-shift test mode: each
+  PE's own heap past `B` by its rank times the shift.
 
 *(Rejected: a compile-time `B` selected by sanitizer macros. It gives each build one
 fixed guess, whereas the lead's search adapts to address spaces nobody listed.)* `-no-pie` pins the executable
@@ -5280,7 +5281,21 @@ to its floor there are in §8.4.
   connection direction and the rendezvous handshake, including a client reaching
   the wrong job's server.
 - **Heap-base shift.** Invariant 7 cannot fail while every process maps its own
-  heap at the same base. A test mode shifts `B` per PE.
+  heap at the same base. A test mode shifts `B` per PE. *Done* (phase 1 step 4
+  slice 2): `OSOE_HEAP_SHIFT=BYTES`, a whole number of pages, maps each PE's
+  own heap at `B + rank × BYTES`, so that no two PEs of the job hold a
+  symmetric object at the same address; by world rank, so one setting moves
+  the intranode case and the internode one at once. The lead still searches
+  its candidates for `B` and publishes it unshifted. A sample runs shifted in
+  every preset (`shmem.heap-shift.*`), and the whole of tier 2 passes with
+  `OSOE_HEAP_SHIFT=2m` in ctest's environment. It found two places that
+  assumed one base, neither on the wire: `shmem.rma`'s symmetry check compared
+  addresses between PEs, where the specification promises only corresponding
+  objects (it now compares each object's offset from another), and
+  `shmem_align` decided whether a PE's base met an alignment from that PE's
+  own base, so that under a 2 MiB shift a 4 MiB alignment succeeded on even
+  ranks and failed on odd ones (it now decides from `B` and the shift, which
+  every PE shares). No wire format depended on identical addresses.
 - **Timeouts on every test**, so a hang fails instead of stalling the suite.
 - **A `NEEDED`-libraries check** on built binaries for invariant 15.
 - **Collective timing checks must not depend on scheduling.** A first version of
@@ -5694,6 +5709,8 @@ Each is independently breakable, and each failure appears far from its cause.
 6. **The allocator is a pure deterministic function of its call sequence.**
    (§4.4) Violating it desynchronizes heaps silently.
 7. **The wire format never depends on identical virtual addresses.** (§4.2)
+   Testable since phase 1 step 4: §8.2's heap-base shift gives every PE's heap
+   a base of its own, and tier 2 passes under it.
 8. **The wakeup mechanism affects only how soon a sealed buffer is submitted,
    never whether.** (§3.10)
 9. **Barrier queue bounds rest on collectives being blocking.** (§3.8) A future

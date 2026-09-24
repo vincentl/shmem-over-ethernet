@@ -1,7 +1,8 @@
 /*
  * shmem_malloc and shmem_free (spec §9.3.1, §9.3.2): size 0 and NULL need no
  * barrier; otherwise malloc barriers on exit and free on entry. Symmetry across
- * PEs is checked by shmem.rma, which can compare addresses between PEs.
+ * PEs is checked by shmem.rma, which compares each object's offset from another
+ * between PEs. And shmem_align refuses an alignment on every PE or on none.
  */
 #define _GNU_SOURCE
 #include <stdint.h>
@@ -47,6 +48,28 @@ int main(void)
     CHECK(shmem_malloc((size_t)1 << 40) == NULL);
     char *d = shmem_malloc(64);
     CHECK(d != NULL);
+
+    /* shmem_align decides a refusal every PE agrees on (malloc.c): an
+     * alignment a PE's heap base may not meet - 4 MiB, on the odd ranks of
+     * §8.2's heap-base shift at 2 MiB - fails on every PE or on none, and one
+     * that succeeds is aligned. A disagreement is not freed: a collective free
+     * on some PEs and a NULL one on the rest would hang. */
+    size_t alignment = (size_t)4 << 20;
+    char *aligned = shmem_align(alignment, 64);
+    CHECK(aligned == NULL || (uintptr_t)aligned % alignment == 0);
+    int *verdicts = shmem_calloc((size_t)n, sizeof(int));
+    CHECK_FATAL(verdicts != NULL);
+    int mine = aligned != NULL;
+    for (int t = 0; t < n; t++)
+        shmem_putmem(verdicts + me, &mine, sizeof mine, t);
+    shmem_barrier_all();
+    int agree = 1;
+    for (int w = 0; w < n; w++)
+        agree &= verdicts[w] == mine;
+    CHECK(agree);
+    shmem_free(verdicts);
+    if (agree)
+        shmem_free(aligned);
 
     shmem_free(d);
     shmem_free(c);

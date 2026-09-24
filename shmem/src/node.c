@@ -154,11 +154,15 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap
         ncandidates = 1;
     }
 
+    /* B is what is returned and published; the heap itself sits past it by
+     * this PE's shift, which is 0 unless §8.2's test mode is on. */
+    uint64_t shift = b->heap_shift * b->rank;
     uint64_t mapped_at = 0;
     for (size_t i = 0; i < ncandidates && !mapped_at; i++) {
-        void *p = mmap((void *)(uintptr_t)candidates[i], n->heap_bytes,
-                       PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED_NOREPLACE, fd, 0);
-        if (p == (void *)(uintptr_t)candidates[i])
+        void *want = (void *)(uintptr_t)(candidates[i] + shift);
+        void *p = mmap(want, n->heap_bytes, PROT_READ | PROT_WRITE,
+                       MAP_SHARED | MAP_FIXED_NOREPLACE, fd, 0);
+        if (p == want)
             mapped_at = candidates[i];
         else if (p != MAP_FAILED)
             munmap(p, n->heap_bytes);   /* a kernel without NOREPLACE placed it elsewhere */
@@ -557,13 +561,15 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
             snprintf(msg, sizeof msg, "no candidate heap base is free for a %llu-byte heap; "
                      "set OSOE_HEAP_BASE to a free address", (unsigned long long)n->heap_bytes);
         else
-            snprintf(msg, sizeof msg, "cannot map this PE's heap at the node's base %#llx, "
-                     "which the local lead chose; set OSOE_HEAP_BASE to an address free in "
-                     "every PE", (unsigned long long)n->hdr->heap_base);
+            snprintf(msg, sizeof msg, "cannot map this PE's heap at the node's base %#llx "
+                     "plus its shift %#llx (OSOE_HEAP_SHIFT), which the local lead chose; set "
+                     "OSOE_HEAP_BASE to an address free in every PE",
+                     (unsigned long long)n->hdr->heap_base,
+                     (unsigned long long)(b->heap_shift * b->rank));
         shm_unlink(me->heap_name);
         fail_rendezvous(n, msg);
     }
-    n->heap_of[b->local_id] = (void *)(uintptr_t)base;
+    n->heap_of[b->local_id] = (void *)(uintptr_t)(base + b->heap_shift * b->rank);
 
     if (lead) {
         n->hdr->heap_base = base;

@@ -587,6 +587,43 @@ foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
 endforeach()
 endif()
 
+# §8.2's heap-base shift (invariant 7): every PE maps its own heap at
+# B + rank x OSOE_HEAP_SHIFT, so no two PEs of the job hold a symmetric object at
+# the same address, and code that uses an address where it should use an
+# offset - on the wire, or in the intranode path's translation - fails. Until
+# this mode every PE mapped its own heap at its node's B, and every node chose
+# the same B, so such code passed everything. A sample runs shifted in every
+# preset; the whole of tier 2 runs shifted with OSOE_HEAP_SHIFT in ctest's
+# environment. 2 MiB keeps every PE of these jobs within a few MiB of the
+# candidates each sanitizer allows.
+foreach(name rma amo amo-types wait wait-many signal team malloc barrier)
+  add_test(NAME shmem.heap-shift.${name}.L4
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_SHIFT=2m
+            $<TARGET_FILE:osoe-launch> -n 4 -t 60 -- $<TARGET_FILE:shmem_test_${name}>)
+  set_tests_properties(shmem.heap-shift.${name}.L4 PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  foreach(map 0,0,1,1,2,2 0,1,2,0,1,0)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.heap-shift.internode.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_SHIFT=2m
+              OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+              $<TARGET_FILE:shmem_test_internode>)
+    set_tests_properties(shmem.heap-shift.internode.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 90)
+  endforeach()
+endif()
+# OSOE_HEAP_SHIFT is a whole number of pages, and anything else is refused by name.
+add_test(NAME shmem.heap-shift.invalid
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_SHIFT=100
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.heap-shift.invalid PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_HEAP_SHIFT='100' is not a whole number of")
+
 # The differential test (§8.1): one program, §8.1's four poles of the logical
 # node map at one world size, and the transcripts must match. On the first map
 # every operation is applied in the calling thread; on the second every one
