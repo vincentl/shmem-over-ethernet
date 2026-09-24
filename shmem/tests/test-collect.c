@@ -7,12 +7,16 @@
  *   - collect with blocks that differ from PE to PE, some of them empty, and
  *     with every block but one empty;
  *   - the C11 generics, and the deprecated fcollect32/64 and collect32/64;
- *   - fcollect over SHMEM_TEAM_SHARED, the node's own team;
+ *   - fcollect over SHMEM_TEAM_SHARED, the node's own team; a collect over
+ *     one node's alone, then an allocation over the job and a put across
+ *     nodes into it, which a room for collect's lengths not given back as it
+ *     was taken would send astray; and the next allocation after two collects
+ *     where the one before them was;
  *   - back to back on one dest with no barrier between - an fcollect, a
  *     reduction into the same array, another fcollect - which a node writing
  *     another node's dest for the next collective, while that node's members
  *     still copy the last one out, would corrupt;
- *   - pSync as it was at the end.
+ *   - pSync, a static, as it was at the end.
  *
  * With OSOE_TEST_PARTIAL=1 a PE calls shmem_fcollect64 with an active set one
  * PE short of the job, which must end it by name (shmem.collect.partial).
@@ -30,7 +34,7 @@
 enum { MANY = 3000 };
 
 static int me, npes;
-static long *pSync;
+static long pSync[SHMEM_COLLECT_SYNC_SIZE];     /* a static, as the corpus declares it */
 
 #define FCOLLECT_CHECK(T, NAME, N)                                                  \
     do {                                                                            \
@@ -135,8 +139,15 @@ static void collect_with(size_t (*lengths)(int), int generic)
 
 static void collects(void)
 {
+    /* collect's room for the lengths is given back as taken: the next
+     * allocation lands where the one before this collect did. */
+    void *before = shmem_malloc(64);
+    shmem_free(before);
     collect_with(differing, 0);
     collect_with(only_last, 1);
+    void *after = shmem_malloc(64);
+    CHECK(after == before);
+    shmem_free(after);
 
     /* collectmem, bytes of differing counts. */
     size_t mine = (size_t)me + 1, total = (size_t)npes * (npes + 1) / 2;
@@ -210,6 +221,31 @@ static void shared_team(void)
             wrong += dest[4 * r + e] != r * 10 + e;
     CHECK(wrong == 0);
     shmem_barrier_all();
+
+    /* A collect over PE 0's node's team alone - its lengths' room taken and
+     * given back there and nowhere else - then an allocation over the job and
+     * a put across nodes into it: the heaps must still agree. */
+    if (shmem_ptr(source, 0)) {
+        size_t length = (size_t)(mine % 4);
+        size_t total = 0;
+        for (int r = 0; r < n; r++)
+            total += (size_t)(r % 4);
+        CHECK(shmem_int_collect(SHMEM_TEAM_SHARED, dest, source, length) == 0);
+        size_t place = 0;
+        for (int r = 0; r < n; r++)
+            for (int e = 0; e < r % 4; e++)
+                wrong += dest[place++] != r * 10 + e;
+        CHECK(place == total);
+    }
+    long *after = shmem_malloc(sizeof *after);
+    CHECK_FATAL(after);
+    *after = -1;
+    shmem_barrier_all();
+    shmem_long_p(after, me, (me + 1) % npes);
+    shmem_barrier_all();
+    wrong += *after != (me + npes - 1) % npes;
+    CHECK(wrong == 0);
+    shmem_free(after);
     shmem_free(dest);
     shmem_free(source);
 }
@@ -248,8 +284,6 @@ int main(void)
     shmem_init();
     me = shmem_my_pe();
     npes = shmem_n_pes();
-    pSync = shmem_malloc(SHMEM_COLLECT_SYNC_SIZE * sizeof *pSync);
-    CHECK_FATAL(pSync);
     for (int i = 0; i < SHMEM_COLLECT_SYNC_SIZE; i++)
         pSync[i] = SHMEM_SYNC_VALUE;
     shmem_barrier_all();
@@ -269,7 +303,6 @@ int main(void)
     shared_team();
     back_to_back();
 
-    shmem_free(pSync);
     shmem_barrier_all();
     CHECK_INVARIANTS();
     shmem_finalize();

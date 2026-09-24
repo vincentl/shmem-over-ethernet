@@ -4284,7 +4284,7 @@ does **not** generalize:
 - **collect** with a different `nelems` per PE needs per-PE sizes and offsets.
 
 Each needs its own design before it is implemented (§7). Scans have one (§5.8);
-alltoall and collect do not yet.
+alltoall and collect have theirs as built (below, phase 1 step 5 slice 4).
 
 For the collectives it covers, this eliminates scratch sizing within a node — no
 chunking loop, no high-water allocation, no per-team data area. Their shared
@@ -4350,34 +4350,50 @@ broadcast linear in the node count under a block distribution.
 *As built: collect, fcollect, alltoall and alltoalls* (phase 1 step 5 slice 4;
 `collectives.c`, `collect.c`, `alltoall.c`;
 `docs/prompts/phase1-step5-slice4-prompt.md`, whose decisions are Claude's for
-the author's review). **fcollect is the accumulator with places**: once every
-member has arrived, the lead zeroes its `dest` and copies each local member's
-block to its rank's place - O(*L n*) of its own, under the O(*P n*) each member
-spends copying the result out - and hands `dest` to the internode phase, now
-holding its node's blocks and zero elsewhere; then the release and the
-copy-outs, as for a broadcast. No member writes the lead's `dest`, which a
-slower member may still be reading for the collective before. **The internode
-phase is its own operation at the seam, `osoe_internode_collect`**, whose
-generic implementation is the reduction's tree running an or over bytes -
-blocks at disjoint places and zero elsewhere or to their concatenation - so it
-needs no protocol of its own, and nothing one node writes in another for it
-is outside the internal region: the spec's precondition would allow a put
-straight into another node's `dest`, which SOS uses, but a fast node's put for
-the next collective could land under a slow node's copy-out of this one. A
-piece header marks it a gather, so a node's fcollect is not taken for another
-node's or of the same length. Its cost is stated rather than hidden: each lead
-moves about 2*k P n* bytes where an allgather moves *P n*, which is the
-reason the operation is at the seam, for a backend with an allgather.
-**collect's places are the prefix sums of every member's length**, which each
-PE learns by an fcollect of them - eight bytes a member - into room the
-symmetric heap lends for the call and takes back before it returns (a take and
-its give leave the allocator as it was, §4.4); a scan (§9.10.10, not built)
-would give each PE its own place in O(1) memory. **alltoall and alltoalls are
-direct puts and the team's barrier**: every block goes from its source PE to
-its dest PE, which no tree shortens, and nothing of the library's reads
-`dest`, so the precondition that it is ready is the application's to keep, as
-the spec says. The puts start at the PE's right neighbour, so no PE is
-everyone's first target; a strided block is a put an element.
+the author's review; the adversarial review of the slice reshaped the seam and
+collect's lengths). **fcollect is the accumulator with places**: once every
+member has arrived, the lead copies each local member's block to its rank's
+place in its `dest` - O(*L n*) of its own, under the O(*P n*) each member
+spends copying the result out - and hands `dest` to the internode phase; then
+the release and the copy-outs, as for a broadcast. No member writes the lead's
+`dest`, which a slower member may still be reading for the collective before.
+**The internode phase is its own operation at the seam, `osoe_internode_collect`**,
+given the result's layout - a fixed block, or each member's place - so that a
+backend knows which bytes are whose, and bound by one rule: a peer's buffer may
+be written only once that peer has entered the collective, since until then
+its members may still be copying the last result out of it; before, a backend
+stages through the internal region. The spec's precondition would allow a put
+straight into another node's `dest` at once, which SOS uses; this rule is why
+osoe does not. **The generic implementation is the reduction's tree running an
+or**: it zeroes the other nodes' places, and blocks at disjoint places or to
+their concatenation - no protocol of its own - and a piece header marks it a
+gather, so that one node's fcollect is not taken for another's or of the same
+length. Its cost is stated rather than hidden: per 16 KiB piece a leaf moves
+about two pieces and an interior lead 2(*k* + 1), where an allgather moves each
+block once; and the pieces go one after another, so a gather of a fixed block
+per PE takes ⌈*P n* / 16 KiB⌉ · 2⌈log_*k* *N*⌉ hops - at 400 nodes of 256 PEs
+and *k* = 4, 510 of them for one long each. **It is the one internode phase
+whose latency grows faster than log *N***, the exception §1's goal must carry
+until a backend's allgather replaces it at the seam, or the tree pipelines its
+pieces. **collect's places are the prefix sums of every member's length**:
+every member takes the same room from the symmetric heap, a word per member and
+one more, and writes its length in the last; the lead gathers the lengths into
+its own room, turns them into places and the total, and the other members read
+the total alone - so the P words are the lead's to touch, and a non-lead's cost
+is a page. The room is given back before returning; a take and its give leave
+the allocator as it was (§4.4), on the PEs of a team smaller than the job as on
+the others, and a heap without the room answers nonzero on every member alike.
+A scan (§9.10.10, not built) would give each PE its own place in O(1) memory.
+**alltoall and alltoalls are direct puts and the team's barrier**: every block
+goes from its source PE to its dest PE, which no tree shortens, and every put
+but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads
+no `dest`, so the precondition that it is ready is the application's to keep,
+as the spec says - which includes a sync after a data collective into the same
+array, since the lead's copy of that result may still be being copied out when
+a fast member's put lands in it: back-to-back gathers need none, alltoall after
+one does. The puts start at the PE's right neighbour, so no PE is everyone's
+first target; a strided block is a put an element, element-strided within each
+block as the spec's Example 33 and SOS read §9.10.6.
 
 ### 5.6 Barrier versus sync
 

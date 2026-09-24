@@ -214,8 +214,24 @@ srun -K1 -N4 --ntasks-per-node=4 Synch_p2p/p2p 10 2000 2000 | tee ~/prk-p2p.txt
 srun -K1 -N4 --ntasks-per-node=4 Transpose/transpose 10 2048 | tee ~/prk-transpose.txt
 ```
 
-Each must print "Solution validates". And the examples, each on 4 × 2, one
-line of verdict per program:
+Each must print "Solution validates". ISx, weak and strong scaling, on 4 × 4.
+It allocates a 1 GiB symmetric key buffer on every PE, so the heap must be
+larger than osoe's default, and it asks for `-std=c99`, under which glibc's
+`time.h` has no `struct timespec`:
+
+```sh
+cp -R corpus/isx/SHMEM $W/isx && cd $W/isx
+make CC=$OSHCC CFLAGS="-O2 -std=gnu99 -Wall"
+export SHMEM_SYMMETRIC_SIZE=1200M
+srun -K1 -N4 --ntasks-per-node=4 bin/isx.weak 16777216 ~/isx-weak.log | tee ~/isx-weak.txt
+srun -K1 -N4 --ntasks-per-node=4 bin/isx.strong 268435456 ~/isx-strong.log | tee ~/isx-strong.txt
+unset SHMEM_SYMMETRIC_SIZE
+```
+
+A node's four PEs then hold 4.8 GiB of `/dev/shm` at most, under the 8 GB a
+16 GB node has, though only what ISx touches is ever allocated. ISx verifies
+its own sort and exits nonzero if it failed. And the examples, each on 4 × 2,
+one line of verdict per program:
 
 ```sh
 cd $W/examples
@@ -243,14 +259,12 @@ two logical nodes, on 2026-09-24. **What to expect** from that run:
     `srun`). It calls `shmem_global_exit` straight after `shmem_init`, and can
     leave the job's names in `/dev/shm` behind it - the window design §6.2
     accepts, which `osoe-stat --gc` clears.
-  - Until locks and the collects are merged, the examples that call them
-    (`lock`, `test_lock`, `dtrand`; `collect32`, `collect64`, `fcollect`,
-    `fcollect32`, `fcollect64`, `shmem_fcollect`) do not build.
 - NPB IS verifies, classes S and A, on four PEs over two logical nodes and
   over four.
-- ISx needs `shmem_fcollect`, which the collects' merge brings, and builds
-  only with `CFLAGS="-O2 -std=gnu99"` - it asks for `-std=c99`, under which
-  glibc's `time.h` has no `struct timespec`.
+- ISx, weak scaling on 0,0,1,1 and strong on 0,1,2,3, sorts and verifies,
+  with `SHMEM_SYMMETRIC_SIZE=1200M` - without it `shmem_malloc` returns NULL
+  for the key buffer, which ISx does not check, and every PE dies of a
+  segmentation fault.
 
 A program that passed there and fails here is the finding.
 

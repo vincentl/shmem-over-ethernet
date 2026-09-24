@@ -9,7 +9,11 @@
  *     alltoalls32/64;
  *   - over SHMEM_TEAM_SHARED;
  *   - every block checked, on every PE, on return: the barrier the exchange
- *     ends with is what makes them all there.
+ *     ends with is what makes them all there, and its quiet is checked by
+ *     this PE's count of the transport's waits.
+ *
+ * With OSOE_TEST_ALLTOALL_STRIDE=0 a PE calls shmem_long_alltoalls with a dest
+ * stride of 0, which must end the job by name (shmem.alltoall.stride).
  */
 #include <stddef.h>
 #include <stdint.h>
@@ -23,6 +27,32 @@
 
 static int me, npes;
 static long *pSync;
+
+/*
+ * This PE's count of `name`, a counter of its threads', summed over its
+ * counter blocks in its node's control segment (§3.14).
+ */
+static uint64_t own_count(const char *name)
+{
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(segment, sizeof segment, 0);
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
+        fprintf(stderr, "%s\n", err);
+        return UINT64_MAX;
+    }
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(&s, name);
+    const char *local = osoe_test_launcher("LOCALID");
+    uint32_t mine = local ? (uint32_t)atoi(local) : 0;
+    uint64_t total = 0;
+    for (uint32_t i = 0; m && i < s.dir->blocks_per_pe; i++) {
+        uint64_t v;
+        if (osoe_segment_read(&s, m, mine * s.dir->blocks_per_pe + i, &v))
+            total += v;
+    }
+    osoe_segment_close(&s);
+    return m ? total : UINT64_MAX;
+}
 
 /* PE i's element e of its block for PE j. */
 static long value(int i, int j, size_t e)
@@ -60,7 +90,27 @@ static void alltoalls_contiguous(void)
     ALLTOALL_CHECK(int, int, 777);
     ALLTOALL_CHECK(long, long, 1);
     ALLTOALL_CHECK(long, long, 2000);
+    ALLTOALL_CHECK(long, long, 65536);          /* half a MiB a block */
     ALLTOALL_CHECK(double, double, 3);
+
+    /* The barrier alltoall ends with quiets first, which the transport counts
+     * among this PE's waits: half a MiB a block did not catch an alltoall
+     * without it (the verification of this slice), the send buffer being
+     * bounded - as for shmem_barrier (test-active-set.c). */
+    long *qsource = shmem_malloc((size_t)npes * sizeof *qsource);
+    long *qdest = shmem_malloc((size_t)npes * sizeof *qdest);
+    CHECK_FATAL(qsource && qdest);
+    for (int j = 0; j < npes; j++)
+        qsource[j] = value(me, j, 9);
+    shmem_barrier_all();
+    uint64_t waits = own_count("transport.wait.calls");
+    CHECK(shmem_long_alltoall(SHMEM_TEAM_WORLD, qdest, qsource, 1) == 0);
+    CHECK(own_count("transport.wait.calls") > waits);
+    for (int i = 0; i < npes; i++)
+        CHECK(qdest[i] == value(i, me, 9));
+    shmem_barrier_all();
+    shmem_free(qdest);
+    shmem_free(qsource);
 
     /* The byte form and the generic spelling. */
     char *source = shmem_malloc(3 * (size_t)npes), *dest = shmem_malloc(3 * (size_t)npes);
@@ -202,6 +252,15 @@ int main(void)
     for (int i = 0; i < SHMEM_ALLTOALLS_SYNC_SIZE; i++)
         pSync[i] = SHMEM_SYNC_VALUE;
     shmem_barrier_all();
+
+    const char *stride = getenv("OSOE_TEST_ALLTOALL_STRIDE");
+    if (stride && stride[0] == '0') {
+        long *x = shmem_malloc((size_t)npes * sizeof *x);
+        CHECK_FATAL(x);
+        shmem_long_alltoalls(SHMEM_TEAM_WORLD, x, x, 0, 1, 1);
+        printf("PE %d: a stride of 0 returned, which it must not\n", me);
+        return 1;
+    }
 
     alltoalls_contiguous();
     strided();

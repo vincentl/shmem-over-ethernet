@@ -40,7 +40,7 @@ int osoe_collect(const char *routine, shmem_team_t team, void *dest, const void 
                  size_t nelems, size_t width, bool fixed);
 
 /*
- * An exchange (spec §9.10.9, §9.10.10): member i's source block j - nelems
+ * An exchange (spec §9.10.5, §9.10.6): member i's source block j - nelems
  * elements of `width` bytes, every `source_stride`-th from the block's start -
  * to member j's dest block i, every `dest_stride`-th. alltoall's strides are 1.
  * 0 on success; nonzero for SHMEM_TEAM_INVALID.

@@ -34,6 +34,6 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
 void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index,
                                       void *buffer, size_t bytes, const char *routine);
 void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
-                                    const char *routine);
+                                    size_t block, const uint64_t *places, const char *routine);
 
 #endif /* OSOE_INTERNODE_GENERIC_H */

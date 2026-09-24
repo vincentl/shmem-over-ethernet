@@ -51,9 +51,11 @@ review.*
    counter; the lead's copies are the simpler of the two at no cost that
    shows.)*
 2. **The internode phase is a new operation at the seam,
-   `osoe_internode_collect(team, epoch, buffer, bytes, routine)`**: on entry
-   `buffer` holds this node's blocks at their places and zero elsewhere; on
-   return, every node's. A backend with an allgather does one; **the generic
+   `osoe_internode_collect(team, epoch, buffer, bytes, block, places,
+   routine)`**: on entry `buffer` holds this node's blocks at their places; on
+   return, every node's. *(The layout arguments came with the review, without
+   which no backend could do an allgather; so did the rule that a peer's
+   buffer is written only once the peer has entered.)* A backend with an allgather does one; **the generic
    implementation is the OR reduction over bytes** that the tree already
    runs - blocks at disjoint places, zero elsewhere, OR to their
    concatenation - so no new tree protocol, no new divergence check, and no

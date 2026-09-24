@@ -1205,6 +1205,18 @@ foreach(name collect alltoall)
     osoe_tier2_map_test(${name} 0,1,2,0,1,0)
   endif()
 endforeach()
+# The collect test's pSync is a static, as the corpus declares it (§4.3); and
+# over four nodes at a fan-out of 2, so a gather passes through a lead that is
+# neither the root nor a leaf.
+osoe_statics_program(shmem_test_collect)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(collect 0,1,2,3 OSOE_COLLECTIVE_FANOUT=2)
+endif()
+add_test(NAME shmem.alltoall.stride
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_ALLTOALL_STRIDE=0
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_alltoall>)
+set_tests_properties(shmem.alltoall.stride PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_long_alltoalls: strides 0 and 1; both must be at least 1")
 add_test(NAME shmem.collect.partial
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_PARTIAL=1
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_collect>)
@@ -1225,6 +1237,12 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
             $<TARGET_FILE:shmem_test_collective-divergence>)
   set_tests_properties(shmem.collective-divergence PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "PEs called different collectives")
+  add_test(NAME shmem.collective-divergence.gather
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_DIVERGE_KIND=gather
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,2 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+            $<TARGET_FILE:shmem_test_collective-divergence>)
+  set_tests_properties(shmem.collective-divergence.gather PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "PEs called different collectives")
 endif()
 
