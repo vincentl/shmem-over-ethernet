@@ -30,13 +30,14 @@ extern "C" {
 /*
  * The deprecated active-set collective constants (§6, Annex F.2.8).
  *
- * The constants are defined; the active-set routines that use them are not
- * (§7.4). That is deliberate rather than half-finished: a program that declares
- * `static long pSync[SHMEM_BARRIER_SYNC_SIZE]` and initializes it to
- * SHMEM_SYNC_VALUE must compile, and a program that then calls
- * shmem_barrier(...) must fail at the link rather than be given a routine whose
- * machinery - active sets, pSync ownership, the reuse rules - does not exist.
- * A wrong answer is worse than a missing symbol.
+ * The active-set routines that take them run over the whole job only (design
+ * §7.4): an active set of every PE - PE_start 0, logPE_stride 0, PE_size the
+ * job's size - works, and any other ends the job by name. That is the set every
+ * program in the corpus that still calls these routines passes, and forming a
+ * group for an arbitrary set of PEs is machinery osoe does not have: an answer
+ * over the wrong PEs would be worse than a named refusal. pSync and pWrk are
+ * neither read nor written, which leaves pSync as the spec requires it to be
+ * found afterwards.
  *
  * The sizes are this implementation's, as the spec says they are. They are
  * large enough for a conforming program's array and are otherwise unused.
@@ -554,10 +555,12 @@ void shmem_barrier_all(void);
 void shmem_sync_all(void);
 int shmem_team_sync(shmem_team_t team);
 
-/* spec §9.10.3's C11 spelling. The deprecated active-set form of the same name
- * takes four arguments and is not implemented (§7.4), so there is nothing to
- * dispatch between and this is a plain alias. */
-#define shmem_sync(team) shmem_team_sync(team)
+/* The deprecated active-set forms (Annex F), over the whole job only (above):
+ * shmem_barrier is shmem_barrier_all and shmem_sync is shmem_sync_all. The spec's
+ * C11 shmem_sync(team) shares the second's name; C11 counts the arguments to
+ * tell them apart (with the generics, below) and C++ overloads (at the end). */
+void shmem_barrier(int PE_start, int logPE_stride, int PE_size, long *pSync);
+void shmem_sync(int PE_start, int logPE_stride, int PE_size, long *pSync);
 
 /*
  * Reductions (§9.10.9), team-based, over Table 10's types by operator: the
@@ -618,6 +621,48 @@ OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
 OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
 OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
 
+/*
+ * The deprecated active-set reductions (Annex F; Table 11), over the whole job
+ * only (above): every operator on the four signed integer types, the ordered
+ * and arithmetic ones on the three floating types, and sum and product on the
+ * two complex types where the translation environment has them.
+ */
+#define OSOE_TO_ALL_INTEGER_TYPES(X)                                         \
+    X(short, short) X(int, int) X(long, long) X(long long, longlong)
+#define OSOE_TO_ALL_FLOATING_TYPES(X)                                        \
+    X(float, float) X(double, double) X(long double, longdouble)
+#if !defined(__cplusplus) && !defined(__STDC_NO_COMPLEX__)
+#define OSOE_TO_ALL_COMPLEX_TYPES(X)                                         \
+    X(double _Complex, complexd) X(float _Complex, complexf)
+#else
+#define OSOE_TO_ALL_COMPLEX_TYPES(X)
+#endif
+
+#define OSOE_TO_ALL_DECL_ONE_P(P, T, NAME, SUFFIX)                           \
+    void OSOE_FN(P, NAME, SUFFIX)(T *dest, const T *source, int nreduce,     \
+                                  int PE_start, int logPE_stride, int PE_size, \
+                                  T *pWrk, long *pSync);
+#define OSOE_TO_ALL_DECL_INTEGER_P(P, T, NAME)                               \
+    OSOE_TO_ALL_DECL_ONE_P(P, T, NAME, _and_to_all)                          \
+    OSOE_TO_ALL_DECL_ONE_P(P, T, NAME, _or_to_all)                           \
+    OSOE_TO_ALL_DECL_ONE_P(P, T, NAME, _xor_to_all)                          \
+    OSOE_TO_ALL_DECL_FLOATING_P(P, T, NAME)
+#define OSOE_TO_ALL_DECL_FLOATING_P(P, T, NAME)                              \
+    OSOE_TO_ALL_DECL_ONE_P(P, T, NAME, _max_to_all)                          \
+    OSOE_TO_ALL_DECL_ONE_P(P, T, NAME, _min_to_all)                          \
+    OSOE_TO_ALL_DECL_COMPLEX_P(P, T, NAME)
+#define OSOE_TO_ALL_DECL_COMPLEX_P(P, T, NAME)                               \
+    OSOE_TO_ALL_DECL_ONE_P(P, T, NAME, _sum_to_all)                          \
+    OSOE_TO_ALL_DECL_ONE_P(P, T, NAME, _prod_to_all)
+
+#define OSOE_TO_ALL_DECL_INTEGER(T, NAME) OSOE_TO_ALL_DECL_INTEGER_P(shmem_, T, NAME)
+#define OSOE_TO_ALL_DECL_FLOATING(T, NAME) OSOE_TO_ALL_DECL_FLOATING_P(shmem_, T, NAME)
+#define OSOE_TO_ALL_DECL_COMPLEX(T, NAME) OSOE_TO_ALL_DECL_COMPLEX_P(shmem_, T, NAME)
+
+OSOE_TO_ALL_INTEGER_TYPES(OSOE_TO_ALL_DECL_INTEGER)
+OSOE_TO_ALL_FLOATING_TYPES(OSOE_TO_ALL_DECL_FLOATING)
+OSOE_TO_ALL_COMPLEX_TYPES(OSOE_TO_ALL_DECL_COMPLEX)
+
 /* Broadcast (§9.10.7), team-based, over every standard RMA type of Table 5, and
  * its byte form. The dest is updated on every PE of the team, PE_root's
  * included. Each returns 0 on success. */
@@ -628,6 +673,14 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
 OSOE_RMA_STANDARD_TYPES(OSOE_BROADCAST_DECL)
 int shmem_broadcastmem(shmem_team_t team, void *dest, const void *source, size_t nelems,
                        int PE_root);
+
+/* The deprecated active-set broadcasts (Annex F), over the whole job only
+ * (above), of four- and eight-byte elements. The root's dest is left as it was:
+ * "the dest object is updated on all PEs other than the root PE". */
+void shmem_broadcast32(void *dest, const void *source, size_t nelems, int PE_root,
+                       int PE_start, int logPE_stride, int PE_size, long *pSync);
+void shmem_broadcast64(void *dest, const void *source, size_t nelems, int PE_root,
+                       int PE_start, int logPE_stride, int PE_size, long *pSync);
 
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);
@@ -1022,6 +1075,20 @@ void shmem_udcflush_line(void *dest);
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, broadcast))                 \
         ((team), (dest), (source), (nelems), (PE_root)))
 
+/* spec §9.10.3's shmem_sync(team), beside the deprecated active-set shmem_sync
+ * of four arguments (declared above): the count picks, as it does between the
+ * forms with and without a context, and the deprecated one is called by its
+ * parenthesized name, which no function-like macro expands. Two or three
+ * arguments name an identifier nothing declares, so the mistake does not
+ * compile - where an empty choice would have compiled to a sync that never
+ * happened. */
+#define OSOE_SYNC_1(team) shmem_team_sync(team)
+#define OSOE_SYNC_4(PE_start, logPE_stride, PE_size, pSync)                      \
+    (shmem_sync)((PE_start), (logPE_stride), (PE_size), (pSync))
+#define shmem_sync(...)                                                          \
+    OSOE_PICK4(__VA_ARGS__, OSOE_SYNC_4, osoe_shmem_sync_takes_one_or_four_arguments,  \
+               osoe_shmem_sync_takes_one_or_four_arguments, OSOE_SYNC_1, )(__VA_ARGS__)
+
 
 /* ---- Point-to-point synchronization (spec §9.11) --------------------- */
 
@@ -1124,8 +1191,19 @@ void shmem_pcontrol(int level, ...);
 #undef OSOE_REDUCE_DECL_ORDERED
 #undef OSOE_REDUCE_DECL_ARITHMETIC
 #undef OSOE_BROADCAST_DECL
+#undef OSOE_TO_ALL_DECL_INTEGER
+#undef OSOE_TO_ALL_DECL_FLOATING
+#undef OSOE_TO_ALL_DECL_COMPLEX
 
 #ifdef __cplusplus
+}
+
+/* spec §9.10.3's shmem_sync(team), which C11 dispatches by argument count
+ * (above): C++ overloads it beside the deprecated active-set shmem_sync, the one
+ * with C linkage. */
+static inline int shmem_sync(shmem_team_t team)
+{
+    return shmem_team_sync(team);
 }
 #endif
 

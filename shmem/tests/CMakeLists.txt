@@ -1077,6 +1077,45 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   endforeach()
 endif()
 
+# The public headers compiled under each standard they promise, every warning
+# an error (headers.c, headers.cpp): no other translation unit is C99 or C++,
+# so without these a break in either mode would ship. C++ where the machine has
+# a compiler for it.
+foreach(standard c99 c11 c17)
+  add_test(NAME shmem.headers.${standard}
+    COMMAND ${CMAKE_C_COMPILER} -std=${standard} -Wall -Wextra -Wpedantic -Werror
+            -fsyntax-only -I${PROJECT_SOURCE_DIR}/shmem/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/headers.c)
+  set_tests_properties(shmem.headers.${standard} PROPERTIES LABELS "tier1" TIMEOUT 30)
+endforeach()
+find_program(OSOE_CXX_COMPILER NAMES c++ g++ clang++)
+if(OSOE_CXX_COMPILER)
+  foreach(standard c++11 c++17)
+    add_test(NAME shmem.headers.${standard}
+      COMMAND ${OSOE_CXX_COMPILER} -std=${standard} -Wall -Wextra -Wpedantic -Werror
+              -fsyntax-only -I${PROJECT_SOURCE_DIR}/shmem/include
+              ${CMAKE_CURRENT_SOURCE_DIR}/headers.cpp)
+    set_tests_properties(shmem.headers.${standard} PROPERTIES LABELS "tier1" TIMEOUT 30)
+  endforeach()
+else()
+  message(STATUS "No C++ compiler: the headers' C++ test is not registered")
+endif()
+
+# The deprecated active-set collectives, over the whole job (design §7.4;
+# test-active-set.c), on one node and across nodes; and an active set one PE
+# short of the job, which must end it by name.
+osoe_tier2_test(active-set)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(active-set 0,0,1,1)
+  osoe_tier2_map_test(active-set 0,1,2,0,1,0)
+endif()
+add_test(NAME shmem.active-set.partial
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_PARTIAL=1
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_active-set>)
+set_tests_properties(shmem.active-set.partial PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+  "shmem_long_sum_to_all: the active set \\(PE_start 0, logPE_stride 0, PE_size 1\\) is not the whole job of 2 PEs")
+
 # PEs that call different collectives end the job by name, from the piece
 # headers of the generic internode phase (internode-generic.c): node 1's PE
 # broadcasts where the others reduce, and node 0's lead finds node 1's slot
@@ -1365,7 +1404,11 @@ foreach(case_expect
     "putmem|shmem_putmem: called before shmem_init"
     "team_my_pe|shmem_team_my_pe: called before shmem_init"
     "quiet|quiet: called before shmem_init"   # shmem_quiet wraps shmem_ctx_quiet (§7.3)
-    "ptr|shmem_ptr: called before shmem_init")
+    "ptr|shmem_ptr: called before shmem_init"
+    # The active-set routines check initialization before the active set,
+    # whose "whole job" is of 0 PEs before init.
+    "barrier|shmem_barrier: called before shmem_init"
+    "sum_to_all|shmem_long_sum_to_all: called before shmem_init")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 case)
   list(GET parts 1 expect)
@@ -1456,6 +1499,7 @@ if(OSOE_TIER3)
     # The leads' tree of the reductions and broadcast, over the shaped link.
     osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
     osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)
+    osoe_tier3_test(active-set.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_active-set)
     if(shape STREQUAL "pi")
       osoe_tier3_test(reduce.0-1-2-3-4.k2 pi 0,1,2,3,4 shmem_test_reduce
                       ENV OSOE_COLLECTIVE_FANOUT=2)

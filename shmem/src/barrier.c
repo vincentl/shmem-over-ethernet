@@ -5,6 +5,7 @@
 
 #include "barrier.h"
 #include "blocked.h"
+#include "collectives.h"
 #include "metrics.h"
 #include "base/epoch.h"
 #include "export.h"
@@ -190,7 +191,29 @@ OSOE_API int pshmem_team_sync(shmem_team_t team)
     return 0;
 }
 
+/*
+ * The deprecated active-set forms (Annex F), over the whole job only
+ * (collectives.h): shmem_barrier is shmem_barrier_all and shmem_sync is
+ * shmem_sync_all, pSync neither read nor written - which leaves it as the spec
+ * requires it to be found afterwards, and makes its reuse rules hold trivially.
+ */
+OSOE_API void pshmem_barrier(int PE_start, int logPE_stride, int PE_size, long *pSync)
+{
+    (void)pSync;
+    osoe_active_set_whole_job("shmem_barrier", PE_start, logPE_stride, PE_size);
+    osoe_barrier_all("shmem_barrier");
+}
+
+OSOE_API void pshmem_sync(int PE_start, int logPE_stride, int PE_size, long *pSync)
+{
+    (void)pSync;
+    osoe_active_set_whole_job("shmem_sync", PE_start, logPE_stride, PE_size);
+    team_sync(osoe_team_of("shmem_sync", SHMEM_TEAM_WORLD), "shmem_sync");
+}
+
 /* The weak `shmem_` aliases (export.h). */
 OSOE_ALIAS(barrier_all)
 OSOE_ALIAS(sync_all)
 OSOE_ALIAS(team_sync)
+OSOE_ALIAS(barrier)
+OSOE_ALIAS(sync)
