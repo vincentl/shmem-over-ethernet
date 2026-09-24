@@ -271,6 +271,119 @@ two logical nodes, on 2026-09-24. **What to expect** from that run:
 
 A program that passed there and fails here is the finding.
 
+### The OSU micro-benchmarks
+
+OSU's OpenSHMEM benchmarks (`corpus/osu-omb`, 7.5.2) are the numbers other
+implementations publish. Their own `configure` finds OpenSHMEM by linking with
+`CC`, and finds no MPI, so it builds the OpenSHMEM half alone. A copied tree
+leaves `configure.ac` newer than `configure`, and `make` would then rerun
+autoconf, which the cluster need not have; the stamps go back in order first:
+
+```sh
+cp -R corpus/osu-omb/osu-micro-benchmarks-7.5.2 $W/osu && cd $W/osu
+./configure CC=$OSHCC CXX=g++
+find . \( -name configure.ac -o -name Makefile.am -o -name aclocal.m4 \) \
+     -exec touch -t 202001010000 {} +
+find . -name configure -exec touch {} +
+find . -name Makefile.in -exec touch {} +
+find . -name Makefile -exec touch {} +
+make -C c/openshmem -j4 && cd c/openshmem
+for p in put get put_bw get_bw put_nb get_nb put_nb_bw get_nb_bw put_overlap \
+         get_overlap atomics put_mr put_mr_nb get_mr_nb; do
+  srun -K1 -N2 --ntasks-per-node=1 ./osu_oshm_$p heap > ~/osu-$p.txt
+done
+for p in barrier broadcast collect fcollect reduce; do
+  srun -K1 -N4 --ntasks-per-node=1 ./osu_oshm_$p -m :1048576 > ~/osu-$p-4x1.txt
+  srun -K1 -N4 --ntasks-per-node=4 ./osu_oshm_$p -m :1048576 > ~/osu-$p-4x4.txt
+done
+```
+
+The fourteen point-to-point programs measure a pair, one PE per node here.
+Ten of them exit before `shmem_finalize` when given other than two PEs, which
+osoe names and ends the job for, as it does `nullput`'s; the other four run PEs
+0 and 1 alone whatever the job. The development VM (2026-09-24) built all
+nineteen, and each printed its whole table on two PEs over two logical nodes,
+and the five collectives on four.
+
+### osb's ssca1
+
+Smith-Waterman over sequences spread across the PEs (`corpus/osb/ssca1`), whose
+verification run inserts six known motifs and must find them. **Its data
+generator races**: rank 0 puts the motifs into the other PEs' shares while
+those PEs are still filling them with random codons, with no barrier between,
+so a motif survives or not by timing - one, two or three alignments from the
+same seed, on one node or four, in the VM. One barrier after the fill makes it
+deterministic:
+
+```sh
+cp -R corpus/osb/ssca1 $W/ssca1 && cd $W/ssca1
+sed -i '/sequence->sequence\[idx\] = rand()%64;/{n;s/^  }$/  }\n  BARRIER_ALL();/}' gen_scal_data.c
+make COMPILER=oshcc CC=$OSHCC
+SCALE=14 srun -K1 -N2 --ntasks-per-node=2 ./ssca1 | tee ~/ssca1-2x2.txt
+SCALE=14 srun -K1 -N4 --ntasks-per-node=1 ./ssca1 | tee ~/ssca1-4x1.txt
+```
+
+Both must print "Found 3 acceptable alignments with scores from 55 to 53" and
+three "succeeded" lines: with the barrier the VM found exactly that in each of
+25 runs across three maps, including alignments that cross PEs' boundaries,
+and without it the counts varied from run to run on every map.
+
+The rest of osb is not worth the cluster's time. `nas/C`'s IS is NPB's IS
+above. `GUPs` builds (with `-D_GNU_SOURCE`) but has no knob for its table size
+and takes minutes a run at loopback latency. `shoms` needs its hardcoded x86
+timer changed and then calls `shmem_finalize` in the middle of its sweep, which
+osoe ends the job for once 126 of its 128 tests have run. `Graph500`'s own
+SHMEM shim declares `shmem_int_alltoall` and `shmem_long_alltoall`, names
+OpenSHMEM 1.5 has since given its team collectives, so it does not compile
+against any current implementation. And the `_threaded` variants need
+`SHMEM_THREAD_MULTIPLE` (design §4.11): `ssca1_threaded` asks for it, does not
+check what it got, and calls SHMEM from several OpenMP threads at once, which
+osoe, providing `SERIALIZED`, catches as two gets' replies crossing and ends the
+job for.
+
+### The SOS test suite
+
+Sandia OpenSHMEM's own tests (`corpus/tests-sos/test`) are a conformance pass:
+about 150 small programs, each exiting nonzero on a wrong answer. Their build is
+automake's, so each is built alone with `oshcc` - the C++ ones with `g++` as its
+compiler - and run on 4 × 2:
+
+```sh
+cp -R corpus/tests-sos/test $W/sos && cd $W/sos
+for src in unit/*.c unit/*.cpp spec-example/*.c apps/*.c; do
+  p=${src%.*}; cc=; extra=
+  case $p in
+    unit/mt_lock|spec-example/hybrid_mpi_*) continue ;;   # a helper; MPI programs
+    unit/mt_lock_test) extra=unit/mt_lock.c ;;
+    spec-example/shmem_ctx) extra=-fopenmp ;;
+  esac
+  case $src in *.cpp) cc=OSOE_CC=g++ ;; esac
+  env $cc $OSHCC -O1 -Iinclude $src $extra -o $p -lm -pthread 2> $p.build \
+    || { echo "$p: build failed"; continue; }
+  timeout 120 srun -K1 -N4 --ntasks-per-node=2 ./$p > $p.out 2>&1 < /dev/null
+  echo "$p: exit $?"
+done | tee ~/sos.txt
+```
+
+The development VM ran them on two PEs over two logical nodes and on four over
+two (2026-09-24, `build/scratch/sos/sweep.sh`): 147 built and exited 0 on both.
+**What to expect** of the rest:
+- `c11_shmem_test_all_any_some` and `c11_shmem_wait_until_all_any_some` do not
+  build: they pass `short *` to the `_all`/`_any`/`_some` generics, which
+  OpenSHMEM 1.5 defined over Table 6's AMO types alone - SOS's extension.
+- `mt_a2a`, `mt_contention`, `mt_lock_test`, `mt_membar`, `thread_wait`,
+  `threading`, `web` and `spec-example/shmem_ctx` exit 1: they need
+  `SHMEM_THREAD_MULTIPLE`, and osoe provides `SERIALIZED` (design §4.11).
+- `shmem_team_reuse_teams`, `unit/shmem_team_translate` and the examples
+  `shmem_team_split_strided`, `shmem_team_context` and, on four PEs or more,
+  `shmem_team_sync` exit 1: they create teams, which osoe does not yet (§5.7;
+  `docs/prompts/phase1-step7-slice1-prompt.md` proposes it).
+- `shmemalign` exits 1 with osoe naming the call: it asks `shmem_align` for an
+  alignment of 2, which the spec leaves undefined below `sizeof(void *)`.
+
+On eight PEs over four nodes the programs meet shapes the VM did not run them
+on; one that fails here and passed there is the finding.
+
 ## 9. What to bring back
 
 - the outputs of steps 1, 5, 6, 7 and 8;
