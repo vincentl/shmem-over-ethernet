@@ -1987,7 +1987,7 @@ outcome C11 forbids, and with what.
 | Shape | C11's requirement | Order | Where |
 |---|---|---|---|
 | Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed`; the agent's `running` (phase 1 step 4). *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
-| A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready`; the node's `lead_agent_running` (phase 1 step 4) |
+| A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready`; the node's `lead_agent_running` (phase 1 step 4), whose store also follows the lead's removal of the node's heap and control-segment names (§6.2) |
 | Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count. A thread inside `exit` against its agent (phase 1 step 4, third review): its store of `inside_exit` and load of the claim `ending`, against the claim's CAS and the load of `inside_exit` |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere; among them the abort word, installed whole by one CAS, and `ending`, the claim on ending a process (phase 1 step 4) |
 | A queue in one word, then a wake word: a waiter's ticket and a giver's serve are RMWs on the same word; the giver then bumps a futex word; the waiter loads that word, then checks its ticket (slice 2 of step 3) | Not store buffering: two RMWs on one word are ordered by its modification order, so a give always sees every ticket taken before it. The waiter's check needs only to follow the giver's serve when it has seen the giver's bump — a release RMW read by an `acquire` load; a bump it has not seen is the futex compare's to catch | RMWs **`seq_cst`** (the row above); the waiter's loads of the wake word and of the state **`acquire`** | `osoe_credit_take`, `_give`, `_served` (`credit_wait_model.py`) |
@@ -4357,11 +4357,30 @@ that needs it has it open, so that after init nothing this job created in
   every local PE opened the segment before it could map a sibling's heap.
 - **The connection area**: by whichever local PE's open brings its `opened`
   count to `L`.
-- **The job segment**: by whichever PE's open brings its `opened` count to the
+- **The job segment**: likewise, at `L`: it is per node since phase 1 step 3
+  ("The rendezvous as built", below). Step 2's job-wide segment counted to the
   world size.
-- **A wire**: by the second of its two leads to open it. `opened` is the
-  open-time twin of `leaving`; a counter is all the handshake needs, since
-  exactly one of two seq_cst increments sees 2.
+- **A wire** had a name in step 2, removed by the second of its two leads to
+  open it; since step 3 a wire is a socket, and has none.
+
+**For the heaps and the control segment, "after init" holds per PE**: no PE
+returns from `shmem_init` while they have names. The lead removes them before it
+publishes `lead_agent_running`, and every other local PE waits for that word
+before it returns (§3.15). The order is §3.16's for a futex word that is its own
+predicate, with the removal where the header would be: each `shm_unlink` has
+returned before the lead's `release` store, a PE's `acquire` load that reads the
+store comes after it, and a name an `unlink` has removed is gone for every
+lookup begun after the call returned. So the removal stays before that store;
+after it, a PE could leave init with the names still there. For the connection
+area and the job segment, "after init" means after *every* local PE's init:
+their last opener removes the name, and a sibling may return from init first. A
+barrier after init is past both points, and that is where the tier-2 tests look
+(`invariants.h`, `shmem.kill-after-init.*`); `shmem.fork.*` looks as soon as its
+own init returns, at the heaps and the control segment. (Until the review of
+phase 1 step 4's first slice added the §3.15 wait, `9d9251e`, a non-lead could
+return before its lead had acted on `mapped` reaching `L`, and the fork test
+failed about one run in four beside 16 busy loops in tsan. With only that wait
+removed from today's tree it fails the same way, 6 of 30; 2026-09-23.)
 
 The last opener rather than the creator removes each name, so nothing waits for
 anything, and a re-init after finalize is a fresh session with fresh names.
@@ -4372,8 +4391,7 @@ that finished and immediately re-initialized could recreate the name and a slowe
 sibling would remove the new segment. The window that remains is init itself: a
 job killed there can leave names behind, and the next job with the same id
 reclaims them (below). Where hugetlbfs is mounted and has pages, heaps use it
-under the same names; otherwise they fall back to regular shared memory. Where hugetlbfs is mounted and has pages, heaps use it under the same
-names; otherwise they fall back to regular shared memory.
+under the same names; otherwise they fall back to regular shared memory.
 
 **Global.** The step's rendezvous server is the lead of node 0: the task with
 `SLURM_NODEID == 0` and `SLURM_LOCALID == 0`, on the first host of

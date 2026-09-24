@@ -609,7 +609,13 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
      * heap. From here nothing this node created in /dev/shm has a name: no
      * death of any process can strand it, and osoe-stat finds the segment
      * through a live PE's descriptor (§3.14). OSOE_KEEP_CONTROL_SEGMENT keeps
-     * the control segment's name until finalize instead. */
+     * the control segment's name until finalize instead.
+     *
+     * Only the lead waits for `mapped`, yet no local PE returns from init with
+     * these names still there: the lead publishes lead_agent_running after
+     * removing them, and every other PE waits for that word before it returns
+     * (init.c, §6.2). So the removal belongs here, before that store; moved
+     * after it, a PE could leave init while the names remain. */
     if (lead) {
         if (wait_count(n, &n->hdr->mapped, b->local_count, b->no_progress_ns) != 0) {
             char missing[256], msg[400];
