@@ -91,11 +91,14 @@
  * an engine's free resources. A node that offloads while another falls back
  * waits for it in a different place, and both wait forever.
  *
- * **The buffer is the lead's dest**: symmetric, in the heap, at the same offset
- * on every node that receives into it, so a backend may address a peer's
- * buffer by its own offset - an RDMA backend writing the result straight into
- * each child's buffer, where the generic implementation stages it through its
- * slots. It stays the lead's own memory: nothing but this call writes it
+ * **The buffer is the lead's dest**: symmetric - in the heap, or since step 6
+ * among the program's statics (§4.3) - at the same place in its region on
+ * every node that receives into it, so a backend may address a peer's buffer
+ * by the place of its own: the region the address falls in - the lead's heap
+ * mapping, or the program's two statics ranges, which is where the lead's own
+ * statics are addressed (node.h) - and the offset into it. An RDMA backend
+ * would write the result straight into each child's buffer, where the generic
+ * implementation stages it through its slots. It stays the lead's own memory: nothing but this call writes it
  * before the lead's release (§5.5, invariant 16), and nothing reads it by
  * reference afterwards (above).
  *

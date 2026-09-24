@@ -11,9 +11,9 @@
  * One word, so it is published and read in one atomic operation and no writer
  * can see a stale half of a range. The layout is §4.11 item 3's `rng`:
  *
- *     bits 63..62  region, so a waiter on OSOE_REGION_INTERNAL (§5.8) or, with
- *                  §4.3 phase 1.5, on statics is not confused with a heap
- *                  waiter at the same offset - both regions start at 0
+ *     bits 63..62  region, so a waiter on OSOE_REGION_INTERNAL (§5.8) or on
+ *                  OSOE_REGION_STATICS (§4.3) is not confused with a heap
+ *                  waiter at the same offset - every region starts at 0
  *     bits 61..22  the first grain of the range
  *     bits 21..0   the range's length in grains; 0 is no watch, and the maximum
  *                  saturates to "to the end of the region"

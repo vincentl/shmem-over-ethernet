@@ -56,8 +56,9 @@ static void signal_update(const char *routine, shmem_ctx_t ctx, uint64_t *sig_ad
 {
     osoe_check_pe(routine, pe);
     osoe_count(OSOE_C_SHMEM_SIGNAL_UPDATE_CALLS, 1);
-    uint64_t offset = osoe_symmetric_word_offset(routine, sig_addr, OSOE_SIGNAL_WIDTH);
-    osoe_transport_rmw(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, op,
+    struct osoe_symmetric_location at =
+        osoe_symmetric_word_locate(routine, sig_addr, OSOE_SIGNAL_WIDTH);
+    osoe_transport_rmw(osoe_ctx_of(routine, ctx), pe, at.region, at.offset, op,
                 OSOE_SIGNAL_WIDTH, signal, 0, flags);
 }
 
@@ -79,7 +80,7 @@ static void put_signal(const char *routine, shmem_ctx_t ctx, void *dest, const v
     osoe_check_pe(routine, pe);
     if (nelems > 0) {
         size_t len = osoe_rma_bytes(routine, nelems, width);
-        uint64_t offset = osoe_symmetric_offset(routine, dest, len);
+        struct osoe_symmetric_location at = osoe_symmetric_locate(routine, dest, len);
         /*
          * **OSOE_TRANSPORT_MORE's first caller** (§4.10), and put_signal is the
          * one routine in this step that can be it honestly: the signal below
@@ -93,7 +94,7 @@ static void put_signal(const char *routine, shmem_ctx_t ctx, void *dest, const v
          * copy has been taken either way, and what is deferred is the
          * submission, never the copy.
          */
-        osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source,
+        osoe_transport_put(osoe_ctx_of(routine, ctx), pe, at.region, at.offset, source,
                     len, OSOE_TRANSPORT_MORE);
     }
     /* The fence is on the same context as the put, which is what makes it
@@ -210,8 +211,9 @@ OSOE_API void pshmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe)
 OSOE_API uint64_t pshmem_signal_fetch(const uint64_t *sig_addr)
 {
     osoe_count(OSOE_C_SHMEM_SIGNAL_FETCH_CALLS, 1);
-    uint64_t offset = osoe_symmetric_word_offset("shmem_signal_fetch", sig_addr, OSOE_SIGNAL_WIDTH);
-    return osoe_transport_load(OSOE_REGION_HEAP, offset, OSOE_SIGNAL_WIDTH);
+    struct osoe_symmetric_location at =
+        osoe_symmetric_word_locate("shmem_signal_fetch", sig_addr, OSOE_SIGNAL_WIDTH);
+    return osoe_transport_load(at.region, at.offset, OSOE_SIGNAL_WIDTH);
 }
 
 /*

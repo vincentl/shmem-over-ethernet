@@ -1,0 +1,68 @@
+#!/bin/sh
+# oshcc - compile and link an OpenSHMEM program against osoe.
+#
+# The C compiler osoe was built with - or $OSOE_CC, which may be several words,
+# "ccache gcc" - given osoe's headers, and, when it links, osoe's library and a
+# run path to it. A compile-only call (-c, -S, -E, -M, -MM, -fsyntax-only) gets
+# the header path and -fno-pie, so object files build as they would with any
+# other oshcc; so does a query of the compiler (--version, -dumpversion,
+# -print-*), and `oshcc -v` alone is the compiler's. `oshcc -show ...` prints
+# the command it would run instead of running it; --showme, --showme:compile
+# and --showme:link are Open MPI's spellings, which some build systems ask.
+#
+# Symmetric statics (design §4.3): every compile gets -fno-pie and every link
+# of a program -no-pie and osoe's linker script, which gathers the program's
+# global and static variables where shmem_init can map them. -no-pie puts them
+# at the same address in every PE, which a program sending one's address to
+# another PE needs. A caller's own -fpie and -pie, together - an object
+# compiled -fno-pie cannot go into a position-independent program - win over
+# the wrapper's, and the statics are symmetric by offset still. A shared
+# library (-shared) or a relocatable object (-r) is linked as asked: its data is
+# not yet a program's. -static is refused: the C library's own state would be
+# gathered with the program's, and a fork() would write the parent's copy.
+compiler=${OSOE_CC:-@OSOE_WRAPPER_COMPILER@}
+include='@OSOE_WRAPPER_INCLUDE@'
+library='@OSOE_WRAPPER_LIBRARY@'
+libraries='@OSOE_WRAPPER_LIBRARIES@'
+link_flags='@OSOE_WRAPPER_LINK_FLAGS@'
+statics='@OSOE_WRAPPER_STATICS_SCRIPT@'
+
+show=no
+case $1 in
+    -show|--showme) show=yes; shift ;;
+    --showme:compile) echo "-I$include -fno-pie"; exit 0 ;;
+    --showme:link)
+        echo "-fno-pie -no-pie -Xlinker -T -Xlinker $statics $link_flags -L$library" \
+             "$libraries -Xlinker -rpath -Xlinker $library"
+        exit 0 ;;
+esac
+if [ $# -eq 1 ] && [ "$1" = -v ]; then
+    exec $compiler -v
+fi
+link=yes
+program=yes
+for argument in "$@"; do
+    case $argument in
+        -c|-S|-E|-M|-MM|-fsyntax-only|--version|-dumpversion|-dumpmachine|-dumpspecs|-print-*)
+            link=no ;;
+        -shared|-r) program=no ;;
+        -static)
+            echo "oshcc: -static would gather the C library's own state with the program's" \
+                 "symmetric statics (osoe's design notes, §4.3); link dynamically" >&2
+            exit 1 ;;
+    esac
+done
+if [ $link = no ]; then
+    set -- -I"$include" -fno-pie "$@"
+elif [ $program = yes ]; then
+    set -- -I"$include" -fno-pie -no-pie -Xlinker -T -Xlinker "$statics" $link_flags "$@" \
+        -L"$library" $libraries -Xlinker -rpath -Xlinker "$library"
+else
+    set -- -I"$include" $link_flags "$@" -L"$library" $libraries -Xlinker -rpath \
+        -Xlinker "$library"
+fi
+if [ $show = yes ]; then
+    echo $compiler "$@"
+    exit 0
+fi
+exec $compiler "$@"

@@ -441,6 +441,7 @@ static void check_details(void)
         { OSOE_SEGMENT_DETAIL_CREDIT, "reply credit toward node 3" },
         { OSOE_SEGMENT_DETAIL_REPLY, "reply from node 3" },
         { OSOE_SEGMENT_DETAIL_GETS_IN_FLIGHT, "nonblocking gets, 3 bytes in flight" },
+        { OSOE_SEGMENT_DETAIL_STATICS_OFFSET, "statics offset 0x3" },
         { 99, "+0x3" },
     };
     for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {

@@ -56,19 +56,20 @@ _Static_assert(_Generic((size_t)0, unsigned long: 1, default: 0),
 _Static_assert(_Generic((ptrdiff_t)0, long: 1, default: 0), "ptrdiff_t must be long");
 #endif
 
-/* An AMO's target must be a word in the heap, aligned for its width. */
-static uint64_t amo_offset(const char *routine, const void *addr, unsigned width, int pe)
+/* An AMO's target must be a symmetric word, aligned for its width. */
+static struct osoe_symmetric_location amo_location(const char *routine, const void *addr,
+                                                   unsigned width, int pe)
 {
     osoe_check_pe(routine, pe);
-    return osoe_symmetric_word_offset(routine, addr, width);
+    return osoe_symmetric_word_locate(routine, addr, width);
 }
 
 static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
                         unsigned width, enum osoe_rmw_op op, uint64_t value,
                         uint64_t compare, unsigned flags, int pe)
 {
-    uint64_t offset = amo_offset(routine, dest, width, pe);
-    return osoe_transport_rmw(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, op, width,
+    struct osoe_symmetric_location at = amo_location(routine, dest, width, pe);
+    return osoe_transport_rmw(osoe_ctx_of(routine, ctx), pe, at.region, at.offset, op, width,
                        value, compare, flags);
 }
 

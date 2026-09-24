@@ -82,24 +82,31 @@ static bool satisfied(int cmp, uint64_t have, uint64_t want, bool sgn, const cha
 
 /* ---- the scalar forms -------------------------------------------------- */
 
-/* The scalar wait is region-wait.h's on the heap. The late-wake accounting,
- * the blocked record and the sweep are all there. */
+/* What a blocked record says a wait's offset is an offset into (§3.14). */
+static enum osoe_blocked_detail offset_detail(enum osoe_region region)
+{
+    return region == OSOE_REGION_STATICS ? OSOE_BLOCKED_DETAIL_STATICS_OFFSET
+                                         : OSOE_BLOCKED_DETAIL_OFFSET;
+}
+
+/* The scalar wait is region-wait.h's on the variable's region. The late-wake
+ * accounting, the blocked record and the sweep are all there. */
 uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, bool sgn,
                          int cmp, uint64_t want)
 {
     osoe_count(OSOE_C_SHMEM_WAIT_UNTIL_CALLS, 1);
-    uint64_t offset = osoe_symmetric_word_offset(routine, ivar, width);
-    return osoe_region_wait(routine, OSOE_REGION_HEAP, offset, width, sgn,
-                            comparison_of(cmp, routine), want, OSOE_BLOCKED_DETAIL_OFFSET,
-                            offset);
+    struct osoe_symmetric_location at = osoe_symmetric_word_locate(routine, ivar, width);
+    return osoe_region_wait(routine, at.region, at.offset, width, sgn,
+                            comparison_of(cmp, routine), want, offset_detail(at.region),
+                            at.offset);
 }
 
 int osoe_test(const char *routine, const void *ivar, unsigned width, bool sgn, int cmp,
               uint64_t want)
 {
-    uint64_t offset = osoe_symmetric_word_offset(routine, ivar, width);
+    struct osoe_symmetric_location at = osoe_symmetric_word_locate(routine, ivar, width);
     osoe_count(OSOE_C_SHMEM_TEST_CALLS, 1);
-    uint64_t have = extend(osoe_transport_load(OSOE_REGION_HEAP, offset, width), width, sgn);
+    uint64_t have = extend(osoe_transport_load(at.region, at.offset, width), width, sgn);
     return satisfied(cmp, have, extend(want, width, sgn), sgn, routine);
 }
 
@@ -146,17 +153,18 @@ static uint64_t want_of(const struct osoe_wait_many *w, size_t i)
                      : extend(w->value, w->width, w->sgn);
 }
 
-/* The heap offset of ivars[0], with the array's bounds and alignment checked
- * once for the whole call. */
-static uint64_t ivars_offset(const struct osoe_wait_many *w)
+/* Where ivars[0] is, with the array's bounds and alignment checked once for
+ * the whole call. */
+static struct osoe_symmetric_location ivars_location(const struct osoe_wait_many *w)
 {
     if (w->nelems > UINT64_MAX / w->width)
         osoe_fatal("%s: %zu elements of %u bytes overflows", w->routine, w->nelems,
                    w->width);
-    uint64_t offset = osoe_symmetric_offset(w->routine, w->ivars, (uint64_t)w->nelems * w->width);
-    if (offset % w->width)
+    struct osoe_symmetric_location at =
+        osoe_symmetric_locate(w->routine, w->ivars, (uint64_t)w->nelems * w->width);
+    if (at.offset % w->width)
         osoe_fatal("%s: %p is not %u-byte aligned", w->routine, w->ivars, w->width);
-    return offset;
+    return at;
 }
 
 /* The first and last unmasked element, or false when the set is empty. */
@@ -175,9 +183,11 @@ static bool unmasked_span(const struct osoe_wait_many *w, size_t *first, size_t 
     return any;
 }
 
-static bool element_satisfied(const struct osoe_wait_many *w, uint64_t base, size_t i)
+static bool element_satisfied(const struct osoe_wait_many *w,
+                              struct osoe_symmetric_location base, size_t i)
 {
-    uint64_t have = osoe_transport_load(OSOE_REGION_HEAP, base + (uint64_t)i * w->width, w->width);
+    uint64_t have = osoe_transport_load(base.region, base.offset + (uint64_t)i * w->width,
+                                        w->width);
     return satisfied(w->cmp, extend(have, w->width, w->sgn), want_of(w, i), w->sgn,
                      w->routine);
 }
@@ -212,8 +222,8 @@ static size_t any_scan_start(size_t nelems)
  * and ANY are free to short-circuit; it still visits the set in ascending
  * order; only ANY's start rotates (`start` is 0 for the other two modes).
  */
-static size_t scan(const struct osoe_wait_many *w, uint64_t base, enum many_mode mode,
-                   size_t *indices, size_t start)
+static size_t scan(const struct osoe_wait_many *w, struct osoe_symmetric_location base,
+                   enum many_mode mode, size_t *indices, size_t start)
 {
     size_t found = 0;
     for (size_t k = 0; k < w->nelems; k++) {
@@ -273,11 +283,11 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
      * calls, not across one call's internal wake-ups. */
     size_t start = mode == MANY_ANY ? any_scan_start(w->nelems) : 0;
 
-    uint64_t base = ivars_offset(w);
+    struct osoe_symmetric_location base = ivars_location(w);
     /* §4.9: one watch, over the span of the unmasked elements. */
-    uint64_t span_offset = base + (uint64_t)first * w->width;
+    uint64_t span_offset = base.offset + (uint64_t)first * w->width;
     uint64_t span_len = (uint64_t)(last - first + 1) * w->width;
-    struct osoe_transport_watch *watch = osoe_transport_watch(OSOE_REGION_HEAP, span_offset,
+    struct osoe_transport_watch *watch = osoe_transport_watch(base.region, span_offset,
                                                 (size_t)span_len);
     uint64_t slept_since = 0;
     bool slept = false, woken = false, timed_out = false;
@@ -300,7 +310,7 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
         if (!slept) {
             slept = true;
             slept_since = osoe_now_ns();
-            osoe_blocked_enter(w->routine, OSOE_BLOCKED_DETAIL_OFFSET, span_offset);
+            osoe_blocked_enter(w->routine, offset_detail(base.region), span_offset);
             osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
         }
 
@@ -330,7 +340,7 @@ static size_t test_many(const struct osoe_wait_many *w, enum many_mode mode, siz
     if (!unmasked_span(w, &first, &last))
         return empty_answer(mode);
     size_t start = mode == MANY_ANY ? any_scan_start(w->nelems) : 0;
-    return scan(w, ivars_offset(w), mode, indices, start);
+    return scan(w, ivars_location(w), mode, indices, start);
 }
 
 void   osoe_wait_all(const struct osoe_wait_many *w)  { wait_many(w, MANY_ALL, NULL); }

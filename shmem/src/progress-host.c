@@ -48,7 +48,8 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
                      uint32_t length)
 {
     (void)context;
-    if (region != OSOE_REGION_HEAP && region != OSOE_REGION_INTERNAL)
+    if (region != OSOE_REGION_HEAP && region != OSOE_REGION_INTERNAL &&
+        region != OSOE_REGION_STATICS)
         osoe_fatal("a peer addressed region %u, which this build does not carry; "
                    "the nodes are running different libraries", region);
     if (pe >= osoe.bootstrap.world_size)
@@ -67,6 +68,18 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
                        (unsigned long long)offset, pe,
                        (unsigned long long)osoe.node.internal_bytes);
         return (char *)osoe.node.heap_of[local] + osoe.node.internal_offset + offset;
+    }
+    if (region == OSOE_REGION_STATICS) {
+        /* The program's statics (§4.3), which every PE of the job has alike if
+         * it runs one program linked by oshcc. */
+        uint64_t bytes = osoe.node.statics_bytes;
+        if (offset > bytes || length > bytes - offset)
+            osoe_fatal("a peer addressed %u bytes at offset %llu of PE %u's symmetric "
+                       "statics, which are %llu bytes; the nodes run different programs, "
+                       "or one not linked with oshcc", length,
+                       (unsigned long long)offset, pe, (unsigned long long)bytes);
+        return osoe_node_statics_at(&osoe.node, (uint32_t)local,
+                                    (uint32_t)local == osoe.bootstrap.local_id, offset);
     }
     if (offset > osoe.node.heap_size || length > osoe.node.heap_size - offset)
         osoe_fatal("a peer addressed %u bytes at offset %llu of PE %u's heap, which is "

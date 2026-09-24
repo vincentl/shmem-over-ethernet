@@ -45,6 +45,13 @@ void *osoe_transport_local_address(int pe, enum osoe_region region, uint64_t off
         return (char *)osoe.node.heap_of[local] + offset;
     case OSOE_REGION_INTERNAL:
         return (char *)osoe.node.heap_of[local] + osoe.node.internal_offset + offset;
+    case OSOE_REGION_STATICS:
+        /* A node-mate's through its object's mapping, this PE's own where its
+         * program has them (node.h). */
+        return osoe.node.statics_of
+                   ? osoe_node_statics_at(&osoe.node, (uint32_t)local,
+                                          (uint32_t)local == osoe.bootstrap.local_id, offset)
+                   : NULL;
     default:
         return NULL;
     }

@@ -34,6 +34,9 @@
 #include "transport.h"
 #include "watch-range.h"
 
+_Static_assert(OSOE_REGION_COUNT <= 1u << OSOE_WATCH_REGION_BITS,
+               "a watch names its region in OSOE_WATCH_REGION_BITS (watch-range.h)");
+
 struct osoe_transport_watch {
     struct osoe_pe_slot *slot;
 };
@@ -42,10 +45,10 @@ static struct osoe_transport_watch the_watch;      /* one wait at a time (§4.6)
 
 struct osoe_transport_watch *osoe_transport_watch(enum osoe_region region, uint64_t offset, size_t len)
 {
-    /* The heap and OSOE_REGION_INTERNAL have waiters: the encoding names the
-     * region, so the internal region needed this guard widened and nothing
-     * else, as statics (§4.3 phase 1.5) will. */
-    if (region != OSOE_REGION_HEAP && region != OSOE_REGION_INTERNAL)
+    /* Every region has waiters: the encoding names the region, so each new one
+     * needed this guard widened and nothing else. */
+    if (region != OSOE_REGION_HEAP && region != OSOE_REGION_INTERNAL &&
+        region != OSOE_REGION_STATICS)
         osoe_fatal("watching region %d is not supported", (int)region);
     struct osoe_pe_slot *slot = &osoe.node.slots[osoe.bootstrap.local_id];
     osoe_count(OSOE_C_TRANSPORT_WATCH_CALLS, 1);

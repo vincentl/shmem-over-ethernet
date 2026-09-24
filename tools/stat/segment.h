@@ -213,11 +213,15 @@ void osoe_segment_close(struct osoe_segment *s);
  *       landing_slot_bytes is now a whole zone rather than a slot and a chunk;
  *       and blocked-record detail kind 9, a wait for them, the detail being
  *       the bytes still in flight
+ *   17  each PE's symmetric statics (§4.3): pe.statics_bytes and
+ *       pe.statics_name in its slot, after pe.heap_name; and the watch word's
+ *       region 2, OSOE_REGION_STATICS
  *
- * None of 5 to 16 changed the watch word's encoding.
+ * None of 5 to 17 changed the watch word's encoding; 17 gave it a region value
+ * it could already carry.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               16
+#define OSOE_SEGMENT_NEWEST_LAYOUT               17
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is
@@ -295,6 +299,7 @@ enum osoe_segment_detail {
     OSOE_SEGMENT_DETAIL_CREDIT,
     OSOE_SEGMENT_DETAIL_REPLY,
     OSOE_SEGMENT_DETAIL_GETS_IN_FLIGHT,   /* layout 16: bytes of nonblocking gets */
+    OSOE_SEGMENT_DETAIL_STATICS_OFFSET,   /* layout 17: an offset into the statics */
 };
 
 /* `detail` as its kind says - "node 3", "epoch 17", "offset 0x40",

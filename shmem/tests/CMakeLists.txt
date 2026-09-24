@@ -756,6 +756,15 @@ function(osoe_tier2_map_test name map)
   set_tests_properties(shmem.${name}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endfunction()
 
+# Link a test program as oshcc links one (design §4.3): -fno-pie, -no-pie and
+# osoe's linker script, so that its global and static variables are symmetric.
+function(osoe_statics_program target)
+  set(script ${PROJECT_SOURCE_DIR}/tools/wrapper/osoe-statics.ld)
+  target_compile_options(${target} PRIVATE -fno-pie)
+  target_link_options(${target} PRIVATE -no-pie "LINKER:-T,${script}")
+  set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS ${script})
+endfunction()
+
 # A quiesced pair falls silent (§3.4; review round two, C1). Before slice 2's
 # acknowledgement protocol: 1,320 header-only segments per node in the idle
 # half second.
@@ -1128,6 +1137,40 @@ set_tests_properties(shmem.active-set.partial PROPERTIES LABELS "tier2" TIMEOUT 
   PASS_REGULAR_EXPRESSION
   "shmem_long_sum_to_all: the active set \\(PE_start 0, logPE_stride 0, PE_size 1\\) is not the whole job of 2 PEs")
 
+# Symmetric statics (design §4.3; test-statics.c), in a program linked as oshcc
+# links one: on one node, across nodes on a block map and an interleaved one;
+# and a put to a stack address, which must name both regions it is not in.
+osoe_tier2_test(statics)
+osoe_statics_program(shmem_test_statics)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(statics 0,0,1,1)
+  osoe_tier2_map_test(statics 0,1,2,0,1,0)
+endif()
+# The same test built -fpie and -pie with the script: every PE's statics at an
+# address of its own, which symmetric operations must not care about.
+add_executable(shmem_test_statics-pie test-statics.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_statics-pie PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_statics-pie PRIVATE osoe rt)
+target_compile_definitions(shmem_test_statics-pie PRIVATE OSOE_TEST_STATICS_PIE)
+target_compile_options(shmem_test_statics-pie PRIVATE -fpie)
+target_link_options(shmem_test_statics-pie PRIVATE -pie
+  "LINKER:-T,${PROJECT_SOURCE_DIR}/tools/wrapper/osoe-statics.ld")
+osoe_warnings(shmem_test_statics-pie)
+add_test(NAME shmem.statics.pie.L2
+  COMMAND osoe-launch -n 2 -t 60 -- $<TARGET_FILE:shmem_test_statics-pie>)
+set_tests_properties(shmem.statics.pie.L2 PROPERTIES LABELS "tier2" TIMEOUT 90)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.statics.pie.0-0-1-1
+    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_statics-pie>)
+  set_tests_properties(shmem.statics.pie.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
+endif()
+add_test(NAME shmem.statics.misuse
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STATICS_MISUSE=stack
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_statics>)
+set_tests_properties(shmem.statics.misuse PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+  "shmem_int_p: .* is neither within the symmetric heap nor among the program's global and static variables")
+
 # PEs that call different collectives end the job by name, from the piece
 # headers of the generic internode phase (internode-generic.c): node 1's PE
 # broadcasts where the others reduce, and node 0's lead finds node 1's slot
@@ -1392,7 +1435,8 @@ osoe_warnings(shmem_test_bad_put)
 add_test(NAME shmem.refuse.nonsymmetric_put
   COMMAND osoe-launch -n 1 -t 60 -- $<TARGET_FILE:shmem_test_bad_put>)
 set_tests_properties(shmem.refuse.nonsymmetric_put PROPERTIES
-  PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap")
+  PASS_REGULAR_EXPRESSION
+  "shmem_putmem: .* is not within the symmetric heap, and this program was not linked with oshcc")
 set_tests_properties(shmem.refuse.no_launcher shmem.refuse.slurm_not_a_step
   shmem.refuse.bad_size shmem.refuse.bad_size_sma shmem.refuse.zero_size
   shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
@@ -1512,6 +1556,7 @@ if(OSOE_TIER3)
     osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
     osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)
     osoe_tier3_test(active-set.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_active-set)
+    osoe_tier3_test(statics.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_statics)
     if(shape STREQUAL "pi")
       osoe_tier3_test(reduce.0-1-2-3-4.k2 pi 0,1,2,3,4 shmem_test_reduce
                       ENV OSOE_COLLECTIVE_FANOUT=2)
