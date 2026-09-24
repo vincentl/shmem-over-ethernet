@@ -31,6 +31,7 @@
 #include "export.h"
 #include "fatal.h"
 #include "metrics.h"
+#include "rma.h"
 #include "symmetric.h"
 #include "team.h"
 #include "transport.h"
@@ -63,20 +64,22 @@ static void signal_update(const char *routine, shmem_ctx_t ctx, uint64_t *sig_ad
 /*
  * The put returns at local completion, and the signal is placed after it, so
  * the routine "returns after the data has been copied out of the source array"
- * (§9.8.3) and the signal's arrival announces the data.
+ * (§9.8.3) and the signal's arrival announces the data. Every put-with-signal,
+ * byte, typed, sized or nonblocking, is this with its element width and its
+ * own name for diagnostics (rma.h).
  *
  * nelems 0 still signals: the spec makes the signal update unconditional, and a
  * zero-length put is the empty transfer it announces.
  */
-OSOE_API void pshmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *source,
-                                      size_t nelems, uint64_t *sig_addr, uint64_t signal,
-                                      int sig_op, int pe)
+static void put_signal(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
+                       size_t nelems, size_t width, uint64_t *sig_addr, uint64_t signal,
+                       int sig_op, int pe)
 {
-    static const char routine[] = "shmem_ctx_putmem_signal";
     enum osoe_rmw_op op = signal_op(routine, sig_op);
     osoe_check_pe(routine, pe);
     if (nelems > 0) {
-        uint64_t offset = osoe_symmetric_offset(routine, dest, nelems);
+        size_t len = osoe_rma_bytes(routine, nelems, width);
+        uint64_t offset = osoe_symmetric_offset(routine, dest, len);
         /*
          * **OSOE_TRANSPORT_MORE's first caller** (§4.10), and put_signal is the
          * one routine in this step that can be it honestly: the signal below
@@ -91,19 +94,95 @@ OSOE_API void pshmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *
          * submission, never the copy.
          */
         osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source,
-                    nelems, OSOE_TRANSPORT_MORE);
+                    len, OSOE_TRANSPORT_MORE);
     }
     /* The fence is on the same context as the put, which is what makes it
      * order the two (spec §9.12.1, 1.6 change #18). */
     signal_update(routine, ctx, sig_addr, signal, op, pe, OSOE_TRANSPORT_FENCED);
 }
 
+OSOE_API void pshmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *source,
+                                      size_t nelems, uint64_t *sig_addr, uint64_t signal,
+                                      int sig_op, int pe)
+{
+    put_signal("shmem_ctx_putmem_signal", ctx, dest, source, nelems, 1, sig_addr, signal,
+               sig_op, pe);
+}
+
 OSOE_API void pshmem_putmem_signal(void *dest, const void *source, size_t nelems,
                                   uint64_t *sig_addr, uint64_t signal, int sig_op, int pe)
 {
-    pshmem_ctx_putmem_signal(SHMEM_CTX_DEFAULT, dest, source, nelems, sig_addr, signal,
-                            sig_op, pe);
+    put_signal("shmem_putmem_signal", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, sig_addr,
+               signal, sig_op, pe);
 }
+
+/*
+ * The nonblocking put-with-signal (spec §9.8.4) completes at the next quiet,
+ * and may complete sooner: the blocking code already returns at the put's
+ * local completion with the signal fenced behind it, which is everything the
+ * nonblocking form promises, so it is the same call (rma-typed.c says the
+ * same of put_nbi).
+ */
+OSOE_API void pshmem_ctx_putmem_signal_nbi(shmem_ctx_t ctx, void *dest, const void *source,
+                                          size_t nelems, uint64_t *sig_addr, uint64_t signal,
+                                          int sig_op, int pe)
+{
+    put_signal("shmem_ctx_putmem_signal_nbi", ctx, dest, source, nelems, 1, sig_addr, signal,
+               sig_op, pe);
+}
+
+OSOE_API void pshmem_putmem_signal_nbi(void *dest, const void *source, size_t nelems,
+                                      uint64_t *sig_addr, uint64_t signal, int sig_op, int pe)
+{
+    put_signal("shmem_putmem_signal_nbi", SHMEM_CTX_DEFAULT, dest, source, nelems, 1,
+               sig_addr, signal, sig_op, pe);
+}
+
+/*
+ * Typed and sized put-with-signal (spec §9.8.3-§9.8.4), over the type and size
+ * lists of rma-typed.c's put and get, each with and without _nbi.
+ */
+#define OSOE_PUT_SIGNAL_TYPED(T, NAME, SUFFIX)                                            \
+    OSOE_API void OSOE_FN(pshmem_, ctx_##NAME, _put_signal##SUFFIX)(shmem_ctx_t ctx,      \
+                            T *dest, const T *source, size_t nelems, uint64_t *sig_addr,  \
+                            uint64_t signal, int sig_op, int pe)                          \
+    {                                                                                     \
+        put_signal("shmem_ctx_" #NAME "_put_signal" #SUFFIX, ctx, dest, source, nelems,   \
+                   sizeof(T), sig_addr, signal, sig_op, pe);                              \
+    }                                                                                     \
+    OSOE_API void OSOE_FN(pshmem_, NAME, _put_signal##SUFFIX)(T *dest, const T *source,   \
+                            size_t nelems, uint64_t *sig_addr, uint64_t signal,           \
+                            int sig_op, int pe)                                           \
+    {                                                                                     \
+        put_signal("shmem_" #NAME "_put_signal" #SUFFIX, SHMEM_CTX_DEFAULT, dest, source, \
+                   nelems, sizeof(T), sig_addr, signal, sig_op, pe);                      \
+    }
+
+#define OSOE_PUT_SIGNAL_SIZED(SIZE, SUFFIX)                                               \
+    OSOE_API void pshmem_ctx_put##SIZE##_signal##SUFFIX(shmem_ctx_t ctx, void *dest,      \
+                            const void *source, size_t nelems, uint64_t *sig_addr,        \
+                            uint64_t signal, int sig_op, int pe)                          \
+    {                                                                                     \
+        put_signal("shmem_ctx_put" #SIZE "_signal" #SUFFIX, ctx, dest, source, nelems,    \
+                   SIZE / 8, sig_addr, signal, sig_op, pe);                               \
+    }                                                                                     \
+    OSOE_API void pshmem_put##SIZE##_signal##SUFFIX(void *dest, const void *source,       \
+                            size_t nelems, uint64_t *sig_addr, uint64_t signal,           \
+                            int sig_op, int pe)                                           \
+    {                                                                                     \
+        put_signal("shmem_put" #SIZE "_signal" #SUFFIX, SHMEM_CTX_DEFAULT, dest, source,  \
+                   nelems, SIZE / 8, sig_addr, signal, sig_op, pe);                       \
+    }
+
+#define OSOE_PUT_SIGNAL_BLOCKING(T, NAME) OSOE_PUT_SIGNAL_TYPED(T, NAME, )
+#define OSOE_PUT_SIGNAL_NBI(T, NAME) OSOE_PUT_SIGNAL_TYPED(T, NAME, _nbi)
+#define OSOE_PUT_SIGNAL_SIZED_BLOCKING(SIZE) OSOE_PUT_SIGNAL_SIZED(SIZE, )
+#define OSOE_PUT_SIGNAL_SIZED_NBI(SIZE) OSOE_PUT_SIGNAL_SIZED(SIZE, _nbi)
+
+OSOE_RMA_STANDARD_TYPES(OSOE_PUT_SIGNAL_BLOCKING)
+OSOE_RMA_STANDARD_TYPES(OSOE_PUT_SIGNAL_NBI)
+OSOE_RMA_SIZES(OSOE_PUT_SIGNAL_SIZED_BLOCKING)
+OSOE_RMA_SIZES(OSOE_PUT_SIGNAL_SIZED_NBI)
 
 OSOE_API void pshmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
                                    int pe)
@@ -152,9 +231,22 @@ OSOE_API uint64_t pshmem_signal_wait_until(uint64_t *sig_addr, int cmp, uint64_t
 /* The weak `shmem_` aliases (export.h). */
 OSOE_ALIAS(ctx_putmem_signal)
 OSOE_ALIAS(putmem_signal)
+OSOE_ALIAS(ctx_putmem_signal_nbi)
+OSOE_ALIAS(putmem_signal_nbi)
 OSOE_ALIAS(ctx_signal_set)
 OSOE_ALIAS(ctx_signal_add)
 OSOE_ALIAS(signal_set)
 OSOE_ALIAS(signal_add)
 OSOE_ALIAS(signal_fetch)
 OSOE_ALIAS(signal_wait_until)
+
+#define OSOE_PUT_SIGNAL_ALIAS_TYPED(T, NAME)                                              \
+    OSOE_ALIAS(ctx_##NAME##_put_signal) OSOE_ALIAS(NAME##_put_signal)                     \
+    OSOE_ALIAS(ctx_##NAME##_put_signal_nbi) OSOE_ALIAS(NAME##_put_signal_nbi)
+
+#define OSOE_PUT_SIGNAL_ALIAS_SIZED(SIZE)                                                 \
+    OSOE_ALIAS(ctx_put##SIZE##_signal) OSOE_ALIAS(put##SIZE##_signal)                     \
+    OSOE_ALIAS(ctx_put##SIZE##_signal_nbi) OSOE_ALIAS(put##SIZE##_signal_nbi)
+
+OSOE_RMA_STANDARD_TYPES(OSOE_PUT_SIGNAL_ALIAS_TYPED)
+OSOE_RMA_SIZES(OSOE_PUT_SIGNAL_ALIAS_SIZED)

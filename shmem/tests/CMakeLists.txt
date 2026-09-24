@@ -1027,6 +1027,19 @@ osoe_tier2_test(quiet)
 osoe_tier2_test(heap)
 osoe_tier2_test(landing)
 osoe_tier2_test(amo-types)
+osoe_tier2_test(typed-rma)
+
+# shmem.typed-rma over a logical node map (§8.1), so "right" is a same-node PE
+# on one member of the pair and a remote one on the other - the program itself
+# never names the difference (test-typed-rma.c). Two maps, as the neighbouring
+# families use for the same reason: a 2-node pair and the 3-node, 6-PE map
+# shmem.internode.* also runs. Excluded under ThreadSanitizer for exactly the
+# reason shmem.internode.* is (above): the ordering that makes a cross-node put
+# safe runs through another process, which tsan cannot see.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(typed-rma 0,0,1,1)
+  osoe_tier2_map_test(typed-rma 0,1,2,0,1,0)
+endif()
 
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
 # §4.9 watch word to check the unmasked-span refinement, which is the one place

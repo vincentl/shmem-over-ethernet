@@ -78,12 +78,25 @@ void pshmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source, size_t n
                        int pe);
 void *pshmem_ptr(const void *dest, int pe);
 
+/* The nonblocking byte forms (§9.6.2.1-§9.6.2.2) */
+void pshmem_putmem_nbi(void *dest, const void *source, size_t nelems, int pe);
+void pshmem_getmem_nbi(void *dest, const void *source, size_t nelems, int pe);
+void pshmem_ctx_putmem_nbi(shmem_ctx_t ctx, void *dest, const void *source, size_t nelems,
+                           int pe);
+void pshmem_ctx_getmem_nbi(shmem_ctx_t ctx, void *dest, const void *source, size_t nelems,
+                           int pe);
+
 /* Signalling operations (§9.8) */
 void pshmem_putmem_signal(void *dest, const void *source, size_t nelems,
                           uint64_t *sig_addr, uint64_t signal, int sig_op, int pe);
 void pshmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *source,
                               size_t nelems, uint64_t *sig_addr, uint64_t signal,
                               int sig_op, int pe);
+void pshmem_putmem_signal_nbi(void *dest, const void *source, size_t nelems,
+                              uint64_t *sig_addr, uint64_t signal, int sig_op, int pe);
+void pshmem_ctx_putmem_signal_nbi(shmem_ctx_t ctx, void *dest, const void *source,
+                                  size_t nelems, uint64_t *sig_addr, uint64_t signal,
+                                  int sig_op, int pe);
 void pshmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe);
 void pshmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe);
 void pshmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal, int pe);
@@ -158,6 +171,32 @@ OSOE_WAIT_SHORT_TYPES(OSOE_WAIT_PDECL_SCALAR)
 OSOE_AMO_STANDARD_TYPES(OSOE_WAIT_PDECL_MANY)
 OSOE_WAIT_DEPRECATED_TYPES(OSOE_WAIT_PDECL_DEPRECATED)
 
+/* The typed and sized RMA families (§9.6, §9.8.3-§9.8.4), from the same lists
+ * and macros as shmem.h. */
+#define OSOE_RMA_PDECL_PUT_GET(T, NAME) OSOE_RMA_DECL_PUT_GET_P(pshmem_, T, NAME)
+#define OSOE_RMA_PDECL_P_G(T, NAME) OSOE_RMA_DECL_P_G_P(pshmem_, T, NAME)
+#define OSOE_RMA_PDECL_IPUT_IGET(T, NAME) OSOE_RMA_DECL_IPUT_IGET_P(pshmem_, T, NAME)
+#define OSOE_RMA_PDECL_NBI(T, NAME) OSOE_RMA_DECL_NBI_P(pshmem_, T, NAME)
+#define OSOE_RMA_PDECL_PUT_SIGNAL(T, NAME) OSOE_RMA_DECL_PUT_SIGNAL_P(pshmem_, T, NAME)
+#define OSOE_RMA_PDECL_PUT_SIGNAL_NBI(T, NAME) OSOE_RMA_DECL_PUT_SIGNAL_NBI_P(pshmem_, T, NAME)
+#define OSOE_RMA_PDECL_SIZE_PUT_GET(SIZE) OSOE_RMA_DECL_SIZE_PUT_GET_P(pshmem_, SIZE)
+#define OSOE_RMA_PDECL_SIZE_IPUT_IGET(SIZE) OSOE_RMA_DECL_SIZE_IPUT_IGET_P(pshmem_, SIZE)
+#define OSOE_RMA_PDECL_SIZE_NBI(SIZE) OSOE_RMA_DECL_SIZE_NBI_P(pshmem_, SIZE)
+#define OSOE_RMA_PDECL_SIZE_PUT_SIGNAL(SIZE) OSOE_RMA_DECL_SIZE_PUT_SIGNAL_P(pshmem_, SIZE)
+#define OSOE_RMA_PDECL_SIZE_PUT_SIGNAL_NBI(SIZE) OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI_P(pshmem_, SIZE)
+
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_PDECL_PUT_GET)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_PDECL_P_G)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_PDECL_IPUT_IGET)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_PDECL_NBI)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_PDECL_PUT_SIGNAL)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_PDECL_PUT_SIGNAL_NBI)
+OSOE_RMA_SIZES(OSOE_RMA_PDECL_SIZE_PUT_GET)
+OSOE_RMA_SIZES(OSOE_RMA_PDECL_SIZE_IPUT_IGET)
+OSOE_RMA_SIZES(OSOE_RMA_PDECL_SIZE_NBI)
+OSOE_RMA_SIZES(OSOE_RMA_PDECL_SIZE_PUT_SIGNAL)
+OSOE_RMA_SIZES(OSOE_RMA_PDECL_SIZE_PUT_SIGNAL_NBI)
+
 #undef OSOE_AMO_PDECL_STANDARD
 #undef OSOE_AMO_PDECL_EXTENDED
 #undef OSOE_AMO_PDECL_BITWISE
@@ -167,6 +206,17 @@ OSOE_WAIT_DEPRECATED_TYPES(OSOE_WAIT_PDECL_DEPRECATED)
 #undef OSOE_WAIT_PDECL_SCALAR
 #undef OSOE_WAIT_PDECL_MANY
 #undef OSOE_WAIT_PDECL_DEPRECATED
+#undef OSOE_RMA_PDECL_PUT_GET
+#undef OSOE_RMA_PDECL_P_G
+#undef OSOE_RMA_PDECL_IPUT_IGET
+#undef OSOE_RMA_PDECL_NBI
+#undef OSOE_RMA_PDECL_PUT_SIGNAL
+#undef OSOE_RMA_PDECL_PUT_SIGNAL_NBI
+#undef OSOE_RMA_PDECL_SIZE_PUT_GET
+#undef OSOE_RMA_PDECL_SIZE_IPUT_IGET
+#undef OSOE_RMA_PDECL_SIZE_NBI
+#undef OSOE_RMA_PDECL_SIZE_PUT_SIGNAL
+#undef OSOE_RMA_PDECL_SIZE_PUT_SIGNAL_NBI
 
 /* Profiling control (§10.1.1). shmem_pcontrol is declared by shmem.h, which is
  * where user code looks (conformance review F7); this header only adds the

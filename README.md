@@ -7,18 +7,22 @@ libraries.
 **Status:** phase 1, step 4 of 4 (design §7.1). Jobs run on one node or across
 nodes over TCP and io_uring, started by `srun` or by `osoe-launch`:
 initialization and thread levels up to `SHMEM_THREAD_SERIALIZED`, the symmetric
-heap allocator in full, contiguous RMA (`shmem_putmem`, `shmem_getmem`,
-`shmem_putmem_signal`), `shmem_ptr`, every atomic type of specification Tables
-6–8 with the C11 type-generic interfaces, the point-to-point waits and tests
-including the multiple-element forms, signalling operations, memory ordering,
-`shmem_barrier_all`, `shmem_sync_all` and `shmem_team_sync`,
-`shmem_global_exit`, and the mandatory surface of §7.4 including the `pshmem_`
-profiling interface. A PE or a node that dies ends the whole job (§3.15).
+heap allocator in full, RMA - `shmem_putmem` and `shmem_getmem`, and every type
+and size of specification Table 5 with their single-element, strided and
+nonblocking forms, and put-with-signal in each - `shmem_ptr`, every atomic type
+of specification Tables 6–8, the C11 type-generic interfaces of both, the
+point-to-point waits and tests including the multiple-element forms,
+signalling operations, memory ordering, `shmem_barrier_all`, `shmem_sync_all`
+and `shmem_team_sync`, `shmem_global_exit`, and the mandatory surface of §7.4
+including the `pshmem_` profiling interface. A PE or a node that dies ends the
+whole job (§3.15).
 
 Not yet: symmetric statics, which are refused with a diagnostic (§4.3);
 collectives other than the barriers - broadcast, reductions, collect and
-alltoall; typed and strided RMA and the nonblocking forms; locks; contexts
-other than the default; and `SHMEM_THREAD_MULTIPLE` (§7.5, §4.11).
+alltoall; the block-strided `shmem_ibput` and `shmem_ibget`; locks; contexts
+other than the default; and `SHMEM_THREAD_MULTIPLE` (§7.5, §7.6, §4.11). The
+nonblocking forms complete before they return, which the specification allows,
+so they overlap nothing yet.
 
 ## Requirements
 

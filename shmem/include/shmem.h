@@ -169,6 +169,14 @@ void shmem_putmem_signal(void *dest, const void *source, size_t nelems, uint64_t
 void shmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *source,
                              size_t nelems, uint64_t *sig_addr, uint64_t signal,
                              int sig_op, int pe);
+/* The nonblocking put-with-signal byte form (§9.8.4); "returns after
+ * initiating the operation", completed by a subsequent shmem_quiet, exactly as
+ * shmem_putmem_nbi below. Defined alongside shmem_putmem_signal in signal.c. */
+void shmem_putmem_signal_nbi(void *dest, const void *source, size_t nelems,
+                             uint64_t *sig_addr, uint64_t signal, int sig_op, int pe);
+void shmem_ctx_putmem_signal_nbi(shmem_ctx_t ctx, void *dest, const void *source,
+                                 size_t nelems, uint64_t *sig_addr, uint64_t signal,
+                                 int sig_op, int pe);
 void shmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe);
 void shmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe);
 void shmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal, int pe);
@@ -372,6 +380,166 @@ void shmem_ctx_putmem(shmem_ctx_t ctx, void *dest, const void *source, size_t ne
 void shmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source, size_t nelems,
                       int pe);
 
+/* The nonblocking byte forms (§9.6.2.1-§9.6.2.2): "return after initiating the
+ * operation", completed by a subsequent shmem_quiet. Defined in rma-typed.c
+ * beside the typed and sized nonblocking forms below. */
+void shmem_putmem_nbi(void *dest, const void *source, size_t nelems, int pe);
+void shmem_getmem_nbi(void *dest, const void *source, size_t nelems, int pe);
+void shmem_ctx_putmem_nbi(shmem_ctx_t ctx, void *dest, const void *source, size_t nelems,
+                          int pe);
+void shmem_ctx_getmem_nbi(shmem_ctx_t ctx, void *dest, const void *source, size_t nelems,
+                          int pe);
+
+/*
+ * Typed and sized RMA (spec §9.6, §9.8.3-§9.8.4): the standard RMA types of
+ * Table 5, and the sized putSIZE/getSIZE that take nelems of that many bits
+ * each. Declared here by expanding the type list, the same way rma-typed.c
+ * (and signal.c, for the put-with-signal families) generates the definitions,
+ * so a type appears once (§7.4's rule for the AMO tables, applied to RMA).
+ *
+ * The list is Table 5's own order: the fourteen types the C11 generic
+ * selection below dispatches on directly, then ten that are typedefs of one of
+ * those fourteen on this implementation's targets (LP64 Linux) - int8_t/
+ * uint8_t are signed/unsigned char, int16_t/uint16_t are short/unsigned short,
+ * int32_t/uint32_t are int/unsigned int, int64_t/uint64_t/ptrdiff_t/size_t are
+ * long/unsigned long. rma-typed.c's static assertions check the two narrower
+ * identities that amo.c's own do not already establish for Tables 6-8.
+ */
+#define OSOE_RMA_STANDARD_TYPES(X)                                           \
+    X(float, float) X(double, double) X(long double, longdouble)             \
+    X(char, char) X(signed char, schar) X(short, short)                      \
+    X(int, int) X(long, long) X(long long, longlong)                         \
+    X(unsigned char, uchar) X(unsigned short, ushort)                        \
+    X(unsigned int, uint) X(unsigned long, ulong)                            \
+    X(unsigned long long, ulonglong)                                         \
+    X(int8_t, int8) X(int16_t, int16) X(int32_t, int32) X(int64_t, int64)    \
+    X(uint8_t, uint8) X(uint16_t, uint16) X(uint32_t, uint32)                \
+    X(uint64_t, uint64) X(size_t, size) X(ptrdiff_t, ptrdiff)
+
+/* The sized forms' widths, in bits (e.g. spec §9.6.1.1: "SIZE is one of 8, 16,
+ * 32, 64, 128"). A routine's byte count is nelems * (SIZE / 8). */
+#define OSOE_RMA_SIZES(X) X(8) X(16) X(32) X(64) X(128)
+
+/* Declared with the prefix as a parameter, as the AMO families above:
+ * pshmem.h generates the `pshmem_` spellings from the same lists and macros. */
+#define OSOE_RMA_DECL_PUT_GET_P(P, T, NAME)                                  \
+    void OSOE_FN(P, ctx_##NAME, _put)(shmem_ctx_t ctx, T *dest,              \
+                        const T *source, size_t nelems, int pe);             \
+    void OSOE_FN(P, NAME, _put)(T *dest, const T *source, size_t nelems, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _get)(shmem_ctx_t ctx, T *dest,              \
+                        const T *source, size_t nelems, int pe);             \
+    void OSOE_FN(P, NAME, _get)(T *dest, const T *source, size_t nelems, int pe);
+
+#define OSOE_RMA_DECL_P_G_P(P, T, NAME)                                      \
+    void OSOE_FN(P, ctx_##NAME, _p)(shmem_ctx_t ctx, T *dest, T value, int pe); \
+    void OSOE_FN(P, NAME, _p)(T *dest, T value, int pe);                     \
+    T OSOE_FN(P, ctx_##NAME, _g)(shmem_ctx_t ctx, const T *source, int pe);  \
+    T OSOE_FN(P, NAME, _g)(const T *source, int pe);
+
+#define OSOE_RMA_DECL_IPUT_IGET_P(P, T, NAME)                                \
+    void OSOE_FN(P, ctx_##NAME, _iput)(shmem_ctx_t ctx, T *dest,             \
+                        const T *source, ptrdiff_t dst, ptrdiff_t sst,       \
+                        size_t nelems, int pe);                              \
+    void OSOE_FN(P, NAME, _iput)(T *dest, const T *source, ptrdiff_t dst,    \
+                        ptrdiff_t sst, size_t nelems, int pe);               \
+    void OSOE_FN(P, ctx_##NAME, _iget)(shmem_ctx_t ctx, T *dest,             \
+                        const T *source, ptrdiff_t dst, ptrdiff_t sst,       \
+                        size_t nelems, int pe);                              \
+    void OSOE_FN(P, NAME, _iget)(T *dest, const T *source, ptrdiff_t dst,    \
+                        ptrdiff_t sst, size_t nelems, int pe);
+
+#define OSOE_RMA_DECL_NBI_P(P, T, NAME)                                      \
+    void OSOE_FN(P, ctx_##NAME, _put_nbi)(shmem_ctx_t ctx, T *dest,          \
+                        const T *source, size_t nelems, int pe);             \
+    void OSOE_FN(P, NAME, _put_nbi)(T *dest, const T *source, size_t nelems, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _get_nbi)(shmem_ctx_t ctx, T *dest,          \
+                        const T *source, size_t nelems, int pe);             \
+    void OSOE_FN(P, NAME, _get_nbi)(T *dest, const T *source, size_t nelems, int pe);
+
+/* Typed put-with-signal (spec §9.8.3-§9.8.4). The byte form is declared above
+ * with the rest of §9.8; these and it are all defined together in signal.c. */
+#define OSOE_RMA_DECL_PUT_SIGNAL_P(P, T, NAME)                               \
+    void OSOE_FN(P, ctx_##NAME, _put_signal)(shmem_ctx_t ctx, T *dest,       \
+                        const T *source, size_t nelems, uint64_t *sig_addr,  \
+                        uint64_t signal, int sig_op, int pe);                \
+    void OSOE_FN(P, NAME, _put_signal)(T *dest, const T *source, size_t nelems, \
+                        uint64_t *sig_addr, uint64_t signal, int sig_op, int pe);
+
+#define OSOE_RMA_DECL_PUT_SIGNAL_NBI_P(P, T, NAME)                           \
+    void OSOE_FN(P, ctx_##NAME, _put_signal_nbi)(shmem_ctx_t ctx, T *dest,   \
+                        const T *source, size_t nelems, uint64_t *sig_addr,  \
+                        uint64_t signal, int sig_op, int pe);                \
+    void OSOE_FN(P, NAME, _put_signal_nbi)(T *dest, const T *source, size_t nelems, \
+                        uint64_t *sig_addr, uint64_t signal, int sig_op, int pe);
+
+#define OSOE_RMA_DECL_PUT_GET(T, NAME) OSOE_RMA_DECL_PUT_GET_P(shmem_, T, NAME)
+#define OSOE_RMA_DECL_P_G(T, NAME) OSOE_RMA_DECL_P_G_P(shmem_, T, NAME)
+#define OSOE_RMA_DECL_IPUT_IGET(T, NAME) OSOE_RMA_DECL_IPUT_IGET_P(shmem_, T, NAME)
+#define OSOE_RMA_DECL_NBI(T, NAME) OSOE_RMA_DECL_NBI_P(shmem_, T, NAME)
+#define OSOE_RMA_DECL_PUT_SIGNAL(T, NAME) OSOE_RMA_DECL_PUT_SIGNAL_P(shmem_, T, NAME)
+#define OSOE_RMA_DECL_PUT_SIGNAL_NBI(T, NAME) OSOE_RMA_DECL_PUT_SIGNAL_NBI_P(shmem_, T, NAME)
+
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_PUT_GET)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_P_G)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_IPUT_IGET)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_NBI)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_PUT_SIGNAL)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_PUT_SIGNAL_NBI)
+
+/* The sized forms: putSIZE/getSIZE, their strided and nonblocking forms, and
+ * the sized put-with-signal and put-with-signal-nbi. */
+#define OSOE_RMA_DECL_SIZE_PUT_GET_P(P, SIZE)                                \
+    void P##ctx_put##SIZE(shmem_ctx_t ctx, void *dest, const void *source,   \
+                          size_t nelems, int pe);                            \
+    void P##put##SIZE(void *dest, const void *source, size_t nelems, int pe); \
+    void P##ctx_get##SIZE(shmem_ctx_t ctx, void *dest, const void *source,   \
+                          size_t nelems, int pe);                            \
+    void P##get##SIZE(void *dest, const void *source, size_t nelems, int pe);
+
+#define OSOE_RMA_DECL_SIZE_IPUT_IGET_P(P, SIZE)                              \
+    void P##ctx_iput##SIZE(shmem_ctx_t ctx, void *dest, const void *source,  \
+                           ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe); \
+    void P##iput##SIZE(void *dest, const void *source, ptrdiff_t dst,        \
+                       ptrdiff_t sst, size_t nelems, int pe);                 \
+    void P##ctx_iget##SIZE(shmem_ctx_t ctx, void *dest, const void *source,  \
+                           ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe); \
+    void P##iget##SIZE(void *dest, const void *source, ptrdiff_t dst,        \
+                       ptrdiff_t sst, size_t nelems, int pe);
+
+#define OSOE_RMA_DECL_SIZE_NBI_P(P, SIZE)                                    \
+    void P##ctx_put##SIZE##_nbi(shmem_ctx_t ctx, void *dest, const void *source, \
+                                size_t nelems, int pe);                      \
+    void P##put##SIZE##_nbi(void *dest, const void *source, size_t nelems, int pe); \
+    void P##ctx_get##SIZE##_nbi(shmem_ctx_t ctx, void *dest, const void *source, \
+                                size_t nelems, int pe);                      \
+    void P##get##SIZE##_nbi(void *dest, const void *source, size_t nelems, int pe);
+
+#define OSOE_RMA_DECL_SIZE_PUT_SIGNAL_P(P, SIZE)                             \
+    void P##ctx_put##SIZE##_signal(shmem_ctx_t ctx, void *dest, const void *source, \
+                                   size_t nelems, uint64_t *sig_addr,        \
+                                   uint64_t signal, int sig_op, int pe);     \
+    void P##put##SIZE##_signal(void *dest, const void *source, size_t nelems, \
+                               uint64_t *sig_addr, uint64_t signal, int sig_op, int pe);
+
+#define OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI_P(P, SIZE)                         \
+    void P##ctx_put##SIZE##_signal_nbi(shmem_ctx_t ctx, void *dest, const void *source, \
+                                       size_t nelems, uint64_t *sig_addr,    \
+                                       uint64_t signal, int sig_op, int pe); \
+    void P##put##SIZE##_signal_nbi(void *dest, const void *source, size_t nelems, \
+                                   uint64_t *sig_addr, uint64_t signal, int sig_op, int pe);
+
+#define OSOE_RMA_DECL_SIZE_PUT_GET(SIZE) OSOE_RMA_DECL_SIZE_PUT_GET_P(shmem_, SIZE)
+#define OSOE_RMA_DECL_SIZE_IPUT_IGET(SIZE) OSOE_RMA_DECL_SIZE_IPUT_IGET_P(shmem_, SIZE)
+#define OSOE_RMA_DECL_SIZE_NBI(SIZE) OSOE_RMA_DECL_SIZE_NBI_P(shmem_, SIZE)
+#define OSOE_RMA_DECL_SIZE_PUT_SIGNAL(SIZE) OSOE_RMA_DECL_SIZE_PUT_SIGNAL_P(shmem_, SIZE)
+#define OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI(SIZE) OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI_P(shmem_, SIZE)
+
+OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_PUT_GET)
+OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_IPUT_IGET)
+OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_NBI)
+OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_PUT_SIGNAL)
+OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI)
+
 /* Memory ordering (§9.12) */
 void shmem_fence(void);
 void shmem_quiet(void);
@@ -484,6 +652,9 @@ void shmem_udcflush_line(void *dest);
 #define OSOE_PICK3(_1, _2, _3, NAME, ...) NAME
 #define OSOE_PICK4(_1, _2, _3, _4, NAME, ...) NAME
 #define OSOE_PICK5(_1, _2, _3, _4, _5, NAME, ...) NAME
+/* iput/iget (6 or 7 arguments) and put_signal (7 or 8) need two wider ones. */
+#define OSOE_PICK7(_1, _2, _3, _4, _5, _6, _7, NAME, ...) NAME
+#define OSOE_PICK8(_1, _2, _3, _4, _5, _6, _7, _8, NAME, ...) NAME
 
 /* Table 6, one entry per distinct C type. */
 #define OSOE_AMO_G_STANDARD(X, OP)                                                \
@@ -601,6 +772,128 @@ void shmem_udcflush_line(void *dest);
     OSOE_PICK4(__VA_ARGS__, OSOE_G_FXOR_4, OSOE_G_FXOR_3, , )(__VA_ARGS__)
 
 
+/* ---- Remote memory access (spec §9.6, §9.8.3) ------------------------- */
+
+/*
+ * Table 5, the fourteen distinct C types (as OSOE_AMO_G_STANDARD above): the
+ * ten aliased TYPENAMEs of §9.6's declarations are typedefs of one of these
+ * fourteen on this implementation's targets, so a fifteenth `_Generic`
+ * association for one of them would be a duplicate case rather than a
+ * fifteenth type.
+ */
+#define OSOE_RMA_G_STANDARD(X, OP)                                               \
+    X(float, float, OP) X(double, double, OP) X(long double, longdouble, OP)     \
+    X(char, char, OP) X(signed char, schar, OP) X(short, short, OP)              \
+    X(int, int, OP) X(long, long, OP) X(long long, longlong, OP)                 \
+    X(unsigned char, uchar, OP) X(unsigned short, ushort, OP)                    \
+    X(unsigned int, uint, OP) X(unsigned long, ulong, OP)                        \
+    X(unsigned long long, ulonglong, OP)
+
+#define OSOE_RMA_G(T, NAME, OP)   , T *: shmem_##NAME##_##OP
+/* For shmem_g, whose argument may be const-qualified, as OSOE_AMO_GC. */
+#define OSOE_RMA_GC(T, NAME, OP)  , T *: shmem_##NAME##_##OP                     \
+                                  , const T *: shmem_##NAME##_##OP
+/* The same, for the context-taking spellings. */
+#define OSOE_RMA_GX(T, NAME, OP)  , T *: shmem_ctx_##NAME##_##OP
+#define OSOE_RMA_GCX(T, NAME, OP) , T *: shmem_ctx_##NAME##_##OP                 \
+                                  , const T *: shmem_ctx_##NAME##_##OP
+
+/*
+ * Every routine dispatches on `dest` - the local buffer for get/iget/g, the
+ * symmetric one for put/iput/p/put_signal - which Table 5's C11 SYNOPSIS
+ * always types as plain `TYPE *`, never const. shmem_g is the one exception:
+ * its only pointer argument is `source`, typed `const TYPE *`, so it dispatches
+ * on that instead and needs both the const and non-const associations (OSOE_
+ * RMA_GC/GCX), exactly as shmem_atomic_fetch does for the same reason.
+ */
+#define OSOE_G_PUT_4(dest, source, nelems, pe)                                   \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, put))((dest), (source), (nelems), (pe)))
+#define OSOE_G_PUT_5(ctx, dest, source, nelems, pe)                              \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, put))                      \
+        ((ctx), (dest), (source), (nelems), (pe)))
+#define shmem_put(...)                                                           \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_PUT_5, OSOE_G_PUT_4, , , )(__VA_ARGS__)
+
+#define OSOE_G_GET_4(dest, source, nelems, pe)                                   \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, get))((dest), (source), (nelems), (pe)))
+#define OSOE_G_GET_5(ctx, dest, source, nelems, pe)                              \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, get))                      \
+        ((ctx), (dest), (source), (nelems), (pe)))
+#define shmem_get(...)                                                           \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_GET_5, OSOE_G_GET_4, , , )(__VA_ARGS__)
+
+#define OSOE_G_P_3(dest, value, pe)                                              \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, p))((dest), (value), (pe)))
+#define OSOE_G_P_4(ctx, dest, value, pe)                                         \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, p))((ctx), (dest), (value), (pe)))
+#define shmem_p(...)                                                             \
+    OSOE_PICK4(__VA_ARGS__, OSOE_G_P_4, OSOE_G_P_3, , )(__VA_ARGS__)
+
+#define OSOE_G_G_2(source, pe)                                                   \
+    (_Generic((source) OSOE_RMA_G_STANDARD(OSOE_RMA_GC, g))((source), (pe)))
+#define OSOE_G_G_3(ctx, source, pe)                                              \
+    (_Generic((source) OSOE_RMA_G_STANDARD(OSOE_RMA_GCX, g))((ctx), (source), (pe)))
+#define shmem_g(...)                                                             \
+    OSOE_PICK3(__VA_ARGS__, OSOE_G_G_3, OSOE_G_G_2, )(__VA_ARGS__)
+
+#define OSOE_G_IPUT_6(dest, source, dst, sst, nelems, pe)                        \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, iput))                      \
+        ((dest), (source), (dst), (sst), (nelems), (pe)))
+#define OSOE_G_IPUT_7(ctx, dest, source, dst, sst, nelems, pe)                   \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, iput))                     \
+        ((ctx), (dest), (source), (dst), (sst), (nelems), (pe)))
+#define shmem_iput(...)                                                          \
+    OSOE_PICK7(__VA_ARGS__, OSOE_G_IPUT_7, OSOE_G_IPUT_6, , , , , )(__VA_ARGS__)
+
+#define OSOE_G_IGET_6(dest, source, dst, sst, nelems, pe)                        \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, iget))                      \
+        ((dest), (source), (dst), (sst), (nelems), (pe)))
+#define OSOE_G_IGET_7(ctx, dest, source, dst, sst, nelems, pe)                   \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, iget))                     \
+        ((ctx), (dest), (source), (dst), (sst), (nelems), (pe)))
+#define shmem_iget(...)                                                          \
+    OSOE_PICK7(__VA_ARGS__, OSOE_G_IGET_7, OSOE_G_IGET_6, , , , , )(__VA_ARGS__)
+
+#define OSOE_G_PUT_NBI_4(dest, source, nelems, pe)                               \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, put_nbi))                   \
+        ((dest), (source), (nelems), (pe)))
+#define OSOE_G_PUT_NBI_5(ctx, dest, source, nelems, pe)                          \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, put_nbi))                  \
+        ((ctx), (dest), (source), (nelems), (pe)))
+#define shmem_put_nbi(...)                                                       \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_PUT_NBI_5, OSOE_G_PUT_NBI_4, , , )(__VA_ARGS__)
+
+#define OSOE_G_GET_NBI_4(dest, source, nelems, pe)                               \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, get_nbi))                   \
+        ((dest), (source), (nelems), (pe)))
+#define OSOE_G_GET_NBI_5(ctx, dest, source, nelems, pe)                          \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, get_nbi))                  \
+        ((ctx), (dest), (source), (nelems), (pe)))
+#define shmem_get_nbi(...)                                                       \
+    OSOE_PICK5(__VA_ARGS__, OSOE_G_GET_NBI_5, OSOE_G_GET_NBI_4, , , )(__VA_ARGS__)
+
+/* The two signalling routines the spec gives a C11 generic SYNOPSIS (§9.8.3,
+ * §9.8.4). */
+#define OSOE_G_PUT_SIGNAL_7(dest, source, nelems, sig_addr, signal, sig_op, pe)  \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, put_signal))                \
+        ((dest), (source), (nelems), (sig_addr), (signal), (sig_op), (pe)))
+#define OSOE_G_PUT_SIGNAL_8(ctx, dest, source, nelems, sig_addr, signal, sig_op, pe) \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, put_signal))               \
+        ((ctx), (dest), (source), (nelems), (sig_addr), (signal), (sig_op), (pe)))
+#define shmem_put_signal(...)                                                    \
+    OSOE_PICK8(__VA_ARGS__, OSOE_G_PUT_SIGNAL_8, OSOE_G_PUT_SIGNAL_7, , , , , , )(__VA_ARGS__)
+
+#define OSOE_G_PUT_SIGNAL_NBI_7(dest, source, nelems, sig_addr, signal, sig_op, pe) \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, put_signal_nbi))            \
+        ((dest), (source), (nelems), (sig_addr), (signal), (sig_op), (pe)))
+#define OSOE_G_PUT_SIGNAL_NBI_8(ctx, dest, source, nelems, sig_addr, signal, sig_op, pe) \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, put_signal_nbi))           \
+        ((ctx), (dest), (source), (nelems), (sig_addr), (signal), (sig_op), (pe)))
+#define shmem_put_signal_nbi(...)                                                \
+    OSOE_PICK8(__VA_ARGS__, OSOE_G_PUT_SIGNAL_NBI_8, OSOE_G_PUT_SIGNAL_NBI_7, , , , , , ) \
+        (__VA_ARGS__)
+
+
 /* ---- Point-to-point synchronization (spec §9.11) --------------------- */
 
 /* Table 6, one entry per distinct C type, as above. */
@@ -687,6 +980,17 @@ void shmem_pcontrol(int level, ...);
 #undef OSOE_WAIT_DECL_SCALAR
 #undef OSOE_WAIT_DECL_MANY
 #undef OSOE_WAIT_DECL_DEPRECATED
+#undef OSOE_RMA_DECL_PUT_GET
+#undef OSOE_RMA_DECL_P_G
+#undef OSOE_RMA_DECL_IPUT_IGET
+#undef OSOE_RMA_DECL_NBI
+#undef OSOE_RMA_DECL_PUT_SIGNAL
+#undef OSOE_RMA_DECL_PUT_SIGNAL_NBI
+#undef OSOE_RMA_DECL_SIZE_PUT_GET
+#undef OSOE_RMA_DECL_SIZE_IPUT_IGET
+#undef OSOE_RMA_DECL_SIZE_NBI
+#undef OSOE_RMA_DECL_SIZE_PUT_SIGNAL
+#undef OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI
 
 #ifdef __cplusplus
 }

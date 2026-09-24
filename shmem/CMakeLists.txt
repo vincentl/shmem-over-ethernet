@@ -46,6 +46,7 @@ add_library(osoe
   src/rank-map.c
   src/rendezvous.c
   src/rma.c
+  src/rma-typed.c
   src/session.c
   src/shm-object.c
   src/signal.c
