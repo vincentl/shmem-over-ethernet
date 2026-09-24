@@ -327,6 +327,10 @@ releases a buffer only once every byte has been accepted, and re-offers from whe
 the count ended — so `progress.c` did not change for it; the wire checks that
 bytes offered while a send is in flight are the ones in flight. `MSG_NOSIGNAL` on
 every send: a peer that has gone is a completion with `-EPIPE`, not a signal.
+Such a failure — `-EPIPE` or `-ECONNRESET`, the peer's reset — is the send
+side's alone (phase 1 step 4, third review): the wire sends nothing more, and
+its receive side goes on, since what the peer sent ahead of the reset is still
+there to read; any other failure is the whole connection's.
 
 **Split injection survives the socket.** `OSOE_WIRE_SPLIT` and `OSOE_WIRE_SEED`
 truncate sends (to at least one byte — a send truncated to nothing would wait for
@@ -1777,10 +1781,19 @@ the bytes forever, and this process is ending either way; a peer told nothing
 takes its end of stream for a death. A reset ends it at once — it leaves
 `SIOCOUTQ` above 0 for good, so a closed connection counts as told — and the
 grace of `exit` above follows it, so a process ends within twice the grace of
-its abort. What the wait makes sure of is the peer's kernel, not its engine: a
-peer whose own send fails on the reset stops receiving, and ends on the failure
-with the goodbye unread if its ring had not taken it (third review; not yet
-fixed — the decisions log of 2026-09-23, entry 23). The one new message kind is `OSOE_AM_ABORT`
+its abort. The wait makes sure of the peer's kernel, and the peer's engine does
+the rest: a peer still sending to this node finds the reset as a failed send,
+and one that took that for the connection's failure ended on it at once, with
+the goodbye unread in its kernel whenever its ring had had no buffer free for it
+(found in the third review; `abort_model.py`, `send_error_ends`). A failed send
+on a reset now stops the sends and nothing else: the peer goes on receiving,
+reads the goodbye ahead of the reset, and is judged at its stream's end — by the
+goodbye, or, without one, as a peer that died (`shmem.global-exit.stream` with
+two wire buffers). The close follows the same rule: a connection whose sends met
+the peer's reset is owed nothing more, and needs no goodbye of this side's once
+the peer's own has arrived and its stream has ended - a peer that crashed during
+the close, which would otherwise leave this node waiting to send a goodbye
+nobody will read (the model's crash cases). The one new message kind is `OSOE_AM_ABORT`
 (§3.13's table, and so its checksum). An abort during §6.4's close needs no
 abortive goodbye, the model found: after the final barrier no PE can call
 `shmem_global_exit`, and a fatal's status is a failure anyway.

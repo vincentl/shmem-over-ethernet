@@ -1066,6 +1066,16 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
   set_tests_properties(shmem.global-exit.stream.0-0-1-1
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  # The same with two wire buffers, so that a node's ring has often none free
+  # when the goodbye arrives: the goodbye then waits in its kernel while the
+  # node's own stream meets the caller's reset as a failed send, which must
+  # stop the sends and nothing else (wire.h: send_error).
+  add_test(NAME shmem.global-exit.stream.two-buffers.0-0-1-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
+  set_tests_properties(shmem.global-exit.stream.two-buffers.0-0-1-1
+    PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "OSOE_WIRE_BUFFERS=2"
+               PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endif()
 
 # OSOE_KEEPALIVE is three counts or 0, and anything else is refused by name.
@@ -1372,6 +1382,13 @@ if(OSOE_TIER3)
       set_tests_properties(tier3.${shape}.global-exit.${label}.0-0-1-1
         PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
     endforeach()
+    string(REPLACE ";" " " wrap "${osoe_tier3};${shape};2;OSOE_WIRE_BUFFERS=2;--")
+    add_test(NAME tier3.${shape}.global-exit.stream.two-buffers.0-0-1-1
+      COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+              sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
+    set_tests_properties(tier3.${shape}.global-exit.stream.two-buffers.0-0-1-1
+      PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
     # A node that vanishes - its link cut once the job is ready - is found by TCP
     # keepalive at its tightest (§3.15, wire.c). See vanished-node.sh.
     foreach(map 0,1 0,0,1,1)

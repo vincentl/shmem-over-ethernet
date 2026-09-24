@@ -215,6 +215,8 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len)
 {
     if (w->error)
         osoe_fatal("the connection to node %u failed: %s", w->peer, strerror(-w->error));
+    if (w->send_error)
+        return 0;                       /* the peer has reset the connection (wire.h) */
     if (w->sending) {
         /* One send in flight (§3.3): the caller offers what it offered, until
          * the kernel says how much of it went. */

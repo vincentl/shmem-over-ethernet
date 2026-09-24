@@ -591,6 +591,10 @@ static bool receive(struct osoe_progress *p, uint32_t slot)
         if (!osoe_am_parser_between_segments(&c->parser))
             osoe_fatal("node %u: node %u's stream ended in the middle of a segment: its "
                        "lead has exited or died mid-send", p->node, peer_of(p, slot));
+        if (!c->peer_goodbye && w->send_error)
+            osoe_fatal("node %u: node %u reset its connection without its goodbye (%s): "
+                       "its lead has exited or died (§6.4)", p->node, peer_of(p, slot),
+                       strerror(-w->send_error));
         if (!c->peer_goodbye)
             osoe_fatal("node %u: node %u ended its connection without its goodbye: its "
                        "lead has exited or died (§6.4)", p->node, peer_of(p, slot));
@@ -814,7 +818,7 @@ static bool flush_aborting(struct osoe_progress *p, uint32_t slot,
     struct osoe_wire *w = &p->wire[slot];
     if (c->abort_done)
         return false;
-    if (w->error || c->peer_aborted || c->goodbye == OSOE_GOODBYE_SENT ||
+    if (w->error || w->send_error || c->peer_aborted || c->goodbye == OSOE_GOODBYE_SENT ||
         (osoe_wire_ended(w) && !c->peer_goodbye)) {
         c->abort_done = true;           /* nobody to tell */
         return true;
@@ -862,6 +866,10 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
      * which a send would take for a failure - a fatal on this thread, ending
      * this node before its agent could tell its other peers. */
     if (c->peer_aborted)
+        return false;
+    /* Nor to a peer that has reset the connection, which reads nothing more:
+     * whether it was ending or died, its stream's end says (receive). */
+    if (p->wire[slot].send_error)
         return false;
     bool moved = false;
 
@@ -1160,6 +1168,8 @@ bool osoe_progress_idle(struct osoe_progress *p)
             return false;
     for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
         struct osoe_progress_connection *c = &p->connection[slot];
+        if (p->wire[slot].send_error)
+            continue;                   /* a peer that reset the connection is owed nothing */
         if (c->sending != OSOE_CONNECTION_NONE || c->sealed != OSOE_CONNECTION_NONE)
             return false;
         if (c->queues.control.depth != 0 || c->queues.bulk.depth != 0)
@@ -1259,7 +1269,8 @@ bool osoe_progress_aborted(const struct osoe_progress *p)
          * peer is ending too.
          */
         if (c->abort_sent == p->abort_segment_bytes && !c->peer_aborted &&
-            !p->wire[slot].error && osoe_wire_unacknowledged(&p->wire[slot]))
+            !p->wire[slot].error && !p->wire[slot].send_error &&
+            osoe_wire_unacknowledged(&p->wire[slot]))
             return false;
     }
     return true;
@@ -1269,8 +1280,11 @@ bool osoe_progress_closed(const struct osoe_progress *p)
 {
     for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
         const struct osoe_progress_connection *c = &p->connection[slot];
-        if (c->goodbye != OSOE_GOODBYE_SENT || !c->peer_goodbye ||
-            !osoe_wire_ended(&p->wire[slot]))
+        /* A connection whose sends met the peer's reset needs no goodbye of this
+         * side's once the peer's own has arrived and its stream ended: the peer
+         * reads nothing more - it crashed during the close (abort_model.py). */
+        if ((c->goodbye != OSOE_GOODBYE_SENT && !p->wire[slot].send_error) ||
+            !c->peer_goodbye || !osoe_wire_ended(&p->wire[slot]))
             return false;
     }
     return true;

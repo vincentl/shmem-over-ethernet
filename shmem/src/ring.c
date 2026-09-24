@@ -189,7 +189,12 @@ void osoe_ring_reap(struct osoe_ring *r)
             break;
         case SEND:
             if (cqe->res < 0) {
-                w->error = cqe->res;
+                /* The peer's reset (wire.h) - not a send after this side's
+                 * own end of stream, which would be this node's mistake. */
+                if ((cqe->res == -EPIPE || cqe->res == -ECONNRESET) && !w->shut)
+                    w->send_error = cqe->res;
+                else
+                    w->error = cqe->res;
                 w->sent = 0;
                 mark(r, slot);
             } else {
