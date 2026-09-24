@@ -1,0 +1,40 @@
+#!/bin/sh
+# oshcc - compile and link an OpenSHMEM program against osoe.
+#
+# The C compiler osoe was built with - or $OSOE_CC - given osoe's headers, and,
+# when it links, osoe's library and a run path to it. A compile-only call (-c,
+# -S, -E, -M, -MM, -fsyntax-only) gets the header path alone, so object files
+# build as they would with any other oshcc. `oshcc -show ...` prints the command
+# it would run instead of running it.
+#
+# Symmetric statics are not yet supported (design §4.3): a program that passes
+# a global or static variable where a symmetric address is required is refused
+# at run time by name. When they are, this is where -fno-pie, -no-pie and the
+# linker script that gathers the program's data go, since the wrapper is what
+# knows which objects are the program's own.
+compiler=${OSOE_CC:-@OSOE_WRAPPER_COMPILER@}
+include='@OSOE_WRAPPER_INCLUDE@'
+library='@OSOE_WRAPPER_LIBRARY@'
+libraries='@OSOE_WRAPPER_LIBRARIES@'
+
+show=no
+if [ "$1" = -show ]; then
+    show=yes
+    shift
+fi
+link=yes
+for argument in "$@"; do
+    case $argument in
+        -c|-S|-E|-M|-MM|-fsyntax-only) link=no ;;
+    esac
+done
+if [ $link = yes ]; then
+    set -- -I"$include" "$@" -L"$library" $libraries -Wl,-rpath,"$library"
+else
+    set -- -I"$include" "$@"
+fi
+if [ $show = yes ]; then
+    echo "$compiler" "$@"
+    exit 0
+fi
+exec "$compiler" "$@"
