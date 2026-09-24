@@ -52,7 +52,7 @@ static int local_count;
 
 static void read_local_ranks(void)
 {
-    const char *gtids = getenv("OSOE_GTIDS");
+    const char *gtids = osoe_test_launcher("GTIDS");
     if (!gtids) {
         fprintf(stderr, "OSOE_GTIDS is unset: this test needs osoe-launch\n");
         exit(2);
@@ -81,7 +81,8 @@ int main(void)
     read_local_ranks();
     const char *force = getenv("OSOE_FORCE_REMOTE");
     int forced = force && strcmp(force, "0") != 0;
-    int nodes = atoi(getenv("OSOE_STEP_NUM_NODES") ? getenv("OSOE_STEP_NUM_NODES") : "1");
+    const char *step_nodes = osoe_test_launcher("STEP_NUM_NODES");
+    int nodes = atoi(step_nodes ? step_nodes : "1");
 
     arrivals_open();
     shmem_init();
@@ -204,7 +205,7 @@ int main(void)
     if (nodes > 1) {
         const char *k_env = getenv("OSOE_COLLECTIVE_FANOUT");
         uint32_t k = k_env ? (uint32_t)atoi(k_env) : 4;
-        uint32_t me_node = (uint32_t)atoi(getenv("OSOE_NODEID"));
+        uint32_t me_node = (uint32_t)atoi(osoe_test_launcher("NODEID"));
         uint64_t parent = 0, children = 0, missing = 0, own = 0, fanout = 0;
         CHECK(osoe_test_node_metric("team.world.tree.parent", &parent));
         CHECK(osoe_test_node_metric("team.world.tree.children", &children));

@@ -496,12 +496,14 @@ void osoe_listener_node_address(const struct osoe_bootstrap *b, uint32_t node,
 {
     char host[256];
     if (!b->node_list || !osoe_hostlist_entry(b->node_list, node, host, sizeof host))
-        osoe_fatal("OSOE_STEP_NODELIST='%s' has no usable entry for node %u",
-                   b->node_list ? b->node_list : "", node);
+        osoe_fatal("%sSTEP_NODELIST='%s' has no usable entry for node %u",
+                   b->launcher ? b->launcher : "OSOE_", b->node_list ? b->node_list : "",
+                   node);
     struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM }, *found;
     int e = getaddrinfo(host, NULL, &hints, &found);
     if (e != 0)
-        osoe_fatal("cannot resolve %s, node %u's host in OSOE_STEP_NODELIST: %s", host, node,
+        osoe_fatal("cannot resolve %s, node %u's host in %sSTEP_NODELIST: %s", host, node,
+                   b->launcher ? b->launcher : "OSOE_",
                    gai_strerror(e));
     *out = *(const struct sockaddr_in *)found->ai_addr;
     out->sin_port = 0;

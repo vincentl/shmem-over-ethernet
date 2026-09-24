@@ -4275,6 +4275,19 @@ rendezvous** from each node's `SLURM_GTIDS` (§6.2).
 `SLURM_NODEID` is still the locality input, which is the shape §8.1 wants:
 `OSOE_NODE_MAP` overrides it, and both paths share one code path.
 
+*As built* (phase 1 step 4, the second slice's Part B): the bootstrap reads
+these names as `srun` sets them, or as `osoe-launch` mirrors them with `OSOE_`
+in place of `SLURM_`. `OSOE_PROCID` decides which, and every name is then read
+with that prefix, never a mixture — so a test that `osoe-launch` starts inside
+a Slurm allocation, whose environment holds both, is the launcher's job and not
+the allocation's. A task in a Slurm job but in no step of it — a program run
+straight from a batch script — is refused, naming `srun`. The node list is
+Slurm's compressed form (`pi-[001-004]`), each entry resolved by
+`getaddrinfo`. `osoe-launch -s` sets `srun`'s names, so the Slurm path runs at
+every tier on one machine (`shmem.slurm.*`), and `shmem.bootstrap.*` replays
+real and documented `srun` environments (`shmem/tests/slurm-fixtures/`), which
+`tools/launch/capture-slurm-fixtures.sh` captures.
+
 ### 6.2 Rendezvous
 
 > **Local PEs meet on their node; only each node's lead crosses the network.

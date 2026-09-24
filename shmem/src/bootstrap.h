@@ -1,8 +1,10 @@
 /*
  * Bootstrap environment (§6.1, §6.2).
  *
- * Phase 1 step 1 reads only the OSOE_ variables, and only a one-node job:
- * Slurm's SLURM_ variables arrive with the environment fixtures of §8.2.
+ * The launcher's variables are Slurm's, as srun sets them, or osoe-launch's
+ * mirror of them - the same names with OSOE_ in place of SLURM_ - which a test
+ * or a job started by hand sets too. OSOE_PROCID decides which are read. The
+ * comments below give the names without their prefix.
  */
 #ifndef OSOE_BOOTSTRAP_H
 #define OSOE_BOOTSTRAP_H
@@ -11,16 +13,18 @@
 #include <stdint.h>
 
 struct osoe_bootstrap {
+    const char *launcher;       /* "SLURM_" or "OSOE_": whose names were read; NULL
+                                 * in a bootstrap built by hand, which means OSOE_ */
     bool have_rank;             /* rank is valid, for messages */
-    uint32_t rank;              /* OSOE_PROCID */
-    uint32_t world_size;        /* OSOE_STEP_NUM_TASKS */
-    uint32_t node;              /* OSOE_NODEID */
-    uint32_t node_count;        /* OSOE_STEP_NUM_NODES */
-    uint32_t local_id;          /* OSOE_LOCALID; the lead is 0 */
-    uint32_t local_count;       /* L: the length of OSOE_GTIDS */
+    uint32_t rank;              /* PROCID */
+    uint32_t world_size;        /* STEP_NUM_TASKS */
+    uint32_t node;              /* NODEID */
+    uint32_t node_count;        /* STEP_NUM_NODES */
+    uint32_t local_id;          /* LOCALID; the lead is 0 */
+    uint32_t local_count;       /* L: the length of GTIDS */
     uint32_t *gtids;            /* world rank of each local id */
-    uint64_t job;               /* OSOE_JOB_ID */
-    uint32_t step;              /* OSOE_STEP_ID */
+    uint64_t job;               /* JOB_ID */
+    uint32_t step;              /* STEP_ID */
     uint64_t symmetric_size;    /* SHMEM_SYMMETRIC_SIZE, or the default */
     uint64_t no_progress_ns;    /* OSOE_NO_PROGRESS_TIMEOUT, seconds; 0 = never (§3.15) */
     uint64_t heap_base;         /* OSOE_HEAP_BASE, 0 if unset */
@@ -37,7 +41,7 @@ struct osoe_bootstrap {
      * OSOE_KEEPALIVE=0. */
     uint32_t keepalive_idle_s, keepalive_interval_s, keepalive_count;
     bool keepalive_off;
-    const char *node_list;      /* OSOE_STEP_NODELIST (§6.1), when the job spans nodes */
+    const char *node_list;      /* STEP_NODELIST (§6.1), when the job spans nodes */
     bool secured;               /* OSOE_JOB_SECRET is set (§6.2, §10) */
     unsigned char secret[16];   /* its 128 bits, the key every hello's proof is made with */
 

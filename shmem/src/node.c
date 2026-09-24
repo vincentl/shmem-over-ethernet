@@ -215,8 +215,9 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
         }
         if (n->slots[i].rank != b->gtids[i]) {
             char msg[256];
-            snprintf(msg, sizeof msg, "local PE %u joined as rank %u, but OSOE_GTIDS "
-                     "names rank %u", i, n->slots[i].rank, b->gtids[i]);
+            snprintf(msg, sizeof msg, "local PE %u joined as rank %u, but %sGTIDS "
+                     "names rank %u", i, n->slots[i].rank,
+                     b->launcher ? b->launcher : "OSOE_", b->gtids[i]);
             fail_rendezvous(n, msg);
         }
     }

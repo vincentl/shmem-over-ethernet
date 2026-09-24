@@ -178,10 +178,13 @@ static void connect_floor(int me, int *port)
         shmem_barrier_all();
         int there = 0;
         shmem_getmem(&there, port, sizeof there, 1);
-        const char *list = getenv("OSOE_STEP_NODELIST");
+        /* The step's hosts under the bootstrap's rule (§6.1): osoe-launch's
+         * names when OSOE_PROCID is set, srun's otherwise. */
+        const char *list = getenv(getenv("OSOE_PROCID") ? "OSOE_STEP_NODELIST"
+                                                        : "SLURM_STEP_NODELIST");
         char host[256];
         if (!list || !osoe_hostlist_entry(list, 1, host, sizeof host))
-            fail("OSOE_STEP_NODELIST names no node 1", EINVAL);
+            fail("the step's node list names no node 1", EINVAL);
         struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM }, *found;
         if (getaddrinfo(host, NULL, &hints, &found) != 0)
             fail("getaddrinfo", EHOSTUNREACH);

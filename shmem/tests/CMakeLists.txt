@@ -216,6 +216,24 @@ osoe_warnings(shmem_test_fatal-order)
 add_test(NAME shmem.fatal-order COMMAND shmem_test_fatal-order)
 set_tests_properties(shmem.fatal-order PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# The bootstrap against launcher environments (§6.1, §8.2): each fixture in
+# slurm-fixtures/ is one task's environment - captured from a real srun, or
+# written from Slurm's documentation and marked so - replayed with nothing of
+# the test's own, and read as the task it was or refused by name. See
+# test-bootstrap.c and slurm-fixtures/README.md.
+add_executable(shmem_test_bootstrap test-bootstrap.c ../src/bootstrap.c)
+target_include_directories(shmem_test_bootstrap PRIVATE ../src)
+target_link_libraries(shmem_test_bootstrap PRIVATE osoe_base)
+osoe_warnings(shmem_test_bootstrap)
+file(GLOB osoe_slurm_fixtures CONFIGURE_DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/slurm-fixtures/*.env)
+foreach(fixture IN LISTS osoe_slurm_fixtures)
+  get_filename_component(label ${fixture} NAME_WE)
+  add_test(NAME shmem.bootstrap.${label} COMMAND shmem_test_bootstrap ${fixture})
+  set_tests_properties(shmem.bootstrap.${label} PROPERTIES LABELS "tier1" TIMEOUT 30
+    PASS_REGULAR_EXPRESSION "FIXTURE OK")
+endforeach()
+
 add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c ../src/shm-object.c
   ../src/am.c ../src/rendezvous.c ../src/rank-map.c ../src/listener.c)
 target_include_directories(shmem_test_job PRIVATE ../src)
@@ -557,6 +575,28 @@ foreach(map IN LISTS osoe_internode_maps)
             $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
             $<TARGET_FILE:shmem_test_internode>)
   set_tests_properties(shmem.internode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+# The same through the bootstrap's Slurm path (§6.1): osoe-launch -s names the
+# launcher's variables as srun does, SLURM_ in place of OSOE_. One node, one PE
+# a node, the block map, and the cyclic one, whose ranks are not contiguous per
+# node - the distribution §6.1 says the environment cannot describe, and the
+# rendezvous must assemble from each node's SLURM_GTIDS.
+if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(osoe_slurm_maps 0,0,0,0)
+else()
+  set(osoe_slurm_maps 0,0,0,0 0,1,2 0,0,1,1,2,2 0,1,2,0,1,0)
+endif()
+foreach(map IN LISTS osoe_slurm_maps)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.slurm.internode.${label}
+    COMMAND ${CMAKE_COMMAND} -E env --unset=OSOE_PROCID OSOE_AM_CHUNK=1024
+            OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -s -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_internode>)
+  set_tests_properties(shmem.slurm.internode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
 # The same program under §8.1's force-remote flag (slice 3). It is registered
 # now because the flag no longer touches the route: a put to a node-mate is
@@ -1177,9 +1217,16 @@ set_tests_properties(shmem.watchdog.default PROPERTIES
 # Init must refuse what it cannot run, saying why.
 add_test(NAME shmem.refuse.no_launcher
   COMMAND ${CMAKE_COMMAND} -E env --unset=OSOE_PROCID --unset=SLURM_JOB_ID
-          $<TARGET_FILE:shmem_test_init>)
+          --unset=SLURM_PROCID --unset=SLURM_STEP_ID $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.refuse.no_launcher PROPERTIES
   PASS_REGULAR_EXPRESSION "no launcher environment")
+# Inside a Slurm job but not a step of it - a program run straight from a
+# batch script - which has a job id and no task of its own (§6.1).
+add_test(NAME shmem.refuse.slurm_not_a_step
+  COMMAND ${CMAKE_COMMAND} -E env --unset=OSOE_PROCID --unset=SLURM_PROCID
+          --unset=SLURM_STEP_ID SLURM_JOB_ID=4242 $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.refuse.slurm_not_a_step PROPERTIES
+  PASS_REGULAR_EXPRESSION "inside Slurm job 4242 but not in a step of it")
 # A multi-node job is no longer refused; shmem.multinode.* is what it does
 # instead, and shmem.init.* still covers the one-node case.
 add_test(NAME shmem.refuse.bad_size
