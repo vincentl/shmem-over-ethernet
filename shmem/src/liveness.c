@@ -36,8 +36,8 @@ static bool said_no_pidfd;
 void osoe_liveness_start(void)
 {
     watched_count = 0;
-    if (osoe.bootstrap.liveness_off || osoe.bootstrap.local_count < 2)
-        return;                         /* OSOE_LIVENESS=0, or nobody to watch */
+    if (osoe.bootstrap.local_count < 2)
+        return;                         /* nobody to watch */
     uint32_t me = osoe.bootstrap.local_id, n = me == 0 ? osoe.bootstrap.local_count - 1 : 1;
     watched_id = malloc(n * sizeof *watched_id);
     watched_fd = malloc(n * sizeof *watched_fd);

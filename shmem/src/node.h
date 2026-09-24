@@ -121,7 +121,7 @@ struct osoe_pe_slot {
     _Alignas(OSOE_CACHELINE) _Atomic uint64_t watch_rng;
     _Atomic uint32_t watch_seq;
     uint32_t rank;
-    int32_t pid;                    /* this PE's process id, for the watchdog (§3.15) */
+    int32_t pid;                    /* this PE's process id, for liveness (§3.15) */
     int32_t tid;                    /* the initializing thread, for /proc/<pid>/task/<tid> */
     uint64_t symmetric_size;        /* SHMEM_SYMMETRIC_SIZE as this PE parsed it */
     uint64_t heap_bytes;            /* mapped length of the heap object */

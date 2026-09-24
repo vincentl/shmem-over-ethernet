@@ -65,5 +65,10 @@ fi
 case $MODE in
 start-pes|returned)
     [ -n "$began" ] && awk -v t="$took" 'BEGIN { exit !(t < 6) }' || exit 1 ;;
+handlers)
+    # exit on the caller's PE only, which runs its handler; _exit elsewhere.
+    ran=$(printf '%s\n' "$out" | grep -c "^PE [0-9]*: handler ran\$")
+    echo "handlers: $ran ran"
+    [ "$ran" -eq 1 ] && printf '%s\n' "$out" | grep -q "^PE $CALLER: handler ran\$" || exit 1 ;;
 esac
 echo "GLOBAL EXIT OK"

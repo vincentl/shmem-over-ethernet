@@ -1,13 +1,17 @@
 /*
- * The development watchdog (§3.15): a PE that dies while its siblings are
- * blocked in a library wait must produce a loud failure naming it, not a hang.
+ * A PE that dies while its siblings are blocked in a library wait ends the job
+ * with a loud failure naming where each survivor was, not a hang (§3.15), in
+ * every build.
  *
  * The last rank kills itself with SIGKILL - the one signal no handler can
  * intercept, so nothing in the library runs on its way out and its slot is left
  * exactly as a crash would leave it. Every other PE then blocks forever in the
  * routine named by OSOE_TEST_WAIT: a barrier the dead PE will never arrive at,
- * or a wait_until on a flag it will never write. Both are library waits with a
- * safety-sweep deadline, and both must end in the watchdog's message.
+ * or a wait_until on a flag it will never write. The lead's agent finds the
+ * death by its pidfd and declares the node's abort, and each survivor ends -
+ * from its agent, which names the routine its thread waits in, or from that
+ * wait's own sweep, which names it too. This was the development watchdog's
+ * test until it was retired (2026-09-23).
  *
  * Run under `osoe-launch -k`, so the launcher does not terminate the survivors
  * when it reaps the victim: what ends this job has to be the library.
@@ -31,14 +35,16 @@ int main(void)
     bool in_wait = which && strcmp(which, "wait_until") == 0;
 
     uint64_t *flag = shmem_malloc(sizeof *flag);
-    CHECK_FATAL(flag);  /* NULL would be dereferenced just below */
+    uint64_t *scratch = shmem_malloc(sizeof *scratch);
+    CHECK_FATAL(flag && scratch);   /* NULL would be dereferenced just below */
     *flag = 0;
     shmem_barrier_all();
 
     if (n == 1) {
         /* Nothing can die on a one-PE job, and nothing else here would block.
          * Say so rather than pretending to have tested it. */
-        fprintf(stderr, "watchdog: one PE, nothing to detect\n");
+        fprintf(stderr, "death-in-wait: one PE, nothing to detect\n");
+        shmem_free(scratch);
         shmem_free(flag);
         shmem_finalize();
         return CHECK_DONE();
@@ -46,17 +52,23 @@ int main(void)
 
     if (me == n - 1) {
         raise(SIGKILL);
-        fprintf(stderr, "watchdog: SIGKILL did not kill PE %d\n", me);
+        fprintf(stderr, "death-in-wait: SIGKILL did not kill PE %d\n", me);
         return 2;
     }
 
-    /* Unreachable in a passing run: the watchdog aborts inside one of these. */
+    /* A put to the PE half the job away, on another node when there are two:
+     * the barrier then quiets it inside its own wait, a wait within a wait,
+     * whose end must leave the barrier's routine named (blocked.h). */
+    uint64_t one = 1;
+    shmem_putmem(scratch, &one, sizeof one, (me + n / 2) % n);
+
+    /* Unreachable in a passing run: the abort ends this PE inside one of these. */
     if (in_wait)
         shmem_uint64_wait_until(flag, SHMEM_CMP_EQ, 1);
     else
         shmem_barrier_all();
 
-    fprintf(stderr, "watchdog: PE %d returned from a wait the dead PE never "
+    fprintf(stderr, "death-in-wait: PE %d returned from a wait the dead PE never "
                     "completed\n", me);
     return 2;
 }

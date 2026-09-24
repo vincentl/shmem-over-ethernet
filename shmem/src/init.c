@@ -84,9 +84,6 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "    SHMEM_DEBUG            print what the library set up, per PE\n"
 "\n"
 "  Specific to osoe:\n"
-"    OSOE_WATCHDOG          0 or 1: the development watchdog that ends a job\n"
-"                           whose PE has died, instead of waiting for the\n"
-"                           launcher's timeout. On in debug builds (§3.15)\n"
 "    OSOE_MAX_THREADS       counter blocks per PE, one per thread (§3.14)\n"
 "    OSOE_NO_PROGRESS_TIMEOUT\n"
 "                           seconds a wait may see no progress before it ends\n"
@@ -116,8 +113,6 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "    OSOE_KEEPALIVE         IDLE,INTERVAL,COUNT: TCP keepalive between nodes,\n"
 "                           in seconds, seconds and probes; default 60,10,6;\n"
 "                           0 for none (§3.15)\n"
-"    OSOE_LIVENESS          0: no agent watches for a local PE's death, which\n"
-"                           only the tests of the watchdog need (§3.15)\n"
 "\n"
 "  The bootstrap variables OSOE_PROCID, OSOE_LOCALID, OSOE_GTIDS,\n"
 "  OSOE_STEP_NUM_TASKS, OSOE_NODEID, OSOE_JOB_ID and OSOE_STEP_ID are set by\n"
@@ -147,7 +142,6 @@ SHMEM_VENDOR_STRING " environment variables\n"
  */
 static void exit_without_finalize(void)
 {
-    osoe_abort_inside_exit();
     /* osoe_initialized, not refcount, which the mutex guards: this may run on
      * the agent, ending the process while the main thread is still finishing
      * shmem_init; and init_pid only once that acquire load has found it set,
@@ -155,9 +149,8 @@ static void exit_without_finalize(void)
     if (atomic_load_explicit(&osoe_initialized, memory_order_acquire) == 0 ||
         getpid() != init_pid || osoe_abort_stand_aside())
         return;
-    /* A global exit already declared is what this exit is part of: it ends
-     * the process with its status, and this thread, inside exit, is the one to
-     * end it once the agent has told the other nodes (abort.h). */
+    /* A global exit already declared is what this exit is part of: its end
+     * is this PE's end, with its status (abort.h). */
     uint32_t pe;
     int status;
     if (osoe_node_abort_read(&osoe.node, &pe, &status) == OSOE_ABORT_GLOBAL_EXIT)
@@ -172,7 +165,13 @@ static void exit_without_finalize(void)
                                                                           : sizeof msg - 1);
         (void)ignored;
     }
-    osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE, OSOE_ABORT_FATAL);
+    /* A global exit declared since the read above wins the word, and this PE
+     * then ends as it does, with its status - as fatal.c routes a fatal that
+     * loses (review of the watchdog's retirement). */
+    if (!osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE,
+                                 OSOE_ABORT_FATAL) &&
+        osoe_node_abort_read(&osoe.node, &pe, &status) == OSOE_ABORT_GLOBAL_EXIT)
+        osoe_abort_end();
     _exit(EXIT_FAILURE);
 }
 
@@ -307,12 +306,11 @@ static void session_start(void)
      */
     if (osoe.bootstrap.debug)
         fprintf(stderr, "osoe: PE %u of %u (local %u of %u): segment /dev/shm%s, "
-                "heap %llu bytes at %#llx, watchdog %s, node %u of %u%s\n",
+                "heap %llu bytes at %#llx, node %u of %u%s\n",
                 osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
                 osoe.bootstrap.local_count, osoe.node.control_name,
                 (unsigned long long)osoe.node.heap_size,
                 (unsigned long long)(uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id],
-                osoe.bootstrap.watchdog ? "on" : "off",
                 osoe.job.node, osoe.job.node_count,
                 osoe.job.force_remote ? ", force-remote" : "");
 }
@@ -364,8 +362,7 @@ OSOE_API void pshmem_finalize(void)
     /* A process ending on an abort runs no collective on the way out: a
      * program's own atexit(shmem_finalize) would wait for PEs that are
      * exiting (abort.h; the rule of conformance F1). Only the thread ending the
-     * process returns; any other waits for that end here - or, inside exit,
-     * ends the process itself (abort.h). */
+     * process returns; any other waits for that end here. */
     if (osoe_abort_stand_aside())
         return;
     pthread_mutex_lock(&lifecycle);
@@ -405,6 +402,7 @@ OSOE_API void pshmem_global_exit(int status)
     if (atomic_load_explicit(&osoe_initialized, memory_order_acquire) == 0 ||
         getpid() != init_pid)
         exit(status);
+    osoe_abort_caller();
     osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, status, OSOE_ABORT_GLOBAL_EXIT);
     osoe_abort_end();
 }

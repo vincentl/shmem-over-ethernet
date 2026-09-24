@@ -54,7 +54,7 @@ add_library(osoe
   src/transport-local.c
   src/wait.c
   src/watch.c
-  src/watchdog.c
+  src/sweep.c
   ${osoe_backend_sources})
 target_include_directories(osoe
   PUBLIC
@@ -66,15 +66,6 @@ target_include_directories(osoe
 # the AM backend's ring is its first user (phase 1 step 3).
 target_link_libraries(osoe PRIVATE osoe_base Threads::Threads PkgConfig::LIBURING)
 
-# The development watchdog (§3.15) is a development aid, not the release path:
-# on in the debug, asan and tsan presets, which all build Debug, and off in
-# release. OSOE_WATCHDOG overrides it at run time either way.
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(OSOE_WATCHDOG_DEFAULT 1)
-else()
-  set(OSOE_WATCHDOG_DEFAULT 0)
-endif()
-target_compile_definitions(osoe PRIVATE OSOE_WATCHDOG_DEFAULT=${OSOE_WATCHDOG_DEFAULT})
 set_target_properties(osoe PROPERTIES
   C_VISIBILITY_PRESET hidden
   VERSION ${PROJECT_VERSION}

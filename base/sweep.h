@@ -8,8 +8,8 @@
  *
  * base declares it and provides a do-nothing definition, so base's own waits -
  * the epoch counters - can call it without depending on the layer above. The
- * SHMEM layer overrides that definition with the development watchdog
- * (shmem/src/watchdog.c), which checks the abort word and the local PEs'
+ * SHMEM layer overrides that definition with its sweep (shmem/src/sweep.c),
+ * which checks the abort word and, before the agent runs, the local PEs'
  * liveness. `routine` names the API routine the caller is inside, for the
  * diagnostic.
  */

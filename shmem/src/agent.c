@@ -59,7 +59,7 @@ static void *agent_main(void *arg)
         if (atomic_load_explicit(&stop_requested, memory_order_acquire))
             break;
         /*
-         * Liveness without the watchdog (liveness.h): at most once a sweep
+         * Liveness (liveness.h): at most once a sweep
          * interval, a death this agent can see - the lead's of any other local
          * PE, any other PE's of its lead - declares the node's abort, which the
          * check below then acts on in this same turn. Every wait of this loop

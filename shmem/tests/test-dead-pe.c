@@ -15,7 +15,7 @@
  * only their agents can end, and the even ones wait in a barrier the dead PE
  * never reaches. dead-pe.sh requires every survivor to leave with the failure
  * status - none killed by the launcher at its timeout, or still computing 30 s
- * later - with the development watchdog off, so that it is not what finds it.
+ * later.
  *
  * In init, before any agent runs, the sweeps of init's own waits watch instead
  * (liveness.h): dead-pe-init.sh requires rank 1, waiting on its lead in the

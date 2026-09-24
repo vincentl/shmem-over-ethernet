@@ -38,8 +38,13 @@
  *              200 ms later: its agent's exit is then waiting on the main
  *              thread before the library's own handler runs
  *
- * In the last two, exit's lock (glibc 2.41) is held by the main thread, which
- * must end the process itself: the agent's exit can only wait on it.
+ *   handlers   compute, with an atexit handler on every PE that prints a line:
+ *              only the caller's PE ends with exit, which runs it; every other
+ *              ends with fflush and _exit, running none beside a main thread
+ *              still computing
+ *
+ * In start-pes and returned, exit's lock (glibc 2.41) is held by the main
+ * thread, which a non-caller's _exit does not wait on.
  *
  * global-exit.sh runs the job and requires every rank to have left with the
  * status - the caller's, or a fatal's failure - and, for a global exit, every
@@ -69,6 +74,13 @@ static void end_the_job(const char *how)
     shmem_global_exit(atoi(how));
 }
 
+static int my_pe = -1;
+
+static void handler_ran(void)
+{
+    printf("PE %d: handler ran\n", my_pe);
+}
+
 static void slow_handler(void)
 {
     struct timespec slow = { 1, 500 * 1000 * 1000 };
@@ -92,6 +104,9 @@ int main(int argc, char **argv)
     else
         shmem_init();
     int me = shmem_my_pe(), npes = shmem_n_pes();
+    my_pe = me;
+    if (strcmp(mode, "handlers") == 0)
+        atexit(handler_ran);
     printf("PE %d: computing\n", me);           /* buffered: flushed only by exit */
     if (me == caller && strcmp(mode, "immediate") == 0)
         end_the_job(how);

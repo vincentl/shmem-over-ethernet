@@ -11,8 +11,8 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
 
 /*
  * osoe_fatal with a last act before the abort: the message is written, then
- * `publish(context)` runs - a rendezvous's `failed` word, the watchdog's abort
- * naming a dead sibling - and then the process leaves as osoe_fatal does.
+ * `publish(context)` runs - a rendezvous's `failed` word - and then the
+ * process leaves as osoe_fatal does.
  *
  * The message first, always. Anything published lets another process end the
  * job: its PEs stop, the launcher sees a failure and sends the rest SIGTERM. A

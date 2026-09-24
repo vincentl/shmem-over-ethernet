@@ -12,10 +12,11 @@
  * the quiet can never finish. PE 1 runs the real osoe-stat on its node until PE
  * 0 shows as blocked in shmem_quiet on node 1's acknowledgement, and the
  * connection toward node 1 as having one PE asleep on that word (§3.14's
- * waiters per wake word, since layout 14), then kills itself. PE 0's next sweep
- * must find the dead sibling and end the job, naming the routine it was in;
- * ctest checks the message, and the launcher's short timeout is the bound on
- * "next sweep".
+ * waiters per wake word, since layout 14), and then PE 0's sweep count rising
+ * while it waits there - the sweep this test exists for - then kills itself.
+ * PE 0's lead's agent finds the death by its pidfd, and PE 0 ends, from its
+ * agent or its quiet's own next sweep, naming the routine it was in; ctest
+ * checks the message, and the launcher's short timeout is the bound on it.
  *
  * **The stopped node is killed only after PE 0 has gone** (phase 1 step 3).
  * On a socket its death is not silent: its kernel resets the connection that
@@ -24,9 +25,9 @@
  * the one this test exists for. So PE 1 leaves a helper behind that waits for
  * PE 0 to exit and only then cleans up the stopped node.
  *
- * Run with -k, so the launcher leaves the survivors to the library, and with
- * the development watchdog on, since that is what reads a sibling's liveness
- * at a sweep (§3.15).
+ * Run with -k, so the launcher leaves the survivors to the library. Until the
+ * development watchdog was retired (2026-09-23), a sweep was also what found
+ * the dead sibling; the sweep count is now how the test sees the sweep.
  */
 #define _GNU_SOURCE
 #include <signal.h>
@@ -80,6 +81,17 @@ static void run_stat(char *out, size_t len)
     size_t n = fread(out, 1, len - 1, f);
     out[n] = '\0';
     pclose(f);
+}
+
+/* Local PE 0's sweep count in osoe-stat's table, or 0 if it cannot be read:
+ * the sixth column of the first row after the header. */
+static unsigned long long pe0_sweeps(const char *out)
+{
+    const char *header = strstr(out, "blocked in\n");
+    unsigned long long sweeps = 0;
+    if (header)
+        sscanf(header + strlen("blocked in\n"), "%*u %*u %*u %*s %*u %llu", &sweeps);
+    return sweeps;
 }
 
 /* Does local PE 0's row - the first after the table's header - say it is in
@@ -148,6 +160,15 @@ int main(void)
         printf("PE 1: osoe-stat shows PE 0 blocked in shmem_quiet\n");
     else
         printf("BLOCKED RECORD WRONG: osoe-stat does not show PE 0 in shmem_quiet:\n%s\n", out);
+    /* Three sweep intervals: a quiet that sweeps counts at least two. */
+    unsigned long long before = pe0_sweeps(out);
+    sleep_ms(350);
+    run_stat(out, sizeof out);
+    unsigned long long after = pe0_sweeps(out);
+    if (after > before)
+        printf("PE 1: PE 0's quiet swept, %llu to %llu\n", before, after);
+    else
+        printf("QUIET DID NOT SWEEP: PE 0's sweeps stayed at %llu:\n%s\n", before, out);
     fflush(stdout);
     pid_t quiet = (pid_t)*quiet_pid, stopped = (pid_t)*stopped_pid;
     if (fork() == 0) {

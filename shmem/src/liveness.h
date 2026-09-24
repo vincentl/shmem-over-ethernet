@@ -1,5 +1,5 @@
 /*
- * Liveness without the watchdog (§3.15; phase 1 step 4 slice 1, part C).
+ * Liveness (§3.15; phase 1 step 4 slice 1, part C).
  *
  * A PE that dies without finalizing leaves the rest of the job waiting for
  * something it will never do, and no wait gives up because time passed. So
@@ -20,10 +20,6 @@
  * is watched by kill(pid, 0) instead, after one line saying so, rather than the
  * job ending for it. Like the reclaim of a dead job's objects (§6.2), this
  * assumes the PEs of a node share a pid namespace.
- *
- * OSOE_LIVENESS=0 turns it off, for the tests of what else finds a death: the
- * development watchdog and a wait's sweep, which the agent would otherwise
- * race and, ending the PE itself, pre-empt.
  */
 #ifndef OSOE_LIVENESS_H
 #define OSOE_LIVENESS_H
