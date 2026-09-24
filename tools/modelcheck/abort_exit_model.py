@@ -61,9 +61,12 @@ Cases
   exiting   A's P calls it with 5 while A's lead's main thread is inside exit
             - it returned from main - and in the library's handler: start_pes's
             finalize, a barrier that sweeps. It holds exit's lock, which since
-            glibc 2.41 (BZ 31997) is never given back, so the agent's exit(s)
-            waits on it, and it may reach the handler at any moment, the
-            agent's exit already waiting or not.
+            glibc 2.41 (BZ 31997) is never given back, so an exit(s) from any
+            other thread would wait on it for good. Only a PE whose program
+            called shmem_global_exit ends with exit(s), its handlers and then
+            stdio (spec §9.1.6); every other ends with fflush and _exit, which
+            takes no lock and runs no handler beside a main thread still
+            running (the author's decision after the third review).
 
 Options
   pidfd     a sibling's death is a completion that wakes the lead's agent at
@@ -107,13 +110,9 @@ Variants (each breaks one rule above)
                     straight after init finds its lead still connecting, and
                     the lead's main thread ends it with nobody sent a goodbye
                     (phase 1 step 4's review). STATUS.
-  exit_waits        a main thread inside exit waits for its agent to end the
-                    process, as any other thread does: the agent's exit waits
-                    on the thread's lock, and the process on both. STUCK.
-  exit_early        a main thread inside exit ends the process as soon as it
-                    finds the global exit, without waiting for the agent's
-                    claim: the lead's process ends before its agent has sent
-                    the goodbye. STATUS.
+  exit_everywhere   every PE a global exit ends calls exit(s), the caller's or
+                    not, as the first slice built it: the lead's agent waits
+                    on the lock its main thread holds inside exit. STUCK.
   no_rewake         the lead's agent does not wake the others again: with the
                     declarer's own agent ending its process right after the
                     CAS, the lead is woken by its pidfd and the others by
@@ -162,7 +161,7 @@ def EOF(x, y):      return ('$eof', x, y)
 def REAPED(p):      return ('$reaped', p)          # the lead's agent has had p's pidfd completion
 def AGENT_UP(p):    return ('$agent_up', p)        # p's agent has started (init.c)
 def EXIT_LOCK(p):   return ('$exit_lock', p)       # who holds exit's lock: 0, MAIN or AGENT
-def INSIDE(p):      return ('$inside', p)          # abort.c's inside_exit
+def CALLED(p):      return ('$called', p)          # p's program called shmem_global_exit
 
 
 def disposition(word):
@@ -222,13 +221,10 @@ def finish_declaring(L):
 # ---- the agent --------------------------------------------------------------
 
 (PC_TOP, PC_WORD, PC_WORK, PC_WAIT, PC_REWAKE, PC_SEND, PC_END, PC_PAUSE,
- PC_EXITING, PC_HANDOFF) = range(10)
+ PC_EXITING) = range(9)
 
 
-def agent(variant, local, p, options, exiting=False):
-    """p's agent. `exiting`: p's main thread may be inside exit, so the agent's
-    end looks for it before calling exit - a step of its own only then, since
-    elsewhere it finds nothing and would only add states."""
+def agent(variant, local, p, options):
     x = NODE_OF[p]
     y = PEER[x]
     lead = is_lead(p)
@@ -321,20 +317,16 @@ def agent(variant, local, p, options, exiting=False):
             # before it is gone, and other threads run meanwhile.
             if M[ENDING(p)]:
                 return [({}, {'pc': PC_PAUSE}, f'{name}: another thread ends this process')]
-            if not exiting:
-                return [({ENDING(p): 1}, {'pc': PC_EXITING}, f'{name}: claims the process and calls exit')]
-            return [({ENDING(p): 1}, {'pc': PC_HANDOFF}, f'{name}: claims the process')]
-        if pc == PC_HANDOFF:
-            # A global exit's end is exit(s), which a thread inside exit
-            # already would make wait: that thread ends the process instead.
-            if disposition(M[WORD(x)]) == GLOBAL and M[INSIDE(p)]:
-                return [({}, {'pc': PC_PAUSE}, f'{name}: a thread inside exit ends this process')]
-            return [({}, {'pc': PC_EXITING}, f'{name}: calls exit')]
+            return [({ENDING(p): 1}, {'pc': PC_EXITING}, f'{name}: claims the process')]
         if pc == PC_EXITING:
-            if disposition(M[WORD(x)]) == GLOBAL:
+            # exit(s) only where this process's program called shmem_global_exit,
+            # and exit's lock is then needed; everywhere else fflush and _exit.
+            calls_exit = disposition(M[WORD(x)]) == GLOBAL and (
+                M[CALLED(p)] or variant == 'exit_everywhere')
+            if calls_exit:
                 if M[EXIT_LOCK(p)] == MAIN:
                     return []           # exit's lock, held for good by the main thread
-                upd, _, lbl = end_process(M, p, exit_status(M[WORD(x)]), 'its agent')
+                upd, _, lbl = end_process(M, p, exit_status(M[WORD(x)]), 'its agent, by exit')
                 upd[EXIT_LOCK(p)] = AGENT
                 return [(upd, {}, lbl)]
             return [end_process(M, p, exit_status(M[WORD(x)]), 'its agent, by _exit')]
@@ -375,7 +367,8 @@ def caller(variant, local, p, status):
             return d
         pc = L['pc']
         if pc == PC_CALL:
-            return [({}, start_declaring(GLOBAL * 16 + status, PC_MAIN_END),
+            # abort.c records the call before declaring (osoe_abort_caller).
+            return [({CALLED(p): 1}, start_declaring(GLOBAL * 16 + status, PC_MAIN_END),
                      f'{name}: calls shmem_global_exit({status})')]
         if pc == PC_MAIN_END:
             return main_end(variant, M, p, name)
@@ -477,54 +470,32 @@ def finisher(variant, local, p):
     return step, PC_FINALIZE
 
 
-PC_EXIT_MARK, PC_EXIT_SWEEP, PC_EXIT_AWAIT, PC_EXIT_END = 50, 51, 52, 53
+PC_EXIT_SWEEP = 50
 
 
 def exiter(variant, local, p):
-    """A main thread that returned from main: inside exit, holding exit's lock,
-    it reaches the library's handler - start_pes's finalize - at any moment,
-    and says so (osoe_abort_inside_exit); the handler's final barrier sweeps
-    like any wait. Finding a global exit it waits for the agent's claim, which
-    follows the goodbyes, then ends the process itself: exit again, from the
-    handler, which its lock lets through and which ends with the global exit's
-    status. A fatal ends by _exit, which takes no lock: it waits for that as
-    any other thread does."""
+    """A main thread that returned from main: inside exit, holding exit's lock
+    for good (glibc 2.41), in the library's handler - start_pes's finalize,
+    whose final barrier sweeps like any wait. Finding the abort, it waits for
+    its agent to end the process, as every thread but the agent does: the
+    agent's _exit needs no lock, and its exit(s), only on a caller's PE, would
+    wait on this one - which exit_everywhere shows."""
     x = NODE_OF[p]
     name = f'{p}\'s main thread'
-
-    def end_inside_exit(M):
-        w = M[WORD(x)]
-        if variant == 'exit_waits' or disposition(w) != GLOBAL:
-            return [({}, {'pc': PC_PAUSE}, f'{name}: waits for its agent to end the process')]
-        return [end_process(M, p, exit_status(w), 'its main thread, inside exit, calling it again')]
 
     def step(M, L):
         if not M[ALIVE(p)]:
             return [({}, {'finished': 1}, f'{name}: its process has ended')]
         pc = L['pc']
-        if pc == PC_EXIT_MARK:
-            return [({INSIDE(p): 1}, {'pc': PC_EXIT_SWEEP},
-                     f'{name}: reaches the library\'s handler, inside exit')]
         if pc == PC_EXIT_SWEEP:
-            if M[ENDING(p)]:
-                return end_inside_exit(M)       # finalize stands aside
-            w = M[WORD(x)]
-            if w and disposition(w) == GLOBAL:
-                if variant == 'exit_early':
-                    return end_inside_exit(M)
-                return [({}, {'pc': PC_EXIT_AWAIT}, f'{name}: its sweep finds the global exit')]
-            if w:
-                return [({}, {'pc': PC_PAUSE}, f'{name}: its sweep finds a fatal; waits')]
+            if M[ENDING(p)] or M[WORD(x)]:
+                return [({}, {'pc': PC_PAUSE}, f'{name}: inside exit, waits for its agent')]
             return [({}, {}, f'{name}: in the final barrier, which does not complete')]
-        if pc == PC_EXIT_AWAIT:
-            if not M[ENDING(p)]:
-                return []               # until the agent's claim
-            return end_inside_exit(M)
         if pc == PC_PAUSE:
             return []
         raise AssertionError(pc)
 
-    return step, PC_EXIT_MARK
+    return step, PC_EXIT_SWEEP
 
 
 PC_CONNECTING, PC_EARLY_CALL = 40, 41
@@ -618,7 +589,7 @@ def case(variant, which, options):
     callers = set(shape['callers'].values()) | set(shape.get('early_callers', {}).values())
     threads = []
     for p in processes:
-        step, initial = agent(variant, local, p, options, p in shape.get('exiters', ()))
+        step, initial = agent(variant, local, p, options)
         threads.append(thread(step, initial, callers))
     for p, status in shape['callers'].items():
         step, initial = caller(variant, local, p, status)
@@ -653,7 +624,7 @@ def case(variant, which, options):
         mem[REAPED(p)] = 0
         mem[AGENT_UP(p)] = 0 if p in shape.get('connecting', ()) else 1
         mem[EXIT_LOCK(p)] = MAIN if p in shape.get('exiters', ()) else 0
-        mem[INSIDE(p)] = 0
+        mem[CALLED(p)] = 0
     flags = ','.join(k for k, v in sorted(options.items()) if v)
     return f'abort_exit/{variant} [{which}; {flags}]', threads, mem, processes
 
@@ -688,8 +659,7 @@ CASES = [
     ('built', 'early', BUILT, True),
     ('no_init_wait', 'early', BUILT, False),
     ('built', 'exiting', BUILT, True),
-    ('exit_waits', 'exiting', BUILT, False),
-    ('exit_early', 'exiting', BUILT, False),
+    ('exit_everywhere', 'exiting', BUILT, False),
 ]
 
 if __name__ == '__main__':

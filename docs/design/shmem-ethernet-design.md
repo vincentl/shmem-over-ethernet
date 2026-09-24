@@ -1694,41 +1694,37 @@ finding the word, first wakes every local agent again: a declarer's own agent
 can end its process before the declarer has woken the rest, and the lead's
 agent, woken first, closes that gap for all of them (O(L) once per node;
 `abort_exit_model.py`, `no_rewake`). The agent ends the process. On a global
-exit it calls `exit(status)`, which flushes standard I/O as §9.1.6 asks, with
-the library's own atexit handlers and `shmem_finalize` standing aside, since the
-one is a barrier and the other would declare an abort that already is. Because
-`exit` from a thread that is not main can block on a stdio lock the main thread
-holds, `_exit(status)` follows after `OSOE_ABORT_GRACE_SECONDS` (10). That is
-not a wait that gives up because time passed: it ends a process that is already
-ending. On a fatal the agent says so once and `_exit`s with the declarer's
-status. On a global exit exactly one thread of a process ends it, and while the
+exit, the caller's PE — whichever PE's program called `shmem_global_exit` —
+ends with `exit(status)`, its handlers and then standard I/O as §9.1.6 asks,
+with the library's own atexit handlers and `shmem_finalize` standing aside,
+since the one is a barrier and the other would declare an abort that already
+is. Every other PE ends with `fflush` and then `_exit(status)`, as a fatal
+does: its main thread may still be running the program, and a handler or a
+C++ destructor run beside it would pull state from under it; and `_exit` takes
+no lock, where `exit` since glibc 2.41 (BZ 31997) takes one it never gives
+back, so that a second thread's `exit` waits for good on a main thread already
+inside one — returned from `main` into start_pes's finalize, say (the author's
+decision after the third review, which had found that wait and fixed it with a
+hand-off to the thread inside `exit`, now gone; `abort_exit_model.py`,
+`exit_everywhere`; `shmem.global-exit.handlers`, `.start-pes` and
+`.returned`). Because an end can still wait on a lock another thread holds —
+a stream's, or on the caller's PE `exit`'s own — `_exit(status)` follows after
+`OSOE_ABORT_GRACE_SECONDS` (10), flushing stdout first if no thread holds it.
+That is not a wait that gives up because time passed: it ends a process that is
+already ending. On a fatal the agent says so once and `_exit`s with the
+declarer's status. On a global exit exactly one thread of a process ends it, and while the
 agent runs it is the agent; any other thread that finds the word waits for it —
 including one that reaches `shmem_finalize` or the library's atexit handler
 meanwhile, which stand aside by returning only on the thread ending the process:
 on any other they would return into a second `exit`, main's own beside the
 agent's, which C leaves undefined and which could end the process with main's
-status (found in review; `abort_exit_model.py`, `finalize_returns`). The one
-thread that ends its process itself is one already inside `exit`: since glibc
-2.41 (BZ 31997) `exit` takes a lock it never gives back, so the agent's
-`exit(status)` would wait on a main thread that returned from `main` and is in
-start_pes's finalize, or in the handler for a program that left without
-finalizing, until the grace ended the process unflushed (found in the third
-review; `shmem.global-exit.start-pes` and `.returned`). The library's atexit
-handlers say that their thread is inside `exit`; such a thread waits for the
-agent's claim, which follows its goodbyes, then calls `exit(status)` again from
-the handler — which glibc has always run as one exit, ending with the last
-call's status — and the agent, finding it there, leaves `exit` to it; each of
-the two sees the other, by `seq_cst` on both sides (`abort_exit_model.py`,
-`exit_waits` and `exit_early`). A fatal
+status (found in review; `abort_exit_model.py`, `finalize_returns`). A fatal
 ends at once, on whichever thread finds it, as it did before: its status is a
 failure whoever ends the process, and on the eager mesh every node reads the
 dying lead's end of stream itself. With on-demand connections a fatal will need
-the agent's goodbye too. `exit` from the agent runs the process's atexit
-handlers and destructors while its main thread still runs; a handler that calls
-into the library then waits out the grace, as does a program's own handler that
-is in a library wait when a global exit comes, since nothing says its thread is
-inside `exit`: the grace ends the process with its status, flushing stdout if no
-thread holds it, but not otherwise as `exit` would. No PE returns from `shmem_init` before its
+the agent's goodbye too. On the caller's PE, `exit` from the agent runs the
+process's atexit handlers beside whatever other threads the program has; a
+handler that calls into the library then waits out the grace. No PE returns from `shmem_init` before its
 node's lead's agent runs, which the lead publishes in the node's rendezvous
 words: a non-lead is otherwise done once the connection area is open, and a
 global exit straight after init found its lead still connecting the mesh, with
@@ -2001,7 +1997,7 @@ outcome C11 forbids, and with what.
 |---|---|---|---|
 | Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed`; the agent's `running` (phase 1 step 4). *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
 | A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready`; the node's `lead_agent_running` (phase 1 step 4), whose store also follows the lead's removal of the node's heap and control-segment names (§6.2) |
-| Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count. A thread inside `exit` against its agent (phase 1 step 4, third review): its store of `inside_exit` and load of the claim `ending`, against the claim's CAS and the load of `inside_exit` |
+| Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count. |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere; among them the abort word, installed whole by one CAS, and `ending`, the claim on ending a process (phase 1 step 4) |
 | A queue in one word, then a wake word: a waiter's ticket and a giver's serve are RMWs on the same word; the giver then bumps a futex word; the waiter loads that word, then checks its ticket (slice 2 of step 3) | Not store buffering: two RMWs on one word are ordered by its modification order, so a give always sees every ticket taken before it. The waiter's check needs only to follow the giver's serve when it has seen the giver's bump — a release RMW read by an `acquire` load; a bump it has not seen is the futex compare's to catch | RMWs **`seq_cst`** (the row above); the waiter's loads of the wake word and of the state **`acquire`** | `osoe_credit_take`, `_give`, `_served` (`credit_wait_model.py`) |
 | Two-sided, with a claim: the writer's store is an RMW on a bitmap and the lead's a flag, and a writer that reads the flag raised takes it down with a CAS before waking (slice 3) | The store-buffering outcome - the lead's recheck misses the bit and the writer misses the flag - is forbidden only among `seq_cst` operations; the claim CAS is an RMW in *S*, and a writer that loses it read a later value of the flag, so the lead's recheck ordered after that value sees its bit | **`seq_cst`** `fetch_or`, flag store, flag load and CAS; `seq_cst` recheck loads | `osoe_connection_area_mark`, `osoe_progress_host_wake_lead`, `osoe_progress_host_poll` (`lead_wake_model.py`) |
@@ -4715,8 +4711,8 @@ Things to get right, each of which is a silent bug otherwise:
   the library still initialized, prints so, declares the node's abort, and makes
   the status nonzero, since `srun -K1` acts only on a nonzero one — an `exit(0)`
   used to hang a release-build job until its timeout. A global exit already
-  declared it joins instead: its thread, inside `exit`, ends the process with
-  that exit's status (§3.15). `start_pes` registers its
+  declared it joins instead, and the process ends with that exit's status
+  (§3.15). `start_pes` registers its
   implicit finalize after that handler, so it runs first. **No exit path runs a
   collective the application did not call**: `osoe_fatal` leaves through `_exit`,
   not `exit`, so it never runs `start_pes`'s finalize — which is a barrier — on its
@@ -5843,16 +5839,16 @@ Assert what can be asserted. Instrument the rest.
     connection the peer is still sending on (`close_model.py`).
 36. **A lead whose node aborts has its abortive goodbye acknowledged on every
     connection that still has someone to tell before its process ends; on a
-    global exit, while its agent runs, nothing but the agent ends that process
-    - or, once the agent has claimed the end, a thread already inside `exit`;
-    and no PE returns from `shmem_init` before its lead's agent runs.** (§3.15)
+    global exit, while its agent runs, nothing but the agent ends that process,
+    and with `exit` only on the caller's PE; and no PE returns from
+    `shmem_init` before its lead's agent runs.** (§3.15)
     Sent any slower - along the tree - or after the process has ended, the
     goodbye loses the race with the end of stream it should precede, and a node
     that reads the end of stream first ends with a failure where a caller of
     `shmem_global_exit` gave a status (`abort_model.py`, `abort_exit_model.py`);
     sent but unacknowledged, it dies in the reset of a process that ends with
-    input unread; and the agent's own `exit` would wait for good on a thread
-    already inside one (glibc 2.41).
+    input unread; and an `exit` on any other PE would wait for good on a main
+    thread already inside one (glibc 2.41).
 
 ## 10. Open Questions
 

@@ -1042,13 +1042,14 @@ endforeach()
 # global exit straight after shmem_init, which init must not return before the
 # lead's agent runs to carry. Two ended while every other PE's main thread is
 # inside exit, holding exit's lock: in start_pes's finalize, and in a handler
-# of the program's before the library's; each such thread must end its process
-# itself. And one ended mid-stream: the goodbye queued
+# of the program's before the library's, which a non-caller's _exit must not
+# wait on. One with a handler on every PE, which only the caller's exit may
+# run. And one ended mid-stream: the goodbye queued
 # behind a stream, with one arriving, must survive the caller's end, which is
 # a reset while input is unread, until the peer's kernel has acknowledged it.
 foreach(case "nonlead;7;7;1;compute" "fatal.nonlead;fatal;1;1;compute"
              "immediate;7;7;1;immediate" "start-pes;7;7;0;start-pes"
-             "returned;7;7;0;returned")
+             "returned;7;7;0;returned" "handlers;7;7;1;handlers")
   list(GET case 0 label)
   list(GET case 1 how)
   list(GET case 2 status)
