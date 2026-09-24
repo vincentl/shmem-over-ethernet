@@ -6,6 +6,14 @@
  * modern routine under its old name, so there is one implementation and the two
  * spellings cannot drift.
  *
+ * The deprecated atomic names (F.2.12: shmem_TYPENAME_fetch, _set, _swap,
+ * _cswap, _finc, _inc, _fadd and _add) are the same rule at fourteen or forty
+ * routines instead of one, so they are macro-generated from shmem.h's
+ * OSOE_AMO_DEPRECATED_TYPES and OSOE_AMO_DEPRECATED_EXTENDED_TYPES lists,
+ * the way amo.c generates the modern routines they call - a type appears once,
+ * here and there both, and cannot end up with a definition in one and not the
+ * other.
+ *
  * `start_pes` is the exception with behaviour of its own. Its `npes` argument
  * has meant nothing for decades and is ignored. More importantly it has no
  * matching finalize: programs written against it never call one, because
@@ -93,6 +101,53 @@ OSOE_API void pshmem_udcflush(void) { }
 OSOE_API void pshmem_udcflush_line(void *dest) { (void)dest; }
 
 /*
+ * The deprecated atomic memory operations (Annex F.2.12). fetch, set and swap
+ * take the five deprecated-extended types (Table 6's plain integers plus
+ * Table 7's float and double); cswap, finc, inc, fadd and add take the three
+ * deprecated types (Table 6's plain integers only) - the same split shmem.h
+ * declares from, so a type cannot be defined here without being declared
+ * there or vice versa.
+ */
+#define OSOE_AMO_DEPRECATED_EXTENDED(T, NAME)                                \
+    OSOE_API T pshmem_##NAME##_fetch(const T *source, int pe)                \
+    {                                                                        \
+        return pshmem_##NAME##_atomic_fetch(source, pe);                     \
+    }                                                                        \
+    OSOE_API void pshmem_##NAME##_set(T *dest, T value, int pe)              \
+    {                                                                        \
+        pshmem_##NAME##_atomic_set(dest, value, pe);                         \
+    }                                                                        \
+    OSOE_API T pshmem_##NAME##_swap(T *dest, T value, int pe)                \
+    {                                                                        \
+        return pshmem_##NAME##_atomic_swap(dest, value, pe);                 \
+    }
+
+#define OSOE_AMO_DEPRECATED_STANDARD(T, NAME)                                \
+    OSOE_API T pshmem_##NAME##_cswap(T *dest, T cond, T value, int pe)       \
+    {                                                                        \
+        return pshmem_##NAME##_atomic_compare_swap(dest, cond, value, pe);   \
+    }                                                                        \
+    OSOE_API T pshmem_##NAME##_finc(T *dest, int pe)                         \
+    {                                                                        \
+        return pshmem_##NAME##_atomic_fetch_inc(dest, pe);                   \
+    }                                                                        \
+    OSOE_API void pshmem_##NAME##_inc(T *dest, int pe)                       \
+    {                                                                        \
+        pshmem_##NAME##_atomic_inc(dest, pe);                                \
+    }                                                                        \
+    OSOE_API T pshmem_##NAME##_fadd(T *dest, T value, int pe)                \
+    {                                                                        \
+        return pshmem_##NAME##_atomic_fetch_add(dest, value, pe);            \
+    }                                                                        \
+    OSOE_API void pshmem_##NAME##_add(T *dest, T value, int pe)              \
+    {                                                                        \
+        pshmem_##NAME##_atomic_add(dest, value, pe);                         \
+    }
+
+OSOE_AMO_DEPRECATED_EXTENDED_TYPES(OSOE_AMO_DEPRECATED_EXTENDED)
+OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DEPRECATED_STANDARD)
+
+/*
  * The weak `shmem_` aliases (export.h), for the prefixed names only. The
  * unprefixed ones — start_pes, _my_pe, shmalloc and the rest — have no
  * `shmem_` to weaken and no `pshmem_` spelling to weaken it towards: the
@@ -106,3 +161,18 @@ OSOE_ALIAS(set_cache_line_inv)
 OSOE_ALIAS(clear_cache_line_inv)
 OSOE_ALIAS(udcflush)
 OSOE_ALIAS(udcflush_line)
+
+#define OSOE_AMO_ALIAS_DEPRECATED_EXTENDED(T, NAME)                          \
+    OSOE_ALIAS(NAME##_fetch)                                                 \
+    OSOE_ALIAS(NAME##_set)                                                   \
+    OSOE_ALIAS(NAME##_swap)
+
+#define OSOE_AMO_ALIAS_DEPRECATED_STANDARD(T, NAME)                          \
+    OSOE_ALIAS(NAME##_cswap)                                                 \
+    OSOE_ALIAS(NAME##_finc)                                                  \
+    OSOE_ALIAS(NAME##_inc)                                                   \
+    OSOE_ALIAS(NAME##_fadd)                                                  \
+    OSOE_ALIAS(NAME##_add)
+
+OSOE_AMO_DEPRECATED_EXTENDED_TYPES(OSOE_AMO_ALIAS_DEPRECATED_EXTENDED)
+OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_ALIAS_DEPRECATED_STANDARD)

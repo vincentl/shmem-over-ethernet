@@ -733,6 +733,46 @@ void shmem_udcflush(void);
 void shmem_udcflush_line(void *dest);
 
 /*
+ * The deprecated atomic memory operations (Annex F.2.12): the pre-§9.7 names,
+ * one routine per (type, operation) instead of the modern
+ * shmem_TYPENAME_atomic_* names. deprecated.c makes each exactly its modern
+ * routine under its old name, so declaring both from one list here (as the
+ * AMO families above) keeps the two from disagreeing about which types exist.
+ *
+ * The deprecated names never covered all of Tables 6 and 7, only a subset:
+ * fetch, set and swap take the three plain integer types of Table 6 plus the
+ * float and double Table 7 adds; cswap, finc, inc, fadd and add take the
+ * three plain integer types only. There are no context forms - the spec never
+ * gave these routines one - and no exact-width, unsigned or size/ptrdiff
+ * types either.
+ */
+#define OSOE_AMO_DEPRECATED_TYPES(X) X(int, int) X(long, long) X(long long, longlong)
+
+/* fetch, set and swap add float and double, as Table 7 adds them to Table 6. */
+#define OSOE_AMO_DEPRECATED_EXTENDED_TYPES(X)                                \
+    OSOE_AMO_DEPRECATED_TYPES(X) X(float, float) X(double, double)
+
+#define OSOE_AMO_DECL_DEPRECATED_EXTENDED_P(P, T, NAME)                      \
+    T OSOE_FN(P, NAME, _fetch)(const T *source, int pe);                    \
+    void OSOE_FN(P, NAME, _set)(T *dest, T value, int pe);                  \
+    T OSOE_FN(P, NAME, _swap)(T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_DEPRECATED_STANDARD_P(P, T, NAME)                      \
+    T OSOE_FN(P, NAME, _cswap)(T *dest, T cond, T value, int pe);           \
+    T OSOE_FN(P, NAME, _finc)(T *dest, int pe);                             \
+    void OSOE_FN(P, NAME, _inc)(T *dest, int pe);                           \
+    T OSOE_FN(P, NAME, _fadd)(T *dest, T value, int pe);                    \
+    void OSOE_FN(P, NAME, _add)(T *dest, T value, int pe);
+
+#define OSOE_AMO_DECL_DEPRECATED_EXTENDED(T, NAME)                           \
+    OSOE_AMO_DECL_DEPRECATED_EXTENDED_P(shmem_, T, NAME)
+#define OSOE_AMO_DECL_DEPRECATED_STANDARD(T, NAME)                           \
+    OSOE_AMO_DECL_DEPRECATED_STANDARD_P(shmem_, T, NAME)
+
+OSOE_AMO_DEPRECATED_EXTENDED_TYPES(OSOE_AMO_DECL_DEPRECATED_EXTENDED)
+OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
+
+/*
  * C11 type-generic interfaces (§7.4; spec §9.7).
  *
  * `_Generic` selects on the *type* of the pointer, so each association must
@@ -894,6 +934,51 @@ void shmem_udcflush_line(void *dest);
 #define shmem_atomic_fetch_xor(...)                                                 \
     OSOE_PICK4(__VA_ARGS__, OSOE_G_FXOR_4, OSOE_G_FXOR_3, , )(__VA_ARGS__)
 
+/*
+ * The deprecated C11 generic spellings (Annex F.2.12): shmem_fetch, shmem_set,
+ * shmem_swap, shmem_cswap, shmem_finc, shmem_inc, shmem_fadd and shmem_add,
+ * dispatching on the type of the pointer argument to the deprecated
+ * TYPENAME-spelled routine above rather than to the modern shmem_TYPENAME_
+ * atomic_* one - the deprecated C/C++ name is the modern routine under its
+ * old name (deprecated.c), and the deprecated C11 name only has to reach that
+ * same old name. There are no context forms and so no arity to pick between,
+ * unlike shmem_atomic_* above.
+ */
+#define OSOE_AMO_G_DEPRECATED(T, NAME, OP)  , T *: shmem_##NAME##_##OP
+/* For shmem_fetch, whose argument may be const-qualified. */
+#define OSOE_AMO_GC_DEPRECATED(T, NAME, OP) , T *: shmem_##NAME##_##OP            \
+                                            , const T *: shmem_##NAME##_##OP
+
+/* The three-type and five-type lists above, as association lists (T, NAME, OP). */
+#define OSOE_AMO_G_DEPRECATED_STANDARD(X, OP)                                    \
+    X(int, int, OP) X(long, long, OP) X(long long, longlong, OP)
+#define OSOE_AMO_G_DEPRECATED_EXTENDED(X, OP)                                    \
+    OSOE_AMO_G_DEPRECATED_STANDARD(X, OP) X(float, float, OP) X(double, double, OP)
+
+#define shmem_fetch(source, pe)                                                  \
+    (_Generic((source) OSOE_AMO_G_DEPRECATED_EXTENDED(OSOE_AMO_GC_DEPRECATED, fetch)) \
+        ((source), (pe)))
+#define shmem_set(dest, value, pe)                                               \
+    (_Generic((dest) OSOE_AMO_G_DEPRECATED_EXTENDED(OSOE_AMO_G_DEPRECATED, set))  \
+        ((dest), (value), (pe)))
+#define shmem_swap(dest, value, pe)                                              \
+    (_Generic((dest) OSOE_AMO_G_DEPRECATED_EXTENDED(OSOE_AMO_G_DEPRECATED, swap)) \
+        ((dest), (value), (pe)))
+#define shmem_cswap(dest, cond, value, pe)                                       \
+    (_Generic((dest) OSOE_AMO_G_DEPRECATED_STANDARD(OSOE_AMO_G_DEPRECATED, cswap)) \
+        ((dest), (cond), (value), (pe)))
+#define shmem_finc(dest, pe)                                                     \
+    (_Generic((dest) OSOE_AMO_G_DEPRECATED_STANDARD(OSOE_AMO_G_DEPRECATED, finc)) \
+        ((dest), (pe)))
+#define shmem_inc(dest, pe)                                                      \
+    (_Generic((dest) OSOE_AMO_G_DEPRECATED_STANDARD(OSOE_AMO_G_DEPRECATED, inc))  \
+        ((dest), (pe)))
+#define shmem_fadd(dest, value, pe)                                              \
+    (_Generic((dest) OSOE_AMO_G_DEPRECATED_STANDARD(OSOE_AMO_G_DEPRECATED, fadd)) \
+        ((dest), (value), (pe)))
+#define shmem_add(dest, value, pe)                                               \
+    (_Generic((dest) OSOE_AMO_G_DEPRECATED_STANDARD(OSOE_AMO_G_DEPRECATED, add))  \
+        ((dest), (value), (pe)))
 
 /* ---- Remote memory access (spec §9.6, §9.8.3) ------------------------- */
 
@@ -1173,6 +1258,8 @@ void shmem_pcontrol(int level, ...);
 #undef OSOE_AMO_DECL_CTX_STANDARD
 #undef OSOE_AMO_DECL_CTX_EXTENDED
 #undef OSOE_AMO_DECL_CTX_BITWISE
+#undef OSOE_AMO_DECL_DEPRECATED_EXTENDED
+#undef OSOE_AMO_DECL_DEPRECATED_STANDARD
 #undef OSOE_WAIT_DECL_SCALAR
 #undef OSOE_WAIT_DECL_MANY
 #undef OSOE_WAIT_DECL_DEPRECATED
