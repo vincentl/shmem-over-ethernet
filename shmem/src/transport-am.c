@@ -301,10 +301,10 @@ static void count_if_lost(const _Atomic uint32_t *word, uint32_t seen, const cha
 /* How far a connection has turned over: the newest sequence either buffer has
  * been opened with. It rises every time the lead frees and reopens a buffer,
  * which is the progress a writer waiting for room is waiting on. */
-static uint64_t turnover(const struct osoe_connection *conn)
+static uint64_t turnover(const struct osoe_connection *connection)
 {
-    uint64_t a = atomic_load_explicit(&conn->s->buffer[0].seq, memory_order_acquire);
-    uint64_t b = atomic_load_explicit(&conn->s->buffer[1].seq, memory_order_acquire);
+    uint64_t a = atomic_load_explicit(&connection->s->buffer[0].seq, memory_order_acquire);
+    uint64_t b = atomic_load_explicit(&connection->s->buffer[1].seq, memory_order_acquire);
     return a > b ? a : b;
 }
 
@@ -324,22 +324,22 @@ static uint64_t turnover(const struct osoe_connection *conn)
  * to 3% of the floor (§8.4). am.reserve_stalls counts every wait, so a buffer
  * that is often full is visible rather than assumed rare.
  */
-static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
+static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, int pe,
                             const char *routine, uint32_t len, struct osoe_reservation *r)
 {
-    if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK)
+    if (osoe_connection_reserve(connection, len, r) == OSOE_RESERVATION_OK)
         return;
     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
-    struct osoe_wait_word *word = osoe_connection_turnover_wait(conn);
+    struct osoe_wait_word *word = osoe_connection_turnover_wait(connection);
     struct am_wait w;
     am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_TURNOVER, "the connection's buffer turnover",
-                  peer, pe, turnover(conn));
+                  peer, pe, turnover(connection));
     osoe_wait_word_enter(word);
     uint32_t slept_on = 0;
     bool swept = false;
     for (;;) {
         uint32_t seen = osoe_wait_word_load(word);
-        if (osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK) {
+        if (osoe_connection_reserve(connection, len, r) == OSOE_RESERVATION_OK) {
             if (swept)
                 count_if_lost(&word->word, slept_on, routine);
             break;
@@ -348,7 +348,7 @@ static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
         osoe_progress_host_wake_lead();
         slept_on = seen;
         swept = sleep_on(word, seen);
-        am_wait_check(&w, turnover(conn));
+        am_wait_check(&w, turnover(connection));
     }
     osoe_wait_word_leave(word);
     am_wait_end();
@@ -363,10 +363,11 @@ static void reserve_waiting(struct osoe_connection *conn, uint32_t peer, int pe,
  * for room that cannot exist. Taking the smaller of the two is what makes a
  * small OSOE_AM_BUFFER a slow configuration rather than a hanging one.
  */
-static uint32_t payload_limit(struct osoe_connection *conn, uint32_t peer, uint32_t fixed_bytes)
+static uint32_t payload_limit(struct osoe_connection *connection, uint32_t peer,
+                              uint32_t fixed_bytes)
 {
     uint32_t chunk = (uint32_t)osoe_am.area.chunk_bytes;
-    uint32_t room = osoe_connection_payload_capacity(conn);
+    uint32_t room = osoe_connection_payload_capacity(connection);
     if (room < chunk)
         chunk = room;
     uint32_t overhead = (uint32_t)sizeof(struct osoe_message_header) + fixed_bytes;
@@ -381,11 +382,11 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
                        uint64_t offset, const void *src, size_t len, unsigned flags)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
-    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
-    if (!conn)
+    struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
+    if (!connection)
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
 
-    uint32_t limit = payload_limit(conn, peer, (uint32_t)sizeof(struct osoe_am_put));
+    uint32_t limit = payload_limit(connection, peer, (uint32_t)sizeof(struct osoe_am_put));
     const unsigned char *at = src;
     /* A zero-length put is a no-op the spec still allows to be issued; it must
      * not become a message, or the peer applies an empty write and the loop
@@ -397,12 +398,12 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
         uint32_t body = (uint32_t)sizeof m + n;
         struct osoe_message_header h = { OSOE_AM_PUT, 0, body };
         struct osoe_reservation r;
-        reserve_waiting(conn, peer, pe, "shmem_put", osoe_message_padded(body), &r);
-        unsigned char *to = osoe_reservation_bytes(conn, &r);
+        reserve_waiting(connection, peer, pe, "shmem_put", osoe_message_padded(body), &r);
+        unsigned char *to = osoe_reservation_bytes(connection, &r);
         memcpy(to, &h, sizeof h);
         memcpy(to + sizeof h, &m, sizeof m);
         memcpy(to + sizeof h + sizeof m, at, n);
-        osoe_connection_commit(conn, &r);
+        osoe_connection_commit(connection, &r);
         /* After every commit, not once per put: the next chunk may have to
          * wait for room, and the lead makes room only in a connection it
          * knows has bytes (§3.10). Marking once at the end hung every
@@ -476,9 +477,10 @@ static uint32_t landing_capacity(void)
  * arriving meanwhile can take it (credit_wait_model.py). Step 2 polled here,
  * waking the lead and sleeping 20 us.
  */
-static void take_credit(struct osoe_connection *conn, uint32_t peer, int pe, const char *routine)
+static void take_credit(struct osoe_connection *connection, uint32_t peer, int pe,
+                        const char *routine)
 {
-    struct osoe_credit *credit = osoe_connection_credit(conn);
+    struct osoe_credit *credit = osoe_connection_credit(connection);
     uint32_t ticket;
     if (osoe_credit_take(credit, &ticket))
         return;
@@ -555,20 +557,20 @@ static uint64_t arm(struct osoe_landing_slot *slot)
 }
 
 /* Reserve, fill and commit one message of `fixed_bytes` plus `payload` bytes. */
-static uint64_t send_message(struct osoe_connection *conn, uint32_t peer, int pe,
+static uint64_t send_message(struct osoe_connection *connection, uint32_t peer, int pe,
                              const char *routine, uint16_t kind, const void *fixed,
                              uint32_t fixed_bytes, const void *payload, uint32_t payload_bytes)
 {
     uint32_t body = fixed_bytes + payload_bytes;
     struct osoe_message_header h = { kind, 0, body };
     struct osoe_reservation r;
-    reserve_waiting(conn, peer, pe, routine, osoe_message_padded(body), &r);
-    unsigned char *to = osoe_reservation_bytes(conn, &r);
+    reserve_waiting(connection, peer, pe, routine, osoe_message_padded(body), &r);
+    unsigned char *to = osoe_reservation_bytes(connection, &r);
     memcpy(to, &h, sizeof h);
     memcpy(to + sizeof h, fixed, fixed_bytes);
     if (payload_bytes)
         memcpy(to + sizeof h + fixed_bytes, payload, payload_bytes);
-    osoe_connection_commit(conn, &r);
+    osoe_connection_commit(connection, &r);
     osoe_connection_area_mark(&osoe_am.area, peer);
     return r.seq;
 }
@@ -577,25 +579,25 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
                        size_t len)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
-    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
-    if (!conn)
+    struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
+    if (!connection)
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
     struct osoe_landing_slot *slot = my_landing();
     uint32_t limit = landing_capacity();
-    if (limit > payload_limit(conn, peer, (uint32_t)sizeof(struct osoe_am_get_reply)))
-        limit = payload_limit(conn, peer, (uint32_t)sizeof(struct osoe_am_get_reply));
+    if (limit > payload_limit(connection, peer, (uint32_t)sizeof(struct osoe_am_get_reply)))
+        limit = payload_limit(connection, peer, (uint32_t)sizeof(struct osoe_am_get_reply));
 
     unsigned char *at = dst;
     while (len > 0) {
         uint32_t n = len > limit ? limit : (uint32_t)len;
         uint64_t token = arm(slot);
-        take_credit(conn, peer, pe, "shmem_get");
+        take_credit(connection, peer, pe, "shmem_get");
         struct osoe_am_get_request m = { .target_pe = (uint32_t)pe,
                                          .origin_pe = osoe.bootstrap.rank,
                                          .region = (uint16_t)region, .flags = 0,
                                          .length = n, .offset = offset,
                                          .token = token };
-        send_message(conn, peer, pe, "shmem_get", OSOE_AM_GET_REQUEST, &m, (uint32_t)sizeof m,
+        send_message(connection, peer, pe, "shmem_get", OSOE_AM_GET_REQUEST, &m, (uint32_t)sizeof m,
                      NULL, 0);
         osoe_progress_host_wake_lead();
         await_reply(slot, token, peer, pe, "shmem_get");
@@ -606,7 +608,7 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
         /* Returned when the reply has *landed* (§3.8), which is here and not
          * when the target sent it: the bound being kept is on replies in
          * flight toward this node, not on replies the peer has finished with. */
-        osoe_credit_give(osoe_connection_credit(conn));
+        osoe_credit_give(osoe_connection_credit(connection));
         at += n;
         offset += n;
         len -= n;
@@ -619,8 +621,8 @@ static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
                            uint64_t compare, unsigned flags)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
-    struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
-    if (!conn)
+    struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
+    if (!connection)
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
     bool fetching = (flags & OSOE_TRANSPORT_FETCH) != 0;
     struct osoe_landing_slot *slot = my_landing();
@@ -628,7 +630,7 @@ static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
 
     if (fetching) {
         token = arm(slot);
-        take_credit(conn, peer, pe, "shmem_atomic");
+        take_credit(connection, peer, pe, "shmem_atomic");
     }
     struct osoe_am_rmw_request m = { .target_pe = (uint32_t)pe,
                                      .origin_pe = osoe.bootstrap.rank,
@@ -636,7 +638,7 @@ static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
                                      .width = width, .offset = offset,
                                      .operand = operand, .compare = compare,
                                      .token = token, .flags = flags };
-    uint64_t seq = send_message(conn, peer, pe, "shmem_atomic", OSOE_AM_RMW_REQUEST, &m,
+    uint64_t seq = send_message(connection, peer, pe, "shmem_atomic", OSOE_AM_RMW_REQUEST, &m,
                                 (uint32_t)sizeof m, NULL, 0);
     osoe_progress_host_wake_lead();
     if (!fetching) {
@@ -647,7 +649,7 @@ static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
     }
     await_reply(slot, token, peer, pe, "shmem_atomic");
     uint64_t previous = atomic_load_explicit(&slot->value, memory_order_acquire);
-    osoe_credit_give(osoe_connection_credit(conn));
+    osoe_credit_give(osoe_connection_credit(connection));
     return previous;
 }
 
@@ -718,11 +720,11 @@ static void flush_dirty(struct osoe_transport_context *c)
         if (acknowledged(c, slot))
             continue;
         uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
-        struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
+        struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
         /* "Acknowledge through the highest segment this context wrote into":
          * what quiet then waits for, and nothing more. */
-        if (conn) {
-            osoe_connection_request_ack(conn, c->high_segment[slot]);
+        if (connection) {
+            osoe_connection_request_ack(connection, c->high_segment[slot]);
             osoe_connection_area_mark(&osoe_am.area, peer);
             asked = true;
         }
@@ -814,10 +816,10 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
              * lands and anyone is registered (base/wait-word.h). Every waiter
              * is woken, each checking its own writes. */
             uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
-            struct osoe_connection *conn = osoe_connection_to(&osoe_am.area, peer);
-            if (!conn)
+            struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
+            if (!connection)
                 osoe_fatal("no connection toward node %u, which this context wrote to", peer);
-            struct osoe_wait_word *word = osoe_connection_acked_wait(conn);
+            struct osoe_wait_word *word = osoe_connection_acked_wait(connection);
             const char *routine = pes ? "shmem_pe_quiet" : "shmem_quiet";
             struct am_wait w;
             /* No single PE: a quiet waits for a whole node's queue, not one

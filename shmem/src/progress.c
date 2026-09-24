@@ -534,10 +534,10 @@ static void segment_applied(void *context, const struct osoe_am_segment_header *
         c->acked = segment->ack;
         /* Publish it where a waiting PE can see it: quiet runs in whichever
          * process issued the writes, which is usually not this one (§4.6). */
-        struct osoe_connection *conn = osoe_connection_to(p->area,
+        struct osoe_connection *connection = osoe_connection_to(p->area,
                                           a->slot < p->node ? a->slot : a->slot + 1);
-        if (conn)
-            osoe_connection_publish_acked(conn, c->acked);
+        if (connection)
+            osoe_connection_publish_acked(connection, c->acked);
     }
 }
 
@@ -620,18 +620,18 @@ struct drain_target {
     uint32_t budget;                /* bytes still allowed, for a private buffer */
 };
 
-static bool reserve_for_reply(struct osoe_connection *conn, struct drain_target *t,
+static bool reserve_for_reply(struct osoe_connection *connection, struct drain_target *t,
                               uint32_t len, struct osoe_reservation *r)
 {
     if (t->private_buffer == OSOE_CONNECTION_NONE)
-        return osoe_connection_reserve(conn, len, r) == OSOE_RESERVATION_OK;
-    if (len > t->budget || !osoe_connection_drain_reserve(conn, t->private_buffer, len, r))
+        return osoe_connection_reserve(connection, len, r) == OSOE_RESERVATION_OK;
+    if (len > t->budget || !osoe_connection_drain_reserve(connection, t->private_buffer, len, r))
         return false;
     t->budget -= len;
     return true;
 }
 
-static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_connection *conn,
+static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_connection *connection,
                        struct drain_target *t)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
@@ -646,13 +646,13 @@ static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_conne
         bool barrier = r->kind == OSOE_REPLY_RELEASE || r->kind == OSOE_REPLY_ARRIVE;
         uint32_t fixed_bytes = barrier ? (uint32_t)sizeof(struct osoe_am_barrier)
                                        : (uint32_t)sizeof(struct osoe_am_rmw_reply);
-        if (!reserve_for_reply(conn, t, osoe_message_padded(fixed_bytes), &resv))
+        if (!reserve_for_reply(connection, t, osoe_message_padded(fixed_bytes), &resv))
             return moved;                   /* no room: try again next pass */
         uint16_t kind = r->kind == OSOE_REPLY_RELEASE ? OSOE_AM_BARRIER_RELEASE
                       : r->kind == OSOE_REPLY_ARRIVE  ? OSOE_AM_BARRIER_ARRIVE
                                                       : OSOE_AM_RMW_REPLY;
         struct osoe_message_header h = { kind, 0, fixed_bytes };
-        unsigned char *at = osoe_reservation_bytes(conn, &resv);
+        unsigned char *at = osoe_reservation_bytes(connection, &resv);
         memcpy(at, &h, sizeof h);
         if (barrier) {
             struct osoe_am_barrier m = { .team = r->origin_pe, .epoch = (uint32_t)r->value,
@@ -663,7 +663,7 @@ static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_conne
                                            .value = r->value };
             memcpy(at + sizeof h, &m, sizeof m);
         }
-        osoe_connection_commit(conn, &resv);
+        osoe_connection_commit(connection, &resv);
         osoe_reply_give(&p->pool, osoe_reply_pop(&p->pool, &c->queues.control));
         moved = true;
     }
@@ -680,17 +680,17 @@ static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_conne
         if (chunk > p->area->chunk_bytes)
             chunk = (uint32_t)p->area->chunk_bytes;
         uint32_t len = osoe_message_padded((uint32_t)sizeof(struct osoe_am_get_reply) + chunk);
-        if (len > osoe_connection_payload_capacity(conn)) {
+        if (len > osoe_connection_payload_capacity(connection)) {
             /* The buffer cannot hold this chunk even empty: shrink it to what
              * fits rather than deadlocking on a message that never fits. */
-            uint32_t room = osoe_connection_payload_capacity(conn) -
+            uint32_t room = osoe_connection_payload_capacity(connection) -
                             (uint32_t)sizeof(struct osoe_message_header) -
                             (uint32_t)sizeof(struct osoe_am_get_reply);
             chunk = room & ~UINT32_C(7);
             len = osoe_message_padded((uint32_t)sizeof(struct osoe_am_get_reply) + chunk);
         }
         struct osoe_reservation resv;
-        if (!reserve_for_reply(conn, t, len, &resv))
+        if (!reserve_for_reply(connection, t, len, &resv))
             return moved;
         const void *source = p->host.resolve(p->host.context, r->target_pe, r->region,
                                              r->offset + r->sent, chunk);
@@ -699,14 +699,14 @@ static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_conne
         struct osoe_am_get_reply m = { .origin_pe = r->origin_pe,
                                        .chunk_offset = r->sent, .total = r->length,
                                        .token = r->token };
-        unsigned char *at = osoe_reservation_bytes(conn, &resv);
+        unsigned char *at = osoe_reservation_bytes(connection, &resv);
         memcpy(at, &h, sizeof h);
         memcpy(at + sizeof h, &m, sizeof m);
         if (source)
             memcpy(at + sizeof h + sizeof m, source, chunk);
         else
             memset(at + sizeof h + sizeof m, 0, chunk);
-        osoe_connection_commit(conn, &resv);
+        osoe_connection_commit(connection, &resv);
         moved = true;
 
         r->sent += chunk;
@@ -722,12 +722,12 @@ static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_conne
 static bool drain(struct osoe_progress *p, uint32_t slot)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
-    struct osoe_connection *conn = osoe_connection_to(p->area,
-                                                      slot < p->node ? slot : slot + 1);
-    if (!conn || c->open == OSOE_CONNECTION_NONE)
+    struct osoe_connection *connection = osoe_connection_to(p->area,
+                                                            slot < p->node ? slot : slot + 1);
+    if (!connection || c->open == OSOE_CONNECTION_NONE)
         return false;
     struct drain_target open = { OSOE_CONNECTION_NONE, 0 };
-    return drain_into(p, slot, conn, &open);
+    return drain_into(p, slot, connection, &open);
 }
 
 /* ---- Sealing and sending ---------------------------------------------- */
@@ -765,11 +765,11 @@ static bool asks_for_ack(const struct osoe_progress_connection *c, uint64_t seq,
     return seq <= wanted || late;
 }
 
-static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connection *conn,
+static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connection *connection,
                      uint32_t k, uint32_t bytes, uint64_t wanted)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
-    unsigned char *base = conn->data + (size_t)k * conn->capacity;
+    unsigned char *base = connection->data + (size_t)k * connection->capacity;
     uint32_t count = 0;
     for (uint32_t off = (uint32_t)sizeof(struct osoe_am_segment_header); off < bytes; ) {
         struct osoe_message_header h;
@@ -784,7 +784,7 @@ static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connect
         off += osoe_message_padded(h.len);
         count++;
     }
-    uint64_t seq = atomic_load_explicit(&conn->s->buffer[k].seq, memory_order_acquire);
+    uint64_t seq = atomic_load_explicit(&connection->s->buffer[k].seq, memory_order_acquire);
     /* The goodbye is sealed last and alone (flush), so the sealed buffer is it
      * once one has been sealed; it asks nothing, since no answer could follow. */
     bool goodbye = c->goodbye == OSOE_GOODBYE_SEALED;
@@ -807,7 +807,8 @@ static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connect
  * The abort's visit (osoe_progress_abort): finish the segment on the wire, then
  * send the abortive goodbye and end the stream. Returns whether anything moved.
  */
-static bool flush_aborting(struct osoe_progress *p, uint32_t slot, struct osoe_connection *conn)
+static bool flush_aborting(struct osoe_progress *p, uint32_t slot,
+                           struct osoe_connection *connection)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
     struct osoe_wire *w = &p->wire[slot];
@@ -822,7 +823,7 @@ static bool flush_aborting(struct osoe_progress *p, uint32_t slot, struct osoe_c
     if (c->sending != OSOE_CONNECTION_NONE) {
         /* A segment half on the wire is finished, so that the peer's stream
          * stays whole: the abortive goodbye is read after it, not inside it. */
-        unsigned char *base = conn->data + (size_t)c->sending * conn->capacity;
+        unsigned char *base = connection->data + (size_t)c->sending * connection->capacity;
         size_t n = osoe_wire_send(w, base + c->sent, c->sending_bytes - c->sent);
         c->sent += (uint32_t)n;
         if (c->sent < c->sending_bytes)
@@ -850,12 +851,12 @@ static bool flush_aborting(struct osoe_progress *p, uint32_t slot, struct osoe_c
 static bool flush(struct osoe_progress *p, uint32_t slot)
 {
     struct osoe_progress_connection *c = &p->connection[slot];
-    struct osoe_connection *conn = osoe_connection_to(p->area,
-                                                      slot < p->node ? slot : slot + 1);
-    if (!conn)
+    struct osoe_connection *connection = osoe_connection_to(p->area,
+                                                            slot < p->node ? slot : slot + 1);
+    if (!connection)
         return false;
     if (p->aborting)
-        return flush_aborting(p, slot, conn);
+        return flush_aborting(p, slot, connection);
     /* A peer whose abortive goodbye has arrived is ending: nothing more of the
      * job's goes to it, and its exit may already have reset the connection,
      * which a send would take for a failure - a fatal on this thread, ending
@@ -870,7 +871,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
      * this load is seen by the next pass; the late-request rule in
      * asks_for_ack is what makes that safe.
      */
-    uint64_t wanted = osoe_connection_ack_wanted(conn);
+    uint64_t wanted = osoe_connection_ack_wanted(connection);
     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
     struct osoe_am_connection_metrics *cm = conn_metrics(p, slot);
     if (cm) {
@@ -887,14 +888,14 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     /* Finish an in-flight send. A short write is the normal case (§3.3): keep
      * the remainder and offer it again. */
     if (c->sending != OSOE_CONNECTION_NONE) {
-        unsigned char *base = conn->data + (size_t)c->sending * conn->capacity;
+        unsigned char *base = connection->data + (size_t)c->sending * connection->capacity;
         size_t n = osoe_wire_send(&p->wire[slot], base + c->sent,
                                   c->sending_bytes - c->sent);
         c->sent += (uint32_t)n;
         if (n > 0)
             moved = true;
         if (c->sent == c->sending_bytes) {
-            osoe_connection_release(conn, c->sending);
+            osoe_connection_release(connection, c->sending);
             c->state[c->sending] = OSOE_BUFFER_FREE;
             c->sending = OSOE_CONNECTION_NONE;
             /* That was the goodbye (nothing is sealed after it): end the stream. */
@@ -916,8 +917,8 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
      * hang (§3.5). */
     if (c->sending == OSOE_CONNECTION_NONE && c->sealed != OSOE_CONNECTION_NONE) {
         uint32_t bytes;
-        if (osoe_connection_sendable(conn, c->sealed, &bytes)) {
-            finalize(p, slot, conn, c->sealed, bytes, wanted);
+        if (osoe_connection_sendable(connection, c->sealed, &bytes)) {
+            finalize(p, slot, connection, c->sealed, bytes, wanted);
             c->sending = c->sealed;
             c->sealed = OSOE_CONNECTION_NONE;
             c->state[c->sending] = OSOE_BUFFER_SENDING;
@@ -937,7 +938,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     if (c->sealed == OSOE_CONNECTION_NONE && c->open != OSOE_CONNECTION_NONE &&
         c->goodbye == OSOE_GOODBYE_NONE) {
         uint32_t used = OSOE_BUFFER_USED(
-            atomic_load_explicit(&conn->s->buffer[c->open].head, memory_order_acquire));
+            atomic_load_explicit(&connection->s->buffer[c->open].head, memory_order_acquire));
         /* Seal for data, to pay a debt, or for a late request that no
          * unfinalized segment will carry - the one header-only segment the
          * model says a quiesced pair may still exchange. */
@@ -956,7 +957,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
                 if (conn_metrics(p, slot))
                     osoe_counter_word_add(&conn_metrics(p, slot)->header_only_sent, 1);
             }
-            osoe_connection_seal(conn, c->open);
+            osoe_connection_seal(connection, c->open);
             c->carrying = false;
             c->state[c->open] = OSOE_BUFFER_SEALED_STATE;
             c->sealed = c->open;
@@ -973,10 +974,10 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
                 /* The pre-open drain (§3.8): replies first, while k is still
                  * sealed and no writer can reach it. */
                 c->state[k] = OSOE_BUFFER_DRAINING;
-                struct drain_target preopen = { k, conn->capacity / 2 };
-                if (drain_into(p, slot, conn, &preopen))
+                struct drain_target preopen = { k, connection->capacity / 2 };
+                if (drain_into(p, slot, connection, &preopen))
                     c->carrying = true;
-                osoe_connection_open(conn, k, c->next_seq++);
+                osoe_connection_open(connection, k, c->next_seq++);
                 c->state[k] = OSOE_BUFFER_OPEN;
                 c->open = k;
                 moved = true;
@@ -1163,15 +1164,15 @@ bool osoe_progress_idle(struct osoe_progress *p)
             return false;
         if (c->queues.control.depth != 0 || c->queues.bulk.depth != 0)
             return false;
-        struct osoe_connection *conn = osoe_connection_to(p->area,
-                                                          slot < p->node ? slot : slot + 1);
-        if (!conn || c->open == OSOE_CONNECTION_NONE)
+        struct osoe_connection *connection = osoe_connection_to(p->area,
+                                                                slot < p->node ? slot : slot + 1);
+        if (!connection || c->open == OSOE_CONNECTION_NONE)
             continue;
         /* Bytes a writer has committed into the open buffer that no segment
          * has carried yet. Reserved-but-uncommitted is not possible here: every
          * writer has passed shmem_finalize's barrier. */
         uint32_t used = OSOE_BUFFER_USED(
-            atomic_load_explicit(&conn->s->buffer[c->open].head, memory_order_acquire));
+            atomic_load_explicit(&connection->s->buffer[c->open].head, memory_order_acquire));
         if (used > header)
             return false;
     }
