@@ -1086,8 +1086,9 @@ space:
 - copying completed **nonblocking get** replies from the landing zone into a
   private destination, so landing-zone space is released without waiting for the
   application to call `quiet`;
-- **`shmem_global_exit` and job abort**: the agent calls `exit(status)` inside its
-  own process, so the exit status survives (§3.15).
+- **`shmem_global_exit` and job abort**: the agent ends its own process with the
+  status - with `exit(status)` on the caller's PE, and `fflush` and
+  `_exit(status)` on every other (§3.15, as built).
 
 **Application threads never submit.** They reserve and copy into connection
 buffers (§3.5), and ask the lead for everything else — seal-and-flush for
@@ -1659,7 +1660,9 @@ The policy is right; an earlier draft lacked **detection and propagation**:
   2. Each lead sets an **abort word** in its node segment and wakes every local
      agent.
   3. Each agent calls `exit(status)` in its own process (§3.12), so the status
-     survives and standard I/O is flushed as §9.1.6 requires.
+     survives and standard I/O is flushed as §9.1.6 requires. *(As built:
+     `exit` on the caller's PE only; every other PE flushes standard I/O and
+     `_exit`s, below.)*
 
   Every library wait also checks the abort word. `exit` from a non-main thread can
   block if an application thread holds a stdio lock, so an agent falls back to
@@ -1707,7 +1710,12 @@ inside one — returned from `main` into start_pes's finalize, say (the author's
 decision after the third review, which had found that wait and fixed it with a
 hand-off to the thread inside `exit`, now gone; `abort_exit_model.py`,
 `exit_everywhere`; `shmem.global-exit.handlers`, `.start-pes` and
-`.returned`). Because an end can still wait on a lock another thread holds —
+`.returned`). What a non-caller loses is what only its handlers would have
+flushed: output buffered outside stdio - a C++ stream not synchronized with it,
+a logger's own buffer. And one narrow case waits out the grace again: on the
+caller's PE, another thread already inside `exit` - main returned into the
+library's handler while a second thread called `shmem_global_exit` - holds the
+lock the agent's `exit` needs (the model's `caller_exiting`). Because an end can still wait on a lock another thread holds —
 a stream's, or on the caller's PE `exit`'s own — `_exit(status)` follows after
 `OSOE_ABORT_GRACE_SECONDS` (10), flushing stdout first if no thread holds it.
 That is not a wait that gives up because time passed: it ends a process that is
@@ -1870,7 +1878,9 @@ any local death, and the abort ends every PE (above). The watchdog then added
 only its message, mostly unseen, since the agents usually found a death first,
 and the author retired it (2026-09-23): the ending agent now names the routine
 its PE was waiting in (abort.c), from a pointer each wait publishes beside its
-blocked record (§3.14; `blocked.h`), so the message is in every build. One
+blocked record (§3.14; `blocked.h`) - the innermost wait's, the outer one's again
+once an inner one ends, as a barrier's quiet does - so the message is in every
+build (`shmem.death-in-wait.*`, on one node and on two). One
 thing went with it: every waiting PE checked every sibling, so a lead alive but
 wedged still had its siblings' deaths found; now only the lead's agent watches
 them. `OSOE_WATCHDOG` and `OSOE_LIVENESS` are retired, and a job that sets
@@ -1957,7 +1967,7 @@ outcome C11 forbids, and with what.
 
 | Shape | C11's requirement | Order | Where |
 |---|---|---|---|
-| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed`; the agent's `running` (phase 1 step 4). *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
+| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed`; the agent's `running` (phase 1 step 4); `called`, a caller of `shmem_global_exit` recorded before its declaration's CAS, which the agent's acquire of the word then carries; `waiting_in`, the routine a wait publishes for its agent (the watchdog's retirement). *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
 | A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready`; the node's `lead_agent_running` (phase 1 step 4), whose store also follows the lead's removal of the node's heap and control-segment names (§6.2) |
 | Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count. |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere; among them the abort word, installed whole by one CAS, and `ending`, the claim on ending a process (phase 1 step 4) |
@@ -4600,7 +4610,8 @@ implementations do. It saves typing `osoe-launch -n 1` and hides the mistake abo
 `OSOE_NO_PROGRESS_TIMEOUT` (§3.15) is osoe's own, read by the library; it
 replaced `OSOE_BOOTSTRAP_TIMEOUT`, which is retired. So, since phase 1 step 3,
 are `OSOE_PORT_RANGE` and `OSOE_JOB_SECRET` (§6.2), both optional, and since
-step 4 `OSOE_KEEPALIVE` and `OSOE_LIVENESS` (§3.15).
+step 4 `OSOE_KEEPALIVE` (§3.15); `OSOE_LIVENESS`, from the same step, is
+retired with the development watchdog (§3.15).
 `OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
 turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
 library never sees it.

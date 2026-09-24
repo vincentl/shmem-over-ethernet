@@ -1116,25 +1116,24 @@ set_tests_properties(shmem.dead-pe.lead-in-init
 # build, naming where each survivor was (§3.15): its lead's agent finds the
 # death by its pidfd, and each survivor ends from its agent, which names the
 # routine its thread waits in, or from that wait's sweep, which names it too.
-# Not an osoe_tier2_test: it needs -k, so the launcher leaves the survivors to
-# the library, and it asserts on output rather than on an exit status, since
-# the job is meant to fail. The development watchdog's test until it was retired.
+# Every survivor must name its routine, on one node and on two, where a put
+# first makes the barrier quiet inside its own wait. See death-in-wait.sh. The
+# development watchdog's test until it was retired.
 add_executable(shmem_test_death-in-wait test-death-in-wait.c)
 target_link_libraries(shmem_test_death-in-wait PRIVATE osoe)
 osoe_warnings(shmem_test_death-in-wait)
-foreach(count 2 4)
+foreach(layout "L2;2;-" "L4;4;-" "0-0-1-1;4;0,0,1,1")
   foreach(case "barrier;shmem_barrier_all" "wait_until;shmem_uint64_wait_until")
+    list(GET layout 0 label)
+    list(GET layout 1 count)
+    list(GET layout 2 map)
     list(GET case 0 where)
     list(GET case 1 routine)
-    add_test(NAME shmem.death-in-wait.${where}.L${count}
-      COMMAND osoe-launch -n ${count} -t 20 -k
-              -e 0:OSOE_TEST_WAIT=${where} -e 1:OSOE_TEST_WAIT=${where}
-              -e 2:OSOE_TEST_WAIT=${where} -e 3:OSOE_TEST_WAIT=${where}
-              -- $<TARGET_FILE:shmem_test_death-in-wait>)
-    set_tests_properties(shmem.death-in-wait.${where}.L${count} PROPERTIES
-      LABELS "tier2" TIMEOUT 60
-      PASS_REGULAR_EXPRESSION "${routine}: the job is aborting on behalf of PE|waiting in ${routine}"
-      FAIL_REGULAR_EXPRESSION "timeout after|returned from a wait")
+    add_test(NAME shmem.death-in-wait.${where}.${label}
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/death-in-wait.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_death-in-wait> ${count} ${map} ${where} ${routine})
+    set_tests_properties(shmem.death-in-wait.${where}.${label} PROPERTIES
+      LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "DEATH IN WAIT OK")
   endforeach()
 endforeach()
 

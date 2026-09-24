@@ -69,6 +69,13 @@ Cases
             stdio (spec §9.1.6); every other ends with fflush and _exit, which
             takes no lock and runs no handler beside a main thread still
             running (the author's decision after the third review).
+  caller_exiting
+            A's P calls it with 5 while another thread of A's P is inside exit
+            holding its lock - main returned into the library's handler. The
+            caller's PE ends with exit, which waits on that lock: STUCK here,
+            where the code's grace ends the process after
+            OSOE_ABORT_GRACE_SECONDS with the status, stdout flushed. Kept as
+            the known limit of dropping the third review's hand-off.
 
 Options
   pidfd     a sibling's death is a completion that wakes the lead's agent at
@@ -547,6 +554,7 @@ CASES_OF = {
     'early': {'callers': {}, 'early_callers': {'PA': 5}, 'waiters': (), 'connecting': ('LA',),
               'local': LOCAL},
     'exiting': {'callers': {'PA': 5}, 'waiters': (), 'exiters': ('LA',), 'local': LOCAL},
+    'caller_exiting': {'callers': {'PA': 5}, 'waiters': (), 'exiters': ('PA',), 'local': LOCAL},
 }
 
 
@@ -625,6 +633,7 @@ CASES = [
     ('no_init_wait', 'early', BUILT, False),
     ('built', 'exiting', BUILT, True),
     ('exit_everywhere', 'exiting', BUILT, False),
+    ('built', 'caller_exiting', BUILT, False),     # ends at the grace in the code
 ]
 
 if __name__ == '__main__':

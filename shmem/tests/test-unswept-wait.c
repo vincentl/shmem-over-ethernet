@@ -83,10 +83,6 @@ static void run_stat(char *out, size_t len)
     pclose(f);
 }
 
-/* Does local PE 0's row - the first after the table's header - say it is in
- * shmem_quiet waiting on node 1's acknowledgement, and the connection toward
- * node 1 that one PE waits on that word and none on its others? On map 0,0,1
- * local PE 0 of node 0 is rank 0, and PE 1, running this, waits on nothing. */
 /* Local PE 0's sweep count in osoe-stat's table, or 0 if it cannot be read:
  * the sixth column of the first row after the header. */
 static unsigned long long pe0_sweeps(const char *out)
@@ -98,6 +94,10 @@ static unsigned long long pe0_sweeps(const char *out)
     return sweeps;
 }
 
+/* Does local PE 0's row - the first after the table's header - say it is in
+ * shmem_quiet waiting on node 1's acknowledgement, and the connection toward
+ * node 1 that one PE waits on that word and none on its others? On map 0,0,1
+ * local PE 0 of node 0 is rank 0, and PE 1, running this, waits on nothing. */
 static int pe0_blocked_in_quiet(const char *out)
 {
     const char *header = strstr(out, "blocked in\n");

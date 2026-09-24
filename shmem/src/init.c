@@ -165,7 +165,13 @@ static void exit_without_finalize(void)
                                                                           : sizeof msg - 1);
         (void)ignored;
     }
-    osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE, OSOE_ABORT_FATAL);
+    /* A global exit declared since the read above wins the word, and this PE
+     * then ends as it does, with its status - as fatal.c routes a fatal that
+     * loses (review of the watchdog's retirement). */
+    if (!osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE,
+                                 OSOE_ABORT_FATAL) &&
+        osoe_node_abort_read(&osoe.node, &pe, &status) == OSOE_ABORT_GLOBAL_EXIT)
+        osoe_abort_end();
     _exit(EXIT_FAILURE);
 }
 

@@ -164,8 +164,8 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     if ((getenv("OSOE_WATCHDOG") || getenv("OSOE_LIVENESS")) && b->local_id == 0 &&
         b->rank == 0)
         fprintf(stderr, "osoe: OSOE_WATCHDOG and OSOE_LIVENESS are retired and ignored; "
-                        "every agent watches its node-mates with pidfds, in every build "
-                        "(design §3.15)\n");
+                        "a lead's agent watches the node's other PEs with pidfds, and each "
+                        "other agent its lead, in every build (design §3.15)\n");
 
     /*
      * §3.14: the control segment's name is removed as soon as every local PE

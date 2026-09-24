@@ -21,9 +21,11 @@
  *   a fatal         _exit with the declarer's status, as a fatal does.
  *
  * Either way the end can wait on a lock another thread holds - a stream's, or
- * on the caller's PE exit's own, held by a program's handler in a library
- * wait - so _exit(status) follows after OSOE_ABORT_GRACE_SECONDS, flushing
- * stdout first if no thread holds it: a process already ending, which is not a
+ * on the caller's PE exit's own, held by a thread already inside exit: a
+ * program's handler in a library wait, or main returned into the library's
+ * handler while another thread called shmem_global_exit - so _exit(status)
+ * follows after OSOE_ABORT_GRACE_SECONDS, flushing stdout first if no thread
+ * holds it: a process already ending, which is not a
  * wait that gives up because time passed. Exactly one thread of a process ends
  * it; any other that gets here waits for that to happen.
  *

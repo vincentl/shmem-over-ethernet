@@ -425,18 +425,47 @@ static void publish(const char *routine, enum osoe_blocked_detail kind, uint64_t
  * of this process reads it without the record's plain character stores. */
 static _Atomic(const char *) waiting_in;
 
+/*
+ * Waits nest - a barrier quiets inside its own wait, and an allocation's
+ * barrier inside the allocation's - so each thread keeps the waits it is in,
+ * and leaving the inner one restores the outer, in the record and the pointer
+ * alike. Without it an inner wait's leave cleared both, and a PE blocked in a
+ * barrier after a remote put read as waiting in nothing (review of the
+ * watchdog's retirement). Deeper than the stack holds, the outermost are kept.
+ */
+enum { BLOCKED_NESTING = 4 };
+struct blocked_wait {
+    const char *routine;
+    enum osoe_blocked_detail kind;
+    uint64_t detail, since;
+};
+static _Thread_local struct blocked_wait open_waits[BLOCKED_NESTING];
+static _Thread_local unsigned open_count;
+
 void osoe_blocked_enter(const char *routine, enum osoe_blocked_detail kind, uint64_t detail)
 {
+    uint64_t since = osoe_now_ns();
+    if (open_count < BLOCKED_NESTING)
+        open_waits[open_count] = (struct blocked_wait){ routine, kind, detail, since };
+    open_count++;
     if (osoe.node.slots)
-        publish(routine, kind, detail, osoe_now_ns());
+        publish(routine, kind, detail, since);
     atomic_store_explicit(&waiting_in, routine, memory_order_release);
 }
 
 void osoe_blocked_leave(void)
 {
-    atomic_store_explicit(&waiting_in, NULL, memory_order_release);
-    if (osoe.node.slots)
-        publish(NULL, OSOE_BLOCKED_DETAIL_NONE, 0, 0);
+    if (open_count > 0)
+        open_count--;
+    const struct blocked_wait *outer = open_count > 0 && open_count <= BLOCKED_NESTING
+                                           ? &open_waits[open_count - 1] : NULL;
+    atomic_store_explicit(&waiting_in, outer ? outer->routine : NULL, memory_order_release);
+    if (osoe.node.slots) {
+        if (outer)
+            publish(outer->routine, outer->kind, outer->detail, outer->since);
+        else
+            publish(NULL, OSOE_BLOCKED_DETAIL_NONE, 0, 0);
+    }
 }
 
 const char *osoe_blocked_routine(void)

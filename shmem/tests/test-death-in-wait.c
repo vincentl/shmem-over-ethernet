@@ -35,7 +35,8 @@ int main(void)
     bool in_wait = which && strcmp(which, "wait_until") == 0;
 
     uint64_t *flag = shmem_malloc(sizeof *flag);
-    CHECK_FATAL(flag);  /* NULL would be dereferenced just below */
+    uint64_t *scratch = shmem_malloc(sizeof *scratch);
+    CHECK_FATAL(flag && scratch);   /* NULL would be dereferenced just below */
     *flag = 0;
     shmem_barrier_all();
 
@@ -43,6 +44,7 @@ int main(void)
         /* Nothing can die on a one-PE job, and nothing else here would block.
          * Say so rather than pretending to have tested it. */
         fprintf(stderr, "death-in-wait: one PE, nothing to detect\n");
+        shmem_free(scratch);
         shmem_free(flag);
         shmem_finalize();
         return CHECK_DONE();
@@ -53,6 +55,12 @@ int main(void)
         fprintf(stderr, "death-in-wait: SIGKILL did not kill PE %d\n", me);
         return 2;
     }
+
+    /* A put to the PE half the job away, on another node when there are two:
+     * the barrier then quiets it inside its own wait, a wait within a wait,
+     * whose end must leave the barrier's routine named (blocked.h). */
+    uint64_t one = 1;
+    shmem_putmem(scratch, &one, sizeof one, (me + n / 2) % n);
 
     /* Unreachable in a passing run: the abort ends this PE inside one of these. */
     if (in_wait)

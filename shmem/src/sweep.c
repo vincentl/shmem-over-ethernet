@@ -12,7 +12,6 @@
  * ending agent names the routine (abort.c), so it was retired (the author's
  * decision, 2026-09-23), and OSOE_WATCHDOG and OSOE_LIVENESS with it.
  */
-#define _GNU_SOURCE
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
