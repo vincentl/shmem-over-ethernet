@@ -71,13 +71,17 @@ srun -N4 --ntasks-per-node=4 ./my_program
 
 No PMI plugin is involved: each node's lead finds the others over TCP, on a
 port it derives from the job and step ids (`OSOE_PORT_RANGE`, default
-17000–26999, must be open between the nodes), and every node must resolve the
-names in the step's node list. The program must be at the same path on every
-node. `OSOE_JOB_SECRET`, 32 hexadecimal digits exported before `srun`, keeps
-other hosts out of the job's rendezvous (design §6.2). A program run straight
-from a batch script, not through `srun`, is refused, since it is no task of a
-step. `tools/launch/capture-slurm-fixtures.sh` records a step's environment
-for the bootstrap's tests (design §6.1, §8.2).
+17000–26999), and then connects to each on a port the kernel chooses, so TCP
+must be open between the nodes, not only that range. Every node must resolve
+the names in the step's node list, and the program must be at the same path on
+every node. Use `srun -K1` (or `KillOnBadExit=1`), so that a task that fails
+at start-up ends the rest rather than leaving them waiting (design §3.15), and
+`OSOE_NO_PROGRESS_TIMEOUT=60` while a cluster is new, so that a wait that stops
+moving says what it waits for. `OSOE_JOB_SECRET`, 32 hexadecimal digits
+exported before `srun`, keeps other hosts out of the job's rendezvous (design
+§6.2). A program run straight from a batch script, not through `srun`, is
+refused, since it is no task of a step. `tools/launch/capture-slurm-fixtures.sh`
+records a step's environment for the bootstrap's tests (design §6.1, §8.2).
 
 ### With `osoe-launch` (development and tests)
 

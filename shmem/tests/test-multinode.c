@@ -54,7 +54,7 @@ static void read_local_ranks(void)
 {
     const char *gtids = osoe_test_launcher("GTIDS");
     if (!gtids) {
-        fprintf(stderr, "OSOE_GTIDS is unset: this test needs osoe-launch\n");
+        fprintf(stderr, "GTIDS is unset: this test needs osoe-launch or srun\n");
         exit(2);
     }
     for (const char *at = gtids; *at; ) {

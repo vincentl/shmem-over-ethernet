@@ -16,7 +16,8 @@
 # from SLURM_GTIDS, so replaying it checks §6.1's reading of SLURM_GTIDS against
 # what Slurm itself says. The task kept for each node is its local id 1, or 0
 # on a node of one task. Names that say who submitted the job or from where are
-# dropped.
+# dropped. Every task's record must arrive, or the capture fails: OUTDIR on a
+# filesystem some node cannot see leaves some tasks unrecorded.
 set -eu
 if [ $# -lt 2 ]; then
     echo "usage: capture-slurm-fixtures.sh NAME OUTDIR [SRUN ARGS]..." >&2
@@ -29,8 +30,16 @@ RAW=$(mktemp -d "$OUTDIR/.capture-$NAME.XXXXXX")
 trap 'rm -rf "$RAW"' EXIT
 
 srun "$@" sh -c 'env | grep "^SLURM_" |
-    grep -v "^SLURM_JOB_USER=\|^SLURM_JOB_UID=\|^SLURM_JOB_GID=\|^SLURM_SUBMIT_DIR=\|^SLURM_SUBMIT_HOST=" |
+    grep -v "^SLURM_JOB_USER=\|^SLURM_JOB_UID=\|^SLURM_JOB_GID=\|^SLURM_JOB_GROUP=\|^SLURM_SUBMIT_DIR=\|^SLURM_SUBMIT_HOST=" |
     sort > "$0/task-$SLURM_PROCID.env"' "$RAW"
+
+TASKS=$(ls "$RAW" | grep -c "^task-") || true
+WANT=$(sed -n 's/^SLURM_STEP_NUM_TASKS=//p' "$RAW/task-0.env" 2>/dev/null)
+if [ -z "$WANT" ] || [ "$TASKS" -ne "$WANT" ]; then
+    echo "capture-slurm-fixtures.sh: $TASKS of ${WANT:-?} tasks recorded: $OUTDIR must be" \
+         "on a filesystem every node of the step sees" >&2
+    exit 1
+fi
 
 VERSION=$(srun --version 2>/dev/null || echo "slurm, version unknown")
 COMMAND="srun $*"

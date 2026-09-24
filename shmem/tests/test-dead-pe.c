@@ -32,14 +32,16 @@
 
 #include <shmem.h>
 
+#include "launcher.h"
+
 enum { COMPUTE_SECONDS = 30 };
 
 int main(int argc, char **argv)
 {
     int dies = argc > 1 ? atoi(argv[1]) : 1;
     if (argc > 2 && strcmp(argv[2], "init") == 0) {
-        const char *rank = getenv("OSOE_PROCID"), *node = getenv("OSOE_NODEID");
-        const char *nodes = getenv("OSOE_STEP_NUM_NODES");
+        const char *rank = osoe_test_launcher("PROCID"), *node = osoe_test_launcher("NODEID");
+        const char *nodes = osoe_test_launcher("STEP_NUM_NODES");
         if (rank && atoi(rank) == dies)
             alarm(3);                           /* SIGALRM ends it inside shmem_init */
         if (node && nodes && atoi(node) == atoi(nodes) - 1 && atoi(nodes) > 1)

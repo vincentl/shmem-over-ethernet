@@ -36,7 +36,7 @@ enum { SMALL = 64, CHUNKED = 5000, TINY = 1, PATTERN_MOD = 251 };
 
 static int me, npes, local_id;
 
-/* The world ranks on this node, from the launcher's OSOE_GTIDS (§6.2), so the
+/* The world ranks on this node, from the launcher's GTIDS (§6.2, launcher.h), so the
  * test can tell a node-mate from a peer without asking the library. */
 enum { LOCAL_MAX = 256 };
 static int local_ranks[LOCAL_MAX];

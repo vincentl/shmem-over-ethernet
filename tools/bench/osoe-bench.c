@@ -16,15 +16,17 @@
  *   bandwidth  a stream of puts of each size, quieted at the end, in MiB/s
  *   atomic     a 64-bit fetch-add's median and fastest round trip
  *   barrier    shmem_barrier_all across every PE: the median and fastest
- *   pairs      every PE at once streams to the PE half the job away, which on
- *              a block layout of two or more nodes is on another node: each
- *              PE's MiB/s, and their sum - what the switch and every link
- *              carry together
+ *   pairs      every PE at once streams to the PE half the job away - on
+ *              another node when the job is a block layout with the same count
+ *              on every node - each PE's MiB/s, and the whole job's: every
+ *              byte over the slowest PE's time, what the switch and every link
+ *              carried together
  *
  * Lines start with the measurement's name and give key=value fields, so a
  * shell can pick them apart; times are microseconds. Design §8.4 has what the
- * library should cost against the floor: tests/test-floor.c measures that
+ * library should cost against the floor: shmem/tests/test-floor.c measures that
  * ratio between two nodes directly, against an io_uring echo on the same link.
+ * A name it does not know is refused, rather than run as nothing.
  */
 #define _GNU_SOURCE
 #include <stdint.h>
@@ -67,7 +69,7 @@ static size_t stream_bytes = STREAM_BYTES;          /* `quick`: a sixteenth */
 static unsigned char *window;           /* symmetric, MAX_BYTES */
 static unsigned char *source;           /* private, MAX_BYTES */
 static uint64_t *counter;               /* symmetric */
-static double *results;                 /* symmetric, one MiB/s per PE */
+static double *results;                 /* symmetric, one stream's seconds per PE */
 
 static void latency(int target, const char *where)
 {
@@ -164,18 +166,20 @@ static void pairs(int me, int npes)
         shmem_putmem(window, source, bytes, target);
     shmem_quiet();
     double seconds = (double)(now_ns() - t) / 1e9;
-    double mine = (double)(count * bytes) / (1 << 20) / seconds;
-    shmem_putmem(&results[me], &mine, sizeof mine, 0);
+    shmem_putmem(&results[me], &seconds, sizeof seconds, 0);
     shmem_quiet();
     shmem_barrier_all();
     if (me == 0) {
-        double sum = 0;
+        double mib = (double)(count * bytes) / (1 << 20), slowest = 0;
         for (int p = 0; p < npes; p++) {
             printf("pairs pe=%d target=%d bytes=%zu mib_per_s=%.1f\n", p, (p + npes / 2) % npes,
-                   bytes, results[p]);
-            sum += results[p];
+                   bytes, mib / results[p]);
+            if (results[p] > slowest)
+                slowest = results[p];
         }
-        printf("pairs pes=%d total_mib_per_s=%.1f\n", npes, sum);
+        /* Every byte over the slowest PE's time: what the whole job moved, not
+         * a sum of rates each over its own time, which overstates it. */
+        printf("pairs pes=%d total_mib_per_s=%.1f\n", npes, mib * npes / slowest);
         fflush(stdout);
     }
 }
@@ -195,6 +199,18 @@ static int wanted(int argc, char **argv, const char *what)
 
 int main(int argc, char **argv)
 {
+    static const char *const known[] = { "latency", "bandwidth", "atomic", "barrier",
+                                         "pairs", "quick" };
+    for (int i = 1; i < argc; i++) {
+        size_t k = 0;
+        while (k < sizeof known / sizeof *known && strcmp(argv[i], known[k]) != 0)
+            k++;
+        if (k == sizeof known / sizeof *known) {
+            fprintf(stderr, "osoe-bench: no measurement '%s': latency, bandwidth, atomic, "
+                    "barrier, pairs, quick\n", argv[i]);
+            return 2;
+        }
+    }
     for (int i = 1; i < argc; i++)
         if (strcmp(argv[i], "quick") == 0) {
             trips_per_size = LATENCY_TRIPS / 10;

@@ -130,13 +130,13 @@ static uint32_t node_count_for_children;
 static pid_t launcher_pid;
 static const char *namespace_prefix;    /* -N: tier 3's per-node network namespaces */
 static const char *host_list;           /* -H: their addresses, as OSOE_STEP_NODELIST */
-static const char *names = "OSOE_";     /* -s: "SLURM_", srun's names (§6.1) */
+static const char *launcher_prefix = "OSOE_";  /* -s: "SLURM_", srun's names (§6.1) */
 
 /* One of the bootstrap's launcher variables, under this launch's names. */
 static void set_launcher_variable(const char *suffix, const char *value)
 {
     char name[40];
-    snprintf(name, sizeof name, "%s%s", names, suffix);
+    snprintf(name, sizeof name, "%s%s", launcher_prefix, suffix);
     setenv_or_die(name, value);
 }
 
@@ -187,7 +187,7 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
 
     /* Under srun's names, nothing of ours may be left for the bootstrap to
      * prefer: OSOE_PROCID decides which names it reads (§6.1). */
-    if (strcmp(names, "OSOE_") != 0)
+    if (strcmp(launcher_prefix, "OSOE_") != 0)
         unsetenv("OSOE_PROCID");
     char buf[32];
     snprintf(buf, sizeof buf, "%ld", rank);
@@ -297,7 +297,7 @@ int main(int argc, char **argv)
             keep = true;
             break;
         case 's':
-            names = "SLURM_";
+            launcher_prefix = "SLURM_";
             break;
         case 'e': {
             char *colon = strchr(optarg, ':');

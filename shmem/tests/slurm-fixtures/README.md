@@ -2,9 +2,9 @@
 
 One task's environment each, replayed into the bootstrap by
 `shmem/tests/test-bootstrap.c` (tier 1, `shmem.bootstrap.*`; design §6.1, §8.2).
-Only the `SLURM_` names a task sees are kept, less those that name a user or a
-path (`SLURM_JOB_USER`, `SLURM_JOB_UID`, `SLURM_JOB_GID`, `SLURM_SUBMIT_DIR`,
-`SLURM_SUBMIT_HOST`).
+Only the `SLURM_` names a task sees are kept, less those that name a user, a
+group or a path (`SLURM_JOB_USER`, `SLURM_JOB_UID`, `SLURM_JOB_GID`,
+`SLURM_JOB_GROUP`, `SLURM_SUBMIT_DIR`, `SLURM_SUBMIT_HOST`).
 
 - `captured-*`: from a real `srun`, with the Slurm version and command line in
   the header. `tools/launch/capture-slurm-fixtures.sh` makes them.

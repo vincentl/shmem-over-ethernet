@@ -8,4 +8,5 @@ osoe_warnings(osoe-bench)
 add_test(NAME tools.bench.0-0-1-1
   COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-bench> quick)
 set_tests_properties(tools.bench.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
-  PASS_REGULAR_EXPRESSION "pairs pes=4 total_mib_per_s=")
+  PASS_REGULAR_EXPRESSION "pairs pes=4 total_mib_per_s="
+  FAIL_REGULAR_EXPRESSION "exited with status [1-9]|killed by signal|timeout after|left behind")

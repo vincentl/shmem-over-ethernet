@@ -1282,8 +1282,8 @@ add_test(NAME shmem.refuse.nonsymmetric_put
   COMMAND osoe-launch -n 1 -t 60 -- $<TARGET_FILE:shmem_test_bad_put>)
 set_tests_properties(shmem.refuse.nonsymmetric_put PROPERTIES
   PASS_REGULAR_EXPRESSION "shmem_putmem: .* is not within the symmetric heap")
-set_tests_properties(shmem.refuse.no_launcher shmem.refuse.bad_size
-  shmem.refuse.bad_size_sma shmem.refuse.zero_size
+set_tests_properties(shmem.refuse.no_launcher shmem.refuse.slurm_not_a_step
+  shmem.refuse.bad_size shmem.refuse.bad_size_sma shmem.refuse.zero_size
   shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
   LABELS "tier2" TIMEOUT 90)
 

@@ -1,10 +1,13 @@
 # Running osoe on the Raspberry Pi cluster
 
 The runbook for the first experiments on real hardware: four Raspberry Pi 5
-compute nodes, `pi-001` to `pi-004` (16 GB each), booting over the network from
-a head node (8 GB, 512 GB NVMe), all on one gigabit PoE switch, with Slurm as
-the launcher. Every step names what it checks and what to keep. Written for
-Raspberry Pi OS Trixie (Debian 13); the first step says whether that holds.
+compute nodes, `pi-001` to `pi-004` (16 GB each, at 10.0.1.1 to 10.0.1.4),
+booting over the network from the head node `pi-login`, all on one gigabit PoE
+switch, with Slurm as the launcher. The cluster is `pi-cluster`'s: every
+compute node shares one read-only root, the image on the head node, and mounts
+`/home` read-write from it, so a checkout in `/home` is at the same path on
+every node, and software reaches the nodes only through the image
+(`pi-cluster/head/image-run.sh`). Slurm is set up by hand there for now.
 
 The emulated version of this cluster is tier 3's `pi` link (1 Gbit/s, 100 µs
 each way; design §8.2): there the library's round trips measured 1.01–1.06×
@@ -14,35 +17,34 @@ Cortex-A76 cores do to it.
 
 ## 1. The nodes
 
-Each compute node must have Linux 6.7 or newer and io_uring enabled:
-
 ```sh
 srun -N4 --ntasks-per-node=1 uname -r
 srun -N4 --ntasks-per-node=1 getconf PAGESIZE                          # 16384 on a Pi 5's kernel
 srun -N4 --ntasks-per-node=1 cat /proc/sys/kernel/io_uring_disabled   # 0
+srun -N4 --ntasks-per-node=1 cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
 srun -N4 --ntasks-per-node=1 sh -c 'echo "$(hostname): $(getent ahostsv4 $(hostname) | head -1)"'
 sinfo -V
 ```
 
-The third line shows what each node's own name resolves to there. Raspberry
-Pi OS maps a host's own name to 127.0.1.1 in `/etc/hosts`, which its peers
-cannot reach; the library then listens at the node's address toward the
-others instead (design §6.1), and `SHMEM_DEBUG=1` says so per node. If the
-names resolve to the nodes' LAN addresses everywhere, nothing changes.
+Keep the output: it goes in the notes with the results.
+- osoe needs Linux 6.7 or newer, and `probe` below checks the rest.
+- A Pi 5's kernel uses 16 KiB pages where the VM's uses 4 KiB. osoe sizes every mapping by the page it is given (design §8.5), and this is the first run that proves it.
+- The governor matters to every time below: `ondemand` clocks a core down between trips, so write down which one ran.
+- The fifth line shows what each node's own name resolves to there. On this cluster the image's `/etc/hosts` maps each name to its 10.0.1.N address. A stock Raspberry Pi OS maps a host's own name to 127.0.1.1, which its peers cannot reach; osoe then listens at the node's address toward the others instead (design §6.1), and `SHMEM_DEBUG=1` says so per node.
 
-Keep the output: it goes in the notes with the results. A Pi 5's kernel uses
-16 KiB pages where the VM's uses 4 KiB; osoe sizes every mapping by the page it
-is given (design §8.5), and this is the first run that proves it. Trixie gives kernel 6.12
-and Slurm 24.11; Bookworm's may be too old for osoe (6.6), which `probe` below
-says plainly.
+## 2. Build once, in /home
 
-## 2. Build once, on the shared filesystem
-
-The compute nodes have no disks, so the tree lives on the filesystem every
-node mounts; build it once, at the same path everywhere:
+On the head node, the tools; into the compute nodes' image, with the nodes
+powered off, the library osoe loads at run time and `ctest`:
 
 ```sh
 sudo apt install build-essential cmake pkg-config liburing-dev git
+sudo bash ~/pi-cluster/head/image-run.sh apt-get install -y liburing2 cmake
+```
+
+Then, in the checkout under `/home`, on the head node:
+
+```sh
 cmake --preset release
 cmake --build build/release -j4
 srun -N4 --ntasks-per-node=1 build/release/tools/probe/probe     # every node: all ok
@@ -60,10 +62,9 @@ srun -N1 -n1 -c4 ctest --test-dir build/release -L 'tier1|tier2' -E '^model\.' -
 ```
 
 The models (`model.*`) are left out: they check designs, not this machine,
-and take the better part of an hour on a Pi.
-
-The floor pins (`shmem.floor`) and `echo-uring`'s were set on the VM's CPU and
-may fail on a Pi. That is a finding to keep, not a reason to stop.
+and take the better part of an hour on a Pi. The floor pins (`shmem.floor`) and
+`echo-uring`'s were set on the VM's CPU and may fail on a Pi. That is a finding
+to keep, not a reason to stop.
 
 ## 3. Slurm's environment, captured
 
@@ -80,30 +81,43 @@ tools/launch/capture-slurm-fixtures.sh plane-4x4  $F -N4 --ntasks-per-node=4 --d
 tools/launch/capture-slurm-fixtures.sh uneven     $F -N3 -n7
 salloc -N4 sh -c "tools/launch/capture-slurm-fixtures.sh relative $F -N2 -r2 -n2"
 tools/launch/capture-slurm-fixtures.sh exclude    $F -N3 -n3 -x pi-002
+cmake --build build/release                      # registers the new fixtures
+ctest --test-dir build/release -N -R 'shmem\.bootstrap\.captured'
 ctest --test-dir build/release -R 'shmem\.bootstrap\.' --output-on-failure
 ```
 
-Every `captured-*` fixture must pass. One that fails is either the bootstrap
-misreading Slurm or §6.1 describing it wrongly; which one is the finding.
+The listing must show the new `captured-*` names, and every one must pass. One
+that fails is either the bootstrap misreading Slurm or §6.1 describing it
+wrongly; which one is the finding.
 
 ## 4. The smoke test
 
+For the first runs, a wait that stops moving should say what it waits for, and
+a task that fails at start-up should end the rest (`-K1`):
+
 ```sh
-srun -N4 --ntasks-per-node=4 build/release/shmem/tests/shmem_test_internode
-srun -N4 --ntasks-per-node=4 --distribution=cyclic build/release/shmem/tests/shmem_test_internode
+export OSOE_NO_PROGRESS_TIMEOUT=60
+T="env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2 OSOE_WIRE_BYTES=256 \
+     OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919"
+srun -K1 -N4 --ntasks-per-node=4 $T build/release/shmem/tests/shmem_test_internode
+srun -K1 -N4 --ntasks-per-node=4 --distribution=cyclic $T build/release/shmem/tests/shmem_test_internode
 ```
 
-Both must exit 0 on every task. The cyclic one is the layout the environment
-cannot describe and the rendezvous must assemble (design §6.1).
+Both must exit 0 on every task. The settings are the test's own (its ctest
+registration): small segments and two reply credits, so that segment splitting
+and the credit limits cross the real link. The cyclic run is the layout the
+environment cannot describe and the rendezvous must assemble (design §6.1).
 
 ## 5. The library against its floor
 
 Two nodes, one PE on each: the library's get, put and quiet, fetch-add and
 stream, against an io_uring echo and stream between the same two processes on
-the same link, in seven interleaved pairs (design §8.4):
+the same link, in seven interleaved pairs (design §8.4). `-c4` gives the one
+task all four cores: with one, its main thread, its agent and the floor's echo
+would share a core, and that cost would read as the Pi's:
 
 ```sh
-srun -N2 --ntasks-per-node=1 build/release/shmem/tests/shmem_test_floor > floor.txt
+srun -K1 -N2 --ntasks-per-node=1 -c4 build/release/shmem/tests/shmem_test_floor > floor.txt
 ```
 
 Keep `floor.txt`. Its `ratio` lines are the numbers to compare with tier 3's
@@ -118,34 +132,38 @@ streaming at once (`tools/bench/osoe-bench.c`).
 
 ```sh
 B=build/release/tools/bench/osoe-bench
-srun -N2 --ntasks-per-node=1 $B > bench-2x1.txt
-srun -N4 --ntasks-per-node=1 $B > bench-4x1.txt
-srun -N4 --ntasks-per-node=4 $B > bench-4x4.txt
-srun -N4 --ntasks-per-node=4 --cpu-bind=none $B > bench-4x4-unbound.txt
+srun -K1 -N2 --ntasks-per-node=1 -c4 $B > bench-2x1.txt
+srun -K1 -N4 --ntasks-per-node=1 -c4 $B > bench-4x1.txt
+srun -K1 -N4 --ntasks-per-node=4 $B > bench-4x4.txt
+srun -K1 -N4 --ntasks-per-node=4 --cpu-bind=none $B > bench-4x4-unbound.txt
 ```
 
 The last pair is the experiment the design most wants from four-core nodes.
-Each PE has an agent thread beside its main thread (§3.12), and Slurm's
-default binding may pin both to one core. The difference between the two runs
-is what that costs.
+Each PE has an agent thread beside its main thread (§3.12), and Slurm's default
+binding gives each of the four tasks one core, which its two threads share;
+unbound, they may use any of the node's four. The difference between the two
+runs is what the sharing costs.
 
 ## 7. Endings
 
 A global exit from one PE, while every other PE computes, must end every task
-with the caller's status. A killed PE must end the job with a failure:
+with the caller's status. A killed PE must end the job with a failure. Here
+`-K0`: what ends the tasks must be the library, not Slurm:
 
 ```sh
-srun -N4 --ntasks-per-node=4 build/release/shmem/tests/shmem_test_global-exit 7 1 compute; echo $?
-srun -N4 --ntasks-per-node=4 -K0 build/release/shmem/tests/shmem_test_dead-pe 5; echo $?
+srun -K0 -N4 --ntasks-per-node=4 build/release/shmem/tests/shmem_test_global-exit 7 1 compute; echo $?
+srun -K0 -N4 --ntasks-per-node=4 build/release/shmem/tests/shmem_test_dead-pe 5; echo $?
 ```
 
 The first must print 7, and every task's "PE n: computing" line. The second
-must end every task within a few seconds, with the line naming PE 5 as dead.
+must end every task within a few seconds, naming rank 5 as dead.
 
 A vanished node needs care here: these nodes boot from the network, so a node
 whose cable is pulled loses its root filesystem too, and will need its PoE port
-power-cycled afterwards. From the others' side it is still the test: keepalive
-should end the job one to two minutes after the cut (design §3.15).
+power-cycled afterwards. From the others' side it is still the test. With the
+connections idle, keepalive ends the job one to two minutes after the cut; with
+data in flight toward the lost node, the kernel's retransmission limit
+(`tcp_retries2`) decides instead, about fifteen minutes (design §3.15).
 
 ## 8. What to bring back
 
