@@ -11,36 +11,49 @@ There is no git remote, so every merge here is local and nothing was pushed.
 
 ## Where things stand, and what needs you
 
+*Vincent reviewed every entry on his return the same evening; each question
+below carries his answer, and "The author's review" at the end records every
+entry's.*
+
 On main: step 3 slice 2 (36b05fe), the osoe-stat branch (a0cded6), the test
 review (fd7c07e), step 4 slice 1 (92309a7), the fixes its review found
 (9d9251e) and those a third review then found (567d02f), with this log and the
-second slice's brief among them. On branch `phase1-step4-slice2`, not merged: the
-heap-base shift (its Part A). Nothing was pushed; there is no remote.
+second slice's brief among them; and, after the review, the heap-base shift
+(d5ca388), the fork.L4 guarantee (8f55f43) and the `conn` rename (9b8c985).
+Nothing was pushed; there is no remote.
 
 Decisions to confirm or reverse, most consequential first:
 
 1. The abort crosses nodes as an abortive goodbye rather than along the tree
    (12). This changes §3.15's "flood" design, on the strength of a model.
-2. Keepalive's values, 60/10/6, and no `TCP_USER_TIMEOUT` (17).
+   **Confirmed.**
+2. Keepalive's values, 60/10/6, and no `TCP_USER_TIMEOUT` (17). **Confirmed.**
 3. The development watchdog: retire it, or have the ending agent name the
-   routine its PE is blocked in (16).
+   routine its PE is blocked in (16). **Both: retire it, and the ending agent
+   names the routine, in every build.**
 4. Pidfds from every agent's loop rather than the lead's ring (16), and
-   whether the ring version is worth a new seam function (20).
+   whether the ring version is worth a new seam function (20). **Confirmed;
+   the ring version is not built now.**
 5. `OSOE_LIVENESS=0`, a second off-switch beside `OSOE_WATCHDOG`, for the
-   tests of the watchdog and the sweep (18).
+   tests of the watchdog and the sweep (18). **Confirmed until the watchdog
+   goes, then dropped with it.**
 6. Parts A, C and D verified together rather than one by one (15).
+   **Confirmed.**
 7. Slurm: where to capture fixtures, and building the Slurm path they need,
-   which does not exist yet (19, 20).
+   which does not exist yet (19, 20). **The path in the next slice; fixtures
+   captured from Slurm installed in the VM.**
 8. Merging the second slice's Part A alone, or waiting for the rest. Its
    branch (`83a3fbd`) is on today's main, after the third review's fixes,
-   and verified there.
+   and verified there. **Merged alone (d5ca388).**
 9. What the review left as designed rather than fixed (22): `exit` from the
    agent runs handlers beside a live main thread, and a fatal ends at once
-   rather than through the agent.
+   rather than through the agent. **`exit` on the caller's PE only, `fflush`
+   and `_exit` on every other; a fatal as it is until on-demand
+   connections.**
 10. The third review's open finding (23): a peer's send error on the ending
     node's reset can end it before its engine reads the goodbye, which its
     kernel holds. Closing it changes how the wire treats an error in either
-    direction.
+    direction. **A small slice of its own, next, modelled first.**
 
 After the merge, two adversarial reviews found four bugs in step 4 slice 1,
 and verifying their fixes found a fifth. All five are fixed, verified and
@@ -54,7 +67,8 @@ Found on the way and left as suggested tasks: `progress.c` names every
 forbids (the new code followed the file rather than start a second style);
 and `shmem.fork.L4` flaked under load in tsan, since before step 4 (21) - on
 main, the review's first fix turned out to have closed it; branch
-`fork-l4-flake` makes that order deliberate.
+`fork-l4-flake` makes that order deliberate. Both were done by sessions of
+their own and merged after the author's review.
 
 ## Phase 1 step 3 slice 2
 
@@ -331,7 +345,8 @@ before its lead has removed it. It fails the same way without the shift and
 on the tree before step 4, so it was left as a suggested task rather than
 fixed inside the heap shift.
 
-*Resolved since, on branch `fork-l4-flake`, not merged.* The review's first fix
+*Resolved since, on branch `fork-l4-flake`, merged after the author's review
+(8f55f43).* The review's first fix
 (22) had already closed it on main: init's wait for the lead's agent holds every
 non-lead until a store the lead makes after removing the names. Beside 16 busy
 loops in tsan, 30 runs each: 8 failures on the tree before that fix, 0 on main,
@@ -460,6 +475,47 @@ anywhere. The AM kinds are `PUT`, `GET_REQUEST`, `GET_REPLY`, `RMW_REQUEST`,
 its pid in its slot before the release store of its phase; `pidfd_open` is
 not used anywhere yet, though the second review's portability evidence
 proves `pidfd_open` polled on a ring beside a futex wait.
+
+## The author's review, the same evening
+
+Vincent went through every entry on his return. Each is confirmed as built
+unless this section says otherwise.
+
+- **Confirmed as built:** 1–15, 16's pidfds from every agent's loop, 17, and
+  23's smaller fixes and what it kept. Entry 12 (question 1), the abortive
+  goodbye, among them.
+- **16's watchdog, with 18 (questions 3 and 5):** retire the development
+  watchdog, and have the ending agent name the routine its PE was blocked in
+  — its blocked record (§3.14) says — in every build. `OSOE_LIVENESS=0` stays
+  until then and goes with `OSOE_WATCHDOG`, and the tests that exist to tell
+  the two apart are reworked. A later slice.
+- **20's Part C (question 4):** the lead's pidfds stay polled at its agent's
+  sweep. The ring version needs a seam function and buys at most a sweep
+  interval, so it is not built now; only if sub-100 ms death detection ever
+  matters.
+- **19 and 20's Part B (question 7):** the Slurm path is the next slice's,
+  and its fixtures are captured from Slurm installed in the VM — `slurm-wlm`
+  and munge, one `slurmd` for single-node captures, a container cluster for
+  multi-node ones. The second slice's brief now says so.
+- **20's Part A (question 8):** merged ahead of the rest of its slice
+  (d5ca388).
+- **21, and the rename:** both sessions' branches merged (8f55f43, 9b8c985).
+  The three merges, each verified alone, were verified together on main.
+- **22 (question 9):** a global exit ends the caller's PE with
+  `exit(status)` and every other PE with `fflush(NULL)` then `_exit(status)`,
+  so that no handler or destructor runs beside a main thread that is still
+  computing; a follow-up. With it, 23's hand-off to a thread inside `exit` is
+  to be removed if it has become redundant. A fatal keeps ending at once until
+  on-demand connections, which must send it through the agent's goodbye.
+- **23's open finding (question 10):** a small slice of its own, next:
+  `abort_model.py` carries a send error first; then the wire's errors are
+  split by direction, a reset's send error stops the sends without ending the
+  node, and the node is judged when its receive side ends.
+
+The work this leaves, in the author's order: the question-10 slice; the
+exit follow-up (22); the rest of step 4's second slice, the Slurm path and
+its captures; the watchdog's retirement; and, with on-demand connections,
+fatals through the goodbye.
 
 ## How this record is kept
 

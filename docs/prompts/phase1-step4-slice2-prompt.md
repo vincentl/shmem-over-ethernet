@@ -20,8 +20,10 @@ Machine setup: "Setting up on a new machine" in `phase1-step2-slice1-prompt.md`.
 Meaning of phase/step/slice: `docs/prompts/README.md`.
 
 *Written by Claude on 2026-09-23 while the author was away, under his mandate to
-continue past slice boundaries (`docs/decisions/2026-09-23-autonomous.md`). Part
-B needs a decision only the author can take, and says so.*
+continue past slice boundaries (`docs/decisions/2026-09-23-autonomous.md`), and
+brought in line with his review of that log the same evening: Part A is done
+and merged (d5ca388); Part B is the Slurm path first, then fixtures captured
+from Slurm installed in the VM; Part C is not being built now.*
 
 ## Read first
 
@@ -43,16 +45,22 @@ B needs a decision only the author can take, and says so.*
   address is the same number on every PE of the job, and code that sends or
   compares raw addresses where it should use offsets passes every test there is.
   The intranode path translates through `base_of`; nothing forces it to.
-- **No tier feeds real `SLURM_*` values.** The bootstrap's Slurm path has been
-  read against documentation and the launcher's imitation of it, never against
-  what `srun` sets.
+- **There is no Slurm path.** `osoe_bootstrap_read` refuses a Slurm
+  environment ("launch under Slurm is not yet supported") and reads only the
+  `OSOE_` names `osoe-launch` sets; this brief first assumed otherwise (the
+  decisions log, 20).
 - **The multi-node lead finds a sibling's death within a sweep interval**, by
   polling its pidfds from its agent loop, where a completion on its ring would
-  find it at once.
+  find it at once. The author decided to keep it so (Part C).
 
 ## Order of work
 
-### Part A — the heap-base shift
+### Part A — the heap-base shift (**done**, merged as d5ca388)
+
+`OSOE_HEAP_SHIFT` shifts by world rank; it found two one-base assumptions,
+neither on the wire (a test comparing addresses, and `shmem_align` deciding
+from the PE's own base), and `shmem.heap-shift.*` runs the address-heavy tests
+shifted in every preset. What follows is the part as it was briefed.
 
 A test mode in which **every PE maps its own heap at a different address**:
 `OSOE_HEAP_SHIFT=BYTES` (a multiple of the page size, 0 by default) makes each
@@ -70,31 +78,35 @@ finding — fix it, and say what it was. If nothing fails, break it on purpose
 show the mode catches it. Decide whether the mode becomes a ctest label run in
 every preset or a preset of its own, by what it costs.
 
-### Part B — Slurm environment fixtures (**needs the author**)
+### Part B — the Slurm path, then captured fixtures (**decided by the author**)
 
-§8.2 asks for *captured* `srun` environments — block, cyclic, plane and
+First the path itself: §6.1's table read with the `SLURM_` prefix, in place of
+`osoe_bootstrap_read`'s refusal. It needs no Slurm to build.
+
+Then §8.2's *captured* `srun` environments — block, cyclic, plane and
 arbitrary distributions, `-r` and `-x`, a heterogeneous job, a bare `sbatch` —
-replayed into bootstrap parsing at tier 1. Capturing needs a Slurm: the
-development VM has none (Debian's `slurm-wlm` 24.11 is available), and a
-single host runs one `slurmd` unless Slurm is built for several. **Stop and ask
-before installing anything**: the author chooses between the VM with Slurm
-installed, a real cluster, or fixtures written from Slurm's documentation and
-marked as such. Until then, write the replay harness against one fixture the
-launcher produces, so the part is ready for real captures.
+replayed into bootstrap parsing at tier 1. The author chose the source: Slurm
+installed in the development VM — Debian's `slurm-wlm` (24.11) and munge, one
+`slurmctld` and one `slurmd` for the single-node captures, and a small
+container cluster for the multi-node ones, since a single host runs one
+`slurmd` unless Slurm is built for several. The VM is shared with other
+sessions: say before starting the daemons, and stop them when the captures are
+done. The path is supported once the real captures pass.
 
-### Part C — the multi-node lead's pidfds on its ring
+### Part C — the multi-node lead's pidfds on its ring (**not now**)
 
-On the lead of a multi-node job, arm each sibling's pidfd on the ring
+The author decided against it for now: the ring is the AM backend's, below
+§4.10, and `liveness.c` above it, so it needs a new seam function (and an RDMA
+backend one of its own), and all it buys is the sweep interval, at most
+100 ms. Revisit only if sub-100 ms death detection ever matters. As briefed: on
+the lead of a multi-node job, arm each sibling's pidfd on the ring
 (`IORING_OP_POLL_ADD`, oneshot), so a death is a completion that wakes the
-agent at once; keep the sweep-interval poll for a single-node job, which has no
-ring. Update the ring's submission and completion bounds (§3.3's assertion) for
-L − 1 more entries, armed once. Measure the difference with `shmem.dead-pe` on
-two nodes: the time from the death to the last rank's exit.
+agent at once, and measure the difference with `shmem.dead-pe` on two nodes.
 
 ### Part D — what the notes must now say
 
-§7.1 step 4 done, or what remains; §8.2's two items; invariant 7's evidence;
-§3.15's liveness paragraph for Part C.
+§7.1 step 4 done, or what remains; §8.2's Slurm item (the heap shift's is
+done); §6.1 for the Slurm path.
 
 ## Rules
 
@@ -113,8 +125,8 @@ the later slices, apply. In addition:
 ## Working method
 
 - State a short plan, then proceed. Stop only on a surprise, saying what you
-  expected, what happened, and the options — and at Part B's decision.
-- Branch `phase1-step4-slice2`. Small commits, warning-free, all four presets
+  expected, what happened, and the options.
+- Branch `phase1-step4-slice2-slurm` from main (Part A's branch is merged). Small commits, warning-free, all four presets
   green in the VM, the load loop on every test added or changed, messages that
   say what was verified and how, the design doc changed in the commit that
   makes it true.
