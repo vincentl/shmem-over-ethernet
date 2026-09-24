@@ -1,11 +1,14 @@
 /* shmem_putmem, shmem_getmem (spec §9.6.1) and shmem_ptr (§9.1.9), over the
  * transport boundary (§4.10). */
 #include <stddef.h>
+#include <stdint.h>
 
 #include <pshmem.h>
 #include <shmem.h>
 
 #include "export.h"
+#include "fatal.h"
+#include "rma.h"
 #include "state.h"
 #include "symmetric.h"
 #include "team.h"
@@ -18,46 +21,56 @@
  * the work and a context form that ignored its argument would be the shape that
  * breaks when a second context exists.
  */
-static void ctx_putmem(const char *routine, shmem_ctx_t ctx, void *dest,
-                       const void *source, size_t nelems, int pe)
+size_t osoe_rma_bytes(const char *routine, size_t nelems, size_t width)
 {
-    if (nelems == 0)
-        return;
-    osoe_check_pe(routine, pe);
-    uint64_t offset = osoe_symmetric_offset(routine, dest, nelems);
-    osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source, nelems, 0);
+    if (width > 1 && nelems > SIZE_MAX / width)
+        osoe_fatal("%s: %zu elements of %zu bytes are more bytes than a size_t can count",
+                   routine, nelems, width);
+    return nelems * width;
 }
 
-static void ctx_getmem(const char *routine, shmem_ctx_t ctx, void *dest,
-                       const void *source, size_t nelems, int pe)
+void osoe_rma_put(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
+                  size_t nelems, size_t width, int pe)
 {
     if (nelems == 0)
         return;
+    size_t len = osoe_rma_bytes(routine, nelems, width);
     osoe_check_pe(routine, pe);
-    uint64_t offset = osoe_symmetric_offset(routine, source, nelems);
-    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, nelems, 0);
+    uint64_t offset = osoe_symmetric_offset(routine, dest, len);
+    osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source, len, 0);
+}
+
+void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
+                  size_t nelems, size_t width, int pe)
+{
+    if (nelems == 0)
+        return;
+    size_t len = osoe_rma_bytes(routine, nelems, width);
+    osoe_check_pe(routine, pe);
+    uint64_t offset = osoe_symmetric_offset(routine, source, len);
+    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, len, 0);
 }
 
 OSOE_API void pshmem_putmem(void *dest, const void *source, size_t nelems, int pe)
 {
-    ctx_putmem("shmem_putmem", SHMEM_CTX_DEFAULT, dest, source, nelems, pe);
+    osoe_rma_put("shmem_putmem", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, pe);
 }
 
 OSOE_API void pshmem_getmem(void *dest, const void *source, size_t nelems, int pe)
 {
-    ctx_getmem("shmem_getmem", SHMEM_CTX_DEFAULT, dest, source, nelems, pe);
+    osoe_rma_get("shmem_getmem", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, pe);
 }
 
 OSOE_API void pshmem_ctx_putmem(shmem_ctx_t ctx, void *dest, const void *source,
                                size_t nelems, int pe)
 {
-    ctx_putmem("shmem_ctx_putmem", ctx, dest, source, nelems, pe);
+    osoe_rma_put("shmem_ctx_putmem", ctx, dest, source, nelems, 1, pe);
 }
 
 OSOE_API void pshmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
                                size_t nelems, int pe)
 {
-    ctx_getmem("shmem_ctx_getmem", ctx, dest, source, nelems, pe);
+    osoe_rma_get("shmem_ctx_getmem", ctx, dest, source, nelems, 1, pe);
 }
 
 /* NULL for anything not reachable by loads and stores in this process: a

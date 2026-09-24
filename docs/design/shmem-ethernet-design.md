@@ -4963,7 +4963,7 @@ shifted name of a function that never had a `shmem_` prefix should be:
 `pstart_pes` is what Sandia OpenSHMEM chose, and `pshmem_start_pes` is the
 literal reading, which also yields `pshmem__my_pe`. Deferred rather than
 guessed, because a profiling tool that looks for the wrong one is no better off
-than one that finds nothing, and every other routine — all 526 — has its pair.
+than one that finds nothing, and every other routine — all 1,092 — has its pair.
 
 Two of §10's other requirements are satisfied and worth recording as such, since
 both look like omissions otherwise. Item 3 states that the C11 type-generic
@@ -4982,8 +4982,39 @@ together, immediately after step 4.
 
 ### 7.5 Deferred (mechanical)
 
-Full type/operation cross product, strided transfers, nonblocking variants,
-broadcast/reduce/collect/alltoall, locks.
+Broadcast/reduce/collect/alltoall, locks.
+
+**RMA's full type/operation cross product, strided transfers and nonblocking
+variants are implemented** (§9.6, §9.8.3-§9.8.4): every standard RMA type of
+Table 5 has `put`/`get`/`p`/`g`/`iput`/`iget` and their nonblocking forms, the
+sized `put8..128`/`get8..128` have the same six forms, `putmem_nbi`/
+`getmem_nbi` sit beside `putmem`/`getmem`, and the typed and sized
+put-with-signal and put-with-signal-nbi families sit beside `putmem_signal`
+(rma-typed.c, signal.c). Every one is a thin wrapper over `putmem`/`getmem`/
+`putmem_signal`, generated from the same type lists `shmem.h`'s C11 selection
+uses, on the same "a type appears once" principle as the AMO tables (§7.3).
+The C11 generic macros cover `put`/`get`/`p`/`g`/`iput`/`iget`/`put_nbi`/
+`get_nbi`/`put_signal`/`put_signal_nbi`, each with and without a leading
+context, dispatched on arity first as the AMO generics are (§7.3). Every
+routine reaches the transport through the body of `putmem` or `getmem` with its
+element width and its own name as parameters (`rma.h`), so a bad PE or a
+non-symmetric address is reported as `shmem_double_put`'s, not as the byte
+form's beneath it.
+
+The nonblocking forms call exactly the blocking code. A conforming
+implementation may complete a nonblocking operation before it returns, and the
+blocking forms give no less than the nonblocking ones promise on either
+backend: a put returns at local completion and completes remotely at quiet,
+which is `put_nbi`'s contract already, and a get completes before it returns,
+which `get_nbi` permits. What a real nonblocking get would add is overlap -
+several requests in flight across the network before one wait - through the
+nonblocking flag §4.10 reserves on `osoe_transport_get`; nothing takes it yet.
+The strided forms are a loop of single-element transfers - O(nelems) network
+operations rather than the one a strided transport primitive would take, and
+across nodes an `iget` of n elements is n round trips - and a future user of
+`OSOE_TRANSPORT_MORE` (§4.10 already names "the strided ... RMA loops" as its
+next driver). Block-strided `ibput`/`ibget` (§9.6.1.4, §9.6.1.8) remain
+deferred; see §7.6.
 
 The collectives are mechanical *given* §5.5's rules, which they must inherit: the
 local lead is the single writer before release and leaves last, and a peer's
