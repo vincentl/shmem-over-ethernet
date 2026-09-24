@@ -117,6 +117,44 @@ static inline uint32_t osoe_job_local_index(const struct osoe_job *j, uint32_t p
              : UINT32_MAX;
 }
 
+/*
+ * The world rank of node `node`'s lead - its PE with local id 0 - or UINT32_MAX
+ * if the map has none. O(R): each run is an arithmetic progression in node and
+ * local id, solved for the one rank that is on `node` with local id 0. The
+ * collectives ask it once per tree neighbour (collectives.c), never per PE, so
+ * nothing here keeps an O(N) table.
+ */
+static inline uint32_t osoe_job_node_lead(const struct osoe_job *j, uint32_t node)
+{
+    for (uint32_t i = 0; i < j->run_count; i++) {
+        const struct osoe_rank_run *r = &j->runs[i];
+        int64_t k;
+        if (r->node_step == 0) {
+            if (r->first_node != node)
+                continue;
+            if (r->local_step == 0) {
+                if (r->first_local != 0)
+                    continue;
+                k = 0;
+            } else if ((int64_t)r->first_local % r->local_step != 0) {
+                continue;
+            } else {
+                k = -(int64_t)r->first_local / r->local_step;
+            }
+        } else {
+            int64_t apart = (int64_t)node - (int64_t)r->first_node;
+            if (apart % r->node_step != 0)
+                continue;
+            k = apart / r->node_step;
+            if ((int64_t)r->first_local + k * r->local_step != 0)
+                continue;
+        }
+        if (k >= 0 && k < (int64_t)r->count)
+            return r->first_rank + (uint32_t)k;
+    }
+    return UINT32_MAX;
+}
+
 /* The logical node a world rank is on. O(log R): the network path's question. */
 static inline uint32_t osoe_node_of(const struct osoe_job *j, uint32_t pe)
 {

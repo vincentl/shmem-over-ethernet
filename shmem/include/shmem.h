@@ -559,6 +559,76 @@ int shmem_team_sync(shmem_team_t team);
  * dispatch between and this is a plain alias. */
 #define shmem_sync(team) shmem_team_sync(team)
 
+/*
+ * Reductions (§9.10.9), team-based, over Table 10's types by operator: the
+ * bitwise operators on the unsigned and exact-width integer types; the ordered
+ * operators on those, the signed integer types and the floating types; the
+ * arithmetic operators on those and, where the C translation environment has
+ * them, the two complex types (the spec permits leaving them out otherwise,
+ * and C++ has no _Complex). Each returns 0 on success.
+ */
+#define OSOE_REDUCE_BITWISE_TYPES(X)                                         \
+    X(unsigned char, uchar) X(unsigned short, ushort) X(unsigned int, uint)  \
+    X(unsigned long, ulong) X(unsigned long long, ulonglong)                 \
+    X(int8_t, int8) X(int16_t, int16) X(int32_t, int32) X(int64_t, int64)    \
+    X(uint8_t, uint8) X(uint16_t, uint16) X(uint32_t, uint32)                \
+    X(uint64_t, uint64) X(size_t, size)
+
+#define OSOE_REDUCE_INTEGER_TYPES(X)                                         \
+    X(char, char) X(signed char, schar) X(short, short) X(int, int)          \
+    X(long, long) X(long long, longlong) X(ptrdiff_t, ptrdiff)               \
+    OSOE_REDUCE_BITWISE_TYPES(X)
+
+#define OSOE_REDUCE_FLOATING_TYPES(X)                                        \
+    X(float, float) X(double, double) X(long double, longdouble)
+
+#if !defined(__cplusplus) && !defined(__STDC_NO_COMPLEX__)
+#define OSOE_REDUCE_COMPLEX_TYPES(X)                                         \
+    X(double _Complex, complexd) X(float _Complex, complexf)
+#else
+#define OSOE_REDUCE_COMPLEX_TYPES(X)
+#endif
+
+/* The whole routine name is pasted as a suffix, never the operator alone:
+ * `and`, `or` and `xor` are alternative tokens in C++ and macros under
+ * <iso646.h>. Declared with the prefix as a parameter, so that pshmem.h
+ * generates the `pshmem_` spellings from the same lists. */
+#define OSOE_REDUCE_DECL_ONE_P(P, T, NAME, SUFFIX)                           \
+    int OSOE_FN(P, NAME, SUFFIX)(shmem_team_t team, T *dest, const T *source, \
+                                size_t nreduce);
+#define OSOE_REDUCE_DECL_BITWISE_P(P, T, NAME)                               \
+    OSOE_REDUCE_DECL_ONE_P(P, T, NAME, _and_reduce)                          \
+    OSOE_REDUCE_DECL_ONE_P(P, T, NAME, _or_reduce)                           \
+    OSOE_REDUCE_DECL_ONE_P(P, T, NAME, _xor_reduce)
+#define OSOE_REDUCE_DECL_ORDERED_P(P, T, NAME)                               \
+    OSOE_REDUCE_DECL_ONE_P(P, T, NAME, _max_reduce)                          \
+    OSOE_REDUCE_DECL_ONE_P(P, T, NAME, _min_reduce)
+#define OSOE_REDUCE_DECL_ARITHMETIC_P(P, T, NAME)                            \
+    OSOE_REDUCE_DECL_ONE_P(P, T, NAME, _sum_reduce)                          \
+    OSOE_REDUCE_DECL_ONE_P(P, T, NAME, _prod_reduce)
+
+#define OSOE_REDUCE_DECL_BITWISE(T, NAME) OSOE_REDUCE_DECL_BITWISE_P(shmem_, T, NAME)
+#define OSOE_REDUCE_DECL_ORDERED(T, NAME) OSOE_REDUCE_DECL_ORDERED_P(shmem_, T, NAME)
+#define OSOE_REDUCE_DECL_ARITHMETIC(T, NAME) OSOE_REDUCE_DECL_ARITHMETIC_P(shmem_, T, NAME)
+
+OSOE_REDUCE_BITWISE_TYPES(OSOE_REDUCE_DECL_BITWISE)
+OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DECL_ORDERED)
+OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DECL_ORDERED)
+OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
+OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
+OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
+
+/* Broadcast (§9.10.7), team-based, over every standard RMA type of Table 5, and
+ * its byte form. The dest is updated on every PE of the team, PE_root's
+ * included. Each returns 0 on success. */
+#define OSOE_BROADCAST_DECL_P(P, T, NAME)                                    \
+    int OSOE_FN(P, NAME, _broadcast)(shmem_team_t team, T *dest, const T *source, \
+                                    size_t nelems, int PE_root);
+#define OSOE_BROADCAST_DECL(T, NAME) OSOE_BROADCAST_DECL_P(shmem_, T, NAME)
+OSOE_RMA_STANDARD_TYPES(OSOE_BROADCAST_DECL)
+int shmem_broadcastmem(shmem_team_t team, void *dest, const void *source, size_t nelems,
+                       int PE_root);
+
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);
 void shmem_info_get_name(char *name);
@@ -894,6 +964,65 @@ void shmem_udcflush_line(void *dest);
         (__VA_ARGS__)
 
 
+/* ---- Collectives (spec §9.10.7, §9.10.9) ------------------------------ */
+
+/*
+ * The reductions' C11 interfaces dispatch on dest's type over the distinct C
+ * types of Table 10's operator groups. The exact-width and size types are
+ * typedefs of these on this implementation's targets (LP64 Linux), so the
+ * bitwise group reaches its signed exact-width members through their base
+ * types: an int* is int32's, a long* int64's. A type an operator does not take
+ * - a long long* to shmem_and_reduce - has no association and does not compile.
+ */
+#define OSOE_REDUCE_G_BITWISE(X, SUFFIX)                                         \
+    X(unsigned char, uchar, SUFFIX) X(unsigned short, ushort, SUFFIX)            \
+    X(unsigned int, uint, SUFFIX) X(unsigned long, ulong, SUFFIX)                \
+    X(unsigned long long, ulonglong, SUFFIX) X(signed char, int8, SUFFIX)        \
+    X(short, int16, SUFFIX) X(int, int32, SUFFIX) X(long, int64, SUFFIX)
+#define OSOE_REDUCE_G_ORDERED(X, SUFFIX)                                         \
+    X(char, char, SUFFIX) X(signed char, schar, SUFFIX) X(short, short, SUFFIX)  \
+    X(int, int, SUFFIX) X(long, long, SUFFIX) X(long long, longlong, SUFFIX)     \
+    X(unsigned char, uchar, SUFFIX) X(unsigned short, ushort, SUFFIX)            \
+    X(unsigned int, uint, SUFFIX) X(unsigned long, ulong, SUFFIX)                \
+    X(unsigned long long, ulonglong, SUFFIX) X(float, float, SUFFIX)             \
+    X(double, double, SUFFIX) X(long double, longdouble, SUFFIX)
+#if !defined(__STDC_NO_COMPLEX__)
+#define OSOE_REDUCE_G_ARITHMETIC(X, SUFFIX)                                      \
+    OSOE_REDUCE_G_ORDERED(X, SUFFIX)                                             \
+    X(double _Complex, complexd, SUFFIX) X(float _Complex, complexf, SUFFIX)
+#else
+#define OSOE_REDUCE_G_ARITHMETIC(X, SUFFIX) OSOE_REDUCE_G_ORDERED(X, SUFFIX)
+#endif
+#define OSOE_REDUCE_G(T, NAME, SUFFIX) , T *: OSOE_FN(shmem_, NAME, SUFFIX)
+
+#define shmem_and_reduce(team, dest, source, nreduce)                            \
+    (_Generic((dest) OSOE_REDUCE_G_BITWISE(OSOE_REDUCE_G, _and_reduce))          \
+        ((team), (dest), (source), (nreduce)))
+#define shmem_or_reduce(team, dest, source, nreduce)                             \
+    (_Generic((dest) OSOE_REDUCE_G_BITWISE(OSOE_REDUCE_G, _or_reduce))           \
+        ((team), (dest), (source), (nreduce)))
+#define shmem_xor_reduce(team, dest, source, nreduce)                            \
+    (_Generic((dest) OSOE_REDUCE_G_BITWISE(OSOE_REDUCE_G, _xor_reduce))          \
+        ((team), (dest), (source), (nreduce)))
+#define shmem_max_reduce(team, dest, source, nreduce)                            \
+    (_Generic((dest) OSOE_REDUCE_G_ORDERED(OSOE_REDUCE_G, _max_reduce))          \
+        ((team), (dest), (source), (nreduce)))
+#define shmem_min_reduce(team, dest, source, nreduce)                            \
+    (_Generic((dest) OSOE_REDUCE_G_ORDERED(OSOE_REDUCE_G, _min_reduce))          \
+        ((team), (dest), (source), (nreduce)))
+#define shmem_sum_reduce(team, dest, source, nreduce)                            \
+    (_Generic((dest) OSOE_REDUCE_G_ARITHMETIC(OSOE_REDUCE_G, _sum_reduce))       \
+        ((team), (dest), (source), (nreduce)))
+#define shmem_prod_reduce(team, dest, source, nreduce)                           \
+    (_Generic((dest) OSOE_REDUCE_G_ARITHMETIC(OSOE_REDUCE_G, _prod_reduce))      \
+        ((team), (dest), (source), (nreduce)))
+
+/* Broadcast dispatches on dest over Table 5's distinct types, as put does. */
+#define shmem_broadcast(team, dest, source, nelems, PE_root)                     \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, broadcast))                 \
+        ((team), (dest), (source), (nelems), (PE_root)))
+
+
 /* ---- Point-to-point synchronization (spec §9.11) --------------------- */
 
 /* Table 6, one entry per distinct C type, as above. */
@@ -991,6 +1120,10 @@ void shmem_pcontrol(int level, ...);
 #undef OSOE_RMA_DECL_SIZE_NBI
 #undef OSOE_RMA_DECL_SIZE_PUT_SIGNAL
 #undef OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI
+#undef OSOE_REDUCE_DECL_BITWISE
+#undef OSOE_REDUCE_DECL_ORDERED
+#undef OSOE_REDUCE_DECL_ARITHMETIC
+#undef OSOE_BROADCAST_DECL
 
 #ifdef __cplusplus
 }

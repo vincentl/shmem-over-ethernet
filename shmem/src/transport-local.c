@@ -34,11 +34,20 @@
 
 void *osoe_transport_local_address(int pe, enum osoe_region region, uint64_t offset)
 {
-    if (region != OSOE_REGION_HEAP || pe < 0 ||
-        (uint32_t)pe >= osoe.bootstrap.world_size)
+    if (pe < 0 || (uint32_t)pe >= osoe.bootstrap.world_size)
         return NULL;
     int32_t local = osoe_node_local_id(&osoe.node, (uint32_t)pe);
-    return local < 0 ? NULL : (char *)osoe.node.heap_of[local] + offset;
+    if (local < 0)
+        return NULL;
+    /* OSOE_REGION_INTERNAL is the tail of the same mapping (internal-region.h). */
+    switch (region) {
+    case OSOE_REGION_HEAP:
+        return (char *)osoe.node.heap_of[local] + offset;
+    case OSOE_REGION_INTERNAL:
+        return (char *)osoe.node.heap_of[local] + osoe.node.internal_offset + offset;
+    default:
+        return NULL;
+    }
 }
 
 void osoe_transport_local_put(int pe, enum osoe_region region, uint64_t offset,

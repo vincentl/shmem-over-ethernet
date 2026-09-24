@@ -1049,6 +1049,21 @@ endif()
 # the maps for shmem.internode.*'s reason: the lead writes the reply from
 # another process.
 osoe_tier2_test(get-nbi)
+
+# The reductions and broadcast (§5.5, phase 1 step 5; test-reduce.c,
+# test-broadcast.c): on one node at 1, 2 and 4 PEs, where only the intranode
+# accumulator runs; across nodes on a block and an interleaved map; and on five
+# nodes at fan-out 2, where the leads' tree has an interior node that both
+# combines its children's pieces and passes the result on. tsan is left out of
+# the maps for shmem.internode.*'s reason.
+foreach(collective reduce broadcast)
+  osoe_tier2_test(${collective})
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    osoe_tier2_map_test(${collective} 0,0,1,1)
+    osoe_tier2_map_test(${collective} 0,1,2,0,1,0)
+    osoe_tier2_map_test(${collective} 0,1,2,3,4 OSOE_COLLECTIVE_FANOUT=2)
+  endif()
+endforeach()
 set(osoe_get_nbi_small OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
@@ -1392,6 +1407,13 @@ if(OSOE_TIER3)
     osoe_tier3_test(get-nbi.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_get-nbi
                     ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
                         OSOE_AM_CREDITS=2)
+    # The leads' tree of the reductions and broadcast, over the shaped link.
+    osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
+    osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)
+    if(shape STREQUAL "pi")
+      osoe_tier3_test(reduce.0-1-2-3-4.k2 pi 0,1,2,3,4 shmem_test_reduce
+                      ENV OSOE_COLLECTIVE_FANOUT=2)
+    endif()
     osoe_tier3_test(reply-starvation.0-1-1-1-1-1-1 ${shape} 0,1,1,1,1,1,1
                     shmem_test_reply-starvation
                     ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096

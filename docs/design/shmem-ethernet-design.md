@@ -4084,6 +4084,45 @@ loop, no high-water allocation, no per-team data area. Their shared footprint is
 loop costs nothing on small reductions and adds pipelining on large ones. §5.8 turns
 this into the large-reduction design.)*
 
+*As built: reductions and broadcast* (phase 1 step 5 slice 1; `collectives.c`,
+`reductions.c`, `broadcast.c`). Within a node, exactly the scheme above: every
+member arrives on the team's `arrived`, the last to arrive wakes the lead, the
+lead - the team's member with the lowest local id, local id 0 for both teams
+that exist, which §5.2's "lowest team rank" coincides with for every
+distribution the bootstrap accepts - reads each member's source only now and
+combines it into its own `dest`, bumps `released`, and leaves after the last
+copy-out on `copied`. **Between nodes the leads meet above the boundary**, over
+put, fenced rmw and a wait - §5.8's generic route - not through AM messages
+the agents interpret: a child puts its partial result into a slot of its
+parent's `OSOE_REGION_INTERNAL` and adds one to the parent's arrival word with
+a fenced rmw, so the add lands after the bytes (invariant 5); the parent's
+application thread waits on the word, combines the slots into its `dest` and
+sends up in turn; the root's result comes down by a put into each child's
+release slot and an add to its release word. The lead's thread is blocked in
+the call and is `dest`'s only writer regardless (invariant 16), so an AM design
+would still have had to land each partial result where that thread could read
+it, and wake it; this does so with operations the transport has, and a RoCE
+backend inherits it. A put returns at local completion, so the result sent down
+is the lead's again at once: the by-reference hazard of the rule above cannot
+arise. The tree is §5.3's k-ary tree over the nodes, with the same fan-out;
+a reduction's is rooted at the first node and found once per team, and a
+broadcast's is rotated to its root's node, so its data travels the depth and
+not up to node 0 first. **A vector larger than a slot, 16 KiB, goes in
+pieces**, each a full pass up and down - the fallback above; a broadcast's
+pieces go up empty, a child's arrival saying its release slot is free. The
+words are compared for equality and never reset (§5.4), and trees differing
+from one collective to the next cannot disturb them: the root releases a piece
+only when every node has arrived for it, and a node arrives only after its own
+wait for its children, so an early arrival for the next piece or collective
+only ever counts toward that one (`collectives.c` walks it through). Every PE
+ends with the same bits, each element combined once along the tree (§5.8 rule
+3). Integer sums and products wrap, through unsigned arithmetic, where C would
+make a signed overflow undefined. Costs, with *N* nodes, *L* local members, *k*
+the fan-out and *n* bytes: the lead's combine O(*L n*), a copy-out O(*n*),
+⌈*n* / 16 KiB⌉ passes of depth ⌈log_*k* *N*⌉ each way with O(*k n*) combining and
+*k* puts per node per piece; a broadcast finds its rotated tree's *k* + 1
+neighbouring leads in the rank map, O(*k R*) for *R* runs.
+
 ### 5.6 Barrier versus sync
 
 **`shmem_barrier_all` includes a quiet.** `shmem_team_sync` and `shmem_sync` do
@@ -4181,7 +4220,13 @@ yet combined. **`OSOE_REGION_INTERNAL`** closes that gap. It is a per-PE region
 for library scratch and collective control words, addressed `(pe, region, offset)`
 like the heap. With it, a generic collective can run on any backend over put,
 fenced rmw, and watch, while osoe's AM backend keeps its handlers. Adding the
-region is additive and costs nothing until a collective uses it.
+region is additive and costs nothing until a collective uses it. *(Built at
+step 5 as the tail of each PE's heap mapping, past the page-rounded
+`SHMEM_SYMMETRIC_SIZE`: no new object or mapping, the allocator never reaches
+it, no API check admits it, and a backend that registers the heap registers it.
+It holds a page of control words and fan-out + 1 slots of 16 KiB; its size is
+fixed by the fan-out every node agrees on, and the slot is a constant for the
+same reason. `internal-region.h`.)*
 
 *(Deferred: a separate internal collective-transport header. Both implementations
 would sit behind the same collective routines and be chosen at build time, so the
@@ -4915,7 +4960,15 @@ machinery. The review's order is adopted.
    sweep interval, and whether the development watchdog stays - retired
    (2026-09-23), and the ring not built for now.*
 
-Symmetric statics and the compiler wrapper follow step 4 (§7.4).
+5. **Collectives** (added 2026-09-24 at the author's direction, ahead of
+   statics: every code in the corpus reduces, and not every one needs a static,
+   §8.6's U7). The data-carrying collectives of §9.10 over §5.5's accumulator.
+   *The first slice has reductions and broadcast on the teams that exist, with
+   `OSOE_REGION_INTERNAL` built for their internode phase (§5.5, §5.8, as
+   built). collect, fcollect, alltoall and alltoalls follow, each with the design
+   §5.5 says it needs first.*
+
+Symmetric statics and the compiler wrapper follow step 5 (§7.4).
 
 ### 7.2 What each phase-1 routine forces
 
@@ -5030,7 +5083,8 @@ together, immediately after step 4.
 
 ### 7.5 Deferred (mechanical)
 
-Broadcast/reduce/collect/alltoall, locks.
+collect/fcollect/alltoall/alltoalls, locks. *(Reductions and broadcast are
+built: §7.1 step 5, §5.5 as built.)*
 
 **RMA's full type/operation cross product, strided transfers and nonblocking
 variants are implemented** (§9.6, §9.8.3-§9.8.4): every standard RMA type of

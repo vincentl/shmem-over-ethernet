@@ -47,6 +47,9 @@ add_library(osoe
   src/rendezvous.c
   src/rma.c
   src/rma-typed.c
+  src/collectives.c
+  src/reductions.c
+  src/broadcast.c
   src/session.c
   src/shm-object.c
   src/signal.c

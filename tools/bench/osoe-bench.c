@@ -4,18 +4,20 @@
  *   srun -N4 --ntasks-per-node=4 osoe-bench [WHAT]...
  *   osoe-launch -n 8 -m 0,0,0,0,1,1,1,1 -- osoe-bench [WHAT]...
  *
- * WHAT is any of latency, bandwidth, atomic, barrier and pairs; all of them by
- * default. `quick` takes a tenth of the trips and a sixteenth of the streams,
- * for the smoke test that runs in every preset. PE 0 measures against two
- * targets - the first PE on another node, and the first other PE on its own
- * node, if there is one - while every other PE waits in a barrier, so its agent
- * serves the traffic and nothing else runs:
+ * WHAT is any of latency, bandwidth, atomic, barrier, collectives and pairs;
+ * all of them by default. `quick` takes a tenth of the trips and a sixteenth of
+ * the streams, for the smoke test that runs in every preset. PE 0 measures
+ * against two targets - the first PE on another node, and the first other PE on
+ * its own node, if there is one - while every other PE waits in a barrier, so
+ * its agent serves the traffic and nothing else runs:
  *
  *   latency    a put and quiet, and a get, for sizes from 8 bytes to 1 MiB:
  *              the median and the fastest of many round trips
  *   bandwidth  a stream of puts of each size, quieted at the end, in MiB/s
  *   atomic     a 64-bit fetch-add's median and fastest round trip
  *   barrier    shmem_barrier_all across every PE: the median and fastest
+ *   collectives a sum reduction and a broadcast from PE 0 across every PE, of
+ *              8 bytes and of 64 KiB: the median and fastest of each
  *   pairs      every PE at once streams to the PE half the job away - on
  *              another node when the job is a block layout with the same count
  *              on every node - each PE's MiB/s, and the whole job's: every
@@ -155,6 +157,43 @@ static void barrier(int me, int npes)
     free(trips);
 }
 
+/*
+ * Every PE runs this: a sum reduction and a broadcast from PE 0, of one long
+ * and of 64 KiB - four of the leads' pieces (collectives.c) - over the world
+ * team. PE 0 reports each one's median and fastest, as for the barrier.
+ */
+static void collectives(int me, int npes)
+{
+    static const size_t sizes[] = { 8, 65536 };
+    long *src = (long *)window;
+    long *dst = (long *)(window + MAX_BYTES / 2);
+    memset(src, me + 1, 65536);
+    uint64_t *trips = malloc(sizeof *trips * (size_t)trips_per_size);
+    for (size_t s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {
+        size_t n = sizes[s] / sizeof *src;
+        for (int kind = 0; kind < 2; kind++) {
+            shmem_barrier_all();
+            for (int i = -WARMUP; i < trips_per_size; i++) {
+                uint64_t t = now_ns();
+                if (kind == 0)
+                    shmem_long_sum_reduce(SHMEM_TEAM_WORLD, dst, src, n);
+                else
+                    shmem_long_broadcast(SHMEM_TEAM_WORLD, dst, src, n, 0);
+                if (i >= 0)
+                    trips[i] = now_ns() - t;
+            }
+            if (me == 0) {
+                double median, fastest;
+                summarize(trips, trips_per_size, &median, &fastest);
+                printf("%s pes=%d bytes=%zu median_us=%.1f fastest_us=%.1f\n",
+                       kind == 0 ? "reduce" : "broadcast", npes, sizes[s], median, fastest);
+                fflush(stdout);
+            }
+        }
+    }
+    free(trips);
+}
+
 /* Every PE streams to the PE half the job away, all at once. */
 static void pairs(int me, int npes)
 {
@@ -200,14 +239,14 @@ static int wanted(int argc, char **argv, const char *what)
 int main(int argc, char **argv)
 {
     static const char *const known[] = { "latency", "bandwidth", "atomic", "barrier",
-                                         "pairs", "quick" };
+                                         "collectives", "pairs", "quick" };
     for (int i = 1; i < argc; i++) {
         size_t k = 0;
         while (k < sizeof known / sizeof *known && strcmp(argv[i], known[k]) != 0)
             k++;
         if (k == sizeof known / sizeof *known) {
             fprintf(stderr, "osoe-bench: no measurement '%s': latency, bandwidth, atomic, "
-                    "barrier, pairs, quick\n", argv[i]);
+                    "barrier, collectives, pairs, quick\n", argv[i]);
             return 2;
         }
     }
@@ -256,6 +295,8 @@ int main(int argc, char **argv)
     }
     if (wanted(argc, argv, "barrier"))
         barrier(me, npes);
+    if (wanted(argc, argv, "collectives"))
+        collectives(me, npes);
     if (wanted(argc, argv, "pairs") && npes > 1)
         pairs(me, npes);
 

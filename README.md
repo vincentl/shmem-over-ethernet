@@ -4,7 +4,7 @@ OpenSHMEM Over Ethernet: an implementation of OpenSHMEM 1.6 for commodity Ethern
 designed to build entirely from a Linux distribution's own packages — no fabric
 libraries.
 
-**Status:** phase 1, step 4 of 4 (design §7.1). Jobs run on one node or across
+**Status:** phase 1, step 5, collectives (design §7.1). Jobs run on one node or across
 nodes over TCP and io_uring, started by `srun` or by `osoe-launch`:
 initialization and thread levels up to `SHMEM_THREAD_SERIALIZED`, the symmetric
 heap allocator in full, RMA - `shmem_putmem` and `shmem_getmem`, and every type
@@ -13,13 +13,15 @@ nonblocking forms, and put-with-signal in each - `shmem_ptr`, every atomic type
 of specification Tables 6–8, the C11 type-generic interfaces of both, the
 point-to-point waits and tests including the multiple-element forms,
 signalling operations, memory ordering, `shmem_barrier_all`, `shmem_sync_all`
-and `shmem_team_sync`, `shmem_global_exit`, and the mandatory surface of §7.4
+and `shmem_team_sync`, the team-based reductions of every operator and type of
+specification Table 10 and broadcast, with their C11 interfaces,
+`shmem_global_exit`, and the mandatory surface of §7.4
 including the `pshmem_` profiling interface. A PE or a node that dies ends the
 whole job (§3.15).
 
 Not yet: symmetric statics, which are refused with a diagnostic (§4.3);
-collectives other than the barriers - broadcast, reductions, collect and
-alltoall; the block-strided `shmem_ibput` and `shmem_ibget`; locks; contexts
+collect, fcollect, alltoall and alltoalls; the block-strided `shmem_ibput` and
+`shmem_ibget`; locks; contexts
 other than the default; and `SHMEM_THREAD_MULTIPLE` (§7.5, §7.6, §4.11).
 Nonblocking gets across nodes overlap, many in flight before the quiet that
 completes them; a nonblocking put returns once its source may be reused, as a

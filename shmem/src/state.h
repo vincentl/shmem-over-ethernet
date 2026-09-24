@@ -29,6 +29,8 @@ struct osoe_state {
     uint32_t world_epoch;           /* k for SHMEM_TEAM_WORLD (§5.4) */
     uint32_t shared_epoch;          /* and for SHMEM_TEAM_SHARED */
     uint32_t finalize_epoch;        /* and for the finalize team (team.h) */
+    uint32_t world_data_epoch;      /* d for SHMEM_TEAM_WORLD: its data collectives (§5.4) */
+    uint32_t shared_data_epoch;     /* and for SHMEM_TEAM_SHARED */
 };
 
 extern struct osoe_state osoe;

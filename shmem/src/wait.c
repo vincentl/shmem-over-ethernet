@@ -109,19 +109,24 @@ static enum osoe_counter late_wake_counter(unsigned width)
 
 /* ---- the scalar forms -------------------------------------------------- */
 
-uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, bool sgn,
-                         int cmp, uint64_t want)
+/*
+ * The scalar wait on a word of this PE's own region, by offset: the public wait
+ * on the heap, and the collectives' on OSOE_REGION_INTERNAL, whose words no
+ * application address can name (internal-region.h). A wait that sleeps records
+ * `kind` and `detail` in the blocked record.
+ */
+static uint64_t wait_at(const char *routine, enum osoe_region region, uint64_t offset,
+                        unsigned width, bool sgn, int cmp, uint64_t want,
+                        enum osoe_blocked_detail kind, uint64_t detail)
 {
-    osoe_count(OSOE_C_SHMEM_WAIT_UNTIL_CALLS, 1);
-    uint64_t offset = osoe_symmetric_word_offset(routine, ivar, width);
     want = extend(want, width, sgn);
-    struct osoe_transport_watch *w = osoe_transport_watch(OSOE_REGION_HEAP, offset, width);
+    struct osoe_transport_watch *w = osoe_transport_watch(region, offset, width);
     uint64_t have, slept_since = 0;
     bool slept = false, woken = false, timed_out = false;
 
     for (;;) {
         uint32_t seq = osoe_transport_watch_seq(w);
-        have = osoe_transport_load(OSOE_REGION_HEAP, offset, width);
+        have = osoe_transport_load(region, offset, width);
         if (satisfied(cmp, extend(have, width, sgn), want, sgn, routine)) {
             /* The condition was already true when the sweep expired, so the
              * update landed while this PE slept and no wake arrived (§4.9).
@@ -138,7 +143,7 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
              * that really sleeps (§3.14 cost rules). */
             slept = true;
             slept_since = osoe_now_ns();
-            osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_OFFSET, offset);
+            osoe_blocked_enter(routine, kind, detail);
             osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
         }
 
@@ -159,6 +164,22 @@ uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, 
         osoe_blocked_leave();
     }
     return have;
+}
+
+uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, bool sgn,
+                         int cmp, uint64_t want)
+{
+    osoe_count(OSOE_C_SHMEM_WAIT_UNTIL_CALLS, 1);
+    uint64_t offset = osoe_symmetric_word_offset(routine, ivar, width);
+    return wait_at(routine, OSOE_REGION_HEAP, offset, width, sgn, cmp, want,
+                   OSOE_BLOCKED_DETAIL_OFFSET, offset);
+}
+
+uint64_t osoe_wait_internal(const char *routine, uint64_t offset, unsigned width, int cmp,
+                            uint64_t want, enum osoe_blocked_detail kind, uint64_t detail)
+{
+    return wait_at(routine, OSOE_REGION_INTERNAL, offset, width, false, cmp, want, kind,
+                   detail);
 }
 
 int osoe_test(const char *routine, const void *ivar, unsigned width, bool sgn, int cmp,
