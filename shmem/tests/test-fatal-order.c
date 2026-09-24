@@ -12,7 +12,9 @@
  * the reason, then the publication, then the abort. And the same for
  * osoe_fatal, which has no publication: the reason, then the abort. And a
  * fatal that finds a global exit declared first ends as that exit ends every
- * PE, through osoe_abort_end and with its status, after the reason.
+ * PE, through osoe_abort_end and with its status, after the reason. A fatal
+ * the agent raises itself says where this PE's thread was waiting; one from any
+ * other thread does not.
  */
 #include <stdbool.h>
 #include <stdio.h>
@@ -22,6 +24,8 @@
 #include <unistd.h>
 
 #include "abort.h"
+#include "agent.h"
+#include "blocked.h"
 #include "check.h"
 #include "fatal.h"
 #include "state.h"
@@ -61,6 +65,20 @@ _Noreturn void osoe_abort_end(void)
 {
     mark("ENDED AS THE GLOBAL EXIT\n");
     _exit(GLOBAL_STATUS);
+}
+
+/* Whether the fatal is the agent's (agent.c), set before each child, and where
+ * this PE's thread waits (metrics.c). */
+static bool on_agent;
+
+bool osoe_agent_is_this_thread(void)
+{
+    return on_agent;
+}
+
+const char *osoe_blocked_routine(void)
+{
+    return "shmem_barrier_all";
 }
 
 static void publish(void *context)
@@ -119,6 +137,14 @@ int main(void)
         fprintf(stderr, "osoe_fatal wrote, in this order:\n%s", out);
     CHECK(in_order(out, "THE REASON", "DECLARED"));
     CHECK(strstr(out, "ENDED AS THE GLOBAL EXIT") == NULL);
+    CHECK(strstr(out, "this PE was") == NULL);
+
+    on_agent = true;
+    child_output(false, EXIT_FAILURE, out, sizeof out);
+    if (!strstr(out, "THE REASON; this PE was waiting in shmem_barrier_all\n"))
+        fprintf(stderr, "osoe_fatal on the agent wrote:\n%s", out);
+    CHECK(strstr(out, "THE REASON; this PE was waiting in shmem_barrier_all\n") != NULL);
+    on_agent = false;
 
     word = OSOE_ABORT_GLOBAL_EXIT;
     child_output(false, GLOBAL_STATUS, out, sizeof out);

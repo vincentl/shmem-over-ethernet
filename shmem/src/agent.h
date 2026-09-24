@@ -26,4 +26,8 @@ bool osoe_agent_running(void);
  * may have the network to tell first. */
 bool osoe_agent_speaks(void);
 
+/* Whether the calling thread is this PE's agent, running: a fatal it raises
+ * itself then says where this PE's own thread was (fatal.c). */
+bool osoe_agent_is_this_thread(void);
+
 #endif /* OSOE_AGENT_H */

@@ -130,6 +130,12 @@ bool osoe_agent_speaks(void)
            !pthread_equal(pthread_self(), agent);
 }
 
+bool osoe_agent_is_this_thread(void)
+{
+    return atomic_load_explicit(&running, memory_order_acquire) &&
+           pthread_equal(pthread_self(), agent);
+}
+
 void osoe_agent_start(struct osoe_pe_slot *slot)
 {
     atomic_store_explicit(&stop_requested, 0, memory_order_release);

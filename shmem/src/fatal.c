@@ -6,6 +6,8 @@
 #include <unistd.h>
 
 #include "abort.h"
+#include "agent.h"
+#include "blocked.h"
 #include "fatal.h"
 #include "state.h"
 
@@ -23,6 +25,19 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
     char out[2048];
     char msg[1024];
     vsnprintf(msg, sizeof msg, fmt, ap);
+    /* A fatal this PE's agent raises itself - another node's death, a local
+     * PE's - ends a PE whose own thread may be waiting in the library, so it
+     * says where, as the agent does when it ends the process on another PE's
+     * abort (abort.c): what the development watchdog named before it was
+     * retired (§3.15). A fatal on any other thread is that thread's own, and
+     * names its routine where it has one. */
+    if (osoe_agent_is_this_thread()) {
+        const char *routine = osoe_blocked_routine();
+        size_t used = strlen(msg);
+        snprintf(msg + used, sizeof msg - used, "; this PE was %s%s",
+                 routine ? "waiting in " : "not waiting in the library",
+                 routine ? routine : "");
+    }
 
     int n;
     if (osoe.bootstrap.have_rank && osoe.node.control_name[0])
