@@ -1027,6 +1027,18 @@ osoe_tier2_test(quiet)
 osoe_tier2_test(heap)
 osoe_tier2_test(landing)
 osoe_tier2_test(amo-types)
+
+# shmem.amo-deprecated over a logical node map (§8.1), so "right" is a
+# same-node PE on one member of the pair and a remote one on the other, as
+# shmem.typed-rma's maps are chosen for below. Excluded under ThreadSanitizer
+# for the same reason: the ordering that makes a cross-node AMO's completion
+# visible runs through another process, which tsan cannot see.
+osoe_tier2_test(amo-deprecated)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(amo-deprecated 0,0,1,1)
+  osoe_tier2_map_test(amo-deprecated 0,1,2,0,1,0)
+endif()
+
 osoe_tier2_test(typed-rma)
 
 # shmem.typed-rma over a logical node map (§8.1), so "right" is a same-node PE

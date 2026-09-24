@@ -11,7 +11,8 @@ heap allocator in full, RMA - `shmem_putmem` and `shmem_getmem`, and every type
 and size of specification Table 5 with their single-element, strided and
 nonblocking forms, and put-with-signal in each - `shmem_ptr`, every atomic type
 of specification Tables 6–8, the C11 type-generic interfaces of both, the
-point-to-point waits and tests including the multiple-element forms,
+deprecated atomic names of Annex F.2.12, the point-to-point waits and tests
+including the multiple-element forms,
 signalling operations, memory ordering, `shmem_barrier_all`, `shmem_sync_all`
 and `shmem_team_sync`, the team-based reductions of every operator and type of
 specification Table 10 and broadcast, with their C11 interfaces, the deprecated
