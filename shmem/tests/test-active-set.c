@@ -226,30 +226,46 @@ static void broadcasts(void)
 /*
  * The active-set barrier and sync, each on its own. shmem_barrier completes the
  * PE's puts before it synchronizes - the quiet a sync does not have - so the
- * left neighbour's put is here when this PE's barrier returns; across nodes,
- * where the put and the barrier travel different paths, a barrier without the
- * quiet would be caught. The deprecated sync is checked alone, after the quiet
+ * left neighbour's puts are here when this PE's barrier returns. A mebibyte of
+ * them: across nodes a barrier without the quiet ends while the bulk is still
+ * in flight, where a four-byte put, one hop against the barrier's two, lands
+ * first and let such a barrier pass (the verification of 751ee71). The
+ * deprecated sync is checked alone, after the quiet
  * its caller owes it and with nothing after it that synchronizes, so a sync
  * that did nothing would be caught too. The C11 shmem_sync(team) that shares
  * its name, last.
  */
 static void barriers(void)
 {
+    enum { BULK = (1 << 20) / sizeof(int) };
     int *flag = shmem_malloc(sizeof *flag), *mark = shmem_malloc(sizeof *mark);
-    CHECK_FATAL(flag && mark);
+    int *bulk = shmem_malloc(BULK * sizeof *bulk), *mine = malloc(BULK * sizeof *mine);
+    CHECK_FATAL(flag && mark && bulk && mine);
     *flag = *mark = -1;
     shmem_barrier_all();
     int right = (me + 1) % npes;
     for (int round = 0; round < 6; round++) {
+        for (size_t i = 0; i < BULK; i++)
+            mine[i] = round;
+        shmem_int_put(bulk, mine, BULK, right);
         shmem_int_p(flag, round, right);
         shmem_barrier(0, 0, npes, pSync);
         CHECK(*flag == round);
+        size_t short_of = 0;
+        for (size_t i = 0; i < BULK; i++)
+            short_of += bulk[i] != round;
+        if (short_of)
+            fprintf(stderr, "PE %d, round %d: %zu of the left neighbour's %d words are "
+                    "not here after shmem_barrier\n", me, round, short_of, (int)BULK);
+        CHECK(short_of == 0);
         shmem_int_p(mark, round, right);
         shmem_quiet();
         shmem_sync(0, 0, npes, pSync);
         CHECK(*mark == round);
     }
     CHECK(shmem_sync(SHMEM_TEAM_WORLD) == 0);
+    free(mine);
+    shmem_free(bulk);
     shmem_free(flag);
     shmem_free(mark);
 }

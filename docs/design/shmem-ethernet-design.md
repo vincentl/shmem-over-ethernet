@@ -3748,6 +3748,61 @@ shmem_quiet". The models check it in that form.
 
 ---
 
+### 4.12 Locks
+
+`shmem_set_lock`, `shmem_test_lock` and `shmem_clear_lock` (spec §9.13), built
+at phase 1 so that the corpus's lock users run: `dtrand`, and hclib's `uts`,
+whose work stealing takes one lock per victim PE.
+
+**First come, first served, so a queue lock.** The spec is explicit - "Waiting
+PEs are guaranteed to set the lock in a first-come, first-served manner" - and
+no test-and-set with back-off gives that, however it is tuned. osoe's is the
+MCS queue lock (`lock.c`), as Sandia OpenSHMEM's is.
+
+**The application's `long` is the implementation's, on every PE.** The spec
+makes any other access to an in-use lock undefined, and requires the variable
+zeroed on every PE before first use, so the lock may use all of its copies. It
+uses them as two 32-bit words:
+- on the lock's **home** PE, the queue's **tail**: the last waiter's PE + 1, or
+  0 when the lock is free;
+- on **every** PE, that PE's **node** in the queue: its successor's PE + 1,
+  and a `GRANTED` bit its predecessor sets to hand the lock over.
+
+An acquirer zeroes its node, swaps itself into the tail, and - if there was a
+predecessor - links itself into the predecessor's node and waits on its own
+node for `GRANTED`. A releaser quiets (the spec's "quiet operation on the
+default context" before release), then grants its successor, or, having none,
+frees the lock with a compare-and-swap of the tail - and if that fails, someone
+swapped in behind it and has not linked yet, so it waits for the link. A tester
+compares-and-swaps the tail from 0. Every operation on another PE's word is one
+four-byte rmw; every wait is on the PE's own word, through the region wait
+(`region-wait.h`), so a waiter sleeps rather than spins and the remote traffic
+per acquire is O(1) - a swap, a link and, later, a grant. **Model-checked**
+(`tools/modelcheck/lock_model.py`): mutual exclusion, the order of arrival, and
+no state from which a PE cannot finish, on two to four PEs with a tester among
+them; seven breakages - the node zeroed after the swap, a release that does not
+wait for a link, `GRANTED` cleared by a store, a test that swaps, a waiter that
+never links, a grant to the tail, a waiter that enters without its grant - each
+fail one of the three.
+
+**The home is spread by address**: the lock's offset in `long`s, modulo the
+PEs. An array of locks - `uts`'s, one per PE - so puts its tails on as many PEs
+as it has locks, where a fixed home would make PE 0 the whole job's lock
+server.
+
+**Misuse is named.** Each PE keeps the offsets of the locks it holds, so a
+clear of a lock it does not hold, and a set or test of one it holds - undefined
+in the spec, which calls the lock non-reentrant - end the job by name instead
+of hanging in a queue nobody will grant.
+
+Costs: an uncontended acquire is two rmw (the zeroing of the node is local) and
+a release one; a contended acquire adds a link and a sleep, and a release a
+grant. With *P* PEs contending, the queue is *O(P)* long but each PE's work is
+*O(1)*, and the home sees one swap per acquire rather than one poll per waiter
+per back-off. Not built: lock operations on contexts other than the default
+(the spec has none), and a lock whose home follows its holders - the tail's PE
+is fixed per lock, so one very hot lock loads one PE.
+
 ## 5. Collectives
 
 ### 5.1 Two-level structure
@@ -5256,9 +5311,9 @@ and every one of them has a wrapper for it.
 
 ### 7.5 Deferred (mechanical)
 
-collect/fcollect/alltoall/alltoalls, locks. *(Reductions and broadcast are
-built, and the deprecated active-set routines over the whole job: §7.1 step 5,
-§5.5 as built, §7.4.)*
+collect/fcollect/alltoall/alltoalls. *(Locks are built: §4.12. Reductions and
+broadcast are built, and the deprecated active-set routines over the whole job:
+§7.1 step 5, §5.5 as built, §7.4.)*
 
 **RMA's full type/operation cross product, strided transfers and nonblocking
 variants are implemented** (§9.6, §9.8.3-§9.8.4): every standard RMA type of

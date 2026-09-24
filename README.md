@@ -19,14 +19,14 @@ and `shmem_team_sync`, the team-based reductions of every operator and type of
 specification Table 10 and broadcast, with their C11 interfaces, the deprecated
 active-set forms - the `_to_all` reductions of Table 11, `shmem_broadcast32` and
 `64`, `shmem_barrier` and `shmem_sync` - over the whole job, which is the only
-active set they accept, `shmem_global_exit`, the mandatory surface of §7.4
-including the `pshmem_` profiling interface, and symmetric statics - a
-program's global and static variables as symmetric objects - in a program
-built with the `oshcc` wrapper (§4.3). A PE or a node that dies ends the whole
-job (§3.15).
+active set they accept, the first-come, first-served distributed locks,
+`shmem_global_exit`, the mandatory surface of §7.4 including the `pshmem_`
+profiling interface, and symmetric statics - a program's global and static
+variables as symmetric objects - in a program built with the `oshcc` wrapper
+(§4.3). A PE or a node that dies ends the whole job (§3.15).
 
 Not yet: collect, fcollect, alltoall and alltoalls; the block-strided `shmem_ibput` and
-`shmem_ibget`; locks; contexts
+`shmem_ibget`; contexts
 other than the default; and `SHMEM_THREAD_MULTIPLE` (§7.5, §7.6, §4.11).
 Nonblocking gets across nodes overlap, many in flight before the quiet that
 completes them; a nonblocking put returns once its source may be reused, as a
