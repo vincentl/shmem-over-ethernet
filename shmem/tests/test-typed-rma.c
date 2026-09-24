@@ -32,13 +32,16 @@
  * width passes every value check and corrupts its neighbour instead, exactly
  * the failure mode test-amo-types.c's own guard catches on the AMO side.
  */
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include <shmem.h>
 
 #include "check.h"
 #include "invariants.h"
+#include "launcher.h"
 
 static int me, n, right, left;
 
@@ -283,6 +286,64 @@ static int me, n, right, left;
         shmem_free(remote);                                                      \
     } while (0);
 
+/* ---- A strided put is batched: one wake of the lead, not one per element --
+ *
+ * Every element of an iput but the last carries OSOE_TRANSPORT_MORE
+ * (rma-typed.c), whose one effect on the AM path is to defer the wake asking
+ * the lead to run - no effect on results by design, so the only way to see it
+ * is to count it, as test-internode.c counts put_signal's (§4.10). Only a put
+ * that crosses a node reaches the AM path; to a node-mate the flag changes
+ * nothing, and none is deferred. */
+
+/* This PE's total for a thread-scope counter, read as osoe-stat reads it: the
+ * counter blocks are per local PE, so indexed by local id (test-internode.c). */
+static uint64_t counter(const char *name)
+{
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(segment, sizeof segment, 0);
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
+        fprintf(stderr, "%s\n", err);
+        return UINT64_MAX;
+    }
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(&s, name);
+    const char *local = osoe_test_launcher("LOCALID");
+    uint32_t local_id = (uint32_t)atoi(local ? local : "0");
+    uint64_t total = 0;
+    for (uint32_t i = 0; m && i < s.dir->blocks_per_pe; i++) {
+        uint64_t v;
+        if (osoe_segment_read(&s, m, local_id * s.dir->blocks_per_pe + i, &v))
+            total += v;
+    }
+    osoe_segment_close(&s);
+    return m ? total : UINT64_MAX;
+}
+
+static void strided_batching_check(void)
+{
+    enum { N = 5 };
+    long *remote = shmem_malloc(2 * N * sizeof *remote);
+    CHECK_FATAL(remote != NULL); /* NULL would be dereferenced just below */
+    long src[N];
+    for (int i = 0; i < N; i++)
+        src[i] = me * 100 + i;
+    shmem_barrier_all();
+
+    bool crosses = shmem_ptr(remote, right) == NULL;   /* the network carries it */
+    uint64_t before = counter("am.wakes_deferred");
+    shmem_long_iput(remote, src, 2, 1, N, right);
+    uint64_t deferred = counter("am.wakes_deferred") - before;
+    if (deferred != (crosses ? N - 1 : 0))
+        fprintf(stderr, "PE %d: an iput of %d elements %s deferred %llu wakes\n", me, N,
+                crosses ? "across nodes" : "to a node-mate", (unsigned long long)deferred);
+    CHECK(deferred == (crosses ? N - 1 : 0));
+
+    shmem_barrier_all();
+    for (int i = 0; i < N; i++)
+        CHECK(remote[2 * i] == left * 100 + i);
+    shmem_free(remote);
+}
+
 /* ---- Typed put-with-signal (spec §9.8.3-§9.8.4) ------------------------- */
 
 static void put_signal_check(void)
@@ -401,6 +462,7 @@ int main(void)
 
     OSOE_RMA_SIZES(SIZED_RMA)
 
+    strided_batching_check();
     put_signal_check();
 
     CHECK_INVARIANTS();

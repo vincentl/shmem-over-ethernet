@@ -252,6 +252,8 @@ enum {
      * source-bytes rule above binds, since such a request references the
      * caller's src rather than a copy. Its drivers are the 1.6 session routines
      * (§7.6), the strided and block RMA loops, and the collectives' own loops.
+     * The strided put loop is its second caller (rma-typed.c): every element
+     * but the last.
      */
     OSOE_TRANSPORT_MORE = 1u << 2,
 };

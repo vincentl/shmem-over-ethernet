@@ -5009,12 +5009,19 @@ which is `put_nbi`'s contract already, and a get completes before it returns,
 which `get_nbi` permits. What a real nonblocking get would add is overlap -
 several requests in flight across the network before one wait - through the
 nonblocking flag §4.10 reserves on `osoe_transport_get`; nothing takes it yet.
-The strided forms are a loop of single-element transfers - O(nelems) network
-operations rather than the one a strided transport primitive would take, and
-across nodes an `iget` of n elements is n round trips - and a future user of
-`OSOE_TRANSPORT_MORE` (§4.10 already names "the strided ... RMA loops" as its
-next driver). Block-strided `ibput`/`ibget` (§9.6.1.4, §9.6.1.8) remain
-deferred; see §7.6.
+The strided forms are a loop of single-element transfers, and stay one: no
+transport osoe targets has a remote-strided operation to map a whole `iput`
+onto - RDMA's scatter/gather list describes the local side only, and a vendor's
+strided memory key must be built by the memory's owner, the target, which a
+one-sided call cannot arrange - and none of the corpus's applications calls
+them, only conformance tests, tutorial examples and one microbenchmark (the
+author's decision, 2026-09-24: no strided operation at the boundary). What the
+loop can use is batching. An `iput`'s elements but the last carry
+`OSOE_TRANSPORT_MORE` (§4.10), its second caller, so across nodes they cost one
+wake of the lead rather than one each, and an RDMA backend would post them
+under one doorbell. An `iget` across nodes is still n round trips, one after
+another, until the nonblocking get flag lets them be in flight together.
+Block-strided `ibput`/`ibget` (§9.6.1.4, §9.6.1.8) remain deferred; see §7.6.
 
 The collectives are mechanical *given* §5.5's rules, which they must inherit: the
 local lead is the single writer before release and leaves last, and a peer's
