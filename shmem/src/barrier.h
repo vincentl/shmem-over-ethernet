@@ -8,4 +8,9 @@ void osoe_barrier_all(const char *routine);
 /* shmem_finalize's barrier, on the finalize team (barrier.c). */
 void osoe_barrier_finalize(void);
 
+/* A barrier over team `t` - the quiet, then the team's sync - for a collective
+ * that ends with one (alltoall). Not counted as the application's barrier. */
+struct osoe_team;
+void osoe_team_barrier(struct osoe_team *t, const char *routine);
+
 #endif /* OSOE_BARRIER_H */

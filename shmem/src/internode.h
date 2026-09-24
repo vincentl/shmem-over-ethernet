@@ -125,6 +125,10 @@
  *     the generic implementation.
  *   - osoe_internode_broadcast: likewise, where a multicast of the root's
  *     buffer is the offload the RoCE review names (§6).
+ *   - osoe_internode_collect: an allgather over RDMA writes - a ring, or
+ *     recursive doubling - moving each node's blocks once, into each peer's
+ *     buffer once that peer has entered the collective (below); or the
+ *     generic implementation's or.
  */
 #ifndef OSOE_INTERNODE_H
 #define OSOE_INTERNODE_H
@@ -215,7 +219,7 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch);
  */
 void osoe_internode_released(uint32_t team, uint32_t epoch);
 
-/* ---- The data half: reductions and broadcast --------------------------- */
+/* ---- The data half: reductions, broadcast and gathers ------------------ */
 
 /* The spec's reduction operations (Table 10), below the boundary's spelling. */
 enum osoe_reduction_operation {
@@ -277,5 +281,31 @@ void osoe_internode_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t c
  */
 void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index, void *buffer,
                               size_t bytes, const char *routine);
+
+/*
+ * The internode phase of a gather - fcollect's and collect's (spec §9.10.8).
+ * The team's result is `bytes` long, member r's block the bytes from place(r)
+ * to place(r + 1): places[r] when `places` is given - the team's members + 1
+ * entries, the last `bytes` - and r * block when it is NULL. On entry `buffer`
+ * holds this node's members' blocks at their places, its other bytes
+ * undefined; on return, every participating node's at theirs, the same bytes
+ * on every node. Called as osoe_internode_reduce is, with the same `bytes`,
+ * `block` and `places` on every node.
+ *
+ * A backend may write a peer's buffer only once that peer has entered this
+ * collective, (team, epoch): until then the peer's members may still be
+ * copying the collective before's result out of it (§5.5). Before that it
+ * stages through OSOE_REGION_INTERNAL (§5.8 rule 1), as the generic
+ * implementation does, which is the reduction's tree running an or: it zeroes
+ * the others' places first, and disjoint blocks or'd are their concatenation.
+ * That moves, per 16 KiB piece, about two pieces at a leaf and 2(k + 1) at an
+ * interior lead, with k the fan-out; and the pieces go one after another, so
+ * a gather of a fixed block per PE takes ceil(bytes / piece) * 2 ceil(log_k N)
+ * hops - linear in the PE count, and so the one internode phase whose latency
+ * grows faster than log N. It is an operation of its own at the seam so that
+ * a backend with an allgather can do better, moving each block once.
+ */
+void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
+                            size_t block, const uint64_t *places, const char *routine);
 
 #endif /* OSOE_INTERNODE_H */

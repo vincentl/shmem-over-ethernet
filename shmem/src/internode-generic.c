@@ -50,9 +50,10 @@
  * the next, every node is past its wait for this piece's arrivals, and an early
  * add only counts toward the next. Nothing is written into a node's release
  * slot before that node's own arrival for the piece, and nothing into a child
- * slot while its owner reads child slots: a reduction's tree is always the
- * same, so its children cannot start the next reduction before this node has
- * released them, and a broadcast reads none. The tree barrier's model checks
+ * slot while its owner reads child slots: a reduction's tree - which a
+ * gather's or shares - is always the same, so its children cannot start the
+ * next reduction or gather before this node has released them, and a
+ * broadcast reads none. The tree barrier's model checks
  * the same up-then-down shape (tree_barrier_model.py); what is added here is
  * the data, which each release's put carries ahead of its fenced add.
  *
@@ -243,6 +244,15 @@ static uint32_t reduction_identity(enum osoe_reduction_operation operation,
            (element.width & 0xff);
 }
 
+/* A gather's: the or over unsigned words that it runs as, with the next bit
+ * set too, so that one is not taken for an application's or of the same
+ * length - a divergence the pieces would otherwise hide. */
+enum { GATHER_BIT = 30 };
+static uint32_t gather_identity(struct osoe_element element)
+{
+    return reduction_identity(OSOE_REDUCTION_OR, element) | UINT32_C(1) << GATHER_BIT;
+}
+
 static const char *operation_name(uint32_t operation)
 {
     static const char *const names[] = {
@@ -271,6 +281,9 @@ static void describe(const struct piece_header *h, char *out, size_t size)
 {
     if (h->epoch == 0)
         snprintf(out, size, "nothing: no piece was put there");
+    else if (h->collective >> 31 && (h->collective >> GATHER_BIT & 1))
+        snprintf(out, size, "piece %u (%u bytes) of epoch %u's collect", h->piece, h->bytes,
+                 h->epoch);
     else if (h->collective >> 31)
         snprintf(out, size, "piece %u (%u bytes) of epoch %u's %s of %u-byte %s", h->piece,
                  h->bytes, h->epoch, operation_name((h->collective >> 16) & 0x7fff), h->collective & 0xff,
@@ -389,6 +402,59 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
     }
     in_pieces(g, team, epoch, reduction_identity(operation, element), &g->reduction_tree, buffer,
               count * element.width, element.width, combine, routine);
+}
+
+/* Member r's place in a gather's result (internode.h). */
+static uint64_t place_of(const uint64_t *places, size_t block, uint64_t r)
+{
+    return places ? places[r] : r * (uint64_t)block;
+}
+
+/*
+ * Zero every place but this node's members': the or needs each byte to be one
+ * node's. Only the world team spans nodes (the file's comment), so a member's
+ * number is its rank. The node's ranks one block, as Slurm's block
+ * distribution makes them, are two runs of zeros; otherwise each rank is asked.
+ */
+static void zero_others(unsigned char *buffer, size_t bytes, size_t block,
+                        const uint64_t *places)
+{
+    const struct osoe_node *n = &osoe.node;
+    if (n->local_block) {
+        uint64_t from = place_of(places, block, n->first_rank);
+        uint64_t to = place_of(places, block, (uint64_t)n->first_rank + n->local_count);
+        memset(buffer, 0, from);
+        memset(buffer + to, 0, bytes - to);
+        return;
+    }
+    for (uint64_t r = 0; r < osoe.bootstrap.world_size; r++)
+        if (osoe_node_local_id(n, (uint32_t)r) < 0)
+            memset(buffer + place_of(places, block, r), 0,
+                   place_of(places, block, r + 1) - place_of(places, block, r));
+}
+
+/*
+ * internode.h's gather, as the or of every node's buffer once the others'
+ * places are zero: blocks at disjoint places, or'd, are their concatenation.
+ * It runs on the reduction's tree - no protocol of its own, and nothing
+ * written in another node but its internal region. In eight-byte words when
+ * the buffer allows, which it does alike on every node: its length is the
+ * same everywhere, and its place is, being symmetric in a page-aligned region.
+ */
+void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
+                                    size_t block, const uint64_t *places, const char *routine)
+{
+    struct generic_team *g = registered_team(team, routine);
+    zero_others(buffer, bytes, block, places);
+    uint32_t width = bytes % 8 == 0 && (uintptr_t)buffer % 8 == 0 ? 8 : 1;
+    struct osoe_element element = { OSOE_ELEMENT_UNSIGNED_INTEGER, width };
+    osoe_combine_function combine = osoe_combine_lookup(OSOE_REDUCTION_OR, element);
+    if (!g->reduction_tree_known) {
+        find_lead_tree(g, 0, &g->reduction_tree, routine);
+        g->reduction_tree_known = true;
+    }
+    in_pieces(g, team, epoch, gather_identity(element), &g->reduction_tree, buffer, bytes,
+              width, combine, routine);
 }
 
 void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index,

@@ -687,6 +687,53 @@ void shmem_set_lock(long *lock);
 void shmem_clear_lock(long *lock);
 int shmem_test_lock(long *lock);
 
+/* collect and fcollect (§9.10.8), team-based, over every standard RMA type of
+ * Table 5, and their byte forms: every PE's block, in team rank order, into
+ * every PE's dest - fcollect's blocks all nelems long, collect's each its own
+ * PE's. alltoall and alltoalls (§9.10.5, §9.10.6): PE i's block j to PE j's
+ * dest block i, with strides in elements for alltoalls. Each returns 0 on
+ * success. */
+#define OSOE_COLLECT_DECL_P(P, T, NAME)                                       \
+    int OSOE_FN(P, NAME, _collect)(shmem_team_t team, T *dest, const T *source, \
+                                   size_t nelems);                            \
+    int OSOE_FN(P, NAME, _fcollect)(shmem_team_t team, T *dest, const T *source, \
+                                    size_t nelems);
+#define OSOE_ALLTOALL_DECL_P(P, T, NAME)                                      \
+    int OSOE_FN(P, NAME, _alltoall)(shmem_team_t team, T *dest, const T *source, \
+                                    size_t nelems);                           \
+    int OSOE_FN(P, NAME, _alltoalls)(shmem_team_t team, T *dest, const T *source, \
+                                     ptrdiff_t dst, ptrdiff_t sst, size_t nelems);
+#define OSOE_COLLECT_DECL(T, NAME) OSOE_COLLECT_DECL_P(shmem_, T, NAME)
+#define OSOE_ALLTOALL_DECL(T, NAME) OSOE_ALLTOALL_DECL_P(shmem_, T, NAME)
+OSOE_RMA_STANDARD_TYPES(OSOE_COLLECT_DECL)
+OSOE_RMA_STANDARD_TYPES(OSOE_ALLTOALL_DECL)
+int shmem_collectmem(shmem_team_t team, void *dest, const void *source, size_t nelems);
+int shmem_fcollectmem(shmem_team_t team, void *dest, const void *source, size_t nelems);
+int shmem_alltoallmem(shmem_team_t team, void *dest, const void *source, size_t nelems);
+int shmem_alltoallsmem(shmem_team_t team, void *dest, const void *source, ptrdiff_t dst,
+                       ptrdiff_t sst, size_t nelems);
+
+/* Their deprecated active-set forms (Annex F), over the whole job only (above),
+ * of four- and eight-byte elements. */
+void shmem_collect32(void *dest, const void *source, size_t nelems, int PE_start,
+                     int logPE_stride, int PE_size, long *pSync);
+void shmem_collect64(void *dest, const void *source, size_t nelems, int PE_start,
+                     int logPE_stride, int PE_size, long *pSync);
+void shmem_fcollect32(void *dest, const void *source, size_t nelems, int PE_start,
+                      int logPE_stride, int PE_size, long *pSync);
+void shmem_fcollect64(void *dest, const void *source, size_t nelems, int PE_start,
+                      int logPE_stride, int PE_size, long *pSync);
+void shmem_alltoall32(void *dest, const void *source, size_t nelems, int PE_start,
+                      int logPE_stride, int PE_size, long *pSync);
+void shmem_alltoall64(void *dest, const void *source, size_t nelems, int PE_start,
+                      int logPE_stride, int PE_size, long *pSync);
+void shmem_alltoalls32(void *dest, const void *source, ptrdiff_t dst, ptrdiff_t sst,
+                       size_t nelems, int PE_start, int logPE_stride, int PE_size,
+                       long *pSync);
+void shmem_alltoalls64(void *dest, const void *source, ptrdiff_t dst, ptrdiff_t sst,
+                       size_t nelems, int PE_start, int logPE_stride, int PE_size,
+                       long *pSync);
+
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);
 void shmem_info_get_name(char *name);
@@ -1165,6 +1212,20 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, broadcast))                 \
         ((team), (dest), (source), (nelems), (PE_root)))
 
+/* So do collect, fcollect, alltoall and alltoalls. */
+#define shmem_collect(team, dest, source, nelems)                                \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, collect))                   \
+        ((team), (dest), (source), (nelems)))
+#define shmem_fcollect(team, dest, source, nelems)                               \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, fcollect))                  \
+        ((team), (dest), (source), (nelems)))
+#define shmem_alltoall(team, dest, source, nelems)                               \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, alltoall))                  \
+        ((team), (dest), (source), (nelems)))
+#define shmem_alltoalls(team, dest, source, dst, sst, nelems)                    \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, alltoalls))                 \
+        ((team), (dest), (source), (dst), (sst), (nelems)))
+
 /* spec §9.10.3's shmem_sync(team), beside the deprecated active-set shmem_sync
  * of four arguments (declared above): the count picks, as it does between the
  * forms with and without a context, and the deprecated one is called by its
@@ -1283,6 +1344,8 @@ void shmem_pcontrol(int level, ...);
 #undef OSOE_REDUCE_DECL_ORDERED
 #undef OSOE_REDUCE_DECL_ARITHMETIC
 #undef OSOE_BROADCAST_DECL
+#undef OSOE_COLLECT_DECL
+#undef OSOE_ALLTOALL_DECL
 #undef OSOE_TO_ALL_DECL_INTEGER
 #undef OSOE_TO_ALL_DECL_FLOATING
 #undef OSOE_TO_ALL_DECL_COMPLEX

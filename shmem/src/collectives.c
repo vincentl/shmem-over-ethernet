@@ -1,6 +1,7 @@
 /*
  * The data-carrying collectives (§5.5, §5.8; phase 1 step 5): §5.5's
- * accumulator, for reductions and broadcast.
+ * accumulator, for reductions, broadcast and the gathers, and alltoall's
+ * exchange.
  *
  * **Within a node** it is §5.5 as written. Every member arrives with one locked
  * increment of the team's `arrived`. The local lead - the team's member with the
@@ -30,10 +31,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <shmem.h>
 
+#include "allocator.h"
+#include "barrier.h"
 #include "base/epoch.h"
 #include "blocked.h"
 #include "collectives.h"
@@ -46,6 +50,7 @@
 #include "state.h"
 #include "symmetric.h"
 #include "team.h"
+#include "transport.h"
 
 /* A reduction's operation and element, and the function that combines them
  * within the node (combine.h); a broadcast has none. */
@@ -199,6 +204,225 @@ int osoe_broadcast(const char *routine, shmem_team_t team, void *dest, const voi
         osoe_fatal("%s: PE_root %d is not a PE number", routine, root);
     return data_collective(routine, team, dest, source, nelems, width, NULL, root,
                            root_keeps_dest);
+}
+
+/* Local PE m's number in `t`, a team every local PE belongs to: the world's
+ * numbers PEs by rank, the shared team's by local id (team.c). */
+static uint32_t local_member_rank(const struct osoe_team *t, uint32_t m)
+{
+    return t->number == OSOE_TEAM_SHARED ? m : osoe.bootstrap.gtids[m];
+}
+
+/*
+ * collect's lengths to places, in place: word r becomes the sum of the words
+ * before it, and word `count` - past the lengths - their sum.
+ */
+static void prefix_sums(const char *routine, uint64_t *words, uint64_t count)
+{
+    uint64_t sum = 0;
+    for (uint64_t r = 0; r < count; r++) {
+        uint64_t length = words[r];
+        words[r] = sum;
+        if (length > UINT64_MAX - sum)
+            osoe_fatal("%s: the members' blocks add up to more bytes than there are", routine);
+        sum += length;
+    }
+    words[count] = sum;
+}
+
+/*
+ * A gather (spec §9.10.8): member r's block into every member's dest at
+ * places[r] - or, with places NULL, at r * block, every block `block` bytes -
+ * `total` bytes in all. This PE's own block is `block` bytes of source.
+ *
+ * The lead copies each local member's block to its place once every member has
+ * arrived - O(L n) of its own, under the O(P n) each member spends copying the
+ * result out, so not the node's bottleneck - and hands dest to the internode
+ * phase, which returns every node's blocks (internode.h); then the release and
+ * the copy-outs, as for a broadcast. Only the lead writes its dest, and only
+ * once every member has arrived, which each does after its copy-out of the
+ * collective before: no member writes memory another may still be reading, and
+ * nothing is written in another node but its internal region (§5.5, invariant
+ * 16).
+ *
+ * With `lengths` it is collect's first gather (collect_varying): each block is
+ * a member's length, eight bytes, and the lead turns the result into their
+ * prefix sums in place - each member's place, and the total in the word after
+ * the result - of which the other members copy the total alone. They need
+ * nothing else, so the P words are the lead's to touch, not every member's.
+ */
+static int gather(const char *routine, struct osoe_team *t, void *dest, const void *source,
+                  size_t block, const uint64_t *places, uint64_t total, bool lengths)
+{
+    if (total == 0)
+        return 0;
+    struct osoe_symmetric_location dest_at = osoe_symmetric_locate(routine, dest, total);
+    struct osoe_symmetric_location source_at = osoe_symmetric_locate(routine, source, block);
+    uint32_t k = *t->epoch, d = *t->data_epoch, members = t->local_members;
+
+    if (t->singleton) {
+        memcpy(dest, source, block);
+        if (lengths)
+            prefix_sums(routine, dest, 1);
+        *t->epoch = k + 1;
+        *t->data_epoch = d + 1;
+        atomic_store_explicit(t->published, k + 1, memory_order_release);
+        return 0;
+    }
+
+    bool lead = osoe.bootstrap.local_id == 0;
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
+    if (osoe_epoch_release_bump_eq(t->arrived, (k + 1) * members) && !lead)
+        osoe_epoch_wake_all(t->arrived);
+
+    if (lead) {
+        osoe_epoch_wait_eq(t->arrived, (k + 1) * members, routine);
+        unsigned char *result = dest;
+        for (uint32_t m = 0; m < members; m++) {
+            uint32_t r = local_member_rank(t, m);
+            uint64_t place = places ? places[r] : (uint64_t)r * block;
+            uint64_t length = places ? places[r + 1] - places[r] : block;
+            if (length)
+                memcpy(result + place, m == 0 ? source : member_copy(m, source_at), length);
+        }
+        if (t->internode)
+            osoe_internode_collect(t->number, k + 1, result, total, block, places, routine);
+        if (lengths)
+            prefix_sums(routine, dest, t->members);
+        if (!osoe_epoch_release_bump_eq(t->released, k + 1))
+            osoe_fatal("%s: %s's epochs diverged at epoch %u: PEs called different numbers "
+                       "of collectives", routine, t->name, k + 1);
+        osoe_epoch_wake_all(t->released);
+        if (members > 1)
+            osoe_epoch_wait_eq(t->copied, (d + 1) * (members - 1), routine);
+    } else {
+        osoe_epoch_wait_eq(t->released, k + 1, routine);
+        if (lengths)
+            memcpy((unsigned char *)dest + total, member_copy(0, dest_at) + total,
+                   sizeof(uint64_t));
+        else
+            memcpy(dest, member_copy(0, dest_at), total);
+        if (osoe_epoch_release_bump_eq(t->copied, (d + 1) * (members - 1)))
+            osoe_epoch_wake_all(t->copied);
+    }
+
+    *t->epoch = k + 1;
+    *t->data_epoch = d + 1;
+    atomic_store_explicit(t->published, k + 1, memory_order_release);
+    osoe_blocked_leave();
+    return 0;
+}
+
+/*
+ * collect's places are the prefix sums of every member's length. Every member
+ * of the team takes the same room from the symmetric heap - the members' count
+ * of words and one more - and writes its length in the last word; the lead
+ * gathers them into its room, turns them into places and the total, and the
+ * other members learn the total alone (gather's `lengths`), touching one page
+ * of their room and allocating nothing else. Then the gather itself, whose
+ * places only the lead reads. The room is given back before returning; the
+ * allocator is a function of its calls alone (§4.4), so a take and its give
+ * leave it as it was, on the PEs of a team smaller than the job as on the
+ * others - and a heap without the room answers nonzero on every member alike.
+ */
+static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
+                           const void *source, size_t block)
+{
+    uint64_t members = t->members;
+    uint64_t room_bytes = (members + 1) * sizeof(uint64_t), offset;
+    int taken = osoe_allocator_take(&osoe.allocator, room_bytes, sizeof(uint64_t), 0, &offset);
+    if (taken < 0)
+        osoe_fatal("%s: out of memory for the symmetric heap's own records", routine);
+    if (taken > 0)
+        return 1;
+    uint64_t *room = (uint64_t *)((unsigned char *)osoe.node.heap_of[osoe.bootstrap.local_id] +
+                                  offset);
+    room[members] = block;
+    int status = gather(routine, t, room, room + members, sizeof *room, NULL,
+                        members * sizeof *room, true);
+    if (status == 0)
+        status = gather(routine, t, dest, source, block, room, room[members], false);
+    osoe_allocator_give(&osoe.allocator, offset);
+    return status;
+}
+
+int osoe_collect(const char *routine, shmem_team_t team, void *dest, const void *source,
+                 size_t nelems, size_t width, bool fixed)
+{
+    struct osoe_team *t = osoe_team_of(routine, team);
+    if (!t)
+        return 1;                       /* SHMEM_TEAM_INVALID: undefined, answered nonzero */
+    size_t block = osoe_rma_bytes(routine, nelems, width);
+    if (!fixed)
+        return collect_varying(routine, t, dest, source, block);
+    if (block == 0)
+        return 0;                       /* every member passes the same count */
+    if (t->members > UINT64_MAX / block)
+        osoe_fatal("%s: %u members' blocks of %zu bytes are more bytes than there are", routine,
+                   t->members, block);
+    return gather(routine, t, dest, source, block, NULL, (uint64_t)t->members * block, false);
+}
+
+/*
+ * alltoall and alltoalls: each block goes straight from its source PE to its
+ * dest PE - no tree shortens that - and the team's barrier after the puts
+ * returns once every block addressed to this PE has landed (spec §9.10.5).
+ * alltoall itself reads no dest, so the precondition that dest is ready on
+ * every PE is the application's to keep, as the spec says - including after a
+ * data collective into the same array, whose lead's copy may still be being
+ * copied out of when a fast member's put lands in it: a gather needs no sync
+ * between, alltoall does. A block with both strides 1 is one put; a strided
+ * one, one put an element: element-strided within each block, as the spec's
+ * Example 33 and SOS read §9.10.6 - member i's block for member j is elements
+ * (j nelems + e) sst of source, landing at (i nelems + e) dst of j's dest.
+ * Every put but the last says more follows (OSOE_TRANSPORT_MORE), so a
+ * backend may submit them together. The PEs are visited from this one's right
+ * neighbour round, so that no PE is every PE's first target.
+ */
+int osoe_alltoall(const char *routine, shmem_team_t team, void *dest, const void *source,
+                  ptrdiff_t dest_stride, ptrdiff_t source_stride, size_t nelems, size_t width)
+{
+    struct osoe_team *t = osoe_team_of(routine, team);
+    if (!t)
+        return 1;
+    if (dest_stride < 1 || source_stride < 1)
+        osoe_fatal("%s: strides %td and %td; both must be at least 1 (spec §9.10.6)", routine,
+                   dest_stride, source_stride);
+    size_t block = osoe_rma_bytes(routine, nelems, width);
+    if (block == 0)
+        return 0;
+    uint64_t members = t->members;
+    uint64_t stride = (uint64_t)(dest_stride > source_stride ? dest_stride : source_stride);
+    /* The last element of the last block bounds what each array spans. */
+    uint64_t last = members * nelems - 1;
+    if (members > UINT64_MAX / nelems || last > (UINT64_MAX / width - 1) / stride)
+        osoe_fatal("%s: the blocks reach past what an offset can count", routine);
+    struct osoe_symmetric_location dest_at =
+        osoe_symmetric_locate(routine, dest, (last * (uint64_t)dest_stride + 1) * width);
+    osoe_symmetric_locate(routine, source, (last * (uint64_t)source_stride + 1) * width);
+
+    struct osoe_transport_context *context = osoe_transport_context_default();
+    uint64_t me = t->me;
+    for (uint64_t step = 0; step < members; step++) {
+        uint64_t j = (me + 1 + step) % members;
+        int pe = osoe_team_to_world(t, (int)j);
+        const unsigned char *from = (const unsigned char *)source +
+                                    j * nelems * (uint64_t)source_stride * width;
+        uint64_t to = dest_at.offset + me * nelems * (uint64_t)dest_stride * width;
+        bool last_block = step + 1 == members;
+        if (dest_stride == 1 && source_stride == 1) {
+            osoe_transport_put(context, pe, dest_at.region, to, from, block,
+                               last_block ? 0 : OSOE_TRANSPORT_MORE);
+            continue;
+        }
+        for (size_t e = 0; e < nelems; e++)
+            osoe_transport_put(context, pe, dest_at.region,
+                               to + e * (uint64_t)dest_stride * width,
+                               from + e * (uint64_t)source_stride * width, width,
+                               last_block && e + 1 == nelems ? 0 : OSOE_TRANSPORT_MORE);
+    }
+    osoe_team_barrier(t, routine);
+    return 0;
 }
 
 void osoe_active_set_whole_job(const char *routine, int PE_start, int logPE_stride,

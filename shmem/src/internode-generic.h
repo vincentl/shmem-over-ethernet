@@ -26,12 +26,14 @@ void osoe_internode_generic_init(void);
  * checked them. */
 void osoe_internode_generic_team(uint32_t team, const uint32_t *nodes, uint32_t count);
 
-/* internode.h's osoe_internode_reduce and osoe_internode_broadcast, whose
- * contracts these meet. */
+/* internode.h's osoe_internode_reduce, osoe_internode_broadcast and
+ * osoe_internode_collect, whose contracts these meet. */
 void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t count,
                                    enum osoe_reduction_operation operation,
                                    struct osoe_element element, const char *routine);
 void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index,
                                       void *buffer, size_t bytes, const char *routine);
+void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
+                                    size_t block, const uint64_t *places, const char *routine);
 
 #endif /* OSOE_INTERNODE_GENERIC_H */

@@ -42,6 +42,13 @@ execute_process(
 if(NOT rc EQUAL 0)
   message(FATAL_ERROR "Building with -std=c11 failed (F12):\n${build_out}\n${build_err}")
 endif()
+# make's own notices of clock skew are not the compiler's warnings: a build
+# tree on a filesystem shared with its host can see its files a moment in the
+# future, and make says so.
+string(REGEX REPLACE "[^\n]*(Clock skew detected|modification time [^\n]* in the future)[^\n]*"
+       "" build_out "${build_out}")
+string(REGEX REPLACE "[^\n]*(Clock skew detected|modification time [^\n]* in the future)[^\n]*"
+       "" build_err "${build_err}")
 if(build_out MATCHES "warning:" OR build_err MATCHES "warning:")
   message(FATAL_ERROR "Building with -std=c11 warned (F12):\n${build_out}\n${build_err}")
 endif()

@@ -230,6 +230,35 @@ void pshmem_broadcast32(void *dest, const void *source, size_t nelems, int PE_ro
 void pshmem_broadcast64(void *dest, const void *source, size_t nelems, int PE_root,
                         int PE_start, int logPE_stride, int PE_size, long *pSync);
 
+/* collect, fcollect, alltoall and alltoalls (§9.10.5, §9.10.6, §9.10.8). */
+#define OSOE_COLLECT_PDECL(T, NAME) OSOE_COLLECT_DECL_P(pshmem_, T, NAME)
+#define OSOE_ALLTOALL_PDECL(T, NAME) OSOE_ALLTOALL_DECL_P(pshmem_, T, NAME)
+OSOE_RMA_STANDARD_TYPES(OSOE_COLLECT_PDECL)
+OSOE_RMA_STANDARD_TYPES(OSOE_ALLTOALL_PDECL)
+int pshmem_collectmem(shmem_team_t team, void *dest, const void *source, size_t nelems);
+int pshmem_fcollectmem(shmem_team_t team, void *dest, const void *source, size_t nelems);
+int pshmem_alltoallmem(shmem_team_t team, void *dest, const void *source, size_t nelems);
+int pshmem_alltoallsmem(shmem_team_t team, void *dest, const void *source, ptrdiff_t dst,
+                        ptrdiff_t sst, size_t nelems);
+void pshmem_collect32(void *dest, const void *source, size_t nelems, int PE_start,
+                      int logPE_stride, int PE_size, long *pSync);
+void pshmem_collect64(void *dest, const void *source, size_t nelems, int PE_start,
+                      int logPE_stride, int PE_size, long *pSync);
+void pshmem_fcollect32(void *dest, const void *source, size_t nelems, int PE_start,
+                       int logPE_stride, int PE_size, long *pSync);
+void pshmem_fcollect64(void *dest, const void *source, size_t nelems, int PE_start,
+                       int logPE_stride, int PE_size, long *pSync);
+void pshmem_alltoall32(void *dest, const void *source, size_t nelems, int PE_start,
+                       int logPE_stride, int PE_size, long *pSync);
+void pshmem_alltoall64(void *dest, const void *source, size_t nelems, int PE_start,
+                       int logPE_stride, int PE_size, long *pSync);
+void pshmem_alltoalls32(void *dest, const void *source, ptrdiff_t dst, ptrdiff_t sst,
+                        size_t nelems, int PE_start, int logPE_stride, int PE_size,
+                        long *pSync);
+void pshmem_alltoalls64(void *dest, const void *source, ptrdiff_t dst, ptrdiff_t sst,
+                        size_t nelems, int PE_start, int logPE_stride, int PE_size,
+                        long *pSync);
+
 /* The deprecated active-set reductions (Table 11). */
 #define OSOE_TO_ALL_PDECL_INTEGER(T, NAME) OSOE_TO_ALL_DECL_INTEGER_P(pshmem_, T, NAME)
 #define OSOE_TO_ALL_PDECL_FLOATING(T, NAME) OSOE_TO_ALL_DECL_FLOATING_P(pshmem_, T, NAME)
@@ -264,6 +293,8 @@ OSOE_TO_ALL_COMPLEX_TYPES(OSOE_TO_ALL_PDECL_COMPLEX)
 #undef OSOE_REDUCE_PDECL_ORDERED
 #undef OSOE_REDUCE_PDECL_ARITHMETIC
 #undef OSOE_BROADCAST_PDECL
+#undef OSOE_COLLECT_PDECL
+#undef OSOE_ALLTOALL_PDECL
 #undef OSOE_TO_ALL_PDECL_INTEGER
 #undef OSOE_TO_ALL_PDECL_FLOATING
 #undef OSOE_TO_ALL_PDECL_COMPLEX

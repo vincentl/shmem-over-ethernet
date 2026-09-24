@@ -4284,7 +4284,7 @@ does **not** generalize:
 - **collect** with a different `nelems` per PE needs per-PE sizes and offsets.
 
 Each needs its own design before it is implemented (§7). Scans have one (§5.8);
-alltoall and collect do not yet.
+alltoall and collect have theirs as built (below, phase 1 step 5 slice 4).
 
 For the collectives it covers, this eliminates scratch sizing within a node — no
 chunking loop, no high-water allocation, no per-team data area. Their shared
@@ -4346,6 +4346,54 @@ neighbouring leads in O(*k*), from a table of each node's lead that the job
 object keeps beside its addresses and blobs (*N* words a node, written at the
 rendezvous in O(*R* + *N*)) - scanning the rank map instead made every
 broadcast linear in the node count under a block distribution.
+
+*As built: collect, fcollect, alltoall and alltoalls* (phase 1 step 5 slice 4;
+`collectives.c`, `collect.c`, `alltoall.c`;
+`docs/prompts/phase1-step5-slice4-prompt.md`, whose decisions are Claude's for
+the author's review; the adversarial review of the slice reshaped the seam and
+collect's lengths). **fcollect is the accumulator with places**: once every
+member has arrived, the lead copies each local member's block to its rank's
+place in its `dest` - O(*L n*) of its own, under the O(*P n*) each member
+spends copying the result out - and hands `dest` to the internode phase; then
+the release and the copy-outs, as for a broadcast. No member writes the lead's
+`dest`, which a slower member may still be reading for the collective before.
+**The internode phase is its own operation at the seam, `osoe_internode_collect`**,
+given the result's layout - a fixed block, or each member's place - so that a
+backend knows which bytes are whose, and bound by one rule: a peer's buffer may
+be written only once that peer has entered the collective, since until then
+its members may still be copying the last result out of it; before, a backend
+stages through the internal region. The spec's precondition would allow a put
+straight into another node's `dest` at once, which SOS uses; this rule is why
+osoe does not. **The generic implementation is the reduction's tree running an
+or**: it zeroes the other nodes' places, and blocks at disjoint places or to
+their concatenation - no protocol of its own - and a piece header marks it a
+gather, so that one node's fcollect is not taken for another's or of the same
+length. Its cost is stated rather than hidden: per 16 KiB piece a leaf moves
+about two pieces and an interior lead 2(*k* + 1), where an allgather moves each
+block once; and the pieces go one after another, so a gather of a fixed block
+per PE takes ⌈*P n* / 16 KiB⌉ · 2⌈log_*k* *N*⌉ hops - at 400 nodes of 256 PEs
+and *k* = 4, 510 of them for one long each. **It is the one internode phase
+whose latency grows faster than log *N***, the exception §1's goal must carry
+until a backend's allgather replaces it at the seam, or the tree pipelines its
+pieces. **collect's places are the prefix sums of every member's length**:
+every member takes the same room from the symmetric heap, a word per member and
+one more, and writes its length in the last; the lead gathers the lengths into
+its own room, turns them into places and the total, and the other members read
+the total alone - so the P words are the lead's to touch, and a non-lead's cost
+is a page. The room is given back before returning; a take and its give leave
+the allocator as it was (§4.4), on the PEs of a team smaller than the job as on
+the others, and a heap without the room answers nonzero on every member alike.
+A scan (§9.10.10, not built) would give each PE its own place in O(1) memory.
+**alltoall and alltoalls are direct puts and the team's barrier**: every block
+goes from its source PE to its dest PE, which no tree shortens, and every put
+but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads
+no `dest`, so the precondition that it is ready is the application's to keep,
+as the spec says - which includes a sync after a data collective into the same
+array, since the lead's copy of that result may still be being copied out when
+a fast member's put lands in it: back-to-back gathers need none, alltoall after
+one does. The puts start at the PE's right neighbour, so no PE is everyone's
+first target; a strided block is a put an element, element-strided within each
+block as the spec's Example 33 and SOS read §9.10.6.
 
 ### 5.6 Barrier versus sync
 
@@ -5214,8 +5262,8 @@ machinery. The review's order is adopted.
    implementation every backend may call (§5.8). The third gives the deprecated
    active-set routines - `_to_all`, `broadcast32`/`64`, `shmem_barrier` and
    `shmem_sync` - over the whole job, the only active set they accept (§7.4).
-   collect, fcollect, alltoall and alltoalls follow, each with the design §5.5
-   says it needs first.*
+   The fourth adds collect, fcollect, alltoall and alltoalls, their active-set
+   forms under the same rule, and the seam's gather (§5.5, as built).*
 
 6. **Symmetric statics and the compiler wrapper** (§4.3). *The first slice:
    `oshcc`, a POSIX `sh` wrapper configured by the build, installed with the
@@ -5306,7 +5354,7 @@ it.
 | `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1, and not stubs. Every PE of an osoe job runs the same executable by construction, so `pe_accessible` is whether `pe` names a PE of this job. `addr_accessible` additionally requires the address to be symmetric: in the heap, or since step 6 among the statics of a program linked with `oshcc` (§4.3). An automatic address answers 0, and so does a static in a program built without the wrapper - stated by the query rather than discovered at the first put |
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
 | Name-shifted deprecated routines | §10 item 1 wants a `pshmem_` entry point for every function | **Not done**, and recorded as known non-conformance below: the spec does not say how to shift a name that never had a `shmem_` prefix, and guessing wrong helps nobody |
-| Deprecated active-set constants (F.2.8) and routines | `SHMEM_SYNC_VALUE` and the `pSync` sizes; `shmem_barrier`, `shmem_sync`, `shmem_broadcast32`/`64`, the `_to_all` reductions of Table 11 | The constants at step 1. **The routines at step 5, over the whole job and nothing else** - at the author's direction of 2026-09-24 to implement them so that corpus programs can be tested against osoe, with the whole-job rule and its scope Claude's decisions for the author's review (`docs/prompts/phase1-step5-slice3-prompt.md`): an active set of every PE - `PE_start` 0, `logPE_stride` 0, `PE_size` the job's - is the world team, and any other ends the job by name. Step 1 had refused the routines at the link, on the grounds that a wrong answer is worse than a missing symbol; that still holds, and a named refusal at run time is neither. It is the active set every corpus program that still calls these passes (ISx, PRK, bale and hclib's copies) - of which PRK's and bale's run on heap data, where ISx and hclib's reduce symmetric statics, which osoe has for a program linked with `oshcc` since step 6 (§4.3) - and forming a group for an arbitrary set of PEs is machinery osoe does not have. `pSync` and `pWrk` are neither read nor written, which leaves `pSync` as the spec requires it to be found afterwards and makes the reuse rules hold trivially. `broadcast32`/`64` leave the root's own `dest` alone, as the spec says; when the root is its node's lead, the node's copy is the root's `source`, read by the internode phase and the copy-outs and never written (`collectives.c`). The active-set forms of collect, fcollect, alltoall and alltoalls follow their team forms, under the same rule |
+| Deprecated active-set constants (F.2.8) and routines | `SHMEM_SYNC_VALUE` and the `pSync` sizes; `shmem_barrier`, `shmem_sync`, `shmem_broadcast32`/`64`, the `_to_all` reductions of Table 11, `shmem_collect32`/`64`, `shmem_fcollect32`/`64`, `shmem_alltoall32`/`64`, `shmem_alltoalls32`/`64` | The constants at step 1. **The routines at step 5, over the whole job and nothing else** - at the author's direction of 2026-09-24 to implement them so that corpus programs can be tested against osoe, with the whole-job rule and its scope Claude's decisions for the author's review (`docs/prompts/phase1-step5-slice3-prompt.md`): an active set of every PE - `PE_start` 0, `logPE_stride` 0, `PE_size` the job's - is the world team, and any other ends the job by name. Step 1 had refused the routines at the link, on the grounds that a wrong answer is worse than a missing symbol; that still holds, and a named refusal at run time is neither. It is the active set every corpus program that still calls these passes (ISx, PRK, bale and hclib's copies) - of which PRK's and bale's run on heap data, where ISx and hclib's reduce symmetric statics, which osoe has for a program linked with `oshcc` since step 6 (§4.3) - and forming a group for an arbitrary set of PEs is machinery osoe does not have. `pSync` and `pWrk` are neither read nor written, which leaves `pSync` as the spec requires it to be found afterwards and makes the reuse rules hold trivially. `broadcast32`/`64` leave the root's own `dest` alone, as the spec says; when the root is its node's lead, the node's copy is the root's `source`, read by the internode phase and the copy-outs and never written (`collectives.c`). The active-set forms of collect, fcollect, alltoall and alltoalls came with their team forms (step 5 slice 4), under the same rule |
 | `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TRANSPORT_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
 
 **Known non-conformance: the deprecated routines have no name-shifted entry
@@ -5338,9 +5386,9 @@ and every one of them has a wrapper for it.
 
 ### 7.5 Deferred (mechanical)
 
-collect/fcollect/alltoall/alltoalls. *(Locks are built: §4.12. Reductions and
-broadcast are built, and the deprecated active-set routines over the whole job:
-§7.1 step 5, §5.5 as built, §7.4.)*
+The scans (§9.10.10). *(Locks are built: §4.12. Reductions, broadcast,
+collect, fcollect, alltoall and alltoalls are built, and the deprecated
+active-set routines over the whole job: §7.1 step 5, §5.5 as built, §7.4.)*
 
 **RMA's full type/operation cross product, strided transfers and nonblocking
 variants are implemented** (§9.6, §9.8.3-§9.8.4): every standard RMA type of
