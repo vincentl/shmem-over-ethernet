@@ -17,7 +17,9 @@
  *   atomic     a 64-bit fetch-add's median and fastest round trip
  *   barrier    shmem_barrier_all across every PE: the median and fastest
  *   collectives a sum reduction and a broadcast from PE 0 across every PE, of
- *              8 bytes and of 64 KiB: the median and fastest of each
+ *              8 bytes and of 64 KiB; and an fcollect and an alltoall of a
+ *              block of 8 bytes and of 4 KiB from every PE, where the job's
+ *              blocks fit the window: the median and fastest of each
  *   pairs      every PE at once streams to the PE half the job away - on
  *              another node when the job is a block layout with the same count
  *              on every node - each PE's MiB/s, and the whole job's: every
@@ -187,6 +189,34 @@ static void collectives(int me, int npes)
                 summarize(trips, trips_per_size, &median, &fastest);
                 printf("%s pes=%d bytes=%zu median_us=%.1f fastest_us=%.1f\n",
                        kind == 0 ? "reduce" : "broadcast", npes, sizes[s], median, fastest);
+                fflush(stdout);
+            }
+        }
+    }
+
+    /* fcollect and alltoall, a block from every PE - ISx's end-of-run gather
+     * of one double is the first - in the window's two halves; every PE skips
+     * alike a size whose job's blocks do not fit. */
+    static const size_t blocks[] = { 8, 4096 };
+    for (size_t b = 0; b < sizeof blocks / sizeof blocks[0]; b++) {
+        if ((uint64_t)npes * blocks[b] > MAX_BYTES / 2)
+            continue;
+        for (int kind = 0; kind < 2; kind++) {
+            shmem_barrier_all();
+            for (int i = -WARMUP; i < trips_per_size; i++) {
+                uint64_t t = now_ns();
+                if (kind == 0)
+                    shmem_fcollectmem(SHMEM_TEAM_WORLD, dst, src, blocks[b]);
+                else
+                    shmem_alltoallmem(SHMEM_TEAM_WORLD, dst, src, blocks[b]);
+                if (i >= 0)
+                    trips[i] = now_ns() - t;
+            }
+            if (me == 0) {
+                double median, fastest;
+                summarize(trips, trips_per_size, &median, &fastest);
+                printf("%s pes=%d block=%zu median_us=%.1f fastest_us=%.1f\n",
+                       kind == 0 ? "fcollect" : "alltoall", npes, blocks[b], median, fastest);
                 fflush(stdout);
             }
         }
