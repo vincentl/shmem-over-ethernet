@@ -18,17 +18,29 @@ GRANTED bit.
                      wait until my node has GRANTED       (a local wait)
                      and-not(my node, GRANTED)            (keep a successor's link)
   release(me)  (quiet: the critical region's writes complete)
-               n := my node's next
+               n := my node's successor
                if n == 0: if cas(home's tail, me + 1, 0): released, nobody waits
-                          else: wait until my node's next != 0; n := it
+                          else: wait until my node != 0; n := its successor
                or(n's node, GRANTED)
   test(me)     store my node := 0; cas(home's tail, 0, me + 1): 0 if it succeeded
+
+The release's wait is the code's: for the whole word to be nonzero, taking the
+successor from the value the wait returned. That is the link only while GRANTED
+is clear in a holder's node, which the acquire's and-not makes so; the model
+checks it (a release that wakes to a word with no successor is a violation), so
+the invariant the code's wait rests on is proved rather than assumed.
 
 Every operation on another PE's word is one of the transport's rmw, which is
 atomic and exclusive (§4.10), so each is one step here; the model is sequentially
 consistent, since the protocol relies on nothing but each PE's program order and
 that atomicity. The waits are abstract: the library waits on its own word with
 the region wait (region-wait.h), whose wake-ups are checked elsewhere.
+
+The link and the grant are not fetching, and across nodes they apply some time
+after the call returns; here each applies at issue. That is sound because only
+a node word's owner reads it, and the owner is either waiting for the write or
+reads before it lands - a schedule the model also explores, the write simply
+coming later.
 
 Properties
   P1  mutual exclusion: never two PEs in the critical region;
@@ -51,6 +63,9 @@ Breakages, each of which must fail
                  comer enters first. -> P2
   enter_early    a waiter enters once it has linked, without waiting for the
                  grant. -> P1
+  no_andn        a waiter enters leaving GRANTED set in its node, so a release
+                 whose compare-and-swap loses to a waiter not yet linked wakes at
+                 once to a word with no successor. -> violation
 
 Usage: lock_model.py [substring ...]
 """
@@ -60,7 +75,7 @@ from engine import DEL, assemble, explore, report, select
 
 TAIL = ('tail',)
 GRANTED = 0x100
-NEXT = 0xff
+SUCCESSOR = 0xff
 IN = ('$in',)
 QUEUE = ('$queue',)
 
@@ -83,20 +98,26 @@ def enter_checks(me):
 
 def release(design, me):
     B = [('R', ('load', lambda L, me=me: node(me), 'n', '@R1')),
-         ('R1', ('br', lambda L: (L['n'] & NEXT) != 0, '@GRANT', '@FREE')),
+         ('R1', ('br', lambda L: (L['n'] & SUCCESSOR) != 0, '@GRANT', '@FREE')),
          ('FREE', ('cas', lambda L: TAIL, lambda L, me=me: me + 1, lambda L: 0, 'ok', '@R2'))]
     if design == 'no_wait_next':
         B += [('R2', ('br', lambda L: L['ok'], '@ROUND', '@ROUND'))]
     else:
+        # The code's wait: until the word is nonzero, the successor taken from
+        # the value that ended it.
         B += [('R2', ('br', lambda L: L['ok'], '@ROUND', '@WAITNEXT')),
-              ('WAITNEXT', ('await', lambda M, L, me=me: (M[node(me)] & NEXT) != 0, '@R'))]
+              ('WAITNEXT', ('nd', lambda M, L, me=me: [({}, {'n': M[node(me)]}, 'woke')]
+                            if M[node(me)] != 0 else [], '@HAVENEXT')),
+              ('HAVENEXT', ('check', lambda M, L: None if (L['n'] & SUCCESSOR) != 0 else
+                            f"a release woke to node {L['n']:#x}, with no successor",
+                            '@GRANT'))]
     if design == 'grant_tail':
         B += [('GRANT', ('load', lambda L: TAIL, 't', '@GRANT2')),
               ('GRANT2', ('or', lambda L: node(L['t'] - 1), lambda L: GRANTED, '_',
                           '@ROUND'))]
     else:
-        B += [('GRANT', ('or', lambda L: node((L['n'] & NEXT) - 1), lambda L: GRANTED, '_',
-                         '@ROUND'))]
+        B += [('GRANT', ('or', lambda L: node((L['n'] & SUCCESSOR) - 1), lambda L: GRANTED,
+                         '_', '@ROUND'))]
     return B
 
 
@@ -142,6 +163,8 @@ def pe(design, me, rounds, tester=False):
             B += [('WAIT', ('await', lambda M, L, me=me: M[node(me)] & GRANTED, '@CLEAR'))]
         if design == 'store_clear':
             B += [('CLEAR', ('store', lambda L, me=me: node(me), lambda L: 0, True, '@CS'))]
+        elif design == 'no_andn':
+            B += [('CLEAR', ('br', lambda L: True, '@CS', '@CS'))]
         else:
             B += [('CLEAR', ('andn', lambda L, me=me: node(me), lambda L: GRANTED, '_',
                              '@CS'))]
@@ -178,6 +201,7 @@ CASES = [
     ('no_link', 2, 1, 0, False),
     ('grant_tail', 3, 1, 0, False),
     ('enter_early', 2, 1, 0, False),
+    ('no_andn', 3, 1, 0, False),
 ]
 
 if __name__ == '__main__':

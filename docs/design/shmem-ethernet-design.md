@@ -2231,7 +2231,7 @@ review; the adversarial review of the slice corrected several claims below.
   whose statics differ in size, which is PEs running different programs.
 - **`OSOE_REGION_STATICS`** at the boundary (§4.10): `symmetric.c` finds the
   region an address is in, heap first, and every API path passes `(region,
-  offset)` - RMA, AMOs, signals, waits, the collectives' intranode phase (a
+  offset)` - RMA, AMOs, signals, waits, locks, the collectives' intranode phase (a
   member's source read through its statics mapping, as through its heap) - so
   the wire and both transport paths carry statics exactly as they carry the
   heap. A PE's own statics are addressed at the program's own addresses, never
@@ -3780,20 +3780,35 @@ four-byte rmw; every wait is on the PE's own word, through the region wait
 per acquire is O(1) - a swap, a link and, later, a grant. **Model-checked**
 (`tools/modelcheck/lock_model.py`): mutual exclusion, the order of arrival, and
 no state from which a PE cannot finish, on two to four PEs with a tester among
-them; seven breakages - the node zeroed after the swap, a release that does not
+them; eight breakages - the node zeroed after the swap, a release that does not
 wait for a link, `GRANTED` cleared by a store, a test that swaps, a waiter that
-never links, a grant to the tail, a waiter that enters without its grant - each
-fail one of the three.
+never links, a grant to the tail, a waiter that enters without its grant, a
+waiter that enters leaving `GRANTED` set - each fail one of the three. The
+model's release waits as the code's does, for the whole node word to be
+nonzero, and grants from the value that ended the wait; that is the link only
+because an entering waiter clears `GRANTED`, which the eighth breakage shows the
+model checking rather than assuming. *(The first model reloaded the successor
+after its wait, which the code does not; the adversarial review of the lock
+found the difference.)*
 
-**The home is spread by address**: the lock's offset in `long`s, modulo the
-PEs. An array of locks - `uts`'s, one per PE - so puts its tails on as many PEs
-as it has locks, where a fixed home would make PE 0 the whole job's lock
-server.
+**The home is spread by a hash of the address**: the lock's offset in `long`s,
+mixed (splitmix64's finalizer), modulo the PEs. Locks at nearby offsets - an
+array of them, `uts`'s one per PE, or several allocated one after another,
+which the allocator aligns to 16 bytes - put their tails on PEs spread over the
+job and so over its nodes. A plain modulo put them on the first PEs, which a
+block map places all on node 0, whose lead would then apply every swap in the
+job; and, at 16-byte alignment, on even PEs only.
 
 **Misuse is named.** Each PE keeps the offsets of the locks it holds, so a
 clear of a lock it does not hold, and a set or test of one it holds - undefined
 in the spec, which calls the lock non-reentrant - end the job by name instead
-of hanging in a queue nobody will grant.
+of hanging in a queue nobody will grant. Only the home's tail need be zero when
+a lock is first used, since each PE zeroes its own node before anyone can find
+it; a tail holding what no lock routine writes - no PE of the job, or the
+caller itself - is the mark of a lock not zeroed on its home, and is fatal by
+name rather than a link sent to no waiter. A last `shmem_finalize` begun with
+locks held says so on stderr: a PE waiting for one never reaches the barrier
+that finalize waits in.
 
 Costs: an uncontended acquire is two rmw (the zeroing of the node is local) and
 a release one; a contended acquire adds a link and a sleep, and a release a
@@ -3802,6 +3817,18 @@ grant. With *P* PEs contending, the queue is *O(P)* long but each PE's work is
 per back-off. Not built: lock operations on contexts other than the default
 (the spec has none), and a lock whose home follows its holders - the tail's PE
 is fixed per lock, so one very hot lock loads one PE.
+
+**What an RDMA backend would pay.** The link and the grant land in memory the
+application allocated, in words its owner waits on; §4.10's hint does not reach
+them, since `osoe_transport_set_range` belongs to the allocator. A backend whose
+remote atomics do not wake the target (§4.10) would see a contended handoff at
+the waiter's next sweep - `OSOE_SWEEP_NS`, 100 ms - unless it notifies by some
+means of its own. The interface change that would let the lock say which rmw
+wakes someone is a flag on the rmw, in the spirit of `OSOE_TRANSPORT_MORE`; it
+waits for the backend that needs it. And standard verbs carry only 64-bit
+fetch-and-add and compare-and-swap: the 4-byte swap and OR become masked
+atomics, or compare-and-swap loops on the 8-byte `long`, where on the home PE
+the tail shares the word with the home's own node.
 
 ## 5. Collectives
 

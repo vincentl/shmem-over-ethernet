@@ -375,6 +375,8 @@ OSOE_API void pshmem_finalize(void)
         pthread_mutex_unlock(&lifecycle);
         return;
     }
+    if (refcount == 1)
+        osoe_lock_warn_held();
     /* Every finalize is a barrier (spec §9.1.4, invariant 26): a non-last one
      * only that, the last one before tearing down. On the finalize team's own
      * counters, so it can never be matched by an application's barrier. */

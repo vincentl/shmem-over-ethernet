@@ -1175,13 +1175,15 @@ set_tests_properties(shmem.statics.misuse PROPERTIES LABELS "tier2" TIMEOUT 60
 # and a clear of a lock not held, and a set of one held, each ending the job by
 # name.
 osoe_tier2_test(lock)
+osoe_statics_program(shmem_test_lock)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(lock 0,0,1,1)
   osoe_tier2_map_test(lock 0,1,2,0,1,0)
 endif()
 foreach(case_expect
     "clear|shmem_clear_lock: this PE does not hold the lock it clears"
-    "twice|shmem_set_lock: this PE holds the lock already")
+    "twice|shmem_set_lock: this PE holds the lock already"
+    "garbage|shmem_set_lock: the lock's queue names PE [0-9]+, which is not waiting for it")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 case)
   list(GET parts 1 expect)
