@@ -21,9 +21,9 @@
 #include <shmem.h>
 
 #include "check.h"
+#include "region-wait.h"
 #include "state.h"
 #include "transport.h"
-#include "wait.h"
 
 int main(void)
 {
@@ -37,8 +37,8 @@ int main(void)
     osoe_transport_put(context, right, OSOE_REGION_INTERNAL, word, &mine, sizeof mine, 0);
     osoe_transport_rmw(context, right, OSOE_REGION_INTERNAL, count, OSOE_RMW_ADD, 8, 1, 0,
                        OSOE_TRANSPORT_FENCED);
-    osoe_wait_internal("test-internal-region", count, 8, SHMEM_CMP_EQ, 1,
-                       OSOE_BLOCKED_DETAIL_EPOCH, 1);
+    osoe_region_wait("test-internal-region", OSOE_REGION_INTERNAL, count, 8, false,
+                     OSOE_COMPARISON_EQUAL, 1, OSOE_BLOCKED_DETAIL_EPOCH, 1);
     /* Read back two ways: the transport's load, and an address computed here
      * from the mapping, so that a transport resolving the region to the wrong
      * place for its writes and its reads alike is still caught. */

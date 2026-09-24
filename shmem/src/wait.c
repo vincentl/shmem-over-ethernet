@@ -41,6 +41,7 @@
 #include "export.h"
 #include "fatal.h"
 #include "metrics.h"
+#include "region-wait.h"
 #include "symmetric.h"
 #include "transport.h"
 #include "wait.h"
@@ -52,134 +53,45 @@
 
 /* ---- comparison ------------------------------------------------------- */
 
-/* A width-byte value, as the 64-bit number its type says it is. */
+/* A width-byte value, as the 64-bit number its type says it is (region-wait.h). */
 static uint64_t extend(uint64_t v, unsigned width, bool sgn)
 {
-    switch (width) {
-    case 8: return v;
-    case 4: return sgn ? (uint64_t)(int64_t)(int32_t)(uint32_t)v : (uint64_t)(uint32_t)v;
-    default: return sgn ? (uint64_t)(int64_t)(int16_t)(uint16_t)v : (uint64_t)(uint16_t)v;
-    }
+    return osoe_region_wait_extend(v, width, sgn);
 }
 
-static bool satisfied(int cmp, uint64_t have, uint64_t want, bool sgn, const char *routine)
+/* The spec's comparison constant as the wait's own: the wait below the API has
+ * its own, so that nothing below the API needs shmem.h to wait. */
+static enum osoe_comparison comparison_of(int cmp, const char *routine)
 {
-    if (sgn) {
-        int64_t h = (int64_t)have, w = (int64_t)want;
-        switch (cmp) {
-        case SHMEM_CMP_EQ: return h == w;
-        case SHMEM_CMP_NE: return h != w;
-        case SHMEM_CMP_GT: return h > w;
-        case SHMEM_CMP_GE: return h >= w;
-        case SHMEM_CMP_LT: return h < w;
-        case SHMEM_CMP_LE: return h <= w;
-        }
-    } else {
-        switch (cmp) {
-        case SHMEM_CMP_EQ: return have == want;
-        case SHMEM_CMP_NE: return have != want;
-        case SHMEM_CMP_GT: return have > want;
-        case SHMEM_CMP_GE: return have >= want;
-        case SHMEM_CMP_LT: return have < want;
-        case SHMEM_CMP_LE: return have <= want;
-        }
+    switch (cmp) {
+    case SHMEM_CMP_EQ: return OSOE_COMPARISON_EQUAL;
+    case SHMEM_CMP_NE: return OSOE_COMPARISON_NOT_EQUAL;
+    case SHMEM_CMP_GT: return OSOE_COMPARISON_GREATER;
+    case SHMEM_CMP_GE: return OSOE_COMPARISON_GREATER_OR_EQUAL;
+    case SHMEM_CMP_LT: return OSOE_COMPARISON_LESS;
+    case SHMEM_CMP_LE: return OSOE_COMPARISON_LESS_OR_EQUAL;
     }
     osoe_fatal("%s: comparison %d is not one of SHMEM_CMP_EQ, NE, GT, GE, LT, LE",
                routine, cmp);
 }
 
-/*
- * Which counter a late wake belongs in.
- *
- * Spec 1.5 change #17 requires a wait variable to be updated with an AMO, and
- * every AMO type is four or eight bytes wide. So at those widths a sweep that
- * expires on an already-true predicate means a wake was lost by the mechanism
- * that must not lose one, and the counter is an invariant (§8.2).
- *
- * At two bytes there is no AMO type - the deprecated short waits of Table 12
- * predate the rule - so the only remote update is a put, for which notification
- * is best effort by design (§4.10) and a sweep is how the wait is meant to
- * finish. Counting that as an invariant violation would make the oracle
- * unusable for the one case it is known to be wrong about.
- */
-static enum osoe_counter late_wake_counter(unsigned width)
+static bool satisfied(int cmp, uint64_t have, uint64_t want, bool sgn, const char *routine)
 {
-    return width >= 4 ? OSOE_C_INVARIANT_MISSED_WAKE : OSOE_C_TRANSPORT_WATCH_LATE_WAKE;
+    return osoe_region_wait_satisfied(comparison_of(cmp, routine), have, want, sgn);
 }
 
 /* ---- the scalar forms -------------------------------------------------- */
 
-/*
- * The scalar wait on a word of this PE's own region, by offset: the public wait
- * on the heap, and the collectives' on OSOE_REGION_INTERNAL, whose words no
- * application address can name (internal-region.h). A wait that sleeps records
- * `kind` and `detail` in the blocked record.
- */
-static uint64_t wait_at(const char *routine, enum osoe_region region, uint64_t offset,
-                        unsigned width, bool sgn, int cmp, uint64_t want,
-                        enum osoe_blocked_detail kind, uint64_t detail)
-{
-    want = extend(want, width, sgn);
-    struct osoe_transport_watch *w = osoe_transport_watch(region, offset, width);
-    uint64_t have, slept_since = 0;
-    bool slept = false, woken = false, timed_out = false;
-
-    for (;;) {
-        uint32_t seq = osoe_transport_watch_seq(w);
-        have = osoe_transport_load(region, offset, width);
-        if (satisfied(cmp, extend(have, width, sgn), want, sgn, routine)) {
-            /* The condition was already true when the sweep expired, so the
-             * update landed while this PE slept and no wake arrived (§4.9).
-             * Which counter that is depends on the width: see above. */
-            if (timed_out)
-                osoe_count(late_wake_counter(width), 1);
-            break;
-        }
-        if (woken)
-            osoe_count(OSOE_C_TRANSPORT_WATCH_SPURIOUS, 1);
-
-        if (!slept) {
-            /* About to block. Everything on this path is paid only by a wait
-             * that really sleeps (§3.14 cost rules). */
-            slept = true;
-            slept_since = osoe_now_ns();
-            osoe_blocked_enter(routine, kind, detail);
-            osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
-        }
-
-        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-        woken = osoe_transport_watch_wait(w, seq, &sweep);
-        timed_out = !woken;
-        if (woken) {
-            osoe_count(OSOE_C_TRANSPORT_WATCH_WAKES, 1);
-        } else {
-            osoe_count(OSOE_C_TRANSPORT_WATCH_SWEEPS, 1);
-            osoe_sweep_expired(routine);        /* only here, never on a wake */
-        }
-    }
-
-    osoe_transport_unwatch(w);
-    if (slept) {
-        osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED_NS, osoe_now_ns() - slept_since);
-        osoe_blocked_leave();
-    }
-    return have;
-}
-
+/* The scalar wait is region-wait.h's on the heap. The late-wake accounting,
+ * the blocked record and the sweep are all there. */
 uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, bool sgn,
                          int cmp, uint64_t want)
 {
     osoe_count(OSOE_C_SHMEM_WAIT_UNTIL_CALLS, 1);
     uint64_t offset = osoe_symmetric_word_offset(routine, ivar, width);
-    return wait_at(routine, OSOE_REGION_HEAP, offset, width, sgn, cmp, want,
-                   OSOE_BLOCKED_DETAIL_OFFSET, offset);
-}
-
-uint64_t osoe_wait_internal(const char *routine, uint64_t offset, unsigned width, int cmp,
-                            uint64_t want, enum osoe_blocked_detail kind, uint64_t detail)
-{
-    return wait_at(routine, OSOE_REGION_INTERNAL, offset, width, false, cmp, want, kind,
-                   detail);
+    return osoe_region_wait(routine, OSOE_REGION_HEAP, offset, width, sgn,
+                            comparison_of(cmp, routine), want, OSOE_BLOCKED_DETAIL_OFFSET,
+                            offset);
 }
 
 int osoe_test(const char *routine, const void *ivar, unsigned width, bool sgn, int cmp,
@@ -379,7 +291,7 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
              * invariant - written through the same rule so there is one place
              * that decides. */
             if (timed_out)
-                osoe_count(late_wake_counter(w->width), 1);
+                osoe_count(osoe_region_wait_late_wake_counter(w->width), 1);
             break;
         }
         if (woken)

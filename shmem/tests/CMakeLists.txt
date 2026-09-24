@@ -1077,6 +1077,22 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   endforeach()
 endif()
 
+# PEs that call different collectives end the job by name, from the piece
+# headers of the generic internode phase (internode-generic.c): node 1's PE
+# broadcasts where the others reduce, and node 0's lead finds node 1's slot
+# holding no partial result. Three nodes, so that node 0 also has a child that
+# did call the reduction.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_executable(shmem_test_collective-divergence test-collective-divergence.c)
+  target_link_libraries(shmem_test_collective-divergence PRIVATE osoe)
+  osoe_warnings(shmem_test_collective-divergence)
+  add_test(NAME shmem.collective-divergence
+    COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+            $<TARGET_FILE:shmem_test_collective-divergence>)
+  set_tests_properties(shmem.collective-divergence PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "PEs called different collectives")
+endif()
+
 # OSOE_REGION_INTERNAL itself (test-internal-region.c): between node-mates, a
 # path no collective takes, across nodes, and both. White-box: it calls the
 # transport, so the library's own sources are compiled into it.

@@ -22,8 +22,10 @@
  * **Addressing is by team and epoch, never by node or PE.** The SHMEM layer
  * owns teams (§5.2); it tells the backend once, at team creation, which nodes
  * take part, and from then on names the team only. What a backend does with
- * the node set - which node is the root, who forwards to whom - is its own
- * business and does not cross this header.
+ * the node set - which node its trees are rooted at, who forwards to whom - is
+ * its own business and does not cross this header; the one exception is a
+ * broadcast's root, which the data half names by its node's position in the
+ * registered set, since the data starts there.
  *
  * **The release is an upcall.** The backend calls osoe_internode_released when
  * the group has been released, on its own thread; the SHMEM layer advances its
@@ -37,29 +39,65 @@
  * member. osoe_internode_released is called by the backend on the node's
  * progress thread (§3.12), in whichever local process runs it, exactly once per
  * (team, epoch) on every participating node. osoe_internode_team is called
- * during initialization, before the progress thread starts (below).
+ * during initialization, before the progress thread starts (below). The data
+ * half, osoe_internode_reduce and osoe_internode_broadcast, is called by the
+ * team's local lead on its own application thread, and blocks.
  *
  * Errors, and waiting. As transport.h: there is no error return, and a failure
- * ends the job (§3.15). Nothing here blocks, so nothing here sweeps; the
- * waiting is the SHMEM layer's own epoch wait (base/epoch.h), which sweeps.
+ * ends the job (§3.15). The barrier's half never blocks, so it never sweeps;
+ * its waiting is the SHMEM layer's own epoch wait (base/epoch.h), which does.
+ * The data half blocks, so it sweeps on §4.10's schedule like every other
+ * blocking call, and names the caller's routine in what it records.
  *
- * **Why this shape survives data-carrying collectives.** §3.8's known future
- * break is a tree reduce, which forwards a partial result of count x
- * sizeof(type) bytes at every level. That is the arrival growing a payload,
- * and the release growing one on the way back down (a broadcast of the
- * result) - so `arrive` will take (team, epoch, op, type, count, source) and
- * `released` will be told where the result is. Nothing in the present
- * signature forecloses it: the arrival is already per (team, epoch) and made
- * once per node after the intranode phase, which is exactly where §5.5 puts the
- * lead's local combine; and the release is already an upcall that happens once
- * per node, which is where a result is copied out to local members. What would
- * foreclose it is a node-addressed call, or a release expressed as an rmw on a
- * counter, and this header has neither. **The data collectives do not cross
- * here yet**: reductions and broadcast (phase 1 step 5) run their internode
- * phase above this header, in collectives.c, over put, fenced rmw and a wait on
- * OSOE_REGION_INTERNAL - §5.8's generic route, correct over any backend and
- * replaceable by none. §5.8's deferred collective-transport header, which puts
- * that phase behind this one, is the step's next slice.
+ * **The data half is a call, not an arrival** (phase 1 step 5 slice 2). This
+ * header once forecast that a reduction would cross as the barrier's arrival
+ * grown a payload, with the result coming back in the release upcall. That is
+ * the barrier's shape, and it is wrong for data: §5.8 rule 2 keeps a
+ * collective's O(n) combining off the progress thread and on the lead's
+ * application thread, which is blocked in the collective regardless, so an
+ * upcall could only hand the data back to the thread already waiting for it.
+ * So the lead hands its node's partial result over once, after the intranode
+ * phase, and gets the result back in the same buffer. The barrier's half stays
+ * asynchronous, because nothing in it is O(n).
+ *
+ * **The operation and the element are values, not code**: a reduction
+ * operation over elements described by kind and width, the vocabulary an
+ * offload engine can be told (libfabric's and UCC's have the same shape) where
+ * a combine function could only be called. What every implementation owes the
+ * caller, whatever does the work:
+ *   - every participating node ends with the same bits, each element's result
+ *     computed once and copied, never recomputed along different paths (§5.8
+ *     rule 3), because floating sum and product are not associative;
+ *   - integer sum and product wrap modulo 2^(8 x width), as two's complement;
+ *   - a floating element as wide as long double is this platform's long
+ *     double, whatever its format - which every node of the job must share:
+ *     nothing checks it, and x86-64's extended format against aarch64's
+ *     quadruple one would reduce to garbage;
+ *   - the buffer is the backend's only between the call and its return: nothing
+ *     reads it by reference afterwards (§5.5's hazard), because the lead
+ *     releases its members, and they may reuse their dest, as soon as it returns.
+ *
+ * **Every backend has the generic implementation to call**
+ * (internode-generic.h): §5.3's tree over put, fenced rmw and a wait on
+ * OSOE_REGION_INTERNAL, which is correct on any transport. A backend may offload
+ * some calls and hand the rest to it, deciding per call and inside the backend,
+ * so nothing above this header asks what a backend supports (§4.10). That is
+ * the difference from the negotiated collective offload the RoCE review rejects
+ * (docs/reviews/roce-transport.md §8.4): this is a mandatory operation with a
+ * generic fallback. AM hands every call to it. **The choice must be the same
+ * on every node**: a function of the call's arguments - team, count or bytes,
+ * operation, element - and of configuration every node agreed at the
+ * rendezvous, as the fan-out is (§6.2), and never of anything local, such as
+ * an engine's free resources. A node that offloads while another falls back
+ * waits for it in a different place, and both wait forever.
+ *
+ * **The buffer is the lead's dest**: symmetric, in the heap, at the same offset
+ * on every node that receives into it, so a backend may address a peer's
+ * buffer by its own offset - an RDMA backend writing the result straight into
+ * each child's buffer, where the generic implementation stages it through its
+ * slots. It stays the lead's own memory: nothing but this call writes it
+ * before the lead's release (§5.5, invariant 16), and nothing reads it by
+ * reference afterwards (above).
  *
  * What an RDMA backend does with each call (§4.10's discipline: say it, so the
  * interface is checked against more than the one backend it has):
@@ -76,10 +114,19 @@
  *   - Hardware offload (an in-network barrier, where a fabric has one - RoCE
  *     switches do not): arrive posts to the offload engine, and its completion
  *     calls released. Nothing above this header changes.
+ *   - osoe_internode_reduce: the generic implementation, whose puts and fenced
+ *     adds become RDMA writes and atomics with no change to it; or, for the
+ *     (operation, element) pairs a NIC's collective engine or an in-network
+ *     reduction supports, the reduction posted there and waited for, with the
+ *     rest - long double, complex, a vector past the engine's limit - handed to
+ *     the generic implementation.
+ *   - osoe_internode_broadcast: likewise, where a multicast of the root's
+ *     buffer is the offload the RoCE review names (§6).
  */
 #ifndef OSOE_INTERNODE_H
 #define OSOE_INTERNODE_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 /* ---- Lifecycle ------------------------------------------------------- */
@@ -130,7 +177,10 @@ uint32_t osoe_internode_fanout_default(void);
  * same handoff an arrival takes (§5.3). No split team exists yet.
  *
  * The array is only read during the call. A backend must not keep it: the node
- * set is O(N), and what a tree needs from it is O(fan-out) (§5.3).
+ * set is O(N), and what a tree with a fixed root needs from it is O(fan-out)
+ * (§5.3). A broadcast re-rooted at every call needs node positions the set
+ * gives: the world team's are the node numbers, and a split team's will need
+ * the set, or a way to search it, kept (§7.3).
  */
 void osoe_internode_team(uint32_t team, const uint32_t *nodes, uint32_t count);
 
@@ -143,8 +193,11 @@ void osoe_internode_team(uint32_t team, const uint32_t *nodes, uint32_t count);
  * registered. Does not block.
  *
  * Epochs are the team's §5.4 epoch count, k + 1 for the k-th collective on the
- * team, and consecutive. Bounded skew holds across this call exactly as within
- * a node: no node arrives for epoch k + 1 before it has been released from k.
+ * team: increasing, but not consecutive, since the data half below numbers its
+ * collectives from the same sequence - a barrier, a reduction and a barrier
+ * arrive here as 3 and then 5. Bounded skew holds across this call exactly as
+ * within a node: no node arrives for a later epoch before it has been released
+ * from this one.
  */
 void osoe_internode_arrive(uint32_t team, uint32_t epoch);
 
@@ -158,5 +211,65 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch);
  * team's release counter and wakes the node's waiters (barrier.c).
  */
 void osoe_internode_released(uint32_t team, uint32_t epoch);
+
+/* ---- The data half: reductions and broadcast --------------------------- */
+
+/* The spec's reduction operations (Table 10), below the boundary's spelling. */
+enum osoe_reduction_operation {
+    OSOE_REDUCTION_AND,
+    OSOE_REDUCTION_OR,
+    OSOE_REDUCTION_XOR,
+    OSOE_REDUCTION_MAXIMUM,
+    OSOE_REDUCTION_MINIMUM,
+    OSOE_REDUCTION_SUM,
+    OSOE_REDUCTION_PRODUCT,
+};
+
+enum osoe_element_kind {
+    OSOE_ELEMENT_SIGNED_INTEGER,
+    OSOE_ELEMENT_UNSIGNED_INTEGER,
+    OSOE_ELEMENT_FLOATING,
+    OSOE_ELEMENT_COMPLEX,
+};
+
+/*
+ * What a reduction's elements are: a kind and a width in bytes - an integer of
+ * 1, 2, 4 or 8; a float, double or long double by its size; a float or double
+ * complex by its size. Every type of the spec's Table 10 is one of these, and
+ * types that are the same element - int and int32_t, long and ptrdiff_t on
+ * LP64 - are reduced alike, as they must be.
+ */
+struct osoe_element {
+    enum osoe_element_kind kind;
+    uint32_t width;
+};
+
+/*
+ * The internode phase of a reduction: on entry `buffer` holds this node's
+ * `count` elements, its members already combined; on return it holds the
+ * operation applied across every participating node's, elementwise, the same
+ * bits on every node (the contract above).
+ *
+ * Called by the team's local lead, once per node per collective, after its
+ * intranode phase and before it releases its members; every participating
+ * node's lead calls it with the same team, epoch, count, operation and element.
+ * `epoch` is the team's §5.4 epoch of this collective, from the sequence the
+ * barrier's arrivals use, so the two halves never disagree on which collective
+ * is which. Blocks until the result is in `buffer`, sweeping as it waits;
+ * `routine` names the caller in what the wait records and in a fatal.
+ */
+void osoe_internode_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t count,
+                           enum osoe_reduction_operation operation,
+                           struct osoe_element element, const char *routine);
+
+/*
+ * The internode phase of a broadcast: on return every participating node's
+ * `buffer` holds the `bytes` the root's node held on entry. `root_index` is the
+ * root's node's position in the node set the team was registered with
+ * (osoe_internode_team) - addressing stays by team. On other nodes `buffer`'s
+ * contents on entry are not read. Called as osoe_internode_reduce is.
+ */
+void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index, void *buffer,
+                              size_t bytes, const char *routine);
 
 #endif /* OSOE_INTERNODE_H */

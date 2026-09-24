@@ -2,20 +2,13 @@
  * The team-based reductions (spec §9.10.9): shmem_TYPENAME_OP_reduce for every
  * operator and type of Table 10, over the accumulator (collectives.c).
  *
- * Each is a call to osoe_reduce with its element width and one combine
- * function, generated here per operator and type from shmem.h's lists - the
- * same lists the declarations and pshmem.h come from, so a type appears once.
+ * Each is a call to osoe_reduce naming its operation and its element - the
+ * kind and width of its C type (internode.h) - generated here per operator and
+ * type from shmem.h's lists, the same lists the declarations and pshmem.h come
+ * from, so a type appears once. The arithmetic is combine.c's, per element, and
+ * the internode phase's is the backend's (internode.h).
  *
- * **Integer sums and products are computed modulo 2^N** through uintmax_t and
- * converted back: a signed overflow is undefined behaviour in C, where the
- * unsigned arithmetic and the conversion are defined (the conversion
- * implementation-defined, and modular on every target osoe builds for), so a
- * program that overflows a reduction gets the wrapped value on every PE rather
- * than a sanitizer's report or an optimiser's surprise. Floating and complex
- * arithmetic is the type's own. Maximum and minimum are the plain comparisons.
- *
- * Complexity: O(n) per combine, one combine per local member at the lead and
- * one per child at each node of the tree (collectives.c).
+ * Complexity: O(1) here; the reduction's own in collectives.c.
  */
 #include <stddef.h>
 #include <stdint.h>
@@ -25,62 +18,49 @@
 
 #include "collectives.h"
 #include "export.h"
+#include "internode.h"
 
-#define OSOE_COMBINE(T, NAME, OPERATOR, EXPRESSION)                                   \
-    static void combine_##NAME##_##OPERATOR(void *accumulator, const void *in, size_t n)      \
-    {                                                                                 \
-        T *a = accumulator;                                                                   \
-        const T *b = in;                                                              \
-        for (size_t i = 0; i < n; i++) {                                              \
-            T x = a[i], y = b[i];                                                     \
-            a[i] = (EXPRESSION);                                                      \
-        }                                                                             \
-    }
-
-#define OSOE_COMBINE_BITWISE(T, NAME)                                                 \
-    OSOE_COMBINE(T, NAME, and, (T)(x & y))                                            \
-    OSOE_COMBINE(T, NAME, or, (T)(x | y))                                             \
-    OSOE_COMBINE(T, NAME, xor, (T)(x ^ y))
-#define OSOE_COMBINE_ORDERED(T, NAME)                                                 \
-    OSOE_COMBINE(T, NAME, max, x > y ? x : y)                                         \
-    OSOE_COMBINE(T, NAME, min, x < y ? x : y)
-#define OSOE_COMBINE_INTEGER_ARITHMETIC(T, NAME)                                      \
-    OSOE_COMBINE(T, NAME, sum, (T)((uintmax_t)x + (uintmax_t)y))                      \
-    OSOE_COMBINE(T, NAME, prod, (T)((uintmax_t)x * (uintmax_t)y))
-#define OSOE_COMBINE_ARITHMETIC(T, NAME)                                              \
-    OSOE_COMBINE(T, NAME, sum, x + y)                                                 \
-    OSOE_COMBINE(T, NAME, prod, x * y)
-
-OSOE_REDUCE_BITWISE_TYPES(OSOE_COMBINE_BITWISE)
-OSOE_REDUCE_INTEGER_TYPES(OSOE_COMBINE_ORDERED)
-OSOE_REDUCE_FLOATING_TYPES(OSOE_COMBINE_ORDERED)
-OSOE_REDUCE_INTEGER_TYPES(OSOE_COMBINE_INTEGER_ARITHMETIC)
-OSOE_REDUCE_FLOATING_TYPES(OSOE_COMBINE_ARITHMETIC)
-OSOE_REDUCE_COMPLEX_TYPES(OSOE_COMBINE_ARITHMETIC)
+/* The element of a C type in each of Table 10's families. An integer's kind is
+ * its signedness, so char is whichever char this platform has. */
+#define OSOE_INTEGER_ELEMENT(T)                                                       \
+    ((struct osoe_element){ (T)0 < (T)-1 ? OSOE_ELEMENT_UNSIGNED_INTEGER               \
+                                         : OSOE_ELEMENT_SIGNED_INTEGER, sizeof(T) })
+#define OSOE_FLOATING_ELEMENT(T) ((struct osoe_element){ OSOE_ELEMENT_FLOATING, sizeof(T) })
+#define OSOE_COMPLEX_ELEMENT(T) ((struct osoe_element){ OSOE_ELEMENT_COMPLEX, sizeof(T) })
 
 /* The routines, the context-free team form (§9.10.9 has no context form). */
-#define OSOE_REDUCE_DEFINE(T, NAME, OPERATOR)                                         \
+#define OSOE_REDUCE_DEFINE(T, NAME, OPERATOR, OPERATION, ELEMENT)                     \
     OSOE_API int OSOE_FN(pshmem_, NAME, _##OPERATOR##_reduce)(shmem_team_t team,      \
                                          T *dest, const T *source, size_t nreduce)    \
     {                                                                                 \
         return osoe_reduce("shmem_" #NAME "_" #OPERATOR "_reduce", team, dest,        \
-                           source, nreduce, sizeof(T), combine_##NAME##_##OPERATOR);  \
+                           source, nreduce, OPERATION, ELEMENT);                      \
     }
 
 #define OSOE_REDUCE_DEFINE_BITWISE(T, NAME)                                           \
-    OSOE_REDUCE_DEFINE(T, NAME, and) OSOE_REDUCE_DEFINE(T, NAME, or)                  \
-    OSOE_REDUCE_DEFINE(T, NAME, xor)
-#define OSOE_REDUCE_DEFINE_ORDERED(T, NAME)                                           \
-    OSOE_REDUCE_DEFINE(T, NAME, max) OSOE_REDUCE_DEFINE(T, NAME, min)
-#define OSOE_REDUCE_DEFINE_ARITHMETIC(T, NAME)                                        \
-    OSOE_REDUCE_DEFINE(T, NAME, sum) OSOE_REDUCE_DEFINE(T, NAME, prod)
+    OSOE_REDUCE_DEFINE(T, NAME, and, OSOE_REDUCTION_AND, OSOE_INTEGER_ELEMENT(T))     \
+    OSOE_REDUCE_DEFINE(T, NAME, or, OSOE_REDUCTION_OR, OSOE_INTEGER_ELEMENT(T))       \
+    OSOE_REDUCE_DEFINE(T, NAME, xor, OSOE_REDUCTION_XOR, OSOE_INTEGER_ELEMENT(T))
+#define OSOE_REDUCE_DEFINE_ORDERED(T, NAME, ELEMENT)                                  \
+    OSOE_REDUCE_DEFINE(T, NAME, max, OSOE_REDUCTION_MAXIMUM, ELEMENT(T))              \
+    OSOE_REDUCE_DEFINE(T, NAME, min, OSOE_REDUCTION_MINIMUM, ELEMENT(T))
+#define OSOE_REDUCE_DEFINE_ARITHMETIC(T, NAME, ELEMENT)                               \
+    OSOE_REDUCE_DEFINE(T, NAME, sum, OSOE_REDUCTION_SUM, ELEMENT(T))                  \
+    OSOE_REDUCE_DEFINE(T, NAME, prod, OSOE_REDUCTION_PRODUCT, ELEMENT(T))
+
+#define OSOE_REDUCE_DEFINE_INTEGER(T, NAME)                                           \
+    OSOE_REDUCE_DEFINE_ORDERED(T, NAME, OSOE_INTEGER_ELEMENT)                         \
+    OSOE_REDUCE_DEFINE_ARITHMETIC(T, NAME, OSOE_INTEGER_ELEMENT)
+#define OSOE_REDUCE_DEFINE_FLOATING(T, NAME)                                          \
+    OSOE_REDUCE_DEFINE_ORDERED(T, NAME, OSOE_FLOATING_ELEMENT)                        \
+    OSOE_REDUCE_DEFINE_ARITHMETIC(T, NAME, OSOE_FLOATING_ELEMENT)
+#define OSOE_REDUCE_DEFINE_COMPLEX(T, NAME)                                           \
+    OSOE_REDUCE_DEFINE_ARITHMETIC(T, NAME, OSOE_COMPLEX_ELEMENT)
 
 OSOE_REDUCE_BITWISE_TYPES(OSOE_REDUCE_DEFINE_BITWISE)
-OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DEFINE_ORDERED)
-OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DEFINE_ORDERED)
-OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DEFINE_ARITHMETIC)
-OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DEFINE_ARITHMETIC)
-OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DEFINE_ARITHMETIC)
+OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_DEFINE_INTEGER)
+OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_DEFINE_FLOATING)
+OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DEFINE_COMPLEX)
 
 /* The weak `shmem_` aliases (export.h), over the same lists. */
 #define OSOE_REDUCE_ALIAS_BITWISE(T, NAME)                                            \

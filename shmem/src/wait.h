@@ -1,6 +1,8 @@
 /*
- * The point-to-point wait loop (§4.9), shared by shmem_wait_until, shmem_test,
- * their multiple-element forms and the signal routines (spec §9.11, §9.8).
+ * The point-to-point waits and tests (§4.9), shared by shmem_wait_until,
+ * shmem_test, their multiple-element forms and the signal routines (spec
+ * §9.11, §9.8): the spec's side of them, over the region wait below the API
+ * (region-wait.h), which holds the loop itself.
  *
  * `routine` names the caller in diagnostics. `width` is the variable's width in
  * bytes - 2, 4 or 8 - and values are carried as uint64_t, which is what the
@@ -19,20 +21,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "node.h"
-
 /* Block until the variable satisfies the comparison, and return the value that
  * did. The value matters to shmem_signal_wait_until (spec §9.11.15), which
  * returns it; every other caller discards it. */
 uint64_t osoe_wait_until(const char *routine, const void *ivar, unsigned width, bool sgn,
                          int cmp, uint64_t want);
-
-/* The same wait on a word of this PE's OSOE_REGION_INTERNAL (internal-region.h),
- * unsigned, by offset: the collectives' own words. A wait that sleeps records
- * `kind` and `detail` in the blocked record - what the routine waits for, since
- * an internal offset would mean nothing to a reader. */
-uint64_t osoe_wait_internal(const char *routine, uint64_t offset, unsigned width, int cmp,
-                            uint64_t want, enum osoe_blocked_detail kind, uint64_t detail);
 
 /* One coherent load and a compare; never blocks and never touches the watch
  * slot. */

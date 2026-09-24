@@ -12,6 +12,9 @@ if(OSOE_BACKEND STREQUAL "am")
     src/connection.c
     src/connection-area.c
     src/internode-am.c
+    # The generic internode phase, which AM hands the data collectives to; any
+    # backend may compile it (it is on the boundary, cmake/CheckBoundary.cmake).
+    src/internode-generic.c
     src/progress.c
     src/progress-host.c
     src/reply.c
@@ -48,6 +51,7 @@ add_library(osoe
   src/rma.c
   src/rma-typed.c
   src/collectives.c
+  src/combine.c
   src/reductions.c
   src/broadcast.c
   src/session.c
@@ -56,6 +60,7 @@ add_library(osoe
   src/symmetric.c
   src/team.c
   src/transport-local.c
+  src/region-wait.c
   src/wait.c
   src/watch.c
   src/sweep.c

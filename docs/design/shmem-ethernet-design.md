@@ -2999,7 +2999,10 @@ PE-addressed. Beside them `shmem/src/internode.h` carries the internode phase of
 a collective (§5.3): a team's node set given once at team creation, an arrival
 per `(team, epoch)` going down, and a release upcall per `(team, epoch)` coming
 back on the node's progress thread (§10 records why this reversed the step-2
-decision). Two more things cross that the original contract left out, and both
+decision) - and, since phase 1 step 5's second slice, the data collectives'
+internode phase as a blocking call carrying the operation and the element, with
+a generic implementation over this boundary that every backend may call
+(§5.8). Two more things cross that the original contract left out, and both
 are now declared in `transport.h`: the backend's **lifecycle** —
 `osoe_transport_init` starts whatever the backend needs, AM's connection area,
 wires and engine included, before the agent thread exists, and
@@ -3015,11 +3018,20 @@ name no AM symbol, and the sentence "the SHMEM layer calls only what is declared
 here" is true of `transport.h` plus `internode.h`. **It is enforced**: the AM
 backend's state moved out of `struct osoe_state` into `am-state.h`, and the tier-1
 test `shmem.boundary` (`cmake/CheckBoundary.cmake`) walks the includes of every
-file above the boundary and fails if one reaches a header below it. The two sides
-are two lists in that one script, and every library source file must be in
-exactly one of them or in the short list of files on the boundary itself
-(`transport-local.c`, `watch.c`, and the rendezvous files `node.c` and `job.c`,
-which still read the AM chunk size and handler checksum). The backend is chosen
+file above the boundary and fails if one reaches a header below it. The layers
+are five lists in that one script - the API, the runtime, the files on the
+boundary, the backend, and the one header only a backend includes - and every
+library source file and header must be in exactly one of them. An include is
+judged by the file it resolves to, quoted or angled, so no spelling of a
+forbidden header gets past. Three files on the boundary reach an AM header, each
+known: `node.c` sizes the landing zones from AM's chunk, `rendezvous.c` checks
+AM's handler checksum, and `transport-local.c` shares a header with AM; every
+other file on the boundary is held to the same rule as the files above it.
+*(Since phase 1 step 5 slice 2 a second walk checks that nothing outside the API
+includes an API header or a public one: the includes run from the OpenSHMEM
+layer down to the runtime and never back - the backend's one call up is the
+release upcall `internode.h` declares - which was already true and is what a
+second API beside this one on the same runtime would need.)* The backend is chosen
 by the CMake option `OSOE_BACKEND`, whose only value is `am`. The last two small
 gaps are closed as well: `osoe_transport_get` takes `flags`, with none defined
 yet, so that `OSOE_TRANSPORT_MORE` and the nonblocking flag arrive without a
@@ -3195,10 +3207,14 @@ instead of pushing every on-node rmw through NIC loopback.
 **Outside the boundary:**
 
 - **Collectives (§5).** The intranode phase runs on node-segment counters, which
-  are the same under any backend. The internode phase is AM traffic between
-  leads. A future backend implements it either natively or generically over this
-  boundary, using `OSOE_REGION_INTERNAL` for scratch and control words (§5.8). The
-  core-API study also keeps collectives above its core.
+  are the same under any backend. The internode phase crosses `internode.h`:
+  the barrier's as an arrival and a release upcall, the data collectives' as a
+  blocking call carrying the operation and the element (phase 1 step 5 slice
+  2). A backend implements either natively or, for the data half, hands it to
+  the generic implementation over this boundary, which uses
+  `OSOE_REGION_INTERNAL` for scratch and control words (§5.8). The core-API
+  study keeps collectives above its core; osoe keeps their internode phase
+  below, because that is where a network's offload is.
 - **Allocation (§4.4)** is a pure function of the call sequence and makes one
   transport call: `set_range(region, offset, len, attributes)` tells a backend
   which ranges carry atomics or signals, called for each hinted allocation. That
@@ -3999,10 +4015,14 @@ wait_eq(&t->copied, (d+1)*(L-1));
 Legal because `dest` is undefined until the collective returns, so intermediate
 values are unobservable by any conforming program. For barrier and sync the
 epoch number travels in the internode AM and is asserted on receipt — the
-collective analogue of §3.13's handler-table checksum. *(The data collectives'
-internode phase, as built below, carries no epoch yet: PEs that call different
-collectives meet there as a wrong result or a hang rather than a named fatal.
-It is checked from phase 1 step 5 slice 2, behind `internode.h`.)*
+collective analogue of §3.13's handler-table checksum. The data collectives'
+internode phase does the same with a header on every piece - the epoch, the
+piece, its bytes and which collective it is - checked by the lead that
+receives it (`internode-generic.c`, `shmem.collective-divergence`). It names a
+divergence where the pieces meet, and only there: collectives whose trees share
+no edge wait in different places, a hang whose blocked records name each PE's
+routine; broadcasts from two roots on one node carry the same root position;
+and a node's members are not compared with each other at all.
 
 **Why a single writer.** An earlier draft had local members combine into the
 lead's `dest` as they arrived. That fails three ways:
@@ -4099,9 +4119,15 @@ distribution Slurm and the launcher produce, though the bootstrap accepts orders
 in which it is not, and any member would do so long as every member agrees -
 reads each member's source only now and
 combines it into its own `dest`, bumps `released`, and leaves after the last
-copy-out on `copied`. **Between nodes the leads meet above the boundary**, over
-put, fenced rmw and a wait - §5.8's generic route - not through AM messages
-the agents interpret: a child puts its partial result into a slot of its
+copy-out on `copied`. **Between nodes the lead hands its node's result to
+`internode.h`'s data half** and gets the team's back in its `dest` (phase 1
+step 5 slice 2; §5.8). The operation goes down as values - the reduction's
+operation and its element, a kind and a width - and not as the function the
+lead combines with, so a backend can give it to hardware that knows the
+operation and cannot call a function. AM's implementation is the generic one,
+which any backend may call: the leads meet over put, fenced rmw and a wait -
+§5.8's generic route - not through AM messages the agents interpret, as the
+first slice built it above the boundary: a child puts its partial result into a slot of its
 parent's `OSOE_REGION_INTERNAL` and adds one to the parent's arrival word with
 a fenced rmw, so the add lands after the bytes (invariant 5); the parent's
 application thread waits on the word, combines the slots into its `dest` and
@@ -4122,7 +4148,7 @@ words are compared for equality and never reset (§5.4), and trees differing
 from one collective to the next cannot disturb them: the root releases a piece
 only when every node has arrived for it, and a node arrives only after its own
 wait for its children, so an early arrival for the next piece or collective
-only ever counts toward that one (`collectives.c` walks it through). Every PE
+only ever counts toward that one (`internode-generic.c` walks it through). Every PE
 ends with the same bits, each element combined once along the tree (§5.8 rule
 3). Integer sums and products wrap, through unsigned arithmetic, where C would
 make a signed overflow undefined. Costs, with *N* nodes, *L* local members, *k*
@@ -4242,11 +4268,21 @@ scratch rather than in a count. Its size is fixed by the fan-out every node
 agrees on, and the slot is a constant for the same reason.
 `internal-region.h`.)*
 
-*(Deferred: a separate internal collective-transport header. Both implementations
-would sit behind the same collective routines and be chosen at build time, so the
-header can wait until reductions land and show what it must contain. They landed
-at step 5 with their internode phase above the boundary, in `collectives.c`; the
-header is that step's next slice.)*
+*(Built at phase 1 step 5 slice 2, once reductions had landed and shown what it
+must contain - not as a separate header but as `internode.h`'s data half, beside
+the barrier's. `osoe_internode_reduce` and `osoe_internode_broadcast` are
+blocking calls on the lead's thread, since rule 2 below keeps the combining
+there, and they carry the reduction as values: an operation, and an element
+described by kind and width, which is the vocabulary offload interfaces use
+(libfabric's, UCC's) where a function pointer can never be offloaded. Every
+backend defines them; each may hand any call to the generic implementation,
+`internode-generic.c`, which is the tree over put, fenced rmw and wait that
+the first slice built, and a backend that offloads some pairs gives it the
+rest. That is a mandatory operation with a generic fallback, which the RoCE
+review's case against negotiated offload does not reach
+(`docs/reviews/roce-transport.md` §8.4). The combine functions are per element
+(`combine.c`), thirteen of them, so two types that are one element cannot be
+reduced differently.)*
 
 #### Large reductions
 
@@ -4271,8 +4307,12 @@ replacing it:
    the accumulator both satisfy this. A scheme where PEs combine the same inputs in
    different orders does not, and it gives PEs results that differ in the last bit.
 4. **The algorithm is chosen from element count, team node count, and local member
-   count**, above the boundary. That is not a capability query (§4.10). The
-   crossover sizes come from measurement (§10).
+   count** - the intranode phase's above the boundary, the internode phase's by
+   the backend behind `internode.h`'s data half, the generic implementation's
+   ring among them. Neither is a capability query (§4.10): nothing above asks
+   what the backend chose. The crossover sizes come from measurement (§10).
+   *(Amended at phase 1 step 5 slice 2, when the internode phase went behind
+   the seam: an algorithm choice above it would have kept the phase there.)*
 
 The intranode phase is unchanged: the lead combines local members' sources into
 its `dest` after they arrive (§5.5). The internode algorithm then runs between
@@ -4983,8 +5023,10 @@ machinery. The review's order is adopted.
    §8.6's U7). The data-carrying collectives of §9.10 over §5.5's accumulator.
    *The first slice has reductions and broadcast on the teams that exist, with
    `OSOE_REGION_INTERNAL` built for their internode phase (§5.5, §5.8, as
-   built). collect, fcollect, alltoall and alltoalls follow, each with the design
-   §5.5 says it needs first.*
+   built). The second puts that phase behind `internode.h`, with the generic
+   implementation every backend may call (§5.8). collect, fcollect, alltoall and
+   alltoalls follow, each with the design §5.5 says it needs first, and each
+   crossing the same seam.*
 
 Symmetric statics and the compiler wrapper follow step 5 (§7.4).
 
@@ -6038,6 +6080,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Project name | **osoe** (OpenSHMEM Over Ethernet). Library `libosoe`, built with hidden visibility so only spec API symbols are exported (enforced by the `shmem.exports` test); internal non-static symbols `osoe_`; implementation-specific environment variables `OSOE_`, since the spec reserves `SHMEM_`. Chosen over `eoshmem`, one letter from Open MPI's `oshmem` |
 | Public header name | **`shmem.h`**, as OpenSHMEM programs expect. Coexistence with another implementation is by install prefix, as with MPI |
 | What `OSOE_NODE_LAYOUT` covers | **The encoding of every word in the control segment, not only the offsets of fields.** A word written by one process and interpreted by another is part of the inter-process contract even when its width and position do not move; changing what its bits mean without bumping the version gives mixed builds silent lost wakes rather than the loud refusal `open_control` exists to produce. Recorded because a proposal got it wrong, arguing the §4.9 watch word could change encoding without a bump since it is "an opaque filter" — it is opaque to its *reader*, which is another process |
+| Where a data collective's internode phase meets the backend | **Behind `internode.h`, as a blocking call on the lead's thread carrying the operation and the element** (phase 1 step 5 slice 2; §5.8). The first slice built it above the boundary, over put, fenced rmw and wait, where no backend could replace it; the header §5.8 deferred until reductions landed is `internode.h`'s data half, and that tree is now the generic implementation every backend may call. Not the arrival-with-a-payload `internode.h` had forecast: §5.8 rule 2 keeps O(*n*) combining on the lead's thread, which a progress-thread upcall would only have handed back |
 | Capability bits at the boundary | **Rejected twice, from two directions.** §4.10 rejected them on design grounds; the RoCE exercise supports the rejection empirically — every place a RoCE backend differs, it differs *underneath* the boundary (emulation, poller, loopback, size classes, queue-pair choice). The one case where the layer above might have wanted to know whether to block or poll is already answered by `osoe_transport_watch_wait` being the backend's own function |
 | A boundary progress call | **Needed, and declared** (phase 1 step 2 slice 3): `osoe_transport_agent_pass` and `osoe_transport_agent_idle_ns` in `transport.h`, the only way the library lends the agent thread to a backend (§3.12, §4.10). *Revised.* The first answer was "not needed, because every place the SHMEM layer can block is already a backend function — `osoe_transport_wait`, `osoe_transport_get`, `osoe_transport_watch_wait` — so a backend pumps its own progress there". That was true of application threads and false of the node: the barrier blocks on an epoch counter outside any backend (`barrier.c`, `base/epoch.h`), and what moves it is the progress thread, which `agent.c` drove by calling the AM engine by name (second review, roce-seam F5). Application threads still need no progress call — the blocking calls pump their own — but the node's thread is the library's, and a backend gets it only through these calls. *Revised again* (phase 1 step 3 slice 1, decided with the author 2026-09-22): the two calls were `pass` and `idle_ns`, how long `agent.c`'s own `futex_wait` might sleep — the review's fix shape ("same code, boundary-named"), and exactly the step-2 stand-in's poll. They could not carry the backend they were declared for: §3.10's lead waits in one io_uring submission on its sockets *and* the wake word, which a futex_wait in `agent.c` cannot, and a `SINGLE_ISSUER` ring refuses every thread but its submitter (`-EEXIST`), while `session_end` joined the agent and only then drained the engine on the main thread. So `idle_ns` became `osoe_transport_agent_wait(wake, seen)`, the backend's own wait, and `osoe_transport_agent_exit()` gives the backend a last turn on the thread for its drain and close. An RDMA backend sleeping on a completion channel needs the first for the same reason. Both were edits above the boundary forced by the seam, not by the backend |
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
@@ -6136,7 +6179,10 @@ which has two states per pair, so a third backend needs a selector of its own
   about 12× once the AM phase is itself a tree (roce-seam §4.3, *arithmetic*).
   So the AM implementation became a k-ary tree in the same slice (§5.3), and a
   backend with a better way — a tree over RDMA put and atomics, or an offload
-  engine — implements `internode.h` without touching `barrier.c`.
+  engine — implements `internode.h` without touching `barrier.c`. The data
+  collectives followed at phase 1 step 5 slice 2, behind the same header, as a
+  blocking call carrying the operation and the element, with a generic
+  implementation every backend may call (§5.8).
 - **Does the AM data path stay hot in an RDMA build?** Bootstrap is out of band
   in every build (§6.2) and that is forced. Whether §3's *data* path — the
   reservation protocol, deferred reply queues, aggregation — stays running is

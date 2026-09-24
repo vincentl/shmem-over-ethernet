@@ -10,6 +10,11 @@
  * pass) and hands it to the engine. That is §3.12's "a flag plus a futex wake",
  * and the whole of what crosses between processes here.
  *
+ * The data half - reductions and broadcast - AM hands whole to the generic
+ * implementation (internode-generic.h), whose puts and adds are AM's own
+ * operations: the lead's thread combines, as §5.8 rule 2 wants, and AM has
+ * nothing faster to offer it.
+ *
  * A second backend replaces this file and keeps barrier.c.
  */
 /* liburing.h, through am-state.h and ring.h, uses POSIX types that plain C11
@@ -24,6 +29,7 @@
 #include "collective-tree.h"
 #include "fatal.h"
 #include "internode.h"
+#include "internode-generic.h"
 #include "node.h"
 #include "progress.h"
 #include "progress-host.h"
@@ -55,6 +61,7 @@ void osoe_internode_init(void)
         consumed[team] = 0;
         registered[team] = false;
     }
+    osoe_internode_generic_init();
 }
 
 void osoe_internode_fini(void)
@@ -82,6 +89,7 @@ void osoe_internode_team(uint32_t team, const uint32_t *nodes, uint32_t count)
     registered[team] = true;
     if (osoe_am.internode && osoe_am.lead)
         osoe_progress_team(&osoe_am.progress, team, &tree);
+    osoe_internode_generic_team(team, nodes, count);
 }
 
 void osoe_internode_arrive(uint32_t team, uint32_t epoch)
@@ -135,4 +143,19 @@ bool osoe_internode_am_take_arrivals(void)
         moved = true;
     }
     return moved;
+}
+
+/* ---- The data half: the generic implementation's ---------------------- */
+
+void osoe_internode_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t count,
+                           enum osoe_reduction_operation operation,
+                           struct osoe_element element, const char *routine)
+{
+    osoe_internode_generic_reduce(team, epoch, buffer, count, operation, element, routine);
+}
+
+void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index, void *buffer,
+                              size_t bytes, const char *routine)
+{
+    osoe_internode_generic_broadcast(team, epoch, root_index, buffer, bytes, routine);
 }

@@ -14,7 +14,6 @@
 #include <shmem.h>
 
 #include "base/epoch.h"
-#include "collective-tree.h"
 
 /*
  * Build the predefined teams for this session, and give each one that spans
@@ -66,22 +65,6 @@ struct osoe_team {
     uint32_t *epoch;                /* this PE's k for the team */
     uint32_t *data_epoch;           /* and its d, data collectives completed */
     _Atomic uint32_t *published;    /* where k is published for osoe-stat */
-
-    /*
-     * A data collective's internode phase, kept by the local lead only
-     * (collectives.c): the tree rooted at the team's first node, as world
-     * ranks of the neighbouring leads, found once; and how many pieces have
-     * arrived at this lead from its children and come down to it from its
-     * parent over the team's life - cumulative, compared for equality (§5.4),
-     * since the counts in the internal region are never reset.
-     */
-    bool lead_tree_known;
-    uint32_t lead_parent;           /* the parent lead's rank, or UINT32_MAX at the root */
-    uint32_t lead_position;         /* this node among the parent's children */
-    uint32_t lead_children;
-    uint32_t lead_child[OSOE_COLLECTIVE_FANOUT_MAX];
-    uint64_t arrivals_expected;
-    uint64_t releases_expected;
 };
 
 /*
