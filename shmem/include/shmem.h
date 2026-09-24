@@ -682,6 +682,11 @@ void shmem_broadcast32(void *dest, const void *source, size_t nelems, int PE_roo
 void shmem_broadcast64(void *dest, const void *source, size_t nelems, int PE_root,
                        int PE_start, int logPE_stride, int PE_size, long *pSync);
 
+/* Distributed locks (§9.13): first come, first served (lock.c). */
+void shmem_set_lock(long *lock);
+void shmem_clear_lock(long *lock);
+int shmem_test_lock(long *lock);
+
 /* Library information (§9.1.11, §9.1.12) */
 void shmem_info_get_version(int *major, int *minor);
 void shmem_info_get_name(char *name);

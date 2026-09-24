@@ -44,9 +44,9 @@ cmake_minimum_required(VERSION 3.25)
 # include its headers.
 set(OSOE_API
   accessible.c amo.c barrier.c broadcast.c collectives.c deprecated.c info.c init.c
-  malloc.c profile.c quiet.c reductions.c rma-typed.c rma.c session.c signal.c
+  lock.c malloc.c profile.c quiet.c reductions.c rma-typed.c rma.c session.c signal.c
   symmetric.c team.c wait.c
-  barrier.h collectives.h export.h rma.h symmetric.h team.h wait.h)
+  barrier.h collectives.h export.h lock.h rma.h symmetric.h team.h wait.h)
 
 # The runtime: initialization's machinery and the agent (§6, §3.12), and the
 # library's own services - fatal, abort, liveness, the sweep, metrics, the

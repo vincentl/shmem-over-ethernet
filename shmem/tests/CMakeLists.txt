@@ -1171,6 +1171,29 @@ set_tests_properties(shmem.statics.misuse PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION
   "shmem_int_p: .* is neither within the symmetric heap nor among the program's global and static variables")
 
+# The distributed lock (spec §9.13; test-lock.c): one node and across nodes;
+# and a clear of a lock not held, and a set of one held, each ending the job by
+# name.
+osoe_tier2_test(lock)
+osoe_statics_program(shmem_test_lock)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(lock 0,0,1,1)
+  osoe_tier2_map_test(lock 0,1,2,0,1,0)
+endif()
+foreach(case_expect
+    "clear|shmem_clear_lock: this PE does not hold the lock it clears"
+    "twice|shmem_set_lock: this PE holds the lock already"
+    "garbage|shmem_set_lock: the lock's queue names PE [0-9]+, which is not waiting for it")
+  string(REPLACE "|" ";" parts "${case_expect}")
+  list(GET parts 0 case)
+  list(GET parts 1 expect)
+  add_test(NAME shmem.lock.misuse.${case}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_LOCK_MISUSE=${case}
+            $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_lock>)
+  set_tests_properties(shmem.lock.misuse.${case} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "${expect}")
+endforeach()
+
 # PEs that call different collectives end the job by name, from the piece
 # headers of the generic internode phase (internode-generic.c): node 1's PE
 # broadcasts where the others reduce, and node 0's lead finds node 1's slot
@@ -1557,6 +1580,7 @@ if(OSOE_TIER3)
     osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)
     osoe_tier3_test(active-set.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_active-set)
     osoe_tier3_test(statics.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_statics)
+    osoe_tier3_test(lock.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_lock)
     if(shape STREQUAL "pi")
       osoe_tier3_test(reduce.0-1-2-3-4.k2 pi 0,1,2,3,4 shmem_test_reduce
                       ENV OSOE_COLLECTIVE_FANOUT=2)

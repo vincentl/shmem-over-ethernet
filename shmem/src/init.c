@@ -29,6 +29,7 @@
 #include "internode.h"
 #include "job.h"
 #include "liveness.h"
+#include "lock.h"
 #include "state.h"
 #include "team.h"
 #include "transport.h"
@@ -328,6 +329,7 @@ static void session_end(void)
     osoe_liveness_stop();
     osoe_internode_fini();
     osoe_allocator_fini(&osoe.allocator);
+    osoe_lock_session_end();
     osoe_transport_fini();
     osoe_job_leave(&osoe.job);
     osoe_node_leave(&osoe.node, &osoe.bootstrap);
@@ -373,6 +375,8 @@ OSOE_API void pshmem_finalize(void)
         pthread_mutex_unlock(&lifecycle);
         return;
     }
+    if (refcount == 1)
+        osoe_lock_warn_held();
     /* Every finalize is a barrier (spec §9.1.4, invariant 26): a non-last one
      * only that, the last one before tearing down. On the finalize team's own
      * counters, so it can never be matched by an application's barrier. */

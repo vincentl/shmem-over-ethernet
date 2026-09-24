@@ -41,6 +41,7 @@ add_library(osoe
   src/job.c
   src/listener.c
   src/liveness.c
+  src/lock.c
   src/malloc.c
   src/metrics.c
   src/node.c

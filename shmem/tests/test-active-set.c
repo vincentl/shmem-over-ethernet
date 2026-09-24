@@ -224,32 +224,78 @@ static void broadcasts(void)
 }
 
 /*
+ * This PE's count of `name`, a counter of its threads', summed over its
+ * counter blocks in its node's control segment (§3.14).
+ */
+static uint64_t own_count(const char *name)
+{
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(segment, sizeof segment, 0);
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
+        fprintf(stderr, "%s\n", err);
+        return UINT64_MAX;
+    }
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(&s, name);
+    const char *local = osoe_test_launcher("LOCALID");
+    uint32_t mine = local ? (uint32_t)atoi(local) : 0;
+    uint64_t total = 0;
+    for (uint32_t i = 0; m && i < s.dir->blocks_per_pe; i++) {
+        uint64_t v;
+        if (osoe_segment_read(&s, m, mine * s.dir->blocks_per_pe + i, &v))
+            total += v;
+    }
+    osoe_segment_close(&s);
+    return m ? total : UINT64_MAX;
+}
+
+/*
  * The active-set barrier and sync, each on its own. shmem_barrier completes the
  * PE's puts before it synchronizes - the quiet a sync does not have - so the
- * left neighbour's put is here when this PE's barrier returns; across nodes,
- * where the put and the barrier travel different paths, a barrier without the
- * quiet would be caught. The deprecated sync is checked alone, after the quiet
- * its caller owes it and with nothing after it that synchronizes, so a sync
- * that did nothing would be caught too. The C11 shmem_sync(team) that shares
- * its name, last.
+ * left neighbour's puts are here when this PE's barrier returns, and a
+ * mebibyte of them. That bulk alone did not catch a barrier without its quiet:
+ * with the connection's send buffer bounded, the put returns with at most a
+ * buffer of it in flight, which one hop delivers before the barrier's two
+ * (the verifications of 751ee71 and of the locks). So the barrier is checked to
+ * add to this PE's count of the transport's waits - its quiet, which nothing
+ * else in the call makes - and the bulk stays for the links tier 3 slows. The
+ * deprecated sync is checked alone, after the quiet its caller owes it and
+ * with nothing after it that synchronizes, so a sync that did nothing would be
+ * caught too. The C11 shmem_sync(team) that shares its name, last.
  */
 static void barriers(void)
 {
+    enum { BULK = (1 << 20) / sizeof(int) };
     int *flag = shmem_malloc(sizeof *flag), *mark = shmem_malloc(sizeof *mark);
-    CHECK_FATAL(flag && mark);
+    int *bulk = shmem_malloc(BULK * sizeof *bulk), *mine = malloc(BULK * sizeof *mine);
+    CHECK_FATAL(flag && mark && bulk && mine);
     *flag = *mark = -1;
     shmem_barrier_all();
     int right = (me + 1) % npes;
     for (int round = 0; round < 6; round++) {
+        for (size_t i = 0; i < BULK; i++)
+            mine[i] = round;
+        shmem_int_put(bulk, mine, BULK, right);
         shmem_int_p(flag, round, right);
+        uint64_t waits = own_count("transport.wait.calls");
         shmem_barrier(0, 0, npes, pSync);
+        CHECK(own_count("transport.wait.calls") > waits);    /* the barrier's quiet */
         CHECK(*flag == round);
+        size_t short_of = 0;
+        for (size_t i = 0; i < BULK; i++)
+            short_of += bulk[i] != round;
+        if (short_of)
+            fprintf(stderr, "PE %d, round %d: %zu of the left neighbour's %d words are "
+                    "not here after shmem_barrier\n", me, round, short_of, (int)BULK);
+        CHECK(short_of == 0);
         shmem_int_p(mark, round, right);
         shmem_quiet();
         shmem_sync(0, 0, npes, pSync);
         CHECK(*mark == round);
     }
     CHECK(shmem_sync(SHMEM_TEAM_WORLD) == 0);
+    free(mine);
+    shmem_free(bulk);
     shmem_free(flag);
     shmem_free(mark);
 }

@@ -119,6 +119,11 @@ int pshmem_team_sync(shmem_team_t team);
 void pshmem_barrier(int PE_start, int logPE_stride, int PE_size, long *pSync);
 void pshmem_sync(int PE_start, int logPE_stride, int PE_size, long *pSync);
 
+/* Distributed locks (§9.13) */
+void pshmem_set_lock(long *lock);
+void pshmem_clear_lock(long *lock);
+int pshmem_test_lock(long *lock);
+
 /* Library information (§9.1.11, §9.1.12) */
 void pshmem_info_get_version(int *major, int *minor);
 void pshmem_info_get_name(char *name);
