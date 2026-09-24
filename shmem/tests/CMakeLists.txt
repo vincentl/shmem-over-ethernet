@@ -645,7 +645,7 @@ endif()
 # preset; the whole of tier 2 runs shifted with OSOE_HEAP_SHIFT in ctest's
 # environment. 2 MiB keeps every PE of these jobs within a few MiB of the
 # candidates each sanitizer allows.
-foreach(name rma amo amo-types wait wait-many signal team malloc barrier)
+foreach(name rma amo amo-types amo-nbi wait wait-many signal team malloc barrier)
   add_test(NAME shmem.heap-shift.${name}.L4
     COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_SHIFT=2m
             $<TARGET_FILE:osoe-launch> -n 4 -t 60 -- $<TARGET_FILE:shmem_test_${name}>)
@@ -1048,6 +1048,26 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(amo-deprecated 0,1,2,0,1,0)
 endif()
 
+# shmem.amo-nbi (§9.7.2; test-amo-nbi.c), over a logical node map (§8.1): its
+# semantics phase's second pass targets each PE's right neighbour, and its
+# contended phase has every PE issue fetch_inc_nbi/fetch_add_nbi at PE 0, each
+# same-node for some PEs and remote for others depending on the map, as
+# shmem.amo-deprecated's right-neighbour targets are just above. Excluded
+# under ThreadSanitizer for the same reason: the ordering that makes a
+# cross-node AMO's completion visible runs through another process, which
+# tsan cannot see. And a nonblocking AMO on a word outside the symmetric heap
+# must end the job under its own name, not the blocking routine's beneath it.
+osoe_tier2_test(amo-nbi)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(amo-nbi 0,0,1,1)
+  osoe_tier2_map_test(amo-nbi 0,1,2,0,1,0)
+endif()
+add_test(NAME shmem.amo-nbi.misuse
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_AMO_NBI_MISUSE=1
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_amo-nbi>)
+set_tests_properties(shmem.amo-nbi.misuse PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_long_atomic_fetch_add_nbi: \\[0x[0-9a-f]+, \\+8\\) is n")
+
 osoe_tier2_test(typed-rma)
 
 # shmem.typed-rma over a logical node map (§8.1), so "right" is a same-node PE
@@ -1121,6 +1141,23 @@ if(OSOE_CXX_COMPILER)
 else()
   message(STATUS "No C++ compiler: the headers' C++ test is not registered")
 endif()
+
+# A C11 generic called with the wrong number of arguments fails to compile,
+# naming what it takes (generic-arity.c): one wrong call from each family the
+# selection serves.
+foreach(pair "fetch_add_nbi:osoe_shmem_atomic_fetch_add_nbi_takes_four_or_five_arguments"
+             "fetch_add:osoe_shmem_atomic_fetch_add_takes_three_or_four_arguments"
+             "put:osoe_shmem_put_takes_four_or_five_arguments")
+  string(REPLACE ":" ";" pair "${pair}")
+  list(GET pair 0 call)
+  list(GET pair 1 complaint)
+  add_test(NAME shmem.generic-arity.${call}
+    COMMAND ${CMAKE_C_COMPILER} -std=c11 -Werror=implicit-function-declaration
+            -fsyntax-only -DOSOE_TEST_ARITY_${call} -I${PROJECT_SOURCE_DIR}/shmem/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/generic-arity.c)
+  set_tests_properties(shmem.generic-arity.${call} PROPERTIES LABELS "tier1" TIMEOUT 30
+    PASS_REGULAR_EXPRESSION "${complaint}")
+endforeach()
 
 # The deprecated active-set collectives, over the whole job (design §7.4;
 # test-active-set.c), on one node and across nodes; and an active set one PE

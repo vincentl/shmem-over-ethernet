@@ -262,6 +262,155 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     OSOE_AMO_BITWISE_OP(T, NAME, xor, OSOE_RMW_XOR)
 
 /*
+ * ---- The nonblocking fetching AMOs (§9.7.2) -----------------------------
+ *
+ * The spec requires a _nbi routine to return after initiating the operation,
+ * and promises only that *fetch holds the answer "at the completion of
+ * [the next] shmem_quiet" - a deadline, not a floor. osoe takes the earliest
+ * conforming choice: each definition below issues the very same blocking
+ * fetching rmw as its blocking counterpart above (amo_rmw(..., dest or
+ * source, ..., OSOE_TRANSPORT_FETCH, pe)) and stores the result to *fetch
+ * before returning, so the value is already there at the call site rather
+ * than only after the caller's next quiet.
+ *
+ * The upgrade (design §7.5) is the transport's rmw taking
+ * OSOE_TRANSPORT_NONBLOCKING instead, with a result destination copied in at
+ * the PE's next wait - the shape osoe's nonblocking gets already have (§4.6, as
+ * built), whose one outstanding fetching AMO it would revisit. Not built here:
+ * every routine below is the immediate form only.
+ *
+ * Each amo_rmw call below is given the _nbi routine's own name
+ * ("shmem_long_atomic_fetch_add_nbi", not "...fetch_add"), so a diagnostic
+ * names the nonblocking routine rather than the blocking one beneath it; a ctx
+ * form reports its plain name, as the blocking ones do.
+ */
+
+/* ---- Table 6's nonblocking fetching AMOs -------------------------------- */
+
+#define OSOE_AMO_STANDARD_NBI(T, NAME)                                                \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_compare_swap_nbi(shmem_ctx_t ctx,        \
+                                                              T *fetch, T *dest,       \
+                                                              T cond, T value, int pe) \
+    {                                                                                 \
+        *fetch = OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_compare_swap_nbi",   \
+                                         ctx, dest, (unsigned)sizeof(T),              \
+                                         OSOE_RMW_CSWAP, OSOE_AMO_IN(value),          \
+                                         OSOE_AMO_IN(cond), OSOE_TRANSPORT_FETCH, pe)); \
+    }                                                                                 \
+    OSOE_API void pshmem_##NAME##_atomic_compare_swap_nbi(T *fetch, T *dest, T cond,   \
+                                                          T value, int pe)             \
+    {                                                                                 \
+        pshmem_ctx_##NAME##_atomic_compare_swap_nbi(SHMEM_CTX_DEFAULT, fetch, dest,   \
+                                                     cond, value, pe);                 \
+    }                                                                                 \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_fetch_inc_nbi(shmem_ctx_t ctx, T *fetch,  \
+                                                           T *dest, int pe)            \
+    {                                                                                 \
+        *fetch = OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_inc_nbi", ctx, \
+                                         dest, (unsigned)sizeof(T), OSOE_RMW_ADD, 1,  \
+                                         0, OSOE_TRANSPORT_FETCH, pe));               \
+    }                                                                                 \
+    OSOE_API void pshmem_##NAME##_atomic_fetch_inc_nbi(T *fetch, T *dest, int pe)      \
+    {                                                                                 \
+        pshmem_ctx_##NAME##_atomic_fetch_inc_nbi(SHMEM_CTX_DEFAULT, fetch, dest, pe);  \
+    }                                                                                 \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_fetch_add_nbi(shmem_ctx_t ctx, T *fetch,  \
+                                                           T *dest, T value, int pe)   \
+    {                                                                                 \
+        *fetch = OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_add_nbi", ctx, \
+                                         dest, (unsigned)sizeof(T), OSOE_RMW_ADD,     \
+                                         OSOE_AMO_IN(value), 0, OSOE_TRANSPORT_FETCH, \
+                                         pe));                                        \
+    }                                                                                 \
+    OSOE_API void pshmem_##NAME##_atomic_fetch_add_nbi(T *fetch, T *dest, T value,     \
+                                                       int pe)                         \
+    {                                                                                 \
+        pshmem_ctx_##NAME##_atomic_fetch_add_nbi(SHMEM_CTX_DEFAULT, fetch, dest,      \
+                                                 value, pe);                           \
+    }
+
+/* ---- Table 7's nonblocking fetching AMOs, integers ---------------------- */
+
+#define OSOE_AMO_EXTENDED_NBI(T, NAME)                                                 \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_fetch_nbi(shmem_ctx_t ctx, T *fetch,      \
+                                                       const T *source, int pe)         \
+    {                                                                                  \
+        *fetch = OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_nbi", ctx,      \
+                                         source, (unsigned)sizeof(T), OSOE_RMW_READ,   \
+                                         0, 0, OSOE_TRANSPORT_FETCH, pe));             \
+    }                                                                                  \
+    OSOE_API void pshmem_##NAME##_atomic_fetch_nbi(T *fetch, const T *source, int pe)   \
+    {                                                                                  \
+        pshmem_ctx_##NAME##_atomic_fetch_nbi(SHMEM_CTX_DEFAULT, fetch, source, pe);     \
+    }                                                                                  \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_swap_nbi(shmem_ctx_t ctx, T *fetch,       \
+                                                      T *dest, T value, int pe)         \
+    {                                                                                  \
+        *fetch = OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_swap_nbi", ctx, dest, \
+                                         (unsigned)sizeof(T), OSOE_RMW_WRITE,          \
+                                         OSOE_AMO_IN(value), 0, OSOE_TRANSPORT_FETCH,  \
+                                         pe));                                         \
+    }                                                                                  \
+    OSOE_API void pshmem_##NAME##_atomic_swap_nbi(T *fetch, T *dest, T value, int pe)   \
+    {                                                                                  \
+        pshmem_ctx_##NAME##_atomic_swap_nbi(SHMEM_CTX_DEFAULT, fetch, dest, value, pe); \
+    }
+
+/* ---- Table 7's nonblocking fetching AMOs, float and double ------------- */
+
+/* Reuses NAME##_bits/NAME##_value, defined just above by this NAME's
+ * OSOE_AMO_FLOAT(T, NAME, U) - so this must be invoked after that, for the
+ * same NAME, which the invocations below do. */
+#define OSOE_AMO_FLOAT_NBI(T, NAME)                                                    \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_fetch_nbi(shmem_ctx_t ctx, T *fetch,      \
+                                                       const T *source, int pe)         \
+    {                                                                                  \
+        *fetch = NAME##_value(amo_rmw("shmem_" #NAME "_atomic_fetch_nbi", ctx, source, \
+                                      (unsigned)sizeof(T), OSOE_RMW_READ, 0, 0,        \
+                                      OSOE_TRANSPORT_FETCH, pe));                      \
+    }                                                                                  \
+    OSOE_API void pshmem_##NAME##_atomic_fetch_nbi(T *fetch, const T *source, int pe)   \
+    {                                                                                  \
+        pshmem_ctx_##NAME##_atomic_fetch_nbi(SHMEM_CTX_DEFAULT, fetch, source, pe);     \
+    }                                                                                  \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_swap_nbi(shmem_ctx_t ctx, T *fetch,       \
+                                                      T *dest, T value, int pe)         \
+    {                                                                                  \
+        *fetch = NAME##_value(amo_rmw("shmem_" #NAME "_atomic_swap_nbi", ctx, dest,    \
+                                      (unsigned)sizeof(T), OSOE_RMW_WRITE,             \
+                                      NAME##_bits(value), 0, OSOE_TRANSPORT_FETCH,     \
+                                      pe));                                            \
+    }                                                                                  \
+    OSOE_API void pshmem_##NAME##_atomic_swap_nbi(T *fetch, T *dest, T value, int pe)   \
+    {                                                                                  \
+        pshmem_ctx_##NAME##_atomic_swap_nbi(SHMEM_CTX_DEFAULT, fetch, dest, value, pe); \
+    }
+
+/* ---- Table 8's nonblocking fetching AMOs -------------------------------- */
+
+#define OSOE_AMO_BITWISE_NBI_OP(T, NAME, OP, RMW)                                      \
+    OSOE_API void pshmem_ctx_##NAME##_atomic_fetch_##OP##_nbi(shmem_ctx_t ctx,         \
+                                                              T *fetch, T *dest,        \
+                                                              T value, int pe)          \
+    {                                                                                  \
+        *fetch = OSOE_AMO_OUT(T, amo_rmw("shmem_" #NAME "_atomic_fetch_" #OP "_nbi",   \
+                                         ctx, dest, (unsigned)sizeof(T), RMW,          \
+                                         OSOE_AMO_IN(value), 0, OSOE_TRANSPORT_FETCH,  \
+                                         pe));                                         \
+    }                                                                                  \
+    OSOE_API void pshmem_##NAME##_atomic_fetch_##OP##_nbi(T *fetch, T *dest, T value,   \
+                                                          int pe)                       \
+    {                                                                                  \
+        pshmem_ctx_##NAME##_atomic_fetch_##OP##_nbi(SHMEM_CTX_DEFAULT, fetch, dest,    \
+                                                     value, pe);                        \
+    }
+
+#define OSOE_AMO_BITWISE_NBI(T, NAME)                                                  \
+    OSOE_AMO_BITWISE_NBI_OP(T, NAME, and, OSOE_RMW_AND)                                \
+    OSOE_AMO_BITWISE_NBI_OP(T, NAME, or, OSOE_RMW_OR)                                  \
+    OSOE_AMO_BITWISE_NBI_OP(T, NAME, xor, OSOE_RMW_XOR)
+
+/*
  * The weak `shmem_` aliases (export.h), over the same type lists. They are a
  * separate pass rather than a line inside each body so that the definitions
  * above read as definitions; the lists are the same ones, so a type cannot get
@@ -298,13 +447,48 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
     OSOE_AMO_ALIAS_BITWISE_OP(T, NAME, or)                                              \
     OSOE_AMO_ALIAS_BITWISE_OP(T, NAME, xor)
 
+/* The same, for the nonblocking fetching AMOs above. */
+#define OSOE_AMO_ALIAS_STANDARD_NBI(T, NAME)                                           \
+    OSOE_ALIAS(ctx_##NAME##_atomic_compare_swap_nbi)                                   \
+    OSOE_ALIAS(NAME##_atomic_compare_swap_nbi)                                         \
+    OSOE_ALIAS(ctx_##NAME##_atomic_fetch_inc_nbi)                                      \
+    OSOE_ALIAS(NAME##_atomic_fetch_inc_nbi)                                            \
+    OSOE_ALIAS(ctx_##NAME##_atomic_fetch_add_nbi)                                      \
+    OSOE_ALIAS(NAME##_atomic_fetch_add_nbi)
+
+#define OSOE_AMO_ALIAS_EXTENDED_NBI(T, NAME)                                           \
+    OSOE_ALIAS(ctx_##NAME##_atomic_fetch_nbi)                                          \
+    OSOE_ALIAS(NAME##_atomic_fetch_nbi)                                                \
+    OSOE_ALIAS(ctx_##NAME##_atomic_swap_nbi)                                           \
+    OSOE_ALIAS(NAME##_atomic_swap_nbi)
+
+#define OSOE_AMO_ALIAS_BITWISE_NBI_OP(T, NAME, OP)                                     \
+    OSOE_ALIAS(ctx_##NAME##_atomic_fetch_##OP##_nbi)                                   \
+    OSOE_ALIAS(NAME##_atomic_fetch_##OP##_nbi)
+
+#define OSOE_AMO_ALIAS_BITWISE_NBI(T, NAME)                                            \
+    OSOE_AMO_ALIAS_BITWISE_NBI_OP(T, NAME, and)                                        \
+    OSOE_AMO_ALIAS_BITWISE_NBI_OP(T, NAME, or)                                         \
+    OSOE_AMO_ALIAS_BITWISE_NBI_OP(T, NAME, xor)
+
 OSOE_AMO_STANDARD_TYPES(OSOE_AMO_STANDARD)
 OSOE_AMO_STANDARD_TYPES(OSOE_AMO_EXTENDED)
 OSOE_AMO_FLOAT(float, float, uint32_t)
 OSOE_AMO_FLOAT(double, double, uint64_t)
 OSOE_AMO_BITWISE_TYPES(OSOE_AMO_BITWISE)
 
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_STANDARD_NBI)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_EXTENDED_NBI)
+OSOE_AMO_FLOAT_NBI(float, float)
+OSOE_AMO_FLOAT_NBI(double, double)
+OSOE_AMO_BITWISE_TYPES(OSOE_AMO_BITWISE_NBI)
+
 OSOE_AMO_STANDARD_TYPES(OSOE_AMO_ALIAS_STANDARD)
 OSOE_AMO_STANDARD_TYPES(OSOE_AMO_ALIAS_EXTENDED)
 OSOE_AMO_FLOAT_TYPES(OSOE_AMO_ALIAS_EXTENDED)
 OSOE_AMO_BITWISE_TYPES(OSOE_AMO_ALIAS_BITWISE)
+
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_ALIAS_STANDARD_NBI)
+OSOE_AMO_STANDARD_TYPES(OSOE_AMO_ALIAS_EXTENDED_NBI)
+OSOE_AMO_FLOAT_TYPES(OSOE_AMO_ALIAS_EXTENDED_NBI)
+OSOE_AMO_BITWISE_TYPES(OSOE_AMO_ALIAS_BITWISE_NBI)

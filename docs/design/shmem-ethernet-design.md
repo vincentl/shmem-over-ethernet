@@ -5430,6 +5430,18 @@ with `OSOE_TRANSPORT_MORE`, completed by one wait on its PE that names the
 routine: in flight together, up to the landing zone's records.
 Block-strided `ibput`/`ibget` (§9.6.1.4, §9.6.1.8) remain deferred; see §7.6.
 
+**The nonblocking fetching AMOs complete at issue** (§9.7.2): `fetch`, `swap`,
+`compare_swap`, `fetch_inc`, `fetch_add` and the three bitwise fetches, each
+`_nbi` over its AMO table, with context forms and C11 generics
+(`compare_swap_nbi` is the one AMO with six arguments). Unlike the nonblocking
+gets, each runs its blocking counterpart's fetching rmw and stores `*fetch`
+before it returns, which the spec permits: the value is promised by the next
+quiet, a deadline rather than a floor. Across nodes each call is therefore a
+round trip where a batch could overlap. The upgrade is the rmw taking
+`OSOE_TRANSPORT_NONBLOCKING` with a result destination the PE's next wait
+copies out, as the gets' does (§4.6), revisiting §4.6's one outstanding
+fetching AMO; nothing in the corpus calls them but the SOS test suite.
+
 The collectives are mechanical *given* §5.5's rules, which they must inherit: the
 local lead is the single writer before release and leaves last, and a peer's
 `source` is read only after that peer has called. A pull-based collect or

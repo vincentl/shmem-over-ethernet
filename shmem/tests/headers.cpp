@@ -20,3 +20,22 @@ void exercise(long *dst, long *src, int *word)
     (void)shmem_long_max_reduce(SHMEM_TEAM_WORLD, dst, src, 1);
     shmem_int_atomic_inc(word, 0);
 }
+
+#if defined(__GNUC__) && !defined(__EDG__) && !defined(__NVCOMPILER) && !defined(__CUDACC__)
+// The complex reductions, which g++ and clang++ let C++ see as an extension
+// (shmem.h). The condition is restated rather than read from shmem.h's
+// OSOE_CXX_COMPLEX, so that a header that stopped defining it fails here;
+// __extension__ keeps this file's -Wpedantic quiet about the type.
+__extension__ typedef float _Complex complex_float;
+__extension__ typedef double _Complex complex_double;
+
+void exercise_complex(complex_float *dst, const complex_float *src, complex_double *d,
+                      const complex_double *s, complex_double *work);
+void exercise_complex(complex_float *dst, const complex_float *src, complex_double *d,
+                      const complex_double *s, complex_double *work)
+{
+    (void)shmem_complexf_sum_reduce(SHMEM_TEAM_WORLD, dst, src, 1);
+    (void)shmem_complexd_prod_reduce(SHMEM_TEAM_WORLD, d, s, 1);
+    shmem_complexd_sum_to_all(d, s, 1, 0, 0, 4, work, pSync);
+}
+#endif
