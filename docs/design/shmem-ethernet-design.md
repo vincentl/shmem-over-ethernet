@@ -5415,6 +5415,17 @@ which is `put_nbi`'s contract already, and a get completes before it returns,
 which `get_nbi` permits. Nonblocking gets across nodes are real: several in
 flight before one wait, through `OSOE_TRANSPORT_NONBLOCKING` on
 `osoe_transport_get` (§4.6, as built).
+
+**The nonblocking fetching AMOs are built the same way** (§9.7.2): `fetch`,
+`swap`, `compare_swap`, `fetch_inc`, `fetch_add` and the three bitwise fetches,
+each `_nbi` over its AMO table, with context forms and C11 generics
+(`compare_swap_nbi` is the one AMO with six arguments). Each runs its blocking
+counterpart's fetching rmw and stores the result before it returns, which the
+spec permits: `*fetch` is promised by the next quiet, a deadline rather than a
+floor. Across nodes each call is therefore a round trip where a batch could
+overlap. The upgrade is the rmw taking `OSOE_TRANSPORT_NONBLOCKING` with a
+result destination the PE's next wait copies out, as nonblocking gets do (§4.6);
+nothing in the corpus calls them but the SOS test suite.
 The strided forms are a loop of single-element transfers, and stay one: no
 transport osoe targets has a remote-strided operation to map a whole `iput`
 onto - RDMA's scatter/gather list describes the local side only, and a vendor's
