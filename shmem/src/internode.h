@@ -54,9 +54,12 @@
  * lead's local combine; and the release is already an upcall that happens once
  * per node, which is where a result is copied out to local members. What would
  * foreclose it is a node-addressed call, or a release expressed as an rmw on a
- * counter, and this header has neither. It is not built: there are no
- * data-carrying collectives yet (§7.1), and a payload with no caller would be a
- * guess.
+ * counter, and this header has neither. **The data collectives do not cross
+ * here yet**: reductions and broadcast (phase 1 step 5) run their internode
+ * phase above this header, in collectives.c, over put, fenced rmw and a wait on
+ * OSOE_REGION_INTERNAL - §5.8's generic route, correct over any backend and
+ * replaceable by none. §5.8's deferred collective-transport header, which puts
+ * that phase behind this one, is the step's next slice.
  *
  * What an RDMA backend does with each call (§4.10's discipline: say it, so the
  * interface is checked against more than the one backend it has):

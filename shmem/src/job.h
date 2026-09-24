@@ -72,6 +72,8 @@ struct osoe_job {
     uint32_t run_count;
     const uint32_t *ipv4;           /* each node's address, network order; NULL on one node */
     const unsigned char *backend_blob;  /* node_count blobs (osoe_job_backend_blob) */
+    const uint32_t *node_lead;      /* node_count leads' ranks; NULL on one node */
+    uint32_t one_node_lead;         /* the lead's rank on one node */
     struct osoe_rank_set here;      /* this node's ranks: the locality question */
     struct osoe_rank_run *owned_runs;   /* the map of a job of one node, freed at leave */
     bool force_remote;              /* §8.1: deny the pointer to a node-mate */
@@ -119,40 +121,17 @@ static inline uint32_t osoe_job_local_index(const struct osoe_job *j, uint32_t p
 
 /*
  * The world rank of node `node`'s lead - its PE with local id 0 - or UINT32_MAX
- * if the map has none. O(R): each run is an arithmetic progression in node and
- * local id, solved for the one rank that is on `node` with local id 0. The
- * collectives ask it once per tree neighbour (collectives.c), never per PE, so
- * nothing here keeps an O(N) table.
+ * if there is no such node. O(1): the node's lead writes every node's lead into
+ * the node-local object at the rendezvous (job.c), found from the runs once in
+ * O(R + N), so that a broadcast can re-root its tree on every call
+ * (collectives.c) without a scan of the map. N words, one copy per node, beside
+ * the node_count addresses and blobs already there.
  */
 static inline uint32_t osoe_job_node_lead(const struct osoe_job *j, uint32_t node)
 {
-    for (uint32_t i = 0; i < j->run_count; i++) {
-        const struct osoe_rank_run *r = &j->runs[i];
-        int64_t k;
-        if (r->node_step == 0) {
-            if (r->first_node != node)
-                continue;
-            if (r->local_step == 0) {
-                if (r->first_local != 0)
-                    continue;
-                k = 0;
-            } else if ((int64_t)r->first_local % r->local_step != 0) {
-                continue;
-            } else {
-                k = -(int64_t)r->first_local / r->local_step;
-            }
-        } else {
-            int64_t apart = (int64_t)node - (int64_t)r->first_node;
-            if (apart % r->node_step != 0)
-                continue;
-            k = apart / r->node_step;
-            if ((int64_t)r->first_local + k * r->local_step != 0)
-                continue;
-        }
-        if (k >= 0 && k < (int64_t)r->count)
-            return r->first_rank + (uint32_t)k;
-    }
-    return UINT32_MAX;
+    if (node >= j->node_count)
+        return UINT32_MAX;
+    return j->node_lead ? j->node_lead[node] : j->one_node_lead;
 }
 
 /* The logical node a world rank is on. O(log R): the network path's question. */

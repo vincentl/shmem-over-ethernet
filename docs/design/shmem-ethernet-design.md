@@ -3997,9 +3997,12 @@ wait_eq(&t->copied, (d+1)*(L-1));
 ```
 
 Legal because `dest` is undefined until the collective returns, so intermediate
-values are unobservable by any conforming program. The epoch number travels in
-the internode AM and is asserted on receipt — the collective analogue of §3.13's
-handler-table checksum.
+values are unobservable by any conforming program. For barrier and sync the
+epoch number travels in the internode AM and is asserted on receipt — the
+collective analogue of §3.13's handler-table checksum. *(The data collectives'
+internode phase, as built below, carries no epoch yet: PEs that call different
+collectives meet there as a wrong result or a hang rather than a named fatal.
+It is checked from phase 1 step 5 slice 2, behind `internode.h`.)*
 
 **Why a single writer.** An earlier draft had local members combine into the
 lead's `dest` as they arrived. That fails three ways:
@@ -4076,9 +4079,12 @@ does **not** generalize:
 Each needs its own design before it is implemented (§7). Scans have one (§5.8);
 alltoall and collect do not yet.
 
-For the collectives it covers, this still eliminates scratch sizing — no chunking
-loop, no high-water allocation, no per-team data area. Their shared footprint is
-**three counters on three cache lines**, regardless of reduction size.
+For the collectives it covers, this eliminates scratch sizing within a node — no
+chunking loop, no high-water allocation, no per-team data area. Their shared
+footprint there is **three counters on three cache lines**, regardless of
+reduction size. Between nodes a partial result has to land somewhere that is not
+`dest`, and the as-built paragraph below says where: fixed slots of §5.8's
+internal region, a vector larger than a slot going in pieces.
 
 *(Fallback for cases where `dest` cannot serve: chunk through fixed scratch. The
 loop costs nothing on small reductions and adds pipelining on large ones. §5.8 turns
@@ -4088,8 +4094,10 @@ this into the large-reduction design.)*
 `reductions.c`, `broadcast.c`). Within a node, exactly the scheme above: every
 member arrives on the team's `arrived`, the last to arrive wakes the lead, the
 lead - the team's member with the lowest local id, local id 0 for both teams
-that exist, which §5.2's "lowest team rank" coincides with for every
-distribution the bootstrap accepts - reads each member's source only now and
+that exist; §5.2 says the lowest team rank, which that is under every
+distribution Slurm and the launcher produce, though the bootstrap accepts orders
+in which it is not, and any member would do so long as every member agrees -
+reads each member's source only now and
 combines it into its own `dest`, bumps `released`, and leaves after the last
 copy-out on `copied`. **Between nodes the leads meet above the boundary**, over
 put, fenced rmw and a wait - §5.8's generic route - not through AM messages
@@ -4121,7 +4129,10 @@ make a signed overflow undefined. Costs, with *N* nodes, *L* local members, *k*
 the fan-out and *n* bytes: the lead's combine O(*L n*), a copy-out O(*n*),
 ⌈*n* / 16 KiB⌉ passes of depth ⌈log_*k* *N*⌉ each way with O(*k n*) combining and
 *k* puts per node per piece; a broadcast finds its rotated tree's *k* + 1
-neighbouring leads in the rank map, O(*k R*) for *R* runs.
+neighbouring leads in O(*k*), from a table of each node's lead that the job
+object keeps beside its addresses and blobs (*N* words a node, written at the
+rendezvous in O(*R* + *N*)) - scanning the rank map instead made every
+broadcast linear in the node count under a block distribution.
 
 ### 5.6 Barrier versus sync
 
@@ -4224,13 +4235,18 @@ region is additive and costs nothing until a collective uses it. *(Built at
 step 5 as the tail of each PE's heap mapping, past the page-rounded
 `SHMEM_SYMMETRIC_SIZE`: no new object or mapping, the allocator never reaches
 it, no API check admits it, and a backend that registers the heap registers it.
-It holds a page of control words and fan-out + 1 slots of 16 KiB; its size is
-fixed by the fan-out every node agrees on, and the slot is a constant for the
-same reason. `internal-region.h`.)*
+It holds fan-out + 1 slots of 16 KiB and then a page of control words - eight
+bytes each, on lines of their own, since stock verbs have no four-byte atomics;
+the slots first, so that a store running off the end of the heap lands in
+scratch rather than in a count. Its size is fixed by the fan-out every node
+agrees on, and the slot is a constant for the same reason.
+`internal-region.h`.)*
 
 *(Deferred: a separate internal collective-transport header. Both implementations
 would sit behind the same collective routines and be chosen at build time, so the
-header can wait until reductions land and show what it must contain.)*
+header can wait until reductions land and show what it must contain. They landed
+at step 5 with their internode phase above the boundary, in `collectives.c`; the
+header is that step's next slice.)*
 
 #### Large reductions
 
@@ -4547,7 +4563,9 @@ D7). Per rank: its node (4 bytes) and its **local index on that node** (2 bytes;
 16 bits suffice at 256 PEs per node, and `OSOE_GTIDS` longer than 65,535 is
 refused). The local index is the one fact about a *remote* PE that an RDMA
 backend cannot do without — it forms a remote heap address as the node's
-registered base plus index × heap size plus offset, and under Slurm's cyclic or
+registered base plus index × the heap mapping's size plus offset (the mapping
+being the heap and, past it, §5.8's internal region at `internal_offset`), and
+under Slurm's cyclic or
 arbitrary distributions the index is not derivable from the node map. The map is
 shared, one copy per node: 6 × 10⁶ bytes ≈ 6 MiB per node at 10⁶ PEs, accepted for
 now. A PE's own node is answered privately and in O(*L*): which local id a rank

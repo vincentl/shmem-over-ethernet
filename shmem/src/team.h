@@ -80,8 +80,8 @@ struct osoe_team {
     uint32_t lead_position;         /* this node among the parent's children */
     uint32_t lead_children;
     uint32_t lead_child[OSOE_COLLECTIVE_FANOUT_MAX];
-    uint32_t arrivals_expected;
-    uint32_t releases_expected;
+    uint64_t arrivals_expected;
+    uint64_t releases_expected;
 };
 
 /*

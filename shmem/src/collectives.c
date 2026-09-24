@@ -59,8 +59,8 @@
  * intranode combine is O(L n), each member's copy-out O(n); the internode phase
  * is ceil(n / slot) passes of depth ceil(log_k N) each way, with O(k n) combining
  * and k puts per node per piece. A broadcast finds its rotated tree's k + 1
- * neighbouring leads in the rank map, O(k R) for R runs; a reduction's tree is
- * found once per team.
+ * neighbouring leads in the job's table of leads, O(k) (job.h); a reduction's
+ * tree is found once per team.
  */
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -70,6 +70,7 @@
 
 #include <shmem.h>
 
+#include "base/cacheline.h"
 #include "base/epoch.h"
 #include "blocked.h"
 #include "collectives.h"
@@ -84,33 +85,34 @@
 #include "transport.h"
 #include "wait.h"
 
-/* The internal region's control words: a cache line each for a team's arrival
- * word (children's pieces in) and release word (the parent's pieces down). */
-enum { WORDS_PER_TEAM = 128 };
+/* The internal region's layout (internal-region.h): the slots, then the control
+ * words, per team an eight-byte arrival word (children's pieces in) and release
+ * word (the parent's pieces down), each on a cache line of its own. */
+enum { WORDS_PER_TEAM = 2 * OSOE_CACHELINE };
 _Static_assert(OSOE_TEAMS * WORDS_PER_TEAM <= OSOE_INTERNAL_WORDS_BYTES,
                "every team's words fit the internal region's page of them");
-
-static uint64_t arrivals_word(uint32_t team)
-{
-    return (uint64_t)team * WORDS_PER_TEAM;
-}
-
-static uint64_t release_word(uint32_t team)
-{
-    return (uint64_t)team * WORDS_PER_TEAM + WORDS_PER_TEAM / 2;
-}
 
 /* Slot `position` holds that child's partial result; the one after the last
  * child's holds what the parent sends down. Only the world team spans nodes
  * today, so the slots are its; a split team (§7.3) will need its own. */
 static uint64_t child_slot(uint32_t position)
 {
-    return OSOE_INTERNAL_WORDS_BYTES + (uint64_t)position * OSOE_INTERNAL_SLOT_BYTES;
+    return (uint64_t)position * OSOE_INTERNAL_SLOT_BYTES;
 }
 
 static uint64_t release_slot(void)
 {
     return child_slot(osoe.bootstrap.collective_fanout);
+}
+
+static uint64_t arrivals_word(uint32_t team)
+{
+    return child_slot(osoe.bootstrap.collective_fanout + 1) + (uint64_t)team * WORDS_PER_TEAM;
+}
+
+static uint64_t release_word(uint32_t team)
+{
+    return arrivals_word(team) + OSOE_CACHELINE;
 }
 
 /* This PE's own internal region, at `offset`. */
@@ -169,7 +171,7 @@ static void find_lead_tree(uint32_t root_node, struct lead_tree *out, const char
  * result comes down from the parent into `at`, and goes on to the children.
  */
 static void lead_piece(struct osoe_team *t, const struct lead_tree *tree, unsigned char *at,
-                       size_t bytes, size_t width, osoe_combine_fn combine, const char *routine)
+                       size_t bytes, size_t width, osoe_combine_function combine, const char *routine)
 {
     struct osoe_transport_context *context = osoe_transport_context_default();
     uint32_t team = t->number;
@@ -177,7 +179,7 @@ static void lead_piece(struct osoe_team *t, const struct lead_tree *tree, unsign
 
     if (tree->children) {
         t->arrivals_expected += tree->children;
-        osoe_wait_internal(routine, arrivals_word(team), 4, SHMEM_CMP_EQ,
+        osoe_wait_internal(routine, arrivals_word(team), 8, SHMEM_CMP_EQ,
                            t->arrivals_expected, OSOE_BLOCKED_DETAIL_EPOCH, epoch);
         if (combine)
             for (uint32_t c = 0; c < tree->children; c++)
@@ -188,9 +190,9 @@ static void lead_piece(struct osoe_team *t, const struct lead_tree *tree, unsign
             osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL,
                                child_slot(tree->position), at, bytes, OSOE_TRANSPORT_MORE);
         osoe_transport_rmw(context, (int)tree->parent, OSOE_REGION_INTERNAL, arrivals_word(team),
-                           OSOE_RMW_ADD, 4, 1, 0, OSOE_TRANSPORT_FENCED);
+                           OSOE_RMW_ADD, 8, 1, 0, OSOE_TRANSPORT_FENCED);
         t->releases_expected += 1;
-        osoe_wait_internal(routine, release_word(team), 4, SHMEM_CMP_EQ,
+        osoe_wait_internal(routine, release_word(team), 8, SHMEM_CMP_EQ,
                            t->releases_expected, OSOE_BLOCKED_DETAIL_EPOCH, epoch);
         memcpy(at, internal(release_slot()), bytes);
     }
@@ -198,7 +200,7 @@ static void lead_piece(struct osoe_team *t, const struct lead_tree *tree, unsign
         osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL, release_slot(),
                            at, bytes, OSOE_TRANSPORT_MORE);
         osoe_transport_rmw(context, (int)tree->child[c], OSOE_REGION_INTERNAL, release_word(team),
-                           OSOE_RMW_ADD, 4, 1, 0,
+                           OSOE_RMW_ADD, 8, 1, 0,
                            OSOE_TRANSPORT_FENCED |
                            (c + 1 < tree->children ? OSOE_TRANSPORT_MORE : 0));
     }
@@ -206,7 +208,7 @@ static void lead_piece(struct osoe_team *t, const struct lead_tree *tree, unsign
 
 /* The leads' phase for the whole of `dest`, piece by piece. */
 static void internode_phase(struct osoe_team *t, unsigned char *dest, size_t bytes, size_t width,
-                            osoe_combine_fn combine, int root_rank, const char *routine)
+                            osoe_combine_function combine, int root_rank, const char *routine)
 {
     if (t->number != OSOE_TEAM_WORLD)
         osoe_fatal("%s: %s spans nodes, and only the world team's leads have a tree", routine,
@@ -242,7 +244,7 @@ static void internode_phase(struct osoe_team *t, unsigned char *dest, size_t byt
  */
 static int data_collective(const char *routine, shmem_team_t team, void *dest,
                            const void *source, size_t nelems, size_t width,
-                           osoe_combine_fn combine, int root)
+                           osoe_combine_function combine, int root)
 {
     struct osoe_team *t = osoe_team_of(routine, team);
     if (!t)
@@ -274,29 +276,34 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
     bool lead = osoe.bootstrap.local_id == 0;
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
 
-    /* Arrive; the last to arrive wakes the lead, which waits for exactly that. */
-    if (osoe_epoch_bump_eq(t->arrived, (k + 1) * members) && !lead)
+    /*
+     * Arrive; the last to arrive wakes the lead, which waits for exactly that.
+     * The bump is the stamping one (base/epoch.h), because the lead waits on
+     * this counter: without the stamp, a sweep expiring just as a late member
+     * arrives would be counted as a lost wake.
+     */
+    if (osoe_epoch_release_bump_eq(t->arrived, (k + 1) * members) && !lead)
         osoe_epoch_wake_all(t->arrived);
 
     if (lead) {
         osoe_epoch_wait_eq(t->arrived, (k + 1) * members, routine);
-        unsigned char *acc = dest;
+        unsigned char *accumulator = dest;
         if (root < 0) {
             /* In place, the lead's source already is its dest. */
             if (source != dest)
-                memcpy(acc, source, bytes);
+                memcpy(accumulator, source, bytes);
             for (uint32_t m = 1; m < members; m++)
-                combine(acc, (const unsigned char *)osoe.node.heap_of[m] + source_offset,
+                combine(accumulator, (const unsigned char *)osoe.node.heap_of[m] + source_offset,
                         nelems);
         } else {
             int32_t root_local = osoe_node_local_id(&osoe.node, (uint32_t)root_rank);
             if (root_local >= 0 &&
                 !((uint32_t)root_local == osoe.bootstrap.local_id && source == dest))
-                memcpy(acc, (const unsigned char *)osoe.node.heap_of[root_local] +
+                memcpy(accumulator, (const unsigned char *)osoe.node.heap_of[root_local] +
                                 source_offset, bytes);
         }
         if (t->internode)
-            internode_phase(t, acc, bytes, width, combine, root_rank, routine);
+            internode_phase(t, accumulator, bytes, width, combine, root_rank, routine);
 
         /* The final dest is written; now the release, and the copy-outs. */
         if (!osoe_epoch_release_bump_eq(t->released, k + 1))
@@ -308,7 +315,7 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
     } else {
         osoe_epoch_wait_eq(t->released, k + 1, routine);
         memcpy(dest, (const unsigned char *)osoe.node.heap_of[0] + dest_offset, bytes);
-        if (osoe_epoch_bump_eq(t->copied, (d + 1) * (members - 1)))
+        if (osoe_epoch_release_bump_eq(t->copied, (d + 1) * (members - 1)))  /* stamped: as arrived */
             osoe_epoch_wake_all(t->copied);
     }
 
@@ -320,7 +327,7 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
 }
 
 int osoe_reduce(const char *routine, shmem_team_t team, void *dest, const void *source,
-                size_t nelems, size_t width, osoe_combine_fn combine)
+                size_t nelems, size_t width, osoe_combine_function combine)
 {
     return data_collective(routine, team, dest, source, nelems, width, combine, -1);
 }

@@ -27,9 +27,9 @@
 #include "export.h"
 
 #define OSOE_COMBINE(T, NAME, OPERATOR, EXPRESSION)                                   \
-    static void combine_##NAME##_##OPERATOR(void *acc, const void *in, size_t n)      \
+    static void combine_##NAME##_##OPERATOR(void *accumulator, const void *in, size_t n)      \
     {                                                                                 \
-        T *a = acc;                                                                   \
+        T *a = accumulator;                                                                   \
         const T *b = in;                                                              \
         for (size_t i = 0; i < n; i++) {                                              \
             T x = a[i], y = b[i];                                                     \

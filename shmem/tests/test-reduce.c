@@ -67,16 +67,24 @@ static void integer_reductions(void)
             CHECK(dst[i] == element(0, (int)i));
     }
 
-    /* A product, of values that stay small, and one that overflows: the wrapped
-     * value, the same on every PE (reductions.c). */
+    /* Products: of twos, which overflow only past 31 PEs; of 65537s, which
+     * overflow from two PEs on; and of ones. Then a sum that overflows. Each
+     * wrapped value is the same on every PE (combine.h), and computed here in
+     * unsigned arithmetic, so the test is defined at any PE count. */
     int *isrc = shmem_malloc(SMALL * sizeof *isrc);
     int *idst = shmem_malloc(SMALL * sizeof *idst);
     CHECK_FATAL(isrc && idst);
     for (int i = 0; i < SMALL; i++)
-        isrc[i] = i == 0 ? 2 : 1;
+        isrc[i] = i == 0 ? 2 : i == 1 ? 65537 : 1;
     CHECK(shmem_int_prod_reduce(SHMEM_TEAM_WORLD, idst, isrc, SMALL) == 0);
-    CHECK(idst[0] == (1 << npes));
-    for (int i = 1; i < SMALL; i++)
+    uint32_t twos = 1, big = 1;
+    for (int p = 0; p < npes; p++) {
+        twos *= 2u;
+        big *= 65537u;
+    }
+    CHECK(idst[0] == (int32_t)twos);
+    CHECK(idst[1] == (int32_t)big);
+    for (int i = 2; i < SMALL; i++)
         CHECK(idst[i] == 1);
     for (int i = 0; i < SMALL; i++)
         isrc[i] = INT32_MAX;
@@ -234,6 +242,10 @@ static void generics_teams_and_rounds(void)
     CHECK_FATAL(usrc && udst);
     *usrc = 1u << (me % 32);
     CHECK(shmem_or_reduce(SHMEM_TEAM_WORLD, udst, usrc, 1) == 0);
+    unsigned int want_bits = 0;
+    for (int p = 0; p < npes; p++)
+        want_bits |= 1u << (p % 32);
+    CHECK(*udst == want_bits);
 
     /* The shared team: this node's PEs only, numbered by local position. */
     int local = shmem_team_n_pes(SHMEM_TEAM_SHARED);

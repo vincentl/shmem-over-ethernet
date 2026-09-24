@@ -46,9 +46,12 @@ bool osoe_epoch_bump_eq(struct osoe_epoch *e, uint32_t target);
 /*
  * bump_eq for a counter that waiters wait on with wait_eq: the same add,
  * preceded by the stamp that lets a waiter tell a lost wake from a late one.
- * One bumper per target by construction - the releaser of an epoch - which is
- * what makes a single stamp enough. The arrival counters, which L members bump,
- * use bump_eq and pay nothing.
+ * One bumper per target, the releaser of an epoch - or several, when every one
+ * of them stamps: a data collective's arrivals and copy-outs, which its lead
+ * waits on (collectives.c). Each stamp precedes its own bump, so a waiter that
+ * sees the target sees the last bumper's stamp or a later one, and a single
+ * word still holds the time the target was reached. The barrier's arrivals,
+ * which nobody waits on, use bump_eq and pay nothing.
  */
 bool osoe_epoch_release_bump_eq(struct osoe_epoch *e, uint32_t target);
 

@@ -9,8 +9,8 @@
 
 #include <shmem.h>
 
-/* acc[i] = acc[i] OP in[i] for i < nelems: one operator on one type. */
-typedef void (*osoe_combine_fn)(void *acc, const void *in, size_t nelems);
+/* accumulator[i] = accumulator[i] OP in[i] for i < nelems: one operator on one type. */
+typedef void (*osoe_combine_function)(void *accumulator, const void *in, size_t nelems);
 
 /*
  * A reduction of nelems elements of `width` bytes over `team`, combining with
@@ -19,7 +19,7 @@ typedef void (*osoe_combine_fn)(void *acc, const void *in, size_t nelems);
  * SHMEM_TEAM_INVALID. `routine` is the API routine, for diagnostics.
  */
 int osoe_reduce(const char *routine, shmem_team_t team, void *dest, const void *source,
-                size_t nelems, size_t width, osoe_combine_fn combine);
+                size_t nelems, size_t width, osoe_combine_function combine);
 
 /* A broadcast of nelems elements of `width` bytes from team rank `root`'s source
  * to every member's dest, the root's included (spec §9.10.7). */
