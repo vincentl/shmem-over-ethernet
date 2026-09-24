@@ -30,47 +30,49 @@ size_t osoe_rma_bytes(const char *routine, size_t nelems, size_t width)
 }
 
 void osoe_rma_put(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
-                  size_t nelems, size_t width, int pe)
+                  size_t nelems, size_t width, int pe, unsigned flags)
 {
     if (nelems == 0)
         return;
     size_t len = osoe_rma_bytes(routine, nelems, width);
     osoe_check_pe(routine, pe);
     uint64_t offset = osoe_symmetric_offset(routine, dest, len);
-    osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source, len, 0);
+    osoe_transport_put(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, source, len,
+                       flags);
 }
 
 void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
-                  size_t nelems, size_t width, int pe)
+                  size_t nelems, size_t width, int pe, unsigned flags)
 {
     if (nelems == 0)
         return;
     size_t len = osoe_rma_bytes(routine, nelems, width);
     osoe_check_pe(routine, pe);
     uint64_t offset = osoe_symmetric_offset(routine, source, len);
-    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, len, 0);
+    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, OSOE_REGION_HEAP, offset, dest, len,
+                       flags);
 }
 
 OSOE_API void pshmem_putmem(void *dest, const void *source, size_t nelems, int pe)
 {
-    osoe_rma_put("shmem_putmem", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, pe);
+    osoe_rma_put("shmem_putmem", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, pe, 0);
 }
 
 OSOE_API void pshmem_getmem(void *dest, const void *source, size_t nelems, int pe)
 {
-    osoe_rma_get("shmem_getmem", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, pe);
+    osoe_rma_get("shmem_getmem", SHMEM_CTX_DEFAULT, dest, source, nelems, 1, pe, 0);
 }
 
 OSOE_API void pshmem_ctx_putmem(shmem_ctx_t ctx, void *dest, const void *source,
                                size_t nelems, int pe)
 {
-    osoe_rma_put("shmem_ctx_putmem", ctx, dest, source, nelems, 1, pe);
+    osoe_rma_put("shmem_ctx_putmem", ctx, dest, source, nelems, 1, pe, 0);
 }
 
 OSOE_API void pshmem_ctx_getmem(shmem_ctx_t ctx, void *dest, const void *source,
                                size_t nelems, int pe)
 {
-    osoe_rma_get("shmem_ctx_getmem", ctx, dest, source, nelems, 1, pe);
+    osoe_rma_get("shmem_ctx_getmem", ctx, dest, source, nelems, 1, pe, 0);
 }
 
 /* NULL for anything not reachable by loads and stores in this process: a

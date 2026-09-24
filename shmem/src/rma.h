@@ -16,15 +16,17 @@
 /*
  * Put nelems elements of `width` bytes from source to dest on pe: returns at
  * local completion, as shmem_putmem (spec §9.6.1.1). nelems 0 is a no-op, and
- * a byte count past SIZE_MAX is fatal, naming `routine`.
+ * a byte count past SIZE_MAX is fatal, naming `routine`. `flags` are the
+ * transport's (transport.h): OSOE_TRANSPORT_MORE from a loop with more to
+ * follow, otherwise 0.
  */
 void osoe_rma_put(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
-                  size_t nelems, size_t width, int pe);
+                  size_t nelems, size_t width, int pe, unsigned flags);
 
 /* Get nelems elements of `width` bytes from source on pe into dest: dest holds
- * them on return, as shmem_getmem (spec §9.6.1.5). */
+ * them on return, as shmem_getmem (spec §9.6.1.5). `flags` as for a put. */
 void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
-                  size_t nelems, size_t width, int pe);
+                  size_t nelems, size_t width, int pe, unsigned flags);
 
 /* nelems elements of `width` bytes as a byte count, fatal naming `routine` if
  * a size_t cannot hold it. */

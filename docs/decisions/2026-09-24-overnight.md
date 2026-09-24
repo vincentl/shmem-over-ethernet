@@ -58,11 +58,14 @@ fails is a finding about the bootstrap or §6.1. Then the smoke test, the floor
 and the benchmark, which measures Slurm's default binding against none
 (entry 9).
 
-**Open for the author:**
+**Open for the author**, both answered the next morning:
 - entry 20: should a fatal on a lead leave the ending to its agent, as a
   global exit does, so the other nodes hear the abort rather than a death?
+  *No* - see the entry.
 - entry 16: the strided forms cost a round trip an element across nodes until
-  a strided primitive exists; ibput and ibget stay deferred.
+  a strided primitive exists; ibput and ibget stay deferred. *No strided
+  primitive; batch the puts, and give gets a nonblocking form* - see the
+  entry.
 
 Nothing in the plan was left undone.
 
@@ -212,6 +215,16 @@ stale:
   before it returns - and what a real nonblocking get would add: requests in
   flight together, through the flag §4.10 reserves.
 
+*The author's decision, the next morning, on the strided forms: no strided
+operation at the transport boundary.* The corpus has no application that
+calls `iput` or `iget` - only conformance tests, tutorial examples and one
+microbenchmark - and no transport osoe targets could carry one: RDMA's
+scatter/gather list describes the local side only, and a vendor's strided
+memory key must be built by the target, which a one-sided call cannot
+arrange. Instead the loop batches: every element of an `iput` but the last
+carries `OSOE_TRANSPORT_MORE`, and gets get the nonblocking form the boundary
+reserves, so an `iget`'s requests can be in flight together.
+
 ## The Pi kit
 
 **17. The memory check found one thing, and it is fixed: an `OSOE_HEAP_BASE`
@@ -266,3 +279,12 @@ the agent, as a global exit does (`osoe_abort_end`), so that the other nodes
 hear the abort and not a death - which §3.15 already says on-demand
 connections will need. It changes the model's waiter and wants a model run;
 not done overnight.
+
+*The author's decision, the next morning: leave a fatal as it is.* A fatal
+races the resource manager, which is tearing the job down anyway: with
+`srun -K1` or a site's `KillOnBadExit=1`, Slurm ends every task itself and
+names the first to fail ("srun: error: pi-002: task 3: Killed"), so what the
+goodbye would add is a better message on the other nodes, under `-K0` only,
+where every PE already ends with the failure. It returns with on-demand
+connections, where a node that holds no connection to the dying one never
+reads its end of stream (§3.15 says so already).
