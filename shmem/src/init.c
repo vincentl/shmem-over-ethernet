@@ -84,9 +84,6 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "    SHMEM_DEBUG            print what the library set up, per PE\n"
 "\n"
 "  Specific to osoe:\n"
-"    OSOE_WATCHDOG          0 or 1: the development watchdog that ends a job\n"
-"                           whose PE has died, instead of waiting for the\n"
-"                           launcher's timeout. On in debug builds (§3.15)\n"
 "    OSOE_MAX_THREADS       counter blocks per PE, one per thread (§3.14)\n"
 "    OSOE_NO_PROGRESS_TIMEOUT\n"
 "                           seconds a wait may see no progress before it ends\n"
@@ -116,8 +113,6 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "    OSOE_KEEPALIVE         IDLE,INTERVAL,COUNT: TCP keepalive between nodes,\n"
 "                           in seconds, seconds and probes; default 60,10,6;\n"
 "                           0 for none (§3.15)\n"
-"    OSOE_LIVENESS          0: no agent watches for a local PE's death, which\n"
-"                           only the tests of the watchdog need (§3.15)\n"
 "\n"
 "  The bootstrap variables OSOE_PROCID, OSOE_LOCALID, OSOE_GTIDS,\n"
 "  OSOE_STEP_NUM_TASKS, OSOE_NODEID, OSOE_JOB_ID and OSOE_STEP_ID are set by\n"
@@ -305,12 +300,11 @@ static void session_start(void)
      */
     if (osoe.bootstrap.debug)
         fprintf(stderr, "osoe: PE %u of %u (local %u of %u): segment /dev/shm%s, "
-                "heap %llu bytes at %#llx, watchdog %s, node %u of %u%s\n",
+                "heap %llu bytes at %#llx, node %u of %u%s\n",
                 osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
                 osoe.bootstrap.local_count, osoe.node.control_name,
                 (unsigned long long)osoe.node.heap_size,
                 (unsigned long long)(uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id],
-                osoe.bootstrap.watchdog ? "on" : "off",
                 osoe.job.node, osoe.job.node_count,
                 osoe.job.force_remote ? ", force-remote" : "");
 }

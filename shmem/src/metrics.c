@@ -420,14 +420,26 @@ static void publish(const char *routine, enum osoe_blocked_detail kind, uint64_t
     atomic_fetch_add_explicit(&me->blocked_gen, 1, memory_order_seq_cst);
 }
 
+/* The routine of the record, for this process's own agent (osoe_blocked_routine):
+ * a pointer to a name with static storage, published alone, so that a thread
+ * of this process reads it without the record's plain character stores. */
+static _Atomic(const char *) waiting_in;
+
 void osoe_blocked_enter(const char *routine, enum osoe_blocked_detail kind, uint64_t detail)
 {
     if (osoe.node.slots)
         publish(routine, kind, detail, osoe_now_ns());
+    atomic_store_explicit(&waiting_in, routine, memory_order_release);
 }
 
 void osoe_blocked_leave(void)
 {
+    atomic_store_explicit(&waiting_in, NULL, memory_order_release);
     if (osoe.node.slots)
         publish(NULL, OSOE_BLOCKED_DETAIL_NONE, 0, 0);
+}
+
+const char *osoe_blocked_routine(void)
+{
+    return atomic_load_explicit(&waiting_in, memory_order_acquire);
 }

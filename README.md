@@ -96,8 +96,6 @@ There is no single-PE default.
 | `OSOE_NO_PROGRESS_TIMEOUT` | no | Seconds a wait may go without progress before it ends the job naming what it waited for; unset, no wait gives up (design §3.15). Replaces `OSOE_BOOTSTRAP_TIMEOUT`, which is retired |
 | `OSOE_HEAP_BASE` | no | Address for each PE's own heap, e.g. `0x100000000000`, if the defaults are taken |
 | `OSOE_HEAP_SHIFT` | no | A test mode: a size, a whole number of pages, e.g. `2m`. Each PE maps its own heap that far times its rank past the base, so no two PEs share a symmetric address (design §8.2) |
-| `OSOE_WATCHDOG` | no | `1` or `0`: the development watchdog, which aborts loudly when a PE dies while others wait, instead of hanging. On in the `debug`, `asan` and `tsan` builds, off in `release` (design §3.15) |
-| `OSOE_LIVENESS` | no | `1` or `0`: whether each PE's agent watches for a local PE's death, with pidfds, in every build (design §3.15). On unless set to `0`, which only the tests of the watchdog need |
 | `OSOE_KEEPALIVE` | no | `IDLE,INTERVAL,COUNT` or `0`: TCP keepalive on the connections between nodes, in seconds, seconds and probes; default `60,10,6` (design §3.15). Jobs of more than one node only |
 
 Rules:

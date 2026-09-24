@@ -22,6 +22,11 @@
 void osoe_blocked_enter(const char *routine, enum osoe_blocked_detail kind, uint64_t detail);
 void osoe_blocked_leave(void);
 
+/* The routine this process's thread is waiting in, NULL if none: for its agent,
+ * which names it when an abort ends the process (abort.c). `routine` must
+ * have static storage - every caller passes a routine's name. */
+const char *osoe_blocked_routine(void);
+
 /* CLOCK_MONOTONIC nanoseconds, for the record and for the wait histograms.
  * Taken only on paths that are already about to sleep (§3.14 cost rules). */
 uint64_t osoe_now_ns(void);

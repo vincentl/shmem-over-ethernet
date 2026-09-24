@@ -11,7 +11,6 @@
 #include "bootstrap.h"
 #include "fatal.h"
 #include "watch-range.h"
-#include "watchdog.h"
 
 /*
  * A specification environment variable (§8), whose deprecated SMA_ spelling is
@@ -162,6 +161,11 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         fprintf(stderr, "osoe: OSOE_BOOTSTRAP_TIMEOUT is retired and ignored; "
                         "OSOE_NO_PROGRESS_TIMEOUT bounds a wait that stops making "
                         "progress, and by default nothing does\n");
+    if ((getenv("OSOE_WATCHDOG") || getenv("OSOE_LIVENESS")) && b->local_id == 0 &&
+        b->rank == 0)
+        fprintf(stderr, "osoe: OSOE_WATCHDOG and OSOE_LIVENESS are retired and ignored; "
+                        "every agent watches its node-mates with pidfds, in every build "
+                        "(design §3.15)\n");
 
     /*
      * §3.14: the control segment's name is removed as soon as every local PE
@@ -293,24 +297,6 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         }
         b->secured = true;
     }
-
-    uint32_t watchdog = OSOE_WATCHDOG_DEFAULT;
-    if (osoe_environment_u32("OSOE_WATCHDOG", &watchdog) == OSOE_ENVIRONMENT_INVALID || watchdog > 1)
-        osoe_fatal("OSOE_WATCHDOG='%s' is not 0 or 1", getenv("OSOE_WATCHDOG"));
-    b->watchdog = watchdog != 0;
-
-    /*
-     * The agents' pidfds find a local PE's death in every build (§3.15,
-     * liveness.h). 0 turns them off, for the tests of what else finds one - the
-     * development watchdog, and a wait's sweep - which the agent would
-     * otherwise race and, ending the PE itself, pre-empt. Stored as "off" so
-     * that a bootstrap built by hand, zeroed, keeps them.
-     */
-    uint32_t liveness = 1;
-    if (osoe_environment_u32("OSOE_LIVENESS", &liveness) == OSOE_ENVIRONMENT_INVALID ||
-        liveness > 1)
-        osoe_fatal("OSOE_LIVENESS='%s' is not 0 or 1", getenv("OSOE_LIVENESS"));
-    b->liveness_off = liveness == 0;
 
     b->print_version = spec_env("VERSION") != NULL;
     b->print_info = spec_env("INFO") != NULL;

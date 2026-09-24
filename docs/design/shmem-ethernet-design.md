@@ -1632,8 +1632,8 @@ form for a fatal with something to publish, and `shmem.fatal-order` and
 `shmem.job.duplicate-rank.slow-message` hold the order.
 
 **A fatal declares the node's abort**, and every wait reads the abort word at its
-next sweep in every build — only the liveness polling is the development
-watchdog. So the other PEs of a node stop within a sweep of the first fatal. A
+next sweep in every build. So the other PEs of a node stop within a sweep of the
+first fatal. A
 remote node cannot see another node's abort word: it learns of the abort from
 the abortive goodbye on its connection to that node (as built, below), or, from
 a node that died, as an end of stream without one.
@@ -1736,11 +1736,9 @@ the window, which a lead's mesh setup keeps to about a millisecond).
 the same path. A library wait that sweeps into a global exit ends the same way,
 not through a fatal that would change the status, and so does a fatal whose own
 declaration loses to a global exit, since what went wrong may be that exit's own
-doing. The development watchdog reads the word again before it calls a dead
-sibling a fatal: a PE a global exit ended is dead too, and a sweep that read the
-word before the exit was declared would otherwise end its PE with a failure — on
-a lead, before its agent could tell the other nodes. `abort_exit_model.py`
-checks this ordering: every process ends, each with a status a caller gave, and
+doing. (The development watchdog read the word again before it called a dead
+sibling a fatal, since a PE a global exit ended is dead too, until it was
+retired: below.) `abort_exit_model.py` checks this ordering: every process ends, each with a status a caller gave, and
 each of these rules broken fails it.
 
 *As built: the abort crosses nodes* (phase 1 step 4 slice 1, part A;
@@ -1794,7 +1792,7 @@ nobody will read (the model's crash cases). The one new message kind is `OSOE_AM
 abortive goodbye, the model found: after the final barrier no PE can call
 `shmem_global_exit`, and a fatal's status is a failure anyway.
 
-*As built: liveness without the watchdog* (phase 1 step 4 slice 1, part C;
+*As built: liveness* (phase 1 step 4 slice 1, part C;
 `liveness.[ch]`). Every PE's agent watches the deaths it can see: the lead's
 agent holds a pidfd for every other local PE, and every other agent one for its
 lead. At most once a sweep interval each agent polls the pidfds it holds, with
@@ -1826,8 +1824,8 @@ refinement the multi-node lead can take later, at the price of a seam function.
 The model's `pidfd` option is that ring version, a completion that wakes the
 lead at once; as built, the lead's own sweep wakes it within a sweep interval,
 and that is what the model's Part B case checks. `shmem.dead-pe` kills a lead or
-a sibling, on one node and on two, with the watchdog off: every survivor leaves
-with the failure status, the computing ones included.
+a sibling, on one node and on two: every survivor leaves with the failure
+status, the computing ones included.
 
 *As built: keepalive* (phase 1 step 4 slice 1, part D; `wire.c`). Every
 node-pair socket sets `SO_KEEPALIVE` with `TCP_KEEPIDLE` 60 s, `TCP_KEEPINTVL`
@@ -1858,63 +1856,27 @@ retransmission outstanding, and that side, correctly, waited on `tcp_retries2`
 rather than keepalive (TCP probes only a connection with nothing
 unacknowledged); the cut now comes two seconds after the job is ready.
 
-#### The development watchdog
+#### The development watchdog, retired
 
-> **A development aid, not the release path: on in the `debug`, `asan` and `tsan`
-> presets and off in `release`, with `OSOE_WATCHDOG` forcing either way.**
+Until §7.1 step 4, a PE blocked in `wait_until` or a barrier whose sibling had
+died waited for the launcher's timeout, so the development presets carried a
+watchdog: at each sweep of a library wait (§3.10), a `kill(pid, 0)` of every
+local PE, and on a dead one a loud failure naming the PE, the routine the waiter
+was in, and the control segment to point `osoe-stat` at. Off in `release`, so
+that production could not come to depend on it.
 
-Everything above is the production answer, and none of it exists before §7.1
-step 4. Until then a PE blocked in `wait_until` or a barrier whose sibling has
-died waits for the launcher's timeout, which on a development machine means
-minutes of nothing. The watchdog gives the developer a loud failure instead:
-
-- **An abort word in the control segment header**, plus a liveness check of the
-  local PEs' recorded pids, **run only when a library wait's safety-sweep
-  deadline expires** (§3.10). Never on the wake path, so a healthy wait pays
-  nothing at all for it — no load, no branch — and a wait that is merely slow
-  pays one pass over the local slots per sweep.
-- **On a dead PE or a set abort word, abort loudly**, naming the PE, the routine
-  the caller is inside, and the control segment to point `osoe-stat` at (§3.14).
-  The PE that notices sets the abort word first, so its siblings stop at their
-  own next sweep instead of each rediscovering the same corpse.
-- **Liveness is `kill(pid, 0)`**, using the pid each PE publishes in its slot
-  before the release store of its phase. `ESRCH` is unambiguous: no process holds
-  that pid. A recycled pid can only make a dead PE look alive, which is the hang
-  this replaces — never a false abort on a healthy job.
-
-**The scoping is the point.** Production must not come to depend on it, because
-it is strictly weaker than what step 4 brings and is absent from the build that
-ships. Off in `release` is what keeps that honest. What it deliberately does not
-do:
-
-- **No pidfd polling.** Detection is a poll at a sweep, so it is up to one sweep
-  late, and it cannot see a PE that is alive but wedged. Since step 4 the
-  library's own liveness does this in every build, with pidfds (above).
-- **No cross-node detection.** One node's PEs check one node's pids. A vanished
-  peer node is TCP keepalive's business (above).
-- **No `shmem_global_exit` and no abort between nodes.** The watchdog writes the
-  abort word within one node and reads it there. Carrying it further is the
-  library's in every build since step 4: the agent ends its PE, and the abortive
-  goodbye crosses nodes (above).
-- **Not during rendezvous.** The bootstrap waits carry a `failed` word and the
-  no-progress rule above, and run before the slots a liveness check would read
-  are all published.
-
-*What the watchdog still adds, since step 4.* Detection is the library's now:
-the agents' pidfds find any local death in every build, and the abort ends every
-PE. The watchdog adds two things. Its message names the routine the PE was
-waiting in, where the agents can only name the dead PE; and every waiting PE
-checks every sibling, where the agents check the lead and the lead checks the
-rest, so a lead that is wedged but alive still has its siblings' deaths found.
-Neither is needed for a job to end, and the first is now mostly unseen: the
-agents usually find a death first, and end their PEs before any sweep speaks,
-so the watchdog's message appears only when it wins the race. It stays in the
-development presets until a slice decides between retiring it and having the
-ending agent name the routine its PE is blocked in, which the PE's blocked
-record already holds; it costs a pass over the slots at each sweep of a waiting
-PE, and nothing on a wake. `OSOE_LIVENESS=0` turns the agents' pidfds off, for
-the tests of the watchdog and of a wait's sweep, which they would otherwise
-pre-empt.
+Step 4 made detection the library's, in every build: the agents' pidfds find
+any local death, and the abort ends every PE (above). The watchdog then added
+only its message, mostly unseen, since the agents usually found a death first,
+and the author retired it (2026-09-23): the ending agent now names the routine
+its PE was waiting in (abort.c), from a pointer each wait publishes beside its
+blocked record (§3.14; `blocked.h`), so the message is in every build. One
+thing went with it: every waiting PE checked every sibling, so a lead alive but
+wedged still had its siblings' deaths found; now only the lead's agent watches
+them. `OSOE_WATCHDOG` and `OSOE_LIVENESS` are retired, and a job that sets
+either is told so once. What a wait's sweep does is what remains of it
+(`sweep.c`): it counts, so that a blocked PE is seen to move (§3.14); polls the
+pidfds while the agent does not run yet, during init; and reads the abort word.
 
 ### 3.16 Memory-order discipline
 
@@ -4867,7 +4829,8 @@ machinery. The review's order is adopted.
    TCP keepalive. The next slice has the Slurm fixtures and the heap-base shift,
    and two refinements this one left open: the multi-node lead's pidfds on its
    ring, where a completion would find a death at once rather than within a
-   sweep interval, and whether the development watchdog stays.*
+   sweep interval, and whether the development watchdog stays - retired
+   (2026-09-23), and the ring not built for now.*
 
 Symmetric statics and the compiler wrapper follow step 4 (§7.4).
 

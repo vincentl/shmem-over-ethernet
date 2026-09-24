@@ -25,10 +25,12 @@ word - which a peer takes for a death, ending with a failure. So:
     that finds the abort - a caller of shmem_global_exit, a library wait that
     sweeps into it - waits for the agent to do so (abort.h: exactly one thread
     ends a process, and while the agent runs it is the agent).
-  * A library wait's sweep reads the word; with the development watchdog on it
-    then checks its siblings' pids, and a dead one is a fatal - unless the word
-    is set by then, since a PE an abort ended is dead too. A fatal whose own
-    declaration loses to a global exit ends as that global exit does.
+  * A library wait's sweep reads the word. It used to check its siblings' pids
+    too, with the development watchdog on, and call a dead one a fatal - which
+    a PE a global exit had ended also was, so the watchdog read the word again
+    first, and a fatal whose declaration lost to a global exit ended as that
+    exit did. The watchdog was retired (2026-09-23), and its three variants
+    with it; the routing of a fatal that loses remains, in fatal.c.
   * A pidfd per local PE (Part C): a PE that ends is found by the lead's
     agent, which declares a fatal naming it. That declaration loses to an
     abort already declared, and does nothing more.
@@ -47,7 +49,7 @@ its stream after what it has queued.
 
 Cases
   nonlead   A's P calls shmem_global_exit(5); A's lead's main thread is in a
-            library wait with the watchdog on, sweeping.
+            library wait, sweeping.
   lead      A's lead's main thread calls shmem_global_exit(5).
   both      A's P calls it with 5 and B's P with 6, at once (no waiter: nonlead
             has it, and with it this case is ten times the size).
@@ -88,14 +90,6 @@ Options
 Variants (each breaks one rule above)
   caller_exits      the caller ends its process itself. On the lead, the
                     process ends before its agent can send: STATUS.
-  neither           the watchdog does not re-read the word before calling a
-                    dead sibling a fatal, and a fatal that loses to a global
-                    exit still ends with a failure: STATUS.
-  watchdog_unchecked, fatal_unrouted
-                    one of those two defences each. Either alone suffices
-                    here; the tree has both, since the first also spares a
-                    misleading message and the second covers any fatal an
-                    abort provokes, not only the watchdog's.
   pidfd_fatal       the lead's agent takes a sibling's death for a fatal
                     rather than declaring one, and ends through the fatal path
                     without sending: STATUS.
@@ -339,7 +333,7 @@ def agent(variant, local, p, options):
 
 # ---- main threads -------------------------------------------------------------
 
-(PC_CALL, PC_MAIN_END, PC_SWEEP, PC_LIVENESS, PC_RECHECK, PC_FATAL_TAIL) = range(20, 26)
+(PC_CALL, PC_MAIN_END, PC_SWEEP) = range(20, 23)
 
 
 def main_end(variant, M, p, name):
@@ -380,16 +374,11 @@ def caller(variant, local, p, status):
 
 
 def waiter(variant, local, p):
-    """A library wait that never completes, sweeping, with the watchdog on."""
+    """A library wait that never completes, sweeping: each sweep reads the word
+    (sweep.c's stop_if_aborting). A global exit it leaves to its agent; a fatal
+    ends it at once, with a failure."""
     x = NODE_OF[p]
     name = f'{p}\'s main thread'
-    siblings = tuple(q for q in local[x] if q != p)
-
-    def on_word(M, w):
-        if disposition(w) == GLOBAL:
-            return main_end(variant, M, p, name)
-        u, _, lbl = end_process(M, p, FAIL, 'a fatal: the job is aborting')
-        return [(u, {}, lbl)]
 
     def step(M, L):
         if not M[ALIVE(p)]:
@@ -400,32 +389,11 @@ def waiter(variant, local, p):
         pc = L['pc']
         if pc == PC_SWEEP:
             w = M[WORD(x)]
-            if w:
-                return on_word(M, w)
-            return [({}, {'pc': PC_LIVENESS}, f'{name}: its sweep finds no abort')]
-        if pc == PC_LIVENESS:
-            dead = [q for q in siblings if not M[ALIVE(q)]]
-            if not dead:
-                return [({}, {'pc': PC_SWEEP}, f'{name}: every sibling is alive')]
-            unchecked = variant in ('watchdog_unchecked', 'neither')
-            if unchecked:
-                return [({}, start_declaring(FATAL * 16 + FAIL, PC_FATAL_TAIL),
-                         f'{name}: {dead[0]} has died: a fatal')]
-            return [({}, {'pc': PC_RECHECK}, f'{name}: {dead[0]} has died; reads the word again')]
-        if pc == PC_RECHECK:
-            w = M[WORD(x)]
-            if w:
-                return on_word(M, w)
-            return [({}, start_declaring(FATAL * 16 + FAIL, PC_FATAL_TAIL),
-                     f'{name}: the word is clear: a fatal')]
-        if pc == PC_FATAL_TAIL:
-            # fatal.c after its declaration: a global exit declared first ends
-            # this PE as that exit does; anything else, _exit with a failure.
-            w = M[WORD(x)]
-            routed = variant not in ('fatal_unrouted', 'neither')
-            if routed and disposition(w) == GLOBAL:
+            if not w:
+                return [({}, {}, f'{name}: its sweep finds no abort')]
+            if disposition(w) == GLOBAL:
                 return main_end(variant, M, p, name)
-            u, _, lbl = end_process(M, p, FAIL, 'a fatal')
+            u, _, lbl = end_process(M, p, FAIL, 'a fatal: the job is aborting')
             return [(u, {}, lbl)]
         if pc == PC_PAUSE:
             return []
@@ -648,9 +616,6 @@ CASES = [
     ('built', 'nonlead', PART_B, True),
     ('built', 'nonlead', NO_HELP, False),     # Part B needs its sweeps: the finding
     ('caller_exits', 'lead', BUILT, False),
-    ('neither', 'nonlead', BUILT, False),
-    ('watchdog_unchecked', 'nonlead', BUILT, True),
-    ('fatal_unrouted', 'nonlead', BUILT, True),
     ('pidfd_fatal', 'nonlead', BUILT, False),
     ('wake_first', 'nonlead', BUILT, False),
     ('no_rewake', 'on_b', {'pidfd': True, 'sweeps': False}, False),

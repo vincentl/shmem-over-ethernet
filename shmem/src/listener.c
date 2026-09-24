@@ -167,7 +167,7 @@ static uint64_t now_ns(void)
 }
 
 /*
- * A wait with no time limit, at its sweep (§3.15): the watchdog, then the
+ * A wait with no time limit, at its sweep (§3.15): the sweep, then the
  * no-progress rule on `moved`, the bytes that have crossed so far - so a
  * rendezvous that is slow but moving is never stalled, and one whose peer has
  * stopped ends naming it after OSOE_NO_PROGRESS_TIMEOUT (by default, never).

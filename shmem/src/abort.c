@@ -11,6 +11,7 @@
 
 #include "abort.h"
 #include "agent.h"
+#include "blocked.h"
 #include "state.h"
 
 static _Atomic uint32_t ending;         /* process-private: a thread is ending it */
@@ -111,11 +112,16 @@ _Noreturn void osoe_abort_end(void)
         _exit(status);
     }
     /* A fatal elsewhere on the node (or across the job): say so, once, for a PE
-     * that was computing and would otherwise vanish without a word, and leave
-     * as a fatal does - flushing, then _exit, running no handler. */
-    char msg[160];
+     * that was computing and would otherwise vanish without a word, and where
+     * this PE was - the routine its thread waits in, which the development
+     * watchdog named before it was retired (§3.15) - and leave as a fatal
+     * does: flushing, then _exit, running no handler. */
+    const char *routine = osoe_blocked_routine();
+    char msg[200];
     int n = snprintf(msg, sizeof msg, "osoe: PE %u: ending: the job is aborting on behalf "
-                     "of PE %u\n", osoe.bootstrap.rank, pe);
+                     "of PE %u; this PE was %s%s\n", osoe.bootstrap.rank, pe,
+                     routine ? "waiting in " : "not waiting in the library",
+                     routine ? routine : "");
     fflush(NULL);
     if (n > 0) {
         ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
