@@ -29,6 +29,15 @@ A node that learns of an abort - a caller, a fatal, an ABORT, a FIN without a
 goodbye - sets its abort word once (first writer wins, and its status stays),
 stops the job's own traffic, and sends as its design says.
 
+A node's processes that exit with input unread reset their connections, and a
+peer still sending to them finds that as a failed send - at once, before it has
+read what arrived ahead of the reset, the ABORT among it. The goodbye design
+counts an ABORT once the peer's kernel has acknowledged it, so it is there to
+be read; what the peer does with its failed send decides whether it is. It
+stops sending on that connection and goes on receiving until the stream ends,
+and is judged there, by the ABORT or its absence (third review of step 4's
+first slice).
+
 Model: three nodes in §5.3's tree at fan-out 1 (0 the root, 1 interior, 2 its
 child) on the eager mesh, so every pair has a connection; each direction is a
 FIFO channel. Each lead is one thread whose steps are: its members arrive at
@@ -53,6 +62,11 @@ Variants
                     Fails ONCE.
   no_abort          no abort message at all, only FINs (step 3 as built).
                     Terminates - the FIN path always does - and fails STATUS.
+  send_error_ends   the goodbye design, but a failed send ends its node with a
+                    failure at once, as the engine did until the third review:
+                    a node whose data to an exiting peer was never read ends on
+                    the reset before reading the ABORT ahead of it. Fails
+                    STATUS.
 
 Properties
   TERMINATES  every node ends: its sockets closed after the handshake, or its
@@ -94,6 +108,7 @@ def CLOSED(x, y):   return ('$closed', x, y)
 def WORD(x):        return ('$word', x)         # the abort word: 0, or the status
 def FROM(x):        return ('$from', x)         # the peer x heard it from, or -1
 def SENT(x, y):     return ('$sent', x, y)      # x sent y an ABORT
+def SEND_FAILED(x, y): return ('$send_failed', x, y)  # x's send to y met y's reset
 def ENDED(x):       return ('$ended', x)        # 1 closed, 2 exited on the abort, 3 crashed
 def STARTS(x):      return ('$starts', x)       # a start of an abort still to come here
 
@@ -135,6 +150,8 @@ def abort_targets(variant, M, x):
             continue
         if (M[SENT(x, y)] and variant != 'resend') or M[FINNED(x, y)] or M[CLOSED(x, y)]:
             continue            # already told, or this side's stream has ended
+        if M[SEND_FAILED(x, y)]:
+            continue            # its end reset the connection: nobody reads there
         if M[EOF(x, y)] and not M[HEARD_BYE(x, y)]:
             continue            # the peer died: nobody reads there
         if variant != 'tree' and M[BYE(x, y)]:
@@ -177,6 +194,19 @@ def lead(variant, x, starts):
                 upd = {STARTS(x): n - 1}
                 learn(M, upd, x, what, -1)
                 out.append((upd, {}, f'node {x}: starts an abort, status {what}'))
+        # A peer whose processes exited with this node's data unread has reset
+        # the connection, and this node's send fails - at any moment from
+        # then, ahead of or behind its reading what the peer sent first. Only
+        # while this node is not aborting: an aborting node sends such a peer
+        # nothing more either way (flush_aborting), and the peer is gone, so
+        # the step would change nothing there but the number of states.
+        for y in peers(x):
+            if (word == 0 and M[ENDED(y)] in (2, 3) and M[QLEN(x, y)]
+                    and not M[SEND_FAILED(x, y)] and not M[CLOSED(x, y)]):
+                upd = {SEND_FAILED(x, y): 1}
+                if variant == 'send_error_ends':
+                    learn(M, upd, x, FAIL, y)
+                out.append((upd, {}, f'node {x}: its send to node {y} fails on {y}\'s reset'))
         if word == 0:
             normal_steps(M, x, out)
         else:
@@ -229,13 +259,16 @@ def normal_steps(M, x, out):
             o = send_step(M, x, y, queued[0], 0)
             if o:
                 out.append(o)
-        if M[FINNED(x, y)] and M[EOF(x, y)] and not M[CLOSED(x, y)]:
+        # A connection whose sends met the peer's reset needs no FIN of this
+        # side's: the peer reads nothing more - it crashed during the close.
+        if ((M[FINNED(x, y)] or M[SEND_FAILED(x, y)]) and M[EOF(x, y)]
+                and not M[CLOSED(x, y)]):
             out.append(({CLOSED(x, y): 1}, {}, f'node {x}: closes its socket to node {y}'))
 
 
 def send_step(M, x, y, m, status):
     n = M[QLEN(x, y)]
-    if n >= CAPACITY or M[CLOSED(x, y)]:
+    if n >= CAPACITY or M[CLOSED(x, y)] or M[SEND_FAILED(x, y)]:
         return None
     upd = {Q(x, y, n): m * 8 + status, QLEN(x, y): n + 1}
     if m in (ARRIVE, RELEASE):
@@ -334,7 +367,7 @@ def case(variant, starts):
                 mem[Q(x, y, i)] = 0
             for m in (ARRIVE, RELEASE):
                 mem[OWES(x, y, m)] = 0
-            for k in (BYE, FINNED, HEARD_BYE, EOF, CLOSED, KFIN, SENT):
+            for k in (BYE, FINNED, HEARD_BYE, EOF, CLOSED, KFIN, SENT, SEND_FAILED):
                 mem[k(x, y)] = 0
             mem[('$twice', x, y)] = 0
             mem[('$echo', x, y)] = 0
@@ -368,6 +401,7 @@ CASES = [
     ('resend', ONE_CALLER, False),
     ('no_abort', CRASH, True),
     ('no_abort', ONE_CALLER, False),
+    ('send_error_ends', ONE_CALLER, False),
 ]
 
 if __name__ == '__main__':

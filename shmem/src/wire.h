@@ -70,7 +70,13 @@ struct osoe_wire {
     uint64_t queued;            /* bytes in all of them, not yet delivered */
     bool receiving;             /* its multishot recv is armed */
     bool ended;                 /* the peer's end of stream has arrived */
-    int error;                  /* a completion on it failed: -errno, or 0 */
+    int error;                  /* a receive failed, or a send for any reason but
+                                 * the peer's reset: -errno, or 0 */
+    /* A send met the peer's reset - its process ended with input unread:
+     * -EPIPE or -ECONNRESET, or 0. Nothing more is sent, and the receive side
+     * goes on, since it may hold what the peer sent ahead of the reset, its
+     * goodbye among it; the stream's end decides (progress.c). */
+    int send_error;
     /* Sending: one in flight (§3.3, invariant 2). */
     const unsigned char *send_at;
     uint32_t send_bytes;        /* what was submitted */
