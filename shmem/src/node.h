@@ -61,6 +61,10 @@ enum osoe_blocked_detail {
     OSOE_BLOCKED_DETAIL_TURNOVER,         /* a writer with no room: the buffer turnover */
     OSOE_BLOCKED_DETAIL_CREDIT,           /* a get or fetching AMO: a reply credit */
     OSOE_BLOCKED_DETAIL_REPLY,            /* the reply itself, on the PE's landing slot */
+    /* Layout 16: a wait for the PE's own nonblocking gets, the detail being
+     * the bytes of them still in flight when it began - not a connection's
+     * word, so not counted among them. */
+    OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
 };
 
 /*
@@ -215,7 +219,8 @@ struct osoe_segment_directory {
     /* Appended at layout 6: the §3.12 landing zones, one slot per local PE. */
     uint64_t landing_offset;
     uint64_t landing_bytes;
-    uint32_t landing_slot_bytes;     /* header plus one AM chunk */
+    uint32_t landing_slot_bytes;     /* a PE's zone: header plus one AM chunk, and since
+                                      * layout 16 its nonblocking gets' records and arena */
     uint32_t landing_count;          /* local_count */
 
     /*

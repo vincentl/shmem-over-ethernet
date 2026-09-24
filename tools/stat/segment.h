@@ -210,7 +210,9 @@ void osoe_segment_close(struct osoe_segment *s);
  *       field for the rank
  *   16  each PE's landing zone also holds its nonblocking gets in flight -
  *       records and an arena after its blocking slot - so the directory's
- *       landing_slot_bytes is now a whole zone rather than a slot and a chunk
+ *       landing_slot_bytes is now a whole zone rather than a slot and a chunk;
+ *       and blocked-record detail kind 9, a wait for them, the detail being
+ *       the bytes still in flight
  *
  * None of 5 to 16 changed the watch word's encoding.
  */
@@ -292,6 +294,7 @@ enum osoe_segment_detail {
     OSOE_SEGMENT_DETAIL_TURNOVER,
     OSOE_SEGMENT_DETAIL_CREDIT,
     OSOE_SEGMENT_DETAIL_REPLY,
+    OSOE_SEGMENT_DETAIL_GETS_IN_FLIGHT,   /* layout 16: bytes of nonblocking gets */
 };
 
 /* `detail` as its kind says - "node 3", "epoch 17", "offset 0x40",

@@ -26,21 +26,19 @@
  *     OSOE_TRANSPORT_MORE, so across nodes they cost one wake of the lead,
  *     not one each. No transport has a remote-strided operation to map a
  *     whole iput onto - RDMA's gather list is the local side's only - so this
- *     is also what an RDMA backend would do. An iget across nodes is still n
- *     round trips, one after another, until the nonblocking get flag
- *     transport.h reserves lets them be in flight together (design notes
- *     §7.5).
+ *     is also what an RDMA backend would do. An iget's elements are
+ *     nonblocking gets, in flight together across nodes up to the landing
+ *     zone's records, completed by one wait for the gets alone (design notes
+ *     §7.5, §4.6).
  *
  * nbi. Spec §9.6.2: the nonblocking routines "return after initiating the
  * operation", and the operation is complete after a subsequent shmem_quiet;
- * completing sooner is permitted. The blocking forms already give put_nbi all
- * it promises and more: osoe_transport_put returns at local completion, with
- * remote completion left to quiet, on both backends (transport.h). A blocking
- * get completes before it returns, which get_nbi permits. So the nonblocking
- * forms call exactly the blocking code. The overlap a nonblocking get could
- * buy - several requests in flight before one wait - is the nonblocking flag
- * transport.h reserves on osoe_transport_get, not taken yet; when it is, only
- * the calls below change, never the declarations above them.
+ * completing sooner is permitted. A put already returns at local completion,
+ * with remote completion left to quiet, on both backends (transport.h), which
+ * is all put_nbi promises, so the nonblocking puts call the blocking code. The
+ * nonblocking gets pass OSOE_TRANSPORT_NONBLOCKING: across nodes they return
+ * once asked, and the next wait completes them (§4.6, as built); to a
+ * node-mate a get is applied before it returns either way.
  */
 #include <stddef.h>
 #include <stdint.h>
@@ -98,16 +96,17 @@ static void strided_get(const char *routine, shmem_ctx_t ctx, void *dest, const 
     const char *s = source;
     ptrdiff_t w = (ptrdiff_t)width;
     /* Every element's get is nonblocking and all but the last say more follows,
-     * so across nodes they are in flight together - one round trip for the
-     * lot, not one each - and the wait after them completes them: iget is a
-     * blocking routine (§4.6, as built). */
+     * so across nodes they are in flight together, up to the landing zone's
+     * records - not one round trip each - and the wait for them after is for
+     * the gets alone: iget is a blocking routine, but promises nothing about
+     * the writes before it (§4.6, as built). */
     if (nelems == 0)
         return;
     for (size_t i = 0; i < nelems; i++)
         osoe_rma_get(routine, ctx, d + (ptrdiff_t)i * dst * w, s + (ptrdiff_t)i * sst * w, 1,
                      width, pe,
                      OSOE_TRANSPORT_NONBLOCKING | (i + 1 < nelems ? OSOE_TRANSPORT_MORE : 0));
-    osoe_rma_complete(routine, ctx, pe);
+    osoe_rma_complete_gets(routine, ctx);
 }
 
 /* ---- Typed put/get, block (spec §9.6.1.1, §9.6.1.5) -------------------- */

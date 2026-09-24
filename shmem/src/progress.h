@@ -90,9 +90,10 @@ struct osoe_progress_host {
      */
     unsigned char *(*landing_request)(void *context, uint32_t pe, uint64_t token,
                                       uint32_t *length);
-    /* That get's reply has landed whole: count it toward the PE's next quiet
-     * (§4.6's counters), and wake the PE if it waits there. */
-    void (*landed)(void *context, uint32_t pe, uint32_t bytes);
+    /* That get's reply has landed whole: retire its record, so that a second
+     * reply naming it is refused, then count it toward the PE's next wait
+     * (§4.6's counters) and wake the PE if it waits there. */
+    void (*landed)(void *context, uint32_t pe, uint64_t token, uint32_t bytes);
 };
 
 /*

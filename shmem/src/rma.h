@@ -28,9 +28,9 @@ void osoe_rma_put(const char *routine, shmem_ctx_t ctx, void *dest, const void *
 void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
                   size_t nelems, size_t width, int pe, unsigned flags);
 
-/* Complete this PE's nonblocking gets, and its writes to pe (§4.6): the wait
- * an iget ends with, naming `routine` wherever it waits. */
-void osoe_rma_complete(const char *routine, shmem_ctx_t ctx, int pe);
+/* Complete this PE's nonblocking gets and nothing else (§4.6): what an iget
+ * ends with, naming `routine` wherever it waits. */
+void osoe_rma_complete_gets(const char *routine, shmem_ctx_t ctx);
 
 /* nelems elements of `width` bytes as a byte count, fatal naming `routine` if
  * a size_t cannot hold it. */

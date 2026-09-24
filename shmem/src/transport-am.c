@@ -231,8 +231,12 @@ struct am_wait {
 /* `pe` is the specific PE this wait is for, or -1 when there is none - a
  * quiet's wait is over a whole node's queue, not one PE's (§4.10, D-6). `kind`
  * names the word the wait sleeps on, for the "blocked in" record (node.h). */
-static void am_wait_begin(struct am_wait *w, const char *routine, enum osoe_blocked_detail kind,
-                          const char *watching, uint32_t peer, int pe, uint64_t progress)
+/* As am_wait_begin, with the blocked record's detail given rather than taken
+ * to be the peer: for a wait toward no one node (UINT32_MAX), whose detail is
+ * something else. */
+static void am_wait_begin_detail(struct am_wait *w, const char *routine,
+                                 enum osoe_blocked_detail kind, uint64_t detail,
+                                 const char *watching, uint32_t peer, int pe, uint64_t progress)
 {
     w->routine = routine;
     w->watching = watching;
@@ -240,7 +244,13 @@ static void am_wait_begin(struct am_wait *w, const char *routine, enum osoe_bloc
     w->pe = pe;
     w->sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     osoe_stall_watch_begin(&w->watch, progress, osoe.bootstrap.no_progress_ns);
-    osoe_blocked_enter(routine, kind, peer);
+    osoe_blocked_enter(routine, kind, detail);
+}
+
+static void am_wait_begin(struct am_wait *w, const char *routine, enum osoe_blocked_detail kind,
+                          const char *watching, uint32_t peer, int pe, uint64_t progress)
+{
+    am_wait_begin_detail(w, routine, kind, peer, watching, peer, pe, progress);
 }
 
 /* Called on every turn of a wait's loop with the progress word as it stands.
@@ -442,9 +452,11 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
 }
 
 /*
- * This PE's landing zone, and the capacity of its payload area (§3.12).
+ * This PE's landing slot, and the capacity of its payload area (§3.12) - the
+ * blocking operations' part of the landing zone, which since layout 16 also
+ * holds the nonblocking gets' records and arena (below).
  *
- * The zone holds one AM chunk, and a get request is therefore issued in pieces
+ * The slot holds one AM chunk, and a blocking get is therefore issued in pieces
  * no larger than that. **The origin chunks the request; the target does not
  * chunk beyond it.** A reply may still be split when the connection buffer is
  * tight - the drain sends one chunk per descriptor per pass (§3.8) - and every
@@ -655,21 +667,29 @@ static void complete_gets(const char *routine)
     if (in_flight.count == 0)
         return;
     struct osoe_landing_slot *slot = my_landing();
-    uint64_t issued = atomic_load_explicit(&slot->bytes_issued, memory_order_relaxed);
-    if (atomic_load_explicit(&slot->bytes_landed, memory_order_seq_cst) != issued) {
+    uint64_t issued = atomic_load_explicit(&slot->bytes_issued, memory_order_acquire);
+    uint64_t landed = atomic_load_explicit(&slot->bytes_landed, memory_order_seq_cst);
+    if (landed != issued) {
         /* Whatever this PE held back goes out before it waits (transport.h). The
-         * gets may be toward any number of nodes, so the wait names none. */
+         * gets may be toward any number of nodes, so the wait names none: its
+         * record says how many bytes are still to land. */
         osoe_progress_host_wake_lead();
         struct am_wait w;
-        am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_NONE,
-                      "the bytes its nonblocking gets have landed", UINT32_MAX, -1,
-                      atomic_load_explicit(&slot->bytes_landed, memory_order_relaxed));
+        am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT, issued - landed,
+                             "the bytes its nonblocking gets have landed", UINT32_MAX, -1,
+                             landed);
         osoe_wait_word_enter(&slot->counter_wake);
         uint32_t slept_on = 0;
         bool swept = false;
         for (;;) {
             uint32_t seen = osoe_wait_word_load(&slot->counter_wake);
-            uint64_t landed = atomic_load_explicit(&slot->bytes_landed, memory_order_seq_cst);
+            landed = atomic_load_explicit(&slot->bytes_landed, memory_order_seq_cst);
+            /* Past equality it can never return: a reply counted twice, which
+             * the lead's checks exist to refuse (progress.c). */
+            if (landed > issued)
+                osoe_fatal("%s: the lead has counted %llu bytes landed for this PE's "
+                           "nonblocking gets, which asked for %llu", routine,
+                           (unsigned long long)landed, (unsigned long long)issued);
             if (landed == issued) {
                 if (swept)
                     count_if_lost(&slot->counter_wake.word, slept_on, routine);
@@ -682,14 +702,11 @@ static void complete_gets(const char *routine)
         osoe_wait_word_leave(&slot->counter_wake);
         am_wait_end();
     }
+    /* Each record was retired by the lead as its reply landed (progress-host.c),
+     * so every one is free to be taken again from here. */
     const unsigned char *arena = osoe_node_landing_arena(&osoe.node, osoe.bootstrap.local_id);
-    struct osoe_landing_request *records =
-        osoe_node_landing_requests(&osoe.node, osoe.bootstrap.local_id);
-    for (uint32_t i = 0; i < in_flight.count; i++) {
+    for (uint32_t i = 0; i < in_flight.count; i++)
         memcpy(in_flight.copy[i].dst, arena + in_flight.copy[i].offset, in_flight.copy[i].length);
-        /* From here the lead refuses any reply that names it (progress-host.c). */
-        atomic_store_explicit(&records[i].token, 0, memory_order_relaxed);
-    }
     in_flight.count = 0;
     in_flight.arena_used = 0;
 }
@@ -746,13 +763,13 @@ static void remote_get_nonblocking(int pe, enum osoe_region region, uint64_t off
         /* Each reply starts 8-byte aligned, for the copy out. */
         in_flight.arena_used += (n + 7u) & ~7u;
         uint64_t token = OSOE_LANDING_NONBLOCKING | (++in_flight.sequence << 16) | index;
-        atomic_store_explicit(&records[index].offset, place, memory_order_relaxed);
-        atomic_store_explicit(&records[index].length, n, memory_order_relaxed);
+        atomic_store_explicit(&records[index].offset, place, memory_order_release);
+        atomic_store_explicit(&records[index].length, n, memory_order_release);
         /* Published before the request goes out: the send's reservation and
          * commit order it before any reply can exist (as arm() for the slot). */
         atomic_store_explicit(&records[index].token, token, memory_order_release);
         in_flight.copy[index] = (struct in_flight_copy){ at, place, n };
-        atomic_fetch_add_explicit(&slot->bytes_issued, n, memory_order_relaxed);
+        atomic_fetch_add_explicit(&slot->bytes_issued, n, memory_order_seq_cst);
 
         take_credit(connection, peer, pe, "shmem_get_nbi");
         struct osoe_am_get_request m = { .target_pe = (uint32_t)pe,
@@ -935,10 +952,12 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
         return;
     osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
     uint64_t t0 = osoe_now_ns();
-    osoe_serializing_fence();
     /* This PE's nonblocking gets, every one of them, whatever PEs the wait
-     * names: their completion is counted per PE, not per target (§4.6). */
+     * names: their completion is counted per PE, not per target (§4.6). First,
+     * so that the stores copying them into place come before quiet's fence
+     * and are ordered as every other store before it is. */
     complete_gets(routine);
+    osoe_serializing_fence();
 
     struct osoe_transport_context *c = context;
     if (!osoe_am.internode || c->count == 0) {
@@ -1019,6 +1038,12 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
     free(wanted);
     osoe_count(OSOE_C_TRANSPORT_WAIT_DIRTY_PEERS, waited);
     osoe_count(OSOE_C_TRANSPORT_WAIT_NS, osoe_now_ns() - t0);
+}
+
+void osoe_transport_wait_gets(struct osoe_transport_context *context, const char *routine)
+{
+    (void)context;              /* a PE's gets complete together, whatever the context */
+    complete_gets(routine);
 }
 
 /* ---- The two entry points that are this backend's, not a path's --------- */

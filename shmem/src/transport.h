@@ -218,8 +218,8 @@ enum {
      * nothing about completion, ordering, or when src may be reused, and a
      * backend that ignores it is correct - which is how the intranode backend
      * implements it, since every operation is applied before it returns.
-     * Any fence, wait, get, fetching rmw, or operation without this flag
-     * submits whatever is held.
+     * Any fence, wait, blocking get, fetching rmw, or operation without this
+     * flag submits whatever is held.
      *
      * A backend may defer an operation only if it has taken its own copy of
      * the source bytes. Put's contract is unconditional - src may be reused
@@ -452,9 +452,10 @@ void osoe_transport_fence(struct osoe_transport_context *context);
  *
  * May over-wait: a PE list waits on gets to every PE (§4.6).
  *
- * `routine` is the API routine the caller is in, for the blocked record and
- * any no-progress diagnostic: "shmem_quiet", or "shmem_int_iget" for the wait
- * that completes an iget's gets.
+ * `routine` names the wait, for the blocked record and any no-progress
+ * diagnostic: "shmem_quiet" or "shmem_pe_quiet", and "shmem_quiet" for the
+ * quiet a barrier and finalize begin with, which nests inside the barrier's own
+ * record (blocked.h).
  *
  * Intranode: one serializing fence; nothing is ever outstanding.
  * AM: the serializing fence; wait for bytes_landed == bytes_issued and copy the
@@ -463,6 +464,19 @@ void osoe_transport_fence(struct osoe_transport_context *context);
  */
 void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes,
                          const char *routine);
+
+/*
+ * Wait for this PE's nonblocking gets and nothing else: return once each is
+ * complete, its bytes in dst; writes stay as they are, for the next wait. The
+ * end of a blocking routine made of nonblocking gets - iget - where a whole
+ * wait would also complete the writes to that PE's node, and pay for their
+ * acknowledgement, for nothing the routine promises. `routine` as for wait:
+ * the API routine, "shmem_long_iget".
+ *
+ * Intranode: nothing is ever in flight.
+ * AM: wait for bytes_landed == bytes_issued, copy the replies out (§4.6).
+ */
+void osoe_transport_wait_gets(struct osoe_transport_context *context, const char *routine);
 
 /* ---- Notification (§4.9) --------------------------------------------- */
 

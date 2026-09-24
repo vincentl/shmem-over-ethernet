@@ -53,9 +53,9 @@ void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *
                        flags);
 }
 
-void osoe_rma_complete(const char *routine, shmem_ctx_t ctx, int pe)
+void osoe_rma_complete_gets(const char *routine, shmem_ctx_t ctx)
 {
-    osoe_transport_wait(osoe_ctx_of(routine, ctx), &pe, 1, routine);
+    osoe_transport_wait_gets(osoe_ctx_of(routine, ctx), routine);
 }
 
 OSOE_API void pshmem_putmem(void *dest, const void *source, size_t nelems, int pe)

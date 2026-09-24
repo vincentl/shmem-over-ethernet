@@ -2519,10 +2519,20 @@ behind replies long delivered. That is the return point the credit's own
 comment has named since the credits were built (reply.h), and the credit
 model's take and give are the same operations whoever gives. Every wait -
 quiet, pe_quiet whatever PEs it names, and a barrier's opening quiet - waits
-for `bytes_landed == bytes_issued`, copies each reply to its `dst` and clears
-the records. **An issue that finds the records or the arena used up completes
+for `bytes_landed == bytes_issued` and copies each reply to its `dst`, and so
+does finalize's barrier; an iget ends with a wait for its gets alone
+(`osoe_transport_wait_gets`), since a whole wait would also complete, and pay
+the acknowledgement of, the writes to that PE's node, which an iget does not
+promise. The lead retires a record as its reply lands, so a duplicate reply is
+refused, and checks a reply with no bytes as it checks one with some - the
+parser hands only replies with bytes to `destination()`, which is where the
+check had lived, for the blocking slot too (review of the nonblocking gets). A
+count of landed bytes past those issued is fatal rather than a wait that can
+never end. **An issue that finds the records or the arena used up completes
 what is in flight first**, which bounds the zone without anything failing; the
 design's other release, the PE's agent copying replies out early, is not built.
+The record's fields and the counters use release, acquire and seq_cst, never
+relaxed, as §3.16 asks of every protocol word.
 A get to a node-mate is a `memcpy` before it returns, as ever. The simple
 equality is right while one thread issues and completes; `MULTIPLE` needs the
 generation scheme below (§4.6, `get_completion_model.py`). Packed replies,
@@ -3013,7 +3023,7 @@ which still read the AM chunk size and handler checksum). The backend is chosen
 by the CMake option `OSOE_BACKEND`, whose only value is `am`. The last two small
 gaps are closed as well: `osoe_transport_get` takes `flags`, with none defined
 yet, so that `OSOE_TRANSPORT_MORE` and the nonblocking flag arrive without a
-signature change; and `osoe_transport_load` and `osoe_transport_set_range` live in
+signature change *(both did, with the nonblocking gets: §4.6, as built)*; and `osoe_transport_load` and `osoe_transport_set_range` live in
 `transport-am.c`, the file a second backend replaces, rather than in the
 intranode path's file, which it keeps.
 
@@ -3142,10 +3152,11 @@ question nobody needed. Recorded before a benchmark applies pressure for them.
 | Operation | Guarantee | Intranode backend | AM backend |
 |---|---|---|---|
 | put | Returns at local completion. Applied later; complete and visible once a covering wait returns. No ordering between puts to one PE except across a fence (spec §9.6.1.1). Notify best effort | `memcpy` into the target's mapping, applied before return, then notify | Reserve and copy into the node-pair buffer (§3.5); the dirty set records the node |
-| get | Blocking. Complete per operation: `dst` holds the bytes on return. Never fenced | `memcpy` out of the target's mapping | Request; the reply lands in the landing zone; the calling thread copies it out (§3.12) |
+| get | Blocking. Complete per operation: `dst` holds the bytes on return. With `OSOE_TRANSPORT_NONBLOCKING`, complete at the PE's next wait instead. Never fenced | `memcpy` out of the target's mapping, nonblocking or not | Request; a blocking get's reply lands in the landing slot and the calling thread copies it out (§3.12); a nonblocking one's in the landing arena, copied out by the wait (§4.6, as built) |
 | rmw | One 4- or 8-byte word. Exactly once. Exclusive against same-width rmw on the word within one atomicity domain, and against waiters and tests (spec §3.2). Fetching: complete on return. Non-fetching: as a put. Notify exact | One C11 atomic on the shared mapping (§3.16 orders), then notify | Handler-time CPU atomic at the target; a fetched value is a value descriptor (§3.8) |
 | fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then ask each dirty peer not yet acknowledged to acknowledge through its highest segment, and flush (§3.4, §4.6) |
-| wait | Every write and nonblocking get on the context — to listed PEs, or to all — is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes |
+| wait | Every write on the context — to listed PEs, or to all — and every nonblocking get the PE has issued is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes, after the nonblocking gets |
+| wait for gets | Every nonblocking get the PE has issued is complete; writes are left for the next wait. An iget's end | Nothing: none is ever in flight | The gets half of the wait (§4.6, as built) |
 | load | A coherent load of a word of the caller's own region, 2, 4 or 8 bytes. Exclusive against rmw on it (spec §3.2). For `shmem_test*`, the `wait_until` predicate, and `shmem_signal_fetch` | One `acquire` load of the word | The same: every writer is a CPU atomic on the shared mapping |
 | notify | Wakes a PE's waiters whose watched range a write overlaps (§4.9). Exact for rmw, best effort for puts; wakes may be spurious | §4.9 watch slot | The same function, called by the progress thread after it applies a write |
 

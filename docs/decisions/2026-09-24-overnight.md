@@ -288,3 +288,26 @@ goodbye would add is a better message on the other nodes, under `-K0` only,
 where every PE already ends with the failure. It returns with on-demand
 connections, where a node that holds no connection to the dying one never
 reads its end of stream (§3.15 says so already).
+
+## The next morning
+
+**21. The nonblocking gets pack their replies, and the lead returns their
+credits.** With the author's answer to entry 16, gets gained the nonblocking
+form the boundary reserved. Two choices in it are mine, recorded in §4.6's
+"as built". Replies share a byte arena with a record per get, rather than a
+chunk-sized slot each, because the corpus's one CPU user of `get_nbi`, bale's
+getput, issues one-word gets by the hundred; a slot per get would hold four of
+them in the default zone. And a nonblocking get's credit comes back when its
+reply lands, returned by the lead, where a blocking caller returns its own:
+the reply sits in the arena until the PE's next wait, and a credit held until
+then would queue its node-mates' gets behind replies long delivered. The
+record's index rides in the token, so the wire format is unchanged. *To
+reverse:* revert the two commits; get_nbi returns to the blocking code.
+
+**22. The boundary gains a wait for gets alone.** The review found every iget
+had become a pe_quiet - it waited on the acknowledgement of earlier writes to
+its PE's node, which an iget does not promise. `osoe_transport_wait_gets` is
+the gets half of the wait. It is a narrower wait, not a handle: the design's
+rule that nonblocking operations complete by counters, never per operation,
+stands. *To reverse:* end iget with the whole wait again.
+
