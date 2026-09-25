@@ -35,8 +35,9 @@ Keep the output: it goes in the notes with the results.
 
 ## 2. Build once, in /home
 
-On the head node, the tools; into the compute nodes' image, with the nodes
-powered off, the library osoe loads at run time and `ctest`:
+Everything is compiled on the head node, which has the tools. The compute
+nodes' image gets, with the nodes powered off, only the library every osoe
+program loads at run time, and `cmake` for its `ctest`:
 
 ```sh
 sudo apt install build-essential cmake pkg-config liburing-dev git
@@ -54,13 +55,19 @@ srun -N4 --ntasks-per-node=1 build/release/tools/probe/probe     # every node: a
 `probe` checks every io_uring and futex facility osoe relies on. If it fails on
 a node, nothing else will work there.
 
-The test suite runs on one node, inside a step of one task given all four
-cores - a task gets one by default, and every process the tests start would
-share it:
+The test suite runs in two halves. Tier 1 is the build's own checks - the
+headers under every standard, a static link, a strict-C11 rebuild, the exported
+symbols, `oshcc` - which run the compiler and need `liburing-dev`, so they run
+on the head node, beside the build. Tier 2 starts the library's processes, and
+runs on a compute node, inside a step of one task given all four cores - a task
+gets one by default, and every process the tests start would share it:
 
 ```sh
-srun -N1 -n1 -c4 ctest --test-dir build/release -L 'tier1|tier2' -E '^model\.' -j4 --timeout 300
+ctest --test-dir build/release -L tier1 -j4 --timeout 300
+srun -N1 -n1 -c4 ctest --test-dir build/release -L tier2 -E '^model\.' -j4 --timeout 300
 ```
+
+A compute node therefore needs no compiler and no headers.
 
 The models (`model.*`) are left out: they check designs, not this machine,
 and take the better part of an hour on a Pi. The floor pins (`shmem.floor`) and
@@ -82,7 +89,7 @@ tools/launch/capture-slurm-fixtures.sh plane-4x4  $F -N4 --ntasks-per-node=4 --d
 tools/launch/capture-slurm-fixtures.sh uneven     $F -N3 -n7
 salloc -N4 sh -c "tools/launch/capture-slurm-fixtures.sh relative $F -N2 -r2 -n2"
 tools/launch/capture-slurm-fixtures.sh exclude    $F -N3 -n3 -x pi-002
-cmake --build build/release                      # registers the new fixtures
+cmake --build build/release    # registers the new fixtures: "GLOB mismatch!" is CMake noticing them
 ctest --test-dir build/release -N -R 'shmem\.bootstrap\.captured'
 ctest --test-dir build/release -R 'shmem\.bootstrap\.' --output-on-failure
 ```
@@ -251,7 +258,11 @@ two logical nodes, on 2026-09-24. **What to expect** from that run:
 - PRK's three kernels validate.
 - Of the 72 examples, all but the following exit 0.
   - `bar_pair` and `bcast4` pass an active set smaller than the job, which osoe
-    refuses by name (design §7.4).
+    refuses by name (design §7.4). So, on more than four PEs, do `bcast3`,
+    `collect32`, `reduce-max` and `reduce-sum`, whose active set is PEs 0 to 3
+    written out - the whole job on the VM's four, half of it on the cluster's
+    4 × 2 (2026-09-24, and in the VM on 8); all but `collect32` also call with
+    PEs outside it, which the spec leaves undefined anyway.
   - `nullput` puts to a null pointer. `just-a-shmalloc` and `shmem_2dheat`
     exit without `shmem_finalize`, which only a `start_pes` program may do
     (the latter calls `exit` on the line before its finalize). `addr-accessible`
@@ -259,9 +270,9 @@ two logical nodes, on 2026-09-24. **What to expect** from that run:
     names each of the first three as such.
   - `global_exit` exits 1 where the program asks for 99: `osoe-launch` reports
     the job's failure, not the status (§7 above checks the status under
-    `srun`). It calls `shmem_global_exit` straight after `shmem_init`, and can
-    leave the job's names in `/dev/shm` behind it - the window design §6.2
-    accepts, which `osoe-stat --gc` clears.
+    `srun`, and on the cluster it exits 99). It calls `shmem_global_exit`
+    straight after `shmem_init`, and can leave the job's names in `/dev/shm`
+    behind it - the window design §6.2 accepts, which `osoe-stat --gc` clears.
 - NPB IS verifies, classes S and A, on four PEs over two logical nodes and
   over four.
 - ISx, weak scaling on 0,0,1,1 and strong on 0,1,2,3, sorts and verifies,
@@ -300,8 +311,13 @@ done
 
 The fourteen point-to-point programs measure a pair, one PE per node here.
 Ten of them exit before `shmem_finalize` when given other than two PEs, which
-osoe names and ends the job for, as it does `nullput`'s; the other four run PEs
-0 and 1 alone whatever the job. The development VM (2026-09-24) built all
+osoe names and ends the job for, as it does `just-a-shmalloc`'s; the other four
+run PEs 0 and 1 alone whatever the job. **`put_bw`, and the non-fetching rows
+of `atomics`, stop the clock after their loop of calls and before any quiet**:
+they measure how fast osoe takes the calls, into about 3 MB of send buffering,
+not how fast the bytes arrive - on the cluster, 3.5 GB/s at 16 KiB. The rest
+quiet inside the clock: `put_nb_bw` after every put, `put_mr` and `put_mr_nb`
+once at the end of their batch. The development VM (2026-09-24) built all
 nineteen, and each printed its whole table on two PEs over two logical nodes,
 and the five collectives on four.
 
