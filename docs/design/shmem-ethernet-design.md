@@ -4561,12 +4561,21 @@ call that fits still gets them; with an add, a `split_2d` of many rows that
 failed would have used up the numbers of every split after it (review of the
 slice, M2). A call that creates more teams than a session can have at all is
 refused before claiming, and a heap without the 16 bytes before claiming too,
-each said once by rank 0. A created team's handle is its
-descriptor's address, in a
-per-process pool indexed by number, so a handle never issued or already
+each said once by rank 0. A created team's handle is its descriptor's address,
+in a per-process pool indexed by number, so a handle never issued or already
 destroyed is named without being read through. Destroy is a sync over the
 team's members, then the descriptor's arrays are freed; the number, its blocks
 and records stay.
+
+*Two readings of §9.4.6*, where the specification says two things. A triplet
+whose sequence would wrap around the parent - "considered invalid and the
+behavior is undefined" - is taken as the invalid triplet it also is, one with
+a rank outside the parent, and returns nonzero with `SHMEM_TEAM_INVALID` on
+every parent PE, as §9.4.6 says an invalid triplet does; a failure is within
+what undefined allows, and it is the answer a program can test. And a negative
+stride orders the new team's members as §9.4.6 says, in reverse of their
+parent ranks: rank *i* is parent rank `start` + `stride` × *i*, so `start` is
+the highest parent rank of the team, its world stride negative (`team.h`).
 
 Runtime rather than build-time, despite the init-ordering cost: the pool cannot
 be sized until the bootstrap has supplied local PE count, so team-pool sizing
