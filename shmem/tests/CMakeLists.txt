@@ -2028,6 +2028,11 @@ if(OSOE_TIER3)
     osoe_tier3_test(get-nbi.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_get-nbi
                     ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
                         OSOE_AM_CREDITS=2)
+    # Contexts' gets sharing the landing zone, and a team context's traffic,
+    # over the shaped link (phase 1 step 8 slice 1).
+    osoe_tier3_test(context.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_context
+                    ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
+                        OSOE_AM_CREDITS=2)
     # The leads' tree of the reductions and broadcast, over the shaped link.
     osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
     osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)

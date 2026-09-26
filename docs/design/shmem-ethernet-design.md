@@ -2496,7 +2496,9 @@ tree topology, counters. *Verify against each collective during the spec read.*
 **Contexts** are purely local (`shmem_ctx_create` is not collective) and must
 require no symmetric memory. A context is a sequence-number space. Confirm this
 stays true as contexts are fleshed out; a context needing symmetric scratch
-would be genuinely difficult.
+would be genuinely difficult. *It stayed true* (phase 1 step 8 slice 1): a
+context is process memory and one cache line of the node segment, nothing
+symmetric.
 
 ### 4.6 Ordering and completion
 
@@ -3413,11 +3415,18 @@ instead of pushing every on-node rmw through NIC loopback.
   both directions, so a backend that does nothing with it is correct.
 - **Nonblocking gets and contexts beyond the default.** They add calls to the
   header when they arrive (§7.3). They do not change the operations above.
+  *As built:* the nonblocking gets are a flag on get (above), and contexts
+  (phase 1 step 8 slice 1) two calls, `osoe_transport_context_create(options)`,
+  which may return NULL, and `osoe_transport_context_destroy`, whose implicit
+  wait is spec §9.5.3's quiet. A context's PE is a world rank at the boundary,
+  as every PE is: the SHMEM layer translates a team context's (`context.c`).
 
 ### 4.11 `SHMEM_THREAD_MULTIPLE`
 
-> **Designed and model-checked, not scheduled.** Phase 1 still provides up to
-> `SERIALIZED` (§4.6). Under `MULTIPLE`, a context that promises serialization
+> **Designed and model-checked; being built in three slices** (phase 1 step 8,
+> `docs/prompts/phase1-step8-slice1-prompt.md`). Slice 1, contexts in serial
+> mode, is built (below, "Context modes"); until slice 2 phase 1 provides up
+> to `SERIALIZED` (§4.6). Under `MULTIPLE`, a context that promises serialization
 > (`SHMEM_CTX_PRIVATE` or `SHMEM_CTX_SERIALIZED`) keeps the §4.6 structures unchanged.
 > A shareable context, `SHMEM_CTX_DEFAULT` included, keeps a lock-free issue path and
 > serializes its quiets with a per-context mutex. Under that mutex, a generation word
@@ -3484,6 +3493,30 @@ serializing fence in either mode.
 
 Operations branch once on the mode. Programs that never request `MULTIPLE` run only
 serial mode, so phase-1 costs do not move.
+
+*As built, serial mode* (phase 1 step 8 slice 1; `context.c`,
+`transport-am.c`, `node.h`). A context is two parts. In the node segment, a
+cache line from its PE's pool of `OSOE_MAX_CONTEXTS` (default 64, 1 to 4,096,
+agreed between a node's PEs, layout 21): a state word claimed by
+compare-and-swap at creation and released at destroy, and the context's
+`bytes_issued`, `bytes_landed` and their wake word, which until then were one
+pair per PE in the landing slot; block 0 is `SHMEM_CTX_DEFAULT`'s. In process
+memory, the dirty set, allocated at creation. A nonblocking get's token names
+its context's block in bits 48 to 59, so the lead credits the right counters
+and the wire is unchanged. The landing zone stays the PE's: its records are
+threaded on per-context lists, and its arena is handed out from one end and
+reused once no context has a get in flight; an issue that finds no room
+completes its own context's gets and then every other context's until there
+is, an early completion the boundary allows. A wait on a context completes
+that context's gets and no other's - `am.gets_completed` pins it. A handle is
+the address of an element of a process pool of `OSOE_MAX_CONTEXTS`, so a
+destroyed or foreign handle ends the job by name. A team context translates
+each PE through its team, `shmem_ctx_pe_quiet`'s targets too (spec §9.5: every
+point-to-point routine on the context). `NOSTORE` skips the fence that orders
+the calling thread's stores in fence and quiet; `PRIVATE` records its creator,
+which alone may destroy it. A team's destroy destroys the shareable contexts
+made from it before its sync (spec §9.4.8) and ends the job naming a live
+private one; the last finalize destroys every context left.
 
 | Per operation | Serial | Shared |
 |---|---|---|
@@ -5742,8 +5775,8 @@ machinery. The review's order is adopted.
 A **context handle** on every RMA entry point and a **team parameter** on every
 collective, implementing at first only `SHMEM_CTX_DEFAULT`, `SHMEM_TEAM_WORLD`
 and `SHMEM_TEAM_SHARED`. Retrofitting either parameter later touches every function
-written. `shmem_ctx_create` and `shmem_team_create_ctx` exist and return
-nonzero until implemented, which the spec permits: §9.5.1 says an unsuccessful
+written. `shmem_ctx_create` and `shmem_team_create_ctx` existed and returned
+nonzero until phase 1 step 8 implemented them, which the spec permits: §9.5.1 says an unsuccessful
 context creation "is not treated as an error" — so a program written against
 the spec already has the branch these take. The team split routines did too
 until phase 1 step 7, which creates teams (§5.7); §9.4 gives a PE that is not a
@@ -6797,7 +6830,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Development environment | **Lima + Debian 13 on Apple Silicon**; CI deferred; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
 | Which process hosts progress | **An agent thread in every PE; the local lead's runs the transport** (§3.12). A helper process was rejected on setup complexity, supervision, statics access, and exit status |
 | Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is designed but not scheduled (below) |
-| `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked, not scheduled** (§4.11). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
+| `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked; being built in three slices, the first (contexts, serial) done** (§4.11, phase 1 step 8). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
 | Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector, deferred until there is a reason for a third formatter. **Revised in phase 1 step 2 slice 2:** the control segment's name is removed during init like every other object's, and `osoe-stat` finds a live job through `/proc/<pid>/fd` of any of its PEs; `OSOE_KEEP_CONTROL_SEGMENT=1` restores the old behaviour for post-mortem work. The original entry kept the name until finalize, accepting a small leak on crash — on the reasoning that uncooperative reading needed a name. It did not: it needed a rendezvous, and `/proc` is one that no crash can strand (§3.14). The reader shares only the frozen directory and the metric descriptor with the writer and finds everything else by name, which a tier-1 test enforces by handing it a segment this build did not write. The flight recorder is deferred to step 2, with its design standing: its events do not exist yet |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |

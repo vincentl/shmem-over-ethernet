@@ -56,9 +56,16 @@ static uint64_t counter(const char *name)
     return m ? total : UINT64_MAX;
 }
 
+/*
+ * Does a get to `pe` go over the network, so that it is in flight until a
+ * wait? shmem_ptr's NULL says so on every map but under §8.1's force-remote
+ * flag, which denies a node-mate the pointer while its gets stay a memcpy in
+ * this thread (job.h): there nothing is in flight to count, and the counter
+ * pins below are skipped while the values are still checked.
+ */
 static bool crosses(const void *symmetric, int pe)
 {
-    return shmem_ptr(symmetric, pe) == NULL;
+    return shmem_ptr(symmetric, pe) == NULL && !getenv("OSOE_FORCE_REMOTE");
 }
 
 static long value(int pe, int tag)
@@ -240,7 +247,15 @@ int main(void)
     /* ---- The landing zone shared by two contexts' gets ----------------------- *
      * Every record taken by gets on one context, then a get on another: the
      * issue finds no record and completes what is in flight - the other's -
-     * rather than hanging (am.landing_full); every value is right after. */
+     * rather than hanging (am.landing_full); every value is right after. It
+     * reads the table's first words, which the sections above wrote into, so
+     * every PE writes its table afresh first, between barriers. */
+    shmem_barrier_all();
+    for (int i = 0; i < 16; i++)
+        table[i] = value(me, i);
+    *signal_word = 0;                   /* the team section's, which start at 0 */
+    *sum = 0;
+    shmem_barrier_all();
     if (crosses(table, right)) {
         shmem_ctx_t a = SHMEM_CTX_INVALID, b = SHMEM_CTX_INVALID;
         CHECK_FATAL(shmem_ctx_create(0, &a) == 0 && shmem_ctx_create(0, &b) == 0);
