@@ -448,7 +448,29 @@ in order, with `W=~/osoe-corpus` and `OSHCC` as in §8:
    done
    ```
 
-7. Optionally, **§7's vanished node**, with its PoE port power-cycled after.
+7. **Pipelined collectives** (merged 2026-09-26, after this runbook's first
+   session): large broadcasts and reductions at D = 1, 2 and 4 pieces in
+   flight, on the tree the four nodes make at the default fan-out of 4 (one
+   level, where D pieces should come near D times faster) and at a fan-out of
+   2 (two levels, where the first build of the loop was held to about 2 times
+   whatever D; the VM measured the fix at 2.2 ms against 4.2 for a 1 MiB
+   broadcast at D = 4 on five nodes). The first session's 1 MiB broadcast took
+   36.5 ms, one piece at a time:
 
-Bring back what §9 lists, and `sos.txt`, the `osu-*-1x2.txt` and `osu-*-4x*.txt`
-files, both halves of the test suite's summary, and the two start-up times.
+   ```sh
+   cd $W/osu/c/openshmem
+   for k in 4 2; do
+     for d in 1 2 4; do
+       for p in broadcast reduce; do
+         OSOE_COLLECTIVE_FANOUT=$k OSOE_COLLECTIVE_PIPELINE=$d \
+           srun -K1 -N4 --ntasks-per-node=1 ./osu_oshm_$p -m 65536:1048576 > ~/osu-$p-k$k-d$d.txt
+       done
+     done
+   done
+   ```
+
+8. Optionally, **§7's vanished node**, with its PoE port power-cycled after.
+
+Bring back what §9 lists, and `sos.txt`, the `osu-*-1x2.txt`, `osu-*-4x*.txt`
+and `osu-*-k*-d*.txt` files, both halves of the test suite's summary, and the
+two start-up times.
