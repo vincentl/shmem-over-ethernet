@@ -1,0 +1,104 @@
+Internal ctest changing into directory: /home/pi/shmem-over-ethernet/build/release
+Test project /home/pi/shmem-over-ethernet/build/release
+      Start 462: model.lock
+      Start 264: shmem.lock.0-1-2-0-1-0
+ 1/47 Test #264: shmem.lock.0-1-2-0-1-0 .....................   Passed    0.53 sec
+      Start 263: shmem.lock.0-0-1-1
+ 2/47 Test #263: shmem.lock.0-0-1-1 .........................   Passed    0.21 sec
+      Start 351: shmem.context.0-1-2-0-1-0
+ 3/47 Test #462: model.lock .................................   Passed    0.78 sec
+      Start 329: shmem.get-nbi.0-1-2-0-1-0
+ 4/47 Test #351: shmem.context.0-1-2-0-1-0 ..................   Passed    0.20 sec
+      Start 328: shmem.get-nbi.0-0-1-1
+ 5/47 Test #329: shmem.get-nbi.0-1-2-0-1-0 ..................   Passed    0.20 sec
+      Start 350: shmem.context.0-0-1-1
+ 6/47 Test #328: shmem.get-nbi.0-0-1-1 ......................   Passed    0.09 sec
+      Start 352: shmem.context.force-remote.0-0-1-1
+ 7/47 Test #350: shmem.context.0-0-1-1 ......................   Passed    0.09 sec
+      Start 262: shmem.lock.L4
+ 8/47 Test #262: shmem.lock.L4 ..............................   Passed    0.04 sec
+      Start 451: model.blocked_record
+ 9/47 Test #451: model.blocked_record .......................   Passed    0.06 sec
+      Start 267: shmem.lock.misuse.garbage
+10/47 Test #267: shmem.lock.misuse.garbage ..................   Passed    0.03 sec
+      Start 260: shmem.lock.L1
+11/47 Test #260: shmem.lock.L1 ..............................   Passed    0.01 sec
+      Start 266: shmem.lock.misuse.twice
+12/47 Test #352: shmem.context.force-remote.0-0-1-1 .........   Passed    0.18 sec
+      Start 353: shmem.context.misuse.destroyed
+13/47 Test #266: shmem.lock.misuse.twice ....................   Passed    0.03 sec
+      Start 355: shmem.context.misuse.invalid
+14/47 Test #353: shmem.context.misuse.destroyed .............   Passed    0.03 sec
+      Start 354: shmem.context.misuse.foreign
+15/47 Test #355: shmem.context.misuse.invalid ...............   Passed    0.03 sec
+      Start 261: shmem.lock.L2
+16/47 Test #354: shmem.context.misuse.foreign ...............   Passed    0.03 sec
+      Start 357: shmem.context.misuse.default
+17/47 Test #261: shmem.lock.L2 ..............................   Passed    0.02 sec
+      Start 356: shmem.context.misuse.outside
+18/47 Test #357: shmem.context.misuse.default ...............   Passed    0.03 sec
+      Start 265: shmem.lock.misuse.clear
+19/47 Test #356: shmem.context.misuse.outside ...............   Passed    0.03 sec
+      Start 358: shmem.context.misuse.private-team
+20/47 Test #265: shmem.lock.misuse.clear ....................   Passed    0.03 sec
+      Start 365: shmem.context.pool-3.L2
+21/47 Test #358: shmem.context.misuse.private-team ..........   Passed    0.03 sec
+      Start 359: shmem.context.misuse.after-team
+22/47 Test #365: shmem.context.pool-3.L2 ....................   Passed    0.03 sec
+      Start 363: shmem.max-contexts.invalid.x
+23/47 Test #359: shmem.context.misuse.after-team ............   Passed    0.03 sec
+      Start 364: shmem.context.pool-1.L2
+24/47 Test #363: shmem.max-contexts.invalid.x ...............   Passed    0.03 sec
+      Start 361: shmem.max-contexts.invalid.0
+25/47 Test #364: shmem.context.pool-1.L2 ....................   Passed    0.03 sec
+      Start 362: shmem.max-contexts.invalid.4097
+26/47 Test #361: shmem.max-contexts.invalid.0 ...............   Passed    0.02 sec
+      Start 380: shmem.thread.L4
+27/47 Test #362: shmem.max-contexts.invalid.4097 ............   Passed    0.03 sec
+      Start 349: shmem.context.L4
+28/47 Test #380: shmem.thread.L4 ............................   Passed    0.01 sec
+      Start 223: shmem.get-nbi.L4
+29/47 Test #349: shmem.context.L4 ...........................   Passed    0.01 sec
+      Start 379: shmem.thread.L2
+30/47 Test #223: shmem.get-nbi.L4 ...........................   Passed    0.01 sec
+      Start 221: shmem.get-nbi.L1
+31/47 Test #379: shmem.thread.L2 ............................   Passed    0.01 sec
+      Start 222: shmem.get-nbi.L2
+32/47 Test #221: shmem.get-nbi.L1 ...........................   Passed    0.01 sec
+      Start 348: shmem.context.L2
+33/47 Test #222: shmem.get-nbi.L2 ...........................   Passed    0.01 sec
+      Start 347: shmem.context.L1
+34/47 Test #348: shmem.context.L2 ...........................   Passed    0.01 sec
+      Start 378: shmem.thread.L1
+35/47 Test #347: shmem.context.L1 ...........................   Passed    0.01 sec
+      Start 360: shmem.max-contexts.local-disagree
+36/47 Test #378: shmem.thread.L1 ............................   Passed    0.01 sec
+      Start  41: shmem.bootstrap.captured-block-1x4-node0
+37/47 Test #360: shmem.max-contexts.local-disagree ..........   Passed    0.01 sec
+      Start  46: shmem.bootstrap.written-block-4x4-node1
+38/47 Test  #41: shmem.bootstrap.captured-block-1x4-node0 ...   Passed    0.01 sec
+      Start 330: shmem.multiple.L1
+39/47 Test  #46: shmem.bootstrap.written-block-4x4-node1 ....   Passed    0.00 sec
+      Start 331: shmem.multiple.L2
+40/47 Test #330: shmem.multiple.L1 ..........................   Passed    0.01 sec
+      Start 332: shmem.multiple.L4
+41/47 Test #331: shmem.multiple.L2 ..........................   Passed    0.01 sec
+      Start 333: shmem.multiple.0-1
+42/47 Test #332: shmem.multiple.L4 ..........................   Passed    0.01 sec
+      Start 334: shmem.multiple.0-0-1-1
+43/47 Test #333: shmem.multiple.0-1 .........................   Passed    0.20 sec
+      Start 335: shmem.multiple.0-1-2-0-1-0
+44/47 Test #334: shmem.multiple.0-0-1-1 .....................   Passed    0.24 sec
+      Start 336: shmem.multiple.exhaust
+45/47 Test #336: shmem.multiple.exhaust .....................   Passed    0.03 sec
+      Start 337: shmem.multiple.landing-unaligned
+46/47 Test #337: shmem.multiple.landing-unaligned ...........   Passed    0.03 sec
+47/47 Test #335: shmem.multiple.0-1-2-0-1-0 .................   Passed    0.41 sec
+
+100% tests passed, 0 tests failed out of 47
+
+Label Time Summary:
+tier1    =   0.84 sec*proc (4 tests)
+tier2    =   3.01 sec*proc (43 tests)
+
+Total Test time (real) =   2.16 sec

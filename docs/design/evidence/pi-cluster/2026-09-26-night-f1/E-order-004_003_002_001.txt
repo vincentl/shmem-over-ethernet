@@ -1,0 +1,8 @@
+rank 2 on pi-002
+rank 1 on pi-003
+rank 0 on pi-004
+rank 3 on pi-001
+block 28672 median_us 1500.4 mean_us 182441.6 slow 2 max_ms 31367.7
+block 32768 median_us 1691.3 mean_us 38354.8 slow 2 max_ms 6709.1
+block 28672 median_us 1546.0 mean_us 93872.7 slow 3 max_ms 14711.8
+block 32768 median_us 1695.7 mean_us 169232.6 slow 3 max_ms 27876.7

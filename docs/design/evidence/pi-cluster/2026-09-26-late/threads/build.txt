@@ -1,0 +1,649 @@
+Preset CMake variables:
+
+  CMAKE_BUILD_TYPE="RelWithDebInfo"
+  CMAKE_EXPORT_COMPILE_COMMANDS="ON"
+
+-- Configuring done (0.2s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/pi/shmem-over-ethernet/build/release
+[  0%] Building C object shmem/tests/CMakeFiles/shmem_test_allocator.dir/__/src/allocator.c.o
+[  0%] Building C object shmem/tests/CMakeFiles/shmem_test_collective_tree.dir/__/src/collective-tree.c.o
+[  0%] Building C object base/CMakeFiles/osoe_base.dir/deadline.c.o
+[  0%] Building C object shmem/tests/CMakeFiles/shmem_test_watch_range.dir/test-watch-range.c.o
+[  1%] Building C object base/CMakeFiles/osoe_base.dir/environment.c.o
+[  1%] Building C object shmem/tests/CMakeFiles/shmem_test_collective_tree.dir/test-collective-tree.c.o
+[  1%] Building C object base/CMakeFiles/osoe_base.dir/node-map.c.o
+[  1%] Building C object shmem/tests/CMakeFiles/shmem_test_allocator.dir/test-allocator.c.o
+[  1%] Building C object base/CMakeFiles/osoe_base.dir/epoch.c.o
+[  1%] Linking C executable shmem_test_collective_tree
+[  1%] Linking C executable shmem_test_watch_range
+[  1%] Built target shmem_test_watch_range
+[  1%] Built target shmem_test_collective_tree
+[  1%] Building C object base/CMakeFiles/osoe_base.dir/futex.c.o
+[  1%] Building C object base/CMakeFiles/osoe_base.dir/hostlist.c.o
+[  1%] Building C object shmem/tests/CMakeFiles/shmem_test_rank-map.dir/__/src/rank-map.c.o
+[  1%] Building C object base/CMakeFiles/osoe_base.dir/order.c.o
+[  2%] Building C object base/CMakeFiles/osoe_base.dir/ring-check.c.o
+[  2%] Building C object base/CMakeFiles/osoe_base.dir/siphash.c.o
+[  3%] Building C object base/CMakeFiles/osoe_base.dir/size.c.o
+[  3%] Building C object shmem/tests/CMakeFiles/shmem_test_rank-map.dir/test-rank-map.c.o
+[  3%] Building C object base/CMakeFiles/osoe_base.dir/stall-watch.c.o
+[  3%] Building C object base/CMakeFiles/osoe_base.dir/sweep.c.o
+[  3%] Built target osoe_base
+[  3%] Building C object shmem/tests/CMakeFiles/shmem_test_own-address.dir/test-own-address.c.o
+[  3%] Building C object shmem/tests/CMakeFiles/slow-message.dir/slow-message.c.o
+[  4%] Linking C executable shmem_test_rank-map
+[  4%] Linking C executable shmem_test_own-address
+[  5%] Linking C shared library libslow-message.so
+[  5%] Built target shmem_test_own-address
+[  5%] Built target shmem_test_rank-map
+[  5%] Built target slow-message
+[  5%] Building C object shmem/tests/CMakeFiles/shmem_test_listener.dir/test-listener.c.o
+[  5%] Building C object shmem/tests/CMakeFiles/shmem_test_connection_area.dir/__/src/connection-area.c.o
+[  5%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/am.c.o
+[  5%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/collective-tree.c.o
+[  5%] Building C object shmem/tests/CMakeFiles/shmem_test_connection_area.dir/__/src/connection.c.o
+[  5%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/connection-area.c.o
+[  5%] Building C object shmem/tests/CMakeFiles/shmem_test_connection_area.dir/__/src/shm-object.c.o
+[  5%] Linking C executable shmem_test_listener
+[  5%] Building C object shmem/tests/CMakeFiles/shmem_test_connection_area.dir/test-connection-area.c.o
+[  5%] Built target shmem_test_listener
+[  6%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/connection.c.o
+[  7%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/listener.c.o
+[  7%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/progress.c.o
+[  8%] Linking C executable shmem_test_connection_area
+[  9%] Linking C executable shmem_test_allocator
+[  9%] Built target shmem_test_allocator
+[  9%] Built target shmem_test_connection_area
+[  9%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/reply.c.o
+[  9%] Building C object shmem/tests/CMakeFiles/deny-futex2.dir/deny-futex2.c.o
+[  9%] Linking C executable deny-futex2
+[  9%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/ring.c.o
+[  9%] Built target deny-futex2
+[  9%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/shm-object.c.o
+[  9%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/abort.c.o
+[  9%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/wire.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/accessible.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/test-progress.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/agent.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/abort.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/allocator.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/accessible.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/abort.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/alltoall.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/agent.c.o
+[ 10%] Linking C executable shmem_test_progress
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/accessible.c.o
+[ 10%] Built target shmem_test_progress
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/agent.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/allocator.c.o
+[ 10%] Building C object tools/probe/CMakeFiles/probe.dir/probe.c.o
+[ 11%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/allocator.c.o
+[ 11%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/am.c.o
+[ 11%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/alltoall.c.o
+[ 11%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/amo.c.o
+[ 11%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/alltoall.c.o
+[ 11%] Linking C executable probe
+[ 11%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/am.c.o
+[ 11%] Built target probe
+[ 11%] Building C object tools/echo-uring/CMakeFiles/echo-uring.dir/echo-uring.c.o
+[ 11%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/am.c.o
+[ 12%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/amo.c.o
+[ 12%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/amo.c.o
+[ 13%] Linking C executable echo-uring
+[ 13%] Built target echo-uring
+[ 13%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/barrier.c.o
+[ 14%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/barrier.c.o
+[ 14%] Building C object tools/launch/CMakeFiles/osoe-launch.dir/launch.c.o
+[ 15%] Linking C executable osoe-launch
+[ 15%] Built target osoe-launch
+[ 15%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/bootstrap.c.o
+[ 15%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/barrier.c.o
+[ 15%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/bootstrap.c.o
+[ 15%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/bootstrap.c.o
+[ 15%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/broadcast.c.o
+[ 15%] Building C object tools/stat/CMakeFiles/osoe-stat.dir/segment.c.o
+[ 15%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/collect.c.o
+[ 15%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/collective-tree.c.o
+[ 16%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/broadcast.c.o
+[ 16%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/collectives.c.o
+[ 16%] Building C object tools/stat/CMakeFiles/osoe-stat.dir/stat.c.o
+[ 16%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/broadcast.c.o
+[ 16%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/collect.c.o
+[ 16%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/collect.c.o
+[ 16%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/collective-tree.c.o
+[ 17%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/combine.c.o
+[ 17%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/collectives.c.o
+[ 18%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/collective-tree.c.o
+[ 18%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/collectives.c.o
+[ 18%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/combine.c.o
+[ 18%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/connection-area.c.o
+[ 18%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/combine.c.o
+[ 18%] Linking C executable osoe-stat
+[ 18%] Built target osoe-stat
+[ 18%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/connection-area.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/connection.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/context.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/connection.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/connection-area.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/context.c.o
+[ 19%] Building C object tools/stat/CMakeFiles/osoe_segment_test.dir/segment.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/deprecated.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/connection.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/deprecated.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/fatal.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/context.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/info.c.o
+[ 19%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/fatal.c.o
+[ 20%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/init.c.o
+[ 21%] Building C object tools/stat/CMakeFiles/osoe_segment_test.dir/test-segment.c.o
+[ 21%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/info.c.o
+[ 21%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/deprecated.c.o
+[ 21%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/init.c.o
+[ 21%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/internode-am.c.o
+[ 22%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/fatal.c.o
+[ 22%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/info.c.o
+[ 22%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/internode-generic.c.o
+[ 23%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/internode-am.c.o
+[ 23%] Linking C executable osoe_segment_test
+[ 23%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/init.c.o
+[ 23%] Built target osoe_segment_test
+[ 23%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/internode-am.c.o
+[ 23%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/internode-generic.c.o
+[ 23%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/internode-generic.c.o
+[ 23%] Building C object base/tests/CMakeFiles/base_test_size.dir/test-size.c.o
+[ 23%] Linking C executable base_test_size
+[ 23%] Built target base_test_size
+[ 23%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/job.c.o
+[ 23%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/listener.c.o
+[ 23%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/liveness.c.o
+[ 23%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/job.c.o
+[ 24%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/listener.c.o
+[ 24%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/job.c.o
+[ 24%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/lock.c.o
+[ 24%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/liveness.c.o
+[ 24%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/listener.c.o
+[ 24%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/lock.c.o
+[ 25%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/malloc.c.o
+[ 25%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/metrics.c.o
+[ 25%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/node.c.o
+[ 25%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/malloc.c.o
+[ 25%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/profile.c.o
+[ 26%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/liveness.c.o
+[ 26%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/lock.c.o
+[ 26%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/metrics.c.o
+[ 26%] Building C object base/tests/CMakeFiles/base_test_environment.dir/test-environment.c.o
+[ 26%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/malloc.c.o
+[ 27%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/node.c.o
+[ 27%] Linking C executable base_test_environment
+[ 27%] Built target base_test_environment
+[ 27%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/profile.c.o
+[ 27%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/metrics.c.o
+[ 27%] Building C object base/tests/CMakeFiles/base_test_node-map.dir/test-node-map.c.o
+[ 28%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/progress-host.c.o
+[ 28%] Linking C executable base_test_node-map
+[ 28%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/node.c.o
+[ 28%] Built target base_test_node-map
+[ 28%] Building C object base/tests/CMakeFiles/base_test_futex.dir/test-futex.c.o
+[ 29%] Linking C executable base_test_futex
+[ 29%] Built target base_test_futex
+[ 29%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/progress.c.o
+[ 29%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/quiet.c.o
+[ 29%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/progress-host.c.o
+[ 29%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/profile.c.o
+[ 29%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/progress-host.c.o
+[ 30%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/progress.c.o
+[ 30%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/progress.c.o
+[ 30%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/quiet.c.o
+[ 30%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/rank-map.c.o
+[ 30%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/rank-map.c.o
+[ 30%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/reductions.c.o
+[ 31%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/reductions.c.o
+[ 32%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/quiet.c.o
+[ 32%] Building C object base/tests/CMakeFiles/base_test_epoch.dir/test-epoch.c.o
+[ 32%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/rank-map.c.o
+[ 32%] Linking C executable base_test_epoch
+[ 32%] Built target base_test_epoch
+[ 32%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/reductions.c.o
+[ 33%] Building C object base/tests/CMakeFiles/base_test_stall-watch.dir/test-stall-watch.c.o
+[ 33%] Linking C executable base_test_stall-watch
+[ 33%] Built target base_test_stall-watch
+[ 34%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/region-wait.c.o
+[ 34%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/region-wait.c.o
+[ 34%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/region-wait.c.o
+[ 34%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/rendezvous.c.o
+[ 35%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/rendezvous.c.o
+[ 35%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/rendezvous.c.o
+[ 35%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/reply.c.o
+[ 35%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/reply.c.o
+[ 35%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/reply.c.o
+[ 35%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/ring.c.o
+[ 35%] Building C object base/tests/CMakeFiles/base_test_hostlist.dir/test-hostlist.c.o
+[ 35%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/ring.c.o
+[ 36%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/ring.c.o
+[ 36%] Linking C executable base_test_hostlist
+[ 36%] Built target base_test_hostlist
+[ 36%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/rma-typed.c.o
+[ 36%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/rma-typed.c.o
+[ 36%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/rma-typed.c.o
+[ 36%] Building C object base/tests/CMakeFiles/base_test_siphash.dir/test-siphash.c.o
+[ 36%] Linking C executable base_test_siphash
+[ 36%] Built target base_test_siphash
+[ 37%] Building C object base/tests/CMakeFiles/base_test_serializing-fence.dir/test-serializing-fence.c.o
+[ 37%] Linking C executable base_test_serializing-fence
+[ 37%] Built target base_test_serializing-fence
+[ 37%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/rma.c.o
+[ 37%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/rma.c.o
+[ 38%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/scans.c.o
+[ 39%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/rma.c.o
+[ 39%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/scans.c.o
+[ 39%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/scans.c.o
+[ 39%] Building C object shmem/CMakeFiles/osoe.dir/src/abort.c.o
+[ 39%] Building C object shmem/CMakeFiles/osoe.dir/src/accessible.c.o
+[ 39%] Building C object shmem/CMakeFiles/osoe.dir/src/agent.c.o
+[ 39%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/session.c.o
+[ 40%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/session.c.o
+[ 40%] Building C object shmem/CMakeFiles/osoe.dir/src/allocator.c.o
+[ 40%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/session.c.o
+[ 40%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/shm-object.c.o
+[ 40%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/shm-object.c.o
+[ 40%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/shm-object.c.o
+[ 41%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/signal.c.o
+[ 41%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/signal.c.o
+[ 42%] Building C object shmem/CMakeFiles/osoe.dir/src/alltoall.c.o
+[ 42%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/signal.c.o
+[ 42%] Building C object shmem/CMakeFiles/osoe.dir/src/amo.c.o
+[ 42%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/sweep.c.o
+[ 42%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/sweep.c.o
+[ 43%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/sweep.c.o
+[ 43%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/symmetric.c.o
+[ 43%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/symmetric.c.o
+[ 43%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/symmetric.c.o
+[ 43%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/team.c.o
+[ 43%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/team.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/team.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/transport-am.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/transport-am.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/transport-am.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/transport-local.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/transport-local.c.o
+[ 44%] Building C object shmem/CMakeFiles/osoe.dir/src/barrier.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/transport-local.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/wait.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/wait.c.o
+[ 44%] Building C object shmem/CMakeFiles/osoe.dir/src/bootstrap.c.o
+[ 44%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/wait.c.o
+[ 44%] Building C object shmem/CMakeFiles/osoe.dir/src/collective-tree.c.o
+[ 44%] Building C object shmem/CMakeFiles/osoe.dir/src/deprecated.c.o
+[ 45%] Building C object shmem/CMakeFiles/osoe.dir/src/fatal.c.o
+[ 45%] Building C object shmem/CMakeFiles/osoe.dir/src/info.c.o
+[ 45%] Building C object shmem/CMakeFiles/osoe.dir/src/init.c.o
+[ 45%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/watch.c.o
+[ 46%] Building C object shmem/CMakeFiles/osoe.dir/src/job.c.o
+[ 46%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/watch.c.o
+[ 46%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/watch.c.o
+[ 46%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/wire.c.o
+[ 46%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/wire.c.o
+[ 46%] Building C object shmem/CMakeFiles/osoe.dir/src/listener.c.o
+[ 47%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/wire.c.o
+[ 47%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/test-internal-region.c.o
+[ 47%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/test-gather-misuse.c.o
+[ 47%] Linking C executable shmem_test_internal-region
+[ 48%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/test-team-storage.c.o
+[ 48%] Linking C executable shmem_test_gather-misuse
+[ 48%] Built target shmem_test_internal-region
+[ 49%] Building C object shmem/CMakeFiles/osoe.dir/src/liveness.c.o
+[ 49%] Building C object shmem/CMakeFiles/osoe.dir/src/lock.c.o
+[ 49%] Built target shmem_test_gather-misuse
+[ 49%] Building C object shmem/tests/CMakeFiles/shmem_test_am.dir/__/src/am.c.o
+[ 49%] Building C object shmem/CMakeFiles/osoe.dir/src/malloc.c.o
+[ 49%] Building C object shmem/tests/CMakeFiles/shmem_test_am.dir/test-am.c.o
+[ 49%] Building C object shmem/CMakeFiles/osoe.dir/src/metrics.c.o
+[ 49%] Building C object shmem/CMakeFiles/osoe.dir/src/node.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/profile.c.o
+[ 51%] Linking C executable shmem_test_am
+[ 51%] Building C object shmem/CMakeFiles/osoe.dir/src/quiet.c.o
+[ 51%] Linking C executable shmem_test_team-storage
+[ 51%] Built target shmem_test_am
+[ 51%] Building C object shmem/CMakeFiles/osoe.dir/src/rank-map.c.o
+[ 51%] Building C object shmem/CMakeFiles/osoe.dir/src/rendezvous.c.o
+[ 51%] Built target shmem_test_team-storage
+[ 51%] Building C object shmem/tests/CMakeFiles/shmem_test_reply.dir/__/src/reply.c.o
+[ 51%] Building C object shmem/CMakeFiles/osoe.dir/src/rma.c.o
+[ 51%] Building C object shmem/tests/CMakeFiles/shmem_test_reply.dir/test-reply.c.o
+[ 51%] Building C object shmem/CMakeFiles/osoe.dir/src/rma-typed.c.o
+[ 52%] Building C object shmem/CMakeFiles/osoe.dir/src/scans.c.o
+[ 52%] Building C object shmem/CMakeFiles/osoe.dir/src/collectives.c.o
+[ 52%] Linking C executable shmem_test_reply
+[ 52%] Built target shmem_test_reply
+[ 52%] Building C object shmem/CMakeFiles/osoe.dir/src/combine.c.o
+[ 52%] Building C object shmem/tests/CMakeFiles/shmem_test_am_size.dir/__/src/connection-area.c.o
+[ 52%] Building C object shmem/tests/CMakeFiles/shmem_test_am_size.dir/__/src/connection.c.o
+[ 52%] Building C object shmem/tests/CMakeFiles/shmem_test_am_size.dir/__/src/shm-object.c.o
+[ 52%] Building C object shmem/tests/CMakeFiles/shmem_test_am_size.dir/test-am-size.c.o
+[ 53%] Building C object shmem/tests/CMakeFiles/shmem_test_connection.dir/__/src/connection.c.o
+[ 54%] Linking C executable shmem_test_am_size
+[ 54%] Building C object shmem/CMakeFiles/osoe.dir/src/context.c.o
+[ 54%] Built target shmem_test_am_size
+[ 54%] Building C object shmem/tests/CMakeFiles/shmem_test_connection.dir/test-connection.c.o
+[ 54%] Building C object shmem/tests/CMakeFiles/shmem_test_wire.dir/__/src/listener.c.o
+[ 54%] Building C object shmem/CMakeFiles/osoe.dir/src/reductions.c.o
+[ 54%] Linking C executable shmem_test_connection
+[ 54%] Built target shmem_test_connection
+[ 55%] Building C object shmem/CMakeFiles/osoe.dir/src/broadcast.c.o
+[ 55%] Building C object shmem/tests/CMakeFiles/shmem_test_wire.dir/__/src/ring.c.o
+[ 55%] Building C object shmem/CMakeFiles/osoe.dir/src/collect.c.o
+[ 55%] Building C object shmem/tests/CMakeFiles/shmem_test_wire.dir/__/src/shm-object.c.o
+[ 55%] Building C object shmem/tests/CMakeFiles/shmem_test_wire.dir/__/src/wire.c.o
+[ 55%] Building C object shmem/CMakeFiles/osoe.dir/src/session.c.o
+[ 55%] Building C object shmem/tests/CMakeFiles/shmem_test_wire_pair.dir/__/src/listener.c.o
+[ 56%] Building C object shmem/tests/CMakeFiles/shmem_test_wire.dir/test-wire.c.o
+[ 56%] Building C object shmem/CMakeFiles/osoe.dir/src/shm-object.c.o
+[ 56%] Building C object shmem/CMakeFiles/osoe.dir/src/signal.c.o
+[ 56%] Linking C executable shmem_test_wire
+[ 56%] Building C object shmem/tests/CMakeFiles/shmem_test_wire_pair.dir/__/src/ring.c.o
+[ 56%] Built target shmem_test_wire
+[ 56%] Building C object shmem/CMakeFiles/osoe.dir/src/symmetric.c.o
+[ 56%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/am.c.o
+[ 56%] Building C object shmem/tests/CMakeFiles/shmem_test_wire_pair.dir/__/src/shm-object.c.o
+[ 56%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/bootstrap.c.o
+[ 56%] Building C object shmem/tests/CMakeFiles/shmem_test_wire_pair.dir/__/src/wire.c.o
+[ 56%] Building C object shmem/tests/CMakeFiles/shmem_test_fatal-order.dir/__/src/fatal.c.o
+[ 57%] Building C object shmem/tests/CMakeFiles/shmem_test_fatal-order.dir/test-fatal-order.c.o
+[ 58%] Building C object shmem/CMakeFiles/osoe.dir/src/team.c.o
+[ 58%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/collective-tree.c.o
+[ 59%] Building C object shmem/tests/CMakeFiles/shmem_test_wire_pair.dir/test-wire-pair.c.o
+[ 59%] Linking C executable shmem_test_fatal-order
+[ 59%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/connection-area.c.o
+[ 59%] Built target shmem_test_fatal-order
+[ 59%] Building C object shmem/tests/CMakeFiles/shmem_test_bootstrap.dir/__/src/bootstrap.c.o
+[ 60%] Linking C executable shmem_test_wire_pair
+[ 60%] Built target shmem_test_wire_pair
+[ 60%] Building C object shmem/tests/CMakeFiles/shmem_test_bootstrap.dir/test-bootstrap.c.o
+[ 60%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/connection.c.o
+[ 60%] Building C object shmem/CMakeFiles/osoe.dir/src/transport-local.c.o
+[ 60%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/listener.c.o
+[ 60%] Linking C executable shmem_test_bootstrap
+[ 60%] Built target shmem_test_bootstrap
+[ 60%] Building C object shmem/CMakeFiles/osoe.dir/src/region-wait.c.o
+[ 61%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/progress.c.o
+[ 61%] Building C object shmem/CMakeFiles/osoe.dir/src/wait.c.o
+[ 61%] Building C object shmem/tests/CMakeFiles/shmem_test_job.dir/__/src/am.c.o
+[ 62%] Building C object shmem/tests/CMakeFiles/shmem_test_job.dir/__/src/bootstrap.c.o
+[ 62%] Building C object shmem/tests/CMakeFiles/shmem_test_job.dir/__/src/job.c.o
+[ 62%] Building C object shmem/tests/CMakeFiles/shmem_test_job.dir/__/src/listener.c.o
+[ 62%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/reply.c.o
+[ 62%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/ring.c.o
+[ 62%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/shm-object.c.o
+[ 62%] Building C object shmem/tests/CMakeFiles/shmem_test_job.dir/__/src/rank-map.c.o
+[ 63%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/wire.c.o
+[ 63%] Building C object shmem/tests/CMakeFiles/shmem_test_job.dir/__/src/rendezvous.c.o
+[ 63%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/test-barrier-am.c.o
+[ 63%] Building C object shmem/CMakeFiles/osoe.dir/src/watch.c.o
+[ 63%] Building C object shmem/tests/CMakeFiles/shmem_test_job.dir/__/src/shm-object.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/sweep.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/am.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/connection.c.o
+[ 64%] Building C object shmem/tests/CMakeFiles/shmem_test_job.dir/test-job.c.o
+[ 65%] Linking C executable shmem_test_barrier_am
+[ 65%] Built target shmem_test_barrier_am
+[ 65%] Building C object shmem/CMakeFiles/osoe.dir/src/connection-area.c.o
+[ 65%] Building C object shmem/CMakeFiles/osoe.dir/src/internode-am.c.o
+[ 66%] Building C object shmem/CMakeFiles/osoe.dir/src/internode-generic.c.o
+[ 66%] Building C object shmem/CMakeFiles/osoe.dir/src/progress.c.o
+[ 66%] Building C object shmem/CMakeFiles/osoe.dir/src/progress-host.c.o
+[ 67%] Linking C executable shmem_test_job
+[ 67%] Built target shmem_test_job
+[ 67%] Building C object shmem/CMakeFiles/osoe.dir/src/reply.c.o
+[ 67%] Building C object shmem/CMakeFiles/osoe.dir/src/ring.c.o
+[ 67%] Building C object shmem/CMakeFiles/osoe.dir/src/transport-am.c.o
+[ 68%] Building C object shmem/CMakeFiles/osoe.dir/src/wire.c.o
+[ 68%] Linking C shared library libosoe.so
+[ 68%] Built target osoe
+[ 68%] Building C object shmem/tests/CMakeFiles/shmem_test_header_surface.dir/test-header-surface.c.o
+[ 68%] Building C object shmem/tests/CMakeFiles/shmem_test_info.dir/test-info.c.o
+[ 68%] Building C object shmem/tests/CMakeFiles/shmem_test_multinode.dir/__/__/tools/stat/segment.c.o
+[ 68%] Building C object shmem/tests/CMakeFiles/shmem_test_floor.dir/__/__/base/hostlist.c.o
+[ 69%] Linking C executable shmem_test_header_surface
+[ 69%] Linking C executable shmem_test_info
+[ 69%] Built target shmem_test_header_surface
+[ 69%] Building C object shmem/tests/CMakeFiles/shmem_test_floor.dir/__/__/tools/stat/segment.c.o
+[ 69%] Built target shmem_test_info
+[ 69%] Building C object shmem/tests/CMakeFiles/shmem_test_work_discovery.dir/__/__/tools/stat/segment.c.o
+[ 69%] Building C object shmem/tests/CMakeFiles/shmem_test_internode.dir/__/__/tools/stat/segment.c.o
+[ 69%] Building C object shmem/tests/CMakeFiles/shmem_test_multinode.dir/test-multinode.c.o
+[ 70%] Building C object shmem/tests/CMakeFiles/shmem_test_floor.dir/test-floor.c.o
+[ 70%] Building C object shmem/tests/CMakeFiles/shmem_test_work_discovery.dir/test-work-discovery.c.o
+[ 71%] Building C object shmem/tests/CMakeFiles/shmem_test_internode.dir/test-internode.c.o
+[ 72%] Linking C executable shmem_test_multinode
+[ 72%] Built target shmem_test_multinode
+[ 72%] Linking C executable shmem_test_work_discovery
+[ 72%] Building C object shmem/tests/CMakeFiles/shmem_test_differential.dir/__/__/tools/stat/segment.c.o
+[ 72%] Built target shmem_test_work_discovery
+[ 72%] Linking C executable shmem_test_internode
+[ 73%] Building C object shmem/tests/CMakeFiles/shmem_test_ack-echo.dir/__/__/tools/stat/segment.c.o
+[ 73%] Linking C executable shmem_test_floor
+[ 73%] Built target shmem_test_internode
+[ 73%] Building C object shmem/tests/CMakeFiles/shmem_test_differential.dir/test-differential.c.o
+[ 73%] Built target shmem_test_floor
+[ 73%] Building C object shmem/tests/CMakeFiles/shmem_test_reply-starvation.dir/__/__/tools/stat/segment.c.o
+[ 73%] Building C object shmem/tests/CMakeFiles/shmem_test_reply-starvation.dir/test-reply-starvation.c.o
+[ 73%] Linking C executable shmem_test_differential
+[ 73%] Built target shmem_test_differential
+[ 73%] Building C object shmem/tests/CMakeFiles/shmem_test_ack-echo.dir/test-ack-echo.c.o
+[ 74%] Building C object shmem/tests/CMakeFiles/shmem_test_unswept-wait.dir/__/__/tools/stat/segment.c.o
+[ 74%] Building C object shmem/tests/CMakeFiles/shmem_test_unswept-wait.dir/test-unswept-wait.c.o
+[ 74%] Linking C executable shmem_test_reply-starvation
+[ 74%] Linking C executable shmem_test_ack-echo
+[ 74%] Built target shmem_test_reply-starvation
+[ 74%] Building C object shmem/tests/CMakeFiles/shmem_test_hang-walk.dir/__/__/tools/stat/segment.c.o
+[ 74%] Built target shmem_test_ack-echo
+[ 74%] Building C object shmem/tests/CMakeFiles/shmem_test_hang-walk.dir/test-hang-walk.c.o
+[ 75%] Building C object shmem/tests/CMakeFiles/shmem_test_reply-pool.dir/__/__/tools/stat/segment.c.o
+[ 75%] Building C object shmem/tests/CMakeFiles/shmem_test_reply-pool.dir/test-reply-pool.c.o
+[ 75%] Linking C executable shmem_test_unswept-wait
+[ 75%] Built target shmem_test_unswept-wait
+[ 76%] Building C object shmem/tests/CMakeFiles/shmem_test_stopped-node.dir/__/__/tools/stat/segment.c.o
+[ 76%] Building C object shmem/tests/CMakeFiles/shmem_test_get-no-progress.dir/__/__/tools/stat/segment.c.o
+[ 76%] Linking C executable shmem_test_hang-walk
+[ 76%] Linking C executable shmem_test_reply-pool
+[ 76%] Built target shmem_test_hang-walk
+[ 76%] Building C object shmem/tests/CMakeFiles/shmem_test_fatal-start-pes.dir/test-fatal-start-pes.c.o
+[ 76%] Built target shmem_test_reply-pool
+[ 76%] Building C object shmem/tests/CMakeFiles/shmem_test_exit-without-finalize.dir/test-exit-without-finalize.c.o
+[ 76%] Linking C executable shmem_test_fatal-start-pes
+[ 76%] Linking C executable shmem_test_exit-without-finalize
+[ 76%] Built target shmem_test_fatal-start-pes
+[ 76%] Building C object shmem/tests/CMakeFiles/shmem_test_get-no-progress.dir/test-get-no-progress.c.o
+[ 76%] Built target shmem_test_exit-without-finalize
+[ 76%] Building C object shmem/tests/CMakeFiles/shmem_test_stopped-node.dir/test-stopped-node.c.o
+[ 76%] Building C object shmem/tests/CMakeFiles/shmem_test_kill-after-init.dir/test-kill-after-init.c.o
+[ 76%] Linking C executable shmem_test_get-no-progress
+[ 76%] Building C object shmem/tests/CMakeFiles/shmem_test_sleeper.dir/sleeper.c.o
+[ 76%] Linking C executable shmem_test_kill-after-init
+[ 76%] Built target shmem_test_get-no-progress
+[ 76%] Linking C executable shmem_test_sleeper
+[ 77%] Building C object shmem/tests/CMakeFiles/shmem_test_core-exclusion.dir/__/__/tools/stat/segment.c.o
+[ 77%] Built target shmem_test_kill-after-init
+[ 77%] Linking C executable shmem_test_stopped-node
+[ 77%] Built target shmem_test_sleeper
+[ 77%] Building C object shmem/tests/CMakeFiles/shmem_test_init.dir/__/__/tools/stat/segment.c.o
+[ 77%] Building C object shmem/tests/CMakeFiles/shmem_test_fork.dir/__/__/tools/stat/segment.c.o
+[ 77%] Built target shmem_test_stopped-node
+[ 77%] Building C object shmem/tests/CMakeFiles/shmem_test_fork.dir/test-fork.c.o
+[ 77%] Building C object shmem/tests/CMakeFiles/shmem_test_core-exclusion.dir/test-core-exclusion.c.o
+[ 77%] Linking C executable shmem_test_core-exclusion
+[ 77%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier.dir/__/__/tools/stat/segment.c.o
+[ 78%] Building C object shmem/tests/CMakeFiles/shmem_test_init.dir/test-init.c.o
+[ 78%] Built target shmem_test_core-exclusion
+[ 79%] Linking C executable shmem_test_fork
+[ 79%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier.dir/test-barrier.c.o
+[ 79%] Built target shmem_test_fork
+[ 79%] Building C object shmem/tests/CMakeFiles/shmem_test_malloc.dir/__/__/tools/stat/segment.c.o
+[ 79%] Linking C executable shmem_test_init
+[ 79%] Building C object shmem/tests/CMakeFiles/shmem_test_malloc.dir/test-malloc.c.o
+[ 79%] Built target shmem_test_init
+[ 79%] Building C object shmem/tests/CMakeFiles/shmem_test_set-range.dir/__/__/tools/stat/segment.c.o
+[ 79%] Linking C executable shmem_test_barrier
+[ 79%] Built target shmem_test_barrier
+[ 80%] Building C object shmem/tests/CMakeFiles/shmem_test_rma.dir/__/__/tools/stat/segment.c.o
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_set-range.dir/test-set-range.c.o
+[ 81%] Linking C executable shmem_test_malloc
+[ 81%] Built target shmem_test_malloc
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_amo.dir/__/__/tools/stat/segment.c.o
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_rma.dir/test-rma.c.o
+[ 81%] Linking C executable shmem_test_set-range
+[ 81%] Built target shmem_test_set-range
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_wait.dir/__/__/tools/stat/segment.c.o
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_wait.dir/test-wait.c.o
+[ 81%] Linking C executable shmem_test_rma
+[ 81%] Built target shmem_test_rma
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_amo.dir/test-amo.c.o
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_signal.dir/__/__/tools/stat/segment.c.o
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_signal.dir/test-signal.c.o
+[ 81%] Linking C executable shmem_test_wait
+[ 81%] Built target shmem_test_wait
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_quiet.dir/__/__/tools/stat/segment.c.o
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_heap.dir/__/__/tools/stat/segment.c.o
+[ 81%] Linking C executable shmem_test_amo
+[ 81%] Built target shmem_test_amo
+[ 81%] Building C object shmem/tests/CMakeFiles/shmem_test_landing.dir/__/__/tools/stat/segment.c.o
+[ 82%] Linking C executable shmem_test_signal
+[ 82%] Built target shmem_test_signal
+[ 82%] Building C object shmem/tests/CMakeFiles/shmem_test_quiet.dir/test-quiet.c.o
+[ 82%] Building C object shmem/tests/CMakeFiles/shmem_test_landing.dir/test-landing.c.o
+[ 82%] Building C object shmem/tests/CMakeFiles/shmem_test_heap.dir/test-heap.c.o
+[ 82%] Linking C executable shmem_test_quiet
+[ 83%] Building C object shmem/tests/CMakeFiles/shmem_test_amo-types.dir/__/__/tools/stat/segment.c.o
+[ 83%] Built target shmem_test_quiet
+[ 84%] Building C object shmem/tests/CMakeFiles/shmem_test_amo-deprecated.dir/__/__/tools/stat/segment.c.o
+[ 85%] Linking C executable shmem_test_landing
+[ 85%] Built target shmem_test_landing
+[ 85%] Building C object shmem/tests/CMakeFiles/shmem_test_amo-deprecated.dir/test-amo-deprecated.c.o
+[ 85%] Linking C executable shmem_test_heap
+[ 85%] Built target shmem_test_heap
+[ 85%] Building C object shmem/tests/CMakeFiles/shmem_test_amo-nbi.dir/__/__/tools/stat/segment.c.o
+[ 85%] Building C object shmem/tests/CMakeFiles/shmem_test_amo-types.dir/test-amo-types.c.o
+[ 85%] Building C object shmem/tests/CMakeFiles/shmem_test_typed-rma.dir/__/__/tools/stat/segment.c.o
+[ 85%] Linking C executable shmem_test_amo-deprecated
+[ 85%] Built target shmem_test_amo-deprecated
+[ 85%] Building C object shmem/tests/CMakeFiles/shmem_test_amo-nbi.dir/test-amo-nbi.c.o
+[ 85%] Building C object shmem/tests/CMakeFiles/shmem_test_get-nbi.dir/__/__/tools/stat/segment.c.o
+[ 86%] Building C object shmem/tests/CMakeFiles/shmem_test_typed-rma.dir/test-typed-rma.c.o
+[ 86%] Building C object shmem/tests/CMakeFiles/shmem_test_get-nbi.dir/test-get-nbi.c.o
+[ 87%] Linking C executable shmem_test_get-nbi
+[ 87%] Built target shmem_test_get-nbi
+[ 87%] Building C object shmem/tests/CMakeFiles/shmem_test_reduce.dir/__/__/tools/stat/segment.c.o
+[ 87%] Linking C executable shmem_test_amo-nbi
+[ 87%] Built target shmem_test_amo-nbi
+[ 87%] Building C object shmem/tests/CMakeFiles/shmem_test_broadcast.dir/__/__/tools/stat/segment.c.o
+[ 87%] Building C object shmem/tests/CMakeFiles/shmem_test_reduce.dir/test-reduce.c.o
+[ 87%] Building C object shmem/tests/CMakeFiles/shmem_test_broadcast.dir/test-broadcast.c.o
+[ 88%] Linking C executable shmem_test_broadcast
+[ 88%] Built target shmem_test_broadcast
+[ 88%] Building C object shmem/tests/CMakeFiles/shmem_test_active-set.dir/__/__/tools/stat/segment.c.o
+[ 88%] Linking C executable shmem_test_amo-types
+[ 88%] Built target shmem_test_amo-types
+[ 89%] Linking C executable shmem_test_reduce
+[ 89%] Building C object shmem/tests/CMakeFiles/shmem_test_statics.dir/__/__/tools/stat/segment.c.o
+[ 89%] Built target shmem_test_reduce
+[ 89%] Building C object shmem/tests/CMakeFiles/shmem_test_statics-pie.dir/__/__/tools/stat/segment.c.o
+[ 89%] Building C object shmem/tests/CMakeFiles/shmem_test_active-set.dir/test-active-set.c.o
+[ 89%] Building C object shmem/tests/CMakeFiles/shmem_test_statics.dir/test-statics.c.o
+[ 89%] Building C object shmem/tests/CMakeFiles/shmem_test_statics-pie.dir/test-statics.c.o
+[ 90%] Linking C executable shmem_test_statics
+[ 90%] Built target shmem_test_statics
+[ 90%] Building C object shmem/tests/CMakeFiles/shmem_test_lock.dir/__/__/tools/stat/segment.c.o
+[ 90%] Linking C executable shmem_test_statics-pie
+[ 90%] Built target shmem_test_statics-pie
+[ 90%] Building C object shmem/tests/CMakeFiles/shmem_test_collect.dir/__/__/tools/stat/segment.c.o
+[ 90%] Building C object shmem/tests/CMakeFiles/shmem_test_lock.dir/test-lock.c.o
+[ 90%] Building C object shmem/tests/CMakeFiles/shmem_test_collect.dir/test-collect.c.o
+[ 90%] Linking C executable shmem_test_active-set
+[ 91%] Linking C executable shmem_test_lock
+[ 91%] Built target shmem_test_active-set
+[ 91%] Built target shmem_test_lock
+[ 91%] Building C object shmem/tests/CMakeFiles/shmem_test_alltoall.dir/__/__/tools/stat/segment.c.o
+[ 91%] Building C object shmem/tests/CMakeFiles/shmem_test_collective-divergence.dir/test-collective-divergence.c.o
+[ 92%] Linking C executable shmem_test_collective-divergence
+[ 92%] Built target shmem_test_collective-divergence
+[ 92%] Building C object shmem/tests/CMakeFiles/shmem_test_pipeline.dir/__/__/tools/stat/segment.c.o
+[ 92%] Building C object shmem/tests/CMakeFiles/shmem_test_alltoall.dir/test-alltoall.c.o
+[ 92%] Linking C executable shmem_test_collect
+[ 92%] Built target shmem_test_collect
+[ 92%] Building C object shmem/tests/CMakeFiles/shmem_test_allgather.dir/__/__/tools/stat/segment.c.o
+[ 92%] Building C object shmem/tests/CMakeFiles/shmem_test_pipeline.dir/test-pipeline.c.o
+[ 92%] Linking C executable shmem_test_pipeline
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_allgather.dir/test-allgather.c.o
+[ 93%] Built target shmem_test_pipeline
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_team-split.dir/__/__/tools/stat/segment.c.o
+[ 93%] Linking C executable shmem_test_alltoall
+[ 93%] Built target shmem_test_alltoall
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_multiple.dir/test-multiple.c.o
+[ 93%] Linking C executable shmem_test_allgather
+[ 93%] Linking C executable shmem_test_typed-rma
+[ 93%] Built target shmem_test_allgather
+[ 93%] Built target shmem_test_typed-rma
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_team-split.dir/test-team-split.c.o
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_scan.dir/__/__/tools/stat/segment.c.o
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_context.dir/__/__/tools/stat/segment.c.o
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_multiple.dir/__/__/tools/stat/segment.c.o
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_scan.dir/test-scan.c.o
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_context.dir/test-context.c.o
+[ 93%] Linking C executable shmem_test_multiple
+[ 93%] Built target shmem_test_multiple
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_surface.dir/__/__/tools/stat/segment.c.o
+[ 93%] Linking C executable shmem_test_team-split
+[ 93%] Built target shmem_test_team-split
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_start-pes.dir/__/__/tools/stat/segment.c.o
+[ 93%] Building C object shmem/tests/CMakeFiles/shmem_test_surface.dir/test-surface.c.o
+[ 93%] Linking C executable shmem_test_context
+[ 93%] Linking C executable shmem_test_scan
+[ 93%] Built target shmem_test_context
+[ 93%] Built target shmem_test_scan
+[ 94%] Building C object shmem/tests/CMakeFiles/shmem_test_profile.dir/__/__/tools/stat/segment.c.o
+[ 95%] Building C object shmem/tests/CMakeFiles/shmem_test_team.dir/__/__/tools/stat/segment.c.o
+[ 95%] Linking C executable shmem_test_surface
+[ 95%] Building C object shmem/tests/CMakeFiles/shmem_test_start-pes.dir/test-start-pes.c.o
+[ 95%] Built target shmem_test_surface
+[ 95%] Building C object shmem/tests/CMakeFiles/shmem_test_thread.dir/__/__/tools/stat/segment.c.o
+[ 95%] Linking C executable shmem_test_start-pes
+[ 95%] Built target shmem_test_start-pes
+[ 95%] Building C object shmem/tests/CMakeFiles/shmem_test_wait-many.dir/__/__/tools/stat/segment.c.o
+[ 95%] Building C object shmem/tests/CMakeFiles/shmem_test_profile.dir/test-profile.c.o
+[ 95%] Building C object shmem/tests/CMakeFiles/shmem_test_team.dir/test-team.c.o
+[ 95%] Building C object shmem/tests/CMakeFiles/shmem_test_thread.dir/test-thread.c.o
+[ 95%] Linking C executable shmem_test_profile
+[ 95%] Built target shmem_test_profile
+[ 95%] Building C object shmem/tests/CMakeFiles/shmem_test_stat.dir/__/__/tools/stat/segment.c.o
+[ 96%] Building C object shmem/tests/CMakeFiles/shmem_test_wait-many.dir/test-wait-many.c.o
+[ 96%] Linking C executable shmem_test_thread
+[ 96%] Built target shmem_test_thread
+[ 96%] Building C object shmem/tests/CMakeFiles/shmem_test_global-exit.dir/test-global-exit.c.o
+[ 96%] Linking C executable shmem_test_team
+[ 97%] Linking C executable shmem_test_global-exit
+[ 97%] Built target shmem_test_team
+[ 97%] Building C object shmem/tests/CMakeFiles/shmem_test_dead-pe.dir/test-dead-pe.c.o
+[ 97%] Built target shmem_test_global-exit
+[ 97%] Building C object shmem/tests/CMakeFiles/shmem_test_death-in-wait.dir/test-death-in-wait.c.o
+[ 98%] Building C object shmem/tests/CMakeFiles/shmem_test_stat.dir/test-stat.c.o
+[ 98%] Linking C executable shmem_test_dead-pe
+[ 99%] Linking C executable shmem_test_death-in-wait
+[ 99%] Built target shmem_test_dead-pe
+[ 99%] Built target shmem_test_death-in-wait
+[ 99%] Building C object shmem/tests/CMakeFiles/shmem_test_bad_team.dir/test-bad-team.c.o
+[ 99%] Building C object shmem/tests/CMakeFiles/shmem_test_bad_put.dir/test-bad-put.c.o
+[100%] Linking C executable shmem_test_bad_team
+[100%] Linking C executable shmem_test_bad_put
+[100%] Linking C executable shmem_test_stat
+[100%] Built target shmem_test_bad_team
+[100%] Built target shmem_test_bad_put
+[100%] Building C object shmem/tests/CMakeFiles/shmem_test_uninitialized.dir/test-uninitialized.c.o
+[100%] Building C object tools/bench/CMakeFiles/osoe-bench.dir/osoe-bench.c.o
+[100%] Built target shmem_test_stat
+[100%] Linking C executable shmem_test_uninitialized
+[100%] Built target shmem_test_uninitialized
+[100%] Linking C executable osoe-bench
+[100%] Built target osoe-bench
+[100%] Linking C executable shmem_test_wait-many
+[100%] Built target shmem_test_wait-many

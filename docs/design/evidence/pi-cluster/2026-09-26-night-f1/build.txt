@@ -1,0 +1,103 @@
+Preset CMake variables:
+
+  CMAKE_BUILD_TYPE="RelWithDebInfo"
+  CMAKE_EXPORT_COMPILE_COMMANDS="ON"
+
+-- The C compiler identification is GNU 14.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found PkgConfig: /usr/bin/pkg-config (found version "1.8.1")
+-- Checking for module 'liburing>=2.6'
+--   Found liburing, version 2.9
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Found Python3: /usr/bin/python3 (found version "3.13.5") found components: Interpreter
+-- Configuring done (0.5s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/pi/osoe-f1/build/release
+[  8%] Building C object base/CMakeFiles/osoe_base.dir/epoch.c.o
+[  8%] Building C object base/CMakeFiles/osoe_base.dir/node-map.c.o
+[  8%] Building C object base/CMakeFiles/osoe_base.dir/deadline.c.o
+[  8%] Building C object base/CMakeFiles/osoe_base.dir/environment.c.o
+[  8%] Building C object base/CMakeFiles/osoe_base.dir/futex.c.o
+[  8%] Building C object base/CMakeFiles/osoe_base.dir/hostlist.c.o
+[  8%] Building C object base/CMakeFiles/osoe_base.dir/order.c.o
+[ 16%] Building C object base/CMakeFiles/osoe_base.dir/ring-check.c.o
+[ 16%] Building C object base/CMakeFiles/osoe_base.dir/siphash.c.o
+[ 16%] Building C object base/CMakeFiles/osoe_base.dir/size.c.o
+[ 16%] Building C object base/CMakeFiles/osoe_base.dir/stall-watch.c.o
+[ 16%] Building C object base/CMakeFiles/osoe_base.dir/sweep.c.o
+[ 16%] Built target osoe_base
+[ 16%] Building C object shmem/CMakeFiles/osoe.dir/src/agent.c.o
+[ 16%] Building C object shmem/CMakeFiles/osoe.dir/src/accessible.c.o
+[ 16%] Building C object shmem/CMakeFiles/osoe.dir/src/abort.c.o
+[ 16%] Building C object shmem/CMakeFiles/osoe.dir/src/allocator.c.o
+[ 25%] Building C object shmem/CMakeFiles/osoe.dir/src/alltoall.c.o
+[ 25%] Building C object shmem/CMakeFiles/osoe.dir/src/amo.c.o
+[ 25%] Building C object shmem/CMakeFiles/osoe.dir/src/barrier.c.o
+[ 25%] Building C object shmem/CMakeFiles/osoe.dir/src/bootstrap.c.o
+[ 25%] Building C object shmem/CMakeFiles/osoe.dir/src/collective-tree.c.o
+[ 25%] Building C object shmem/CMakeFiles/osoe.dir/src/deprecated.c.o
+[ 33%] Building C object shmem/CMakeFiles/osoe.dir/src/fatal.c.o
+[ 33%] Building C object shmem/CMakeFiles/osoe.dir/src/info.c.o
+[ 33%] Building C object shmem/CMakeFiles/osoe.dir/src/init.c.o
+[ 33%] Building C object shmem/CMakeFiles/osoe.dir/src/job.c.o
+[ 33%] Building C object shmem/CMakeFiles/osoe.dir/src/listener.c.o
+[ 41%] Building C object shmem/CMakeFiles/osoe.dir/src/liveness.c.o
+[ 41%] Building C object shmem/CMakeFiles/osoe.dir/src/lock.c.o
+[ 41%] Building C object shmem/CMakeFiles/osoe.dir/src/malloc.c.o
+[ 41%] Building C object shmem/CMakeFiles/osoe.dir/src/metrics.c.o
+[ 41%] Building C object shmem/CMakeFiles/osoe.dir/src/node.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/profile.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/quiet.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/rank-map.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/rendezvous.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/rma.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/rma-typed.c.o
+[ 58%] Building C object shmem/CMakeFiles/osoe.dir/src/scans.c.o
+[ 58%] Building C object shmem/CMakeFiles/osoe.dir/src/collectives.c.o
+[ 58%] Building C object shmem/CMakeFiles/osoe.dir/src/combine.c.o
+[ 58%] Building C object shmem/CMakeFiles/osoe.dir/src/context.c.o
+[ 58%] Building C object shmem/CMakeFiles/osoe.dir/src/reductions.c.o
+[ 66%] Building C object shmem/CMakeFiles/osoe.dir/src/broadcast.c.o
+[ 66%] Building C object shmem/CMakeFiles/osoe.dir/src/collect.c.o
+[ 66%] Building C object shmem/CMakeFiles/osoe.dir/src/session.c.o
+[ 66%] Building C object shmem/CMakeFiles/osoe.dir/src/shm-object.c.o
+[ 66%] Building C object shmem/CMakeFiles/osoe.dir/src/signal.c.o
+[ 66%] Building C object shmem/CMakeFiles/osoe.dir/src/symmetric.c.o
+[ 75%] Building C object shmem/CMakeFiles/osoe.dir/src/team.c.o
+[ 75%] Building C object shmem/CMakeFiles/osoe.dir/src/transport-local.c.o
+[ 75%] Building C object shmem/CMakeFiles/osoe.dir/src/region-wait.c.o
+[ 75%] Building C object shmem/CMakeFiles/osoe.dir/src/wait.c.o
+[ 75%] Building C object shmem/CMakeFiles/osoe.dir/src/watch.c.o
+[ 83%] Building C object shmem/CMakeFiles/osoe.dir/src/sweep.c.o
+[ 83%] Building C object shmem/CMakeFiles/osoe.dir/src/am.c.o
+[ 83%] Building C object shmem/CMakeFiles/osoe.dir/src/connection.c.o
+[ 83%] Building C object shmem/CMakeFiles/osoe.dir/src/connection-area.c.o
+[ 83%] Building C object shmem/CMakeFiles/osoe.dir/src/internode-am.c.o
+[ 91%] Building C object shmem/CMakeFiles/osoe.dir/src/internode-generic.c.o
+[ 91%] Building C object shmem/CMakeFiles/osoe.dir/src/progress.c.o
+[ 91%] Building C object shmem/CMakeFiles/osoe.dir/src/progress-host.c.o
+[ 91%] Building C object shmem/CMakeFiles/osoe.dir/src/reply.c.o
+[ 91%] Building C object shmem/CMakeFiles/osoe.dir/src/ring.c.o
+[ 91%] Building C object shmem/CMakeFiles/osoe.dir/src/transport-am.c.o
+[100%] Building C object shmem/CMakeFiles/osoe.dir/src/wire.c.o
+/home/pi/osoe-f1/shmem/src/wire.c: In function ‘osoe_wire_attach’:
+/home/pi/osoe-f1/shmem/src/wire.c:138:67: warning: declaration of ‘r’ shadows a parameter [-Wshadow]
+  138 |       if ((e = getenv("OSOE_EXPERIMENT_PACING"))) { unsigned long r = strtoul(e, NULL, 0);
+      |                                                                   ^
+/home/pi/osoe-f1/shmem/src/wire.c:109:62: note: shadowed declaration is here
+  109 | void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,
+      |                                            ~~~~~~~~~~~~~~~~~~^
+/home/pi/osoe-f1/shmem/src/wire.c:141:57: warning: declaration of ‘b’ shadows a parameter [-Wshadow]
+  141 |       if ((e = getenv("OSOE_EXPERIMENT_SNDBUF"))) { int b = atoi(e);
+      |                                                         ^
+/home/pi/osoe-f1/shmem/src/wire.c:110:67: note: shadowed declaration is here
+  110 |                       uint32_t peer, const struct osoe_bootstrap *b)
+      |                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+[100%] Linking C shared library libosoe.so
+[100%] Built target osoe

@@ -1,0 +1,141 @@
+17:37:17 probe build 0
+17:39:04 A-4x1 exit 0
+    block 16384 median_us 823.5 mean_us 824.9 slow 0 max_ms 1.2
+    block 20480 median_us 968.3 mean_us 962.2 slow 0 max_ms 1.0
+    block 24576 median_us 1108.1 mean_us 7196.3 slow 1 max_ms 1220.6
+    block 28672 median_us 1283.7 mean_us 197502.3 slow 2 max_ms 35887.1
+    block 32768 median_us 1449.5 mean_us 269870.2 slow 3 max_ms 35842.3
+    block 36864 median_us 1583.2 mean_us 29163.4 slow 2 max_ms 4683.7
+    block 40960 median_us 1703.0 mean_us 1758.1 slow 0 max_ms 7.1
+    block 49152 median_us 1989.0 mean_us 2392.5 slow 2 max_ms 45.3
+    block 57344 median_us 2286.0 mean_us 2316.3 slow 0 max_ms 9.3
+    block 65536 median_us 2292.0 mean_us 2373.6 slow 0 max_ms 2.6
+17:39:58 A-4x2 exit 0
+    block 8192 median_us 854.1 mean_us 850.9 slow 0 max_ms 0.9
+    block 12288 median_us 1128.8 mean_us 1118.7 slow 0 max_ms 1.6
+    block 16384 median_us 1458.1 mean_us 180327.9 slow 1 max_ms 35775.9
+    block 20480 median_us 1767.1 mean_us 1793.3 slow 0 max_ms 6.4
+    block 24576 median_us 2023.7 mean_us 2026.0 slow 0 max_ms 2.1
+    block 32768 median_us 2629.6 mean_us 2502.6 slow 0 max_ms 2.7
+17:40:01 A-4x4 exit 0
+    block 4096 median_us 859.4 mean_us 863.8 slow 0 max_ms 1.5
+    block 6144 median_us 1156.6 mean_us 1170.2 slow 0 max_ms 1.3
+    block 8192 median_us 1465.5 mean_us 1471.2 slow 0 max_ms 1.6
+    block 12288 median_us 2145.7 mean_us 2123.1 slow 0 max_ms 2.2
+    block 16384 median_us 2703.1 mean_us 2705.3 slow 0 max_ms 2.8
+17:40:10 B-4x1-32k exit 0
+    block 32768 median_us 1382.9 mean_us 17651.0 slow 13 max_ms 458.7
+    block 32768 median_us 1391.9 mean_us 20411.1 slow 16 max_ms 459.8
+4
+17:40:39 experimental build 0
+17:41:01 C none 4x1: block 32768 median_us 1423.0 mean_us 85642.7 slow 3 max_ms 11022.9
+17:41:07 C none 4x2: block 16384 median_us 1456.5 mean_us 23350.4 slow 3 max_ms 2680.3
+17:42:11 C none bench: get bytes=262144 median_us=2953.0 ;get bytes=1048576 median_us=11316.5 ;bandwidth put bytes=1048576 mib_per_s=111.5;
+17:43:56 C pace100 4x1: block 32768 median_us 2111.1 mean_us 479529.9 slow 11 max_ms 31754.6
+17:43:57 C pace100 4x2: block 16384 median_us 1445.7 mean_us 1495.2 slow 0 max_ms 7.1
+17:45:06 C pace100 bench: get bytes=262144 median_us=2949.0 ;get bytes=1048576 median_us=11315.4 ;bandwidth put bytes=1048576 mib_per_s=95.3;
+17:45:07 C pace60 4x1: block 32768 median_us 1414.5 mean_us 1420.0 slow 0 max_ms 1.8
+17:45:16 C pace60 4x2: block 16384 median_us 2177.9 mean_us 45031.7 slow 1 max_ms 8511.6
+17:47:04 C pace60 bench: get bytes=262144 median_us=4416.5 ;get bytes=1048576 median_us=17513.7 ;bandwidth put bytes=1048576 mib_per_s=57.2;
+17:47:15 C sndbuf64k 4x1: block 32768 median_us 1416.3 mean_us 56646.5 slow 2 max_ms 5996.9
+17:47:24 C sndbuf64k 4x2: block 16384 median_us 1451.3 mean_us 38636.6 slow 1 max_ms 7421.8
+17:48:28 C sndbuf64k bench: get bytes=262144 median_us=2931.0 ;get bytes=1048576 median_us=11229.2 ;bandwidth put bytes=1048576 mib_per_s=111.5;
+17:49:01 C sndbuf32k 4x1: block 32768 median_us 1428.0 mean_us 136745.0 slow 3 max_ms 21826.8
+17:49:02 C sndbuf32k 4x2: block 16384 median_us 1437.1 mean_us 1445.2 slow 0 max_ms 1.7
+17:50:06 C sndbuf32k bench: get bytes=262144 median_us=2935.1 ;get bytes=1048576 median_us=11231.3 ;bandwidth put bytes=1048576 mib_per_s=111.5;
+17:50:23 C reno 4x1: block 32768 median_us 1432.6 mean_us 84027.8 slow 3 max_ms 7848.8
+17:50:56 C reno 4x2: block 16384 median_us 1455.6 mean_us 159326.8 slow 2 max_ms 31524.6
+17:51:59 C reno bench: get bytes=262144 median_us=2847.5 ;get bytes=1048576 median_us=10887.4 ;bandwidth put bytes=1048576 mib_per_s=111.5;
+17:52:00 C chunk16k 4x1: block 32768 median_us 1259.0 mean_us 1251.4 slow 0 max_ms 1.5
+17:52:00 C chunk16k 4x2: block 16384 median_us 1283.8 mean_us 1276.2 slow 0 max_ms 1.3
+17:53:22 C chunk16k bench: get bytes=262144 median_us=4459.8 ;get bytes=1048576 median_us=17362.9 ;bandwidth put bytes=1048576 mib_per_s=111.2;
+17:53:22 DONE
+17:53:28 D tcp 4 nodes: tcp-bruck n 4 block 16384 median_us 894.8 max_ms 94.3 slow 1 
+17:53:28 D tcp 4 nodes: tcp-bruck n 4 block 24576 median_us 1072.2 max_ms 2.7 slow 0 
+17:53:29 D tcp 4 nodes: tcp-bruck n 4 block 32768 median_us 1288.1 max_ms 1.8 slow 0 
+17:53:31 D tcp 4 nodes: tcp-bruck n 4 block 65536 median_us 3183.5 max_ms 5.5 slow 0 
+17:53:33 D tcp 4 nodes long: tcp-bruck n 4 block 32768 median_us 1297.7 max_ms 1.8 slow 0 
+17:53:34 D osoe 3 nodes pi-[001-003]:
+    block 24576 median_us 835.4 mean_us 813.6 slow 0 max_ms 0.9
+    block 32768 median_us 1025.2 mean_us 959.9 slow 0 max_ms 1.1
+    block 36864 median_us 1176.6 mean_us 1116.6 slow 0 max_ms 1.3
+    block 49152 median_us 1500.3 mean_us 1428.9 slow 0 max_ms 1.5
+17:53:36 D osoe 3 nodes pi-[001-002,004]:
+    block 24576 median_us 859.9 mean_us 847.9 slow 0 max_ms 0.9
+    block 32768 median_us 1031.8 mean_us 974.2 slow 0 max_ms 1.1
+    block 36864 median_us 1187.8 mean_us 1139.0 slow 0 max_ms 1.3
+    block 49152 median_us 1512.0 mean_us 1470.5 slow 0 max_ms 1.5
+17:53:38 D osoe 3 nodes pi-[001,003-004]:
+    block 24576 median_us 860.6 mean_us 841.4 slow 0 max_ms 0.9
+    block 32768 median_us 1029.4 mean_us 970.6 slow 0 max_ms 1.1
+    block 36864 median_us 1187.5 mean_us 1139.1 slow 0 max_ms 1.3
+    block 49152 median_us 1511.8 mean_us 1446.4 slow 0 max_ms 1.5
+17:53:39 D osoe 3 nodes pi-[002-004]:
+    block 24576 median_us 869.9 mean_us 862.1 slow 0 max_ms 1.2
+    block 32768 median_us 914.5 mean_us 994.3 slow 0 max_ms 1.4
+    block 36864 median_us 1226.9 mean_us 1229.0 slow 0 max_ms 1.6
+    block 49152 median_us 1542.5 mean_us 1475.2 slow 0 max_ms 1.6
+17:53:39 PHASE-D-DONE
+17:55:17 E ranks on pi-001 pi-002 pi-003 pi-004: 
+17:55:17     timeouts before: pi-001=12 pi-002=1757 pi-003=8 pi-004=8 
+17:55:17     timeouts after:  pi-001=12 pi-002=1757 pi-003=8 pi-004=8 
+17:55:17 E ranks on pi-002 pi-001 pi-003 pi-004: 
+17:55:17     timeouts before: pi-001=12 pi-002=1757 pi-003=8 pi-004=8 
+17:55:17     timeouts after:  pi-001=12 pi-002=1757 pi-003=8 pi-004=8 
+17:55:18 E ranks on pi-003 pi-004 pi-001 pi-002: 
+17:55:18     timeouts before: pi-001=12 pi-002=1757 pi-003=8 pi-004=8 
+17:55:18     timeouts after:  pi-001=12 pi-002=1757 pi-003=8 pi-004=8 
+17:55:18 E ranks on pi-004 pi-003 pi-002 pi-001: 
+17:55:18     timeouts before: pi-001=12 pi-002=1757 pi-003=8 pi-004=8 
+17:55:18     timeouts after:  pi-001=12 pi-002=1757 pi-003=8 pi-004=8 
+17:55:21 E tcp overlapped steps: tcp-bruck n 4 block 24576 median_us 985.7 max_ms 1.5 slow 0 
+17:55:23 E tcp overlapped steps: tcp-bruck n 4 block 32768 median_us 1181.7 max_ms 1.7 slow 0 
+17:55:23 PHASE-E-DONE
+17:58:01 E ranks on pi-001 pi-002 pi-003 pi-004: 28672:slow=3,max=12009.3 32768:slow=3,max=31889.3 28672:slow=3,max=15845.8 32768:slow=3,max=31720.1 
+17:58:01     timeouts before: pi-001=12 pi-002=1757 pi-003=8 pi-004=8 
+17:58:01     timeouts after:  pi-001=12 pi-002=1848 pi-003=8 pi-004=8 
+18:00:06 E ranks on pi-002 pi-001 pi-003 pi-004: 28672:slow=3,max=31852.9 32768:slow=4,max=1090.3 28672:slow=4,max=31927.2 32768:slow=2,max=1535.6 
+18:00:06     timeouts before: pi-001=12 pi-002=1848 pi-003=8 pi-004=8 
+18:00:06     timeouts after:  pi-001=25 pi-002=1940 pi-003=8 pi-004=8 
+18:02:24 E ranks on pi-003 pi-004 pi-001 pi-002: 28672:slow=4,max=31876.6 32768:slow=4,max=15873.1 28672:slow=3,max=31652.4 32768:slow=2,max=15882.6 
+18:02:24     timeouts before: pi-001=25 pi-002=1940 pi-003=8 pi-004=8 
+18:02:24     timeouts after:  pi-001=25 pi-002=2050 pi-003=8 pi-004=8 
+18:04:01 E ranks on pi-004 pi-003 pi-002 pi-001: 28672:slow=2,max=31367.7 32768:slow=2,max=6709.1 28672:slow=3,max=14711.8 32768:slow=3,max=27876.7 
+18:04:01     timeouts before: pi-001=25 pi-002=2050 pi-003=8 pi-004=8 
+18:04:01     timeouts after:  pi-001=25 pi-002=2132 pi-003=8 pi-004=8 
+18:04:01 PHASE-E2-DONE
+thin lines: 1
+18:04:46 thin build 0
+18:05:24 F OSOE_NOTHING=1: 28672:mean_us=74407.1,slow=4,max_ms=5773.6 32768:mean_us=108423.5,slow=3,max_ms=19853.2 
+18:06:04 F OSOE_EXPERIMENT_THIN=1: 28672:mean_us=29348.5,slow=2,max_ms=4981.3 32768:mean_us=10092.8,slow=4,max_ms=1446.3 
+18:07:04 F OSOE_NOTHING=1: 28672:mean_us=257645.1,slow=4,max_ms=19583.9 32768:mean_us=44175.3,slow=4,max_ms=5823.1 
+18:08:03 F OSOE_EXPERIMENT_THIN=1: 28672:mean_us=159770.4,slow=2,max_ms=26665.7 32768:mean_us=39309.6,slow=4,max_ms=4913.7 
+18:08:03 PHASE-F-DONE
+gather lines: 1
+18:13:17 gather build 0
+18:14:02 G OSOE_NOTHING=1 4x1 a: 24576:slow=0,max_ms=1.5 28672:slow=2,max_ms=730.5 32768:slow=4,max_ms=30604.7 36864:slow=1,max_ms=208.8 
+18:14:04 G OSOE_NOTHING=1 4x2 a: 16384:slow=1,max_ms=1471.4 
+18:15:05 G OSOE_EXPERIMENT_GATHER_PIECE=16384 4x1 a: 24576:slow=0,max_ms=1.2 28672:slow=3,max_ms=26768.8 32768:slow=4,max_ms=1938.3 36864:slow=1,max_ms=464.3 
+18:15:11 G OSOE_EXPERIMENT_GATHER_PIECE=16384 4x2 a: 16384:slow=1,max_ms=44.4 
+18:16:55 G OSOE_NOTHING=1 4x1 b: 24576:slow=0,max_ms=1.4 28672:slow=3,max_ms=31870.8 32768:slow=4,max_ms=5744.5 36864:slow=2,max_ms=31774.0 
+18:16:56 G OSOE_NOTHING=1 4x2 b: 16384:slow=1,max_ms=45.0 
+18:19:01 G OSOE_EXPERIMENT_GATHER_PIECE=16384 4x1 b: 24576:slow=3,max_ms=21869.8 28672:slow=4,max_ms=26723.1 32768:slow=3,max_ms=31822.9 36864:slow=2,max_ms=2828.3 
+18:19:07 G OSOE_EXPERIMENT_GATHER_PIECE=16384 4x2 b: 16384:slow=0,max_ms=9.3 
+18:20:09 G bench with pieces: get bytes=262144 median_us=2934.8 ;get bytes=1048576 median_us=11222.2 ;
+18:20:09 PHASE-G-DONE
+18:22:04 H OSOE_AM_CHUNK=32768 4x1: 24576:slow=0,max_ms=1.2 28672:slow=3,max_ms=19885.5 32768:slow=5,max_ms=26691.7 36864:slow=1,max_ms=1624.2 
+18:22:56 H OSOE_AM_CHUNK=32768 4x2: 16384:slow=3,max_ms=26813.9 
+18:22:56 H OSOE_AM_CHUNK=24576 4x1: 
+18:22:56 H OSOE_AM_CHUNK=24576 4x2: 
+18:23:58 H OSOE_AM_BUFFER=262144 4x1: 24576:slow=0,max_ms=1.2 28672:slow=3,max_ms=2707.0 32768:slow=4,max_ms=26675.1 36864:slow=2,max_ms=937.6 
+18:24:02 H OSOE_AM_BUFFER=262144 4x2: 16384:slow=1,max_ms=3364.1 
+18:25:56 H OSOE_AM_CHUNK=32768 4x1: 24576:slow=1,max_ms=1239.4 28672:slow=4,max_ms=26800.4 32768:slow=3,max_ms=19898.6 36864:slow=4,max_ms=26124.1 
+18:26:04 H OSOE_AM_CHUNK=32768 4x2: 16384:slow=3,max_ms=5368.5 
+18:27:15 H OSOE_AM_CHUNK=32768 bench: get bytes=32768 median_us=586.7 ;get bytes=262144 median_us=3520.3 ;get bytes=1048576 median_us=13578.0 ;bandwidth put bytes=1048576 mib_per_s=111.4;
+18:27:15 H OSOE_AM_CHUNK=24576 bench: 
+18:27:15 PHASE-H-DONE
+18:28:57 I chunk16k 4x1 a: 4096:slow=0,max_ms=0.6 6144:slow=0,max_ms=0.6 8192:slow=0,max_ms=0.6 10240:slow=0,max_ms=0.7 12288:slow=0,max_ms=0.7 14336:slow=0,max_ms=0.8 16384:slow=0,max_ms=1.1 20480:slow=0,max_ms=1.0 24576:slow=1,max_ms=5848.7 28672:slow=4,max_ms=19894.8 32768:slow=0,max_ms=1.4 36864:slow=0,max_ms=1.4 49152:slow=0,max_ms=2.0 
+18:29:04 I chunk16k 4x2 a: 4096:slow=0,max_ms=0.7 6144:slow=0,max_ms=0.7 8192:slow=0,max_ms=0.9 12288:slow=1,max_ms=467.8 16384:slow=0,max_ms=1.6 24576:slow=0,max_ms=1.8 
+18:30:05 I chunk16k 4x1 b: 4096:slow=0,max_ms=0.6 6144:slow=0,max_ms=0.7 8192:slow=0,max_ms=0.7 10240:slow=0,max_ms=0.9 12288:slow=0,max_ms=0.9 14336:slow=0,max_ms=1.0 16384:slow=0,max_ms=1.1 20480:slow=0,max_ms=1.4 24576:slow=0,max_ms=1.2 28672:slow=4,max_ms=16012.8 32768:slow=0,max_ms=1.3 36864:slow=0,max_ms=1.7 49152:slow=0,max_ms=1.7 
+18:30:25 I chunk16k 4x2 b: 4096:slow=0,max_ms=0.7 6144:slow=0,max_ms=0.9 8192:slow=0,max_ms=0.9 12288:slow=1,max_ms=17778.8 16384:slow=0,max_ms=1.6 24576:slow=0,max_ms=1.8 
+18:30:25 PHASE-I-DONE

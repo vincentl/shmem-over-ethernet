@@ -1,0 +1,8 @@
+/usr/bin/ld: /tmp/ccqPqeTn.o: in function `thread_main':
+mt_lock_test.c:(.text+0x30): undefined reference to `mtl_test_lock'
+/usr/bin/ld: mt_lock_test.c:(.text+0x5c): undefined reference to `mtl_clear_lock'
+/usr/bin/ld: mt_lock_test.c:(.text+0x88): undefined reference to `mtl_set_lock'
+/usr/bin/ld: mt_lock_test.c:(.text+0xb0): undefined reference to `mtl_clear_lock'
+/usr/bin/ld: /tmp/ccqPqeTn.o: in function `main':
+mt_lock_test.c:(.text+0x1f8): undefined reference to `mtl_cleanup'
+collect2: error: ld returned 1 exit status
