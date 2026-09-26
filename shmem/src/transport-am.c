@@ -1201,8 +1201,7 @@ uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum
     context_enter(context);
     uint64_t previous = remote_rmw(context, pe, region, offset, op, width, operand, compare,
                                    flags);
-    if (fetching)
-        context_leave(context);
+    context_leave(context);
     return previous;
 }
 

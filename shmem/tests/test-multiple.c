@@ -192,6 +192,10 @@ int main(void)
                          value(left, t, ROUNDS - 1, i));
                     break;
                 }
+        /* Every PE has checked its rows before any starts the next wave, whose
+         * first puts would otherwise land in a slower neighbour's rows while
+         * it still reads them. */
+        shmem_barrier_all();
     }
     shmem_barrier_all();
     if (me == 0 && *counter != (uint64_t)npes * THREADS * ROUNDS * 2)
