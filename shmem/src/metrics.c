@@ -135,6 +135,12 @@ _Static_assert(sizeof thread_metrics / sizeof thread_metrics[0] == OSOE_COUNTER_
 
 #define TEAM(name, where)                                                   \
     { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_TEAM, 4, (uint32_t)(where), 0 }
+/* A record's child ranks, a name each, as many as the largest fan-out allows:
+ * a reader shows those below the record's own count (osoe-stat). */
+#define RECORD_CHILD(i)                                                     \
+    TEAM("team.record.child." #i, BLOCK_RECORD(child) + (i) * sizeof(uint32_t))
+_Static_assert(OSOE_COLLECTIVE_FANOUT_MAX == 32,
+               "one name per child rank a record can hold (record_metrics below)");
 #define NDTEAM(name, number, where)                                         \
     { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,      \
       (uint32_t)(offsetof(struct osoe_node_header, team) +                  \
@@ -223,6 +229,14 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     TEAM("team.record.parent", BLOCK_RECORD(parent)),
     TEAM("team.record.position", BLOCK_RECORD(position)),
     TEAM("team.record.children", BLOCK_RECORD(children)),
+    RECORD_CHILD(0), RECORD_CHILD(1), RECORD_CHILD(2), RECORD_CHILD(3),
+    RECORD_CHILD(4), RECORD_CHILD(5), RECORD_CHILD(6), RECORD_CHILD(7),
+    RECORD_CHILD(8), RECORD_CHILD(9), RECORD_CHILD(10), RECORD_CHILD(11),
+    RECORD_CHILD(12), RECORD_CHILD(13), RECORD_CHILD(14), RECORD_CHILD(15),
+    RECORD_CHILD(16), RECORD_CHILD(17), RECORD_CHILD(18), RECORD_CHILD(19),
+    RECORD_CHILD(20), RECORD_CHILD(21), RECORD_CHILD(22), RECORD_CHILD(23),
+    RECORD_CHILD(24), RECORD_CHILD(25), RECORD_CHILD(26), RECORD_CHILD(27),
+    RECORD_CHILD(28), RECORD_CHILD(29), RECORD_CHILD(30), RECORD_CHILD(31),
     { "team.record.name", "", OSOE_MTYPE_STRING, OSOE_MKIND_STATE, OSOE_MSCOPE_TEAM,
       (uint16_t)sizeof(((struct osoe_team_record *)0)->name), (uint32_t)BLOCK_RECORD(name), 0 },
     /* The predefined teams' fields in the node scope, by the names they had
@@ -296,6 +310,10 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("node.mapped", mapped, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.finalized", finalized, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.failed", failed, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    /* One past the highest team number whose record here is published: how far
+     * the lead's agent looks for arrivals (layout 18, node.h). */
+    ND("node.team_numbers_published", team_numbers_published, OSOE_MTYPE_U32,
+       OSOE_MKIND_STATE, ""),
     NDDIR("node.local_count", local_count, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
     NDDIR("node.blocks_per_pe", blocks_per_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
     /* The AM layer's node-wide counters (node.h, layout 8). */

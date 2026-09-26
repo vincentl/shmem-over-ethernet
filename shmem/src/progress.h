@@ -299,15 +299,15 @@ void osoe_progress_attach_teams(struct osoe_progress *p, struct osoe_progress_te
 bool osoe_progress_poll(struct osoe_progress *p);
 
 /*
- * Meet every team whose record is published now, as if each had been used:
- * the predefined teams, whose records are written before the engine's thread
- * starts, so that osoe-stat shows each one's place in the tree from the first
- * pass (§3.14), as it did when they were registered at init - a node none of
- * whose members has reached the first collective still says where it hangs
- * from. O(OSOE_MAX_TEAMS) once; a team published later is met at its first
- * use.
+ * Meet every team numbered below `count` whose record is published now, as if
+ * each had been used: the predefined teams, whose records are written before
+ * the engine's thread starts, so that osoe-stat shows each one's place in the
+ * tree from the first pass (§3.14), as it did when they were registered at
+ * init - a node none of whose members has reached the first collective still
+ * says where it hangs from. O(count) once, count the node's high-water mark of
+ * published numbers (node.h); a team published later is met at its first use.
  */
-void osoe_progress_meet_teams(struct osoe_progress *p);
+void osoe_progress_meet_teams(struct osoe_progress *p, uint32_t count);
 
 /*
  * Does this node owe the network nothing? True when every connection has an

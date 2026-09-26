@@ -76,6 +76,22 @@ static bool team_label(const struct osoe_segment *s, uint32_t team, char *label,
     return true;
 }
 
+/* Whether a team-scope metric is one of the record's child ranks past the
+ * children it has: they are named team.record.child.<i>, as many as the
+ * largest fan-out allows, and a team shows the ones its record holds. */
+static bool beyond_children(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
+                            uint32_t team)
+{
+    static const char prefix[] = "team.record.child.";
+    char name[48];
+    metric_name(m, name, sizeof name);
+    if (strncmp(name, prefix, sizeof prefix - 1) != 0)
+        return false;
+    uint64_t children = 0;
+    osoe_segment_read_name(s, "team.record.children", team, &children);
+    return strtoull(name + sizeof prefix - 1, NULL, 10) >= children;
+}
+
 /* A team-scope metric's name as one team's: team.arrived as team.world.arrived,
  * or team.3.arrived for a team numbered 3. */
 static void team_metric_name(const struct osoe_metric_descriptor *m, const char *label,
@@ -413,7 +429,7 @@ static void print_connection_lines(const struct osoe_segment *s)
 
 /* One team's tree state on one node (§5.3), as the summary shows it. */
 struct tree_state {
-    uint64_t open, closed, own, kids, arrived, missing, parent;
+    uint64_t open, closed, own, children, arrived, missing, parent;
 };
 
 /*
@@ -427,8 +443,8 @@ static bool read_tree_state(const struct osoe_segment *s, uint32_t team, const c
     static const char *const fields[] = { "epoch_open", "epoch_closed", "own_arrived",
                                           "children", "children_arrived", "lowest_missing",
                                           "parent" };
-    uint64_t *values[] = { &out->open, &out->closed, &out->own, &out->kids, &out->arrived,
-                           &out->missing, &out->parent };
+    uint64_t *values[] = { &out->open, &out->closed, &out->own, &out->children,
+                           &out->arrived, &out->missing, &out->parent };
     *out = (struct tree_state){ 0 };
     for (size_t i = 0; i < sizeof fields / sizeof fields[0]; i++) {
         char name[64];
@@ -453,10 +469,10 @@ static void tree_line(const struct osoe_segment *s, uint64_t node, const char *h
     if (t->parent != UINT32_MAX)
         snprintf(parent_s, sizeof parent_s, "%" PRIu64, t->parent);
     printf("node %-3" PRIu64 " %-16s %2" PRIu64 "/%-2u live  %-8s epoch %" PRIu64
-           "/%-3" PRIu64 " own %-3s kids %" PRIu64 "/%-2" PRIu64
+           "/%-3" PRIu64 " own %-3s children %" PRIu64 "/%-2" PRIu64
            " next %-4s parent %-4s  %s\n",
            node, host, live, s->local_count, team, t->open, t->closed, t->own ? "yes" : "no",
-           t->arrived, t->kids, missing_s, parent_s, where);
+           t->arrived, t->children, missing_s, parent_s, where);
 }
 
 /*
@@ -473,8 +489,10 @@ static void tree_line(const struct osoe_segment *s, uint64_t node, const char *h
  * every node has its line, even on a job of one node, where no team has a
  * tree; any other only if its record says it spans nodes and it has run: the
  * finalize team's record is written at init and it moves only at
- * shmem_finalize. A segment from before layout 18 has no records, and its two
- * teams are found by the names its header gave them.
+ * shmem_finalize. A node with no record published - read before its lead
+ * wrote them, or whose lead died in init - and a segment from before layout
+ * 18, which has none, are read as before the records: the world and finalize
+ * teams, by the node-scope names the header gives them.
  */
 static void summary_line(const struct osoe_segment *s)
 {
@@ -506,27 +524,26 @@ static void summary_line(const struct osoe_segment *s)
         snprintf(where, sizeof where, "PE%u %s (%s) %s", i, b.routine, what, d);
     }
 
-    if (s->team_count > 0) {
-        bool first = true;
-        for (uint32_t t = 0; t < s->team_count; t++) {
-            char label[24];
-            uint64_t nodes = 0;
-            struct tree_state state;
-            if (!team_label(s, t, label, sizeof label) || !read_tree_state(s, t, label, &state))
-                continue;
-            osoe_segment_read_name(s, "team.record.nodes", t, &nodes);
-            if (!first && (nodes < 2 || (state.open == 0 && state.closed == 0)))
-                continue;
-            first = false;
-            tree_line(s, node, host, live, label, &state, where);
-        }
-        return;
+    bool first = true;
+    for (uint32_t t = 0; t < s->team_count; t++) {
+        char label[24];
+        uint64_t nodes = 0;
+        struct tree_state state;
+        if (!team_label(s, t, label, sizeof label) || !read_tree_state(s, t, label, &state))
+            continue;
+        osoe_segment_read_name(s, "team.record.nodes", t, &nodes);
+        if (!first && (nodes < 2 || (state.open == 0 && state.closed == 0)))
+            continue;
+        first = false;
+        tree_line(s, node, host, live, label, &state, where);
     }
+    if (!first)
+        return;
     for (unsigned t = 0; t < 2; t++) {
         const char *team = t == 0 ? "world" : "finalize";
         struct tree_state state;
         if (!read_tree_state(s, UINT32_MAX, team, &state))
-            return;                     /* older layout: no tree state to show */
+            return;                     /* before layout 12: no tree state to show */
         /* A team that has not run says nothing: the finalize team is
          * registered from init and only moves at shmem_finalize. */
         if (state.open == 0 && state.closed == 0 && t == 1)
@@ -723,7 +740,7 @@ static void dump_human(const struct osoe_segment *s)
             continue;
         printf("\n  team %s (number %u)\n", label, t);
         for (uint32_t i = 0; i < s->nmetrics; i++) {
-            if (s->metrics[i].scope != OSOE_MSCOPE_TEAM)
+            if (s->metrics[i].scope != OSOE_MSCOPE_TEAM || beyond_children(s, &s->metrics[i], t))
                 continue;
             char shown[64];
             team_metric_name(&s->metrics[i], label, shown, sizeof shown);
@@ -894,7 +911,7 @@ static void dump_json(const struct osoe_segment *s)
             const struct osoe_metric_descriptor *m = &s->metrics[i];
             uint64_t v;
             if (m->scope != OSOE_MSCOPE_TEAM || m->type == OSOE_MTYPE_STRING ||
-                !osoe_segment_read(s, m, t, &v))
+                beyond_children(s, m, t) || !osoe_segment_read(s, m, t, &v))
                 continue;
             char shown[64];
             team_metric_name(m, label, shown, sizeof shown);

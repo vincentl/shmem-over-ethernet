@@ -796,7 +796,12 @@ argument 1 is per connection, argument 2 is per node.
 
 *As built (phase 1 step 2 slice 3):* `degree` is `OSOE_COLLECTIVE_DEGREE(k)` =
 *k* + 1 for the tree's fan-out *k*, `max_teams` is `OSOE_TEAMS` (the two
-predefined teams and the finalize team). Slice 2 sized argument
+predefined teams and the finalize team). *Phase 1 step 7* made `OSOE_MAX_TEAMS`
+a run-time value (§5.7) and sized everything indexed by team number by it, but
+this term still counts the teams that can exist, `OSOE_PREDEFINED_TEAMS`, the
+same three: the split that creates teams (step 7's second slice) sizes it by
+`OSOE_MAX_TEAMS` and changes `shmem.reply-pool.overflow`, whose arithmetic is
+three teams'. Slice 2 sized argument
 2 per connection at one per team, which was the star's shape — its root released
 every peer at once — and cost N − 1 descriptors per team on every node for a need
 only the root had; the node-wide term is O(*k*·*T*). `slack` stays 0 — every
@@ -953,6 +958,14 @@ queued toward a connection) and settled after each visit. A pass costs *N*/64
 loads of each bitmap and O(active) connections visited. Nothing added touches
 every connection's shared state periodically, so lazy connection establishment
 is no harder.
+
+**A pass also reads the arrival handoffs** (§5.3), a word per team number in
+the node header, for arrivals the node's members have posted. *As built (phase 1
+step 7):* only those below `team_numbers_published`, the node's high-water mark
+of published team records, which each record's writer raises after publishing
+it and the lead's agent loads once a pass: team numbers are never reused
+(§5.7), so a pass costs O(teams created) - three until splits exist - and not
+O(`OSOE_MAX_TEAMS`), 32 by default and 1,024 at most.
 
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
@@ -1237,9 +1250,17 @@ that is stuck. Memory can be read without the job's cooperation.
   Two structures, both frozen, both checked: that is the whole contract between
   a job and a tool from another commit.
 
-  Four sections, each starting on a cache line: the header, the PE slots, the
-  metric table, and the counter blocks. A metric names its **scope** — node,
-  PE, or thread — which says which record its offset is into.
+  Sections, each starting on a cache line: the header, the PE slots, the
+  metric table, the counter blocks, and since layouts 6, 12 and 18 the landing
+  zones, the connection records and each PE's row of published epochs. Since
+  layout 18 the header ends with one block per team number, `OSOE_MAX_TEAMS` of
+  them (§5.7). A metric names its **scope** — node, PE, thread, connection, and
+  since layout 18 **team** (a team number's block, indexed by the number) and
+  **epochs** (a PE's row, a word per team number) — which says which record its
+  offset is into. The predefined teams' fields keep their node-scope names,
+  `team.world.*` and the like, since the blocks are the header's tail; a reader
+  finds every team by walking the team scope, and `osoe-stat` shows each whose
+  record is published as `team.<name>.*`.
 
 - **Counters are bounded per PE, and exhaustion is visible rather than fatal.**
   `OSOE_MAX_THREADS` blocks per PE, claimed by CAS on first use. A thread that
@@ -3848,14 +3869,26 @@ Computed once at team creation, stored in the private team descriptor:
 - **Local member count** — team members *on this node*, not local PE count. A
   node with eight PEs of which three are in team T has arrival target three.
 - **Node participation** — the internode tree spans only nodes with at least one
-  member. Topology is per team. *As built:* the team hands its sorted node list to
-  `osoe_internode_team` once, at creation (`internode.h`); the backend keeps the
-  O(*k*) of it the tree needs and drops the O(*N*) list. The world and finalize
-  teams span every node; a split team (§7.3) will pass a sparse list, and the
-  topology function is tested on sparse lists already (`shmem.collective-tree`).
+  member. Topology is per team. *As built (phase 1 step 7):* each member node's
+  block for the team's number holds the team's **record** (`node.h`) - its local
+  member count, and the O(*k*) of the tree over its sorted node list that the
+  node needs, each neighbour named by its lead's rank - published before the
+  team's first arrival anywhere; the progress thread and the internode backend
+  learn the team from it the first time they meet it, never from a descriptor,
+  since the node lead's process need not belong to the team. The O(*N*) list is
+  dropped once the record is written. (Until step 7 the team handed the list to
+  `osoe_internode_team`.) The world and finalize teams span every node; a split
+  team (§7.3) will have a sparse list, and the topology function is tested on
+  sparse lists already (`shmem.collective-tree`).
 - **Local lead** — lowest team rank among local members. Must be a member, since
   its `dest` is the accumulator and it is the only PE that writes that `dest`
-  before release (§5.5).
+  before release (§5.5). *As built (phase 1 step 7):* the rule for teams a split
+  creates, whose leads the internode phase will find through their records. The
+  predefined teams' lead is local id 0, the node's lead, which the generic
+  internode phase and the job's table of leads address on every node; the two
+  agree under every distribution Slurm and `osoe-launch` produce, and a local
+  order given by hand, whose local id 0 is not the lowest rank, runs as it
+  always did.
 
 ### 5.3 Intranode phase
 
@@ -4013,6 +4046,16 @@ forwarding before the last child and not resetting the child count release a
 node before every node has arrived; releasing locally before forwarding and
 resetting after leaves two epochs open at a node; applying a child's arrival to
 the epoch the node's own counter implies books it against a closed one.
+
+*As built (phase 1 step 7):* the progress thread learns each team from its
+record in the node's block for the team's number (§5.2), never from a
+descriptor. The node's lead writes the predefined teams' records before its
+agent starts, and the agent meets every published team at its first pass, so
+that `osoe-stat` shows each one's place in the tree from the start; a team
+published later is met at its first arrival or message. The releases a pass
+forwards are applied at its end in the order they were forwarded - a list,
+O(*k*) each, rather than a look at every team number - which no team can
+observe, each team's release being its own.
 
 The wire message did not change: `struct osoe_am_barrier {team, epoch,
 from_node}` carries everything, and `from_node` is now checked — an ARRIVE must
@@ -4300,10 +4343,12 @@ this into the large-reduction design.)*
 *As built: reductions and broadcast* (phase 1 step 5 slice 1; `collectives.c`,
 `reductions.c`, `broadcast.c`). Within a node, exactly the scheme above: every
 member arrives on the team's `arrived`, the last to arrive wakes the lead, the
-lead - the team's member with the lowest local id, local id 0 for both teams
-that exist; §5.2 says the lowest team rank, which that is under every
-distribution Slurm and the launcher produce, though the bootstrap accepts orders
-in which it is not, and any member would do so long as every member agrees -
+lead - local id 0 for the predefined teams, the node's lead, which the generic
+internode phase addresses on every node; §5.2 says the lowest team rank, which
+that is under every distribution Slurm and the launcher produce, though the
+bootstrap accepts orders in which it is not, and any member would do so long as
+every member agrees (phase 1 step 7 keeps it so: the descriptor lists the
+predefined teams' members in local-id order, and §5.2's rule is a split team's) -
 reads each member's source only now and
 combines it into its own `dest`, bumps `released`, and leaves after the last
 copy-out on `copied`. **Between nodes the lead hands its node's result to
@@ -4420,7 +4465,12 @@ so it cannot perform a world-collective allocation.
 **`max_teams` is a runtime value, read from the environment during init**, and
 **the same parameter bounds the control queue (§3.8)** and the team range
 allocator. Three constraints resolve against one number — one thing to document,
-one place to fail loudly.
+one place to fail loudly. *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`,
+default 32, between 4 and 1,024, read at each session's first init and agreed at
+the job rendezvous (§6.2) and between a node's PEs; it sizes each node's team
+blocks, each PE's published epochs, the internal region's per-team blocks
+(§5.8) and the progress thread's per-team state, and from the split that
+creates teams the control queue's term (§3.8).
 
 **It counts teams in existence job-wide at once, including the predefined teams —
 not teams per PE.** The control-queue bound is per connection: the number of
@@ -4430,11 +4480,14 @@ count makes the §3.8 assert fire on conforming programs (review C10). Teams per
 edge never exceed teams job-wide, so the job-wide count is a safe bound, and the
 node-wide pool (§3.8) keeps it from costing memory per connection.
 
-**Open: the team range allocator and the split protocol are not yet designed.**
-This section refers to "team ranges" without defining them, and nothing yet says
-how PEs agree on a new team's identifier or claim its counter blocks during
-`shmem_team_split_strided` and `shmem_team_split_2d`. Phase 1 has no team creation,
-but this becomes blocking when team creation lands (§10).
+**The team range allocator and the split protocol**, open here until phase 1
+step 7, are designed and approved (`docs/prompts/phase1-step7-slice1-prompt.md`,
+`docs/decisions/2026-09-25.md`): a team is a number, job-wide and never reused
+within a session, claimed by the parent's rank 0 with one fetching add on a
+counter in world PE 0's internal page; every node's block for the number holds
+the team's counters and, on each member node, its record; the split is
+collective over the parent and ends with a sync over it. Step 7's first slice
+built the storage, and its second builds the split (§10).
 
 Runtime rather than build-time, despite the init-ordering cost: the pool cannot
 be sized until the bootstrap has supplied local PE count, so team-pool sizing
@@ -4550,7 +4603,13 @@ bytes each, on lines of their own, since stock verbs have no four-byte atomics;
 the slots first, so that a store running off the end of the heap lands in
 scratch rather than in a count. Its size is fixed by the fan-out every node
 agrees on, and the slot is a constant for the same reason.
-`internal-region.h`.)*
+`internal-region.h`. *Since phase 1 step 7* a block per team number: first every
+team number's fan-out + 1 slots, then every team number's two words, each alone
+on a 128-byte line - a constant, not the compiler's cache line, which is 64
+bytes on x86-64 and 128 on aarch64, so that nodes of different architectures
+compute the same offsets. About 2.5 MiB a PE at the default 32 teams and a
+fan-out of 4, of which a team touches only its own slots and words, and only
+on its leads.)*
 
 *(Built at phase 1 step 5 slice 2, once reductions had landed and shown what it
 must contain - not as a separate header but as `internode.h`'s data half, beside
@@ -4840,8 +4899,10 @@ phase 1 step 3 as a tree rooted at that lead - "The rendezvous as built", below.
   moves on.
 - **Who connects:** only node leads — one connection per node. Each sends its
   node's rank list (`SLURM_GTIDS`), `SHMEM_SYMMETRIC_SIZE`, handler-table
-  checksum (§3.13) and `OSOE_COLLECTIVE_FANOUT` (§5.3: a node building a
-  different tree waits for arrivals sent elsewhere, silently). The server checks
+  checksum (§3.13), `OSOE_COLLECTIVE_FANOUT` (§5.3: a node building a
+  different tree waits for arrivals sent elsewhere, silently) and, since phase 1
+  step 7, `OSOE_MAX_TEAMS` (§5.7: a node counting to another number lays its
+  team state and internal region out differently). The server checks
   agreement, then broadcasts the rank→node map and node addresses, and each
   node's fixed-size backend blob (§4.10; zeros on AM, an RDMA backend's queue-pair
   and key material).
@@ -4956,8 +5017,9 @@ waiting on its socket names it ("the rendezvous lost node 9, its child…").
 *Up the tree* goes each subtree's report: per node its address, its ranks as
 arithmetic progressions in local-id order (one under block, one under cyclic;
 `rank-map.h`) and its blob; and the values every node must agree on — the job's
-size, `SHMEM_SYMMETRIC_SIZE`, the handler checksum, `OSOE_COLLECTIVE_FANOUT` —
-which each parent checks against its own, so a disagreement is refused by the
+size, `SHMEM_SYMMETRIC_SIZE`, the handler checksum, `OSOE_COLLECTIVE_FANOUT`,
+`OSOE_MAX_TEAMS` — which each parent checks against its own, so a disagreement
+is refused by the
 lead that sees it, naming both nodes (`shmem.job.disagree.*`). *At the root* the
 map is built: the progressions are expanded once, into O(*P*) scratch on that one
 node, to check that every rank is claimed exactly once (`shmem.job.duplicate-rank`,
@@ -5205,7 +5267,10 @@ Things to get right, each of which is a silent bug otherwise:
   session's lifetime. If a later init in the same process picks up a changed
   environment, the pools differ from what the application saw last time. Either
   re-read it and document that, or latch it at first init and document *that* —
-  but do not leave it accidental.
+  but do not leave it accidental. *As built (phase 1 step 7):* re-read, like
+  everything the bootstrap reads, at each session's first init, since a new
+  session re-runs the whole of §6: a changed environment gives it its own count,
+  agreed afresh at its rendezvous.
 
 ---
 
@@ -6368,7 +6433,8 @@ Recorded rather than deleted, so they are not reopened from memory.
 | `shmem_team_destroy` scoping | **Collective over the team's members**: non-members hold `SHMEM_TEAM_INVALID`, on which destroy is a no-op. An earlier resolution called the scope ambiguous. Team ranges still leak until finalize (§5.7) |
 | Team-based allocation | **Does not exist through 1.6.** 1.6 change #10 states malloc and friends are world-team collective (§4.5) |
 | PMIx on the actual nodes | **Moot.** Nothing links against PMIx or PMI-2 on the default path (§6) |
-| `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7) |
+| `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7). *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`, read at each session's first init and agreed at the rendezvous, sizing everything indexed by team number; the control queue's term follows with the split |
+| Team range allocator and split protocol | **Designed and approved** (2026-09-25; §5.7, `docs/prompts/phase1-step7-slice1-prompt.md`): team numbers claimed from a counter on world PE 0 and never reused within a session, storage per number on every node, a record per member node that the progress thread learns a team from, the split collective over its parent. Phase 1 step 7's first slice built the storage; its second builds creation |
 | How a PE blocks in `wait_until` | **One watch slot per local PE with a 32-bit futex sequence word** (§4.9). Futexing on the `ivar` itself was withdrawn, since 64-bit futexes do not exist, and the hash table was replaced once waits were seen to be on the caller's own variable |
 | io_uring ring bound | **Two bounds, two rings.** CQ is sized from the provided-buffer ring (§3.3). Verified by `tools/probe` |
 | Reduction `dest` versus 1.6 change #17 | **Not a conflict** — same arrays means same symmetric offset. The surrounding text exposed three real bugs, fixed by a single-writer lead that leaves last (§5.5) |
@@ -6520,8 +6586,6 @@ which has two states per pair, so a third backend needs a selector of its own
 - **The value of the reply credit `C`** (§3.8, §4.6). Large enough to be
   irrelevant to real codes, small enough that `connections × C` descriptors stay
   cheap; pick it from measurement.
-- **Team range allocator and split protocol** (§5.7). Undesigned; becomes blocking
-  when team creation lands.
 - **`SHMEM_THREAD_MULTIPLE`: points §4.11 leaves open.** None blocks phase 1.
   - **A full thread table.** A PE's `OSOE_MAX_THREADS` blocks can all be taken by
     live threads. Aborting with a diagnostic naming the variable is loud and simple.

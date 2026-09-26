@@ -12,7 +12,14 @@
 #include "listener.h"
 #include "rendezvous.h"
 
-#define UP_MAGIC   UINT64_C(0x7075656d6f736f)    /* "osomeup", little-endian */
+/*
+ * Each header's magic is its version too: a report whose shape differs is a
+ * node running another library, and must be refused as one - read as this
+ * shape, it would be refused for whichever value the misread happened to hit.
+ * The up header's second shape, "osoeup-2", carries OSOE_MAX_TEAMS (phase 1
+ * step 7) and is 48 bytes, where the first, "osomeup", was 40.
+ */
+#define UP_MAGIC   UINT64_C(0x322d7075656f736f)  /* "osoeup-2", little-endian */
 #define DOWN_MAGIC UINT64_C(0x6e776f64656f736f)  /* "osoedown" */
 
 /* What every node must agree on (§6.2): a node that differs is a mismatched
@@ -31,11 +38,14 @@ struct agreement {
 };
 
 struct up_header {
-    uint64_t magic;
+    uint64_t magic;                 /* UP_MAGIC: its shape */
     struct agreement agreement;
     uint32_t nodes;                 /* node records that follow */
     uint32_t progressions;          /* progressions that follow the records */
 };
+
+_Static_assert(sizeof(struct up_header) == 48,
+               "the up header's shape is UP_MAGIC's: a new shape takes a new magic");
 
 /* One node of a subtree, as it travels up. */
 struct node_record {
@@ -117,7 +127,8 @@ static void receive_up(const struct osoe_bootstrap *b, int fd, uint32_t child,
     if (!osoe_listener_read(b, fd, &h, sizeof h, child))
         lost(b, child, "child in the rendezvous tree");
     if (h.magic != UP_MAGIC)
-        osoe_fatal("node %u sent a rendezvous report this build cannot read", child);
+        osoe_fatal("node %u sent a rendezvous report this build cannot read: the nodes are "
+                   "running different osoe libraries", child);
     agree(b, child, mine, &h.agreement);
     if (h.nodes == 0 || h.nodes > b->node_count || h.progressions > b->world_size)
         osoe_fatal("node %u's rendezvous report claims %u nodes and %u progressions in a job "

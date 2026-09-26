@@ -62,11 +62,10 @@
  * reduction's rotated to its root with arithmetic alone. The reduction's tree
  * is the team's record's (node.h), read the first time a call names the team;
  * a broadcast's rotated one names each node's lead by the job's table of them
- * (job.h), its local id 0, which is the world team's lead there - the node's
- * lowest rank - under every distribution Slurm and osoe-launch produce. A split
- * team spanning some of the nodes will need its node set's positions, which
- * are O(N) and not kept (internode.h); until split teams exist that is refused
- * by name.
+ * (job.h), its local id 0, which is the world team's lead there (team.c). A
+ * split team spanning some of the nodes will need its node set's positions,
+ * which are O(N) and not kept (internode.h), and its leads, which its records
+ * name; until split teams exist that is refused by name.
  *
  * Costs, with N nodes, k the fan-out and n bytes: ceil(n / slot) passes of depth
  * ceil(log_k N) each way, with O(k n) combining and k puts per node per piece;
@@ -82,7 +81,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "base/cacheline.h"
 #include "collective-tree.h"
 #include "combine.h"
 #include "fatal.h"
@@ -95,35 +93,35 @@
 #include "transport.h"
 
 /*
- * The internal region's layout (internal-region.h): the words area - per team
- * number an eight-byte arrival word (children's pieces in) and release word
- * (the parent's pieces down), each on a cache line of its own - then a block
- * of slots per team number. Slot `position` of a team's block holds that
- * child's partial result; the one after the last child's holds what the
- * parent sends down. Each team number has its own, so two teams whose trees
- * share a lead put into different places (§7.3).
+ * The internal region's layout (internal-region.h): a block of slots per team
+ * number, then the words - per team number an eight-byte arrival word
+ * (children's pieces in) and release word (the parent's pieces down), each
+ * alone on a line of the region's fixed 128 bytes. Slot `position` of a team's
+ * block holds that child's partial result; the one after the last child's
+ * holds what the parent sends down. Each team number has its own, so two teams
+ * whose trees share a lead put into different places (§7.3).
  */
-static uint64_t arrivals_word(uint32_t team)
-{
-    return (uint64_t)team * OSOE_INTERNAL_TEAM_WORDS_BYTES;
-}
-
-static uint64_t release_word(uint32_t team)
-{
-    return arrivals_word(team) + OSOE_CACHELINE;
-}
-
 static uint64_t child_slot(uint32_t team, uint32_t position)
 {
-    uint64_t block = osoe_internal_words_bytes(osoe.bootstrap.max_teams) +
-                     (uint64_t)team *
-                         osoe_internal_team_slots_bytes(osoe.bootstrap.collective_fanout);
-    return block + (uint64_t)position * OSOE_INTERNAL_SLOTS_PER_CHILD * OSOE_INTERNAL_SLOT_BYTES;
+    return (uint64_t)team * osoe_internal_team_slots_bytes(osoe.bootstrap.collective_fanout) +
+           (uint64_t)position * OSOE_INTERNAL_SLOTS_PER_CHILD * OSOE_INTERNAL_SLOT_BYTES;
 }
 
 static uint64_t release_slot(uint32_t team)
 {
     return child_slot(team, osoe.bootstrap.collective_fanout);
+}
+
+static uint64_t arrivals_word(uint32_t team)
+{
+    return osoe_internal_words_offset(osoe.bootstrap.collective_fanout,
+                                      osoe.bootstrap.max_teams) +
+           (uint64_t)team * OSOE_INTERNAL_TEAM_WORDS_BYTES;
+}
+
+static uint64_t release_word(uint32_t team)
+{
+    return arrivals_word(team) + OSOE_INTERNAL_LINE_BYTES;
 }
 
 /* This PE's own internal region, at `offset`. */
@@ -182,14 +180,10 @@ void osoe_internode_generic_fini(void)
  * the rest (§3.16) - the node count, and this node's place in the reduction's
  * tree, rooted at the first node, whose leads the record names by rank.
  *
- * For the world team only: the slots are the world team's, and so is the lead
- * a node's local id 0 is - a split team (§7.3) spanning every node would pass
- * a check on its node set and still write into the wrong PE's region and share
- * the world's slots, so the refusal is by team. And its lead here must be the
- * rank the other nodes put to, local id 0 (the file's comment): a node whose
- * ranks do not ascend with their local ids has its lowest rank elsewhere, and
- * its lead would wait in a region nothing writes, so that is refused by name
- * too, where it would otherwise hang.
+ * For the world team only: its lead on every node is the node's local id 0,
+ * which the other nodes put to (job.h) - a split team (§7.3) spanning every
+ * node would pass a check on its node set and still have its lead elsewhere,
+ * so the refusal is by team.
  */
 static struct generic_team *registered_team(uint32_t team, const char *routine)
 {
@@ -220,12 +214,6 @@ static struct generic_team *registered_team(uint32_t team, const char *routine)
         osoe_fatal("%s: team %u spans %u of the job's %u nodes, and the generic internode "
                    "phase runs the world team's only (§7.3)", routine, team, g->count,
                    osoe.job.node_count);
-    if (osoe.bootstrap.local_id != 0)
-        osoe_fatal("%s: team %u's lead on node %u is local id %u, its lowest rank, and the "
-                   "generic internode phase meets each node at its local id 0: the node's "
-                   "ranks do not ascend with their local ids (%sGTIDS)", routine, team,
-                   osoe.job.node, osoe.bootstrap.local_id,
-                   osoe.bootstrap.launcher ? osoe.bootstrap.launcher : "OSOE_");
     return g;
 }
 

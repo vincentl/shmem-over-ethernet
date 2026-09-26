@@ -432,18 +432,34 @@ struct osoe_collective_state {
  *
  * Its content is §5.2's accounting as the node sees it: the team's members on
  * this node, and this node's place in the team's internode tree - O(k), the
- * part of the node set the tree keeps. The neighbours are named by their local
- * leads' ranks, which the generic internode phase puts to, and from which the
- * progress thread finds the node numbers its messages go to.
+ * part of the node set the tree keeps. Each neighbour node is named by its
+ * lead's rank - for the predefined teams the rank at its local id 0 - which the
+ * generic internode phase puts to, and from which the progress thread finds
+ * the node numbers its messages go to.
  *
  * Written once, fields first and then `published` with a release store; a
  * reader loads `published` with acquire and reads the rest only once it is 1
  * (§3.16's single-writer publication). Never rewritten: a team number is not
- * reused within a session (§5.7), so neither is its record. The predefined
- * teams' records are written by this node's lead, before its agent starts
- * (team.c), and a team of one - SHMEM_TEAM_SHARED under force-remote - has none,
- * since it touches nothing of the node's. More than one cache line: the
- * children's ranks alone are 128 bytes at the largest fan-out.
+ * reused within a session (§5.7), so neither is its record. A team of one -
+ * SHMEM_TEAM_SHARED under force-remote - has none, since it touches nothing of
+ * the node's. More than one cache line: the children's ranks alone are 128
+ * bytes at the largest fan-out.
+ *
+ * **Who sees it, and why** (§3.16). The predefined teams' records are written
+ * by this node's lead in osoe_team_start (team.c), in every session, before
+ * two things: its agent's start, which orders them before everything that
+ * thread does; and its release store to `lead_agent_running`, which every other
+ * local PE loads with acquire before it returns from shmem_init (init.c). So
+ * every PE finds them published, in any process and on any thread that runs
+ * after its init, whether it reads its team's record on the arrival path
+ * (osoe_internode_arrive) or as a lead in a data collective
+ * (internode-generic.c). The arrival counter carries them as well: the lead is
+ * a member of every predefined team, and the member that posts an arrival
+ * reads, with its own seq_cst add, a value in the release sequence of the
+ * lead's add, which the lead made after writing them. A record a split writes
+ * (slice 2) is written by the team's local lead while every process runs, and
+ * needs its own argument: the split's sync over the parent team, which no
+ * member leaves before every record of the new team is published.
  */
 struct osoe_team_record {
     _Alignas(OSOE_CACHELINE)
@@ -451,11 +467,15 @@ struct osoe_team_record {
     uint32_t local_members;         /* the team's members on this node (§5.2) */
     uint32_t nodes;                 /* the nodes it spans: 1 is no internode phase */
     uint32_t index;                 /* this node's position in its sorted node set */
-    uint32_t parent;                /* the parent's local lead's rank, or UINT32_MAX */
+    /* The parent node's lead's rank - for the predefined teams the rank at its
+     * local id 0 - or UINT32_MAX at the root. */
+    uint32_t parent;
     uint32_t position;              /* this node among its parent's children */
     uint32_t children;              /* how many of `child` there are */
     char name[16];                  /* in metric names: world, shared, finalize, a number */
-    uint32_t child[OSOE_COLLECTIVE_FANOUT_MAX];     /* each child's local lead's rank */
+    /* Each child node's lead's rank - for the predefined teams the rank at its
+     * local id 0 - in the order of the children's positions. */
+    uint32_t child[OSOE_COLLECTIVE_FANOUT_MAX];
 };
 
 /*
@@ -545,6 +565,20 @@ struct osoe_node_header {
     uint32_t landing_requests_offset;
     uint32_t landing_arena_offset;
     uint32_t landing_arena_bytes;
+
+    /*
+     * Layout 18: one past the highest team number whose record on this node is
+     * published, or 0 before the first. What bounds the node lead agent's scan
+     * of the arrival handoffs (internode-am.c), so that a pass costs the teams
+     * created and not OSOE_MAX_TEAMS: numbers are never reused (§5.7), and a
+     * node's are published in no particular order, so it is a high-water mark,
+     * raised by each record's writer after its `published` and never lowered -
+     * a compare-and-swap that only raises it, since the writers of slice 2's
+     * records are the teams' local leads, in any process of the node. Raised as
+     * part of writing the record, so the record's argument for who sees it
+     * covers it too. On its own line: every pass of the agent loads it.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t team_numbers_published;
 
     /*
      * Layout 18: one block per team number, `dir.team_count` of them

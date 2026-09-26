@@ -371,9 +371,9 @@ static struct osoe_progress_team *known_team(struct osoe_progress *p, uint32_t t
     return t->registered ? t : NULL;
 }
 
-void osoe_progress_meet_teams(struct osoe_progress *p)
+void osoe_progress_meet_teams(struct osoe_progress *p, uint32_t count)
 {
-    for (uint32_t team = 0; team < p->team_count; team++)
+    for (uint32_t team = 0; team < count && team < p->team_count; team++)
         known_team(p, team);
 }
 

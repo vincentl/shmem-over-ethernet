@@ -59,13 +59,19 @@ struct osoe_team {
      */
     uint32_t local_members;
     /*
-     * This node's members, in team-rank order: their local ids and their team
-     * ranks, `local_members` of each (§5.2). `local_ids[0]` is the local lead,
-     * the member with the lowest team rank, which alone writes its `dest` before
-     * a data collective's release (§5.5); `lead_local_id` is the same number.
-     * What the collectives read to find a member's memory and its place in a
-     * result - never a local id's position, which differs from its team rank
-     * as soon as a node's ranks are not the team's first (0,1,2,0,1,0).
+     * This node's members: their local ids, and their team ranks in the same
+     * order, `local_members` of each (§5.2). `local_ids[0]` is the local lead,
+     * which alone writes its `dest` before a data collective's release (§5.5),
+     * and the others are combined into it in list order; `lead_local_id` is the
+     * same number. For the predefined teams the list is in local-id order and
+     * the lead is local id 0, the node's lead, which the generic internode
+     * phase addresses on every node (team.c). A team a split creates (slice 2)
+     * will list its members in team-rank order, its lead the one with the
+     * lowest team rank, as §5.2 says, and the internode phase will find it
+     * through the team's records. What the collectives read to find a member's
+     * memory and its place in a result - never a position in the list, whose
+     * team rank differs from it as soon as a node's ranks are not the team's
+     * first (0,1,2,0,1,0).
      */
     const uint32_t *local_ids;
     const uint32_t *local_ranks;

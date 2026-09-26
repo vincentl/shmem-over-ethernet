@@ -77,9 +77,14 @@ void osoe_internode_fini(void)
 
 void osoe_internode_arrive(uint32_t team, uint32_t epoch)
 {
-    /* Only a team whose record here says it spans nodes posts: the record is
-     * published before any member can arrive (node.h), and loaded as it was
-     * published, with acquire (§3.16). */
+    /* Only a team whose record here says it spans nodes posts. The record is
+     * loaded as it was published, with acquire (§3.16), and this member finds
+     * it published whichever process it is: the node's lead wrote the
+     * predefined teams' records before its release store to
+     * lead_agent_running, which this PE loaded with acquire before its
+     * shmem_init returned (init.c), and the arrival counter's release sequence
+     * carries them too (node.h, the record). Slice 2 argues a split team's
+     * through the parent team's sync. */
     struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
     if (!b || !atomic_load_explicit(&b->record.published, memory_order_acquire) ||
         b->record.nodes < 2)
@@ -114,17 +119,30 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
  * docs/design/evidence/am-backend/arrival_model.py, where the whole job hangs
  * and every other node is the one that looks stuck.
  *
- * A word per team number, OSOE_MAX_TEAMS of them, each on its own line of the
- * node's own header - never a connection: a team is met here, and learnt from
- * its record, at its first post, so every number is looked at. That is O(T)
- * loads per pass with T the job's team count, 32 by default - a cost that
- * grows with OSOE_MAX_TEAMS, not with the teams in use. A word that has not
- * moved is skipped at once; a team that has no internode phase never posts.
+ * A word per team number, each on its own line of the node's own header -
+ * never a connection - but only below `team_numbers_published`, one past the
+ * highest number whose record on this node is published (node.h): numbers are
+ * never reused, so a pass costs O(teams created), three in phase 1 step 7's
+ * first slice, and not OSOE_MAX_TEAMS. A team is met here, and learnt from its
+ * record, at its first post; a word that has not moved is skipped at once, and
+ * a team that has no internode phase never posts.
+ *
+ * The bound is loaded with acquire, once a pass, after the agent's load of its
+ * wake word and before the handoff words, and it misses no post: a member posts
+ * only once its team's record is published and the bound raised past it (the
+ * record's argument, node.h), and then bumps the lead's wake word. An agent
+ * whose load of that word read the bump sees the raised bound; one whose load
+ * came before it finds the wait's compare fail and passes again - the rule
+ * that makes the handoff sound already (§5.3).
  */
 bool osoe_internode_am_take_arrivals(void)
 {
     bool moved = false;
-    for (uint32_t team = 0; team < consumed_count; team++) {
+    uint32_t count = atomic_load_explicit(&osoe.node.hdr->team_numbers_published,
+                                          memory_order_acquire);
+    if (count > consumed_count)
+        count = consumed_count;
+    for (uint32_t team = 0; team < count; team++) {
         uint32_t epoch = atomic_load_explicit(&osoe_node_team(&osoe.node, team)->arrival.epoch,
                                               memory_order_acquire);
         if (epoch == consumed[team])

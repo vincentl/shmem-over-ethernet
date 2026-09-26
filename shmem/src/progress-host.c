@@ -563,7 +563,9 @@ bool osoe_progress_host_poll(void)
      * whose records the node's lead wrote before this thread started. */
     if (!osoe_am.ring.enabled) {
         osoe_ring_enable(&osoe_am.ring);
-        osoe_progress_meet_teams(&osoe_am.progress);
+        osoe_progress_meet_teams(&osoe_am.progress,
+                                 atomic_load_explicit(&osoe.node.hdr->team_numbers_published,
+                                                      memory_order_acquire));
     }
     struct osoe_connection_area *a = &osoe_am.area;
     if (flag_raised) {

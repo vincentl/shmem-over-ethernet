@@ -4,14 +4,15 @@
  * exchange.
  *
  * **Within a node** it is §5.5 as written. Every member arrives with one locked
- * increment of the team's `arrived`. The local lead - the team's member on
- * this node with the lowest team rank (§5.2), which the descriptor names
- * (team.h) - waits for all of them, then reads each member's source (only now:
- * invariant 17, push never pull) and combines it into its own `dest`, which it
- * alone writes before release (invariant 16). It bumps `released`; every other member copies the
- * lead's `dest` into its own and bumps `copied`; the lead waits for the last
- * copy and leaves last. `dest` is undefined until the call returns, so the
- * intermediate values the lead's `dest` holds are unobservable.
+ * increment of the team's `arrived`. The local lead - the member the
+ * descriptor names (team.h): local id 0 for the predefined teams - waits for
+ * all of them, then reads each member's source (only now: invariant 17, push
+ * never pull) and combines it, in the descriptor's order, into its own `dest`,
+ * which it alone writes before release (invariant 16). It bumps `released`;
+ * every other member copies the lead's `dest` into its own and bumps `copied`;
+ * the lead waits for the last copy and leaves last. `dest` is undefined until
+ * the call returns, so the intermediate values the lead's `dest` holds are
+ * unobservable.
  *
  * **Between nodes** the lead hands its node's result to internode.h's data
  * half - osoe_internode_reduce or osoe_internode_broadcast - after its local
@@ -151,7 +152,9 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
         unsigned char *accumulator = member_copy(lead_local_id, result_at);
         if (reduction) {
             /* In place, the lead's source already is its dest. Then the other
-             * members, in team-rank order: local_ids[0] is the lead. */
+             * members in the descriptor's order - local-id order for the
+             * predefined teams, as before step 7, so a floating sum rounds as
+             * it did: local_ids[0] is the lead. */
             if (source != dest)
                 memcpy(accumulator, source, bytes);
             for (uint32_t m = 1; m < members; m++)

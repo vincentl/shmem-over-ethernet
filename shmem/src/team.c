@@ -14,8 +14,8 @@
  * node header - §5.4's counters, the arrival handoff, and the record of the
  * team's place on this node that the progress thread reads - its published
  * epoch in each PE's row, and its block of the internal region. What the
- * descriptor holds is the team's shape: this node's members in team-rank
- * order, and its ranks as world ranks (team.h).
+ * descriptor holds is the team's shape: this node's members and which of them
+ * leads, and its ranks as world ranks (team.h).
  *
  * Everything that would create a new team or context returns nonzero and
  * assigns the invalid handle. spec §9.5.1 says an unsuccessful context creation
@@ -54,48 +54,32 @@ static struct osoe_team world_team, shared_team, finalize_team;
 static _Atomic(struct osoe_team *) *numbered;
 static uint32_t numbered_count;
 
-/* What the predefined teams' shapes are made of, beyond what the node and the
- * bootstrap already hold: the world's local members in rank order, and the
- * shared team's, whose ranks are their local ids. */
-static uint32_t *world_local_ids, *world_local_ranks, *identity;
+/* The predefined teams' local list, every local id in order - beyond what the
+ * node and the bootstrap already hold, the one array their shapes need. */
+static uint32_t *identity;
 
 /* A team of one's list of local ranks: its only member is rank 0. */
 static const uint32_t rank_zero = 0;
 
-/* Local ids in order of their world rank: an (id, rank) pair's rank. */
-static int compare_rank(const void *a, const void *b)
-{
-    uint32_t x = ((const uint32_t *)a)[1], y = ((const uint32_t *)b)[1];
-    return x < y ? -1 : x > y;
-}
-
 /*
- * The world's members on this node in team-rank order, which for the world is
- * world-rank order (§5.2): O(L log L) once. `local_ids[0]` is then the node's
- * lowest rank, the local lead - local id 0 under every distribution Slurm and
- * osoe-launch produce, and not under an order given by hand (GTIDS 2,1), which
- * the bootstrap accepts.
+ * The predefined teams' local list: every local PE, in local-id order, so that
+ * the local lead is local id 0 - the node's lead, which the generic internode
+ * phase and the job's table of leads (job.h) address on every node, whatever
+ * order a hand-given GTIDS puts the node's ranks in (the bootstrap accepts
+ * one that is not ascending). The members' team ranks, in the same order, are
+ * the ranks the bootstrap lists by local id for the world and finalize teams,
+ * and the local ids themselves for SHMEM_TEAM_SHARED. Design §5.2's lead, the
+ * member with the lowest team rank, is the rule for teams created by a split
+ * (slice 2), whose leads the internode phase will find through their records.
  */
-static void world_local_shape(void)
+static void predefined_local_shape(void)
 {
     uint32_t count = osoe.bootstrap.local_count;
-    uint32_t (*pairs)[2] = malloc(sizeof *pairs * count);
-    world_local_ids = malloc(sizeof *world_local_ids * count);
-    world_local_ranks = malloc(sizeof *world_local_ranks * count);
     identity = malloc(sizeof *identity * count);
-    if (!pairs || !world_local_ids || !world_local_ranks || !identity)
+    if (!identity)
         osoe_fatal("out of memory describing this node's %u PEs", count);
-    for (uint32_t i = 0; i < count; i++) {
-        pairs[i][0] = i;
-        pairs[i][1] = osoe.bootstrap.gtids[i];
+    for (uint32_t i = 0; i < count; i++)
         identity[i] = i;
-    }
-    qsort(pairs, count, sizeof *pairs, compare_rank);
-    for (uint32_t i = 0; i < count; i++) {
-        world_local_ids[i] = pairs[i][0];
-        world_local_ranks[i] = pairs[i][1];
-    }
-    free(pairs);
 }
 
 /*
@@ -112,9 +96,9 @@ static struct osoe_team every_pe(const char *name, uint32_t number)
         /* Every local PE is a member, so the local member count is the node's
          * PE count (§5.2). */
         .local_members = osoe.bootstrap.local_count,
-        .local_ids = world_local_ids,
-        .local_ranks = world_local_ranks,
-        .lead_local_id = world_local_ids[0],
+        .local_ids = identity,
+        .local_ranks = osoe.bootstrap.gtids,
+        .lead_local_id = 0,
         .internode = osoe.job.node_count > 1,
         .nodes = osoe.job.node_count,
         .me = osoe.bootstrap.rank,
@@ -180,10 +164,10 @@ static struct osoe_team shared(void)
 }
 
 /*
- * Node `node`'s local lead in a team spanning every node: its lowest rank,
- * which is its local id 0 under every distribution Slurm and osoe-launch
- * produce (world_local_shape), and so the rank the job's table of leads holds
- * (job.h) - the same rank the generic internode phase puts to (§5.8).
+ * Node `node`'s lead: the rank at its local id 0, which the job's table of
+ * leads holds (job.h). It is the local lead of every predefined team there
+ * (predefined_local_shape), and the rank the generic internode phase puts to
+ * (§5.8).
  */
 static uint32_t lead_of(uint32_t node)
 {
@@ -199,8 +183,9 @@ static uint32_t lead_of(uint32_t node)
  * team from, the first time they meet it, rather than from a call made here.
  *
  * For a team spanning several nodes, this node's place in §5.3's k-ary tree
- * over its node set - the nodes holding at least one member, sorted - named by
- * the neighbours' local leads' ranks. For the world and finalize teams that set
+ * over its node set - the nodes holding at least one member, sorted - naming
+ * each neighbour node by its lead's rank: for the predefined teams, the rank
+ * at its local id 0. For the world and finalize teams that set
  * is every node, and so needs no computation; the list is built anyway,
  * because a split team's is a real computation and the tree should not be able
  * to tell the difference. O(N) once per team, freed at once: the record keeps
@@ -240,6 +225,16 @@ static void write_record(struct osoe_team *t, const char *name)
     }
     /* release: the record, then the word its readers load first (§3.16). */
     atomic_store_explicit(&r->published, 1, memory_order_release);
+    /* Then the node's high-water mark of published numbers (node.h), raised
+     * past this one and never lowered: a record another process writes may
+     * have raised it further first. A compare-and-swap, seq_cst as every one
+     * is (§3.16), which releases the record with it. */
+    _Atomic uint32_t *high = &osoe.node.hdr->team_numbers_published;
+    uint32_t seen = atomic_load_explicit(high, memory_order_acquire);
+    while (seen < t->number + 1 &&
+           !atomic_compare_exchange_strong_explicit(high, &seen, t->number + 1,
+                                                    memory_order_seq_cst, memory_order_acquire))
+        ;
 }
 
 /* Bind a descriptor to its number's block on this node and this PE's
@@ -258,7 +253,7 @@ void osoe_team_start(void)
     numbered = calloc(numbered_count, sizeof *numbered);
     if (!numbered)
         osoe_fatal("out of memory for %u teams", numbered_count);
-    world_local_shape();
+    predefined_local_shape();
     world_team = every_pe("SHMEM_TEAM_WORLD", OSOE_TEAM_WORLD);
     shared_team = shared();
     finalize_team = every_pe("the finalize team", OSOE_TEAM_FINALIZE);
@@ -284,12 +279,10 @@ void osoe_team_start(void)
 void osoe_team_stop(void)
 {
     free(numbered);
-    free(world_local_ids);
-    free(world_local_ranks);
     free(identity);
     numbered = NULL;
     numbered_count = 0;
-    world_local_ids = world_local_ranks = identity = NULL;
+    identity = NULL;
 }
 
 struct osoe_team *osoe_team_finalize(void)
