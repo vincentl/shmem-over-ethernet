@@ -364,6 +364,21 @@ foreach(value 0 9 x)
     TIMEOUT 60 PASS_REGULAR_EXPRESSION "OSOE_COLLECTIVE_PIPELINE='${value}' is not between 1 and 8")
 endforeach()
 
+# Both are agreed between the PEs of one node as well, as OSOE_MAX_TEAMS is:
+# they size every PE's internal region, and a created team's local lead may be
+# any PE of the node, building its tree and keeping its window by its own
+# (node.c, open_control).
+add_test(NAME shmem.collective-fanout.local-disagree
+  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_COLLECTIVE_FANOUT=2 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.collective-fanout.local-disagree PROPERTIES LABELS "tier2"
+  TIMEOUT 60 PASS_REGULAR_EXPRESSION
+  "OSOE_COLLECTIVE_FANOUT differs between PEs: the local lead has 4, this PE has 2")
+add_test(NAME shmem.collective-pipeline.local-disagree
+  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_COLLECTIVE_PIPELINE=4 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.collective-pipeline.local-disagree PROPERTIES LABELS "tier2"
+  TIMEOUT 60 PASS_REGULAR_EXPRESSION
+  "OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 2, this PE has 4")
+
 # The node count is the value that shapes the waits: a lead expects children by
 # its own count, so one given too many waits for children that do not exist.
 # The hello carries the count and a lead calls its parent before it waits for

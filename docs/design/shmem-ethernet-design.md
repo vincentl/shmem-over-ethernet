@@ -4573,7 +4573,9 @@ teams and a fan-out of 4, 5 MiB a PE, touched only by a team's local leads.
 `docs/prompts/phase1-step5-slice5-prompt.md`). D is `OSOE_COLLECTIVE_PIPELINE`,
 default 2, between 1 and 8, read at init beside the fan-out and `OSOE_MAX_TEAMS`
 and agreed at the rendezvous as they are (§6.2), since it fixes the internal
-region's offsets; D = 1 keeps one piece at a time. A team number's block holds
+region's offsets - and, with the fan-out, between a node's PEs at the node's
+own rendezvous (`node.c`), as `OSOE_MAX_TEAMS` is, since a created team's local
+lead may be any of them; D = 1 keeps one piece at a time. A team number's block holds
 (fan-out + 1) × D slots and fan-out + 1 counters, each alone on its line. The
 loop is the model's: a lead sends piece `up` while `up` < pieces and `up` <
 `down` + D - its children's copies in, combined, and on to the parent, fenced

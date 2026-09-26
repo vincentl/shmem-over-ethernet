@@ -616,6 +616,8 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->session = session;
     h->dir.local_count = b->local_count;
     h->world_size = b->world_size;
+    h->collective_fanout = b->collective_fanout;
+    h->collective_pipeline = b->collective_pipeline;
     h->dir.slot_bytes = sizeof(struct osoe_pe_slot);
     h->dir.slots_offset = slots_offset;
     h->dir.metrics_offset = metrics_offset;
@@ -761,6 +763,21 @@ again:;
         char msg[256];
         snprintf(msg, sizeof msg, "OSOE_MAX_TEAMS differs between PEs: the local lead has %u, "
                  "this PE has %u (§5.7)", h->dir.team_count, b->max_teams);
+        fail_rendezvous(n, msg);
+    }
+    /* And by its fan-out and pipeline depth, which a created team's local lead
+     * - any PE of the node - also builds its tree and keeps its window by. */
+    if (h->collective_fanout != b->collective_fanout) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_COLLECTIVE_FANOUT differs between PEs: the local lead "
+                 "has %u, this PE has %u (§5.3)", h->collective_fanout, b->collective_fanout);
+        fail_rendezvous(n, msg);
+    }
+    if (h->collective_pipeline != b->collective_pipeline) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_COLLECTIVE_PIPELINE differs between PEs: the local "
+                 "lead has %u, this PE has %u (§5.8)", h->collective_pipeline,
+                 b->collective_pipeline);
         fail_rendezvous(n, msg);
     }
     if (h->job != b->job || h->step != b->step || h->node != b->node ||
