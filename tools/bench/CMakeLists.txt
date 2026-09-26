@@ -3,7 +3,8 @@
 # measurement once, quickly, on two logical nodes of two PEs; the numbers it
 # prints on loopback are not the point.
 add_executable(osoe-bench osoe-bench.c)
-target_link_libraries(osoe-bench PRIVATE osoe)
+find_package(Threads REQUIRED)
+target_link_libraries(osoe-bench PRIVATE osoe Threads::Threads)
 osoe_warnings(osoe-bench)
 # Not under ThreadSanitizer, like every test over a node map: a remote AMO's
 # write is ordered after the target's own earlier writes through another
@@ -15,5 +16,11 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-bench> quick)
   set_tests_properties(tools.bench.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
     PASS_REGULAR_EXPRESSION "pairs pes=4 total_mib_per_s="
+    FAIL_REGULAR_EXPRESSION "exited with status [1-9]|killed by signal|timeout after|left behind")
+  # The threads line, which runs only when named, under SHMEM_THREAD_MULTIPLE.
+  add_test(NAME tools.bench.threads.0-1
+    COMMAND osoe-launch -n 2 -m 0,1 -t 120 -- $<TARGET_FILE:osoe-bench> threads quick)
+  set_tests_properties(tools.bench.threads.0-1 PROPERTIES LABELS "tier2" TIMEOUT 180
+    PASS_REGULAR_EXPRESSION "threads n=4 target=1 ops=16000 ops_per_s="
     FAIL_REGULAR_EXPRESSION "exited with status [1-9]|killed by signal|timeout after|left behind")
 endif()

@@ -5,7 +5,8 @@
  *   osoe-launch -n 8 -m 0,0,0,0,1,1,1,1 -- osoe-bench [WHAT]...
  *
  * WHAT is any of latency, bandwidth, atomic, barrier, collectives and pairs;
- * all of them by default. `quick` takes a tenth of the trips and a sixteenth of
+ * all of them by default. And threads, only when named, since it initializes
+ * with SHMEM_THREAD_MULTIPLE, which the others should not pay for. `quick` takes a tenth of the trips and a sixteenth of
  * the streams, for the smoke test that runs in every preset. PE 0 measures
  * against two targets - the first PE on another node, and the first other PE on
  * its own node, if there is one - while every other PE waits in a barrier, so
@@ -25,6 +26,12 @@
  *              on every node - each PE's MiB/s, and the whole job's: every
  *              byte over the slowest PE's time, what the switch and every link
  *              carried together
+ *   threads    PE 0 alone, with 1, 2 and 4 threads sharing the default
+ *              context: each issues 8-byte puts and nonblocking gets in turn
+ *              to the PE on another node, quieting after every 32 pairs, and
+ *              the line gives every thread's operations a second together -
+ *              how issue from several threads on one context scales (step 8
+ *              slice 3's speed claim, measured before and after)
  *
  * Lines start with the measurement's name and give key=value fields, so a
  * shell can pick them apart; times are microseconds. Design §8.4 has what the
@@ -33,6 +40,7 @@
  * A name it does not know is refused, rather than run as nothing.
  */
 #define _GNU_SOURCE
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -253,6 +261,48 @@ static void pairs(int me, int npes)
     }
 }
 
+enum { THREAD_PAIRS = 20000, QUIET_EVERY = 32, MAX_BENCH_THREADS = 4 };
+static int thread_pairs = THREAD_PAIRS;         /* `quick`: a tenth */
+static int thread_target;
+
+static void *issue(void *argument)
+{
+    size_t slot = (size_t)(uintptr_t)argument * 64;   /* each thread its own line */
+    uint64_t word = 0;
+    for (int i = 0; i < thread_pairs; i++) {
+        shmem_putmem(window + slot, source, 8, thread_target);
+        shmem_getmem_nbi(&word, window + slot + 8, 8, thread_target);
+        if ((i + 1) % QUIET_EVERY == 0)
+            shmem_quiet();
+    }
+    shmem_quiet();
+    return NULL;
+}
+
+static void threads(int me, int remote)
+{
+    shmem_barrier_all();
+    if (me == 0 && remote >= 0) {
+        thread_target = remote;
+        for (int n = 1; n <= MAX_BENCH_THREADS; n *= 2) {
+            pthread_t t[MAX_BENCH_THREADS];
+            uint64_t start = now_ns();
+            for (int k = 0; k < n; k++)
+                if (pthread_create(&t[k], NULL, issue, (void *)(uintptr_t)k) != 0) {
+                    fprintf(stderr, "osoe-bench: no thread\n");
+                    shmem_global_exit(1);
+                }
+            for (int k = 0; k < n; k++)
+                pthread_join(t[k], NULL);
+            double seconds = (double)(now_ns() - start) / 1e9;
+            printf("threads n=%d target=%d ops=%d ops_per_s=%.0f\n", n, remote,
+                   2 * n * thread_pairs, 2.0 * n * thread_pairs / seconds);
+            fflush(stdout);
+        }
+    }
+    shmem_barrier_all();
+}
+
 static int wanted(int argc, char **argv, const char *what)
 {
     int named = 0;
@@ -263,20 +313,20 @@ static int wanted(int argc, char **argv, const char *what)
         if (strcmp(argv[i], what) == 0)
             return 1;
     }
-    return !named;                      /* nothing named: every measurement */
+    return !named && strcmp(what, "threads") != 0;   /* nothing named: all but threads */
 }
 
 int main(int argc, char **argv)
 {
     static const char *const known[] = { "latency", "bandwidth", "atomic", "barrier",
-                                         "collectives", "pairs", "quick" };
+                                         "collectives", "pairs", "threads", "quick" };
     for (int i = 1; i < argc; i++) {
         size_t k = 0;
         while (k < sizeof known / sizeof *known && strcmp(argv[i], known[k]) != 0)
             k++;
         if (k == sizeof known / sizeof *known) {
             fprintf(stderr, "osoe-bench: no measurement '%s': latency, bandwidth, atomic, "
-                    "barrier, collectives, pairs, quick\n", argv[i]);
+                    "barrier, collectives, pairs, threads, quick\n", argv[i]);
             return 2;
         }
     }
@@ -284,8 +334,18 @@ int main(int argc, char **argv)
         if (strcmp(argv[i], "quick") == 0) {
             trips_per_size = LATENCY_TRIPS / 10;
             stream_bytes = STREAM_BYTES / 16;
+            thread_pairs = THREAD_PAIRS / 10;
         }
-    shmem_init();
+    if (wanted(argc, argv, "threads")) {
+        int provided = -1;
+        shmem_init_thread(SHMEM_THREAD_MULTIPLE, &provided);
+        if (provided != SHMEM_THREAD_MULTIPLE) {
+            fprintf(stderr, "osoe-bench: threads needs SHMEM_THREAD_MULTIPLE, got %d\n", provided);
+            shmem_global_exit(1);
+        }
+    } else {
+        shmem_init();
+    }
     int me = shmem_my_pe(), npes = shmem_n_pes();
     window = shmem_malloc(MAX_BYTES);
     counter = shmem_calloc(1, sizeof *counter);
@@ -329,6 +389,8 @@ int main(int argc, char **argv)
         collectives(me, npes);
     if (wanted(argc, argv, "pairs") && npes > 1)
         pairs(me, npes);
+    if (wanted(argc, argv, "threads"))
+        threads(me, remote);
 
     shmem_free(results);
     shmem_free(counter);
