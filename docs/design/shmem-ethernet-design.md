@@ -6489,8 +6489,8 @@ which has two states per pair, so a third backend needs a selector of its own
     wake before the clear, with no wake, or with the clear before the copy.*
   - **Copy-out claims.** The agent and any quiet may both copy a landed
     nonblocking get to its destination. A CAS on the record's state gives exactly
-    one copier. The idea is standard but not modeled. *Decided 2026-09-25: the CAS is
-    LANDED to COPYING; the winner copies, credits the landed count, then frees the
+    one copier. The idea is standard. *Decided 2026-09-25: the CAS is LANDED to
+    COPYING; the winner copies, credits the landed count, then frees the
     record. `copy_out_claim_model.py` checks it, and fails with a plain store for
     the claim, with the credit before the copy, or with the record freed at the
     claim.*
