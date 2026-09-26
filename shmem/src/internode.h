@@ -193,8 +193,8 @@ uint32_t osoe_internode_fanout_default(void);
  * re-rooted at every call needs any node's lead by its position in the set,
  * and a gather needs to know which members' places are its node's, and which
  * node holds every other member's; the calls below give them, above this
- * header, to the thread the data half runs on (phase 1 step 7 slice 2, and
- * the third phase 1 step 5 slice 6).
+ * header, to the thread the data half runs on (phase 1 step 7 slice 2; the
+ * third call, osoe_internode_team_world_ranks, phase 1 step 5 slice 6).
  */
 
 /*
