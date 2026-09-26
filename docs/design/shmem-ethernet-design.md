@@ -4360,12 +4360,13 @@ operation and cannot call a function. AM's implementation is the generic one,
 which any backend may call: the leads meet over put, fenced rmw and a wait -
 §5.8's generic route - not through AM messages the agents interpret, as the
 first slice built it above the boundary: a child puts its partial result into a slot of its
-parent's `OSOE_REGION_INTERNAL` and adds one to the parent's arrival word with
-a fenced rmw, so the add lands after the bytes (invariant 5); the parent's
-application thread waits on the word, combines the slots into its `dest` and
-sends up in turn; the root's result comes down by a put into each child's
-release slot and an add to its release word. The lead's thread is blocked in
-the call and is `dest`'s only writer regardless (invariant 16), so an AM design
+parent's `OSOE_REGION_INTERNAL` and adds one to the parent's arrival counter
+for its position with a fenced rmw, so the add lands after the bytes
+(invariant 5); the parent's application thread waits on the counters, combines
+the slots into its `dest` and sends up in turn; the root's result comes down by
+a put into each child's release slot and an add to its release counter. The
+lead's thread is blocked in the call and is `dest`'s only writer regardless
+(invariant 16), so an AM design
 would still have had to land each partial result where that thread could read
 it, and wake it; this does so with operations the transport has, and a RoCE
 backend inherits it. A put returns at local completion, so the result sent down
@@ -4374,21 +4375,29 @@ arise. The tree is §5.3's k-ary tree over the nodes, with the same fan-out;
 a reduction's is rooted at the first node and found once per team, and a
 broadcast's is rotated to its root's node, so its data travels the depth and
 not up to node 0 first. **A vector larger than a slot, 16 KiB, goes in
-pieces**, each a full pass up and down - the fallback above; a broadcast's
-pieces go up empty, a child's arrival saying its release slot is free. The
-words are compared for equality and never reset (§5.4), and trees differing
-from one collective to the next cannot disturb them: the root releases a piece
-only when every node has arrived for it, and a node arrives only after its own
-wait for its children, so an early arrival for the next piece or collective
-only ever counts toward that one (`internode-generic.c` walks it through). Every PE
-ends with the same bits, each element combined once along the tree (§5.8 rule
-3). Integer sums and products wrap, through unsigned arithmetic, where C would
-make a signed overflow undefined. Costs, with *N* nodes, *L* local members, *k*
-the fan-out and *n* bytes: the lead's combine O(*L n*), a copy-out O(*n*),
-⌈*n* / 16 KiB⌉ passes of depth ⌈log_*k* *N*⌉ each way with O(*k n*) combining and
-*k* puts per node per piece; a broadcast finds its rotated tree's *k* + 1
-neighbouring leads in O(*k*), from a table of each node's lead that the job
-object keeps beside its addresses and blobs (*N* words a node, written at the
+pieces** - the fallback above - and since phase 1 step 5 slice 5 each lead
+keeps D of them in flight (§5.8, "Pipelined pieces"); a broadcast's pieces go
+up empty, a child's arrival for a piece saying its release slot for it is
+free. The counters - an arrival counter per child position and a release
+counter - are cumulative, never reset, and compared as at least against bases
+each lead advances by its own tree at a collective's end; trees differing from
+one collective to the next cannot disturb them: the root releases a piece only
+when every node has sent it up, and a node sends a piece up only after its own
+wait for its children's, so an early arrival for the next collective only ever
+counts toward that one (`internode-generic.c` walks it through,
+`pipeline_model.py` checks it). *(Until slice 5 each piece made a whole pass up
+and down, and one arrival word per node was compared for equality, §5.4's
+rule.)* Every PE ends with the same bits, each element combined once along the
+tree (§5.8 rule 3). Integer sums and products wrap, through unsigned
+arithmetic, where C would make a signed overflow undefined. Costs, with *N*
+nodes, *L* local members, *k* the fan-out and *n* bytes: the lead's combine
+O(*L n*), a copy-out O(*n*), ⌈*n* / 16 KiB⌉ pieces through a tree of depth
+⌈log_*k* *N*⌉, D in flight at each lead - about ⌈*n* / 16 KiB⌉ / D round trips
+of the tree where one at a time took ⌈*n* / 16 KiB⌉, while the round trip
+rather than the links is the limit - with O(*k n*) combining and *k* puts per
+node per piece; a broadcast finds its rotated tree's *k* + 1 neighbouring leads
+in O(*k*), from a table of each node's lead that the job object keeps beside
+its addresses and blobs (*N* words a node, written at the
 rendezvous in O(*R* + *N*)) - scanning the rank map instead made every
 broadcast linear in the node count under a block distribution.
 
@@ -4415,14 +4424,16 @@ their concatenation - no protocol of its own - and a piece header marks it a
 gather, so that one node's fcollect is not taken for another's or of the same
 length. Its cost is stated rather than hidden: per 16 KiB piece a leaf moves
 about two pieces and an interior lead 2(*k* + 1), where an allgather moves each
-block once; and the pieces go one after another, so a gather of a fixed block
-per PE takes ⌈*P n* / 16 KiB⌉ · 2⌈log_*k* *N*⌉ hops - at 400 nodes of 256 PEs
-and *k* = 4, 510 of them for one long each. **It is the one internode phase
-whose latency grows faster than log *N***, the exception §1's goal must carry
-until a backend's allgather replaces it at the seam, or the tree pipelines its
-pieces. **collect's places are the prefix sums of every member's length**:
-every member takes the same room from the symmetric heap, a word per member and
-one more, and writes its length in the last; the lead gathers the lengths into
+block once; and one piece at a time, a gather of a fixed block per PE takes
+⌈*P n* / 16 KiB⌉ · 2⌈log_*k* *N*⌉ hops - at 400 nodes of 256 PEs and *k* = 4,
+510 of them for one long each. The pipeline (§5.8, phase 1 step 5 slice 5)
+divides that by about D - some 260 at the default D = 2 - without changing how
+it grows: **it is the one internode phase whose latency grows faster than log
+*N***, the exception §1's goal must carry until an allgather replaces it at the
+seam (§5.8, "An allgather for fcollect", the next slice). **collect's places
+are the prefix sums of every member's length**: every member takes the same
+room from the symmetric heap, a word per member and one more, and writes its
+length in the last; the lead gathers the lengths into
 its own room, turns them into places and the total, and the other members read
 the total alone - so the P words are the lead's to touch, and a non-lead's cost
 is a page. The room is given back before returning; a take and its give leave
@@ -4531,9 +4542,10 @@ uses an OpenSHMEM extension.
 
 **Pipelined pieces** *(decided 2026-09-25, the Pi cluster's numbers in hand: a
 1 MiB broadcast over four nodes took 36.5 ms and a 16 x 1 MiB fcollect 773 ms;
-checked by `pipeline_model.py`; not yet built).* The generic internode phase
-keeps D pieces in flight instead of one: each parent holds D slots per child
-position and each node D release slots, piece k in slot k mod D. Four rules
+checked by `pipeline_model.py`; built at phase 1 step 5 slice 5, below).* The
+generic internode phase keeps D pieces in flight instead of one: each parent
+holds D slots per child position and each node D release slots, piece k in
+slot k mod D. Four rules
 make it hold, and the model breaks each:
 - **One arrival counter per child position**, not one per node. With pieces in
   flight, a fast child's second arrival would stand in for a slow child's first
@@ -4556,6 +4568,24 @@ each position received, and the argument for early arrivals (§5.5 as built)
 carries over, since no node starts the next collective before holding this one's
 last release. D pieces cost D times the internal region's slots: at D = 2, 32
 teams and a fan-out of 4, 5 MiB a PE, touched only by a team's local leads.
+
+*As built* (phase 1 step 5 slice 5; `internode-generic.c`, `internal-region.h`;
+`docs/prompts/phase1-step5-slice5-prompt.md`). D is `OSOE_COLLECTIVE_PIPELINE`,
+default 2, between 1 and 8, read at init beside the fan-out and `OSOE_MAX_TEAMS`
+and agreed at the rendezvous as they are (§6.2), since it fixes the internal
+region's offsets; D = 1 keeps one piece at a time. A team number's block holds
+(fan-out + 1) × D slots and fan-out + 1 counters, each alone on its line. The
+loop is the model's: a lead sends piece `up` while `up` < pieces and `up` <
+`down` + D - its children's copies in, combined, and on to the parent, fenced
+add after the put - and otherwise consumes release `down`: copied out,
+forwarded to every child, and only then counted; the root, which sends nothing
+up, gathers each piece from its children and forwards it. Every slot's header
+is checked as before, so a divergence is still named where the pieces meet. A
+lead fills its window before it looks for a release, so every lead but the
+root has exactly min(D, pieces) in flight at its busiest; each publishes the
+most it had in its last collective in the team's tree state
+(`team.tree.most_pieces_in_flight`, layout 19), which `shmem.pipeline.*`
+asserts at D = 1, 2 and 4 on three maps - pinned by a count, not a time.
 
 **An allgather for fcollect** *(decided 2026-09-25; checked by
 `allgather_model.py`; not yet built).* The generic gather's latency grows with
@@ -4607,9 +4637,12 @@ agrees on, and the slot is a constant for the same reason.
 team number's fan-out + 1 slots, then every team number's two words, each alone
 on a 128-byte line - a constant, not the compiler's cache line, which is 64
 bytes on x86-64 and 128 on aarch64, so that nodes of different architectures
-compute the same offsets. About 2.5 MiB a PE at the default 32 teams and a
-fan-out of 4, of which a team touches only its own slots and words, and only
-on its leads.)*
+compute the same offsets. *Since phase 1 step 5 slice 5* each team number's
+slots are (fan-out + 1) × D, D per child position and D for releases, and its
+words fan-out + 1, an arrival counter per child position and a release counter
+("Pipelined pieces", above). About 5 MiB a PE at the default 32 teams, a
+fan-out of 4 and D = 2, of which a team touches only its own slots and words,
+and only on its leads.)*
 
 *(Built at phase 1 step 5 slice 2, once reductions had landed and shown what it
 must contain - not as a separate header but as `internode.h`'s data half, beside
@@ -4900,9 +4933,11 @@ phase 1 step 3 as a tree rooted at that lead - "The rendezvous as built", below.
 - **Who connects:** only node leads — one connection per node. Each sends its
   node's rank list (`SLURM_GTIDS`), `SHMEM_SYMMETRIC_SIZE`, handler-table
   checksum (§3.13), `OSOE_COLLECTIVE_FANOUT` (§5.3: a node building a
-  different tree waits for arrivals sent elsewhere, silently) and, since phase 1
-  step 7, `OSOE_MAX_TEAMS` (§5.7: a node counting to another number lays its
-  team state and internal region out differently). The server checks
+  different tree waits for arrivals sent elsewhere, silently), since phase 1
+  step 7 `OSOE_MAX_TEAMS` (§5.7: a node counting to another number lays its
+  team state and internal region out differently), and since phase 1 step 5
+  slice 5 `OSOE_COLLECTIVE_PIPELINE` (§5.8: a node keeping another number of
+  pieces in flight places them in its internal region by it). The server checks
   agreement, then broadcasts the rank→node map and node addresses, and each
   node's fixed-size backend blob (§4.10; zeros on AM, an RDMA backend's queue-pair
   and key material).
@@ -5018,8 +5053,8 @@ waiting on its socket names it ("the rendezvous lost node 9, its child…").
 arithmetic progressions in local-id order (one under block, one under cyclic;
 `rank-map.h`) and its blob; and the values every node must agree on — the job's
 size, `SHMEM_SYMMETRIC_SIZE`, the handler checksum, `OSOE_COLLECTIVE_FANOUT`,
-`OSOE_MAX_TEAMS` — which each parent checks against its own, so a disagreement
-is refused by the
+`OSOE_MAX_TEAMS`, `OSOE_COLLECTIVE_PIPELINE` — which each parent checks against
+its own, so a disagreement is refused by the
 lead that sees it, naming both nodes (`shmem.job.disagree.*`). *At the root* the
 map is built: the progressions are expanded once, into O(*P*) scratch on that one
 node, to check that every rank is claimed exactly once (`shmem.job.duplicate-rank`,
@@ -5377,7 +5412,9 @@ machinery. The review's order is adopted.
    active-set routines - `_to_all`, `broadcast32`/`64`, `shmem_barrier` and
    `shmem_sync` - over the whole job, the only active set they accept (§7.4).
    The fourth adds collect, fcollect, alltoall and alltoalls, their active-set
-   forms under the same rule, and the seam's gather (§5.5, as built).*
+   forms under the same rule, and the seam's gather (§5.5, as built). The fifth
+   keeps D pieces in flight at each lead of the generic internode phase (§5.8,
+   "Pipelined pieces").*
 
 6. **Symmetric statics and the compiler wrapper** (§4.3). *The first slice:
    `oshcc`, a POSIX `sh` wrapper configured by the build, installed with the
@@ -6314,6 +6351,9 @@ Each is independently breakable, and each failure appears far from its cause.
 10. **Collective epoch counters are compared for equality, which assumes bounded
     skew.** (§5.4) Guaranteed by blocking collectives. Nonblocking collectives
     break it and must move to 64-bit `>=` predicates with a separate wake word.
+    The generic internode phase's piece counters are not epoch counters: since
+    phase 1 step 5 slice 5 they are 64-bit and compared as at least, since a
+    child runs up to D pieces ahead of its parent's wait (§5.8).
 11. **AMO result descriptors carry values; get descriptors carry references.**
     (§3.8) Unifying them reorders AMOs.
 12. **The completion queue is sized from the provided-buffer ring, not from the
