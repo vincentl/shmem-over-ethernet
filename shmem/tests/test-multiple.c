@@ -10,9 +10,10 @@
  *     neighbour, a blocking get and a nonblocking get of the right
  *     neighbour's fixed table, a fetching AMO, a quiet - each result checked
  *     by value;
- *     several nonblocking gets at once (PIECES of them, so that with a small
- *     landing zone the threads' pieces outnumber its extents, and an issue
- *     must copy out others' landed pieces and wait for room);
+ *     several nonblocking gets at once (PIECES of them, more than a small
+ *     landing zone's extents, so that each thread's own pieces overfill it
+ *     however the scheduler runs the threads, and an issue must copy out
+ *     landed pieces, its own or other threads', and wait for room);
  *   - on the default context, which every thread shares: a fetch-add on one
  *     counter at PE 0, a blocking get and a nonblocking one;
  *   - a distributed lock, one per worker number, which the same-numbered
@@ -43,7 +44,7 @@
 #include "invariants.h"
 #include "launcher.h"
 
-enum { THREADS = 4, ROUNDS = 50, WORDS = 8, PIECES = 4 };
+enum { THREADS = 4, ROUNDS = 50, WORDS = 8, PIECES = 12 };
 
 static int me, npes, left, right;
 static long *words;             /* [THREADS][WORDS]: each worker's own */
@@ -252,10 +253,12 @@ int main(void)
          * it still reads them. */
         shmem_barrier_all();
     }
-    /* With a small landing zone and a neighbour on another node, the threads'
-     * pieces overfilled it: an issue found no room at least once, which is
-     * what makes the room-making path, and its copy-out of other threads'
-     * pieces, part of what this test ran. */
+    /* With a small landing zone and a neighbour on another node, each
+     * thread's pieces overfilled it: an issue found no room at least once,
+     * which is what makes the room-making path part of what this test ran.
+     * Each thread's own PIECES exceed the zone, so this holds even when the
+     * threads run one at a time - under load they did, and a pin that needed
+     * them concurrent failed (the load loop of 2026-09-26). */
     const char *landing_bytes = getenv("OSOE_GET_LANDING_BYTES");
     if (landing_bytes && atol(landing_bytes) <= 8192 && shmem_ptr(fixed, right) == NULL)
         CHECK(counter_total("am.landing_full") > 0);

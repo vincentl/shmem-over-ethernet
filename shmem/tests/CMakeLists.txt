@@ -1622,7 +1622,7 @@ endif()
 # test-multiple.c): worker threads of every PE in the library at once, on
 # private contexts and on the default one, waiting several at a time; on one
 # node, and across nodes on a block and an interleaved map, with a landing zone
-# of 8 extents that the threads' 16 pieces in flight overfill; and a full
+# of 8 extents that each thread's 12 pieces in flight overfill; and a full
 # thread table ending the job by name. Under tsan the cross-node case that
 # counts is 0,1: one PE a node, so everything that writes a PE's memory - its
 # agent's landings, its threads' copy-outs, its replies - is a thread of the
