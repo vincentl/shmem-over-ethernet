@@ -139,8 +139,10 @@ size, stream bandwidth, fetch-add latency, barrier time, a reduction's and a
 broadcast's time at 8 bytes and 64 KiB, an fcollect's and an alltoall's at a
 block of 8 bytes and of 4 KiB from every PE, and every PE streaming at once
 (`tools/bench/osoe-bench.c`). The fcollect of 8 bytes is ISx's end-of-run
-gather; its generic internode phase is the one whose latency grows faster
-than log N (design §5.5), so its line at 16 PEs is the one to keep.
+gather; its generic internode phase was the one whose latency grew faster
+than log N until phase 1 step 5 slice 6 made it an allgather of ceil(log2 N)
+steps (design §5.5, §5.8), so its line at 16 PEs is the one to compare with
+the first session's.
 
 ```sh
 B=build/release/tools/bench/osoe-bench
