@@ -56,11 +56,8 @@
  * descriptor's arrays are freed and its number forgotten here; the number, and
  * its blocks and records on every node, stay, since nothing reuses them.
  *
- * Contexts other than the default are not created: shmem_ctx_create and
- * shmem_team_create_ctx return nonzero and assign SHMEM_CTX_INVALID, which
- * spec §9.5.1 permits - an unsuccessful context creation "is not treated as an
- * error" - so a program written against the spec already has the branch this
- * takes.
+ * Contexts are context.c's (phase 1 step 8): a team's destroy destroys the
+ * shareable contexts created from it, before its sync (spec §9.4.8).
  */
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -77,6 +74,7 @@
 #include "barrier.h"
 #include "collective-tree.h"
 #include "collectives.h"
+#include "context.h"
 #include "export.h"
 #include "fatal.h"
 #include "internal-region.h"
@@ -678,18 +676,6 @@ uint32_t osoe_internode_team_world_ranks(uint32_t team, uint32_t rank, uint32_t 
     return t->world_of_rank ? 1 : t->members - rank;
 }
 
-struct osoe_transport_context *osoe_ctx_of(const char *routine, shmem_ctx_t ctx)
-{
-    osoe_require_initialized(routine);
-    if (ctx == SHMEM_CTX_DEFAULT)
-        return osoe_transport_context_default();
-    if (ctx == SHMEM_CTX_INVALID)
-        osoe_fatal("%s: SHMEM_CTX_INVALID is not a context this operation may use",
-                   routine);
-    osoe_fatal("%s: %p is not a context this library issued; only SHMEM_CTX_DEFAULT "
-               "exists (shmem_ctx_create is not implemented)", routine, (void *)ctx);
-}
-
 /* ---- team queries (§9.4) ----------------------------------------------- */
 
 OSOE_API int pshmem_team_my_pe(shmem_team_t team)
@@ -1129,6 +1115,10 @@ OSOE_API void pshmem_team_destroy(shmem_team_t team)
     if (t->number < OSOE_PREDEFINED_TEAMS)
         osoe_fatal("shmem_team_destroy: %s is a predefined team and cannot be destroyed",
                    t->name);
+    /* The shareable contexts created from the team go first, each with its
+     * implicit quiet, so that the sync below orders their last operations as
+     * it orders everything else on the team (spec §9.4.8; context.c). */
+    osoe_context_team_destroyed(t, "shmem_team_destroy");
     osoe_team_sync(t, "shmem_team_destroy");
     forget(t);
 }
@@ -1149,57 +1139,6 @@ OSOE_API void *pshmem_team_ptr(shmem_team_t team, const void *dest, int pe)
     return pshmem_ptr(dest, world);
 }
 
-/* ---- contexts (§9.5) --------------------------------------------------- */
-
-OSOE_API int pshmem_ctx_create(long options, shmem_ctx_t *ctx)
-{
-    (void)options;
-    if (ctx)
-        *ctx = SHMEM_CTX_INVALID;
-    return 1;
-}
-
-OSOE_API int pshmem_team_create_ctx(shmem_team_t team, long options, shmem_ctx_t *ctx)
-{
-    (void)options;
-    /* spec §9.5.2: an invalid team yields an invalid context and nonzero; so,
-     * here, does every other, contexts beyond the default not being created. */
-    osoe_team_of("shmem_team_create_ctx", team);
-    if (ctx)
-        *ctx = SHMEM_CTX_INVALID;
-    return 1;
-}
-
-/*
- * spec §9.5.3: SHMEM_CTX_INVALID does nothing. The default context is not one
- * the program created, so destroying it is a bug this names rather than a quiet
- * teardown of every operation the program has left.
- */
-OSOE_API void pshmem_ctx_destroy(shmem_ctx_t ctx)
-{
-    if (ctx == SHMEM_CTX_INVALID)
-        return;
-    if (ctx == SHMEM_CTX_DEFAULT)
-        osoe_fatal("shmem_ctx_destroy: SHMEM_CTX_DEFAULT was not created by "
-                   "shmem_ctx_create and cannot be destroyed");
-    osoe_fatal("shmem_ctx_destroy: %p is not a context this library issued",
-               (void *)ctx);
-}
-
-/* spec §9.5.4: the default context belongs to the world team. */
-OSOE_API int pshmem_ctx_get_team(shmem_ctx_t ctx, shmem_team_t *team)
-{
-    if (ctx == SHMEM_CTX_INVALID) {
-        if (team)
-            *team = SHMEM_TEAM_INVALID;
-        return 1;
-    }
-    osoe_ctx_of("shmem_ctx_get_team", ctx);
-    if (team)
-        *team = SHMEM_TEAM_WORLD;
-    return 0;
-}
-
 /* The weak `shmem_` aliases (export.h). */
 OSOE_ALIAS(team_my_pe)
 OSOE_ALIAS(team_n_pes)
@@ -1209,7 +1148,3 @@ OSOE_ALIAS(team_split_strided)
 OSOE_ALIAS(team_split_2d)
 OSOE_ALIAS(team_destroy)
 OSOE_ALIAS(team_ptr)
-OSOE_ALIAS(ctx_create)
-OSOE_ALIAS(team_create_ctx)
-OSOE_ALIAS(ctx_destroy)
-OSOE_ALIAS(ctx_get_team)

@@ -80,10 +80,12 @@ enum osoe_region {
     OSOE_REGION_COUNT
 };
 
-/* Per-context transport state: ordering window, dirty set (§4.6). Owned by
- * the backend and embedded in the SHMEM layer's context. The default
- * context's state is created by osoe_transport_init; creation for other contexts
- * arrives with shmem_ctx_create (§7.3). */
+/* Per-context transport state: ordering window, dirty set, the completion of
+ * the context's nonblocking gets (§4.6). Owned by the backend; the SHMEM
+ * layer's context (context.c) holds a pointer to it. The default context's is
+ * made by osoe_transport_init and lives until osoe_transport_fini; every other
+ * comes from osoe_transport_context_create and goes with
+ * osoe_transport_context_destroy (§4.11; phase 1 step 8). */
 struct osoe_transport_context;
 
 /* An absolute CLOCK_MONOTONIC instant (§3.10), from base/. */
@@ -109,6 +111,36 @@ void osoe_transport_init(void);
 void osoe_transport_fini(void);
 
 struct osoe_transport_context *osoe_transport_context_default(void);
+
+/* A context's options at creation: spec §9.5's three, as the backend sees them
+ * (it includes no OpenSHMEM header). */
+enum {
+    OSOE_TRANSPORT_CONTEXT_SERIALIZED = 1u << 0,
+    OSOE_TRANSPORT_CONTEXT_PRIVATE    = 1u << 1,
+    /* Quiet and fence on the context need not order the calling thread's own
+     * memory stores (spec §9.5, SHMEM_CTX_NOSTORE). A backend may use it only
+     * where its fences order nothing else: osoe's intranode path applies puts
+     * as the calling thread's stores, which the same fences order, so neither
+     * of its paths skips them (phase 1 step 8's review, B1). */
+    OSOE_TRANSPORT_CONTEXT_NOSTORE    = 1u << 2,
+};
+
+/*
+ * Create a context (§4.11's modes; phase 1 step 8): the backend's state for
+ * an independent ordering and completion environment - on AM its own dirty
+ * set and get counters (transport-am.c). A backend may bound how many a PE
+ * has at once, as OSOE_MAX_CONTEXTS bounds AM's. Returns NULL when it cannot
+ * make one now, which spec §9.5.1 lets shmem_ctx_create report as a failure
+ * that is not an error.
+ * Below SHMEM_THREAD_MULTIPLE every context is serial (§4.11, "Context
+ * modes"): one call on it at a time, as on the default context.
+ *
+ * Destroy releases the block and the memory, after the implicit wait spec
+ * §9.5.3 requires - every write and nonblocking get on the context complete -
+ * naming `routine` in any blocked record. Never the default context's.
+ */
+struct osoe_transport_context *osoe_transport_context_create(unsigned options);
+void osoe_transport_context_destroy(struct osoe_transport_context *context, const char *routine);
 
 /*
  * Ready what another node's lead needs to reach this node, and describe it in
@@ -261,11 +293,13 @@ enum {
 
     /*
      * get only: the call may return before dst holds the bytes. They are there
-     * once an osoe_transport_wait on this PE has returned - any wait, whatever
-     * PEs it names, since a PE's nonblocking gets complete together (§4.6) -
-     * and until then dst must stay valid and unread. No handle: the spec
-     * completes _nbi operations only at quiet. A backend that completes the get
-     * before it returns is correct, which is how the intranode path, and the AM
+     * once an osoe_transport_wait on this context has returned - any wait on
+     * it, whatever PEs it names, since a context's nonblocking gets complete
+     * together (§4.6) - and until then dst must stay valid and unread. A wait
+     * on another context need not complete them, though a backend may
+     * complete them early. No handle: the spec completes
+     * _nbi operations only at quiet. A backend that completes the get before
+     * it returns is correct, which is how the intranode path, and the AM
      * path's blocking code, would implement it (§4.6, as built).
      */
     OSOE_TRANSPORT_NONBLOCKING = 1u << 3,
@@ -460,23 +494,25 @@ void osoe_transport_fence(struct osoe_transport_context *context);
  * record (blocked.h).
  *
  * Intranode: one serializing fence; nothing is ever outstanding.
- * AM: the serializing fence; wait for bytes_landed == bytes_issued and copy the
- * nonblocking gets out; flush the dirty set restricted to the listed PEs'
- * nodes, wait for acknowledgements, clear what was waited on (§4.6).
+ * AM: the serializing fence; wait for the context's bytes_landed ==
+ * bytes_issued and copy its nonblocking gets out; flush its dirty set
+ * restricted to the listed PEs' nodes, wait for acknowledgements, clear what
+ * was waited on (§4.6).
  */
 void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes,
                          const char *routine);
 
 /*
- * Wait for this PE's nonblocking gets and nothing else: return once each is
- * complete, its bytes in dst; writes stay as they are, for the next wait. The
- * end of a blocking routine made of nonblocking gets - iget - where a whole
- * wait would also complete the writes to that PE's node, and pay for their
- * acknowledgement, for nothing the routine promises. `routine` as for wait:
- * the API routine, "shmem_long_iget".
+ * Wait for this context's nonblocking gets and nothing else: return once each
+ * is complete, its bytes in dst; writes stay as they are, for the next wait.
+ * The end of a blocking routine made of nonblocking gets - iget - where a
+ * whole wait would also complete the writes to that PE's node, and pay for
+ * their acknowledgement, for nothing the routine promises. `routine` as for
+ * wait: the API routine, "shmem_long_iget".
  *
  * Intranode: nothing is ever in flight.
- * AM: wait for bytes_landed == bytes_issued, copy the replies out (§4.6).
+ * AM: wait for the context's bytes_landed == bytes_issued, copy its replies
+ * out (§4.6).
  */
 void osoe_transport_wait_gets(struct osoe_transport_context *context, const char *routine);
 

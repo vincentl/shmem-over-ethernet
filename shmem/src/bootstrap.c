@@ -258,6 +258,19 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    OSOE_MAX_TEAMS_LOWEST, OSOE_MAX_TEAMS_HIGHEST);
 
     /*
+     * How many contexts a PE may have at once (§4.11; phase 1 step 8): it
+     * sizes each PE's pool of context blocks in the node segment, which the
+     * node's lead lays out, so a node's PEs must agree, and the node's own
+     * rendezvous checks that they do (node.c). Not between nodes: no other
+     * node indexes the pool.
+     */
+    b->max_contexts = OSOE_MAX_CONTEXTS_DEFAULT;
+    if (osoe_environment_u32("OSOE_MAX_CONTEXTS", &b->max_contexts) == OSOE_ENVIRONMENT_INVALID ||
+        b->max_contexts < OSOE_MAX_CONTEXTS_LOWEST || b->max_contexts > OSOE_MAX_CONTEXTS_HIGHEST)
+        osoe_fatal("OSOE_MAX_CONTEXTS='%s' is not between %u and %u", getenv("OSOE_MAX_CONTEXTS"),
+                   OSOE_MAX_CONTEXTS_LOWEST, OSOE_MAX_CONTEXTS_HIGHEST);
+
+    /*
      * How many pieces of a data collective each lead of the internode tree
      * keeps in flight (§5.8, "Pipelined pieces"). It fixes the internal
      * region's offsets - D slots per child position and D release slots in

@@ -33,7 +33,7 @@
 #include "metrics.h"
 #include "rma.h"
 #include "symmetric.h"
-#include "team.h"
+#include "context.h"
 #include "transport.h"
 #include "wait.h"
 
@@ -51,15 +51,16 @@ static enum osoe_rmw_op signal_op(const char *routine, int sig_op)
     }
 }
 
-static void signal_update(const char *routine, shmem_ctx_t ctx, uint64_t *sig_addr,
-                          uint64_t signal, enum osoe_rmw_op op, int pe, unsigned flags)
+/* `pe` is a world rank, translated by the caller (context.h). */
+static void signal_update(const char *routine, struct osoe_transport_context *context,
+                          uint64_t *sig_addr, uint64_t signal, enum osoe_rmw_op op, int pe,
+                          unsigned flags)
 {
-    osoe_check_pe(routine, pe);
     osoe_count(OSOE_C_SHMEM_SIGNAL_UPDATE_CALLS, 1);
     struct osoe_symmetric_location at =
         osoe_symmetric_word_locate(routine, sig_addr, OSOE_SIGNAL_WIDTH);
-    osoe_transport_rmw(osoe_ctx_of(routine, ctx), pe, at.region, at.offset, op,
-                OSOE_SIGNAL_WIDTH, signal, 0, flags);
+    osoe_transport_rmw(context, pe, at.region, at.offset, op, OSOE_SIGNAL_WIDTH, signal, 0,
+                       flags);
 }
 
 /*
@@ -77,7 +78,9 @@ static void put_signal(const char *routine, shmem_ctx_t ctx, void *dest, const v
                        int sig_op, int pe)
 {
     enum osoe_rmw_op op = signal_op(routine, sig_op);
-    osoe_check_pe(routine, pe);
+    /* Resolved once for the put and the signal: the context's team numbers
+     * the PE (context.h). */
+    struct osoe_transport_context *context = osoe_ctx_resolve(routine, ctx, &pe);
     if (nelems > 0) {
         size_t len = osoe_rma_bytes(routine, nelems, width);
         struct osoe_symmetric_location at = osoe_symmetric_locate(routine, dest, len);
@@ -94,12 +97,12 @@ static void put_signal(const char *routine, shmem_ctx_t ctx, void *dest, const v
          * copy has been taken either way, and what is deferred is the
          * submission, never the copy.
          */
-        osoe_transport_put(osoe_ctx_of(routine, ctx), pe, at.region, at.offset, source,
-                    len, OSOE_TRANSPORT_MORE);
+        osoe_transport_put(context, pe, at.region, at.offset, source, len,
+                           OSOE_TRANSPORT_MORE);
     }
     /* The fence is on the same context as the put, which is what makes it
      * order the two (spec §9.12.1, 1.6 change #18). */
-    signal_update(routine, ctx, sig_addr, signal, op, pe, OSOE_TRANSPORT_FENCED);
+    signal_update(routine, context, sig_addr, signal, op, pe, OSOE_TRANSPORT_FENCED);
 }
 
 OSOE_API void pshmem_ctx_putmem_signal(shmem_ctx_t ctx, void *dest, const void *source,
@@ -188,13 +191,15 @@ OSOE_RMA_SIZES(OSOE_PUT_SIGNAL_SIZED_NBI)
 OSOE_API void pshmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
                                    int pe)
 {
-    signal_update("shmem_ctx_signal_set", ctx, sig_addr, signal, OSOE_RMW_WRITE, pe, 0);
+    struct osoe_transport_context *context = osoe_ctx_resolve("shmem_ctx_signal_set", ctx, &pe);
+    signal_update("shmem_ctx_signal_set", context, sig_addr, signal, OSOE_RMW_WRITE, pe, 0);
 }
 
 OSOE_API void pshmem_ctx_signal_add(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
                                    int pe)
 {
-    signal_update("shmem_ctx_signal_add", ctx, sig_addr, signal, OSOE_RMW_ADD, pe, 0);
+    struct osoe_transport_context *context = osoe_ctx_resolve("shmem_ctx_signal_add", ctx, &pe);
+    signal_update("shmem_ctx_signal_add", context, sig_addr, signal, OSOE_RMW_ADD, pe, 0);
 }
 
 OSOE_API void pshmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe)

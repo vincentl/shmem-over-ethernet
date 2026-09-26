@@ -53,6 +53,18 @@
 #include "transport.h"
 #include "transport-local.h"
 
+/* The peer slot for a node, as the connection area and the progress loop both
+ * index it: node order with this node left out (§3.4). */
+static uint32_t peer_slot(uint32_t peer)
+{
+    return peer < osoe.job.node ? peer : peer - 1;
+}
+
+static uint32_t peer_count(void)
+{
+    return osoe.job.node_count - 1;
+}
+
 /*
  * Per-context ordering state (§4.6).
  *
@@ -70,24 +82,94 @@
  * the job size - rather than every connection.
  */
 struct osoe_transport_context {
+    uint32_t block;             /* its block in this PE's pool (node.h): element index too */
+    unsigned options;           /* OSOE_TRANSPORT_CONTEXT_*, from creation */
+    bool live;
     uint64_t *high_segment;     /* per peer slot: the highest segment written into */
     uint32_t *order;            /* the slots touched, in the order first touched */
     bool *touched;              /* membership, so marking twice is not quadratic */
     uint32_t count;
+    /* This context's nonblocking gets in flight: a list through the records'
+     * `next` (struct in_flight_copy, below), and its length. */
+    uint32_t records_head;
+    uint32_t records_count;
 };
 
-static struct osoe_transport_context default_context;
+/*
+ * Every context this PE may have, OSOE_MAX_CONTEXTS of them, element i owning
+ * block i of this PE's pool in the node segment (§4.11; phase 1 step 8).
+ * Element 0 is the default context, live from init to fini; the others are
+ * live between osoe_transport_context_create and _destroy, and an element's
+ * block is claimed and released with it. The pool's state words are the
+ * truth about which blocks are taken - a compare-and-swap, as §4.11 item 4
+ * says, though below MULTIPLE nothing contends for them.
+ */
+static struct osoe_transport_context *contexts;
+static uint32_t context_count;
 
-/* The peer slot for a node, as the connection area and the progress loop both
- * index it: node order with this node left out (§3.4). */
-static uint32_t peer_slot(uint32_t peer)
+enum { NO_RECORD = UINT32_MAX };
+
+/*
+ * This PE's nonblocking gets in flight (§4.6, as built): the records of every
+ * context, since the zone is the PE's (node.h) while the gets are a context's
+ * (phase 1 step 8). Private: below MULTIPLE one thread issues them and
+ * completes them, and the lead sees only the landing records. `copy` holds,
+ * per record, where its reply goes once it has landed - a `dst` the lead's
+ * process may not be able to see (§3.12) - and `next` threads the record on
+ * its context's list, or on the free list. The arena is one bump allocator,
+ * given back whole once nothing is in flight (complete_gets).
+ */
+struct in_flight_copy {
+    void *dst;
+    uint32_t offset;            /* into the landing arena */
+    uint32_t length;
+    uint32_t next;              /* the context's next record, or the free list's */
+};
+
+static struct in_flight_state {
+    uint32_t total;             /* records in use, over every context */
+    uint32_t free_head;         /* the free list; NO_RECORD when none */
+    uint32_t arena_used;        /* bytes of the arena handed out */
+    uint64_t sequence;          /* the count of tokens made */
+    uint32_t capacity;          /* entries in `copy` */
+    struct in_flight_copy *copy;
+} in_flight;
+
+static struct osoe_context_block *block_of(const struct osoe_transport_context *c)
 {
-    return peer < osoe.job.node ? peer : peer - 1;
+    return osoe_node_context(&osoe.node, osoe.bootstrap.local_id, c->block);
 }
 
-static uint32_t peer_count(void)
+/* The dirty set's arrays, O(peer nodes) virtual, resident as touched (§4.6).
+ * A job of one node has no peers and none. */
+static bool dirty_set_allocate(struct osoe_transport_context *c)
 {
-    return osoe.job.node_count - 1;
+    if (!osoe_am.internode)
+        return true;
+    uint32_t peers = peer_count();
+    c->high_segment = calloc(peers, sizeof *c->high_segment);
+    c->order = calloc(peers, sizeof *c->order);
+    c->touched = calloc(peers, sizeof *c->touched);
+    return c->high_segment && c->order && c->touched;
+}
+
+static void dirty_set_free(struct osoe_transport_context *c)
+{
+    free(c->high_segment);
+    free(c->order);
+    free(c->touched);
+    c->high_segment = NULL;
+    c->order = NULL;
+    c->touched = NULL;
+    c->count = 0;
+}
+
+/* Make element `index` live on its block, which the caller has claimed. */
+static bool context_open(struct osoe_transport_context *c, uint32_t index, unsigned options)
+{
+    *c = (struct osoe_transport_context){ .block = index, .options = options, .live = true,
+                                          .records_head = NO_RECORD };
+    return dirty_set_allocate(c);
 }
 
 /*
@@ -103,16 +185,20 @@ void osoe_transport_init(void)
     osoe_am.internode = osoe.job.node_count > 1;
     osoe_am.lead = osoe.bootstrap.local_id == 0;
 
-    struct osoe_transport_context *c = &default_context;
-    *c = (struct osoe_transport_context){ 0 };
-    if (osoe_am.internode) {
-        uint32_t peers = peer_count();
-        c->high_segment = calloc(peers, sizeof *c->high_segment);
-        c->order = calloc(peers, sizeof *c->order);
-        c->touched = calloc(peers, sizeof *c->touched);
-        if (!c->high_segment || !c->order || !c->touched)
-            osoe_fatal("out of memory for the ordering state of %u peer nodes", peers);
-    }
+    context_count = osoe.node.contexts_per_pe;
+    contexts = calloc(context_count, sizeof *contexts);
+    if (!contexts)
+        osoe_fatal("out of memory for %u contexts", context_count);
+    /* The default context's block is block 0, claimed here as any other is
+     * claimed at creation. The segment is this session's, made zeroed by the
+     * lead, so the claim can fail only on a segment that is not. */
+    uint32_t expected = OSOE_CONTEXT_FREE;
+    struct osoe_context_block *b = osoe_node_context(&osoe.node, osoe.bootstrap.local_id, 0);
+    if (!atomic_compare_exchange_strong_explicit(&b->state, &expected, OSOE_CONTEXT_LIVE,
+                                                 memory_order_seq_cst, memory_order_seq_cst))
+        osoe_fatal("this PE's context block 0 is already live in a fresh control segment");
+    if (!context_open(&contexts[0], 0, 0))
+        osoe_fatal("out of memory for the ordering state of %u peer nodes", peer_count());
     osoe_progress_host_start(osoe.node.hdr->session);
 }
 
@@ -122,11 +208,21 @@ void osoe_transport_init(void)
 void osoe_transport_fini(void)
 {
     osoe_progress_host_stop();
-    struct osoe_transport_context *c = &default_context;
-    free(c->high_segment);
-    free(c->order);
-    free(c->touched);
-    *c = (struct osoe_transport_context){ 0 };
+    /* Every created context was destroyed before the finalize barrier
+     * (context.c), so only the default one is live here; a block left live
+     * would be a defect, and the segment goes with the session either way. */
+    for (uint32_t i = 0; i < context_count; i++)
+        if (contexts[i].live) {
+            dirty_set_free(&contexts[i]);
+            atomic_store_explicit(&block_of(&contexts[i])->state, OSOE_CONTEXT_FREE,
+                                  memory_order_release);
+            contexts[i].live = false;
+        }
+    free(contexts);
+    contexts = NULL;
+    context_count = 0;
+    free(in_flight.copy);
+    in_flight = (struct in_flight_state){ 0 };
     osoe_am = (struct osoe_am_state){ 0 };
 }
 
@@ -164,7 +260,46 @@ void osoe_transport_agent_abort(void)
 
 struct osoe_transport_context *osoe_transport_context_default(void)
 {
-    return &default_context;
+    return &contexts[0];
+}
+
+/*
+ * transport.h: a context from this PE's pool. The first free block from 1 up
+ * is claimed by a compare-and-swap on its state word - O(OSOE_MAX_CONTEXTS)
+ * per creation, a setup-time cost, and the segment's words rather than a
+ * process-memory free list so that the pool has one truth (§4.11 item 4).
+ * NULL when every block is live or the dirty set's memory is short; a claim
+ * whose memory then fails is given back.
+ */
+struct osoe_transport_context *osoe_transport_context_create(unsigned options)
+{
+    for (uint32_t i = 1; i < context_count; i++) {
+        struct osoe_context_block *b = osoe_node_context(&osoe.node, osoe.bootstrap.local_id, i);
+        uint32_t expected = OSOE_CONTEXT_FREE;
+        if (!atomic_compare_exchange_strong_explicit(&b->state, &expected, OSOE_CONTEXT_LIVE,
+                                                     memory_order_seq_cst, memory_order_seq_cst))
+            continue;
+        struct osoe_transport_context *c = &contexts[i];
+        if (context_open(c, i, options))
+            return c;
+        dirty_set_free(c);
+        c->live = false;
+        atomic_store_explicit(&b->state, OSOE_CONTEXT_FREE, memory_order_release);
+        return NULL;
+    }
+    return NULL;
+}
+
+/* transport.h: the implicit wait of spec §9.5.3, then the block and the
+ * memory go back. The counters in the block are cumulative and never reset,
+ * so a later claimant of the block starts from equal counters, whatever they
+ * count to. */
+void osoe_transport_context_destroy(struct osoe_transport_context *c, const char *routine)
+{
+    osoe_transport_wait(c, NULL, 0, routine);
+    dirty_set_free(c);
+    c->live = false;
+    atomic_store_explicit(&block_of(c)->state, OSOE_CONTEXT_FREE, memory_order_release);
 }
 
 /*
@@ -635,40 +770,22 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
 }
 
 /*
- * This PE's nonblocking gets in flight (§4.6, as built). Private: under
- * SERIALIZED one thread issues them and completes them, and the lead sees only
- * the landing records. `copy` holds, per record, where its reply goes once it
- * has landed - a `dst` the lead's process may not be able to see (§3.12).
+ * Complete every nonblocking get context `c` has in flight: wait until the
+ * lead has landed as many bytes as the context asked for (§4.6's counters, in
+ * the context's block), then copy each reply out and give its record back. A
+ * wait on the context calls it - a quiet, and all that completes as one - and
+ * so does an issue that finds the records or the arena used up, on its own
+ * context first and then on every other with gets in flight, which is how
+ * the landing zone stays bounded without anything failing (phase 1 step 8:
+ * the records are per context, the zone per PE).
  */
-struct in_flight_copy {
-    void *dst;
-    uint32_t offset;            /* into the landing arena */
-    uint32_t length;
-};
-
-static struct {
-    uint32_t count;             /* records in use, from index 0 */
-    uint32_t arena_used;        /* bytes of the arena handed out */
-    uint64_t sequence;          /* the count of tokens made */
-    uint32_t capacity;          /* entries in `copy` */
-    struct in_flight_copy *copy;
-} in_flight;
-
-/*
- * Complete every nonblocking get this PE has in flight: wait until the lead has
- * landed as many bytes as the PE asked for (§4.6's counters), then copy each
- * reply out and give its record back. A wait calls it - a quiet, and all that
- * completes as one - and so does an issue that finds the records or the arena
- * used up, which is how the landing zone stays bounded without anything
- * failing.
- */
-static void complete_gets(const char *routine)
+static void complete_gets(struct osoe_transport_context *c, const char *routine)
 {
-    if (in_flight.count == 0)
+    if (c->records_count == 0)
         return;
-    struct osoe_landing_slot *slot = my_landing();
-    uint64_t issued = atomic_load_explicit(&slot->bytes_issued, memory_order_acquire);
-    uint64_t landed = atomic_load_explicit(&slot->bytes_landed, memory_order_seq_cst);
+    struct osoe_context_block *block = block_of(c);
+    uint64_t issued = atomic_load_explicit(&block->bytes_issued, memory_order_acquire);
+    uint64_t landed = atomic_load_explicit(&block->bytes_landed, memory_order_seq_cst);
     if (landed != issued) {
         /* Whatever this PE held back goes out before it waits (transport.h). The
          * gets may be toward any number of nodes, so the wait names none: its
@@ -678,37 +795,68 @@ static void complete_gets(const char *routine)
         am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT, issued - landed,
                              "the bytes its nonblocking gets have landed", UINT32_MAX, -1,
                              landed);
-        osoe_wait_word_enter(&slot->counter_wake);
+        osoe_wait_word_enter(&block->counter_wake);
         uint32_t slept_on = 0;
         bool swept = false;
         for (;;) {
-            uint32_t seen = osoe_wait_word_load(&slot->counter_wake);
-            landed = atomic_load_explicit(&slot->bytes_landed, memory_order_seq_cst);
+            uint32_t seen = osoe_wait_word_load(&block->counter_wake);
+            landed = atomic_load_explicit(&block->bytes_landed, memory_order_seq_cst);
             /* Past equality it can never return: a reply counted twice, which
              * the lead's checks exist to refuse (progress.c). */
             if (landed > issued)
-                osoe_fatal("%s: the lead has counted %llu bytes landed for this PE's "
+                osoe_fatal("%s: the lead has counted %llu bytes landed for this context's "
                            "nonblocking gets, which asked for %llu", routine,
                            (unsigned long long)landed, (unsigned long long)issued);
             if (landed == issued) {
                 if (swept)
-                    count_if_lost(&slot->counter_wake.word, slept_on, routine);
+                    count_if_lost(&block->counter_wake.word, slept_on, routine);
                 break;
             }
             slept_on = seen;
-            swept = sleep_on(&slot->counter_wake, seen);
+            swept = sleep_on(&block->counter_wake, seen);
             am_wait_check(&w, landed);
         }
-        osoe_wait_word_leave(&slot->counter_wake);
+        osoe_wait_word_leave(&block->counter_wake);
         am_wait_end();
     }
     /* Each record was retired by the lead as its reply landed (progress-host.c),
-     * so every one is free to be taken again from here. */
+     * so every one of this context's is free to be taken again from here. */
     const unsigned char *arena = osoe_node_landing_arena(&osoe.node, osoe.bootstrap.local_id);
-    for (uint32_t i = 0; i < in_flight.count; i++)
-        memcpy(in_flight.copy[i].dst, arena + in_flight.copy[i].offset, in_flight.copy[i].length);
-    in_flight.count = 0;
-    in_flight.arena_used = 0;
+    uint32_t completed = 0;
+    for (uint32_t i = c->records_head; i != NO_RECORD; ) {
+        struct in_flight_copy *r = &in_flight.copy[i];
+        memcpy(r->dst, arena + r->offset, r->length);
+        uint32_t next = r->next;
+        r->next = in_flight.free_head;
+        in_flight.free_head = i;
+        i = next;
+        completed++;
+    }
+    osoe_count(OSOE_C_AM_GETS_COMPLETED, completed);
+    c->records_head = NO_RECORD;
+    c->records_count = 0;
+    in_flight.total -= completed;
+    /* The arena is handed out from one end and taken back only whole: a
+     * context's replies may sit anywhere in it while another's are still to
+     * land, so it is reused once no context has a get in flight. */
+    if (in_flight.total == 0)
+        in_flight.arena_used = 0;
+}
+
+/* The records and the arena for a session's zone, every record free. */
+static void in_flight_open(uint32_t requests)
+{
+    free(in_flight.copy);
+    in_flight = (struct in_flight_state){ 0 };
+    in_flight.copy = calloc(requests, sizeof *in_flight.copy);
+    if (!in_flight.copy)
+        osoe_fatal("out of memory for %u nonblocking gets in flight", requests);
+    in_flight.capacity = requests;
+    in_flight.free_head = NO_RECORD;
+    for (uint32_t i = requests; i-- > 0; ) {
+        in_flight.copy[i].next = in_flight.free_head;
+        in_flight.free_head = i;
+    }
 }
 
 /*
@@ -724,7 +872,14 @@ static void complete_gets(const char *routine)
  * lead, as the reply lands, rather than the caller after reading it - which
  * reply.h has said the difference would be since the credits were built.
  */
-static void remote_get_nonblocking(int pe, enum osoe_region region, uint64_t offset, void *dst,
+static bool zone_has_room(uint32_t n)
+{
+    return in_flight.free_head != NO_RECORD &&
+           in_flight.arena_used + (uint64_t)n <= osoe.node.landing_arena_bytes;
+}
+
+static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
+                                   enum osoe_region region, uint64_t offset, void *dst,
                                    size_t len, unsigned flags)
 {
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
@@ -733,14 +888,8 @@ static void remote_get_nonblocking(int pe, enum osoe_region region, uint64_t off
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
     uint32_t requests = osoe.node.landing_requests;
     uint32_t arena_bytes = osoe.node.landing_arena_bytes;
-    if (in_flight.capacity != requests) {
-        complete_gets("shmem_get_nbi");         /* a new session's zone; empty in practice */
-        free(in_flight.copy);
-        in_flight.copy = calloc(requests, sizeof *in_flight.copy);
-        if (!in_flight.copy)
-            osoe_fatal("out of memory for %u nonblocking gets in flight", requests);
-        in_flight.capacity = requests;
-    }
+    if (in_flight.capacity != requests)
+        in_flight_open(requests);        /* a session's first: fini emptied the last */
     uint32_t limit = landing_capacity();
     if (limit > arena_bytes)
         limit = arena_bytes;
@@ -748,28 +897,44 @@ static void remote_get_nonblocking(int pe, enum osoe_region region, uint64_t off
     if (limit > wire)
         limit = wire;
 
-    struct osoe_landing_slot *slot = my_landing();
+    struct osoe_context_block *block = block_of(c);
     struct osoe_landing_request *records =
         osoe_node_landing_requests(&osoe.node, osoe.bootstrap.local_id);
     unsigned char *at = dst;
     while (len > 0) {
         uint32_t n = len > limit ? limit : (uint32_t)len;
-        if (in_flight.count == requests || in_flight.arena_used + (uint64_t)n > arena_bytes) {
+        if (!zone_has_room(n)) {
+            /* This context's first, whose replies are its caller's to read
+             * next anyway; then, while there is still no room, every other
+             * context's - an early completion those contexts' waits then find
+             * done, which the boundary allows (transport.h). Once nothing is
+             * in flight the arena is whole again, and a piece fits it. */
             osoe_count(OSOE_C_AM_LANDING_FULL, 1);
-            complete_gets("shmem_get_nbi");
+            complete_gets(c, "shmem_get_nbi");
+            for (uint32_t i = 0; i < context_count && !zone_has_room(n); i++)
+                if (contexts[i].live && contexts[i].records_count)
+                    complete_gets(&contexts[i], "shmem_get_nbi");
         }
-        uint32_t index = in_flight.count++;
+        uint32_t index = in_flight.free_head;
+        in_flight.free_head = in_flight.copy[index].next;
+        in_flight.total++;
         uint32_t place = in_flight.arena_used;
         /* Each reply starts 8-byte aligned, for the copy out. */
         in_flight.arena_used += (n + 7u) & ~7u;
-        uint64_t token = OSOE_LANDING_NONBLOCKING | (++in_flight.sequence << 16) | index;
+        /* The token: the record's index, 32 bits of sequence, the context's
+         * block, and the nonblocking bit (node.h). */
+        uint64_t token = OSOE_LANDING_NONBLOCKING |
+                         ((uint64_t)c->block << OSOE_LANDING_CONTEXT_SHIFT) |
+                         ((++in_flight.sequence & UINT64_C(0xffffffff)) << 16) | index;
         atomic_store_explicit(&records[index].offset, place, memory_order_release);
         atomic_store_explicit(&records[index].length, n, memory_order_release);
         /* Published before the request goes out: the send's reservation and
          * commit order it before any reply can exist (as arm() for the slot). */
         atomic_store_explicit(&records[index].token, token, memory_order_release);
-        in_flight.copy[index] = (struct in_flight_copy){ at, place, n };
-        atomic_fetch_add_explicit(&slot->bytes_issued, n, memory_order_seq_cst);
+        in_flight.copy[index] = (struct in_flight_copy){ at, place, n, c->records_head };
+        c->records_head = index;
+        c->records_count++;
+        atomic_fetch_add_explicit(&block->bytes_issued, n, memory_order_seq_cst);
 
         take_credit(connection, peer, pe, "shmem_get_nbi");
         struct osoe_am_get_request m = { .target_pe = (uint32_t)pe,
@@ -847,7 +1012,6 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
 void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
                  uint64_t offset, void *dst, size_t len, unsigned flags)
 {
-    (void)context;
     if (osoe_routes_in_process(&osoe.job, (uint32_t)pe)) {
         /* Applied before it returns, nonblocking or not: complete early, which
          * a nonblocking get may be (transport.h). */
@@ -857,7 +1021,7 @@ void osoe_transport_get(struct osoe_transport_context *context, int pe, enum oso
     osoe_count(OSOE_C_TRANSPORT_GET_CALLS, 1);
     osoe_count(OSOE_C_TRANSPORT_GET_BYTES, len);
     if (flags & OSOE_TRANSPORT_NONBLOCKING) {
-        remote_get_nonblocking(pe, region, offset, dst, len, flags);
+        remote_get_nonblocking(context, pe, region, offset, dst, len, flags);
         return;
     }
     /* A blocking get is complete on return, so it never joins the dirty set:
@@ -931,6 +1095,10 @@ static void flush_dirty(struct osoe_transport_context *c)
 void osoe_transport_fence(struct osoe_transport_context *context)
 {
     osoe_count(OSOE_C_TRANSPORT_FENCE_CALLS, 1);
+    /* Also on a NOSTORE context: spec §9.5 lets fence skip ordering the
+     * application's own stores there, but on the intranode path this fence is
+     * also what orders the context's puts, each a memcpy in this thread
+     * (base/order.h), and those it must still order (transport.h). */
     osoe_release_fence();
     if (osoe_am.internode)
         flush_dirty(context);
@@ -952,11 +1120,12 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
         return;
     osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
     uint64_t t0 = osoe_now_ns();
-    /* This PE's nonblocking gets, every one of them, whatever PEs the wait
-     * names: their completion is counted per PE, not per target (§4.6). First,
-     * so that the stores copying them into place come before quiet's fence
-     * and are ordered as every other store before it is. */
-    complete_gets(routine);
+    /* This context's nonblocking gets, every one of them, whatever PEs the
+     * wait names: their completion is counted per context, not per target
+     * (§4.6). First, so that the stores copying them into place come before
+     * quiet's fence and are ordered as every other store before it is. */
+    complete_gets(context, routine);
+    /* On a NOSTORE context too, for fence's reason above. */
     osoe_serializing_fence();
 
     struct osoe_transport_context *c = context;
@@ -1042,8 +1211,7 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
 
 void osoe_transport_wait_gets(struct osoe_transport_context *context, const char *routine)
 {
-    (void)context;              /* a PE's gets complete together, whatever the context */
-    complete_gets(routine);
+    complete_gets(context, routine);
 }
 
 /* ---- The two entry points that are this backend's, not a path's --------- */

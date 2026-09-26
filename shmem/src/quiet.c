@@ -14,14 +14,15 @@
  * how rma.c is written.
  */
 #include <stddef.h>
+#include <stdlib.h>
 
 #include <pshmem.h>
 #include <shmem.h>
 
+#include "context.h"
 #include "export.h"
+#include "fatal.h"
 #include "metrics.h"
-#include "symmetric.h"
-#include "team.h"
 #include "transport.h"
 
 /*
@@ -73,10 +74,19 @@ OSOE_API void pshmem_ctx_pe_quiet(shmem_ctx_t ctx, const int *target_pes, size_t
     if (npes == 0 || ctx == SHMEM_CTX_INVALID)
         return;
     osoe_count(OSOE_C_SHMEM_PE_QUIET_CALLS, 1);
-    for (size_t i = 0; i < npes; i++)
-        osoe_check_pe("shmem_ctx_pe_quiet", target_pes[i]);
-    osoe_transport_wait(osoe_ctx_of("shmem_ctx_pe_quiet", ctx), target_pes, npes,
-                        "shmem_pe_quiet");
+    /* The targets are numbered in the context's team, as every PE a routine
+     * on a context takes is (spec §9.5; context.h), and the transport takes
+     * world ranks: translated into a list of its own, on the stack for the
+     * lists real programs pass and from malloc past that. */
+    int stack[64];
+    int *world = npes <= sizeof stack / sizeof stack[0] ? stack : malloc(npes * sizeof *world);
+    if (!world)
+        osoe_fatal("shmem_ctx_pe_quiet: out of memory for %zu target PEs", npes);
+    struct osoe_transport_context *context =
+        osoe_ctx_resolve_list("shmem_ctx_pe_quiet", ctx, target_pes, npes, world);
+    osoe_transport_wait(context, world, npes, "shmem_pe_quiet");
+    if (world != stack)
+        free(world);
 }
 
 OSOE_API void pshmem_pe_quiet(const int *target_pes, size_t npes)

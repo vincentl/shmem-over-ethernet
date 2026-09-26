@@ -110,16 +110,20 @@ static void splits_and_contexts(void)
     CHECK(shmem_team_n_pes(x) == 1 && shmem_team_my_pe(x) == 0);
     CHECK(shmem_team_n_pes(y) == npes && shmem_team_my_pe(y) == me);
 
-    /* Contexts beyond the default are still not created, on any team. */
-    shmem_ctx_t ctx = SHMEM_CTX_DEFAULT;
-    CHECK(shmem_ctx_create(0, &ctx) != 0);
-    CHECK(ctx == SHMEM_CTX_INVALID);
-    ctx = SHMEM_CTX_DEFAULT;
-    CHECK(shmem_team_create_ctx(SHMEM_TEAM_WORLD, 0, &ctx) != 0);
-    CHECK(ctx == SHMEM_CTX_INVALID);
-    ctx = SHMEM_CTX_DEFAULT;
-    CHECK(shmem_team_create_ctx(made, 0, &ctx) != 0);
-    CHECK(ctx == SHMEM_CTX_INVALID);
+    /* Contexts are created on any team (§9.5; phase 1 step 8, test-context.c
+     * is theirs): here that each creation answers, and each context names
+     * its team (§9.5.4). */
+    shmem_ctx_t ctx = SHMEM_CTX_INVALID, team_ctx = SHMEM_CTX_INVALID;
+    shmem_team_t of = SHMEM_TEAM_INVALID;
+    CHECK(shmem_ctx_create(0, &ctx) == 0 && ctx != SHMEM_CTX_INVALID);
+    CHECK(shmem_ctx_get_team(ctx, &of) == 0 && of == SHMEM_TEAM_WORLD);
+    shmem_ctx_destroy(ctx);
+    CHECK(shmem_team_create_ctx(SHMEM_TEAM_WORLD, 0, &ctx) == 0 && ctx != SHMEM_CTX_INVALID);
+    CHECK(shmem_ctx_get_team(ctx, &of) == 0 && of == SHMEM_TEAM_WORLD);
+    shmem_ctx_destroy(ctx);
+    CHECK(shmem_team_create_ctx(made, 0, &team_ctx) == 0 && team_ctx != SHMEM_CTX_INVALID);
+    CHECK(shmem_ctx_get_team(team_ctx, &of) == 0 && of == made);
+    /* Left for the team's destroy to destroy (§9.4.8). */
     shmem_team_destroy(made);
     shmem_team_destroy(x);
     shmem_team_destroy(y);

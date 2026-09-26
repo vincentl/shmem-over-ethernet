@@ -30,7 +30,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 20
+#define OSOE_NODE_LAYOUT 21
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -265,6 +265,17 @@ struct osoe_segment_directory {
     uint64_t epochs_bytes;
     uint32_t epoch_row_bytes;        /* one PE's row */
     uint32_t epoch_row_count;        /* local_count */
+
+    /*
+     * Appended at layout 21 (§4.6, §4.11; phase 1 step 8): each local PE's
+     * pool of context blocks, contexts_per_pe (OSOE_MAX_CONTEXTS) of them in
+     * local-id order, after every other section so that nothing before them
+     * moved. A PE's block 0 is SHMEM_CTX_DEFAULT's.
+     */
+    uint64_t contexts_offset;
+    uint64_t contexts_bytes;
+    uint32_t context_bytes;          /* one block */
+    uint32_t contexts_per_pe;        /* OSOE_MAX_CONTEXTS */
 };
 
 /*
@@ -659,6 +670,43 @@ struct osoe_node_header {
 };
 
 /*
+ * A context's block in the node segment (§4.6, §4.11; phase 1 step 8 slice
+ * 1): the part of a context that the lead's agent writes and another process
+ * reads. Each local PE has a pool of OSOE_MAX_CONTEXTS of them (layout 21,
+ * osoe_node_context), block 0 being SHMEM_CTX_DEFAULT's, live from init to
+ * finalize; shmem_ctx_create claims a free one by a compare-and-swap on its
+ * state word and shmem_ctx_destroy releases it, so a destroyed context's
+ * block serves a later creation. Fixed-size, one cache line: the pool is O(1)
+ * per context whatever the job's size, which is the proposal's bound
+ * (docs/prompts/phase1-step8-slice1-prompt.md, decision 2).
+ *
+ * The rest of a context - its dirty set, O(nodes) virtual - is process
+ * memory of the PE that owns it (transport-am.c).
+ */
+struct osoe_context_block {
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint32_t state;             /* OSOE_CONTEXT_FREE or OSOE_CONTEXT_LIVE */
+    uint32_t reserved;
+    /*
+     * §4.6's get completion, per context since layout 21 (until then the
+     * landing slot held one pair per PE): two cumulative counters, never
+     * reset, with the companion 32-bit wake word they need because a 64-bit
+     * counter cannot be futexed (§4.9). The PE adds each nonblocking get's
+     * bytes to `bytes_issued` as it asks; the progress thread adds them to
+     * `bytes_landed` as the whole reply lands, then bumps the wake word and
+     * wakes only while the PE waits on it (base/wait-word.h); a wait on the
+     * context waits for the two to be equal and then copies its replies out.
+     * The reply's token names the block (OSOE_LANDING_CONTEXT_SHIFT), so the
+     * lead credits the right context without the wire changing.
+     */
+    _Atomic uint64_t bytes_issued;
+    _Atomic uint64_t bytes_landed;
+    struct osoe_wait_word counter_wake;
+};
+
+enum { OSOE_CONTEXT_FREE = 0, OSOE_CONTEXT_LIVE = 1 };
+
+/*
  * A PE's landing zone (§3.12, §4.6): this slot, for its blocking gets and
  * fetching AMOs, then - since layout 16 - the records and the arena of its
  * nonblocking gets in flight (struct osoe_landing_request).
@@ -678,29 +726,16 @@ struct osoe_node_header {
  *
  * One slot is enough for the blocking operations: under SERIALIZED a PE has at
  * most one outstanding (§4.6), so it is sized by L alone and not by node count.
- * Its nonblocking gets complete by the counters below, §4.6's shape for them:
- * the PE adds each one's bytes to `bytes_issued` as it asks, the lead adds
- * them to `bytes_landed` as the whole reply lands, and a quiet waits for the
- * two to be equal and then copies every reply out.
+ * Its nonblocking gets complete by the counters of their context's block
+ * (struct osoe_context_block, layout 21; the slot held one pair per PE from
+ * layout 16 to 20), §4.6's shape for them: the PE adds each one's bytes to
+ * `bytes_issued` as it asks, the lead adds them to `bytes_landed` as the
+ * whole reply lands, and a wait on the context waits for the two to be equal
+ * and then copies its replies out.
  */
 struct osoe_landing_slot {
     /*
-     * §4.6's get completion: two cumulative counters, never reset, with the
-     * companion 32-bit wake word they need because a 64-bit counter cannot be
-     * futexed (§4.9). The progress thread adds landed bytes, bumps the wake
-     * word, then wakes; the waiter loads the wake word, then compares the
-     * counters, then waits on the wake word.
-     */
-    _Alignas(OSOE_CACHELINE)
-    _Atomic uint64_t bytes_issued;      /* this PE adds expected bytes on issue */
-    _Atomic uint64_t bytes_landed;      /* the progress thread adds as replies land */
-    /* Bumped after `bytes_landed` moves, and a wake only while this PE waits
-     * on it (base/wait-word.h): a burst of small replies costs the lead no
-     * syscall unless a quiet is waiting for them. */
-    struct osoe_wait_word counter_wake;
-
-    /*
-     * Per-operation completion, which the counters cannot serve: a blocking
+     * Per-operation completion, which counters cannot serve: a blocking
      * caller waits for *its* reply, not for a byte count (§4.6).
      */
     _Alignas(OSOE_CACHELINE)
@@ -733,11 +768,19 @@ struct osoe_landing_slot {
 
 /*
  * The top bit of a token names a nonblocking get's reply; its low 16 bits are
- * the index of its record among the PE's landing requests. A blocking
- * operation's token never has the bit (transport-am.c counts them from 1).
+ * the index of its record among the PE's landing requests, and since layout
+ * 21 bits 48 to 59 are the index of the context's block, which the lead
+ * credits as the reply lands (progress-host.c): OSOE_MAX_CONTEXTS' ceiling is
+ * what twelve bits hold. That leaves bits 16 to 47 for the sequence, 32 bits
+ * where there were 47: a stale reply could match a record reused with the
+ * same index only after 2^32 nonblocking gets. A blocking operation's token never has the top bit
+ * (transport-am.c counts them from 1). The token is echoed by the target and
+ * read by the origin alone, so the wire format is unchanged.
  */
 #define OSOE_LANDING_NONBLOCKING (UINT64_C(1) << 63)
 #define OSOE_LANDING_REQUEST_MASK UINT64_C(0xffff)
+#define OSOE_LANDING_CONTEXT_SHIFT 48
+#define OSOE_LANDING_CONTEXT_MASK UINT64_C(0xfff)
 
 /*
  * A nonblocking get in flight (§4.6, as built): where in its PE's landing arena
@@ -825,7 +868,18 @@ struct osoe_node {
     uint32_t team_count;
     _Atomic uint32_t *epochs;
     uint32_t epoch_row_words;
+    /* Each local PE's pool of context blocks, `contexts_per_pe` each
+     * (OSOE_MAX_CONTEXTS), indexed by osoe_node_context. */
+    struct osoe_context_block *contexts;
+    uint32_t contexts_per_pe;
 };
+
+/* Local PE `local_id`'s context block `index` (§4.11; layout 21). */
+static inline struct osoe_context_block *osoe_node_context(const struct osoe_node *n,
+                                                           uint32_t local_id, uint32_t index)
+{
+    return &n->contexts[(size_t)local_id * n->contexts_per_pe + index];
+}
 
 /* The node's block for team number `team`, or NULL past the last (§5.7). */
 static inline struct osoe_team_block *osoe_node_team(const struct osoe_node *n, uint32_t team)

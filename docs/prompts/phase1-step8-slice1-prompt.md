@@ -1,6 +1,6 @@
 # Phase 1, step 8: contexts and SHMEM_THREAD_MULTIPLE - a proposal, three slices
 
-**Status: proposed on 2026-09-26; approved by the author the same day as proposed, all eleven decisions and the three slices (`docs/decisions/2026-09-26-day.md`).** Slice 1's build brief below is the brief to build from. Design §4.11 is designed and
+**Status: proposed on 2026-09-26; approved by the author the same day as proposed, all eleven decisions and the three slices (`docs/decisions/2026-09-26-day.md`). Slice 1 built the same evening (`docs/decisions/2026-09-26-evening.md` §2).** Slice 1's build brief below is the brief to build from. Design §4.11 is designed and
 model-checked; §10's open points were decided on 2026-09-25
 (`docs/decisions/2026-09-25.md`, item 3), and the last, `pe_quiet`'s piggyback,
 was modeled on 2026-09-26 (`tools/modelcheck/pe_quiet_model.py`). What is left

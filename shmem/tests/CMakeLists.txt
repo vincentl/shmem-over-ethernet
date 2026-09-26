@@ -1618,6 +1618,58 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(get-nbi 0,1,2,0,1,0 ${osoe_get_nbi_small})
 endif()
 
+# Contexts (spec §9.5; design §4.6, §4.11; phase 1 step 8 slice 1;
+# test-context.c): on one node, across nodes on a block and an interleaved
+# map, and under force-remote; the multi-node maps with the landing records
+# small, so that a second context's get finds them taken by the first's.
+# Then each misuse ending the job by name, and OSOE_MAX_CONTEXTS disagreeing
+# between a node's PEs, or outside its range, refused.
+osoe_tier2_test(context)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(context 0,0,1,1 ${osoe_get_nbi_small})
+  osoe_tier2_map_test(context 0,1,2,0,1,0 ${osoe_get_nbi_small})
+  add_test(NAME shmem.context.force-remote.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 ${osoe_get_nbi_small}
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_context>)
+  set_tests_properties(shmem.context.force-remote.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
+endif()
+foreach(pair
+    "destroyed:shmem_ctx_long_put: context 0x[0-9a-f]+ has been destroyed"
+    "foreign:shmem_ctx_long_put: 0x[0-9a-f]+ is not a context this library issued"
+    "invalid:shmem_ctx_long_put: SHMEM_CTX_INVALID is not a context this operation may use"
+    "outside:shmem_ctx_long_put: PE 2 is not in 0..1 of team 3, the team of the context"
+    "default:shmem_ctx_destroy: SHMEM_CTX_DEFAULT was not created by shmem_ctx_create"
+    "private-team:shmem_team_destroy: context 0x[0-9a-f]+, created from team 3 with SHMEM_CTX_PRIVATE, is still live"
+    "after-team:shmem_ctx_long_put: context 0x[0-9a-f]+ has been destroyed")
+  string(REPLACE ":" ";" parts "${pair}")
+  list(GET parts 0 which)
+  list(GET parts 1 expression)
+  add_test(NAME shmem.context.misuse.${which}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_CONTEXT=${which}
+            $<TARGET_FILE:osoe-launch> -n 4 -t 30 -- $<TARGET_FILE:shmem_test_context>)
+  set_tests_properties(shmem.context.misuse.${which} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "${expression}")
+endforeach()
+add_test(NAME shmem.max-contexts.local-disagree
+  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_MAX_CONTEXTS=128 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.max-contexts.local-disagree PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_MAX_CONTEXTS differs between PEs: the local lead has 64, this PE has 128")
+foreach(value 0 4097 x)
+  add_test(NAME shmem.max-contexts.invalid.${value}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_CONTEXTS=${value}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.max-contexts.invalid.${value} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "OSOE_MAX_CONTEXTS='${value}' is not between 1 and 4096")
+endforeach()
+# And small pools: the exhaustion check scales to them, and a pool of one -
+# the default context alone - refuses every creation.
+foreach(pool 1 3)
+  add_test(NAME shmem.context.pool-${pool}.L2
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_CONTEXTS=${pool}
+            $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_context>)
+  set_tests_properties(shmem.context.pool-${pool}.L2 PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
 # §4.9 watch word to check the unmasked-span refinement, which is the one place
 # a test needs the encoding itself rather than a name in the metric table.
@@ -1977,6 +2029,11 @@ if(OSOE_TIER3)
     osoe_tier3_test(barrier-am.0-1-2 ${shape} 0,1,2 shmem_test_barrier_am
                     ENV ${osoe_tier3_wire})
     osoe_tier3_test(get-nbi.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_get-nbi
+                    ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
+                        OSOE_AM_CREDITS=2)
+    # Contexts' gets sharing the landing zone, and a team context's traffic,
+    # over the shaped link (phase 1 step 8 slice 1).
+    osoe_tier3_test(context.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_context
                     ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
                         OSOE_AM_CREDITS=2)
     # The leads' tree of the reductions and broadcast, over the shaped link.

@@ -144,9 +144,12 @@ static void check_team(shmem_team_t team, const struct expected *expected, shmem
     config.num_contexts = -5;
     CHECK(shmem_team_get_config(team, 0, &config) == 0);
     CHECK(config.num_contexts == -5);
-    shmem_ctx_t ctx = SHMEM_CTX_DEFAULT;
-    CHECK(shmem_team_create_ctx(team, 0, &ctx) != 0);
-    CHECK(ctx == SHMEM_CTX_INVALID);
+    /* A context from the team (§9.5.2; phase 1 step 8), naming it. */
+    shmem_ctx_t ctx = SHMEM_CTX_INVALID;
+    shmem_team_t of = SHMEM_TEAM_INVALID;
+    CHECK(shmem_team_create_ctx(team, 0, &ctx) == 0 && ctx != SHMEM_CTX_INVALID);
+    CHECK(shmem_ctx_get_team(ctx, &of) == 0 && of == team);
+    shmem_ctx_destroy(ctx);
 }
 
 /*

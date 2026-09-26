@@ -4,9 +4,9 @@ OpenSHMEM Over Ethernet: an implementation of OpenSHMEM 1.6 for commodity Ethern
 designed to build entirely from a Linux distribution's own packages — no fabric
 libraries.
 
-**Status:** phase 1, through step 7 (team creation) and step 9's first slice
-(block-strided RMA); step 8, contexts and `SHMEM_THREAD_MULTIPLE`, is proposed
-(design §7.1). Jobs run on one node or across
+**Status:** phase 1, through step 7 (team creation), step 8's first slice
+(contexts) and step 9's first slice (block-strided RMA); step 8's threads,
+`SHMEM_THREAD_MULTIPLE`, follow (design §7.1, §4.11). Jobs run on one node or across
 nodes over TCP and io_uring, started by `srun` or by `osoe-launch`:
 initialization and thread levels up to `SHMEM_THREAD_SERIALIZED`, the symmetric
 heap allocator in full, RMA - `shmem_putmem` and `shmem_getmem`, and every type
@@ -31,8 +31,13 @@ symmetric statics - a program's global and static variables as symmetric
 objects - in a program built with the `oshcc` wrapper (§4.3). A PE or a node
 that dies ends the whole job (§3.15).
 
-Not yet: the scans (`shmem_sum_inscan`, `shmem_sum_exscan`); contexts
-other than the default; and `SHMEM_THREAD_MULTIPLE` (§7.5, §7.6, §4.11).
+Contexts - `shmem_ctx_create`, `shmem_team_create_ctx` and every RMA, AMO and
+ordering routine on them, with team-relative PE numbering - are there; a
+context is serial, one call at a time, as every thread level up to
+`SHMEM_THREAD_SERIALIZED` requires anyway.
+
+Not yet: the scans (`shmem_sum_inscan`, `shmem_sum_exscan`) and
+`SHMEM_THREAD_MULTIPLE` (§7.5, §7.6, §4.11).
 Nonblocking gets across nodes overlap, many in flight before the quiet that
 completes them; a nonblocking put returns once its source may be reused, as a
 blocking one does.
@@ -160,6 +165,7 @@ There is no single-PE default.
 | `OSOE_HEAP_BASE` | no | Address for each PE's own heap, e.g. `0x100000000000`, if the defaults are taken. A multiple of the page size, which is 16 KiB on a Raspberry Pi 5 |
 | `OSOE_HEAP_SHIFT` | no | A test mode: a size, a whole number of pages, e.g. `2m`. Each PE maps its own heap that far times its rank past the base, so no two PEs share a symmetric address (design §8.2) |
 | `OSOE_MAX_TEAMS` | no | Teams in existence job-wide at once, the three predefined included; `4` to `1024`, default `64`. Must agree across PEs: it sizes every per-team structure, and a `shmem_team_split_2d` claims a number for every row and column at once (design §5.7) |
+| `OSOE_MAX_CONTEXTS` | no | Contexts a PE may have at once, `SHMEM_CTX_DEFAULT` included; `1` to `4096`, default `64`. Past it `shmem_ctx_create` returns nonzero. Must agree among the PEs of a node (design §4.11) |
 | `OSOE_GETS_IN_FLIGHT` | no | Nonblocking gets across nodes each PE may have in flight, one per piece of at most a chunk; default `64`, at most `65536`. Past it a PE completes what is in flight before it asks for more (design §4.6) |
 | `OSOE_GET_LANDING_BYTES` | no | Bytes of each PE's landing zone their replies share, in `/dev/shm`; a decimal byte count from `64` to `1073741824`, default `262144` (256 KiB) (design §4.6) |
 | `OSOE_KEEPALIVE` | no | `IDLE,INTERVAL,COUNT` or `0`: TCP keepalive on the connections between nodes, in seconds, seconds and probes; default `60,10,6` (design §3.15). Jobs of more than one node only |

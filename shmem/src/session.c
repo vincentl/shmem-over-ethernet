@@ -23,8 +23,8 @@
 #include <pshmem.h>
 #include <shmem.h>
 
+#include "context.h"
 #include "export.h"
-#include "team.h"
 
 OSOE_API void pshmem_ctx_session_start(shmem_ctx_t ctx, long options,
                                        const shmem_ctx_session_config_t *config,

@@ -6,6 +6,7 @@
 #include <pshmem.h>
 #include <shmem.h>
 
+#include "context.h"
 #include "export.h"
 #include "fatal.h"
 #include "rma.h"
@@ -35,10 +36,11 @@ void osoe_rma_put(const char *routine, shmem_ctx_t ctx, void *dest, const void *
     if (nelems == 0)
         return;
     size_t len = osoe_rma_bytes(routine, nelems, width);
-    osoe_check_pe(routine, pe);
+    /* The context's team numbers the PE (context.h); the transport takes a
+     * world rank (§4.10). */
+    struct osoe_transport_context *context = osoe_ctx_resolve(routine, ctx, &pe);
     struct osoe_symmetric_location at = osoe_symmetric_locate(routine, dest, len);
-    osoe_transport_put(osoe_ctx_of(routine, ctx), pe, at.region, at.offset, source, len,
-                       flags);
+    osoe_transport_put(context, pe, at.region, at.offset, source, len, flags);
 }
 
 void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
@@ -47,10 +49,9 @@ void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *
     if (nelems == 0)
         return;
     size_t len = osoe_rma_bytes(routine, nelems, width);
-    osoe_check_pe(routine, pe);
+    struct osoe_transport_context *context = osoe_ctx_resolve(routine, ctx, &pe);
     struct osoe_symmetric_location at = osoe_symmetric_locate(routine, source, len);
-    osoe_transport_get(osoe_ctx_of(routine, ctx), pe, at.region, at.offset, dest, len,
-                       flags);
+    osoe_transport_get(context, pe, at.region, at.offset, dest, len, flags);
 }
 
 void osoe_rma_complete_gets(const char *routine, shmem_ctx_t ctx)

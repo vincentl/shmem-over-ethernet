@@ -24,6 +24,7 @@
 #include "base/ring-check.h"
 #include "base/sweep.h"
 #include "barrier.h"
+#include "context.h"
 #include "export.h"
 #include "fatal.h"
 #include "internode.h"
@@ -89,6 +90,9 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "    OSOE_MAX_TEAMS         teams in existence job-wide at once, the three\n"
 "                           predefined included: 4 to 1024, the same on every\n"
 "                           node; default 64 (§5.7)\n"
+"    OSOE_MAX_CONTEXTS      contexts a PE may have at once, the default one\n"
+"                           included: 1 to 4096, the same on every PE of a\n"
+"                           node; default 64 (§4.11)\n"
 "    OSOE_NO_PROGRESS_TIMEOUT\n"
 "                           seconds a wait may see no progress before it ends\n"
 "                           the job; 0, the default, means never (§3.15)\n"
@@ -263,6 +267,7 @@ static void session_start(void)
      * before its agent - their reader - exists.
      */
     osoe_transport_init();
+    osoe_context_start();
     if (osoe_allocator_init(&osoe.allocator, osoe.node.heap_size) != 0)
         osoe_fatal("out of memory");
     osoe_internode_init();
@@ -339,6 +344,7 @@ static void session_end(void)
     osoe_team_stop();
     osoe_allocator_fini(&osoe.allocator);
     osoe_lock_session_end();
+    osoe_context_stop();
     osoe_transport_fini();
     osoe_job_leave(&osoe.job);
     osoe_node_leave(&osoe.node, &osoe.bootstrap);
@@ -384,8 +390,12 @@ OSOE_API void pshmem_finalize(void)
         pthread_mutex_unlock(&lifecycle);
         return;
     }
-    if (refcount == 1)
+    if (refcount == 1) {
         osoe_lock_warn_held();
+        /* Every context the program left goes, with its implicit quiet, while
+         * the transport is up to complete it (context.h). */
+        osoe_context_finalize();
+    }
     /* Every finalize is a barrier (spec §9.1.4, invariant 26): a non-last one
      * only that, the last one before tearing down. On the finalize team's own
      * counters, so it can never be matched by an application's barrier. */
