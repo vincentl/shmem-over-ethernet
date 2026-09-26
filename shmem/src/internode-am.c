@@ -83,8 +83,9 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
      * predefined teams' records before its release store to
      * lead_agent_running, which this PE loaded with acquire before its
      * shmem_init returned (init.c), and the arrival counter's release sequence
-     * carries them too (node.h, the record). Slice 2 argues a split team's
-     * through the parent team's sync. */
+     * carries them too (node.h, the record). A created team's record is
+     * carried by the split's sync over its parent, which this member left
+     * before posting (node.h). */
     struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
     if (!b || !atomic_load_explicit(&b->record.published, memory_order_acquire) ||
         b->record.nodes < 2)
@@ -122,10 +123,10 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
  * A word per team number, each on its own line of the node's own header -
  * never a connection - but only below `team_numbers_published`, one past the
  * highest number whose record on this node is published (node.h): numbers are
- * never reused, so a pass costs O(teams created), three in phase 1 step 7's
- * first slice, and not OSOE_MAX_TEAMS. A team is met here, and learnt from its
- * record, at its first post; a word that has not moved is skipped at once, and
- * a team that has no internode phase never posts.
+ * never reused, so a pass costs the numbers issued so far, up to the highest
+ * published here, and not OSOE_MAX_TEAMS. A team is met here, and learnt from
+ * its record, at its first post; a word that has not moved is skipped at once,
+ * and a team that has no internode phase never posts.
  *
  * The bound is loaded with acquire, once a pass, after the agent's load of its
  * wake word and before the handoff words, and it misses no post: a member posts

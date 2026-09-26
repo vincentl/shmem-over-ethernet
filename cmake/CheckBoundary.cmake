@@ -27,8 +27,9 @@ cmake_minimum_required(VERSION 3.25)
 # nothing kept it so. It is what lets a second API sit beside OpenSHMEM's on
 # the same runtime, one of the stances the successor-API notes weigh
 # (docs/design/successor-api-stage-setting.md §6). It is about includes: the
-# backend still calls the one upcall the API defines, osoe_internode_released,
-# which internode.h declares.
+# backend still calls the upcalls the API defines - osoe_internode_released,
+# and the two a data half asks of a team, osoe_internode_team_lead and
+# osoe_internode_team_local_ranks - which internode.h declares.
 #
 # **An include is judged by the file it resolves to**, quoted or angled, the
 # way the build's include path finds it - shmem/src, the repository root, the

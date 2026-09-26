@@ -13,4 +13,9 @@ void osoe_barrier_finalize(void);
 struct osoe_team;
 void osoe_team_barrier(struct osoe_team *t, const char *routine);
 
+/* A sync over team `t` and no quiet (§5.6), for the library's own use: the
+ * split's sync over its parent and destroy's over the team (team.c). Not
+ * counted as the application's barrier either. */
+void osoe_team_sync(struct osoe_team *t, const char *routine);
+
 #endif /* OSOE_BARRIER_H */

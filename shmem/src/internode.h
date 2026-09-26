@@ -111,7 +111,10 @@
  *   - a team's record: read the first time the team is met, like AM's, with
  *     its tree neighbours' leads the ranks whose per-team slab of counters -
  *     the internal region's block for the team's number, registered with the
- *     heap - its RDMA atomics write.
+ *     heap - its RDMA atomics write; and osoe_internode_team_lead and
+ *     osoe_internode_team_local_ranks, asked as the generic implementation
+ *     asks them, to re-root a tree at any node and to know which of a
+ *     gather's blocks are its node's. Nothing in the three is AM's.
  *   - osoe_internode_arrive: once the node has arrived and its children's
  *     counters show theirs, an RDMA fetch-add on the parent's counter - the
  *     tree built out of put and atomics, with the progress thread (or a NIC
@@ -183,10 +186,33 @@ uint32_t osoe_internode_fanout_default(void);
  *
  * The record keeps O(k) of the team's node set - the logical nodes holding at
  * least one member, sorted - and never the O(N) set itself (§5.3). A broadcast
- * re-rooted at every call needs node positions the set gives: a team spanning
- * every node's are the node numbers, and a split team's will need the set, or
- * a way to search it, kept (§7.3).
+ * re-rooted at every call needs any node's lead by its position in the set,
+ * and a gather needs to know which members' places are its node's; the two
+ * calls below give them, above this header, to the thread the data half runs
+ * on (phase 1 step 7 slice 2).
  */
+
+/*
+ * Up, and implemented above this header like osoe_internode_released: the
+ * world rank of the lead of the node at position `index` of team `team`'s
+ * sorted node set - the rank that node's part of the data half runs on - or
+ * UINT32_MAX if there is none. For the predefined teams, which span every
+ * node, the position is the node's number and the lead the job's table's
+ * (job.h); for a team a split creates, the member with the lowest team rank
+ * there, from the list of every node's lead that each node's local lead of the
+ * team keeps (§5.2). So it may be asked only on the thread that runs the data
+ * half, the team's local lead's: O(1).
+ */
+uint32_t osoe_internode_team_lead(uint32_t team, uint32_t index);
+
+/*
+ * Up, as the call above, and asked where it is: this node's members of team
+ * `team`, as team ranks in ascending order, `*count` of them - the members
+ * whose places in a gather's result are this node's to fill (below) - or NULL
+ * and 0 where this process holds no descriptor for the team, which on the
+ * thread the data half runs on is a bug to name. O(1).
+ */
+const uint32_t *osoe_internode_team_local_ranks(uint32_t team, uint32_t *count);
 
 /* ---- The phase itself ------------------------------------------------- */
 

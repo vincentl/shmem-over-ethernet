@@ -29,6 +29,13 @@
  * scratch that means something only while a collective has it, rather than in
  * a count the next collective would wait on forever.
  *
+ * Last, one more line: **the count of team numbers claimed** (§5.7; phase 1
+ * step 7 slice 2), an eight-byte word at the line's start. Every PE's region
+ * has the line and only world PE 0's is used: a split's parent rank 0 claims
+ * the numbers its call creates by compare-and-swap there (team.c), so numbers
+ * are job-wide and never reused within a session. It is not a team number's
+ * word, and no collective counts on it.
+ *
  * Every PE's heap carries one, and a team touches only its own slots and its
  * words' lines, and only on the leads of its nodes; the pages nobody writes
  * cost address space and the /dev/shm capacity check's share, not memory -
@@ -80,14 +87,23 @@ static inline uint64_t osoe_internal_words_offset(uint32_t fanout, uint32_t pipe
     return (uint64_t)max_teams * osoe_internal_team_slots_bytes(fanout, pipeline);
 }
 
-/* The region's size for `max_teams` team numbers, a tree of fan-out `fanout`
- * and `pipeline` pieces in flight, before page rounding: the slots, then the
- * words. */
-static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipeline,
-                                                  uint32_t max_teams)
+/* Where the count of team numbers claimed is: the line past every team
+ * number's words. */
+static inline uint64_t osoe_internal_team_counter_offset(uint32_t fanout, uint32_t pipeline,
+                                                         uint32_t max_teams)
 {
     return osoe_internal_words_offset(fanout, pipeline, max_teams) +
            (uint64_t)max_teams * osoe_internal_team_words_bytes(fanout);
+}
+
+/* The region's size for `max_teams` team numbers, a tree of fan-out `fanout`
+ * and `pipeline` pieces in flight, before page rounding: the slots, the words,
+ * then the counter's line. */
+static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipeline,
+                                                  uint32_t max_teams)
+{
+    return osoe_internal_team_counter_offset(fanout, pipeline, max_teams) +
+           OSOE_INTERNAL_LINE_BYTES;
 }
 
 #endif /* OSOE_INTERNAL_REGION_H */

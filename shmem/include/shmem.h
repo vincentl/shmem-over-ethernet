@@ -95,11 +95,13 @@ void shmem_query_thread(int *provided);
  * be exporting a symbol outside the `shmem_` namespace the export test
  * enforces, for no gain.
  *
- * osoe implements SHMEM_TEAM_WORLD, SHMEM_TEAM_SHARED and SHMEM_CTX_DEFAULT
- * (§7.3). `shmem_ctx_create`, `shmem_team_create_ctx` and the team splits
- * exist and return nonzero, which the spec permits: an unsuccessful context
- * creation "is not treated as an error". The parameter is on every entry point
- * from the start because retrofitting it later touches every function written.
+ * osoe implements SHMEM_TEAM_WORLD, SHMEM_TEAM_SHARED, the teams the splits
+ * create - whose handles are the addresses of the library's descriptors for
+ * them - and SHMEM_CTX_DEFAULT (§7.3). `shmem_ctx_create` and
+ * `shmem_team_create_ctx` exist and return nonzero, which the spec permits: an
+ * unsuccessful context creation "is not treated as an error". The parameter
+ * is on every entry point from the start because retrofitting it later touches
+ * every function written.
  */
 typedef struct shmem_team_opaque *shmem_team_t;
 typedef struct shmem_ctx_opaque *shmem_ctx_t;

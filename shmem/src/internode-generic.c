@@ -87,15 +87,19 @@
  * collective's last release exists. The model checks the rotated trees, one
  * collective after another (its cases with several roots).
  *
- * **The tree is over every node** (§7.3): the world team's node set is the
- * job's, so a node's index is its number and a broadcast's tree is the
- * reduction's rotated to its root with arithmetic alone. The reduction's tree
- * is the team's record's (node.h), read the first time a call names the team;
- * a broadcast's rotated one names each node's lead by the job's table of them
- * (job.h), its local id 0, which is the world team's lead there (team.c). A
- * split team spanning some of the nodes will need its node set's positions,
- * which are O(N) and not kept (internode.h), and its leads, which its records
- * name; until split teams exist that is refused by name.
+ * **The tree is over the team's nodes**, its sorted node set (§5.2), by their
+ * positions in it: the reduction's tree is the team's record's (node.h), read
+ * the first time a call names the team, rooted at position 0 and naming each
+ * neighbour by its lead's rank; a broadcast's is the same tree rotated to its
+ * root's position, from this node's position in the record, with arithmetic
+ * alone, and names each node's lead by position through the SHMEM layer
+ * (internode.h, osoe_internode_team_lead): for the predefined teams, which
+ * span every node, the job's table of each node's local id 0 (job.h); for a
+ * team a split creates, the list of every node's lead - its member with the
+ * lowest team rank - that each node's local lead of the team keeps (team.c;
+ * phase 1 step 7 slice 2). Each team number has its own slots and words in
+ * the internal region, so two teams whose leads coincide on a node never meet
+ * there, whatever their trees share.
  *
  * Costs, with N nodes, k the fan-out, n bytes and p = ceil(n / slot) pieces:
  * O(k n) combining and k puts per node per piece; and since each lead keeps D
@@ -103,10 +107,9 @@
  * input as it comes, the p pieces take about p / D round trips of the tree's
  * depth ceil(log_k N) where one at a time took p, for as long as the round trip
  * rather than the links is the limit (a timing simulation of the loop gives D
- * times at depths 1 to 4, for D of 2, 4 and 8). A
- * broadcast finds its rotated tree's k + 1 neighbouring leads in the job's
- * table of leads, O(k) (job.h), and a reduction's tree is found once per team.
- * State: O(k) per team.
+ * times at depths 1 to 4, for D of 2, 4 and 8). A broadcast finds its rotated
+ * tree's k + 1 neighbouring leads in O(k), and a reduction's tree is found once
+ * per team. State: O(k) per team.
  */
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -190,8 +193,8 @@ struct lead_tree {
  */
 struct generic_team {
     bool registered;
-    bool every_node;                    /* the node set is 0 ... N - 1 */
     uint32_t count;                     /* how many nodes it spans */
+    uint32_t index;                     /* this node's position among them */
     struct lead_tree reduction_tree;
     uint64_t arrival_base[OSOE_COLLECTIVE_FANOUT_MAX];
     uint64_t release_base;
@@ -219,13 +222,12 @@ void osoe_internode_generic_fini(void)
 /*
  * The team's state. The first call that names a team learns it from its
  * record in this node's block (node.h): `published` loaded with acquire, then
- * the rest (§3.16) - the node count, and this node's place in the reduction's
- * tree, rooted at the first node, whose leads the record names by rank.
- *
- * For the world team only: its lead on every node is the node's local id 0,
- * which the other nodes put to (job.h) - a split team (§7.3) spanning every
- * node would pass a check on its node set and still have its lead elsewhere,
- * so the refusal is by team.
+ * the rest (§3.16) - the node count, this node's position in the team's node
+ * set, and its place in the reduction's tree, rooted at position 0, whose
+ * leads the record names by rank. Any team whose record says it spans nodes:
+ * the predefined ones, and since phase 1 step 7's second slice those a split
+ * creates, whose leads are wherever their lowest team ranks are - which the
+ * record names, and osoe_internode_team_lead gives by position.
  */
 static struct generic_team *registered_team(uint32_t team, const char *routine)
 {
@@ -238,13 +240,12 @@ static struct generic_team *registered_team(uint32_t team, const char *routine)
             b->record.nodes < 2)
             osoe_fatal("%s: team %u has no internode phase on this node", routine, team);
         const struct osoe_team_record *r = &b->record;
-        if (r->children > osoe.bootstrap.collective_fanout)
-            osoe_fatal("%s: team %u's record on this node says %u children, at a fan-out of "
-                       "%u", routine, team, r->children, osoe.bootstrap.collective_fanout);
+        if (r->children > osoe.bootstrap.collective_fanout || r->index >= r->nodes)
+            osoe_fatal("%s: team %u's record on this node says %u children at position %u of "
+                       "%u nodes, at a fan-out of %u", routine, team, r->children, r->index,
+                       r->nodes, osoe.bootstrap.collective_fanout);
         g->count = r->nodes;
-        /* The set is sorted and free of repeats (team.c checks it as it builds
-         * the record), so one as large as the job's is every node. */
-        g->every_node = r->nodes == osoe.job.node_count;
+        g->index = r->index;
         g->reduction_tree.parent = r->parent;
         g->reduction_tree.position = r->position;
         g->reduction_tree.children = r->children;
@@ -253,37 +254,36 @@ static struct generic_team *registered_team(uint32_t team, const char *routine)
         g->published = &osoe_node_team(&osoe.node, team)->tree;
         g->registered = true;
     }
-    if (team != OSOE_TEAM_WORLD || !g->every_node)
-        osoe_fatal("%s: team %u spans %u of the job's %u nodes, and the generic internode "
-                   "phase runs the world team's only (§7.3)", routine, team, g->count,
-                   osoe.job.node_count);
     return g;
 }
 
-static uint32_t lead_of(uint32_t node, const char *routine)
+/* The lead of the node at position `index` of the team's node set (the file's
+ * comment). */
+static uint32_t lead_of(uint32_t team, uint32_t index, const char *routine)
 {
-    uint32_t rank = osoe_job_node_lead(&osoe.job, node);
+    uint32_t rank = osoe_internode_team_lead(team, index);
     if (rank == UINT32_MAX)
-        osoe_fatal("%s: the rank map has no lead for node %u", routine, node);
+        osoe_fatal("%s: team %u has no lead for the node at position %u of its node set",
+                   routine, team, index);
     return rank;
 }
 
 /*
- * §5.3's k-ary tree over the team's nodes, 0 ... N - 1, with the indices
- * rotated so that `root` is index 0: node index i's parent is (i - 1) / k and
- * its children k i + 1 ... k i + k. The same shape as the barrier's tree when
- * the root is node 0; a broadcast roots it at its root's node, so the data
- * travels depth levels and not up to node 0 first.
+ * §5.3's k-ary tree over the team's node set, positions 0 ... N - 1, rotated
+ * so that `root` is position 0: position i's parent is (i - 1) / k and its
+ * children k i + 1 ... k i + k. The reduction's tree when the root is position
+ * 0; a broadcast roots it at its root's node, so the data travels depth levels
+ * and not up to position 0 first.
  */
-static void find_lead_tree(const struct generic_team *g, uint32_t root, struct lead_tree *out,
-                           const char *routine)
+static void find_lead_tree(const struct generic_team *g, uint32_t team, uint32_t root,
+                           struct lead_tree *out, const char *routine)
 {
     uint32_t n = g->count, k = osoe.bootstrap.collective_fanout;
-    uint32_t index = (osoe.job.node + n - root) % n;
+    uint32_t index = (g->index + n - root) % n;
     out->parent = UINT32_MAX;
     out->position = 0;
     if (index > 0) {
-        out->parent = lead_of(((index - 1) / k + root) % n, routine);
+        out->parent = lead_of(team, ((index - 1) / k + root) % n, routine);
         out->position = (index - 1) % k;
     }
     out->children = 0;
@@ -291,7 +291,7 @@ static void find_lead_tree(const struct generic_team *g, uint32_t root, struct l
         uint64_t child = (uint64_t)k * index + 1 + c;
         if (child >= n)
             break;
-        out->child[out->children++] = lead_of((uint32_t)((child + root) % n), routine);
+        out->child[out->children++] = lead_of(team, (uint32_t)((child + root) % n), routine);
     }
 }
 
@@ -655,25 +655,30 @@ static uint64_t place_of(const uint64_t *places, size_t block, uint64_t r)
 
 /*
  * Zero every place but this node's members': the or needs each byte to be one
- * node's. Only the world team spans nodes (the file's comment), so a member's
- * number is its rank. The node's ranks one block, as Slurm's block
- * distribution makes them, are two runs of zeros; otherwise each rank is asked.
+ * node's. The members are the team's, by team rank (internode.h), which the
+ * SHMEM layer lists in ascending order, so the places to zero are the gaps
+ * between theirs: O(L) calls whatever the team's size, with the bytes zeroed
+ * the result's less this node's own. A node whose members are one run of
+ * ranks, as Slurm's block distribution makes the world's, zeroes two runs.
  */
-static void zero_others(unsigned char *buffer, size_t bytes, size_t block,
-                        const uint64_t *places)
+static void zero_others(uint32_t team, unsigned char *buffer, size_t bytes, size_t block,
+                        const uint64_t *places, const char *routine)
 {
-    const struct osoe_node *n = &osoe.node;
-    if (n->local_block) {
-        uint64_t from = place_of(places, block, n->first_rank);
-        uint64_t to = place_of(places, block, (uint64_t)n->first_rank + n->local_count);
-        memset(buffer, 0, from);
-        memset(buffer + to, 0, bytes - to);
-        return;
+    uint32_t count = 0;
+    const uint32_t *ranks = osoe_internode_team_local_ranks(team, &count);
+    /* No list is no member here that this process knows of, and zeroing every
+     * place would pass on nothing of this node's: named, as lead_of names a
+     * position with no lead. */
+    if (!ranks)
+        osoe_fatal("%s: team %u has no members on this node that this process knows of",
+                   routine, team);
+    uint64_t from = 0;
+    for (uint32_t m = 0; m < count; m++) {
+        uint64_t at = place_of(places, block, ranks[m]);
+        memset(buffer + from, 0, at - from);
+        from = place_of(places, block, (uint64_t)ranks[m] + 1);
     }
-    for (uint64_t r = 0; r < osoe.bootstrap.world_size; r++)
-        if (osoe_node_local_id(n, (uint32_t)r) < 0)
-            memset(buffer + place_of(places, block, r), 0,
-                   place_of(places, block, r + 1) - place_of(places, block, r));
+    memset(buffer + from, 0, bytes - from);
 }
 
 /*
@@ -688,7 +693,7 @@ void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer,
                                     size_t block, const uint64_t *places, const char *routine)
 {
     struct generic_team *team_phase = registered_team(team, routine);
-    zero_others(buffer, bytes, block, places);
+    zero_others(team, buffer, bytes, block, places, routine);
     uint32_t width = bytes % 8 == 0 && (uintptr_t)buffer % 8 == 0 ? 8 : 1;
     struct osoe_element element = { OSOE_ELEMENT_UNSIGNED_INTEGER, width };
     osoe_combine_function combine = osoe_combine_lookup(OSOE_REDUCTION_OR, element);
@@ -705,7 +710,7 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
         osoe_fatal("%s: the root's node is index %u of a team spanning %u nodes", routine,
                    root_index, team_phase->count);
     struct lead_tree tree;
-    find_lead_tree(team_phase, root_index, &tree, routine);
+    find_lead_tree(team_phase, team, root_index, &tree, routine);
     struct pieces pieces = { team, epoch, root_index, buffer, bytes, piece_bytes(1), 1, NULL,
                              routine };
     in_pieces(team_phase, &pieces, &tree);

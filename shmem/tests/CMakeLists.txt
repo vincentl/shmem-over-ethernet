@@ -911,16 +911,19 @@ else()
   target_link_libraries(shmem_test_reply-pool PRIVATE osoe rt)
   osoe_warnings(shmem_test_reply-pool)
 endif()
-# The target's pool is C per connection plus (k + 1) x teams for the tree's
-# forwards, node-wide (§3.8): with C = 1 and k = 2 that is 1 + 3 x 3 = 10, so
-# eleven origin PEs each with a blocking get outstanding overflow it. Slice 3
-# made the forward term node-wide; at the default k = 4 it is 16, and the
-# seven origin PEs this test had until then stopped reaching it.
+# The target's pool is C per connection plus (k + 1) x OSOE_MAX_TEAMS for the
+# tree's forwards, node-wide (§3.8): with C = 1, k = 2 and the fewest teams the
+# variable allows, 4, that is 1 + 3 x 4 = 13, so fourteen origin PEs each with
+# a blocking get outstanding overflow it, and fifteen leave a margin. Slice 3
+# made the forward term node-wide - at the default k = 4 it was 16, and the
+# seven origin PEs this test had until then stopped reaching it - and phase 1
+# step 7's second slice made it count every team number, where it had counted
+# the three predefined teams and eleven origins overflowed it.
 add_test(NAME shmem.reply-pool.overflow
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow SHMEM_SYMMETRIC_SIZE=16m
-          OSOE_COLLECTIVE_FANOUT=2
-          $<TARGET_FILE:osoe-launch> -n 12 -m 0,0,0,0,0,0,0,0,0,0,0,1 -t 30
-          -e 11:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
+          OSOE_COLLECTIVE_FANOUT=2 OSOE_MAX_TEAMS=4
+          $<TARGET_FILE:osoe-launch> -n 16 -m 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 -t 30
+          -e 15:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
 set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
 
@@ -1436,6 +1439,9 @@ endif()
 # internode phase meets the node at its local id 0, rank 1 (OSOE_TEST_LEADS).
 add_executable(shmem_test_team-storage test-team-storage.c ${osoe_library_sources})
 target_include_directories(shmem_test_team-storage PRIVATE ../src ../include)
+# The split's parent sync, tested by delaying one node's record: team.c's call
+# to the tree function goes through the test's wrapper (check_parent_sync).
+target_link_options(shmem_test_team-storage PRIVATE "LINKER:--wrap=osoe_collective_tree")
 target_link_libraries(shmem_test_team-storage PRIVATE osoe_base rt Threads::Threads
   PkgConfig::LIBURING)
 osoe_warnings(shmem_test_team-storage)
@@ -1466,6 +1472,70 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(shmem.team-storage.local-order.internode PROPERTIES LABELS "tier2"
     TIMEOUT 90)
 endif()
+# Team creation (phase 1 step 7 slice 2; test-team-split.c): halves, evens and
+# odds, one PE, the world reversed, grids of the world and of a split, SHARED
+# split, splits of splits, and two teams whose local leads coincide running
+# collectives back to back - each team's shape and every collective on it
+# checked, with the arrival table showing no team counting another's arrivals.
+# On one node at 1, 2 and 4 PEs; on a block map, an interleaved one and four
+# nodes of one PE, where {0, 1} and {0, 2} meet at PE 0 from two other nodes;
+# and under force-remote, where each PE's SHARED is itself. The program makes
+# about forty teams, whose numbers are never reused, so it runs with 64.
+add_executable(shmem_test_team-split test-team-split.c
+  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_team-split PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_team-split PRIVATE osoe rt)
+osoe_warnings(shmem_test_team-split)
+set(osoe_team_split_environment OSOE_MAX_TEAMS=64 SHMEM_SYMMETRIC_SIZE=16m)
+foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
+  add_test(NAME shmem.team-split.L${count}
+    COMMAND ${CMAKE_COMMAND} -E env ${osoe_team_split_environment}
+            $<TARGET_FILE:osoe-launch> -n ${count} -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
+  set_tests_properties(shmem.team-split.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
+
+# The split's three ways to fail for want of what it needs, each a mode of the
+# program on four PEs (the program's comment), judged by what PE 0 says rather
+# than by the exit status - so every failure a run can show fails it by its
+# words: exhaust, under OSOE_MAX_TEAMS=8, where two split_2d calls fail at the
+# claim and take nothing - PE 0 saying 2 numbers had been claimed before each -
+# so that three splits after them still fit, and then the numbers run out, 5
+# claimed; too-many, under OSOE_MAX_TEAMS=4, a split_2d of five teams refused
+# before any claim and the one number then still there; and full, the heap
+# filled to its last block under SHMEM_SYMMETRIC_SIZE=1m.
+function(osoe_team_split_mode mode label launch environment pass)
+  add_test(NAME shmem.team-split.${mode}.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SPLIT=${mode} ${environment}
+            $<TARGET_FILE:osoe-launch> ${launch} -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
+  set_tests_properties(shmem.team-split.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "${pass}"
+    FAIL_REGULAR_EXPRESSION "CHECK[(]|exited with status|killed by signal|timeout after")
+endfunction()
+set(osoe_team_split_exhaust_environment OSOE_MAX_TEAMS=8 SHMEM_SYMMETRIC_SIZE=16m)
+set(osoe_team_split_exhausted
+  "the 4 teams this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 2 have been claimed.*the 5 teams this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 2 have been claimed.*the 1 team this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 5 have been claimed.*every check of this mode passed")
+set(osoe_team_split_full "the symmetric heap has no 16 bytes free.*every check of this mode passed")
+osoe_team_split_mode(exhaust L4 "-n;4" "${osoe_team_split_exhaust_environment}"
+  "${osoe_team_split_exhausted}")
+osoe_team_split_mode(too-many L4 "-n;4" "OSOE_MAX_TEAMS=4;SHMEM_SYMMETRIC_SIZE=16m"
+  "this call creates 5 teams, more than a session can ever have: OSOE_MAX_TEAMS is 4.*the 1 team this call creates: OSOE_MAX_TEAMS is 4, 3 of them predefined, and 1 has been claimed.*every check of this mode passed")
+osoe_team_split_mode(full L4 "-n;4" "SHMEM_SYMMETRIC_SIZE=1m" "${osoe_team_split_full}")
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(team-split 0,0,1,1 ${osoe_team_split_environment})
+  osoe_tier2_map_test(team-split 0,1,2,0,1,0 ${osoe_team_split_environment})
+  osoe_tier2_map_test(team-split 0,1,2,3 ${osoe_team_split_environment})
+  add_test(NAME shmem.team-split.force-remote.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 ${osoe_team_split_environment}
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+            $<TARGET_FILE:shmem_test_team-split>)
+  set_tests_properties(shmem.team-split.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
+    TIMEOUT 90)
+  osoe_team_split_mode(exhaust 0-0-1-1 "-n;4;-m;0,0,1,1" "${osoe_team_split_exhaust_environment}"
+    "${osoe_team_split_exhausted}")
+  osoe_team_split_mode(full 0-0-1-1 "-n;4;-m;0,0,1,1" "SHMEM_SYMMETRIC_SIZE=1m"
+    "${osoe_team_split_full}")
+endif()
+
 set(osoe_get_nbi_small OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
@@ -1680,8 +1750,11 @@ add_test(NAME shmem.refuse.zero_size
           -- $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.refuse.zero_size PROPERTIES
   PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE='0' is 0")
-# Destroying a predefined team is undefined by spec §9.4.8, and undefined is
-# loud here: no other team can exist, so every call naming one is a program bug.
+# Team handles a program must not use (test-bad-team.c), each undefined by the
+# spec and loud here: destroying a predefined team (§9.4.8), and a handle the
+# library never issued or this PE has destroyed (phase 1 step 7 slice 2) - the
+# destroyed one on two logical nodes, since the destroy before it is a sync
+# over a team whose records are on both.
 add_executable(shmem_test_bad_team test-bad-team.c)
 target_link_libraries(shmem_test_bad_team PRIVATE osoe)
 osoe_warnings(shmem_test_bad_team)
@@ -1690,6 +1763,23 @@ add_test(NAME shmem.refuse.destroy_predefined_team
 set_tests_properties(shmem.refuse.destroy_predefined_team PROPERTIES
   LABELS "tier2" TIMEOUT 90
   PASS_REGULAR_EXPRESSION "SHMEM_TEAM_WORLD is a predefined team and cannot be destroyed")
+foreach(case_expect
+    "shared|1|0|SHMEM_TEAM_SHARED is a predefined team and cannot be destroyed"
+    "destroyed|2|0,1|shmem_team_n_pes: 0x[0-9a-f]+ is team 3, which this PE has destroyed"
+    "destroyed-twice|2|0,0|shmem_team_destroy: 0x[0-9a-f]+ is team 3, which this PE has destroyed"
+    "never|1|0|shmem_team_sync: 0x[0-9a-f]+ is not a team this library issued")
+  string(REPLACE "|" ";" parts "${case_expect}")
+  list(GET parts 0 case)
+  list(GET parts 1 count)
+  list(GET parts 2 map)
+  list(GET parts 3 expect)
+  add_test(NAME shmem.refuse.team.${case}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_BAD_TEAM=${case}
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_bad_team>)
+  set_tests_properties(shmem.refuse.team.${case} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "${expect}")
+endforeach()
 
 add_executable(shmem_test_bad_put test-bad-put.c)
 target_link_libraries(shmem_test_bad_put PRIVATE osoe)

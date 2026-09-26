@@ -159,6 +159,13 @@ void osoe_team_barrier(struct osoe_team *t, const char *routine)
     osoe_blocked_leave();
 }
 
+void osoe_team_sync(struct osoe_team *t, const char *routine)
+{
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, t->epoch + 1);
+    sync_team(t, routine);
+    osoe_blocked_leave();
+}
+
 /*
  * The barrier inside shmem_finalize (spec §9.1.4): a quiet, then the finalize
  * team's own synchronization - the world's members on counters no application
