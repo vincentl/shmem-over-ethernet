@@ -249,7 +249,7 @@ void osoe_segment_close(struct osoe_segment *s);
  *       in flight in its last one (§5.8's pipelined pieces)
  *   20  team.tree.gather_steps and team.tree.gather_shares, in the same
  *       padding: the steps the node's lead made in its last gather, and the
- *       shares they moved into its buffer (§5.8's allgather)
+ *       (node, step) pairs it sends them in (§5.8's allgather)
  *
  * None of 5 to 20 changed the watch word's encoding; 17 gave it a region value
  * it could already carry.

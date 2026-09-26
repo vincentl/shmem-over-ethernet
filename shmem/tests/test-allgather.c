@@ -19,8 +19,10 @@
  *     for);
  *   - the counts each lead publishes in the team's tree state
  *     (team.tree.gather_steps and team.tree.gather_shares), read as osoe-stat
- *     reads them: ceil(log2 N) steps and N - 1 shares moved into every lead
- *     for a team over N nodes - the algorithm pinned by counts, not by time.
+ *     reads them: ceil(log2 N) steps, and N - 1 (node, step) pairs in the
+ *     lists of what it sends, for a team over N nodes - the algorithm pinned
+ *     by counts, not by time; a last step sending the full 2^s shares, which
+ *     only rewrites bytes the receiver holds, shows only here.
  *
  * OSOE_TEST_MAP gives the node of every rank, so that the test knows how many
  * nodes each team spans. Numbers are claimed in the order the splits run, one
@@ -212,9 +214,9 @@ static void collect(const struct team_case *t, unsigned char *dest, unsigned cha
 
 /*
  * The counts this node's lead published for its last gather on the team:
- * ceil(log2 N) steps, and N - 1 shares moved into its buffer. Then a sync, so
- * that no lead starts another gather while a PE of its node has still to read
- * this one's.
+ * ceil(log2 N) steps, and N - 1 (node, step) pairs in its lists. Then a sync,
+ * so that no lead starts another gather while a PE of its node has still to
+ * read this one's.
  */
 static void check_counts(const struct team_case *t)
 {
@@ -225,7 +227,7 @@ static void check_counts(const struct team_case *t)
     uint64_t want_steps = (uint64_t)steps_over(t->nodes), want_shares = (uint64_t)t->nodes - 1;
     if (steps != want_steps || shares != want_shares)
         fprintf(stderr, "PE %d: %s spans %d nodes, and this node's lead's last gather made %llu "
-                "steps moving %llu shares in, not %llu and %llu\n", me, t->name, t->nodes,
+                "steps sending %llu shares, not %llu and %llu\n", me, t->name, t->nodes,
                 (unsigned long long)steps, (unsigned long long)shares,
                 (unsigned long long)want_steps, (unsigned long long)want_shares);
     CHECK(steps == want_steps);
