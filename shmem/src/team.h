@@ -80,9 +80,13 @@ struct osoe_team {
     /*
      * Members on more than one logical node, so the team has §5.3's internode
      * phase: the node's arrival goes to the root and the release comes back,
-     * rather than the last local arriver releasing the epoch itself. `nodes` is
-     * how many it spans: the size of its node set, the nodes holding at least
-     * one member, sorted (§5.2).
+     * rather than the last local arriver releasing the epoch itself - for a
+     * created team, exactly when not all its members are on this node. `nodes`
+     * is how many it spans: the size of its node set, the nodes holding at
+     * least one member, sorted (§5.2). A created team's is counted by each
+     * node's local lead of it, which alone builds the set; its other members
+     * have 1 for a team on this node alone and 0, not counted, for one that
+     * spans nodes.
      */
     bool internode;
     uint32_t nodes;

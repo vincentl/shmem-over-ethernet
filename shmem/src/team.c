@@ -32,9 +32,12 @@
  *   3. a broadcast over the parent carries the first number, or 0 for a claim
  *      past OSOE_MAX_TEAMS, in eight bytes every parent PE borrows from the
  *      symmetric heap for the call, as collect borrows its lengths' room;
- *   4. every member builds its descriptor: its node's members in O(L), and the
- *      team's node set in O(team size), the one step that is not logarithmic,
- *      taken at creation only;
+ *   4. every member builds its descriptor: its node's members in O(L), and
+ *      from them whether the team spans nodes, O(1); and each node's local
+ *      lead of the team - the one PE per node that needs it - the team's node
+ *      set, O(S) node lookups for a team of S members whose walk meets the
+ *      nodes in order and O(S log S) otherwise, O(S) memory either way: the
+ *      one step that is not logarithmic, taken at creation only;
  *   5. each node's local lead of the new team writes the team's record into
  *      its node's block for the number and publishes it (node.h, where the
  *      argument that every reader sees it is written);
@@ -248,9 +251,10 @@ static uint32_t lead_of(uint32_t node)
  * The logical nodes holding at least one of a team's members, ascending, and
  * each one's lead: the rank the other nodes' leads put to there, and whose
  * node the progress thread's messages for the team go to (node.h, the
- * record). O(N) for a team of N nodes; built once, when the team is, and
- * dropped once its record is written - but for the leads, which a created
- * team's local lead keeps (team.h, `node_leads`).
+ * record). O(N) for a team of N nodes; built once, when the team is, by each
+ * node's local lead of it alone, and dropped once its record is written - but
+ * for the leads, which a created team's local lead keeps (team.h,
+ * `node_leads`).
  */
 struct node_set {
     uint32_t count;
@@ -295,22 +299,38 @@ static uint32_t node_of_member(const struct osoe_team *t, uint32_t rank, uint32_
     return node;
 }
 
+/* A member's node and team rank, for the walk that meets nodes out of order. */
+struct member_node {
+    uint32_t node;
+    uint32_t rank;
+};
+
+/* By node, and on one node by team rank: each node's run then starts with
+ * its member of lowest team rank, its lead. */
+static int by_node_then_rank(const void *a, const void *b)
+{
+    const struct member_node *x = a, *y = b;
+    if (x->node != y->node)
+        return x->node < y->node ? -1 : 1;
+    return x->rank < y->rank ? -1 : x->rank > y->rank;
+}
+
 /*
- * A created team's node set (decision 4 of the slice's brief): a walk of the
- * team's ranks, mapping each to its node, and per node its member with the
- * lowest team rank for the lead.
+ * A created team's node set (decision 4 of the slice's brief), on each node's
+ * local lead of the team, which alone needs it: a walk of the team's S ranks,
+ * mapping each to its node, and per node its member with the lowest team rank
+ * for the lead. No step of it costs anything in the job's node count.
  *
  * The walk goes in ascending world rank - team-rank order, or its reverse when
  * a negative stride makes the team's world ranks descend - and a block
  * distribution's nodes then come in ascending order too, each a run of
  * members: the set is the runs, and each run's lead its member of lowest team
- * rank, the first met, or the last when the walk goes backwards. O(size) node
- * lookups (each O(log R), job.h) and O(nodes) memory. A team whose ranks visit
- * a node twice or out of order - a cyclic distribution's, an interleaved
- * map's - is walked once more, in team-rank order, into a table of the job's
- * N nodes, where the first member met on each node is its lead: O(size)
- * lookups again, O(N) words for the moment it takes, and O(N) to read the set
- * out of it.
+ * rank, the first met, or the last when the walk goes backwards. O(S) node
+ * lookups (each O(log R), job.h) and O(min(S, N)) memory. A team whose walk
+ * meets a node twice or out of order - a cyclic distribution's, an interleaved
+ * map's - is gathered instead as (node, team rank) pairs, sorted by node and
+ * then rank, and each node's run of pairs gives the node and, first, its lead:
+ * O(S) lookups again, O(S log S) to sort and O(S) memory.
  */
 static void created_node_set(const struct osoe_team *t, struct node_set *set)
 {
@@ -341,26 +361,23 @@ static void created_node_set(const struct osoe_team *t, struct node_set *set)
     }
 
     node_set_free(set);
-    uint32_t *lead_on = malloc(sizeof *lead_on * nodes);
-    if (!lead_on)
-        osoe_fatal("out of memory finding %s's nodes among the job's %u", t->name, nodes);
-    memset(lead_on, 0xff, sizeof *lead_on * nodes);
+    struct member_node *pairs = malloc(sizeof *pairs * members);
+    if (!pairs)
+        osoe_fatal("out of memory finding the nodes of %s's %u members", t->name, members);
+    for (uint32_t rank = 0; rank < members; rank++)
+        pairs[rank] = (struct member_node){ node_of_member(t, rank, &world), rank };
+    qsort(pairs, members, sizeof *pairs, by_node_then_rank);
     count = 0;
-    for (uint32_t rank = 0; rank < members; rank++) {
-        uint32_t node = node_of_member(t, rank, &world);
-        if (lead_on[node] == UINT32_MAX) {
-            lead_on[node] = world;
-            count++;
-        }
-    }
+    for (uint32_t i = 0; i < members; i++)
+        count += i == 0 || pairs[i].node != pairs[i - 1].node;
     node_set_allocate(set, count, t->name);
-    for (uint32_t node = 0, i = 0; node < nodes; node++)
-        if (lead_on[node] != UINT32_MAX) {
-            set->nodes[i] = node;
-            set->leads[i] = lead_on[node];
-            i++;
+    for (uint32_t i = 0, j = 0; i < members; i++)
+        if (i == 0 || pairs[i].node != pairs[i - 1].node) {
+            set->nodes[j] = pairs[i].node;
+            set->leads[j] = (uint32_t)osoe_team_to_world(t, (int)pairs[i].rank);
+            j++;
         }
-    free(lead_on);
+    free(pairs);
 }
 
 /*
@@ -794,9 +811,10 @@ static uint64_t claim(const char *routine, uint32_t count)
  * This PE's descriptor for team `number`, which its call has just claimed and
  * whose members are the parent ranks `p` (steps 4 and 5 of the file's
  * comment): its world mapping, composed from the parent's; its members on this
- * node in team-rank order, by testing each local PE, O(L); its node set, once,
- * O(size); and, on its local lead here, the record, written and published,
- * and the node set's leads kept.
+ * node in team-rank order, by testing each local PE, O(L); from them whether
+ * it spans nodes, O(1); and, on its local lead here, its node set, O(S) or
+ * O(S log S), and the record, written and published, and the set's leads
+ * kept.
  */
 static struct osoe_team *build(const struct osoe_team *parent, uint32_t number,
                                const struct progression *p, int num_contexts)
@@ -875,10 +893,19 @@ static struct osoe_team *build(const struct osoe_team *parent, uint32_t number,
     t->local_ranks = ranks;
     t->lead_local_id = ids[0];
 
-    /* The node set: this node alone for a split of a parent on one node, which
-     * is every split of SHMEM_TEAM_SHARED; otherwise found by walking. */
+    /*
+     * The team spans nodes exactly when some member is not here, which every
+     * member knows from its own node's list; only the local lead here goes on
+     * to the node set (team.h, `nodes`), which is this node alone for a team
+     * whose members are all here - every split of SHMEM_TEAM_SHARED - and
+     * otherwise found by walking the team.
+     */
+    t->internode = t->local_members < t->members;
+    t->nodes = t->internode ? 0 : 1;
+    if (osoe.bootstrap.local_id != t->lead_local_id)
+        return t;
     struct node_set set = { 0 };
-    if (parent->nodes == 1) {
+    if (!t->internode) {
         node_set_allocate(&set, 1, t->name);
         set.nodes[0] = osoe.job.node;
         set.leads[0] = osoe.bootstrap.gtids[t->lead_local_id];
@@ -886,15 +913,12 @@ static struct osoe_team *build(const struct osoe_team *parent, uint32_t number,
         created_node_set(t, &set);
     }
     t->nodes = set.count;
-    t->internode = set.count > 1;
-    if (osoe.bootstrap.local_id == t->lead_local_id) {
-        char name[16];
-        snprintf(name, sizeof name, "%u", number);
-        write_record(t, name, &set);
-        if (t->internode) {
-            t->node_leads = set.leads;
-            set.leads = NULL;
-        }
+    char name[16];
+    snprintf(name, sizeof name, "%u", number);
+    write_record(t, name, &set);
+    if (t->internode) {
+        t->node_leads = set.leads;
+        set.leads = NULL;
     }
     node_set_free(&set);
     return t;

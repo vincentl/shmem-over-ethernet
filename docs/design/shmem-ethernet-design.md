@@ -3882,12 +3882,18 @@ Computed once at team creation, stored in the private team descriptor:
   team's first arrival anywhere; the progress thread and the internode backend
   learn the team from it the first time they meet it, never from a descriptor,
   since the node lead's process need not belong to the team. A team a split
-  creates (phase 1 step 7 slice 2) finds its node set once, at creation: every
-  member walks the team's ranks, mapping each to its node, and takes per node
-  its member of lowest team rank as the lead - O(team size) lookups, and a
-  table of the job's *N* nodes for a walk that meets them out of order, a
-  cyclic distribution's or an interleaved map's. It is the one step of team
-  creation that is not logarithmic. The O(*N*) list of node numbers is dropped
+  creates (phase 1 step 7 slice 2) finds its node set once, at creation, and
+  only on each node's local lead of it, the one PE per node that needs it: it
+  walks the team's *S* ranks, mapping each to its node, and takes per node its
+  member of lowest team rank as the lead - O(*S*) node lookups when the walk
+  meets the nodes in order, as a block distribution's does (backwards for a
+  negative stride), and otherwise, for a cyclic distribution's or an
+  interleaved map's, the members gathered as (node, rank) pairs and sorted,
+  O(*S* log *S*); O(*S*) memory either way, and nothing in the job's node
+  count. It is the one step of team creation that is not logarithmic. Every
+  other member needs only whether the team spans nodes, which its node's
+  members answer in O(1): some member is not here. The O(*N*) list of node
+  numbers is dropped
   once the record is written, and so are its leads - **except by each node's
   local lead of a created team, which keeps every node's lead by its position
   in the set**, O(the team's nodes) on one PE per node: the generic internode
@@ -4540,8 +4546,9 @@ one for `split_strided` and every row and column for `split_2d`, which fails
 the split on every parent PE, with one diagnostic naming `OSOE_MAX_TEAMS`, when
 it would reach the limit; a broadcast over the parent of the first number, in
 eight bytes each parent PE borrows from the heap for the call; each member's
-descriptor - its node's members in team-rank order, O(*L*), and the node set,
-O(team size), §5.2; each member node's record, written by the team's local
+descriptor - its node's members in team-rank order, O(*L*), whether the team
+spans nodes, O(1), and on each node's local lead the node set, O(*S*) or
+O(*S* log *S*), §5.2; each member node's record, written by the team's local
 lead there; and the sync over the parent, which orders every record before any
 collective on the new team (`node.h` argues it, from orders that already
 existed). A created team's handle is its descriptor's address, in a

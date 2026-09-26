@@ -228,9 +228,9 @@ static void check_shared(const uint32_t *gtids, uint32_t local_count)
 /*
  * A created team's descriptor against the map: its members here in team-rank
  * order, each at the local id the launcher's OSOE_GTIDS gives its rank, the
- * lead the first of them, its world mapping, and its node set - every node's
- * lead by position, the member of lowest team rank there, kept on the local
- * lead alone. `world_of` gives the team's ranks as world ranks, and `number`
+ * lead the first of them, its world mapping, and its node set - counted, and
+ * every node's lead by position, the member of lowest team rank there, kept,
+ * on the local lead alone. `world_of` gives the team's ranks as world ranks, and `number`
  * its number, or UINT32_MAX where the test cannot say.
  */
 static void check_created(shmem_team_t team, uint32_t number, const uint32_t *world_of,
@@ -266,8 +266,12 @@ static void check_created(shmem_team_t team, uint32_t number, const uint32_t *wo
             lead_by_node[node_of[world_of[r]]] = world_of[r];
             spanned++;
         }
-    CHECK(t->nodes == spanned && t->internode == (spanned > 1));
-    if (osoe.bootstrap.local_id == t->lead_local_id && t->internode) {
+    /* Only the local lead builds the node set (team.h, `nodes`); every member
+     * knows whether the team spans nodes. */
+    bool lead = osoe.bootstrap.local_id == t->lead_local_id;
+    CHECK(t->internode == (spanned > 1));
+    CHECK(t->nodes == (lead ? spanned : spanned > 1 ? 0 : 1));
+    if (lead && t->internode) {
         CHECK_FATAL(t->node_leads != NULL);
         for (uint32_t n = 0, i = 0; n < nodes; n++)
             if (lead_by_node[n] != UINT32_MAX)
