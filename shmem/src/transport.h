@@ -117,19 +117,21 @@ struct osoe_transport_context *osoe_transport_context_default(void);
 enum {
     OSOE_TRANSPORT_CONTEXT_SERIALIZED = 1u << 0,
     OSOE_TRANSPORT_CONTEXT_PRIVATE    = 1u << 1,
-    /* Quiet and fence on the context need not order the calling thread's
-     * memory stores (spec §9.5, SHMEM_CTX_NOSTORE): the serializing fence they
-     * begin with may be skipped. */
+    /* Quiet and fence on the context need not order the calling thread's own
+     * memory stores (spec §9.5, SHMEM_CTX_NOSTORE). A backend may use it only
+     * where its fences order nothing else: osoe's intranode path applies puts
+     * as the calling thread's stores, which the same fences order, so neither
+     * of its paths skips them (phase 1 step 8's review, B1). */
     OSOE_TRANSPORT_CONTEXT_NOSTORE    = 1u << 2,
 };
 
 /*
  * Create a context (§4.11's modes; phase 1 step 8): the backend's state for
- * an independent ordering and completion environment - its own dirty set,
- * its own get counters - drawn from this PE's pool of OSOE_MAX_CONTEXTS
- * blocks in the node segment (node.h), whose block 0 is the default
- * context's. Returns NULL when the pool is empty or memory is short, which
- * spec §9.5.1 lets shmem_ctx_create report as a failure that is not an error.
+ * an independent ordering and completion environment - on AM its own dirty
+ * set and get counters (transport-am.c). A backend may bound how many a PE
+ * has at once, as OSOE_MAX_CONTEXTS bounds AM's. Returns NULL when it cannot
+ * make one now, which spec §9.5.1 lets shmem_ctx_create report as a failure
+ * that is not an error.
  * Below SHMEM_THREAD_MULTIPLE every context is serial (§4.11, "Context
  * modes"): one call on it at a time, as on the default context.
  *
@@ -294,8 +296,8 @@ enum {
      * once an osoe_transport_wait on this context has returned - any wait on
      * it, whatever PEs it names, since a context's nonblocking gets complete
      * together (§4.6) - and until then dst must stay valid and unread. A wait
-     * on another context does not complete them, though it may, when the
-     * landing zone is full (transport-am.c). No handle: the spec completes
+     * on another context need not complete them, though a backend may
+     * complete them early. No handle: the spec completes
      * _nbi operations only at quiet. A backend that completes the get before
      * it returns is correct, which is how the intranode path, and the AM
      * path's blocking code, would implement it (§4.6, as built).

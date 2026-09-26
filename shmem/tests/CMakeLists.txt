@@ -1661,11 +1661,14 @@ foreach(value 0 4097 x)
   set_tests_properties(shmem.max-contexts.invalid.${value} PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "OSOE_MAX_CONTEXTS='${value}' is not between 1 and 4096")
 endforeach()
-# And a small pool: the exhaustion check scales to it.
-add_test(NAME shmem.context.small-pool.L2
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_CONTEXTS=3
-          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_context>)
-set_tests_properties(shmem.context.small-pool.L2 PROPERTIES LABELS "tier2" TIMEOUT 90)
+# And small pools: the exhaustion check scales to them, and a pool of one -
+# the default context alone - refuses every creation.
+foreach(pool 1 3)
+  add_test(NAME shmem.context.pool-${pool}.L2
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_CONTEXTS=${pool}
+            $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_context>)
+  set_tests_properties(shmem.context.pool-${pool}.L2 PROPERTIES LABELS "tier2" TIMEOUT 90)
+endforeach()
 
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
 # §4.9 watch word to check the unmasked-span refinement, which is the one place

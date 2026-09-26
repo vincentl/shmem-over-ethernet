@@ -84,9 +84,10 @@ enum osoe_counter {
      * was asleep, or skipped because it was awake (lead_wake_model.py). */
     OSOE_C_AM_WAKES_SENT, OSOE_C_AM_WAKES_SKIPPED,
     /* Nonblocking gets (§4.6, as built): the requests issued, one per piece;
-     * the pieces copied out of the landing arena by a wait on their context
-     * (phase 1 step 8: a wait completes its own context's gets, so the two
-     * differ by what other contexts still have in flight); and the times an
+     * the pieces copied out of the landing arena, by a wait on their context
+     * or early, by an issue on any context that found the zone full (phase 1
+     * step 8: a wait completes its own context's gets, so the two differ by
+     * what other contexts still have in flight); and the times an
      * issue found the landing records or arena used up and completed what was
      * in flight first - the zone's bound, working. */
     OSOE_C_AM_GETS_NONBLOCKING, OSOE_C_AM_GETS_COMPLETED, OSOE_C_AM_LANDING_FULL,

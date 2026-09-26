@@ -8,8 +8,9 @@
  * Every routine here is a call to osoe_rma_put or osoe_rma_get (rma.h), the
  * bodies of shmem_putmem and shmem_getmem with the element width and the
  * routine's own name as parameters: a transfer of nelems elements is a byte
- * transfer of nelems * width bytes, and those two already carry the PE check,
- * the SHMEM_CTX_INVALID check (through osoe_ctx_of, §7.3), the symmetric-range
+ * transfer of nelems * width bytes, and those two already carry the context's
+ * resolution - its handle checked, and the PE checked and translated through
+ * the context's team (osoe_ctx_resolve, context.h) - the symmetric-range
  * check and the zero-length no-op. Reusing them, rather than re-deriving that
  * logic once per type, is what keeps several hundred generated functions a
  * mechanical certainty instead of several hundred places the same bug could be

@@ -3488,8 +3488,13 @@ serialize every operation on a `SERIALIZED` context, quiet included. So no issue
 overlaps a quiet on that context and the equality wait cannot starve. The progress
 thread and agent touch only landed counters and acknowledgements, which are atomics
 already. `PRIVATE` adds one thing: the context caches its creating thread's block
-(below), so a blocking operation skips the thread-local lookup. `NOSTORE` skips the
-serializing fence in either mode.
+(below), so a blocking operation skips the thread-local lookup. `NOSTORE` keeps the
+serializing fence in either mode, where an earlier draft skipped it: the fence that orders the calling
+thread's stores is also what orders the context's own puts on the intranode
+path, each a `memcpy` in the calling thread (`base/order.h`), and those spec
+§9.5 does not exempt. A backend whose fences order nothing but the
+application's stores may skip them (`transport.h`). *(Corrected by the review
+of phase 1 step 8 slice 1, B1, which found the skip as first built.)*
 
 Operations branch once on the mode. Programs that never request `MULTIPLE` run only
 serial mode, so phase-1 costs do not move.
@@ -3512,11 +3517,17 @@ that context's gets and no other's - `am.gets_completed` pins it. A handle is
 the address of an element of a process pool of `OSOE_MAX_CONTEXTS`, so a
 destroyed or foreign handle ends the job by name. A team context translates
 each PE through its team, `shmem_ctx_pe_quiet`'s targets too (spec §9.5: every
-point-to-point routine on the context). `NOSTORE` skips the fence that orders
-the calling thread's stores in fence and quiet; `PRIVATE` records its creator,
-which alone may destroy it. A team's destroy destroys the shareable contexts
-made from it before its sync (spec §9.4.8) and ends the job naming a live
-private one; the last finalize destroys every context left.
+point-to-point routine on the context). `NOSTORE` is recorded and changes
+nothing (above); `PRIVATE` records its creator, which alone may destroy it. A
+team's destroy destroys the shareable contexts made from it before its sync
+(spec §9.4.8) and ends the job naming a live private one, which the spec
+leaves undefined; the last finalize destroys every context left, private ones
+too, silently - also undefined for private ones (§9.1.4), and the one moment
+nothing can use them again. **Contexts still share one landing zone**: while
+any context has a get in flight the arena is not rewound, so a loop of gets
+and quiets on one context can fill it and complete another's gets early -
+correct, and a coupling in time between contexts that slice 2's extents,
+reused one by one, removes.
 
 | Per operation | Serial | Shared |
 |---|---|---|

@@ -151,7 +151,9 @@ static void landed(void *context, uint32_t pe, uint64_t token, uint32_t bytes)
         return;                 /* landing_request has already refused it */
     uint32_t block = (uint32_t)((token >> OSOE_LANDING_CONTEXT_SHIFT) & OSOE_LANDING_CONTEXT_MASK);
     if (block >= osoe.node.contexts_per_pe)
-        return;
+        osoe_fatal("a nonblocking get's reply for PE %u names context block %u of %u: its "
+                   "token was accepted, so this PE made it, and it made none past its pool",
+                   pe, block, osoe.node.contexts_per_pe);
     struct osoe_landing_request *r = &osoe_node_landing_requests(
         &osoe.node, (uint32_t)local)[token & OSOE_LANDING_REQUEST_MASK];
     atomic_store_explicit(&r->token, 0, memory_order_release);

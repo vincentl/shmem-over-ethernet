@@ -1095,10 +1095,11 @@ static void flush_dirty(struct osoe_transport_context *c)
 void osoe_transport_fence(struct osoe_transport_context *context)
 {
     osoe_count(OSOE_C_TRANSPORT_FENCE_CALLS, 1);
-    /* A NOSTORE context promises nothing about the thread's own stores (spec
-     * §9.5), so the fence that orders them is the one thing it may skip. */
-    if (!(context->options & OSOE_TRANSPORT_CONTEXT_NOSTORE))
-        osoe_release_fence();
+    /* Also on a NOSTORE context: spec §9.5 lets fence skip ordering the
+     * application's own stores there, but on the intranode path this fence is
+     * also what orders the context's puts, each a memcpy in this thread
+     * (base/order.h), and those it must still order (transport.h). */
+    osoe_release_fence();
     if (osoe_am.internode)
         flush_dirty(context);
 }
@@ -1124,8 +1125,8 @@ void osoe_transport_wait(struct osoe_transport_context *context, const int *pes,
      * (§4.6). First, so that the stores copying them into place come before
      * quiet's fence and are ordered as every other store before it is. */
     complete_gets(context, routine);
-    if (!(context->options & OSOE_TRANSPORT_CONTEXT_NOSTORE))
-        osoe_serializing_fence();
+    /* On a NOSTORE context too, for fence's reason above. */
+    osoe_serializing_fence();
 
     struct osoe_transport_context *c = context;
     if (!osoe_am.internode || c->count == 0) {

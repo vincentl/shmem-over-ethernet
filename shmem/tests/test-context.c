@@ -171,9 +171,11 @@ int main(void)
     CHECK(made == max - 1);
     shmem_ctx_t one = SHMEM_CTX_DEFAULT;
     CHECK(shmem_ctx_create(0, &one) != 0 && one == SHMEM_CTX_INVALID);
-    shmem_ctx_destroy(many[made / 2]);
-    CHECK(shmem_ctx_create(0, &one) == 0 && one != SHMEM_CTX_INVALID);
-    CHECK(shmem_ctx_get_team(one, &of) == 0 && of == SHMEM_TEAM_WORLD);
+    if (made > 0) {
+        shmem_ctx_destroy(many[made / 2]);
+        CHECK(shmem_ctx_create(0, &one) == 0 && one != SHMEM_CTX_INVALID);
+        CHECK(shmem_ctx_get_team(one, &of) == 0 && of == SHMEM_TEAM_WORLD);
+    }
     /* Every created context works: a put on each to the right, quieted. */
     for (int i = 0; i < made; i++) {
         shmem_ctx_t c = i == made / 2 ? one : many[i];
@@ -181,16 +183,22 @@ int main(void)
         shmem_ctx_quiet(c);
     }
     shmem_barrier_all();
-    CHECK(table[1] == value(left, 0));
+    if (made > 0)
+        CHECK(table[1] == value(left, 0));
     for (int i = 0; i < made; i++)
         shmem_ctx_destroy(i == made / 2 ? one : many[i]);
     free(many);
     shmem_barrier_all();
 
+    /* What follows creates contexts: how many at once each section needs,
+     * against the pool (OSOE_MAX_CONTEXTS - 1 beside the default). A pool of
+     * one, which the range allows, runs only the exhaustion above. */
+#define ROOM(n) (max - 1 >= (n))
+
     /* ---- The options: each accepted, each context carrying traffic --------- */
     long options[] = { SHMEM_CTX_SERIALIZED, SHMEM_CTX_PRIVATE, SHMEM_CTX_NOSTORE,
                        SHMEM_CTX_SERIALIZED | SHMEM_CTX_NOSTORE };
-    for (int k = 0; k < 4; k++) {
+    for (int k = 0; k < 4 && ROOM(1); k++) {
         shmem_ctx_t c = SHMEM_CTX_INVALID;
         CHECK_FATAL(shmem_ctx_create(options[k], &c) == 0);
         long v = value(me, 10 + k);
@@ -209,7 +217,7 @@ int main(void)
      * A nonblocking get and a put outstanding on the context: the get's dst
      * holds its bytes the moment destroy returns, and the put is visible at
      * its target after the sync that follows, which has no quiet of its own. */
-    {
+    if (ROOM(1)) {
         shmem_ctx_t c = SHMEM_CTX_INVALID;
         CHECK_FATAL(shmem_ctx_create(0, &c) == 0);
         long got = -1, v = value(me, 20);
@@ -227,7 +235,7 @@ int main(void)
      * and no other's - one piece completed, then two - and each dst holds its
      * value after its own context's quiet. Only where the gets cross a node
      * is anything in flight to count. */
-    if (crosses(table, right)) {
+    if (crosses(table, right) && ROOM(2)) {
         shmem_ctx_t a = SHMEM_CTX_INVALID, b = SHMEM_CTX_INVALID;
         CHECK_FATAL(shmem_ctx_create(0, &a) == 0 && shmem_ctx_create(0, &b) == 0);
         uint64_t before = counter("am.gets_completed");
@@ -256,7 +264,7 @@ int main(void)
     *signal_word = 0;                   /* the team section's, which start at 0 */
     *sum = 0;
     shmem_barrier_all();
-    if (crosses(table, right)) {
+    if (crosses(table, right) && ROOM(2)) {
         shmem_ctx_t a = SHMEM_CTX_INVALID, b = SHMEM_CTX_INVALID;
         CHECK_FATAL(shmem_ctx_create(0, &a) == 0 && shmem_ctx_create(0, &b) == 0);
         const char *records = getenv("OSOE_GETS_IN_FLIGHT");
@@ -281,6 +289,44 @@ int main(void)
         shmem_ctx_destroy(a);
         shmem_ctx_destroy(b);
     }
+
+    /* ---- The arena full across contexts --------------------------------------- *
+     * One word in flight on context A, then a get on B as large as the whole
+     * arena: no record is short, the arena is, and it is handed out from one
+     * end and rewound only once nothing is in flight - so B's issue completes
+     * A's get early (am.gets_completed rises by one before any wait) and then
+     * fits. ctest runs the multi-node maps with a 512-byte arena. */
+    const char *arena = getenv("OSOE_GET_LANDING_BYTES");
+    size_t whole = arena ? (size_t)atol(arena) : 0;
+    unsigned char *big = whole ? shmem_malloc(whole) : NULL;
+    if (big) {
+        for (size_t i = 0; i < whole; i++)
+            big[i] = (unsigned char)(me * 31 + (int)i);
+    }
+    shmem_barrier_all();
+    if (big && crosses(table, right) && ROOM(2)) {
+        shmem_ctx_t a = SHMEM_CTX_INVALID, b = SHMEM_CTX_INVALID;
+        CHECK_FATAL(shmem_ctx_create(0, &a) == 0 && shmem_ctx_create(0, &b) == 0);
+        unsigned char *mine = malloc(whole);
+        CHECK_FATAL(mine != NULL);
+        long word_a = -1;
+        uint64_t full = counter("am.landing_full"), done = counter("am.gets_completed");
+        shmem_ctx_long_get_nbi(a, &word_a, &table[7], 1, right);
+        shmem_ctx_getmem_nbi(b, mine, big, whole, right);
+        CHECK(counter("am.landing_full") == full + 1);
+        CHECK(counter("am.gets_completed") == done + 1);
+        CHECK(word_a == value(right, 7));       /* complete already: early */
+        shmem_ctx_quiet(b);
+        size_t bad = whole;
+        for (size_t i = 0; i < whole && bad == whole; i++)
+            if (mine[i] != (unsigned char)(right * 31 + (int)i))
+                bad = i;
+        CHECK(bad == whole);
+        shmem_ctx_quiet(a);
+        free(mine);
+        shmem_ctx_destroy(a);
+        shmem_ctx_destroy(b);
+    }
     shmem_barrier_all();
 
     /* ---- A team context: PE numbering checked by value ---------------------- *
@@ -288,7 +334,7 @@ int main(void)
      * into the team's rank 0 with an AMO, signals the next member, and quiets
      * the next member alone: every PE received from the member before it in
      * team order, so a translation that landed on a world rank shows. */
-    {
+    if (ROOM(1)) {
         shmem_team_t t = evens();
         shmem_barrier_all();
         if (me % 2 == 0) {
@@ -323,15 +369,55 @@ int main(void)
         shmem_barrier_all();
     }
 
-    /* ---- Left for finalize ---------------------------------------------------- */
-    shmem_ctx_t leftover = SHMEM_CTX_INVALID;
-    CHECK(shmem_ctx_create(SHMEM_CTX_PRIVATE, &leftover) == 0);
-    long v = value(me, 40);
-    shmem_ctx_long_put_nbi(leftover, &table[10], &v, 1, right);
+    /* ---- Team contexts on a table and on a negative stride ------------------ *
+     * SHMEM_TEAM_SHARED's ranks are a table where a node's world ranks
+     * interleave with another's (0,1,2,0,1,0), and a split with stride -1
+     * reverses the world: on each, every member puts to the next member of the
+     * team, which must land at the world rank the team says it is. */
+    if (ROOM(1)) {
+        shmem_team_t reversed = SHMEM_TEAM_INVALID;
+        CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_WORLD, npes - 1, -1, npes, NULL, 0,
+                                             &reversed) == 0);
+        shmem_team_t teams[2] = { SHMEM_TEAM_SHARED, reversed };
+        for (int k = 0; k < 2; k++) {
+            shmem_team_t t = teams[k];
+            int my = shmem_team_my_pe(t), n = shmem_team_n_pes(t);
+            int next = (my + 1) % n, previous = (my + n - 1) % n;
+            int next_world = shmem_team_translate_pe(t, next, SHMEM_TEAM_WORLD);
+            int previous_world = shmem_team_translate_pe(t, previous, SHMEM_TEAM_WORLD);
+            shmem_ctx_t c = SHMEM_CTX_INVALID;
+            CHECK_FATAL(shmem_team_create_ctx(t, 0, &c) == 0);
+            long v = value(me, 50 + k);
+            shmem_ctx_long_put(c, &table[14], &v, 1, next);
+            CHECK(shmem_ctx_long_g(c, &table[0], next) == value(next_world, 0));
+            shmem_ctx_quiet(c);
+            shmem_ctx_destroy(c);
+            shmem_barrier_all();
+            if (table[14] != value(previous_world, 50 + k))
+                fprintf(stderr, "PE %d: team %d's put from team rank %d read %ld, not %ld\n", me,
+                        k, previous, table[14], value(previous_world, 50 + k));
+            CHECK(table[14] == value(previous_world, 50 + k));
+            shmem_barrier_all();
+        }
+        shmem_team_destroy(reversed);
+    }
+
+    /* ---- Left for finalize ---------------------------------------------------- *
+     * A private context with a get in flight into private memory: the last
+     * finalize destroys it, and its implicit quiet completes the get before
+     * finalize returns - where a get crosses a node, only that fills the word. */
+    long left_for_finalize = -1;
+    if (ROOM(1)) {
+        shmem_ctx_t leftover = SHMEM_CTX_INVALID;
+        CHECK(shmem_ctx_create(SHMEM_CTX_PRIVATE, &leftover) == 0);
+        shmem_ctx_long_get_nbi(leftover, &left_for_finalize, &table[15], 1, right);
+    }
+    long expect_left = value(right, 15);
 
     shmem_barrier_all();
-    shmem_free(table);
     CHECK_INVARIANTS();
     shmem_finalize();
+    if (ROOM(1))
+        CHECK(left_for_finalize == expect_left);
     return CHECK_DONE();
 }

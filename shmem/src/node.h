@@ -771,7 +771,9 @@ struct osoe_landing_slot {
  * the index of its record among the PE's landing requests, and since layout
  * 21 bits 48 to 59 are the index of the context's block, which the lead
  * credits as the reply lands (progress-host.c): OSOE_MAX_CONTEXTS' ceiling is
- * what twelve bits hold. A blocking operation's token never has the top bit
+ * what twelve bits hold. That leaves bits 16 to 47 for the sequence, 32 bits
+ * where there were 47: a stale reply could match a record reused with the
+ * same index only after 2^32 nonblocking gets. A blocking operation's token never has the top bit
  * (transport-am.c counts them from 1). The token is echoed by the target and
  * read by the origin alone, so the wire format is unchanged.
  */
