@@ -167,10 +167,20 @@
  * Every put but a step's last operation - its fenced add - says more follows
  * (OSOE_TRANSPORT_MORE). State: the lists, O(intervals) per team.
  *
- * Unlike a reduction's pieces, a gather's puts carry no header: a gather
- * against another collective waits in different words from it, a hang whose
- * blocked records name each PE's routine, as for collectives whose trees
- * share no edge (above).
+ * **A lead says what gather it has entered** (§5.5's "asserted on receipt"),
+ * first of all: into the READY[0] line of the lead that writes to it at step
+ * 0, past the counter, it puts the gather's shape - the team's epoch, the
+ * result's bytes, and whether places lay it out or a block, the block then,
+ * which is every node's alike; collect's second gather's blocks differ from
+ * node to node and its places are what every node shares - and its add to
+ * that READY[0] is fenced after it. The writer compares the shape with its own
+ * after its READY wait and before any put, and a difference ends the job
+ * naming both leads (check_shape). Step 0 joins every lead to the one before
+ * it, a ring, so its comparisons alone cover every pair, and nothing lands in
+ * a buffer whose owner reckons the result another size. A gather against
+ * another collective still waits in words the other never touches, a hang
+ * whose blocked records name each PE's routine, as for collectives whose
+ * trees share no edge (above).
  *
  * Each lead publishes, in the team's tree state (node.h), the steps its last
  * gather made and the (node, step) pairs its lists hold - ceil(log2 N) and
@@ -947,6 +957,56 @@ static void find_intervals(struct generic_team *team_phase, uint32_t team, const
                    "lists %u here", routine, walk.here, team, listed);
 }
 
+/*
+ * What a lead says of the gather it has entered, in the READY[0] line of the
+ * lead that writes to it at step 0, past the counter (the file's comment): the
+ * team's epoch, whether the result is laid out by places - collect's second
+ * gather, whose blocks differ from node to node - or by a block, which every
+ * node's is then, and its bytes and block. Twenty-four bytes, in a line of
+ * 128 whose first eight hold the counter.
+ */
+struct gather_shape {
+    uint32_t epoch;
+    uint32_t by_places;
+    uint64_t bytes;
+    uint64_t block;
+};
+enum { SHAPE_OFFSET = 8 };
+_Static_assert(SHAPE_OFFSET + sizeof(struct gather_shape) <= OSOE_INTERNAL_LINE_BYTES,
+               "a gather's shape fits its READY line past the counter");
+
+/* A shape as a reader wants it: "epoch 3's gather of 64 bytes, in blocks of 8". */
+static void describe_shape(const struct gather_shape *shape, char *out, size_t size)
+{
+    if (shape->epoch == 0)
+        snprintf(out, size, "nothing: no gather's shape was put there");
+    else if (shape->by_places)
+        snprintf(out, size, "epoch %u's gather of %llu bytes, at places of their own",
+                 shape->epoch, (unsigned long long)shape->bytes);
+    else
+        snprintf(out, size, "epoch %u's gather of %llu bytes, in blocks of %llu", shape->epoch,
+                 (unsigned long long)shape->bytes, (unsigned long long)shape->block);
+}
+
+/* The shape the lead at step 0's receiver - `receiver` - put in this lead's
+ * READY[0] line is this lead's own, or the job ends naming both, before any
+ * put. */
+static void check_shape(uint32_t team, const struct gather_shape *mine, uint32_t receiver,
+                        const char *routine)
+{
+    struct gather_shape theirs;
+    memcpy(&theirs, internal(ready_counter(team, 0) + SHAPE_OFFSET), sizeof theirs);
+    if (theirs.epoch == mine->epoch && theirs.by_places == mine->by_places &&
+        theirs.bytes == mine->bytes && theirs.block == mine->block)
+        return;
+    char here[160], there[160];
+    describe_shape(mine, here, sizeof here);
+    describe_shape(&theirs, there, sizeof there);
+    osoe_fatal("%s: this node's lead entered %s, and node %u's lead (PE %u) %s: PEs called "
+               "different collectives, or the same one with different arguments", routine,
+               here, osoe_node_of(&osoe.job, receiver), receiver, there);
+}
+
 /* One gather as a call gives it: its team, its buffer - where it is, at a
  * peer as here (internode.h) - and its layout. */
 struct gather {
@@ -1051,10 +1111,12 @@ static void locate(struct gather *gather)
 
 /*
  * internode.h's gather: Bruck's allgather, allgather_model.py's lead program
- * (the file's comment). Enter before anything else - one more on READY[s] at
- * the lead that writes here at every step s - and only then find the team's
- * intervals, at its first gather, and check the call's layout at its ends.
- * Then each step: its READY; the step's puts,
+ * (the file's comment). Enter before anything else - this gather's shape into
+ * the READY[0] line of the lead that writes here at step 0, one more on its
+ * READY[0], fenced after the shape, and one more on READY[s] at the lead that
+ * writes here at every other step s - and only then find the team's intervals, at
+ * its first gather, and check the call's layout at its ends. Then each step:
+ * its READY, and at step 0 the shape its receiver entered; the step's puts,
  * straight into the buffer of the lead 2^s positions before this one; the
  * fenced add of that lead's DATA[s]; and this lead's own DATA[s], which says
  * the step's shares are in. Then the counts it published.
@@ -1066,7 +1128,15 @@ void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer,
     uint64_t n = team_phase->count, i = team_phase->index, want = team_phase->gathers + 1;
     uint32_t steps = osoe_internal_gather_steps(team_phase->count);
     struct osoe_transport_context *context = osoe_transport_context_default();
-    for (uint32_t s = 0; s < steps; s++) {
+    struct gather_shape mine = { epoch, places != NULL, bytes, places ? 0 : block };
+    int first_writer = (int)lead_of(team, (uint32_t)((i + 1) % n), routine);
+    osoe_transport_put(context, first_writer, OSOE_REGION_INTERNAL,
+                       ready_counter(team, 0) + SHAPE_OFFSET, &mine, sizeof mine,
+                       OSOE_TRANSPORT_MORE);
+    osoe_transport_rmw(context, first_writer, OSOE_REGION_INTERNAL, ready_counter(team, 0),
+                       OSOE_RMW_ADD, 8, 1, 0,
+                       OSOE_TRANSPORT_FENCED | (steps > 1 ? OSOE_TRANSPORT_MORE : 0));
+    for (uint32_t s = 1; s < steps; s++) {
         uint32_t writer = lead_of(team, (uint32_t)((i + (UINT64_C(1) << s)) % n), routine);
         osoe_transport_rmw(context, (int)writer, OSOE_REGION_INTERNAL, ready_counter(team, s),
                            OSOE_RMW_ADD, 8, 1, 0, s + 1 < steps ? OSOE_TRANSPORT_MORE : 0);
@@ -1087,6 +1157,8 @@ void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer,
         uint32_t receiver = lead_of(team, (uint32_t)((i + n - (UINT64_C(1) << s)) % n), routine);
         osoe_region_wait(routine, OSOE_REGION_INTERNAL, ready_counter(team, s), 8, false,
                          OSOE_COMPARISON_GREATER_OR_EQUAL, want, OSOE_BLOCKED_DETAIL_EPOCH, epoch);
+        if (s == 0)
+            check_shape(team, &mine, receiver, routine);
         put_step(&gather, &team_phase->step_intervals[s], context, (int)receiver);
         osoe_transport_rmw(context, (int)receiver, OSOE_REGION_INTERNAL, data_counter(team, s),
                            OSOE_RMW_ADD, 8, 1, 0, OSOE_TRANSPORT_FENCED);

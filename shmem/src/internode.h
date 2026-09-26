@@ -352,7 +352,11 @@ void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index
  * is ceil(log2 N) steps, each a put and an add, and its bytes the result's
  * less a node's own share in and out of each lead - where the reduction's tree
  * running an or, which it replaced, moved the whole result through every
- * level of the tree, twice at each lead.
+ * level of the tree, twice at each lead. Where it says it has entered, a lead
+ * says what: the epoch, `bytes`, and `block` when no `places` are given - with
+ * places, `block` is each PE's own and differs from node to node - which the
+ * lead writing to it compares with its own before any put, ending the job
+ * where they differ.
  */
 void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                             size_t block, const uint64_t *places, const char *routine);
