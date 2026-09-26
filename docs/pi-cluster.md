@@ -429,23 +429,26 @@ first session's numbers are in the expectations above, where they apply.
 
 ## 11. Next session
 
-1. **F1**, first: `cd $W/osu/c/openshmem` and
+The third session (`docs/pi-cluster-results.md`) did the last list's F1
+levers, F2's sweep and the SOS context and scan programs. What is left:
+
+1. **F1's lost segments, with root.** Which link drops them is what a
+   capture shows and counters cannot: on `pi-002` and on the node it sends
+   to in the exchange,
 
    ```sh
-   srun -K1 -N4 --ntasks-per-node=2 ./osu_oshm_fcollect -m 16384:16384 -i 200 > ~/f1.txt &
-   srun -N4 --ntasks-per-node=1 --overlap sh -c 'for i in $(seq 40); do echo "$(hostname) $(date +%T) $(nstat -z TcpRetransSegs TcpExtTCPTimeouts | awk "NR>2{printf \"%s=%s \", \$1, \$2}")"; sleep 1; done' > ~/f1-nstat.txt
+   srun -N1 -w pi-002 --overlap sudo tcpdump -i eth0 -w /tmp/f1-pi-002.pcap port not 22
    ```
 
-   then the same with `tcpdump -i eth0 -w ~/f1-pi-002.pcap port not 22` on
-   one node (`srun -N1 -w pi-002 --overlap`, root needed), to see which
-   segments are lost and where: the switch dropping an incast at step 1, where
-   two nodes' 64 KiB shares arrive at one, or a sender's burst. Try
-   `OSOE_AM_CHUNK` and `OSOE_WIRE_BYTES` smaller, and `-N4 --ntasks-per-node=2`
-   with `OSOE_COLLECTIVE_PIPELINE=1`.
-2. **F2's crossover**: broadcast and reduce from 4 bytes to 64 KiB at k = 2
-   and k = 4 (`-m :65536`), to set the size at which a fan-out of 2 should
-   take over.
-3. **The vanished node** (§7), with its PoE port power-cycled after.
-4. After step 8's first slice lands: SOS's `shmem_team_context` must pass.
+   during `srun -K1 -N4 --ntasks-per-node=2 ./osu_oshm_fcollect -m 16384:16384 -i 50`
+   from `$W/osu/c/openshmem`. Needs the author (sudo asks for a password).
+2. **Would a 16 KiB `OSOE_AM_CHUNK` cost anything?** It removed F1's
+   losses. Run §6's `osoe-bench` and the OSU fcollect, broadcast and put
+   bandwidth sweeps at 4 × 1 and 4 × 4 with `OSOE_AM_CHUNK=16384` and without;
+   if the stream holds 111 MiB/s, the default should change.
+3. **The vanished node** (§7), with its PoE port power-cycled after. Needs
+   the author at the switch.
+4. **After step 8 slice 2 lands**: SOS's nine threaded programs at 4 × 2,
+   and `shmem_test_multiple` under Slurm at 4 × 2.
 
-Bring back `f1*.txt`, the pcap, the two sweeps, and anything that failed.
+Bring back the pcap, the sweeps, and anything that failed.

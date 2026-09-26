@@ -1,0 +1,12 @@
+default-a before: pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7298 TcpExtTCPTimeouts=884  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7445 TcpExtTCPTimeouts=8  
+default-a after:  pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7308 TcpExtTCPTimeouts=928  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7445 TcpExtTCPTimeouts=8  
+rto5ms-a before: pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7308 TcpExtTCPTimeouts=928  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7445 TcpExtTCPTimeouts=8  
+rto5ms-a after:  pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7318 TcpExtTCPTimeouts=1004  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7446 TcpExtTCPTimeouts=8  
+rto1ms-a before: pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7318 TcpExtTCPTimeouts=1004  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7446 TcpExtTCPTimeouts=8  
+rto1ms-a after:  pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7318 TcpExtTCPTimeouts=1004  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7446 TcpExtTCPTimeouts=8  
+default-b before: pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7318 TcpExtTCPTimeouts=1004  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7446 TcpExtTCPTimeouts=8  
+default-b after:  pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7328 TcpExtTCPTimeouts=1041  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7448 TcpExtTCPTimeouts=8  
+rto5ms-b before: pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7328 TcpExtTCPTimeouts=1041  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7448 TcpExtTCPTimeouts=8  
+rto5ms-b after:  pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7336 TcpExtTCPTimeouts=1109  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7450 TcpExtTCPTimeouts=8  
+rto1ms-b before: pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7336 TcpExtTCPTimeouts=1109  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7450 TcpExtTCPTimeouts=8  
+rto1ms-b after:  pi-001 TcpRetransSegs=3774 TcpExtTCPTimeouts=10  pi-002 TcpRetransSegs=7336 TcpExtTCPTimeouts=1109  pi-003 TcpRetransSegs=7797 TcpExtTCPTimeouts=8  pi-004 TcpRetransSegs=7450 TcpExtTCPTimeouts=8  

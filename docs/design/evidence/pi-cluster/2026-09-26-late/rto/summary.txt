@@ -1,0 +1,10 @@
+experiment lines: 1
+16:05:14 build exit 0
+	/home/pi/osoe-rto/build/release/shmem/libosoe.so.0 (0x00007fff3e7b0000)
+16:06:16 default-a exit 0: 16384 80118.32
+16:07:01 rto5ms-a exit 0: 16384 50126.82
+16:07:02 rto1ms-a exit 143: 
+16:08:04 default-b exit 0: 16384 11992.54
+16:09:04 rto5ms-b exit 0: 16384 33906.63
+16:09:04 rto1ms-b exit 143: 
+16:09:04 DONE

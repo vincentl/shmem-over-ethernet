@@ -1,0 +1,12 @@
+Preset CMake variables:
+
+  CMAKE_BUILD_TYPE="RelWithDebInfo"
+  CMAKE_EXPORT_COMPILE_COMMANDS="ON"
+
+-- Configuring done (0.2s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/pi/osoe-rto/build/release
+[ 16%] Built target osoe_base
+[ 16%] Building C object shmem/CMakeFiles/osoe.dir/src/wire.c.o
+[ 16%] Linking C shared library libosoe.so
+[100%] Built target osoe
