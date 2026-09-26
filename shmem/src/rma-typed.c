@@ -30,14 +30,15 @@
  *     nonblocking gets, in flight together across nodes up to the landing
  *     zone's records, completed by one wait for the gets alone (design notes
  *     §7.5, §4.6).
- *   - ibput/ibget: O(nblocks) - the same loop, generalised from one element to
+ *   - ibput/ibget: O(nblocks) - the same loop, generalized from one element to
  *     one block of bsize elements: nblocks transport calls, each a single
  *     contiguous transfer, not nblocks * bsize. Batched the same way - every
  *     block but the last carries OSOE_TRANSPORT_MORE, and an ibget's blocks
  *     are nonblocking gets completed by one wait for the gets alone - so a
  *     block size of 1 costs exactly what iput/iget costs, which is the same
  *     loop calling osoe_rma_put/osoe_rma_get with bsize elements instead of
- *     one (spec's own Note: shmem_ibput with bsize 1 is shmem_iput).
+ *     one (spec's own Note: shmem_ibput with bsize 1 is shmem_iput). Both
+ *     strides equal to bsize is one transfer of the whole: O(1).
  *
  * nbi. Spec §9.6.2: the nonblocking routines "return after initiating the
  * operation", and the operation is complete after a subsequent shmem_quiet;
@@ -122,7 +123,7 @@ static void strided_get(const char *routine, shmem_ctx_t ctx, void *dest, const 
  * The block-strided forms (spec §9.6.1.4, §9.6.1.8), typed and sized alike:
  * block b, for b from 0 to nblocks - 1, copies bsize elements from
  * source + b*sst elements to dest + b*dst elements, one contiguous transfer
- * per block - the same loop strided_put/strided_get run, generalised from one
+ * per block - the same loop strided_put/strided_get run, generalized from one
  * element to a block of bsize. nblocks or bsize 0 transfers nothing, matching
  * the strided forms' own zero-length rule; calling with bsize 1 is iput/iget
  * (the spec's own Notes say so). Both strides are "scaled by the element
@@ -140,6 +141,15 @@ static void strided_block_put(const char *routine, shmem_ctx_t ctx, void *dest,
     if (dst < 0 || sst < 0 || (size_t)dst < bsize || (size_t)sst < bsize)
         osoe_fatal("%s: dst %td, sst %td below bsize %zu; spec §9.6.1.4 requires each "
                    "stride at least bsize", routine, dst, sst, bsize);
+    /* Both strides bsize: the blocks run on unbroken on either side, one
+     * transfer of the whole. */
+    if ((size_t)dst == bsize && (size_t)sst == bsize) {
+        if (nblocks > SIZE_MAX / bsize)
+            osoe_fatal("%s: %zu blocks of %zu elements are more than memory holds", routine,
+                       nblocks, bsize);
+        osoe_rma_put(routine, ctx, dest, source, nblocks * bsize, width, pe, 0);
+        return;
+    }
     char *d = dest;
     const char *s = source;
     ptrdiff_t w = (ptrdiff_t)width;
@@ -159,6 +169,14 @@ static void strided_block_get(const char *routine, shmem_ctx_t ctx, void *dest,
     if (dst < 0 || sst < 0 || (size_t)dst < bsize || (size_t)sst < bsize)
         osoe_fatal("%s: dst %td, sst %td below bsize %zu; spec §9.6.1.8 requires each "
                    "stride at least bsize", routine, dst, sst, bsize);
+    /* Both strides bsize: one transfer of the whole, as for ibput. */
+    if ((size_t)dst == bsize && (size_t)sst == bsize) {
+        if (nblocks > SIZE_MAX / bsize)
+            osoe_fatal("%s: %zu blocks of %zu elements are more than memory holds", routine,
+                       nblocks, bsize);
+        osoe_rma_get(routine, ctx, dest, source, nblocks * bsize, width, pe, 0);
+        return;
+    }
     char *d = dest;
     const char *s = source;
     ptrdiff_t w = (ptrdiff_t)width;
