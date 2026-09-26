@@ -92,6 +92,11 @@ enum osoe_counter {
      * issue found the landing records or arena used up and completed what was
      * in flight first - the zone's bound, working. */
     OSOE_C_AM_GETS_NONBLOCKING, OSOE_C_AM_GETS_COMPLETED, OSOE_C_AM_LANDING_FULL,
+    /* A shared context (§4.11 item 1): a nonblocking get's issue that found
+     * the generation moved under it and counted again in the other pair; and
+     * every acquisition of a context's mutex, which after phase 1 step 8
+     * slice 3 only a wait takes - a run of issues leaves it unmoved. */
+    OSOE_C_AM_ISSUE_RETRIES, OSOE_C_AM_CONTEXT_LOCKS,
 
     /*
      * Must be zero at quiescence (§3.14 question 6, §8.2).

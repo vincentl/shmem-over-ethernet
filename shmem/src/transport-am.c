@@ -86,15 +86,22 @@ struct osoe_transport_context {
     uint32_t block;             /* its block in this PE's pool (node.h): element index too */
     unsigned options;           /* OSOE_TRANSPORT_CONTEXT_*, from creation */
     bool live;
-    /* Several threads may call on it at once (OSOE_TRANSPORT_CONTEXT_CONCURRENT):
-     * then every call holds `mutex` (phase 1 step 8 slice 2's interim, until
-     * §4.11's lock-free shared mode). */
+    /* Shared mode (§4.11; OSOE_TRANSPORT_CONTEXT_CONCURRENT): several threads
+     * may call on it at once. Issue takes no lock; a wait holds `mutex`
+     * (items 1, 2 and 4; phase 1 step 8 slice 3). Serial mode takes none. */
     bool concurrent;
     pthread_mutex_t mutex;
+    /* Serial mode's dirty set (§4.6). */
     uint64_t *high_segment;     /* per peer slot: the highest segment written into */
     uint32_t *order;            /* the slots touched, in the order first touched */
     bool *touched;              /* membership, so marking twice is not quadratic */
     uint32_t count;
+    /* Shared mode's (§4.11 item 2): the highest segment per peer slot, raised
+     * by compare-and-swap, and a bit per slot set after the raise and cleared
+     * only by a wait holding `mutex`. Process memory, like the serial set:
+     * O(peer nodes) a context, never in the node segment. */
+    _Atomic uint64_t *shared_high;
+    _Atomic uint64_t *dirty_bits;
     /* This context's nonblocking gets in flight, as (extent, token) pairs:
      * the pieces its wait copies out, if no other thread of the PE has
      * (copy_out). Touched only by calls on this context. */
@@ -143,7 +150,11 @@ static bool dirty_set_allocate(struct osoe_transport_context *c)
     c->high_segment = calloc(peers, sizeof *c->high_segment);
     c->order = calloc(peers, sizeof *c->order);
     c->touched = calloc(peers, sizeof *c->touched);
-    return c->high_segment && c->order && c->touched;
+    /* Both sets, whatever the mode: the default context's mode is set after
+     * it is opened (osoe_transport_threads). */
+    c->shared_high = calloc(peers, sizeof *c->shared_high);
+    c->dirty_bits = calloc((peers + 63) / 64, sizeof *c->dirty_bits);
+    return c->high_segment && c->order && c->touched && c->shared_high && c->dirty_bits;
 }
 
 static void dirty_set_free(struct osoe_transport_context *c)
@@ -152,6 +163,10 @@ static void dirty_set_free(struct osoe_transport_context *c)
     free(c->order);
     free(c->touched);
     free(c->pending);
+    free(c->shared_high);
+    free(c->dirty_bits);
+    c->shared_high = NULL;
+    c->dirty_bits = NULL;
     c->high_segment = NULL;
     c->order = NULL;
     c->touched = NULL;
@@ -171,18 +186,20 @@ static bool context_open(struct osoe_transport_context *c, uint32_t index, unsig
 }
 
 /*
- * The interim of phase 1 step 8 slice 2: a context several threads may use at
- * once is held for the whole of each call on it. Never across a wait outside
- * the call, so no thread waits on another's program while it holds one: a
- * quiet or a blocking get holding it waits only for the network. What every
- * context shares - the landing zone's extents and records - is claimed by
- * compare-and-swap and needs no lock (§4.11 items 7 and 8). Below
- * THREAD_MULTIPLE nothing is concurrent and no mutex is taken.
+ * A shared context's mutex (§4.11 item 4; phase 1 step 8 slice 3): taken by
+ * its waits - quiet, pe_quiet, a wait for its gets, and destroy's implicit
+ * quiet - and by nothing that issues. Serializing the waits is what makes
+ * closing a counter pair and clearing a dirty bit sound (the models' `nolock`
+ * and `unlocked`); issue is lock-free, as the transport under it already is.
+ * Held across nothing but the network. Slice 2 held it around every call, an
+ * interim. Below THREAD_MULTIPLE nothing is shared and no mutex is taken.
  */
 static void context_enter(struct osoe_transport_context *c)
 {
-    if (c->concurrent)
+    if (c->concurrent) {
         pthread_mutex_lock(&c->mutex);
+        osoe_count(OSOE_C_AM_CONTEXT_LOCKS, 1);
+    }
 }
 
 static void context_leave(struct osoe_transport_context *c)
@@ -364,6 +381,26 @@ void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset)
 static void mark(struct osoe_transport_context *c, uint32_t peer, uint64_t seq)
 {
     uint32_t slot = peer_slot(peer);
+    if (c->concurrent) {
+        /*
+         * §4.11 item 2, as dirty_set_model.py checks it: raise the slot's
+         * highest segment by compare-and-swap (a load and a store lets a lower
+         * number overwrite a higher, `plainmax`), *then* set its bit (the bit
+         * first lets a quiet clear it against an old number, `bitfirst`). The
+         * bit's fetch_or only when it is clear: once a segment a node, not
+         * once an operation.
+         */
+        _Atomic uint64_t *high = &c->shared_high[slot];
+        uint64_t seen = atomic_load_explicit(high, memory_order_seq_cst);
+        while (seq > seen && !atomic_compare_exchange_weak_explicit(
+                                 high, &seen, seq, memory_order_seq_cst, memory_order_seq_cst))
+            ;
+        _Atomic uint64_t *word = &c->dirty_bits[slot / 64];
+        uint64_t bit = UINT64_C(1) << (slot % 64);
+        if (!(atomic_load_explicit(word, memory_order_seq_cst) & bit))
+            atomic_fetch_or_explicit(word, bit, memory_order_seq_cst);
+        return;
+    }
     if (!c->touched[slot]) {
         c->touched[slot] = true;
         c->order[c->count++] = slot;
@@ -721,7 +758,8 @@ static bool copy_out(uint32_t extent)
         (uint32_t)((token >> OSOE_LANDING_OWNER_SHIFT) & OSOE_LANDING_OWNER_MASK));
     atomic_store_explicit(&r->token, 0, memory_order_release);
     atomic_store_explicit(&r->state, OSOE_LANDING_FREE, memory_order_release);
-    atomic_fetch_add_explicit(&c->bytes_copied, length, memory_order_seq_cst);
+    atomic_fetch_add_explicit(&c->bytes_copied[(token & OSOE_LANDING_PAIR) ? 1 : 0], length,
+                              memory_order_seq_cst);
     osoe_wait_word_wake_all(&c->counter_wake);
     release_run(extent, extents_for(length));
     osoe_count(OSOE_C_AM_GETS_COMPLETED, 1);
@@ -795,7 +833,7 @@ static uint64_t make_token(bool nonblocking, uint32_t owner, uint64_t extent)
 {
     return (nonblocking ? OSOE_LANDING_NONBLOCKING : 0) |
            ((uint64_t)owner << OSOE_LANDING_OWNER_SHIFT) |
-           ((++token_sequence & UINT64_C(0xffffffff)) << 16) | extent;
+           ((++token_sequence & OSOE_LANDING_SEQUENCE_MASK) << 16) | extent;
 }
 
 /*
@@ -995,7 +1033,7 @@ static void complete_gets(struct osoe_transport_context *c, const char *routine)
     if (c->pending_count == 0)
         return;
     struct osoe_context_block *block = block_of(c);
-    uint64_t issued = atomic_load_explicit(&block->bytes_issued, memory_order_acquire);
+    uint64_t issued = atomic_load_explicit(&block->bytes_issued[0], memory_order_acquire);
     struct am_wait w;
     bool waiting = false;
     uint32_t slept_on = 0;
@@ -1009,7 +1047,7 @@ static void complete_gets(struct osoe_transport_context *c, const char *routine)
                 piece->token)
                 copy_out(piece->extent);
         }
-        uint64_t copied = atomic_load_explicit(&block->bytes_copied, memory_order_seq_cst);
+        uint64_t copied = atomic_load_explicit(&block->bytes_copied[0], memory_order_seq_cst);
         /* Past equality it can never return: a reply counted twice, which the
          * lead's checks exist to refuse (progress.c). */
         if (copied > issued)
@@ -1033,12 +1071,71 @@ static void complete_gets(struct osoe_transport_context *c, const char *routine)
         }
         slept_on = seen;
         swept = sleep_on(&block->counter_wake, seen);
-        am_wait_check(&w, atomic_load_explicit(&block->bytes_copied, memory_order_seq_cst));
+        am_wait_check(&w, atomic_load_explicit(&block->bytes_copied[0], memory_order_seq_cst));
     }
     osoe_wait_word_leave(&block->counter_wake);
     if (waiting)
         am_wait_end();
     c->pending_count = 0;
+}
+
+/*
+ * A shared context's gets in pair `pair`, which the caller has closed by
+ * bumping the generation while holding the context's mutex (§4.11 item 1;
+ * get_completion_model.py): wait until every byte counted in it has been
+ * copied out, copying out meanwhile every landed piece of this context's that
+ * no other thread has claimed first. The pieces are found by scanning the
+ * PE's landing records for this context's owner bits (the slice 3 brief,
+ * decision 5): the zone's extent count of loads, against a network round
+ * trip, and no word of its own to keep. A piece of the other pair copied here
+ * is an early completion, which the boundary allows. An issuer that added to
+ * this pair and then saw the generation move takes its add back and wakes
+ * the word, so a transient excess ends.
+ */
+static void complete_pair(struct osoe_transport_context *c, unsigned pair, const char *routine)
+{
+    struct osoe_context_block *block = block_of(c);
+    struct am_wait w;
+    bool waiting = false;
+    uint32_t slept_on = 0;
+    bool swept = false;
+    osoe_wait_word_enter(&block->counter_wake);
+    for (;;) {
+        uint32_t seen = osoe_wait_word_load(&block->counter_wake);
+        for (uint32_t e = 0; e < osoe.node.landing_requests; e++) {
+            struct osoe_landing_record *r = &my_records()[e];
+            if (atomic_load_explicit(&r->state, memory_order_seq_cst) != OSOE_LANDING_LANDED)
+                continue;
+            uint64_t token = atomic_load_explicit(&r->token, memory_order_acquire);
+            if ((token & OSOE_LANDING_NONBLOCKING) &&
+                ((token >> OSOE_LANDING_OWNER_SHIFT) & OSOE_LANDING_OWNER_MASK) == c->block)
+                copy_out(e);
+        }
+        uint64_t issued = atomic_load_explicit(&block->bytes_issued[pair], memory_order_seq_cst);
+        uint64_t copied = atomic_load_explicit(&block->bytes_copied[pair], memory_order_seq_cst);
+        if (copied > issued)
+            osoe_fatal("%s: %llu bytes of this context's nonblocking gets were copied out, "
+                       "which asked for %llu", routine, (unsigned long long)copied,
+                       (unsigned long long)issued);
+        if (copied == issued) {
+            if (swept)
+                count_if_lost(&block->counter_wake.word, slept_on, routine);
+            break;
+        }
+        if (!waiting) {
+            osoe_progress_host_wake_lead();
+            am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
+                                 issued - copied, "the bytes its nonblocking gets have landed",
+                                 UINT32_MAX, -1, copied);
+            waiting = true;
+        }
+        slept_on = seen;
+        swept = sleep_on(&block->counter_wake, seen);
+        am_wait_check(&w, atomic_load_explicit(&block->bytes_copied[pair], memory_order_seq_cst));
+    }
+    osoe_wait_word_leave(&block->counter_wake);
+    if (waiting)
+        am_wait_end();
 }
 
 static void pending_add(struct osoe_transport_context *c, uint32_t extent, uint64_t token)
@@ -1077,10 +1174,32 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
     while (len > 0) {
         uint32_t n = len > limit ? limit : (uint32_t)len;
         uint32_t extent = make_room(extents_for(n), "shmem_get_nbi");
-        uint64_t token = make_token(true, c->block, extent);
+        unsigned pair = 0;
+        if (c->concurrent) {
+            /*
+             * §4.11 item 1: count in the pair of the generation loaded, then
+             * load it again; if a quiet bumped it between, take the add back,
+             * wake whoever waits on the pair, and count in the other. Without
+             * the second load the next quiet misses this get (`noretag`).
+             */
+            for (;;) {
+                uint32_t g = atomic_load_explicit(&block->generation, memory_order_seq_cst);
+                atomic_fetch_add_explicit(&block->bytes_issued[g & 1], n, memory_order_seq_cst);
+                if (atomic_load_explicit(&block->generation, memory_order_seq_cst) == g) {
+                    pair = g & 1;
+                    break;
+                }
+                atomic_fetch_sub_explicit(&block->bytes_issued[g & 1], n, memory_order_seq_cst);
+                osoe_wait_word_wake_all(&block->counter_wake);
+                osoe_count(OSOE_C_AM_ISSUE_RETRIES, 1);
+            }
+        } else {
+            atomic_fetch_add_explicit(&block->bytes_issued[0], n, memory_order_seq_cst);
+        }
+        uint64_t token = make_token(true, c->block, extent) | (pair ? OSOE_LANDING_PAIR : 0);
         copy_destination[extent] = at;
-        pending_add(c, extent, token);
-        atomic_fetch_add_explicit(&block->bytes_issued, n, memory_order_seq_cst);
+        if (!c->concurrent)
+            pending_add(c, extent, token);
         /* Published before the request goes out: the send's reservation and
          * commit order it before any reply can exist (as arm() for a slot). */
         issue_record(extent, token, n);
@@ -1159,9 +1278,8 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
     }
     osoe_count(OSOE_C_TRANSPORT_PUT_CALLS, 1);
     osoe_count(OSOE_C_TRANSPORT_PUT_BYTES, len);
-    context_enter(context);
+    /* No lock on a shared context: issue is lock-free (§4.11 item 4). */
     remote_put(context, pe, region, offset, src, len, flags);
-    context_leave(context);
 }
 
 void osoe_transport_get(struct osoe_transport_context *context, int pe, enum osoe_region region,
@@ -1175,7 +1293,6 @@ void osoe_transport_get(struct osoe_transport_context *context, int pe, enum oso
     }
     osoe_count(OSOE_C_TRANSPORT_GET_CALLS, 1);
     osoe_count(OSOE_C_TRANSPORT_GET_BYTES, len);
-    context_enter(context);
     if (flags & OSOE_TRANSPORT_NONBLOCKING)
         remote_get_nonblocking(context, pe, region, offset, dst, len, flags);
     else
@@ -1183,7 +1300,6 @@ void osoe_transport_get(struct osoe_transport_context *context, int pe, enum oso
          * set: §4.6 makes gets a quiet-only concern and there is nothing left
          * for a quiet to wait for once the bytes are in dst. */
         remote_get(pe, region, offset, dst, len);
-    context_leave(context);
 }
 
 uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum osoe_region region,
@@ -1197,10 +1313,8 @@ uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum
     bool fetching = (flags & OSOE_TRANSPORT_FETCH) != 0;
     if (fetching)
         osoe_count(OSOE_C_TRANSPORT_RMW_FETCHING, 1);
-    context_enter(context);
     uint64_t previous = remote_rmw(context, pe, region, offset, op, width, operand, compare,
                                    flags);
-    context_leave(context);
     return previous;
 }
 
@@ -1211,7 +1325,28 @@ uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum
 static bool acknowledged(const struct osoe_transport_context *c, uint32_t slot)
 {
     uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
-    return osoe_progress_host_acked(peer) >= c->high_segment[slot];
+    uint64_t high = c->concurrent
+                        ? atomic_load_explicit(&c->shared_high[slot], memory_order_seq_cst)
+                        : c->high_segment[slot];
+    return osoe_progress_host_acked(peer) >= high;
+}
+
+/* Ask `slot`'s peer to acknowledge through the highest segment this context
+ * wrote there, unless it already has: whether it asked. */
+static bool ask_acknowledgement(const struct osoe_transport_context *c, uint32_t slot)
+{
+    if (acknowledged(c, slot))
+        return false;
+    uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
+    struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
+    if (!connection)
+        return false;
+    uint64_t high = c->concurrent
+                        ? atomic_load_explicit(&c->shared_high[slot], memory_order_seq_cst)
+                        : c->high_segment[slot];
+    osoe_connection_request_ack(connection, high);
+    osoe_connection_area_mark(&osoe_am.area, peer);
+    return true;
 }
 
 /* Ask every dirty peer that has not already acknowledged this context's writes
@@ -1222,6 +1357,23 @@ static bool acknowledged(const struct osoe_transport_context *c, uint32_t slot)
 static void flush_dirty(struct osoe_transport_context *c)
 {
     bool asked = false;
+    if (c->concurrent) {
+        /* The bits, read and never cleared: a fence takes no lock (§4.11
+         * item 2). */
+        uint32_t words = (peer_count() + 63) / 64;
+        for (uint32_t w = 0; w < words; w++) {
+            uint64_t bits = atomic_load_explicit(&c->dirty_bits[w], memory_order_seq_cst);
+            while (bits) {
+                uint32_t slot = w * 64 + (uint32_t)__builtin_ctzll(bits);
+                bits &= bits - 1;
+                if (ask_acknowledgement(c, slot))
+                    asked = true;
+            }
+        }
+        if (asked)
+            osoe_progress_host_wake_lead();
+        return;
+    }
     for (uint32_t i = 0; i < c->count; i++) {
         uint32_t slot = c->order[i];
         if (acknowledged(c, slot))
@@ -1265,6 +1417,49 @@ static void fence_body(struct osoe_transport_context *context)
         flush_dirty(context);
 }
 
+
+/*
+ * Wait until `slot`'s peer has acknowledged through segment `through`, which
+ * the caller asked for (ask_acknowledgement) before waking the lead; the agent
+ * bumps the connection's acknowledgement word when one lands and anyone is
+ * registered (base/wait-word.h). Every waiter is woken, each checking its own
+ * writes. A number, not the slot's current highest: on a shared context
+ * another thread's put may raise that after it was asked for, and a wait for
+ * it would wait for an acknowledgement nobody requested - the hang the first
+ * build of slice 3 had. The shared wait loads the number, asks, waits for it,
+ * then clears the bit and looks again, as dirty_set_model.py has it.
+ */
+static void wait_acknowledged(uint32_t slot, uint64_t through, const char *routine)
+{
+    uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
+    if (osoe_progress_host_acked(peer) >= through)
+        return;
+    struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
+    if (!connection)
+        osoe_fatal("no connection toward node %u, which this context wrote to", peer);
+    struct osoe_wait_word *word = osoe_connection_acked_wait(connection);
+    struct am_wait w;
+    /* No single PE: a quiet waits for a whole node's queue, not one PE's
+     * (D-6). */
+    am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_ACKNOWLEDGEMENT,
+                  "the peer's acknowledged sequence", peer, -1, osoe_progress_host_acked(peer));
+    osoe_wait_word_enter(word);
+    uint32_t slept_on = 0;
+    bool swept = false;
+    for (;;) {
+        uint32_t seen = osoe_wait_word_load(word);
+        if (osoe_progress_host_acked(peer) >= through) {
+            if (swept)
+                count_if_lost(&word->word, slept_on, routine);
+            break;
+        }
+        slept_on = seen;
+        swept = sleep_on(word, seen);
+        am_wait_check(&w, osoe_progress_host_acked(peer));
+    }
+    osoe_wait_word_leave(word);
+    am_wait_end();
+}
 
 /*
  * §4.10's wait: complete every operation this context has outstanding, to every
@@ -1328,39 +1523,7 @@ static void wait_body(struct osoe_transport_context *context, const int *pes, si
             continue;
         }
         waited++;
-        if (!acknowledged(c, slot)) {
-            /* flush_dirty has asked for the acknowledgement and woken the lead;
-             * the agent bumps this connection's acknowledgement word when one
-             * lands and anyone is registered (base/wait-word.h). Every waiter
-             * is woken, each checking its own writes. */
-            uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
-            struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
-            if (!connection)
-                osoe_fatal("no connection toward node %u, which this context wrote to", peer);
-            struct osoe_wait_word *word = osoe_connection_acked_wait(connection);
-            struct am_wait w;
-            /* No single PE: a quiet waits for a whole node's queue, not one
-             * PE's (D-6). */
-            am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_ACKNOWLEDGEMENT,
-                          "the peer's acknowledged sequence", peer, -1,
-                          osoe_progress_host_acked(peer));
-            osoe_wait_word_enter(word);
-            uint32_t slept_on = 0;
-            bool swept = false;
-            for (;;) {
-                uint32_t seen = osoe_wait_word_load(word);
-                if (acknowledged(c, slot)) {
-                    if (swept)
-                        count_if_lost(&word->word, slept_on, routine);
-                    break;
-                }
-                slept_on = seen;
-                swept = sleep_on(word, seen);
-                am_wait_check(&w, osoe_progress_host_acked(peer));
-            }
-            osoe_wait_word_leave(word);
-            am_wait_end();
-        }
+        wait_acknowledged(slot, c->high_segment[slot], routine);
         c->touched[slot] = false;
         c->high_segment[slot] = 0;
     }
@@ -1370,26 +1533,130 @@ static void wait_body(struct osoe_transport_context *context, const int *pes, si
     osoe_count(OSOE_C_TRANSPORT_WAIT_NS, osoe_now_ns() - t0);
 }
 
+/*
+ * A shared context's dirty set, under its mutex (§4.11 item 2;
+ * dirty_set_model.py): for each set bit the wait covers, wait for the
+ * acknowledgement through the slot's highest segment, clear the bit, and look
+ * again - a put another thread issued meanwhile may have raised the number
+ * and found the bit still set, and so not set it; if the peer is now behind,
+ * the bit goes back and the wait repeats (`naive`, without the re-check,
+ * loses that put). Only a wait clears bits, and waits hold the mutex
+ * (`unlocked`, without it, lets a second quiet read a bit mid-clear as done).
+ */
+static uint32_t wait_dirty_shared(struct osoe_transport_context *c, const bool *wanted,
+                                  const char *routine)
+{
+    flush_dirty(c);
+    uint32_t waited = 0, words = (peer_count() + 63) / 64;
+    for (uint32_t w = 0; w < words; w++) {
+        uint64_t bits = atomic_load_explicit(&c->dirty_bits[w], memory_order_seq_cst);
+        while (bits) {
+            uint32_t slot = w * 64 + (uint32_t)__builtin_ctzll(bits);
+            uint64_t bit = UINT64_C(1) << (slot % 64);
+            bits &= bits - 1;
+            if (wanted && !wanted[slot])
+                continue;               /* not asked for: stays dirty */
+            waited++;
+            for (;;) {
+                uint64_t through =
+                    atomic_load_explicit(&c->shared_high[slot], memory_order_seq_cst);
+                if (ask_acknowledgement(c, slot))
+                    osoe_progress_host_wake_lead();
+                wait_acknowledged(slot, through, routine);
+                atomic_fetch_and_explicit(&c->dirty_bits[w], ~bit, memory_order_seq_cst);
+                if (acknowledged(c, slot))
+                    break;
+                atomic_fetch_or_explicit(&c->dirty_bits[w], bit, memory_order_seq_cst);
+            }
+        }
+    }
+    return waited;
+}
+
+/*
+ * A shared context's wait (§4.11 items 1, 2 and 4; get_completion_model.py,
+ * dirty_set_model.py, pe_quiet_model.py). The generation is loaded at the
+ * call, then the mutex taken. A full quiet that opened a generation past the
+ * one loaded, which it did after this call began and finished before letting
+ * the mutex go, covered everything posted before this call: the wait
+ * piggybacks, full quiet or pe_quiet alike - and only on a *full* quiet, which
+ * `full` records, since a pe_quiet leaves other nodes' puts outstanding.
+ * Otherwise it bumps the generation, closing the pair issuers counted in until
+ * now, completes that pair's gets, and waits for the dirty set - every node
+ * for a quiet, the named ones for a pe_quiet - and a full quiet stores the
+ * generation it opened in `full`. A wait for gets alone (`only_gets`)
+ * closes a pair too and leaves the dirty set be.
+ */
+static void wait_shared(struct osoe_transport_context *c, const int *pes, size_t npes,
+                        bool only_gets, const char *routine)
+{
+    if (pes && npes == 0)
+        return;
+    osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
+    uint64_t t0 = osoe_now_ns();
+    osoe_serializing_fence();
+    struct osoe_context_block *block = block_of(c);
+    uint32_t e = atomic_load_explicit(&block->generation, memory_order_seq_cst);
+    context_enter(c);
+    uint32_t full = atomic_load_explicit(&block->full, memory_order_seq_cst);
+    if ((int32_t)(full - e) > 0) {
+        context_leave(c);
+        osoe_count(OSOE_C_TRANSPORT_WAIT_NOTHING_OUTSTANDING, 1);
+        return;
+    }
+    uint32_t g = atomic_load_explicit(&block->generation, memory_order_seq_cst);
+    atomic_store_explicit(&block->generation, g + 1, memory_order_seq_cst);
+    complete_pair(c, g & 1, routine);
+    /* The stores that copied the gets into place, ordered as every other store
+     * before the wait is (§4.6). */
+    osoe_serializing_fence();
+    uint32_t waited = 0;
+    if (!only_gets && osoe_am.internode) {
+        bool *wanted = NULL;
+        if (pes) {
+            wanted = calloc(peer_count(), sizeof *wanted);
+            if (!wanted)
+                osoe_fatal("out of memory in shmem_pe_quiet");
+            for (size_t i = 0; i < npes; i++) {
+                uint32_t node = osoe_node_of(&osoe.job, (uint32_t)pes[i]);
+                if (node != osoe.job.node && node != UINT32_MAX)
+                    wanted[peer_slot(node)] = true;
+            }
+        }
+        waited = wait_dirty_shared(c, wanted, routine);
+        free(wanted);
+    }
+    if (!pes && !only_gets)
+        atomic_store_explicit(&block->full, g + 1, memory_order_seq_cst);
+    context_leave(c);
+    if (waited == 0)
+        osoe_count(OSOE_C_TRANSPORT_WAIT_NOTHING_OUTSTANDING, 1);
+    osoe_count(OSOE_C_TRANSPORT_WAIT_DIRTY_PEERS, waited);
+    osoe_count(OSOE_C_TRANSPORT_WAIT_NS, osoe_now_ns() - t0);
+}
+
+/* No lock on either mode: a shared context's fence reads its bits and clears
+ * none (§4.11 item 2). */
 void osoe_transport_fence(struct osoe_transport_context *context)
 {
-    context_enter(context);
     fence_body(context);
-    context_leave(context);
 }
 
 void osoe_transport_wait(struct osoe_transport_context *context, const int *pes, size_t npes,
                          const char *routine)
 {
-    context_enter(context);
-    wait_body(context, pes, npes, routine);
-    context_leave(context);
+    if (context->concurrent)
+        wait_shared(context, pes, npes, false, routine);
+    else
+        wait_body(context, pes, npes, routine);
 }
 
 void osoe_transport_wait_gets(struct osoe_transport_context *context, const char *routine)
 {
-    context_enter(context);
-    complete_gets(context, routine);
-    context_leave(context);
+    if (context->concurrent)
+        wait_shared(context, NULL, 0, true, routine);
+    else
+        complete_gets(context, routine);
 }
 
 /* ---- The two entry points that are this backend's, not a path's --------- */
