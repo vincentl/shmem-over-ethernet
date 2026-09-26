@@ -40,6 +40,21 @@ Breakages
   short_steps    floor(log2 N) steps rather than the ceiling: on a node count
                  that is not a power of two some shares never arrive (RESULT).
 
+Staged (proposed to the author, 2026-09-26, from the review of step 5 slice 6):
+step 0's one share goes into one of two slots at the receiver, chosen by the
+collective's parity, with no READY wait, and the receiver copies it into its
+buffer once DATA[0] says it landed; READY[0] is not sent; steps 1 on are as
+above. It takes READY's hop off a small gather's path. Safe because a lead
+writing in collective x has finished x - 1, which no lead finishes before every
+lead has entered it - so every lead has finished x - 2, the slot's last user.
+  staged              the design (SLOT: a staged share is never overwritten
+                      before its receiver copied it).
+  staged_one_slot     one slot, not two: at four nodes a lead finishes x and
+                      overwrites the slot its receiver has not copied (SLOT).
+                      At N with N - 1 a power of two, lead i - 1 feeds lead i
+                      directly at the last step, and one slot happens to hold.
+  staged_early_copy   the receiver copies before DATA[0] (FORWARD).
+
 Sending the last step's full 2^s shares, past N - 2^s, is not a breakage: the
 extra shares wrap onto ones the receiver already holds, with the same values.
 The model found that before this line said it: the bound saves bytes, and
@@ -58,6 +73,8 @@ BUF = lambda n, k: ('buf', n, k)         # lead n's buffer: share k's value
 READY = lambda n, s: ('ready', n, s)     # at lead n: step s's receiver has entered
 DATA = lambda n, s: ('data', n, s)       # at lead n: step s's shares have landed
 IN = lambda n: ('$in', n)                # ghost: the collective lead n is in, + 1; 0 between
+SLOT = lambda n, p: ('slot', n, p)       # at lead n: step 0's share, staged, slot p of two
+STAGED = lambda n, p: ('$staged', n, p)  # ghost: collective + 1 whose share slot p holds uncopied
 FIN = ('$fin',)
 
 
@@ -86,16 +103,58 @@ def lead(design, i, nodes, collectives):
         B += [(p + 'E', ('ghost', lambda M, L, x=x: ({IN(i): x + 1}, {}), '@' + p + 'E0')),
               (p + 'E0', ('store', lambda L: BUF(i, i), lambda L, x=x: value(x, i), True,
                           '@' + p + 'R0'))]
-        for s in range(S):
+        staged = design.startswith('staged')
+        first_ready = 1 if staged else 0
+        if first_ready >= S:
+            B += [(f'{p}R{first_ready}', ('br', lambda L: True, f'@{p}S0', f'@{p}S0'))]
+        for s in range(first_ready, S):
             writer = (i + (1 << s)) % nodes
             nx = f'@{p}R{s + 1}' if s + 1 < S else f'@{p}S0'
             B += [(f'{p}R{s}', ('add', lambda L, w=writer, s=s: READY(w, s), lambda L: 1, '_', nx))]
+        if first_ready != 0:
+            B += [(p + 'R0', ('br', lambda L: True, f'@{p}R{first_ready}', f'@{p}R{first_ready}'))]
         # The steps.
         for s in range(S):
             to = (i - (1 << s)) % nodes
             c = min(1 << s, nodes - (1 << s))
             shares = [(i + j) % nodes for j in range(c)]
             q = f'{p}S{s}'
+            if staged and s == 0:
+                # Step 0's one share, i's own, into the receiver's slot for this
+                # collective's parity, with no wait: the slot's last user was
+                # collective x - 2, which every lead has finished once this lead
+                # has finished x - 1 (a lead cannot finish x - 1 before every
+                # lead has entered it).
+                parity = (lambda x: 0) if design == 'staged_one_slot' else (lambda x: x % 2)
+                slot = parity(x)
+                def put_slot(M, L, to=to, slot=slot, x=x):
+                    if M[STAGED(to, slot)]:
+                        return [({('$overwrite',): 1}, {}, 'overwrite')]
+                    return [({SLOT(to, slot): value(x, i), STAGED(to, slot): x + 1}, {},
+                             f'stage share {i} in lead {to}\'s slot {slot}')]
+                mine = (i + 1) % nodes
+                B += [(q, ('nd', put_slot, f'@{q}O')),
+                      (f'{q}O', ('check', lambda M, L, to=to, slot=slot:
+                                 None if not M[('$overwrite',)] else
+                                 f'lead {i} overwrote lead {to}\'s slot {slot} before lead {to} '
+                                 f'copied the share staged there', f'@{q}D')),
+                      (f'{q}D', ('add', lambda L, to=to: DATA(to, 0), lambda L: 1, '_', f'@{q}A'))]
+                # This lead's own staged share, from lead i + 1: once DATA says it
+                # landed, copied into place; then on to step 1.
+                nx = f'@{p}S1' if S > 1 else f'@{p}RET'
+                if design == 'staged_early_copy':
+                    B += [(f'{q}A', ('br', lambda L: True, f'@{q}C', f'@{q}C'))]
+                else:
+                    B += [(f'{q}A', ('await', lambda M, L, x=x: M[DATA(i, 0)] >= x + 1, f'@{q}C'))]
+                B += [(f'{q}C', ('check', lambda M, L, slot=slot, x=x, mine=mine:
+                                 None if M[SLOT(i, slot)] == value(x, mine) else
+                                 f'lead {i} copied share {mine} out of its slot {slot} as '
+                                 f'{M[SLOT(i, slot)]}, not collective {x}\'s {value(x, mine)}',
+                                 f'@{q}K')),
+                      (f'{q}K', ('nd', lambda M, L, slot=slot, x=x, mine=mine: [(
+                          {BUF(i, mine): M[SLOT(i, slot)], STAGED(i, slot): 0}, {},
+                          f'copy share {mine} out of slot {slot}')], nx))]
+                continue
             # Wait for the receiver's entry, then write, then say so.
             if design == 'no_ready':
                 B += [(q, ('br', lambda L: True, f'@{q}W0', f'@{q}W0'))]
@@ -145,6 +204,10 @@ def case(design, nodes, collectives):
             mem[READY(n, s)] = mem[DATA(n, s)] = 0
         for k in range(nodes):
             mem[BUF(n, k)] = 0
+        for q in range(2):
+            mem[SLOT(n, q)] = 0
+            mem[STAGED(n, q)] = 0
+    mem[('$overwrite',)] = 0
     return f'allgather/{design} nodes={nodes} collectives={collectives}', threads, mem, nodes
 
 
@@ -158,6 +221,13 @@ CASES = [
     ('no_ready', 3, 2, False),
     ('no_data_wait', 4, 1, False),
     ('short_steps', 3, 1, False),
+    ('staged', 2, 3, True),
+    ('staged', 3, 3, True),
+    ('staged', 4, 3, True),
+    ('staged', 5, 2, True),
+    ('staged_one_slot', 3, 2, True),    # N - 1 a power of two: i - 1 feeds i, so one slot holds
+    ('staged_one_slot', 4, 2, False),
+    ('staged_early_copy', 3, 1, False),
 ]
 
 
