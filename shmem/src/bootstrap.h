@@ -69,7 +69,8 @@ struct osoe_bootstrap {
  * OSOE_MAX_TEAMS (§5.7): its default, and the range it must lie in - room for
  * at least one team beyond the three predefined, and at most 1,024, where a
  * node's team blocks come to about a megabyte of its control segment and each
- * PE's internal region to about 80 MiB of address space at the default fan-out.
+ * PE's internal region to about 160 MiB of address space at the default
+ * fan-out and OSOE_COLLECTIVE_PIPELINE.
  */
 #define OSOE_MAX_TEAMS_DEFAULT 32u
 #define OSOE_MAX_TEAMS_LOWEST  4u

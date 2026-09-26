@@ -557,7 +557,11 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     /*
      * The node's whole request, checked once and before any of it exists: this
      * segment and every local PE's heap. The lead knows L and the heap size;
-     * every PE has parsed the same size, or check_agreement fails them all.
+     * every PE has parsed the same size, or check_agreement fails them all. A
+     * heap object is the heap and then its internal region (internal-region.h),
+     * about 5 MiB at the default 32 teams, fan-out of 4 and two pieces in
+     * flight (OSOE_COLLECTIVE_PIPELINE), which is counted here with the heap
+     * it follows.
      */
     uint64_t wanted = n->control_bytes +
                       (uint64_t)b->local_count * (n->heap_bytes + n->statics_bytes);
@@ -878,6 +882,7 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
      * the allocator is given heap_size and never reaches the tail. */
     n->internal_offset = page_round(b->symmetric_size ? b->symmetric_size : 1);
     n->internal_bytes = page_round(osoe_internal_region_bytes(b->collective_fanout,
+                                                              b->collective_pipeline,
                                                               b->max_teams));
     n->heap_bytes = n->internal_offset + n->internal_bytes;
     n->heap_of = calloc(b->local_count, sizeof *n->heap_of);

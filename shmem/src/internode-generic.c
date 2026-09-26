@@ -6,20 +6,43 @@
  * **Only the node leads take part**, over §5.3's k-ary tree of nodes, and they
  * meet over the transport rather than through AM messages the agents interpret:
  * a child puts its partial result into a slot of its parent's
- * OSOE_REGION_INTERNAL and adds one to the parent's arrival word with a fenced
- * rmw, so the add lands after the bytes (invariant 5); the parent's application
- * thread waits on that word, combines each slot into its buffer, and sends up in
- * turn. The root holds the result, and it comes down the same way: a put into
- * each child's release slot and an add to its release word. The lead's thread is
- * blocked in the collective regardless and is the only writer of its buffer
- * either way, so an AM design would still have had to land each partial result
- * where that thread could read it and wake it; this does exactly that with
- * operations every transport has (§5.8). A put returns at local completion, so a
- * result sent down is the lead's to reuse at once, and §5.5's hazard of a
- * forward that reads `dest` by reference after the lead has left cannot arise.
+ * OSOE_REGION_INTERNAL and adds one to the parent's arrival counter for its
+ * position with a fenced rmw, so the add lands after the bytes (invariant 5);
+ * the parent's application thread waits on that counter, combines each slot
+ * into its buffer, and sends up in turn. The root holds the result, and it
+ * comes down the same way: a put into each child's release slot and an add to
+ * its release counter. The lead's thread is blocked in the collective
+ * regardless and is the only writer of its buffer either way, so an AM design
+ * would still have had to land each partial result where that thread could
+ * read it and wake it; this does exactly that with operations every transport
+ * has (§5.8). A put returns at local completion, so a result sent down is the
+ * lead's to reuse at once, and §5.5's hazard of a forward that reads `dest` by
+ * reference after the lead has left cannot arise.
  *
- * **A vector larger than a slot goes through the tree in slot-sized pieces**,
- * each piece a full pass up and down (§5.5's "chunk through fixed scratch").
+ * **A vector larger than a slot goes through the tree in slot-sized pieces,
+ * and each lead keeps D of them in flight** (§5.8, "Pipelined pieces"; phase 1
+ * step 5 slice 5): D is OSOE_COLLECTIVE_PIPELINE, which every node agrees on,
+ * and a parent keeps D slots per child position and every node D release
+ * slots, piece k in slot k mod D (internal-region.h). The loop, in_pieces, is
+ * tools/modelcheck/pipeline_model.py's node loop, and it keeps the four rules
+ * whose breakages the model shows:
+ *   - **one arrival counter per child position**, not one per node: with
+ *     pieces in flight a fast child's second arrival would stand in for a slow
+ *     child's first, and the parent would read a slot not yet written;
+ *   - **counters cumulative over the team's life, compared as at least**:
+ *     within a collective a child runs up to D pieces ahead of its parent's
+ *     wait, so §5.4's equality no longer holds, and the window is what bounds
+ *     the skew;
+ *   - **a node sends piece k up only once it holds piece k - D's release**,
+ *     which is the parent's word that slot k mod D has been read;
+ *   - **a node copies a release out and forwards it to its children before it
+ *     counts it**, because the arrival that count lets through is what tells
+ *     the parent the release slot is free: counted first, a leaf's next
+ *     arrival lets its parent overwrite a release it has not copied, and a
+ *     middle node waits on a child that waits on it.
+ * D = 1 keeps one piece at a time, each a whole pass up and down, as before
+ * the slice.
+ *
  * **Each piece carries a header** - the team's epoch, the piece's number and
  * bytes, and which collective it is - which the lead receiving it checks
  * (§5.5's "asserted on receipt"). A reduction's pieces carry one up and every
@@ -31,31 +54,27 @@
  * different places: a hang, whose blocked records name each PE's routine.
  * Broadcasts from two roots on one node carry the same root position and are
  * not told apart. And within a node, members' calls are not compared at all.
- * A broadcast's pieces go up empty: a child's arrival says its release slot is
- * free, since its last piece has been copied out of it, and only then does the
- * parent write the next.
- *
- * **Every word is compared for equality** (§5.4): the arrival and release words
- * are never reset, and a lead keeps how many pieces it has seen arrive and come
- * down over the team's life. Skew is bounded as §5.4 says - a child's next piece
- * needs this piece's release, and a node's next collective needs this one's -
- * so no word runs past a value a lead waits for.
+ * A broadcast's pieces go up empty: a child's arrival for piece k says its
+ * release slot k mod D is free, since piece k - D has been copied out of it,
+ * and only then does the parent write piece k there.
  *
  * **Trees differ from one collective to the next** - a broadcast is rooted at
- * its root's node, a reduction at the first - so a lead's next arrivals may come
- * from nodes that were not its children this time, and early. They are
- * harmless for one reason: the root releases a piece only once every node has
- * arrived for it, and a node arrives only after its own wait for its children
- * has ended; so by the time any node has this piece's release, and can start
- * the next, every node is past its wait for this piece's arrivals, and an early
- * add only counts toward the next. Nothing is written into a node's release
- * slot before that node's own arrival for the piece, and nothing into a child
- * slot while its owner reads child slots: a reduction's tree - which a
- * gather's or shares - is always the same, so its children cannot start the
- * next reduction or gather before this node has released them, and a
- * broadcast reads none. The tree barrier's model checks
- * the same up-then-down shape (tree_barrier_model.py); what is added here is
- * the data, which each release's put carries ahead of its fenced add.
+ * its root's node, a reduction at the first - so a position's counter is fed
+ * by different children over the team's life, and a lead's next arrivals may
+ * come early, from nodes that were not its children this time. Each lead keeps
+ * a base per child position and one for releases, and at a collective's end
+ * adds to them what its own tree says each received: the pieces, at every
+ * position it had a child at, and at the release base unless it was the root.
+ * Early arrivals are harmless for one reason: the root releases a piece only
+ * once every other node has sent it up, and a node sends a piece up only after
+ * its own wait for its children's; so by the time any node holds a collective's
+ * last release, and can start the next, every node is past its last wait on
+ * its children in this one, and an early add only counts toward the next.
+ * Nothing is written into a node's release slot for a piece before that
+ * node's own arrival for it, and nothing into a child slot while its owner
+ * still reads it: every node has read the last of its child slots before the
+ * collective's last release exists. The model checks the rotated trees, one
+ * collective after another (its cases with several roots).
  *
  * **The tree is over every node** (§7.3): the world team's node set is the
  * job's, so a node's index is its number and a broadcast's tree is the
@@ -67,9 +86,12 @@
  * which are O(N) and not kept (internode.h), and its leads, which its records
  * name; until split teams exist that is refused by name.
  *
- * Costs, with N nodes, k the fan-out and n bytes: ceil(n / slot) passes of depth
- * ceil(log_k N) each way, with O(k n) combining and k puts per node per piece;
- * a broadcast finds its rotated tree's k + 1 neighbouring leads in the job's
+ * Costs, with N nodes, k the fan-out, n bytes and p = ceil(n / slot) pieces:
+ * O(k n) combining and k puts per node per piece; and since each lead keeps D
+ * pieces between sending them up and holding their release, the p pieces take
+ * about p / D round trips of the tree's depth ceil(log_k N) where one at a time
+ * took p, for as long as the round trip rather than the links is the limit. A
+ * broadcast finds its rotated tree's k + 1 neighbouring leads in the job's
  * table of leads, O(k) (job.h), and a reduction's tree is found once per team.
  * State: O(k) per team.
  */
@@ -94,34 +116,39 @@
 
 /*
  * The internal region's layout (internal-region.h): a block of slots per team
- * number, then the words - per team number an eight-byte arrival word
- * (children's pieces in) and release word (the parent's pieces down), each
- * alone on a line of the region's fixed 128 bytes. Slot `position` of a team's
- * block holds that child's partial result; the one after the last child's
- * holds what the parent sends down. Each team number has its own, so two teams
+ * number, then the words. A team's block of slots is a row of D per child
+ * position - that child's pieces, piece k in the row's slot k mod D - and a
+ * last row the parent's releases land in, likewise. Its words are an
+ * eight-byte arrival counter per child position (that child's pieces in) and
+ * then the release counter (the parent's pieces down), each alone on a line of
+ * the region's fixed 128 bytes. Each team number has its own, so two teams
  * whose trees share a lead put into different places (§7.3).
  */
-static uint64_t child_slot(uint32_t team, uint32_t position)
+static uint64_t child_slot(uint32_t team, uint32_t position, uint64_t piece)
 {
-    return (uint64_t)team * osoe_internal_team_slots_bytes(osoe.bootstrap.collective_fanout) +
-           (uint64_t)position * OSOE_INTERNAL_SLOTS_PER_CHILD * OSOE_INTERNAL_SLOT_BYTES;
+    uint32_t pipeline = osoe.bootstrap.collective_pipeline;
+    return (uint64_t)team * osoe_internal_team_slots_bytes(osoe.bootstrap.collective_fanout,
+                                                           pipeline) +
+           ((uint64_t)position * pipeline + piece % pipeline) * OSOE_INTERNAL_SLOT_BYTES;
 }
 
-static uint64_t release_slot(uint32_t team)
+static uint64_t release_slot(uint32_t team, uint64_t piece)
 {
-    return child_slot(team, osoe.bootstrap.collective_fanout);
+    return child_slot(team, osoe.bootstrap.collective_fanout, piece);
 }
 
-static uint64_t arrivals_word(uint32_t team)
+static uint64_t arrival_counter(uint32_t team, uint32_t position)
 {
-    return osoe_internal_words_offset(osoe.bootstrap.collective_fanout,
+    uint32_t fanout = osoe.bootstrap.collective_fanout;
+    return osoe_internal_words_offset(fanout, osoe.bootstrap.collective_pipeline,
                                       osoe.bootstrap.max_teams) +
-           (uint64_t)team * OSOE_INTERNAL_TEAM_WORDS_BYTES;
+           (uint64_t)team * osoe_internal_team_words_bytes(fanout) +
+           (uint64_t)position * OSOE_INTERNAL_LINE_BYTES;
 }
 
-static uint64_t release_word(uint32_t team)
+static uint64_t release_counter(uint32_t team)
 {
-    return arrivals_word(team) + OSOE_INTERNAL_LINE_BYTES;
+    return arrival_counter(team, osoe.bootstrap.collective_fanout);
 }
 
 /* This PE's own internal region, at `offset`. */
@@ -141,19 +168,20 @@ struct lead_tree {
 
 /*
  * A team's internode phase as this node's lead keeps it: the reduction's tree,
- * from the team's record, and how many pieces have arrived at this lead from
- * its children and come down to it from its parent over the team's life -
- * cumulative, and compared for equality (§5.4), since the counts in the
- * internal region are never reset. One per team number (OSOE_MAX_TEAMS),
- * allocated at init and filled the first time a call names the team.
+ * from the team's record, and the bases its waits count from - where each child
+ * position's arrival counter and the release counter stood when the team's
+ * last collective ended, by this lead's own trees (the file's comment), since
+ * the counters in the internal region are cumulative over the team's life and
+ * never reset. One per team number (OSOE_MAX_TEAMS), allocated at init and
+ * filled the first time a call names the team.
  */
 struct generic_team {
     bool registered;
     bool every_node;                    /* the node set is 0 ... N - 1 */
     uint32_t count;                     /* how many nodes it spans */
     struct lead_tree reduction_tree;
-    uint64_t arrivals_expected;
-    uint64_t releases_expected;
+    uint64_t arrival_base[OSOE_COLLECTIVE_FANOUT_MAX];
+    uint64_t release_base;
 };
 
 static struct generic_team *teams;
@@ -341,79 +369,166 @@ static void check_piece(const unsigned char *slot, const struct piece_header *ex
 }
 
 /*
- * One piece: `expected->bytes` of this lead's buffer at `at`. A reduction's
- * children send their partial results up, combined into `at` (combine
- * non-NULL); a broadcast's send nothing up but their arrival. Then the result
- * comes down from the parent into `at`, and goes on to the children.
+ * One collective's pieces, as every lead cuts them alike: its buffer, `bytes`
+ * long, in pieces of `piece` bytes - a whole number of elements that fits a
+ * slot behind its header - the last of which may be shorter; and what each
+ * piece's header says besides its number and bytes. `combine` is NULL for a
+ * broadcast, whose pieces go up empty.
  */
-static void lead_piece(struct generic_team *g, uint32_t team, const struct piece_header *expected,
-                       const struct lead_tree *tree, unsigned char *at, size_t width,
-                       osoe_combine_function combine, const char *routine)
+struct pieces {
+    uint32_t team;
+    uint32_t epoch;
+    uint32_t collective;                /* the header's: reduction_identity, or the root */
+    unsigned char *buffer;
+    size_t bytes;
+    size_t piece;
+    size_t width;
+    osoe_combine_function combine;
+    const char *routine;
+};
+
+/* The most bytes of `width`-byte elements a slot holds behind its header. */
+static size_t piece_bytes(size_t width)
+{
+    return ((OSOE_INTERNAL_SLOT_BYTES - HEADER_BYTES) / width) * width;
+}
+
+/* Piece `number`'s header. */
+static struct piece_header header_of(const struct pieces *p, uint64_t number)
+{
+    size_t done = (size_t)number * p->piece;
+    return (struct piece_header){
+        .epoch = p->epoch,
+        .piece = (uint32_t)number,
+        .collective = p->collective,
+        .bytes = (uint32_t)(p->bytes - done < p->piece ? p->bytes - done : p->piece),
+    };
+}
+
+/*
+ * Piece `number` from every child, into `at`: wait until the child position's
+ * arrival counter shows it, at least - a child may be up to D pieces ahead,
+ * and the counter holds the team's whole life, so it is compared with the
+ * position's base plus the piece - then check the header in the position's
+ * slot for the piece and combine what follows it into `at`. Position by
+ * position, in order, so that every run combines alike (§5.8 rule 3). A
+ * broadcast's children put nothing: their arrival says only that their
+ * release slot for this piece is free.
+ */
+static void from_children(const struct generic_team *g, const struct pieces *p,
+                          const struct lead_tree *tree, const struct piece_header *h,
+                          uint64_t number, unsigned char *at)
+{
+    for (uint32_t c = 0; c < tree->children; c++) {
+        osoe_region_wait(p->routine, OSOE_REGION_INTERNAL, arrival_counter(p->team, c), 8, false,
+                         OSOE_COMPARISON_GREATER_OR_EQUAL, g->arrival_base[c] + number + 1,
+                         OSOE_BLOCKED_DETAIL_EPOCH, h->epoch);
+        if (p->combine) {
+            const unsigned char *slot = internal(child_slot(p->team, c, number));
+            check_piece(slot, h, "a child's partial result", tree->child[c], p->routine);
+            p->combine(at, slot + HEADER_BYTES, h->bytes / p->width);
+        }
+    }
+}
+
+/* Piece `number` up: the partial result in `at` into the parent's slot for
+ * this node's position and the piece, behind its header - a broadcast's goes
+ * up empty - then one more on the parent's arrival counter for the position,
+ * fenced, so that the add lands after the bytes (invariant 5). */
+static void to_parent(const struct pieces *p, const struct lead_tree *tree,
+                      const struct piece_header *h, uint64_t number, const unsigned char *at)
 {
     struct osoe_transport_context *context = osoe_transport_context_default();
-    size_t bytes = expected->bytes;
+    if (p->combine) {
+        uint64_t slot = child_slot(p->team, tree->position, number);
+        osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL, slot, h,
+                           HEADER_BYTES, OSOE_TRANSPORT_MORE);
+        osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL, slot + HEADER_BYTES,
+                           at, h->bytes, OSOE_TRANSPORT_MORE);
+    }
+    osoe_transport_rmw(context, (int)tree->parent, OSOE_REGION_INTERNAL,
+                       arrival_counter(p->team, tree->position), OSOE_RMW_ADD, 8, 1, 0,
+                       OSOE_TRANSPORT_FENCED);
+}
 
-    if (tree->children) {
-        g->arrivals_expected += tree->children;
-        osoe_region_wait(routine, OSOE_REGION_INTERNAL, arrivals_word(team), 8, false,
-                         OSOE_COMPARISON_EQUAL, g->arrivals_expected,
-                         OSOE_BLOCKED_DETAIL_EPOCH, expected->epoch);
-        if (combine)
-            for (uint32_t c = 0; c < tree->children; c++) {
-                const unsigned char *slot = internal(child_slot(team, c));
-                check_piece(slot, expected, "a child's partial result", tree->child[c],
-                            routine);
-                combine(at, slot + HEADER_BYTES, bytes / width);
-            }
-    }
-    if (tree->parent != UINT32_MAX) {
-        if (combine) {
-            osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL,
-                               child_slot(team, tree->position), expected, HEADER_BYTES,
-                               OSOE_TRANSPORT_MORE);
-            osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL,
-                               child_slot(team, tree->position) + HEADER_BYTES, at, bytes,
-                               OSOE_TRANSPORT_MORE);
-        }
-        osoe_transport_rmw(context, (int)tree->parent, OSOE_REGION_INTERNAL, arrivals_word(team),
-                           OSOE_RMW_ADD, 8, 1, 0, OSOE_TRANSPORT_FENCED);
-        g->releases_expected += 1;
-        osoe_region_wait(routine, OSOE_REGION_INTERNAL, release_word(team), 8, false,
-                         OSOE_COMPARISON_EQUAL, g->releases_expected,
-                         OSOE_BLOCKED_DETAIL_EPOCH, expected->epoch);
-        const unsigned char *slot = internal(release_slot(team));
-        check_piece(slot, expected, "the result from the parent", tree->parent, routine);
-        memcpy(at, slot + HEADER_BYTES, bytes);
-    }
+/* Piece `number`'s release from the parent, into `at`: wait until the release
+ * counter shows it, at least, check the header in the release slot for the
+ * piece, and copy what follows it out. */
+static void from_parent(const struct generic_team *g, const struct pieces *p,
+                        const struct lead_tree *tree, const struct piece_header *h,
+                        uint64_t number, unsigned char *at)
+{
+    osoe_region_wait(p->routine, OSOE_REGION_INTERNAL, release_counter(p->team), 8, false,
+                     OSOE_COMPARISON_GREATER_OR_EQUAL, g->release_base + number + 1,
+                     OSOE_BLOCKED_DETAIL_EPOCH, h->epoch);
+    const unsigned char *slot = internal(release_slot(p->team, number));
+    check_piece(slot, h, "the result from the parent", tree->parent, p->routine);
+    memcpy(at, slot + HEADER_BYTES, h->bytes);
+}
+
+/* Piece `number`'s release down, from `at`: into each child's release slot for
+ * the piece, behind its header, then one more on the child's release counter,
+ * fenced after the bytes. */
+static void to_children(const struct pieces *p, const struct lead_tree *tree,
+                        const struct piece_header *h, uint64_t number, const unsigned char *at)
+{
+    struct osoe_transport_context *context = osoe_transport_context_default();
+    uint64_t slot = release_slot(p->team, number);
     for (uint32_t c = 0; c < tree->children; c++) {
+        osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL, slot, h,
+                           HEADER_BYTES, OSOE_TRANSPORT_MORE);
         osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL,
-                           release_slot(team), expected, HEADER_BYTES, OSOE_TRANSPORT_MORE);
-        osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL,
-                           release_slot(team) + HEADER_BYTES, at, bytes, OSOE_TRANSPORT_MORE);
-        osoe_transport_rmw(context, (int)tree->child[c], OSOE_REGION_INTERNAL, release_word(team),
-                           OSOE_RMW_ADD, 8, 1, 0,
+                           slot + HEADER_BYTES, at, h->bytes, OSOE_TRANSPORT_MORE);
+        osoe_transport_rmw(context, (int)tree->child[c], OSOE_REGION_INTERNAL,
+                           release_counter(p->team), OSOE_RMW_ADD, 8, 1, 0,
                            OSOE_TRANSPORT_FENCED |
                            (c + 1 < tree->children ? OSOE_TRANSPORT_MORE : 0));
     }
 }
 
-/* The whole buffer, piece by piece, each a whole number of elements that fits
- * a slot behind its header. */
-static void in_pieces(struct generic_team *g, uint32_t team, uint32_t epoch, uint32_t collective,
-                      const struct lead_tree *tree, unsigned char *buffer, size_t bytes,
-                      size_t width, osoe_combine_function combine, const char *routine)
+/*
+ * The whole buffer through `tree`, D pieces in flight: pipeline_model.py's
+ * node loop (the file's comment). A lead keeps `up`, the next piece to send
+ * up, and `down`, the next release to consume. While the window allows - a
+ * piece left to send, and fewer than D sent whose release it does not hold -
+ * it sends up: its children's copies of piece `up` in, combined, and on to the
+ * parent. Otherwise it consumes release `down`: copied out, forwarded to every
+ * child, and only then counted, since the next piece up is what tells the
+ * parent that the release slot is free. The root sends nothing up: for each
+ * piece it waits for every child's copy, combines, and forwards - its buffer
+ * is the result.
+ *
+ * At the end, the bases advance by what this tree says each counter received.
+ */
+static void in_pieces(struct generic_team *g, const struct pieces *p,
+                      const struct lead_tree *tree)
 {
-    size_t piece = ((OSOE_INTERNAL_SLOT_BYTES - HEADER_BYTES) / width) * width;
-    uint32_t number = 0;
-    for (size_t done = 0; done < bytes; done += piece, number++) {
-        struct piece_header expected = {
-            .epoch = epoch,
-            .piece = number,
-            .collective = collective,
-            .bytes = (uint32_t)(bytes - done < piece ? bytes - done : piece),
-        };
-        lead_piece(g, team, &expected, tree, buffer + done, width, combine, routine);
+    uint64_t pieces = (p->bytes + p->piece - 1) / p->piece;
+    uint64_t window = osoe.bootstrap.collective_pipeline;
+    bool root = tree->parent == UINT32_MAX;
+    uint64_t up = 0, down = 0;
+    while (down < pieces) {
+        if (!root && up < pieces && up < down + window) {
+            struct piece_header h = header_of(p, up);
+            unsigned char *at = p->buffer + up * p->piece;
+            from_children(g, p, tree, &h, up, at);
+            to_parent(p, tree, &h, up, at);
+            up++;
+            continue;
+        }
+        struct piece_header h = header_of(p, down);
+        unsigned char *at = p->buffer + down * p->piece;
+        if (root)
+            from_children(g, p, tree, &h, down, at);
+        else
+            from_parent(g, p, tree, &h, down, at);
+        to_children(p, tree, &h, down, at);
+        down++;
     }
+    for (uint32_t c = 0; c < tree->children; c++)
+        g->arrival_base[c] += pieces;
+    if (!root)
+        g->release_base += pieces;
 }
 
 void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t count,
@@ -425,8 +540,10 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
     if (!combine || element.width > OSOE_INTERNAL_SLOT_BYTES - HEADER_BYTES)
         osoe_fatal("%s: no reduction %d over elements of kind %d and width %u", routine,
                    (int)operation, (int)element.kind, element.width);
-    in_pieces(g, team, epoch, reduction_identity(operation, element), &g->reduction_tree, buffer,
-              count * element.width, element.width, combine, routine);
+    struct pieces p = { team, epoch, reduction_identity(operation, element), buffer,
+                        count * element.width, piece_bytes(element.width), element.width,
+                        combine, routine };
+    in_pieces(g, &p, &g->reduction_tree);
 }
 
 /* Member r's place in a gather's result (internode.h). */
@@ -474,8 +591,9 @@ void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer,
     uint32_t width = bytes % 8 == 0 && (uintptr_t)buffer % 8 == 0 ? 8 : 1;
     struct osoe_element element = { OSOE_ELEMENT_UNSIGNED_INTEGER, width };
     osoe_combine_function combine = osoe_combine_lookup(OSOE_REDUCTION_OR, element);
-    in_pieces(g, team, epoch, gather_identity(element), &g->reduction_tree, buffer, bytes,
-              width, combine, routine);
+    struct pieces p = { team, epoch, gather_identity(element), buffer, bytes, piece_bytes(width),
+                        width, combine, routine };
+    in_pieces(g, &p, &g->reduction_tree);
 }
 
 void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index,
@@ -487,5 +605,6 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
                    root_index, g->count);
     struct lead_tree tree;
     find_lead_tree(g, root_index, &tree, routine);
-    in_pieces(g, team, epoch, root_index, &tree, buffer, bytes, 1, NULL, routine);
+    struct pieces p = { team, epoch, root_index, buffer, bytes, piece_bytes(1), 1, NULL, routine };
+    in_pieces(g, &p, &tree);
 }
