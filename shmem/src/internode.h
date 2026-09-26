@@ -111,7 +111,10 @@
  *   - a team's record: read the first time the team is met, like AM's, with
  *     its tree neighbours' leads the ranks whose per-team slab of counters -
  *     the internal region's block for the team's number, registered with the
- *     heap - its RDMA atomics write.
+ *     heap - its RDMA atomics write; and osoe_internode_team_lead and
+ *     osoe_internode_team_local_ranks, asked as the generic implementation
+ *     asks them, to re-root a tree at any node and to know which of a
+ *     gather's blocks are its node's. Nothing in the three is AM's.
  *   - osoe_internode_arrive: once the node has arrived and its children's
  *     counters show theirs, an RDMA fetch-add on the parent's counter - the
  *     tree built out of put and atomics, with the progress thread (or a NIC

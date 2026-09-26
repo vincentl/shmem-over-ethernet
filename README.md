@@ -15,7 +15,9 @@ of specification Tables 6–8, the C11 type-generic interfaces of both, the
 deprecated atomic names of Annex F.2.12, the point-to-point waits and tests
 including the multiple-element forms,
 signalling operations, memory ordering, `shmem_barrier_all`, `shmem_sync_all`
-and `shmem_team_sync`, the team-based reductions of every operator and type of
+and `shmem_team_sync`, team creation - `shmem_team_split_strided`,
+`shmem_team_split_2d` and `shmem_team_destroy`, with every team routine and
+collective on the teams they make - the team-based reductions of every operator and type of
 specification Table 10, broadcast, collect, fcollect, alltoall and alltoalls,
 with their C11 interfaces, the deprecated
 active-set forms - the `_to_all` reductions of Table 11, `shmem_broadcast32` and

@@ -797,11 +797,12 @@ argument 1 is per connection, argument 2 is per node.
 *As built (phase 1 step 2 slice 3):* `degree` is `OSOE_COLLECTIVE_DEGREE(k)` =
 *k* + 1 for the tree's fan-out *k*, `max_teams` is `OSOE_TEAMS` (the two
 predefined teams and the finalize team). *Phase 1 step 7* made `OSOE_MAX_TEAMS`
-a run-time value (§5.7) and sized everything indexed by team number by it, but
-this term still counts the teams that can exist, `OSOE_PREDEFINED_TEAMS`, the
-same three: the split that creates teams (step 7's second slice) sizes it by
-`OSOE_MAX_TEAMS` and changes `shmem.reply-pool.overflow`, whose arithmetic is
-three teams'. Slice 2 sized argument
+a run-time value (§5.7) and sized everything indexed by team number by it; its
+first slice left this term at the three teams that could then exist, and its
+second, whose splits create teams, made it `OSOE_MAX_TEAMS`.
+`shmem.reply-pool.overflow` changed with it: at *C* = 1, *k* = 2 and the
+fewest teams the variable allows, four, the pool is 1 + 3 × 4 = 13, and fifteen
+origins overflow it where eleven overflowed three teams' 10. Slice 2 sized argument
 2 per connection at one per team, which was the star's shape — its root released
 every peer at once — and cost N − 1 descriptors per team on every node for a need
 only the root had; the node-wide term is O(*k*·*T*). `slack` stays 0 — every
@@ -964,8 +965,8 @@ the node header, for arrivals the node's members have posted. *As built (phase 1
 step 7):* only those below `team_numbers_published`, the node's high-water mark
 of published team records, which each record's writer raises after publishing
 it and the lead's agent loads once a pass: team numbers are never reused
-(§5.7), so a pass costs O(teams created) - three until splits exist - and not
-O(`OSOE_MAX_TEAMS`), 32 by default and 1,024 at most.
+(§5.7), so a pass costs the numbers issued so far, up to the highest published
+on the node, and not O(`OSOE_MAX_TEAMS`), 32 by default and 1,024 at most.
 
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
@@ -3880,15 +3881,29 @@ Computed once at team creation, stored in the private team descriptor:
   node needs, each neighbour named by its lead's rank - published before the
   team's first arrival anywhere; the progress thread and the internode backend
   learn the team from it the first time they meet it, never from a descriptor,
-  since the node lead's process need not belong to the team. The O(*N*) list is
-  dropped once the record is written. (Until step 7 the team handed the list to
-  `osoe_internode_team`.) The world and finalize teams span every node; a split
-  team (§7.3) will have a sparse list, and the topology function is tested on
-  sparse lists already (`shmem.collective-tree`).
+  since the node lead's process need not belong to the team. A team a split
+  creates (phase 1 step 7 slice 2) finds its node set once, at creation: every
+  member walks the team's ranks, mapping each to its node, and takes per node
+  its member of lowest team rank as the lead - O(team size) lookups, and a
+  table of the job's *N* nodes for a walk that meets them out of order, a
+  cyclic distribution's or an interleaved map's. It is the one step of team
+  creation that is not logarithmic. The O(*N*) list of node numbers is dropped
+  once the record is written, and so are its leads - **except by each node's
+  local lead of a created team, which keeps every node's lead by its position
+  in the set**, O(the team's nodes) on one PE per node: the generic internode
+  phase re-roots a broadcast's tree at any node and must address that node's
+  lead by position (§5.5), which for the predefined teams, spanning every node,
+  is the job's table of leads, and for a created team this list. (Until step 7
+  the team handed the list to `osoe_internode_team`.) The world and finalize
+  teams span every node; a split team's list is sparse, and the topology
+  function is tested on sparse lists (`shmem.collective-tree`), as the teams
+  the splits create are (`shmem.team-split.*`).
 - **Local lead** — lowest team rank among local members. Must be a member, since
   its `dest` is the accumulator and it is the only PE that writes that `dest`
   before release (§5.5). *As built (phase 1 step 7):* the rule for teams a split
-  creates, whose leads the internode phase will find through their records. The
+  creates - their members on a node listed in team-rank order, the first their
+  lead - which the other nodes' leads address through the team's records and
+  its list of leads above, whatever local id the lead has. The
   predefined teams' lead is local id 0, the node's lead, which the generic
   internode phase and the job's table of leads address on every node; the two
   agree under every distribution Slurm and `osoe-launch` produce, and a local
@@ -4404,7 +4419,14 @@ node per piece; a broadcast finds its rotated tree's *k* + 1 neighbouring leads
 in O(*k*), from a table of each node's lead that the job object keeps beside
 its addresses and blobs (*N* words a node, written at the
 rendezvous in O(*R* + *N*)) - scanning the rank map instead made every
-broadcast linear in the node count under a block distribution.
+broadcast linear in the node count under a block distribution. *As built
+(phase 1 step 7 slice 2):* a team a split creates, which spans some of the
+nodes and is led on each by its member of lowest team rank, has its own table:
+the list of every node's lead by position in its node set that each node's
+local lead of the team keeps (§5.2), which the backend asks for through
+`internode.h` (`osoe_internode_team_lead`), the root's position found in it by
+a binary search, O(log *N*). The tree is rotated from this node's position,
+which the team's record holds, rather than from its node number.
 
 *As built: collect, fcollect, alltoall and alltoalls* (phase 1 step 5 slice 4;
 `collectives.c`, `collect.c`, `alltoall.c`;
@@ -4424,7 +4446,9 @@ its members may still be copying the last result out of it; before, a backend
 stages through the internal region. The spec's precondition would allow a put
 straight into another node's `dest` at once, which SOS uses; this rule is why
 osoe does not. **The generic implementation is the reduction's tree running an
-or**: it zeroes the other nodes' places, and blocks at disjoint places or to
+or**: it zeroes the other nodes' places - the gaps between its own members'
+places, which the SHMEM layer lists by team rank (`osoe_internode_team_local_ranks`,
+phase 1 step 7 slice 2) - and blocks at disjoint places or to
 their concatenation - no protocol of its own - and a piece header marks it a
 gather, so that one node's fcollect is not taken for another's or of the same
 length. Its cost is stated rather than hidden: per 16 KiB piece a leaf moves
@@ -4497,13 +4521,34 @@ edge never exceed teams job-wide, so the job-wide count is a safe bound, and the
 node-wide pool (§3.8) keeps it from costing memory per connection.
 
 **The team range allocator and the split protocol**, open here until phase 1
-step 7, are designed and approved (`docs/prompts/phase1-step7-slice1-prompt.md`,
+step 7, were designed and approved (`docs/prompts/phase1-step7-slice1-prompt.md`,
 `docs/decisions/2026-09-25.md`): a team is a number, job-wide and never reused
 within a session, claimed by the parent's rank 0 with one fetching add on a
 counter in world PE 0's internal page; every node's block for the number holds
 the team's counters and, on each member node, its record; the split is
 collective over the parent and ends with a sync over it. Step 7's first slice
-built the storage, and its second builds the split (§10).
+built the storage, and its second the split.
+
+*As built (phase 1 step 7 slice 2; `team.c`,
+`docs/prompts/phase1-step7-slice2-prompt.md`).* The counter is the internal
+region's last line (§5.8), used on world PE 0 alone. A split runs, over its
+parent: the argument checks, alike on every parent PE - an invalid triplet
+returns nonzero on all of them, and what the spec leaves undefined, a stride of
+0 with a size other than 1 or a non-positive `xrange`, ends the job by name;
+the claim, by the parent's rank 0, of a number for every team the call creates,
+one for `split_strided` and every row and column for `split_2d`, which fails
+the split on every parent PE, with one diagnostic naming `OSOE_MAX_TEAMS`, when
+it would reach the limit; a broadcast over the parent of the first number, in
+eight bytes each parent PE borrows from the heap for the call; each member's
+descriptor - its node's members in team-rank order, O(*L*), and the node set,
+O(team size), §5.2; each member node's record, written by the team's local
+lead there; and the sync over the parent, which orders every record before any
+collective on the new team (`node.h` argues it, from orders that already
+existed). A created team's handle is its descriptor's address, in a
+per-process pool indexed by number, so a handle never issued or already
+destroyed is named without being read through. Destroy is a sync over the
+team's members, then the descriptor's arrays are freed; the number, its blocks
+and records stay.
 
 Runtime rather than build-time, despite the init-ordering cost: the pool cannot
 be sized until the bootstrap has supplied local PE count, so team-pool sizing
@@ -4671,7 +4716,9 @@ slots are (fan-out + 1) × D, D per child position and D for releases, and its
 words fan-out + 1, an arrival counter per child position and a release counter
 ("Pipelined pieces", above). About 5 MiB a PE at the default 32 teams, a
 fan-out of 4 and D = 2, of which a team touches only its own slots and words,
-and only on its leads.)*
+and only on its leads. And since the second slice of step 7 one line more,
+whose first word counts the team numbers claimed, on world PE 0 alone
+(§5.7).)*
 
 *(Built at phase 1 step 5 slice 2, once reductions had landed and shown what it
 must contain - not as a separate header but as `internode.h`'s data half, beside
@@ -5475,13 +5522,14 @@ machinery. The review's order is adopted.
 ### 7.3 Plumb but do not implement
 
 A **context handle** on every RMA entry point and a **team parameter** on every
-collective, implementing only `SHMEM_CTX_DEFAULT`, `SHMEM_TEAM_WORLD` and
-`SHMEM_TEAM_SHARED`. Retrofitting either parameter later touches every function
-written. `shmem_ctx_create`, `shmem_team_create_ctx` and the team split routines
-exist and return nonzero until implemented, which the spec permits: §9.5.1 says
-an unsuccessful context creation "is not treated as an error", and §9.4 gives a
-PE that is not a member of a new team `SHMEM_TEAM_INVALID` — so a program
-written against the spec already has the branch these take.
+collective, implementing at first only `SHMEM_CTX_DEFAULT`, `SHMEM_TEAM_WORLD`
+and `SHMEM_TEAM_SHARED`. Retrofitting either parameter later touches every function
+written. `shmem_ctx_create` and `shmem_team_create_ctx` exist and return
+nonzero until implemented, which the spec permits: §9.5.1 says an unsuccessful
+context creation "is not treated as an error" — so a program written against
+the spec already has the branch these take. The team split routines did too
+until phase 1 step 7, which creates teams (§5.7); §9.4 gives a PE that is not a
+member of a new team `SHMEM_TEAM_INVALID`, so the same branch serves there.
 
 **The context form is the definition; the plain form calls it with
 `SHMEM_CTX_DEFAULT`.** The other way round — a plain form that does the work and
@@ -5493,7 +5541,8 @@ one appears. Every AMO, `putmem`, `getmem`, `putmem_signal`, the signal updates,
 **Handles are opaque pointers with macro constants, not exported objects.**
 `shmem_team_t` and `shmem_ctx_t` are pointers to incomplete types, so passing a
 team where a context is expected is a compile error, and the predefined handles
-are small integers cast to those types. A library that exported
+are small integers cast to those types. A created team's handle is the address
+of the library's descriptor for it (§5.7). A library that exported
 `SHMEM_TEAM_WORLD` as data would be exporting a symbol outside the `shmem_`
 namespace the export test enforces, for no gain.
 
@@ -6502,8 +6551,8 @@ Recorded rather than deleted, so they are not reopened from memory.
 | `shmem_team_destroy` scoping | **Collective over the team's members**: non-members hold `SHMEM_TEAM_INVALID`, on which destroy is a no-op. An earlier resolution called the scope ambiguous. Team ranges still leak until finalize (§5.7) |
 | Team-based allocation | **Does not exist through 1.6.** 1.6 change #10 states malloc and friends are world-team collective (§4.5) |
 | PMIx on the actual nodes | **Moot.** Nothing links against PMIx or PMI-2 on the default path (§6) |
-| `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7). *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`, read at each session's first init and agreed at the rendezvous, sizing everything indexed by team number; the control queue's term follows with the split |
-| Team range allocator and split protocol | **Designed and approved** (2026-09-25; §5.7, `docs/prompts/phase1-step7-slice1-prompt.md`): team numbers claimed from a counter on world PE 0 and never reused within a session, storage per number on every node, a record per member node that the progress thread learns a team from, the split collective over its parent. Phase 1 step 7's first slice built the storage; its second builds creation |
+| `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7). *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`, read at each session's first init and agreed at the rendezvous, sizing everything indexed by team number, the control queue's term too since the split creates teams |
+| Team range allocator and split protocol | **Built** (approved 2026-09-25; §5.7, `docs/prompts/phase1-step7-slice1-prompt.md`, `docs/prompts/phase1-step7-slice2-prompt.md`): team numbers claimed from a counter on world PE 0 and never reused within a session, storage per number on every node, a record per member node that the progress thread learns a team from, the split collective over its parent and ending with a sync over it. Phase 1 step 7's first slice built the storage, its second creation: `shmem_team_split_strided`, `shmem_team_split_2d`, `shmem_team_destroy` |
 | How a PE blocks in `wait_until` | **One watch slot per local PE with a 32-bit futex sequence word** (§4.9). Futexing on the `ivar` itself was withdrawn, since 64-bit futexes do not exist, and the hash table was replaced once waits were seen to be on the caller's own variable |
 | io_uring ring bound | **Two bounds, two rings.** CQ is sized from the provided-buffer ring (§3.3). Verified by `tools/probe` |
 | Reduction `dest` versus 1.6 change #17 | **Not a conflict** — same arrays means same symmetric offset. The surrounding text exposed three real bugs, fixed by a single-writer lead that leaves last (§5.5) |
