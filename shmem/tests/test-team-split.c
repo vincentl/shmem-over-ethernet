@@ -11,15 +11,16 @@
  * every value against the members the phase expects. The phases:
  *
  * - halves: the world split in two, the second half's rank 0 not world PE 0,
- *   so its claim of a number is a fetching add from another PE - another node
- *   on most maps - and each half split again into its even ranks: a split of
- *   a split;
- * - evens and odds;
+ *   so its claim of a number is a compare-and-swap from another PE - another
+ *   node on most maps - and each half split again into its even and its odd
+ *   ranks: a split of a split;
+ * - evens and odds of the world;
  * - one PE, by a size of 1 and by a stride of 0;
- * - the world reversed, by a stride of -1, and its even ranks, a stride of -2
- *   in the world's;
- * - grids: split_2d over rows of two, and over rows longer than the world,
- *   the x-axis team given a configuration and the y-axis team none;
+ * - the world reversed, by a stride of -1, and split again into its even and
+ *   odd ranks, strides of -2 in the world's, and into a grid: split_2d of a
+ *   parent other than the world;
+ * - grids of the world: split_2d over rows of two, and over rows longer than
+ *   the world, the x-axis team given a configuration and the y-axis team none;
  * - SHMEM_TEAM_SHARED split: the node again, and reversed - a table of ranks
  *   where the node's ranks interleave with another node's (0,1,2,0,1,0);
  * - two teams whose local leads coincide, {0, 1} and {0, 2}, reducing and
@@ -29,12 +30,13 @@
  * - splits that must fail, returning nonzero and SHMEM_TEAM_INVALID on every
  *   PE.
  *
- * Wherever a phase's teams partition the world - halves, evens and odds, a
- * grid's rows and its columns, each node's SHARED split - every PE syncs its
- * own team with its arrival staggered by world rank and checks that it left
- * after every member of its team, and only those, had arrived (arrivals.h):
- * no team counts another's arrivals, which counters shared between two teams
- * would make it do, evens and odds arriving in turn.
+ * Wherever a phase's teams partition the world - halves and each half's evens
+ * and odds, the world's evens and odds, the reversed world and its evens and
+ * odds, a grid's rows and its columns, each node's SHARED split - every PE
+ * syncs its own team with its arrival staggered by world rank and checks that
+ * it left after every member of its team, and only those, had arrived
+ * (arrivals.h): no team counts another's arrivals, which counters shared
+ * between two teams would make it do, evens and odds arriving in turn.
  *
  * Three modes, on four PEs, instead run out of what a split needs; each has
  * PE 0 say last that every check passed, since each is judged by what PE 0
@@ -236,56 +238,92 @@ static void exercise(shmem_team_t team, const struct expected *expected)
     CHECK(shmem_team_sync(team) == 0);
 }
 
-static void halves(void)
+/*
+ * `parent`'s even ranks and its odd ranks, split from it, each checked and
+ * run, and synced with the arrival table: every member of `parent` is in one
+ * of the two, and every PE of the world calls this for the parent it is in at
+ * the same time, so the calls partition the world. For a parent other than the
+ * world, a split of a split.
+ */
+static void evens_and_odds_of(shmem_team_t parent, const struct expected *parent_expected)
 {
-    int h = npes > 1 ? npes / 2 : 1;
-    bool in_first = me < h;
-    shmem_team_t first = SHMEM_TEAM_INVALID, second = SHMEM_TEAM_INVALID;
-    shmem_team_config_t config = { .num_contexts = 2 };
-    CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, h, &config, SHMEM_TEAM_NUM_CONTEXTS,
-                                   &first) == 0);
-    if (npes > 1)
-        CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, h, 1, npes - h, NULL, 0, &second) == 0);
-    CHECK((first != SHMEM_TEAM_INVALID) == in_first);
-    CHECK((second != SHMEM_TEAM_INVALID) == !in_first);
-    shmem_team_t mine = in_first ? first : second;
-    struct expected half = strided(&world_expected, in_first ? 0 : h, 1,
-                                   in_first ? h : npes - h);
-    check_team(mine, &half, SHMEM_TEAM_WORLD, &world_expected, in_first ? 2 : 0);
-    staggered_sync(mine, &half);
-    exercise(mine, &half);
-
-    /* Each half's even ranks, split from the half: its rank 0 claims. */
-    shmem_team_t evens = SHMEM_TEAM_INVALID;
-    CHECK(shmem_team_split_strided(mine, 0, 2, (half.members + 1) / 2, NULL, 0, &evens) == 0);
-    CHECK((evens != SHMEM_TEAM_INVALID) == (shmem_team_my_pe(mine) % 2 == 0));
-    if (evens != SHMEM_TEAM_INVALID) {
-        struct expected e = strided(&half, 0, 2, (half.members + 1) / 2);
-        check_team(evens, &e, mine, &half, 0);
-        exercise(evens, &e);
-    }
-    shmem_barrier_all();
-    shmem_team_destroy(evens);
-    shmem_team_destroy(mine);
-}
-
-static void evens_and_odds(void)
-{
+    int members = parent_expected->members;
+    bool even = shmem_team_my_pe(parent) % 2 == 0;
     shmem_team_t evens = SHMEM_TEAM_INVALID, odds = SHMEM_TEAM_INVALID;
-    CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 2, (npes + 1) / 2, NULL, 0, &evens) == 0);
-    if (npes > 1)
-        CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, 1, 2, npes / 2, NULL, 0, &odds) == 0);
-    bool even = me % 2 == 0;
+    CHECK(shmem_team_split_strided(parent, 0, 2, (members + 1) / 2, NULL, 0, &evens) == 0);
+    if (members > 1)
+        CHECK(shmem_team_split_strided(parent, 1, 2, members / 2, NULL, 0, &odds) == 0);
     CHECK((evens != SHMEM_TEAM_INVALID) == even);
     CHECK((odds != SHMEM_TEAM_INVALID) == !even);
-    shmem_team_t mine = even ? evens : odds;
-    struct expected e = strided(&world_expected, even ? 0 : 1, 2, even ? (npes + 1) / 2 : npes / 2);
-    check_team(mine, &e, SHMEM_TEAM_WORLD, &world_expected, 0);
-    staggered_sync(mine, &e);
-    exercise(mine, &e);
+    shmem_team_t part = even ? evens : odds;
+    struct expected part_expected = strided(parent_expected, even ? 0 : 1, 2,
+                                            even ? (members + 1) / 2 : members / 2);
+    check_team(part, &part_expected, parent, parent_expected, 0);
+    staggered_sync(part, &part_expected);
+    exercise(part, &part_expected);
     shmem_barrier_all();
     shmem_team_destroy(evens);
     shmem_team_destroy(odds);
+}
+
+/*
+ * split_2d of `parent` over rows of `xrange` (spec §9.4.7): the x-axis team is
+ * this PE's row, and its rank there its x; the y-axis team its column, rank y.
+ * Every team checked and run, rows and then columns synced with the arrival
+ * table: like evens_and_odds_of, called by every PE at once for a parent that
+ * partitions the world.
+ */
+static void grid_of(shmem_team_t parent, const struct expected *parent_expected, int xrange)
+{
+    int members = parent_expected->members, rank = shmem_team_my_pe(parent);
+    shmem_team_config_t x_config = { .num_contexts = 3 };
+    shmem_team_t row = SHMEM_TEAM_INVALID, column = SHMEM_TEAM_INVALID;
+    CHECK(shmem_team_split_2d(parent, xrange, &x_config, SHMEM_TEAM_NUM_CONTEXTS, &row, NULL, 0,
+                              &column) == 0);
+    int columns = xrange < members ? xrange : members;
+    int x = rank % columns, y = rank / columns;
+    int row_size = members - y * columns < columns ? members - y * columns : columns;
+    struct expected row_expected = strided(parent_expected, y * columns, 1, row_size);
+    struct expected column_expected = strided(parent_expected, x, columns,
+                                              (members - x + columns - 1) / columns);
+    check_team(row, &row_expected, parent, parent_expected, 3);
+    check_team(column, &column_expected, parent, parent_expected, 0);
+    CHECK(shmem_team_my_pe(row) == x);
+    CHECK(shmem_team_my_pe(column) == y);
+    staggered_sync(row, &row_expected);
+    staggered_sync(column, &column_expected);
+    exercise(row, &row_expected);
+    shmem_barrier_all();
+    exercise(column, &column_expected);
+    shmem_barrier_all();
+    shmem_team_destroy(row);
+    shmem_team_destroy(column);
+}
+
+static void halves(void)
+{
+    int split_at = npes > 1 ? npes / 2 : 1;
+    bool in_first = me < split_at;
+    shmem_team_t first = SHMEM_TEAM_INVALID, second = SHMEM_TEAM_INVALID;
+    shmem_team_config_t config = { .num_contexts = 2 };
+    CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, split_at, &config,
+                                   SHMEM_TEAM_NUM_CONTEXTS, &first) == 0);
+    if (npes > 1)
+        CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, split_at, 1, npes - split_at, NULL, 0,
+                                       &second) == 0);
+    CHECK((first != SHMEM_TEAM_INVALID) == in_first);
+    CHECK((second != SHMEM_TEAM_INVALID) == !in_first);
+    shmem_team_t half = in_first ? first : second;
+    struct expected half_expected = strided(&world_expected, in_first ? 0 : split_at, 1,
+                                            in_first ? split_at : npes - split_at);
+    check_team(half, &half_expected, SHMEM_TEAM_WORLD, &world_expected, in_first ? 2 : 0);
+    staggered_sync(half, &half_expected);
+    exercise(half, &half_expected);
+
+    /* Each half's even and odd ranks, split from the half, whose rank 0
+     * claims: the second half's is not world PE 0. */
+    evens_and_odds_of(half, &half_expected);
+    shmem_team_destroy(half);
 }
 
 static void one_pe(void)
@@ -296,67 +334,34 @@ static void one_pe(void)
     CHECK((last != SHMEM_TEAM_INVALID) == (me == npes - 1));
     CHECK((first != SHMEM_TEAM_INVALID) == (me == 0));
     if (last != SHMEM_TEAM_INVALID) {
-        struct expected e = strided(&world_expected, npes - 1, 1, 1);
-        check_team(last, &e, SHMEM_TEAM_WORLD, &world_expected, 0);
-        exercise(last, &e);
+        struct expected last_expected = strided(&world_expected, npes - 1, 1, 1);
+        check_team(last, &last_expected, SHMEM_TEAM_WORLD, &world_expected, 0);
+        exercise(last, &last_expected);
     }
     if (first != SHMEM_TEAM_INVALID) {
-        struct expected e = strided(&world_expected, 0, 0, 1);
-        check_team(first, &e, SHMEM_TEAM_WORLD, &world_expected, 0);
-        exercise(first, &e);
+        struct expected first_expected = strided(&world_expected, 0, 0, 1);
+        check_team(first, &first_expected, SHMEM_TEAM_WORLD, &world_expected, 0);
+        exercise(first, &first_expected);
     }
     shmem_barrier_all();
     shmem_team_destroy(last);
     shmem_team_destroy(first);
 }
 
+/* The world reversed, and split again: its even and odd ranks - world ranks
+ * npes - 1, npes - 3, ... and npes - 2, ... - and a grid of it, split_2d of a
+ * parent other than the world. */
 static void reversed(void)
 {
     shmem_team_t back = SHMEM_TEAM_INVALID;
     CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, npes - 1, -1, npes, NULL, 0, &back) == 0);
-    struct expected e = strided(&world_expected, npes - 1, -1, npes);
-    check_team(back, &e, SHMEM_TEAM_WORLD, &world_expected, 0);
-    exercise(back, &e);
-
-    /* Its even ranks: world ranks npes - 1, npes - 3, ... */
-    shmem_team_t evens = SHMEM_TEAM_INVALID;
-    CHECK(shmem_team_split_strided(back, 0, 2, (npes + 1) / 2, NULL, 0, &evens) == 0);
-    CHECK((evens != SHMEM_TEAM_INVALID) == ((npes - 1 - me) % 2 == 0));
-    if (evens != SHMEM_TEAM_INVALID) {
-        struct expected ee = strided(&e, 0, 2, (npes + 1) / 2);
-        check_team(evens, &ee, back, &e, 0);
-        exercise(evens, &ee);
-    }
-    shmem_barrier_all();
-    shmem_team_destroy(evens);
+    struct expected back_expected = strided(&world_expected, npes - 1, -1, npes);
+    check_team(back, &back_expected, SHMEM_TEAM_WORLD, &world_expected, 0);
+    staggered_sync(back, &back_expected);
+    exercise(back, &back_expected);
+    evens_and_odds_of(back, &back_expected);
+    grid_of(back, &back_expected, 2);
     shmem_team_destroy(back);
-}
-
-/* split_2d over rows of `xrange` (spec §9.4.7): the x-axis team is this PE's
- * row, and its rank there its x; the y-axis team its column, rank y. */
-static void grid(int xrange)
-{
-    shmem_team_config_t x_config = { .num_contexts = 3 };
-    shmem_team_t row = SHMEM_TEAM_INVALID, column = SHMEM_TEAM_INVALID;
-    CHECK(shmem_team_split_2d(SHMEM_TEAM_WORLD, xrange, &x_config, SHMEM_TEAM_NUM_CONTEXTS, &row,
-                              NULL, 0, &column) == 0);
-    int columns = xrange < npes ? xrange : npes;
-    int x = me % columns, y = me / columns;
-    int row_size = npes - y * columns < columns ? npes - y * columns : columns;
-    struct expected r = strided(&world_expected, y * columns, 1, row_size);
-    struct expected c = strided(&world_expected, x, columns, (npes - x + columns - 1) / columns);
-    check_team(row, &r, SHMEM_TEAM_WORLD, &world_expected, 3);
-    check_team(column, &c, SHMEM_TEAM_WORLD, &world_expected, 0);
-    CHECK(shmem_team_my_pe(row) == x);
-    CHECK(shmem_team_my_pe(column) == y);
-    staggered_sync(row, &r);
-    staggered_sync(column, &c);
-    exercise(row, &r);
-    shmem_barrier_all();
-    exercise(column, &c);
-    shmem_barrier_all();
-    shmem_team_destroy(row);
-    shmem_team_destroy(column);
 }
 
 /* SHMEM_TEAM_SHARED split, on every node at once: the node again, and
@@ -622,11 +627,11 @@ int main(void)
         heap_full();
     } else {
         halves();
-        evens_and_odds();
+        evens_and_odds_of(SHMEM_TEAM_WORLD, &world_expected);
         one_pe();
         reversed();
-        grid(2);
-        grid(npes + 1);
+        grid_of(SHMEM_TEAM_WORLD, &world_expected, 2);
+        grid_of(SHMEM_TEAM_WORLD, &world_expected, npes + 1);
         shared_splits();
         coinciding_leads();
         invalid_splits();

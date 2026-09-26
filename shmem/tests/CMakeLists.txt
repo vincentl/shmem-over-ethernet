@@ -1470,14 +1470,14 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     TIMEOUT 90)
 endif()
 # Team creation (phase 1 step 7 slice 2; test-team-split.c): halves, evens and
-# odds, one PE, the world reversed, grids, SHARED split, splits of splits, and
-# two teams whose local leads coincide running collectives back to back - each
-# team's shape and every collective on it checked, with the arrival table
-# showing no team counting another's arrivals. On one node at 1, 2 and 4 PEs;
-# on a block map, an interleaved one and four nodes of one PE, where {0, 1} and
-# {0, 2} meet at PE 0 from two other nodes; and under force-remote, where each
-# PE's SHARED is itself. The program makes about thirty teams, whose numbers are
-# never reused, so it runs with 64.
+# odds, one PE, the world reversed, grids of the world and of a split, SHARED
+# split, splits of splits, and two teams whose local leads coincide running
+# collectives back to back - each team's shape and every collective on it
+# checked, with the arrival table showing no team counting another's arrivals.
+# On one node at 1, 2 and 4 PEs; on a block map, an interleaved one and four
+# nodes of one PE, where {0, 1} and {0, 2} meet at PE 0 from two other nodes;
+# and under force-remote, where each PE's SHARED is itself. The program makes
+# about forty teams, whose numbers are never reused, so it runs with 64.
 add_executable(shmem_test_team-split test-team-split.c
   ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 target_include_directories(shmem_test_team-split PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
