@@ -4504,6 +4504,27 @@ carries over, since no node starts the next collective before holding this one's
 last release. D pieces cost D times the internal region's slots: at D = 2, 32
 teams and a fan-out of 4, 5 MiB a PE, touched only by a team's local leads.
 
+**An allgather for fcollect** *(decided 2026-09-25; checked by
+`allgather_model.py`; not yet built).* The generic gather's latency grows with
+the whole result at every level (§5.5 as built), so fcollect's internode phase
+becomes Bruck's allgather among the team's node leads: at step s, lead i sends
+every share it holds - nodes i to i + c - 1, c = min(2^s, N - 2^s) - to lead
+i - 2^s, written straight to their places in that lead's buffer. ceil(log2 N)
+steps, each node's blocks crossing the network once, any N. Two counters per
+step and team keep it safe:
+- **READY**: at entry a lead adds one at every lead that will write to it, and a
+  writer waits for it - internode.h's rule that a peer's buffer is written only
+  once the peer has entered, since its members may still be copying out the
+  collective before's result.
+- **DATA**: a writer adds one after its put, fenced, and the receiver waits for
+  it before forwarding at the next step, and before returning.
+Both are cumulative and compared as at least: each collective adds one to each.
+A node's share is its members' blocks, contiguous under a block distribution and
+L runs under a cyclic one, so a step's put is one or two ranges or at most L of
+them. The model breaks each rule - a write before READY, a forward before DATA,
+and floor rather than ceiling of log2 N steps - and found that sending the last
+step's full 2^s shares, past N - 2^s, only rewrites shares the receiver holds.
+
 #### What the surface provides, and what it lacks
 
 osoe's collective machinery is:
