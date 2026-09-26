@@ -6617,7 +6617,7 @@ U1, U3 and U7 exercise the §10 fence-eagerness question directly. U6 waits for
 bases at full commit SHAs (the OSU tarball by SHA-256), and
 `tools/corpus/fetch.sh` fetches exactly those into `corpus/`, which git ignores.
 Pins make every `file:line` citation reproducible. The corpus is read, never
-built or copied: this repository has no license yet, and corpus licenses vary.
+built or copied: corpus licenses vary, and none is this repository's (LGPLv3).
 Each workload is backed by a *virtual trace* in `docs/design/workloads/traces/`,
 one hot-loop iteration as ordered calls with sizes, targets, repeat counts, and
 contexts, each step cited. Traces come from reading, not running, since building
@@ -7048,6 +7048,9 @@ development VM before being folded in.
 
 ### Still open — project
 
-- **License.** None chosen. The repository carries no `LICENSE` file, and the
-  README states that no rights are granted until one is added. Nothing should be
-  published or accept outside contributions before this is settled.
+- **License.** *Decided 2026-09-26 by the author: the GNU LGPL, version 3*
+  (`COPYING.LESSER`, with the GPL it supplements in `COPYING`). A library
+  under the LGPL may be linked into programs of any license, which is what an
+  OpenSHMEM implementation is for. Open for the release: whether the notice
+  says "version 3" or "version 3 or any later version", which decides each
+  file's SPDX identifier (`LGPL-3.0-only` or `LGPL-3.0-or-later`).
