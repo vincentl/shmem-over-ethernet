@@ -92,7 +92,9 @@ enum osoe_counter {
      * Must be zero at quiescence (§3.14 question 6, §8.2).
      *
      * missed_wake: a safety sweep expired and the predicate was *then* true, so
-     * the update landed during the sleep and no wake arrived (§4.9).
+     * the update landed during the sleep, and no wake arrived - judged a margin
+     * later, since a wake on its way looks the same for an instant (§4.9;
+     * base/epoch.c, region-wait.h).
      *
      * It counts only waits on a variable the spec requires to be updated with
      * an AMO - every width of 4 or 8 bytes, which is every type of Table 6.

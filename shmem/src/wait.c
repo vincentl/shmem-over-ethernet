@@ -290,6 +290,7 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
     struct osoe_transport_watch *watch = osoe_transport_watch(base.region, span_offset,
                                                 (size_t)span_len);
     uint64_t slept_since = 0;
+    uint32_t slept_on = 0;
     bool slept = false, woken = false, timed_out = false;
     size_t result;
 
@@ -298,10 +299,10 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
         result = scan(w, base, mode, indices, start);
         if (scan_done(mode, result)) {
             /* Table 6 only, so always four or eight bytes and always the
-             * invariant - written through the same rule so there is one place
-             * that decides. */
+             * invariant - judged, and counted, where the scalar wait's is
+             * (region-wait.h), so there is one place that decides. */
             if (timed_out)
-                osoe_count(osoe_region_wait_late_wake_counter(w->width), 1);
+                osoe_region_wait_count_if_lost(watch, slept_on, w->width);
             break;
         }
         if (woken)
@@ -315,6 +316,7 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
         }
 
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        slept_on = seq;
         woken = osoe_transport_watch_wait(watch, seq, &sweep);
         timed_out = !woken;
         if (woken) {
