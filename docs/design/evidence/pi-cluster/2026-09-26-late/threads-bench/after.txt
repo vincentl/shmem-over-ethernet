@@ -1,0 +1,11 @@
+build exit 0
+threads n=1 target=1 ops=40000 ops_per_s=333672
+threads n=2 target=1 ops=80000 ops_per_s=350407
+threads n=4 target=1 ops=160000 ops_per_s=453779
+threads n=1 target=1 ops=40000 ops_per_s=368237
+threads n=2 target=1 ops=80000 ops_per_s=347903
+threads n=4 target=1 ops=160000 ops_per_s=564696
+threads n=1 target=1 ops=40000 ops_per_s=387710
+threads n=2 target=1 ops=80000 ops_per_s=369978
+threads n=4 target=1 ops=160000 ops_per_s=543136
+DONE

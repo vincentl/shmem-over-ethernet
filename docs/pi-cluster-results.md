@@ -164,3 +164,18 @@ reason not yet looked into. Whether to trade the gets for
 the collectives - or give collectives a chunk of their own - is the author's
 decision; nothing was changed. (`osu_oshm_put_bw` needs a `heap` argument the
 script did not pass; the bench's put stream stands in for it.)
+
+**Step 8 slice 3's timing** (`threads-bench/`): `osoe-bench threads`, PE 0's
+threads sharing the default context, 8-byte puts and nonblocking gets toward
+the other node with a quiet every 32 pairs, two Pis, three runs each:
+
+| threads | under slice 2's mutex | slice 3, lock-free issue |
+|---|---|---|
+| 1 | 327-379 k ops/s | 334-388 k |
+| 2 | 325-330 k | 348-370 k |
+| 4 | 317-320 k | 454-565 k |
+
+Four threads went from 0.89 of one thread's rate to about 1.4, which is the
+brief's claim. In the VM the four-thread run shares four cores with both PEs'
+agents and shows no change; issue alone there rose 10-25% at two and four
+threads.
