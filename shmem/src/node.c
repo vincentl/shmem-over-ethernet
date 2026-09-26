@@ -466,6 +466,19 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
                      (unsigned long long)b->symmetric_size);
             fail_rendezvous(n, msg);
         }
+        /* A backstop. Every setting that sizes the heap object - the symmetric
+         * size above, the fan-out, the pipeline's depth and the team count in
+         * open_control - is agreed by name; this fires only for one that a
+         * later change forgets to agree, before the progress thread reads a
+         * node-mate's internal region by this PE's size of it. */
+        if (n->slots[i].heap_bytes != n->heap_bytes) {
+            char msg[256];
+            snprintf(msg, sizeof msg, "local PE %u's heap object is %llu bytes and this PE's "
+                     "%llu: the PEs size the library's internal region differently", i,
+                     (unsigned long long)n->slots[i].heap_bytes,
+                     (unsigned long long)n->heap_bytes);
+            fail_rendezvous(n, msg);
+        }
         if (n->slots[i].statics_bytes != n->statics_bytes) {
             char msg[256];
             snprintf(msg, sizeof msg, "the PEs run different programs: local PE %u's "

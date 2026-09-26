@@ -82,7 +82,11 @@ struct osoe_bootstrap {
  * sending them up and receiving their release. Its default, and the range it
  * must lie in: 1 is one piece at a time, each a whole pass up and down, as
  * before phase 1 step 5 slice 5; each step of D costs every team number's
- * slots in the internal region again (internal-region.h).
+ * slots in the internal region again (internal-region.h). A PE's region is
+ * OSOE_MAX_TEAMS x (fan-out + 1) x D slots of 16 KiB, and a line per counter:
+ * 5 MiB at the defaults (32 teams, fan-out 4, D = 2), and at the extremes the
+ * ranges allow (1,024 teams, fan-out 32, D = 8) 4.1 GiB, which the shared-memory
+ * capacity check refuses at init on a machine without it (node.c).
  */
 #define OSOE_COLLECTIVE_PIPELINE_DEFAULT 2u
 #define OSOE_COLLECTIVE_PIPELINE_LOWEST  1u
