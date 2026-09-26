@@ -54,6 +54,7 @@ add_library(osoe
   src/rma-typed.c
   src/collectives.c
   src/combine.c
+  src/context.c
   src/reductions.c
   src/broadcast.c
   src/collect.c

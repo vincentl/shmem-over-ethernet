@@ -35,9 +35,9 @@
  * rather than the job.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 208,
+_Static_assert(sizeof(struct osoe_segment_directory) == 232,
                "frozen by §3.14: append only. 136 at layout 6; 160 at layout 12; 208 at "
-               "layout 18");
+               "layout 18; 232 at layout 21");
 
 uint64_t osoe_segment_now_ns(void)
 {

@@ -1,10 +1,10 @@
 /*
- * Teams and contexts (§7.3, spec §9.4, §9.5).
+ * Teams (§5.7, §7.3; spec §9.4).
  *
  * The parameter is on every entry point from the start. The predefined teams
  * exist from init, and since phase 1 step 7's second slice the splits create
- * more (team.c); SHMEM_CTX_DEFAULT is the only context, and everything that
- * would create another returns nonzero, which the spec permits.
+ * more (team.c). Contexts, which every point-to-point routine takes beside a
+ * PE of a team, are context.h's (phase 1 step 8).
  */
 #ifndef OSOE_TEAM_H
 #define OSOE_TEAM_H
@@ -157,13 +157,5 @@ int osoe_team_to_world(const struct osoe_team *t, int pe);
  * root is looked for (collectives.c). O(log N) node lookups.
  */
 uint32_t osoe_team_node_index(const struct osoe_team *t, uint32_t node);
-
-/*
- * Resolve a context handle to the transport context. SHMEM_CTX_DEFAULT is the
- * only one that exists; SHMEM_CTX_INVALID is fatal here, and the routines the
- * spec says must ignore it (fence and quiet, §9.12.1-§9.12.2) test for it
- * before calling.
- */
-struct osoe_transport_context *osoe_ctx_of(const char *routine, shmem_ctx_t ctx);
 
 #endif /* OSOE_TEAM_H */

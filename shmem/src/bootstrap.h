@@ -33,6 +33,8 @@ struct osoe_bootstrap {
     bool shm_capacity_warning_only; /* OSOE_SHM_CAPACITY_CHECK=0: report, do not refuse */
     uint32_t collective_fanout; /* OSOE_COLLECTIVE_FANOUT: k of the internode tree (§5.3) */
     uint32_t max_teams;         /* OSOE_MAX_TEAMS: teams in existence job-wide at once (§5.7) */
+    uint32_t max_contexts;      /* OSOE_MAX_CONTEXTS: contexts a PE may have at once, the
+                                 * default one included (§4.11; phase 1 step 8) */
     uint32_t collective_pipeline;   /* OSOE_COLLECTIVE_PIPELINE: D, a data collective's
                                      * pieces in flight per level of the tree (§5.8) */
     uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
@@ -75,6 +77,18 @@ struct osoe_bootstrap {
 #define OSOE_MAX_TEAMS_DEFAULT 64u
 #define OSOE_MAX_TEAMS_LOWEST  4u
 #define OSOE_MAX_TEAMS_HIGHEST 1024u
+
+/*
+ * OSOE_MAX_CONTEXTS (§4.11; phase 1 step 8): how many contexts a PE may have
+ * at once, SHMEM_CTX_DEFAULT counted, and so the size of each PE's pool of
+ * context blocks in the node segment (node.h). Its default, and the range it
+ * must lie in: at least the default context, and at most what a nonblocking
+ * get's token can name (OSOE_LANDING_CONTEXT_MASK) - a block is a cache line,
+ * so the ceiling costs a PE half a megabyte of segment.
+ */
+#define OSOE_MAX_CONTEXTS_DEFAULT 64u
+#define OSOE_MAX_CONTEXTS_LOWEST  1u
+#define OSOE_MAX_CONTEXTS_HIGHEST 4096u
 
 /*
  * OSOE_COLLECTIVE_PIPELINE (§5.8, "Pipelined pieces"): D, how many pieces of a

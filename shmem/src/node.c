@@ -33,10 +33,10 @@
  * appended, and never otherwise.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 208,
+_Static_assert(sizeof(struct osoe_segment_directory) == 232,
                "frozen by §3.14: append only. 136 at layouts 6 and 7; 160 at layout 12, "
                "with the connections section; 208 at layout 18, with the team blocks and "
-               "the published epochs");
+               "the published epochs; 232 at layout 21, with the context pools");
 
 /*
  * Candidate heap bases, tried in order by the lead; the first where its own
@@ -565,7 +565,16 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint64_t epoch_row_bytes = align_up((uint64_t)b->max_teams * sizeof(uint32_t));
     uint64_t epochs_offset = align_up(connections_offset + connections_bytes);
     uint64_t epochs_bytes = (uint64_t)b->local_count * epoch_row_bytes;
-    n->control_bytes = page_round(epochs_offset + epochs_bytes);
+
+    /*
+     * Each local PE's pool of context blocks (layout 21; §4.6, §4.11): a
+     * cache line per context, OSOE_MAX_CONTEXTS of them a PE, 8 KiB a PE at
+     * the default. Last, so that nothing before it moved when it was added.
+     */
+    uint64_t contexts_offset = align_up(epochs_offset + epochs_bytes);
+    uint64_t contexts_bytes = (uint64_t)b->local_count * b->max_contexts *
+                              sizeof(struct osoe_context_block);
+    n->control_bytes = page_round(contexts_offset + contexts_bytes);
 
     /*
      * The node's whole request, checked once and before any of it exists: this
@@ -659,6 +668,10 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->dir.epochs_bytes = epochs_bytes;
     h->dir.epoch_row_bytes = (uint32_t)epoch_row_bytes;
     h->dir.epoch_row_count = b->local_count;
+    h->dir.contexts_offset = contexts_offset;
+    h->dir.contexts_bytes = contexts_bytes;
+    h->dir.context_bytes = (uint32_t)sizeof(struct osoe_context_block);
+    h->dir.contexts_per_pe = b->max_contexts;
     h->dir.block_bytes = (uint32_t)sizeof(struct osoe_counter_block);
     memcpy((char *)p + metrics_offset, metrics, metrics_bytes);
     n->blocks = (struct osoe_counter_block *)((char *)p + blocks_offset);
@@ -680,6 +693,8 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     n->team_count = b->max_teams;
     n->epochs = (_Atomic uint32_t *)((char *)p + epochs_offset);
     n->epoch_row_words = (uint32_t)(epoch_row_bytes / sizeof(uint32_t));
+    n->contexts = (struct osoe_context_block *)((char *)p + contexts_offset);
+    n->contexts_per_pe = b->max_contexts;
     /*
      * Which machine this logical node is on (§3.14): the node numbers a
      * hung collective names are logical, and a walk down the tree needs the
@@ -793,6 +808,14 @@ again:;
                  b->collective_pipeline);
         fail_rendezvous(n, msg);
     }
+    /* And by its OSOE_MAX_CONTEXTS, which sizes every PE's pool of context
+     * blocks (layout 21): this PE would claim blocks past its own pool's end. */
+    if (h->dir.contexts_per_pe != b->max_contexts) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_MAX_CONTEXTS differs between PEs: the local lead has "
+                 "%u, this PE has %u (§4.11)", h->dir.contexts_per_pe, b->max_contexts);
+        fail_rendezvous(n, msg);
+    }
     if (h->job != b->job || h->step != b->step || h->node != b->node ||
         h->session != session || h->dir.local_count != b->local_count ||
         h->world_size != b->world_size)
@@ -830,6 +853,8 @@ again:;
     n->team_count = h->dir.team_count;
     n->epochs = (_Atomic uint32_t *)((char *)n->hdr + h->dir.epochs_offset);
     n->epoch_row_words = h->dir.epoch_row_bytes / (uint32_t)sizeof(uint32_t);
+    n->contexts = (struct osoe_context_block *)((char *)n->hdr + h->dir.contexts_offset);
+    n->contexts_per_pe = h->dir.contexts_per_pe;
 
     /* The metric table is fixed for a build, so a mismatch is a mixed-library
      * job that the layout check above did not catch (§3.13's argument for

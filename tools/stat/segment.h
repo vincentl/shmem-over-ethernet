@@ -94,6 +94,14 @@ struct osoe_segment_directory {
     uint64_t epochs_bytes;
     uint32_t epoch_row_bytes;
     uint32_t epoch_row_count;
+
+    /* Appended at layout 21: each local PE's pool of context blocks (design
+     * §4.11; phase 1 step 8), which no metric scope reads yet. A reader built
+     * before them asks and finds them absent. */
+    uint64_t contexts_offset;
+    uint64_t contexts_bytes;
+    uint32_t context_bytes;
+    uint32_t contexts_per_pe;
 };
 
 /*
@@ -255,7 +263,7 @@ void osoe_segment_close(struct osoe_segment *s);
  * it could already carry.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               20
+#define OSOE_SEGMENT_NEWEST_LAYOUT               21
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is

@@ -132,12 +132,16 @@ static unsigned char *landing_request(void *context, uint32_t pe, uint64_t token
  * A nonblocking get's reply has landed whole. Its record is retired first, so
  * that a second reply naming it - a duplicate, which would count its bytes
  * twice - is refused (landing_request); the PE takes the record again only
- * after the add below, so nothing else writes it meanwhile. The counter is the
- * value half of base/wait-word.h's two-sided wait: a seq_cst add, then the
- * wake only if the PE is registered as waiting - so a burst of replies costs no
- * syscall while nobody waits. The add also releases the reply's bytes, which
- * the parser wrote before this call, to the wait that reads the counter and
- * then them.
+ * after the add below, so nothing else writes it meanwhile. The counter is
+ * the one in the block of the context the get was issued on, which the token
+ * names (node.h, OSOE_LANDING_CONTEXT_SHIFT; phase 1 step 8): the value half
+ * of base/wait-word.h's two-sided wait, a seq_cst add, then the wake only if
+ * the PE is registered as waiting on that context - so a burst of replies
+ * costs no syscall while nobody waits. The add also releases the reply's
+ * bytes, which the parser wrote before this call, to the wait that reads the
+ * counter and then them. A token naming a block past the pool - a token this
+ * PE never made, which landing_request's check of the record should already
+ * have refused - is refused here too rather than read through.
  */
 static void landed(void *context, uint32_t pe, uint64_t token, uint32_t bytes)
 {
@@ -145,12 +149,15 @@ static void landed(void *context, uint32_t pe, uint64_t token, uint32_t bytes)
     int32_t local = osoe_node_local_id(&osoe.node, pe);
     if (local < 0)
         return;                 /* landing_request has already refused it */
+    uint32_t block = (uint32_t)((token >> OSOE_LANDING_CONTEXT_SHIFT) & OSOE_LANDING_CONTEXT_MASK);
+    if (block >= osoe.node.contexts_per_pe)
+        return;
     struct osoe_landing_request *r = &osoe_node_landing_requests(
         &osoe.node, (uint32_t)local)[token & OSOE_LANDING_REQUEST_MASK];
     atomic_store_explicit(&r->token, 0, memory_order_release);
-    struct osoe_landing_slot *slot = osoe_node_landing(&osoe.node, (uint32_t)local);
-    atomic_fetch_add_explicit(&slot->bytes_landed, bytes, memory_order_seq_cst);
-    osoe_wait_word_wake_all(&slot->counter_wake);
+    struct osoe_context_block *c = osoe_node_context(&osoe.node, (uint32_t)local, block);
+    atomic_fetch_add_explicit(&c->bytes_landed, bytes, memory_order_seq_cst);
+    osoe_wait_word_wake_all(&c->counter_wake);
 }
 
 /* §4.9's watch half. The same function the intranode backend calls, for the
