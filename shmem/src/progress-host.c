@@ -331,15 +331,14 @@ void osoe_progress_host_start(uint32_t session)
      * The forwards' term counts the teams that can exist at once, since a node
      * pair carries the trees of as many teams as exist job-wide and never more
      * (§5.7), and the pool is node-wide, so it costs a descriptor per team per
-     * degree and not one per connection. Until teams can be created that is
-     * the predefined three; the split that creates them raises it to
-     * OSOE_MAX_TEAMS, the bound §5.7 gives the control queue. The per-team
-     * state below is sized by that already, since it is indexed by number.
+     * degree and not one per connection: OSOE_MAX_TEAMS, the bound §5.7 gives
+     * the control queue, since the splits create teams (phase 1 step 7 slice
+     * 2; the first slice counted the predefined three). The per-team state
+     * below is sized by it too, since it is indexed by number.
      */
     uint32_t teams = osoe.bootstrap.max_teams;
     uint32_t descriptors = peers * (osoe_am.area.credits + OSOE_REPLY_SLACK) +
-                           OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) *
-                               OSOE_PREDEFINED_TEAMS;
+                           OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) * teams;
     osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
     osoe_am.busy = calloc((peers + 63) / 64, sizeof *osoe_am.busy);

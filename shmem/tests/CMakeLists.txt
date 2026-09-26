@@ -911,16 +911,19 @@ else()
   target_link_libraries(shmem_test_reply-pool PRIVATE osoe rt)
   osoe_warnings(shmem_test_reply-pool)
 endif()
-# The target's pool is C per connection plus (k + 1) x teams for the tree's
-# forwards, node-wide (§3.8): with C = 1 and k = 2 that is 1 + 3 x 3 = 10, so
-# eleven origin PEs each with a blocking get outstanding overflow it. Slice 3
-# made the forward term node-wide; at the default k = 4 it is 16, and the
-# seven origin PEs this test had until then stopped reaching it.
+# The target's pool is C per connection plus (k + 1) x OSOE_MAX_TEAMS for the
+# tree's forwards, node-wide (§3.8): with C = 1, k = 2 and the fewest teams the
+# variable allows, 4, that is 1 + 3 x 4 = 13, so fourteen origin PEs each with
+# a blocking get outstanding overflow it, and fifteen leave a margin. Slice 3
+# made the forward term node-wide - at the default k = 4 it was 16, and the
+# seven origin PEs this test had until then stopped reaching it - and phase 1
+# step 7's second slice made it count every team number, where it had counted
+# the three predefined teams and eleven origins overflowed it.
 add_test(NAME shmem.reply-pool.overflow
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow SHMEM_SYMMETRIC_SIZE=16m
-          OSOE_COLLECTIVE_FANOUT=2
-          $<TARGET_FILE:osoe-launch> -n 12 -m 0,0,0,0,0,0,0,0,0,0,0,1 -t 30
-          -e 11:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
+          OSOE_COLLECTIVE_FANOUT=2 OSOE_MAX_TEAMS=4
+          $<TARGET_FILE:osoe-launch> -n 16 -m 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 -t 30
+          -e 15:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
 set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
 
