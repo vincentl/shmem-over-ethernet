@@ -1,0 +1,23 @@
+[ 16%] Built target osoe_base
+[ 25%] Building C object shmem/CMakeFiles/osoe.dir/src/wire.c.o
+/home/pi/osoe-f1/shmem/src/wire.c: In function ‘osoe_wire_attach’:
+/home/pi/osoe-f1/shmem/src/wire.c:138:67: warning: declaration of ‘r’ shadows a parameter [-Wshadow]
+  138 |       if ((e = getenv("OSOE_EXPERIMENT_PACING"))) { unsigned long r = strtoul(e, NULL, 0);
+      |                                                                   ^
+/home/pi/osoe-f1/shmem/src/wire.c:109:62: note: shadowed declaration is here
+  109 | void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,
+      |                                            ~~~~~~~~~~~~~~~~~~^
+/home/pi/osoe-f1/shmem/src/wire.c:141:57: warning: declaration of ‘b’ shadows a parameter [-Wshadow]
+  141 |       if ((e = getenv("OSOE_EXPERIMENT_SNDBUF"))) { int b = atoi(e);
+      |                                                         ^
+/home/pi/osoe-f1/shmem/src/wire.c:110:67: note: shadowed declaration is here
+  110 |                       uint32_t peer, const struct osoe_bootstrap *b)
+      |                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+/home/pi/osoe-f1/shmem/src/wire.c:144:55: warning: declaration of ‘one’ shadows a previous local [-Wshadow]
+  144 |       if ((e = getenv("OSOE_EXPERIMENT_THIN"))) { int one = 1;
+      |                                                       ^~~
+/home/pi/osoe-f1/shmem/src/wire.c:133:9: note: shadowed declaration is here
+  133 |     int one = 1;
+      |         ^~~
+[ 25%] Linking C shared library libosoe.so
+[100%] Built target osoe

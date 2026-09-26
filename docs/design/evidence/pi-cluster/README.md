@@ -10,3 +10,4 @@ the status page read the numbers from here.
 | `2026-09-24/` | `bc86e8f` (before pipelining, the allgather and team creation) | runbook §1-§4, §7, most of §8: probe, smoke, endings, NPB IS, ISx, PRK, ssca1, the 72 examples, all 19 OSU programs |
 | `2026-09-26/` | `b8d7ad5` (main) | §5 floor, §6 bench, tier 1 and 2, the SOS suite, start-up times, PEs per node, the pipelined collectives at fan-outs 2, 3 and 4 and D of 1 to 8, the allgather's fcollect |
 | `2026-09-26-late/` | `a4ca6c4` (main) | tier 2, SOS's context and scan programs, F1 with its levers and the TCP counters, F2's crossover sweep; `rto/`, the minimum-timeout experiment on F1; `netcfg-*`, each node's TCP and NIC settings |
+| `2026-09-26-night-f1/` | `96b2e0f` (main) | F1 investigated: the trigger map by block size, per-socket TCP samples, socket and chunk knobs, plain TCP with osoe's exchange, node subsets, rank placements, the 16 KiB chunk's map |
