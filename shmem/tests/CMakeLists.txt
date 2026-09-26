@@ -1255,8 +1255,8 @@ foreach(pair "fetch_add_nbi:osoe_shmem_atomic_fetch_add_nbi_takes_four_or_five_a
 endforeach()
 
 # The deprecated active-set collectives, over the whole job (design §7.4;
-# test-active-set.c), on one node and across nodes; and an active set one PE
-# short of the job, which must end it by name.
+# test-active-set.c), on one node and across nodes; and an active set reaching
+# past the job, which must end it by name.
 osoe_tier2_test(active-set)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(active-set 0,0,1,1)
@@ -1267,7 +1267,15 @@ add_test(NAME shmem.active-set.partial
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_active-set>)
 set_tests_properties(shmem.active-set.partial PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION
-  "shmem_long_sum_to_all: the active set \\(PE_start 0, logPE_stride 0, PE_size 1\\) is not the whole job of 2 PEs")
+  "shmem_long_sum_to_all: the active set \\(PE_start 0, logPE_stride 0, PE_size 3\\) is not a set of this job's 2 PEs")
+
+# The deprecated collectives on active sets within the job but not all of it
+# (phase 1 step 5 slice 7; active-set.c; test-active-set-partial.c): six sets,
+# two of them at once, every routine, pSync reused, on one node and across
+# nodes on a block and an interleaved map.
+osoe_tier2_test(active-set-partial)
+osoe_tier2_map_test(active-set-partial 0,0,1,1)
+osoe_tier2_map_test(active-set-partial 0,1,2,0,1,0)
 
 # Symmetric statics (design §4.3; test-statics.c), in a program linked as oshcc
 # links one: on one node, across nodes on a block map and an interleaved one;

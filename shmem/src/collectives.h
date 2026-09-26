@@ -63,13 +63,37 @@ int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *so
               size_t nelems, struct osoe_element element, bool inclusive);
 
 /*
- * The deprecated active-set routines (Annex F) run over the whole job and
- * nothing else (design §7.4): PE_start 0, logPE_stride 0 and PE_size the job's
- * size - with any stride in a job of one PE. Any other active set ends the job
- * by name: osoe forms no group for it, and answering over the wrong PEs would
- * be a wrong answer rather than a missing one.
+ * The deprecated active-set routines (Annex F). The whole job - PE_start 0,
+ * logPE_stride 0 and PE_size the job's size, any stride in a job of one PE -
+ * takes the world team's collectives; any other set, the member-only
+ * algorithms of active-set.c (phase 1 step 5 slice 7). A set that is not one
+ * of this job, or a caller outside it, ends the job by name.
  */
-void osoe_active_set_whole_job(const char *routine, int PE_start, int logPE_stride,
-                               int PE_size);
+struct osoe_active_set {
+    int start, stride_log, size;
+    int rank;                   /* the calling PE's place in the set */
+};
+
+/* True for the whole job; otherwise checks the set, fills `s` and is false. */
+bool osoe_active_set_is_whole_job(const char *routine, int PE_start, int logPE_stride,
+                                  int PE_size, struct osoe_active_set *s);
+
+void osoe_active_set_barrier(const char *routine, const struct osoe_active_set *s,
+                             long *pSync, bool quiet);
+void osoe_active_set_broadcast(const char *routine, const struct osoe_active_set *s,
+                               void *dest, const void *source, size_t bytes, int root,
+                               long *pSync);
+void osoe_active_set_fcollect(const char *routine, const struct osoe_active_set *s,
+                              void *dest, const void *source, size_t bytes, long *pSync);
+void osoe_active_set_collect(const char *routine, const struct osoe_active_set *s,
+                             void *dest, const void *source, size_t bytes, long *pSync);
+void osoe_active_set_reduce(const char *routine, const struct osoe_active_set *s, void *dest,
+                            const void *source, size_t nreduce,
+                            enum osoe_reduction_operation operation,
+                            struct osoe_element element, long *pSync);
+void osoe_active_set_alltoall(const char *routine, const struct osoe_active_set *s,
+                              void *dest, const void *source, ptrdiff_t dest_stride,
+                              ptrdiff_t source_stride, size_t nelems, size_t width,
+                              long *pSync);
 
 #endif /* OSOE_COLLECTIVES_H */

@@ -55,21 +55,26 @@ OSOE_API int pshmem_alltoallsmem(shmem_team_t team, void *dest, const void *sour
                                         int PE_start, int logPE_stride, int PE_size,   \
                                         long *pSync)                                   \
     {                                                                                 \
-        (void)pSync;                                                                  \
-        osoe_active_set_whole_job("shmem_alltoall" #BITS, PE_start, logPE_stride,     \
-                                  PE_size);                                           \
-        osoe_alltoall("shmem_alltoall" #BITS, SHMEM_TEAM_WORLD, dest, source, 1, 1,   \
-                      nelems, BITS / 8);                                              \
+        const char *routine = "shmem_alltoall" #BITS;                                 \
+        struct osoe_active_set s;                                                     \
+        if (osoe_active_set_is_whole_job(routine, PE_start, logPE_stride, PE_size, &s)) \
+            osoe_alltoall(routine, SHMEM_TEAM_WORLD, dest, source, 1, 1, nelems, BITS / 8); \
+        else                                                                          \
+            osoe_active_set_alltoall(routine, &s, dest, source, 1, 1, nelems, BITS / 8, \
+                                     pSync);                                          \
     }                                                                                 \
     OSOE_API void pshmem_alltoalls##BITS(void *dest, const void *source, ptrdiff_t dst, \
                                          ptrdiff_t sst, size_t nelems, int PE_start,  \
                                          int logPE_stride, int PE_size, long *pSync)  \
     {                                                                                 \
-        (void)pSync;                                                                  \
-        osoe_active_set_whole_job("shmem_alltoalls" #BITS, PE_start, logPE_stride,    \
-                                  PE_size);                                           \
-        osoe_alltoall("shmem_alltoalls" #BITS, SHMEM_TEAM_WORLD, dest, source, dst,   \
-                      sst, nelems, BITS / 8);                                         \
+        const char *routine = "shmem_alltoalls" #BITS;                                \
+        struct osoe_active_set s;                                                     \
+        if (osoe_active_set_is_whole_job(routine, PE_start, logPE_stride, PE_size, &s)) \
+            osoe_alltoall(routine, SHMEM_TEAM_WORLD, dest, source, dst, sst, nelems,   \
+                          BITS / 8);                                                  \
+        else                                                                          \
+            osoe_active_set_alltoall(routine, &s, dest, source, dst, sst, nelems,     \
+                                     BITS / 8, pSync);                                \
     }
 OSOE_ALLTOALL_ACTIVE_SET_DEFINE(32)
 OSOE_ALLTOALL_ACTIVE_SET_DEFINE(64)

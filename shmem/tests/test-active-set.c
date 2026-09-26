@@ -11,8 +11,9 @@
  * so afterwards; one call passes a static pSync, which works because osoe never
  * touches it.
  *
- * With OSOE_TEST_PARTIAL=1 every PE passes an active set one PE short of the
- * job, which must end the job by name (shmem.active-set.partial).
+ * With OSOE_TEST_PARTIAL=1 every PE passes an active set reaching one PE past
+ * the job, which must end the job by name (shmem.active-set.partial). A set
+ * within the job that is not all of it is test-active-set-partial.c's.
  */
 #include <complex.h>
 #include <stddef.h>
@@ -317,8 +318,8 @@ int main(void)
     if (partial && partial[0] == '1') {
         long *x = shmem_malloc(sizeof *x);
         CHECK_FATAL(x);
-        shmem_long_sum_to_all(x, x, 1, 0, 0, npes - 1, pWrk, pSync);
-        printf("PE %d: a partial active set returned, which it must not\n", me);
+        shmem_long_sum_to_all(x, x, 1, 0, 0, npes + 1, pWrk, pSync);
+        printf("PE %d: an active set past the job returned, which it must not\n", me);
         return 1;
     }
 

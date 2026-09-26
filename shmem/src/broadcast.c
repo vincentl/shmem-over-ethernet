@@ -21,6 +21,7 @@
 
 #include "collectives.h"
 #include "export.h"
+#include "rma.h"
 
 #define OSOE_BROADCAST_DEFINE(T, NAME)                                                \
     OSOE_API int OSOE_FN(pshmem_, NAME, _broadcast)(shmem_team_t team, T *dest,       \
@@ -39,17 +40,21 @@ OSOE_API int pshmem_broadcastmem(shmem_team_t team, void *dest, const void *sour
 }
 
 /* The deprecated active-set forms (Annex F): PE_root counts within the active
- * set, which is the whole job, so it is a world rank. */
+ * set - over the whole job a world rank, else a rank of active-set.c's set. */
 #define OSOE_BROADCAST_ACTIVE_SET_DEFINE(BITS)                                        \
     OSOE_API void pshmem_broadcast##BITS(void *dest, const void *source, size_t nelems,  \
                                          int PE_root, int PE_start, int logPE_stride,  \
                                          int PE_size, long *pSync)                     \
     {                                                                                 \
-        (void)pSync;                                                                  \
-        osoe_active_set_whole_job("shmem_broadcast" #BITS, PE_start, logPE_stride,    \
-                                  PE_size);                                           \
-        osoe_broadcast("shmem_broadcast" #BITS, SHMEM_TEAM_WORLD, dest, source, nelems, \
-                       BITS / 8, PE_root, true);                                      \
+        const char *routine = "shmem_broadcast" #BITS;                                \
+        struct osoe_active_set s;                                                     \
+        if (osoe_active_set_is_whole_job(routine, PE_start, logPE_stride, PE_size, &s)) \
+            osoe_broadcast(routine, SHMEM_TEAM_WORLD, dest, source, nelems, BITS / 8,  \
+                           PE_root, true);                                            \
+        else                                                                          \
+            osoe_active_set_broadcast(routine, &s, dest, source,                      \
+                                      osoe_rma_bytes(routine, nelems, BITS / 8),      \
+                                      PE_root, pSync);                                \
     }
 OSOE_BROADCAST_ACTIVE_SET_DEFINE(32)
 OSOE_BROADCAST_ACTIVE_SET_DEFINE(64)

@@ -648,18 +648,3 @@ int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *so
     return 0;
 }
 
-void osoe_active_set_whole_job(const char *routine, int PE_start, int logPE_stride,
-                               int PE_size)
-{
-    /* Before or after the library's life the job's size is 0, and "not the
-     * whole job of 0 PEs" would be a wrong reason for the right refusal. */
-    osoe_require_initialized(routine);
-    int npes = (int)osoe.bootstrap.world_size;
-    if (PE_start == 0 && PE_size == npes && logPE_stride >= 0 &&
-        (logPE_stride == 0 || PE_size == 1))
-        return;
-    osoe_fatal("%s: the active set (PE_start %d, logPE_stride %d, PE_size %d) is not the "
-               "whole job of %d PEs, and osoe runs the deprecated active-set routines over "
-               "the whole job only (design §7.4)", routine, PE_start, logPE_stride, PE_size,
-               npes);
-}

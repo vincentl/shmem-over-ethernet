@@ -21,6 +21,7 @@
 
 #include "collectives.h"
 #include "export.h"
+#include "rma.h"
 
 #define OSOE_COLLECT_DEFINE(T, NAME)                                                  \
     OSOE_API int OSOE_FN(pshmem_, NAME, _collect)(shmem_team_t team, T *dest,         \
@@ -54,11 +55,16 @@ OSOE_API int pshmem_fcollectmem(shmem_team_t team, void *dest, const void *sourc
                                       int PE_start, int logPE_stride, int PE_size,     \
                                       long *pSync)                                     \
     {                                                                                 \
-        (void)pSync;                                                                  \
-        osoe_active_set_whole_job("shmem_" #KIND #BITS, PE_start, logPE_stride,       \
-                                  PE_size);                                           \
-        osoe_collect("shmem_" #KIND #BITS, SHMEM_TEAM_WORLD, dest, source, nelems,    \
-                     BITS / 8, FIXED);                                                \
+        const char *routine = "shmem_" #KIND #BITS;                                   \
+        struct osoe_active_set s;                                                     \
+        if (osoe_active_set_is_whole_job(routine, PE_start, logPE_stride, PE_size, &s)) \
+            osoe_collect(routine, SHMEM_TEAM_WORLD, dest, source, nelems, BITS / 8, FIXED); \
+        else if (FIXED)                                                               \
+            osoe_active_set_fcollect(routine, &s, dest, source,                       \
+                                     osoe_rma_bytes(routine, nelems, BITS / 8), pSync); \
+        else                                                                          \
+            osoe_active_set_collect(routine, &s, dest, source,                        \
+                                    osoe_rma_bytes(routine, nelems, BITS / 8), pSync); \
     }
 OSOE_COLLECT_ACTIVE_SET_DEFINE(collect, 32, false)
 OSOE_COLLECT_ACTIVE_SET_DEFINE(collect, 64, false)

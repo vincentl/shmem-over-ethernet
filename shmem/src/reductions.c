@@ -16,6 +16,7 @@
  *
  * Complexity: O(1) here; the reduction's own in collectives.c.
  */
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -87,13 +88,19 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_ALIAS_ARITHMETIC)
 
 /* The deprecated active-set forms (Annex F; Table 11), over the whole job. */
 static void to_all(const char *routine, void *dest, const void *source, int nreduce,
-                   int PE_start, int logPE_stride, int PE_size,
+                   int PE_start, int logPE_stride, int PE_size, long *pSync,
                    enum osoe_reduction_operation operation, struct osoe_element element)
 {
-    osoe_active_set_whole_job(routine, PE_start, logPE_stride, PE_size);
+    struct osoe_active_set s;
+    bool whole = osoe_active_set_is_whole_job(routine, PE_start, logPE_stride, PE_size, &s);
     if (nreduce < 0)
         osoe_fatal("%s: nreduce %d is negative", routine, nreduce);
-    osoe_reduce(routine, SHMEM_TEAM_WORLD, dest, source, (size_t)nreduce, operation, element);
+    if (whole)
+        osoe_reduce(routine, SHMEM_TEAM_WORLD, dest, source, (size_t)nreduce, operation,
+                    element);
+    else
+        osoe_active_set_reduce(routine, &s, dest, source, (size_t)nreduce, operation, element,
+                               pSync);
 }
 
 #define OSOE_TO_ALL_DEFINE(T, NAME, OPERATOR, OPERATION, ELEMENT)                     \
@@ -101,9 +108,8 @@ static void to_all(const char *routine, void *dest, const void *source, int nred
         int nreduce, int PE_start, int logPE_stride, int PE_size, T *pWrk, long *pSync) \
     {                                                                                 \
         (void)pWrk;                                                                   \
-        (void)pSync;                                                                  \
         to_all("shmem_" #NAME "_" #OPERATOR "_to_all", dest, source, nreduce, PE_start, \
-               logPE_stride, PE_size, OPERATION, ELEMENT);                            \
+               logPE_stride, PE_size, pSync, OPERATION, ELEMENT);                      \
     }
 
 #define OSOE_TO_ALL_DEFINE_INTEGER(T, NAME)                                           \

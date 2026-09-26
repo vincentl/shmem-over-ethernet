@@ -215,23 +215,27 @@ OSOE_API int pshmem_team_sync(shmem_team_t team)
 }
 
 /*
- * The deprecated active-set forms (Annex F), over the whole job only
- * (collectives.h): shmem_barrier is shmem_barrier_all and shmem_sync is
- * shmem_sync_all, pSync neither read nor written - which leaves it as the spec
- * requires it to be found afterwards, and makes its reuse rules hold trivially.
+ * The deprecated active-set forms (Annex F; collectives.h): over the whole job
+ * shmem_barrier is shmem_barrier_all and shmem_sync is shmem_sync_all, pSync
+ * neither read nor written; over any other set, active-set.c's dissemination
+ * barrier on pSync.
  */
 OSOE_API void pshmem_barrier(int PE_start, int logPE_stride, int PE_size, long *pSync)
 {
-    (void)pSync;
-    osoe_active_set_whole_job("shmem_barrier", PE_start, logPE_stride, PE_size);
-    osoe_barrier_all("shmem_barrier");
+    struct osoe_active_set s;
+    if (osoe_active_set_is_whole_job("shmem_barrier", PE_start, logPE_stride, PE_size, &s))
+        osoe_barrier_all("shmem_barrier");
+    else
+        osoe_active_set_barrier("shmem_barrier", &s, pSync, true);
 }
 
 OSOE_API void pshmem_sync(int PE_start, int logPE_stride, int PE_size, long *pSync)
 {
-    (void)pSync;
-    osoe_active_set_whole_job("shmem_sync", PE_start, logPE_stride, PE_size);
-    team_sync(osoe_team_of("shmem_sync", SHMEM_TEAM_WORLD), "shmem_sync");
+    struct osoe_active_set s;
+    if (osoe_active_set_is_whole_job("shmem_sync", PE_start, logPE_stride, PE_size, &s))
+        team_sync(osoe_team_of("shmem_sync", SHMEM_TEAM_WORLD), "shmem_sync");
+    else
+        osoe_active_set_barrier("shmem_sync", &s, pSync, false);
 }
 
 /* The weak `shmem_` aliases (export.h). */
