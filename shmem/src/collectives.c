@@ -439,6 +439,103 @@ int osoe_alltoall(const char *routine, shmem_team_t team, void *dest, const void
     return 0;
 }
 
+/*
+ * The prefix scans (spec §9.10.10; phase 1 step 10 slice 1). A team spanning
+ * nodes hands the whole scan to internode.h, where every member runs its place
+ * in the scan's tree (osoe_internode_scan), and takes no epoch: the node's
+ * counters would only add an intranode barrier to a collective whose members
+ * each wait for their own inputs. A team on one node is its local lead's:
+ * every member arrives, the lead sums the members' sources in team rank order
+ * into each one's dest - reading a member's source before writing its dest,
+ * so the two may be one array, and writing a dest only once its owner has
+ * arrived, which the spec allows (every dest is ready before any PE calls) -
+ * and releases them. O(L n) on the lead; no copy-out, so no `copied`.
+ * Floating results depend on the order of the additions, and so on the layout
+ * (design §5.8): conforming, since the spec defines the sum mathematically.
+ */
+int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *source,
+              size_t nelems, struct osoe_element element, bool inclusive)
+{
+    struct osoe_team *t = osoe_team_of(routine, team);
+    if (!t)
+        return 1;                       /* SHMEM_TEAM_INVALID: undefined, answered nonzero */
+    osoe_combine_function add = osoe_combine_lookup(OSOE_REDUCTION_SUM, element);
+    if (!add)
+        osoe_fatal("%s: no sum over elements of kind %d and width %u", routine,
+                   (int)element.kind, element.width);
+    size_t bytes = osoe_rma_bytes(routine, nelems, element.width);
+    if (bytes == 0)
+        return 0;
+    struct osoe_symmetric_location dest_at = osoe_symmetric_locate(routine, dest, bytes);
+    struct osoe_symmetric_location source_at = osoe_symmetric_locate(routine, source, bytes);
+
+    if (t->internode) {
+        osoe_internode_scan(t->number, t->scans, t->me, dest, source, nelems, element, inclusive,
+                            routine);
+        t->scans++;
+        return 0;
+    }
+
+    uint32_t k = t->epoch, members = t->local_members;
+    if (t->singleton) {
+        if (!inclusive)
+            memset(dest, 0, bytes);
+        else if (source != dest)
+            memmove(dest, source, bytes);
+        t->epoch = k + 1;
+        atomic_store_explicit(t->published, k + 1, memory_order_release);
+        return 0;
+    }
+
+    struct osoe_team_block *b = t->block;
+    bool lead = osoe.bootstrap.local_id == t->lead_local_id;
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
+    if (osoe_epoch_release_bump_eq(&b->arrived, (k + 1) * members) && !lead)
+        osoe_epoch_wake_all(&b->arrived);
+    if (lead) {
+        osoe_epoch_wait_eq(&b->arrived, (k + 1) * members, routine);
+        /* The members in team rank order: local_ranks need not be ascending
+         * (the predefined teams list local-id order), so sort their indices. */
+        uint32_t *order = malloc((size_t)members * sizeof *order);
+        unsigned char *running = calloc(1, bytes), *mine = malloc(bytes);
+        if (!order || !running || !mine)
+            osoe_fatal("%s: out of memory for a scan of %zu bytes", routine, bytes);
+        for (uint32_t m = 0; m < members; m++) {
+            uint32_t at = m;
+            while (at > 0 && t->local_ranks[order[at - 1]] > t->local_ranks[m]) {
+                order[at] = order[at - 1];
+                at--;
+            }
+            order[at] = m;
+        }
+        for (uint32_t i = 0; i < members; i++) {
+            uint32_t id = t->local_ids[order[i]];
+            memcpy(mine, member_copy(id, source_at), bytes);
+            unsigned char *out = member_copy(id, dest_at);
+            if (inclusive) {
+                add(running, mine, nelems);
+                memcpy(out, running, bytes);
+            } else {
+                memcpy(out, running, bytes);
+                add(running, mine, nelems);
+            }
+        }
+        free(order);
+        free(running);
+        free(mine);
+        if (!osoe_epoch_release_bump_eq(&b->released, k + 1))
+            osoe_fatal("%s: %s's epochs diverged at epoch %u: PEs called different numbers "
+                       "of collectives", routine, t->name, k + 1);
+        osoe_epoch_wake_all(&b->released);
+    } else {
+        osoe_epoch_wait_eq(&b->released, k + 1, routine);
+    }
+    t->epoch = k + 1;
+    atomic_store_explicit(t->published, k + 1, memory_order_release);
+    osoe_blocked_leave();
+    return 0;
+}
+
 void osoe_active_set_whole_job(const char *routine, int PE_start, int logPE_stride,
                                int PE_size)
 {

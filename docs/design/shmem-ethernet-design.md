@@ -4439,8 +4439,9 @@ does **not** generalize:
   rank;
 - **collect** with a different `nelems` per PE needs per-PE sizes and offsets.
 
-Each needs its own design before it is implemented (§7). Scans have one (§5.8);
-alltoall and collect have theirs as built (below, phase 1 step 5 slice 4).
+Each needs its own design before it is implemented (§7). Scans have theirs as
+built (§5.8, phase 1 step 10 slice 1); alltoall and collect have theirs as
+built (below, phase 1 step 5 slice 4).
 
 For the collectives it covers, this eliminates scratch sizing within a node — no
 chunking loop, no high-water allocation, no per-team data area. Their shared
@@ -4560,7 +4561,7 @@ the total alone - so the P words are the lead's to touch, and a non-lead's cost
 is a page. The room is given back before returning; a take and its give leave
 the allocator as it was (§4.4), on the PEs of a team smaller than the job as on
 the others, and a heap without the room answers nonzero on every member alike.
-A scan (§9.10.10, not built) would give each PE its own place in O(1) memory.
+A scan (§9.10.10, built since phase 1 step 10) gives each PE its own place in O(1) memory.
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put
 but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads
@@ -5061,6 +5062,41 @@ once that PE has called, so the design pushes as §5.5 requires.
 *(Rejected: a sequential chain through the ranks — O(PEs) rounds, and a dead PE
 stalls everything behind it. Rejected: a rank-level parallel prefix even when runs
 are long, which multiplies the rounds by the local member count for nothing.)*
+
+*As built - not the runs above* (phase 1 step 10 slice 1;
+`docs/prompts/phase1-step10-slice1-prompt.md`; the author's design A of
+2026-09-26). **Every member holds its team rank's place in a pre-order k-ary
+tree over the ranks**, k the agreed fan-out: a place covering [a, b) is rank
+a, its children split [a + 1, b) into at most k consecutive blocks, so every
+subtree is a contiguous range of ranks. Up, a member sums its children's
+subtree totals and its own source and puts that to its parent; down, it
+receives the sum of every rank before its subtree - its exclusive result -
+and sends child j that plus its own source plus the totals of children
+before j. Each member runs its own place on its own thread, reads only its
+own source and writes only its own `dest`, so in place is safe. A tree over
+the ranks rather than the runs: the modeled and timed comparison
+(`tools/modelcheck/scan_model.py`, `scan_timing.py`) found the two equal under
+a cyclic layout and the runs about two network hops faster under a block one,
+where the rank tree's subtrees do not line up with nodes (at a Pi's 4 x 4,
+about 320 against 165 µs); the runs would have needed a walk of the layout per
+team, run bookkeeping and a lead serving many places, and no program in the
+corpus calls a scan. The "rank-level" rejection above was of a flat parallel
+prefix over ranks; a tree's levels within a node cost shared-memory hops.
+
+**The open point, how a node holding many runs takes their messages**,
+resolved itself: every PE has its own internal region, so every member's place
+lands in its own. The slots are the PE's, shared by every team - k up-slots
+and a down-slot, and a counter for each, cumulative, each PE counting its own
+scans - and not the reductions' per-team rows, which a node that finished a
+scan could be writing for a reduction while its tree parent in the scan still
+reads them. **READY, per team number**, keeps a member of a new team that was
+not in the last from writing into a parent still in another scan; the model
+breaks it without READY, and with one READY for every team, which takes three
+teams to show. The seam's call is `osoe_internode_scan`, the one data-half
+call every member makes (internode.h), over the team's world ranks from its
+record (decision E); a team on one node is scanned by its local lead, in rank
+order, between the intranode arrival and release. A scan on a team spanning
+nodes takes no epoch: nothing of the node's counters is used.
 
 ---
 
@@ -5879,9 +5915,10 @@ and every one of them has a wrapper for it.
 
 ### 7.5 Deferred (mechanical)
 
-The scans (§9.10.10). *(Locks are built: §4.12. Reductions, broadcast,
-collect, fcollect, alltoall and alltoalls are built, and the deprecated
-active-set routines over the whole job: §7.1 step 5, §5.5 as built, §7.4.)*
+Nothing of the collectives: the scans (§9.10.10) are built since phase 1
+step 10 (§5.8). *(Locks are built: §4.12. Reductions, broadcast, collect,
+fcollect, alltoall and alltoalls are built, and the deprecated active-set
+routines over the whole job: §7.1 step 5, §5.5 as built, §7.4.)*
 
 **RMA's full type/operation cross product, strided transfers and nonblocking
 variants are implemented** (§9.6, §9.8.3-§9.8.4): every standard RMA type of
@@ -5958,7 +5995,7 @@ alltoall is non-conforming.
 | Routine | Why it waits |
 |---|---|
 | `shmem_ctx_session_start` / `_stop` (§9.9) | Hints only. A conforming implementation may ignore them entirely, so the no-op is the whole phase-1 implementation |
-| `shmem_sum_inscan`, `shmem_sum_exscan` (§9.10.10) | Inherits the §5.1 two-level skeleton, but **not** §5.5's accumulator: each PE's result depends on team rank order, so it needs its own design |
+| `shmem_sum_inscan`, `shmem_sum_exscan` (§9.10.10) | Inherits the §5.1 two-level skeleton, but **not** §5.5's accumulator: each PE's result depends on team rank order, so it needs its own design - built at phase 1 step 10, a tree over the team's ranks (§5.8) |
 
 Session routines are worth stubbing early precisely *because* they are ignorable:
 an empty implementation is conforming, and having the entry points present stops

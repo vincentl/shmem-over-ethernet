@@ -47,7 +47,7 @@ cmake_minimum_required(VERSION 3.25)
 set(OSOE_API
   accessible.c alltoall.c amo.c barrier.c broadcast.c collect.c collectives.c context.c
   deprecated.c info.c init.c lock.c malloc.c profile.c quiet.c reductions.c rma-typed.c
-  rma.c session.c signal.c symmetric.c team.c wait.c
+  rma.c scans.c session.c signal.c symmetric.c team.c wait.c
   barrier.h collectives.h context.h export.h lock.h rma.h symmetric.h team.h wait.h)
 
 # The runtime: initialization's machinery and the agent (§6, §3.12), and the

@@ -255,6 +255,18 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_PDECL_ARITHMETIC)
 #ifdef OSOE_CXX_COMPLEX
 #pragma GCC diagnostic pop
 #endif
+/* The prefix scans (§9.10.10), from shmem.h's lists. */
+#define OSOE_SCAN_PDECL(T, NAME) OSOE_SCAN_DECL_P(pshmem_, T, NAME)
+OSOE_REDUCE_INTEGER_TYPES(OSOE_SCAN_PDECL)
+OSOE_REDUCE_FLOATING_TYPES(OSOE_SCAN_PDECL)
+#ifdef OSOE_CXX_COMPLEX
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+OSOE_REDUCE_COMPLEX_TYPES(OSOE_SCAN_PDECL)
+#ifdef OSOE_CXX_COMPLEX
+#pragma GCC diagnostic pop
+#endif
 OSOE_RMA_STANDARD_TYPES(OSOE_BROADCAST_PDECL)
 int pshmem_broadcastmem(shmem_team_t team, void *dest, const void *source, size_t nelems,
                         int PE_root);

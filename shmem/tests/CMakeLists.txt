@@ -1618,6 +1618,30 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(get-nbi 0,1,2,0,1,0 ${osoe_get_nbi_small})
 endif()
 
+# The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on
+# one node, where the team's local lead scans; across nodes on a block, an
+# interleaved and an uneven map, and under force-remote, where every member
+# runs its place in the scan's tree; and on five nodes at fan-out 2, where
+# that tree over ten members is three levels deep, with the AM layer's small
+# settings, which split a scan's pieces on the wire.
+osoe_tier2_test(scan)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(scan 0,0,1,1)
+  osoe_tier2_map_test(scan 0,1,2,0,1,0)
+  osoe_tier2_map_test(scan 0,0,0,1,2,2)
+  add_test(NAME shmem.scan.force-remote.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_scan>)
+  set_tests_properties(shmem.scan.force-remote.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
+  add_test(NAME shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=2 OSOE_AM_CHUNK=1024
+            OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+            $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
+            $<TARGET_FILE:shmem_test_scan>)
+  set_tests_properties(shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4 PROPERTIES LABELS "tier2"
+    TIMEOUT 120)
+endif()
+
 # Contexts (spec §9.5; design §4.6, §4.11; phase 1 step 8 slice 1;
 # test-context.c): on one node, across nodes on a block and an interleaved
 # map, and under force-remote; the multi-node maps with the landing records
@@ -2033,6 +2057,8 @@ if(OSOE_TIER3)
                         OSOE_AM_CREDITS=2)
     # Contexts' gets sharing the landing zone, and a team context's traffic,
     # over the shaped link (phase 1 step 8 slice 1).
+    osoe_tier3_test(scan.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_scan
+                    ENV ${osoe_tier3_wire})
     osoe_tier3_test(context.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_context
                     ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
                         OSOE_AM_CREDITS=2)

@@ -52,6 +52,7 @@ add_library(osoe
   src/rendezvous.c
   src/rma.c
   src/rma-typed.c
+  src/scans.c
   src/collectives.c
   src/combine.c
   src/context.c

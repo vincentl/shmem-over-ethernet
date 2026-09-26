@@ -14,6 +14,7 @@
 #ifndef OSOE_INTERNODE_GENERIC_H
 #define OSOE_INTERNODE_GENERIC_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -34,5 +35,8 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
                                       void *buffer, size_t bytes, const char *routine);
 void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                                     size_t block, const uint64_t *places, const char *routine);
+void osoe_internode_generic_scan(uint32_t team, uint32_t scan, uint32_t rank, void *dest,
+                                 const void *source, size_t count, struct osoe_element element,
+                                 bool inclusive, const char *routine);
 
 #endif /* OSOE_INTERNODE_GENERIC_H */

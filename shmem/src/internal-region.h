@@ -133,16 +133,42 @@ static inline uint64_t osoe_internal_gather_offset(uint32_t fanout, uint32_t pip
            OSOE_INTERNAL_LINE_BYTES;
 }
 
-/* The region's size for `max_teams` team numbers, a tree of fan-out `fanout`,
- * `pipeline` pieces in flight and a job of `nodes` nodes, before page
- * rounding: the slots, the words, the counter's line, then the allgather's
- * words. */
-static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipeline,
-                                                  uint32_t max_teams, uint32_t nodes)
+/*
+ * Last, **the scans' area** (spec §9.10.10; phase 1 step 10 slice 1,
+ * docs/prompts/phase1-step10-slice1-prompt.md): the PE's, shared by every
+ * team, since every member of a scan holds a place of its own in the scan's
+ * tree - `fanout` up-slots, one per child position, and a down-slot, each a
+ * slot; then a counter for each, alone on its line; then a READY word per team
+ * number, alone on its line, which a PE's parents in scans on that team add
+ * to as they enter. Not the reductions' per-team rows: a node that finished a
+ * scan may start a reduction and put into a row its tree parent, still in the
+ * scan, would be reading - different collectives have different trees
+ * (tools/modelcheck/scan_model.py). 80 KiB and a line per team number at the
+ * defaults, touched only by scans.
+ */
+static inline uint64_t osoe_internal_scan_offset(uint32_t fanout, uint32_t pipeline,
+                                                 uint32_t max_teams, uint32_t nodes)
 {
     return osoe_internal_gather_offset(fanout, pipeline, max_teams) +
            (uint64_t)max_teams *
                osoe_internal_team_gather_bytes(osoe_internal_gather_steps(nodes));
+}
+
+static inline uint64_t osoe_internal_scan_bytes(uint32_t fanout, uint32_t max_teams)
+{
+    return (uint64_t)(fanout + 1) * (OSOE_INTERNAL_SLOT_BYTES + OSOE_INTERNAL_LINE_BYTES) +
+           (uint64_t)max_teams * OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* The region's size for `max_teams` team numbers, a tree of fan-out `fanout`,
+ * `pipeline` pieces in flight and a job of `nodes` nodes, before page
+ * rounding: the slots, the words, the counter's line, the allgather's words,
+ * then the scans' area. */
+static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipeline,
+                                                  uint32_t max_teams, uint32_t nodes)
+{
+    return osoe_internal_scan_offset(fanout, pipeline, max_teams, nodes) +
+           osoe_internal_scan_bytes(fanout, max_teams);
 }
 
 #endif /* OSOE_INTERNAL_REGION_H */

@@ -175,3 +175,11 @@ void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t 
 {
     osoe_internode_generic_collect(team, epoch, buffer, bytes, block, places, routine);
 }
+
+void osoe_internode_scan(uint32_t team, uint32_t scan, uint32_t rank, void *dest,
+                         const void *source, size_t count, struct osoe_element element,
+                         bool inclusive, const char *routine)
+{
+    osoe_internode_generic_scan(team, scan, rank, dest, source, count, element, inclusive,
+                                routine);
+}

@@ -145,6 +145,7 @@
 #ifndef OSOE_INTERNODE_H
 #define OSOE_INTERNODE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -348,5 +349,31 @@ void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index
  */
 void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                             size_t block, const uint64_t *places, const char *routine);
+
+/*
+ * The internode phase of a prefix scan (spec §9.10.10; phase 1 step 10 slice
+ * 1, docs/prompts/phase1-step10-slice1-prompt.md): the one data-half call
+ * **every member** makes, on its own thread, not the team's local lead alone.
+ * `rank` is the caller's team rank; on return `dest` holds the sum of every
+ * member's `source`, `count` elements of `element`, over ranks 0 .. rank
+ * (`inclusive`) or 0 .. rank - 1 (exclusive, 0 at rank 0). `source` is read
+ * before `dest` is written, so the two may be one array. `scan` is the team's
+ * count of scans before this one, the same on every member. Called only for a
+ * team spanning nodes, whose ranks are a progression of world ranks its record
+ * carries (node.h, decision E); a team on one node is its local lead's to scan
+ * (collectives.c). Blocks, sweeping, naming `routine`.
+ *
+ * The generic implementation: every member at its rank's place in a pre-order
+ * k-ary tree over the ranks, k the agreed fan-out - each subtree a contiguous
+ * range of ranks - its subtree's total sent up, the sum of every rank before
+ * its subtree sent down, 2 ceil(log_k M) steps for M members. Its slots are
+ * the PE's own, in the internal region, shared by every team, and guarded by a
+ * READY per team number (internal-region.h; tools/modelcheck/scan_model.py).
+ * An RDMA backend runs it as it is, its puts and fenced adds RDMA writes and
+ * atomics.
+ */
+void osoe_internode_scan(uint32_t team, uint32_t scan, uint32_t rank, void *dest,
+                         const void *source, size_t count, struct osoe_element element,
+                         bool inclusive, const char *routine);
 
 #endif /* OSOE_INTERNODE_H */

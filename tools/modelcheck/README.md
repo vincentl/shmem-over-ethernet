@@ -12,6 +12,7 @@ were run. Develop new models here.
 | `get_completion_model.py`, `dirty_set_model.py`, `watch_list_model.py` | Worked models: each checks a design and deliberately broken variants |
 | `pipeline_model.py` | Pieces of a data collective pipelined through the internode tree, the author's decision of 2026-09-25 (§5.8) |
 | `allgather_model.py` | Bruck's allgather among node leads for fcollect's internode phase, the same decision (§5.8) |
+| `scan_model.py` | The prefix scans' tree over a team's ranks, with per-PE slots shared by every team and READY per team number (§5.8, phase 1 step 10); `scan_timing.py` times it against §5.8's runs |
 | `landing_extent_model.py`, `copy_out_claim_model.py` | §4.11's two open points the author decided on 2026-09-25: landing-zone extents claimed by CAS over a bitmap, and one copier per landed nonblocking get |
 | `pe_quiet_model.py` | §4.11 item 2's rule that a full quiet never piggybacks on a `pe_quiet`, which §10 had left unmodeled |
 | `selftest.py` | Checks that the reductions change no verdict; rerun it after changing the engine |
