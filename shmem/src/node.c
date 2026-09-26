@@ -581,7 +581,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * segment and every local PE's heap. The lead knows L and the heap size;
      * every PE has parsed the same size, or check_agreement fails them all. A
      * heap object is the heap and then its internal region (internal-region.h),
-     * about 10 MiB at the default 64 teams, fan-out of 4 and two pieces in
+     * about 11 MiB at the default 64 teams, fan-out of 4 and two pieces in
      * flight (OSOE_COLLECTIVE_PIPELINE), which is counted here with the heap
      * it follows.
      */

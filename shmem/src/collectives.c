@@ -444,12 +444,14 @@ int osoe_alltoall(const char *routine, shmem_team_t team, void *dest, const void
  * nodes hands the whole scan to internode.h, where every member runs its place
  * in the scan's tree (osoe_internode_scan), and takes no epoch: the node's
  * counters would only add an intranode barrier to a collective whose members
- * each wait for their own inputs. A team on one node is its local lead's:
+ * each wait for their own inputs, so osoe-stat's published epoch does not
+ * count such a scan. A team on one node is its local lead's:
  * every member arrives, the lead sums the members' sources in team rank order
  * into each one's dest - reading a member's source before writing its dest,
  * so the two may be one array, and writing a dest only once its owner has
  * arrived, which the spec allows (every dest is ready before any PE calls) -
- * and releases them. O(L n) on the lead; no copy-out, so no `copied`.
+ * and releases them, a chunk of elements at a time so that its own memory
+ * stays small. O(L n) on the lead; no copy-out, so no `copied`.
  * Floating results depend on the order of the additions, and so on the layout
  * (design §5.8): conforming, since the spec defines the sum mathematically.
  */
@@ -470,9 +472,7 @@ int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *so
     struct osoe_symmetric_location source_at = osoe_symmetric_locate(routine, source, bytes);
 
     if (t->internode) {
-        osoe_internode_scan(t->number, t->scans, t->me, dest, source, nelems, element, inclusive,
-                            routine);
-        t->scans++;
+        osoe_internode_scan(t->number, t->me, dest, source, nelems, element, inclusive, routine);
         return 0;
     }
 
@@ -494,12 +494,18 @@ int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *so
         osoe_epoch_wake_all(&b->arrived);
     if (lead) {
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * members, routine);
-        /* The members in team rank order: local_ranks need not be ascending
-         * (the predefined teams list local-id order), so sort their indices. */
+        /* The members in team rank order: every one-node team lists its
+         * members ascending today (team.h), and the sort keeps this from
+         * depending on it - O(L^2) at worst, once a call. */
         uint32_t *order = malloc((size_t)members * sizeof *order);
-        unsigned char *running = calloc(1, bytes), *mine = malloc(bytes);
+        /* A running sum and a member's source, a chunk at a time, so that the
+         * lead's memory does not grow with the scan (the review of the slice). */
+        enum { CHUNK = 16 << 10 };
+        size_t per_chunk = CHUNK / element.width;
+        size_t chunk_bytes = (nelems < per_chunk ? nelems : per_chunk) * element.width;
+        unsigned char *running = malloc(chunk_bytes), *mine = malloc(chunk_bytes);
         if (!order || !running || !mine)
-            osoe_fatal("%s: out of memory for a scan of %zu bytes", routine, bytes);
+            osoe_fatal("%s: out of memory for a scan", routine);
         for (uint32_t m = 0; m < members; m++) {
             uint32_t at = m;
             while (at > 0 && t->local_ranks[order[at - 1]] > t->local_ranks[m]) {
@@ -508,17 +514,23 @@ int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *so
             }
             order[at] = m;
         }
-        for (uint32_t i = 0; i < members; i++) {
-            uint32_t id = t->local_ids[order[i]];
-            memcpy(mine, member_copy(id, source_at), bytes);
-            unsigned char *out = member_copy(id, dest_at);
-            if (inclusive) {
-                add(running, mine, nelems);
-                memcpy(out, running, bytes);
-            } else {
-                memcpy(out, running, bytes);
-                add(running, mine, nelems);
+        for (size_t done = 0; done < nelems;) {
+            size_t n = nelems - done < per_chunk ? nelems - done : per_chunk;
+            size_t at = done * element.width, length = n * element.width;
+            memset(running, 0, length);
+            for (uint32_t i = 0; i < members; i++) {
+                uint32_t id = t->local_ids[order[i]];
+                memcpy(mine, member_copy(id, source_at) + at, length);
+                unsigned char *out = member_copy(id, dest_at) + at;
+                if (inclusive) {
+                    add(running, mine, n);
+                    memcpy(out, running, length);
+                } else {
+                    memcpy(out, running, length);
+                    add(running, mine, n);
+                }
             }
+            done += n;
         }
         free(order);
         free(running);

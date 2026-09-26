@@ -49,9 +49,11 @@
  * before them moved when they were added.
  *
  * Every PE's heap carries one, and a team touches only its own slots and its
- * words' lines, and only on the leads of its nodes; the pages nobody writes
+ * words' lines, and only on the leads of its nodes - but for its scans, whose
+ * slots are on every member (below); the pages nobody writes
  * cost address space and the /dev/shm capacity check's share, not memory -
- * about 10 MiB a PE at the default 64 teams, a fan-out of 4 and D = 2, half of
+ * about 10 MiB of slots a PE at the default 64 teams, a fan-out of 4 and D = 2,
+ * and 1.3 MiB of the scans' (below); the tree's slots are half of
  * that at D = 1; the allgather's words add 2.5 KiB a team number at a thousand
  * nodes. **Every node computes the same offsets**: the layout is fixed by the
  * fan-out, OSOE_MAX_TEAMS, D and the job's node count, which every node agrees
@@ -76,6 +78,10 @@ enum {
      * Pi's Cortex-A72 and A76 and x86-64 have 64.
      */
     OSOE_INTERNAL_LINE_BYTES = 128,
+    /* One piece of a prefix scan: smaller than a data collective's, since a
+     * scan's slots are every member's and not only its node's lead's, and no
+     * program in the corpus scans much (the scans' area, below). */
+    OSOE_INTERNAL_SCAN_SLOT_BYTES = 4 << 10,
 };
 
 /* One team number's block of slots, for a tree of fan-out `fanout` whose leads
@@ -135,16 +141,18 @@ static inline uint64_t osoe_internal_gather_offset(uint32_t fanout, uint32_t pip
 
 /*
  * Last, **the scans' area** (spec §9.10.10; phase 1 step 10 slice 1,
- * docs/prompts/phase1-step10-slice1-prompt.md): the PE's, shared by every
- * team, since every member of a scan holds a place of its own in the scan's
- * tree - `fanout` up-slots, one per child position, and a down-slot, each a
- * slot; then a counter for each, alone on its line; then a READY word per team
- * number, alone on its line, which a PE's parents in scans on that team add
- * to as they enter. Not the reductions' per-team rows: a node that finished a
- * scan may start a reduction and put into a row its tree parent, still in the
- * scan, would be reading - different collectives have different trees
- * (tools/modelcheck/scan_model.py). 80 KiB and a line per team number at the
- * defaults, touched only by scans.
+ * docs/prompts/phase1-step10-slice1-prompt.md): per team number, like
+ * everything else here, and on every member's region rather than its node's
+ * lead's alone, since every member of a scan holds a place of its own in the
+ * scan's tree - `fanout` up-slots, one per child position, and a down-slot,
+ * each a scan slot; then a counter for each, alone on its line. Not the
+ * reductions' rows: a node that finished a scan may start a reduction and put
+ * into a row its tree parent, still in the scan, would be reading - different
+ * collectives have different trees. Per team number and not the PE's alone,
+ * shared by every team: under THREAD_MULTIPLE two threads of a PE may scan two
+ * teams at once (spec §9.4), and with a team's own slots consecutive scans on
+ * it are safe by the tree alone (tools/modelcheck/scan_model.py, per_team;
+ * the review of the slice). 1.3 MiB at the defaults, touched only by scans.
  */
 static inline uint64_t osoe_internal_scan_offset(uint32_t fanout, uint32_t pipeline,
                                                  uint32_t max_teams, uint32_t nodes)
@@ -154,10 +162,15 @@ static inline uint64_t osoe_internal_scan_offset(uint32_t fanout, uint32_t pipel
                osoe_internal_team_gather_bytes(osoe_internal_gather_steps(nodes));
 }
 
+/* One team number's scan slots and counters. */
+static inline uint64_t osoe_internal_team_scan_bytes(uint32_t fanout)
+{
+    return (uint64_t)(fanout + 1) * (OSOE_INTERNAL_SCAN_SLOT_BYTES + OSOE_INTERNAL_LINE_BYTES);
+}
+
 static inline uint64_t osoe_internal_scan_bytes(uint32_t fanout, uint32_t max_teams)
 {
-    return (uint64_t)(fanout + 1) * (OSOE_INTERNAL_SLOT_BYTES + OSOE_INTERNAL_LINE_BYTES) +
-           (uint64_t)max_teams * OSOE_INTERNAL_LINE_BYTES;
+    return (uint64_t)max_teams * osoe_internal_team_scan_bytes(fanout);
 }
 
 /* The region's size for `max_teams` team numbers, a tree of fan-out `fanout`,

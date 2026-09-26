@@ -5,15 +5,17 @@
  * contribution, or holding one it should not, shows.
  *
  * Inclusive and exclusive; in place and not; one element, a few, and more
- * than a slot of the internal region holds (a scan in pieces); long through
- * its typed name and the C11 generic, and int, char, unsigned char (sums that
- * wrap), float, double, long double and double complex; on the world, the
+ * than a scan slot of the internal region holds (a scan in pieces); long
+ * through its typed name and the C11 generic, and one scan of each other type
+ * SUM takes but the exact-width ones whose base type is tested - unsigned
+ * char, unsigned int and uint64_t with sums that wrap; on the world, the
  * world's evens (a strided split), the world reversed (a stride of -1),
  * SHMEM_TEAM_SHARED - a table of ranks on 0,1,2,0,1,0 - and a team of one.
  * Then scans back to back on teams whose members differ, with no barrier
- * between, which is what the READY rule is for: a team of the first and last
- * PE and then the world (the model's CA); and three teams of two - {0, 3},
- * {0, 1}, {2, 1} - in that order (the model's ZXY).
+ * between, each team on its own slots: a team of the first and last PE and
+ * then the world (the model's CA); and three teams of two - {0, 3}, {0, 1},
+ * {2, 1} - in that order (the model's ZXY), which span nodes on a map of one
+ * PE a node.
  */
 #include <complex.h>
 #include <stdbool.h>
@@ -28,7 +30,7 @@
 #include "check.h"
 #include "invariants.h"
 
-enum { LARGE = 2048 + 3 };   /* past a 16 KiB slot of longs */
+enum { LARGE = 2048 + 3 };   /* past a 4 KiB scan slot of longs, four times over */
 
 static int me, npes;
 static unsigned char *first, *second;   /* symmetric, LARGE x 16 bytes each */
@@ -85,6 +87,20 @@ SCAN_CHECK(float, float, FLOAT_VALUE)
 SCAN_CHECK(double, double, DOUBLE_VALUE)
 SCAN_CHECK(long double, longdouble, LONGDOUBLE_VALUE)
 SCAN_CHECK(double _Complex, complexd, COMPLEX_VALUE)
+#define SHORT_VALUE(r, j) ((short)(((r) + 1) * 31 + (int)(j) % 11))
+#define LONGLONG_VALUE(r, j) ((long long)((r) + 1) * 1000000007LL + (long long)(j))
+#define UINT_VALUE(r, j) ((unsigned int)((r) + 1) * 4000000000u + (unsigned int)(j))
+#define UINT64_VALUE(r, j) ((uint64_t)((r) + 1) * UINT64_C(0x9e3779b97f4a7c15) + (uint64_t)(j))
+#define SIZE_VALUE(r, j) ((size_t)((r) + 1) * 77u + (size_t)(j))
+#define PTRDIFF_VALUE(r, j) ((ptrdiff_t)((r) + 1) * -5 + (ptrdiff_t)(j))
+#define COMPLEXF_VALUE(r, j) ((float)((r) + 1) + (float)(j) * I)
+SCAN_CHECK(short, short, SHORT_VALUE)
+SCAN_CHECK(long long, longlong, LONGLONG_VALUE)
+SCAN_CHECK(unsigned int, uint, UINT_VALUE)
+SCAN_CHECK(uint64_t, uint64, UINT64_VALUE)
+SCAN_CHECK(size_t, size, SIZE_VALUE)
+SCAN_CHECK(ptrdiff_t, ptrdiff, PTRDIFF_VALUE)
+SCAN_CHECK(float _Complex, complexf, COMPLEXF_VALUE)
 
 /* Every shape of long's, and one of every other type's, on `team`. */
 static void check_team(shmem_team_t team, const char *label)
@@ -103,6 +119,15 @@ static void check_team(shmem_team_t team, const char *label)
     check_double(team, label, LARGE / 2, false, false, false);
     check_longdouble(team, label, 7, true, false, false);
     check_complexd(team, label, 7, false, true, false);
+    /* The rest of the types SUM takes, once each; unsigned int and uint64_t
+     * wrap. */
+    check_short(team, label, 7, true, false, false);
+    check_longlong(team, label, 7, false, false, false);
+    check_uint(team, label, 7, true, false, false);
+    check_uint64(team, label, 7, false, true, false);
+    check_size(team, label, 7, true, false, false);
+    check_ptrdiff(team, label, 7, false, false, false);
+    check_complexf(team, label, 7, true, false, false);
 }
 
 static shmem_team_t split(int start, int stride, int size)

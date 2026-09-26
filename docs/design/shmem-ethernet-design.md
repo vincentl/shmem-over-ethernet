@@ -4973,7 +4973,9 @@ bytes on x86-64 and 128 on aarch64, so that nodes of different architectures
 compute the same offsets. *Since phase 1 step 5 slice 5* each team number's
 slots are (fan-out + 1) × D, D per child position and D for releases, and its
 words fan-out + 1, an arrival counter per child position and a release counter
-("Pipelined pieces", above). About 10 MiB a PE at the default 64 teams, a
+("Pipelined pieces", above). About 10 MiB a PE at the default 64 teams (and,
+*since phase 1 step 10*, 1.3 MiB more of the scans' per-team slots at the
+region's end, on every member: "Prefix scans", below), a
 fan-out of 4 and D = 2, of which a team touches only its own slots and words,
 and only on its leads. And since the second slice of step 7 one line more,
 whose first word counts the team numbers claimed, on world PE 0 alone
@@ -5085,14 +5087,19 @@ prefix over ranks; a tree's levels within a node cost shared-memory hops.
 
 **The open point, how a node holding many runs takes their messages**,
 resolved itself: every PE has its own internal region, so every member's place
-lands in its own. The slots are the PE's, shared by every team - k up-slots
-and a down-slot, and a counter for each, cumulative, each PE counting its own
-scans - and not the reductions' per-team rows, which a node that finished a
-scan could be writing for a reduction while its tree parent in the scan still
-reads them. **READY, per team number**, keeps a member of a new team that was
-not in the last from writing into a parent still in another scan; the model
-breaks it without READY, and with one READY for every team, which takes three
-teams to show. The seam's call is `osoe_internode_scan`, the one data-half
+lands in its own. **The slots are the team number's on every member** - k
+up-slots and a down-slot of 4 KiB, and a counter for each, cumulative, each
+member expecting one more piece than the team's scans have moved - and not the
+reductions' rows, which a node that finished a scan could be writing for a
+reduction while its tree parent in the scan still reads them. Consecutive
+scans on one team are safe by the tree alone: a child reaches the next piece
+only after its parent read its total and sent it the down. *The brief and the
+first build shared one set of slots among every team, with a READY per team
+number to keep a new team's member from writing into a parent still in
+another scan; the review of the slice found that wrong under
+`THREAD_MULTIPLE`, where two threads of a PE may scan two teams at once (spec
+§9.4), and the per-team slots need no READY. Both designs are in the model,
+with a breakage of each rule.* The seam's call is `osoe_internode_scan`, the one data-half
 call every member makes (internode.h), over the team's world ranks from its
 record (decision E); a team on one node is scanned by its local lead, in rank
 order, between the intranode arrival and release. A scan on a team spanning

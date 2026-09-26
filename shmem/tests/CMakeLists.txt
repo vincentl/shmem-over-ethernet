@@ -1626,6 +1626,7 @@ endif()
 # settings, which split a scan's pieces on the wire.
 osoe_tier2_test(scan)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(scan 0,1,2,3)
   osoe_tier2_map_test(scan 0,0,1,1)
   osoe_tier2_map_test(scan 0,1,2,0,1,0)
   osoe_tier2_map_test(scan 0,0,0,1,2,2)

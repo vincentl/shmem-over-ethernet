@@ -41,7 +41,16 @@ stride of -1), so the two trees differ. Each case gives the order of scans
 every member makes, e.g. "AB": a scan on A then one on B.
 
 Designs
-  design         as above.
+  design         as above: per-PE slots shared by every team, and READY.
+  per_team       **as built**: slots and counters per (PE, team number), each
+                 PE counting per team, and no READY. The review of the slice
+                 found the shared slots wrong under THREAD_MULTIPLE, where two
+                 threads of a PE may scan two teams at once (spec §9.4); with a
+                 team's own slots, consecutive scans on one team are safe by the
+                 tree itself - a child reaches the next scan only after its
+                 parent read its total and sent it the down - which the cases
+                 on one team check, and scans on different teams touch
+                 different memory.
 Breakages
   no_ready       a child puts up without waiting for READY (SLOT or VALUE).
   shared_ready   one READY per PE rather than per team (SLOT or VALUE).
@@ -50,6 +59,10 @@ Breakages
                  (RESULT).
   team_counts    a PE counts what it expects in its slots per team, not over
                  every team's scans: a scan on B reads what A's left (VALUE).
+  per_team_pe_counts
+                 per-team slots, but counted over every team's scans, as the
+                 shared slots are: a scan on B waits for a count its own slots
+                 never reach (STUCK).
 
 Runs are SC; puts are fenced before the counter add that covers them, and
 waits are abstract (the region wait's wake is wait_word_model.py's).
@@ -60,10 +73,12 @@ import sys
 
 from engine import assemble, explore, report, select
 
-UP = lambda p, j: ('up', p, j)          # at PE p: child position j's subtree total
-UPC = lambda p, j: ('upc', p, j)        # at PE p: totals put into position j, cumulative
-DOWN = lambda p: ('down', p)            # at PE p: the sum before its subtree
-DOWNC = lambda p: ('downc', p)
+# Slots and counters are keyed by (PE, team) under the per_team design (as
+# built) and by PE alone under the others, where `s` is always 0.
+UP = lambda p, j, s=0: ('up', p, j, s)      # at PE p: child position j's subtree total
+UPC = lambda p, j, s=0: ('upc', p, j, s)    # at PE p: totals put into position j, cumulative
+DOWN = lambda p, s=0: ('down', p, s)        # at PE p: the sum before its subtree
+DOWNC = lambda p, s=0: ('downc', p, s)
 READY = lambda p, t: ('ready', p, t)    # at PE p: its parents' entries into scans on team t
 UNREAD = lambda key: ('$unread',) + key  # ghost: the slot holds a value not yet read
 TAG = lambda key: ('$tag',) + key        # ghost: (team, scan) + 1 of the value in the slot
@@ -149,7 +164,8 @@ def member(design, pe, members, k, order):
         rank = rank_of(team, pe, members)
         parent, position, kids = tree[rank]
         tag = 10 * t + n_on_team + 1          # (team, scan on it) + 1
-        scope = team if design == 'team_counts' else None
+        scope = team if design in ('team_counts', 'per_team') else None
+        key = t if design in ('per_team', 'per_team_pe_counts') else 0
         ups = expected_up.setdefault(scope, [0] * k)
         p = f'x{x}_'
         later = [y for y in range(x + 1, len(order)) if pe in team_members(order[y], members)]
@@ -165,19 +181,19 @@ def member(design, pe, members, k, order):
         for j, (c, _) in enumerate(kids):
             want = ups[j] + 1
             ups[j] += 1
-            steps.append((f'{p}U{j}', ('await', lambda M, L, j=j, want=want:
-                                       M[UPC(pe, j)] >= want, None)))
-            steps.append((f'{p}V{j}', ('check', lambda M, L, j=j, tag=tag:
-                                       None if M[TAG(UP(pe, j))] == tag else
-                                       f'PE {pe} read up-slot {j} with tag {M[TAG(UP(pe, j))]}, '
+            steps.append((f'{p}U{j}', ('await', lambda M, L, j=j, want=want, key=key:
+                                       M[UPC(pe, j, key)] >= want, None)))
+            steps.append((f'{p}V{j}', ('check', lambda M, L, j=j, tag=tag, key=key:
+                                       None if M[TAG(UP(pe, j, key))] == tag else
+                                       f'PE {pe} read up-slot {j} with tag {M[TAG(UP(pe, j, key))]}, '
                                        f'not this scan\'s {tag}', None)))
-            steps.append((f'{p}T{j}', ('ghost', lambda M, L, j=j:
-                                       ({UNREAD(UP(pe, j)): 0},
-                                        {f'c{j}': M[UP(pe, j)]}), None)))
+            steps.append((f'{p}T{j}', ('ghost', lambda M, L, j=j, key=key:
+                                       ({UNREAD(UP(pe, j, key)): 0},
+                                        {f'c{j}': M[UP(pe, j, key)]}), None)))
         own = source(x, rank, members)
         if parent is not None:
             ppe = pe_of(team, parent, members)
-            if design == 'no_ready':
+            if design in ('no_ready', 'per_team', 'per_team_pe_counts'):
                 pass
             elif design == 'shared_ready':
                 shared_ready_expected += 1
@@ -190,8 +206,9 @@ def member(design, pe, members, k, order):
                 steps.append((f'{p}W', ('await', lambda M, L, want=want, t=t:
                                         M[READY(pe, t)] >= want, None)))
 
-            def put_up(M, L, ppe=ppe, position=position, own=own, n=len(kids), tag=tag):
-                key = UP(ppe, position)
+            def put_up(M, L, ppe=ppe, position=position, own=own, n=len(kids), tag=tag,
+                       slot=key):
+                key = UP(ppe, position, slot)
                 if M[UNREAD(key)]:
                     return [({('$overwrite',): 1}, {}, 'overwrite')]
                 total = own + sum(L[f'c{j}'] for j in range(n))
@@ -200,17 +217,18 @@ def member(design, pe, members, k, order):
             steps.append((f'{p}P', ('nd', put_up, None)))
             steps.append((f'{p}O', ('check', lambda M, L: None if not M[('$overwrite',)] else
                                     f'PE {pe} overwrote an unread slot', None)))
-            steps.append((f'{p}A', ('add', lambda L, ppe=ppe, position=position:
-                                    UPC(ppe, position), lambda L: 1, '_', None)))
+            steps.append((f'{p}A', ('add', lambda L, ppe=ppe, position=position, key=key:
+                                    UPC(ppe, position, key), lambda L: 1, '_', None)))
             want = expected_down.get(scope, 0) + 1
             expected_down[scope] = want
-            steps.append((f'{p}D', ('await', lambda M, L, want=want: M[DOWNC(pe)] >= want, None)))
-            steps.append((f'{p}DV', ('check', lambda M, L, tag=tag:
-                                     None if M[TAG(DOWN(pe))] == tag else
-                                     f'PE {pe} read its down-slot with tag {M[TAG(DOWN(pe))]}, '
-                                     f'not this scan\'s {tag}', None)))
-            steps.append((f'{p}DT', ('ghost', lambda M, L: ({UNREAD(DOWN(pe)): 0},
-                                                            {'before': M[DOWN(pe)]}), None)))
+            steps.append((f'{p}D', ('await', lambda M, L, want=want, key=key:
+                                    M[DOWNC(pe, key)] >= want, None)))
+            steps.append((f'{p}DV', ('check', lambda M, L, tag=tag, key=key:
+                                     None if M[TAG(DOWN(pe, key))] == tag else
+                                     f'PE {pe} read its down-slot with tag '
+                                     f'{M[TAG(DOWN(pe, key))]}, not this scan\'s {tag}', None)))
+            steps.append((f'{p}DT', ('ghost', lambda M, L, key=key: ({UNREAD(DOWN(pe, key)): 0},
+                                                            {'before': M[DOWN(pe, key)]}), None)))
         else:
             steps.append((f'{p}D', ('set', 'before', lambda L: 0, None)))
         # The result, checked, then down to each child.
@@ -222,8 +240,8 @@ def member(design, pe, members, k, order):
         for j, (c, _) in enumerate(kids):
             cpe = pe_of(team, c, members)
 
-            def put_down(M, L, j=j, cpe=cpe, own=own, tag=tag):
-                key = DOWN(cpe)
+            def put_down(M, L, j=j, cpe=cpe, own=own, tag=tag, slot=key):
+                key = DOWN(cpe, slot)
                 if M[UNREAD(key)]:
                     return [({('$overwrite',): 1}, {}, 'overwrite')]
                 left = 0 if design == 'no_left_sums' else sum(L[f'c{i}'] for i in range(j))
@@ -232,8 +250,8 @@ def member(design, pe, members, k, order):
             steps.append((f'{p}Q{j}', ('nd', put_down, None)))
             steps.append((f'{p}QO{j}', ('check', lambda M, L: None if not M[('$overwrite',)] else
                                         f'PE {pe} overwrote an unread down-slot', None)))
-            steps.append((f'{p}QA{j}', ('add', lambda L, cpe=cpe: DOWNC(cpe), lambda L: 1, '_',
-                                        None)))
+            steps.append((f'{p}QA{j}', ('add', lambda L, cpe=cpe, key=key: DOWNC(cpe, key),
+                                        lambda L: 1, '_', None)))
         # Chain the steps.
         chained = [(p + 'E', ('br', lambda L: True, None, None))] + steps
         for i, (lab, ins) in enumerate(chained):
@@ -254,9 +272,11 @@ def case(design, members, k, order):
     threads = [member(design, pe, members, k, order) for pe in range(members)]
     mem = {FIN: 0, ('$overwrite',): 0}
     for p in range(members):
-        for j in range(k):
-            mem[UP(p, j)] = mem[UPC(p, j)] = mem[UNREAD(UP(p, j))] = mem[TAG(UP(p, j))] = 0
-        mem[DOWN(p)] = mem[DOWNC(p)] = mem[UNREAD(DOWN(p))] = mem[TAG(DOWN(p))] = 0
+        for s in [0] + sorted(TEAM_NUMBER.values()):
+            for j in range(k):
+                mem[UP(p, j, s)] = mem[UPC(p, j, s)] = 0
+                mem[UNREAD(UP(p, j, s))] = mem[TAG(UP(p, j, s))] = 0
+            mem[DOWN(p, s)] = mem[DOWNC(p, s)] = mem[UNREAD(DOWN(p, s))] = mem[TAG(DOWN(p, s))] = 0
         for t in TEAM_NUMBER.values():
             mem[READY(p, t)] = 0
     return (f'scan/{design} members={members} k={k} order={order}', threads, mem, members)
@@ -278,6 +298,14 @@ CASES = [
     ('shared_ready', 4, 2, 'ZXY', False),
     ('no_left_sums', 4, 2, 'A', False),
     ('team_counts', 4, 2, 'AB', False),
+    ('per_team', 3, 2, 'AA', True),
+    ('per_team', 4, 2, 'ABA', True),
+    ('per_team', 5, 3, 'AB', True),
+    ('per_team', 6, 2, 'AB', True),
+    ('per_team', 4, 2, 'CAB', True),
+    ('per_team', 4, 2, 'ZXY', True),
+    ('per_team', 5, 2, 'AAA', True),
+    ('per_team_pe_counts', 4, 2, 'AB', False),
 ]
 
 

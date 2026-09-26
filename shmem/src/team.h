@@ -133,10 +133,6 @@ struct osoe_team {
     struct osoe_team_block *block;  /* this node's block for `number` (node.h) */
     uint32_t epoch;                 /* this PE's k for the team (§5.4) */
     uint32_t data_epoch;            /* and its d, data collectives completed */
-    /* Scans made on a team spanning nodes, which take no epoch: every member
-     * runs the scan's tree itself, and the node's counters are not used
-     * (collectives.c, osoe_scan). */
-    uint32_t scans;
     _Atomic uint32_t *published;    /* where k is published for osoe-stat */
 };
 

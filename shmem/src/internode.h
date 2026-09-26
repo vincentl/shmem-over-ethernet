@@ -45,7 +45,7 @@
  * (team, epoch) on every participating node. The data half,
  * osoe_internode_reduce, osoe_internode_broadcast and osoe_internode_collect,
  * is called by the team's local lead on its own application thread, and
- * blocks.
+ * blocks; osoe_internode_scan by every member, on its own thread.
  *
  * Errors, and waiting. As transport.h: there is no error return, and a failure
  * ends the job (§3.15). The barrier's half never blocks, so it never sweeps;
@@ -357,8 +357,7 @@ void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t 
  * `rank` is the caller's team rank; on return `dest` holds the sum of every
  * member's `source`, `count` elements of `element`, over ranks 0 .. rank
  * (`inclusive`) or 0 .. rank - 1 (exclusive, 0 at rank 0). `source` is read
- * before `dest` is written, so the two may be one array. `scan` is the team's
- * count of scans before this one, the same on every member. Called only for a
+ * before `dest` is written, so the two may be one array. Called only for a
  * team spanning nodes, whose ranks are a progression of world ranks its record
  * carries (node.h, decision E); a team on one node is its local lead's to scan
  * (collectives.c). Blocks, sweeping, naming `routine`.
@@ -367,13 +366,13 @@ void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t 
  * k-ary tree over the ranks, k the agreed fan-out - each subtree a contiguous
  * range of ranks - its subtree's total sent up, the sum of every rank before
  * its subtree sent down, 2 ceil(log_k M) steps for M members. Its slots are
- * the PE's own, in the internal region, shared by every team, and guarded by a
- * READY per team number (internal-region.h; tools/modelcheck/scan_model.py).
- * An RDMA backend runs it as it is, its puts and fenced adds RDMA writes and
- * atomics.
+ * the team number's, in every member's internal region (internal-region.h;
+ * tools/modelcheck/scan_model.py), so scans on different teams may run at once
+ * on different threads. An RDMA backend runs it as it is, its puts and fenced
+ * adds RDMA writes and atomics.
  */
-void osoe_internode_scan(uint32_t team, uint32_t scan, uint32_t rank, void *dest,
-                         const void *source, size_t count, struct osoe_element element,
-                         bool inclusive, const char *routine);
+void osoe_internode_scan(uint32_t team, uint32_t rank, void *dest, const void *source,
+                         size_t count, struct osoe_element element, bool inclusive,
+                         const char *routine);
 
 #endif /* OSOE_INTERNODE_H */

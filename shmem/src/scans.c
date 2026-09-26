@@ -15,7 +15,6 @@
 
 #include "collectives.h"
 #include "export.h"
-#include "internode.h"
 
 #define OSOE_SCAN_INTEGER_ELEMENT(T)                                                  \
     ((struct osoe_element){ (T)0 < (T)-1 ? OSOE_ELEMENT_UNSIGNED_INTEGER               \
