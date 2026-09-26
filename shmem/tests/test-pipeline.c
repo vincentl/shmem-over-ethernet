@@ -15,12 +15,14 @@
  *     over the run, and only the bases a lead advances by its own trees keep
  *     the pieces apart;
  *   - the count each lead publishes of the most pieces it had in flight
- *     (team.tree.most_pieces_in_flight), read as osoe-stat reads it: after a
- *     broadcast and a reduction of many pieces, exactly min(D, pieces) at
- *     every lead but the tree's root's, which sends nothing up and says 0. A
- *     lead fills its window before it looks for a release, so the value is
- *     not a matter of timing, and a lead with one piece too many in flight
- *     shows it here.
+ *     (team.tree.most_pieces_in_flight), read as osoe-stat reads it, after a
+ *     broadcast and a reduction of many pieces: exactly min(D, pieces) at a
+ *     leaf of the collective's tree, which has no children to wait for and
+ *     fills its window before it looks for a release; between 1 and that at a
+ *     lead between the root and the leaves, which takes whichever of its
+ *     inputs is ready first, so the schedule decides; and 0 at the root, which
+ *     sends nothing up. A lead with one piece too many in flight shows it
+ *     here, and a leaf with one too few.
  */
 #include <stdbool.h>
 #include <stddef.h>
@@ -163,25 +165,46 @@ static uint64_t pipeline(void)
     return d ? strtoull(d, NULL, 10) : 2;
 }
 
+/* The fan-out, likewise: the library's default is 4 (internode-am.c). */
+static uint64_t fanout(void)
+{
+    const char *k = getenv("OSOE_COLLECTIVE_FANOUT");
+    return k ? strtoull(k, NULL, 10) : 4;
+}
+
+/* Where a node is in the tree over `nodes` nodes rooted at node `root_node`:
+ * internode-generic.c's, whose node index i has children k i + 1 ... k i + k. */
+enum place { ROOT, BETWEEN, LEAF };
+static const char *const place_names[] = { "the root", "between root and leaves", "a leaf" };
+
+static enum place place_in_tree(int nodes, int node, int root_node)
+{
+    uint64_t index = (uint64_t)((node - root_node + nodes) % nodes);
+    if (index == 0)
+        return ROOT;
+    return fanout() * index + 1 >= (uint64_t)nodes ? LEAF : BETWEEN;
+}
+
 /*
  * The count this node's lead published for its last data collective on the
  * world team (number 0), which was of `pieces` pieces: 0 at the tree's root,
- * which sends nothing up, and min(D, pieces) at every other node. Then a
- * barrier, so that no lead starts another data collective while a PE of its
- * node has still to read this one's.
+ * min(D, pieces) at a leaf, and at least 1 and at most that between them.
+ * Then a barrier, so that no lead starts another data collective while a PE
+ * of its node has still to read this one's.
  */
-static void check_in_flight(const char *what, bool at_root, uint64_t pieces)
+static void check_in_flight(const char *what, enum place place, uint64_t pieces)
 {
     uint64_t most = UINT64_MAX;
     CHECK(osoe_test_scoped_metric("team.tree.most_pieces_in_flight", OSOE_MSCOPE_TEAM, 0,
                                   &most));
-    uint64_t want = at_root ? 0 : pieces < pipeline() ? pieces : pipeline();
-    if (most != want)
-        fprintf(stderr, "PE %d: after a %s of %llu pieces, this node's lead - %sthe tree's "
-                "root - had at most %llu in flight; D is %llu, so %llu\n", me, what,
-                (unsigned long long)pieces, at_root ? "" : "not ", (unsigned long long)most,
-                (unsigned long long)pipeline(), (unsigned long long)want);
-    CHECK(most == want);
+    uint64_t window = pieces < pipeline() ? pieces : pipeline();
+    bool right = place == ROOT ? most == 0 : place == LEAF ? most == window
+                                                           : most >= 1 && most <= window;
+    if (!right)
+        fprintf(stderr, "PE %d: after a %s of %llu pieces, this node's lead - %s - had at "
+                "most %llu in flight; D is %llu\n", me, what, (unsigned long long)pieces,
+                place_names[place], (unsigned long long)most, (unsigned long long)pipeline());
+    CHECK(right);
     shmem_barrier_all();
 }
 
@@ -235,13 +258,19 @@ int main(void)
      */
     shmem_barrier_all();
     if (nodes > 1) {
+        /* The broadcast's tree is rooted at its root's node: ask the root. */
+        int *node_of = shmem_malloc(sizeof *node_of);
+        CHECK_FATAL(node_of);
+        *node_of = node;
+        shmem_barrier_all();
+        int root_node = shmem_int_g(node_of, root);
+        shmem_free(node_of);
+
         uint64_t pieces = (MEBIBYTE_LONGS * sizeof(long) + PIECE_BYTES - 1) / PIECE_BYTES;
         broadcast_longs(dst, src, MEBIBYTE_LONGS, root, 40);
-        check_in_flight("broadcast",
-                        shmem_team_translate_pe(SHMEM_TEAM_WORLD, root, SHMEM_TEAM_SHARED) >= 0,
-                        pieces);
+        check_in_flight("broadcast", place_in_tree(nodes, node, root_node), pieces);
         reduction(dst, src, MEBIBYTE_LONGS, 41);
-        check_in_flight("reduction", node == 0, pieces);
+        check_in_flight("reduction", place_in_tree(nodes, node, 0), pieces);
     }
 
     shmem_free(src);

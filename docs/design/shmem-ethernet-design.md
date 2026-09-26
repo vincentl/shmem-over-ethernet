@@ -4545,8 +4545,9 @@ uses an OpenSHMEM extension.
 checked by `pipeline_model.py`; built at phase 1 step 5 slice 5, below).* The
 generic internode phase keeps D pieces in flight instead of one: each parent
 holds D slots per child position and each node D release slots, piece k in
-slot k mod D. Four rules
-make it hold, and the model breaks each:
+slot k mod D. Four rules make it hold - the model breaks the first, third and
+fourth, the tests the second, where an equality wait hangs - and a fifth makes
+it fast:
 - **One arrival counter per child position**, not one per node. With pieces in
   flight, a fast child's second arrival would stand in for a slow child's first
   in a summed count, and the parent would read a slot not yet written.
@@ -4559,7 +4560,19 @@ make it hold, and the model breaks each:
 - **A node copies a release out and forwards it before sending anything that
   release lets through**: the arrival it sends next is what tells its parent
   the release slot is free. Reversing the two lets a parent overwrite a release
-  a leaf has not copied, and deadlocks a middle node on a child waiting for it.
+  a node has not copied.
+- **A lead takes whichever input is ready** - its children's copies of the next
+  piece up, while the window allows, or its parent's next release - and waits
+  for either when neither is. A lead that waited for its children alone, with a
+  release waiting, would hold back the release they need to send what it waits
+  for: release k + 1 would leave it no sooner than a round trip to the bottom
+  of its subtree after release k, and a tree of depth h would run at about
+  h / (h - 1) times one piece at a time's speed, whatever D. *(The slice's first
+  build did exactly that, and its review found it with a timing simulation of
+  the loop: 1.97, 2.03 and 2.17 times at D = 2, 4 and 8 on a tree two deep,
+  1.50 to 1.66 three deep, where a lead taking either gets 2, 4 and 8 at every
+  depth.)* The model lets either input go first, so it covers the code's
+  order, which takes the children's piece first.
 
 Collectives still follow one another with different trees, a broadcast's rotated
 to its root, so a position's counter is fed by different children over the
@@ -4575,19 +4588,28 @@ default 2, between 1 and 8, read at init beside the fan-out and `OSOE_MAX_TEAMS`
 and agreed at the rendezvous as they are (§6.2), since it fixes the internal
 region's offsets - and, with the fan-out, between a node's PEs at the node's
 own rendezvous (`node.c`), as `OSOE_MAX_TEAMS` is, since a created team's local
-lead may be any of them; D = 1 keeps one piece at a time. A team number's block holds
-(fan-out + 1) × D slots and fan-out + 1 counters, each alone on its line. The
-loop is the model's: a lead sends piece `up` while `up` < pieces and `up` <
-`down` + D - its children's copies in, combined, and on to the parent, fenced
-add after the put - and otherwise consumes release `down`: copied out,
-forwarded to every child, and only then counted; the root, which sends nothing
-up, gathers each piece from its children and forwards it. Every slot's header
-is checked as before, so a divergence is still named where the pieces meet. A
-lead fills its window before it looks for a release, so every lead but the
-root has exactly min(D, pieces) in flight at its busiest; each publishes the
-most it had in its last collective in the team's tree state
-(`team.tree.most_pieces_in_flight`, layout 19), which `shmem.pipeline.*`
-asserts at D = 1, 2 and 4 on three maps - pinned by a count, not a time.
+lead may be any of them; D = 1 keeps one piece at a time. A team number's
+block of slots holds (fan-out + 1) × D slots, and its words fan-out + 1
+counters, each alone on its line. The loop is the model's, taking whichever
+input is ready: piece `up`, when `up` < pieces and `up` < `down` + D and its
+children's copies are in - combined, and on to the parent, fenced add after
+the put - or release `down`: copied out, forwarded to every child, and only
+then counted. One watch over the team's words, which are contiguous, waits
+for either (`osoe_region_wait_condition`). The root, which sends nothing up,
+gathers each piece from its children and forwards it. Every slot's header is
+checked as before, so a divergence is still named where the pieces meet. Each
+lead publishes the most pieces it had in flight in its last collective in the
+team's tree state (`team.tree.most_pieces_in_flight`, layout 19): exactly
+min(D, pieces) at a leaf, which fills its window before it looks for a
+release, and between 1 and that at a lead with children, as the schedule has
+it. `shmem.pipeline.*` asserts both at D = 1, 2 and 4 on four maps, the
+deepest three levels, and under the AM stress settings: the count pins the
+window; the speed-up is the simulation's, which a test could only time. Timed
+once in the VM (one host, loopback, 1 MiB, the median of 31, fan-out 2): on
+five nodes a broadcast took 12.0 ms at D = 1, 4.4 and 4.2 ms at D = 2 and 4
+with the first build's loop, and 4.0 and 2.2 ms with this one; on eight nodes,
+three levels deep, a reduction took 18.8 ms at D = 1, 12.8 and 12.4 ms with
+the first loop, 10.7 and 6.3 ms with this one.
 
 **An allgather for fcollect** *(decided 2026-09-25; checked by
 `allgather_model.py`; not yet built).* The generic gather's latency grows with

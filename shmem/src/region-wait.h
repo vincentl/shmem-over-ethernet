@@ -57,4 +57,18 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
                           unsigned width, bool is_signed, enum osoe_comparison comparison,
                           uint64_t want, enum osoe_blocked_detail kind, uint64_t detail);
 
+/*
+ * Block until `holds(context)` is true, where `holds` reads only eight-byte
+ * words of this PE's `region` within [offset, offset + len), which one watch
+ * covers: a condition over several words, such as a node lead's wait for
+ * whichever of its inputs is ready first (internode-generic.c). The words are
+ * updated only by rmw, so a sweep that finds the condition already true is a
+ * lost wake, counted as osoe_region_wait's are at that width. Recorded and swept
+ * as osoe_region_wait.
+ */
+void osoe_region_wait_condition(const char *routine, enum osoe_region region, uint64_t offset,
+                                size_t len, bool (*holds)(const void *context),
+                                const void *context, enum osoe_blocked_detail kind,
+                                uint64_t detail);
+
 #endif /* OSOE_REGION_WAIT_H */

@@ -125,3 +125,49 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
     }
     return have;
 }
+
+/* osoe_region_wait's loop, over a condition the caller evaluates: the watch
+ * published before the first evaluation, the sequence word loaded before each. */
+void osoe_region_wait_condition(const char *routine, enum osoe_region region, uint64_t offset,
+                                size_t len, bool (*holds)(const void *context),
+                                const void *context, enum osoe_blocked_detail kind,
+                                uint64_t detail)
+{
+    struct osoe_transport_watch *w = osoe_transport_watch(region, offset, len);
+    uint64_t slept_since = 0;
+    bool slept = false, woken = false, timed_out = false;
+
+    for (;;) {
+        uint32_t seq = osoe_transport_watch_seq(w);
+        if (holds(context)) {
+            if (timed_out)
+                osoe_count(osoe_region_wait_late_wake_counter(8), 1);
+            break;
+        }
+        if (woken)
+            osoe_count(OSOE_C_TRANSPORT_WATCH_SPURIOUS, 1);
+
+        if (!slept) {
+            slept = true;
+            slept_since = osoe_now_ns();
+            osoe_blocked_enter(routine, kind, detail);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
+        }
+
+        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        woken = osoe_transport_watch_wait(w, seq, &sweep);
+        timed_out = !woken;
+        if (woken) {
+            osoe_count(OSOE_C_TRANSPORT_WATCH_WAKES, 1);
+        } else {
+            osoe_count(OSOE_C_TRANSPORT_WATCH_SWEEPS, 1);
+            osoe_sweep_expired(routine);
+        }
+    }
+
+    osoe_transport_unwatch(w);
+    if (slept) {
+        osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED_NS, osoe_now_ns() - slept_since);
+        osoe_blocked_leave();
+    }
+}
