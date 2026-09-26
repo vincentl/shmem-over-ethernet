@@ -159,6 +159,44 @@ static void notify(void *context, uint32_t pe, uint16_t region, uint64_t offset,
 }
 
 /*
+ * A team the engine meets for the first time (progress.h): its record in this
+ * node's block (node.h), loaded as it was published - `published` with acquire,
+ * then the rest (§3.16) - and turned into the engine's terms, the node numbers
+ * its messages go to rather than the neighbours' leads' ranks the record keeps.
+ * False for a team with no record here, or one spanning a single node: the
+ * engine then ends the job naming it, as it did an unregistered team. The
+ * record's counts are this library's own, but they are read from shared
+ * memory, so a child count past the fan-out is refused rather than followed.
+ */
+static bool team_of_record(void *context, uint32_t team, struct osoe_collective_tree *tree,
+                           struct osoe_collective_state **published)
+{
+    (void)context;
+    struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
+    if (!b || !atomic_load_explicit(&b->record.published, memory_order_acquire))
+        return false;
+    const struct osoe_team_record *r = &b->record;
+    if (r->nodes < 2)
+        return false;
+    uint32_t fanout = osoe.bootstrap.collective_fanout;
+    if (r->children > fanout || r->index >= r->nodes)
+        osoe_fatal("team %u's record on this node says %u children at index %u of %u nodes, "
+                   "at a fan-out of %u", team, r->children, r->index, r->nodes, fanout);
+    *tree = (struct osoe_collective_tree){
+        .count = r->nodes,
+        .index = r->index,
+        .fanout = fanout,
+        .parent = r->parent == UINT32_MAX ? OSOE_COLLECTIVE_TREE_NONE
+                                          : osoe_node_of(&osoe.job, r->parent),
+        .children = r->children,
+    };
+    for (uint32_t j = 0; j < r->children; j++)
+        tree->child[j] = osoe_node_of(&osoe.job, r->child[j]);
+    *published = &b->tree;
+    return true;
+}
+
+/*
  * §5.3's release, applied on this node. The engine knows only (team, epoch);
  * what a release *does* - advance the team's counter and wake its members - is
  * the collective layer's, reached through internode.h's upcall. Before slice 3
@@ -285,16 +323,28 @@ void osoe_progress_host_start(uint32_t session)
      * released every peer at once. No legal program can empty the pool, and
      * progress.c ends the job naming the peer if one does.
      */
+    /*
+     * The forwards' term counts the teams that can exist at once, since a node
+     * pair carries the trees of as many teams as exist job-wide and never more
+     * (§5.7), and the pool is node-wide, so it costs a descriptor per team per
+     * degree and not one per connection. Until teams can be created that is
+     * the predefined three; the split that creates them raises it to
+     * OSOE_MAX_TEAMS, the bound §5.7 gives the control queue. The per-team
+     * state below is sized by that already, since it is indexed by number.
+     */
+    uint32_t teams = osoe.bootstrap.max_teams;
     uint32_t descriptors = peers * (osoe_am.area.credits + OSOE_REPLY_SLACK) +
                            OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) *
-                               OSOE_TEAMS;
+                               OSOE_PREDEFINED_TEAMS;
     osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
     osoe_am.busy = calloc((peers + 63) / 64, sizeof *osoe_am.busy);
     osoe_am.descriptor = calloc(descriptors, sizeof *osoe_am.descriptor);
     osoe_am.scratch = malloc(osoe_am.area.chunk_bytes);
+    osoe_am.team = calloc(teams, sizeof *osoe_am.team);
+    osoe_am.pending = calloc(teams, sizeof *osoe_am.pending);
     if (!osoe_am.wire || !osoe_am.connection || !osoe_am.busy || !osoe_am.descriptor ||
-        !osoe_am.scratch)
+        !osoe_am.scratch || !osoe_am.team || !osoe_am.pending)
         osoe_fatal("out of memory setting up the AM backend for %u peer nodes", peers);
 
     /*
@@ -324,12 +374,14 @@ void osoe_progress_host_start(uint32_t session)
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, &osoe_am.ring,
                        osoe_am.descriptor, descriptors, osoe_am.scratch,
                        (uint32_t)osoe_am.area.chunk_bytes, &host);
+    osoe_progress_attach_teams(&osoe_am.progress, osoe_am.team, osoe_am.pending, teams,
+                               team_of_record);
     /* Count into the control segment, where osoe-stat and the tests read it. */
     osoe_am.progress.metrics = &osoe.node.hdr->am;
-    /* §3.14's connection scope and the tree's per-team state, in the same
-     * segment: the engine writes them, osoe-stat and the tests read them. */
+    /* §3.14's connection scope, in the same segment: the engine writes it,
+     * osoe-stat and the tests read it. Each team's tree state goes to its own
+     * block, which the engine learns with the team (team_of_record). */
     osoe_am.progress.connection_metrics = osoe.node.connection_metrics;
-    osoe_am.progress.collective = osoe.node.hdr->collective;
     for (uint32_t c = 0; c < osoe.node.connection_count; c++)
         atomic_store_explicit(&osoe.node.connection_metrics[c].peer,
                               c < osoe.job.node ? c : c + 1, memory_order_release);
@@ -475,11 +527,15 @@ void osoe_progress_host_stop(void)
         free(osoe_am.busy);
         free(osoe_am.descriptor);
         free(osoe_am.scratch);
+        free(osoe_am.team);
+        free(osoe_am.pending);
         osoe_am.wire = NULL;
         osoe_am.connection = NULL;
         osoe_am.busy = NULL;
         osoe_am.descriptor = NULL;
         osoe_am.scratch = NULL;
+        osoe_am.team = NULL;
+        osoe_am.pending = NULL;
     }
     osoe_connection_area_close(&osoe_am.area);
     osoe_am.internode = false;

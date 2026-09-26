@@ -59,6 +59,36 @@ static void metric_name(const struct osoe_metric_descriptor *m, char *buf, size_
     buf[n] = '\0';
 }
 
+/*
+ * Whether team number `team`'s block holds a published record (layout 18), and
+ * if so the name its metrics go by - the record's own, world or finalize or a
+ * number, found by name like everything else, or the number when the record
+ * gives none. What every view that walks the teams asks first: a block whose
+ * record is not published belongs to no team on this node.
+ */
+static bool team_label(const struct osoe_segment *s, uint32_t team, char *label, size_t len)
+{
+    uint64_t published = 0;
+    if (!osoe_segment_read_name(s, "team.record.published", team, &published) || !published)
+        return false;
+    if (!osoe_segment_read_str(s, "team.record.name", team, label, len) || !label[0])
+        snprintf(label, len, "%u", team);
+    return true;
+}
+
+/* A team-scope metric's name as one team's: team.arrived as team.world.arrived,
+ * or team.3.arrived for a team numbered 3. */
+static void team_metric_name(const struct osoe_metric_descriptor *m, const char *label,
+                             char *buf, size_t len)
+{
+    char name[48];
+    metric_name(m, name, sizeof name);
+    if (strncmp(name, "team.", 5) == 0)
+        snprintf(buf, len, "team.%s.%s", label, name + 5);
+    else
+        snprintf(buf, len, "%s", name);
+}
+
 static void print_duration(char *buf, size_t len, uint64_t ns)
 {
     if (ns < 1000)
@@ -381,6 +411,54 @@ static void print_connection_lines(const struct osoe_segment *s)
 
 /* ---- the summary view -------------------------------------------------- */
 
+/* One team's tree state on one node (§5.3), as the summary shows it. */
+struct tree_state {
+    uint64_t open, closed, own, kids, arrived, missing, parent;
+};
+
+/*
+ * Read by the team scope's names at team number `team` (layout 18), or - with
+ * `team` UINT32_MAX - by the node-scope names of the team called `label`, as a
+ * segment before layout 18 has them. False if the first is not there at all.
+ */
+static bool read_tree_state(const struct osoe_segment *s, uint32_t team, const char *label,
+                            struct tree_state *out)
+{
+    static const char *const fields[] = { "epoch_open", "epoch_closed", "own_arrived",
+                                          "children", "children_arrived", "lowest_missing",
+                                          "parent" };
+    uint64_t *values[] = { &out->open, &out->closed, &out->own, &out->kids, &out->arrived,
+                           &out->missing, &out->parent };
+    *out = (struct tree_state){ 0 };
+    for (size_t i = 0; i < sizeof fields / sizeof fields[0]; i++) {
+        char name[64];
+        if (team == UINT32_MAX)
+            snprintf(name, sizeof name, "team.%s.tree.%s", label, fields[i]);
+        else
+            snprintf(name, sizeof name, "team.tree.%s", fields[i]);
+        if (!osoe_segment_read_name(s, name, team == UINT32_MAX ? 0 : team, values[i]) &&
+            i == 0)
+            return false;
+    }
+    return true;
+}
+
+static void tree_line(const struct osoe_segment *s, uint64_t node, const char *host,
+                      uint64_t live, const char *team, const struct tree_state *t,
+                      const char *where)
+{
+    char missing_s[16] = "-", parent_s[16] = "root";
+    if (t->missing != UINT32_MAX)
+        snprintf(missing_s, sizeof missing_s, "%" PRIu64, t->missing);
+    if (t->parent != UINT32_MAX)
+        snprintf(parent_s, sizeof parent_s, "%" PRIu64, t->parent);
+    printf("node %-3" PRIu64 " %-16s %2" PRIu64 "/%-2u live  %-8s epoch %" PRIu64
+           "/%-3" PRIu64 " own %-3s kids %" PRIu64 "/%-2" PRIu64
+           " next %-4s parent %-4s  %s\n",
+           node, host, live, s->local_count, team, t->open, t->closed, t->own ? "yes" : "no",
+           t->arrived, t->kids, missing_s, parent_s, where);
+}
+
 /*
  * One line per node, for walking a hung collective down the tree (§3.14, §5.3).
  *
@@ -389,6 +467,14 @@ static void print_connection_lines(const struct osoe_segment *s)
  * **the lowest child that has not**. That last is the next node to look at, and
  * `host` says where. A node with `own` no is one whose own PEs have not all
  * called the collective, and the PE lines of *that* node say which.
+ *
+ * The teams are the node's published records (layout 18): every team number
+ * whose record says it spans nodes, shown under the record's name. The first
+ * of them - the world team - is always shown, so that every node has its line;
+ * any other only once it has run: the finalize team's record is written at
+ * init and it moves only at shmem_finalize. A segment from before layout 18
+ * has no records, and its two teams are found by the names its header gave
+ * them.
  */
 static void summary_line(const struct osoe_segment *s)
 {
@@ -420,39 +506,33 @@ static void summary_line(const struct osoe_segment *s)
         snprintf(where, sizeof where, "PE%u %s (%s) %s", i, b.routine, what, d);
     }
 
+    if (s->team_count > 0) {
+        bool first = true;
+        for (uint32_t t = 0; t < s->team_count; t++) {
+            char label[24];
+            uint64_t nodes = 0;
+            struct tree_state state;
+            if (!team_label(s, t, label, sizeof label) ||
+                !osoe_segment_read_name(s, "team.record.nodes", t, &nodes) || nodes < 2 ||
+                !read_tree_state(s, t, label, &state))
+                continue;
+            if (!first && state.open == 0 && state.closed == 0)
+                continue;
+            first = false;
+            tree_line(s, node, host, live, label, &state, where);
+        }
+        return;
+    }
     for (unsigned t = 0; t < 2; t++) {
         const char *team = t == 0 ? "world" : "finalize";
-        char name[64];
-        uint64_t open = 0, closed = 0, own = 0, kids = 0, arrived = 0, missing = 0, parent = 0;
-        snprintf(name, sizeof name, "team.%s.tree.epoch_open", team);
-        if (!osoe_segment_read_name(s, name, 0, &open))
+        struct tree_state state;
+        if (!read_tree_state(s, UINT32_MAX, team, &state))
             return;                     /* older layout: no tree state to show */
-        snprintf(name, sizeof name, "team.%s.tree.epoch_closed", team);
-        osoe_segment_read_name(s, name, 0, &closed);
-        snprintf(name, sizeof name, "team.%s.tree.own_arrived", team);
-        osoe_segment_read_name(s, name, 0, &own);
-        snprintf(name, sizeof name, "team.%s.tree.children", team);
-        osoe_segment_read_name(s, name, 0, &kids);
-        snprintf(name, sizeof name, "team.%s.tree.children_arrived", team);
-        osoe_segment_read_name(s, name, 0, &arrived);
-        snprintf(name, sizeof name, "team.%s.tree.lowest_missing", team);
-        osoe_segment_read_name(s, name, 0, &missing);
-        snprintf(name, sizeof name, "team.%s.tree.parent", team);
-        osoe_segment_read_name(s, name, 0, &parent);
         /* A team that has not run says nothing: the finalize team is
          * registered from init and only moves at shmem_finalize. */
-        if (open == 0 && closed == 0 && t == 1)
+        if (state.open == 0 && state.closed == 0 && t == 1)
             continue;
-        char missing_s[16] = "-", parent_s[16] = "root";
-        if (missing != UINT32_MAX)
-            snprintf(missing_s, sizeof missing_s, "%" PRIu64, missing);
-        if (parent != UINT32_MAX)
-            snprintf(parent_s, sizeof parent_s, "%" PRIu64, parent);
-        printf("node %-3" PRIu64 " %-16s %2" PRIu64 "/%-2u live  %-8s epoch %" PRIu64
-               "/%-3" PRIu64 " own %-3s kids %" PRIu64 "/%-2" PRIu64
-               " next %-4s parent %-4s  %s\n",
-               node, host, live, s->local_count, team, open, closed, own ? "yes" : "no",
-               arrived, kids, missing_s, parent_s, where);
+        tree_line(s, node, host, live, team, &state, where);
     }
 }
 
@@ -569,24 +649,25 @@ static void threads_human(const struct osoe_segment *s)
 
 /* ---- the state dump --------------------------------------------------- */
 
-static void print_value(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
-                        uint32_t index)
+/* One value, shown as `shown` - its own name, or a team's name for it. */
+static void print_value_as(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
+                           uint32_t index, const char *shown)
 {
     char name[48];
     metric_name(m, name, sizeof name);
     if (m->type == OSOE_MTYPE_STRING) {
         char buf[128];
         osoe_segment_read_str(s, name, index, buf, sizeof buf);
-        printf("    %-32s %s\n", name, buf[0] ? buf : "-");
+        printf("    %-32s %s\n", shown, buf[0] ? buf : "-");
         return;
     }
     uint64_t v;
     if (!osoe_segment_read(s, m, index, &v)) {
-        printf("    %-32s (unreadable)\n", name);
+        printf("    %-32s (unreadable)\n", shown);
         return;
     }
     if (m->type == OSOE_MTYPE_I32)
-        printf("    %-32s %" PRId64 "\n", name, (int64_t)v);
+        printf("    %-32s %" PRId64 "\n", shown, (int64_t)v);
     /* A STATE metric in nanoseconds is an instant on CLOCK_MONOTONIC, not an
      * elapsed time: printing "90596.181 s" beside it would read as a duration
      * and mean nothing. Only an accumulating kind is a duration. */
@@ -594,9 +675,17 @@ static void print_value(const struct osoe_segment *s, const struct osoe_metric_d
              m->kind != OSOE_MKIND_STATE) {
         char d[32];
         print_duration(d, sizeof d, v);
-        printf("    %-32s %" PRIu64 "  (%s)\n", name, v, d);
+        printf("    %-32s %" PRIu64 "  (%s)\n", shown, v, d);
     } else
-        printf("    %-32s %" PRIu64 "\n", name, v);
+        printf("    %-32s %" PRIu64 "\n", shown, v);
+}
+
+static void print_value(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
+                        uint32_t index)
+{
+    char name[48];
+    metric_name(m, name, sizeof name);
+    print_value_as(s, m, index, name);
 }
 
 static void dump_human(const struct osoe_segment *s)
@@ -615,17 +704,39 @@ static void dump_human(const struct osoe_segment *s)
     if (OSOE_SEGMENT_HAS(s->dir, connection_count))
         printf("    %-32s %" PRIu64 " + %u * %u\n", "connections", s->dir->connections_offset,
                s->dir->connection_count, s->dir->connection_bytes);
+    if (OSOE_SEGMENT_HAS(s->dir, epoch_row_count)) {
+        printf("    %-32s %" PRIu64 " + %u * %u\n", "teams", s->dir->teams_offset,
+               s->dir->team_count, s->dir->team_bytes);
+        printf("    %-32s %" PRIu64 " + %u * %u\n", "epochs", s->dir->epochs_offset,
+               s->dir->epoch_row_count, s->dir->epoch_row_bytes);
+    }
 
     printf("\n  node\n");
     for (uint32_t i = 0; i < s->nmetrics; i++)
         if (s->metrics[i].scope == OSOE_MSCOPE_NODE)
             print_value(s, &s->metrics[i], 0);
 
+    /* Every team with a record on this node (layout 18), under its name: its
+     * block's fields, then each local PE's published epoch for it. */
+    for (uint32_t t = 0; t < s->team_count; t++) {
+        char label[24];
+        if (!team_label(s, t, label, sizeof label))
+            continue;
+        printf("\n  team %s (number %u)\n", label, t);
+        for (uint32_t i = 0; i < s->nmetrics; i++) {
+            if (s->metrics[i].scope != OSOE_MSCOPE_TEAM)
+                continue;
+            char shown[64];
+            team_metric_name(&s->metrics[i], label, shown, sizeof shown);
+            print_value_as(s, &s->metrics[i], t, shown);
+        }
+    }
+
     uint64_t now = osoe_segment_now_ns();
     for (uint32_t p = 0; p < s->local_count; p++) {
         printf("\n  PE %u\n", p);
         for (uint32_t i = 0; i < s->nmetrics; i++)
-            if (s->metrics[i].scope == OSOE_MSCOPE_PE)
+            if (s->metrics[i].scope == OSOE_MSCOPE_PE || s->metrics[i].scope == OSOE_MSCOPE_EPOCHS)
                 print_value(s, &s->metrics[i], p);
 
         uint64_t rng = 0;
@@ -721,7 +832,7 @@ static void dump_json(const struct osoe_segment *s)
         first = true;
         for (uint32_t i = 0; i < s->nmetrics; i++) {
             const struct osoe_metric_descriptor *m = &s->metrics[i];
-            if (m->scope != OSOE_MSCOPE_PE)
+            if (m->scope != OSOE_MSCOPE_PE && m->scope != OSOE_MSCOPE_EPOCHS)
                 continue;
             char name[48];
             metric_name(m, name, sizeof name);
@@ -766,6 +877,33 @@ static void dump_json(const struct osoe_segment *s)
             printf(":%" PRIu64, pe_thread_value(s, m, p));
         }
         printf("}}");
+    }
+    printf("]");
+
+    /* Every team with a record on this node (layout 18), by number and name,
+     * its fields under the names they have for it. */
+    printf(",\"teams\":[");
+    bool first_team = true;
+    for (uint32_t t = 0; t < s->team_count; t++) {
+        char label[24];
+        if (!team_label(s, t, label, sizeof label))
+            continue;
+        printf("%s{\"number\":%u,\"name\":", first_team ? "" : ",", t);
+        first_team = false;
+        json_str(stdout, label);
+        for (uint32_t i = 0; i < s->nmetrics; i++) {
+            const struct osoe_metric_descriptor *m = &s->metrics[i];
+            uint64_t v;
+            if (m->scope != OSOE_MSCOPE_TEAM || m->type == OSOE_MTYPE_STRING ||
+                !osoe_segment_read(s, m, t, &v))
+                continue;
+            char shown[64];
+            team_metric_name(m, label, shown, sizeof shown);
+            printf(",");
+            json_str(stdout, shown);
+            printf(":%" PRIu64, v);
+        }
+        printf("}");
     }
     printf("]}\n");
 }

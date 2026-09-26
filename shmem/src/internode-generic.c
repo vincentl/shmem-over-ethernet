@@ -59,9 +59,14 @@
  *
  * **The tree is over every node** (§7.3): the world team's node set is the
  * job's, so a node's index is its number and a broadcast's tree is the
- * reduction's rotated to its root with arithmetic alone. A split team spanning
- * some of the nodes will need its node set's positions, which are O(N) and not
- * kept (internode.h); until split teams exist that is refused by name.
+ * reduction's rotated to its root with arithmetic alone. The reduction's tree
+ * is the team's record's (node.h), read the first time a call names the team;
+ * a broadcast's rotated one names each node's lead by the job's table of them
+ * (job.h), its local id 0, which is the world team's lead there - the node's
+ * lowest rank - under every distribution Slurm and osoe-launch produce. A split
+ * team spanning some of the nodes will need its node set's positions, which
+ * are O(N) and not kept (internode.h); until split teams exist that is refused
+ * by name.
  *
  * Costs, with N nodes, k the fan-out and n bytes: ceil(n / slot) passes of depth
  * ceil(log_k N) each way, with O(k n) combining and k puts per node per piece;
@@ -69,10 +74,12 @@
  * table of leads, O(k) (job.h), and a reduction's tree is found once per team.
  * State: O(k) per team.
  */
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "base/cacheline.h"
@@ -91,8 +98,8 @@
  * words, per team an eight-byte arrival word (children's pieces in) and release
  * word (the parent's pieces down), each on a cache line of its own. */
 enum { TEAM_WORDS_BYTES = 2 * OSOE_CACHELINE };
-_Static_assert(OSOE_TEAMS * TEAM_WORDS_BYTES <= OSOE_INTERNAL_WORDS_BYTES,
-               "every team's words fit the internal region's page of them");
+_Static_assert(OSOE_PREDEFINED_TEAMS * TEAM_WORDS_BYTES <= OSOE_INTERNAL_WORDS_BYTES,
+               "every predefined team's words fit the internal region's page of them");
 
 /* Slot `position` holds that child's partial result; the one after the last
  * child's holds what the parent sends down. Only the world team spans nodes
@@ -134,57 +141,89 @@ struct lead_tree {
 
 /*
  * A team's internode phase as this node's lead keeps it: the reduction's tree,
- * found once, and how many pieces have arrived at this lead from its children
- * and come down to it from its parent over the team's life - cumulative, and
- * compared for equality (§5.4), since the counts in the internal region are
- * never reset.
+ * from the team's record, and how many pieces have arrived at this lead from
+ * its children and come down to it from its parent over the team's life -
+ * cumulative, and compared for equality (§5.4), since the counts in the
+ * internal region are never reset. One per team number (OSOE_MAX_TEAMS),
+ * allocated at init and filled the first time a call names the team.
  */
 struct generic_team {
     bool registered;
     bool every_node;                    /* the node set is 0 ... N - 1 */
     uint32_t count;                     /* how many nodes it spans */
-    bool reduction_tree_known;
     struct lead_tree reduction_tree;
     uint64_t arrivals_expected;
     uint64_t releases_expected;
 };
 
-static struct generic_team teams[OSOE_TEAMS];
+static struct generic_team *teams;
+static uint32_t team_count;
 
 void osoe_internode_generic_init(void)
 {
-    memset(teams, 0, sizeof teams);
+    team_count = osoe.bootstrap.max_teams;
+    teams = calloc(team_count, sizeof *teams);
+    if (!teams)
+        osoe_fatal("out of memory for %u teams' internode phases", team_count);
 }
 
-void osoe_internode_generic_team(uint32_t team, const uint32_t *nodes, uint32_t count)
+void osoe_internode_generic_fini(void)
 {
-    (void)nodes;
-    if (team >= OSOE_TEAMS)
-        osoe_fatal("team %u has an internode phase, and this build has %u teams", team,
-                   OSOE_TEAMS);
-    struct generic_team *g = &teams[team];
-    g->registered = true;
-    g->count = count;
-    /* The set is sorted and free of repeats (the backend's registration checks
-     * it), so one as large as the job's is every node. */
-    g->every_node = count == osoe.job.node_count;
+    free(teams);
+    teams = NULL;
+    team_count = 0;
 }
 
 /*
- * The team's state, for the world team only: the slots are the world team's,
- * and so is the lead a node's local id 0 is - a split team (§7.3) spanning
- * every node would pass a check on its node set and still write into the
- * wrong PE's region and share the world's slots, so the refusal is by team.
+ * The team's state. The first call that names a team learns it from its
+ * record in this node's block (node.h): `published` loaded with acquire, then
+ * the rest (§3.16) - the node count, and this node's place in the reduction's
+ * tree, rooted at the first node, whose leads the record names by rank.
+ *
+ * For the world team only: the slots are the world team's, and so is the lead
+ * a node's local id 0 is - a split team (§7.3) spanning every node would pass
+ * a check on its node set and still write into the wrong PE's region and share
+ * the world's slots, so the refusal is by team. And its lead here must be the
+ * rank the other nodes put to, local id 0 (the file's comment): a node whose
+ * ranks do not ascend with their local ids has its lowest rank elsewhere, and
+ * its lead would wait in a region nothing writes, so that is refused by name
+ * too, where it would otherwise hang.
  */
 static struct generic_team *registered_team(uint32_t team, const char *routine)
 {
-    if (team >= OSOE_TEAMS || !teams[team].registered)
-        osoe_fatal("%s: team %u has no internode phase registered", routine, team);
+    if (team >= team_count)
+        osoe_fatal("%s: team %u is past the job's %u team numbers", routine, team, team_count);
     struct generic_team *g = &teams[team];
+    if (!g->registered) {
+        const struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
+        if (!atomic_load_explicit(&b->record.published, memory_order_acquire) ||
+            b->record.nodes < 2)
+            osoe_fatal("%s: team %u has no internode phase on this node", routine, team);
+        const struct osoe_team_record *r = &b->record;
+        if (r->children > osoe.bootstrap.collective_fanout)
+            osoe_fatal("%s: team %u's record on this node says %u children, at a fan-out of "
+                       "%u", routine, team, r->children, osoe.bootstrap.collective_fanout);
+        g->count = r->nodes;
+        /* The set is sorted and free of repeats (team.c checks it as it builds
+         * the record), so one as large as the job's is every node. */
+        g->every_node = r->nodes == osoe.job.node_count;
+        g->reduction_tree.parent = r->parent;
+        g->reduction_tree.position = r->position;
+        g->reduction_tree.children = r->children;
+        for (uint32_t c = 0; c < r->children; c++)
+            g->reduction_tree.child[c] = r->child[c];
+        g->registered = true;
+    }
     if (team != OSOE_TEAM_WORLD || !g->every_node)
         osoe_fatal("%s: team %u spans %u of the job's %u nodes, and the generic internode "
                    "phase runs the world team's only (§7.3)", routine, team, g->count,
                    osoe.job.node_count);
+    if (osoe.bootstrap.local_id != 0)
+        osoe_fatal("%s: team %u's lead on node %u is local id %u, its lowest rank, and the "
+                   "generic internode phase meets each node at its local id 0: the node's "
+                   "ranks do not ascend with their local ids (%sGTIDS)", routine, team,
+                   osoe.job.node, osoe.bootstrap.local_id,
+                   osoe.bootstrap.launcher ? osoe.bootstrap.launcher : "OSOE_");
     return g;
 }
 
@@ -396,10 +435,6 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
     if (!combine || element.width > OSOE_INTERNAL_SLOT_BYTES - HEADER_BYTES)
         osoe_fatal("%s: no reduction %d over elements of kind %d and width %u", routine,
                    (int)operation, (int)element.kind, element.width);
-    if (!g->reduction_tree_known) {
-        find_lead_tree(g, 0, &g->reduction_tree, routine);
-        g->reduction_tree_known = true;
-    }
     in_pieces(g, team, epoch, reduction_identity(operation, element), &g->reduction_tree, buffer,
               count * element.width, element.width, combine, routine);
 }
@@ -449,10 +484,6 @@ void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer,
     uint32_t width = bytes % 8 == 0 && (uintptr_t)buffer % 8 == 0 ? 8 : 1;
     struct osoe_element element = { OSOE_ELEMENT_UNSIGNED_INTEGER, width };
     osoe_combine_function combine = osoe_combine_lookup(OSOE_REDUCTION_OR, element);
-    if (!g->reduction_tree_known) {
-        find_lead_tree(g, 0, &g->reduction_tree, routine);
-        g->reduction_tree_known = true;
-    }
     in_pieces(g, team, epoch, gather_identity(element), &g->reduction_tree, buffer, bytes,
               width, combine, routine);
 }

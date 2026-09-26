@@ -114,27 +114,37 @@ _Static_assert(sizeof thread_metrics / sizeof thread_metrics[0] == OSOE_COUNTER_
     { name, unit, type, kind, OSOE_MSCOPE_CONNECTION,                       \
       (uint16_t)sizeof(((struct osoe_am_connection_metrics *)0)->field),    \
       (uint32_t)offsetof(struct osoe_am_connection_metrics, field), 0 }
-/* A team's tree state, one set of fields per team (§5.3). Node scope, because
- * there is one of each per node, and named per team as the epoch counters are. */
-#define NDTREE(name, team, field)                                           \
-    { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,      \
-      (uint32_t)(offsetof(struct osoe_node_header, collective) +            \
-                 (team) * sizeof(struct osoe_collective_state) +            \
-                 offsetof(struct osoe_collective_state, field)), 0 }
-/* An epoch counter's value is a word inside a cache-line-padded structure, and
- * the word is what a reader loads. */
-#define NDEPOCH(name, field)                                                \
-    { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,      \
-      (uint32_t)(offsetof(struct osoe_node_header, field) +                 \
-                 offsetof(struct osoe_epoch, count_compare_only_by_equality)), 0 }
+/*
+ * A word of a team's block (node.h, layout 18), by where it is in the block:
+ * an epoch counter's value - a word inside a cache-line-padded structure, and
+ * the word is what a reader loads - the arrival handoff's, the tree state's and
+ * the record's. Each is named twice: once in the team scope, the index being
+ * the team's number, which is how a reader finds every team; and for the
+ * predefined teams once more in the node scope, by the names they had when the
+ * header held them, since the blocks end the header.
+ */
+#define BLOCK_EPOCH(field)                                                  \
+    (offsetof(struct osoe_team_block, field) +                              \
+     offsetof(struct osoe_epoch, count_compare_only_by_equality))
+#define BLOCK_ARRIVAL                                                       \
+    (offsetof(struct osoe_team_block, arrival) + offsetof(struct osoe_arrival_handoff, epoch))
+#define BLOCK_TREE(field)                                                   \
+    (offsetof(struct osoe_team_block, tree) + offsetof(struct osoe_collective_state, field))
+#define BLOCK_RECORD(field)                                                 \
+    (offsetof(struct osoe_team_block, record) + offsetof(struct osoe_team_record, field))
 
-/* One team's §5.3 arrival handoff. The word lives in an array of cache-line
- * padded structures, so the entry names the element and then the word. */
-#define NDARRIVAL(name, team)                                               \
+#define TEAM(name, where)                                                   \
+    { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_TEAM, 4, (uint32_t)(where), 0 }
+#define NDTEAM(name, number, where)                                         \
     { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,      \
-      (uint32_t)(offsetof(struct osoe_node_header, arrival) +               \
-                 (team) * sizeof(struct osoe_arrival_handoff) +             \
-                 offsetof(struct osoe_arrival_handoff, epoch)), 0 }
+      (uint32_t)(offsetof(struct osoe_node_header, team) +                  \
+                 (number) * sizeof(struct osoe_team_block) + (where)), 0 }
+
+/* One local PE's published epoch count for a team (§5.4): the team's word of
+ * the PE's row. */
+#define EPOCH(name, number)                                                 \
+    { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_EPOCHS, 4,    \
+      (uint32_t)((number) * sizeof(uint32_t)), 0 }
 
 static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.rank", rank, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
@@ -155,9 +165,11 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.statics_name", statics_name, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
     PE("pe.watch_rng", watch_rng, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     PE("pe.watch_seq", watch_seq, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
-    PE("pe.world_epoch", world_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
-    PE("pe.shared_epoch", shared_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
-    PE("pe.finalize_epoch", finalize_epoch, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    /* Each PE's k per predefined team, by the names they had in its slot;
+     * since layout 18 a word of its row of published epochs. */
+    EPOCH("pe.world_epoch", OSOE_TEAM_WORLD),
+    EPOCH("pe.shared_epoch", OSOE_TEAM_SHARED),
+    EPOCH("pe.finalize_epoch", OSOE_TEAM_FINALIZE),
     PE("pe.sweeps", sweeps, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     /* An invariant at PE scope, because the thread it describes is by
      * definition one whose counter block nobody can read. */
@@ -172,46 +184,76 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     PE("heap.bytes_in_use", heap_in_use, OSOE_MTYPE_U64, OSOE_MKIND_GAUGE, "bytes"),
     PE("heap.bytes_high_water", heap_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, "bytes"),
     PE("heap.largest_free_block", heap_largest_free, OSOE_MTYPE_U64, OSOE_MKIND_GAUGE, "bytes"),
-    NDEPOCH("team.world.arrived", world_arrived),
-    NDEPOCH("team.world.released", world_released),
-    NDEPOCH("team.world.copied", world_copied),
-    NDEPOCH("team.shared.arrived", shared_arrived),
-    NDEPOCH("team.shared.released", shared_released),
-    NDEPOCH("team.shared.copied", shared_copied),
-    NDEPOCH("team.finalize.arrived", finalize_arrived),
-    NDEPOCH("team.finalize.released", finalize_released),
     /*
-     * §5.3's internode arrival handoff: the epoch a local member posted for the
-     * lead's agent to forward. Against `released` it is where a hung multi-node
-     * barrier usually is - posted ahead of released means this node's arrival
-     * has not reached the root or the release has not come back, and posted
-     * equal to released means this node has not arrived at all, which points at
-     * a PE that has not called the collective rather than at the network.
+     * Every team number's block (layout 18), one record per number. A reader
+     * that walks them all - osoe-stat does - shows those whose record is
+     * published, under the record's name: team.world.*, team.3.*.
+     *
+     * §5.4's three counters; then §5.3's internode arrival handoff, the epoch a
+     * local member posted for the lead's agent to forward. Against `released`
+     * it is where a hung multi-node barrier usually is - posted ahead of
+     * released means this node's arrival has not reached the root or the
+     * release has not come back, and posted equal to released means this node
+     * has not arrived at all, which points at a PE that has not called the
+     * collective rather than at the network.
      */
-    NDARRIVAL("team.world.arrival_posted", OSOE_TEAM_WORLD),
-    NDARRIVAL("team.shared.arrival_posted", OSOE_TEAM_SHARED),
-    NDARRIVAL("team.finalize.arrival_posted", OSOE_TEAM_FINALIZE),
+    TEAM("team.arrived", BLOCK_EPOCH(arrived)),
+    TEAM("team.released", BLOCK_EPOCH(released)),
+    TEAM("team.copied", BLOCK_EPOCH(copied)),
+    TEAM("team.arrival_posted", BLOCK_ARRIVAL),
     /*
-     * The internode tree, per team (§5.3): where this node is in it and how far
-     * the epoch in progress has got. `tree.lowest_missing` is the one a hung
+     * The internode tree (§5.3): where this node is in it and how far the
+     * epoch in progress has got. `tree.lowest_missing` is the one a hung
      * collective is walked down by - the lowest child node that owes this node
      * an arrival - and `node.hostname` says which machine to ask next.
      */
-    NDTREE("team.world.tree.epoch_open", OSOE_TEAM_WORLD, epoch_open),
-    NDTREE("team.world.tree.epoch_closed", OSOE_TEAM_WORLD, epoch_closed),
-    NDTREE("team.world.tree.own_arrived", OSOE_TEAM_WORLD, own_arrived),
-    NDTREE("team.world.tree.children", OSOE_TEAM_WORLD, children),
-    NDTREE("team.world.tree.children_arrived", OSOE_TEAM_WORLD, children_arrived),
-    NDTREE("team.world.tree.lowest_missing", OSOE_TEAM_WORLD, lowest_missing),
-    NDTREE("team.world.tree.parent", OSOE_TEAM_WORLD, parent),
-    NDTREE("team.world.tree.fanout", OSOE_TEAM_WORLD, fanout),
-    NDTREE("team.finalize.tree.epoch_open", OSOE_TEAM_FINALIZE, epoch_open),
-    NDTREE("team.finalize.tree.epoch_closed", OSOE_TEAM_FINALIZE, epoch_closed),
-    NDTREE("team.finalize.tree.own_arrived", OSOE_TEAM_FINALIZE, own_arrived),
-    NDTREE("team.finalize.tree.children", OSOE_TEAM_FINALIZE, children),
-    NDTREE("team.finalize.tree.children_arrived", OSOE_TEAM_FINALIZE, children_arrived),
-    NDTREE("team.finalize.tree.lowest_missing", OSOE_TEAM_FINALIZE, lowest_missing),
-    NDTREE("team.finalize.tree.parent", OSOE_TEAM_FINALIZE, parent),
+    TEAM("team.tree.epoch_open", BLOCK_TREE(epoch_open)),
+    TEAM("team.tree.epoch_closed", BLOCK_TREE(epoch_closed)),
+    TEAM("team.tree.own_arrived", BLOCK_TREE(own_arrived)),
+    TEAM("team.tree.children", BLOCK_TREE(children)),
+    TEAM("team.tree.children_arrived", BLOCK_TREE(children_arrived)),
+    TEAM("team.tree.lowest_missing", BLOCK_TREE(lowest_missing)),
+    TEAM("team.tree.parent", BLOCK_TREE(parent)),
+    TEAM("team.tree.fanout", BLOCK_TREE(fanout)),
+    /* The record (node.h): whether there is one, and what it says. */
+    TEAM("team.record.published", BLOCK_RECORD(published)),
+    TEAM("team.record.local_members", BLOCK_RECORD(local_members)),
+    TEAM("team.record.nodes", BLOCK_RECORD(nodes)),
+    TEAM("team.record.index", BLOCK_RECORD(index)),
+    TEAM("team.record.parent", BLOCK_RECORD(parent)),
+    TEAM("team.record.position", BLOCK_RECORD(position)),
+    TEAM("team.record.children", BLOCK_RECORD(children)),
+    { "team.record.name", "", OSOE_MTYPE_STRING, OSOE_MKIND_STATE, OSOE_MSCOPE_TEAM,
+      (uint16_t)sizeof(((struct osoe_team_record *)0)->name), (uint32_t)BLOCK_RECORD(name), 0 },
+    /* The predefined teams' fields in the node scope, by the names they had
+     * when the header held them, for readers that find them so. */
+    NDTEAM("team.world.arrived", OSOE_TEAM_WORLD, BLOCK_EPOCH(arrived)),
+    NDTEAM("team.world.released", OSOE_TEAM_WORLD, BLOCK_EPOCH(released)),
+    NDTEAM("team.world.copied", OSOE_TEAM_WORLD, BLOCK_EPOCH(copied)),
+    NDTEAM("team.shared.arrived", OSOE_TEAM_SHARED, BLOCK_EPOCH(arrived)),
+    NDTEAM("team.shared.released", OSOE_TEAM_SHARED, BLOCK_EPOCH(released)),
+    NDTEAM("team.shared.copied", OSOE_TEAM_SHARED, BLOCK_EPOCH(copied)),
+    NDTEAM("team.finalize.arrived", OSOE_TEAM_FINALIZE, BLOCK_EPOCH(arrived)),
+    NDTEAM("team.finalize.released", OSOE_TEAM_FINALIZE, BLOCK_EPOCH(released)),
+    NDTEAM("team.world.arrival_posted", OSOE_TEAM_WORLD, BLOCK_ARRIVAL),
+    NDTEAM("team.shared.arrival_posted", OSOE_TEAM_SHARED, BLOCK_ARRIVAL),
+    NDTEAM("team.finalize.arrival_posted", OSOE_TEAM_FINALIZE, BLOCK_ARRIVAL),
+    NDTEAM("team.world.tree.epoch_open", OSOE_TEAM_WORLD, BLOCK_TREE(epoch_open)),
+    NDTEAM("team.world.tree.epoch_closed", OSOE_TEAM_WORLD, BLOCK_TREE(epoch_closed)),
+    NDTEAM("team.world.tree.own_arrived", OSOE_TEAM_WORLD, BLOCK_TREE(own_arrived)),
+    NDTEAM("team.world.tree.children", OSOE_TEAM_WORLD, BLOCK_TREE(children)),
+    NDTEAM("team.world.tree.children_arrived", OSOE_TEAM_WORLD, BLOCK_TREE(children_arrived)),
+    NDTEAM("team.world.tree.lowest_missing", OSOE_TEAM_WORLD, BLOCK_TREE(lowest_missing)),
+    NDTEAM("team.world.tree.parent", OSOE_TEAM_WORLD, BLOCK_TREE(parent)),
+    NDTEAM("team.world.tree.fanout", OSOE_TEAM_WORLD, BLOCK_TREE(fanout)),
+    NDTEAM("team.finalize.tree.epoch_open", OSOE_TEAM_FINALIZE, BLOCK_TREE(epoch_open)),
+    NDTEAM("team.finalize.tree.epoch_closed", OSOE_TEAM_FINALIZE, BLOCK_TREE(epoch_closed)),
+    NDTEAM("team.finalize.tree.own_arrived", OSOE_TEAM_FINALIZE, BLOCK_TREE(own_arrived)),
+    NDTEAM("team.finalize.tree.children", OSOE_TEAM_FINALIZE, BLOCK_TREE(children)),
+    NDTEAM("team.finalize.tree.children_arrived", OSOE_TEAM_FINALIZE,
+           BLOCK_TREE(children_arrived)),
+    NDTEAM("team.finalize.tree.lowest_missing", OSOE_TEAM_FINALIZE, BLOCK_TREE(lowest_missing)),
+    NDTEAM("team.finalize.tree.parent", OSOE_TEAM_FINALIZE, BLOCK_TREE(parent)),
     /* One record per connection toward a peer node, in peer-slot order. */
     CONN("connection.peer", peer, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     CONN("connection.segments_sent", segments_sent, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),

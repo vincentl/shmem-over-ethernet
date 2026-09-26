@@ -97,6 +97,21 @@ struct osoe_progress_host {
 };
 
 /*
+ * How a host tells the engine a team it meets for the first time - its own
+ * members' arrival, a child's, or a release (§5.3): the team's place in the
+ * internode tree, in node numbers, and where its state is published for
+ * osoe-stat (§3.14) - or false if the team has no internode phase on this
+ * node. A host in a job reads it from the team's record in the node's block
+ * (node.h), published before the team's first arrival anywhere; the engine
+ * never learns a team any other way there, since the process it runs in may
+ * hold no descriptor for it. Called with the host's context, and given with
+ * the per-team arrays it fills (osoe_progress_attach_teams).
+ */
+typedef bool osoe_progress_team_source(void *context, uint32_t team,
+                                       struct osoe_collective_tree *tree,
+                                       struct osoe_collective_state **published);
+
+/*
  * One team's place in the internode tree, and the epoch it is in (§5.3).
  *
  * A node *opens* an epoch at the first arrival booked for it - its own members'
@@ -109,6 +124,10 @@ struct osoe_progress_host {
 struct osoe_progress_team {
     bool registered;
     struct osoe_collective_tree tree;
+    /* Where the state below is published for osoe-stat (§3.14): the team's
+     * block in the node header, or NULL where there is none (the engine's own
+     * tests), and then nothing is published. */
+    struct osoe_collective_state *published;
     uint32_t open;              /* the epoch in progress, or 0 */
     uint32_t closed;            /* the last epoch closed */
     bool own;                   /* this node's members have arrived for `open` */
@@ -202,12 +221,27 @@ struct osoe_progress {
     struct osoe_progress_host host;
 
     /*
-     * The internode tree's state, per team (§5.3): private to the progress
-     * thread, like everything else here, and O(k) per team - the topology -
-     * plus O(1) for the epoch in progress. Registered once per team before
-     * this thread runs (osoe_progress_team).
+     * The internode tree's state, per team number (§5.3): private to the
+     * progress thread, like everything else here, and O(k) per team - the
+     * topology - plus O(1) for the epoch in progress. An entry is filled the
+     * first time the engine meets its team (`team_source`). `team_count`
+     * entries: OSOE_MAX_TEAMS once the host attaches its arrays
+     * (osoe_progress_attach_teams), and until then `own_team`'s, room for the
+     * predefined teams, which is all an engine without a job registers.
+     *
+     * `pending` lists the teams whose release this pass has forwarded and not
+     * yet applied (release_pending), so that the pass's end costs what it has
+     * to do and not a look at every team number.
      */
-    struct osoe_progress_team team[OSOE_TEAMS];
+    struct osoe_progress_team *team;
+    uint32_t team_count;
+    uint32_t *pending;
+    uint32_t pending_count;
+    struct osoe_progress_team own_team[OSOE_PREDEFINED_TEAMS];
+    uint32_t own_pending[OSOE_PREDEFINED_TEAMS];
+    /* Where a team met for the first time is learnt, or NULL where teams are
+     * registered by hand (osoe_progress_team): the engine's own tests. */
+    osoe_progress_team_source *team_source;
 
     /*
      * §3.14 counters, read by osoe-stat and by the tests: the node header's
@@ -218,14 +252,14 @@ struct osoe_progress {
     struct osoe_am_node_metrics *metrics;
     struct osoe_am_node_metrics own_metrics;
     /*
-     * §3.14's connection scope and the tree's per-team state, in the control
-     * segment where osoe-stat and the tests read them (progress-host.c binds
-     * them). NULL outside a job - the engine's own tests run without a control
-     * segment - and every write to them is guarded, because a diagnostic must
-     * not decide whether the loop can run.
+     * §3.14's connection scope, in the control segment where osoe-stat and the
+     * tests read it (progress-host.c binds it); each team's tree state is
+     * published into its own block (`published` above). NULL outside a job -
+     * the engine's own tests run without a control segment - and every write
+     * to them is guarded, because a diagnostic must not decide whether the
+     * loop can run.
      */
     struct osoe_am_connection_metrics *connection_metrics;
-    struct osoe_collective_state *collective;
 };
 
 /*
@@ -252,6 +286,15 @@ void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *ar
  * the loop never allocates. */
 void osoe_progress_attach(struct osoe_progress *p,
                           struct osoe_progress_connection *connections, uint64_t *busy);
+
+/* Bind the per-team state, `count` entries - one per team number the job may
+ * have (OSOE_MAX_TEAMS) - and a list of as many team numbers, both zeroed,
+ * and where each team is learnt from the first time the engine meets it.
+ * Until this, the engine has room for the predefined teams alone, registered
+ * by hand. */
+void osoe_progress_attach_teams(struct osoe_progress *p, struct osoe_progress_team *teams,
+                                uint32_t *pending, uint32_t count,
+                                osoe_progress_team_source *source);
 
 bool osoe_progress_poll(struct osoe_progress *p);
 
@@ -307,9 +350,11 @@ uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer);
 
 /*
- * A team's internode tree, computed from its node set (internode-am.c,
- * collective-tree.h). Called before the engine's thread starts; the engine keeps
- * the tree, O(k), and never the node set, O(N).
+ * Register a team's internode tree by hand (collective-tree.h), for an engine
+ * whose host has no records to learn it from: the engine's own tests. In a job
+ * the engine learns each team from its host's source the first time it meets
+ * it (osoe_progress_attach_teams). Called before the engine's thread starts;
+ * the engine keeps the tree, O(k), and never the node set, O(N).
  */
 void osoe_progress_team(struct osoe_progress *p, uint32_t team,
                         const struct osoe_collective_tree *tree);

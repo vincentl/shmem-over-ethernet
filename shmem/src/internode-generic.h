@@ -7,8 +7,9 @@
  * For backends only. Each backend defines osoe_internode_reduce and
  * osoe_internode_broadcast (internode.h), and may hand any call to the
  * functions here with the same arguments; one that does forwards its
- * osoe_internode_init and osoe_internode_team to them as well. The SHMEM layer
- * calls internode.h and never this.
+ * osoe_internode_init and osoe_internode_fini to them as well. A team is
+ * learnt from its record in the node's block (node.h) the first time a call
+ * here names it. The SHMEM layer calls internode.h and never this.
  */
 #ifndef OSOE_INTERNODE_GENERIC_H
 #define OSOE_INTERNODE_GENERIC_H
@@ -19,12 +20,10 @@
 #include "internode.h"
 
 /* From the backend's osoe_internode_init: every team's state starts afresh,
- * as the internal region does with the session's heap. */
+ * as the internal region does with the session's heap, one entry per team
+ * number (OSOE_MAX_TEAMS). And from its osoe_internode_fini: freed. */
 void osoe_internode_generic_init(void);
-
-/* From the backend's osoe_internode_team, with its arguments, after it has
- * checked them. */
-void osoe_internode_generic_team(uint32_t team, const uint32_t *nodes, uint32_t count);
+void osoe_internode_generic_fini(void);
 
 /* internode.h's osoe_internode_reduce, osoe_internode_broadcast and
  * osoe_internode_collect, whose contracts these meet. */

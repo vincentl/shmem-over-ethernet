@@ -4,11 +4,11 @@
  * exchange.
  *
  * **Within a node** it is §5.5 as written. Every member arrives with one locked
- * increment of the team's `arrived`. The local lead - the team's member with the
- * lowest local id, local id 0 for both teams that exist - waits for all of
- * them, then reads each member's source (only now: invariant 17, push never
- * pull) and combines it into its own `dest`, which it alone writes before
- * release (invariant 16). It bumps `released`; every other member copies the
+ * increment of the team's `arrived`. The local lead - the team's member on
+ * this node with the lowest team rank (§5.2), which the descriptor names
+ * (team.h) - waits for all of them, then reads each member's source (only now:
+ * invariant 17, push never pull) and combines it into its own `dest`, which it
+ * alone writes before release (invariant 16). It bumps `released`; every other member copies the
  * lead's `dest` into its own and bumps `copied`; the lead waits for the last
  * copy and leaves last. `dest` is undefined until the call returns, so the
  * intermediate values the lead's `dest` holds are unobservable.
@@ -60,25 +60,28 @@ struct reduction {
     osoe_combine_function combine;
 };
 
-/* The root's node as its index in the node set `t` was registered with
- * (team.c, osoe_internode_team): the world team's set is every node, so the
- * index is the node's number. Split teams, whose sets are not, are §7.3's. */
+/* The root's node as its index in the node set of `t` (team.c, the record):
+ * for a team spanning every node that is the node's number. A team spanning
+ * some of the nodes needs its set's positions, which are §7.3's. */
 static uint32_t root_index(const struct osoe_team *t, int root_rank, const char *routine)
 {
-    if (t->number != OSOE_TEAM_WORLD)
-        osoe_fatal("%s: %s spans nodes, and only the world team's node set is every node",
-                   routine, t->name);
+    if (t->nodes != osoe.job.node_count)
+        osoe_fatal("%s: %s spans %u of the job's %u nodes, and a broadcast's root is found "
+                   "only in a node set of every node", routine, t->name, t->nodes,
+                   osoe.job.node_count);
     return osoe_node_of(&osoe.job, (uint32_t)root_rank);
 }
 
-/* Local PE m's copy of a symmetric object, at the place it has in its region
- * on every PE: every local PE's heap and statics are mapped in this process
- * (§4.1, §4.3), this PE's own statics where its program has them. */
-static unsigned char *member_copy(uint32_t m, struct osoe_symmetric_location at)
+/* The local PE with local id `local`'s copy of a symmetric object, at the
+ * place it has in its region on every PE: every local PE's heap and statics
+ * are mapped in this process (§4.1, §4.3), this PE's own statics where its
+ * program has them. */
+static unsigned char *member_copy(uint32_t local, struct osoe_symmetric_location at)
 {
     if (at.region == OSOE_REGION_STATICS)
-        return osoe_node_statics_at(&osoe.node, m, m == osoe.bootstrap.local_id, at.offset);
-    return (unsigned char *)osoe.node.heap_of[m] + at.offset;
+        return osoe_node_statics_at(&osoe.node, local, local == osoe.bootstrap.local_id,
+                                    at.offset);
+    return (unsigned char *)osoe.node.heap_of[local] + at.offset;
 }
 
 /*
@@ -105,7 +108,8 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
     /* A deprecated broadcast's root keeps its dest as it was (broadcast.c). */
     bool keep_mine = root_keeps_dest && (uint32_t)root_rank == osoe.job.me;
 
-    uint32_t k = *t->epoch, d = *t->data_epoch, members = t->local_members;
+    uint32_t k = t->epoch, d = t->data_epoch, members = t->local_members;
+    struct osoe_team_block *b = t->block;
 
     /* A team of one (team.h): the caller is every member, its source the
      * result, and it touches none of the node-wide counters - they belong to
@@ -113,13 +117,14 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
     if (t->singleton) {
         if (source != dest && !keep_mine)
             memmove(dest, source, bytes);
-        *t->epoch = k + 1;
-        *t->data_epoch = d + 1;
+        t->epoch = k + 1;
+        t->data_epoch = d + 1;
         atomic_store_explicit(t->published, k + 1, memory_order_release);
         return 0;
     }
 
-    bool lead = osoe.bootstrap.local_id == 0;
+    uint32_t lead_local_id = t->lead_local_id;
+    bool lead = osoe.bootstrap.local_id == lead_local_id;
     /*
      * Where this node's copy of the result is: the lead's dest - or, when a
      * deprecated broadcast's root is the lead itself, whose dest must stay as
@@ -127,7 +132,8 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
      * internode phase and the members' copy-outs only read.
      */
     bool lead_keeps_dest = root_keeps_dest && root_rank >= 0 &&
-                           osoe_node_local_id(&osoe.node, (uint32_t)root_rank) == 0;
+                           osoe_node_local_id(&osoe.node, (uint32_t)root_rank) ==
+                               (int32_t)lead_local_id;
     struct osoe_symmetric_location result_at = lead_keeps_dest ? source_at : dest_at;
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
 
@@ -137,18 +143,20 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
      * this counter: without the stamp, a sweep expiring just as a late member
      * arrives would be counted as a lost wake.
      */
-    if (osoe_epoch_release_bump_eq(t->arrived, (k + 1) * members) && !lead)
-        osoe_epoch_wake_all(t->arrived);
+    if (osoe_epoch_release_bump_eq(&b->arrived, (k + 1) * members) && !lead)
+        osoe_epoch_wake_all(&b->arrived);
 
     if (lead) {
-        osoe_epoch_wait_eq(t->arrived, (k + 1) * members, routine);
-        unsigned char *accumulator = member_copy(0, result_at);
+        osoe_epoch_wait_eq(&b->arrived, (k + 1) * members, routine);
+        unsigned char *accumulator = member_copy(lead_local_id, result_at);
         if (reduction) {
-            /* In place, the lead's source already is its dest. */
+            /* In place, the lead's source already is its dest. Then the other
+             * members, in team-rank order: local_ids[0] is the lead. */
             if (source != dest)
                 memcpy(accumulator, source, bytes);
             for (uint32_t m = 1; m < members; m++)
-                reduction->combine(accumulator, member_copy(m, source_at), nelems);
+                reduction->combine(accumulator, member_copy(t->local_ids[m], source_at),
+                                   nelems);
         } else if (!lead_keeps_dest) {
             int32_t root_local = osoe_node_local_id(&osoe.node, (uint32_t)root_rank);
             if (root_local >= 0 &&
@@ -165,22 +173,22 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
         }
 
         /* The final dest is written; now the release, and the copy-outs. */
-        if (!osoe_epoch_release_bump_eq(t->released, k + 1))
+        if (!osoe_epoch_release_bump_eq(&b->released, k + 1))
             osoe_fatal("%s: %s's epochs diverged at epoch %u: PEs called different numbers "
                        "of collectives", routine, t->name, k + 1);
-        osoe_epoch_wake_all(t->released);
+        osoe_epoch_wake_all(&b->released);
         if (members > 1)
-            osoe_epoch_wait_eq(t->copied, (d + 1) * (members - 1), routine);
+            osoe_epoch_wait_eq(&b->copied, (d + 1) * (members - 1), routine);
     } else {
-        osoe_epoch_wait_eq(t->released, k + 1, routine);
+        osoe_epoch_wait_eq(&b->released, k + 1, routine);
         if (!keep_mine)
-            memcpy(dest, member_copy(0, result_at), bytes);
-        if (osoe_epoch_release_bump_eq(t->copied, (d + 1) * (members - 1)))  /* stamped: as arrived */
-            osoe_epoch_wake_all(t->copied);
+            memcpy(dest, member_copy(lead_local_id, result_at), bytes);
+        if (osoe_epoch_release_bump_eq(&b->copied, (d + 1) * (members - 1)))  /* stamped: as arrived */
+            osoe_epoch_wake_all(&b->copied);
     }
 
-    *t->epoch = k + 1;
-    *t->data_epoch = d + 1;
+    t->epoch = k + 1;
+    t->data_epoch = d + 1;
     atomic_store_explicit(t->published, k + 1, memory_order_release);
     osoe_blocked_leave();
     return 0;
@@ -204,13 +212,6 @@ int osoe_broadcast(const char *routine, shmem_team_t team, void *dest, const voi
         osoe_fatal("%s: PE_root %d is not a PE number", routine, root);
     return data_collective(routine, team, dest, source, nelems, width, NULL, root,
                            root_keeps_dest);
-}
-
-/* Local PE m's number in `t`, a team every local PE belongs to: the world's
- * numbers PEs by rank, the shared team's by local id (team.c). */
-static uint32_t local_member_rank(const struct osoe_team *t, uint32_t m)
-{
-    return t->number == OSOE_TEAM_SHARED ? m : osoe.bootstrap.gtids[m];
 }
 
 /*
@@ -258,56 +259,60 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
         return 0;
     struct osoe_symmetric_location dest_at = osoe_symmetric_locate(routine, dest, total);
     struct osoe_symmetric_location source_at = osoe_symmetric_locate(routine, source, block);
-    uint32_t k = *t->epoch, d = *t->data_epoch, members = t->local_members;
+    uint32_t k = t->epoch, d = t->data_epoch, members = t->local_members;
+    struct osoe_team_block *b = t->block;
 
     if (t->singleton) {
         memcpy(dest, source, block);
         if (lengths)
             prefix_sums(routine, dest, 1);
-        *t->epoch = k + 1;
-        *t->data_epoch = d + 1;
+        t->epoch = k + 1;
+        t->data_epoch = d + 1;
         atomic_store_explicit(t->published, k + 1, memory_order_release);
         return 0;
     }
 
-    bool lead = osoe.bootstrap.local_id == 0;
+    bool lead = osoe.bootstrap.local_id == t->lead_local_id;
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
-    if (osoe_epoch_release_bump_eq(t->arrived, (k + 1) * members) && !lead)
-        osoe_epoch_wake_all(t->arrived);
+    if (osoe_epoch_release_bump_eq(&b->arrived, (k + 1) * members) && !lead)
+        osoe_epoch_wake_all(&b->arrived);
 
     if (lead) {
-        osoe_epoch_wait_eq(t->arrived, (k + 1) * members, routine);
+        osoe_epoch_wait_eq(&b->arrived, (k + 1) * members, routine);
         unsigned char *result = dest;
+        /* Each member's block at its team rank's place: member m is local id
+         * local_ids[m] with rank local_ranks[m], and m = 0 is this lead. */
         for (uint32_t m = 0; m < members; m++) {
-            uint32_t r = local_member_rank(t, m);
+            uint32_t r = t->local_ranks[m];
             uint64_t place = places ? places[r] : (uint64_t)r * block;
             uint64_t length = places ? places[r + 1] - places[r] : block;
             if (length)
-                memcpy(result + place, m == 0 ? source : member_copy(m, source_at), length);
+                memcpy(result + place,
+                       m == 0 ? source : member_copy(t->local_ids[m], source_at), length);
         }
         if (t->internode)
             osoe_internode_collect(t->number, k + 1, result, total, block, places, routine);
         if (lengths)
             prefix_sums(routine, dest, t->members);
-        if (!osoe_epoch_release_bump_eq(t->released, k + 1))
+        if (!osoe_epoch_release_bump_eq(&b->released, k + 1))
             osoe_fatal("%s: %s's epochs diverged at epoch %u: PEs called different numbers "
                        "of collectives", routine, t->name, k + 1);
-        osoe_epoch_wake_all(t->released);
+        osoe_epoch_wake_all(&b->released);
         if (members > 1)
-            osoe_epoch_wait_eq(t->copied, (d + 1) * (members - 1), routine);
+            osoe_epoch_wait_eq(&b->copied, (d + 1) * (members - 1), routine);
     } else {
-        osoe_epoch_wait_eq(t->released, k + 1, routine);
+        osoe_epoch_wait_eq(&b->released, k + 1, routine);
+        unsigned char *lead_dest = member_copy(t->lead_local_id, dest_at);
         if (lengths)
-            memcpy((unsigned char *)dest + total, member_copy(0, dest_at) + total,
-                   sizeof(uint64_t));
+            memcpy((unsigned char *)dest + total, lead_dest + total, sizeof(uint64_t));
         else
-            memcpy(dest, member_copy(0, dest_at), total);
-        if (osoe_epoch_release_bump_eq(t->copied, (d + 1) * (members - 1)))
-            osoe_epoch_wake_all(t->copied);
+            memcpy(dest, lead_dest, total);
+        if (osoe_epoch_release_bump_eq(&b->copied, (d + 1) * (members - 1)))
+            osoe_epoch_wake_all(&b->copied);
     }
 
-    *t->epoch = k + 1;
-    *t->data_epoch = d + 1;
+    t->epoch = k + 1;
+    t->data_epoch = d + 1;
     atomic_store_explicit(t->published, k + 1, memory_order_release);
     osoe_blocked_leave();
     return 0;
