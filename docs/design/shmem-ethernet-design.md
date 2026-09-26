@@ -154,10 +154,10 @@ following hold, and RoCE work waits until after it:
    collective sweeps recorded in `docs/pi-cluster.md`.
 5. A license chosen (§10), and `cmake --install` with the README enough for a
    stranger to build and run a program on a Slurm cluster like the author's.
-6. A version tag and a release note listing the known limits: the deprecated
-   routines' missing name-shifted entry points (§7.4), partial active sets
-   refused (§7.4), and whatever the last Pi session measured short of the
-   floor.
+6. A version tag and a release note listing the known limits: whatever the
+   last Pi session measured short of the floor. *(The two §7.4 limits once
+   listed here, the deprecated routines' profiling names and partial active
+   sets, were closed on 2026-09-26 at the author's direction.)*
 
 ---
 
@@ -5951,21 +5951,22 @@ it.
 | C11 type-generic interfaces | Part of the API | Step 1, for the types implemented. `_Generic` selects on *type*, and the exact-width types of Tables 6–8 are typedefs of the canonical ones on LP64 Linux, so the selection lists one association per distinct type and the library's build asserts that each typedef is the type assumed. Each list emits a *leading* comma per entry, so there is no `default:` association and a type outside the table is a compile error naming the call rather than a silent route to another type's routine |
 | `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1, and not stubs. Every PE of an osoe job runs the same executable by construction, so `pe_accessible` is whether `pe` names a PE of this job. `addr_accessible` additionally requires the address to be symmetric: in the heap, or since step 6 among the statics of a program linked with `oshcc` (§4.3). An automatic address answers 0, and so does a static in a program built without the wrapper - stated by the query rather than discovered at the first put |
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
-| Name-shifted deprecated routines | §10 item 1 wants a `pshmem_` entry point for every function | **Not done**, and recorded as known non-conformance below: the spec does not say how to shift a name that never had a `shmem_` prefix, and guessing wrong helps nobody |
-| Deprecated active-set constants (F.2.8) and routines | `SHMEM_SYNC_VALUE` and the `pSync` sizes; `shmem_barrier`, `shmem_sync`, `shmem_broadcast32`/`64`, the `_to_all` reductions of Table 11, `shmem_collect32`/`64`, `shmem_fcollect32`/`64`, `shmem_alltoall32`/`64`, `shmem_alltoalls32`/`64` | The constants at step 1. **The routines at step 5, over the whole job and nothing else** - at the author's direction of 2026-09-24 to implement them so that corpus programs can be tested against osoe, with the whole-job rule and its scope Claude's decisions for the author's review (`docs/prompts/done/phase1-step5-slice3-prompt.md`): an active set of every PE - `PE_start` 0, `logPE_stride` 0, `PE_size` the job's - is the world team, and any other ends the job by name. Step 1 had refused the routines at the link, on the grounds that a wrong answer is worse than a missing symbol; that still holds, and a named refusal at run time is neither. It is the active set every corpus program that still calls these passes (ISx, PRK, bale and hclib's copies) - of which PRK's and bale's run on heap data, where ISx and hclib's reduce symmetric statics, which osoe has for a program linked with `oshcc` since step 6 (§4.3) - and forming a group for an arbitrary set of PEs is machinery osoe does not have. `pSync` and `pWrk` are neither read nor written, which leaves `pSync` as the spec requires it to be found afterwards and makes the reuse rules hold trivially. `broadcast32`/`64` leave the root's own `dest` alone, as the spec says; when the root is its node's lead, the node's copy is the root's `source`, read by the internode phase and the copy-outs and never written (`collectives.c`). The active-set forms of collect, fcollect, alltoall and alltoalls came with their team forms (step 5 slice 4), under the same rule |
+| Name-shifted deprecated routines | §10 item 1 wants a `pshmem_` entry point for every function | **Both readings, since 2026-09-26** (below): Sandia OpenSHMEM's `pstart_pes`, `p_my_pe`, `pshmalloc` and the rest as the definitions, the literal `pshmem_start_pes`, `pshmem__my_pe` and the rest as second strong names, the old names weak aliases |
+| Deprecated active-set constants (F.2.8) and routines | `SHMEM_SYNC_VALUE` and the `pSync` sizes; `shmem_barrier`, `shmem_sync`, `shmem_broadcast32`/`64`, the `_to_all` reductions of Table 11, `shmem_collect32`/`64`, `shmem_fcollect32`/`64`, `shmem_alltoall32`/`64`, `shmem_alltoalls32`/`64` | The constants at step 1. **The routines at step 5, over the whole job and nothing else** - at the author's direction of 2026-09-24 to implement them so that corpus programs can be tested against osoe, with the whole-job rule and its scope Claude's decisions for the author's review (`docs/prompts/done/phase1-step5-slice3-prompt.md`): an active set of every PE - `PE_start` 0, `logPE_stride` 0, `PE_size` the job's - is the world team, and any other ends the job by name. Step 1 had refused the routines at the link, on the grounds that a wrong answer is worse than a missing symbol; that still holds, and a named refusal at run time is neither. It is the active set every corpus program that still calls these passes (ISx, PRK, bale and hclib's copies) - of which PRK's and bale's run on heap data, where ISx and hclib's reduce symmetric statics, which osoe has for a program linked with `oshcc` since step 6 (§4.3) - and forming a group for an arbitrary set of PEs is machinery osoe does not have. `pSync` and `pWrk` are neither read nor written, which leaves `pSync` as the spec requires it to be found afterwards and makes the reuse rules hold trivially. `broadcast32`/`64` leave the root's own `dest` alone, as the spec says; when the root is its node's lead, the node's copy is the root's `source`, read by the internode phase and the copy-outs and never written (`collectives.c`). The active-set forms of collect, fcollect, alltoall and alltoalls came with their team forms (step 5 slice 4), under the same rule. **Any active set since 2026-09-26** (step 5 slice 7, `active-set.c`, at the author's direction): the whole job keeps the world team's path; any other set within the job runs member-only algorithms over the program's `pSync` - a dissemination barrier, binomial-tree broadcast, fcollect, collect and reductions whose every signal is a counted add taken back by its receiver, so `pSync` is found at `SHMEM_SYNC_VALUE` afterwards and can be reused at once, and direct-put alltoall(s) - log2 of the set's size deep, touching nothing in the node segment. A set past the job, or a caller outside it, still ends the job by name |
 | `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TRANSPORT_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
 
-**Known non-conformance: the deprecated routines have no name-shifted entry
-points.** §10 item 1 requires "an alternate entry point name, with the prefix
-`pshmem_` for each OpenSHMEM function", and the seven unprefixed deprecated
+**The deprecated routines' profiling names.** §10 item 1 requires "an
+alternate entry point name, with the prefix `pshmem_` for each OpenSHMEM
+function", and does not say how to shift the seven unprefixed deprecated
 routines — `start_pes`, `_my_pe`, `_num_pes`, `shmalloc`, `shfree`,
-`shrealloc`, `shmemalign` — have none. The spec's wording does not say what the
-shifted name of a function that never had a `shmem_` prefix should be:
-`pstart_pes` is what Sandia OpenSHMEM chose, and `pshmem_start_pes` is the
-literal reading, which also yields `pshmem__my_pe`. Deferred rather than
-guessed, because a profiling tool that looks for the wrong one is no better off
-than one that finds nothing, and every other routine has its pair, which
-`shmem.profiling` checks against the declarations rather than a count kept here.
+`shrealloc`, `shmemalign`. Until 2026-09-26 osoe gave them none, a known
+non-conformance, rather than guess. Now it gives both readings (`deprecated.c`):
+`p` and the name, which Sandia OpenSHMEM defines (`#pragma weak start_pes =
+pstart_pes`, `_my_pe = p_my_pe`, `shmalloc = pshmalloc`, in its sources) and
+so what existing tools call, as the definition; and the literal `pshmem_` and
+the name - `pshmem_start_pes`, `pshmem__my_pe` - as a second strong name for
+it. The old name is a weak alias, as every `shmem_` routine is.
+`shmem.profiling` checks the three names of each.
 
 Two of §10's other requirements are satisfied and worth recording as such, since
 both look like omissions otherwise. Item 3 states that the C11 type-generic

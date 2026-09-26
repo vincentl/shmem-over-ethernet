@@ -21,7 +21,8 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Large collectives get both fixes.** A pipelined internode tree, then a dedicated internode allgather. Author, [2026-09-25](2026-09-25.md) item 2.
 - **Small gathers keep Bruck's cost.** No two-slot staging and no crossover. Author, [2026-09-26-day](2026-09-26-day.md) item 5.
 - **No strided primitive at the transport boundary.** `iput` batches puts; `iget` uses the nonblocking get. Author, [2026-09-24-overnight](2026-09-24-overnight.md), "Typed RMA".
-- **Deprecated active-set collectives run over the whole job only.** Claude, [2026-09-24-day](2026-09-24-day.md) item 1.
+- **Deprecated active-set collectives run on any active set**: the world team's path for the whole job, member-only algorithms over `pSync` for any other. Author, [2026-09-26-evening](2026-09-26-evening.md) item 13.
+- **The deprecated routines' profiling names come in both readings**, `pstart_pes` (Sandia's) and `pshmem_start_pes` (literal). Author, [2026-09-26-evening](2026-09-26-evening.md) item 13.
 
 ## Protocols and data structures
 

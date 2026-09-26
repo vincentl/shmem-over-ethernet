@@ -26,8 +26,7 @@ specification Table 10, broadcast, collect, fcollect, alltoall and alltoalls,
 with their C11 interfaces, the deprecated
 active-set forms - the `_to_all` reductions of Table 11, `shmem_broadcast32` and
 `64`, the collects, fcollects and alltoalls of 32 and 64 bits, `shmem_barrier`
-and `shmem_sync` - over the whole job, which is the only active set they
-accept, the first-come, first-served distributed locks, `shmem_global_exit`,
+and `shmem_sync` - over any active set, the first-come, first-served distributed locks, `shmem_global_exit`,
 the mandatory surface of §7.4 including the `pshmem_` profiling interface, and
 symmetric statics - a program's global and static variables as symmetric
 objects - in a program built with the `oshcc` wrapper (§4.3). A PE or a node
