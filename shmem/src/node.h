@@ -30,7 +30,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 19
+#define OSOE_NODE_LAYOUT 20
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -408,8 +408,8 @@ struct osoe_am_connection_metrics {
  * visits - each node names the lowest child index that has not arrived, and
  * `hostname` below says where to look next - rather than by visiting every
  * node. Written by the lead's progress thread as the state changes, a handful
- * of single-writer stores per barrier (§3.16) - all but the last field, which
- * the generic internode phase writes on the lead's application thread.
+ * of single-writer stores per barrier (§3.16) - all but the last three fields,
+ * which the generic internode phase writes on the lead's application thread.
  */
 struct osoe_collective_state {
     _Alignas(OSOE_CACHELINE)
@@ -433,6 +433,18 @@ struct osoe_collective_state {
      * only be compared.
      */
     _Atomic uint32_t most_pieces_in_flight;
+    /*
+     * Layout 20 (phase 1 step 5 slice 6), in the same padding: the steps this
+     * node's lead made in its last gather on the team, and the (node, step)
+     * pairs its lists of what to send hold - a share for each node a step
+     * sends, counted as the lists were filled rather than computed -
+     * ceil(log2 N) and N - 1 for a team over N nodes (§5.8, "An allgather for
+     * fcollect"). Written as the gather ends (internode-generic.c), before the
+     * lead releases its members, so counts pin the algorithm where a time
+     * could only be compared.
+     */
+    _Atomic uint32_t gather_steps;
+    _Atomic uint32_t gather_shares;
 };
 
 /*

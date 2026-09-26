@@ -665,6 +665,19 @@ const uint32_t *osoe_internode_team_local_ranks(uint32_t team, uint32_t *count)
     return t->local_ranks;
 }
 
+/* The team's mapping to world ranks (team.h), as a progression from `rank` on:
+ * the rest of the team for a strided one, one rank for one with a table. */
+uint32_t osoe_internode_team_world_ranks(uint32_t team, uint32_t rank, uint32_t *world,
+                                         int32_t *stride)
+{
+    const struct osoe_team *t = osoe_team_numbered(team);
+    if (!t || rank >= t->members)
+        return 0;
+    *world = (uint32_t)osoe_team_to_world(t, (int)rank);
+    *stride = t->world_of_rank ? 1 : t->world_stride;
+    return t->world_of_rank ? 1 : t->members - rank;
+}
+
 struct osoe_transport_context *osoe_ctx_of(const char *routine, shmem_ctx_t ctx)
 {
     osoe_require_initialized(routine);

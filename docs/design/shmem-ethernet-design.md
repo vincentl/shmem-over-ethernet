@@ -4271,13 +4271,19 @@ Legal because `dest` is undefined until the collective returns, so intermediate
 values are unobservable by any conforming program. For barrier and sync the
 epoch number travels in the internode AM and is asserted on receipt — the
 collective analogue of §3.13's handler-table checksum. The data collectives'
-internode phase does the same with a header on every piece - the epoch, the
-piece, its bytes and which collective it is - checked by the lead that
-receives it (`internode-generic.c`, `shmem.collective-divergence`). It names a
-divergence where the pieces meet, and only there: collectives whose trees share
-no edge wait in different places, a hang whose blocked records name each PE's
-routine; broadcasts from two roots on one node carry the same root position;
-and a node's members are not compared with each other at all.
+internode phase does the same: a reduction's and a broadcast's with a header
+on every piece - the epoch, the piece, its bytes and which collective it is -
+checked by the lead that receives it (`internode-generic.c`,
+`shmem.collective-divergence`), and since phase 1 step 5 slice 6 a gather's
+with its shape - the epoch, the result's bytes and its block - which each lead
+puts beside the READY counter of the lead that writes to it first, and which
+that lead compares with its own before it puts a byte
+(`shmem.collective-divergence.gather-size`; §5.8). It names a divergence where
+the leads meet, and only there: collectives whose phases share no edge or word
+wait in different places, a hang whose blocked records name each PE's routine
+- a gather against a reduction among them; broadcasts from two roots on one
+node carry the same root position; and a node's members are not compared with
+each other at all.
 
 **Why a single writer.** An earlier draft had local members combine into the
 lead's `dest` as they arrived. That fails three ways:
@@ -4449,23 +4455,22 @@ given the result's layout - a fixed block, or each member's place - so that a
 backend knows which bytes are whose, and bound by one rule: a peer's buffer may
 be written only once that peer has entered the collective, since until then
 its members may still be copying the last result out of it; before, a backend
-stages through the internal region. The spec's precondition would allow a put
-straight into another node's `dest` at once, which SOS uses; this rule is why
-osoe does not. **The generic implementation is the reduction's tree running an
-or**: it zeroes the other nodes' places - the gaps between its own members'
-places, which the SHMEM layer lists by team rank (`osoe_internode_team_local_ranks`,
-phase 1 step 7 slice 2) - and blocks at disjoint places or to
-their concatenation - no protocol of its own - and a piece header marks it a
-gather, so that one node's fcollect is not taken for another's or of the same
-length. Its cost is stated rather than hidden: per 16 KiB piece a leaf moves
-about two pieces and an interior lead 2(*k* + 1), where an allgather moves each
-block once; and one piece at a time, a gather of a fixed block per PE takes
-⌈*P n* / 16 KiB⌉ · 2⌈log_*k* *N*⌉ hops - at 400 nodes of 256 PEs and *k* = 4,
-510 of them for one long each. The pipeline (§5.8, phase 1 step 5 slice 5)
-divides that by about D - some 260 at the default D = 2 - without changing how
-it grows: **it is the one internode phase whose latency grows faster than log
-*N***, the exception §1's goal must carry until an allgather replaces it at the
-seam (§5.8, "An allgather for fcollect", the next slice). **collect's places
+stages through the internal region, or waits. The spec's precondition would
+allow a put straight into another node's `dest` at once, which SOS uses; this
+rule is why osoe does not. **The generic implementation is Bruck's allgather
+among the team's node leads** (§5.8, "An allgather for fcollect", as built at
+phase 1 step 5 slice 6): ⌈log₂ *N*⌉ steps, at each of which a lead puts the
+shares it holds - each node's members' blocks at their places - straight into
+the buffer of the lead 2^s positions before it once that lead has said it
+entered, so that each lead receives every other node's share once and sends as
+many. *(Until then it was the reduction's tree running an or: each node zeroed
+the other nodes' places, blocks at disjoint places or'd to their
+concatenation, and a piece header marked it a gather. Its cost grew with the
+whole result at every level - ⌈*P n* / 16 KiB⌉ · 2⌈log_*k* *N*⌉ hops one piece
+at a time, 510 at 400 nodes of 256 PEs and *k* = 4 for one long each, about D
+times fewer with the pipeline - which made it the one internode phase whose
+latency grew faster than log *N*, the exception §1's goal carried until the
+allgather replaced it.)* **collect's places
 are the prefix sums of every member's length**: every member takes the same
 room from the symmetric heap, a word per member and one more, and writes its
 length in the last; the lead gathers the lengths into
@@ -4689,13 +4694,13 @@ three levels deep, a reduction took 18.8 ms at D = 1, 12.8 and 12.4 ms with
 the first loop, 10.7 and 6.3 ms with this one.
 
 **An allgather for fcollect** *(decided 2026-09-25; checked by
-`allgather_model.py`; not yet built).* The generic gather's latency grows with
-the whole result at every level (§5.5 as built), so fcollect's internode phase
-becomes Bruck's allgather among the team's node leads: at step s, lead i sends
-every share it holds - nodes i to i + c - 1, c = min(2^s, N - 2^s) - to lead
-i - 2^s, written straight to their places in that lead's buffer. ceil(log2 N)
-steps, each node's blocks crossing the network once, any N. Two counters per
-step and team keep it safe:
+`allgather_model.py`; built at phase 1 step 5 slice 6, below).* The generic
+gather's latency grew with the whole result at every level (§5.5 as built), so
+fcollect's internode phase becomes Bruck's allgather among the team's node
+leads: at step s, lead i sends every share it holds - nodes i to i + c - 1,
+c = min(2^s, N - 2^s) - to lead i - 2^s, written straight to their places in
+that lead's buffer. ceil(log2 N) steps, each node's blocks crossing the network
+once, any N. Two counters per step and team keep it safe:
 - **READY**: at entry a lead adds one at every lead that will write to it, and a
   writer waits for it - internode.h's rule that a peer's buffer is written only
   once the peer has entered, since its members may still be copying out the
@@ -4708,6 +4713,149 @@ L runs under a cyclic one, so a step's put is one or two ranges or at most L of
 them. The model breaks each rule - a write before READY, a forward before DATA,
 and floor rather than ceiling of log2 N steps - and found that sending the last
 step's full 2^s shares, past N - 2^s, only rewrites shares the receiver holds.
+
+*As built* (phase 1 step 5 slice 6; `internode-generic.c`, `internal-region.h`;
+`docs/prompts/phase1-step5-slice6-prompt.md`). Every team the generic
+implementation serves takes it, the predefined teams and those a split creates,
+over the reduction tree's positions: the team's sorted node set, this node's
+position from its record and any other's lead through
+`osoe_internode_team_lead`. **A lead enters first of all**: it puts the
+gather's shape - the team's epoch, the result's bytes, and whether places lay
+it out or a block, the block then - into the READY[0] line of the lead at
+i + 1, past the counter, adds one to that READY[0] fenced after it, and adds
+one to READY[s] at the lead at i + 2^s for every other s. Then, step by step, it
+waits for its own READY[s] - at step 0 comparing the shape its receiver put
+there with its own, and ending the job naming both where they differ - puts the
+step's shares into the buffer of the lead at i - 2^s, every put saying more
+follows and the step's fenced add of that lead's DATA[s] ending it, and waits
+for its own DATA[s]. Step 0 joins every lead to the one before it in a ring,
+so its comparisons alone cover every pair, and a gather whose size differs
+between nodes is named before a byte lands
+(`shmem.collective-divergence.gather-size`) - what the piece header's gather
+bit, which went with the or-tree, named while it existed; a gather against a
+reduction waits on other
+words than the reduction's, a hang whose blocked records name each PE's
+routine, as for collectives whose trees share no edge (§5.5). The words are
+each team number's own: a READY and a DATA for each of the ⌈log₂ *N*⌉ steps
+the job's *N* nodes allow, each alone on its line, after the line that counts
+the team numbers claimed, so that nothing before them moved (the internal
+region, below) - sized by the node count's logarithm and the team count, and
+by nothing else; the shape takes 24 bytes of READY[0]'s line. A lead counts
+its gathers per team, and its gather *x* waits for *x* + 1.
+
+**Which members' blocks each step sends is found once per team**, at its
+first gather, after the lead has entered: it depends on the team and the rank
+map alone. A walk of the team's ranks in order - their world ranks as
+progressions from a third upcall, `osoe_internode_team_world_ranks`, since a
+created team's mapping is its descriptor's, above the seam, and its members
+on another node can be found no other way; their nodes from the rank map's
+runs, a stretch of one node's members at a time under a block distribution
+and one member at a time, by arithmetic, under a cyclic one - puts each
+stretch in the list of every step whose shares include its node, merged with
+the interval before it when the two touch. A list holds intervals of
+consecutive team ranks, which are contiguous in the result whatever its
+layout: one or two a step under a block distribution and at most *L* + 1 under
+a cyclic one. The walk costs O(*N* + intervals) under a block distribution
+and O(*P*) under a cyclic one, and for a team spanning fewer than every node
+a binary search of its node set per stretch besides, O(log *N*) lookups of a
+lead and its node: O((*N* + intervals) log *N*). It checks that this node is
+where the team's record puts it and holds as many members as the team lists
+here (`shmem.gather-misuse.local-count`). **A gather after it costs
+O(intervals)** beside its puts and its ⌈log₂
+*N*⌉ waits: each interval's ends mapped to bytes by the call's block or
+through its places, checked there - non-decreasing, from 0 to the result's
+end - so that no put leaves the result whatever the places hold, and a layout
+overwritten since it was made ends the job by name, as a program's collect
+into a dest shorter than the result makes one, the lead's own copy of its
+members' blocks running on into the room that holds the places
+(`shmem.gather-misuse.short-dest`, SOS's `shmem_team_b2b_collectives`). At
+the RoCE target the walk, which ran at every call until the review of the
+slice, would have cost more than the gather: a copy of it timed 76 µs at 4,096
+nodes under a block distribution and 3.3 ms at 10⁶ PEs under a cyclic one,
+against about 58 µs for the whole 13-step gather. The buffer is addressed at
+a peer by its region, heap or statics, and offset (`internode.h`).
+
+Each lead publishes the steps its last gather made and the (node, step) pairs
+its lists hold, counted as the walk fills them (`team.tree.gather_steps` and
+`gather_shares`, layout 20): ⌈log₂ *N*⌉ and *N* - 1, which `shmem.allgather.*`
+asserts on the world, its even ranks, the world reversed and a team spanning
+three of five nodes, over two to five nodes of a block map, a cyclic one and
+an uneven one - with every byte of blocks of 1 byte, 8 bytes and 64 KiB, a
+collect's differing blocks, dests in both statics ranges and a collect into
+them, and fcollects back to back with the team's rank 0 reading each result
+late, which READY is there for. A last step sending the full 2^s shares rewrites only bytes the receiver
+holds, and shows in the pairs alone.
+
+Timed in the VM - one host, loopback, release, the default fan-out 4 and D = 2,
+one PE a node - as the median of 31 fcollects between barriers, whose own time,
+55 to 70 µs, each includes, and the median of three such runs; before is main
+at the slice's base (4ec5e5d), the tree running an or with its pieces
+pipelined. Runs in other sessions of the same day came out up to a fifth faster
+or slower on both sides, the VM's noise:
+
+| Nodes | Per PE | Before | After | |
+|---|---|---|---|---|
+| 4 | 1 MiB | 14.1 ms | 2.0 ms | 7.1 times as fast |
+| 5 | 1 MiB | 19.2 ms | 3.5 ms | 5.5 times as fast |
+| 4 | 8 bytes | 176 µs | 280 µs | 1.6 times as long |
+| 5 | 8 bytes | 164 µs | 310 µs | 1.9 times as long |
+
+**The bytes predict the large gather.** Before, the whole result went through
+the tree in 16 KiB pieces, two at a time, so it took ⌈*N* MiB / 16 KiB⌉ / 2
+round trips of a tree one level deep - 129 and 161 - at about 110 and 120 µs
+each: bound by round trips, not by bytes. After, each lead puts *N* - 1 shares
+out and receives as many, 3 and 4 MiB each way over ⌈log₂ *N*⌉ steps, every
+lead at once. At the rate one pair of leads reaches alone - two nodes, one
+step, 1 MiB each way in 0.44 ms - that predicts 1.3 and 1.8 ms where 2.0 and
+3.5 were measured, and 0.9 ms on three nodes, where 1.0 was. The gap at four
+and five nodes is the VM's, not the algorithm's: every lead and its agent work
+at once, 8 and 10 busy threads on four CPUs, and the bytes all the leads move
+together, *N* (*N* - 1) MiB, go at 6 to 7 GB/s from three nodes on. On a
+machine per node each lead would keep the pair's rate.
+
+**The step count predicts the small gather, and the barrier after it the
+rest.** Every lead's gather was timed from inside, at 8 bytes - its marks on
+one clock, the VM's, which every process reads:
+
+| Per lead, the median of 93 gathers | 4 nodes | 5 nodes |
+|---|---|---|
+| Before: the tree's gather, entry to exit | 71 µs | 71 µs |
+| After: the entry's adds, and the intervals and checks | 2 µs, 0 | 1 µs, 0 |
+| Entry to READY[0] held | 35 µs | 37 µs |
+| READY[0]'s add, sent to held | 34 µs | 34 µs |
+| Each step's DATA wait, steps 0, 1, 2 | 30, 32 µs | 32, 26, 28 µs |
+| After: the gather, entry to exit | 105 µs | 142 µs |
+| First lead's entry to last lead's exit, before and after | 103, 148 µs | 109, 189 µs |
+
+A hop costs the same in both: a step's DATA wait is one message's crossing,
+26 to 32 µs, and the tree's gather, up and down, is two, 71 µs. Nothing at
+entry costs what a hop does - the adds take 2 µs and the intervals, found at
+the team's first gather, nothing - but every lead enters within about 20 µs
+of the others, so READY[0], added by the lead before at its own entry, is held
+one crossing after this one's: ⌈log₂ *N*⌉ + 1 hops, 3 and 4 where the tree
+made 2, 105 and 142 µs where it took 71, as the count predicts. The rounds
+lose more than that, 104 and 146 µs, for two reasons the marks show. The
+leads' exits spread wider - the tree's root releases every leaf at once, where
+an allgather's lead finishes when its last share arrives - so the last lead
+leaves 45 and 80 µs later than the tree's did. And the barrier that ends each
+round begins with a quiet, which waits for the acknowledgement of every put:
+an allgather's lead puts its last step's shares one hop before it leaves, a
+tree's leaf its piece two hops before, acknowledged by then. Rounds between
+`shmem_sync_all`, which has no quiet, lose 62 and 96 µs rather than 104 and
+146 (230 against 168 µs, 253 against 157). So a small gather on a few nodes is
+slower than it was by ⌈log₂ *N*⌉ - 1 hops of its own, the wider spread of its
+exits, and the quiet of a barrier after it; on more nodes the tree's
+2⌈log_*k* *N*⌉ hops and the allgather's ⌈log₂ *N*⌉ + 1 stay within a hop of
+each other at *k* = 4, and no lead takes *k* arrivals a hop. Taking READY off
+the critical path - staging step 0 in slots of the internal region, which the
+review of the slice simulated at 92 -> 63 µs on four nodes - and keeping the
+tree for small gathers, a choice by size and node count like rule 4's below,
+are for the author.
+
+With two PEs a node, the same internode phase and each member copying twice
+the result out, 1 MiB each took 29.4 against 5.0 ms on four nodes and 40.0
+against 8.0 on five (one run each, against ea311cf and the slice's first
+build).
 
 #### What the surface provides, and what it lacks
 
@@ -4745,7 +4893,11 @@ words fan-out + 1, an arrival counter per child position and a release counter
 fan-out of 4 and D = 2, of which a team touches only its own slots and words,
 and only on its leads. And since the second slice of step 7 one line more,
 whose first word counts the team numbers claimed, on world PE 0 alone
-(§5.7).)*
+(§5.7). *Since phase 1 step 5 slice 6*, after that line, each team number's
+allgather words: a READY and a DATA counter for each of the ⌈log₂ *N*⌉ steps
+the job's *N* nodes allow a team, each alone on its line - the one part of the
+layout the node count sizes, 2.5 KiB a team number at a thousand nodes ("An
+allgather for fcollect", below).)*
 
 *(Built at phase 1 step 5 slice 2, once reductions had landed and shown what it
 must contain - not as a separate header but as `internode.h`'s data half, beside
@@ -5517,7 +5669,9 @@ machinery. The review's order is adopted.
    The fourth adds collect, fcollect, alltoall and alltoalls, their active-set
    forms under the same rule, and the seam's gather (§5.5, as built). The fifth
    keeps D pieces in flight at each lead of the generic internode phase (§5.8,
-   "Pipelined pieces").*
+   "Pipelined pieces"). The sixth makes the generic gather Bruck's allgather
+   among the node leads, ⌈log₂ *N*⌉ steps in place of the tree's or over the
+   whole result (§5.8, "An allgather for fcollect").*
 
 6. **Symmetric statics and the compiler wrapper** (§4.3). *The first slice:
    `oshcc`, a POSIX `sh` wrapper configured by the build, installed with the
@@ -6458,7 +6612,9 @@ Each is independently breakable, and each failure appears far from its cause.
     break it and must move to 64-bit `>=` predicates with a separate wake word.
     The generic internode phase's piece counters are not epoch counters: since
     phase 1 step 5 slice 5 they are 64-bit and compared as at least, since a
-    child runs up to D pieces ahead of its parent's wait (§5.8).
+    child runs up to D pieces ahead of its parent's wait (§5.8). Nor are its
+    allgather's READY and DATA (phase 1 step 5 slice 6): each gather adds one
+    to each, and a lead waits for at least its count of gathers plus one.
 11. **AMO result descriptors carry values; get descriptors carry references.**
     (§3.8) Unifying them reorders AMOs.
 12. **The completion queue is sized from the provided-buffer ring, not from the
@@ -6477,6 +6633,10 @@ Each is independently breakable, and each failure appears far from its cause.
 16. **Before release, the local lead is the only writer of its `dest`, and it
     leaves the collective last.** (§5.5) Concurrent combines lose updates; a lead
     that leaves early lets the next epoch clobber a result still being copied out.
+    The one other writer is the internode phase, into the places of other nodes'
+    blocks, once the lead has handed `dest` over (`internode.h`): since phase 1
+    step 5 slice 6 the generic gather's puts from the other nodes' leads, which
+    READY holds back until then (§5.8).
 17. **A data-carrying collective reads a peer's `source` only after that peer has
     called.** (§5.5) Pulling before arrival is non-conforming under 1.6 §9.10.
 18. **Futex words are 32-bit, and `futex_wait` deadlines are absolute.** (§3.10,

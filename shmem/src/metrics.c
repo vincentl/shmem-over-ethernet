@@ -224,6 +224,11 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     /* The most pieces of a data collective the lead had in flight in its last
      * one (§5.8; layout 19): a count to pin the pipeline's overlap by. */
     TEAM("team.tree.most_pieces_in_flight", BLOCK_TREE(most_pieces_in_flight)),
+    /* The steps the lead's last gather made and the (node, step) pairs its
+     * lists send (§5.8, the allgather; layout 20): counts to pin the
+     * algorithm by. */
+    TEAM("team.tree.gather_steps", BLOCK_TREE(gather_steps)),
+    TEAM("team.tree.gather_shares", BLOCK_TREE(gather_shares)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),
     TEAM("team.record.local_members", BLOCK_RECORD(local_members)),

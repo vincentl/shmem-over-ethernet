@@ -1349,12 +1349,15 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             $<TARGET_FILE:shmem_test_collective-divergence>)
   set_tests_properties(shmem.collective-divergence PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "PEs called different collectives")
-  add_test(NAME shmem.collective-divergence.gather
+  # A gather's size differing between two nodes: the one PE fcollects two longs
+  # where the other fcollects one, and a lead finds the shape the other said it
+  # entered is not its own before a byte lands (phase 1 step 5 slice 6).
+  add_test(NAME shmem.collective-divergence.gather-size
     COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_DIVERGE_KIND=gather
-            $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,2 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
             $<TARGET_FILE:shmem_test_collective-divergence>)
-  set_tests_properties(shmem.collective-divergence.gather PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "PEs called different collectives")
+  set_tests_properties(shmem.collective-divergence.gather-size PROPERTIES LABELS "tier2"
+    TIMEOUT 60 PASS_REGULAR_EXPRESSION "PEs called different collectives")
 endif()
 
 # Pipelined pieces through the internode tree (design §5.8; phase 1 step 5
@@ -1405,6 +1408,31 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
             $<TARGET_FILE:shmem_test_pipeline>)
   set_tests_properties(shmem.pipeline.0-0-1-1.max-teams-4 PROPERTIES LABELS "tier2" TIMEOUT 90)
+endif()
+
+# The allgather among node leads that is fcollect's and collect's internode
+# phase (design §5.8, "An allgather for fcollect"; phase 1 step 5 slice 6;
+# test-allgather.c): blocks of 1 byte, 8 bytes and 64 KiB and a collect's
+# differing ones, into the heap and into both statics ranges, byte by byte;
+# fcollects back to back into one dest with the team's rank 0 reading each
+# result late; and the steps and shares each lead publishes. On the world, its
+# even ranks and the world reversed, over two to five logical nodes - so that
+# the node count is and is not a power of two - on a block map and a cyclic
+# one of two PEs a node, and on an interleaved map of uneven nodes; and on
+# five, a team spanning three nodes: on the block map ranks 3 to 7, nodes 1 to
+# 3 unevenly, and on the cyclic one ranks 2, 5 and 8, nodes 2, 0 and 3 in that
+# order of team rank. Linked as oshcc links (§4.3), for its statics. tsan is
+# left out of the maps for shmem.internode.*'s reason.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  foreach(case "0,0,1,1" "0,1,0,1" "0,0,1,1,2,2" "0,1,2,0,1,2" "0,0,1,1,2,2,3,3"
+               "0,1,2,3,0,1,2,3" "0,0,1,1,2,2,3,3,4,4:OSOE_TEST_THREE_OF_FIVE=3,1,5"
+               "0,1,2,3,4,0,1,2,3,4:OSOE_TEST_THREE_OF_FIVE=2,3,3" "0,1,2,0,1,0")
+    string(REPLACE ":" ";" environment "${case}")
+    list(POP_FRONT environment map)
+    osoe_tier2_map_test(allgather ${map} OSOE_TEST_MAP=${map} SHMEM_SYMMETRIC_SIZE=16m
+      ${environment})
+  endforeach()
+  osoe_statics_program(shmem_test_allgather)
 endif()
 
 # OSOE_REGION_INTERNAL itself (test-internal-region.c): between node-mates, a
@@ -1471,6 +1499,32 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             $<TARGET_FILE:shmem_test_team-storage>)
   set_tests_properties(shmem.team-storage.local-order.internode PROPERTIES LABELS "tier2"
     TIMEOUT 90)
+endif()
+
+# The generic gather's own checks, each ending the job by name before a byte
+# of the gather lands (test-gather-misuse.c; phase 1 step 5 slice 6): a collect
+# into a dest shorter than its result, SOS's shmem_team_b2b_collectives'
+# mistake, whose lead's own copy of its members' blocks overwrites the room
+# holding the places; and a lead's descriptor counting one member more on its
+# node than the rank map does. White-box, for the second, like team-storage's.
+add_executable(shmem_test_gather-misuse test-gather-misuse.c ${osoe_library_sources})
+target_include_directories(shmem_test_gather-misuse PRIVATE ../src ../include)
+target_link_libraries(shmem_test_gather-misuse PRIVATE osoe_base rt Threads::Threads
+  PkgConfig::LIBURING)
+osoe_warnings(shmem_test_gather-misuse)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.gather-misuse.short-dest
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MISUSE=short-dest
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
+            $<TARGET_FILE:shmem_test_gather-misuse>)
+  set_tests_properties(shmem.gather-misuse.short-dest PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "shmem_long_collect: team 0's member [0-9]+ has its place at byte [0-9]+ of a result of 320 bytes, out of the places' order: the layout was overwritten")
+  add_test(NAME shmem.gather-misuse.local-count
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MISUSE=local-count
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
+            $<TARGET_FILE:shmem_test_gather-misuse>)
+  set_tests_properties(shmem.gather-misuse.local-count PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "test-gather-misuse: the rank map puts 2 of team 0's members on this node, and the team lists 3 here")
 endif()
 # Team creation (phase 1 step 7 slice 2; test-team-split.c): halves, evens and
 # odds, one PE, the world reversed, grids of the world and of a split, SHARED

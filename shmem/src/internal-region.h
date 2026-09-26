@@ -29,24 +29,37 @@
  * scratch that means something only while a collective has it, rather than in
  * a count the next collective would wait on forever.
  *
- * Last, one more line: **the count of team numbers claimed** (§5.7; phase 1
+ * Then one more line: **the count of team numbers claimed** (§5.7; phase 1
  * step 7 slice 2), an eight-byte word at the line's start. Every PE's region
  * has the line and only world PE 0's is used: a split's parent rank 0 claims
  * the numbers its call creates by compare-and-swap there (team.c), so numbers
  * are job-wide and never reused within a session. It is not a team number's
  * word, and no collective counts on it.
  *
+ * Last, **the allgather's words** (§5.8, "An allgather for fcollect"; phase 1
+ * step 5 slice 6): per team number, a READY counter for each of the gather's
+ * steps and then a DATA counter for each, eight bytes each and each alone on
+ * its line, as the tree's are. READY[s] at a lead counts the entries of the
+ * lead it writes to at step s, DATA[s] the steps s of the lead that writes to
+ * it (internode-generic.c); READY[0]'s line also holds, past the counter, the
+ * shape of the gather that lead entered, 24 bytes, put before the add. A team over N nodes takes ceil(log2 N) steps, so
+ * every team number has room for ceil(log2 N) steps of the job's N nodes,
+ * which every node agrees on - the one part of the layout the node count
+ * sizes, by its logarithm. They come after the counter's line so that nothing
+ * before them moved when they were added.
+ *
  * Every PE's heap carries one, and a team touches only its own slots and its
  * words' lines, and only on the leads of its nodes; the pages nobody writes
  * cost address space and the /dev/shm capacity check's share, not memory -
  * about 5 MiB a PE at the default 32 teams, a fan-out of 4 and D = 2, half of
- * that at D = 1. **Every node computes the same offsets**: the layout is fixed
- * by the fan-out, OSOE_MAX_TEAMS and D, which every node agrees on (§5.3, §5.7,
- * §5.8), and by the slot and the words' line, which are constants rather than
- * settings, and constants rather than the compiler's cache line - 128 bytes on
- * aarch64 and 64 on x86-64 - so that nodes of different architectures in one
- * job agree too. Two nodes that disagreed about any of them would put into
- * each other's slots at different offsets.
+ * that at D = 1; the allgather's words add 2.5 KiB a team number at a thousand
+ * nodes. **Every node computes the same offsets**: the layout is fixed by the
+ * fan-out, OSOE_MAX_TEAMS, D and the job's node count, which every node agrees
+ * on (§5.3, §5.7, §5.8, §6.2), and by the slot and the words' line, which are
+ * constants rather than settings, and constants rather than the compiler's
+ * cache line - 128 bytes on aarch64 and 64 on x86-64 - so that nodes of
+ * different architectures in one job agree too. Two nodes that disagreed about
+ * any of them would put into each other's slots at different offsets.
  */
 #ifndef OSOE_INTERNAL_REGION_H
 #define OSOE_INTERNAL_REGION_H
@@ -96,14 +109,40 @@ static inline uint64_t osoe_internal_team_counter_offset(uint32_t fanout, uint32
            (uint64_t)max_teams * osoe_internal_team_words_bytes(fanout);
 }
 
-/* The region's size for `max_teams` team numbers, a tree of fan-out `fanout`
- * and `pipeline` pieces in flight, before page rounding: the slots, the words,
- * then the counter's line. */
-static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipeline,
-                                                  uint32_t max_teams)
+/* The allgather's steps over `nodes` nodes: ceil(log2 nodes), 0 for one. */
+static inline uint32_t osoe_internal_gather_steps(uint32_t nodes)
+{
+    uint32_t steps = 0;
+    while ((UINT64_C(1) << steps) < nodes)
+        steps++;
+    return steps;
+}
+
+/* One team number's allgather words for a job whose teams take up to `steps`
+ * steps: READY for each step, then DATA for each, each alone on its line. */
+static inline uint64_t osoe_internal_team_gather_bytes(uint32_t steps)
+{
+    return (uint64_t)2 * steps * OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* Where the allgather's words start: past the counter's line. */
+static inline uint64_t osoe_internal_gather_offset(uint32_t fanout, uint32_t pipeline,
+                                                   uint32_t max_teams)
 {
     return osoe_internal_team_counter_offset(fanout, pipeline, max_teams) +
            OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* The region's size for `max_teams` team numbers, a tree of fan-out `fanout`,
+ * `pipeline` pieces in flight and a job of `nodes` nodes, before page
+ * rounding: the slots, the words, the counter's line, then the allgather's
+ * words. */
+static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipeline,
+                                                  uint32_t max_teams, uint32_t nodes)
+{
+    return osoe_internal_gather_offset(fanout, pipeline, max_teams) +
+           (uint64_t)max_teams *
+               osoe_internal_team_gather_bytes(osoe_internal_gather_steps(nodes));
 }
 
 #endif /* OSOE_INTERNAL_REGION_H */

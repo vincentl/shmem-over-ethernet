@@ -1,7 +1,9 @@
 /*
  * The generic internode phase of the data collectives (internode-generic.h;
  * §5.5, §5.8), moved behind internode.h from collectives.c, where phase 1 step
- * 5's first slice built it.
+ * 5's first slice built it: a reduction and a broadcast through §5.3's tree of
+ * node leads, and since phase 1 step 5 slice 6 a gather as an allgather among
+ * the same leads (the last part of this comment).
  *
  * **Only the node leads take part**, over §5.3's k-ary tree of nodes, and they
  * meet over the transport rather than through AM messages the agents interpret:
@@ -110,6 +112,82 @@
  * times at depths 1 to 4, for D of 2, 4 and 8). A broadcast finds its rotated
  * tree's k + 1 neighbouring leads in O(k), and a reduction's tree is found once
  * per team. State: O(k) per team.
+ *
+ * **A gather is Bruck's allgather among the team's node leads** (§5.8, "An
+ * allgather for fcollect"; phase 1 step 5 slice 6), tools/modelcheck/
+ * allgather_model.py's lead program: the tree running an or, which it
+ * replaced, carried the whole result through every level. The leads are the
+ * tree's - positions 0 ... N - 1 of the team's node set, this node's from its
+ * record and any other's lead through osoe_internode_team_lead. A node's
+ * *share* is its members' blocks at their places in the result. At step s,
+ * for s from 0 to ceil(log2 N) - 1, the lead at position i puts every share
+ * it holds - positions i to i + c - 1, c = min(2^s, N - 2^s), its own and
+ * those gathered so far - straight to their places in the buffer of the lead
+ * at i - 2^s, and receives positions i + 2^s onward from the lead at i + 2^s:
+ * after the last step it holds every share, each put into its buffer once,
+ * N - 1 in all, and has sent as many. Nothing is staged and nothing rotated.
+ * Two counters per step, in the team number's own words (internal-region.h),
+ * each cumulative over the team's life and waited on as at least - each gather
+ * adds one to each, and the lead counts its gathers on the team, so its
+ * gather x waits for x + 1 - keep it the model's:
+ *   - **READY[s]**, at a writer: at entry a lead adds one to READY[s] at the
+ *     lead that writes to it at step s, the one at i + 2^s, for every s; a
+ *     writer waits for its own before its step-s puts. This is internode.h's
+ *     rule that a peer's buffer is written only once the peer has entered,
+ *     since until then its members may still be copying the gather before's
+ *     result out of it - and the model's no_ready breakage;
+ *   - **DATA[s]**, at a receiver: a writer adds one to DATA[s] at the lead it
+ *     wrote to, fenced after its puts (invariant 5); a lead waits for its own
+ *     before its step s + 1, which forwards what step s brought, and after its
+ *     last step before returning - the model's no_data_wait breakage.
+ * And ceil(log2 N) steps, not floor: on a node count that is not a power of
+ * two some shares would never arrive (short_steps). A lead reads the shares it
+ * sends at a step while the leads after it write the ones it has yet to
+ * receive: different bytes, since the shares a lead receives are positions
+ * i + 1 ... i + N - 1, each once, and it sends only those it holds.
+ *
+ * **The shares' members are found once per team** (find_intervals), at its
+ * first gather, since they depend on the team and the rank map alone: the
+ * team's ranks walked in order, their world ranks from the team's mapping
+ * (osoe_internode_team_world_ranks) and their nodes from the rank map's runs,
+ * each stretch of members on one node joining the list of every step whose
+ * shares include its node, merged with the interval before it when the two
+ * touch. A list holds intervals of consecutive team ranks, and consecutive
+ * ranks are contiguous in the result whatever its layout, so under a block
+ * distribution a step's shares are one interval, or two when they wrap past
+ * position N - 1, and under a cyclic one at most L + 1, L the node's PEs. The
+ * walk costs O(N + intervals) under a block distribution, whose rank-map runs
+ * each hold a node's members, and O(P) under a cyclic one, whose runs step
+ * from node to node a member at a time - and, for a team spanning fewer than
+ * every node, a binary search of its node set per stretch, O(log N) lookups.
+ * It is made once. **Every gather costs O(intervals)** beyond its puts: each
+ * interval's ends mapped to bytes by the call's `block` or `places`, and
+ * checked there - the places non-decreasing, from 0 to the result's end - so
+ * that no put leaves [0, bytes) whatever the places hold (layout_overwritten).
+ * Every put but a step's last operation - its fenced add - says more follows
+ * (OSOE_TRANSPORT_MORE). State: the lists, O(intervals) per team.
+ *
+ * **A lead says what gather it has entered** (§5.5's "asserted on receipt"),
+ * first of all: into the READY[0] line of the lead that writes to it at step
+ * 0, past the counter, it puts the gather's shape - the team's epoch, the
+ * result's bytes, and whether places lay it out or a block, the block then,
+ * which is every node's alike; collect's second gather's blocks differ from
+ * node to node and its places are what every node shares - and its add to
+ * that READY[0] is fenced after it. The writer compares the shape with its own
+ * after its READY wait and before any put, and a difference ends the job
+ * naming both leads (check_shape). Step 0 joins every lead to the one before
+ * it, a ring, so its comparisons alone cover every pair, and nothing lands in
+ * a buffer whose owner reckons the result another size. A gather against
+ * another collective still waits in words the other never touches, a hang
+ * whose blocked records name each PE's routine, as for collectives whose
+ * trees share no edge (above).
+ *
+ * Each lead publishes, in the team's tree state (node.h), the steps its last
+ * gather made and the (node, step) pairs its lists hold - ceil(log2 N) and
+ * N - 1, counted as the walk fills the lists rather than computed - so that a
+ * test pins the algorithm by counts rather than by time: a last step sending
+ * the full 2^s shares, whose extra bytes only rewrite what the receiver holds,
+ * shows there and nowhere else.
  */
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -167,6 +245,35 @@ static uint64_t release_counter(uint32_t team)
     return arrival_counter(team, osoe.bootstrap.collective_fanout);
 }
 
+/*
+ * The allgather's words (internal-region.h): per team number, past the line
+ * that counts the team numbers claimed, READY for each step and then DATA for
+ * each, each alone on its line, with room for as many steps as the job's
+ * node count takes - the most any team's gather takes.
+ */
+static uint64_t gather_word(uint32_t team, uint32_t line)
+{
+    uint32_t steps = osoe_internal_gather_steps(osoe.bootstrap.node_count);
+    return osoe_internal_gather_offset(osoe.bootstrap.collective_fanout,
+                                       osoe.bootstrap.collective_pipeline,
+                                       osoe.bootstrap.max_teams) +
+           (uint64_t)team * osoe_internal_team_gather_bytes(steps) +
+           (uint64_t)line * OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* READY[step], at the lead that writes at `step`: the entries of the lead it
+ * writes to. */
+static uint64_t ready_counter(uint32_t team, uint32_t step)
+{
+    return gather_word(team, step);
+}
+
+/* DATA[step], at the lead written to at `step`: its writer's steps done. */
+static uint64_t data_counter(uint32_t team, uint32_t step)
+{
+    return gather_word(team, osoe_internal_gather_steps(osoe.bootstrap.node_count) + step);
+}
+
 /* This PE's own internal region, at `offset`. */
 static unsigned char *internal(uint64_t offset)
 {
@@ -182,6 +289,20 @@ struct lead_tree {
     uint32_t child[OSOE_COLLECTIVE_FANOUT_MAX];
 };
 
+/* Team ranks `first` up to `end`: consecutive members whose blocks go at one
+ * step of a gather, and so one range of its result whatever its layout. */
+struct member_interval {
+    uint32_t first;
+    uint32_t end;
+};
+
+/* The intervals a lead sends at one step of its team's gathers, ascending. */
+struct interval_list {
+    struct member_interval *intervals;
+    uint32_t count;
+    uint32_t capacity;
+};
+
 /*
  * A team's internode phase as this node's lead keeps it: the reduction's tree,
  * from the team's record, and the bases its waits count from - where each child
@@ -189,7 +310,10 @@ struct lead_tree {
  * last collective ended, by this lead's own trees (the file's comment), since
  * the counters in the internal region are cumulative over the team's life and
  * never reset. One per team number (OSOE_MAX_TEAMS), allocated at init and
- * filled the first time a call names the team.
+ * filled the first time a call names the team. And what its gathers keep:
+ * the gathers so far, which READY and DATA count; and, found at the first and
+ * the same for every one after it, the steps, the team's size, the (node,
+ * step) pairs the lists hold, and each step's intervals of members.
  */
 struct generic_team {
     bool registered;
@@ -199,6 +323,11 @@ struct generic_team {
     uint64_t arrival_base[OSOE_COLLECTIVE_FANOUT_MAX];
     uint64_t release_base;
     struct osoe_collective_state *published;    /* the team's tree state (node.h) */
+    uint64_t gathers;
+    uint32_t steps;
+    uint32_t members;
+    uint32_t shares;
+    struct interval_list *step_intervals;
 };
 
 static struct generic_team *teams;
@@ -214,6 +343,11 @@ void osoe_internode_generic_init(void)
 
 void osoe_internode_generic_fini(void)
 {
+    for (uint32_t t = 0; teams && t < team_count; t++) {
+        for (uint32_t s = 0; teams[t].step_intervals && s < teams[t].steps; s++)
+            free(teams[t].step_intervals[s].intervals);
+        free(teams[t].step_intervals);
+    }
     free(teams);
     teams = NULL;
     team_count = 0;
@@ -316,15 +450,6 @@ static uint32_t reduction_identity(enum osoe_reduction_operation operation,
            (element.width & 0xff);
 }
 
-/* A gather's: the or over unsigned words that it runs as, with the next bit
- * set too, so that one is not taken for an application's or of the same
- * length - a divergence the pieces would otherwise hide. */
-enum { GATHER_BIT = 30 };
-static uint32_t gather_identity(struct osoe_element element)
-{
-    return reduction_identity(OSOE_REDUCTION_OR, element) | UINT32_C(1) << GATHER_BIT;
-}
-
 static const char *operation_name(uint32_t operation)
 {
     static const char *const names[] = {
@@ -353,9 +478,6 @@ static void describe(const struct piece_header *h, char *out, size_t size)
 {
     if (h->epoch == 0)
         snprintf(out, size, "nothing: no piece was put there");
-    else if (h->collective >> 31 && (h->collective >> GATHER_BIT & 1))
-        snprintf(out, size, "piece %u (%u bytes) of epoch %u's collect", h->piece, h->bytes,
-                 h->epoch);
     else if (h->collective >> 31)
         snprintf(out, size, "piece %u (%u bytes) of epoch %u's %s of %u-byte %s", h->piece,
                  h->bytes, h->epoch, operation_name((h->collective >> 16) & 0x7fff), h->collective & 0xff,
@@ -653,53 +775,402 @@ static uint64_t place_of(const uint64_t *places, size_t block, uint64_t r)
     return places ? places[r] : r * (uint64_t)block;
 }
 
-/*
- * Zero every place but this node's members': the or needs each byte to be one
- * node's. The members are the team's, by team rank (internode.h), which the
- * SHMEM layer lists in ascending order, so the places to zero are the gaps
- * between theirs: O(L) calls whatever the team's size, with the bytes zeroed
- * the result's less this node's own. A node whose members are one run of
- * ranks, as Slurm's block distribution makes the world's, zeroes two runs.
- */
-static void zero_others(uint32_t team, unsigned char *buffer, size_t bytes, size_t block,
-                        const uint64_t *places, const char *routine)
+/* How many shares a lead sends at step `step` of a gather over `nodes` nodes:
+ * min(2^step, nodes - 2^step) - 2^step at every step but the last. */
+static uint32_t shares_at(uint32_t nodes, uint32_t step)
 {
-    uint32_t count = 0;
-    const uint32_t *ranks = osoe_internode_team_local_ranks(team, &count);
-    /* No list is no member here that this process knows of, and zeroing every
-     * place would pass on nothing of this node's: named, as lead_of names a
-     * position with no lead. */
-    if (!ranks)
-        osoe_fatal("%s: team %u has no members on this node that this process knows of",
-                   routine, team);
-    uint64_t from = 0;
-    for (uint32_t m = 0; m < count; m++) {
-        uint64_t at = place_of(places, block, ranks[m]);
-        memset(buffer + from, 0, at - from);
-        from = place_of(places, block, (uint64_t)ranks[m] + 1);
-    }
-    memset(buffer + from, 0, bytes - from);
+    uint64_t power = UINT64_C(1) << step;
+    return (uint32_t)(power < nodes - power ? power : nodes - power);
 }
 
 /*
- * internode.h's gather, as the or of every node's buffer once the others'
- * places are zero: blocks at disjoint places, or'd, are their concatenation.
- * It runs on the reduction's tree - no protocol of its own, and nothing
- * written in another node but its internal region. In eight-byte words when
- * the buffer allows, which it does alike on every node: its length is the
- * same everywhere, and its place is, being symmetric in a page-aligned region.
+ * The position of node `node` in the team's node set: its number for a team
+ * spanning every node; else a binary search of the set by its leads' nodes,
+ * O(log N) lookups of a lead (osoe_internode_team_lead) and of its node
+ * (job.h), O(log R) each. Only a team's first gather asks, whose intervals
+ * every later gather reuses.
+ */
+static uint32_t position_of(const struct generic_team *team_phase, uint32_t team, uint32_t node,
+                            const char *routine)
+{
+    uint32_t count = team_phase->count, low = node;
+    if (count < osoe.job.node_count) {
+        uint32_t high = count;
+        low = 0;
+        while (low < high) {
+            uint32_t middle = low + (high - low) / 2;
+            if (osoe_node_of(&osoe.job, lead_of(team, middle, routine)) < node)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+        if (low < count && osoe_node_of(&osoe.job, lead_of(team, low, routine)) != node)
+            low = count;
+    }
+    if (low >= count)
+        osoe_fatal("%s: team %u has a member on node %u, which is not in its node set", routine,
+                   team, node);
+    return low;
+}
+
+/* Team ranks `first` up to `end` at the end of `list`, merged with its last
+ * interval when the two touch. */
+static void add_interval(struct interval_list *list, uint32_t first, uint32_t end, const char *routine)
+{
+    if (list->count > 0 && list->intervals[list->count - 1].end == first) {
+        list->intervals[list->count - 1].end = end;
+        return;
+    }
+    if (list->count == list->capacity) {
+        uint32_t capacity = list->capacity ? 2 * list->capacity : 4;
+        struct member_interval *grown = realloc(list->intervals, sizeof *grown * capacity);
+        if (!grown)
+            osoe_fatal("%s: out of memory for a gather's %u intervals of members", routine, capacity);
+        list->intervals = grown;
+        list->capacity = capacity;
+    }
+    list->intervals[list->count++] = (struct member_interval){ first, end };
+}
+
+/* A team's intervals as its first gather's walk finds them: the team, its lead's
+ * state, the members found on this node, and each position's steps so far,
+ * a bit a step, so that its (node, step) pairs are counted as they join. */
+struct member_walk {
+    struct generic_team *team_phase;
+    uint32_t team;
+    uint32_t here;
+    uint64_t *steps_joined;
+    const char *routine;
+};
+
+/* The members `first` to `first` + `count` - 1, at position `position`, join
+ * step `step`'s list. */
+static void join(struct member_walk *walk, uint32_t position, uint32_t step, uint32_t first,
+                 uint32_t count)
+{
+    add_interval(&walk->team_phase->step_intervals[step], first, first + count, walk->routine);
+    uint64_t bit = UINT64_C(1) << step;
+    if (!(walk->steps_joined[position] & bit)) {
+        walk->steps_joined[position] |= bit;
+        walk->team_phase->shares++;
+    }
+}
+
+/*
+ * Team ranks `first` to `first` + `count` - 1, all on node `node`: they join
+ * the list of every step whose shares include the node's - the steps s at
+ * which the node is fewer than shares_at(s) positions after this one: from
+ * the first s with 2^s past that distance to the last but one, and the last if
+ * its fewer shares reach. So each stretch costs O(1) and the lists it joins,
+ * and a binary search of the node set where positions are not node numbers.
+ */
+static void add_members(struct member_walk *walk, uint32_t first, uint32_t count, uint32_t node)
+{
+    struct generic_team *team_phase = walk->team_phase;
+    uint32_t n = team_phase->count;
+    uint32_t position = position_of(team_phase, walk->team, node, walk->routine);
+    uint32_t after = (uint32_t)(((uint64_t)position + n - team_phase->index) % n);
+    if (after == 0)
+        walk->here += count;
+    uint32_t last = team_phase->steps - 1;
+    if (after < shares_at(n, last))
+        join(walk, position, last, first, count);
+    for (uint32_t s = last; s-- > 0 && (UINT64_C(1) << s) > after;)
+        join(walk, position, s, first, count);
+}
+
+/*
+ * A team's intervals, found at its first gather (the file's comment): the team's
+ * ranks walked in order, in the progressions of world ranks the SHMEM layer
+ * gives (internode.h), each cut where the rank map's runs cut it (rank-map.h).
+ * A rank-map run whose ranks share a node - a block distribution's - gives one
+ * stretch of members at a time, and one whose ranks step from node to node -
+ * a cyclic one's - one member at a time, its node by arithmetic; a search of
+ * the map only where a progression enters a run. And the checks that the walk
+ * and the SHMEM layer agree, before any put: this node is where the team's
+ * record puts it, and as many members are on it as the layer lists here - the
+ * blocks the lead has put in the buffer, and the only ones it can send before
+ * it receives any.
+ */
+static void find_intervals(struct generic_team *team_phase, uint32_t team, const char *routine)
+{
+    const struct osoe_job *job = &osoe.job;
+    /* No list is a team this process holds no descriptor for, which on the
+     * thread the data half runs on - its local lead's - is a bug: named, as
+     * lead_of names a position with no lead, before the walk would find the
+     * team empty. */
+    uint32_t listed = 0;
+    if (!osoe_internode_team_local_ranks(team, &listed))
+        osoe_fatal("%s: team %u has no members on this node that this process knows of",
+                   routine, team);
+    if (team_phase->count > job->node_count)
+        osoe_fatal("%s: team %u spans %u nodes of a job of %u", routine, team, team_phase->count,
+                   job->node_count);
+    uint32_t here = position_of(team_phase, team, job->node, routine);
+    if (here != team_phase->index)
+        osoe_fatal("%s: team %u's record puts this node, node %u, at position %u of its node "
+                   "set, and its leads at %u", routine, team, job->node, team_phase->index, here);
+    team_phase->steps = osoe_internal_gather_steps(team_phase->count);
+    team_phase->step_intervals = calloc(team_phase->steps, sizeof *team_phase->step_intervals);
+    struct member_walk walk = { team_phase, team, 0,
+                                calloc(team_phase->count, sizeof *walk.steps_joined), routine };
+    if (!team_phase->step_intervals || !walk.steps_joined)
+        osoe_fatal("%s: out of memory for team %u's gather", routine, team);
+
+    uint32_t rank = 0, world = 0, count;
+    int32_t stride = 1;
+    while ((count = osoe_internode_team_world_ranks(team, rank, &world, &stride)) > 0) {
+        if (stride == 0 && count > 1)
+            osoe_fatal("%s: team %u's ranks from %u on are all world rank %u", routine, team,
+                       rank, world);
+        for (uint32_t k = 0; k < count;) {
+            int64_t w = (int64_t)world + (int64_t)k * stride;
+            const struct osoe_rank_run *run =
+                w >= 0 && w < job->world_size
+                    ? osoe_rank_run_find(job->runs, job->run_count, (uint32_t)w) : NULL;
+            if (!run)
+                osoe_fatal("%s: team %u's rank %u is PE %lld, which the rank map places on no "
+                           "node", routine, team, rank + k, (long long)w);
+            /* The progression's ranks from k on that this run holds. */
+            uint64_t along = (uint64_t)w - run->first_rank;
+            uint64_t in_run = stride > 0 ? (run->count - 1 - along) / (uint64_t)stride + 1
+                              : stride < 0 ? along / (uint64_t)(-(int64_t)stride) + 1 : 1;
+            if (in_run > count - k)
+                in_run = count - k;
+            if (run->node_step == 0) {
+                add_members(&walk, rank + k, (uint32_t)in_run, run->first_node);
+            } else {
+                for (uint64_t j = 0; j < in_run; j++) {
+                    int64_t at = (int64_t)along + (int64_t)j * stride;
+                    add_members(&walk, rank + k + (uint32_t)j, 1,
+                                (uint32_t)((int64_t)run->first_node + at * run->node_step));
+                }
+            }
+            k += (uint32_t)in_run;
+        }
+        rank += count;
+    }
+    free(walk.steps_joined);
+    team_phase->members = rank;
+    if (walk.here != listed)
+        osoe_fatal("%s: the rank map puts %u of team %u's members on this node, and the team "
+                   "lists %u here", routine, walk.here, team, listed);
+}
+
+/*
+ * What a lead says of the gather it has entered, in the READY[0] line of the
+ * lead that writes to it at step 0, past the counter (the file's comment): the
+ * team's epoch, whether the result is laid out by places - collect's second
+ * gather, whose blocks differ from node to node - or by a block, which every
+ * node's is then, and its bytes and block. Twenty-four bytes, in a line of
+ * 128 whose first eight hold the counter.
+ */
+struct gather_shape {
+    uint32_t epoch;
+    uint32_t by_places;
+    uint64_t bytes;
+    uint64_t block;
+};
+enum { SHAPE_OFFSET = 8 };
+_Static_assert(SHAPE_OFFSET + sizeof(struct gather_shape) <= OSOE_INTERNAL_LINE_BYTES,
+               "a gather's shape fits its READY line past the counter");
+
+/* A shape as a reader wants it: "epoch 3's gather of 64 bytes, in blocks of 8". */
+static void describe_shape(const struct gather_shape *shape, char *out, size_t size)
+{
+    if (shape->epoch == 0)
+        snprintf(out, size, "nothing: no gather's shape was put there");
+    else if (shape->by_places)
+        snprintf(out, size, "epoch %u's gather of %llu bytes, at places of their own",
+                 shape->epoch, (unsigned long long)shape->bytes);
+    else
+        snprintf(out, size, "epoch %u's gather of %llu bytes, in blocks of %llu", shape->epoch,
+                 (unsigned long long)shape->bytes, (unsigned long long)shape->block);
+}
+
+/* The shape the lead at step 0's receiver - `receiver` - put in this lead's
+ * READY[0] line is this lead's own, or the job ends naming both, before any
+ * put. */
+static void check_shape(uint32_t team, const struct gather_shape *mine, uint32_t receiver,
+                        const char *routine)
+{
+    struct gather_shape theirs;
+    memcpy(&theirs, internal(ready_counter(team, 0) + SHAPE_OFFSET), sizeof theirs);
+    if (theirs.epoch == mine->epoch && theirs.by_places == mine->by_places &&
+        theirs.bytes == mine->bytes && theirs.block == mine->block)
+        return;
+    char here[160], there[160];
+    describe_shape(mine, here, sizeof here);
+    describe_shape(&theirs, there, sizeof there);
+    osoe_fatal("%s: this node's lead entered %s, and node %u's lead (PE %u) %s: PEs called "
+               "different collectives, or the same one with different arguments", routine,
+               here, osoe_node_of(&osoe.job, receiver), receiver, there);
+}
+
+/* One gather as a call gives it: its team, its buffer - where it is, at a
+ * peer as here (internode.h) - and its layout. */
+struct gather {
+    uint32_t team;
+    const unsigned char *buffer;
+    enum osoe_region region;
+    uint64_t offset;
+    uint64_t bytes;
+    size_t block;
+    const uint64_t *places;
+    const char *routine;
+};
+
+/*
+ * The layout does not fit the result: team rank `rank`'s place is `place`,
+ * before the place of the interval before it or past the result's end. Places are
+ * made consistent (internode.h), so these were overwritten after they were
+ * made - in a program's collect whose dest is shorter than the result, by the
+ * lead's own copy of its members' blocks, running on past dest into the room
+ * that holds them (collectives.c). Named, before the put it would have cut:
+ * one cut from them could land anywhere in a peer's heap.
+ */
+static void layout_overwritten(const struct gather *gather, uint64_t rank, uint64_t place)
+{
+    osoe_fatal("%s: team %u's member %llu has its place at byte %llu of a result of %llu "
+               "bytes, out of the places' order: the layout was overwritten after it was made "
+               "- is dest shorter than the result, so that copying into it ran on past its "
+               "end?", gather->routine, gather->team, (unsigned long long)rank,
+               (unsigned long long)place, (unsigned long long)gather->bytes);
+}
+
+/* Bytes `from` up to `to` of the buffer into the receiver's, at the same place. */
+static void put_bytes(const struct gather *gather, struct osoe_transport_context *context,
+                      int receiver, uint64_t from, uint64_t to)
+{
+    osoe_transport_put(context, receiver, gather->region, gather->offset + from,
+                       gather->buffer + from, (size_t)(to - from), OSOE_TRANSPORT_MORE);
+}
+
+/*
+ * One step's puts: each interval of the step's list mapped to its bytes by the
+ * call's layout, O(1) an interval, and checked there - its end not before its
+ * start, its start not before the end of the interval before it, its end within
+ * the result - so that no put leaves [0, bytes) whatever the places hold;
+ * intervals whose bytes touch, members with no bytes between them, go as one
+ * put.
+ */
+static void put_step(const struct gather *gather, const struct interval_list *list,
+                     struct osoe_transport_context *context, int receiver)
+{
+    uint64_t from = 0, to = 0, reached = 0;
+    bool pending = false;
+    for (uint32_t r = 0; r < list->count; r++) {
+        const struct member_interval *interval = &list->intervals[r];
+        uint64_t start = place_of(gather->places, gather->block, interval->first);
+        uint64_t end = place_of(gather->places, gather->block, interval->end);
+        if (start < reached)
+            layout_overwritten(gather, interval->first, start);
+        if (end < start || end > gather->bytes)
+            layout_overwritten(gather, interval->end, end);
+        reached = end;
+        if (start == end)
+            continue;
+        if (pending && to == start) {
+            to = end;
+            continue;
+        }
+        if (pending)
+            put_bytes(gather, context, receiver, from, to);
+        from = start;
+        to = end;
+        pending = true;
+    }
+    if (pending)
+        put_bytes(gather, context, receiver, from, to);
+}
+
+/*
+ * The buffer as a peer's is addressed (internode.h): its region - this PE's
+ * heap, or the program's statics, whose two ranges run on in one offset space
+ * (node.h) - and its offset there, which is every node's.
+ */
+static void locate(struct gather *gather)
+{
+    const struct osoe_node *n = &osoe.node;
+    uintptr_t at = (uintptr_t)gather->buffer, heap = (uintptr_t)n->heap_of[osoe.bootstrap.local_id];
+    uintptr_t data = (uintptr_t)n->statics_data, bss = (uintptr_t)n->statics_bss;
+    if (at >= heap && at - heap < n->heap_size && gather->bytes <= n->heap_size - (at - heap)) {
+        gather->region = OSOE_REGION_HEAP;
+        gather->offset = at - heap;
+    } else if (n->statics_data_bytes && at >= data && at - data < n->statics_data_bytes) {
+        gather->region = OSOE_REGION_STATICS;
+        gather->offset = at - data;
+    } else if (n->statics_bss_bytes && at >= bss && at - bss < n->statics_bss_bytes) {
+        gather->region = OSOE_REGION_STATICS;
+        gather->offset = n->statics_data_bytes + (at - bss);
+    } else {
+        osoe_fatal("%s: a gather's buffer, at %p, is in neither this PE's symmetric heap nor "
+                   "its statics", gather->routine, (const void *)gather->buffer);
+    }
+}
+
+/*
+ * internode.h's gather: Bruck's allgather, allgather_model.py's lead program
+ * (the file's comment). Enter before anything else - this gather's shape into
+ * the READY[0] line of the lead that writes here at step 0, one more on its
+ * READY[0], fenced after the shape, and one more on READY[s] at the lead that
+ * writes here at every other step s - and only then find the team's intervals, at
+ * its first gather, and check the call's layout at its ends. Then each step:
+ * its READY, and at step 0 the shape its receiver entered; the step's puts,
+ * straight into the buffer of the lead 2^s positions before this one; the
+ * fenced add of that lead's DATA[s]; and this lead's own DATA[s], which says
+ * the step's shares are in. Then the counts it published.
  */
 void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                                     size_t block, const uint64_t *places, const char *routine)
 {
     struct generic_team *team_phase = registered_team(team, routine);
-    zero_others(team, buffer, bytes, block, places, routine);
-    uint32_t width = bytes % 8 == 0 && (uintptr_t)buffer % 8 == 0 ? 8 : 1;
-    struct osoe_element element = { OSOE_ELEMENT_UNSIGNED_INTEGER, width };
-    osoe_combine_function combine = osoe_combine_lookup(OSOE_REDUCTION_OR, element);
-    struct pieces pieces = { team, epoch, gather_identity(element), buffer, bytes,
-                             piece_bytes(width), width, combine, routine };
-    in_pieces(team_phase, &pieces, &team_phase->reduction_tree);
+    uint64_t n = team_phase->count, i = team_phase->index, want = team_phase->gathers + 1;
+    uint32_t steps = osoe_internal_gather_steps(team_phase->count);
+    struct osoe_transport_context *context = osoe_transport_context_default();
+    struct gather_shape mine = { epoch, places != NULL, bytes, places ? 0 : block };
+    int first_writer = (int)lead_of(team, (uint32_t)((i + 1) % n), routine);
+    osoe_transport_put(context, first_writer, OSOE_REGION_INTERNAL,
+                       ready_counter(team, 0) + SHAPE_OFFSET, &mine, sizeof mine,
+                       OSOE_TRANSPORT_MORE);
+    osoe_transport_rmw(context, first_writer, OSOE_REGION_INTERNAL, ready_counter(team, 0),
+                       OSOE_RMW_ADD, 8, 1, 0,
+                       OSOE_TRANSPORT_FENCED | (steps > 1 ? OSOE_TRANSPORT_MORE : 0));
+    for (uint32_t s = 1; s < steps; s++) {
+        uint32_t writer = lead_of(team, (uint32_t)((i + (UINT64_C(1) << s)) % n), routine);
+        osoe_transport_rmw(context, (int)writer, OSOE_REGION_INTERNAL, ready_counter(team, s),
+                           OSOE_RMW_ADD, 8, 1, 0, s + 1 < steps ? OSOE_TRANSPORT_MORE : 0);
+    }
+
+    if (!team_phase->step_intervals)
+        find_intervals(team_phase, team, routine);
+    struct gather gather = { team, buffer, OSOE_REGION_HEAP, 0, bytes, block, places, routine };
+    locate(&gather);
+    uint64_t first_place = place_of(places, block, 0);
+    uint64_t end_place = place_of(places, block, team_phase->members);
+    if (first_place != 0)
+        layout_overwritten(&gather, 0, first_place);
+    if (end_place != bytes)
+        layout_overwritten(&gather, team_phase->members, end_place);
+
+    for (uint32_t s = 0; s < steps; s++) {
+        uint32_t receiver = lead_of(team, (uint32_t)((i + n - (UINT64_C(1) << s)) % n), routine);
+        osoe_region_wait(routine, OSOE_REGION_INTERNAL, ready_counter(team, s), 8, false,
+                         OSOE_COMPARISON_GREATER_OR_EQUAL, want, OSOE_BLOCKED_DETAIL_EPOCH, epoch);
+        if (s == 0)
+            check_shape(team, &mine, receiver, routine);
+        put_step(&gather, &team_phase->step_intervals[s], context, (int)receiver);
+        osoe_transport_rmw(context, (int)receiver, OSOE_REGION_INTERNAL, data_counter(team, s),
+                           OSOE_RMW_ADD, 8, 1, 0, OSOE_TRANSPORT_FENCED);
+        osoe_region_wait(routine, OSOE_REGION_INTERNAL, data_counter(team, s), 8, false,
+                         OSOE_COMPARISON_GREATER_OR_EQUAL, want, OSOE_BLOCKED_DETAIL_EPOCH, epoch);
+    }
+    team_phase->gathers = want;
+    /* Single-writer publication for osoe-stat and the tests (§3.16), before the
+     * lead bumps the team's `released`, as in_pieces publishes its count. */
+    atomic_store_explicit(&team_phase->published->gather_steps, steps, memory_order_release);
+    atomic_store_explicit(&team_phase->published->gather_shares, team_phase->shares,
+                          memory_order_release);
 }
 
 void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index,

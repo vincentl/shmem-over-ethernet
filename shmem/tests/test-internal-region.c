@@ -10,11 +10,12 @@
  *
  * White-box: it calls the transport, so the library's sources are compiled into
  * it (CMakeLists.txt), the shared library exporting nothing but the API. The
- * words it uses are the region's last 64 bytes: the second half of the line
- * that counts the team numbers claimed (internal-region.h), whose word is at
- * the line's start, or the page rounding past it where the region does not
- * end on a page - never a word a collective counts on, and nothing here
- * creates a team.
+ * words it uses are the region's last 64 bytes: the second half of its last
+ * line (internal-region.h) - on one node the one that counts the team numbers
+ * claimed, and across nodes the last team number's last allgather counter -
+ * whose word is at the line's start, or the page rounding past it where the
+ * region does not end on a page: never a word a collective counts on, and
+ * nothing here creates a team.
  * It does not check the invariants: osoe-stat's view of the segment
  * (invariants.h) and the library's (node.h) cannot share a translation unit,
  * and every other tier-2 test checks them.
