@@ -1539,12 +1539,16 @@ static void wait_body(struct osoe_transport_context *context, const int *pes, si
 
 /*
  * A shared context's dirty set, under its mutex (§4.11 item 2;
- * dirty_set_model.py): for each set bit the wait covers, wait for the
- * acknowledgement through the slot's highest segment, clear the bit, and look
- * again - a put another thread issued meanwhile may have raised the number
- * and found the bit still set, and so not set it; if the peer is now behind,
- * the bit goes back and the wait repeats (`naive`, without the re-check,
- * loses that put). Only a wait clears bits, and waits hold the mutex
+ * dirty_set_model.py): for each set bit the wait covers, load the slot's
+ * highest segment, wait for the acknowledgement through it, clear the bit,
+ * and look again - a put another thread issued meanwhile may have raised the
+ * number and found the bit still set, and so not set it; if the peer is now
+ * behind, the bit goes back (`naive`, without the re-check, loses that put)
+ * and the wait moves on: the one wait covered every put that returned before
+ * the call, and the re-set leaves the later one to the next wait. Waiting
+ * again, as the design first had it, let a thread that kept putting to the
+ * node hold the quiet, and the mutex, for ever (the review of slice 3, S1;
+ * the model's `resetstop`, approved by the author 2026-09-26). Only a wait clears bits, and waits hold the mutex
  * (`unlocked`, without it, lets a second quiet read a bit mid-clear as done).
  */
 static uint32_t wait_dirty_shared(struct osoe_transport_context *c, const bool *wanted,
@@ -1561,17 +1565,14 @@ static uint32_t wait_dirty_shared(struct osoe_transport_context *c, const bool *
             if (wanted && !wanted[slot])
                 continue;               /* not asked for: stays dirty */
             waited++;
-            for (;;) {
-                uint64_t through =
-                    atomic_load_explicit(&c->shared_highest_segment[slot], memory_order_seq_cst);
-                if (ask_acknowledgement(c, slot))
-                    osoe_progress_host_wake_lead();
-                wait_acknowledged(slot, through, routine);
-                atomic_fetch_and_explicit(&c->dirty_bits[w], ~bit, memory_order_seq_cst);
-                if (acknowledged(c, slot))
-                    break;
+            uint64_t through =
+                atomic_load_explicit(&c->shared_highest_segment[slot], memory_order_seq_cst);
+            if (ask_acknowledgement(c, slot))
+                osoe_progress_host_wake_lead();
+            wait_acknowledged(slot, through, routine);
+            atomic_fetch_and_explicit(&c->dirty_bits[w], ~bit, memory_order_seq_cst);
+            if (!acknowledged(c, slot))
                 atomic_fetch_or_explicit(&c->dirty_bits[w], bit, memory_order_seq_cst);
-            }
         }
     }
     return waited;

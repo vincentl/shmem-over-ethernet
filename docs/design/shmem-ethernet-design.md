@@ -3760,7 +3760,13 @@ bytes) and a `high_seg` word per node (8 bytes per node).
   load `high_seg[n]`, ask for an acknowledgement through it (§3.4), and wait for
   `acked[n] >= high_seg`.
   Clear the bit, re-load `high_seg[n]` and `acked[n]`, and if the node is still
-  behind, set the bit again and repeat.
+  behind, set the bit again and move on. *(Changed 2026-09-26, approved by the
+  author: the design said "and repeat", and a quiet that waits again can be
+  held for ever, with the mutex, by a thread that keeps putting to the node -
+  the review of step 8 slice 3, S1. The one wait already covers every put
+  that returned before the call, since each raised `high_seg[n]` before the
+  quiet loaded it; the re-set hands a later put to the next quiet.
+  `dirty_set_model.py`'s variant `resetstop` passes every design case.)*
 - **Fence** reads the bits and flushes, and never clears, so it takes no lock.
 - **`shmem_ctx_pe_quiet`** clears only its listed nodes' bits, under the same mutex.
   It still bumps the generation for gets, since it waits on every get (§4.6). It

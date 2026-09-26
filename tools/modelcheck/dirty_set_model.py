@@ -19,7 +19,9 @@ Threads
   quiets      take the context's quiet mutex (the one get completion uses). If
               the dirty bit is set: load high_seg, wait for acked >= it, clear the
               bit, re-load high_seg and acked, and if the node is still behind,
-              set the bit again and repeat. Release the mutex.
+              set the bit again and repeat. Release the mutex. (The built design
+              is `resetstop` below, which re-sets and returns instead of
+              repeating; approved 2026-09-26. Both are checked.)
 
 The flush request and the wake word are abstracted: a quiet's wait is an 'await'
 on acked, and the connection may seal at any time. Both are §4.6 patterns the
