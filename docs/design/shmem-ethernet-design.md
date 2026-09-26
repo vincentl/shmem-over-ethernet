@@ -6477,15 +6477,23 @@ which has two states per pair, so a third backend needs a selector of its own
   - **A full thread table.** A PE's `OSOE_MAX_THREADS` blocks can all be taken by
     live threads. Aborting with a diagnostic naming the variable is loud and simple.
     A shared overflow block needs its own locking and wake-all rules, which only
-    that rare case would exercise. Aborting is the proposal; decide before
-    implementing.
+    that rare case would exercise. *Decided 2026-09-25: the job ends, naming
+    `OSOE_MAX_THREADS`.*
   - **Landing-zone space under concurrent blocking gets.** §3.12 sizes the landing
     zone per PE, and phase 1 allocates from it with one caller at a time. Several
     threads claiming reply space at once need a concurrent allocator, such as
-    fixed extents claimed by CAS over a bitmap. It is undesigned.
+    fixed extents claimed by CAS over a bitmap. *Decided 2026-09-25: exactly that.
+    A thread that finds every bit set sleeps on the word with the value it read;
+    the owner copies its reply out, clears its bit, then wakes the word.
+    `landing_extent_model.py` checks it, and fails without the CAS, with the
+    wake before the clear, with no wake, or with the clear before the copy.*
   - **Copy-out claims.** The agent and any quiet may both copy a landed
     nonblocking get to its destination. A CAS on the record's state gives exactly
-    one copier. The idea is standard but not modeled.
+    one copier. The idea is standard but not modeled. *Decided 2026-09-25: the CAS is
+    LANDED to COPYING; the winner copies, credits the landed count, then frees the
+    record. `copy_out_claim_model.py` checks it, and fails with a plain store for
+    the claim, with the credit before the copy, or with the record freed at the
+    claim.*
   - **`pe_quiet` and piggyback.** The rule that a full quiet never piggybacks on a
     `pe_quiet` is stated in §4.11 item 2 but is not in the models. Add `pe_quiet`
     to `get_completion_model.py` before implementing it.

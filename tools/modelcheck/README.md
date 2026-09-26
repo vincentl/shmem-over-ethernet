@@ -10,12 +10,14 @@ were run. Develop new models here.
 |---|---|
 | `engine.py` | The explorer; its docstring is the reference for the instruction set |
 | `get_completion_model.py`, `dirty_set_model.py`, `watch_list_model.py` | Worked models: each checks a design and deliberately broken variants |
+| `landing_extent_model.py`, `copy_out_claim_model.py` | §4.11's two open points the author decided on 2026-09-25: landing-zone extents claimed by CAS over a bitmap, and one copier per landed nonblocking get |
 | `selftest.py` | Checks that the reductions change no verdict; rerun it after changing the engine |
 
 **Where they run.** Every model is a ctest in the release preset only: a model
 is Python and gives the same verdict whichever preset built the library. The
-three of §4.11's `SHMEM_THREAD_MULTIPLE` designs (`get_completion` but for its
-phase-1 case, `dirty_set`, `watch_list`) run only with `OSOE_MULTIPLE_MODELS=ON`,
+five of §4.11's `SHMEM_THREAD_MULTIPLE` designs (`get_completion` but for its
+phase-1 case, `dirty_set`, `watch_list`, `landing_extent`, `copy_out_claim`) run
+only with `OSOE_MULTIPLE_MODELS=ON`,
 since phase 1 ships up to `SERIALIZED` and they were three quarters of every
 release run; turn it on when §4.11 is scheduled or `engine.py` changes.
 
