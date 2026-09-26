@@ -1155,6 +1155,27 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(typed-rma 0,0,1,1)
   osoe_tier2_map_test(typed-rma 0,1,2,0,1,0)
 endif()
+# Under §8.1's force-remote flag: a same-node PE is denied the intranode
+# pointer too, so every block of an ibput/ibget's loop (as every element of an
+# iput/iget's) takes the AM path regardless of the map, as the collectives'
+# own force-remote test does. Multi-node maps only, and left out under tsan for
+# shmem.internode.*'s reason (above).
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.typed-rma.force-remote.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+            $<TARGET_FILE:shmem_test_typed-rma>)
+  set_tests_properties(shmem.typed-rma.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
+    TIMEOUT 90)
+endif()
+# shmem_ibput's dst/sst below bsize is undefined (spec §9.6.1.4's Arguments)
+# and ends the job by name (strided_block_put, rma-typed.c), as the other
+# refusals are (shmem.lock.misuse.*, shmem.statics.misuse).
+add_test(NAME shmem.typed-rma.ibput-misuse
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_IBPUT_MISUSE=1
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_typed-rma>)
+set_tests_properties(shmem.typed-rma.ibput-misuse PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_long_ibput: dst 1, sst 2 below bsize 2; spec")
 
 # Nonblocking gets (§4.6, as built; test-get-nbi.c): on one node, where every
 # get is applied before it returns; and across nodes with the landing records
