@@ -859,13 +859,16 @@ set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT
 
 # A quiet waits as long as its peer does (§3.15; review round two, D3): node 1
 # stopped for 3 s, then continued, and the quiet completes with the no-progress
-# limit unset; with it at 1 s, the quiet ends the job naming the connection.
-# The slice-2 commit records a run stopped for 65 s, past the old 60 s bound.
+# limit unset; with it at 5 s and node 1 stopped for 9, the quiet ends the job
+# naming the connection. The slice-2 commit records a run stopped for 65 s, past
+# the old 60 s bound. The limit was 1 s until a Pi took longer than that to
+# connect a second logical node under ctest -j4, and the limit fired at start-up
+# instead (docs/pi-cluster.md, 2026-09-24).
 osoe_tier2_map_test(stopped-node 0,0,1 OSOE_TEST_STOP_MS=3000)
 set_tests_properties(shmem.stopped-node.0-0-1 PROPERTIES
   PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
 add_test(NAME shmem.stopped-node.no-progress
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=6000 OSOE_NO_PROGRESS_TIMEOUT=1
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=9000 OSOE_NO_PROGRESS_TIMEOUT=5
           $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
           $<TARGET_FILE:shmem_test_stopped-node>)
 set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TIMEOUT 60
@@ -884,8 +887,9 @@ set_tests_properties(shmem.stopped-node.keepalive PROPERTIES LABELS "tier2" TIME
 
 # The other half of D-6 (diagnosability review): a blocking get waits for one
 # PE's reply, not a whole node's queue, so its no-progress fatal must name that
-# PE and not only the node. Before this fix it named neither.
-osoe_tier2_map_test(get-no-progress 0,1 OSOE_NO_PROGRESS_TIMEOUT=1)
+# PE and not only the node. Before this fix it named neither. Five seconds, like
+# shmem.stopped-node.no-progress's, because the limit covers start-up too.
+osoe_tier2_map_test(get-no-progress 0,1 OSOE_NO_PROGRESS_TIMEOUT=5)
 set_tests_properties(shmem.get-no-progress.0-1 PROPERTIES
   PASS_REGULAR_EXPRESSION "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s"
   FAIL_REGULAR_EXPRESSION "GET RETURNED")
