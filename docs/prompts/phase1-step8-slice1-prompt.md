@@ -1,6 +1,6 @@
 # Phase 1, step 8: contexts and SHMEM_THREAD_MULTIPLE - a proposal, three slices
 
-**Status: proposed on 2026-09-26, for the author.** Design §4.11 is designed and
+**Status: proposed on 2026-09-26; approved by the author the same day as proposed, all eleven decisions and the three slices (`docs/decisions/2026-09-26-day.md`).** Slice 1's build brief below is the brief to build from. Design §4.11 is designed and
 model-checked; §10's open points were decided on 2026-09-25
 (`docs/decisions/2026-09-25.md`, item 3), and the last, `pe_quiet`'s piggyback,
 was modeled on 2026-09-26 (`tools/modelcheck/pe_quiet_model.py`). What is left
@@ -20,7 +20,9 @@ The author's goals, the axes to judge the work by:
 
 - **Internode algorithms logarithmic in node count**, in time and in memory.
 - **Intranode algorithms linear or better in PEs per node.**
-- **A path to RoCE at ~10⁶ PEs that no interface blocks.**
+- **A path to RoCE at ~10⁶ PEs that no interface blocks.** A constraint on the
+  seams, not work in this project: the release point (design §1) comes before
+  any RoCE backend (2026-09-26).
 
 ## What exists (a survey of main at 3af41f5)
 
@@ -182,7 +184,7 @@ If a context's node-segment block must grow with the job's size; if the landing
 zone's extents cannot hold today's largest nonblocking get in flight without
 enlarging the zone; or if a decision above contradicts §4.11 as modeled.
 
-## Slice 1's build brief: contexts, serial only (DRAFT - pending the author's decision)
+## Slice 1's build brief: contexts, serial only (approved 2026-09-26)
 
 You are building **contexts** for osoe (OpenSHMEM Over Ethernet): spec §9.5 whole
 - `shmem_ctx_create`, `shmem_team_create_ctx`, `shmem_ctx_destroy`,

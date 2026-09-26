@@ -1,0 +1,12 @@
+hello -N1 --ntasks-per-node=1: 0.10 s
+hello -N4 --ntasks-per-node=1: 0.14 s
+hello -N4 --ntasks-per-node=4: 0.23 s
+hello -N1 --ntasks-per-node=1: 0.07 s
+hello -N4 --ntasks-per-node=1: 0.24 s
+hello -N4 --ntasks-per-node=4: 0.26 s
+hello -N1 --ntasks-per-node=1: 0.07 s
+hello -N4 --ntasks-per-node=1: 0.25 s
+hello -N4 --ntasks-per-node=4: 0.26 s
+srun /bin/true 4x4: 0.18 s
+srun /bin/true 4x4: 0.20 s
+srun /bin/true 4x4: 0.20 s

@@ -1,0 +1,19 @@
+Internal ctest changing into directory: /home/pi/shmem-over-ethernet/build/release
+Test project /home/pi/shmem-over-ethernet/build/release
+    Start 146: shmem.get-no-progress.0-1
+    Test #146: shmem.get-no-progress.0-1 ........   Passed    7.36 sec
+    Start 146: shmem.get-no-progress.0-1
+    Test #146: shmem.get-no-progress.0-1 ........   Passed    7.29 sec
+    Start 146: shmem.get-no-progress.0-1
+    Test #146: shmem.get-no-progress.0-1 ........   Passed    7.28 sec
+    Start 146: shmem.get-no-progress.0-1
+    Test #146: shmem.get-no-progress.0-1 ........   Passed    7.28 sec
+    Start 146: shmem.get-no-progress.0-1
+1/1 Test #146: shmem.get-no-progress.0-1 ........   Passed    7.28 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+tier2    =   7.28 sec*proc (1 test)
+
+Total Test time (real) =  36.54 sec

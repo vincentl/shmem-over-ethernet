@@ -30,7 +30,8 @@ Keep the output: it goes in the notes with the results.
 - osoe needs Linux 6.7 or newer, and `probe` below checks the rest.
 - A Pi 5's kernel uses 16 KiB pages where the VM's uses 4 KiB. osoe sizes every mapping by the page it is given (design §8.5), and this is the first run that proves it. `OSOE_HEAP_BASE`, if you set it, must be a multiple of that page.
 - Memory: a node's four PEs hold about 1 GiB of `/dev/shm` at the default heap, 256 MiB a PE, touched only as it is used, and about 22 MiB besides: each PE's internal region, 5 MiB since phase 1 step 5 slice 5 gave every team number's block of it (32 by default, since phase 1 step 7) room for two pieces in flight per child (`OSOE_COLLECTIVE_PIPELINE`) - 20 MiB for the four, touched only by a team's leads - the node's control segment, 1.3 MiB, and its connection buffers, 0.8 MiB (the last two measured on the VM's 4-node, 4-PE map; the region's size is computed, and was 2.5 MiB a PE before the slice). A 16 GB node's `/dev/shm` is 8 GB by default.
-- The governor matters to every time below: `ondemand` clocks a core down between trips, so write down which one ran.
+- The governor matters to every time below: `ondemand` clocks a core down between trips, so write down which one ran. Both sessions so far ran `ondemand`.
+- The switch: compute node `pi-00X` is on port X and the head node on port 9; the switch is unmanaged as far as known, so it has no counters to read. What TCP saw of it is in `nstat -az TcpRetransSegs TcpExtTCPTimeouts` on each node.
 - The fifth line shows what each node's own name resolves to there. On this cluster the image's `/etc/hosts` maps each name to its 10.0.1.N address. A stock Raspberry Pi OS maps a host's own name to 127.0.1.1, which its peers cannot reach; osoe then listens at the node's address toward the others instead (design §6.1), and `SHMEM_DEBUG=1` says so per node.
 
 ## 2. Build once, in /home
@@ -70,7 +71,9 @@ srun -N1 -n1 -c4 ctest --test-dir build/release -L tier2 -E '^model\.' -j4 --tim
 A compute node therefore needs no compiler and no headers.
 
 The models (`model.*`) are left out: they check designs, not this machine,
-and take the better part of an hour on a Pi. The floor pins (`shmem.floor`) and
+and take the better part of an hour on a Pi. Tier 1's label carries three of
+them too; on the head node add `-E '^model\.'` there as well, or budget 25
+minutes for them (the second session ran them: 732 s for `tree_barrier`). The floor pins (`shmem.floor`) and
 `echo-uring`'s were set on the VM's CPU and may fail on a Pi. That is a finding
 to keep, not a reason to stop.
 
@@ -290,7 +293,10 @@ OSU's OpenSHMEM benchmarks (`corpus/osu-omb`, 7.5.2) are the numbers other
 implementations publish. Their own `configure` finds OpenSHMEM by linking with
 `CC`, and finds no MPI, so it builds the OpenSHMEM half alone. A copied tree
 leaves `configure.ac` newer than `configure`, and `make` would then rerun
-autoconf, which the cluster need not have; the stamps go back in order first:
+autoconf, which the cluster need not have; the stamps go back in order first.
+`configure` also bakes the compiler's absolute path into every Makefile, so a
+checkout that moves needs `make distclean` and a new `configure` (the second
+session found the first session's nested path there):
 
 ```sh
 cp -R corpus/osu-omb/osu-micro-benchmarks-7.5.2 $W/osu && cd $W/osu
@@ -384,7 +390,8 @@ done | tee ~/sos.txt
 ```
 
 The development VM ran them on two PEs over two logical nodes and on four over
-two (2026-09-24, `build/scratch/sos/sweep.sh`): 147 built and exited 0 on both.
+two (`build/scratch/sos/sweep.sh`): 147 built and exited 0 on both on
+2026-09-24, and 150 on 2026-09-26 at `e61a172`, after team creation.
 **What to expect** of the rest:
 - `c11_shmem_test_all_any_some` and `c11_shmem_wait_until_all_any_some` do not
   build: they pass `short *` to the `_all`/`_any`/`_some` generics, which
@@ -392,12 +399,18 @@ two (2026-09-24, `build/scratch/sos/sweep.sh`): 147 built and exited 0 on both.
 - `mt_a2a`, `mt_contention`, `mt_lock_test`, `mt_membar`, `thread_wait`,
   `threading`, `web` and `spec-example/shmem_ctx` exit 1: they need
   `SHMEM_THREAD_MULTIPLE`, and osoe provides `SERIALIZED` (design §4.11).
-- `shmem_team_reuse_teams`, `unit/shmem_team_translate` and the examples
-  `shmem_team_split_strided`, `shmem_team_context` and, on four PEs or more,
-  `shmem_team_sync` exit 1: they create teams, which osoe does not yet (§5.7;
-  `docs/prompts/phase1-step7-slice1-prompt.md` proposes it).
+- `spec-example/shmem_team_context` exits 1: it needs contexts beyond the
+  default (§7.3), which step 8 proposes
+  (`docs/prompts/phase1-step8-slice1-prompt.md`). The other team tests pass
+  since team creation (phase 1 step 7 slice 2, 2026-09-26).
+- `shmem_team_b2b_collectives` collects 40 longs into a destination of 10 on
+  the VM's 0,0,1,1 map, and osoe stops it by name where the old gather
+  corrupted memory silently; whether 4 × 2 trips it is a finding either way.
 - `shmemalign` exits 1 with osoe naming the call: it asks `shmem_align` for an
   alignment of 2, which the spec leaves undefined below `sizeof(void *)`.
+- `bigget` exits 124 - the loop's 120 s `timeout` - on the cluster: it does
+  1,000 gets of 16 MiB a PE, 16 GiB over gigabit Ethernet. Run it alone with
+  `./unit/bigget -l 100`; it passes in 22 s at 4 × 2 (2026-09-26).
 
 On eight PEs over four nodes the programs meet shapes the VM did not run them
 on; one that fails here and passed there is the finding.
@@ -408,84 +421,104 @@ on; one that fails here and passed there is the finding.
 - the fixtures step 3 captured, to commit with the tests they feed;
 - anything that failed, with its output, and the node it failed on.
 
-## 10. Next session
+## 10. The second session (2026-09-26)
 
-The first session (2026-09-24) ran §1 to §4, §7 and most of §8; its results
-are in the status page and in `docs/decisions/2026-09-24-day.md`. What it left,
-in order, with `W=~/osoe-corpus` and `OSHCC` as in §8:
+Main `b8d7ad5` (plus that day's documentation), `release`, driven over
+`ssh pi-login` from the development Mac, about 45 minutes of cluster time.
+Raw outputs: `docs/design/evidence/pi-cluster/2026-09-26/`; the day's record
+and the decisions it fed: `docs/decisions/2026-09-26-day.md`. Everything the
+first session left ran, and the runbook's expectations held, with two
+findings.
 
-1. **The test suite, split as §2 now has it**: tier 1 on the head node, tier 2
-   on a compute node whose image has neither a compiler nor `liburing-dev`.
-2. **`shmem.get-no-progress.0-1` alone.** Its one-second limit fired while a
-   second logical node was still connecting; its limit is now five seconds.
-   Alone, it tells contention from a slow start:
+**The floor (§5)**, seven pairs on two nodes: the echo's fastest round trip
+153-156 µs; the library's get 1.09× of it, put and quiet 1.08×, fetch-add
+1.12× (fastest of each pair; the medians 1.09, 1.08, 1.13); the stream 111
+against the echo's 112 MiB/s. Tier 3's `pi` link had predicted 1.01-1.06× on
+a fast CPU; the Pi's cores cost a further 3-7%, and the 170 µs round trip
+every table shows is the Pi's network stack, not the library.
+
+**`osoe-bench` (§6)**, all four lines: 8-byte put and quiet 169-175 µs, get
+168-181, fetch-add 162-176; a 1 MiB put 9.1 ms and get 11.2 ms (the get gap of
+the first session, unchanged); every stream 111.5 MiB/s from 64 KiB up; a
+barrier 178-184 µs at 2, 4 and 16 PEs; sixteen PEs streaming pairwise 440
+MiB/s in all, four links at line rate. **Bound against unbound at 4 × 4**:
+168.6 against 170.5 µs for the put, every line within 5%. The agent thread
+sharing a core with its PE costs nothing measurable here.
+
+**The test suite, split as §2 has it.** Tier 1 on the head node: 95 of 95,
+1,485 s of which 1,300 were the three model checks. Tier 2 on one compute node
+with `-c4`: 347 of 347 in 44 s, the floor pins and `echo-uring`'s included.
+`shmem.get-no-progress.0-1` alone, five repeats: pass, about 7 s each.
+
+**Start-up.** `hello` at 1 × 1 in 0.07-0.10 s, at 4 × 1 in 0.14-0.25 s, at
+4 × 4 in 0.23-0.26 s, against 0.18-0.20 s for `srun /bin/true` at 4 × 4: the
+library adds about 60 ms at 16 PEs. The first session's guess that a node took
+over a second to connect is refuted; that test's 1 s limit was simply tight.
+
+**SOS at 4 × 2**: 149 pass, 2 do not build, 12 exit nonzero, each as §8 names
+it - `bigget` new among them, for its loop count at gigabit speed alone.
+
+**The pipelined collectives**, 1 MiB on four nodes, one PE a node
+(`osu-*-k*-d*.txt`; a fan-out of 3 is a fan-out of 4 on four nodes):
+
+| | D = 1 | D = 2 | D = 4 | D = 8 |
+|---|---|---|---|---|
+| broadcast, k = 4 | 36.6 ms | 27.4 | 27.2 | - |
+| broadcast, k = 2 | 38.8 | 22.3 | 18.4 | 18.2 |
+| reduce, k = 4 | 48.5 | 28.2 | 28.3 | - |
+| reduce, k = 2 | 58.4 | 33.5 | 23.0 | 19.4 |
+
+At k = 4 the root sends three copies over one link, 27 ms at 111 MiB/s, and
+no D goes below it; at k = 2 it sends two, 18.8 ms, and D = 4 reaches it. So
+**over Ethernet the fan-out is a bandwidth decision for large messages**: k =
+2 is 1.5× faster than the default at 1 MiB, and 1.45× for the reduction at
+D = 8 (design §10, the fan-out item; L48). Small messages pay a hop per level;
+the sweep started at 64 KiB, so the crossover is the next session's.
+
+**The allgather.** fcollect of 1 MiB a PE: 28.0 ms at 4 × 1 and 120 ms at
+4 × 4, against the first session's tree at 190 and 773 - 6.8× and 6.4×, the
+second within 10% of the twelve MiB a node must send at line rate. Of 8 bytes
+a PE: 243 µs at 4 × 1 and 269 at 4 × 4 against 190 and 197 - 1.28× and 1.37×,
+under the 1.5× at which the two-slot staging would have been built; the author
+accepted the cost (`docs/decisions/2026-09-26-day.md`).
+
+**PEs per node.** A barrier 181, 202 and 185 µs at 1, 2 and 4 PEs a node; an
+8-byte reduce 184, 193, 193; an 8-byte fcollect 246, 254, 270. Shared memory,
+two PEs on one node: a put of 1 byte 0.16 µs, a get 0.04; 1 MiB 103 and 99 µs.
+
+**Finding F1: fcollect at 4 × 2 with 16 KiB blocks takes 63-109 ms a call**
+(five runs: 69, 63, 88, 109 ms, and 43.6 under a cyclic layout), against
+0.8 ms at 8 KiB and 2.5 ms at 32 KiB; every other shape is smooth, 4 × 1 and
+4 × 4 at 16 KiB included, and 4 × 4 at 8 KiB has the same 32 KiB share a
+node. On any three of the four nodes the row is normal (1.17 ms without
+`pi-002`, 1.11 without `pi-004`). The job makes progress throughout - the
+no-progress rule never fires - the NICs count no errors and no drops, and
+TCP's `TcpExtTCPTimeouts` on one node climbed 482 → 492 in eight seconds of
+the run while the others held at 2-4; every node has fast-retransmitted about
+0.03% of its segments since boot. A retransmission timeout is 200 ms or more,
+so the average is one every few calls. Not a cable: it needs all four nodes.
+
+**Finding F2** is the fan-out, above.
+
+## 11. Next session
+
+1. **F1**, first: `cd $W/osu/c/openshmem` and
 
    ```sh
-   srun -N1 -n1 -c4 ctest --test-dir build/release -R get-no-progress --repeat until-fail:5 --output-on-failure
+   srun -K1 -N4 --ntasks-per-node=2 ./osu_oshm_fcollect -m 16384:16384 -i 200 > ~/f1.txt &
+   srun -N4 --ntasks-per-node=1 --overlap sh -c 'for i in $(seq 40); do echo "$(hostname) $(date +%T) $(nstat -z TcpRetransSegs TcpExtTCPTimeouts | awk "NR>2{printf \"%s=%s \", \$1, \$2}")"; sleep 1; done' > ~/f1-nstat.txt
    ```
 
-3. **How long a job takes to start**, one node and four, with §8's `hello`:
+   then the same with `tcpdump -i eth0 -w ~/f1-pi-002.pcap port not 22` on
+   one node (`srun -N1 -w pi-002 --overlap`, root needed), to see which
+   segments are lost and where: the switch dropping an incast at step 1, where
+   two nodes' 64 KiB shares arrive at one, or a sender's burst. Try
+   `OSOE_AM_CHUNK` and `OSOE_WIRE_BYTES` smaller, and `-N4 --ntasks-per-node=2`
+   with `OSOE_COLLECTIVE_PIPELINE=1`.
+2. **F2's crossover**: broadcast and reduce from 4 bytes to 64 KiB at k = 2
+   and k = 4 (`-m :65536`), to set the size at which a fan-out of 2 should
+   take over.
+3. **The vanished node** (§7), with its PoE port power-cycled after.
+4. After step 8's first slice lands: SOS's `shmem_team_context` must pass.
 
-   ```sh
-   time srun -K1 -N1 --ntasks-per-node=1 $W/examples/hello > /dev/null
-   time srun -K1 -N4 --ntasks-per-node=4 $W/examples/hello > /dev/null
-   ```
-
-4. **§5, the floor**, and **§6, `osoe-bench`**, all five lines: the first
-   session brought back neither, and they say how close a round trip is to
-   the link's own.
-5. **§8's SOS test suite** at 4 × 2: 147 programs pass and 16 fail, each for
-   the reason §8 names. It ran verbatim at this shape in the VM.
-6. **PEs per node.** A pair on one node, which is the shared-memory path, and
-   three collectives at one, two and four PEs a node:
-
-   ```sh
-   cd $W/osu/c/openshmem
-   srun -K1 -N1 --ntasks-per-node=2 ./osu_oshm_put heap > ~/osu-put-1x2.txt
-   srun -K1 -N1 --ntasks-per-node=2 ./osu_oshm_get heap > ~/osu-get-1x2.txt
-   for ppn in 1 2 4; do
-     for p in barrier reduce fcollect; do
-       srun -K1 -N4 --ntasks-per-node=$ppn ./osu_oshm_$p -m :65536 > ~/osu-$p-4x$ppn.txt
-     done
-   done
-   ```
-
-7. **Pipelined collectives** (merged 2026-09-26, after this runbook's first
-   session): large broadcasts and reductions at D = 1, 2 and 4 pieces in
-   flight, on the tree the four nodes make at the default fan-out of 4 (one
-   level, where D pieces should come near D times faster) and at a fan-out of
-   2 (two levels, where the first build of the loop was held to about 2 times
-   whatever D; the VM measured the fix at 2.2 ms against 4.2 for a 1 MiB
-   broadcast at D = 4 on five nodes). The first session's 1 MiB broadcast took
-   36.5 ms, one piece at a time:
-
-   ```sh
-   cd $W/osu/c/openshmem
-   for k in 4 2; do
-     for d in 1 2 4; do
-       for p in broadcast reduce; do
-         OSOE_COLLECTIVE_FANOUT=$k OSOE_COLLECTIVE_PIPELINE=$d \
-           srun -K1 -N4 --ntasks-per-node=1 ./osu_oshm_$p -m 65536:1048576 > ~/osu-$p-k$k-d$d.txt
-       done
-     done
-   done
-   ```
-
-   And **the allgather** (merged the same day): fcollect and collect now move
-   each node's blocks once, in ceil(log2 N) steps, where the first session's
-   16 x 1 MiB fcollect took 773 ms through the tree. Every size, at one and
-   four PEs a node - small blocks too, where the VM measured the allgather
-   slower than the tree (280 against 176 us for 8 bytes a PE on four nodes),
-   which real links will price differently:
-
-   ```sh
-   for ppn in 1 4; do
-     srun -K1 -N4 --ntasks-per-node=$ppn ./osu_oshm_fcollect > ~/osu-fcollect-allgather-4x$ppn.txt
-   done
-   ```
-
-8. Optionally, **§7's vanished node**, with its PoE port power-cycled after.
-
-Bring back what §9 lists, and `sos.txt`, the `osu-*-1x2.txt`, `osu-*-4x*.txt`,
-`osu-*-k*-d*.txt` and `osu-fcollect-allgather-*.txt` files, both halves of the
-test suite's summary, and the two start-up times.
+Bring back `f1*.txt`, the pcap, the two sweeps, and anything that failed.

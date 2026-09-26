@@ -1,0 +1,4 @@
+pi-001: TcpExtTCPTimeouts=10
+pi-002: TcpExtTCPTimeouts=698
+pi-003: TcpExtTCPTimeouts=8
+pi-004: TcpExtTCPTimeouts=8

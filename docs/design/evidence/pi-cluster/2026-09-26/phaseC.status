@@ -1,0 +1,27 @@
+start Sat 26 Sep 11:54:47 EDT 2026
+broadcast k4 d1 exit 0 11:55:09
+reduce k4 d1 exit 0 11:55:29
+broadcast k4 d2 exit 0 11:55:44
+reduce k4 d2 exit 0 11:56:00
+broadcast k4 d4 exit 0 11:56:14
+reduce k4 d4 exit 0 11:56:30
+broadcast k2 d1 exit 0 11:56:53
+reduce k2 d1 exit 0 11:57:23
+broadcast k2 d2 exit 0 11:57:43
+reduce k2 d2 exit 0 11:58:06
+broadcast k2 d4 exit 0 11:58:24
+reduce k2 d4 exit 0 11:58:45
+fcollect-allgather 4x1 exit 0 12:01:55
+fcollect-allgather 4x4 exit 0 12:02:51
+put 1x2 exit 0
+get 1x2 exit 0
+barrier 4x1 exit 0 12:02:51
+reduce 4x1 exit 0 12:03:01
+fcollect 4x1 exit 0 12:05:55
+barrier 4x2 exit 0 12:06:00
+reduce 4x2 exit 0 12:06:10
+fcollect 4x2 exit 0 12:08:07
+barrier 4x4 exit 0 12:08:07
+reduce 4x4 exit 0 12:08:18
+fcollect 4x4 exit 0 12:08:46
+done Sat 26 Sep 12:08:46 EDT 2026

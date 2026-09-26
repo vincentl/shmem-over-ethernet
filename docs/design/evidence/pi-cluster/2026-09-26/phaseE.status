@@ -1,0 +1,8 @@
+start Sat 26 Sep 12:15:02 EDT 2026
+broadcast k2 d8 exit 0 12:15:20
+reduce k2 d8 exit 0 12:15:40
+broadcast k3 d4 exit 0 12:15:54
+reduce k3 d4 exit 0 12:16:10
+broadcast k3 d8 exit 0 12:16:24
+reduce k3 d8 exit 0 12:16:41
+done Sat 26 Sep 12:16:41 EDT 2026

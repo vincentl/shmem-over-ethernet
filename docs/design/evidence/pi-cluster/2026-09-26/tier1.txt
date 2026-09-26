@@ -1,0 +1,200 @@
+Internal ctest changing into directory: /home/pi/shmem-over-ethernet/build/release
+Test project /home/pi/shmem-over-ethernet/build/release
+      Start   1: base.size
+      Start   2: base.environment
+      Start   3: base.node-map
+      Start   4: base.futex
+ 1/95 Test   #1: base.size .......................................   Passed    0.00 sec
+ 2/95 Test   #2: base.environment ................................   Passed    0.00 sec
+ 3/95 Test   #3: base.node-map ...................................   Passed    0.00 sec
+      Start   5: base.epoch
+      Start   6: base.stall-watch
+      Start   7: base.hostlist
+ 4/95 Test   #7: base.hostlist ...................................   Passed    0.00 sec
+      Start   8: base.siphash
+ 5/95 Test   #8: base.siphash ....................................   Passed    0.00 sec
+      Start   9: base.serializing-fence
+ 6/95 Test   #9: base.serializing-fence ..........................   Passed    0.07 sec
+      Start  10: shmem.info
+ 7/95 Test  #10: shmem.info ......................................   Passed    0.00 sec
+      Start  11: shmem.header-surface
+ 8/95 Test  #11: shmem.header-surface ............................   Passed    0.00 sec
+      Start  12: shmem.exports
+ 9/95 Test   #5: base.epoch ......................................   Passed    0.10 sec
+      Start  13: shmem.profiling_aliases
+10/95 Test   #4: base.futex ......................................   Passed    0.15 sec
+      Start  14: shmem.boundary
+11/95 Test   #6: base.stall-watch ................................   Passed    0.16 sec
+      Start  15: shmem.static-link
+12/95 Test  #12: shmem.exports ...................................   Passed    0.09 sec
+      Start  16: shmem.strict-c11
+13/95 Test  #14: shmem.boundary ..................................   Passed    0.75 sec
+      Start  17: shmem.allocator
+14/95 Test  #17: shmem.allocator .................................   Passed    0.01 sec
+      Start  18: shmem.collective-tree
+15/95 Test  #18: shmem.collective-tree ...........................   Passed    0.01 sec
+      Start  19: shmem.watch-range
+16/95 Test  #19: shmem.watch-range ...............................   Passed    0.00 sec
+      Start  20: shmem.am
+17/95 Test  #20: shmem.am ........................................   Passed    0.01 sec
+      Start  21: shmem.am.malformed.count
+18/95 Test  #21: shmem.am.malformed.count ........................   Passed    0.00 sec
+      Start  22: shmem.am.malformed.length
+19/95 Test  #22: shmem.am.malformed.length .......................   Passed    0.00 sec
+      Start  23: shmem.am.malformed.short-segment
+20/95 Test  #23: shmem.am.malformed.short-segment ................   Passed    0.00 sec
+      Start  24: shmem.am.malformed.kind
+21/95 Test  #24: shmem.am.malformed.kind .........................   Passed    0.00 sec
+      Start  25: shmem.am.malformed.short-message
+22/95 Test  #25: shmem.am.malformed.short-message ................   Passed    0.00 sec
+      Start  26: shmem.am.malformed.long-message
+23/95 Test  #26: shmem.am.malformed.long-message .................   Passed    0.00 sec
+      Start  27: shmem.am.malformed.empty-count
+24/95 Test  #27: shmem.am.malformed.empty-count ..................   Passed    0.00 sec
+      Start  28: shmem.reply
+25/95 Test  #13: shmem.profiling_aliases .........................   Passed    1.02 sec
+      Start  29: shmem.am-size
+26/95 Test  #29: shmem.am-size ...................................   Passed    0.00 sec
+      Start  30: shmem.connection
+27/95 Test  #30: shmem.connection ................................   Passed    0.01 sec
+      Start  31: shmem.rank-map
+28/95 Test  #31: shmem.rank-map ..................................   Passed    0.16 sec
+      Start  32: shmem.wire
+29/95 Test  #32: shmem.wire ......................................   Passed    0.02 sec
+      Start  38: shmem.fatal-order
+30/95 Test  #38: shmem.fatal-order ...............................   Passed    0.01 sec
+      Start  39: shmem.own-address
+31/95 Test  #39: shmem.own-address ...............................   Passed    0.00 sec
+      Start  40: shmem.bootstrap.captured-batch-script
+32/95 Test  #40: shmem.bootstrap.captured-batch-script ...........   Passed    0.00 sec
+      Start  41: shmem.bootstrap.captured-block-1x4-node0
+33/95 Test  #41: shmem.bootstrap.captured-block-1x4-node0 ........   Passed    0.01 sec
+      Start  42: shmem.bootstrap.captured-cyclic-1x4-node0
+34/95 Test  #42: shmem.bootstrap.captured-cyclic-1x4-node0 .......   Passed    0.00 sec
+      Start  43: shmem.bootstrap.captured-plane-1x4-node0
+35/95 Test  #43: shmem.bootstrap.captured-plane-1x4-node0 ........   Passed    0.00 sec
+      Start  44: shmem.bootstrap.captured-single-node0
+36/95 Test  #44: shmem.bootstrap.captured-single-node0 ...........   Passed    0.00 sec
+      Start  45: shmem.bootstrap.osoe-over-slurm
+37/95 Test  #45: shmem.bootstrap.osoe-over-slurm .................   Passed    0.00 sec
+      Start  46: shmem.bootstrap.written-block-4x4-node1
+38/95 Test  #46: shmem.bootstrap.written-block-4x4-node1 .........   Passed    0.00 sec
+      Start  47: shmem.bootstrap.written-cyclic-4x4-node2
+39/95 Test  #47: shmem.bootstrap.written-cyclic-4x4-node2 ........   Passed    0.00 sec
+      Start  48: shmem.bootstrap.written-gtids-disagree
+40/95 Test  #48: shmem.bootstrap.written-gtids-disagree ..........   Passed    0.00 sec
+      Start  49: shmem.bootstrap.written-het-job
+41/95 Test  #49: shmem.bootstrap.written-het-job .................   Passed    0.00 sec
+      Start  50: shmem.bootstrap.written-relative-step
+42/95 Test  #50: shmem.bootstrap.written-relative-step ...........   Passed    0.00 sec
+      Start  51: shmem.bootstrap.written-special-step
+43/95 Test  #51: shmem.bootstrap.written-special-step ............   Passed    0.00 sec
+      Start  80: shmem.listener.secret
+44/95 Test  #80: shmem.listener.secret ...........................   Passed    0.00 sec
+      Start 238: shmem.headers.c99
+45/95 Test #238: shmem.headers.c99 ...............................   Passed    0.06 sec
+      Start 239: shmem.headers.c11
+46/95 Test #239: shmem.headers.c11 ...............................   Passed    0.06 sec
+      Start 240: shmem.headers.c17
+47/95 Test #240: shmem.headers.c17 ...............................   Passed    0.06 sec
+      Start 241: shmem.headers.c++11
+48/95 Test #241: shmem.headers.c++11 .............................   Passed    0.08 sec
+      Start 242: shmem.headers.c++17
+49/95 Test #242: shmem.headers.c++17 .............................   Passed    0.09 sec
+      Start 243: shmem.generic-arity.fetch_add_nbi
+50/95 Test #243: shmem.generic-arity.fetch_add_nbi ...............   Passed    0.04 sec
+      Start 244: shmem.generic-arity.fetch_add
+51/95 Test #244: shmem.generic-arity.fetch_add ...................   Passed    0.05 sec
+      Start 245: shmem.generic-arity.put
+52/95 Test #245: shmem.generic-arity.put .........................   Passed    0.04 sec
+      Start 397: shmem.refuse.uninitialized.before.malloc
+53/95 Test #397: shmem.refuse.uninitialized.before.malloc ........   Passed    0.00 sec
+      Start 398: shmem.refuse.uninitialized.before.free
+54/95 Test #398: shmem.refuse.uninitialized.before.free ..........   Passed    0.00 sec
+      Start 399: shmem.refuse.uninitialized.before.wait_until
+55/95 Test #399: shmem.refuse.uninitialized.before.wait_until ....   Passed    0.00 sec
+      Start 400: shmem.refuse.uninitialized.before.barrier_all
+56/95 Test #400: shmem.refuse.uninitialized.before.barrier_all ...   Passed    0.00 sec
+      Start 401: shmem.refuse.uninitialized.before.putmem
+57/95 Test #401: shmem.refuse.uninitialized.before.putmem ........   Passed    0.00 sec
+      Start 402: shmem.refuse.uninitialized.before.team_my_pe
+58/95 Test #402: shmem.refuse.uninitialized.before.team_my_pe ....   Passed    0.00 sec
+      Start 403: shmem.refuse.uninitialized.before.quiet
+59/95 Test #403: shmem.refuse.uninitialized.before.quiet .........   Passed    0.00 sec
+      Start 404: shmem.refuse.uninitialized.before.ptr
+60/95 Test #404: shmem.refuse.uninitialized.before.ptr ...........   Passed    0.00 sec
+      Start 405: shmem.refuse.uninitialized.before.barrier
+61/95 Test #405: shmem.refuse.uninitialized.before.barrier .......   Passed    0.00 sec
+      Start 406: shmem.refuse.uninitialized.before.sum_to_all
+62/95 Test #406: shmem.refuse.uninitialized.before.sum_to_all ....   Passed    0.00 sec
+      Start 407: shmem.refuse.uninitialized.after.malloc
+63/95 Test #407: shmem.refuse.uninitialized.after.malloc .........   Passed    0.00 sec
+      Start 408: shmem.refuse.uninitialized.after.ptr
+64/95 Test #408: shmem.refuse.uninitialized.after.ptr ............   Passed    0.00 sec
+      Start 409: model.get_completion.equality
+65/95 Test #409: model.get_completion.equality ...................   Passed    0.07 sec
+      Start 410: model.wire
+66/95 Test #410: model.wire ......................................   Passed    0.40 sec
+      Start 411: model.credit
+67/95 Test #411: model.credit ....................................   Passed    0.31 sec
+      Start 412: model.arrival
+68/95 Test  #28: shmem.reply .....................................   Passed    1.72 sec
+      Start 413: model.ack
+69/95 Test #412: model.arrival ...................................   Passed    0.12 sec
+      Start 414: model.reservation
+70/95 Test  #15: shmem.static-link ...............................   Passed    8.15 sec
+      Start 415: model.blocked_record
+71/95 Test #415: model.blocked_record ............................   Passed    0.06 sec
+      Start 416: model.range_watch
+72/95 Test #416: model.range_watch ...............................   Passed    0.50 sec
+      Start 417: model.chained_wake
+73/95 Test #417: model.chained_wake ..............................   Passed    0.61 sec
+      Start 418: model.lead_wake
+74/95 Test #414: model.reservation ...............................   Passed   20.27 sec
+      Start 419: model.rendezvous
+75/95 Test #419: model.rendezvous ................................   Passed    0.10 sec
+      Start 420: model.wait_word
+76/95 Test #420: model.wait_word .................................   Passed    1.73 sec
+      Start 421: model.credit_wait
+77/95 Test #418: model.lead_wake .................................   Passed   21.15 sec
+      Start 422: model.tree_barrier
+78/95 Test #421: model.credit_wait ...............................   Passed    6.90 sec
+      Start 423: model.close
+79/95 Test  #16: shmem.strict-c11 ................................   Passed   52.73 sec
+      Start 424: model.abort
+80/95 Test #413: model.ack .......................................   Passed  145.98 sec
+      Start 425: model.abort_exit
+81/95 Test #423: model.close .....................................   Passed  220.13 sec
+      Start 426: model.lock
+82/95 Test #426: model.lock ......................................   Passed    0.67 sec
+      Start 427: model.pipeline
+83/95 Test #427: model.pipeline ..................................   Passed   71.92 sec
+      Start 428: model.allgather
+84/95 Test #428: model.allgather .................................   Passed  149.72 sec
+      Start 429: model.selftest
+85/95 Test #429: model.selftest ..................................   Passed   66.84 sec
+      Start 438: stat.segment
+86/95 Test #438: stat.segment ....................................   Passed    0.01 sec
+      Start 439: stat.absent
+87/95 Test #439: stat.absent .....................................   Passed    0.00 sec
+      Start 440: stat.help
+88/95 Test #440: stat.help .......................................   Passed    0.00 sec
+      Start 442: wrapper.hello
+89/95 Test #442: wrapper.hello ...................................   Passed    0.09 sec
+      Start 443: wrapper.compile-then-link
+90/95 Test #443: wrapper.compile-then-link .......................   Passed    0.15 sec
+      Start 444: wrapper.show
+91/95 Test #444: wrapper.show ....................................   Passed    0.02 sec
+      Start 445: wrapper.statics
+92/95 Test #445: wrapper.statics .................................   Passed    0.14 sec
+93/95 Test #422: model.tree_barrier ..............................   Passed  732.05 sec
+94/95 Test #425: model.abort_exit ................................   Passed  1296.60 sec
+95/95 Test #424: model.abort .....................................   Passed  1431.68 sec
+
+100% tests passed, 0 tests failed out of 95
+
+Label Time Summary:
+tier1    = 4233.95 sec*proc (95 tests)
+
+Total Test time (real) = 1484.60 sec
+TIER1_EXIT=0

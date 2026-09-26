@@ -1,0 +1,3 @@
+# OSU OpenSHMEM Barrier Latency Test v7.5.2
+# Avg Latency(us)
+           192.89

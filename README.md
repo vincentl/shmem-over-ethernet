@@ -4,8 +4,9 @@ OpenSHMEM Over Ethernet: an implementation of OpenSHMEM 1.6 for commodity Ethern
 designed to build entirely from a Linux distribution's own packages — no fabric
 libraries.
 
-**Status:** phase 1, step 6, symmetric statics and the compiler wrapper (design
-§7.1). Jobs run on one node or across
+**Status:** phase 1, through step 7 (team creation) and step 9's first slice
+(block-strided RMA); step 8, contexts and `SHMEM_THREAD_MULTIPLE`, is proposed
+(design §7.1). Jobs run on one node or across
 nodes over TCP and io_uring, started by `srun` or by `osoe-launch`:
 initialization and thread levels up to `SHMEM_THREAD_SERIALIZED`, the symmetric
 heap allocator in full, RMA - `shmem_putmem` and `shmem_getmem`, and every type

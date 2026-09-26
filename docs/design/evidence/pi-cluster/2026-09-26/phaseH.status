@@ -1,0 +1,5 @@
+start Sat 26 Sep 12:25:04 EDT 2026
+fcollect 3x2 without pi-002 exit 0 12:25:19
+fcollect 3x2 without pi-004 exit 0 12:25:34
+fcollect 4x2 cyclic exit 0 12:26:41
+done Sat 26 Sep 12:26:41 EDT 2026

@@ -30,6 +30,16 @@ that they are not silently reversed.
 - Slurm launch. No PMI link dependency (§6).
 - TCP is acceptable. io_uring is required (kernel 6.7+ for futex ops; Trixie
   ships 6.12).
+- **RoCE is a design constraint, not this project's work.** The transport and
+  collective seams (§4.10, `internode.h`) must keep an RDMA backend possible at
+  hundreds of nodes and toward 10⁶ PEs, and every review grades them so. But no
+  RoCE hardware will be available before this project reaches its release point
+  (below), so no RoCE backend is built here. Decided 2026-09-26. The one local
+  road to a *functional* verbs backend is Soft-RoCE (`rdma_rxe`, in Debian's
+  generic kernel, not its cloud kernel) over tier 3's veth pairs; it can test
+  that the seams carry verbs, and nothing about performance, XRC (V1 of
+  `docs/reviews/roce-transport.md` §10) or NIC atomics. It is post-release
+  work, if hardware is still far off then.
 
 ### Framing
 
@@ -121,6 +131,33 @@ fetch-add at most 1.5× a get, measured 0.98–1.00×, the pin a wait that polls
 fails; and a stream at the default connection buffer at least 0.1× the
 floor's, measured 0.21–0.43×.
 Track all three per commit through the §3.14 counters.
+
+The floor has since run on the target hardware itself (`docs/pi-cluster.md`,
+2026-09-26): on two Raspberry Pi 5 nodes over one gigabit switch, the echo's
+fastest round trip is 153-156 µs, the library's get 1.09×, put and quiet 1.08×
+and fetch-add 1.12-1.13× of it, and the library streams at 0.999× the echo's
+111-112 MiB/s. The Pi's round trip is the Pi's network stack, not the library.
+
+### Release point
+
+*(Added 2026-09-26, with the author.)* The project is released when all of the
+following hold, and RoCE work waits until after it:
+
+1. OpenSHMEM 1.5 complete: contexts and `SHMEM_THREAD_MULTIPLE` (phase 1 step
+   8, three slices).
+2. OpenSHMEM 1.6 complete but for the known non-conformance §7.4 records: the
+   scans (§9.10.10) built, beside the block-strided RMA and the sessions
+   already there.
+3. The SOS test suite passes every program except those using SOS's own
+   extensions (§8.6, the runbook's §8 names them).
+4. The Pi runbook green end to end, with the floor ratios, `osoe-bench` and the
+   collective sweeps recorded in `docs/pi-cluster.md`.
+5. A license chosen (§10), and `cmake --install` with the README enough for a
+   stranger to build and run a program on a Slurm cluster like the author's.
+6. A version tag and a release note listing the known limits: the deprecated
+   routines' missing name-shifted entry points (§7.4), partial active sets
+   refused (§7.4), and whatever the last Pi session measured short of the
+   floor.
 
 ---
 
@@ -6801,8 +6838,26 @@ Recorded rather than deleted, so they are not reopened from memory.
   backend's constant today; measuring the hop latency *h* and per-message cost *o*
   at init and choosing *k* from their ratio is the next step, once a real fabric
   exists to measure. The optimum is broad, so this is refinement, not a fix.
+  *Measured on the Pi cluster, 2026-09-26 (`docs/pi-cluster.md` §10):* on four
+  nodes over gigabit Ethernet the large-message optimum is not broad. A 1 MiB
+  broadcast at the default fan-out of 4 (one level) takes 36.6 ms at D = 1 and
+  27.2 ms at any D ≥ 2, because the root sends three copies over one link and
+  3 MiB at 111 MiB/s is 27 ms; at a fan-out of 2 (two levels) it takes 38.8,
+  22.3, 18.4 and 18.2 ms at D = 1, 2, 4 and 8, the root's two copies at line
+  rate. A 1 MiB reduction goes 48.5 → 28.2 ms at k = 4 and 58.4 → 19.4 ms at
+  k = 2, D = 8. So over Ethernet a tree's fan-out is a bandwidth decision for
+  large messages - the root's link carries k - 1 copies whatever the pipelining -
+  and a latency decision for small ones, where each level costs a hop. The
+  refinement is a fan-out chosen per message size, k = 2 above a threshold the
+  small-message sweep at k = 2 has yet to set (the sweep ran from 64 KiB up).
 
 ### Still open — the RoCE exercise of 2026-09-17
+
+*Stance since 2026-09-26 (§1): RoCE is a constraint the seams must keep
+satisfying, not work this project does before its release point; no hardware
+is coming soon. Every item below stays open on those terms, and a Soft-RoCE
+functional backend is the post-release road to the ones a device is not
+strictly needed for.*
 
 `docs/reviews/roce-transport.md` planned a RoCEv2 backend behind §4.10 to test
 whether the boundary can carry RDMA at all, and estimated what it leaves on the

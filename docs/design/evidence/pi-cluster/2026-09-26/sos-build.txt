@@ -1,0 +1,2 @@
+unit/c11_shmem_test_all_any_some: build failed
+unit/c11_shmem_wait_until_all_any_some: build failed

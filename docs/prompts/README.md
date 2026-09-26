@@ -24,6 +24,12 @@ A fourth numbering shares the word and is unrelated: **§4.3's** phases 1, 1.5 a
 `task-*.md` files are one-off jobs — a merge, a review — rather than a slice of a
 step.
 
+**RoCE in the briefs.** Several briefs give "a path to RoCE at ~10⁶ PEs that no
+interface blocks" as an axis to judge the work by. That axis stands: it is a
+constraint on the seams. It is not a plan to build a RoCE backend in this
+project, which reaches its release point (design §1) before any RoCE work; no
+hardware is coming soon (decided 2026-09-26).
+
 **These files are not updated when the code they describe is renamed.** They are
 the brief as it was given, and rewriting one would make it describe something
 that was not asked for. Two driftings are known and harmless: the earlier

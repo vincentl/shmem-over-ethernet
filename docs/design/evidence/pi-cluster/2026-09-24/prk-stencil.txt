@@ -1,0 +1,13 @@
+Parallel Research Kernels version 2.17
+SHMEM stencil execution on 2D grid
+Number of ranks        = 16
+Grid size              = 2000
+Radius of stencil      = 2
+Tiles in x/y-direction = 4/4
+Type of stencil        = star
+Data type              = double precision
+Compact representation of stencil loop body
+Split fence            = OFF
+Number of iterations   = 20
+Solution validates
+Rate (MFlops/s): 9935.466942  Avg time (s): 0.007619
