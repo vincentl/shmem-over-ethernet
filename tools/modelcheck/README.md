@@ -10,6 +10,7 @@ were run. Develop new models here.
 |---|---|
 | `engine.py` | The explorer; its docstring is the reference for the instruction set |
 | `get_completion_model.py`, `dirty_set_model.py`, `watch_list_model.py` | Worked models: each checks a design and deliberately broken variants |
+| `pipeline_model.py` | Pieces of a data collective pipelined through the internode tree, the author's decision of 2026-09-25 (§5.8) |
 | `landing_extent_model.py`, `copy_out_claim_model.py` | §4.11's two open points the author decided on 2026-09-25: landing-zone extents claimed by CAS over a bitmap, and one copier per landed nonblocking get |
 | `selftest.py` | Checks that the reductions change no verdict; rerun it after changing the engine |
 

@@ -4476,6 +4476,34 @@ Two cases need more:
 This section records the decisions that must hold when those arrive. Nothing here
 uses an OpenSHMEM extension.
 
+**Pipelined pieces** *(decided 2026-09-25, the Pi cluster's numbers in hand: a
+1 MiB broadcast over four nodes took 36.5 ms and a 16 x 1 MiB fcollect 773 ms;
+checked by `pipeline_model.py`; not yet built).* The generic internode phase
+keeps D pieces in flight instead of one: each parent holds D slots per child
+position and each node D release slots, piece k in slot k mod D. Four rules
+make it hold, and the model breaks each:
+- **One arrival counter per child position**, not one per node. With pieces in
+  flight, a fast child's second arrival would stand in for a slow child's first
+  in a summed count, and the parent would read a slot not yet written.
+- **Counters compared as at least**, cumulative over the team's life. Within a
+  collective a child runs up to D pieces ahead, so equality (§5.4) no longer
+  holds; the bound that equality protected becomes the window.
+- **A node sends piece k up only once it holds piece k - D's release**, which is
+  the parent's word that slot k mod D has been read. One piece more and the
+  parent reads a piece from the window after.
+- **A node copies a release out and forwards it before sending anything that
+  release lets through**: the arrival it sends next is what tells its parent
+  the release slot is free. Reversing the two lets a parent overwrite a release
+  a leaf has not copied, and deadlocks a middle node on a child waiting for it.
+
+Collectives still follow one another with different trees, a broadcast's rotated
+to its root, so a position's counter is fed by different children over the
+team's life: each node adds to its per-position bases what its own tree says
+each position received, and the argument for early arrivals (§5.5 as built)
+carries over, since no node starts the next collective before holding this one's
+last release. D pieces cost D times the internal region's slots: at D = 2, 32
+teams and a fan-out of 4, 5 MiB a PE, touched only by a team's local leads.
+
 #### What the surface provides, and what it lacks
 
 osoe's collective machinery is:
