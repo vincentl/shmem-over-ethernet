@@ -4,24 +4,30 @@
  * results - under tsan, the one tool that sees a race inside a process.
  *
  * THREADS threads a PE, in two waves, so that the second wave's threads take
- * the counter blocks and records the first wave's gave back at their exit
- * (the default OSOE_MAX_THREADS, 8, holds the main thread, the agent and one
- * wave). Each worker, ROUNDS times:
+ * the counter blocks and records the first wave's gave back at their exit (a
+ * claim takes the lowest free block). Each worker, ROUNDS times:
  *   - on a private context of its own: a put of its own words to the right
  *     neighbour, a blocking get and a nonblocking get of the right
  *     neighbour's fixed table, a fetching AMO, a quiet - each result checked
  *     by value;
+ *     several nonblocking gets at once (PIECES of them, so that with a small
+ *     landing zone the threads' pieces outnumber its extents, and an issue
+ *     must copy out others' landed pieces and wait for room);
  *   - on the default context, which every thread shares: a fetch-add on one
- *     counter at PE 0, and a blocking get;
+ *     counter at PE 0, a blocking get and a nonblocking one;
+ *   - a distributed lock, one per worker number, which the same-numbered
+ *     workers of every PE contend for, around a get and a put of a count at
+ *     PE 0 - so several threads of one PE hold different locks at once;
  *   - a wait: it waits for its own word, which the same-numbered worker of
  *     its left neighbour sets with an AMO, several workers of one PE waiting
  *     at once (§4.11 item 3's records); and two workers of each PE wait on
  *     one shared word, which PE 0's main thread sets once, and both wake.
  * Then PE 0's counter is every increment of every worker.
  *
- * OSOE_TEST_MULTIPLE=exhaust: OSOE_MAX_THREADS=3, the main thread, the agent
- * and two workers in the library at once, each worker in a wait nobody ends:
- * the fourth thread ends the job naming OSOE_MAX_THREADS (decided 2026-09-25).
+ * OSOE_TEST_MULTIPLE=exhaust: OSOE_MAX_THREADS=2, the main thread and two
+ * workers in the library at once (the agent's block is not among the two),
+ * each worker in a wait nobody ends: the third application thread ends the job
+ * naming OSOE_MAX_THREADS (decided 2026-09-25).
  */
 #define _GNU_SOURCE
 #include <pthread.h>
@@ -35,8 +41,9 @@
 
 #include "check.h"
 #include "invariants.h"
+#include "launcher.h"
 
-enum { THREADS = 4, ROUNDS = 50, WORDS = 8 };
+enum { THREADS = 4, ROUNDS = 50, WORDS = 8, PIECES = 4 };
 
 static int me, npes, left, right;
 static long *words;             /* [THREADS][WORDS]: each worker's own */
@@ -45,8 +52,34 @@ static long *landing;           /* [THREADS][WORDS]: where the left neighbour pu
 static uint64_t *flags;         /* [THREADS]: each worker's wait word */
 static uint64_t *shared_flag;   /* one word two workers of each PE wait on */
 static uint64_t *counter;       /* at PE 0: every worker's increments */
+static long *locks;             /* [THREADS]: one lock per worker number */
+static long *locked_count;      /* [THREADS], at PE 0: counted under the locks */
 static pthread_mutex_t report = PTHREAD_MUTEX_INITIALIZER;
 static int failures;
+
+/* This PE's total for a thread-scope counter, over every thread's block
+ * (test-context.c's). */
+static uint64_t counter_total(const char *name)
+{
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(segment, sizeof segment, 0);
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0) {
+        fprintf(stderr, "%s\n", err);
+        return UINT64_MAX;
+    }
+    const struct osoe_metric_descriptor *m = osoe_segment_metric(&s, name);
+    const char *local = osoe_test_launcher("LOCALID");
+    uint32_t local_id = (uint32_t)atoi(local ? local : "0");
+    uint64_t total = 0;
+    for (uint32_t i = 0; m && i < s.dir->blocks_per_pe; i++) {
+        uint64_t v;
+        if (osoe_segment_read(&s, m, local_id * s.dir->blocks_per_pe + i, &v))
+            total += v;
+    }
+    osoe_segment_close(&s);
+    return total;
+}
 
 static long value(int pe, int thread, int round, int i)
 {
@@ -77,7 +110,7 @@ static void *work(void *argument)
         return NULL;
     }
     for (int round = 0; round < ROUNDS; round++) {
-        long mine[WORDS], got[WORDS];
+        long mine[WORDS], got[PIECES][WORDS];
         for (int i = 0; i < WORDS; i++)
             mine[i] = value(me, t, round, i);
         /* This worker's words, then the neighbour's copy of them. Each
@@ -94,19 +127,38 @@ static void *work(void *argument)
             fail("a blocking get of the right neighbour's table", t, round, one,
                  value(right, t, 0, 1));
         memset(got, 0, sizeof got);
-        shmem_ctx_long_get_nbi(ctx, got, &fixed[t * WORDS], WORDS, right);
+        for (int k = 0; k < PIECES; k++)
+            shmem_ctx_long_get_nbi(ctx, got[k], &fixed[((t + k) % THREADS) * WORDS], WORDS,
+                                   right);
         shmem_ctx_quiet(ctx);
-        for (int i = 0; i < WORDS; i++)
-            if (got[i] != value(right, t, 0, i)) {
-                fail("a nonblocking get of the right neighbour's table", t, round, got[i],
-                     value(right, t, 0, i));
-                break;
-            }
+        for (int k = 0; k < PIECES; k++)
+            for (int i = 0; i < WORDS; i++)
+                if (got[k][i] != value(right, (t + k) % THREADS, 0, i)) {
+                    fail("a nonblocking get of the right neighbour's table", t, round,
+                         got[k][i], value(right, (t + k) % THREADS, 0, i));
+                    break;
+                }
         /* The shared default context: an increment at PE 0 and a get. */
         shmem_uint64_atomic_inc(counter, 0);
         long shared_get = shmem_long_g(&fixed[t * WORDS + 3], right);
         if (shared_get != value(right, t, 0, 3))
             fail("a get on the default context", t, round, shared_get, value(right, t, 0, 3));
+        long shared_nbi[WORDS];
+        memset(shared_nbi, 0, sizeof shared_nbi);
+        shmem_long_get_nbi(shared_nbi, &fixed[t * WORDS], WORDS, left);
+        shmem_quiet();
+        for (int i = 0; i < WORDS; i++)
+            if (shared_nbi[i] != value(left, t, 0, i)) {
+                fail("a nonblocking get on the default context", t, round, shared_nbi[i],
+                     value(left, t, 0, i));
+                break;
+            }
+        /* A count kept by a get and a put, under this worker number's lock. */
+        shmem_set_lock(&locks[t]);
+        long count = shmem_long_g(&locked_count[t], 0);
+        shmem_long_p(&locked_count[t], count + 1, 0);
+        shmem_quiet();
+        shmem_clear_lock(&locks[t]);
     }
     shmem_quiet();
     /* The wait: this worker's word, set by the left neighbour's same worker;
@@ -131,14 +183,14 @@ static void *sit(void *argument)
 
 static void exhaust(void)
 {
-    /* The main thread and the agent hold two of the three blocks; two
-     * workers in a wait at once need two more. */
+    /* The main thread holds one of the two blocks; two workers in a wait
+     * at once need two more. */
     pthread_t a, b;
     CHECK_FATAL(pthread_create(&a, NULL, sit, NULL) == 0);
     CHECK_FATAL(pthread_create(&b, NULL, sit, NULL) == 0);
     pthread_join(a, NULL);
     pthread_join(b, NULL);
-    fprintf(stderr, "PE %d: four threads ran on three blocks\n", me);
+    fprintf(stderr, "PE %d: three threads ran on two blocks\n", me);
     exit(1);
 }
 
@@ -157,7 +209,10 @@ int main(void)
     flags = shmem_calloc(THREADS, sizeof *flags);
     shared_flag = shmem_calloc(1, sizeof *shared_flag);
     counter = shmem_calloc(1, sizeof *counter);
-    CHECK_FATAL(words && fixed && landing && flags && shared_flag && counter);
+    locks = shmem_calloc(THREADS, sizeof *locks);
+    locked_count = shmem_calloc(THREADS, sizeof *locked_count);
+    CHECK_FATAL(words && fixed && landing && flags && shared_flag && counter && locks &&
+                locked_count);
     for (int t = 0; t < THREADS; t++)
         for (int i = 0; i < WORDS; i++)
             fixed[t * WORDS + i] = value(me, t, 0, i);
@@ -197,11 +252,23 @@ int main(void)
          * it still reads them. */
         shmem_barrier_all();
     }
+    /* With a small landing zone and a neighbour on another node, the threads'
+     * pieces overfilled it: an issue found no room at least once, which is
+     * what makes the room-making path, and its copy-out of other threads'
+     * pieces, part of what this test ran. */
+    const char *landing_bytes = getenv("OSOE_GET_LANDING_BYTES");
+    if (landing_bytes && atol(landing_bytes) <= 8192 && shmem_ptr(fixed, right) == NULL)
+        CHECK(counter_total("am.landing_full") > 0);
     shmem_barrier_all();
     if (me == 0 && *counter != (uint64_t)npes * THREADS * ROUNDS * 2)
         fail("PE 0's counter", -1, -1, (long)*counter, (long)npes * THREADS * ROUNDS * 2);
+    for (int t = 0; me == 0 && t < THREADS; t++)
+        if (locked_count[t] != (long)npes * ROUNDS * 2)
+            fail("the count kept under a lock", t, -1, locked_count[t], (long)npes * ROUNDS * 2);
     CHECK(failures == 0);
     shmem_barrier_all();
+    shmem_free(locked_count);
+    shmem_free(locks);
     shmem_free(counter);
     shmem_free(shared_flag);
     shmem_free(flags);

@@ -179,8 +179,6 @@ static bool context_open(struct osoe_transport_context *c, uint32_t index, unsig
  * compare-and-swap and needs no lock (§4.11 items 7 and 8). Below
  * THREAD_MULTIPLE nothing is concurrent and no mutex is taken.
  */
-static bool threads_concurrent;
-
 static void context_enter(struct osoe_transport_context *c)
 {
     if (c->concurrent)
@@ -195,7 +193,6 @@ static void context_leave(struct osoe_transport_context *c)
 
 void osoe_transport_threads(bool concurrent)
 {
-    threads_concurrent = concurrent;
     contexts[0].concurrent = concurrent;
 }
 
@@ -241,7 +238,6 @@ void osoe_transport_fini(void)
     /* Every created context was destroyed before the finalize barrier
      * (context.c), so only the default one is live here; a block left live
      * would be a defect, and the segment goes with the session either way. */
-    threads_concurrent = false;
     for (uint32_t i = 0; i < context_count; i++)
         if (contexts[i].live) {
             pthread_mutex_destroy(&contexts[i].mutex);
@@ -657,7 +653,10 @@ static uint32_t claim_in_word(uint32_t word, uint32_t count)
         return UINT32_MAX;
     uint64_t run = count == 64 ? ~UINT64_C(0) : (UINT64_C(1) << count) - 1;
     _Atomic uint64_t *bits = &my_zone()->bits[word];
-    uint64_t seen = atomic_load_explicit(bits, memory_order_acquire);
+    /* seq_cst, as the check of a wait-word wait (base/wait-word.h): make_room
+     * sleeps on `freed` after this finds no room, and a release skips the wake
+     * when no waiter is registered (review of slice 2, S1). */
+    uint64_t seen = atomic_load_explicit(bits, memory_order_seq_cst);
     for (;;) {
         uint32_t at = UINT32_MAX;
         for (uint32_t b = 0; b + count <= valid; b++)
@@ -668,7 +667,7 @@ static uint32_t claim_in_word(uint32_t word, uint32_t count)
         if (at == UINT32_MAX)
             return UINT32_MAX;
         if (atomic_compare_exchange_weak_explicit(bits, &seen, seen | (run << at),
-                                                  memory_order_seq_cst, memory_order_acquire))
+                                                  memory_order_seq_cst, memory_order_seq_cst))
             return word * 64 + at;
     }
 }
@@ -734,7 +733,7 @@ static uint32_t copy_out_any(void)
 {
     uint32_t copied = 0;
     for (uint32_t e = 0; e < osoe.node.landing_requests; e++)
-        if (atomic_load_explicit(&my_records()[e].state, memory_order_acquire) ==
+        if (atomic_load_explicit(&my_records()[e].state, memory_order_seq_cst) ==
                 OSOE_LANDING_LANDED && copy_out(e))
             copied++;
     return copied;

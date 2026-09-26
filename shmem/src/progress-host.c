@@ -150,7 +150,10 @@ static void landed(void *context, uint32_t pe, uint64_t token, uint32_t bytes)
                    pe, block, osoe.node.contexts_per_pe);
     struct osoe_landing_record *r =
         &osoe_node_landing_records(&osoe.node, (uint32_t)local)[token & OSOE_LANDING_EXTENT_MASK];
-    atomic_store_explicit(&r->state, OSOE_LANDING_LANDED, memory_order_release);
+    /* seq_cst: the value of two wait-word waits, the context's and the zone's
+     * `freed`, whose wakes are skipped when nobody is registered
+     * (base/wait-word.h; review of slice 2, S1). */
+    atomic_store_explicit(&r->state, OSOE_LANDING_LANDED, memory_order_seq_cst);
     struct osoe_context_block *c = osoe_node_context(&osoe.node, (uint32_t)local, block);
     atomic_fetch_add_explicit(&c->bytes_landed, bytes, memory_order_seq_cst);
     osoe_wait_word_wake_all(&c->counter_wake);

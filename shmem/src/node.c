@@ -541,6 +541,12 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * record an extent, then the extents. A piece of a get is at most a run of
      * 64 extents in one word of the bitmap, and at most a chunk, which the
      * wire's largest message holds. */
+    /* Whole extents or nothing: a size that is not one is refused by name
+     * rather than quietly rounded down (review of step 8 slice 2). */
+    if (am.get_landing_bytes % OSOE_LANDING_EXTENT_BYTES != 0)
+        osoe_fatal("OSOE_GET_LANDING_BYTES=%llu is not a multiple of the landing zone's "
+                   "%u-byte extents", (unsigned long long)am.get_landing_bytes,
+                   (unsigned)OSOE_LANDING_EXTENT_BYTES);
     uint64_t extents = am.get_landing_bytes / OSOE_LANDING_EXTENT_BYTES;
     uint64_t landing_requests_offset =
         align_up(sizeof(struct osoe_landing_zone) + (extents + 63) / 64 * sizeof(uint64_t));

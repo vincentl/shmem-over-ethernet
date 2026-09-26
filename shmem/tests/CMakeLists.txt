@@ -1620,21 +1620,32 @@ endif()
 
 # SHMEM_THREAD_MULTIPLE (design §4.11; phase 1 step 8 slice 2;
 # test-multiple.c): worker threads of every PE in the library at once, on
-# private contexts and on the default one, waiting several at a time - under
-# tsan on one node, which is where it sees a race - and across nodes on a block
-# and an interleaved map, with a small landing zone so that threads' pieces
-# contend for its extents; and a full thread table ending the job by name.
+# private contexts and on the default one, waiting several at a time; on one
+# node, and across nodes on a block and an interleaved map, with a landing zone
+# of 8 extents that the threads' 16 pieces in flight overfill; and a full
+# thread table ending the job by name. Under tsan the cross-node case that
+# counts is 0,1: one PE a node, so everything that writes a PE's memory - its
+# agent's landings, its threads' copy-outs, its replies - is a thread of the
+# one process tsan instruments, and a race among them is a report, not the
+# unprovable cross-process kind the internode tests are kept from.
 osoe_tier2_test(multiple)
+osoe_tier2_map_test(multiple 0,1 OSOE_GET_LANDING_BYTES=8192)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(multiple 0,0,1,1 OSOE_GET_LANDING_BYTES=8192)
   osoe_tier2_map_test(multiple 0,1,2,0,1,0 OSOE_GET_LANDING_BYTES=8192)
 endif()
 add_test(NAME shmem.multiple.exhaust
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MULTIPLE=exhaust OSOE_MAX_THREADS=3
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MULTIPLE=exhaust OSOE_MAX_THREADS=2
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_multiple>)
 set_tests_properties(shmem.multiple.exhaust PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "more threads of this PE are in the library than OSOE_MAX_THREADS=3 allows")
+  PASS_REGULAR_EXPRESSION "more threads of this PE are in the library than OSOE_MAX_THREADS=2 allows")
 target_link_libraries(shmem_test_multiple PRIVATE Threads::Threads)
+# A landing zone that is not whole extents is refused by name, not rounded.
+add_test(NAME shmem.multiple.landing-unaligned
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_GET_LANDING_BYTES=1500
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_multiple>)
+set_tests_properties(shmem.multiple.landing-unaligned PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_GET_LANDING_BYTES=1500 is not a multiple of the landing zone's 1024-byte extents")
 
 # The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on
 # one node, where the team's local lead scans; across nodes on a block, an

@@ -671,7 +671,8 @@ bool osoe_segment_watch(const struct osoe_segment *s, uint32_t pe, uint64_t *wor
             const unsigned char *record = s->map + s->dir->threads_offset +
                                           ((uint64_t)pe * s->dir->threads_per_pe + i) *
                                               s->dir->thread_record_bytes;
-            uint64_t v = __atomic_load_n((const uint64_t *)record, __ATOMIC_ACQUIRE);
+            uint64_t v = atomic_load_explicit((const _Atomic uint64_t *)(const void *)record,
+                                              memory_order_acquire);
             if (v) {
                 *word = v;
                 break;
