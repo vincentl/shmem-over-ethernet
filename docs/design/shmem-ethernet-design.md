@@ -4733,10 +4733,13 @@ arithmetic, under a cyclic one. Each stretch joins the list of every step whose
 shares include its node, merged with the range before it when the two touch:
 one or two ranges a step under a block distribution and at most *L* + 1 under
 a cyclic one, the walk O(*N* + ranges) and O(*P*) a call - O(its members) for
-each share, and no search of the map per member. The walk checks that its
-members' places end at the result's end and that it finds as many members on
-this node as the team lists here; a team spanning fewer than every node finds
-the node at each position once, from its leads. The buffer is addressed at a
+each share, and no search of the map per member. Before any put the walk
+checks that the members' places run in order from 0 to the result's end - a
+layout overwritten since it was made ends the job by name, as a program's
+collect into a dest shorter than the result makes one, the lead's own copy of
+its members' blocks running on into the room that holds the places - and that
+it finds as many members on this node as the team lists here; a team spanning
+fewer than every node finds the node at each position once, from its leads. The buffer is addressed at a
 peer by its region, heap or statics, and offset (`internode.h`). Each lead
 publishes the steps its last gather made and the shares they moved into its
 buffer (`team.tree.gather_steps` and `gather_shares`, layout 20), ⌈log₂ *N*⌉

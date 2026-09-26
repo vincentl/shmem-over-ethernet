@@ -844,15 +844,35 @@ static void add_range(struct range_list *list, uint64_t from, uint64_t to, const
 }
 
 /* One gather's ranges as build_ranges makes them: the team, its lead's state,
- * the result's layout, and how many members it has found on this node. */
+ * the result's layout and size, and how many members it has found on this
+ * node. */
 struct gather {
     struct generic_team *team_phase;
     uint32_t team;
     size_t block;
     const uint64_t *places;
+    uint64_t bytes;
     uint32_t here;
     const char *routine;
 };
+
+/*
+ * The layout does not fit the result: team rank `rank`'s place is `place`,
+ * before the place before it or past the result's end. Places are made
+ * consistent (internode.h), so these were overwritten after they were made -
+ * in a program's collect whose dest is shorter than the result, by the lead's
+ * own copy of its members' blocks, running on past dest into the room that
+ * holds them (collectives.c). Named, before any put: one cut from them would
+ * land anywhere in a peer's heap.
+ */
+static void layout_overwritten(const struct gather *g, uint64_t rank, uint64_t place)
+{
+    osoe_fatal("%s: team %u's member %llu has its place at byte %llu of a result of %llu "
+               "bytes, out of the places' order: the layout was overwritten after it was made "
+               "- is dest shorter than the result, so that copying into it ran on past its "
+               "end?", g->routine, g->team, (unsigned long long)rank,
+               (unsigned long long)place, (unsigned long long)g->bytes);
+}
 
 /*
  * Team ranks `first` to `first` + `count` - 1, all on node `node`: their blocks
@@ -872,6 +892,8 @@ static void add_members(struct gather *g, uint32_t first, uint32_t count, uint32
         g->here += count;
     uint64_t from = place_of(g->places, g->block, first);
     uint64_t to = place_of(g->places, g->block, (uint64_t)first + count);
+    if (to < from || to > g->bytes)
+        layout_overwritten(g, (uint64_t)first + count, to);
     if (from == to)
         return;
     uint32_t last = team_phase->steps - 1;
@@ -888,13 +910,13 @@ static void add_members(struct gather *g, uint32_t first, uint32_t count, uint32
  * whose ranks share a node - a block distribution's - gives one stretch of
  * members at a time, and one whose ranks step from node to node - a cyclic
  * one's - one member at a time, its node by arithmetic; a search of the runs
- * only where a progression enters a run. Then the checks that the walk and
- * the call agree: its members' places end at the result's bytes, and as many
- * of them are on this node as the SHMEM layer lists here - the blocks the
- * lead has put in the buffer, and the only ones it can send before it
- * receives any.
+ * only where a progression enters a run. And the checks that the walk and the
+ * call agree, all before any put: the members' places run in order from 0 to
+ * the result's end (layout_overwritten), and as many members are on this node
+ * as the SHMEM layer lists here - the blocks the lead has put in the buffer,
+ * and the only ones it can send before it receives any.
  */
-static void build_ranges(struct gather *g, uint64_t bytes)
+static void build_ranges(struct gather *g)
 {
     struct generic_team *team_phase = g->team_phase;
     const struct osoe_job *job = &osoe.job;
@@ -942,11 +964,12 @@ static void build_ranges(struct gather *g, uint64_t bytes)
         }
         rank += count;
     }
-    if (place_of(g->places, g->block, rank) != bytes)
-        osoe_fatal("%s: team %u's %u members' blocks end at byte %llu of a result of %llu",
-                   g->routine, g->team, rank,
-                   (unsigned long long)place_of(g->places, g->block, rank),
-                   (unsigned long long)bytes);
+    uint64_t first_place = place_of(g->places, g->block, 0);
+    uint64_t end_place = place_of(g->places, g->block, rank);
+    if (first_place != 0)
+        layout_overwritten(g, 0, first_place);
+    if (end_place != g->bytes)
+        layout_overwritten(g, rank, end_place);
     if (g->here != listed)
         osoe_fatal("%s: the rank map puts %u of team %u's members on this node, and the team "
                    "lists %u here", g->routine, g->here, g->team, listed);
@@ -991,8 +1014,8 @@ void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer,
 {
     struct generic_team *team_phase = registered_team(team, routine);
     prepare_gathers(team_phase, team, routine);
-    struct gather g = { team_phase, team, block, places, 0, routine };
-    build_ranges(&g, bytes);
+    struct gather g = { team_phase, team, block, places, bytes, 0, routine };
+    build_ranges(&g);
     enum osoe_region region;
     uint64_t offset;
     locate(buffer, bytes, &region, &offset, routine);
