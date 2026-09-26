@@ -14,8 +14,9 @@
 #include "node.h"
 
 /*
- * What every part of the library may read: the job, the node, the heap and the
- * collectives' own epoch counts. **Nothing of any backend's.** The AM layer's
+ * What every part of the library may read: the job, the node and the heap. A
+ * team's epoch counts are its descriptor's (team.h). **Nothing of any
+ * backend's.** The AM layer's
  * wires, connections, reply pool and engine are in am-state.h, which only the
  * AM backend's files include; before slice 3 they were fields here, so every
  * §4 file could name them, and the boundary rested on nobody doing so (second
@@ -26,11 +27,6 @@ struct osoe_state {
     struct osoe_node node;
     struct osoe_job job;
     struct osoe_allocator allocator;
-    uint32_t world_epoch;           /* k for SHMEM_TEAM_WORLD (§5.4) */
-    uint32_t shared_epoch;          /* and for SHMEM_TEAM_SHARED */
-    uint32_t finalize_epoch;        /* and for the finalize team (team.h) */
-    uint32_t world_data_epoch;      /* d for SHMEM_TEAM_WORLD: its data collectives (§5.4) */
-    uint32_t shared_data_epoch;     /* and for SHMEM_TEAM_SHARED */
 };
 
 extern struct osoe_state osoe;

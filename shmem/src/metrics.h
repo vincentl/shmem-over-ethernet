@@ -16,10 +16,20 @@
  * everything by *name*. A job built from a different commit, with different
  * counters, is read correctly.
  *
- * Three scopes, because a metric belongs to one of three records:
- *   NODE    a field of the header: one per node
- *   PE      a field of a PE's slot: one per local PE, written by that PE
- *   THREAD  a counter in a thread's block: one per thread (§3.14 cost rules)
+ * A metric's scope says which record its offset is into:
+ *   NODE        a field of the header: one per node
+ *   PE          a field of a PE's slot: one per local PE, written by that PE
+ *   THREAD      a counter in a thread's block: one per thread (§3.14 cost rules)
+ *   CONNECTION  a field of one connection's record: one per peer node
+ *   TEAM        a field of one team number's block: one per team number
+ *               (layout 18), the index being the number - which is how a
+ *               reader finds a team created after the table was written
+ *   EPOCHS      a word of one local PE's row of published epochs, a word per
+ *               team number (layout 18), the index being the local id
+ *
+ * The predefined teams' fields are node-scope names too, `team.world.*` and
+ * the like, as they were when the header held them by name: the team blocks
+ * end the header, so the node record reaches them.
  *
  * Naming. `transport.*` is the transport boundary's own vocabulary, defined here
  * rather than by each backend, so two backends are comparable in one harness
@@ -147,6 +157,8 @@ enum osoe_metric_scope {
     OSOE_MSCOPE_PE,           /* a field of a PE's slot */
     OSOE_MSCOPE_THREAD,       /* a counter in a thread's block */
     OSOE_MSCOPE_CONNECTION,   /* a field of one connection's record (§3.14) */
+    OSOE_MSCOPE_TEAM,         /* a field of one team number's block (layout 18) */
+    OSOE_MSCOPE_EPOCHS,       /* one PE's published epoch for one team (layout 18) */
 };
 
 struct osoe_metric_descriptor {

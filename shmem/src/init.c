@@ -86,6 +86,9 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "\n"
 "  Specific to osoe:\n"
 "    OSOE_MAX_THREADS       counter blocks per PE, one per thread (§3.14)\n"
+"    OSOE_MAX_TEAMS         teams in existence job-wide at once, the three\n"
+"                           predefined included: 4 to 1024, the same on every\n"
+"                           node; default 32 (§5.7)\n"
 "    OSOE_NO_PROGRESS_TIMEOUT\n"
 "                           seconds a wait may see no progress before it ends\n"
 "                           the job; 0, the default, means never (§3.15)\n"
@@ -251,8 +254,9 @@ static void session_start(void)
      * runs the backend - each needs the one before it. osoe_transport_init
      * starts whatever the backend needs (on AM, the connection area, the wires
      * and the engine), so it is complete before the agent that polls it
-     * exists; the internode backend rides on it (internode.h); and the teams
-     * hand their node sets to that backend while nothing else can read them.
+     * exists; the internode backend rides on it (internode.h); and the node's
+     * lead writes the teams' records, which that backend learns them from,
+     * before its agent - their reader - exists.
      */
     osoe_transport_init();
     if (osoe_allocator_init(&osoe.allocator, osoe.node.heap_size) != 0)
@@ -328,6 +332,7 @@ static void session_end(void)
     osoe_agent_stop(&osoe.node.slots[osoe.bootstrap.local_id]);
     osoe_liveness_stop();
     osoe_internode_fini();
+    osoe_team_stop();
     osoe_allocator_fini(&osoe.allocator);
     osoe_lock_session_end();
     osoe_transport_fini();

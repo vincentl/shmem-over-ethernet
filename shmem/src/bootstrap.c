@@ -243,6 +243,21 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    getenv("OSOE_COLLECTIVE_FANOUT"), (unsigned)OSOE_COLLECTIVE_FANOUT_MAX);
 
     /*
+     * How many teams may exist job-wide at once, the predefined ones included
+     * (§5.7). It sizes each node's team blocks, each PE's published epochs and
+     * the internal region's per-team blocks, and a team's number is job-wide
+     * and below it - so every node must agree, and the job rendezvous checks
+     * that they do beside the fan-out (§6.2). A node with a different count
+     * would lay its internal region out differently, and a put of one team's
+     * piece would land in another's slot.
+     */
+    b->max_teams = OSOE_MAX_TEAMS_DEFAULT;
+    if (osoe_environment_u32("OSOE_MAX_TEAMS", &b->max_teams) == OSOE_ENVIRONMENT_INVALID ||
+        b->max_teams < OSOE_MAX_TEAMS_LOWEST || b->max_teams > OSOE_MAX_TEAMS_HIGHEST)
+        osoe_fatal("OSOE_MAX_TEAMS='%s' is not between %u and %u", getenv("OSOE_MAX_TEAMS"),
+                   OSOE_MAX_TEAMS_LOWEST, OSOE_MAX_TEAMS_HIGHEST);
+
+    /*
      * The ports a node lead may listen on (§6.2's "configurable range"). Each
      * lead binds the first free port of a candidate sequence hashed from (job,
      * step, node) inside it, and another lead finds it by trying the same

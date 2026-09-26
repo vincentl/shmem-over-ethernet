@@ -41,7 +41,8 @@
  */
 static void sync_team(struct osoe_team *t, const char *routine)
 {
-    uint32_t k = *t->epoch;
+    uint32_t k = t->epoch;
+    struct osoe_team_block *b = t->block;
 
     /*
      * A team of one (team.h): the caller is the only member, so the
@@ -49,12 +50,12 @@ static void sync_team(struct osoe_team *t, const char *routine)
      * node-wide counters, which belong to the node's team and not to this one.
      */
     if (t->singleton) {
-        *t->epoch = k + 1;
+        t->epoch = k + 1;
         atomic_store_explicit(t->published, k + 1, memory_order_release);
         return;
     }
 
-    if (osoe_epoch_bump_eq(t->arrived, (k + 1) * t->local_members)) {
+    if (osoe_epoch_bump_eq(&b->arrived, (k + 1) * t->local_members)) {
         if (t->internode) {
             /*
              * §5.3's other half. This node has now arrived for every member of
@@ -67,23 +68,23 @@ static void sync_team(struct osoe_team *t, const char *routine)
              */
             osoe_internode_arrive(t->number, k + 1);
         } else {
-            if (!osoe_epoch_release_bump_eq(t->released, k + 1))
+            if (!osoe_epoch_release_bump_eq(&b->released, k + 1))
                 osoe_fatal("%s epochs diverged at epoch %u: PEs called different numbers "
                            "of collectives", t->name, k + 1);
             /* The single-node release: this thread is the last arriving
              * member, not the node's network, and on the cores this has been
              * measured on the kernel's one-pass wake-all beats the chain
              * (§5.3). The internode release below chains. */
-            osoe_epoch_wake_all(t->released);
+            osoe_epoch_wake_all(&b->released);
         }
     }
     /* Chained exactly when the release comes from the progress thread, which
      * wakes two and leaves the rest to the members (base/epoch.h). */
     if (t->internode)
-        osoe_epoch_wait_eq_chained(t->released, k + 1, routine);
+        osoe_epoch_wait_eq_chained(&b->released, k + 1, routine);
     else
-        osoe_epoch_wait_eq(t->released, k + 1, routine);
-    *t->epoch = k + 1;
+        osoe_epoch_wait_eq(&b->released, k + 1, routine);
+    t->epoch = k + 1;
     /* Publish it: comparing each PE's k against the team's counters is how
      * osoe-stat says which PE has not reached a barrier, the most common real
      * hang (§3.14 question 1). */
@@ -102,20 +103,26 @@ static void sync_team(struct osoe_team *t, const char *routine)
  * equality waits turn that into a hang rather than an error unless it is named
  * here.
  *
- * The team is found by number (team.c), so a team is anything the table holds:
+ * **The team is found by number in the node's block, never by a descriptor**
+ * (node.h): this runs in the node lead's process, which need not belong to
+ * the team - it will not, for a split team whose members are all elsewhere on
+ * the node - and so may hold no descriptor for it. The block's record says
+ * whether the team has an internode phase here, loaded with acquire (§3.16);
  * nothing here, and nothing in the backend, knows how many teams exist.
  */
 void osoe_internode_released(uint32_t team, uint32_t epoch)
 {
-    struct osoe_team *t = osoe_team_numbered(team);
-    if (!t || !t->internode)
+    struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
+    char label[32];
+    if (!b || !atomic_load_explicit(&b->record.published, memory_order_acquire) ||
+        b->record.nodes < 2)
         osoe_fatal("an internode release names team %u, which has no internode phase "
                    "on this node", team);
-    if (!osoe_epoch_release_bump_eq(t->released, epoch))
+    if (!osoe_epoch_release_bump_eq(&b->released, epoch))
         osoe_fatal("the internode release for %s arrived for epoch %u out of order: "
-                   "the PEs of this job called different numbers of collectives", t->name,
-                   epoch);
-    osoe_epoch_release_wake(t->released, epoch);
+                   "the PEs of this job called different numbers of collectives",
+                   osoe_team_label(team, label, sizeof label), epoch);
+    osoe_epoch_release_wake(&b->released, epoch);
 }
 
 /* A sync, timed and recorded, without the quiet. */
@@ -123,7 +130,7 @@ static void team_sync(struct osoe_team *t, const char *routine)
 {
     uint64_t t0 = osoe_now_ns();
     osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
-    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, *t->epoch + 1);
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, t->epoch + 1);
     sync_team(t, routine);
     osoe_blocked_leave();
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
@@ -137,7 +144,7 @@ void osoe_barrier_all(const char *routine)
     uint64_t t0 = osoe_now_ns();
     osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
     struct osoe_team *world = osoe_team_of(routine, SHMEM_TEAM_WORLD);
-    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, osoe.world_epoch + 1);
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, world->epoch + 1);
     osoe_transport_wait(osoe_transport_context_default(), NULL, 0, "shmem_quiet");
     sync_team(world, routine);
     osoe_blocked_leave();
@@ -146,7 +153,7 @@ void osoe_barrier_all(const char *routine)
 
 void osoe_team_barrier(struct osoe_team *t, const char *routine)
 {
-    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, *t->epoch + 1);
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, t->epoch + 1);
     osoe_transport_wait(osoe_transport_context_default(), NULL, 0, "shmem_quiet");
     sync_team(t, routine);
     osoe_blocked_leave();
@@ -164,9 +171,10 @@ void osoe_barrier_finalize(void)
 {
     uint64_t t0 = osoe_now_ns();
     osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
-    osoe_blocked_enter("shmem_finalize", OSOE_BLOCKED_DETAIL_EPOCH, osoe.finalize_epoch + 1);
+    struct osoe_team *finalize = osoe_team_finalize();
+    osoe_blocked_enter("shmem_finalize", OSOE_BLOCKED_DETAIL_EPOCH, finalize->epoch + 1);
     osoe_transport_wait(osoe_transport_context_default(), NULL, 0, "shmem_quiet");
-    sync_team(osoe_team_finalize(), "shmem_finalize");
+    sync_team(finalize, "shmem_finalize");
     osoe_blocked_leave();
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
 }

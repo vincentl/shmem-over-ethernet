@@ -3,11 +3,12 @@
  *
  * One named shared-memory object per node per session,
  * /osoe.<job>.<step>.<node>.<session>, mode 0600, created by the local lead.
- * It holds a versioned header, one slot per local PE, and the world team's
- * epoch counters. Each PE's heap is its own named object,
- * /osoe.<job>.<step>.<node>.<session>.heap.<local id>, whose name the lead
- * removes once every local PE has mapped it. The control segment keeps its
- * name until the last finalize, so it can be read while the job runs.
+ * It holds a versioned header ending in one block per team number, one slot
+ * per local PE, and each PE's published epochs. Each PE's heap is its own
+ * named object, /osoe.<job>.<step>.<node>.<session>.heap.<local id>, whose
+ * name the lead removes once every local PE has mapped it. The control
+ * segment keeps its name until the last finalize, so it can be read while the
+ * job runs.
  *
  * Writers: the lead writes the header before publishing `ready`; each PE writes
  * only its own slot, publishing each step through `phase`. Everything a reader
@@ -26,9 +27,10 @@
 #include "base/epoch.h"
 #include "base/wait-word.h"
 #include "bootstrap.h"
+#include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 17
+#define OSOE_NODE_LAYOUT 18
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -95,10 +97,13 @@ enum osoe_abort_disposition {
 /*
  * The predefined teams, numbered (§7.3, spec §9.4).
  *
- * Both the node header and the progress loop index per-team state by this, so
- * it is one enumeration rather than two agreeing constants. shmem_team_split_*
- * is not implemented, so these are all the teams there are; a split team
- * spanning several nodes is what grows this, and it grows the arrays with it.
+ * A team's number indexes every piece of per-team state - its block in the
+ * node header, its published epoch in each PE's row, its block of the internal
+ * region, the progress thread's and the backends' bookkeeping - and is
+ * job-wide, so every node means the same team by it. The predefined teams take
+ * the first three; teams created by shmem_team_split_* (phase 1 step 7 slice
+ * 2) will take 3 to OSOE_MAX_TEAMS - 1, which is what every per-team array is
+ * sized by (§5.7).
  */
 enum osoe_team_number {
     OSOE_TEAM_WORLD = 0,
@@ -112,7 +117,7 @@ enum osoe_team_number {
      * matched (§6.4; second review, D14). Not a team an application can name.
      */
     OSOE_TEAM_FINALIZE = 2,
-    OSOE_TEAMS,
+    OSOE_PREDEFINED_TEAMS,
 };
 
 /* The routine name in a "blocked in" record (§3.14). Fixed width: it is read
@@ -162,11 +167,11 @@ struct osoe_pe_slot {
     char blocked_routine[OSOE_BLOCKED_ROUTINE_MAX];
     _Atomic uint32_t blocked_detail_kind;   /* enum osoe_blocked_detail; layout 9 */
 
-    /* Liveness and progress, published by this PE (§3.14 question 1). */
+    /* Liveness and progress, published by this PE (§3.14 question 1). Its
+     * epoch count k for each team is published too - since layout 18 in a row
+     * of its own outside this slot, a word per team number
+     * (osoe_node_published_epoch). */
     _Atomic uint64_t sweeps;             /* safety-sweep expiries: a blocked PE still moves */
-    _Atomic uint32_t world_epoch;        /* this PE's k for SHMEM_TEAM_WORLD (§5.4) */
-    _Atomic uint32_t shared_epoch;       /* and for SHMEM_TEAM_SHARED */
-    _Atomic uint32_t finalize_epoch;     /* and for the finalize team (layout 10) */
 
     /*
      * Threads of this PE that found no free counter block (§3.14). It belongs
@@ -244,10 +249,27 @@ struct osoe_segment_directory {
     uint64_t connections_bytes;
     uint32_t connection_bytes;       /* one record */
     uint32_t connection_count;       /* nodes - 1 */
+
+    /*
+     * Appended at layout 18 (§5.7; phase 1 step 7): one block per team number,
+     * OSOE_MAX_TEAMS of them - the node header's own tail, so `header_bytes`
+     * covers them and a node-scope metric can name a predefined team's field -
+     * and each local PE's published epochs, a row per PE of one 32-bit word
+     * per team number (OSOE_MSCOPE_EPOCHS), each row padded to a cache line.
+     */
+    uint64_t teams_offset;
+    uint64_t teams_bytes;
+    uint32_t team_bytes;             /* one block */
+    uint32_t team_count;             /* OSOE_MAX_TEAMS */
+    uint64_t epochs_offset;
+    uint64_t epochs_bytes;
+    uint32_t epoch_row_bytes;        /* one PE's row */
+    uint32_t epoch_row_count;        /* local_count */
 };
 
 /*
- * The internode arrival handoff, one per predefined team (§5.3, §3.12).
+ * The internode arrival handoff, one per team number, in its block (§5.3,
+ * §3.12).
  *
  * Whichever local member's increment reaches the team's arrival target leaves
  * the epoch here and bumps the local lead's `agent_wake`; that agent consumes
@@ -276,10 +298,10 @@ struct osoe_segment_directory {
  * every other node, which is the worst place to debug it.
  *
  * A team with no internode phase never touches its entry. SHMEM_TEAM_SHARED is
- * one node by definition, so today only the world team's is ever written; it is
- * per team anyway, because a split team (§7.3) spanning several nodes is the
- * next thing to arrive and sharing one word between two teams would make a sync
- * on one forward the arrival of the other.
+ * one node by definition, so today only the world and finalize teams' are ever
+ * written; it is per team anyway, because a split team (§7.3) spanning several
+ * nodes is the next thing to arrive and sharing one word between two teams
+ * would make a sync on one forward the arrival of the other.
  */
 struct osoe_arrival_handoff {
     /*
@@ -401,6 +423,85 @@ struct osoe_collective_state {
     _Atomic uint32_t fanout;
 };
 
+/*
+ * A team's record on this node (layout 18; phase 1 step 7): what this node's
+ * progress thread and internode backend need of a team they may hold no
+ * descriptor for. When split teams exist, the node lead's process - where the
+ * progress thread runs - need not belong to a team at all, so it learns the
+ * team here, by number, and never from a private descriptor.
+ *
+ * Its content is §5.2's accounting as the node sees it: the team's members on
+ * this node, and this node's place in the team's internode tree - O(k), the
+ * part of the node set the tree keeps. Each neighbour node is named by its
+ * lead's rank - for the predefined teams the rank at its local id 0 - which the
+ * generic internode phase puts to, and from which the progress thread finds
+ * the node numbers its messages go to.
+ *
+ * Written once, fields first and then `published` with a release store; a
+ * reader loads `published` with acquire and reads the rest only once it is 1
+ * (§3.16's single-writer publication). Never rewritten: a team number is not
+ * reused within a session (§5.7), so neither is its record. A team of one -
+ * SHMEM_TEAM_SHARED under force-remote - has none, since it touches nothing of
+ * the node's. More than one cache line: the children's ranks alone are 128
+ * bytes at the largest fan-out.
+ *
+ * **Who sees it, and why** (§3.16). The predefined teams' records are written
+ * by this node's lead in osoe_team_start (team.c), in every session, before
+ * two things: its agent's start, which orders them before everything that
+ * thread does; and its release store to `lead_agent_running`, which every other
+ * local PE loads with acquire before it returns from shmem_init (init.c). So
+ * every PE finds them published, in any process and on any thread that runs
+ * after its init, whether it reads its team's record on the arrival path
+ * (osoe_internode_arrive) or as a lead in a data collective
+ * (internode-generic.c). The arrival counter carries them as well: the lead is
+ * a member of every predefined team, and the member that posts an arrival
+ * reads, with its own seq_cst add, a value in the release sequence of the
+ * lead's add, which the lead made after writing them. A record a split writes
+ * (slice 2) is written by the team's local lead while every process runs, and
+ * needs its own argument: the split's sync over the parent team, which no
+ * member leaves before every record of the new team is published.
+ */
+struct osoe_team_record {
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint32_t published;     /* 0 until the record is written, then 1 */
+    uint32_t local_members;         /* the team's members on this node (§5.2) */
+    uint32_t nodes;                 /* the nodes it spans: 1 is no internode phase */
+    uint32_t index;                 /* this node's position in its sorted node set */
+    /* The parent node's lead's rank - for the predefined teams the rank at its
+     * local id 0 - or UINT32_MAX at the root. */
+    uint32_t parent;
+    uint32_t position;              /* this node among its parent's children */
+    uint32_t children;              /* how many of `child` there are */
+    char name[16];                  /* in metric names: world, shared, finalize, a number */
+    /* Each child node's lead's rank - for the predefined teams the rank at its
+     * local id 0 - in the order of the children's positions. */
+    uint32_t child[OSOE_COLLECTIVE_FANOUT_MAX];
+};
+
+/*
+ * Everything a node keeps per team number (layout 18; §5.3, §5.4, §5.7): the
+ * header ends with OSOE_MAX_TEAMS of these, indexed by the team's number
+ * (osoe_node_team), so a team created later needs no storage of its own and
+ * no team's state shares a cache line with another's.
+ *
+ * - **§5.4's three epoch counters**, each alone on its line. SHMEM_TEAM_SHARED
+ *   has its own although on one node its membership is the world's: the spec
+ *   makes them distinct predefined teams forming separate atomicity domains,
+ *   and sharing the counters would make a sync on one team release a wait on
+ *   the other. The finalize team never uses `copied`: it has no copy phase.
+ * - **The arrival handoff** (§5.3), to the node lead's agent.
+ * - **The tree's published state** (§3.14), which that agent writes.
+ * - **The record** above.
+ */
+struct osoe_team_block {
+    struct osoe_epoch arrived;
+    struct osoe_epoch released;
+    struct osoe_epoch copied;
+    struct osoe_arrival_handoff arrival;
+    struct osoe_collective_state tree;
+    struct osoe_team_record record;
+};
+
 struct osoe_node_header {
     /* Written by the lead before `ready`; constant afterwards. */
     struct osoe_segment_directory dir;
@@ -432,30 +533,11 @@ struct osoe_node_header {
     _Alignas(OSOE_CACHELINE)
     _Atomic uint64_t aborting;
 
-    /*
-     * Each predefined team's epoch counters (§5.4), each on its own line.
-     * SHMEM_TEAM_SHARED has its own set although on one node its membership is
-     * the world's: the spec makes them distinct predefined teams forming
-     * separate atomicity domains, and sharing the counters would make a sync on
-     * one team release a wait on the other.
-     */
-    struct osoe_epoch world_arrived;
-    struct osoe_epoch world_released;
-    struct osoe_epoch world_copied;
-    struct osoe_epoch shared_arrived;
-    struct osoe_epoch shared_released;
-    struct osoe_epoch shared_copied;
-    /* The finalize team's (layout 10). It has no copy phase. */
-    struct osoe_epoch finalize_arrived;
-    struct osoe_epoch finalize_released;
-
-    /* Appended at layout 7 (§5.3). */
-    struct osoe_arrival_handoff arrival[OSOE_TEAMS];
-
     /* Appended at layout 8; layout 11 appended passes and send_visits to it,
      * and layout 13 the ring's six counters, which moved nothing before it
-     * (what follows moved, and is found by name). Layout 10 added the finalize team's counters above
-     * and grew `arrival` by one, which moved this record; readers find it by
+     * (what follows moved, and is found by name). Layout 18 moved every
+     * team's epoch counters and arrival handoff from before this record into
+     * the team blocks at the header's end, which moved it; readers find it by
      * name. Layout 9 added blocked_detail_kind to the PE slot,
      * which moved no header field. Layout 8 also gave each epoch counter's line a
      * second word, released_at_ns (base/epoch.h), in padding it already owned:
@@ -469,7 +551,6 @@ struct osoe_node_header {
      * Written by the lead before `ready`, constant afterwards.
      */
     char hostname[64];
-    struct osoe_collective_state collective[OSOE_TEAMS];
 
     /*
      * Appended at layout 16: each PE's landing zone also holds its nonblocking
@@ -484,6 +565,29 @@ struct osoe_node_header {
     uint32_t landing_requests_offset;
     uint32_t landing_arena_offset;
     uint32_t landing_arena_bytes;
+
+    /*
+     * Layout 18: one past the highest team number whose record on this node is
+     * published, or 0 before the first. What bounds the node lead agent's scan
+     * of the arrival handoffs (internode-am.c), so that a pass costs the teams
+     * created and not OSOE_MAX_TEAMS: numbers are never reused (§5.7), and a
+     * node's are published in no particular order, so it is a high-water mark,
+     * raised by each record's writer after its `published` and never lowered -
+     * a compare-and-swap that only raises it, since the writers of slice 2's
+     * records are the teams' local leads, in any process of the node. Raised as
+     * part of writing the record, so the record's argument for who sees it
+     * covers it too. On its own line: every pass of the agent loads it.
+     */
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t team_numbers_published;
+
+    /*
+     * Layout 18: one block per team number, `dir.team_count` of them
+     * (OSOE_MAX_TEAMS), which end the header - `dir.header_bytes` counts them,
+     * so the node scope of the metric table reaches the predefined teams'
+     * fields by the names they had when the header held them (§3.14). Found
+     * with osoe_node_team.
+     */
+    struct osoe_team_block team[];
 };
 
 /*
@@ -648,7 +752,30 @@ struct osoe_node {
      * one node (§3.14's connection scope). */
     struct osoe_am_connection_metrics *connection_metrics;
     uint32_t connection_count;
+    /* The header's team blocks, one per team number (OSOE_MAX_TEAMS), and
+     * each local PE's row of published epochs, `epoch_row_words` long. */
+    uint32_t team_count;
+    _Atomic uint32_t *epochs;
+    uint32_t epoch_row_words;
 };
+
+/* The node's block for team number `team`, or NULL past the last (§5.7). */
+static inline struct osoe_team_block *osoe_node_team(const struct osoe_node *n, uint32_t team)
+{
+    return team < n->team_count ? &n->hdr->team[team] : NULL;
+}
+
+/*
+ * Where local PE `local_id` publishes its epoch count k for team `team` (§5.4),
+ * which osoe-stat compares against the team's counters to say which PE has not
+ * reached a collective (§3.14). One word of that PE's row, which only it
+ * writes; the rows are padded to a cache line, so no two PEs share one.
+ */
+static inline _Atomic uint32_t *osoe_node_published_epoch(const struct osoe_node *n,
+                                                          uint32_t local_id, uint32_t team)
+{
+    return &n->epochs[(size_t)local_id * n->epoch_row_words + team];
+}
 
 /* This node's landing slot for a local PE: the start of its zone. The zone is
  * not a fixed-size type - its payloads are sized at run time - so it is indexed

@@ -5,10 +5,14 @@
  * moves - the tree's per-team state and the per-connection queues - is private
  * to that thread, in the lead's process, and the arriver is an application
  * thread of any local PE. So osoe_internode_arrive only leaves the epoch in the
- * team's handoff word of the node header and wakes the lead; the agent takes it
- * on its next pass (osoe_internode_am_take_arrivals, called from the engine's
- * pass) and hands it to the engine. That is §3.12's "a flag plus a futex wake",
- * and the whole of what crosses between processes here.
+ * handoff word of the team's block in the node header and wakes the lead; the
+ * agent takes it on its next pass (osoe_internode_am_take_arrivals, called from
+ * the engine's pass) and hands it to the engine. That is §3.12's "a flag plus a
+ * futex wake", and the whole of what crosses between processes here.
+ *
+ * A team reaches this backend as its record in the same block (node.h): the
+ * engine reads it the first time it meets the team, through its host
+ * (progress-host.c), and the generic data half likewise (internode-generic.c).
  *
  * The data half - reductions and broadcast - AM hands whole to the generic
  * implementation (internode-generic.h), whose puts and adds are AM's own
@@ -23,10 +27,10 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "am-state.h"
 #include "base/futex.h"
-#include "collective-tree.h"
 #include "fatal.h"
 #include "internode.h"
 #include "internode-generic.h"
@@ -36,14 +40,13 @@
 #include "state.h"
 
 /*
- * The epoch this agent has already taken out of each team's handoff word.
- * Private to the agent thread: nothing else reads or writes it, which is the
- * whole point of the word it shadows.
+ * The epoch this agent has already taken out of each team's handoff word, one
+ * per team number (OSOE_MAX_TEAMS), allocated at init. Private to the agent
+ * thread: nothing else reads or writes it, which is the whole point of the
+ * word it shadows.
  */
-static uint32_t consumed[OSOE_TEAMS];
-
-/* Which teams have an internode phase on this node (osoe_internode_team). */
-static bool registered[OSOE_TEAMS];
+static uint32_t *consumed;
+static uint32_t consumed_count;
 
 /*
  * 4 for AM over Ethernet: h/o is about 4 on a server's TCP (h ~ 20 us one way,
@@ -57,46 +60,37 @@ uint32_t osoe_internode_fanout_default(void)
 
 void osoe_internode_init(void)
 {
-    for (uint32_t team = 0; team < OSOE_TEAMS; team++) {
-        consumed[team] = 0;
-        registered[team] = false;
-    }
+    consumed_count = osoe.bootstrap.max_teams;
+    consumed = calloc(consumed_count, sizeof *consumed);
+    if (!consumed)
+        osoe_fatal("out of memory for %u teams' arrivals", consumed_count);
     osoe_internode_generic_init();
 }
 
 void osoe_internode_fini(void)
 {
-}
-
-void osoe_internode_team(uint32_t team, const uint32_t *nodes, uint32_t count)
-{
-    if (team >= OSOE_TEAMS)
-        osoe_fatal("team %u has an internode phase, and this build has %u teams", team,
-                   OSOE_TEAMS);
-    if (count < 2)
-        osoe_fatal("team %u registered an internode phase over %u node", team, count);
-    /*
-     * The k-ary tree over the node set's index (§5.3, collective-tree.h), with
-     * the fan-out every lead agreed on at the job rendezvous (§6.2). Every PE
-     * computes it, so a node set the tree cannot be built from is refused on
-     * all of them; only the lead's engine keeps it, and it is not running yet.
-     */
-    struct osoe_collective_tree tree;
-    if (!osoe_collective_tree(nodes, count, osoe.job.node, osoe.bootstrap.collective_fanout,
-                              &tree))
-        osoe_fatal("team %u's internode node set (%u nodes) is not sorted, repeats a node, "
-                   "or leaves out node %u, which holds members", team, count, osoe.job.node);
-    registered[team] = true;
-    if (osoe_am.internode && osoe_am.lead)
-        osoe_progress_team(&osoe_am.progress, team, &tree);
-    osoe_internode_generic_team(team, nodes, count);
+    osoe_internode_generic_fini();
+    free(consumed);
+    consumed = NULL;
+    consumed_count = 0;
 }
 
 void osoe_internode_arrive(uint32_t team, uint32_t epoch)
 {
-    if (team >= OSOE_TEAMS || !registered[team])
-        osoe_fatal("team %u arrived at an internode phase it never registered", team);
-    struct osoe_arrival_handoff *h = &osoe.node.hdr->arrival[team];
+    /* Only a team whose record here says it spans nodes posts. The record is
+     * loaded as it was published, with acquire (§3.16), and this member finds
+     * it published whichever process it is: the node's lead wrote the
+     * predefined teams' records before its release store to
+     * lead_agent_running, which this PE loaded with acquire before its
+     * shmem_init returned (init.c), and the arrival counter's release sequence
+     * carries them too (node.h, the record). Slice 2 argues a split team's
+     * through the parent team's sync. */
+    struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
+    if (!b || !atomic_load_explicit(&b->record.published, memory_order_acquire) ||
+        b->record.nodes < 2)
+        osoe_fatal("team %u arrived at an internode phase it has no record of on this node",
+                   team);
+    struct osoe_arrival_handoff *h = &b->arrival;
     /*
      * A single-writer publication store (§3.16): only one member posts per
      * epoch, and the release of the previous epoch orders it after the last
@@ -125,16 +119,31 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
  * docs/design/evidence/am-backend/arrival_model.py, where the whole job hangs
  * and every other node is the one that looks stuck.
  *
- * O(T) per pass, T the build's team count, and it touches only this node's own
- * header - never a connection.
+ * A word per team number, each on its own line of the node's own header -
+ * never a connection - but only below `team_numbers_published`, one past the
+ * highest number whose record on this node is published (node.h): numbers are
+ * never reused, so a pass costs O(teams created), three in phase 1 step 7's
+ * first slice, and not OSOE_MAX_TEAMS. A team is met here, and learnt from its
+ * record, at its first post; a word that has not moved is skipped at once, and
+ * a team that has no internode phase never posts.
+ *
+ * The bound is loaded with acquire, once a pass, after the agent's load of its
+ * wake word and before the handoff words, and it misses no post: a member posts
+ * only once its team's record is published and the bound raised past it (the
+ * record's argument, node.h), and then bumps the lead's wake word. An agent
+ * whose load of that word read the bump sees the raised bound; one whose load
+ * came before it finds the wait's compare fail and passes again - the rule
+ * that makes the handoff sound already (§5.3).
  */
 bool osoe_internode_am_take_arrivals(void)
 {
     bool moved = false;
-    for (uint32_t team = 0; team < OSOE_TEAMS; team++) {
-        if (!registered[team])
-            continue;
-        uint32_t epoch = atomic_load_explicit(&osoe.node.hdr->arrival[team].epoch,
+    uint32_t count = atomic_load_explicit(&osoe.node.hdr->team_numbers_published,
+                                          memory_order_acquire);
+    if (count > consumed_count)
+        count = consumed_count;
+    for (uint32_t team = 0; team < count; team++) {
+        uint32_t epoch = atomic_load_explicit(&osoe_node_team(&osoe.node, team)->arrival.epoch,
                                               memory_order_acquire);
         if (epoch == consumed[team])
             continue;

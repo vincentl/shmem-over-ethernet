@@ -33,9 +33,10 @@
  * appended, and never otherwise.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 160,
+_Static_assert(sizeof(struct osoe_segment_directory) == 208,
                "frozen by §3.14: append only. 136 at layouts 6 and 7; 160 at layout 12, "
-               "with the connections section");
+               "with the connections section; 208 at layout 18, with the team blocks and "
+               "the published epochs");
 
 /*
  * Candidate heap bases, tried in order by the lead; the first where its own
@@ -496,7 +497,16 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint32_t metrics_count;
     const struct osoe_metric_descriptor *metrics = osoe_metrics_table(&metrics_count);
 
-    uint64_t slots_offset = align_up(sizeof(struct osoe_node_header));
+    /*
+     * The header ends with one block per team number (layout 18, §5.7):
+     * OSOE_MAX_TEAMS of them, about 900 bytes each with 128-byte lines, so 28
+     * KiB of the segment at the default of 32 and under a megabyte at the most.
+     * Sized by the count every node agreed, never by the teams that exist.
+     */
+    uint64_t teams_offset = offsetof(struct osoe_node_header, team);
+    uint64_t teams_bytes = (uint64_t)b->max_teams * sizeof(struct osoe_team_block);
+    uint64_t header_bytes = teams_offset + teams_bytes;
+    uint64_t slots_offset = align_up(header_bytes);
     uint64_t metrics_offset =
         align_up(slots_offset + (uint64_t)b->local_count * sizeof(struct osoe_pe_slot));
     uint64_t metrics_bytes = (uint64_t)metrics_count * sizeof *metrics;
@@ -532,7 +542,17 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint64_t connections_offset = align_up(landing_offset + landing_bytes);
     uint64_t connection_count = b->node_count > 1 ? b->node_count - 1 : 0;
     uint64_t connections_bytes = connection_count * sizeof(struct osoe_am_connection_metrics);
-    n->control_bytes = page_round(connections_offset + connections_bytes);
+
+    /*
+     * Each local PE's published epochs (layout 18, §5.4): a row per PE of one
+     * word per team number, indexed [local id][team], each row padded to a
+     * cache line so that a PE publishing its count after every collective
+     * shares no line with another. 128 bytes a PE at the default.
+     */
+    uint64_t epoch_row_bytes = align_up((uint64_t)b->max_teams * sizeof(uint32_t));
+    uint64_t epochs_offset = align_up(connections_offset + connections_bytes);
+    uint64_t epochs_bytes = (uint64_t)b->local_count * epoch_row_bytes;
+    n->control_bytes = page_round(epochs_offset + epochs_bytes);
 
     /*
      * The node's whole request, checked once and before any of it exists: this
@@ -584,7 +604,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     struct osoe_node_header *h = n->hdr;
     h->dir.magic = OSOE_NODE_MAGIC;
     h->dir.layout = OSOE_NODE_LAYOUT;
-    h->dir.header_bytes = sizeof *h;
+    h->dir.header_bytes = (uint32_t)header_bytes;
     h->dir.segment_bytes = n->control_bytes;
     h->job = b->job;
     h->step = b->step;
@@ -612,6 +632,14 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->dir.connections_bytes = connections_bytes;
     h->dir.connection_bytes = (uint32_t)sizeof(struct osoe_am_connection_metrics);
     h->dir.connection_count = (uint32_t)connection_count;
+    h->dir.teams_offset = teams_offset;
+    h->dir.teams_bytes = teams_bytes;
+    h->dir.team_bytes = (uint32_t)sizeof(struct osoe_team_block);
+    h->dir.team_count = b->max_teams;
+    h->dir.epochs_offset = epochs_offset;
+    h->dir.epochs_bytes = epochs_bytes;
+    h->dir.epoch_row_bytes = (uint32_t)epoch_row_bytes;
+    h->dir.epoch_row_count = b->local_count;
     h->dir.block_bytes = (uint32_t)sizeof(struct osoe_counter_block);
     memcpy((char *)p + metrics_offset, metrics, metrics_bytes);
     n->blocks = (struct osoe_counter_block *)((char *)p + blocks_offset);
@@ -630,6 +658,9 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     n->connection_metrics = connection_count
         ? (struct osoe_am_connection_metrics *)((char *)p + connections_offset) : NULL;
     n->connection_count = (uint32_t)connection_count;
+    n->team_count = b->max_teams;
+    n->epochs = (_Atomic uint32_t *)((char *)p + epochs_offset);
+    n->epoch_row_words = (uint32_t)(epoch_row_bytes / sizeof(uint32_t));
     /*
      * Which machine this logical node is on (§3.14): the node numbers a
      * hung collective names are logical, and a walk down the tree needs the
@@ -639,14 +670,13 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     if (gethostname(h->hostname, sizeof h->hostname) != 0)
         snprintf(h->hostname, sizeof h->hostname, "unknown");
     h->hostname[sizeof h->hostname - 1] = '\0';
-    osoe_epoch_init(&h->world_arrived);
-    osoe_epoch_init(&h->world_released);
-    osoe_epoch_init(&h->world_copied);
-    osoe_epoch_init(&h->shared_arrived);
-    osoe_epoch_init(&h->shared_released);
-    osoe_epoch_init(&h->shared_copied);
-    osoe_epoch_init(&h->finalize_arrived);
-    osoe_epoch_init(&h->finalize_released);
+    /* Every team's counters, whether or not its number is ever used: the rest
+     * of each block, its handoff, tree state and record, is zero as it is. */
+    for (uint32_t t = 0; t < b->max_teams; t++) {
+        osoe_epoch_init(&h->team[t].arrived);
+        osoe_epoch_init(&h->team[t].released);
+        osoe_epoch_init(&h->team[t].copied);
+    }
 }
 
 /* A non-lead opens the control segment by name, waiting for the lead to
@@ -711,10 +741,24 @@ again:;
     }
 
     struct osoe_node_header *h = n->hdr;
+    uint64_t header_bytes = offsetof(struct osoe_node_header, team) +
+                            (uint64_t)h->dir.team_count * sizeof(struct osoe_team_block);
     if (h->dir.magic != OSOE_NODE_MAGIC || h->dir.layout != OSOE_NODE_LAYOUT ||
-        h->dir.header_bytes != sizeof *h || h->dir.slot_bytes != sizeof(struct osoe_pe_slot))
+        h->dir.header_bytes != header_bytes || h->dir.slot_bytes != sizeof(struct osoe_pe_slot) ||
+        h->dir.team_bytes != sizeof(struct osoe_team_block) ||
+        h->dir.teams_offset != offsetof(struct osoe_node_header, team))
         osoe_fatal("control segment %s has layout %u; this library expects %u (mixed "
                    "library versions?)", n->control_name, h->dir.layout, OSOE_NODE_LAYOUT);
+    /* The lead sized the team blocks, the published epochs and every PE's
+     * internal region by its own OSOE_MAX_TEAMS, and this PE would index them
+     * by its own: the rendezvous agrees the count between nodes (§6.2), and
+     * this between a node's PEs, as check_agreement does the heap's size. */
+    if (h->dir.team_count != b->max_teams) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_MAX_TEAMS differs between PEs: the local lead has %u, "
+                 "this PE has %u (§5.7)", h->dir.team_count, b->max_teams);
+        fail_rendezvous(n, msg);
+    }
     if (h->job != b->job || h->step != b->step || h->node != b->node ||
         h->session != session || h->dir.local_count != b->local_count ||
         h->world_size != b->world_size)
@@ -725,7 +769,12 @@ again:;
     if (h->dir.slots_offset + (uint64_t)h->dir.local_count * h->dir.slot_bytes > n->control_bytes ||
         h->dir.blocks_offset + h->dir.blocks_bytes > n->control_bytes ||
         h->dir.connections_offset + h->dir.connections_bytes > n->control_bytes ||
-        h->dir.metrics_offset + h->dir.metrics_bytes > n->control_bytes)
+        h->dir.metrics_offset + h->dir.metrics_bytes > n->control_bytes ||
+        header_bytes > n->control_bytes ||
+        h->dir.epoch_row_bytes < (uint64_t)h->dir.team_count * sizeof(uint32_t) ||
+        h->dir.epoch_row_count != h->dir.local_count ||
+        h->dir.epochs_offset + (uint64_t)h->dir.epoch_row_count * h->dir.epoch_row_bytes >
+            n->control_bytes)
         osoe_fatal("control segment %s is too small for its own directory",
                    n->control_name);
     n->slots = (struct osoe_pe_slot *)((char *)n->hdr + h->dir.slots_offset);
@@ -744,6 +793,9 @@ again:;
         ? (struct osoe_am_connection_metrics *)((char *)n->hdr + h->dir.connections_offset)
         : NULL;
     n->connection_count = h->dir.connection_count;
+    n->team_count = h->dir.team_count;
+    n->epochs = (_Atomic uint32_t *)((char *)n->hdr + h->dir.epochs_offset);
+    n->epoch_row_words = h->dir.epoch_row_bytes / (uint32_t)sizeof(uint32_t);
 
     /* The metric table is fixed for a build, so a mismatch is a mixed-library
      * job that the layout check above did not catch (§3.13's argument for
@@ -825,7 +877,8 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     /* The heap, then OSOE_REGION_INTERNAL, in one object (internal-region.h):
      * the allocator is given heap_size and never reaches the tail. */
     n->internal_offset = page_round(b->symmetric_size ? b->symmetric_size : 1);
-    n->internal_bytes = page_round(osoe_internal_region_bytes(b->collective_fanout));
+    n->internal_bytes = page_round(osoe_internal_region_bytes(b->collective_fanout,
+                                                              b->max_teams));
     n->heap_bytes = n->internal_offset + n->internal_bytes;
     n->heap_of = calloc(b->local_count, sizeof *n->heap_of);
     if (!n->heap_of)
@@ -1043,5 +1096,7 @@ void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)
     n->slots = NULL;
     n->blocks = NULL;
     n->landing = NULL;
+    n->epochs = NULL;
+    n->team_count = 0;
     n->control_name[0] = '\0';
 }

@@ -20,12 +20,16 @@
  * needs a place to do it that is not the SHMEM layer's own files.
  *
  * **Addressing is by team and epoch, never by node or PE.** The SHMEM layer
- * owns teams (§5.2); it tells the backend once, at team creation, which nodes
- * take part, and from then on names the team only. What a backend does with
- * the node set - which node its trees are rooted at, who forwards to whom - is
- * its own business and does not cross this header; the one exception is a
- * broadcast's root, which the data half names by its node's position in the
- * registered set, since the data starts there.
+ * owns teams (§5.2). At a team's creation it writes the team's record into each
+ * member node's block for the team's number (node.h): the team's members on
+ * that node, and the node's place in §5.3's k-ary tree over the team's nodes -
+ * its parent's and children's local leads, O(k) - published before the team's
+ * first arrival anywhere. From then on it names the team by number only, and a
+ * backend learns the team from the record the first time it meets it, on
+ * whichever thread that is: in the node lead's process, where the progress
+ * thread runs, there may be no descriptor for the team at all. The one other
+ * thing that crosses is a broadcast's root, which the data half names by its
+ * node's position in the team's node set, since the data starts there.
  *
  * **The release is an upcall.** The backend calls osoe_internode_released when
  * the group has been released, on its own thread; the SHMEM layer advances its
@@ -38,10 +42,10 @@
  * returns, and the caller then waits on its own team's counter like every other
  * member. osoe_internode_released is called by the backend on the node's
  * progress thread (§3.12), in whichever local process runs it, exactly once per
- * (team, epoch) on every participating node. osoe_internode_team is called
- * during initialization, before the progress thread starts (below). The data
- * half, osoe_internode_reduce and osoe_internode_broadcast, is called by the
- * team's local lead on its own application thread, and blocks.
+ * (team, epoch) on every participating node. The data half,
+ * osoe_internode_reduce, osoe_internode_broadcast and osoe_internode_collect,
+ * is called by the team's local lead on its own application thread, and
+ * blocks.
  *
  * Errors, and waiting. As transport.h: there is no error return, and a failure
  * ends the job (§3.15). The barrier's half never blocks, so it never sweeps;
@@ -104,9 +108,10 @@
  *
  * What an RDMA backend does with each call (§4.10's discipline: say it, so the
  * interface is checked against more than the one backend it has):
- *   - osoe_internode_team: computes the same k-ary tree over the node set, and
- *     registers (or reuses) a small per-team slab of counters on each node
- *     that its tree neighbours write with RDMA atomics.
+ *   - a team's record: read the first time the team is met, like AM's, with
+ *     its tree neighbours' leads the ranks whose per-team slab of counters -
+ *     the internal region's block for the team's number, registered with the
+ *     heap - its RDMA atomics write.
  *   - osoe_internode_arrive: once the node has arrived and its children's
  *     counters show theirs, an RDMA fetch-add on the parent's counter - the
  *     tree built out of put and atomics, with the progress thread (or a NIC
@@ -140,7 +145,8 @@
 
 /*
  * Called once per session by the first shmem_init, after osoe_transport_init
- * and before any team is registered or the node's progress thread starts; and
+ * and before any team's record is written or the node's progress thread
+ * starts; and
  * by the last shmem_finalize after that thread has been joined and before
  * osoe_transport_fini. A backend that carries its messages over the transport's
  * own engine, as AM's does, relies on that bracket: the engine exists for the
@@ -165,39 +171,30 @@ uint32_t osoe_internode_fanout_default(void);
 /* ---- Teams ------------------------------------------------------------ */
 
 /*
- * The node set a team's internode phase spans (§5.2): the logical nodes holding
- * at least one member, sorted ascending, with no repeats, and including this
- * node. `count` is at least 2 - a team on one node has no internode phase and
- * is never registered.
+ * There is no call. A team reaches the backend as its record in each member
+ * node's block for its number (node.h), which the SHMEM layer writes and
+ * publishes with a release store, and a backend reads with an acquire load
+ * the first time it meets the team - its first arrival, a peer's message
+ * naming it, or its first data collective. Phase 1 step 7 replaced a call
+ * made on every local PE at the team's creation: a team created while the
+ * progress thread runs must be learnt by that thread, in a process that may
+ * hold no descriptor for it, and a record in shared memory is what it can read
+ * there.
  *
- * Called on every local PE of every participating node with identical
- * arguments, as a consequence of team creation being collective - never by
- * coordination (the same rule §4.10 gives osoe_transport_set_range). A backend
- * keeps what it needs once per node and ignores the repeats.
- *
- * For the predefined teams this runs during shmem_init, after
- * osoe_transport_init and before the node's progress thread starts, so the
- * thread that will carry the team's arrivals never races it. A split team
- * (§7.3) will register from inside the split's own collective, while that
- * thread runs; when it arrives, the call must be ordered before the team's
- * first arrival reaches the backend, which on AM means carrying it through the
- * same handoff an arrival takes (§5.3). No split team exists yet.
- *
- * The array is only read during the call. A backend must not keep it: the node
- * set is O(N), and what a tree with a fixed root needs from it is O(fan-out)
- * (§5.3). A broadcast re-rooted at every call needs node positions the set
- * gives: the world team's are the node numbers, and a split team's will need
- * the set, or a way to search it, kept (§7.3).
+ * The record keeps O(k) of the team's node set - the logical nodes holding at
+ * least one member, sorted - and never the O(N) set itself (§5.3). A broadcast
+ * re-rooted at every call needs node positions the set gives: a team spanning
+ * every node's are the node numbers, and a split team's will need the set, or
+ * a way to search it, kept (§7.3).
  */
-void osoe_internode_team(uint32_t team, const uint32_t *nodes, uint32_t count);
 
 /* ---- The phase itself ------------------------------------------------- */
 
 /*
  * Down: this node has arrived for (team, epoch) - every local member of the
  * team is in (§5.3). Called by whichever member's increment reached the team's
- * arrival target, once per node per epoch, and never for a team that was not
- * registered. Does not block.
+ * arrival target, once per node per epoch, and never for a team whose record
+ * on this node says it has no internode phase. Does not block.
  *
  * Epochs are the team's §5.4 epoch count, k + 1 for the k-th collective on the
  * team: increasing, but not consecutive, since the data half below numbers its
@@ -272,8 +269,8 @@ void osoe_internode_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t c
 /*
  * The internode phase of a broadcast: on return every participating node's
  * `buffer` holds the `bytes` the root's node held on entry. `root_index` is the
- * root's node's position in the node set the team was registered with
- * (osoe_internode_team) - addressing stays by team. On other nodes `buffer`'s
+ * root's node's position in the team's sorted node set - addressing stays by
+ * team. On other nodes `buffer`'s
  * contents on entry are not read; on the root's node `buffer` is only read,
  * never written - it may be the root's own source, when a deprecated broadcast
  * leaves the root's dest alone (collectives.c). Called as osoe_internode_reduce

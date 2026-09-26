@@ -81,6 +81,19 @@ struct osoe_segment_directory {
     uint64_t connections_bytes;
     uint32_t connection_bytes;
     uint32_t connection_count;
+
+    /* Appended at layout 18: one block per team number, the team scope's
+     * records - the node header's own tail, so the node record holds them
+     * too - and each local PE's row of published epochs, the epochs scope's.
+     * A reader built before them asks and finds them absent. */
+    uint64_t teams_offset;
+    uint64_t teams_bytes;
+    uint32_t team_bytes;
+    uint32_t team_count;
+    uint64_t epochs_offset;
+    uint64_t epochs_bytes;
+    uint32_t epoch_row_bytes;
+    uint32_t epoch_row_count;
 };
 
 /*
@@ -130,6 +143,11 @@ enum osoe_metric_scope {
     OSOE_MSCOPE_PE,
     OSOE_MSCOPE_THREAD,
     OSOE_MSCOPE_CONNECTION,
+    /* Layout 18: a team number's block, the index being the number; and a
+     * local PE's row of published epochs, a 32-bit word per team number, the
+     * index being the local id and the offset four times the team's number. */
+    OSOE_MSCOPE_TEAM,
+    OSOE_MSCOPE_EPOCHS,
 };
 
 /* ---- An opened segment --------------------------------------------- */
@@ -159,6 +177,10 @@ struct osoe_segment {
      * end of the segment. Zero on a job of one node, and on any segment
      * written before layout 12. */
     uint32_t connection_count;
+    /* And the team blocks and the rows of published epochs (layout 18): zero
+     * on any segment written before it. */
+    uint32_t team_count;
+    uint32_t epoch_row_count;
 };
 
 /*
@@ -216,12 +238,18 @@ void osoe_segment_close(struct osoe_segment *s);
  *   17  each PE's symmetric statics (§4.3): pe.statics_bytes and
  *       pe.statics_name in its slot, after pe.heap_name; and the watch word's
  *       region 2, OSOE_REGION_STATICS
+ *   18  one block per team number ending the header, the team scope's
+ *       records, where each team's counters, handoff and tree state went -
+ *       the predefined teams' still named in the node scope too - with a
+ *       record of the team on this node; each PE's epochs moved from its slot
+ *       to a row of its own, the epochs scope; the directory grew 160 -> 208
+ *       bytes to say where both are
  *
- * None of 5 to 17 changed the watch word's encoding; 17 gave it a region value
+ * None of 5 to 18 changed the watch word's encoding; 17 gave it a region value
  * it could already carry.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               17
+#define OSOE_SEGMENT_NEWEST_LAYOUT               18
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is
@@ -241,8 +269,9 @@ const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segme
 
 /*
  * Load a numeric metric with acquire. `index` selects the record within the
- * metric's scope: ignored for NODE, the local PE id for PE, the block number
- * for THREAD. I32 metrics are sign-extended into the uint64_t.
+ * metric's scope: ignored for NODE, the local PE id for PE and EPOCHS, the
+ * block number for THREAD, the peer slot for CONNECTION and the team's number
+ * for TEAM. I32 metrics are sign-extended into the uint64_t.
  *
  * False when the metric is absent, is a string, is misaligned for its width, or
  * would read outside its record or the mapping - so a malformed segment is

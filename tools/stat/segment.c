@@ -35,8 +35,9 @@
  * rather than the job.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 160,
-               "frozen by §3.14: append only. 136 at layout 6; 160 at layout 12");
+_Static_assert(sizeof(struct osoe_segment_directory) == 208,
+               "frozen by §3.14: append only. 136 at layout 6; 160 at layout 12; 208 at "
+               "layout 18");
 
 uint64_t osoe_segment_now_ns(void)
 {
@@ -310,6 +311,14 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
     if (OSOE_SEGMENT_HAS(s->dir, connection_count))
         s->connection_count = clamp_count(s->dir->connections_offset, s->dir->connection_bytes,
                                           s->bytes, s->bytes, s->dir->connection_count);
+    /* Layout 18's two: the team blocks end the header, so the slots are the
+     * section after them; the rows of epochs run to the end of the segment. */
+    if (OSOE_SEGMENT_HAS(s->dir, team_count))
+        s->team_count = clamp_count(s->dir->teams_offset, s->dir->team_bytes,
+                                    s->dir->slots_offset, s->bytes, s->dir->team_count);
+    if (OSOE_SEGMENT_HAS(s->dir, epoch_row_count))
+        s->epoch_row_count = clamp_count(s->dir->epochs_offset, s->dir->epoch_row_bytes,
+                                         s->bytes, s->bytes, s->dir->epoch_row_count);
     if (OSOE_SEGMENT_HAS(s->dir, block_count)) {
         uint64_t after_blocks = OSOE_SEGMENT_HAS(s->dir, landing_offset)
                                  ? s->dir->landing_offset : s->bytes;
@@ -389,6 +398,18 @@ static const unsigned char *record(const struct osoe_segment *s, unsigned scope,
             return NULL;
         n = s->dir->connection_bytes;
         off = s->dir->connections_offset + (uint64_t)index * n;
+        break;
+    case OSOE_MSCOPE_TEAM:
+        if (index >= s->team_count)
+            return NULL;
+        n = s->dir->team_bytes;
+        off = s->dir->teams_offset + (uint64_t)index * n;
+        break;
+    case OSOE_MSCOPE_EPOCHS:
+        if (index >= s->epoch_row_count)
+            return NULL;
+        n = s->dir->epoch_row_bytes;
+        off = s->dir->epochs_offset + (uint64_t)index * n;
         break;
     default:
         return NULL;

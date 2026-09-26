@@ -312,6 +312,40 @@ set_tests_properties(shmem.job.disagree.symmetric-size PROPERTIES PASS_REGULAR_E
 set_tests_properties(shmem.job.disagree.fanout PROPERTIES PASS_REGULAR_EXPRESSION
   "node 2 [(]or a node below it[)] has OSOE_COLLECTIVE_FANOUT=2; node 0 has 4")
 
+# OSOE_MAX_TEAMS is agreed the same way (§5.7): team numbers are job-wide, and
+# a node counting to another number lays its team state out differently. Two
+# nodes, the second's lead given 64 teams to the first's default 32.
+add_test(NAME shmem.job.disagree.max-teams
+  COMMAND osoe-launch -n 2 -m 0,1 -t 30 -e 1:OSOE_MAX_TEAMS=64 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.disagree.max-teams PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=64; node 0 has 32")
+
+# Between the PEs of one node too: the lead sizes the team blocks, the rows of
+# published epochs and the internal regions by its count, and a PE with
+# another would index them by its own (node.c). A real program, since it is the
+# node's rendezvous and not the job's that sees it.
+add_test(NAME shmem.max-teams.local-disagree
+  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_MAX_TEAMS=64 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.max-teams.local-disagree PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS differs between PEs: the local lead has 32, this PE has 64")
+# And the lead's count the larger, whose segment then has room for more than
+# the member counts on: refused the same way.
+add_test(NAME shmem.max-teams.local-disagree.lead
+  COMMAND osoe-launch -n 2 -t 30 -e 0:OSOE_MAX_TEAMS=64 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.max-teams.local-disagree.lead PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS differs between PEs: the local lead has 64, this PE has 32")
+
+# And outside its range, or not a number, it is refused by name at init: at
+# least one team beyond the three predefined, and at most 1,024.
+foreach(value 3 1025 x)
+  add_test(NAME shmem.max-teams.invalid.${value}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_TEAMS=${value}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.max-teams.invalid.${value} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS='${value}' is not between 4 and 1024")
+endforeach()
+
 # The node count is the value that shapes the waits: a lead expects children by
 # its own count, so one given too many waits for children that do not exist.
 # The hello carries the count and a lead calls its parent before it waits for
@@ -1303,6 +1337,51 @@ set_tests_properties(shmem.internal-region.L2 PROPERTIES LABELS "tier2" TIMEOUT 
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(internal-region 0,1)
   osoe_tier2_map_test(internal-region 0,0,1,1)
+endif()
+
+# Where a team's state lives and how its shape is found (phase 1 step 7 slice
+# 1; test-team-storage.c): the descriptor's local list against the map - every
+# local id in order, local id 0 the lead - SHMEM_TEAM_SHARED's world mapping
+# both ways, a reduction, a gather and a broadcast on each team, and osoe-stat
+# naming the teams by their records on the live job, with the world's record
+# as the map implies it and the finalize team's summary line. White-box, like
+# internal-region's. The map where local ids and world ranks interleave; 0,0,1,1,
+# where node 1's lead is rank 2, so a record naming a node by its number is
+# caught; SHARED as the PE alone under force-remote, whose list is a local id
+# that is not 0; and a node whose local ids are given by hand against its ranks
+# - rank 0 at local id 1 - on one node and on a node of two, where the generic
+# internode phase meets the node at its local id 0, rank 1 (OSOE_TEST_LEADS).
+add_executable(shmem_test_team-storage test-team-storage.c ${osoe_library_sources})
+target_include_directories(shmem_test_team-storage PRIVATE ../src ../include)
+target_link_libraries(shmem_test_team-storage PRIVATE osoe_base rt Threads::Threads
+  PkgConfig::LIBURING)
+osoe_warnings(shmem_test_team-storage)
+set(osoe_hand_order -e 0:OSOE_LOCALID=1 -e 1:OSOE_LOCALID=0 -e 0:OSOE_GTIDS=1,0
+    -e 1:OSOE_GTIDS=1,0)
+add_test(NAME shmem.team-storage.local-order
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 ${osoe_hand_order} --
+          $<TARGET_FILE:shmem_test_team-storage>)
+set_tests_properties(shmem.team-storage.local-order PROPERTIES LABELS "tier2" TIMEOUT 90)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(team-storage 0,1,2,0,1,0 OSOE_TEST_MAP=0,1,2,0,1,0
+    OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>)
+  osoe_tier2_map_test(team-storage 0,0,1,1 OSOE_TEST_MAP=0,0,1,1
+    OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>)
+  add_test(NAME shmem.team-storage.force-remote.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 OSOE_TEST_MAP=0,0,1,1
+            OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+            $<TARGET_FILE:shmem_test_team-storage>)
+  set_tests_properties(shmem.team-storage.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
+    TIMEOUT 90)
+  add_test(NAME shmem.team-storage.local-order.internode
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MAP=0,0,1 OSOE_TEST_LEADS=1,2
+            OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 60 ${osoe_hand_order} --
+            $<TARGET_FILE:shmem_test_team-storage>)
+  set_tests_properties(shmem.team-storage.local-order.internode PROPERTIES LABELS "tier2"
+    TIMEOUT 90)
 endif()
 set(osoe_get_nbi_small OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
