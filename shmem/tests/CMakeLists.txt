@@ -1323,6 +1323,50 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(internal-region 0,1)
   osoe_tier2_map_test(internal-region 0,0,1,1)
 endif()
+
+# Where a team's state lives and how its shape is found (phase 1 step 7 slice
+# 1; test-team-storage.c): the descriptor's local list in team-rank order
+# against the map, SHMEM_TEAM_SHARED's world mapping both ways, a reduction, a
+# gather and a broadcast on each, and osoe-stat naming the teams by their
+# records on the live job. White-box, like internal-region's. The map where
+# local ids and world ranks interleave; SHARED as the PE alone under
+# force-remote, whose list is a local id that is not 0; and one node whose
+# local ids are given by hand against its ranks - rank 0 at local id 1 - so
+# that the world's lead, its lowest rank, is not the node's local id 0.
+add_executable(shmem_test_team-storage test-team-storage.c ${osoe_library_sources})
+target_include_directories(shmem_test_team-storage PRIVATE ../src ../include)
+target_link_libraries(shmem_test_team-storage PRIVATE osoe_base rt Threads::Threads
+  PkgConfig::LIBURING)
+osoe_warnings(shmem_test_team-storage)
+set(osoe_hand_order -e 0:OSOE_LOCALID=1 -e 1:OSOE_LOCALID=0 -e 0:OSOE_GTIDS=1,0
+    -e 1:OSOE_GTIDS=1,0)
+add_test(NAME shmem.team-storage.local-order
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 ${osoe_hand_order} --
+          $<TARGET_FILE:shmem_test_team-storage>)
+set_tests_properties(shmem.team-storage.local-order PROPERTIES LABELS "tier2" TIMEOUT 90)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(team-storage 0,1,2,0,1,0 OSOE_TEST_MAP=0,1,2,0,1,0
+    OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>)
+  add_test(NAME shmem.team-storage.force-remote.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 OSOE_TEST_MAP=0,0,1,1
+            OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+            $<TARGET_FILE:shmem_test_team-storage>)
+  set_tests_properties(shmem.team-storage.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
+    TIMEOUT 90)
+  # The same hand-given order on a node of a job of two: the generic internode
+  # phase meets each node at its local id 0 (internode-generic.c), and a lead
+  # elsewhere is refused by name rather than left to wait in a region nothing
+  # writes.
+  add_test(NAME shmem.team-storage.local-order.internode
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MAP=0,0,1
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 ${osoe_hand_order} --
+            $<TARGET_FILE:shmem_test_team-storage>)
+  set_tests_properties(shmem.team-storage.local-order.internode PROPERTIES LABELS "tier2"
+    TIMEOUT 60 PASS_REGULAR_EXPRESSION
+    "team 0's lead on node 0 is local id 1, its lowest rank, and the generic internode phase meets each node at its local id 0")
+endif()
 set(osoe_get_nbi_small OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")

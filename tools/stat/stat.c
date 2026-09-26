@@ -468,13 +468,13 @@ static void tree_line(const struct osoe_segment *s, uint64_t node, const char *h
  * `host` says where. A node with `own` no is one whose own PEs have not all
  * called the collective, and the PE lines of *that* node say which.
  *
- * The teams are the node's published records (layout 18): every team number
- * whose record says it spans nodes, shown under the record's name. The first
- * of them - the world team - is always shown, so that every node has its line;
- * any other only once it has run: the finalize team's record is written at
- * init and it moves only at shmem_finalize. A segment from before layout 18
- * has no records, and its two teams are found by the names its header gave
- * them.
+ * The teams are the node's published records (layout 18), each shown under
+ * its record's name. The first - the world team - is always shown, so that
+ * every node has its line, even on a job of one node, where no team has a
+ * tree; any other only if its record says it spans nodes and it has run: the
+ * finalize team's record is written at init and it moves only at
+ * shmem_finalize. A segment from before layout 18 has no records, and its two
+ * teams are found by the names its header gave them.
  */
 static void summary_line(const struct osoe_segment *s)
 {
@@ -512,11 +512,10 @@ static void summary_line(const struct osoe_segment *s)
             char label[24];
             uint64_t nodes = 0;
             struct tree_state state;
-            if (!team_label(s, t, label, sizeof label) ||
-                !osoe_segment_read_name(s, "team.record.nodes", t, &nodes) || nodes < 2 ||
-                !read_tree_state(s, t, label, &state))
+            if (!team_label(s, t, label, sizeof label) || !read_tree_state(s, t, label, &state))
                 continue;
-            if (!first && state.open == 0 && state.closed == 0)
+            osoe_segment_read_name(s, "team.record.nodes", t, &nodes);
+            if (!first && (nodes < 2 || (state.open == 0 && state.closed == 0)))
                 continue;
             first = false;
             tree_line(s, node, host, live, label, &state, where);
