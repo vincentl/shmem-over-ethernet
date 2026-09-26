@@ -181,3 +181,68 @@ waits concurrently on private contexts (slice 2) and on the default context
 If a context's node-segment block must grow with the job's size; if the landing
 zone's extents cannot hold today's largest nonblocking get in flight without
 enlarging the zone; or if a decision above contradicts §4.11 as modeled.
+
+## Slice 1's build brief: contexts, serial only (DRAFT - pending the author's decision)
+
+You are building **contexts** for osoe (OpenSHMEM Over Ethernet): spec §9.5 whole
+- `shmem_ctx_create`, `shmem_team_create_ctx`, `shmem_ctx_destroy`,
+`shmem_ctx_get_team` - and every RMA, AMO and ordering routine on a created
+context. The thread level stays at most `SHMEM_THREAD_SERIALIZED`: every context
+is serial (§4.11's modes), so nothing here is concurrent; slice 2 makes it so.
+
+### Read first
+
+1. `CLAUDE.md`.
+2. The spec, §9.5 whole, and the context forms of §9.6-§9.8, §9.12.
+3. This file's "Proposed decisions" 2 to 6, as the author approved them.
+4. Design §4.6 (the dirty set, nonblocking gets and their counters), §4.10
+   (the transport boundary, which already takes a context), §4.11 ("Context
+   modes", item 4), §7.3 (plumb but do not implement: the context form is the
+   definition).
+5. The code: `team.c`'s `osoe_ctx_of` and context stubs; `transport-am.c`'s
+   `struct osoe_transport_context`, `mark`, `flush_dirty`,
+   `osoe_transport_wait`, `remote_get_nonblocking` and `complete_gets`;
+   `progress-host.c`'s `landed`; `node.h`'s landing slot and PE slot;
+   `quiet.c`; `session.c` (it validates a context).
+
+### Decisions (from the proposal, made concrete)
+
+1. **The node segment's context blocks**: a per-PE array of
+   `OSOE_MAX_CONTEXTS` blocks after the landing zones (layout 20), each a state
+   word and what the agent credits: `bytes_issued`, `bytes_landed` and their
+   wake word, moved out of the landing slot. Block 0 is `SHMEM_CTX_DEFAULT`'s,
+   live from init to finalize.
+2. **A nonblocking get's record names its block**, and `landed` credits that
+   block's counters; `complete_gets` copies out the records of the context it
+   is called for, and a get that finds no record free copies out any landed
+   record of its PE (serial: one caller at a time).
+3. **The process-memory context**: `struct osoe_transport_context` gains its
+   block index, options, team and state, and lives in a process array of
+   `OSOE_MAX_CONTEXTS`; handles are element addresses, `SHMEM_CTX_DEFAULT`
+   element 0. The dirty set is allocated at creation, freed at destroy.
+4. **Team contexts translate their PE** in the SHMEM layer, before the
+   transport, through the team's mapping; the PE check is against the team's
+   size (§9.5: "team-relative PE numbering").
+5. **Options**: recorded; `NOSTORE` skips the serializing fence in quiet and
+   fence; `PRIVATE` records the creating thread and a destroy from another ends
+   the job by name.
+6. **`OSOE_MAX_CONTEXTS`**, default 64, 1 to 4,096, read at the first init,
+   agreed between a node's PEs (node.c, as `OSOE_MAX_TEAMS` is).
+
+### Tests
+
+Creation to exhaustion returning nonzero on the 65th (default counts); destroy's
+implicit quiet (puts and nonblocking gets outstanding on the context, visible
+after destroy returns); two contexts' quiets independent (a quiet on one does
+not wait on the other's gets - pinned by counters, not time); team contexts'
+PE numbering checked by value on a split team; `ctx_get_team`; `NOSTORE`
+accepted; a destroyed or foreign handle and `SHMEM_CTX_INVALID` in an RMA ending
+the job by name; `OSOE_MAX_CONTEXTS` disagreeing between a node's PEs refused;
+L1, L2, L4, `0,0,1,1`, `0,1,2,0,1,0`, force-remote. SOS: `shmem_team_context`
+must pass; `spec-example/shmem_ctx` still asks for MULTIPLE (slice 2).
+
+### Stop and ask
+
+If a context's node-segment block must grow with the job's size; if the
+landing zone's records cannot say which context a reply belongs to without
+changing the AM wire format; or if the spec's §9.5 contradicts a decision here.
