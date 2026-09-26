@@ -30,14 +30,12 @@ extern "C" {
 /*
  * The deprecated active-set collective constants (§6, Annex F.2.8).
  *
- * The active-set routines that take them run over the whole job only (design
- * §7.4): an active set of every PE - PE_start 0, logPE_stride 0, PE_size the
- * job's size - works, and any other ends the job by name. That is the set every
- * program in the corpus that still calls these routines passes, and forming a
- * group for an arbitrary set of PEs is machinery osoe does not have: an answer
- * over the wrong PEs would be worse than a named refusal. pSync and pWrk are
- * neither read nor written, which leaves pSync as the spec requires it to be
- * found afterwards.
+ * The active-set routines that take them run on any active set within the job
+ * (design §7.4). The whole job - PE_start 0, logPE_stride 0, PE_size the job's
+ * size - takes the world team's collectives and leaves pSync untouched; any
+ * other set uses pSync, which must be initialized to SHMEM_SYNC_VALUE as the
+ * spec says, and is found so again afterwards. pWrk is never used. A set
+ * reaching past the job, or a caller outside its set, ends the job by name.
  *
  * The sizes are this implementation's, as the spec says they are. They are
  * large enough for a conforming program's array and are otherwise unused.
@@ -652,8 +650,9 @@ void shmem_barrier_all(void);
 void shmem_sync_all(void);
 int shmem_team_sync(shmem_team_t team);
 
-/* The deprecated active-set forms (Annex F), over the whole job only (above):
- * shmem_barrier is shmem_barrier_all and shmem_sync is shmem_sync_all. The spec's
+/* The deprecated active-set forms (Annex F), on any active set (above): over
+ * the whole job shmem_barrier is shmem_barrier_all and shmem_sync is
+ * shmem_sync_all. The spec's
  * C11 shmem_sync(team) shares the second's name; C11 counts the arguments to
  * tell them apart (with the generics, below) and C++ overloads (at the end). */
 void shmem_barrier(int PE_start, int logPE_stride, int PE_size, long *pSync);
@@ -762,8 +761,8 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_SCAN_DECL)
 #endif
 
 /*
- * The deprecated active-set reductions (Annex F; Table 11), over the whole job
- * only (above): every operator on the four signed integer types, the ordered
+ * The deprecated active-set reductions (Annex F; Table 11), on any active set
+ * (above): every operator on the four signed integer types, the ordered
  * and arithmetic ones on the three floating types, and sum and product on the
  * two complex types where the translation environment has them.
  */
@@ -824,8 +823,8 @@ OSOE_RMA_STANDARD_TYPES(OSOE_BROADCAST_DECL)
 int shmem_broadcastmem(shmem_team_t team, void *dest, const void *source, size_t nelems,
                        int PE_root);
 
-/* The deprecated active-set broadcasts (Annex F), over the whole job only
- * (above), of four- and eight-byte elements. The root's dest is left as it was:
+/* The deprecated active-set broadcasts (Annex F), on any active set (above),
+ * of four- and eight-byte elements. The root's dest is left as it was:
  * "the dest object is updated on all PEs other than the root PE". */
 void shmem_broadcast32(void *dest, const void *source, size_t nelems, int PE_root,
                        int PE_start, int logPE_stride, int PE_size, long *pSync);
@@ -863,8 +862,8 @@ int shmem_alltoallmem(shmem_team_t team, void *dest, const void *source, size_t 
 int shmem_alltoallsmem(shmem_team_t team, void *dest, const void *source, ptrdiff_t dst,
                        ptrdiff_t sst, size_t nelems);
 
-/* Their deprecated active-set forms (Annex F), over the whole job only (above),
- * of four- and eight-byte elements. */
+/* Their deprecated active-set forms (Annex F), on any active set (above), of
+ * four- and eight-byte elements. */
 void shmem_collect32(void *dest, const void *source, size_t nelems, int PE_start,
                      int logPE_stride, int PE_size, long *pSync);
 void shmem_collect64(void *dest, const void *source, size_t nelems, int PE_start,

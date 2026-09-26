@@ -5,9 +5,9 @@
  * every member's block, in team rank order, into every member's dest. fcollect's
  * blocks are all one length; collect's may each differ, and are gathered after
  * an fcollect of their lengths. The deprecated active-set forms, collect32,
- * collect64, fcollect32 and fcollect64, run over the whole job only
- * (collectives.h), their elements four and eight bytes; pSync is neither read
- * nor written.
+ * collect64, fcollect32 and fcollect64, run on any active set (collectives.h):
+ * the world team's forms for the whole job, pSync untouched, active-set.c's for
+ * any other. Their elements are four and eight bytes.
  *
  * Complexity: O(P n) copied by each member and O(L n) by the lead; the
  * internode phase as internode.h says.
@@ -49,7 +49,7 @@ OSOE_API int pshmem_fcollectmem(shmem_team_t team, void *dest, const void *sourc
     return osoe_collect("shmem_fcollectmem", team, dest, source, nelems, 1, true);
 }
 
-/* The deprecated active-set forms (Annex F), over the whole job only. */
+/* The deprecated active-set forms (Annex F), on any active set. */
 #define OSOE_COLLECT_ACTIVE_SET_DEFINE(KIND, BITS, FIXED)                             \
     OSOE_API void pshmem_##KIND##BITS(void *dest, const void *source, size_t nelems,   \
                                       int PE_start, int logPE_stride, int PE_size,     \

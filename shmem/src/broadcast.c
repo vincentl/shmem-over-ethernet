@@ -5,9 +5,9 @@
  * object is updated on all PEs" - the root's included, where the deprecated
  * active-set forms, shmem_broadcast32 and shmem_broadcast64, leave the root's
  * alone: "the dest object is updated on all PEs other than the root PE". Those
- * run over the whole job only (collectives.h), and count their elements in four
- * and eight bytes; pSync is neither read nor written, which leaves it as the
- * spec requires it to be found afterwards.
+ * run on any active set (collectives.h) - the world team's broadcast for the
+ * whole job, pSync untouched, and active-set.c's for any other - and count
+ * their elements in four and eight bytes.
  *
  * Complexity: O(n) copies per member; the internode phase as collectives.c
  * says, down a tree rooted at the root's node.

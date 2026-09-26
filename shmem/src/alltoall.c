@@ -4,8 +4,9 @@
  * shmem_alltoallmem and shmem_alltoallsmem, over the exchange in
  * collectives.c - member i's block j to member j's dest block i, direct, then
  * the team's barrier. The deprecated active-set forms, alltoall32, alltoall64,
- * alltoalls32 and alltoalls64, run over the whole job only (collectives.h),
- * their elements four and eight bytes; pSync is neither read nor written.
+ * alltoalls32 and alltoalls64, run on any active set (collectives.h): the
+ * world team's form for the whole job, pSync untouched; active-set.c's for any
+ * other. Their elements are four and eight bytes.
  *
  * Complexity: P puts a member - one a block, or one an element when strided -
  * and a barrier.
@@ -49,7 +50,7 @@ OSOE_API int pshmem_alltoallsmem(shmem_team_t team, void *dest, const void *sour
     return osoe_alltoall("shmem_alltoallsmem", team, dest, source, dst, sst, nelems, 1);
 }
 
-/* The deprecated active-set forms (Annex F), over the whole job only. */
+/* The deprecated active-set forms (Annex F), on any active set. */
 #define OSOE_ALLTOALL_ACTIVE_SET_DEFINE(BITS)                                         \
     OSOE_API void pshmem_alltoall##BITS(void *dest, const void *source, size_t nelems, \
                                         int PE_start, int logPE_stride, int PE_size,   \

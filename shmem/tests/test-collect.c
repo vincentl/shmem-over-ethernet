@@ -18,8 +18,10 @@
  *     still copy the last one out, would corrupt;
  *   - pSync, a static, as it was at the end.
  *
- * With OSOE_TEST_PARTIAL=1 a PE calls shmem_fcollect64 with an active set one
- * PE short of the job, which must end it by name (shmem.collect.partial).
+ * With OSOE_TEST_PARTIAL=1 the last PE calls shmem_fcollect64 naming an active
+ * set of the PEs before it, which it is not in, and that must end the job by
+ * name (shmem.collect.partial); a set within the job but not all of it is
+ * test-active-set-partial.c's.
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -292,8 +294,13 @@ int main(void)
     if (partial && partial[0] == '1') {
         long *x = shmem_malloc((size_t)npes * sizeof *x);
         CHECK_FATAL(x);
-        shmem_fcollect64(x, x, 1, 0, 0, npes - 1, pSync);
-        printf("PE %d: a partial active set returned, which it must not\n", me);
+        if (me == npes - 1) {
+            shmem_fcollect64(x, x, 1, 0, 0, npes - 1, pSync);
+            printf("PE %d: a call from outside its active set returned, which it must not\n",
+                   me);
+            return 1;
+        }
+        shmem_barrier_all();            /* the job ends while this waits */
         return 1;
     }
 

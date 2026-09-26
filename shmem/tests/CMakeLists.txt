@@ -1254,7 +1254,7 @@ foreach(pair "fetch_add_nbi:osoe_shmem_atomic_fetch_add_nbi_takes_four_or_five_a
     PASS_REGULAR_EXPRESSION "${complaint}")
 endforeach()
 
-# The deprecated active-set collectives, over the whole job (design §7.4;
+# The deprecated active-set collectives over the whole job (design §7.4;
 # test-active-set.c), on one node and across nodes; and an active set reaching
 # past the job, which must end it by name.
 osoe_tier2_test(active-set)
@@ -1274,8 +1274,20 @@ set_tests_properties(shmem.active-set.partial PROPERTIES LABELS "tier2" TIMEOUT 
 # two of them at once, every routine, pSync reused, on one node and across
 # nodes on a block and an interleaved map.
 osoe_tier2_test(active-set-partial)
-osoe_tier2_map_test(active-set-partial 0,0,1,1)
-osoe_tier2_map_test(active-set-partial 0,1,2,0,1,0)
+# Across nodes not under tsan, like its whole-job sibling: a remote write's
+# order runs through other processes, which tsan cannot see.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(active-set-partial 0,0,1,1)
+  osoe_tier2_map_test(active-set-partial 0,1,2,0,1,0)
+  # Twelve PEs: sets of 11, with interior members of two and three children
+  # and trees four deep, and a stride of four.
+  osoe_tier2_map_test(active-set-partial 0,0,0,1,1,1,2,2,2,3,3,3)
+endif()
+add_test(NAME shmem.active-set-partial.bad-root
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_BAD_ROOT=1
+          $<TARGET_FILE:osoe-launch> -n 3 -t 30 -- $<TARGET_FILE:shmem_test_active-set-partial>)
+set_tests_properties(shmem.active-set-partial.bad-root PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "shmem_broadcast64: PE_root 2 is not a rank of its active set of 2")
 
 # Symmetric statics (design §4.3; test-statics.c), in a program linked as oshcc
 # links one: on one node, across nodes on a block map and an interleaved one;
@@ -1362,7 +1374,7 @@ add_test(NAME shmem.collect.partial
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_collect>)
 set_tests_properties(shmem.collect.partial PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION
-  "shmem_fcollect64: the active set \\(PE_start 0, logPE_stride 0, PE_size 1\\) is not the whole job of 2 PEs")
+  "shmem_fcollect64: PE 1 called it, and is not in its active set \\(PE_start 0, logPE_stride 0, PE_size 1\\)")
 
 # PEs that call different collectives end the job by name, from the piece
 # headers of the generic internode phase (internode-generic.c): node 1's PE

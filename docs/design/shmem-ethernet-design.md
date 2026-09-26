@@ -5853,7 +5853,8 @@ machinery. The review's order is adopted.
    built). The second puts that phase behind `internode.h`, with the generic
    implementation every backend may call (§5.8). The third gives the deprecated
    active-set routines - `_to_all`, `broadcast32`/`64`, `shmem_barrier` and
-   `shmem_sync` - over the whole job, the only active set they accept (§7.4).
+   `shmem_sync` - over the whole job, the only active set they then accepted;
+   the seventh (2026-09-26) runs them on any active set (§7.4).
    The fourth adds collect, fcollect, alltoall and alltoalls, their active-set
    forms under the same rule, and the seam's gather (§5.5, as built). The fifth
    keeps D pieces in flight at each lead of the generic internode phase (§5.8,
@@ -5988,7 +5989,7 @@ and every one of them has a wrapper for it.
 Nothing of the collectives: the scans (§9.10.10) are built since phase 1
 step 10 (§5.8). *(Locks are built: §4.12. Reductions, broadcast, collect,
 fcollect, alltoall and alltoalls are built, and the deprecated active-set
-routines over the whole job: §7.1 step 5, §5.5 as built, §7.4.)*
+routines on any active set: §7.1 step 5, §5.5 as built, §7.4.)*
 
 **RMA's full type/operation cross product, strided transfers and nonblocking
 variants are implemented** (§9.6, §9.8.3-§9.8.4): every standard RMA type of

@@ -41,9 +41,12 @@ The author's goals, the axes to judge the work by:
    add of the negative - so a word is back at `SHMEM_SYNC_VALUE` when every
    member is done, and a fast member's next call, adding early, is counted
    in the next call and not this one. `pSync` is 256 longs here; the words:
-   0-63 the barrier's rounds, 64 up-arrivals, 65 down-releases, 66 and 67
-   collect's subtree total and offset, 68 and 69 collect's second arrival and
-   release. pWrk is not used: the library may take private memory.
+   0-63 the barrier's rounds, 65 down-releases, 66 to 68 collect's subtree
+   total, offset and whole length, 70 collect's second release, 72-103 an
+   up-arrival a child and 104-135 collect's second. pWrk is not used: the
+   library may take private memory. *(As built: the brief first had one
+   arrival word for all children; the review of the slice gave each child
+   its own, so a parent takes each child's part as soon as it is ready.)*
 3. **A binomial tree over the set's ranks**, rooted at the collective's root
    (broadcast) or rank 0 (the rest), relative rank `v = (rank - root) mod
    size`: `v`'s parent is `v` less its lowest set bit, its children `v +
@@ -69,15 +72,16 @@ The author's goals, the axes to judge the work by:
      partial out of the child's `dest` in chunks into private memory and
      combines it into its own (`combine.h`); down, the root's result to
      every child.
-   - **alltoall and alltoalls**: a barrier (every `dest` ready), each member
-     puts its blocks straight to each member, a quiet, a barrier.
+   - **alltoall and alltoalls**: each member puts its blocks straight to
+     each member, a quiet, a barrier. *(As built: no barrier first, like the
+     team form - the spec has every `dest` ready before any member calls.)*
 6. **Validation**: a set whose last member is past the job, a negative
    stride or size, a caller outside the set, a root outside it - each ends
    the job naming the routine and the values, as the whole-job check does.
 
 ## Tests
 
-`test-active-set.c`: every routine on sets of stride 0 and 1, starting at 0
+`test-active-set-partial.c`: every routine on sets of stride 0 and 1, starting at 0
 and at 1, of 1 member, 2 and all but one, on one node and across nodes;
 two disjoint sets at once with their own `pSync`; the same `pSync` reused in
 back-to-back calls with no barrier between; each result checked by value,

@@ -9,10 +9,9 @@
  * the internode phase's is the backend's (internode.h).
  *
  * The deprecated active-set forms, shmem_TYPENAME_OP_to_all over Table 11,
- * are the same reductions over the whole job (collectives.h): each checks its
- * active set is the job and calls the team form's engine on SHMEM_TEAM_WORLD.
- * pWrk and pSync are neither read nor written, which leaves pSync as the spec
- * requires it to be found afterwards, and makes no demand on pWrk's size.
+ * are the same reductions over the whole job (collectives.h), the team form's
+ * engine on SHMEM_TEAM_WORLD with pSync untouched, and active-set.c's over any
+ * other set. pWrk is never used, which makes no demand on its size.
  *
  * Complexity: O(1) here; the reduction's own in collectives.c.
  */
@@ -86,7 +85,7 @@ OSOE_REDUCE_INTEGER_TYPES(OSOE_REDUCE_ALIAS_ARITHMETIC)
 OSOE_REDUCE_FLOATING_TYPES(OSOE_REDUCE_ALIAS_ARITHMETIC)
 OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_ALIAS_ARITHMETIC)
 
-/* The deprecated active-set forms (Annex F; Table 11), over the whole job. */
+/* The deprecated active-set forms (Annex F; Table 11), on any active set. */
 static void to_all(const char *routine, void *dest, const void *source, int nreduce,
                    int PE_start, int logPE_stride, int PE_size, long *pSync,
                    enum osoe_reduction_operation operation, struct osoe_element element)
