@@ -1,0 +1,28 @@
+15:50:08 build exit 0
+15:50:09 probe exit 0
+15:50:41 tier2: 100% tests passed, 0 tests failed out of 375
+15:50:41 spec-example/shmem_team_context 4x2 exit 0
+15:50:42 unit/many-ctx 4x2 exit 0
+15:50:42 unit/shmem_ctx_get_team 4x2 exit 0
+15:50:42 spec-example/shmem_ctx_pipelined_reduce 4x2 exit 0
+15:50:43 in_scan [-N4 --ntasks-per-node=2] exit 0
+15:50:43 in_scan [-N4 --ntasks-per-node=2 --distribution=cyclic] exit 0
+15:50:43 in_scan [-N4 --ntasks-per-node=4] exit 0
+15:50:44 ex_scan [-N4 --ntasks-per-node=2] exit 0
+15:50:44 ex_scan [-N4 --ntasks-per-node=2 --distribution=cyclic] exit 0
+15:50:44 ex_scan [-N4 --ntasks-per-node=4] exit 0
+15:50:44 scan_in_place [-N4 --ntasks-per-node=2] exit 0
+15:50:45 scan_in_place [-N4 --ntasks-per-node=2 --distribution=cyclic] exit 0
+15:50:45 scan_in_place [-N4 --ntasks-per-node=4] exit 0
+15:51:48 F1 base exit 0: 16384 193539.24
+15:52:49 F1 again exit 0: 16384 237240.83
+15:54:01 F1 pipeline1 exit 0: 16384 61251.94
+15:54:05 F1 chunk16k exit 0: 16384 1227.55
+15:54:11 F1 fanout2 exit 0: 16384 1328.81
+15:54:14 F1 size 8192: 8192 783.62
+15:55:13 F1 size 32768: 32768 2623.48
+15:55:28 F2 broadcast k=2 exit 0
+15:55:43 F2 reduce k=2 exit 0
+15:55:52 F2 broadcast k=4 exit 0
+15:56:02 F2 reduce k=4 exit 0
+15:56:02 DONE

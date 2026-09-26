@@ -82,3 +82,60 @@ the run while the others held at 2-4; every node has fast-retransmitted about
 so the average is one every few calls. Not a cable: it needs all four nodes.
 
 **Finding F2** is the fan-out, above.
+
+## The third session (2026-09-26, late)
+
+Main `a4ca6c4` (contexts and the scans), `release`, about 25 minutes of cluster
+time, then a second half hour for one experiment on F1. Raw outputs:
+`docs/design/evidence/pi-cluster/2026-09-26-late/`, the scripts beside them.
+
+**The build, the probe and tier 2**: clean; 375 of 375 in 32 s.
+
+**SOS's context and scan programs, now that both exist**, at 4 × 2:
+`shmem_team_context`, `many-ctx`, `shmem_ctx_get_team` and
+`shmem_ctx_pipelined_reduce` pass, and so do `in_scan`, `ex_scan` and
+`scan_in_place` under block, cyclic and 4 × 4 layouts (their `shmemx_` names
+renamed to the 1.6 ones).
+
+**F1 again, with its levers.** The 16 KiB fcollect at 4 × 2, 200 calls each:
+
+| Run | a call |
+|---|---|
+| default | 194 ms, then 237 |
+| `OSOE_COLLECTIVE_PIPELINE=1` | 61 ms |
+| `OSOE_AM_CHUNK=16384` | 1.23 ms |
+| `OSOE_COLLECTIVE_FANOUT=2` | 1.33 ms |
+| default at 8 KiB and 32 KiB | 0.78 and 2.6 ms |
+
+Only `pi-002` counts retransmission timeouts - 30 to 48 a run at the default,
+none with the smaller chunk or the fan-out of 2 - and only it: every node
+retransmits about as often in all, and `pi-002` alone recovers by timeout.
+Its kernel, TCP settings, NIC offloads and link (gigabit, full duplex) are
+identical to the others', and no NIC counts an error, a drop, an overrun or a
+pause frame (`netcfg-*.txt`). So the segments are lost in the switch, and
+`pi-002`'s place in this one exchange is what puts them in its flows.
+
+**The experiment: is the 200 ms minimum timeout what makes a loss cost so
+much?** No. A scratch build set `TCP_RTO_MIN_US` on osoe's own sockets (the
+Pis' 6.18 kernel has it; `rto/`). At 5 ms the calls took 50 and 34 ms against
+80 and 12 ms at the default in the same half hour, with as many timeouts as
+before; 1 ms the kernel refuses. The losses themselves are the cost, and
+they depend on the size of the bursts: a 16 KiB chunk or a fan-out of 2 makes
+none. The session also shows how noisy F1 is - 12 to 237 ms a call on the
+same shape.
+
+**F2's crossover**, four nodes, one PE each, from 4 bytes to 64 KiB (`f2-*`):
+
+| | 8 B | 1 KiB | 8 KiB | 16 KiB | 32 KiB | 64 KiB |
+|---|---|---|---|---|---|---|
+| broadcast, k = 4 | 187 µs | 209 | 260 | 447 | 1,036 | 1,838 |
+| broadcast, k = 2 | 367 | 391 | 418 | 607 | 1,307 | 1,785 |
+| reduce, k = 4 | 188 | 228 | 450 | 913 | 1,459 | 2,333 |
+| reduce, k = 2 | 371 | 443 | 512 | 883 | 1,405 | 2,387 |
+
+On four nodes a fan-out of 4 is one hop and 2 is two, and the hop is what
+small messages pay: k = 4 is twice as fast up to 1 KiB and still ahead at 8 KiB. The two meet between
+16 and 64 KiB, and at 1 MiB k = 2 wins by 1.5× (the second session). So the
+fan-out should fall with the message size, somewhere near 32 KiB here -
+a per-call choice of k by size, which the next measurement at more than four
+nodes would have to confirm before it is built.
