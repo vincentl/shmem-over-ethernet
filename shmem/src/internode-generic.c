@@ -41,7 +41,11 @@
  *     arrival lets its parent overwrite a release it has not copied, and a
  *     middle node waits on a child that waits on it.
  * D = 1 keeps one piece at a time, each a whole pass up and down, as before
- * the slice.
+ * the slice. A lead sends up whenever the window allows before it looks for a
+ * release, so every lead but the root has min(D, pieces) in flight at once in
+ * each collective, and publishes the most it had in the team's tree state
+ * (node.h, team.tree.most_pieces_in_flight) - a count a test pins the overlap
+ * by, where a time could only be compared.
  *
  * **Each piece carries a header** - the team's epoch, the piece's number and
  * bytes, and which collective it is - which the lead receiving it checks
@@ -182,6 +186,7 @@ struct generic_team {
     struct lead_tree reduction_tree;
     uint64_t arrival_base[OSOE_COLLECTIVE_FANOUT_MAX];
     uint64_t release_base;
+    struct osoe_collective_state *published;    /* the team's tree state (node.h) */
 };
 
 static struct generic_team *teams;
@@ -236,6 +241,7 @@ static struct generic_team *registered_team(uint32_t team, const char *routine)
         g->reduction_tree.children = r->children;
         for (uint32_t c = 0; c < r->children; c++)
             g->reduction_tree.child[c] = r->child[c];
+        g->published = &osoe_node_team(&osoe.node, team)->tree;
         g->registered = true;
     }
     if (team != OSOE_TEAM_WORLD || !g->every_node)
@@ -498,7 +504,10 @@ static void to_children(const struct pieces *p, const struct lead_tree *tree,
  * piece it waits for every child's copy, combines, and forwards - its buffer
  * is the result.
  *
- * At the end, the bases advance by what this tree says each counter received.
+ * At the end, the bases advance by what this tree says each counter received,
+ * and the most pieces this lead had in flight at once goes into the team's
+ * tree state (node.h): min(D, pieces) at every lead but the root, which has
+ * none, since a lead fills its window before it looks for a release.
  */
 static void in_pieces(struct generic_team *g, const struct pieces *p,
                       const struct lead_tree *tree)
@@ -506,7 +515,7 @@ static void in_pieces(struct generic_team *g, const struct pieces *p,
     uint64_t pieces = (p->bytes + p->piece - 1) / p->piece;
     uint64_t window = osoe.bootstrap.collective_pipeline;
     bool root = tree->parent == UINT32_MAX;
-    uint64_t up = 0, down = 0;
+    uint64_t up = 0, down = 0, most = 0;
     while (down < pieces) {
         if (!root && up < pieces && up < down + window) {
             struct piece_header h = header_of(p, up);
@@ -514,6 +523,8 @@ static void in_pieces(struct generic_team *g, const struct pieces *p,
             from_children(g, p, tree, &h, up, at);
             to_parent(p, tree, &h, up, at);
             up++;
+            if (up - down > most)
+                most = up - down;
             continue;
         }
         struct piece_header h = header_of(p, down);
@@ -529,6 +540,12 @@ static void in_pieces(struct generic_team *g, const struct pieces *p,
         g->arrival_base[c] += pieces;
     if (!root)
         g->release_base += pieces;
+    /* Single-writer publication for osoe-stat and the tests (§3.16), and
+     * before the lead bumps the team's `released`, which every member loads
+     * with acquire before it returns: so once its call has returned, a member
+     * of this node reads this collective's count. */
+    atomic_store_explicit(&g->published->most_pieces_in_flight, (uint32_t)most,
+                          memory_order_release);
 }
 
 void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t count,

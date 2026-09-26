@@ -244,12 +244,15 @@ void osoe_segment_close(struct osoe_segment *s);
  *       record of the team on this node; each PE's epochs moved from its slot
  *       to a row of its own, the epochs scope; the directory grew 160 -> 208
  *       bytes to say where both are
+ *   19  team.tree.most_pieces_in_flight, in padding the tree state's line
+ *       already had: the most pieces of a data collective the node's lead had
+ *       in flight in its last one (§5.8's pipelined pieces)
  *
- * None of 5 to 18 changed the watch word's encoding; 17 gave it a region value
+ * None of 5 to 19 changed the watch word's encoding; 17 gave it a region value
  * it could already carry.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               18
+#define OSOE_SEGMENT_NEWEST_LAYOUT               19
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is
