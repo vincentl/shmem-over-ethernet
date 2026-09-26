@@ -29,6 +29,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +38,7 @@
 #include "am.h"
 #include "am-state.h"
 #include "base/deadline.h"
+#include "base/environment.h"
 #include "base/futex.h"
 #include "base/order.h"
 #include "base/stall-watch.h"
@@ -102,6 +104,9 @@ struct osoe_transport_context {
      * O(peer nodes) a context, never in the node segment. */
     _Atomic uint64_t *shared_highest_segment;
     _Atomic uint64_t *dirty_bits;
+    /* OSOE_CHECK_QUIET only: per slot, the highest segment of a write whose
+     * mark has finished - what a quiet called afterwards owes. */
+    _Atomic uint64_t *returned_highest;
     /* This context's nonblocking gets in flight, as (extent, token) pairs:
      * the pieces its wait copies out, if no other thread of the PE has
      * (copy_out). Touched only by calls on this context. */
@@ -140,6 +145,8 @@ static struct osoe_context_block *block_of(const struct osoe_transport_context *
     return osoe_node_context(&osoe.node, osoe.bootstrap.local_id, c->block);
 }
 
+static bool check_quiet;            /* OSOE_CHECK_QUIET, below */
+
 /* The dirty set's arrays, O(peer nodes) virtual, resident as touched (§4.6).
  * A job of one node has no peers and none. */
 static bool dirty_set_allocate(struct osoe_transport_context *c)
@@ -154,6 +161,8 @@ static bool dirty_set_allocate(struct osoe_transport_context *c)
      * it is opened (osoe_transport_threads). */
     c->shared_highest_segment = calloc(peers, sizeof *c->shared_highest_segment);
     c->dirty_bits = calloc((peers + 63) / 64, sizeof *c->dirty_bits);
+    if (check_quiet && !(c->returned_highest = calloc(peers, sizeof *c->returned_highest)))
+        return false;
     return c->high_segment && c->order && c->touched && c->shared_highest_segment && c->dirty_bits;
 }
 
@@ -165,6 +174,8 @@ static void dirty_set_free(struct osoe_transport_context *c)
     free(c->pending);
     free(c->shared_highest_segment);
     free(c->dirty_bits);
+    free(c->returned_highest);
+    c->returned_highest = NULL;
     c->shared_highest_segment = NULL;
     c->dirty_bits = NULL;
     c->high_segment = NULL;
@@ -220,9 +231,62 @@ void osoe_transport_threads(bool concurrent)
  * internode put wrote through a null one. Then the engine, which must be
  * complete before this returns: the agent thread starts next and polls it.
  */
+/*
+ * Two test hooks for a shared context's protocols (phase 1 step 8 slice 3;
+ * docs/decisions/2026-09-26-evening.md item 12). A race in them - a put a quiet
+ * lets go of, a get it closes the wrong pair on - shows only when the reply or
+ * the acknowledgement is still on its way at the quiet's return, and a thread
+ * reading its own write back rides the same ordered connection and cannot see
+ * it. So:
+ *
+ * - OSOE_CHECK_QUIET=1: every wait on a shared context checks, at its return,
+ *   what it promised - every node it covers has acknowledged through the
+ *   highest segment written toward it when the call began, and no nonblocking
+ *   get of the context whose call returned before this one began is still in
+ *   the landing zone - and ends the job naming the first it finds broken.
+ * - OSOE_TEST_PERTURB=1: at the points between a protocol's steps, a thread
+ *   sometimes yields or sleeps up to 200 us, so that the interleavings the
+ *   models find happen in a run.
+ *
+ * Off, each is one load of a flag a point. Neither changes what is correct.
+ */
+static bool check_quiet;
+static bool perturbing;
+static _Atomic uint64_t issue_clock;      /* nonblocking get calls returned */
+static _Atomic uint64_t *issue_stamp;     /* per extent: its call's clock, or unstamped */
+#define UNSTAMPED UINT64_MAX
+
+static void perturb(void)
+{
+    if (!perturbing)
+        return;
+    static _Thread_local uint64_t x;
+    if (!x)
+        x = (uint64_t)(uintptr_t)&x * UINT64_C(0x9E3779B97F4A7C15) | 1;
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    if ((x & 7) == 0) {
+        struct timespec t = { 0, (long)((x >> 40) % 200000) };
+        nanosleep(&t, NULL);
+    } else if ((x & 1) == 0) {
+        sched_yield();
+    }
+}
+
+static bool environment_flag(const char *name)
+{
+    uint32_t v = 0;
+    if (osoe_environment_u32(name, &v) == OSOE_ENVIRONMENT_INVALID || v > 1)
+        osoe_fatal("%s='%s' is not 0 or 1", name, getenv(name));
+    return v == 1;
+}
+
 void osoe_transport_init(void)
 {
     osoe_am = (struct osoe_am_state){ 0 };
+    check_quiet = environment_flag("OSOE_CHECK_QUIET");
+    perturbing = environment_flag("OSOE_TEST_PERTURB");
     osoe_am.internode = osoe.job.node_count > 1;
     osoe_am.lead = osoe.bootstrap.local_id == 0;
 
@@ -243,6 +307,13 @@ void osoe_transport_init(void)
     copy_destination = calloc(osoe.node.landing_requests, sizeof *copy_destination);
     if (!copy_destination)
         osoe_fatal("out of memory for %u landing extents", osoe.node.landing_requests);
+    if (check_quiet) {
+        issue_stamp = calloc(osoe.node.landing_requests, sizeof *issue_stamp);
+        if (!issue_stamp)
+            osoe_fatal("out of memory for OSOE_CHECK_QUIET's stamps");
+        for (uint32_t e = 0; e < osoe.node.landing_requests; e++)
+            atomic_store_explicit(&issue_stamp[e], UNSTAMPED, memory_order_seq_cst);
+    }
     osoe_progress_host_start(osoe.node.hdr->session);
 }
 
@@ -268,6 +339,8 @@ void osoe_transport_fini(void)
     context_count = 0;
     free(copy_destination);
     copy_destination = NULL;
+    free(issue_stamp);
+    issue_stamp = NULL;
     osoe_am = (struct osoe_am_state){ 0 };
 }
 
@@ -390,15 +463,25 @@ static void mark(struct osoe_transport_context *c, uint32_t peer, uint64_t seq)
          * bit's fetch_or only when it is clear: once a segment a node, not
          * once an operation.
          */
+        perturb();
         _Atomic uint64_t *high = &c->shared_highest_segment[slot];
         uint64_t seen = atomic_load_explicit(high, memory_order_seq_cst);
+        perturb();
         while (seq > seen && !atomic_compare_exchange_weak_explicit(
                                  high, &seen, seq, memory_order_seq_cst, memory_order_seq_cst))
             ;
+        perturb();
         _Atomic uint64_t *word = &c->dirty_bits[slot / 64];
         uint64_t bit = UINT64_C(1) << (slot % 64);
         if (!(atomic_load_explicit(word, memory_order_seq_cst) & bit))
             atomic_fetch_or_explicit(word, bit, memory_order_seq_cst);
+        if (c->returned_highest) {
+            _Atomic uint64_t *done = &c->returned_highest[slot];
+            uint64_t was = atomic_load_explicit(done, memory_order_seq_cst);
+            while (seq > was && !atomic_compare_exchange_weak_explicit(
+                                    done, &was, seq, memory_order_seq_cst, memory_order_seq_cst))
+                ;
+        }
         return;
     }
     if (!c->touched[slot]) {
@@ -1164,10 +1247,29 @@ static void pending_add(struct osoe_transport_context *c, uint32_t extent, uint6
  * returns the credit, and the context's next wait - or any issue that found
  * no room - copies it into `dst`.
  */
+/* OSOE_CHECK_QUIET: the extents of the nonblocking get call in progress on
+ * this thread, stamped together when the call returns. */
+static _Thread_local uint32_t *call_extents;
+static _Thread_local uint32_t call_extent_count, call_extent_capacity;
+
+static void call_extent_add(uint32_t extent)
+{
+    if (call_extent_count == call_extent_capacity) {
+        uint32_t capacity = call_extent_capacity ? 2 * call_extent_capacity : 16;
+        uint32_t *grown = realloc(call_extents, capacity * sizeof *grown);
+        if (!grown)
+            osoe_fatal("out of memory for OSOE_CHECK_QUIET's stamps");
+        call_extents = grown;
+        call_extent_capacity = capacity;
+    }
+    call_extents[call_extent_count++] = extent;
+}
+
 static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
                                    enum osoe_region region, uint64_t offset, void *dst,
                                    size_t len, unsigned flags)
 {
+    call_extent_count = 0;
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
     struct osoe_connection *connection = osoe_connection_to(&osoe_am.area, peer);
     if (!connection)
@@ -1178,6 +1280,10 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
     while (len > 0) {
         uint32_t n = len > limit ? limit : (uint32_t)len;
         uint32_t extent = make_room(extents_for(n), "shmem_get_nbi");
+        if (issue_stamp) {
+            atomic_store_explicit(&issue_stamp[extent], UNSTAMPED, memory_order_seq_cst);
+            call_extent_add(extent);
+        }
         unsigned pair = 0;
         if (c->concurrent) {
             /*
@@ -1188,7 +1294,9 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
              */
             for (;;) {
                 uint64_t g = atomic_load_explicit(&block->generation, memory_order_seq_cst);
+                perturb();
                 atomic_fetch_add_explicit(&block->bytes_issued[g & 1], n, memory_order_seq_cst);
+                perturb();
                 if (atomic_load_explicit(&block->generation, memory_order_seq_cst) == g) {
                     pair = g & 1;
                     break;
@@ -1226,6 +1334,11 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
             osoe_count(OSOE_C_AM_WAKES_DEFERRED, 1);
         else
             osoe_progress_host_wake_lead();
+    }
+    if (issue_stamp) {
+        uint64_t stamp = atomic_fetch_add_explicit(&issue_clock, 1, memory_order_seq_cst) + 1;
+        for (uint32_t i = 0; i < call_extent_count; i++)
+            atomic_store_explicit(&issue_stamp[call_extents[i]], stamp, memory_order_seq_cst);
     }
 }
 
@@ -1570,12 +1683,72 @@ static uint32_t wait_dirty_shared(struct osoe_transport_context *c, const bool *
             if (ask_acknowledgement(c, slot))
                 osoe_progress_host_wake_lead();
             wait_acknowledged(slot, through, routine);
+            perturb();
             atomic_fetch_and_explicit(&c->dirty_bits[w], ~bit, memory_order_seq_cst);
+            perturb();
             if (!acknowledged(c, slot))
                 atomic_fetch_or_explicit(&c->dirty_bits[w], bit, memory_order_seq_cst);
         }
     }
     return waited;
+}
+
+/* OSOE_CHECK_QUIET's snapshot at a wait's call: every slot's highest segment,
+ * and the clock of nonblocking get calls returned. */
+struct quiet_promise {
+    uint64_t *highest;
+    uint64_t clock;
+};
+
+static void promise_take(const struct osoe_transport_context *c, struct quiet_promise *p)
+{
+    p->highest = NULL;
+    if (!check_quiet)
+        return;
+    p->clock = atomic_load_explicit(&issue_clock, memory_order_seq_cst);
+    if (!osoe_am.internode)
+        return;
+    uint32_t peers = peer_count();
+    p->highest = malloc(peers * sizeof *p->highest);
+    if (!p->highest)
+        osoe_fatal("out of memory for OSOE_CHECK_QUIET's snapshot");
+    for (uint32_t slot = 0; slot < peers; slot++)
+        p->highest[slot] = atomic_load_explicit(&c->returned_highest[slot], memory_order_seq_cst);
+}
+
+static void promise_check(const struct osoe_transport_context *c, struct quiet_promise *p,
+                          const bool *wanted, bool only_gets, const char *routine)
+{
+    if (!check_quiet)
+        return;
+    for (uint32_t e = 0; e < osoe.node.landing_requests; e++) {
+        struct osoe_landing_record *r = &my_records()[e];
+        if (atomic_load_explicit(&r->state, memory_order_seq_cst) == OSOE_LANDING_FREE)
+            continue;
+        uint64_t token = atomic_load_explicit(&r->token, memory_order_seq_cst);
+        if (!(token & OSOE_LANDING_NONBLOCKING) ||
+            ((token >> OSOE_LANDING_OWNER_SHIFT) & OSOE_LANDING_OWNER_MASK) != c->block)
+            continue;
+        uint64_t stamp = atomic_load_explicit(&issue_stamp[e], memory_order_seq_cst);
+        if (stamp != UNSTAMPED && stamp <= p->clock)
+            osoe_fatal("OSOE_CHECK_QUIET: %s returned with a nonblocking get in flight that "
+                       "returned before it was called (extent %u, call %llu of %llu)",
+                       routine, e, (unsigned long long)stamp, (unsigned long long)p->clock);
+    }
+    if (p->highest && !only_gets)
+        for (uint32_t slot = 0; slot < peer_count(); slot++) {
+            if (wanted && !wanted[slot])
+                continue;
+            uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
+            uint64_t acked = osoe_progress_host_acked(peer);
+            if (acked < p->highest[slot])
+                osoe_fatal("OSOE_CHECK_QUIET: %s returned with node %u acknowledged through "
+                           "segment %llu, and this context had written through %llu before "
+                           "the call", routine, peer, (unsigned long long)acked,
+                           (unsigned long long)p->highest[slot]);
+        }
+    free(p->highest);
+    p->highest = NULL;
 }
 
 /*
@@ -1599,14 +1772,30 @@ static void wait_shared(struct osoe_transport_context *c, const int *pes, size_t
         return;
     osoe_count(OSOE_C_TRANSPORT_WAIT_CALLS, 1);
     uint64_t t0 = osoe_now_ns();
+    struct quiet_promise promise;
+    promise_take(c, &promise);
+    bool *wanted = NULL;
+    if (pes && osoe_am.internode) {
+        wanted = calloc(peer_count(), sizeof *wanted);
+        if (!wanted)
+            osoe_fatal("out of memory in shmem_pe_quiet");
+        for (size_t i = 0; i < npes; i++) {
+            uint32_t node = osoe_node_of(&osoe.job, (uint32_t)pes[i]);
+            if (node != osoe.job.node && node != UINT32_MAX)
+                wanted[peer_slot(node)] = true;
+        }
+    }
     osoe_serializing_fence();
     struct osoe_context_block *block = block_of(c);
     uint64_t e = atomic_load_explicit(&block->generation, memory_order_seq_cst);
+    perturb();
     context_enter(c);
     uint64_t full = atomic_load_explicit(&block->full, memory_order_seq_cst);
     if (full > e) {
         context_leave(c);
         osoe_count(OSOE_C_TRANSPORT_WAIT_NOTHING_OUTSTANDING, 1);
+        promise_check(c, &promise, wanted, only_gets, routine);
+        free(wanted);
         return;
     }
     uint64_t g = atomic_load_explicit(&block->generation, memory_order_seq_cst);
@@ -1616,24 +1805,13 @@ static void wait_shared(struct osoe_transport_context *c, const int *pes, size_t
      * before the wait is (§4.6). */
     osoe_serializing_fence();
     uint32_t waited = 0;
-    if (!only_gets && osoe_am.internode) {
-        bool *wanted = NULL;
-        if (pes) {
-            wanted = calloc(peer_count(), sizeof *wanted);
-            if (!wanted)
-                osoe_fatal("out of memory in shmem_pe_quiet");
-            for (size_t i = 0; i < npes; i++) {
-                uint32_t node = osoe_node_of(&osoe.job, (uint32_t)pes[i]);
-                if (node != osoe.job.node && node != UINT32_MAX)
-                    wanted[peer_slot(node)] = true;
-            }
-        }
+    if (!only_gets && osoe_am.internode)
         waited = wait_dirty_shared(c, wanted, routine);
-        free(wanted);
-    }
     if (!pes && !only_gets)
         atomic_store_explicit(&block->full, g + 1, memory_order_seq_cst);
     context_leave(c);
+    promise_check(c, &promise, wanted, only_gets, routine);
+    free(wanted);
     if (waited == 0)
         osoe_count(OSOE_C_TRANSPORT_WAIT_NOTHING_OUTSTANDING, 1);
     osoe_count(OSOE_C_TRANSPORT_WAIT_DIRTY_PEERS, waited);

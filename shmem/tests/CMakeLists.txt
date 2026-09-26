@@ -1630,6 +1630,23 @@ endif()
 # unprovable cross-process kind the internode tests are kept from.
 osoe_tier2_test(multiple)
 osoe_tier2_map_test(multiple 0,1 OSOE_GET_LANDING_BYTES=8192)
+# With the library checking every shared wait's promise at its return and
+# perturbing the steps of its protocols (OSOE_CHECK_QUIET, OSOE_TEST_PERTURB;
+# transport-am.c), so that a race the models find happens and shows.
+foreach(map IN ITEMS 0,1 0,1,2,0,1,0)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  if(map STREQUAL "0,1" OR NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.multiple.checked.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1
+              OSOE_GET_LANDING_BYTES=8192
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 120 --
+              $<TARGET_FILE:shmem_test_multiple>)
+    set_tests_properties(shmem.multiple.checked.${label} PROPERTIES LABELS "tier2" TIMEOUT 180
+      FAIL_REGULAR_EXPRESSION "OSOE_CHECK_QUIET:")
+  endif()
+endforeach()
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(multiple 0,0,1,1 OSOE_GET_LANDING_BYTES=8192)
   osoe_tier2_map_test(multiple 0,1,2,0,1,0 OSOE_GET_LANDING_BYTES=8192)

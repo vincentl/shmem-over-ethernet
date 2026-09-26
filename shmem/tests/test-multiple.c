@@ -61,6 +61,7 @@ static uint64_t *counter;       /* at PE 0: every worker's increments */
 static long *locks;             /* [THREADS]: one lock per worker number */
 static long *locked_count;      /* [THREADS], at PE 0: counted under the locks */
 static long *shared_rows;       /* [THREADS][WORDS]: the left neighbour's default-context puts */
+static long *shared_rows_back;  /* [THREADS][WORDS]: the right neighbour's */
 static pthread_mutex_t report = PTHREAD_MUTEX_INITIALIZER;
 static int failures;
 
@@ -167,6 +168,11 @@ static void *work(void *argument)
         for (int i = 0; i < WORDS; i++)
             own[i] = value(me, t, round + 1000, i);
         shmem_long_put(&shared_rows[t * WORDS], own, WORDS, right);
+        /* And to the left neighbour, on another node on an interleaved map,
+         * which a pe_quiet naming only the right one leaves outstanding: a
+         * full quiet another thread began before it must not take it for one
+         * (with OSOE_CHECK_QUIET, the library checks every wait's promise). */
+        shmem_long_put(&shared_rows_back[t * WORDS], own, WORDS, left);
         if (round % 2)
             shmem_pe_quiet(&right, 1);
         else
@@ -257,8 +263,9 @@ int main(void)
     locks = shmem_calloc(THREADS, sizeof *locks);
     locked_count = shmem_calloc(THREADS, sizeof *locked_count);
     shared_rows = shmem_calloc(THREADS * WORDS, sizeof *shared_rows);
+    shared_rows_back = shmem_calloc(THREADS * WORDS, sizeof *shared_rows_back);
     CHECK_FATAL(words && fixed && landing && flags && shared_flag && counter && locks &&
-                locked_count && shared_rows);
+                locked_count && shared_rows && shared_rows_back);
     for (int t = 0; t < THREADS; t++)
         for (int i = 0; i < WORDS; i++)
             fixed[t * WORDS + i] = value(me, t, 0, i);
@@ -335,6 +342,7 @@ int main(void)
             fail("the count kept under a lock", t, -1, locked_count[t], (long)npes * ROUNDS * 2);
     CHECK(failures == 0);
     shmem_barrier_all();
+    shmem_free(shared_rows_back);
     shmem_free(shared_rows);
     shmem_free(locked_count);
     shmem_free(locks);
