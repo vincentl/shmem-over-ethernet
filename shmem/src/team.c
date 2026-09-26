@@ -416,6 +416,15 @@ static void write_record(const struct osoe_team *t, const char *name,
     r->position = 0;
     r->children = 0;
     snprintf(r->name, sizeof r->name, "%s", name);
+    /* The team's world ranks, decision E (node.h): a progression, or for a
+     * table - SHMEM_TEAM_SHARED's family, on one node - nothing. */
+    r->members = t->members;
+    r->strided = t->world_of_rank == NULL;
+    r->world_start = r->strided ? t->world_start : 0;
+    r->world_stride = r->strided ? t->world_stride : 0;
+    if (t->internode && !r->strided)
+        osoe_fatal("%s spans nodes and its ranks are not a progression of world ranks; every "
+                   "team with an internode phase must be one (decision E)", t->name);
     if (t->internode) {
         uint32_t k = osoe.bootstrap.collective_fanout;
         struct osoe_collective_tree tree;
@@ -661,19 +670,6 @@ const uint32_t *osoe_internode_team_local_ranks(uint32_t team, uint32_t *count)
     if (team == OSOE_TEAM_WORLD || team == OSOE_TEAM_FINALIZE)
         return ranks_ascending;
     return t->local_ranks;
-}
-
-/* The team's mapping to world ranks (team.h), as a progression from `rank` on:
- * the rest of the team for a strided one, one rank for one with a table. */
-uint32_t osoe_internode_team_world_ranks(uint32_t team, uint32_t rank, uint32_t *world,
-                                         int32_t *stride)
-{
-    const struct osoe_team *t = osoe_team_numbered(team);
-    if (!t || rank >= t->members)
-        return 0;
-    *world = (uint32_t)osoe_team_to_world(t, (int)rank);
-    *stride = t->world_of_rank ? 1 : t->world_stride;
-    return t->world_of_rank ? 1 : t->members - rank;
 }
 
 /* ---- team queries (§9.4) ----------------------------------------------- */

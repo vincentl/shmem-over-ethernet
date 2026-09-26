@@ -1,7 +1,9 @@
 # Phase 1, step 10, slice 1: the prefix scans, and the team's record carrying its world ranks
 
 **Status: approved by the author on 2026-09-26 (evening): question S, design
-A, every member at its team rank's place.** It departs from design §5.8's
+A, every member at its team rank's place. Built; its review moved the slots
+from the PE's, shared by every team with READY, to the team number's, with no
+READY - see design §5.8 and `docs/decisions/2026-09-26-evening.md` §5.** It departs from design §5.8's
 sketch of runs, which §5.8 is updated to say. Question E (the record, not the
 upcall) was decided earlier the same day and is folded in as decided.
 

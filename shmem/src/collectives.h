@@ -49,6 +49,15 @@ int osoe_alltoall(const char *routine, shmem_team_t team, void *dest, const void
                   ptrdiff_t dest_stride, ptrdiff_t source_stride, size_t nelems, size_t width);
 
 /*
+ * A prefix sum of nelems elements of `element` over `team` (spec §9.10.10):
+ * member i's dest ends holding the sum of the sources of team ranks 0 .. i, or
+ * 0 .. i - 1 when not `inclusive` (0 at rank 0). 0 on success; nonzero for
+ * SHMEM_TEAM_INVALID.
+ */
+int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *source,
+              size_t nelems, struct osoe_element element, bool inclusive);
+
+/*
  * The deprecated active-set routines (Annex F) run over the whole job and
  * nothing else (design §7.4): PE_start 0, logPE_stride 0 and PE_size the job's
  * size - with any stride in a job of one PE. Any other active set ends the job

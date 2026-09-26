@@ -148,8 +148,9 @@
  *
  * **The shares' members are found once per team** (find_intervals), at its
  * first gather, since they depend on the team and the rank map alone: the
- * team's ranks walked in order, their world ranks from the team's mapping
- * (osoe_internode_team_world_ranks) and their nodes from the rank map's runs,
+ * team's ranks walked in order, their world ranks from the progression the
+ * team's record carries (node.h, decision E) and their nodes from the rank
+ * map's runs,
  * each stretch of members on one node joining the list of every step whose
  * shares include its node, merged with the interval before it when the two
  * touch. A list holds intervals of consecutive team ranks, and consecutive
@@ -328,6 +329,9 @@ struct generic_team {
     uint32_t members;
     uint32_t shares;
     struct interval_list *step_intervals;
+    /* The pieces its scans have moved (osoe_internode_generic_scan): what each
+     * scan slot a member uses has received, since the team's tree is one. */
+    uint64_t scan_pieces;
 };
 
 static struct generic_team *teams;
@@ -917,41 +921,46 @@ static void find_intervals(struct generic_team *team_phase, uint32_t team, const
     if (!team_phase->step_intervals || !walk.steps_joined)
         osoe_fatal("%s: out of memory for team %u's gather", routine, team);
 
-    uint32_t rank = 0, world = 0, count;
-    int32_t stride = 1;
-    while ((count = osoe_internode_team_world_ranks(team, rank, &world, &stride)) > 0) {
-        if (stride == 0 && count > 1)
-            osoe_fatal("%s: team %u's ranks from %u on are all world rank %u", routine, team,
-                       rank, world);
-        for (uint32_t k = 0; k < count;) {
-            int64_t w = (int64_t)world + (int64_t)k * stride;
-            const struct osoe_rank_run *run =
-                w >= 0 && w < job->world_size
-                    ? osoe_rank_run_find(job->runs, job->run_count, (uint32_t)w) : NULL;
-            if (!run)
-                osoe_fatal("%s: team %u's rank %u is PE %lld, which the rank map places on no "
-                           "node", routine, team, rank + k, (long long)w);
-            /* The progression's ranks from k on that this run holds. */
-            uint64_t along = (uint64_t)w - run->first_rank;
-            uint64_t in_run = stride > 0 ? (run->count - 1 - along) / (uint64_t)stride + 1
-                              : stride < 0 ? along / (uint64_t)(-(int64_t)stride) + 1 : 1;
-            if (in_run > count - k)
-                in_run = count - k;
-            if (run->node_step == 0) {
-                add_members(&walk, rank + k, (uint32_t)in_run, run->first_node);
-            } else {
-                for (uint64_t j = 0; j < in_run; j++) {
-                    int64_t at = (int64_t)along + (int64_t)j * stride;
-                    add_members(&walk, rank + k + (uint32_t)j, 1,
-                                (uint32_t)((int64_t)run->first_node + at * run->node_step));
-                }
+    /* The team's members as world ranks, from its record on this node, which
+     * this thread - the team's local lead here - wrote (node.h, decision E):
+     * one progression, walked once. */
+    const struct osoe_team_record *record = &osoe_node_team(&osoe.node, team)->record;
+    if (!atomic_load_explicit(&record->published, memory_order_acquire))
+        osoe_fatal("%s: team %u's record here is not published", routine, team);
+    if (!record->strided)
+        osoe_fatal("%s: team %u's record here is not a progression of world ranks", routine,
+                   team);
+    uint32_t world = record->world_start, count = record->members;
+    int32_t stride = record->world_stride;
+    if (stride == 0 && count > 1)
+        osoe_fatal("%s: team %u's ranks are all world rank %u", routine, team, world);
+    for (uint32_t k = 0; k < count;) {
+        int64_t w = (int64_t)world + (int64_t)k * stride;
+        const struct osoe_rank_run *run =
+            w >= 0 && w < job->world_size
+                ? osoe_rank_run_find(job->runs, job->run_count, (uint32_t)w) : NULL;
+        if (!run)
+            osoe_fatal("%s: team %u's rank %u is PE %lld, which the rank map places on no "
+                       "node", routine, team, k, (long long)w);
+        /* The progression's ranks from k on that this run holds. */
+        uint64_t along = (uint64_t)w - run->first_rank;
+        uint64_t in_run = stride > 0 ? (run->count - 1 - along) / (uint64_t)stride + 1
+                          : stride < 0 ? along / (uint64_t)(-(int64_t)stride) + 1 : 1;
+        if (in_run > count - k)
+            in_run = count - k;
+        if (run->node_step == 0) {
+            add_members(&walk, k, (uint32_t)in_run, run->first_node);
+        } else {
+            for (uint64_t j = 0; j < in_run; j++) {
+                int64_t at = (int64_t)along + (int64_t)j * stride;
+                add_members(&walk, k + (uint32_t)j, 1,
+                            (uint32_t)((int64_t)run->first_node + at * run->node_step));
             }
-            k += (uint32_t)in_run;
         }
-        rank += count;
+        k += (uint32_t)in_run;
     }
     free(walk.steps_joined);
-    team_phase->members = rank;
+    team_phase->members = count;
     if (walk.here != listed)
         osoe_fatal("%s: the rank map puts %u of team %u's members on this node, and the team "
                    "lists %u here", routine, walk.here, team, listed);
@@ -1185,4 +1194,188 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
     struct pieces pieces = { team, epoch, root_index, buffer, bytes, piece_bytes(1), 1, NULL,
                              routine };
     in_pieces(team_phase, &pieces, &tree);
+}
+
+/* ---- The scans (spec §9.10.10; phase 1 step 10 slice 1) ------------------ */
+
+/*
+ * A prefix scan over a team spanning nodes, every member at its team rank's
+ * place in a pre-order k-ary tree over the ranks 0 .. M - 1
+ * (docs/prompts/phase1-step10-slice1-prompt.md, the author's design A; the
+ * protocol is tools/modelcheck/scan_model.py's `per_team`). A place covering
+ * the ranks [a, b) is rank a; its children split [a + 1, b) into at most k
+ * consecutive blocks, the first ones a rank longer when the split is uneven,
+ * so every subtree is a contiguous range of ranks. Up: a member waits for each
+ * child's subtree total, adds its own source, and puts the sum into its
+ * parent's up-slot for its position, then adds one, fenced, to the parent's
+ * counter for that slot. Down: the root has nothing before it; every other
+ * member waits for the sum of every rank before its subtree in its down-slot.
+ * That sum is its exclusive result, plus its source its inclusive one, and
+ * child j is sent that plus its source plus the totals of children 0 .. j - 1.
+ *
+ * The slots and counters are the team number's, on every member's region
+ * (internal-region.h), the counters cumulative and compared as at least: a
+ * team's scans all use one tree, so each of its members expects, in every
+ * slot it uses, one more piece than the team's scans have moved so far
+ * (`scan_pieces`, counted per team as the generic implementation's other
+ * bases are). No slot is written while its reader may still need it: a child
+ * puts piece p + 1 up - of this scan or the team's next - only after its down
+ * for piece p arrived, which its parent sent after reading piece p's total;
+ * and a parent puts a down only after the child's total arrived, so the child
+ * has read its last down. Different teams use different memory, so two
+ * threads may scan two teams at once (spec §9.4), which slots shared by every
+ * team would not allow (the review of the slice).
+ *
+ * A scan larger than a slot runs a piece at a time, each piece up and down
+ * before the next. Costs, with M members and k the fan-out: 2 ceil(log_k M)
+ * steps a piece, each a put and a fenced add; O(k) slots and counters a team
+ * number a PE; O(k log_k M) arithmetic to find a place.
+ */
+static uint64_t scan_slot(uint32_t team, uint32_t position)
+{
+    uint32_t fanout = osoe.bootstrap.collective_fanout;
+    return osoe_internal_scan_offset(fanout, osoe.bootstrap.collective_pipeline,
+                                     osoe.bootstrap.max_teams, osoe.bootstrap.node_count) +
+           (uint64_t)team * osoe_internal_team_scan_bytes(fanout) +
+           (uint64_t)position * OSOE_INTERNAL_SCAN_SLOT_BYTES;
+}
+
+/* Slot `position`'s counter: a child position's below the fan-out, the
+ * down-slot's at it. */
+static uint64_t scan_counter(uint32_t team, uint32_t position)
+{
+    uint32_t fanout = osoe.bootstrap.collective_fanout;
+    return scan_slot(team, fanout + 1) + (uint64_t)position * OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* The children of the place covering [a, b): how many, and child j's first
+ * rank and end. */
+static uint32_t scan_children(uint32_t a, uint32_t b, uint32_t k)
+{
+    uint32_t rest = b - a - 1;
+    return rest < k ? rest : k;
+}
+
+static void scan_child(uint32_t a, uint32_t b, uint32_t k, uint32_t j, uint32_t *first,
+                       uint32_t *end)
+{
+    uint32_t rest = b - a - 1, n = scan_children(a, b, k);
+    uint32_t size = rest / n, longer = rest % n;
+    *first = a + 1 + j * size + (j < longer ? j : longer);
+    *end = *first + size + (j < longer ? 1 : 0);
+}
+
+/* The place of `rank` in the tree over `members` ranks: its subtree [*a, *b),
+ * its parent's rank (UINT32_MAX at the root) and its position there. */
+static void scan_place(uint32_t members, uint32_t k, uint32_t rank, uint32_t *a, uint32_t *b,
+                       uint32_t *parent, uint32_t *position)
+{
+    *a = 0;
+    *b = members;
+    *parent = UINT32_MAX;
+    *position = 0;
+    while (*a != rank) {
+        uint32_t n = scan_children(*a, *b, k), first = 0, end = 0, j;
+        for (j = 0; j < n; j++) {
+            scan_child(*a, *b, k, j, &first, &end);
+            if (rank < end)
+                break;
+        }
+        *parent = *a;
+        *position = j;
+        *a = first;
+        *b = end;
+    }
+}
+
+/* Wait for slot `position` of `team` to hold piece `want` of the team's
+ * scans, from PE `from`. */
+static void scan_wait(uint32_t team, uint32_t position, uint64_t want, int from,
+                      const char *routine)
+{
+    osoe_region_wait(routine, OSOE_REGION_INTERNAL, scan_counter(team, position), 8, false,
+                     OSOE_COMPARISON_GREATER_OR_EQUAL, want, OSOE_BLOCKED_DETAIL_PE,
+                     (uint64_t)from);
+}
+
+void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const void *source,
+                                 size_t count, struct osoe_element element, bool inclusive,
+                                 const char *routine)
+{
+    const struct osoe_team_record *record = &osoe_node_team(&osoe.node, team)->record;
+    if (!atomic_load_explicit(&record->published, memory_order_acquire))
+        osoe_fatal("%s: team %u's record here is not published", routine, team);
+    if (!record->strided || rank >= record->members)
+        osoe_fatal("%s: team %u's record here is %s", routine, team,
+                   !record->strided ? "not a progression of world ranks"
+                                    : "shorter than this PE's rank");
+    osoe_combine_function add = osoe_combine_lookup(OSOE_REDUCTION_SUM, element);
+    if (!add)
+        osoe_fatal("%s: no sum over elements of kind %d and width %u", routine,
+                   (int)element.kind, element.width);
+    uint32_t k = osoe.bootstrap.collective_fanout, members = record->members;
+    uint32_t a, b, parent, position;
+    scan_place(members, k, rank, &a, &b, &parent, &position);
+    uint32_t children = scan_children(a, b, k);
+    int child_pe[OSOE_COLLECTIVE_FANOUT_MAX];
+    for (uint32_t j = 0; j < children; j++) {
+        uint32_t first, end;
+        scan_child(a, b, k, j, &first, &end);
+        child_pe[j] = (int)((int64_t)record->world_start + (int64_t)first * record->world_stride);
+    }
+    int parent_pe = parent == UINT32_MAX ? -1
+        : (int)((int64_t)record->world_start + (int64_t)parent * record->world_stride);
+
+    size_t width = element.width, per_piece = OSOE_INTERNAL_SCAN_SLOT_BYTES / width;
+    size_t piece_bytes = (count < per_piece ? count : per_piece) * width;
+    /* Own source, the running sum, and each child's subtree total, a piece each. */
+    unsigned char *buffers = malloc((size_t)(children + 2) * piece_bytes);
+    if (!buffers)
+        osoe_fatal("%s: out of memory for a scan's pieces", routine);
+    unsigned char *own = buffers, *sum = buffers + piece_bytes, *totals = buffers + 2 * piece_bytes;
+    struct osoe_transport_context *context = osoe_transport_context_default();
+    struct generic_team *g = &teams[team];
+
+    for (size_t done = 0; done < count;) {
+        size_t n = count - done < per_piece ? count - done : per_piece;
+        size_t bytes = n * width;
+        uint64_t want = ++g->scan_pieces;
+        /* This PE's source first: dest may be the same array. */
+        memcpy(own, (const unsigned char *)source + done * width, bytes);
+        memcpy(sum, own, bytes);
+        for (uint32_t j = 0; j < children; j++) {
+            scan_wait(team, j, want, child_pe[j], routine);
+            unsigned char *total = totals + (size_t)j * piece_bytes;
+            memcpy(total, internal(scan_slot(team, j)), bytes);
+            add(sum, total, n);
+        }
+        /* `sum` is this subtree's total. Up, then the sum before it down. */
+        unsigned char *out = (unsigned char *)dest + done * width;
+        if (parent_pe >= 0) {
+            osoe_transport_put(context, parent_pe, OSOE_REGION_INTERNAL, scan_slot(team, position),
+                               sum, bytes, OSOE_TRANSPORT_MORE);
+            osoe_transport_rmw(context, parent_pe, OSOE_REGION_INTERNAL,
+                               scan_counter(team, position), OSOE_RMW_ADD, 8, 1, 0,
+                               OSOE_TRANSPORT_FENCED);
+            scan_wait(team, k, want, parent_pe, routine);
+            memcpy(sum, internal(scan_slot(team, k)), bytes);
+        } else {
+            memset(sum, 0, bytes);
+        }
+        /* `sum` is now the sum of every rank before this subtree: this PE's
+         * exclusive result. */
+        memcpy(out, sum, bytes);
+        if (inclusive)
+            add(out, own, n);
+        add(sum, own, n);
+        for (uint32_t j = 0; j < children; j++) {
+            osoe_transport_put(context, child_pe[j], OSOE_REGION_INTERNAL, scan_slot(team, k), sum,
+                               bytes, OSOE_TRANSPORT_MORE);
+            osoe_transport_rmw(context, child_pe[j], OSOE_REGION_INTERNAL, scan_counter(team, k),
+                               OSOE_RMW_ADD, 8, 1, 0, OSOE_TRANSPORT_FENCED);
+            add(sum, totals + (size_t)j * piece_bytes, n);
+        }
+        done += n;
+    }
+    free(buffers);
 }

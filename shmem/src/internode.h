@@ -45,7 +45,7 @@
  * (team, epoch) on every participating node. The data half,
  * osoe_internode_reduce, osoe_internode_broadcast and osoe_internode_collect,
  * is called by the team's local lead on its own application thread, and
- * blocks.
+ * blocks; osoe_internode_scan by every member, on its own thread.
  *
  * Errors, and waiting. As transport.h: there is no error return, and a failure
  * ends the job (§3.15). The barrier's half never blocks, so it never sweeps;
@@ -113,11 +113,11 @@
  *   - a team's record: read the first time the team is met, like AM's, with
  *     its tree neighbours' leads the ranks whose per-team slab of counters -
  *     the internal region's block for the team's number, registered with the
- *     heap - its RDMA atomics write; and osoe_internode_team_lead,
- *     osoe_internode_team_local_ranks and osoe_internode_team_world_ranks,
- *     asked as the generic implementation asks them, to re-root a tree at any
- *     node, to know which of a gather's blocks are its node's, and which node
- *     holds each of the others. Nothing in the four is AM's.
+ *     heap - its RDMA atomics write, and its members as world ranks, the
+ *     progression the record carries (decision E); and osoe_internode_team_lead
+ *     and osoe_internode_team_local_ranks, asked as the generic implementation
+ *     asks them, to re-root a tree at any node and to know which of a gather's
+ *     blocks are its node's. Nothing in the three is AM's.
  *   - osoe_internode_arrive: once the node has arrived and its children's
  *     counters show theirs, an RDMA fetch-add on the parent's counter - the
  *     tree built out of put and atomics, with the progress thread (or a NIC
@@ -145,6 +145,7 @@
 #ifndef OSOE_INTERNODE_H
 #define OSOE_INTERNODE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -189,12 +190,15 @@ uint32_t osoe_internode_fanout_default(void);
  * there.
  *
  * The record keeps O(k) of the team's node set - the logical nodes holding at
- * least one member, sorted - and never the O(N) set itself (§5.3). A broadcast
- * re-rooted at every call needs any node's lead by its position in the set,
- * and a gather needs to know which members' places are its node's, and which
- * node holds every other member's; the calls below give them, above this
- * header, to the thread the data half runs on (phase 1 step 7 slice 2; the
- * third call, osoe_internode_team_world_ranks, phase 1 step 5 slice 6).
+ * least one member, sorted - and never the O(N) set itself (§5.3), and since
+ * layout 22 the team's members as a progression of world ranks, O(1), which
+ * says with the rank map which node holds any member (the author's decision E
+ * of 2026-09-26: every team with an internode phase is such a progression). A
+ * broadcast re-rooted at every call needs any node's lead by its position in
+ * the set, and a gather which members' places are its node's; the two calls
+ * below give them, above this header, to the thread the data half runs on
+ * (phase 1 step 7 slice 2). A third, osoe_internode_team_world_ranks, gave
+ * the world ranks from phase 1 step 5 slice 6 until the record carried them.
  */
 
 /*
@@ -218,22 +222,6 @@ uint32_t osoe_internode_team_lead(uint32_t team, uint32_t index);
  * thread the data half runs on is a bug to name. O(1).
  */
 const uint32_t *osoe_internode_team_local_ranks(uint32_t team, uint32_t *count);
-
-/*
- * Up, as the two calls above, and asked where they are: team `team`'s members
- * from team rank `rank` on as world ranks - the returned count of them, rank
- * `rank` + i being world rank `*world` + i x `*stride` - or 0 if `rank` is
- * past its last member, or where this process holds no descriptor for the
- * team, which on the thread the data half runs on is a bug to name, as for
- * the call above. With the rank map (job.h) it says which node holds
- * any member's place in a gather's result, and so which of a result's bytes
- * are each node's to send (phase 1 step 5 slice 6). A team strided in world
- * ranks - the predefined teams spanning nodes, and every team a split makes
- * of them - is one progression, answered in one call; a team listed rank by
- * rank, which lies within a node, answers a rank at a time. O(1).
- */
-uint32_t osoe_internode_team_world_ranks(uint32_t team, uint32_t rank, uint32_t *world,
-                                         int32_t *stride);
 
 /* ---- The phase itself ------------------------------------------------- */
 
@@ -361,5 +349,30 @@ void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index
  */
 void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                             size_t block, const uint64_t *places, const char *routine);
+
+/*
+ * The internode phase of a prefix scan (spec §9.10.10; phase 1 step 10 slice
+ * 1, docs/prompts/phase1-step10-slice1-prompt.md): the one data-half call
+ * **every member** makes, on its own thread, not the team's local lead alone.
+ * `rank` is the caller's team rank; on return `dest` holds the sum of every
+ * member's `source`, `count` elements of `element`, over ranks 0 .. rank
+ * (`inclusive`) or 0 .. rank - 1 (exclusive, 0 at rank 0). `source` is read
+ * before `dest` is written, so the two may be one array. Called only for a
+ * team spanning nodes, whose ranks are a progression of world ranks its record
+ * carries (node.h, decision E); a team on one node is its local lead's to scan
+ * (collectives.c). Blocks, sweeping, naming `routine`.
+ *
+ * The generic implementation: every member at its rank's place in a pre-order
+ * k-ary tree over the ranks, k the agreed fan-out - each subtree a contiguous
+ * range of ranks - its subtree's total sent up, the sum of every rank before
+ * its subtree sent down, 2 ceil(log_k M) steps for M members. Its slots are
+ * the team number's, in every member's internal region (internal-region.h;
+ * tools/modelcheck/scan_model.py), so scans on different teams may run at once
+ * on different threads. An RDMA backend runs it as it is, its puts and fenced
+ * adds RDMA writes and atomics.
+ */
+void osoe_internode_scan(uint32_t team, uint32_t rank, void *dest, const void *source,
+                         size_t count, struct osoe_element element, bool inclusive,
+                         const char *routine);
 
 #endif /* OSOE_INTERNODE_H */

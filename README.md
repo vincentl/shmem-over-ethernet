@@ -5,7 +5,8 @@ designed to build entirely from a Linux distribution's own packages — no fabri
 libraries.
 
 **Status:** phase 1, through step 7 (team creation), step 8's first slice
-(contexts) and step 9's first slice (block-strided RMA); step 8's threads,
+(contexts), step 9's first slice (block-strided RMA) and step 10's (the
+prefix scans); step 8's threads,
 `SHMEM_THREAD_MULTIPLE`, follow (design §7.1, §4.11). Jobs run on one node or across
 nodes over TCP and io_uring, started by `srun` or by `osoe-launch`:
 initialization and thread levels up to `SHMEM_THREAD_SERIALIZED`, the symmetric
@@ -36,8 +37,10 @@ ordering routine on them, with team-relative PE numbering - are there; a
 context is serial, one call at a time, as every thread level up to
 `SHMEM_THREAD_SERIALIZED` requires anyway.
 
-Not yet: the scans (`shmem_sum_inscan`, `shmem_sum_exscan`) and
-`SHMEM_THREAD_MULTIPLE` (§7.5, §7.6, §4.11).
+The prefix scans, `shmem_sum_inscan` and `shmem_sum_exscan`, over every type
+SUM takes, are there too (design §5.8).
+
+Not yet: `SHMEM_THREAD_MULTIPLE` (§4.11).
 Nonblocking gets across nodes overlap, many in flight before the quiet that
 completes them; a nonblocking put returns once its source may be reused, as a
 blocking one does.

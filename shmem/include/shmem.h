@@ -743,6 +743,24 @@ OSOE_REDUCE_COMPLEX_TYPES(OSOE_REDUCE_DECL_ARITHMETIC)
 #pragma GCC diagnostic pop
 #endif
 
+/* The prefix scans (spec §9.10.10) over the types SUM takes (Table 10). */
+#define OSOE_SCAN_DECL_P(P, T, NAME)                                         \
+    int OSOE_FN(P, NAME, _sum_inscan)(shmem_team_t team, T *dest, const T *source, \
+                                      size_t nelems);                        \
+    int OSOE_FN(P, NAME, _sum_exscan)(shmem_team_t team, T *dest, const T *source, \
+                                      size_t nelems);
+#define OSOE_SCAN_DECL(T, NAME) OSOE_SCAN_DECL_P(shmem_, T, NAME)
+OSOE_REDUCE_INTEGER_TYPES(OSOE_SCAN_DECL)
+OSOE_REDUCE_FLOATING_TYPES(OSOE_SCAN_DECL)
+#ifdef OSOE_CXX_COMPLEX
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+OSOE_REDUCE_COMPLEX_TYPES(OSOE_SCAN_DECL)
+#ifdef OSOE_CXX_COMPLEX
+#pragma GCC diagnostic pop
+#endif
+
 /*
  * The deprecated active-set reductions (Annex F; Table 11), over the whole job
  * only (above): every operator on the four signed integer types, the ordered
@@ -1538,6 +1556,13 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
 #define shmem_prod_reduce(team, dest, source, nreduce)                           \
     (_Generic((dest) OSOE_REDUCE_G_ARITHMETIC(OSOE_REDUCE_G, _prod_reduce))      \
         ((team), (dest), (source), (nreduce)))
+/* The scans (§9.10.10) dispatch as sum does. */
+#define shmem_sum_inscan(team, dest, source, nelems)                             \
+    (_Generic((dest) OSOE_REDUCE_G_ARITHMETIC(OSOE_REDUCE_G, _sum_inscan))       \
+        ((team), (dest), (source), (nelems)))
+#define shmem_sum_exscan(team, dest, source, nelems)                             \
+    (_Generic((dest) OSOE_REDUCE_G_ARITHMETIC(OSOE_REDUCE_G, _sum_exscan))       \
+        ((team), (dest), (source), (nelems)))
 
 /* Broadcast dispatches on dest over Table 5's distinct types, as put does. */
 #define shmem_broadcast(team, dest, source, nelems, PE_root)                     \

@@ -263,7 +263,7 @@ void osoe_segment_close(struct osoe_segment *s);
  * it could already carry.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               21
+#define OSOE_SEGMENT_NEWEST_LAYOUT               22
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is

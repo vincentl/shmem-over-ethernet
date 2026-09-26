@@ -98,7 +98,8 @@ struct osoe_bootstrap {
  * before phase 1 step 5 slice 5; each step of D costs every team number's
  * slots in the internal region again (internal-region.h). A PE's region is
  * OSOE_MAX_TEAMS x (fan-out + 1) x D slots of 16 KiB, and a line per counter:
- * 10 MiB at the defaults (64 teams, fan-out 4, D = 2), and at the extremes the
+ * 10 MiB at the defaults (64 teams, fan-out 4, D = 2) - and the scans' 1.3 MiB after
+ * it (internal-region.h) - and at the extremes the
  * ranges allow (1,024 teams, fan-out 32, D = 8) 4.1 GiB, which the shared-memory
  * capacity check refuses at init on a machine without it (node.c).
  */
