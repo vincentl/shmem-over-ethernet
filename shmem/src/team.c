@@ -149,7 +149,7 @@ static const uint32_t rank_zero = 0;
  */
 static void predefined_local_shape(void)
 {
-    const struct osoe_node *n = &osoe.node;
+    const struct osoe_node *node = &osoe.node;
     uint32_t count = osoe.bootstrap.local_count;
     identity = malloc(sizeof *identity * count);
     ranks_ascending = malloc(sizeof *ranks_ascending * count);
@@ -157,7 +157,7 @@ static void predefined_local_shape(void)
         osoe_fatal("out of memory describing this node's %u PEs", count);
     for (uint32_t i = 0; i < count; i++) {
         identity[i] = i;
-        ranks_ascending[i] = n->local_block ? n->first_rank + i : n->sorted_rank[i];
+        ranks_ascending[i] = node->local_block ? node->first_rank + i : node->sorted_rank[i];
     }
 }
 
@@ -890,26 +890,26 @@ static struct osoe_team *build(const struct osoe_team *parent, uint32_t number,
      * its parent does, and is walked by team rank instead, each rank asked for
      * its local id. The lead is the first: the lowest team rank here (§5.2).
      */
-    const struct osoe_node *n = &osoe.node;
-    uint32_t capacity = t->world_of_rank ? t->members : n->local_count;
+    const struct osoe_node *node = &osoe.node;
+    uint32_t capacity = t->world_of_rank ? t->members : node->local_count;
     uint32_t *ids = malloc(sizeof *ids * capacity), *ranks = malloc(sizeof *ranks * capacity);
     if (!ids || !ranks)
         osoe_fatal("out of memory for %s's members on this node", t->name);
     uint32_t count = 0;
     if (t->world_of_rank) {
         for (uint32_t r = 0; r < t->members; r++) {
-            int32_t local = osoe_node_local_id(n, t->world_of_rank[r]);
+            int32_t local = osoe_node_local_id(node, t->world_of_rank[r]);
             if (local >= 0) {
                 ids[count] = (uint32_t)local;
                 ranks[count++] = r;
             }
         }
     } else {
-        for (uint32_t i = 0; i < n->local_count; i++) {
-            uint32_t world = n->local_block ? n->first_rank + i : n->sorted_rank[i];
+        for (uint32_t i = 0; i < node->local_count; i++) {
+            uint32_t world = node->local_block ? node->first_rank + i : node->sorted_rank[i];
             int r = world_to_team(t, (int)world);
             if (r >= 0) {
-                ids[count] = n->local_block ? i : n->sorted_local[i];
+                ids[count] = node->local_block ? i : node->sorted_local[i];
                 ranks[count++] = (uint32_t)r;
             }
         }

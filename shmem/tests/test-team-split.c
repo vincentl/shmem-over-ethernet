@@ -81,17 +81,17 @@ static struct expected world_expected;
 /* The team a triplet makes of `parent`'s ranks (spec §9.4.6). */
 static struct expected strided(const struct expected *parent, int start, int stride, int size)
 {
-    struct expected e = { .members = size };
+    struct expected expected = { .members = size };
     for (int i = 0; i < size; i++)
-        e.world[i] = parent->world[start + stride * i];
-    return e;
+        expected.world[i] = parent->world[start + stride * i];
+    return expected;
 }
 
-/* Whether world rank `world` is in `e`, and as which rank. */
-static bool rank_in(const struct expected *e, int world, int *rank)
+/* Whether world rank `world` is in `expected`, and as which rank. */
+static bool rank_in(const struct expected *expected, int world, int *rank)
 {
-    for (int r = 0; r < e->members; r++)
-        if (e->world[r] == world) {
+    for (int r = 0; r < expected->members; r++)
+        if (expected->world[r] == world) {
             if (rank)
                 *rank = r;
             return true;
@@ -106,34 +106,34 @@ static void sleep_milliseconds(long milliseconds)
 }
 
 /*
- * What a member can ask of `team`, made of `parent`'s ranks as `e` says, which
- * was created asking for `contexts` contexts: its shape, both ways, against
- * the world and against its parent.
+ * What a member can ask of `team`, made of `parent`'s ranks as `expected`
+ * says, which was created asking for `contexts` contexts: its shape, both
+ * ways, against the world and against its parent.
  */
-static void check_team(shmem_team_t team, const struct expected *e, shmem_team_t parent,
+static void check_team(shmem_team_t team, const struct expected *expected, shmem_team_t parent,
                        const struct expected *parent_expected, int contexts)
 {
     CHECK_FATAL(team != SHMEM_TEAM_INVALID);
     int rank = -1;
-    CHECK(rank_in(e, me, &rank));
-    CHECK(shmem_team_n_pes(team) == e->members);
+    CHECK(rank_in(expected, me, &rank));
+    CHECK(shmem_team_n_pes(team) == expected->members);
     CHECK(shmem_team_my_pe(team) == rank);
-    for (int r = 0; r < e->members; r++) {
+    for (int r = 0; r < expected->members; r++) {
         int in_parent = -1;
-        CHECK(rank_in(parent_expected, e->world[r], &in_parent));
-        CHECK(shmem_team_translate_pe(team, r, SHMEM_TEAM_WORLD) == e->world[r]);
-        CHECK(shmem_team_translate_pe(SHMEM_TEAM_WORLD, e->world[r], team) == r);
+        CHECK(rank_in(parent_expected, expected->world[r], &in_parent));
+        CHECK(shmem_team_translate_pe(team, r, SHMEM_TEAM_WORLD) == expected->world[r]);
+        CHECK(shmem_team_translate_pe(SHMEM_TEAM_WORLD, expected->world[r], team) == r);
         CHECK(shmem_team_translate_pe(team, r, parent) == in_parent);
         CHECK(shmem_team_translate_pe(parent, in_parent, team) == r);
-        CHECK(shmem_team_ptr(team, source, r) == shmem_ptr(source, e->world[r]));
+        CHECK(shmem_team_ptr(team, source, r) == shmem_ptr(source, expected->world[r]));
     }
     for (int w = 0; w < npes; w++)
-        if (!rank_in(e, w, NULL))
+        if (!rank_in(expected, w, NULL))
             CHECK(shmem_team_translate_pe(SHMEM_TEAM_WORLD, w, team) == -1);
-    CHECK(shmem_team_translate_pe(team, e->members, SHMEM_TEAM_WORLD) == -1);
+    CHECK(shmem_team_translate_pe(team, expected->members, SHMEM_TEAM_WORLD) == -1);
     CHECK(shmem_team_translate_pe(team, -1, SHMEM_TEAM_WORLD) == -1);
     CHECK(shmem_team_translate_pe(team, 0, SHMEM_TEAM_INVALID) == -1);
-    CHECK(shmem_team_ptr(team, source, e->members) == NULL);
+    CHECK(shmem_team_ptr(team, source, expected->members) == NULL);
 
     /* §9.4.4, with the mask and without: the configuration it was given. */
     shmem_team_config_t config = { .num_contexts = -5 };
@@ -153,26 +153,26 @@ static void check_team(shmem_team_t team, const struct expected *e, shmem_team_t
  * world calls this in the same round, each for the team of its own that a
  * phase's partition gives it.
  */
-static void staggered_sync(shmem_team_t team, const struct expected *e)
+static void staggered_sync(shmem_team_t team, const struct expected *expected)
 {
     arrivals_arrive(me);
     CHECK(shmem_team_sync(team) == 0);
     double left = arrivals_now();
     const double *row = arrivals_row();
     arrivals_round++;           /* before reading: arrivals.h says why */
-    for (int r = 0; r < e->members; r++) {
-        double arrived = row[e->world[r]];
+    for (int r = 0; r < expected->members; r++) {
+        double arrived = row[expected->world[r]];
         if (arrived == 0.0 || left < arrived)
             fprintf(stderr, "PE %d: left a sync of %d members before its member PE %d "
-                    "arrived\n", me, e->members, e->world[r]);
+                    "arrived\n", me, expected->members, expected->world[r]);
         CHECK(arrived != 0.0 && left >= arrived);
     }
 }
 
-/* Every collective on `team`, as `e` says it is made, each checked. */
-static void exercise(shmem_team_t team, const struct expected *e)
+/* Every collective on `team`, as `expected` says it is made, each checked. */
+static void exercise(shmem_team_t team, const struct expected *expected)
 {
-    int rank = shmem_team_my_pe(team), n = e->members;
+    int rank = shmem_team_my_pe(team), n = expected->members;
     CHECK(shmem_team_sync(team) == 0);
 
     /* A broadcast from the last rank, which is not rank 0 but in a team of one. */
@@ -182,13 +182,13 @@ static void exercise(shmem_team_t team, const struct expected *e)
     }
     CHECK(shmem_long_broadcast(team, dest, source, 4, n - 1) == 0);
     for (int i = 0; i < 4; i++)
-        CHECK(dest[i] == 1000L * e->world[n - 1] + i);
+        CHECK(dest[i] == 1000L * expected->world[n - 1] + i);
 
     long sum = 0, most = 0, base = 0;
     for (int r = 0; r < n; r++) {
-        sum += e->world[r] + 1;
-        most = e->world[r] + 1 > most ? e->world[r] + 1 : most;
-        base += e->world[r];
+        sum += expected->world[r] + 1;
+        most = expected->world[r] + 1 > most ? expected->world[r] + 1 : most;
+        base += expected->world[r];
     }
     for (int i = 0; i < 4; i++)
         source[i] = (long)(me + 1) * (i + 1);
@@ -212,7 +212,8 @@ static void exercise(shmem_team_t team, const struct expected *e)
     source[1] = 10L * me + 1;
     CHECK(shmem_long_fcollect(team, dest, source, 2) == 0);
     for (int r = 0; r < n; r++)
-        CHECK(dest[2 * r] == 10L * e->world[r] && dest[2 * r + 1] == 10L * e->world[r] + 1);
+        CHECK(dest[2 * r] == 10L * expected->world[r] &&
+              dest[2 * r + 1] == 10L * expected->world[r] + 1);
 
     /* Member r's rank + 1 words, at the sum of the lengths before it. */
     for (int j = 0; j <= rank; j++)
@@ -220,7 +221,7 @@ static void exercise(shmem_team_t team, const struct expected *e)
     CHECK(shmem_long_collect(team, dest, source, (size_t)rank + 1) == 0);
     for (int r = 0, at = 0; r < n; r++)
         for (int j = 0; j <= r; j++)
-            CHECK(dest[at++] == 100L * e->world[r] + j);
+            CHECK(dest[at++] == 100L * expected->world[r] + j);
 
     /* Into an array no other collective here writes, whose puts land in the
      * other members' copies; the sync after keeps a fast member's next
@@ -231,7 +232,7 @@ static void exercise(shmem_team_t team, const struct expected *e)
     CHECK(shmem_long_alltoall(team, exchange, source, 2) == 0);
     for (int r = 0; r < n; r++)
         for (int k = 0; k < 2; k++)
-            CHECK(exchange[2 * r + k] == 1000L * e->world[r] + 10 * rank + k);
+            CHECK(exchange[2 * r + k] == 1000L * expected->world[r] + 10 * rank + k);
     CHECK(shmem_team_sync(team) == 0);
 }
 
