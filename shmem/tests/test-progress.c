@@ -122,13 +122,17 @@ enum { PEER_PUT_BYTES = 200 };
  * care where they came from. */
 static uint32_t my_pe;
 static unsigned char heap[HEAP];
-/* The landing zone, then memory that is not the landing zone: the canary is
- * what a forged get reply would land on (OSOE_TEST_FORGE below). */
+/* The landing zone, reduced to one piece's record and its bytes, then memory
+ * that is not the landing zone: the canary is what a forged get reply would
+ * land on (OSOE_TEST_FORGE below). And the one thread's completion slot. Since
+ * layout 23 a blocking get's reply lands in its piece's extents and completes
+ * in its thread's slot (node.h); the host here holds one of each. */
 static struct {
-    unsigned char zone[sizeof(struct osoe_landing_slot) + HEAP];
+    struct osoe_landing_record record;
+    unsigned char zone[HEAP];
     unsigned char canary[256];
 } landing_block;
-#define landing_storage landing_block.zone
+static struct osoe_thread_record thread_slot;
 static uint64_t notifies;
 
 static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offset,
@@ -147,11 +151,47 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
     return heap + offset;
 }
 
-static struct osoe_landing_slot *landing(void *context, uint32_t pe, uint32_t *capacity)
+/* The piece in flight, as progress-host.c finds one: only for its own token,
+ * while it is in flight. */
+static unsigned char *landing_request(void *context, uint32_t pe, uint64_t token,
+                                      uint32_t *length)
 {
     (void)context;
-    *capacity = HEAP;
-    return pe == my_pe ? (struct osoe_landing_slot *)landing_storage : NULL;
+    struct osoe_landing_record *r = &landing_block.record;
+    if (pe != my_pe || atomic_load_explicit(&r->state, memory_order_acquire) != OSOE_LANDING_ISSUED ||
+        atomic_load_explicit(&r->token, memory_order_acquire) != token)
+        return NULL;
+    *length = atomic_load_explicit(&r->length, memory_order_acquire);
+    return landing_block.zone;
+}
+
+/* A blocking operation's completion, into the one thread's slot, only for the
+ * token it armed. */
+static bool completed(void *context, uint32_t pe, uint64_t token, uint32_t length,
+                      uint64_t value)
+{
+    (void)context;
+    if (pe != my_pe || atomic_load_explicit(&thread_slot.armed_token, memory_order_acquire) != token)
+        return false;
+    atomic_store_explicit(&landing_block.record.state, OSOE_LANDING_LANDED_BLOCKING,
+                          memory_order_release);
+    atomic_store_explicit(&thread_slot.length, length, memory_order_release);
+    atomic_store_explicit(&thread_slot.value, value, memory_order_release);
+    atomic_store_explicit(&thread_slot.token, token, memory_order_release);
+    atomic_store_explicit(&thread_slot.ready, 1, memory_order_release);
+    return true;
+}
+
+/* Arm the slot and the piece's record for `token`, as transport-am.c does
+ * before a request goes out. */
+static void arm_piece(uint64_t token, uint32_t length)
+{
+    atomic_store_explicit(&thread_slot.ready, 0, memory_order_release);
+    atomic_store_explicit(&thread_slot.armed_token, token, memory_order_release);
+    atomic_store_explicit(&landing_block.record.token, token, memory_order_release);
+    atomic_store_explicit(&landing_block.record.length, length, memory_order_release);
+    atomic_store_explicit(&landing_block.record.state, OSOE_LANDING_ISSUED,
+                          memory_order_release);
 }
 
 static void notify(void *context, uint32_t pe, uint16_t region, uint64_t offset,
@@ -296,8 +336,8 @@ int main(void)
     static unsigned char scratch[SCRATCH];
     static struct osoe_progress_connection connections[1];
     static uint64_t busy[1];
-    struct osoe_progress_host host = { resolve, landing, notify, release, NULL, NULL, NULL,
-                                       NULL };
+    struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
+                                       NULL, completed };
     struct osoe_progress p;
     osoe_progress_init(&p, &area, &wire, &ring, descriptors, DESCRIPTORS, scratch, SCRATCH,
                        &host);
@@ -308,7 +348,7 @@ int main(void)
     CHECK_FATAL(osoe_collective_tree(both, 2, b.node, 2, &tree));
     osoe_progress_team(&p, 0, &tree);
 
-    struct osoe_landing_slot *slot = (struct osoe_landing_slot *)landing_storage;
+    struct osoe_thread_record *slot = &thread_slot;
     struct osoe_deadline give_up = osoe_deadline_in(UINT64_C(25000000000));
 
     /*
@@ -344,7 +384,7 @@ int main(void)
      * reply this lead's own requests could get. */
     enum { FORGED_TOKEN = 0x77 };
     if (bounds && node == 1 && lead)
-        atomic_store_explicit(&slot->armed_token, FORGED_TOKEN, memory_order_release);
+        arm_piece(FORGED_TOKEN, GET_BYTES);
     if (forge && (strcmp(forge, "get-reply") == 0 || bounds) && node == 0 && lead) {
         unsigned char forged[64];
         memset(forged, 0xEE, sizeof forged);
@@ -365,7 +405,7 @@ int main(void)
     /* Armed before the request, as transport-am.c's arm() does: the lead
      * refuses a reply for any other token (§3.4's trust boundary). */
     if (!bounds)
-        atomic_store_explicit(&slot->armed_token, 1, memory_order_release);
+        arm_piece(1, GET_BYTES);
     struct osoe_am_get_request request = { .target_pe = peer_lead, .origin_pe = my_pe,
                                            .region = 0, .length = GET_BYTES,
                                            .offset = GET_AT, .token = 1 };
@@ -387,9 +427,9 @@ int main(void)
     CHECK(atomic_load_explicit(&slot->token, memory_order_acquire) == 1);
     CHECK(atomic_load_explicit(&slot->length, memory_order_acquire) == GET_BYTES);
     for (uint32_t i = 0; i < GET_BYTES; i++)
-        if (slot->data[i] != pattern(GET_AT + i)) {
+        if (landing_block.zone[i] != pattern(GET_AT + i)) {
             fprintf(stderr, "PE %u: get reply byte %u is 0x%02x, expected 0x%02x\n",
-                    my_pe, i, slot->data[i], pattern(GET_AT + i));
+                    my_pe, i, landing_block.zone[i], pattern(GET_AT + i));
             CHECK(false);
             break;
         }
@@ -397,11 +437,15 @@ int main(void)
 
     /* A fetching AMO: applied at handler time, its value carried back on the
      * control queue (§3.8). */
-    if (!bounds)
-        atomic_store_explicit(&slot->armed_token, 2, memory_order_release);
+    if (!bounds) {
+        atomic_store_explicit(&slot->ready, 0, memory_order_release);
+        atomic_store_explicit(&slot->armed_token, 2 | OSOE_LANDING_NO_EXTENT,
+                              memory_order_release);
+    }
     struct osoe_am_rmw_request rmw = { .target_pe = peer_lead, .origin_pe = my_pe,
                                        .region = 0, .op = OSOE_RMW_ADD, .width = 8,
-                                       .offset = RMW_AT, .operand = 7, .token = 2,
+                                       .offset = RMW_AT, .operand = 7,
+                                       .token = 2 | OSOE_LANDING_NO_EXTENT,
                                        .flags = OSOE_TRANSPORT_FETCH };
     while (!post(c, OSOE_AM_RMW_REQUEST, &rmw, sizeof rmw, NULL, 0))
         osoe_progress_poll(&p);
@@ -414,7 +458,7 @@ int main(void)
             goto done;
         }
     }
-    CHECK(atomic_load_explicit(&slot->token, memory_order_acquire) == 2);
+    CHECK(atomic_load_explicit(&slot->token, memory_order_acquire) == (2 | OSOE_LANDING_NO_EXTENT));
     /* The peer's word was zero and exactly one add reached it. */
     CHECK(atomic_load_explicit(&slot->value, memory_order_acquire) == 0);
 

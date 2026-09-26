@@ -756,7 +756,7 @@ static void dump_human(const struct osoe_segment *s)
                 print_value(s, &s->metrics[i], p);
 
         uint64_t rng = 0;
-        if (osoe_segment_read_name(s, "pe.watch_rng", p, &rng)) {
+        if (osoe_segment_watch(s, p, &rng)) {
             char w[96];
             describe_watch(w, sizeof w, s->dir->layout, rng);
             printf("    %-32s %s\n", "pe.watch (decoded)", w);

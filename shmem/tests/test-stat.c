@@ -156,7 +156,7 @@ static void observe_stalled(const char *segment, uint32_t who)
 
     /* The watch word says it is waiting on its own heap, not on nothing. */
     uint64_t rng = 0;
-    CHECK(osoe_segment_read_name(&s, "pe.watch_rng", who, &rng));
+    CHECK(osoe_segment_watch(&s, who, &rng));
     CHECK(rng != 0);
 
     /* The heartbeat: a blocked PE still sweeps. */

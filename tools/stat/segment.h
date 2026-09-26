@@ -102,6 +102,15 @@ struct osoe_segment_directory {
     uint64_t contexts_bytes;
     uint32_t context_bytes;
     uint32_t contexts_per_pe;
+
+    /* Appended at layout 23: each local PE's thread records, whose first
+     * word is the §4.9 watch word of that thread's wait (design §4.11 item 3;
+     * phase 1 step 8 slice 2). Until layout 23 the PE's slot held one watch
+     * word, read by name. */
+    uint64_t threads_offset;
+    uint64_t threads_bytes;
+    uint32_t thread_record_bytes;
+    uint32_t threads_per_pe;
 };
 
 /*
@@ -263,7 +272,7 @@ void osoe_segment_close(struct osoe_segment *s);
  * it could already carry.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               22
+#define OSOE_SEGMENT_NEWEST_LAYOUT               23
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is
@@ -293,6 +302,14 @@ const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segme
  */
 bool osoe_segment_read(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,
                    uint32_t index, uint64_t *out);
+/*
+ * The watch word of local PE `pe`'s wait: from layout 23 the first of its
+ * threads' records holding one, and from before it the PE slot's word, read by
+ * name. `*word` is 0 when it waits on nothing. False if the segment has
+ * neither.
+ */
+bool osoe_segment_watch(const struct osoe_segment *s, uint32_t pe, uint64_t *word);
+
 bool osoe_segment_read_name(const struct osoe_segment *s, const char *name, uint32_t index,
                         uint64_t *out);
 

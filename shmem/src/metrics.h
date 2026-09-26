@@ -42,6 +42,7 @@
 #ifndef OSOE_METRICS_H
 #define OSOE_METRICS_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "base/counters.h"
@@ -208,8 +209,19 @@ struct osoe_counter_block *osoe_metrics_block(void);
 void osoe_metrics_init(struct osoe_counter_block *pool, uint32_t per_pe, uint32_t local_id);
 void osoe_metrics_fini(void);
 
-/* How many blocks each PE gets: OSOE_MAX_THREADS, read at first init (§5.7). */
+/* How many blocks each PE gets: OSOE_MAX_THREADS, read at first init (§5.7),
+ * and one more for the PE's agent. */
 uint32_t osoe_metrics_blocks_per_pe(void);
+
+/* Whether several threads of this PE may call the library at once
+ * (THREAD_MULTIPLE), set at each session's start: the blocked record takes a
+ * mutex only then. */
+void osoe_metrics_threads(bool concurrent);
+
+/* This thread's block's index in its PE's pool, claiming one if it has none:
+ * the index of its thread record too (node.h, §4.11 item 3). Only in a
+ * session. */
+uint32_t osoe_metrics_thread_index(void);
 
 /* Publish this PE's heap levels into its slot. Called by the allocator after
  * every change, which is a cold path (§4.4). */

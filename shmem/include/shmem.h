@@ -71,10 +71,10 @@ void shmem_global_exit(int status);
 void shmem_query_initialized(int *initialized);
 
 /*
- * Thread levels (§6, §9.2). The spec requires increasing integer values, and
- * osoe provides up to SHMEM_THREAD_SERIALIZED: SHMEM_THREAD_MULTIPLE is §4.11
- * of the design notes and is not implemented, so asking for it yields
- * SERIALIZED rather than a failure, which is what the interface is shaped for.
+ * Thread levels (§6, §9.2). The spec requires increasing integer values.
+ * osoe provides all four: SHMEM_THREAD_MULTIPLE to a program that asks for it
+ * with shmem_init_thread, and SHMEM_THREAD_SERIALIZED to shmem_init, which
+ * lets the implementation choose (the design notes' §4.11).
  */
 #define SHMEM_THREAD_SINGLE     0
 #define SHMEM_THREAD_FUNNELED   1

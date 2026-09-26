@@ -56,6 +56,8 @@ without the author, under a standing mandate, and the record carries the undo.
 
 - **`OSOE_MAX_TEAMS`** defaults to 64, at most 1,024. Author, [2026-09-26-day](2026-09-26-day.md) item 4.
 - **`OSOE_MAX_CONTEXTS`** defaults to 64, from 1 to 4,096, agreed by a node's PEs at start. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 2.
+- **`OSOE_MAX_THREADS`** counts application threads, default 16, at most 1,023; the agent's block is one more, and a thread past it ends the job by name. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 9.
+- **`shmem_init` gives `SERIALIZED`**; `shmem_init_thread` gives `MULTIPLE` when asked. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 9.
 - **`OSOE_COLLECTIVE_PIPELINE`** defaults to 2, from 1 to 8, agreed at rendezvous. [2026-09-26-overnight](2026-09-26-overnight.md) item 1.
 - **Keepalive** is 60 s idle, 10 s between probes, 6 probes; `TCP_USER_TIMEOUT` is not set; `OSOE_KEEPALIVE` overrides. Claude, [2026-09-23-autonomous](2026-09-23-autonomous.md) item 17.
 - **`OSOE_HEAP_BASE`** must be page-aligned, and an unaligned one is refused by name. Claude, [2026-09-24-overnight](2026-09-24-overnight.md) item 17.

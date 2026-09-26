@@ -267,8 +267,9 @@ int main(void)
     if (crosses(table, right) && ROOM(2)) {
         shmem_ctx_t a = SHMEM_CTX_INVALID, b = SHMEM_CTX_INVALID;
         CHECK_FATAL(shmem_ctx_create(0, &a) == 0 && shmem_ctx_create(0, &b) == 0);
-        const char *records = getenv("OSOE_GETS_IN_FLIGHT");
-        int n = records ? atoi(records) : 64;
+        /* Every extent of the zone, a one-word get taking one. */
+        const char *zone = getenv("OSOE_GET_LANDING_BYTES");
+        int n = zone ? atoi(zone) / 1024 : 256;
         long *got = calloc((size_t)n + 1, sizeof *got);
         CHECK_FATAL(got != NULL);
         uint64_t full = counter("am.landing_full");
@@ -290,12 +291,12 @@ int main(void)
         shmem_ctx_destroy(b);
     }
 
-    /* ---- The arena full across contexts --------------------------------------- *
-     * One word in flight on context A, then a get on B as large as the whole
-     * arena: no record is short, the arena is, and it is handed out from one
-     * end and rewound only once nothing is in flight - so B's issue completes
-     * A's get early (am.gets_completed rises by one before any wait) and then
-     * fits. ctest runs the multi-node maps with a 512-byte arena. */
+    /* ---- The zone full across contexts, in pieces ------------------------------ *
+     * One word in flight on context A, then a get on B of more pieces than the
+     * zone holds: B's issues find the zone full and copy out the landed pieces
+     * of both contexts (am.landing_full), and every byte is right after each
+     * context's quiet. ctest runs the multi-node maps with a zone of four 1 KiB
+     * extents and 1 KiB chunks. */
     const char *arena = getenv("OSOE_GET_LANDING_BYTES");
     size_t whole = arena ? (size_t)atol(arena) : 0;
     unsigned char *big = whole ? shmem_malloc(whole) : NULL;
@@ -313,16 +314,16 @@ int main(void)
         uint64_t full = counter("am.landing_full"), done = counter("am.gets_completed");
         shmem_ctx_long_get_nbi(a, &word_a, &table[7], 1, right);
         shmem_ctx_getmem_nbi(b, mine, big, whole, right);
-        CHECK(counter("am.landing_full") == full + 1);
-        CHECK(counter("am.gets_completed") == done + 1);
-        CHECK(word_a == value(right, 7));       /* complete already: early */
+        CHECK(counter("am.landing_full") > full);
         shmem_ctx_quiet(b);
+        CHECK(counter("am.gets_completed") > done);
         size_t bad = whole;
         for (size_t i = 0; i < whole && bad == whole; i++)
             if (mine[i] != (unsigned char)(right * 31 + (int)i))
                 bad = i;
         CHECK(bad == whole);
         shmem_ctx_quiet(a);
+        CHECK(word_a == value(right, 7));
         free(mine);
         shmem_ctx_destroy(a);
         shmem_ctx_destroy(b);

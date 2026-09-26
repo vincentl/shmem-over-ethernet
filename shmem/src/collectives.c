@@ -46,6 +46,7 @@
 #include "collectives.h"
 #include "combine.h"
 #include "fatal.h"
+#include "internal-region.h"
 #include "internode.h"
 #include "job.h"
 #include "node.h"
@@ -83,6 +84,8 @@ static uint32_t root_index(const struct osoe_team *t, int root_rank, const char 
  * program has them. */
 static unsigned char *member_copy(uint32_t local, struct osoe_symmetric_location at)
 {
+    if (at.region == OSOE_REGION_INTERNAL)
+        return (unsigned char *)osoe.node.heap_of[local] + osoe.node.internal_offset + at.offset;
     if (at.region == OSOE_REGION_STATICS)
         return osoe_node_statics_at(&osoe.node, local, local == osoe.bootstrap.local_id,
                                     at.offset);
@@ -94,6 +97,12 @@ static unsigned char *member_copy(uint32_t local, struct osoe_symmetric_location
  * broadcast from team rank `root`, which leaves the root's own dest alone if
  * `root_keeps_dest`. §5.5, as the file's comment walks through.
  */
+static void data_collective_at(const char *routine, struct osoe_team *t, void *dest,
+                               struct osoe_symmetric_location dest_at, const void *source,
+                               struct osoe_symmetric_location source_at, size_t nelems,
+                               size_t width, const struct reduction *reduction, int root,
+                               bool root_keeps_dest);
+
 static int data_collective(const char *routine, shmem_team_t team, void *dest,
                            const void *source, size_t nelems, size_t width,
                            const struct reduction *reduction, int root, bool root_keeps_dest)
@@ -109,6 +118,21 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
         return 0;                       /* every member passes the same count: nothing to do */
     struct osoe_symmetric_location dest_at = osoe_symmetric_locate(routine, dest, bytes);
     struct osoe_symmetric_location source_at = osoe_symmetric_locate(routine, source, bytes);
+    data_collective_at(routine, t, dest, dest_at, source, source_at, nelems, width, reduction,
+                       root, root_keeps_dest);
+    return 0;
+}
+
+/* The body of a data collective, given where dest and source are: the heap,
+ * the statics, or - for the library's own words (osoe_team_broadcast_word) -
+ * the internal region. */
+static void data_collective_at(const char *routine, struct osoe_team *t, void *dest,
+                               struct osoe_symmetric_location dest_at, const void *source,
+                               struct osoe_symmetric_location source_at, size_t nelems,
+                               size_t width, const struct reduction *reduction, int root,
+                               bool root_keeps_dest)
+{
+    size_t bytes = nelems * width;
     int root_rank = root >= 0 ? osoe_team_to_world(t, root) : -1;
     /* A deprecated broadcast's root keeps its dest as it was (broadcast.c). */
     bool keep_mine = root_keeps_dest && (uint32_t)root_rank == osoe.job.me;
@@ -125,7 +149,7 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
         t->epoch = k + 1;
         t->data_epoch = d + 1;
         atomic_store_explicit(t->published, k + 1, memory_order_release);
-        return 0;
+        return;
     }
 
     uint32_t lead_local_id = t->lead_local_id;
@@ -198,7 +222,6 @@ static int data_collective(const char *routine, shmem_team_t team, void *dest,
     t->data_epoch = d + 1;
     atomic_store_explicit(t->published, k + 1, memory_order_release);
     osoe_blocked_leave();
-    return 0;
 }
 
 int osoe_reduce(const char *routine, shmem_team_t team, void *dest, const void *source,
@@ -219,6 +242,35 @@ int osoe_broadcast(const char *routine, shmem_team_t team, void *dest, const voi
         osoe_fatal("%s: PE_root %d is not a PE number", routine, root);
     return data_collective(routine, team, dest, source, nelems, width, NULL, root,
                            root_keeps_dest);
+}
+
+/* Spare word `which` of team `t`'s number in local PE `local`'s internal
+ * region (internal-region.h), and where it is. */
+static struct osoe_symmetric_location team_word_at(const struct osoe_team *t,
+                                                   enum osoe_internal_team_spare which)
+{
+    struct osoe_symmetric_location at = {
+        OSOE_REGION_INTERNAL,
+        osoe_internal_team_spare_word(osoe.bootstrap.collective_fanout,
+                                      osoe.bootstrap.collective_pipeline,
+                                      osoe.bootstrap.max_teams, t->number, which) };
+    return at;
+}
+
+/*
+ * A word from team rank 0 to every member of `t`, through the team number's
+ * own word in the internal region: a broadcast that borrows nothing from the
+ * heap, so that it stays symmetric when another thread allocates meanwhile
+ * (phase 1 step 8 slice 2). The split's first number travels in it (team.c).
+ */
+uint64_t osoe_team_broadcast_word(const char *routine, struct osoe_team *t, uint64_t value)
+{
+    struct osoe_symmetric_location at = team_word_at(t, OSOE_INTERNAL_SPLIT_NUMBER);
+    uint64_t *word = (uint64_t *)member_copy(osoe.bootstrap.local_id, at);
+    if (t->me == 0)
+        *word = value;
+    data_collective_at(routine, t, word, at, word, at, 1, sizeof *word, NULL, 0, false);
+    return *word;
 }
 
 /*
@@ -268,6 +320,21 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
         return 0;
     struct osoe_symmetric_location dest_at = osoe_symmetric_locate(routine, dest, total);
     struct osoe_symmetric_location source_at = osoe_symmetric_locate(routine, source, block);
+    /*
+     * A dest in the heap shorter than the result is named before anything is
+     * written past it: the allocator knows where its block ends (phase 1 step
+     * 8 slice 2). SOS's shmem_team_b2b_collectives collects 40 longs into a
+     * dest of 10. Until the places left the heap, the lead's copy ran on into
+     * the room that held them and a check of their order caught it by luck;
+     * this asks directly, on every member, for its own dest. The statics'
+     * sizes are the program's and not known here.
+     */
+    uint64_t room;
+    if (dest_at.region == OSOE_REGION_HEAP &&
+        osoe_allocator_room(&osoe.allocator, dest_at.offset, &room) == 0 && room < total)
+        osoe_fatal("%s: dest has room for %llu bytes to the end of its allocation, and the "
+                   "result is %llu bytes (spec §9.10.8: dest must hold every member's block)",
+                   routine, (unsigned long long)room, (unsigned long long)total);
     uint32_t k = t->epoch, d = t->data_epoch, members = t->local_members;
     struct osoe_team_block *b = t->block;
 
@@ -328,35 +395,68 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
 }
 
 /*
- * collect's places are the prefix sums of every member's length. Every member
- * of the team takes the same room from the symmetric heap - the members' count
- * of words and one more - and writes its length in the last word; the lead
- * gathers them into its room, turns them into places and the total, and the
- * other members learn the total alone (gather's `lengths`), touching one page
- * of their room and allocating nothing else. Then the gather itself, whose
- * places only the lead reads. The room is given back before returning; the
- * allocator is a function of its calls alone (§4.4), so a take and its give
- * leave it as it was, on the PEs of a team smaller than the job as on the
- * others - and a heap without the room answers nonzero on every member alike.
+ * collect's places are the prefix sums of every member's length (phase 1 step
+ * 8 slice 2; the author's C4, docs/prompts/phase1-step8-slice2-prompt.md).
+ * They need not be symmetric - only the lead reads them - so nothing is
+ * borrowed from the heap: each member leaves its length in its own word of the
+ * team number's line (internal-region.h), the lead sets its members' lengths
+ * at their ranks in a vector of the team's size in its own memory, the
+ * internode reduction's tree sums the nodes' vectors into every lead's, the
+ * lead turns the result into places and leaves the total in its own word, and
+ * the members read it there after the release. Then the gather itself, whose
+ * places only the lead reads. The lengths, eight bytes a member, cost O(members)
+ * bytes a level of the tree, in pieces; the data keeps the allgather.
  */
 static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
                            const void *source, size_t block)
 {
     uint64_t members = t->members;
-    uint64_t room_bytes = (members + 1) * sizeof(uint64_t), offset;
-    int taken = osoe_allocator_take(&osoe.allocator, room_bytes, sizeof(uint64_t), 0, &offset);
-    if (taken < 0)
-        osoe_fatal("%s: out of memory for the symmetric heap's own records", routine);
-    if (taken > 0)
-        return 1;
-    uint64_t *room = (uint64_t *)((unsigned char *)osoe.node.heap_of[osoe.bootstrap.local_id] +
-                                  offset);
-    room[members] = block;
-    int status = gather(routine, t, room, room + members, sizeof *room, NULL,
-                        members * sizeof *room, true);
-    if (status == 0)
-        status = gather(routine, t, dest, source, block, room, room[members], false);
-    osoe_allocator_give(&osoe.allocator, offset);
+    if (t->singleton)
+        return gather(routine, t, dest, source, block, NULL, block, false);
+
+    struct osoe_symmetric_location length_at = team_word_at(t, OSOE_INTERNAL_COLLECT_LENGTH);
+    struct osoe_symmetric_location total_at = team_word_at(t, OSOE_INTERNAL_COLLECT_TOTAL);
+    uint32_t lead_local_id = t->lead_local_id;
+    bool lead = osoe.bootstrap.local_id == lead_local_id;
+    uint32_t k = t->epoch, local = t->local_members;
+    struct osoe_team_block *b = t->block;
+    *(uint64_t *)member_copy(osoe.bootstrap.local_id, length_at) = block;
+
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
+    if (osoe_epoch_release_bump_eq(&b->arrived, (k + 1) * local) && !lead)
+        osoe_epoch_wake_all(&b->arrived);
+    uint64_t *places = NULL, total;
+    if (lead) {
+        osoe_epoch_wait_eq(&b->arrived, (k + 1) * local, routine);
+        places = calloc(members + 1, sizeof *places);
+        if (!places)
+            osoe_fatal("%s: out of memory for the places of %llu members", routine,
+                       (unsigned long long)members);
+        for (uint32_t m = 0; m < local; m++)
+            places[t->local_ranks[m]] =
+                *(const uint64_t *)member_copy(t->local_ids[m], length_at);
+        if (t->internode)
+            osoe_internode_reduce(t->number, k + 1, places, members, OSOE_REDUCTION_SUM,
+                                  (struct osoe_element){ OSOE_ELEMENT_UNSIGNED_INTEGER,
+                                                         sizeof(uint64_t) }, routine);
+        prefix_sums(routine, places, members);
+        total = places[members];
+        *(uint64_t *)member_copy(lead_local_id, total_at) = total;
+        if (!osoe_epoch_release_bump_eq(&b->released, k + 1))
+            osoe_fatal("%s: %s's epochs diverged at epoch %u: PEs called different numbers "
+                       "of collectives", routine, t->name, k + 1);
+        osoe_epoch_wake_all(&b->released);
+    } else {
+        osoe_epoch_wait_eq(&b->released, k + 1, routine);
+        /* The lead writes it again only in the team's next collect, once every
+         * member has arrived at the gather below, after this read. */
+        total = *(const uint64_t *)member_copy(lead_local_id, total_at);
+    }
+    t->epoch = k + 1;
+    atomic_store_explicit(t->published, k + 1, memory_order_release);
+    osoe_blocked_leave();
+    int status = gather(routine, t, dest, source, block, places, total, false);
+    free(places);
     return status;
 }
 

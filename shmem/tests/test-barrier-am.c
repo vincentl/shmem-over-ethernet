@@ -66,8 +66,6 @@ static uint32_t releases, released_epoch;
 
 static void *resolve(void *c, uint32_t pe, uint16_t r, uint64_t o, uint32_t n)
 { (void)c; (void)pe; (void)r; (void)o; (void)n; return NULL; }
-static struct osoe_landing_slot *landing(void *c, uint32_t pe, uint32_t *capacity)
-{ (void)c; (void)pe; *capacity = 0; return NULL; }
 static void notify(void *c, uint32_t pe, uint16_t r, uint64_t o, uint32_t n)
 { (void)c; (void)pe; (void)r; (void)o; (void)n; }
 
@@ -115,7 +113,7 @@ int main(void)
     static unsigned char scratch[SCRATCH];
     static struct osoe_progress_connection connections[MAX_NODES];
     static uint64_t busy[(MAX_NODES + 63) / 64];
-    struct osoe_progress_host host = { resolve, landing, notify, release, NULL, NULL, NULL,
+    struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, NULL, NULL,
                                        NULL };
     struct osoe_progress p;
     osoe_progress_init(&p, &area, wires, &ring, descriptors, DESCRIPTORS, scratch, SCRATCH,

@@ -79,6 +79,31 @@ The author's goals, the axes to judge the work by:
    split never borrows from the allocator.
 9. **`collect` with differing sizes: C4**, below - no heap borrow at all.
 
+## Order of building, each part tested before the next
+
+1. **What needs only a mutex**: the lock list (7); the context pool's claim
+   and release (context.c); a team split's own bookkeeping in `team.c` (its
+   process-local pools and the guess at the claimed count), never held across
+   a collective; the interim per-context mutex (6), taken where a routine
+   resolves a shareable context and released after its transport call.
+2. **The collectives' scratch** (8, 9): the split's word into the parent's
+   words line; collect's lengths by C4.
+3. **Thread blocks** (2): the counter block grown by a watch record, a
+   completion slot and the "blocked in" record (§3.14, now per thread, since
+   two threads of a PE may wait at once); the claim at a thread's first call,
+   the release at its exit, the `active` bitmap, notify over it
+   (`watch_list_model.py`). Layout bump; osoe-stat shows each thread's wait.
+4. **Extents** (3, 4, 5): the zone's data as extents, 1 KiB each, claimed as a
+   run of bits within one 64-bit word by CAS, so a piece is at most 64 KiB -
+   the default chunk - and the default 256 KiB zone holds 256 one-word gets in
+   flight where it held 64. A token names its first extent in its low 16
+   bits, and the thread block (blocking) or context block (nonblocking) in
+   bits 48-59; the extent's record holds the token and length the lead checks.
+   `OSOE_GETS_IN_FLIGHT` goes: the extents count what is in flight. Copy-out
+   claims by CAS on the record (5).
+5. **`provided` becomes MULTIPLE** (1), last, once everything above is in; the
+   tsan tests and the SOS `mt_` programs then run.
+
 ## Question C: where collect's lengths live under MULTIPLE
 
 `collect` (differing sizes) gathers every member's length first, into

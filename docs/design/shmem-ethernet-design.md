@@ -1316,6 +1316,20 @@ that is stuck. Memory can be read without the job's cooperation.
   Not a shared block either, which would break §3.16's single-writer rule on
   every counter. The private block makes the fallback path identical to the
   normal one, so nothing has to test whether it is initialized.
+
+  *Changed in phase 1 step 8 slice 2.* A block now also indexes the thread's
+  record of §4.11 items 3 and 5, and a thread without one would have nowhere to
+  wait or take a reply, so **a full table ends the job, naming
+  `OSOE_MAX_THREADS`**, at every thread level (decided 2026-09-25); the PE's
+  slot still counts the event first, for `osoe-stat`. The private block is left
+  for before init and after finalize. A thread gives its block back at exit, by
+  a `pthread_key_create` destructor that also forgets it, so a destructor of
+  the program's that runs later claims afresh; the give-back and finalize's
+  release of the pool share a mutex, so a thread exiting during a finalize
+  never stores into a segment being unmapped. `OSOE_MAX_THREADS` counts the
+  application's threads, default 16 and at most 1,023, and the agent's block
+  is one more (review of the slice, B1: with the agent inside a default of 8,
+  SOS's eight-thread programs ended the job).
 - **On abort**, the library prints the control segment's name to standard error, so
   whoever reads the message knows what to point `osoe-stat` at.
 
@@ -2592,7 +2606,10 @@ litmus programs on a Pi 4 (Cortex-A72) and a Pi 5 (Cortex-A76)** when they exist
 
 **Thread level.** Phase 1 provides up to `SHMEM_THREAD_SERIALIZED`: `SINGLE`,
 `FUNNELED`, and `SERIALIZED` are all supported, and a request for `MULTIPLE`
-provides `SERIALIZED`, which §9.2.1 permits. The structures below assume that at
+provides `SERIALIZED`, which §9.2.1 permits. *Since phase 1 step 8 slice 2*,
+`shmem_init_thread(SHMEM_THREAD_MULTIPLE)` provides `MULTIPLE` (§4.11, as
+built); `shmem_init` still provides `SERIALIZED`, so a program that never asks
+for threads pays nothing for them. The structures below assume that at
 most one application thread of a PE is inside the library at a time. They are
 marked where `MULTIPLE` would change them: under `MULTIPLE` the equality wait below
 can starve, and clearing the dirty set races. §4.11 designs both changes. Contexts
@@ -2697,7 +2714,10 @@ never end. **An issue that finds the records or the arena used up completes
 what is in flight first**, which bounds the zone without anything failing; the
 design's other release, the PE's agent copying replies out early, is not built.
 The record's fields and the counters use release, acquire and seq_cst, never
-relaxed, as §3.16 asks of every protocol word.
+relaxed, as §3.16 asks of every protocol word. *Replaced in phase 1 step 8
+slice 2* (§4.11, as built): the records and arena became 1 KiB extents claimed
+by compare-and-swap, `OSOE_GETS_IN_FLIGHT` is retired, and the blocking slot
+became one per thread.
 A get to a node-mate is a `memcpy` before it returns, as ever. The simple
 equality is right while one thread issues and completes; `MULTIPLE` needs the
 generation scheme below (§4.6, `get_completion_model.py`). Packed replies,
@@ -3425,8 +3445,9 @@ instead of pushing every on-node rmw through NIC loopback.
 
 > **Designed and model-checked; being built in three slices** (phase 1 step 8,
 > `docs/prompts/done/phase1-step8-slice1-prompt.md`). Slice 1, contexts in serial
-> mode, is built (below, "Context modes"); until slice 2 phase 1 provides up
-> to `SERIALIZED` (§4.6). Under `MULTIPLE`, a context that promises serialization
+> mode, is built (below, "Context modes"); slice 2 provides `MULTIPLE`, with
+> an interim mutex on shareable contexts where items 1, 2 and 4 put lock-free
+> issue (below, "As built, slice 2"); slice 3 replaces the mutex. Under `MULTIPLE`, a context that promises serialization
 > (`SHMEM_CTX_PRIVATE` or `SHMEM_CTX_SERIALIZED`) keeps the §4.6 structures unchanged.
 > A shareable context, `SHMEM_CTX_DEFAULT` included, keeps a lock-free issue path and
 > serializes its quiets with a per-context mutex. Under that mutex, a generation word
@@ -3528,6 +3549,47 @@ any context has a get in flight the arena is not rewound, so a loop of gets
 and quiets on one context can fill it and complete another's gets early -
 correct, and a coupling in time between contexts that slice 2's extents,
 reused one by one, removes.
+
+*As built, slice 2* (`docs/prompts/phase1-step8-slice2-prompt.md`;
+`metrics.c`, `watch.c`, `transport-am.c`, `progress-host.c`, `node.h` layout
+23). `shmem_init_thread` provides `MULTIPLE` when asked; `shmem_init` stays at
+`SERIALIZED` (§4.6). What exists:
+
+- **Thread records** (items 3 and 5): a PE's `OSOE_MAX_THREADS` records, one
+  per counter block (§3.14), each a watch range and sequence and a completion
+  slot (wake, ready, length, value, token, armed token); an `active` bitmap of
+  16 words a PE marks the records holding a range, and a notify bumps every
+  overlapping one. A blocking get or fetching AMO lands in its thread's slot:
+  the token names the thread in the owner bits, with a per-thread sequence.
+- **Landing extents** (§10's decision of 2026-09-25): the zone is 1 KiB
+  extents, claimed as runs by compare-and-swap over a bitmap; a record goes
+  FREE, ISSUED, LANDED, then COPYING by compare-and-swap, so exactly one of the
+  PE's threads copies a landed piece to its `dst`, credits `bytes_copied` in
+  its context's block and frees the extents; a wait is over when
+  `bytes_copied` reaches `bytes_issued`. An issue that finds no room copies
+  out every landed piece it can claim, of any context, then sleeps on the
+  zone's `freed` word. The claim's check and the landing's state store are
+  `seq_cst`, as the value of a wait whose wake is skipped with nobody
+  registered (base/wait-word.h; the review, S1).
+- **The interim**: a shareable context, the default included, holds a
+  process mutex for the whole of each call on it under `MULTIPLE`; serial
+  contexts and every context below `MULTIPLE` take none. The allocator, the
+  lock list, the context pool and, under `MULTIPLE`, the blocked record's
+  owner take mutexes of their own. Slice 3 removes the context mutex from
+  issue.
+- **No collective borrows the heap**: a split's number travels in the parent
+  team's spare internal-region words, and collect's per-member lengths
+  through the reduction tree's fixed slots into private memory (the author's
+  C4).
+- **The blocked record** stays one per PE: the first of its threads to wait
+  owns it until its outermost wait ends, so `osoe-stat` shows one waiting
+  thread whole; the other threads' waits show in their watch records.
+
+Its test, `test-multiple.c`, runs four threads a PE in two waves on one node,
+on block and interleaved maps and, under tsan, on one PE a node - where every
+writer of a PE's memory is a thread of its own process, so tsan sees them
+all - with a landing zone of 8 extents that the threads' pieces overfill
+(the test pins that the zone filled).
 
 | Per operation | Serial | Shared |
 |---|---|---|
@@ -6887,7 +6949,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Development environment | **Lima + Debian 13 on Apple Silicon**; CI deferred; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
 | Which process hosts progress | **An agent thread in every PE; the local lead's runs the transport** (§3.12). A helper process was rejected on setup complexity, supervision, statics access, and exit status |
 | Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is designed but not scheduled (below) |
-| `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked; being built in three slices, the first (contexts, serial) done** (§4.11, phase 1 step 8). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
+| `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked; being built in three slices, contexts (serial) and `MULTIPLE` with an interim mutex done** (§4.11, phase 1 step 8). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
 | Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector, deferred until there is a reason for a third formatter. **Revised in phase 1 step 2 slice 2:** the control segment's name is removed during init like every other object's, and `osoe-stat` finds a live job through `/proc/<pid>/fd` of any of its PEs; `OSOE_KEEP_CONTROL_SEGMENT=1` restores the old behaviour for post-mortem work. The original entry kept the name until finalize, accepting a small leak on crash — on the reasoning that uncooperative reading needed a name. It did not: it needed a rendezvous, and `/proc` is one that no crash can strand (§3.14). The reader shares only the frozen directory and the metric descriptor with the writer and finds everything else by name, which a tier-1 test enforces by handing it a segment this build did not write. The flight recorder is deferred to step 2, with its design standing: its events do not exist yet |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |

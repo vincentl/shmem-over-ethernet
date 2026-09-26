@@ -3,6 +3,7 @@
  * the design; this is the table itself and the block claim.
  */
 #define _GNU_SOURCE
+#include <pthread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -170,8 +171,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * for a program linked without oshcc's script. */
     PE("pe.statics_bytes", statics_bytes, OSOE_MTYPE_U64, OSOE_MKIND_STATE, "bytes"),
     PE("pe.statics_name", statics_name, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
-    PE("pe.watch_rng", watch_rng, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
-    PE("pe.watch_seq", watch_seq, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    PE("pe.watch_active", watch_active, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     /* Each PE's k per predefined team, by the names they had in its slot;
      * since layout 18 a word of its row of published epochs. */
     EPOCH("pe.world_epoch", OSOE_TEAM_WORLD),
@@ -392,11 +392,33 @@ uint32_t osoe_metric_checksum(const struct osoe_metric_descriptor *t, uint32_t n
 
 /* ---- Per-thread blocks ------------------------------------------------ */
 
-#define OSOE_DEFAULT_MAX_THREADS 8
+/*
+ * Application threads a PE may have in the library at once. The agent's own
+ * block is on top of these, so a program's count is its own (the review of
+ * phase 1 step 8 slice 2, B1: at 8 with the agent inside, SOS's eight-thread
+ * programs ended the job). 16 rather than the node's CPU count, which a
+ * four-core Pi would make 4: threads oversubscribe cores freely, and a
+ * default that moves with the machine is one a program cannot rely on. Each
+ * costs a counter block and a thread record, about 768 bytes of the node
+ * segment a PE (decisions, 2026-09-26-evening).
+ */
+#define OSOE_DEFAULT_MAX_THREADS 16
 
 static struct osoe_counter_block *pool;         /* this PE's slice of the node pool */
 static uint32_t pool_blocks;
 static _Thread_local struct osoe_counter_block *my_block;
+/*
+ * Which session `pool` is, and which one this thread's `my_block` was claimed
+ * in: a thread that claimed a block in a session since ended must not use a
+ * pointer into a segment that is gone (phase 1 step 8 slice 2). Every session
+ * counts up; a thread whose count is not the current one claims again.
+ */
+static _Atomic uint64_t pool_session;
+static _Thread_local uint64_t my_session;
+/* A thread's block is given back at its exit (phase 1 step 8 slice 2), by the
+ * destructor of this key, whose value is the block. */
+static pthread_key_t release_key;
+static pthread_once_t release_once = PTHREAD_ONCE_INIT;
 
 /*
  * The block a thread gets when the pool is full, and the one every thread uses
@@ -406,37 +428,83 @@ static _Thread_local struct osoe_counter_block *my_block;
  */
 static _Thread_local struct osoe_counter_block orphan;
 
+/* Held by a thread giving its block back at exit, and by finalize while it
+ * lets go of the pool, so that a thread exiting during a finalize never
+ * stores into a segment that finalize is about to unmap (review of slice 2,
+ * S4). Only at thread exit and at finalize: nothing that counts takes it. */
+static pthread_mutex_t pool_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/* Whether the PE's threads may be in the library at once (THREAD_MULTIPLE):
+ * the blocked record's owner then needs `record_mutex`, and otherwise nothing
+ * takes it, since below MULTIPLE nothing takes a lock it did not before
+ * (review of slice 2, S5; the slice's brief, decision 1). */
+static bool records_concurrent;
+
+void osoe_metrics_threads(bool concurrent)
+{
+    records_concurrent = concurrent;
+}
+
 uint32_t osoe_metrics_blocks_per_pe(void)
 {
     uint32_t n = OSOE_DEFAULT_MAX_THREADS;
     /* A malformed value is an error, never a default (base/environment.h): a typo in a
      * launch script must fail at init rather than quietly change the pool. */
-    if (osoe_environment_u32("OSOE_MAX_THREADS", &n) == OSOE_ENVIRONMENT_INVALID || n == 0)
-        osoe_fatal("OSOE_MAX_THREADS='%s' is not a positive number of threads",
-                   getenv("OSOE_MAX_THREADS"));
-    return n;
+    if (osoe_environment_u32("OSOE_MAX_THREADS", &n) == OSOE_ENVIRONMENT_INVALID || n == 0 ||
+        n > OSOE_MAX_THREADS_HIGHEST - 1)
+        osoe_fatal("OSOE_MAX_THREADS='%s' is not a number of threads from 1 to %u",
+                   getenv("OSOE_MAX_THREADS"), (unsigned)OSOE_MAX_THREADS_HIGHEST - 1);
+    return n + 1;       /* and the agent's */
 }
 
 void osoe_metrics_init(struct osoe_counter_block *blocks, uint32_t per_pe, uint32_t local_id)
 {
     pool = blocks + (size_t)local_id * per_pe;
     pool_blocks = per_pe;
+    atomic_fetch_add_explicit(&pool_session, 1, memory_order_seq_cst);
     my_block = NULL;
 }
 
 void osoe_metrics_fini(void)
 {
+    pthread_mutex_lock(&pool_mutex);
     pool = NULL;
     pool_blocks = 0;
+    pthread_mutex_unlock(&pool_mutex);
     my_block = NULL;
+}
+
+/* At a thread's exit: its block back to the pool, idle - a thread cannot exit
+ * inside a call, so it holds no watch. Only for a block of the session still
+ * running; one of an ended session went with its segment. */
+static void release_block(void *value)
+{
+    struct osoe_counter_block *block = value;
+    pthread_mutex_lock(&pool_mutex);
+    if (pool && my_session == atomic_load_explicit(&pool_session, memory_order_acquire) &&
+        block >= pool && block < pool + pool_blocks)
+        atomic_store_explicit(&block->c[OSOE_C_THREAD_CLAIMED], 0, memory_order_seq_cst);
+    pthread_mutex_unlock(&pool_mutex);
+    /* Forgotten here too: a destructor of the program's that runs after this
+     * one and calls the library claims a block afresh, rather than share this
+     * one with the thread that claims it next (review of slice 2, S3). */
+    my_block = NULL;
+    my_session = 0;
+}
+
+static void make_release_key(void)
+{
+    if (pthread_key_create(&release_key, release_block) != 0)
+        osoe_fatal("no thread-specific key for giving counter blocks back at thread exit");
 }
 
 struct osoe_counter_block *osoe_metrics_block(void)
 {
-    if (my_block)
+    uint64_t session = atomic_load_explicit(&pool_session, memory_order_acquire);
+    if (my_block && (my_block == &orphan ? !pool : my_session == session))
         return my_block;
     if (!pool)
-        return &orphan;
+        return my_block = &orphan;
 
     for (uint32_t i = 0; i < pool_blocks; i++) {
         uint64_t unclaimed = 0;
@@ -444,18 +512,31 @@ struct osoe_counter_block *osoe_metrics_block(void)
                                                     &unclaimed, 1, memory_order_seq_cst,
                                                     memory_order_seq_cst)) {
             my_block = &pool[i];
+            my_session = session;
             osoe_counter_set(my_block, OSOE_C_THREAD_TID, (uint64_t)(uint32_t)gettid());
+            pthread_once(&release_once, make_release_key);
+            pthread_setspecific(release_key, my_block);
             return my_block;
         }
     }
-    /* No block left. This thread counts into a private one nobody reads, which
-     * is why the fact that it happened is recorded in the PE's slot instead
-     * (§3.14): capacity, not correctness, but it must be visible or the
-     * metrics quietly under-report. */
-    my_block = &orphan;
+    /* No block left: every one belongs to a live thread of this PE, since a
+     * thread gives its block back at exit. A thread with none would have no
+     * record to wait in either (§4.11 item 5), so it ends the job by name at
+     * every thread level (decided 2026-09-25): a program with more live
+     * calling threads raises OSOE_MAX_THREADS. The PE's slot says so first,
+     * for osoe-stat. */
     atomic_fetch_add_explicit(&osoe.node.slots[osoe.bootstrap.local_id].blocks_exhausted, 1,
                               memory_order_seq_cst);
-    return my_block;
+    osoe_fatal("more threads of this PE are in the library than OSOE_MAX_THREADS=%u allows; "
+               "raise it (at most %u)", pool_blocks - 1, (unsigned)OSOE_MAX_THREADS_HIGHEST - 1);
+}
+
+uint32_t osoe_metrics_thread_index(void)
+{
+    struct osoe_counter_block *block = osoe_metrics_block();
+    if (block == &orphan)
+        osoe_fatal("a thread asked for its record outside a session");
+    return (uint32_t)(block - pool);
 }
 
 /* ---- The "blocked in" record (blocked.h) ------------------------------ */
@@ -517,15 +598,38 @@ struct blocked_wait {
 static _Thread_local struct blocked_wait open_waits[BLOCKED_NESTING];
 static _Thread_local unsigned open_count;
 
+/*
+ * The record is the PE's, and under THREAD_MULTIPLE several of its threads may
+ * wait at once (phase 1 step 8 slice 2): the first to wait owns it until it
+ * leaves its outermost wait, and the others do not publish, so the record
+ * shows one blocked thread whole rather than two torn together. `owned` is
+ * whether this thread owns it; `owner_taken` whether any thread does, both
+ * changed under `record_mutex` under THREAD_MULTIPLE - on the way into and out
+ * of every recorded wait, a barrier's included - and below it under nothing,
+ * since then one thread at a time calls the library.
+ */
+static pthread_mutex_t record_mutex = PTHREAD_MUTEX_INITIALIZER;
+static bool owner_taken;
+static _Thread_local bool owned;
+
 void osoe_blocked_enter(const char *routine, enum osoe_blocked_detail kind, uint64_t detail)
 {
     uint64_t since = osoe_now_ns();
     if (open_count < BLOCKED_NESTING)
         open_waits[open_count] = (struct blocked_wait){ routine, kind, detail, since };
     open_count++;
-    if (osoe.node.slots)
-        publish(routine, kind, detail, since);
-    atomic_store_explicit(&waiting_in, routine, memory_order_release);
+    bool lock = records_concurrent;
+    if (lock)
+        pthread_mutex_lock(&record_mutex);
+    if (!owned && !owner_taken)
+        owned = owner_taken = true;
+    if (owned) {
+        if (osoe.node.slots)
+            publish(routine, kind, detail, since);
+        atomic_store_explicit(&waiting_in, routine, memory_order_release);
+    }
+    if (lock)
+        pthread_mutex_unlock(&record_mutex);
 }
 
 void osoe_blocked_leave(void)
@@ -534,13 +638,22 @@ void osoe_blocked_leave(void)
         open_count--;
     const struct blocked_wait *outer = open_count > 0 && open_count <= BLOCKED_NESTING
                                            ? &open_waits[open_count - 1] : NULL;
-    atomic_store_explicit(&waiting_in, outer ? outer->routine : NULL, memory_order_release);
-    if (osoe.node.slots) {
-        if (outer)
-            publish(outer->routine, outer->kind, outer->detail, outer->since);
-        else
-            publish(NULL, OSOE_BLOCKED_DETAIL_NONE, 0, 0);
+    bool lock = records_concurrent;
+    if (lock)
+        pthread_mutex_lock(&record_mutex);
+    if (owned) {
+        atomic_store_explicit(&waiting_in, outer ? outer->routine : NULL, memory_order_release);
+        if (osoe.node.slots) {
+            if (outer)
+                publish(outer->routine, outer->kind, outer->detail, outer->since);
+            else
+                publish(NULL, OSOE_BLOCKED_DETAIL_NONE, 0, 0);
+        }
+        if (!outer)
+            owned = owner_taken = false;
     }
+    if (lock)
+        pthread_mutex_unlock(&record_mutex);
 }
 
 const char *osoe_blocked_routine(void)
