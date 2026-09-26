@@ -1339,6 +1339,36 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     PASS_REGULAR_EXPRESSION "PEs called different collectives")
 endif()
 
+# Pipelined pieces through the internode tree (design §5.8; phase 1 step 5
+# slice 5; test-pipeline.c): a reduction, a broadcast from a root off PE 0's
+# node and an fcollect, each of 1 MiB and of an odd size, every element
+# checked; collectives back to back from every root, their trees rotating; and
+# the count each lead publishes of the most pieces it had in flight, exact. On
+# a block map, an interleaved one and five nodes at a fan-out of 2, where a
+# lead is both a parent and a child, at D = 1, 2 and 4 - D = 1 being one piece
+# at a time. tsan is left out of the maps for shmem.internode.*'s reason.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_executable(shmem_test_pipeline test-pipeline.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_pipeline PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_pipeline PRIVATE osoe rt)
+  osoe_warnings(shmem_test_pipeline)
+  foreach(case "0,0,1,1" "0,1,2,0,1,0" "0,1,2,3,4:OSOE_COLLECTIVE_FANOUT=2")
+    string(REPLACE ":" ";" environment "${case}")
+    list(POP_FRONT environment map)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    string(REPLACE "," "-" label "${map}")
+    foreach(depth 1 2 4)
+      add_test(NAME shmem.pipeline.${label}.in-flight-${depth}
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${depth} ${environment}
+                $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+                $<TARGET_FILE:shmem_test_pipeline>)
+      set_tests_properties(shmem.pipeline.${label}.in-flight-${depth} PROPERTIES
+        LABELS "tier2" TIMEOUT 90)
+    endforeach()
+  endforeach()
+endif()
+
 # OSOE_REGION_INTERNAL itself (test-internal-region.c): between node-mates, a
 # path no collective takes, across nodes, and both. White-box: it calls the
 # transport, so the library's own sources are compiled into it.
