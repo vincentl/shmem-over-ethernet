@@ -346,6 +346,24 @@ foreach(value 3 1025 x)
     PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS='${value}' is not between 4 and 1024")
 endforeach()
 
+# OSOE_COLLECTIVE_PIPELINE too (§5.8): the pieces each lead keeps in flight
+# place them in the internal region, so a node with another number puts a piece
+# where its parent keeps another. Two nodes, the second's lead given 4 to the
+# first's default 2; and outside 1 to 8, or not a number, refused at init.
+add_test(NAME shmem.job.disagree.pipeline
+  COMMAND osoe-launch -n 2 -m 0,1 -t 30 -e 1:OSOE_COLLECTIVE_PIPELINE=4 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.disagree.pipeline PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+  "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=4; node 0 has 2")
+foreach(value 0 9 x)
+  add_test(NAME shmem.collective-pipeline.invalid.${value}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${value}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.collective-pipeline.invalid.${value} PROPERTIES LABELS "tier2"
+    TIMEOUT 60 PASS_REGULAR_EXPRESSION "OSOE_COLLECTIVE_PIPELINE='${value}' is not between 1 and 8")
+endforeach()
+
 # The node count is the value that shapes the waits: a lead expects children by
 # its own count, so one given too many waits for children that do not exist.
 # The hello carries the count and a lead calls its parent before it waits for

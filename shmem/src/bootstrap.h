@@ -33,6 +33,8 @@ struct osoe_bootstrap {
     bool shm_capacity_warning_only; /* OSOE_SHM_CAPACITY_CHECK=0: report, do not refuse */
     uint32_t collective_fanout; /* OSOE_COLLECTIVE_FANOUT: k of the internode tree (§5.3) */
     uint32_t max_teams;         /* OSOE_MAX_TEAMS: teams in existence job-wide at once (§5.7) */
+    uint32_t collective_pipeline;   /* OSOE_COLLECTIVE_PIPELINE: D, a data collective's
+                                     * pieces in flight per level of the tree (§5.8) */
     uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
     /* OSOE_KEEPALIVE (§3.15): TCP keepalive on every node-pair connection, as
      * seconds idle, seconds between probes, and probes. Zero means the default,
@@ -72,6 +74,18 @@ struct osoe_bootstrap {
 #define OSOE_MAX_TEAMS_DEFAULT 32u
 #define OSOE_MAX_TEAMS_LOWEST  4u
 #define OSOE_MAX_TEAMS_HIGHEST 1024u
+
+/*
+ * OSOE_COLLECTIVE_PIPELINE (§5.8, "Pipelined pieces"): D, how many pieces of a
+ * data collective each lead of the internode tree keeps in flight between
+ * sending them up and receiving their release. Its default, and the range it
+ * must lie in: 1 is one piece at a time, each a whole pass up and down, as
+ * before phase 1 step 5 slice 5; each step of D costs every team number's
+ * slots in the internal region again (internal-region.h).
+ */
+#define OSOE_COLLECTIVE_PIPELINE_DEFAULT 2u
+#define OSOE_COLLECTIVE_PIPELINE_LOWEST  1u
+#define OSOE_COLLECTIVE_PIPELINE_HIGHEST 8u
 
 /* The default SHMEM_SYMMETRIC_SIZE: 256 MiB (§4.4). */
 #define OSOE_DEFAULT_SYMMETRIC_SIZE (UINT64_C(256) << 20)
