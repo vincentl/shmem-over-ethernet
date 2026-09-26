@@ -49,6 +49,8 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Internode allgather** runs Bruck's steps among node leads at the seam. Claude, [2026-09-26-overnight](2026-09-26-overnight.md) item 5.
 - **A team's record carries its world ranks** as start, stride and member count; the upcall that computed them is gone. Author, [2026-09-26-day](2026-09-26-day.md) item 7; built in [2026-09-26-evening](2026-09-26-evening.md) item 5.
 - **Contexts.** A pool of `OSOE_MAX_CONTEXTS`; a nonblocking get's token names its context; `NOSTORE` is recorded and still runs the ordering fences. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 2.
+- **Shared contexts issue without a lock**: a generation word and two counter pairs for gets, an atomic dirty bitmap with compare-and-swap highest segments for puts, and a mutex taken only by waits; a wait that finds a node behind after its clear re-sets the bit and moves on. Author (the design and the change to item 2), [2026-09-26-evening](2026-09-26-evening.md) items 10-11.
+- **`OSOE_CHECK_QUIET` and `OSOE_TEST_PERTURB`** are test hooks kept in the library, off by default, and the threaded test runs with both in every preset: together they catch the race mutations the tests otherwise cannot see. Claude, recommended to the author, [2026-09-26-evening](2026-09-26-evening.md) item 12.
 - **Team destroy** tears down its shareable contexts and is fatal, by name, on a live private one; finalize destroys what is left. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 2.
 - **Cross-node scans** use slots and counters per team number, never shared per-PE slots, so threads cannot race on them. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 5.
 
