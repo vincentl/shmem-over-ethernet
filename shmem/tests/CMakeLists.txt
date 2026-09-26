@@ -1349,12 +1349,6 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             $<TARGET_FILE:shmem_test_collective-divergence>)
   set_tests_properties(shmem.collective-divergence PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "PEs called different collectives")
-  add_test(NAME shmem.collective-divergence.gather
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_DIVERGE_KIND=gather
-            $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,2 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
-            $<TARGET_FILE:shmem_test_collective-divergence>)
-  set_tests_properties(shmem.collective-divergence.gather PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "PEs called different collectives")
 endif()
 
 # Pipelined pieces through the internode tree (design §5.8; phase 1 step 5

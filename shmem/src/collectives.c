@@ -26,7 +26,9 @@
  *
  * Costs, with L local members and n bytes: the lead's intranode combine is
  * O(L n), each member's copy-out O(n); the internode phase is the backend's
- * (the generic one's: ceil(n / slot) passes of depth ceil(log_k N)).
+ * (the generic one's: for a reduction or a broadcast ceil(n / slot) pieces
+ * through a tree of depth ceil(log_k N), D of them in flight; for a gather
+ * ceil(log2 N) steps of an allgather).
  */
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -247,9 +249,11 @@ static void prefix_sums(const char *routine, uint64_t *words, uint64_t count)
  * phase, which returns every node's blocks (internode.h); then the release and
  * the copy-outs, as for a broadcast. Only the lead writes its dest, and only
  * once every member has arrived, which each does after its copy-out of the
- * collective before: no member writes memory another may still be reading, and
- * nothing is written in another node but its internal region (§5.5, invariant
- * 16).
+ * collective before: no member writes memory another may still be reading.
+ * The internode phase writes the other nodes' blocks into it - the generic
+ * one by puts from the other nodes' leads - but only once the lead has handed
+ * it over, since the lead leaves last, after every copy-out of the collective
+ * before (§5.5, invariant 16; internode.h).
  *
  * With `lengths` it is collect's first gather (collect_varying): each block is
  * a member's length, eight bytes, and the lead turns the result into their

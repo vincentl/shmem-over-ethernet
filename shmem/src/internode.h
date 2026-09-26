@@ -101,10 +101,12 @@
  * by the place of its own: the region the address falls in - the lead's heap
  * mapping, or the program's two statics ranges, which is where the lead's own
  * statics are addressed (node.h) - and the offset into it. An RDMA backend
- * would write the result straight into each child's buffer, where the generic
- * implementation stages it through its slots. It stays the lead's own memory: nothing but this call writes it
- * before the lead's release (§5.5, invariant 16), and nothing reads it by
- * reference afterwards (above).
+ * would write a reduction's or a broadcast's result straight into each child's
+ * buffer, where the generic implementation's tree stages it through its
+ * slots; its gather already writes straight into each peer's buffer
+ * (osoe_internode_collect). It stays the lead's own memory: nothing but this
+ * call writes it before the lead's release (§5.5, invariant 16), and nothing
+ * reads it by reference afterwards (above).
  *
  * What an RDMA backend does with each call (§4.10's discipline: say it, so the
  * interface is checked against more than the one backend it has):
@@ -134,10 +136,11 @@
  *     the generic implementation.
  *   - osoe_internode_broadcast: likewise, where a multicast of the root's
  *     buffer is the offload the RoCE review names (§6).
- *   - osoe_internode_collect: an allgather over RDMA writes - a ring, or
- *     recursive doubling - moving each node's blocks once, into each peer's
- *     buffer once that peer has entered the collective (below); or the
- *     generic implementation's or.
+ *   - osoe_internode_collect: the generic implementation, an allgather whose
+ *     puts into each peer's buffer, once that peer has entered the collective
+ *     (below), and fenced adds become RDMA writes and atomics with no change
+ *     to it; or another allgather - a ring, or recursive doubling - moving each
+ *     node's blocks once into each peer's buffer, under the same rule.
  */
 #ifndef OSOE_INTERNODE_H
 #define OSOE_INTERNODE_H
@@ -334,16 +337,20 @@ void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index
  * A backend may write a peer's buffer only once that peer has entered this
  * collective, (team, epoch): until then the peer's members may still be
  * copying the collective before's result out of it (§5.5). Before that it
- * stages through OSOE_REGION_INTERNAL (§5.8 rule 1), as the generic
- * implementation does, which is the reduction's tree running an or: it zeroes
- * the others' places first, and disjoint blocks or'd are their concatenation.
- * That moves, per 16 KiB piece, about two pieces at a leaf and 2(k + 1) at an
- * interior lead, with k the fan-out; and the pieces go D at a time
- * (OSOE_COLLECTIVE_PIPELINE, §5.8), so a gather of a fixed block per PE takes
- * about ceil(bytes / piece) / D * 2 ceil(log_k N) hops - linear in the PE
- * count, and so the one internode phase whose latency grows faster than log N.
- * It is an operation of its own at the seam so that a backend with an
- * allgather can do better, moving each block once.
+ * stages through OSOE_REGION_INTERNAL (§5.8 rule 1), or waits.
+ *
+ * The generic implementation waits, and writes nothing twice: it is Bruck's
+ * allgather among the team's node leads (§5.8, "An allgather for fcollect";
+ * phase 1 step 5 slice 6), ceil(log2 N) steps over N nodes. At step s a lead
+ * puts every share it holds - its node's members' blocks and those it has
+ * gathered - straight to their places in the buffer of the lead 2^s positions
+ * before it in the team's node set, once that lead has said it entered, and
+ * each lead ends with every other node's share put into its buffer once:
+ * N - 1 shares in, N - 1 out, and no copy but the puts. So a gather's latency
+ * is ceil(log2 N) steps, each a put and an add, and its bytes the result's
+ * less a node's own share in and out of each lead - where the reduction's tree
+ * running an or, which it replaced, moved the whole result through every
+ * level of the tree, twice at each lead.
  */
 void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                             size_t block, const uint64_t *places, const char *routine);

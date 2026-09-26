@@ -4,11 +4,14 @@
  * OSOE_TEST_DIVERGE=1 calls a broadcast where every other PE calls a
  * reduction. Its lead's arrival counts toward its parent's reduction, but it
  * put no partial result, so the parent finds the slot holding something other
- * than the piece it waits for. With OSOE_TEST_DIVERGE_KIND=gather the one PE
- * fcollects a long where the others or-reduce as many: the same bytes over the
- * same tree, told apart only by the gather's mark in the piece header. The
- * test passes when the job ends with the fatal's words (CMakeLists.txt); any
- * other ending fails it.
+ * than the piece it waits for. The test passes when the job ends with the
+ * fatal's words (CMakeLists.txt); any other ending fails it.
+ *
+ * Until phase 1 step 5 slice 6 a gather ran as an or over the reduction's tree,
+ * and a second case fcollected where the others or-reduced the same bytes,
+ * told apart only by the gather's mark in the piece header. A gather is an
+ * allgather now, on words of its own, and meets no reduction's pieces: the two
+ * wait in different places, as collectives whose trees share no edge do.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,18 +30,7 @@ int main(void)
     for (int i = 0; i < COUNT; i++)
         src[i] = shmem_my_pe();
     const char *diverge = getenv("OSOE_TEST_DIVERGE");
-    const char *kind = getenv("OSOE_TEST_DIVERGE_KIND");
-    int npes = shmem_n_pes();
-    if (kind && kind[0] == 'g') {
-        /* A gather against an or of the same bytes, which the generic
-         * implementation runs a gather as: only the piece header tells them
-         * apart (internode-generic.c, its gather bit). */
-        if (diverge && diverge[0] == '1')
-            shmem_long_fcollect(SHMEM_TEAM_WORLD, dst, src, 1);
-        else
-            shmem_ulong_or_reduce(SHMEM_TEAM_WORLD, (unsigned long *)dst,
-                                  (const unsigned long *)src, (size_t)npes);
-    } else if (diverge && diverge[0] == '1') {
+    if (diverge && diverge[0] == '1') {
         shmem_long_broadcast(SHMEM_TEAM_WORLD, dst, src, COUNT, 0);
     } else {
         shmem_long_sum_reduce(SHMEM_TEAM_WORLD, dst, src, COUNT);
