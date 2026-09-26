@@ -1,0 +1,34 @@
+== none (0 mutated lines)
+100% tests passed, 0 tests failed out of 42
+== noretag (1 mutated lines)
+100% tests passed, 0 tests failed out of 42
+== naive_clear (1 mutated lines)
+    Test #335: shmem.multiple.0-1-2-0-1-0 ...........***Failed    0.21 sec
+98% tests passed, 1 tests failed out of 42
+== bit_first (1 mutated lines)
+100% tests passed, 0 tests failed out of 42
+== plain_max (1 mutated lines)
+100% tests passed, 0 tests failed out of 42
+== copier_pair_zero (1 mutated lines)
+    Test #333: shmem.multiple.0-1 ...................***Failed   60.02 sec
+    Test #334: shmem.multiple.0-0-1-1 ...............***Failed   60.03 sec
+    Test #335: shmem.multiple.0-1-2-0-1-0 ...........***Failed   60.02 sec
+93% tests passed, 3 tests failed out of 42
+== pe_quiet_stores_full (1 mutated lines)
+100% tests passed, 0 tests failed out of 42
+== issue_locks (1 mutated lines)
+    Test #333: shmem.multiple.0-1 ...................***Failed    0.11 sec
+    Test #334: shmem.multiple.0-0-1-1 ...............***Failed    0.13 sec
+    Test #335: shmem.multiple.0-1-2-0-1-0 ...........***Failed    0.22 sec
+93% tests passed, 3 tests failed out of 42
+== no_own_scan (1 mutated lines)
+    Test #333: shmem.multiple.0-1 ...................***Failed   60.02 sec
+    Test #334: shmem.multiple.0-0-1-1 ...............***Failed   60.04 sec
+    Test #335: shmem.multiple.0-1-2-0-1-0 ...........***Failed   60.04 sec
+93% tests passed, 3 tests failed out of 42
+== no_piggyback_guard (1 mutated lines)
+    Test #333: shmem.multiple.0-1 ...................***Failed    0.12 sec
+    Test #334: shmem.multiple.0-0-1-1 ...............***Failed    0.16 sec
+    Test #335: shmem.multiple.0-1-2-0-1-0 ...........***Failed    0.21 sec
+93% tests passed, 3 tests failed out of 42
+DONE

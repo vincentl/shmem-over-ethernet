@@ -1,0 +1,21 @@
+none: 0 mutated lines
+none [OSOE_CHECK_QUIET=1]: 0/10 failed. 
+none [OSOE_TEST_PERTURB=1]: 0/10 failed. 
+none [OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1]: 0/10 failed. 
+noretag: 1 mutated lines
+noretag [OSOE_CHECK_QUIET=1]: 3/10 failed. osoe: PE 5: OSOE_CHECK_QUIET: shmem_quiet returned with a nonblocking get in flight that returned before it was called (extent 0, call 106 of 106)
+noretag [OSOE_TEST_PERTURB=1]: 10/10 failed. PE 5 thread 1 round 0: a nonblocking get on the default context read 0, not 17196646400
+noretag [OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1]: 10/10 failed. osoe: PE 5: OSOE_CHECK_QUIET: shmem_quiet returned with a nonblocking get in flight that returned before it was called (extent 2, call 2 of 2)
+plain_max: 1 mutated lines
+plain_max [OSOE_CHECK_QUIET=1]: 0/10 failed. 
+plain_max [OSOE_TEST_PERTURB=1]: 0/10 failed. 
+plain_max [OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1]: 10/10 failed. osoe: PE 4: OSOE_CHECK_QUIET: shmem_quiet returned with node 0 acknowledged through segment 302, and this context had written through 303 before the call
+pe_quiet_stores_full: 1 mutated lines
+pe_quiet_stores_full [OSOE_CHECK_QUIET=1]: 9/10 failed. osoe: PE 1: OSOE_CHECK_QUIET: shmem_quiet returned with node 0 acknowledged through segment 1611, and this context had written through 1612 before the call
+pe_quiet_stores_full [OSOE_TEST_PERTURB=1]: 0/10 failed. 
+pe_quiet_stores_full [OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1]: 10/10 failed. osoe: PE 5: OSOE_CHECK_QUIET: shmem_quiet returned with node 1 acknowledged through segment 1320, and this context had written through 1322 before the call
+bit_first_moved: 1 mutated lines
+bit_first_moved [OSOE_CHECK_QUIET=1]: 1/10 failed. osoe: PE 1: OSOE_CHECK_QUIET: shmem_quiet returned with node 0 acknowledged through segment 564, and this context had written through 568 before the call
+bit_first_moved [OSOE_TEST_PERTURB=1]: 0/10 failed. 
+bit_first_moved [OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1]: 10/10 failed. osoe: PE 2: OSOE_CHECK_QUIET: shmem_quiet returned with node 0 acknowledged through segment 112, and this context had written through 113 before the call
+DONE

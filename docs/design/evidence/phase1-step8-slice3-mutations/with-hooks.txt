@@ -1,0 +1,24 @@
+== none (0 mutated lines)
+100% tests passed, 0 tests failed out of 2
+== noretag (1 mutated lines)
+    Test #334: shmem.multiple.checked.0-1 ...........***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.06 sec
+    Test #335: shmem.multiple.checked.0-1-2-0-1-0 ...***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.08 sec
+0% tests passed, 2 tests failed out of 2
+== bit_first (1 mutated lines)
+100% tests passed, 0 tests failed out of 2
+== plain_max (1 mutated lines)
+    Test #334: shmem.multiple.checked.0-1 ...........***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.15 sec
+    Test #335: shmem.multiple.checked.0-1-2-0-1-0 ...***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.07 sec
+0% tests passed, 2 tests failed out of 2
+== pe_quiet_stores_full (1 mutated lines)
+    Test #335: shmem.multiple.checked.0-1-2-0-1-0 ...***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.15 sec
+50% tests passed, 1 tests failed out of 2
+== naive_clear (1 mutated lines)
+    Test #334: shmem.multiple.checked.0-1 ...........***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.05 sec
+    Test #335: shmem.multiple.checked.0-1-2-0-1-0 ...***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.07 sec
+0% tests passed, 2 tests failed out of 2
+== no_piggyback_guard (1 mutated lines)
+    Test #334: shmem.multiple.checked.0-1 ...........***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.06 sec
+    Test #335: shmem.multiple.checked.0-1-2-0-1-0 ...***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.07 sec
+0% tests passed, 2 tests failed out of 2
+DONE
