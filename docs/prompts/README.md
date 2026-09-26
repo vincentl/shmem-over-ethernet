@@ -3,6 +3,10 @@
 **Where the files are.** The open brief sits here; every finished one is in
 `done/`, under its own name, which this index still gives.
 
+**Open now:** `phase1-step8-slice3-prompt.md`, lock-free issue on shareable
+contexts. The table below stops at step 4; the briefs after it are in `done/`
+and their outcomes in `docs/decisions/`.
+
 The brief each working session was given, kept so that a decision can be traced
 back to what was asked for as well as to what was done.
 

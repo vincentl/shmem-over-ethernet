@@ -396,7 +396,7 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
 
 /*
  * collect's places are the prefix sums of every member's length (phase 1 step
- * 8 slice 2; the author's C4, docs/prompts/phase1-step8-slice2-prompt.md).
+ * 8 slice 2; the author's C4, docs/prompts/done/phase1-step8-slice2-prompt.md).
  * They need not be symmetric - only the lead reads them - so nothing is
  * borrowed from the heap: each member leaves its length in its own word of the
  * team number's line (internal-region.h), the lead sets its members' lengths

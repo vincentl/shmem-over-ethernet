@@ -3550,7 +3550,7 @@ and quiets on one context can fill it and complete another's gets early -
 correct, and a coupling in time between contexts that slice 2's extents,
 reused one by one, removes.
 
-*As built, slice 2* (`docs/prompts/phase1-step8-slice2-prompt.md`;
+*As built, slice 2* (`docs/prompts/done/phase1-step8-slice2-prompt.md`;
 `metrics.c`, `watch.c`, `transport-am.c`, `progress-host.c`, `node.h` layout
 23). `shmem_init_thread` provides `MULTIPLE` when asked; `shmem_init` stays at
 `SERIALIZED` (§4.6). What exists:
