@@ -24,6 +24,10 @@ struct agreement {
     uint64_t symmetric_size;
     uint32_t handler_checksum;
     uint32_t collective_fanout;     /* §5.3: a node building another tree hangs the job */
+    /* §5.7: team numbers are job-wide, and a node with another count lays its
+     * team state and internal region out differently. */
+    uint32_t max_teams;
+    uint32_t reserved;              /* zero, so that what travels has no padding */
 };
 
 struct up_header {
@@ -92,6 +96,10 @@ static void agree(const struct osoe_bootstrap *b, uint32_t child, const struct a
         osoe_fatal("node %u (or a node below it) has OSOE_COLLECTIVE_FANOUT=%u; node %u has "
                    "%u: every node must build the same internode tree (§5.3)", child,
                    theirs->collective_fanout, b->node, mine->collective_fanout);
+    if (theirs->max_teams != mine->max_teams)
+        osoe_fatal("node %u (or a node below it) has OSOE_MAX_TEAMS=%u; node %u has %u: every "
+                   "node must number teams alike (§5.7)", child, theirs->max_teams, b->node,
+                   mine->max_teams);
 }
 
 static void lost(const struct osoe_bootstrap *b, uint32_t node, const char *role)
@@ -218,7 +226,7 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
 {
     *out = (struct osoe_rendezvous_result){ 0 };
     struct agreement mine = { b->world_size, b->node_count, b->symmetric_size,
-                              osoe_am_table_checksum(), b->collective_fanout };
+                              osoe_am_table_checksum(), b->collective_fanout, b->max_teams, 0 };
 
     /* This node's record: its address, its ranks as progressions, its blob. */
     struct report r = { 0 };

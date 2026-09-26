@@ -312,6 +312,25 @@ set_tests_properties(shmem.job.disagree.symmetric-size PROPERTIES PASS_REGULAR_E
 set_tests_properties(shmem.job.disagree.fanout PROPERTIES PASS_REGULAR_EXPRESSION
   "node 2 [(]or a node below it[)] has OSOE_COLLECTIVE_FANOUT=2; node 0 has 4")
 
+# OSOE_MAX_TEAMS is agreed the same way (§5.7): team numbers are job-wide, and
+# a node counting to another number lays its team state out differently. Two
+# nodes, the second's lead given 64 teams to the first's default 32.
+add_test(NAME shmem.job.disagree.max-teams
+  COMMAND osoe-launch -n 2 -m 0,1 -t 30 -e 1:OSOE_MAX_TEAMS=64 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.disagree.max-teams PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=64; node 0 has 32")
+
+# And outside its range, or not a number, it is refused by name at init: at
+# least one team beyond the three predefined, and at most 1,024.
+foreach(value 3 1025 x)
+  add_test(NAME shmem.max-teams.invalid.${value}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_TEAMS=${value}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.max-teams.invalid.${value} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS='${value}' is not between 4 and 1024")
+endforeach()
+
 # The node count is the value that shapes the waits: a lead expects children by
 # its own count, so one given too many waits for children that do not exist.
 # The hello carries the count and a lead calls its parent before it waits for

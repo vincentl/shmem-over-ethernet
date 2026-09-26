@@ -32,6 +32,7 @@ struct osoe_bootstrap {
     bool keep_control_segment;  /* OSOE_KEEP_CONTROL_SEGMENT: name kept until finalize */
     bool shm_capacity_warning_only; /* OSOE_SHM_CAPACITY_CHECK=0: report, do not refuse */
     uint32_t collective_fanout; /* OSOE_COLLECTIVE_FANOUT: k of the internode tree (§5.3) */
+    uint32_t max_teams;         /* OSOE_MAX_TEAMS: teams in existence job-wide at once (§5.7) */
     uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
     /* OSOE_KEEPALIVE (§3.15): TCP keepalive on every node-pair connection, as
      * seconds idle, seconds between probes, and probes. Zero means the default,
@@ -61,6 +62,16 @@ struct osoe_bootstrap {
 /* The default OSOE_PORT_RANGE (§6.2): below the ephemeral ports. */
 #define OSOE_DEFAULT_PORT_LOW  17000
 #define OSOE_DEFAULT_PORT_HIGH 26999
+
+/*
+ * OSOE_MAX_TEAMS (§5.7): its default, and the range it must lie in - room for
+ * at least one team beyond the three predefined, and at most 1,024, where a
+ * node's team blocks come to about a megabyte of its control segment and each
+ * PE's internal region to about 80 MiB of address space at the default fan-out.
+ */
+#define OSOE_MAX_TEAMS_DEFAULT 32u
+#define OSOE_MAX_TEAMS_LOWEST  4u
+#define OSOE_MAX_TEAMS_HIGHEST 1024u
 
 /* The default SHMEM_SYMMETRIC_SIZE: 256 MiB (§4.4). */
 #define OSOE_DEFAULT_SYMMETRIC_SIZE (UINT64_C(256) << 20)
