@@ -34,6 +34,20 @@
  * before it looks, so that the finalize team has run and, on a job of several
  * nodes, --summary gives that team's line as well as the world's.
  *
+ * **A created team lists its members in team-rank order** (phase 1 step 7
+ * slice 2), its local lead the lowest team rank on the node - on the
+ * hand-given order, rank 0 at local id 1, not the node's local id 0 - and its
+ * lead on each node is what its records name and what its local lead keeps,
+ * by position in its node set, for the internode phase. Three are made: the
+ * world again (number 3), the world reversed (4), whose lead on each node is
+ * its highest rank, and each node reversed, split from SHMEM_TEAM_SHARED - a
+ * table of ranks where the node's interleave with another's. Each PE checks
+ * its descriptors against the map and runs the collectives on each, and
+ * osoe-stat names teams 3 and 4 by their numbers, with their records as the
+ * map implies them - team 4's after it is destroyed, since a record outlives
+ * its team - and the node's own. The two left alive at the end are the
+ * session's end to free.
+ *
  * OSOE_TEST_MAP gives the map, and OSOE_TEST_LEADS each node's lead's rank
  * where a hand-given order makes it other than the node's lowest.
  *
@@ -58,6 +72,12 @@
 enum { MAX_PES = 64 };
 
 static int me, npes;
+
+/* The teams this program creates: the world again, the world reversed, and
+ * this PE's node reversed, whose number its node's claim decides. */
+static shmem_team_t again_team = SHMEM_TEAM_INVALID, reverse_team = SHMEM_TEAM_INVALID,
+                    node_team = SHMEM_TEAM_INVALID;
+static uint32_t node_team_number;
 
 /* A comma-separated list of numbers into `values`, up to `capacity`; how many. */
 static uint32_t read_list(const char *list, uint32_t *values, uint32_t capacity)
@@ -205,6 +225,93 @@ static void check_shared(const uint32_t *gtids, uint32_t local_count)
     check_collectives(SHMEM_TEAM_SHARED, (int)local_count, (int)local_id);
 }
 
+/*
+ * A created team's descriptor against the map: its members here in team-rank
+ * order, each at the local id the launcher's OSOE_GTIDS gives its rank, the
+ * lead the first of them, its world mapping, and its node set - every node's
+ * lead by position, the member of lowest team rank there, kept on the local
+ * lead alone. `world_of` gives the team's ranks as world ranks, and `number`
+ * its number, or UINT32_MAX where the test cannot say.
+ */
+static void check_created(shmem_team_t team, uint32_t number, const uint32_t *world_of,
+                          int members, const uint32_t *node_of, uint32_t nodes,
+                          const uint32_t *gtids, uint32_t local_count)
+{
+    const struct osoe_team *t = osoe_team_of("test-team-storage", team);
+    CHECK_FATAL(t != NULL);
+    if (number != UINT32_MAX)
+        CHECK(t->number == number);
+    CHECK(t->members == (uint32_t)members);
+    uint32_t here = osoe.job.node, count = 0;
+    for (int r = 0; r < members; r++) {
+        CHECK(osoe_team_to_world(t, r) == (int)world_of[r]);
+        if (node_of[world_of[r]] != here)
+            continue;
+        uint32_t id = UINT32_MAX;
+        for (uint32_t m = 0; m < local_count; m++)
+            if (gtids[m] == world_of[r])
+                id = m;
+        CHECK(count < t->local_members && t->local_ranks[count] == (uint32_t)r &&
+              t->local_ids[count] == id);
+        count++;
+    }
+    CHECK(t->local_members == count);
+    CHECK(count > 0 && t->lead_local_id == t->local_ids[0]);
+
+    uint32_t lead_by_node[MAX_PES], spanned = 0;
+    for (uint32_t n = 0; n < nodes; n++)
+        lead_by_node[n] = UINT32_MAX;
+    for (int r = 0; r < members; r++)
+        if (lead_by_node[node_of[world_of[r]]] == UINT32_MAX) {
+            lead_by_node[node_of[world_of[r]]] = world_of[r];
+            spanned++;
+        }
+    CHECK(t->nodes == spanned && t->internode == (spanned > 1));
+    if (osoe.bootstrap.local_id == t->lead_local_id && t->internode) {
+        CHECK_FATAL(t->node_leads != NULL);
+        for (uint32_t n = 0, i = 0; n < nodes; n++)
+            if (lead_by_node[n] != UINT32_MAX)
+                CHECK(t->node_leads[i++] == lead_by_node[n]);
+    } else {
+        CHECK(t->node_leads == NULL);
+    }
+}
+
+/* The three teams, each checked and its collectives run. */
+static void check_created_teams(const uint32_t *node_of, uint32_t nodes, const uint32_t *gtids,
+                                uint32_t local_count)
+{
+    uint32_t world_of[MAX_PES];
+    CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &again_team) ==
+                0);
+    for (int r = 0; r < npes; r++)
+        world_of[r] = (uint32_t)r;
+    check_created(again_team, 3, world_of, npes, node_of, nodes, gtids, local_count);
+    check_collectives(again_team, npes, me);
+
+    CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_WORLD, npes - 1, -1, npes, NULL, 0,
+                                         &reverse_team) == 0);
+    for (int r = 0; r < npes; r++)
+        world_of[r] = (uint32_t)(npes - 1 - r);
+    check_created(reverse_team, 4, world_of, npes, node_of, nodes, gtids, local_count);
+    check_collectives(reverse_team, npes, npes - 1 - me);
+
+    int n = shmem_team_n_pes(SHMEM_TEAM_SHARED);
+    CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_SHARED, n - 1, -1, n, NULL, 0, &node_team) ==
+                0);
+    for (int r = 0; r < n; r++)
+        world_of[r] = (uint32_t)shmem_team_translate_pe(SHMEM_TEAM_SHARED, n - 1 - r,
+                                                        SHMEM_TEAM_WORLD);
+    check_created(node_team, UINT32_MAX, world_of, n, node_of, nodes, gtids, local_count);
+    const struct osoe_team *t = osoe_team_of("test-team-storage", node_team);
+    const struct osoe_team *shared = osoe_team_of("test-team-storage", SHMEM_TEAM_SHARED);
+    node_team_number = t->number;
+    CHECK(node_team_number >= 5);
+    /* A split of a table is a table (team.h). */
+    CHECK((t->world_of_rank != NULL) == (shared->world_of_rank != NULL));
+    check_collectives(node_team, n, shmem_team_my_pe(node_team));
+}
+
 /* Run osoe-stat with `args` on this node's control segment. */
 static int run_stat(const char *args, char *out, size_t len)
 {
@@ -257,35 +364,40 @@ static bool dump_is(const char *out, const char *name, uint64_t want)
     return false;
 }
 
-/*
- * The world's record on this node against the map: §5.3's k-ary tree over
- * every node, this node at its own number's index, each neighbour named by its
- * lead's rank. Through osoe-stat, as a person reading a hung job would.
- */
-static void check_world_record(const char *out, const uint32_t *node_of, uint32_t nodes,
-                               const uint32_t *lead_of)
+static bool record_is(const char *out, const char *label, const char *field, uint64_t want)
 {
-    uint32_t here = osoe.job.node, k = osoe.bootstrap.collective_fanout, local = 0;
-    for (int r = 0; r < npes; r++)
-        if (node_of[r] == here)
-            local++;
-    CHECK(dump_is(out, "team.world.record.published", 1));
-    CHECK(dump_is(out, "team.world.record.local_members", local));
-    CHECK(dump_is(out, "team.world.record.nodes", nodes));
+    char name[64];
+    snprintf(name, sizeof name, "team.%s.record.%s", label, field);
+    return dump_is(out, name, want);
+}
+
+/*
+ * A team's record on this node against the map, through osoe-stat as a person
+ * reading a hung job would: `local` members here, and §5.3's k-ary tree over
+ * the team's `nodes` nodes - every node of the job, or this one alone, so this
+ * node at its own number's position - each neighbour named by its lead's rank,
+ * `lead_of` by node.
+ */
+static void check_record(const char *out, const char *label, uint32_t local, uint32_t nodes,
+                         const uint32_t *lead_of)
+{
+    uint32_t here = osoe.job.node, k = osoe.bootstrap.collective_fanout;
+    CHECK(record_is(out, label, "published", 1));
+    CHECK(record_is(out, label, "local_members", local));
+    CHECK(record_is(out, label, "nodes", nodes));
     if (nodes < 2)
         return;
-    CHECK(dump_is(out, "team.world.record.index", here));
-    CHECK(dump_is(out, "team.world.record.parent",
-                  here == 0 ? UINT32_MAX : lead_of[(here - 1) / k]));
-    CHECK(dump_is(out, "team.world.record.position", here == 0 ? 0 : (here - 1) % k));
+    CHECK(record_is(out, label, "index", here));
+    CHECK(record_is(out, label, "parent", here == 0 ? UINT32_MAX : lead_of[(here - 1) / k]));
+    CHECK(record_is(out, label, "position", here == 0 ? 0 : (here - 1) % k));
     uint32_t children = 0;
     for (uint32_t c = 0; c < k && (uint64_t)k * here + 1 + c < nodes; c++) {
-        char name[48];
-        snprintf(name, sizeof name, "team.world.record.child.%u", c);
-        CHECK(dump_is(out, name, lead_of[k * here + 1 + c]));
+        char field[32];
+        snprintf(field, sizeof field, "child.%u", c);
+        CHECK(record_is(out, label, field, lead_of[k * here + 1 + c]));
         children++;
     }
-    CHECK(dump_is(out, "team.world.record.children", children));
+    CHECK(record_is(out, label, "children", children));
 }
 
 /* Whether the summary has a line for node `node` and team `team`. */
@@ -309,9 +421,14 @@ static bool summary_has(const char *out, uint32_t node, const char *team)
     return false;
 }
 
-static void check_stat(const uint32_t *node_of, uint32_t nodes, const uint32_t *lead_of)
+static void check_stat(const uint32_t *node_of, uint32_t nodes, const uint32_t *lead_of,
+                       const uint32_t *lowest_of, const uint32_t *highest_of)
 {
     static char out[256 * 1024];
+    uint32_t local = 0;
+    for (int r = 0; r < npes; r++)
+        if (node_of[r] == osoe.job.node)
+            local++;
     CHECK(run_stat("-d", out, sizeof out) == 0);
     CHECK(says(out, "team.world.tree.epoch_open"));
     CHECK(says(out, "team.finalize.tree.epoch_open"));
@@ -321,7 +438,19 @@ static void check_stat(const uint32_t *node_of, uint32_t nodes, const uint32_t *
         CHECK(says(out, "team shared (number 1)"));
     /* Every PE's epochs, since layout 18 in a row of their own. */
     CHECK(says(out, "pe.world_epoch"));
-    check_world_record(out, node_of, nodes, lead_of);
+    check_record(out, "world", local, nodes, lead_of);
+
+    /* The created teams, by number: the world again and reversed - the second
+     * destroyed by now - led on each node by its lowest and its highest rank,
+     * and this PE's node reversed, on this node alone. */
+    CHECK(says(out, "team 3 (number 3)"));
+    CHECK(says(out, "team.3.tree.epoch_open"));
+    CHECK(says(out, "team 4 (number 4)"));
+    check_record(out, "3", local, nodes, lowest_of);
+    check_record(out, "4", local, nodes, highest_of);
+    char label[16];
+    snprintf(label, sizeof label, "%u", node_team_number);
+    check_record(out, label, osoe.job.force_remote ? 1 : local, 1, NULL);
 
     CHECK(run_stat("--summary", out, sizeof out) == 0);
     CHECK(summary_has(out, osoe.job.node, "world"));
@@ -351,13 +480,28 @@ int main(void)
 
     check_world(node_of, nodes, gtids, local_count);
     check_shared(gtids, local_count);
+    check_created_teams(node_of, nodes, gtids, local_count);
+    shmem_team_destroy(reverse_team);
+
+    /* Each node's lowest and highest rank: the leads there of the world again
+     * and of the world reversed. */
+    uint32_t lowest_of[MAX_PES], highest_of[MAX_PES];
+    for (uint32_t n = 0; n < nodes; n++) {
+        lowest_of[n] = UINT32_MAX;
+        highest_of[n] = 0;
+    }
+    for (int r = 0; r < npes; r++) {
+        if (lowest_of[node_of[r]] == UINT32_MAX)
+            lowest_of[node_of[r]] = (uint32_t)r;
+        highest_of[node_of[r]] = (uint32_t)r;
+    }
 
     /* Everything has run a collective, and then the finalize team; the node's
      * lead reads its segment. */
     shmem_finalize();
     shmem_barrier_all();
     if (osoe.bootstrap.local_id == 0)
-        check_stat(node_of, nodes, lead_of);
+        check_stat(node_of, nodes, lead_of, lowest_of, highest_of);
     shmem_barrier_all();
 
     shmem_finalize();
