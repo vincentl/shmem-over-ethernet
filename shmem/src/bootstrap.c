@@ -258,6 +258,24 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    OSOE_MAX_TEAMS_LOWEST, OSOE_MAX_TEAMS_HIGHEST);
 
     /*
+     * How many pieces of a data collective each lead of the internode tree
+     * keeps in flight (§5.8, "Pipelined pieces"). It fixes the internal
+     * region's offsets - D slots per child position and D release slots in
+     * every team number's block (internal-region.h) - so every node must
+     * agree, and the job rendezvous checks that they do beside the fan-out
+     * (§6.2): a node with another D would put a piece where its parent keeps
+     * another child's, or another piece.
+     */
+    b->collective_pipeline = OSOE_COLLECTIVE_PIPELINE_DEFAULT;
+    if (osoe_environment_u32("OSOE_COLLECTIVE_PIPELINE", &b->collective_pipeline) ==
+            OSOE_ENVIRONMENT_INVALID ||
+        b->collective_pipeline < OSOE_COLLECTIVE_PIPELINE_LOWEST ||
+        b->collective_pipeline > OSOE_COLLECTIVE_PIPELINE_HIGHEST)
+        osoe_fatal("OSOE_COLLECTIVE_PIPELINE='%s' is not between %u and %u",
+                   getenv("OSOE_COLLECTIVE_PIPELINE"), OSOE_COLLECTIVE_PIPELINE_LOWEST,
+                   OSOE_COLLECTIVE_PIPELINE_HIGHEST);
+
+    /*
      * The ports a node lead may listen on (§6.2's "configurable range"). Each
      * lead binds the first free port of a candidate sequence hashed from (job,
      * step, node) inside it, and another lead finds it by trying the same

@@ -43,6 +43,20 @@ uint64_t osoe_region_wait_extend(uint64_t value, unsigned width, bool is_signed)
  * wait.c's multiple-element forms so that one place decides. */
 enum osoe_counter osoe_region_wait_late_wake_counter(unsigned width);
 
+/*
+ * A sweep expired, and then the condition held: count it as a lost wake only
+ * if it was one. Every update a waiter can need is followed by a bump of its
+ * watch's sequence word (§4.9), so the wake was lost only if the word still
+ * holds `slept_on`, the value the sweep slept on - and still does a margin
+ * later: an updater descheduled between its store and its bump, or a bump
+ * landing as the timer fires, looks the same for an instant, which under load
+ * meets a sweep a few runs in twenty (base/epoch.c measured it). The same
+ * judgement as epoch.c's and transport-am.c's. Counted by width, as
+ * osoe_region_wait_late_wake_counter says.
+ */
+void osoe_region_wait_count_if_lost(struct osoe_transport_watch *w, uint32_t slept_on,
+                                    unsigned width);
+
 /* Whether `have` stands in `comparison` to `want`, both already extended. */
 bool osoe_region_wait_satisfied(enum osoe_comparison comparison, uint64_t have, uint64_t want,
                            bool is_signed);
@@ -56,5 +70,19 @@ bool osoe_region_wait_satisfied(enum osoe_comparison comparison, uint64_t have, 
 uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t offset,
                           unsigned width, bool is_signed, enum osoe_comparison comparison,
                           uint64_t want, enum osoe_blocked_detail kind, uint64_t detail);
+
+/*
+ * Block until `holds(context)` is true, where `holds` reads only eight-byte
+ * words of this PE's `region` within [offset, offset + len), which one watch
+ * covers: a condition over several words, such as a node lead's wait for
+ * whichever of its inputs is ready first (internode-generic.c). The words are
+ * updated only by rmw, so a sweep that finds the condition already true is a
+ * lost wake, counted as osoe_region_wait's are at that width. Recorded and swept
+ * as osoe_region_wait.
+ */
+void osoe_region_wait_condition(const char *routine, enum osoe_region region, uint64_t offset,
+                                size_t len, bool (*holds)(const void *context),
+                                const void *context, enum osoe_blocked_detail kind,
+                                uint64_t detail);
 
 #endif /* OSOE_REGION_WAIT_H */

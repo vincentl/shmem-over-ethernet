@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,9 +18,14 @@
  * node running another library, and must be refused as one - read as this
  * shape, it would be refused for whichever value the misread happened to hit.
  * The up header's second shape, "osoeup-2", carries OSOE_MAX_TEAMS (phase 1
- * step 7) and is 48 bytes, where the first, "osomeup", was 40.
+ * step 7) and is 48 bytes, where the first, "osomeup", was 40. The third,
+ * "osoeup-3", carries OSOE_COLLECTIVE_PIPELINE (phase 1 step 5 slice 5) in the
+ * word the second kept zero only so that nothing travelled as padding: the same
+ * 48 bytes, so the size assert below cannot tell the two apart, and the magic
+ * must. Read as the second shape, a third-shape report's D would be a word no
+ * lead checks, and a node with another D would be let in.
  */
-#define UP_MAGIC   UINT64_C(0x322d7075656f736f)  /* "osoeup-2", little-endian */
+#define UP_MAGIC   UINT64_C(0x332d7075656f736f)  /* "osoeup-3", little-endian */
 #define DOWN_MAGIC UINT64_C(0x6e776f64656f736f)  /* "osoedown" */
 
 /* What every node must agree on (§6.2): a node that differs is a mismatched
@@ -34,7 +40,10 @@ struct agreement {
     /* §5.7: team numbers are job-wide, and a node with another count lays its
      * team state and internal region out differently. */
     uint32_t max_teams;
-    uint32_t reserved;              /* zero, so that what travels has no padding */
+    /* §5.8: D, the pieces in flight per lead, which fixes the internal
+     * region's offsets as the fan-out and the team count do. The last word, so
+     * that what travels has no padding. */
+    uint32_t collective_pipeline;
 };
 
 struct up_header {
@@ -44,7 +53,9 @@ struct up_header {
     uint32_t progressions;          /* progressions that follow the records */
 };
 
-_Static_assert(sizeof(struct up_header) == 48,
+_Static_assert(sizeof(struct up_header) == 48 &&
+               offsetof(struct up_header, agreement) +
+                       offsetof(struct agreement, collective_pipeline) == 36,
                "the up header's shape is UP_MAGIC's: a new shape takes a new magic");
 
 /* One node of a subtree, as it travels up. */
@@ -110,6 +121,11 @@ static void agree(const struct osoe_bootstrap *b, uint32_t child, const struct a
         osoe_fatal("node %u (or a node below it) has OSOE_MAX_TEAMS=%u; node %u has %u: every "
                    "node must number teams alike (§5.7)", child, theirs->max_teams, b->node,
                    mine->max_teams);
+    if (theirs->collective_pipeline != mine->collective_pipeline)
+        osoe_fatal("node %u (or a node below it) has OSOE_COLLECTIVE_PIPELINE=%u; node %u has "
+                   "%u: every node must keep as many pieces in flight, since it places them "
+                   "in its internal region by that number (§5.8)", child,
+                   theirs->collective_pipeline, b->node, mine->collective_pipeline);
 }
 
 static void lost(const struct osoe_bootstrap *b, uint32_t node, const char *role)
@@ -237,7 +253,8 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
 {
     *out = (struct osoe_rendezvous_result){ 0 };
     struct agreement mine = { b->world_size, b->node_count, b->symmetric_size,
-                              osoe_am_table_checksum(), b->collective_fanout, b->max_teams, 0 };
+                              osoe_am_table_checksum(), b->collective_fanout, b->max_teams,
+                              b->collective_pipeline };
 
     /* This node's record: its address, its ranks as progressions, its blob. */
     struct report r = { 0 };

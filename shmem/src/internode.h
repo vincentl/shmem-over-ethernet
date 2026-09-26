@@ -296,11 +296,12 @@ void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index
  * implementation does, which is the reduction's tree running an or: it zeroes
  * the others' places first, and disjoint blocks or'd are their concatenation.
  * That moves, per 16 KiB piece, about two pieces at a leaf and 2(k + 1) at an
- * interior lead, with k the fan-out; and the pieces go one after another, so
- * a gather of a fixed block per PE takes ceil(bytes / piece) * 2 ceil(log_k N)
- * hops - linear in the PE count, and so the one internode phase whose latency
- * grows faster than log N. It is an operation of its own at the seam so that
- * a backend with an allgather can do better, moving each block once.
+ * interior lead, with k the fan-out; and the pieces go D at a time
+ * (OSOE_COLLECTIVE_PIPELINE, §5.8), so a gather of a fixed block per PE takes
+ * about ceil(bytes / piece) / D * 2 ceil(log_k N) hops - linear in the PE
+ * count, and so the one internode phase whose latency grows faster than log N.
+ * It is an operation of its own at the seam so that a backend with an
+ * allgather can do better, moving each block once.
  */
 void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                             size_t block, const uint64_t *places, const char *routine);

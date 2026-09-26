@@ -346,6 +346,39 @@ foreach(value 3 1025 x)
     PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS='${value}' is not between 4 and 1024")
 endforeach()
 
+# OSOE_COLLECTIVE_PIPELINE too (§5.8): the pieces each lead keeps in flight
+# place them in the internal region, so a node with another number puts a piece
+# where its parent keeps another. Two nodes, the second's lead given 4 to the
+# first's default 2; and outside 1 to 8, or not a number, refused at init.
+add_test(NAME shmem.job.disagree.pipeline
+  COMMAND osoe-launch -n 2 -m 0,1 -t 30 -e 1:OSOE_COLLECTIVE_PIPELINE=4 --
+          $<TARGET_FILE:shmem_test_job>)
+set_tests_properties(shmem.job.disagree.pipeline PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+  "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=4; node 0 has 2")
+foreach(value 0 9 x)
+  add_test(NAME shmem.collective-pipeline.invalid.${value}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${value}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.collective-pipeline.invalid.${value} PROPERTIES LABELS "tier2"
+    TIMEOUT 60 PASS_REGULAR_EXPRESSION "OSOE_COLLECTIVE_PIPELINE='${value}' is not between 1 and 8")
+endforeach()
+
+# Both are agreed between the PEs of one node as well, as OSOE_MAX_TEAMS is:
+# they size every PE's internal region, and a created team's local lead may be
+# any PE of the node, building its tree and keeping its window by its own
+# (node.c, open_control).
+add_test(NAME shmem.collective-fanout.local-disagree
+  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_COLLECTIVE_FANOUT=2 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.collective-fanout.local-disagree PROPERTIES LABELS "tier2"
+  TIMEOUT 60 PASS_REGULAR_EXPRESSION
+  "OSOE_COLLECTIVE_FANOUT differs between PEs: the local lead has 4, this PE has 2")
+add_test(NAME shmem.collective-pipeline.local-disagree
+  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_COLLECTIVE_PIPELINE=4 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.collective-pipeline.local-disagree PROPERTIES LABELS "tier2"
+  TIMEOUT 60 PASS_REGULAR_EXPRESSION
+  "OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 2, this PE has 4")
+
 # The node count is the value that shapes the waits: a lead expects children by
 # its own count, so one given too many waits for children that do not exist.
 # The hello carries the count and a lead calls its parent before it waits for
@@ -1319,6 +1352,56 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             $<TARGET_FILE:shmem_test_collective-divergence>)
   set_tests_properties(shmem.collective-divergence.gather PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "PEs called different collectives")
+endif()
+
+# Pipelined pieces through the internode tree (design §5.8; phase 1 step 5
+# slice 5; test-pipeline.c): a reduction, a broadcast from a root off PE 0's
+# node and an fcollect, each of 1 MiB and of an odd size, every element
+# checked; collectives back to back from every root, their trees rotating; and
+# the count each lead publishes of the most pieces it had in flight, by its
+# place in the tree. On a block map, an interleaved one, five nodes at a
+# fan-out of 2, where a lead is both a parent and a child, and eight, a tree
+# three deep, at D = 1, 2 and 4 - D = 1 being one piece at a time. tsan is left
+# out of the maps for shmem.internode.*'s reason.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_executable(shmem_test_pipeline test-pipeline.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_pipeline PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_pipeline PRIVATE osoe rt)
+  osoe_warnings(shmem_test_pipeline)
+  foreach(case "0,0,1,1" "0,1,2,0,1,0" "0,1,2,3,4:OSOE_COLLECTIVE_FANOUT=2"
+               "0,1,2,3,4,5,6,7:OSOE_COLLECTIVE_FANOUT=2")
+    string(REPLACE ":" ";" environment "${case}")
+    list(POP_FRONT environment map)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    string(REPLACE "," "-" label "${map}")
+    foreach(in_flight 1 2 4)
+      add_test(NAME shmem.pipeline.${label}.in-flight-${in_flight}
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${in_flight} ${environment}
+                $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+                $<TARGET_FILE:shmem_test_pipeline>)
+      set_tests_properties(shmem.pipeline.${label}.in-flight-${in_flight} PROPERTIES
+        LABELS "tier2" TIMEOUT 90)
+    endforeach()
+  endforeach()
+  # Under the AM stress settings - 1 KiB chunks, two credits, the wire in short
+  # reads split at random - where a piece is sixteen chunks and a lead's puts
+  # queue behind its credits. And with OSOE_MAX_TEAMS=4, where the counters
+  # begin right after four teams' slots: a slot computed from piece k rather
+  # than k mod D, which every other map lets write into unused teams' slots
+  # unseen, lands on a counter. At D = 2.
+  add_test(NAME shmem.pipeline.0-1-2-3-4.stress
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_COLLECTIVE_FANOUT=2
+            OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n 5 -m 0,1,2,3,4 -t 150 --
+            $<TARGET_FILE:shmem_test_pipeline>)
+  set_tests_properties(shmem.pipeline.0-1-2-3-4.stress PROPERTIES LABELS "tier2" TIMEOUT 180)
+  add_test(NAME shmem.pipeline.0-0-1-1.max-teams-4
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_MAX_TEAMS=4
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+            $<TARGET_FILE:shmem_test_pipeline>)
+  set_tests_properties(shmem.pipeline.0-0-1-1.max-teams-4 PROPERTIES LABELS "tier2" TIMEOUT 90)
 endif()
 
 # OSOE_REGION_INTERNAL itself (test-internal-region.c): between node-mates, a

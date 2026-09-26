@@ -221,6 +221,9 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     TEAM("team.tree.lowest_missing", BLOCK_TREE(lowest_missing)),
     TEAM("team.tree.parent", BLOCK_TREE(parent)),
     TEAM("team.tree.fanout", BLOCK_TREE(fanout)),
+    /* The most pieces of a data collective the lead had in flight in its last
+     * one (§5.8; layout 19): a count to pin the pipeline's overlap by. */
+    TEAM("team.tree.most_pieces_in_flight", BLOCK_TREE(most_pieces_in_flight)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),
     TEAM("team.record.local_members", BLOCK_RECORD(local_members)),

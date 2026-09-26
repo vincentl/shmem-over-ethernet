@@ -30,7 +30,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 18
+#define OSOE_NODE_LAYOUT 19
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -408,7 +408,8 @@ struct osoe_am_connection_metrics {
  * visits - each node names the lowest child index that has not arrived, and
  * `hostname` below says where to look next - rather than by visiting every
  * node. Written by the lead's progress thread as the state changes, a handful
- * of single-writer stores per barrier (§3.16).
+ * of single-writer stores per barrier (§3.16) - all but the last field, which
+ * the generic internode phase writes on the lead's application thread.
  */
 struct osoe_collective_state {
     _Alignas(OSOE_CACHELINE)
@@ -421,6 +422,17 @@ struct osoe_collective_state {
                                           * UINT32_MAX when none is missing */
     _Atomic uint32_t parent;             /* this node's parent, or UINT32_MAX at the root */
     _Atomic uint32_t fanout;
+    /*
+     * Layout 19 (phase 1 step 5 slice 5), in padding the line already had: the
+     * most pieces of a data collective this node's lead had in flight at once -
+     * sent up and their release not yet held - in its last one on the team
+     * (§5.8, "Pipelined pieces"). min(OSOE_COLLECTIVE_PIPELINE, pieces) at
+     * every lead but the root, which sends nothing up and says 0. Written as
+     * the generic internode phase ends (internode-generic.c), before the lead
+     * releases its members, so a count pins the overlap where a time could
+     * only be compared.
+     */
+    _Atomic uint32_t most_pieces_in_flight;
 };
 
 /*
@@ -513,6 +525,13 @@ struct osoe_node_header {
     uint32_t world_size;
     uint64_t heap_base;             /* B, where every PE maps its own heap (§4.1) */
     int32_t creator_pid;            /* the lead, for reclaiming a leftover (shm-object.h) */
+    /* Layout 19: the lead's OSOE_COLLECTIVE_FANOUT and OSOE_COLLECTIVE_PIPELINE.
+     * They size every PE's internal region (internal-region.h), and a team's
+     * local lead - any of the node's PEs once teams are created (§5.2) - runs
+     * the tree and keeps the window they shape, so open_control holds every
+     * other PE of the node to them, as it does to OSOE_MAX_TEAMS. */
+    uint32_t collective_fanout;
+    uint32_t collective_pipeline;
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)

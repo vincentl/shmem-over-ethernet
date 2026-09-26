@@ -4,8 +4,10 @@
  * wait on OSOE_REGION_INTERNAL without reaching above the API (phase 1 step 5
  * slice 2); wait.c's scalar and multiple-element forms are built on it.
  */
+#define _GNU_SOURCE                             /* nanosleep, under -std=c11 too */
 #include <stdbool.h>
 #include <stdint.h>
+#include <time.h>
 
 #include "base/deadline.h"
 #include "base/sweep.h"
@@ -74,6 +76,17 @@ enum osoe_counter osoe_region_wait_late_wake_counter(unsigned width)
     return width >= 4 ? OSOE_C_INVARIANT_MISSED_WAKE : OSOE_C_TRANSPORT_WATCH_LATE_WAKE;
 }
 
+void osoe_region_wait_count_if_lost(struct osoe_transport_watch *w, uint32_t slept_on,
+                                    unsigned width)
+{
+    if (osoe_transport_watch_seq(w) != slept_on)
+        return;                                     /* woken late, not lost */
+    struct timespec margin = { 0, 10000000 };       /* 10 ms, as epoch.c's */
+    nanosleep(&margin, NULL);
+    if (osoe_transport_watch_seq(w) == slept_on)
+        osoe_count(osoe_region_wait_late_wake_counter(width), 1);
+}
+
 uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t offset,
                           unsigned width, bool is_signed, enum osoe_comparison comparison,
                           uint64_t want, enum osoe_blocked_detail kind, uint64_t detail)
@@ -81,6 +94,7 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
     want = osoe_region_wait_extend(want, width, is_signed);
     struct osoe_transport_watch *w = osoe_transport_watch(region, offset, width);
     uint64_t have, slept_since = 0;
+    uint32_t slept_on = 0;
     bool slept = false, woken = false, timed_out = false;
 
     for (;;) {
@@ -88,11 +102,10 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
         have = osoe_transport_load(region, offset, width);
         if (osoe_region_wait_satisfied(comparison, osoe_region_wait_extend(have, width, is_signed), want,
                                   is_signed)) {
-            /* The condition was already true when the sweep expired, so the
-             * update landed while this PE slept and no wake arrived (§4.9).
-             * Which counter that is depends on the width: see above. */
+            /* The condition was true when the sweep expired: the update landed
+             * while this PE slept, and its wake is lost or late (region-wait.h). */
             if (timed_out)
-                osoe_count(osoe_region_wait_late_wake_counter(width), 1);
+                osoe_region_wait_count_if_lost(w, slept_on, width);
             break;
         }
         if (woken)
@@ -108,6 +121,7 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
         }
 
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        slept_on = seq;
         woken = osoe_transport_watch_wait(w, seq, &sweep);
         timed_out = !woken;
         if (woken) {
@@ -124,4 +138,52 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
         osoe_blocked_leave();
     }
     return have;
+}
+
+/* osoe_region_wait's loop, over a condition the caller evaluates: the watch
+ * published before the first evaluation, the sequence word loaded before each. */
+void osoe_region_wait_condition(const char *routine, enum osoe_region region, uint64_t offset,
+                                size_t len, bool (*holds)(const void *context),
+                                const void *context, enum osoe_blocked_detail kind,
+                                uint64_t detail)
+{
+    struct osoe_transport_watch *w = osoe_transport_watch(region, offset, len);
+    uint64_t slept_since = 0;
+    uint32_t slept_on = 0;
+    bool slept = false, woken = false, timed_out = false;
+
+    for (;;) {
+        uint32_t seq = osoe_transport_watch_seq(w);
+        if (holds(context)) {
+            if (timed_out)
+                osoe_region_wait_count_if_lost(w, slept_on, 8);
+            break;
+        }
+        if (woken)
+            osoe_count(OSOE_C_TRANSPORT_WATCH_SPURIOUS, 1);
+
+        if (!slept) {
+            slept = true;
+            slept_since = osoe_now_ns();
+            osoe_blocked_enter(routine, kind, detail);
+            osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED, 1);
+        }
+
+        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        slept_on = seq;
+        woken = osoe_transport_watch_wait(w, seq, &sweep);
+        timed_out = !woken;
+        if (woken) {
+            osoe_count(OSOE_C_TRANSPORT_WATCH_WAKES, 1);
+        } else {
+            osoe_count(OSOE_C_TRANSPORT_WATCH_SWEEPS, 1);
+            osoe_sweep_expired(routine);
+        }
+    }
+
+    osoe_transport_unwatch(w);
+    if (slept) {
+        osoe_count(OSOE_C_TRANSPORT_WATCH_BLOCKED_NS, osoe_now_ns() - slept_since);
+        osoe_blocked_leave();
+    }
 }

@@ -15,7 +15,8 @@
  * Up the tree, each lead sends its subtree's report: for every node in it, its
  * address, its ranks as progressions (rank-map.h), and its backend blob; and
  * the values every node must agree on - the job's size, SHMEM_SYMMETRIC_SIZE,
- * the handler table's checksum (§3.13) and OSOE_COLLECTIVE_FANOUT (§5.3) - which
+ * the handler table's checksum (§3.13), OSOE_COLLECTIVE_FANOUT (§5.3),
+ * OSOE_MAX_TEAMS (§5.7) and OSOE_COLLECTIVE_PIPELINE (§5.8) - which
  * each parent checks against its own, so a disagreement is refused by the
  * lead that sees it, naming both nodes. The root builds the rank map's runs
  * from the reports (and refuses a rank claimed twice or not at all), and down

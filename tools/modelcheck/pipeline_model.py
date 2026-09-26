@@ -16,6 +16,15 @@ The protocol checked here:
   * A node sends piece k up only once it has consumed piece k - D's release,
     which frees its slot at the parent for reuse (the parent read piece k - D
     before releasing it).
+  * A node takes whichever of its two inputs is ready - its children's copies
+    of piece `up`, while the window allows, or release `down` - in either
+    order when both are, and waits only when neither is. The code takes the
+    children's first (internode-generic.c); here either may go first, which
+    covers it. A node that waited for its children while a release sat
+    unconsumed would be as safe, and slow: a middle node would then consume
+    release k + 1 no sooner than a round trip to the bottom of its subtree
+    after release k, whatever D (design §5.8). This model checks safety and
+    liveness, not speed.
   * A parent waits until every child position's counter has reached piece k,
     reads the slots, and sends piece k down: into each child's release slot,
     then an add to the child's release counter. The child sends its arrival for
@@ -40,10 +49,9 @@ Breakages
                       one piece too many in flight (UP).
   summed              one arrival counter per node, summed over positions (UP).
   count_before_copy   a node counts a release consumed when it arrives and copies
-                      it out only after sending what that count lets through: a
-                      leaf's next arrival lets its parent overwrite the release
-                      it has not copied (DOWN), and a middle node waits on a
-                      child that waits on it (stuck).
+                      it out only after sending what that count lets through:
+                      its next arrival lets its parent overwrite the release it
+                      has not copied (DOWN).
 
 Waits are abstract: the wake on a counter is the region wait's, checked in
 wait_word_model.py. Every counter add is fenced after its data (invariant 5),
@@ -53,7 +61,7 @@ Usage: pipeline_model.py [substring ...]   runs the cases whose names match
 """
 import sys
 
-from engine import assemble, explore, report, select
+from engine import DEL, assemble, explore, report, select
 
 ARR = lambda n, c: ('arr', n, c)      # node n's arrival counter for its child position c
 REL = lambda n: ('rel', n)            # node n's release counter
@@ -76,15 +84,24 @@ def tree(nodes, root, fanout):
     return out
 
 
+def children_in(M, n, piece, base, kid_pos, fanout, design):
+    """Whether every child position of node n shows piece `piece` arrived."""
+    if design == 'summed':
+        need = sum(base[c] for c in kid_pos)
+        return sum(M[ARR(n, c)] for c in range(fanout)) >= need + len(kid_pos) * (piece + 1)
+    return all(M[ARR(n, c)] >= base[c] + piece + 1 for c in kid_pos)
+
+
 def node(design, n, nodes, fanout, depth, collectives, pieces):
     """One node lead running `collectives` one after another.
 
-    Its loop: send as many pieces up as the window allows, each once every
-    child's copy of it has arrived; otherwise consume the next release, copy it
-    out and forward it down. The root sends nothing up: its release of a piece
-    is its own result, forwarded once every child's copy has arrived.
-    `count_before_copy` counts a release consumed when it arrives and copies it
-    out only after sending up whatever that count lets through.
+    Its loop: whichever is ready of sending piece `up` - the window open and
+    every child's copy of it arrived - and consuming release `down`, which it
+    copies out and forwards down; either when both are; a wait while neither
+    is. The root sends nothing up: its release of a piece is its own result,
+    forwarded once every child's copy has arrived. `count_before_copy` counts a
+    release consumed when it arrives and copies it out only after sending up
+    whatever that count lets through.
     """
     window = depth + (1 if design == 'window' else 0)
     B = []
@@ -106,15 +123,9 @@ def node(design, n, nodes, fanout, depth, collectives, pieces):
                           tagbase=tagbase):
             if not kid_pos:
                 return [(label, ('br', lambda L: True, then, then))]
-            if design == 'summed':
-                need = sum(base[c] for c in kid_pos)
-                W = [(label, ('await', lambda M, L, need=need, nk=len(kid_pos), v=var:
-                              sum(M[ARR(n, c)] for c in range(fanout)) >= need + nk * (L[v] + 1),
-                              f'{label}K0'))]
-            else:
-                W = [(label, ('await', lambda M, L, v=var:
-                              all(M[ARR(n, c)] >= base[c] + L[v] + 1 for c in kid_pos),
-                              f'{label}K0'))]
+            W = [(label, ('await', lambda M, L, v=var:
+                          children_in(M, n, L[v], base, kid_pos, fanout, design),
+                          f'{label}K0'))]
             for i, c in enumerate(kid_pos):
                 nxt = f'{label}K{i + 1}' if i + 1 < len(kid_pos) else then
                 W += [(f'{label}K{i}', ('check', lambda M, L, c=c, v=var:
@@ -144,17 +155,33 @@ def node(design, n, nodes, fanout, depth, collectives, pieces):
             B += forward(p + 'FW', 'down', '@' + p + 'NX')
             B += [(p + 'NX', ('set', 'down', lambda L: L['down'] + 1, '@' + p + 'LOOP'))]
         else:
-            B += [(p + 'UPQ', ('br', lambda L, P=pieces, w=window:
-                               L['up'] < P and L['up'] < L['down'] + w,
-                               '@' + p + 'W', '@' + p + 'PQ'))]
+            # Whichever is ready: 1, send piece `up`; 2, consume release `down`;
+            # 3, under count_before_copy, copy out the release it counted. None
+            # ready, no alternative: the node waits for either.
+            def choose(M, L, P=pieces, w=window, br=base_rel, base=list(base_arr),
+                       kid_pos=kid_pos):
+                alts = []
+                if L['up'] < P and L['up'] < L['down'] + w and \
+                        children_in(M, n, L['up'], base, kid_pos, fanout, design):
+                    alts.append(({}, {'go': 1}, f'children hold piece {L["up"]}: send it up'))
+                if L['pend']:
+                    alts.append(({}, {'go': 3}, 'copy out the release counted'))
+                elif L['down'] < P and M[REL(n)] >= br + L['down'] + 1:
+                    alts.append(({}, {'go': 2}, f'release {L["down"]} in: consume it'))
+                return alts
+
+            B += [(p + 'UPQ', ('nd', choose, '@' + p + 'GO')),
+                  (p + 'GO', ('br', lambda L: L['go'] == 1, '@' + p + 'GW', '@' + p + 'GO2')),
+                  (p + 'GO2', ('br', lambda L: L['go'] == 2, '@' + p + 'GR', '@' + p + 'GL')),
+                  (p + 'GW', ('set', 'go', lambda L: DEL, '@' + p + 'W')),
+                  (p + 'GR', ('set', 'go', lambda L: DEL, '@' + p + 'RW')),
+                  (p + 'GL', ('set', 'go', lambda L: DEL, '@' + p + 'LATE'))]
             B += wait_children(p + 'W', 'up', '@' + p + 'SEND')
             B += [(p + 'SEND', ('store', lambda L, pa=parent, pos=position: SLOT(pa, pos, L['up'] % depth),
                                 lambda L, tb=tagbase: tb + L['up'], True, '@' + p + 'SEND1')),
                   (p + 'SEND1', ('add', lambda L, pa=parent, pos=position: ARR(pa, pos),
                                  lambda L: 1, '_', '@' + p + 'SEND2')),
                   (p + 'SEND2', ('set', 'up', lambda L: L['up'] + 1, '@' + p + 'LOOP')),
-                  # Nothing to send: a release counted but not yet copied, or the next one.
-                  (p + 'PQ', ('br', lambda L: L['pend'], '@' + p + 'LATE', '@' + p + 'RW')),
                   (p + 'RW', ('await', lambda M, L, br=base_rel: M[REL(n)] >= br + L['down'] + 1,
                               '@' + p + 'RX'))]
             if design == 'count_before_copy':
@@ -172,7 +199,7 @@ def node(design, n, nodes, fanout, depth, collectives, pieces):
                                   None if M[RSLOT(n, L['down'] % depth)] == tb + L['down'] else
                                   f'node {n} read release {M[RSLOT(n, L["down"] % depth)]}, '
                                   f'waiting for {tb + L["down"]}', '@' + p + 'FW')),
-                      (p + 'LATE', ('br', lambda L: True, '@' + p + 'RW', '@' + p + 'RW'))]
+                      (p + 'LATE', ('br', lambda L: True, '@' + p + 'RW', '@' + p + 'RW'))]   # not reached
                 B += forward(p + 'FW', 'down', '@' + p + 'NX')
                 B += [(p + 'NX', ('set', 'down', lambda L: L['down'] + 1, '@' + p + 'LOOP'))]
         for c in kid_pos:
@@ -212,8 +239,8 @@ CASES = [
     ('design', 5, 4, 2, (0, 3), 4, True),        # a wide parent
     ('window', 3, 2, 2, (0,), 4, False),
     ('summed', 3, 2, 2, (0,), 4, False),
-    ('count_before_copy', 3, 1, 2, (0,), 4, False),   # a middle node: stuck
-    ('count_before_copy', 3, 2, 2, (0,), 4, False),   # leaves only: a release overwritten
+    ('count_before_copy', 3, 1, 2, (0,), 4, False),   # a chain: a release overwritten
+    ('count_before_copy', 3, 2, 2, (0,), 4, False),   # leaves only: the same
 ]
 
 
