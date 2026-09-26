@@ -41,7 +41,8 @@
  * steps and then a DATA counter for each, eight bytes each and each alone on
  * its line, as the tree's are. READY[s] at a lead counts the entries of the
  * lead it writes to at step s, DATA[s] the steps s of the lead that writes to
- * it (internode-generic.c). A team over N nodes takes ceil(log2 N) steps, so
+ * it (internode-generic.c); READY[0]'s line also holds, past the counter, the
+ * shape of the gather that lead entered, 24 bytes, put before the add. A team over N nodes takes ceil(log2 N) steps, so
  * every team number has room for ceil(log2 N) steps of the job's N nodes,
  * which every node agrees on - the one part of the layout the node count
  * sizes, by its logarithm. They come after the counter's line so that nothing
