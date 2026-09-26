@@ -4,6 +4,7 @@
  * wait on OSOE_REGION_INTERNAL without reaching above the API (phase 1 step 5
  * slice 2); wait.c's scalar and multiple-element forms are built on it.
  */
+#define _GNU_SOURCE                             /* nanosleep, under -std=c11 too */
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
