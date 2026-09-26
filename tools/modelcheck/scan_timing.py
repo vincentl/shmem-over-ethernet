@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Timing beside scan_model.py (the rule of performance-claims-need-timing):
 how long a scan takes, in network hops, under the two designs the brief
-weighs (docs/prompts/phase1-step10-slice1-prompt.md).
+weighs (docs/prompts/done/phase1-step10-slice1-prompt.md).
 
   members  every member at its team rank's place in a pre-order k-ary tree
            over the ranks, on its own thread (scan_model.py).

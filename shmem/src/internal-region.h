@@ -141,7 +141,7 @@ static inline uint64_t osoe_internal_gather_offset(uint32_t fanout, uint32_t pip
 
 /*
  * Last, **the scans' area** (spec §9.10.10; phase 1 step 10 slice 1,
- * docs/prompts/phase1-step10-slice1-prompt.md): per team number, like
+ * docs/prompts/done/phase1-step10-slice1-prompt.md): per team number, like
  * everything else here, and on every member's region rather than its node's
  * lead's alone, since every member of a scan holds a place of its own in the
  * scan's tree - `fanout` up-slots, one per child position, and a down-slot,

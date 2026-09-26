@@ -105,7 +105,7 @@ job is to **refute** it: reproduce it, find the doc text that already handles it
 or find spec text that permits the behaviour. Keep only findings that survive,
 and list refuted ones briefly with the reason.
 
-### Deliverable: `docs/reviews/design-soundness.md`
+### Deliverable: `docs/reviews/archive/design-soundness.md`
 
 - **Verdict**, one paragraph: proceed, proceed after specific changes, or rethink —
   and why.
@@ -201,7 +201,7 @@ Template:
   efficiently, or a scale at which per-peer or per-context state explodes. The
   architect revises once. Record what changed and what remains contested.
 
-### Deliverable: `docs/reviews/core-api.md`
+### Deliverable: `docs/reviews/archive/core-api.md`
 
 - **Summary:** the proposed core API on one page.
 - **Primitives:** semantics and rationale for each.

@@ -49,7 +49,7 @@ so, and those choices are for the author to confirm.*
    dispatch in `progress.c`; `osoe_collective_tree`; the node-pair sockets in
    `wire.c` (only `TCP_NODELAY` is set today); the pid each PE publishes in its
    slot; `init.c`'s atexit handler for a PE that leaves without finalizing.
-5. `docs/reviews/phase1-step2-slice1-conformance.md` F1 (exit and atexit),
+5. `docs/reviews/archive/phase1-step2-slice1-conformance.md` F1 (exit and atexit),
    and the second review's sequencing section on step 4.
 6. `tools/modelcheck/close_model.py`: the goodbye protocol an abort must not
    break.

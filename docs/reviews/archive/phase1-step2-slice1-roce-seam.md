@@ -393,7 +393,7 @@ reduces to bootstrap plus optional emulation, which is the state in which
 
 ### F2. Emulating a 4-byte rmw by CAS on the containing 8-byte word corrupts a legal program
 
-- **Location:** `docs/reviews/roce-transport.md` §4.3 (l.262, l.272–278), carried
+- **Location:** `docs/reviews/archive/roce-transport.md` §4.3 (l.262, l.272–278), carried
   into design §10's tally ("8-byte-only atomics" as a mere cost) and §4.10's
   emulation list.
 - **Failure scenario:** `struct { int hits; int local_flag; } *s = shmem_malloc(8)`.

@@ -22,9 +22,9 @@ Meaning of phase/step/slice: `docs/prompts/README.md`.
 ## Read first
 
 1. `CLAUDE.md`.
-2. `docs/reviews/phase1-step2-slice1-review.md` — findings D5, D6, D7, D10, D12,
+2. `docs/reviews/archive/phase1-step2-slice1-review.md` — findings D5, D6, D7, D10, D12,
    and the two scoring tables.
-3. `docs/reviews/phase1-step2-slice1-roce-seam.md` — §3 (leaks, with file:line),
+3. `docs/reviews/archive/phase1-step2-slice1-roce-seam.md` — §3 (leaks, with file:line),
    F1, F4, F5, F6, F7, F9, F10.
 4. `docs/reviews/evidence/phase1-step2-slice1/reports/algorithmic-scaling.md`
    (findings 2–5, 9) and `reports/premises.md` (findings 1–3).

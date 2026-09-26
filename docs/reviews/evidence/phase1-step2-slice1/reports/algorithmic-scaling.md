@@ -119,7 +119,7 @@ serial O(N) or O(P) hot spot where a logarithmic algorithm is standard).
   §5.2 ("the internode tree spans only nodes with at least one member"), §5.5
   ("forwarded down the internode tree"), §3.8 ("bounded by tree degree ×
   concurrent teams"), §5.8 ("handlers that forward down a tree"), and §10 /
-  `docs/reviews/roce-transport.md:613` ("a tree over 7812 nodes ≈ 13 levels at
+  `docs/reviews/archive/roce-transport.md:613` ("a tree over 7812 nodes ≈ 13 levels at
   ~1.8 µs ≈ 23 µs … roughly 4–6×").
 - **What is built (*observed in source*):** total messages 2(N−1) — optimal.
   Critical path: depth 1 up, depth 1 down, but **all 2(N−1) message events are

@@ -1,6 +1,6 @@
 /*
  * Communication contexts (spec §9.5; design §4.6, §4.11, §7.3; phase 1 step
- * 8 slice 1, docs/prompts/phase1-step8-slice1-prompt.md).
+ * 8 slice 1, docs/prompts/done/phase1-step8-slice1-prompt.md).
  *
  * A context is two parts. The transport's - its dirty set and the completion
  * of its nonblocking gets, with a block in the node segment (transport.h,

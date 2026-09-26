@@ -10,7 +10,7 @@ working slice of it into code, with a small design step first.
 - **Design record:** `docs/design/shmem-ethernet-design.md` (~2,500 lines). Each
   section states a decision, its rationale, and rejected alternatives. §9 lists
   load-bearing invariants; §10 lists closed decisions and open questions. It has
-  just been revised after an adversarial review (`docs/reviews/design-soundness.md`).
+  just been revised after an adversarial review (`docs/reviews/archive/design-soundness.md`).
 - **Specification:** `docs/reference/OpenSHMEM-1.6.pdf` (local, gitignored;
   `pdftotext -layout` works on the host). Cite it as §9.x.y.
 - **What exists:** a CMake build with `debug`, `release`, `asan`, and `tsan`
@@ -68,7 +68,7 @@ These are project decisions, not preferences.
 ### Step A — the SHMEM↔transport boundary (design, then checkpoint)
 
 Define the internal interface between the SHMEM layer (§4) and whatever carries
-operations to other PEs, in the terms of `docs/reviews/core-api.md` §8.3: **put,
+operations to other PEs, in the terms of `docs/reviews/archive/core-api.md` §8.3: **put,
 get, read-modify-write (for AMOs), fence, wait (completion, for quiet and
 pe_quiet), and notify (waking watchers, §4.9)**. Even though AM (§2–§3) will be the
 only network implementation, the SHMEM layer calls this interface and never AM
@@ -82,7 +82,7 @@ directly, so a future RDMA backend could replace handlers without touching §4.
 - **Checkpoint:** show the user the header and the doc section, and wait for
   approval before building on them.
 
-Read `docs/reviews/core-api.md` §1, §2, and §8 for this step only. It was written
+Read `docs/reviews/archive/core-api.md` §1, §2, and §8 for this step only. It was written
 against the design *before* its review revision (for example it still describes a
 per-node progress pool and a per-address watch table), so where it disagrees with
 the current design doc, the design doc wins.

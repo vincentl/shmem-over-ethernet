@@ -9,7 +9,7 @@ the progress thread learns a team from, an internal-region block per number,
 and a team descriptor that carries its local shape and world mapping.
 
 *Approved by the author on 2026-09-25 (`docs/decisions/2026-09-25.md`), as
-proposed in `docs/prompts/phase1-step7-slice1-prompt.md`: read its "Proposed
+proposed in `docs/prompts/done/phase1-step7-slice1-prompt.md`: read its "Proposed
 decisions" 6 to 10, which this brief builds out. The SOS test suite's team tests
 are the acceptance set.*
 
@@ -27,7 +27,7 @@ The author's goals, the axes to judge the work by:
    gets `SHMEM_TEAM_INVALID`, the valid ranges of `start`, `stride` (the spec
    says whether it may be negative - SOS has `shmem_team_negative_stride`) and
    `size`, `split_2d`'s grid and its `xrange`, and destroy's scope.
-3. `docs/prompts/phase1-step7-slice1-prompt.md`: the proposal (decisions 6-10)
+3. `docs/prompts/done/phase1-step7-slice1-prompt.md`: the proposal (decisions 6-10)
    and slice 1's build brief, which says what exists.
 4. Design §5.2-§5.7 as the first slice left them, and §3.16.
 5. The code: `team.c` and `team.h` whole; `node.h` (the record, `struct

@@ -1,7 +1,7 @@
 # Coverage predicates for the §4.9 watch slot
 
 `coverage_model.py` is the record of what was run for
-`docs/reviews/watch-notification-options.md`. `engine.py` is the copy of the
+`docs/reviews/archive/watch-notification-options.md`. `engine.py` is the copy of the
 model checker it ran with (`tools/modelcheck/`); `coverage_model.out` is the
 recorded run. Run it as `python3 coverage_model.py [substring ...]`; every case
 finishes in well under a second.

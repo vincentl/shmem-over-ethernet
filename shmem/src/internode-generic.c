@@ -1201,7 +1201,7 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
 /*
  * A prefix scan over a team spanning nodes, every member at its team rank's
  * place in a pre-order k-ary tree over the ranks 0 .. M - 1
- * (docs/prompts/phase1-step10-slice1-prompt.md, the author's design A; the
+ * (docs/prompts/done/phase1-step10-slice1-prompt.md, the author's design A; the
  * protocol is tools/modelcheck/scan_model.py's `per_team`). A place covering
  * the ranks [a, b) is rank a; its children split [a + 1, b) into at most k
  * consecutive blocks, the first ones a rank longer when the split is uneven,
