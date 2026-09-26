@@ -4755,15 +4755,17 @@ name each PE's routine, as for collectives whose trees share no edge (§5.5).
 
 Timed in the VM - one host, loopback, release, the default fan-out 4 and D = 2,
 one PE a node - as the median of 31 fcollects between barriers, whose own time,
-about 60 µs, each includes, and the median of three such runs; before is the
-base the slice was cut from, the tree running an or with its pieces pipelined:
+about 55 µs, each includes, and the median of three such runs; before is the
+base the slice was cut from, the tree running an or with its pieces pipelined.
+Runs in other sessions of the same day came out up to a fifth slower on both
+sides, the VM's noise:
 
 | Nodes | Per PE | Before | After | |
 |---|---|---|---|---|
-| 4 | 1 MiB | 14.3 ms | 2.2 ms | 6.5 times as fast |
-| 5 | 1 MiB | 19.3 ms | 3.6 ms | 5.4 times as fast |
-| 4 | 8 bytes | 163 µs | 275 µs | 1.7 times as long |
-| 5 | 8 bytes | 150 µs | 293 µs | 2.0 times as long |
+| 4 | 1 MiB | 14.0 ms | 1.9 ms | 7.3 times as fast |
+| 5 | 1 MiB | 19.0 ms | 3.1 ms | 6.1 times as fast |
+| 4 | 8 bytes | 130 µs | 227 µs | 1.7 times as long |
+| 5 | 8 bytes | 135 µs | 255 µs | 1.9 times as long |
 
 **The bytes predict the large gather.** Before, the whole result went through
 the tree in 16 KiB pieces, two at a time, so it took ⌈*N* MiB / 16 KiB⌉ / 2
@@ -4771,18 +4773,18 @@ round trips of a tree one level deep - 129 and 161 - at about 110 and 120 µs
 each: bound by round trips, not by bytes. After, each lead puts *N* - 1 shares
 out and receives as many, 3 and 4 MiB each way over ⌈log₂ *N*⌉ steps, every
 lead at once. At the rate one pair of leads reaches alone - two nodes, one
-step, 1 MiB each way in 0.44 ms - that predicts 1.3 and 1.8 ms where 2.2 and
-3.6 were measured, and 0.9 ms on three nodes, where 1.0 was. The gap at four
+step, 1 MiB each way in 0.44 ms - that predicts 1.3 and 1.8 ms where 1.9 and
+3.1 were measured, and 0.9 ms on three nodes, where 1.0 was. The gap at four
 and five nodes is the VM's, not the algorithm's: every lead and its agent work
 at once, 8 and 10 busy threads on four CPUs, and the bytes all the leads move
-together, *N* (*N* - 1) MiB, go at about 6 GB/s from three nodes on. On a
+together, *N* (*N* - 1) MiB, go at 6 to 7 GB/s from three nodes on. On a
 machine per node each lead would keep the pair's rate.
 
 **The step count predicts the small one.** At 8 bytes a gather is its hops:
 ⌈log₂ *N*⌉ steps, and before the first one hop more, for READY to cross when
 every lead enters at once - 3 and 4 hops at four and five nodes, where the tree
-one level deep made 2: 1.5 and 2 times as long. Measured, 1.7 and 2.0 times
-with the barrier and about 1.9 and 2.5 without it: a step costs more than a
+one level deep made 2: 1.5 and 2 times as long. Measured, 1.7 and 1.9 times
+with the barrier and about 2.3 and 2.4 without it: a step costs more than a
 tree's hop here, since it keeps every lead and its agent busy at once where a
 hop of the tree has one side working, on four CPUs. At two nodes, READY and one
 step against the tree's two hops, the two were within the VM's noise of each
