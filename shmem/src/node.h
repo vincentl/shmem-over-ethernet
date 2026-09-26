@@ -786,10 +786,13 @@ struct osoe_context_block {
      * A quiet, holding the context's mutex, bumps `generation` and waits for
      * the pair it closed; `full` is the generation the last full quiet
      * opened, which a quiet begun before it may piggyback on. A serial
-     * context uses pair 0 and never moves `generation`.
+     * context uses pair 0 and never moves `generation`. Both are 64 bits:
+     * a pe_quiet or a wait for gets moves `generation` without `full`, and
+     * a 32-bit difference between them wraps after 2^31 of those, when a
+     * quiet would piggyback with puts in flight (review of slice 3, B1).
      */
-    _Atomic uint32_t generation;
-    _Atomic uint32_t full;
+    _Atomic uint64_t generation;
+    _Atomic uint64_t full;
 };
 
 enum { OSOE_CONTEXT_FREE = 0, OSOE_CONTEXT_LIVE = 1 };

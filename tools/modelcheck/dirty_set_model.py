@@ -33,6 +33,15 @@ Breakages
   bitfirst  the issuer sets the bit before raising high_seg.
   plainmax  high_seg raised by load, compare, store instead of a CAS loop.
 
+Variants of the design
+  resetstop the quiet, finding the node behind after its clear, sets the bit
+            again and returns rather than waiting again (the review of phase 1
+            step 8 slice 3, S1: waiting again lets a thread that keeps putting
+            to the node hold the quiet, and the mutex, forever). Every put that
+            returned before the call raised high_seg before the quiet loaded
+            it, so the one wait covers them; the re-set leaves later puts to
+            the next quiet.
+
 Reductions (engine.py): a quiet's call instant is folded into its first step
 (gpre); an issuer's copy into its reservation and its return into its last step
 (gpost). Folding the copy only makes buffers sendable sooner, which keeps every
@@ -121,7 +130,7 @@ def quiet(allops, variant=''):
          ('Q6', ('load', lambda L: ACKED, 'a', '@Q7')),
          ('Q7', ('br', lambda L: L['a'] >= L['h'], '@UNL', '@Q8')),
          ('Q8', ('or', lambda L: BIT, lambda L: 1, '_', '@Q9')),
-         ('Q9', ('set', 'a', lambda L: DEL, '@Q2')),
+         ('Q9', ('set', 'a', lambda L: DEL, '@UNL' if variant == 'resetstop' else '@Q2')),
          ('UNL', ('gpost', lambda M, L: ({}, {'a': DEL, 'b': DEL, 'h': DEL}), '@U0' if lock else '@RET')),
          ('U0', ('store', lambda L: QLOCK, lambda L: 0, True, '@U1')),
          ('U1', ('fwake', lambda L: QLOCK, '@RET')),
@@ -156,6 +165,12 @@ CASES = [
     ('design: 1 issuer x 3 puts, 3 quiets', [[0, 1, 2]], 3, '', True),
     ('design: issuers of 2 puts and 1 put, 3 quiets', [[0, 1], [2]], 3, '', True),
     ('design: 3 issuers x 1 put, 2 quiets', [[0], [1], [2]], 2, '', True),
+    ('resetstop: 2 issuers x 1 put, 2 quiets', [[0], [1]], 2, 'resetstop', True),
+    ('resetstop: issuers of 2 puts and 1 put, 2 quiets', [[0, 1], [2]], 2, 'resetstop', True),
+    ('resetstop: 1 issuer x 3 puts, 2 quiets', [[0, 1, 2]], 2, 'resetstop', True),
+    ('resetstop: 2 issuers x 2 puts, 2 quiets', [[0, 1], [2, 3]], 2, 'resetstop', True),
+    ('resetstop: 1 issuer x 3 puts, 3 quiets', [[0, 1, 2]], 3, 'resetstop', True),
+    ('resetstop: 3 issuers x 1 put, 2 quiets', [[0], [1], [2]], 2, 'resetstop', True),
     ('unlocked: 2 issuers x 1 put, 2 quiets', [[0], [1]], 2, 'unlocked', False),
     ('naive: 1 issuer x 2 puts, 2 quiets', [[0, 1]], 2, 'naive', False),
     ('bitfirst: 1 issuer x 2 puts, 2 quiets', [[0, 1]], 2, 'bitfirst', False),

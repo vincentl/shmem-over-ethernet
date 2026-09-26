@@ -100,7 +100,7 @@ struct osoe_transport_context {
      * by compare-and-swap, and a bit per slot set after the raise and cleared
      * only by a wait holding `mutex`. Process memory, like the serial set:
      * O(peer nodes) a context, never in the node segment. */
-    _Atomic uint64_t *shared_high;
+    _Atomic uint64_t *shared_highest_segment;
     _Atomic uint64_t *dirty_bits;
     /* This context's nonblocking gets in flight, as (extent, token) pairs:
      * the pieces its wait copies out, if no other thread of the PE has
@@ -152,9 +152,9 @@ static bool dirty_set_allocate(struct osoe_transport_context *c)
     c->touched = calloc(peers, sizeof *c->touched);
     /* Both sets, whatever the mode: the default context's mode is set after
      * it is opened (osoe_transport_threads). */
-    c->shared_high = calloc(peers, sizeof *c->shared_high);
+    c->shared_highest_segment = calloc(peers, sizeof *c->shared_highest_segment);
     c->dirty_bits = calloc((peers + 63) / 64, sizeof *c->dirty_bits);
-    return c->high_segment && c->order && c->touched && c->shared_high && c->dirty_bits;
+    return c->high_segment && c->order && c->touched && c->shared_highest_segment && c->dirty_bits;
 }
 
 static void dirty_set_free(struct osoe_transport_context *c)
@@ -163,9 +163,9 @@ static void dirty_set_free(struct osoe_transport_context *c)
     free(c->order);
     free(c->touched);
     free(c->pending);
-    free(c->shared_high);
+    free(c->shared_highest_segment);
     free(c->dirty_bits);
-    c->shared_high = NULL;
+    c->shared_highest_segment = NULL;
     c->dirty_bits = NULL;
     c->high_segment = NULL;
     c->order = NULL;
@@ -390,7 +390,7 @@ static void mark(struct osoe_transport_context *c, uint32_t peer, uint64_t seq)
          * bit's fetch_or only when it is clear: once a segment a node, not
          * once an operation.
          */
-        _Atomic uint64_t *high = &c->shared_high[slot];
+        _Atomic uint64_t *high = &c->shared_highest_segment[slot];
         uint64_t seen = atomic_load_explicit(high, memory_order_seq_cst);
         while (seq > seen && !atomic_compare_exchange_weak_explicit(
                                  high, &seen, seq, memory_order_seq_cst, memory_order_seq_cst))
@@ -1095,6 +1095,10 @@ static void complete_gets(struct osoe_transport_context *c, const char *routine)
 static void complete_pair(struct osoe_transport_context *c, unsigned pair, const char *routine)
 {
     struct osoe_context_block *block = block_of(c);
+    /* Nothing outstanding in the pair: no scan, no wait (review of slice 3). */
+    if (atomic_load_explicit(&block->bytes_issued[pair], memory_order_seq_cst) ==
+        atomic_load_explicit(&block->bytes_copied[pair], memory_order_seq_cst))
+        return;
     struct am_wait w;
     bool waiting = false;
     uint32_t slept_on = 0;
@@ -1183,7 +1187,7 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
              * the second load the next quiet misses this get (`noretag`).
              */
             for (;;) {
-                uint32_t g = atomic_load_explicit(&block->generation, memory_order_seq_cst);
+                uint64_t g = atomic_load_explicit(&block->generation, memory_order_seq_cst);
                 atomic_fetch_add_explicit(&block->bytes_issued[g & 1], n, memory_order_seq_cst);
                 if (atomic_load_explicit(&block->generation, memory_order_seq_cst) == g) {
                     pair = g & 1;
@@ -1326,7 +1330,7 @@ static bool acknowledged(const struct osoe_transport_context *c, uint32_t slot)
 {
     uint32_t peer = slot < osoe.job.node ? slot : slot + 1;
     uint64_t high = c->concurrent
-                        ? atomic_load_explicit(&c->shared_high[slot], memory_order_seq_cst)
+                        ? atomic_load_explicit(&c->shared_highest_segment[slot], memory_order_seq_cst)
                         : c->high_segment[slot];
     return osoe_progress_host_acked(peer) >= high;
 }
@@ -1342,7 +1346,7 @@ static bool ask_acknowledgement(const struct osoe_transport_context *c, uint32_t
     if (!connection)
         return false;
     uint64_t high = c->concurrent
-                        ? atomic_load_explicit(&c->shared_high[slot], memory_order_seq_cst)
+                        ? atomic_load_explicit(&c->shared_highest_segment[slot], memory_order_seq_cst)
                         : c->high_segment[slot];
     osoe_connection_request_ack(connection, high);
     osoe_connection_area_mark(&osoe_am.area, peer);
@@ -1559,7 +1563,7 @@ static uint32_t wait_dirty_shared(struct osoe_transport_context *c, const bool *
             waited++;
             for (;;) {
                 uint64_t through =
-                    atomic_load_explicit(&c->shared_high[slot], memory_order_seq_cst);
+                    atomic_load_explicit(&c->shared_highest_segment[slot], memory_order_seq_cst);
                 if (ask_acknowledgement(c, slot))
                     osoe_progress_host_wake_lead();
                 wait_acknowledged(slot, through, routine);
@@ -1596,17 +1600,17 @@ static void wait_shared(struct osoe_transport_context *c, const int *pes, size_t
     uint64_t t0 = osoe_now_ns();
     osoe_serializing_fence();
     struct osoe_context_block *block = block_of(c);
-    uint32_t e = atomic_load_explicit(&block->generation, memory_order_seq_cst);
+    uint64_t e = atomic_load_explicit(&block->generation, memory_order_seq_cst);
     context_enter(c);
-    uint32_t full = atomic_load_explicit(&block->full, memory_order_seq_cst);
-    if ((int32_t)(full - e) > 0) {
+    uint64_t full = atomic_load_explicit(&block->full, memory_order_seq_cst);
+    if (full > e) {
         context_leave(c);
         osoe_count(OSOE_C_TRANSPORT_WAIT_NOTHING_OUTSTANDING, 1);
         return;
     }
-    uint32_t g = atomic_load_explicit(&block->generation, memory_order_seq_cst);
+    uint64_t g = atomic_load_explicit(&block->generation, memory_order_seq_cst);
     atomic_store_explicit(&block->generation, g + 1, memory_order_seq_cst);
-    complete_pair(c, g & 1, routine);
+    complete_pair(c, (unsigned)(g & 1), routine);
     /* The stores that copied the gets into place, ordered as every other store
      * before the wait is (§4.6). */
     osoe_serializing_fence();
