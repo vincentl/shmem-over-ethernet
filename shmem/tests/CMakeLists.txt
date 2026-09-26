@@ -321,6 +321,15 @@ add_test(NAME shmem.job.disagree.max-teams
 set_tests_properties(shmem.job.disagree.max-teams PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=64; node 0 has 32")
 
+# Between the PEs of one node too: the lead sizes the team blocks, the rows of
+# published epochs and the internal regions by its count, and a PE with
+# another would index them by its own (node.c). A real program, since it is the
+# node's rendezvous and not the job's that sees it.
+add_test(NAME shmem.max-teams.local-disagree
+  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_MAX_TEAMS=64 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.max-teams.local-disagree PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS differs between PEs: the local lead has 32, this PE has 64")
+
 # And outside its range, or not a number, it is refused by name at init: at
 # least one team beyond the three predefined, and at most 1,024.
 foreach(value 3 1025 x)
