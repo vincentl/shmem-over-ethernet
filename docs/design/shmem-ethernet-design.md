@@ -5838,7 +5838,20 @@ wake of the lead rather than one each, and an RDMA backend would post them
 under one doorbell. An `iget`'s elements are nonblocking gets, all but the last
 with `OSOE_TRANSPORT_MORE`, completed by one wait on its PE that names the
 routine: in flight together, up to the landing zone's records.
-Block-strided `ibput`/`ibget` (§9.6.1.4, §9.6.1.8) remain deferred; see §7.6.
+
+**Block-strided `ibput`/`ibget` are built** (§9.6.1.4, §9.6.1.8; phase 1 step 9
+slice 1): the same generated families, the same `strided_put`/`strided_get`
+loop generalized from one element to one block of `bsize` elements, so
+`ibput`/`ibget` cost `O(nblocks)` transport calls rather than `O(nblocks *
+bsize)` - each one a single contiguous transfer, not a loop over `bsize`
+elements. Batched the same way: every block but the last carries
+`OSOE_TRANSPORT_MORE`, and an `ibget`'s blocks are nonblocking gets completed
+by one wait for the gets alone, so a block size of 1 costs exactly what
+`iput`/`iget` costs (the spec's own Note: `shmem_ibput` with `bsize` 1 is
+`shmem_iput`). `dst` and `sst` must each be at least `bsize` (spec's
+Arguments); below that is undefined, and ends the job by name, as
+`shmem_team_split_strided`'s stride of 0 does (§5.7). Both strides equal to
+`bsize` lay the blocks end to end, and move as one transfer of the whole.
 
 **The nonblocking fetching AMOs complete at issue** (§9.7.2): `fetch`, `swap`,
 `compare_swap`, `fetch_inc`, `fetch_add` and the three bitwise fetches, each
@@ -5863,7 +5876,6 @@ alltoall is non-conforming.
 |---|---|
 | `shmem_ctx_session_start` / `_stop` (§9.9) | Hints only. A conforming implementation may ignore them entirely, so the no-op is the whole phase-1 implementation |
 | `shmem_sum_inscan`, `shmem_sum_exscan` (§9.10.10) | Inherits the §5.1 two-level skeleton, but **not** §5.5's accumulator: each PE's result depends on team rank order, so it needs its own design |
-| `shmem_ibput`, `shmem_ibget` (§9.6.1.4, §9.6.1.8) | Interleaved block transfer — an addressing pattern above the chunking layer, mechanical given `(region, offset, length)` chunks |
 
 Session routines are worth stubbing early precisely *because* they are ignorable:
 an empty implementation is conforming, and having the entry points present stops

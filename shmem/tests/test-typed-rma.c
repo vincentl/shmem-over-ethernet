@@ -1,8 +1,8 @@
 /*
  * The typed and sized RMA routines of spec §9.6 and the typed put-with-signal
- * of §9.8.3-§9.8.4: shmem_TYPENAME_put/get/p/g/iput/iget and their nonblocking
- * forms, put8..128/get8..128 and their strided and nonblocking forms,
- * shmem_TYPENAME_put_signal[_nbi], and the C11 type-generic macros.
+ * of §9.8.3-§9.8.4: shmem_TYPENAME_put/get/p/g/iput/iget/ibput/ibget and their
+ * nonblocking forms, put8..128/get8..128 and their strided and nonblocking
+ * forms, shmem_TYPENAME_put_signal[_nbi], and the C11 type-generic macros.
  *
  * Every routine is a thin wrapper over shmem_putmem/getmem/putmem_signal
  * (rma-typed.c, signal.c), so the risk this test is written against is not
@@ -119,6 +119,55 @@ static int me, n, right, left;
         shmem_free(remote);                                                      \
     } while (0);
 
+/* ---- ibput/ibget, block-strided (spec §9.6.1.4, §9.6.1.8) --------------
+ *
+ * Like STRIDED_RMA, a fixed PE-independent payload. bsize 2, nblocks 3, a dst
+ * stride of 3 (> bsize) so every block leaves a one-element gap in the
+ * destination, and an sst equal to bsize so the source stays contiguous -
+ * the two strides differ, on the put side; the get below swaps them, so both
+ * sides are exercised strided and contiguous in turn. */
+
+#define BLOCK_STRIDED_RMA(T, NAME)                                               \
+    do {                                                                          \
+        enum { BSIZE = 2, NBLOCKS = 3, DST_STRIDE = 3, N = NBLOCKS * DST_STRIDE }; \
+        T *remote = shmem_malloc((N + 1) * sizeof *remote); /* +1 guard */       \
+        CHECK_FATAL(remote != NULL); /* NULL would be dereferenced just below */ \
+        for (int i = 0; i < N; i++)                                              \
+            remote[i] = (T)0;                                                    \
+        remote[N] = (T)0x5a;                                                     \
+        T src[NBLOCKS * BSIZE];                                                  \
+        for (int i = 0; i < NBLOCKS * BSIZE; i++)                                \
+            src[i] = (T)(i + 11);                                                \
+        shmem_barrier_all();                                                     \
+                                                                                    \
+        shmem_##NAME##_ibput(remote, src, DST_STRIDE, BSIZE, BSIZE, NBLOCKS, right); \
+        shmem_barrier_all();                                                     \
+        for (int b = 0; b < NBLOCKS; b++) {                                      \
+            for (int i = 0; i < BSIZE; i++)                                      \
+                CHECK(remote[b * DST_STRIDE + i] == src[b * BSIZE + i]);         \
+            CHECK(remote[b * DST_STRIDE + BSIZE] == (T)0); /* the gap */         \
+        }                                                                        \
+        CHECK(remote[N] == (T)0x5a);                                            \
+                                                                                    \
+        /* The reverse, strides swapped: source (remote) strided at stride 3,   \
+         * a local, non-symmetric destination contiguous at stride 2 == bsize. */ \
+        T back[NBLOCKS * BSIZE];                                                \
+        for (int i = 0; i < NBLOCKS * BSIZE; i++)                               \
+            back[i] = (T)0;                                                     \
+        shmem_##NAME##_ibget(back, remote, BSIZE, DST_STRIDE, BSIZE, NBLOCKS, right); \
+        for (int i = 0; i < NBLOCKS * BSIZE; i++)                               \
+            CHECK(back[i] == src[i]);                                           \
+                                                                                    \
+        /* nblocks or bsize 0 transfers nothing. */                              \
+        shmem_##NAME##_ibput(remote, src, DST_STRIDE, BSIZE, 0, NBLOCKS, right); \
+        shmem_##NAME##_ibput(remote, src, DST_STRIDE, BSIZE, BSIZE, 0, right);   \
+        shmem_##NAME##_ibget(back, remote, BSIZE, DST_STRIDE, 0, NBLOCKS, right); \
+        shmem_##NAME##_ibget(back, remote, BSIZE, DST_STRIDE, BSIZE, 0, right);  \
+        CHECK(remote[N] == (T)0x5a);                                            \
+                                                                                    \
+        shmem_free(remote);                                                      \
+    } while (0);
+
 /* ---- put_nbi/get_nbi (spec §9.6.2.1-§9.6.2.2) --------------------------- */
 
 #define NBI_RMA(T, NAME)                                                          \
@@ -187,6 +236,19 @@ static int me, n, right, left;
         shmem_iget(strided_back, remote, 1, 2, 2, right);                        \
         CHECK(strided_back[0] == (T)61 && strided_back[1] == (T)62);             \
                                                                                     \
+        /* ibput/ibget's C11 generic (OSOE_PICK8): two contiguous blocks of two \
+         * (dst == sst == bsize is "one transfer of the whole"), filling remote. */ \
+        T block_src[4] = { (T)71, (T)72, (T)73, (T)74 };                        \
+        T block_back[4] = { 0, 0, 0, 0 };                                       \
+        shmem_barrier_all();                                                     \
+        shmem_ibput(remote, block_src, 2, 2, 2, 2, right);                      \
+        shmem_barrier_all();                                                     \
+        CHECK(remote[0] == (T)71 && remote[1] == (T)72 && remote[2] == (T)73 &&  \
+              remote[3] == (T)74);                                              \
+        shmem_ibget(block_back, remote, 2, 2, 2, 2, right);                     \
+        CHECK(block_back[0] == (T)71 && block_back[1] == (T)72 &&               \
+              block_back[2] == (T)73 && block_back[3] == (T)74);                \
+                                                                                    \
         shmem_barrier_all();                                                     \
         shmem_put_nbi(remote, mine, N, right);                                   \
         shmem_quiet();                                                           \
@@ -214,6 +276,14 @@ static int me, n, right, left;
         shmem_iget(SHMEM_CTX_DEFAULT, strided_back, remote, 1, 2, 2, right);     \
         CHECK(strided_back[0] == (T)61 && strided_back[1] == (T)62);             \
         shmem_barrier_all();                                                     \
+        shmem_ibput(SHMEM_CTX_DEFAULT, remote, block_src, 2, 2, 2, 2, right);    \
+        shmem_barrier_all();                                                     \
+        CHECK(remote[0] == (T)71 && remote[1] == (T)72 && remote[2] == (T)73 &&  \
+              remote[3] == (T)74);                                              \
+        shmem_ibget(SHMEM_CTX_DEFAULT, block_back, remote, 2, 2, 2, 2, right);   \
+        CHECK(block_back[0] == (T)71 && block_back[1] == (T)72 &&               \
+              block_back[2] == (T)73 && block_back[3] == (T)74);                \
+        shmem_barrier_all();                                                     \
         shmem_put_nbi(SHMEM_CTX_DEFAULT, remote, mine, N, right);                \
         shmem_quiet();                                                           \
         shmem_barrier_all();                                                     \
@@ -233,7 +303,7 @@ static int me, n, right, left;
 
 #define SIZED_RMA(SIZE)                                                           \
     do {                                                                          \
-        enum { NELEMS = 4, WIDTH = (SIZE) / 8 };                                 \
+        enum { NELEMS = 9, WIDTH = (SIZE) / 8 };                                 \
         unsigned char *remote = shmem_malloc((size_t)NELEMS * WIDTH + 1); /* +1 guard */ \
         CHECK_FATAL(remote != NULL); /* NULL would be dereferenced just below */  \
         remote[NELEMS * WIDTH] = 0x5a;                                           \
@@ -257,7 +327,7 @@ static int me, n, right, left;
         shmem_get##SIZE(back, remote, 0, right);                                 \
         CHECK(remote[NELEMS * WIDTH] == 0x5a);                                   \
                                                                                     \
-        /* Strided: two elements into a four-element target, stride 2. */        \
+        /* Strided: two elements into a nine-element target, stride 2. */        \
         unsigned char strided_src[2 * WIDTH], strided_back[2 * WIDTH];           \
         for (int i = 0; i < 2 * WIDTH; i++)                                      \
             strided_src[i] = (unsigned char)(0x90 + i);                          \
@@ -271,6 +341,36 @@ static int me, n, right, left;
         shmem_iget##SIZE(strided_back, remote, 1, 2, 2, right);                  \
         for (int i = 0; i < 2 * WIDTH; i++)                                      \
             CHECK(strided_back[i] == strided_src[i]);                            \
+                                                                                    \
+        /* Block-strided: bsize 2, nblocks 3, dst stride 3 (a gap after each     \
+         * block, the nine elements this target was sized for) and sst 2 ==     \
+         * bsize (contiguous source) - the strides differ, as the typed         \
+         * block-strided test's do. The barrier comes before remote is zeroed:  \
+         * a left neighbour's iget above reads this PE's remote, and zeroing it \
+         * unbarriered would race that read (file header comment). */           \
+        unsigned char block_src[3 * 2 * WIDTH], block_back[3 * 2 * WIDTH];      \
+        for (int i = 0; i < 3 * 2 * WIDTH; i++)                                  \
+            block_src[i] = (unsigned char)(0xC0 + i);                           \
+        shmem_barrier_all();                                                     \
+        for (int i = 0; i < NELEMS * WIDTH; i++)                                \
+            remote[i] = 0;                                                       \
+        shmem_barrier_all();                                                     \
+        shmem_ibput##SIZE(remote, block_src, 3, 2, 2, 3, right);                 \
+        shmem_barrier_all();                                                     \
+        for (int b = 0; b < 3; b++) {                                            \
+            for (int i = 0; i < 2 * WIDTH; i++)                                  \
+                CHECK(remote[b * 3 * WIDTH + i] == block_src[b * 2 * WIDTH + i]); \
+            for (int i = 0; i < WIDTH; i++)                                      \
+                CHECK(remote[b * 3 * WIDTH + 2 * WIDTH + i] == 0); /* the gap */  \
+        }                                                                        \
+        CHECK(remote[NELEMS * WIDTH] == 0x5a);                                   \
+        shmem_ibget##SIZE(block_back, remote, 2, 3, 2, 3, right);                \
+        for (int i = 0; i < 3 * 2 * WIDTH; i++)                                  \
+            CHECK(block_back[i] == block_src[i]);                                \
+        /* nblocks or bsize 0 transfers nothing. */                              \
+        shmem_ibput##SIZE(remote, block_src, 3, 2, 0, 3, right);                 \
+        shmem_ibput##SIZE(remote, block_src, 3, 2, 2, 0, right);                 \
+        CHECK(remote[NELEMS * WIDTH] == 0x5a);                                   \
                                                                                     \
         shmem_barrier_all();                                                     \
         shmem_put##SIZE##_nbi(remote, mine, NELEMS, right);                      \
@@ -333,14 +433,88 @@ static void strided_batching_check(void)
     uint64_t before = counter("am.wakes_deferred");
     shmem_long_iput(remote, src, 2, 1, N, right);
     uint64_t deferred = counter("am.wakes_deferred") - before;
-    if (deferred != (crosses ? N - 1 : 0))
-        fprintf(stderr, "PE %d: an iput of %d elements %s deferred %llu wakes\n", me, N,
-                crosses ? "across nodes" : "to a node-mate", (unsigned long long)deferred);
-    CHECK(deferred == (crosses ? N - 1 : 0));
+    /* Under OSOE_FORCE_REMOTE, shmem_ptr denies the pointer without moving the
+     * route: a put to a genuine node-mate still applies in the calling thread
+     * and defers nothing (design notes §8.1, "only the pointer is denied"), so
+     * "crosses" over-counts there and this assertion cannot tell a real
+     * cross-node put from a denied-pointer one. */
+    if (!getenv("OSOE_FORCE_REMOTE")) {
+        if (deferred != (crosses ? N - 1 : 0))
+            fprintf(stderr, "PE %d: an iput of %d elements %s deferred %llu wakes\n", me, N,
+                    crosses ? "across nodes" : "to a node-mate", (unsigned long long)deferred);
+        CHECK(deferred == (crosses ? N - 1 : 0));
+    }
 
     shmem_barrier_all();
     for (int i = 0; i < N; i++)
         CHECK(remote[2 * i] == left * 100 + i);
+    shmem_free(remote);
+}
+
+/* ---- A block-strided put is batched too: one wake per node crossing, not one
+ * per block -----------------------------------------------------------------
+ *
+ * Every block of an ibput but the last carries OSOE_TRANSPORT_MORE
+ * (strided_block_put, rma-typed.c), exactly as every element of an iput does;
+ * counted the way strided_batching_check counts iput's. */
+static void block_strided_batching_check(void)
+{
+    enum { BSIZE = 2, NBLOCKS = 4, DST_STRIDE = 3 };
+    long *remote = shmem_malloc(NBLOCKS * DST_STRIDE * sizeof *remote);
+    CHECK_FATAL(remote != NULL); /* NULL would be dereferenced just below */
+    long src[NBLOCKS * BSIZE];
+    for (int i = 0; i < NBLOCKS * BSIZE; i++)
+        src[i] = me * 100 + i;
+    shmem_barrier_all();
+
+    bool crosses = shmem_ptr(remote, right) == NULL;   /* the network carries it */
+    uint64_t before = counter("am.wakes_deferred");
+    shmem_long_ibput(remote, src, DST_STRIDE, BSIZE, BSIZE, NBLOCKS, right);
+    uint64_t deferred = counter("am.wakes_deferred") - before;
+    /* Under OSOE_FORCE_REMOTE, "crosses" over-counts (strided_batching_check's
+     * comment, above, has why) and this assertion cannot tell a real
+     * cross-node put from a denied-pointer one. */
+    if (!getenv("OSOE_FORCE_REMOTE")) {
+        if (deferred != (crosses ? (uint64_t)(NBLOCKS - 1) : 0))
+            fprintf(stderr, "PE %d: an ibput of %d blocks %s deferred %llu wakes\n", me, NBLOCKS,
+                    crosses ? "across nodes" : "to a node-mate", (unsigned long long)deferred);
+        CHECK(deferred == (crosses ? (uint64_t)(NBLOCKS - 1) : 0));
+    }
+
+    shmem_barrier_all();
+    for (int b = 0; b < NBLOCKS; b++)
+        for (int i = 0; i < BSIZE; i++)
+            CHECK(remote[b * DST_STRIDE + i] == left * 100 + b * BSIZE + i);
+    shmem_free(remote);
+}
+
+/* ---- A block larger than an AM chunk (§4.10; OSOE_AM_DEFAULT_CHUNK, 64 KiB) --
+ *
+ * One contiguous transfer per block (decision, phase1-step9-slice1-prompt.md)
+ * means a single osoe_rma_put/osoe_rma_get call already carries more bytes
+ * than one AM chunk holds - the same splitting a large plain put already
+ * exercises, checked here for the block-strided path too. Two blocks, each
+ * bigger than the default 64 KiB chunk, laid out contiguously (dst == sst ==
+ * bsize: "one transfer of the whole"), so every byte of both is checked. */
+static void block_strided_large_check(void)
+{
+    enum { BSIZE = 10000, NBLOCKS = 2 }; /* 10000 longs = 80000 bytes/block, > 64 KiB */
+    long *remote = shmem_malloc((size_t)NBLOCKS * BSIZE * sizeof *remote);
+    CHECK_FATAL(remote != NULL); /* NULL would be dereferenced just below */
+    static long src[NBLOCKS * BSIZE], back[NBLOCKS * BSIZE];
+    for (int i = 0; i < NBLOCKS * BSIZE; i++)
+        src[i] = me * 1000000 + i;
+    shmem_barrier_all();
+
+    shmem_long_ibput(remote, src, BSIZE, BSIZE, BSIZE, NBLOCKS, right);
+    shmem_barrier_all();
+    for (int i = 0; i < NBLOCKS * BSIZE; i++)
+        CHECK(remote[i] == left * 1000000 + i);
+
+    shmem_long_ibget(back, remote, BSIZE, BSIZE, BSIZE, NBLOCKS, right);
+    for (int i = 0; i < NBLOCKS * BSIZE; i++)
+        CHECK(back[i] == src[i]);
+
     shmem_free(remote);
 }
 
@@ -454,15 +628,26 @@ int main(void)
     right = (me + 1) % n;
     left = (me + n - 1) % n;
 
+    /* A dst stride below bsize is undefined (spec §9.6.1.4's Arguments) and
+     * ends the job by name (strided_block_put, rma-typed.c), as the other
+     * refusals are (shmem.lock.misuse.*, shmem.statics.misuse). */
+    if (getenv("OSOE_TEST_IBPUT_MISUSE")) {
+        long dest[4], src[2] = { 1, 2 };
+        shmem_long_ibput(dest, src, 1 /* < bsize 2 */, 2, 2, 1, right);
+    }
+
     TEST_TYPES(BLOCK_RMA)
     TEST_TYPES(SCALAR_RMA)
     TEST_TYPES(STRIDED_RMA)
+    TEST_TYPES(BLOCK_STRIDED_RMA)
     TEST_TYPES(NBI_RMA)
     GENERIC_TEST_TYPES(GENERIC_RMA)
 
     OSOE_RMA_SIZES(SIZED_RMA)
 
     strided_batching_check();
+    block_strided_batching_check();
+    block_strided_large_check();
     put_signal_check();
 
     CHECK_INVARIANTS();

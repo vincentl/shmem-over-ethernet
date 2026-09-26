@@ -30,6 +30,15 @@
  *     nonblocking gets, in flight together across nodes up to the landing
  *     zone's records, completed by one wait for the gets alone (design notes
  *     §7.5, §4.6).
+ *   - ibput/ibget: O(nblocks) - the same loop, generalized from one element to
+ *     one block of bsize elements: nblocks transport calls, each a single
+ *     contiguous transfer, not nblocks * bsize. Batched the same way - every
+ *     block but the last carries OSOE_TRANSPORT_MORE, and an ibget's blocks
+ *     are nonblocking gets completed by one wait for the gets alone - so a
+ *     block size of 1 costs exactly what iput/iget costs, which is the same
+ *     loop calling osoe_rma_put/osoe_rma_get with bsize elements instead of
+ *     one (spec's own Note: shmem_ibput with bsize 1 is shmem_iput). Both
+ *     strides equal to bsize is one transfer of the whole: O(1).
  *
  * nbi. Spec §9.6.2: the nonblocking routines "return after initiating the
  * operation", and the operation is complete after a subsequent shmem_quiet;
@@ -47,6 +56,7 @@
 #include <shmem.h>
 
 #include "export.h"
+#include "fatal.h"
 #include "rma.h"
 #include "transport.h"
 
@@ -106,6 +116,77 @@ static void strided_get(const char *routine, shmem_ctx_t ctx, void *dest, const 
         osoe_rma_get(routine, ctx, d + (ptrdiff_t)i * dst * w, s + (ptrdiff_t)i * sst * w, 1,
                      width, pe,
                      OSOE_TRANSPORT_NONBLOCKING | (i + 1 < nelems ? OSOE_TRANSPORT_MORE : 0));
+    osoe_rma_complete_gets(routine, ctx);
+}
+
+/*
+ * The block-strided forms (spec §9.6.1.4, §9.6.1.8), typed and sized alike:
+ * block b, for b from 0 to nblocks - 1, copies bsize elements from
+ * source + b*sst elements to dest + b*dst elements, one contiguous transfer
+ * per block - the same loop strided_put/strided_get run, generalized from one
+ * element to a block of bsize. nblocks or bsize 0 transfers nothing, matching
+ * the strided forms' own zero-length rule; calling with bsize 1 is iput/iget
+ * (the spec's own Notes say so). Both strides are "scaled by the element
+ * size" and the spec's Arguments require each at least bsize - undefined
+ * below that, which the library ends by name for the price of a compare, as
+ * it does for shmem_team_split_strided's stride of 0 (team.c) and
+ * shmem_align's alignment (malloc.c).
+ */
+static void strided_block_put(const char *routine, shmem_ctx_t ctx, void *dest,
+                              const void *source, ptrdiff_t dst, ptrdiff_t sst, size_t bsize,
+                              size_t nblocks, size_t width, int pe)
+{
+    if (nblocks == 0 || bsize == 0)
+        return;
+    if (dst < 0 || sst < 0 || (size_t)dst < bsize || (size_t)sst < bsize)
+        osoe_fatal("%s: dst %td, sst %td below bsize %zu; spec §9.6.1.4 requires each "
+                   "stride at least bsize", routine, dst, sst, bsize);
+    /* Both strides bsize: the blocks run on unbroken on either side, one
+     * transfer of the whole. */
+    if ((size_t)dst == bsize && (size_t)sst == bsize) {
+        if (nblocks > SIZE_MAX / bsize)
+            osoe_fatal("%s: %zu blocks of %zu elements are more than memory holds", routine,
+                       nblocks, bsize);
+        osoe_rma_put(routine, ctx, dest, source, nblocks * bsize, width, pe, 0);
+        return;
+    }
+    char *d = dest;
+    const char *s = source;
+    ptrdiff_t w = (ptrdiff_t)width;
+    /* Every block but the last says more follows, exactly as strided_put's
+     * elements do, so a backend may submit the loop's puts together. */
+    for (size_t b = 0; b < nblocks; b++)
+        osoe_rma_put(routine, ctx, d + (ptrdiff_t)b * dst * w, s + (ptrdiff_t)b * sst * w, bsize,
+                     width, pe, b + 1 < nblocks ? OSOE_TRANSPORT_MORE : 0);
+}
+
+static void strided_block_get(const char *routine, shmem_ctx_t ctx, void *dest,
+                              const void *source, ptrdiff_t dst, ptrdiff_t sst, size_t bsize,
+                              size_t nblocks, size_t width, int pe)
+{
+    if (nblocks == 0 || bsize == 0)
+        return;
+    if (dst < 0 || sst < 0 || (size_t)dst < bsize || (size_t)sst < bsize)
+        osoe_fatal("%s: dst %td, sst %td below bsize %zu; spec §9.6.1.8 requires each "
+                   "stride at least bsize", routine, dst, sst, bsize);
+    /* Both strides bsize: one transfer of the whole, as for ibput. */
+    if ((size_t)dst == bsize && (size_t)sst == bsize) {
+        if (nblocks > SIZE_MAX / bsize)
+            osoe_fatal("%s: %zu blocks of %zu elements are more than memory holds", routine,
+                       nblocks, bsize);
+        osoe_rma_get(routine, ctx, dest, source, nblocks * bsize, width, pe, 0);
+        return;
+    }
+    char *d = dest;
+    const char *s = source;
+    ptrdiff_t w = (ptrdiff_t)width;
+    /* Every block's get is nonblocking and all but the last say more follows,
+     * exactly as strided_get's elements, so the wait after is for the gets
+     * alone. */
+    for (size_t b = 0; b < nblocks; b++)
+        osoe_rma_get(routine, ctx, d + (ptrdiff_t)b * dst * w, s + (ptrdiff_t)b * sst * w, bsize,
+                     width, pe,
+                     OSOE_TRANSPORT_NONBLOCKING | (b + 1 < nblocks ? OSOE_TRANSPORT_MORE : 0));
     osoe_rma_complete_gets(routine, ctx);
 }
 
@@ -192,6 +273,36 @@ static void strided_get(const char *routine, shmem_ctx_t ctx, void *dest, const 
                     nelems, sizeof(T), pe);                                               \
     }
 
+/* ---- Typed ibput/ibget, block-strided (spec §9.6.1.4, §9.6.1.8) -------- */
+
+#define OSOE_RMA_IBPUT_IBGET(T, NAME)                                                     \
+    OSOE_API void OSOE_FN(pshmem_, ctx_##NAME, _ibput)(shmem_ctx_t ctx, T *dest,          \
+                            const T *source, ptrdiff_t dst, ptrdiff_t sst,                \
+                            size_t bsize, size_t nblocks, int pe)                         \
+    {                                                                                     \
+        strided_block_put("shmem_ctx_" #NAME "_ibput", ctx, dest, source, dst, sst,      \
+                          bsize, nblocks, sizeof(T), pe);                                 \
+    }                                                                                     \
+    OSOE_API void OSOE_FN(pshmem_, NAME, _ibput)(T *dest, const T *source, ptrdiff_t dst, \
+                            ptrdiff_t sst, size_t bsize, size_t nblocks, int pe)           \
+    {                                                                                     \
+        strided_block_put("shmem_" #NAME "_ibput", SHMEM_CTX_DEFAULT, dest, source, dst, \
+                          sst, bsize, nblocks, sizeof(T), pe);                            \
+    }                                                                                     \
+    OSOE_API void OSOE_FN(pshmem_, ctx_##NAME, _ibget)(shmem_ctx_t ctx, T *dest,          \
+                            const T *source, ptrdiff_t dst, ptrdiff_t sst,                \
+                            size_t bsize, size_t nblocks, int pe)                         \
+    {                                                                                     \
+        strided_block_get("shmem_ctx_" #NAME "_ibget", ctx, dest, source, dst, sst,      \
+                          bsize, nblocks, sizeof(T), pe);                                 \
+    }                                                                                     \
+    OSOE_API void OSOE_FN(pshmem_, NAME, _ibget)(T *dest, const T *source, ptrdiff_t dst, \
+                            ptrdiff_t sst, size_t bsize, size_t nblocks, int pe)           \
+    {                                                                                     \
+        strided_block_get("shmem_" #NAME "_ibget", SHMEM_CTX_DEFAULT, dest, source, dst, \
+                          sst, bsize, nblocks, sizeof(T), pe);                            \
+    }
+
 /* ---- Typed put_nbi/get_nbi (spec §9.6.2.1-§9.6.2.2) --------------------- */
 
 #define OSOE_RMA_NBI(T, NAME)                                                             \
@@ -223,6 +334,7 @@ static void strided_get(const char *routine, shmem_ctx_t ctx, void *dest, const 
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_PUT_GET)
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_P_G)
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_IPUT_IGET)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_IBPUT_IBGET)
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_NBI)
 
 /* ---- Sized put/get, strided and nonblocking (spec §9.6.1, §9.6.2) ------
@@ -275,6 +387,32 @@ OSOE_RMA_STANDARD_TYPES(OSOE_RMA_NBI)
     {                                                                                     \
         strided_get("shmem_iget" #SIZE, SHMEM_CTX_DEFAULT, dest, source, dst, sst,        \
                     nelems, SIZE / 8, pe);                                                \
+    }                                                                                     \
+    OSOE_API void pshmem_ctx_ibput##SIZE(shmem_ctx_t ctx, void *dest, const void *source, \
+                                         ptrdiff_t dst, ptrdiff_t sst, size_t bsize,      \
+                                         size_t nblocks, int pe)                          \
+    {                                                                                     \
+        strided_block_put("shmem_ctx_ibput" #SIZE, ctx, dest, source, dst, sst, bsize,   \
+                          nblocks, SIZE / 8, pe);                                         \
+    }                                                                                     \
+    OSOE_API void pshmem_ibput##SIZE(void *dest, const void *source, ptrdiff_t dst,       \
+                                     ptrdiff_t sst, size_t bsize, size_t nblocks, int pe) \
+    {                                                                                     \
+        strided_block_put("shmem_ibput" #SIZE, SHMEM_CTX_DEFAULT, dest, source, dst, sst, \
+                          bsize, nblocks, SIZE / 8, pe);                                  \
+    }                                                                                     \
+    OSOE_API void pshmem_ctx_ibget##SIZE(shmem_ctx_t ctx, void *dest, const void *source, \
+                                         ptrdiff_t dst, ptrdiff_t sst, size_t bsize,      \
+                                         size_t nblocks, int pe)                          \
+    {                                                                                     \
+        strided_block_get("shmem_ctx_ibget" #SIZE, ctx, dest, source, dst, sst, bsize,   \
+                          nblocks, SIZE / 8, pe);                                         \
+    }                                                                                     \
+    OSOE_API void pshmem_ibget##SIZE(void *dest, const void *source, ptrdiff_t dst,       \
+                                     ptrdiff_t sst, size_t bsize, size_t nblocks, int pe) \
+    {                                                                                     \
+        strided_block_get("shmem_ibget" #SIZE, SHMEM_CTX_DEFAULT, dest, source, dst, sst, \
+                          bsize, nblocks, SIZE / 8, pe);                                  \
     }                                                                                     \
     OSOE_API void pshmem_ctx_put##SIZE##_nbi(shmem_ctx_t ctx, void *dest,                 \
                                              const void *source, size_t nelems, int pe)   \
@@ -340,6 +478,8 @@ OSOE_API void pshmem_getmem_nbi(void *dest, const void *source, size_t nelems, i
     OSOE_ALIAS(ctx_##NAME##_g) OSOE_ALIAS(NAME##_g)                                       \
     OSOE_ALIAS(ctx_##NAME##_iput) OSOE_ALIAS(NAME##_iput)                                 \
     OSOE_ALIAS(ctx_##NAME##_iget) OSOE_ALIAS(NAME##_iget)                                 \
+    OSOE_ALIAS(ctx_##NAME##_ibput) OSOE_ALIAS(NAME##_ibput)                               \
+    OSOE_ALIAS(ctx_##NAME##_ibget) OSOE_ALIAS(NAME##_ibget)                               \
     OSOE_ALIAS(ctx_##NAME##_put_nbi) OSOE_ALIAS(NAME##_put_nbi)                           \
     OSOE_ALIAS(ctx_##NAME##_get_nbi) OSOE_ALIAS(NAME##_get_nbi)
 
@@ -348,6 +488,8 @@ OSOE_API void pshmem_getmem_nbi(void *dest, const void *source, size_t nelems, i
     OSOE_ALIAS(ctx_get##SIZE) OSOE_ALIAS(get##SIZE)                                       \
     OSOE_ALIAS(ctx_iput##SIZE) OSOE_ALIAS(iput##SIZE)                                     \
     OSOE_ALIAS(ctx_iget##SIZE) OSOE_ALIAS(iget##SIZE)                                     \
+    OSOE_ALIAS(ctx_ibput##SIZE) OSOE_ALIAS(ibput##SIZE)                                   \
+    OSOE_ALIAS(ctx_ibget##SIZE) OSOE_ALIAS(ibget##SIZE)                                   \
     OSOE_ALIAS(ctx_put##SIZE##_nbi) OSOE_ALIAS(put##SIZE##_nbi)                           \
     OSOE_ALIAS(ctx_get##SIZE##_nbi) OSOE_ALIAS(get##SIZE##_nbi)
 

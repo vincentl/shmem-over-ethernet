@@ -9,8 +9,9 @@ libraries.
 nodes over TCP and io_uring, started by `srun` or by `osoe-launch`:
 initialization and thread levels up to `SHMEM_THREAD_SERIALIZED`, the symmetric
 heap allocator in full, RMA - `shmem_putmem` and `shmem_getmem`, and every type
-and size of specification Table 5 with their single-element, strided and
-nonblocking forms, and put-with-signal in each - `shmem_ptr`, every atomic type
+and size of specification Table 5 with their single-element, strided,
+block-strided and nonblocking forms, and put-with-signal in each - `shmem_ptr`,
+every atomic type
 of specification Tables 6–8, the C11 type-generic interfaces of both, the
 deprecated atomic names of Annex F.2.12, the point-to-point waits and tests
 including the multiple-element forms,
@@ -29,8 +30,7 @@ symmetric statics - a program's global and static variables as symmetric
 objects - in a program built with the `oshcc` wrapper (§4.3). A PE or a node
 that dies ends the whole job (§3.15).
 
-Not yet: the scans (`shmem_sum_inscan`, `shmem_sum_exscan`); the block-strided `shmem_ibput` and
-`shmem_ibget`; contexts
+Not yet: the scans (`shmem_sum_inscan`, `shmem_sum_exscan`); contexts
 other than the default; and `SHMEM_THREAD_MULTIPLE` (§7.5, §7.6, §4.11).
 Nonblocking gets across nodes overlap, many in flight before the quiet that
 completes them; a nonblocking put returns once its source may be reused, as a

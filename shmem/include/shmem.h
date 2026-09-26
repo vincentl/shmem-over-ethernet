@@ -516,6 +516,20 @@ void shmem_ctx_getmem_nbi(shmem_ctx_t ctx, void *dest, const void *source, size_
     void OSOE_FN(P, NAME, _iget)(T *dest, const T *source, ptrdiff_t dst,    \
                         ptrdiff_t sst, size_t nelems, int pe);
 
+/* Block-strided (spec §9.6.1.4, §9.6.1.8): bsize elements per block, nblocks
+ * blocks, both strides scaled by the element size as iput/iget's are. */
+#define OSOE_RMA_DECL_IBPUT_IBGET_P(P, T, NAME)                              \
+    void OSOE_FN(P, ctx_##NAME, _ibput)(shmem_ctx_t ctx, T *dest,            \
+                        const T *source, ptrdiff_t dst, ptrdiff_t sst,       \
+                        size_t bsize, size_t nblocks, int pe);               \
+    void OSOE_FN(P, NAME, _ibput)(T *dest, const T *source, ptrdiff_t dst,   \
+                        ptrdiff_t sst, size_t bsize, size_t nblocks, int pe); \
+    void OSOE_FN(P, ctx_##NAME, _ibget)(shmem_ctx_t ctx, T *dest,            \
+                        const T *source, ptrdiff_t dst, ptrdiff_t sst,       \
+                        size_t bsize, size_t nblocks, int pe);               \
+    void OSOE_FN(P, NAME, _ibget)(T *dest, const T *source, ptrdiff_t dst,   \
+                        ptrdiff_t sst, size_t bsize, size_t nblocks, int pe);
+
 #define OSOE_RMA_DECL_NBI_P(P, T, NAME)                                      \
     void OSOE_FN(P, ctx_##NAME, _put_nbi)(shmem_ctx_t ctx, T *dest,          \
                         const T *source, size_t nelems, int pe);             \
@@ -543,6 +557,7 @@ void shmem_ctx_getmem_nbi(shmem_ctx_t ctx, void *dest, const void *source, size_
 #define OSOE_RMA_DECL_PUT_GET(T, NAME) OSOE_RMA_DECL_PUT_GET_P(shmem_, T, NAME)
 #define OSOE_RMA_DECL_P_G(T, NAME) OSOE_RMA_DECL_P_G_P(shmem_, T, NAME)
 #define OSOE_RMA_DECL_IPUT_IGET(T, NAME) OSOE_RMA_DECL_IPUT_IGET_P(shmem_, T, NAME)
+#define OSOE_RMA_DECL_IBPUT_IBGET(T, NAME) OSOE_RMA_DECL_IBPUT_IBGET_P(shmem_, T, NAME)
 #define OSOE_RMA_DECL_NBI(T, NAME) OSOE_RMA_DECL_NBI_P(shmem_, T, NAME)
 #define OSOE_RMA_DECL_PUT_SIGNAL(T, NAME) OSOE_RMA_DECL_PUT_SIGNAL_P(shmem_, T, NAME)
 #define OSOE_RMA_DECL_PUT_SIGNAL_NBI(T, NAME) OSOE_RMA_DECL_PUT_SIGNAL_NBI_P(shmem_, T, NAME)
@@ -550,6 +565,7 @@ void shmem_ctx_getmem_nbi(shmem_ctx_t ctx, void *dest, const void *source, size_
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_PUT_GET)
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_P_G)
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_IPUT_IGET)
+OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_IBPUT_IBGET)
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_NBI)
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_PUT_SIGNAL)
 OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_PUT_SIGNAL_NBI)
@@ -573,6 +589,18 @@ OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_PUT_SIGNAL_NBI)
                            ptrdiff_t dst, ptrdiff_t sst, size_t nelems, int pe); \
     void P##iget##SIZE(void *dest, const void *source, ptrdiff_t dst,        \
                        ptrdiff_t sst, size_t nelems, int pe);
+
+#define OSOE_RMA_DECL_SIZE_IBPUT_IBGET_P(P, SIZE)                            \
+    void P##ctx_ibput##SIZE(shmem_ctx_t ctx, void *dest, const void *source, \
+                            ptrdiff_t dst, ptrdiff_t sst, size_t bsize,      \
+                            size_t nblocks, int pe);                         \
+    void P##ibput##SIZE(void *dest, const void *source, ptrdiff_t dst,       \
+                        ptrdiff_t sst, size_t bsize, size_t nblocks, int pe); \
+    void P##ctx_ibget##SIZE(shmem_ctx_t ctx, void *dest, const void *source, \
+                            ptrdiff_t dst, ptrdiff_t sst, size_t bsize,      \
+                            size_t nblocks, int pe);                         \
+    void P##ibget##SIZE(void *dest, const void *source, ptrdiff_t dst,       \
+                        ptrdiff_t sst, size_t bsize, size_t nblocks, int pe);
 
 #define OSOE_RMA_DECL_SIZE_NBI_P(P, SIZE)                                    \
     void P##ctx_put##SIZE##_nbi(shmem_ctx_t ctx, void *dest, const void *source, \
@@ -598,12 +626,14 @@ OSOE_RMA_STANDARD_TYPES(OSOE_RMA_DECL_PUT_SIGNAL_NBI)
 
 #define OSOE_RMA_DECL_SIZE_PUT_GET(SIZE) OSOE_RMA_DECL_SIZE_PUT_GET_P(shmem_, SIZE)
 #define OSOE_RMA_DECL_SIZE_IPUT_IGET(SIZE) OSOE_RMA_DECL_SIZE_IPUT_IGET_P(shmem_, SIZE)
+#define OSOE_RMA_DECL_SIZE_IBPUT_IBGET(SIZE) OSOE_RMA_DECL_SIZE_IBPUT_IBGET_P(shmem_, SIZE)
 #define OSOE_RMA_DECL_SIZE_NBI(SIZE) OSOE_RMA_DECL_SIZE_NBI_P(shmem_, SIZE)
 #define OSOE_RMA_DECL_SIZE_PUT_SIGNAL(SIZE) OSOE_RMA_DECL_SIZE_PUT_SIGNAL_P(shmem_, SIZE)
 #define OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI(SIZE) OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI_P(shmem_, SIZE)
 
 OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_PUT_GET)
 OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_IPUT_IGET)
+OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_IBPUT_IBGET)
 OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_NBI)
 OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_PUT_SIGNAL)
 OSOE_RMA_SIZES(OSOE_RMA_DECL_SIZE_PUT_SIGNAL_NBI)
@@ -1365,6 +1395,39 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
                osoe_shmem_iget_takes_six_or_seven_arguments,                     \
                osoe_shmem_iget_takes_six_or_seven_arguments,                     \
                osoe_shmem_iget_takes_six_or_seven_arguments, )(__VA_ARGS__)
+
+/* Block-strided (spec §9.6.1.4, §9.6.1.8): one argument wider than iput/iget,
+ * so the selection reuses OSOE_PICK8 rather than OSOE_PICK7, exactly as
+ * put_signal's does below. */
+#define OSOE_G_IBPUT_7(dest, source, dst, sst, bsize, nblocks, pe)               \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, ibput))                     \
+        ((dest), (source), (dst), (sst), (bsize), (nblocks), (pe)))
+#define OSOE_G_IBPUT_8(ctx, dest, source, dst, sst, bsize, nblocks, pe)          \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, ibput))                    \
+        ((ctx), (dest), (source), (dst), (sst), (bsize), (nblocks), (pe)))
+#define shmem_ibput(...)                                                        \
+    OSOE_PICK8(__VA_ARGS__, OSOE_G_IBPUT_8, OSOE_G_IBPUT_7,                      \
+               osoe_shmem_ibput_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibput_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibput_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibput_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibput_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibput_takes_seven_or_eight_arguments, )(__VA_ARGS__)
+
+#define OSOE_G_IBGET_7(dest, source, dst, sst, bsize, nblocks, pe)               \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, ibget))                     \
+        ((dest), (source), (dst), (sst), (bsize), (nblocks), (pe)))
+#define OSOE_G_IBGET_8(ctx, dest, source, dst, sst, bsize, nblocks, pe)          \
+    (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_GX, ibget))                    \
+        ((ctx), (dest), (source), (dst), (sst), (bsize), (nblocks), (pe)))
+#define shmem_ibget(...)                                                        \
+    OSOE_PICK8(__VA_ARGS__, OSOE_G_IBGET_8, OSOE_G_IBGET_7,                      \
+               osoe_shmem_ibget_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibget_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibget_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibget_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibget_takes_seven_or_eight_arguments,                  \
+               osoe_shmem_ibget_takes_seven_or_eight_arguments, )(__VA_ARGS__)
 
 #define OSOE_G_PUT_NBI_4(dest, source, nelems, pe)                               \
     (_Generic((dest) OSOE_RMA_G_STANDARD(OSOE_RMA_G, put_nbi))                   \
