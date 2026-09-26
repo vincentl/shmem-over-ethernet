@@ -1358,30 +1358,50 @@ endif()
 # slice 5; test-pipeline.c): a reduction, a broadcast from a root off PE 0's
 # node and an fcollect, each of 1 MiB and of an odd size, every element
 # checked; collectives back to back from every root, their trees rotating; and
-# the count each lead publishes of the most pieces it had in flight, exact. On
-# a block map, an interleaved one and five nodes at a fan-out of 2, where a
-# lead is both a parent and a child, at D = 1, 2 and 4 - D = 1 being one piece
-# at a time. tsan is left out of the maps for shmem.internode.*'s reason.
+# the count each lead publishes of the most pieces it had in flight, by its
+# place in the tree. On a block map, an interleaved one, five nodes at a
+# fan-out of 2, where a lead is both a parent and a child, and eight, a tree
+# three deep, at D = 1, 2 and 4 - D = 1 being one piece at a time. tsan is left
+# out of the maps for shmem.internode.*'s reason.
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   add_executable(shmem_test_pipeline test-pipeline.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
   target_include_directories(shmem_test_pipeline PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
   target_link_libraries(shmem_test_pipeline PRIVATE osoe rt)
   osoe_warnings(shmem_test_pipeline)
-  foreach(case "0,0,1,1" "0,1,2,0,1,0" "0,1,2,3,4:OSOE_COLLECTIVE_FANOUT=2")
+  foreach(case "0,0,1,1" "0,1,2,0,1,0" "0,1,2,3,4:OSOE_COLLECTIVE_FANOUT=2"
+               "0,1,2,3,4,5,6,7:OSOE_COLLECTIVE_FANOUT=2")
     string(REPLACE ":" ";" environment "${case}")
     list(POP_FRONT environment map)
     string(REPLACE "," ";" ranks "${map}")
     list(LENGTH ranks count)
     string(REPLACE "," "-" label "${map}")
-    foreach(depth 1 2 4)
-      add_test(NAME shmem.pipeline.${label}.in-flight-${depth}
-        COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${depth} ${environment}
+    foreach(in_flight 1 2 4)
+      add_test(NAME shmem.pipeline.${label}.in-flight-${in_flight}
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${in_flight} ${environment}
                 $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
                 $<TARGET_FILE:shmem_test_pipeline>)
-      set_tests_properties(shmem.pipeline.${label}.in-flight-${depth} PROPERTIES
+      set_tests_properties(shmem.pipeline.${label}.in-flight-${in_flight} PROPERTIES
         LABELS "tier2" TIMEOUT 90)
     endforeach()
   endforeach()
+  # Under the AM stress settings - 1 KiB chunks, two credits, the wire in short
+  # reads split at random - where a piece is sixteen chunks and a lead's puts
+  # queue behind its credits. And with OSOE_MAX_TEAMS=4, where the counters
+  # begin right after four teams' slots: a slot computed from piece k rather
+  # than k mod D, which every other map lets write into unused teams' slots
+  # unseen, lands on a counter. At D = 2.
+  add_test(NAME shmem.pipeline.0-1-2-3-4.stress
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_COLLECTIVE_FANOUT=2
+            OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n 5 -m 0,1,2,3,4 -t 150 --
+            $<TARGET_FILE:shmem_test_pipeline>)
+  set_tests_properties(shmem.pipeline.0-1-2-3-4.stress PROPERTIES LABELS "tier2" TIMEOUT 180)
+  add_test(NAME shmem.pipeline.0-0-1-1.max-teams-4
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_MAX_TEAMS=4
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+            $<TARGET_FILE:shmem_test_pipeline>)
+  set_tests_properties(shmem.pipeline.0-0-1-1.max-teams-4 PROPERTIES LABELS "tier2" TIMEOUT 90)
 endif()
 
 # OSOE_REGION_INTERNAL itself (test-internal-region.c): between node-mates, a
