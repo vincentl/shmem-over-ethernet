@@ -405,3 +405,50 @@ on; one that fails here and passed there is the finding.
 - the outputs of steps 1, 5, 6, 7 and 8;
 - the fixtures step 3 captured, to commit with the tests they feed;
 - anything that failed, with its output, and the node it failed on.
+
+## 10. Next session
+
+The first session (2026-09-24) ran §1 to §4, §7 and most of §8; its results
+are in the status page and in `docs/decisions/2026-09-24-day.md`. What it left,
+in order, with `W=~/osoe-corpus` and `OSHCC` as in §8:
+
+1. **The test suite, split as §2 now has it**: tier 1 on the head node, tier 2
+   on a compute node whose image has neither a compiler nor `liburing-dev`.
+2. **`shmem.get-no-progress.0-1` alone.** Its one-second limit fired while a
+   second logical node was still connecting; its limit is now five seconds.
+   Alone, it tells contention from a slow start:
+
+   ```sh
+   srun -N1 -n1 -c4 ctest --test-dir build/release -R get-no-progress --repeat until-fail:5 --output-on-failure
+   ```
+
+3. **How long a job takes to start**, one node and four, with §8's `hello`:
+
+   ```sh
+   time srun -K1 -N1 --ntasks-per-node=1 $W/examples/hello > /dev/null
+   time srun -K1 -N4 --ntasks-per-node=4 $W/examples/hello > /dev/null
+   ```
+
+4. **§5, the floor**, and **§6, `osoe-bench`**, all five lines: the first
+   session brought back neither, and they say how close a round trip is to
+   the link's own.
+5. **§8's SOS test suite** at 4 × 2: 147 programs pass and 16 fail, each for
+   the reason §8 names. It ran verbatim at this shape in the VM.
+6. **PEs per node.** A pair on one node, which is the shared-memory path, and
+   three collectives at one, two and four PEs a node:
+
+   ```sh
+   cd $W/osu/c/openshmem
+   srun -K1 -N1 --ntasks-per-node=2 ./osu_oshm_put heap > ~/osu-put-1x2.txt
+   srun -K1 -N1 --ntasks-per-node=2 ./osu_oshm_get heap > ~/osu-get-1x2.txt
+   for ppn in 1 2 4; do
+     for p in barrier reduce fcollect; do
+       srun -K1 -N4 --ntasks-per-node=$ppn ./osu_oshm_$p -m :65536 > ~/osu-$p-4x$ppn.txt
+     done
+   done
+   ```
+
+7. Optionally, **§7's vanished node**, with its PoE port power-cycled after.
+
+Bring back what §9 lists, and `sos.txt`, the `osu-*-1x2.txt` and `osu-*-4x*.txt`
+files, both halves of the test suite's summary, and the two start-up times.
