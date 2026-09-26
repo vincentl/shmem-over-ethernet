@@ -559,9 +559,12 @@ bool osoe_progress_host_poll(void)
     if (!osoe_am.internode || !osoe_am.lead)
         return false;
     /* The first pass is on the agent thread, which enabling makes the ring's only
-     * submitter (ring.h). */
-    if (!osoe_am.ring.enabled)
+     * submitter (ring.h). It is also where the engine first meets the teams
+     * whose records the node's lead wrote before this thread started. */
+    if (!osoe_am.ring.enabled) {
         osoe_ring_enable(&osoe_am.ring);
+        osoe_progress_meet_teams(&osoe_am.progress);
+    }
     struct osoe_connection_area *a = &osoe_am.area;
     if (flag_raised) {
         atomic_store_explicit(a->lead_sleeping, 0, memory_order_seq_cst);
