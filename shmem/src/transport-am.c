@@ -1339,6 +1339,11 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
         uint64_t stamp = atomic_fetch_add_explicit(&issue_clock, 1, memory_order_seq_cst) + 1;
         for (uint32_t i = 0; i < call_extent_count; i++)
             atomic_store_explicit(&issue_stamp[call_extents[i]], stamp, memory_order_seq_cst);
+        /* Freed with the call, not kept per thread: a thread-local list would
+         * outlive its thread (asan, the verification of slice 3). */
+        free(call_extents);
+        call_extents = NULL;
+        call_extent_count = call_extent_capacity = 0;
     }
 }
 
