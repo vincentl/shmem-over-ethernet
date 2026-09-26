@@ -1401,6 +1401,31 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(shmem.pipeline.0-0-1-1.max-teams-4 PROPERTIES LABELS "tier2" TIMEOUT 90)
 endif()
 
+# The allgather among node leads that is fcollect's and collect's internode
+# phase (design §5.8, "An allgather for fcollect"; phase 1 step 5 slice 6;
+# test-allgather.c): blocks of 1 byte, 8 bytes and 64 KiB and a collect's
+# differing ones, into the heap and into both statics ranges, byte by byte;
+# fcollects back to back into one dest with the team's rank 0 reading each
+# result late; and the steps and shares each lead publishes. On the world, its
+# even ranks and the world reversed, over two to five logical nodes - so that
+# the node count is and is not a power of two - on a block map and a cyclic
+# one of two PEs a node, and on an interleaved map of uneven nodes; and on
+# five, a team spanning three nodes: on the block map ranks 3 to 7, nodes 1 to
+# 3 unevenly, and on the cyclic one ranks 2, 5 and 8, nodes 2, 0 and 3 in that
+# order of team rank. Linked as oshcc links (§4.3), for its statics. tsan is
+# left out of the maps for shmem.internode.*'s reason.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  foreach(case "0,0,1,1" "0,1,0,1" "0,0,1,1,2,2" "0,1,2,0,1,2" "0,0,1,1,2,2,3,3"
+               "0,1,2,3,0,1,2,3" "0,0,1,1,2,2,3,3,4,4:OSOE_TEST_THREE_OF_FIVE=3,1,5"
+               "0,1,2,3,4,0,1,2,3,4:OSOE_TEST_THREE_OF_FIVE=2,3,3" "0,1,2,0,1,0")
+    string(REPLACE ":" ";" environment "${case}")
+    list(POP_FRONT environment map)
+    osoe_tier2_map_test(allgather ${map} OSOE_TEST_MAP=${map} SHMEM_SYMMETRIC_SIZE=16m
+      ${environment})
+  endforeach()
+  osoe_statics_program(shmem_test_allgather)
+endif()
+
 # OSOE_REGION_INTERNAL itself (test-internal-region.c): between node-mates, a
 # path no collective takes, across nodes, and both. White-box: it calls the
 # transport, so the library's own sources are compiled into it.
