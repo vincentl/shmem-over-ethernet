@@ -1,8 +1,9 @@
 # Phase 1, step 7: team creation - a proposal, two slices
 
-**Status: a proposal for the author's review, not yet a brief to build from.**
-It closes design §5.7's open item - "the team range allocator and the split
-protocol are not yet designed" - and §10's entry for it. Nothing here is built.
+**Status: approved by the author on 2026-09-25** ("approve 1, 2 (c) and 3 -
+go"; `docs/decisions/2026-09-25.md`), as proposed. It closes design §5.7's open
+item - "the team range allocator and the split protocol are not yet designed" -
+and §10's entry for it. Slice 1's build brief is at the end.
 
 *Written by Claude on 2026-09-24, after the SOS test suite (`corpus/tests-sos`)
 first ran against osoe: 127 of its programs pass on two maps, and the largest
@@ -177,3 +178,115 @@ naming a created team. SOS's team tests, through
 - If the internal region's growth at the default trips the capacity check on a
   configuration in `docs/pi-cluster.md`.
 - If the metrics schema change breaks a consumer beyond `osoe-stat`.
+
+## Build brief: slice 1, storage (approved 2026-09-25)
+
+Behaviour does not change: the world, shared and finalize teams stay the only
+teams, and every existing test passes as it stands. What changes is where each
+team's state lives and how it is found, so that slice 2 adds teams without
+touching any of it again. Work in `build/scratch/wt/teams`, branch
+`phase1-step7-slice1`.
+
+### Decisions, precisely
+
+1. **`OSOE_MAX_TEAMS`.** Read at the first init beside `OSOE_COLLECTIVE_FANOUT`
+   (`bootstrap.c`), into `osoe.bootstrap.max_teams`; default 32; a value outside
+   4 to 1,024, or not a number, ends the job naming the variable, as
+   `OSOE_MAX_THREADS` does (`metrics.c`). Carried in the rendezvous hello beside
+   `collective_fanout` (`rendezvous.c`), and a node that disagrees ends the job
+   naming both values, as the fan-out's check does. Listed in `init.c`'s help
+   text beside `OSOE_MAX_THREADS`.
+2. **Numbers.** `OSOE_TEAM_WORLD` 0, `OSOE_TEAM_SHARED` 1, `OSOE_TEAM_FINALIZE`
+   2, as now; slice 2's teams take 3 to `max_teams - 1`. `OSOE_TEAMS` becomes
+   `OSOE_PREDEFINED_TEAMS` wherever it means "the three predefined", and every
+   array it sized is sized by `max_teams` instead.
+3. **A node block per team number.** One struct, `struct osoe_team_block`,
+   cache-line aligned, holds what the node header now keeps per team in two
+   shapes: the three epoch counters (`arrived`, `released`, `copied`), the
+   arrival handoff, the published tree state, and a **record** - a cache line
+   with a `published` word (0 until written, then 1, stored with release) and
+   this node's place in the team's tree (parent node's lead rank, this node's
+   position among its parent's children, child count, the O(k) children's lead
+   ranks the tree keeps) and the team's local member count on this node. The
+   control segment holds `max_teams` blocks after what it holds now; the
+   header's named `world_*`/`shared_*`/`finalize_*` fields and its
+   `arrival[OSOE_TEAMS]` and `collective[OSOE_TEAMS]` arrays go. Layout
+   version 17 becomes 18.
+4. **Published epochs.** Each local PE's per-team published epoch - today
+   `world_epoch`, `shared_epoch`, `finalize_epoch` in its PE slot - becomes one
+   `_Atomic uint32_t` per team number in an array of `local_pes x max_teams` in
+   the control segment, indexed `[local_id][team]`.
+5. **The private epochs move into the descriptor.** `struct osoe_team` holds its
+   own `epoch` and `data_epoch` (k and d) as values; `struct osoe_state`'s named
+   copies go.
+6. **The descriptor carries its local shape.** `local_ids` - this node's members'
+   local ids in team-rank order; `local_ranks` - their team ranks, same order;
+   `lead_local_id = local_ids[0]`, the member with the lowest team rank (design
+   §5.2). And the world mapping: `world_start` and `world_stride` for a team
+   strided in world ranks, or `world_of_rank`, an explicit table, for one that
+   is not (a split of `SHMEM_TEAM_SHARED` in slice 2; at most the node's PEs).
+   `osoe_team_to_world` and `world_to_team` read these; nothing tests a team's
+   identity (`== &shared_team`, `t->number == OSOE_TEAM_SHARED`) to find its
+   shape. `collectives.c`'s `local_id == 0`, `heap_of[m]` and
+   `local_member_rank` read the descriptor: the lead is `lead_local_id`, member
+   `m`'s heap is `heap_of[local_ids[m]]`, its team rank `local_ranks[m]`.
+   `barrier.c` likewise.
+7. **The progress thread learns a team from its record.** The node lead's
+   per-team bookkeeping (`progress.h`'s `team[OSOE_TEAMS]`,
+   `internode-generic.c`'s `teams[OSOE_TEAMS]`, `internode-am.c`'s `consumed` and
+   `registered`) becomes arrays of `max_teams` allocated at init, and a team's
+   entry is filled from its node block's record the first time the team is
+   used - an acquire load of `published`, then the record's fields - rather than
+   by a call from `osoe_team_start`. The predefined teams' records are written
+   by `osoe_team_start` as now, before the agent starts. **The release upcall
+   resolves a team by number to its node block**, never to a private
+   descriptor: in slice 2 the node lead's process may belong to none of a
+   team's members. A message naming a number whose record is unpublished ends
+   the job by name, as today's unregistered team does.
+8. **`numbered[]`** becomes `max_teams` `_Atomic(struct osoe_team *)`, stored with
+   release and loaded with acquire, for whatever still resolves a number to a
+   descriptor in this process.
+9. **The internal region: a block per team number.** Today `fanout + 1` slots of
+   16 KiB, shared by every team, then a 4 KiB page of per-team words. After: a
+   words area of `max_teams x 128 B` (each team's arrival word and release word,
+   a cache line each), rounded up to the page, then one slot block per team
+   number of `(fanout + 1) x slots_per_child` slots, `slots_per_child` a constant
+   1 for now (the pipelining slice raises it). `child_slot`, `release_slot`,
+   `arrivals_word` and `release_word` take the team. The generic backend keeps
+   refusing every team but the world's (slice 2 lifts it). The capacity check
+   counts the larger region, and `internal-region.h`'s size function takes
+   `max_teams`. At 32 teams and a fan-out of 4 the region grows to about 2.5 MiB
+   a PE, untouched but by a team's local leads.
+10. **Metrics and `osoe-stat`.** The predefined teams keep their names
+    (`team.world.*`, `team.shared.*`, `team.finalize.*`); numbers from 3 would be
+    `team.<n>.*`, generated for every block whose record is published. `osoe-stat
+    --summary` walks the published records rather than two names.
+
+### Not in this slice
+
+Creating, destroying or translating teams; the counter on world PE 0; lifting
+the generic backend's refusal; any change to a protocol, a wake, or a memory
+order. If a change seems to need one, stop and say so.
+
+### Tests
+
+Every existing test passes unchanged in all four presets. New:
+
+- a rendezvous disagreement on `OSOE_MAX_TEAMS` (one rank's environment
+  differs, `-e`, on a map of two nodes) ends the job naming the variable and
+  both values;
+- an `OSOE_MAX_TEAMS` of 3, of 1,025, and of `x` each end the job by name;
+- the descriptor's local shape on `0,1,2,0,1,0`, where local ids and world
+  ranks interleave: each PE checks, through a test-only entry the library
+  already has the pattern for or a new one, that `local_ids`, `local_ranks`
+  and `lead_local_id` for the world team match what the map implies;
+- `osoe-stat` on a live job still names the world and finalize trees.
+
+### Verification and stops
+
+Build and run the debug and asan presets in the VM, foreground, under the VM
+lock (`exec 9>/tmp/osoe-vm.lock; flock -w 540 9`), each whole; the main session
+runs release, tsan, tier 3, mutations and the load loop. Stop and ask if the
+record cannot be read by the progress thread without a new ordering argument,
+if the control segment's growth at the default trips the capacity check on
+any map the suite runs, or if a test must change to pass.
