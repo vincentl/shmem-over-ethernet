@@ -164,3 +164,12 @@ reason not yet looked into. Whether to trade the gets for
 the collectives - or give collectives a chunk of their own - is the author's
 decision; nothing was changed. (`osu_oshm_put_bw` needs a `heap` argument the
 script did not pass; the bench's put stream stands in for it.)
+
+**Threads, after step 8 slice 2** (main `bc5fbb6`, `threads/`; the runbook's
+§11 item 4). The thread, context, get and lock tests of tier 2 on a compute
+node, 47 of 47. `shmem_test_multiple` under Slurm at 4 × 2 and 4 × 1, with
+the landing zone at 8 KiB and at its default: all four pass. SOS's threaded
+programs at 4 × 2: `mt_a2a`, `mt_contention`, `mt_membar`, `threading`,
+`thread_wait` and `query_thread` pass; `mt_lock_test` needs build flags from
+SOS's makefile that this session's script did not pass (it passes in the
+VM's sweep, which does).
