@@ -91,4 +91,9 @@ int osoe_allocator_resize(struct osoe_allocator *a, uint64_t offset, uint64_t si
  * never in a loop. */
 void osoe_allocator_levels(const struct osoe_allocator *a, uint64_t *in_use, uint64_t *largest_free);
 
+/* The bytes from `offset` to the end of the allocated block that holds it:
+ * 0, or -1 if no allocated block holds it (phase 1 step 8 slice 2: how a
+ * gather names a dest too short for its result before writing past it). */
+int osoe_allocator_room(const struct osoe_allocator *a, uint64_t offset, uint64_t *room);
+
 #endif /* OSOE_ALLOCATOR_H */

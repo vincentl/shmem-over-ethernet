@@ -175,13 +175,9 @@ void osoe_am_config_read(struct osoe_am_config *c)
     c->hugepages = huge != 0;
 
     /* Tunable for the same reason as the credits: a test reaches a full landing
-     * arena only by making it small. */
-    uint32_t in_flight = OSOE_DEFAULT_GETS_IN_FLIGHT;
-    if (osoe_environment_u32("OSOE_GETS_IN_FLIGHT", &in_flight) == OSOE_ENVIRONMENT_INVALID ||
-        in_flight < 1 || in_flight > OSOE_MAX_GETS_IN_FLIGHT)
-        osoe_fatal("OSOE_GETS_IN_FLIGHT='%s' is not between 1 and %u",
-                   getenv("OSOE_GETS_IN_FLIGHT"), OSOE_MAX_GETS_IN_FLIGHT);
-    c->gets_in_flight = in_flight;
+     * zone only by making it small. Its extents count what is in flight since
+     * phase 1 step 8 slice 2, so OSOE_GETS_IN_FLIGHT, which counted it apart,
+     * is retired and ignored. */
     c->get_landing_bytes = env_bytes("OSOE_GET_LANDING_BYTES", OSOE_DEFAULT_GET_LANDING_BYTES,
                                      OSOE_MIN_GET_LANDING_BYTES, OSOE_MAX_GET_LANDING_BYTES,
                                      false);

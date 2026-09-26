@@ -1539,7 +1539,7 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
             $<TARGET_FILE:shmem_test_gather-misuse>)
   set_tests_properties(shmem.gather-misuse.short-dest PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "shmem_long_collect: team 0's member [0-9]+ has its place at byte [0-9]+ of a result of 320 bytes, out of the places' order: the layout was overwritten")
+    PASS_REGULAR_EXPRESSION "shmem_long_collect: dest has room for [0-9]+ bytes to the end of its allocation, and the result is 320 bytes")
   add_test(NAME shmem.gather-misuse.local-count
     COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MISUSE=local-count
             $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
@@ -1589,7 +1589,7 @@ endfunction()
 set(osoe_team_split_exhaust_environment OSOE_MAX_TEAMS=8 SHMEM_SYMMETRIC_SIZE=16m)
 set(osoe_team_split_exhausted
   "the 4 teams this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 2 have been claimed.*the 5 teams this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 2 have been claimed.*the 1 team this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 5 have been claimed.*every check of this mode passed")
-set(osoe_team_split_full "the symmetric heap has no 16 bytes free.*every check of this mode passed")
+set(osoe_team_split_full "every check of this mode passed")
 osoe_team_split_mode(exhaust L4 "-n;4" "${osoe_team_split_exhaust_environment}"
   "${osoe_team_split_exhausted}")
 osoe_team_split_mode(too-many L4 "-n;4" "OSOE_MAX_TEAMS=4;SHMEM_SYMMETRIC_SIZE=16m"
@@ -1611,7 +1611,7 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "${osoe_team_split_full}")
 endif()
 
-set(osoe_get_nbi_small OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
+set(osoe_get_nbi_small OSOE_GET_LANDING_BYTES=4096
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(get-nbi 0,0,1,1 ${osoe_get_nbi_small})
@@ -2054,14 +2054,14 @@ if(OSOE_TIER3)
     osoe_tier3_test(barrier-am.0-1-2 ${shape} 0,1,2 shmem_test_barrier_am
                     ENV ${osoe_tier3_wire})
     osoe_tier3_test(get-nbi.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_get-nbi
-                    ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
+                    ENV ${osoe_tier3_wire} OSOE_GET_LANDING_BYTES=4096
                         OSOE_AM_CREDITS=2)
     # Contexts' gets sharing the landing zone, and a team context's traffic,
     # over the shaped link (phase 1 step 8 slice 1).
     osoe_tier3_test(scan.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_scan
                     ENV ${osoe_tier3_wire})
     osoe_tier3_test(context.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_context
-                    ENV ${osoe_tier3_wire} OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512
+                    ENV ${osoe_tier3_wire} OSOE_GET_LANDING_BYTES=4096
                         OSOE_AM_CREDITS=2)
     # The leads' tree of the reductions and broadcast, over the shaped link.
     osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)

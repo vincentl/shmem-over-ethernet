@@ -57,10 +57,6 @@ struct osoe_progress_host {
      */
     void *(*resolve)(void *context, uint32_t pe, uint16_t region, uint64_t offset,
                      uint32_t length);
-    /* A local PE's landing zone (§3.12), or NULL if the PE is not local, and in
-     * `capacity` the bytes its data area holds - which a get reply is checked
-     * against before a byte of it is written (§3.4's trust boundary). */
-    struct osoe_landing_slot *(*landing)(void *context, uint32_t pe, uint32_t *capacity);
     /* Wake that PE's waiters whose watched range this write overlapped (§4.9). */
     void (*notify)(void *context, uint32_t pe, uint16_t region, uint64_t offset,
                    uint32_t length);
@@ -82,18 +78,24 @@ struct osoe_progress_host {
      */
     void (*abort)(void *context, uint32_t pe, int32_t status, uint32_t disposition);
     /*
-     * A local PE's nonblocking get `token`, in flight (§4.6, as built): where
-     * its reply lands, and in `length` the bytes it asked for - or NULL if the
-     * PE is not local or has no such get in flight, which is a peer's bug
-     * (§3.4's trust boundary). NULL, as a callback, where nothing issues
-     * nonblocking gets: the engine's own tests.
+     * A local PE's get `token`, blocking or not, in flight (§4.6; the extents
+     * of layout 23): where its reply lands, and in `length` the bytes it asked
+     * for - or NULL if the PE is not local or has no such get in flight, which
+     * is a peer's bug (§3.4's trust boundary).
      */
     unsigned char *(*landing_request)(void *context, uint32_t pe, uint64_t token,
                                       uint32_t *length);
-    /* That get's reply has landed whole: retire its record, so that a second
-     * reply naming it is refused, then count it toward the PE's next wait
-     * (§4.6's counters) and wake the PE if it waits there. */
+    /* A nonblocking get's reply has landed whole: mark its record landed, so
+     * that a second reply naming it is refused and any of the PE's threads may
+     * copy it out, then count it toward the context's wait (§4.6's counters)
+     * and wake the PE's threads waiting there. */
     void (*landed)(void *context, uint32_t pe, uint64_t token, uint32_t bytes);
+    /* A blocking get's reply has landed whole, `length` bytes, or a fetching
+     * AMO's has arrived with `value`: complete it in the thread the token
+     * names (§4.11 item 5) and wake that thread. False if no thread of that PE
+     * waits for that token, a peer's bug. */
+    bool (*completed)(void *context, uint32_t pe, uint64_t token, uint32_t length,
+                      uint64_t value);
 };
 
 /*

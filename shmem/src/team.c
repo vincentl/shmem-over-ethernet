@@ -120,7 +120,7 @@ static uint32_t created_count;
  * compare-and-swap that fails and says where the counter is - and this PE's
  * own, so a plain word; each session's counter, like its guess, starts at 0.
  */
-static uint64_t claimed_seen;
+static _Atomic uint64_t claimed_seen;   /* a guess: two threads' splits may race it */
 
 /* The predefined teams' local list, every local id in order - beyond what the
  * node and the bootstrap already hold, the one array their shapes need. */
@@ -496,7 +496,7 @@ static void forget(struct osoe_team *t)
 
 void osoe_team_start(void)
 {
-    claimed_seen = 0;
+    atomic_store_explicit(&claimed_seen, 0, memory_order_release);
     numbered_count = osoe.bootstrap.max_teams;
     created_count = numbered_count - OSOE_PREDEFINED_TEAMS;
     /* calloc: a null pointer in every entry, before any reader exists. */
@@ -817,7 +817,7 @@ static uint64_t claim(const char *routine, uint32_t count)
                                                          max_teams);
     /* split has refused a count past this before calling. */
     uint64_t room = max_teams - OSOE_PREDEFINED_TEAMS;
-    uint64_t expected = claimed_seen;
+    uint64_t expected = atomic_load_explicit(&claimed_seen, memory_order_acquire);
     for (;;) {
         bool fits = expected <= room - count;
         uint64_t found = osoe_transport_rmw(osoe_transport_context_default(), 0,
@@ -829,10 +829,10 @@ static uint64_t claim(const char *routine, uint32_t count)
             continue;
         }
         if (fits) {
-            claimed_seen = expected + count;
+            atomic_store_explicit(&claimed_seen, expected + count, memory_order_release);
             return OSOE_PREDEFINED_TEAMS + expected;
         }
-        claimed_seen = expected;
+        atomic_store_explicit(&claimed_seen, expected, memory_order_release);
         numbers_used_up(routine, count, expected);
         return 0;
     }
@@ -971,32 +971,13 @@ static int split(const char *routine, shmem_team_t parent_handle, struct osoe_te
         return 1;
     }
 
-    /* The room the first number travels in, at the same place on every parent
-     * PE: the allocator is a function of its calls alone (§4.4), and a take and
-     * its give leave it as it was. It takes its smallest block, 16 bytes, for
-     * the eight-byte word. A heap without it answers nonzero on every parent PE
-     * alike, before anything is claimed, and the parent's rank 0 says so. */
-    uint64_t offset;
-    int taken = osoe_allocator_take(&osoe.allocator, sizeof(uint64_t), sizeof(uint64_t), 0,
-                                    &offset);
-    if (taken < 0)
-        osoe_fatal("%s: out of memory for the symmetric heap's own records", routine);
-    if (taken > 0) {
-        if (parent->me == 0)
-            fprintf(stderr, "osoe: PE %u: %s: the symmetric heap has no %llu bytes free for "
-                    "the word a split broadcasts its team numbers in (SHMEM_SYMMETRIC_SIZE is "
-                    "%llu bytes); the split returns nonzero on every PE of its parent team\n",
-                    osoe.bootstrap.rank, routine, (unsigned long long)OSOE_ALLOCATOR_ALIGN,
-                    (unsigned long long)osoe.node.heap_size);
-        return 1;
-    }
-    uint64_t *word = (uint64_t *)((unsigned char *)osoe.node.heap_of[osoe.bootstrap.local_id] +
-                                  offset);
-    if (parent->me == 0)
-        *word = claim(routine, count);
-    osoe_broadcast(routine, parent_handle, word, word, 1, sizeof *word, 0, false);
-    uint64_t first = *word;
-    osoe_allocator_give(&osoe.allocator, offset);
+    /* The first number travels in the parent team number's own word of the
+     * internal region, not in a borrow from the heap, which under
+     * THREAD_MULTIPLE could race an allocation on another thread, in a
+     * different order on each PE (phase 1 step 8 slice 2). */
+    (void)parent_handle;
+    uint64_t first = osoe_team_broadcast_word(routine, parent,
+                                              parent->me == 0 ? claim(routine, count) : 0);
     if (first == 0)
         return 1;
 

@@ -38,7 +38,7 @@
  * (arrivals.h): no team counts another's arrivals, which counters shared
  * between two teams would make it do, evens and odds arriving in turn.
  *
- * Three modes, on four PEs, instead run out of what a split needs; each has
+ * Three modes, on four PEs, instead test what a split needs; each has
  * PE 0 say last that every check passed, since each is judged by what PE 0
  * says rather than by the exit status:
  * - OSOE_TEST_SPLIT=exhaust, under OSOE_MAX_TEAMS=8, five numbers for created
@@ -50,8 +50,8 @@
  *   teams is refused before anything is claimed, and the one number serves
  *   the split after it;
  * - OSOE_TEST_SPLIT=full, under a small SHMEM_SYMMETRIC_SIZE: the heap filled
- *   to its last block, a split returns nonzero on every PE, PE 0 saying the
- *   heap had no room, and succeeds once the blocks are given back.
+ *   to its last block, and a split still succeeds on every PE, since it
+ *   borrows nothing from the heap (phase 1 step 8 slice 2).
  */
 #define _GNU_SOURCE
 #include <stdbool.h>
@@ -576,8 +576,9 @@ static void too_many(void)
 /*
  * OSOE_TEST_SPLIT=full, under a small SHMEM_SYMMETRIC_SIZE: the heap filled
  * block by block, halving the block as each stops fitting, until not even the
- * allocator's smallest does; a split then returns nonzero on every PE, PE 0
- * saying why, and succeeds once the blocks are given back.
+ * allocator's smallest does; a split then succeeds on every PE all the same.
+ * Until phase 1 step 8 slice 2 it borrowed its word from the heap and failed
+ * here; now nothing it needs comes from the heap.
  */
 static void heap_full(void)
 {
@@ -592,17 +593,17 @@ static void heap_full(void)
             size /= 2;
     }
     CHECK_FATAL(count < MAX_BLOCKS);
-    shmem_team_t made = SHMEM_TEAM_WORLD;
+    /* Since phase 1 step 8 slice 2 a split borrows nothing from the heap - its
+     * first number travels in the parent team number's own word of the
+     * internal region - so a full heap no longer stops it. */
+    shmem_team_t made = SHMEM_TEAM_INVALID;
     int status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made);
-    CHECK(status != 0 && made == SHMEM_TEAM_INVALID && statuses_agree(status));
-    while (count > 0)
-        shmem_free(blocks[--count]);
-    made = SHMEM_TEAM_INVALID;
-    status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made);
     CHECK(status == 0 && statuses_agree(status));
     check_team(made, &world_expected, SHMEM_TEAM_WORLD, &world_expected, 0);
     exercise(made, &world_expected);
     shmem_team_destroy(made);
+    while (count > 0)
+        shmem_free(blocks[--count]);
     mode_passed();
 }
 

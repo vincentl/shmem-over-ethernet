@@ -211,6 +211,11 @@ void osoe_metrics_fini(void);
 /* How many blocks each PE gets: OSOE_MAX_THREADS, read at first init (§5.7). */
 uint32_t osoe_metrics_blocks_per_pe(void);
 
+/* This thread's block's index in its PE's pool, claiming one if it has none:
+ * the index of its thread record too (node.h, §4.11 item 3). Only in a
+ * session. */
+uint32_t osoe_metrics_thread_index(void);
+
 /* Publish this PE's heap levels into its slot. Called by the allocator after
  * every change, which is a cold path (§4.4). */
 void osoe_publish_heap_levels(void);

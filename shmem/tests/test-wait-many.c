@@ -256,7 +256,7 @@ static void watched_span(uint64_t *v)
     CHECK(waited < 2000);
 
     uint64_t published = 0;
-    CHECK(osoe_segment_read_name(&s, "pe.watch_rng", 1, &published));
+    CHECK(osoe_segment_watch(&s, 1, &published));
     uint64_t expect = osoe_watch_pack(OSOE_REGION_HEAP,
                                       offset + SPAN_FIRST * sizeof *v,
                                       (SPAN_LAST - SPAN_FIRST + 1) * sizeof *v);

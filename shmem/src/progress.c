@@ -42,36 +42,16 @@ static uint32_t peer_of(const struct osoe_progress *p, uint32_t slot)
 }
 
 /*
- * A get reply is checked before a byte of it lands (§3.4's trust boundary;
- * second review, D4). Its token must be the one the owner armed the slot for,
- * and its chunk must lie inside both the whole reply and the slot. A reply that
- * fails is a peer's bug - the same job, the same build - and the landing zone
- * sits in the control segment beside the other PEs' zones, so writing it would
- * corrupt a sibling rather than fail. The measured case: an unsolicited reply
- * with chunk_offset past the zone wrote 64 bytes beyond it and the test passed.
+ * Where a get's reply lands - its PE's zone, in the piece its token names - and
+ * checked before a byte of it lands (§3.4's trust boundary; second review,
+ * D4): a token that names no get of that PE's in flight, or bytes outside its
+ * piece, are a peer's bug and fatal before anything is written or counted. The
+ * zone sits in the control segment beside the other PEs' zones, so writing past
+ * a piece would corrupt a sibling rather than fail. The measured case, before
+ * the check: an unsolicited reply with chunk_offset past the zone wrote 64
+ * bytes beyond it and the test passed.
  */
-static void check_get_reply(struct osoe_progress *p, uint32_t slot,
-                            struct osoe_landing_slot *landing, uint32_t capacity,
-                            const struct osoe_am_get_reply *m, uint32_t chunk)
-{
-    uint64_t armed = atomic_load_explicit(&landing->armed_token, memory_order_acquire);
-    if (m->token != armed)
-        osoe_fatal("a get reply from node %u for PE %u carries token %llu; that PE is "
-                   "waiting for %llu", peer_of(p, slot), m->origin_pe,
-                   (unsigned long long)m->token, (unsigned long long)armed);
-    if ((uint64_t)m->chunk_offset + chunk > m->total || m->total > capacity)
-        osoe_fatal("a get reply from node %u for PE %u puts %u bytes at offset %u of a "
-                   "%u-byte reply, into a landing zone of %u bytes", peer_of(p, slot),
-                   m->origin_pe, chunk, m->chunk_offset, m->total, capacity);
-}
-
-/*
- * Where a nonblocking get's reply lands - its PE's arena, in the range its
- * record names - checked as the blocking slot's reply is (check_get_reply): a
- * token that names no get of that PE's in flight, or bytes outside its range,
- * are a peer's bug and fatal before anything is written or counted.
- */
-static unsigned char *nonblocking_landing(struct osoe_progress *p, uint32_t slot,
+static unsigned char *reply_landing(struct osoe_progress *p, uint32_t slot,
                                           const struct osoe_am_get_reply *m,
                                           uint32_t payload_bytes)
 {
@@ -105,16 +85,7 @@ static void *destination(void *context, const struct osoe_message_header *header
     if (header->kind == OSOE_AM_GET_REPLY) {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
-        if (m.token & OSOE_LANDING_NONBLOCKING)
-            return nonblocking_landing(p, a->slot, &m, payload_bytes) + m.chunk_offset;
-        uint32_t capacity = 0;
-        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
-                                                         &capacity);
-        if (!slot)
-            osoe_fatal("a get reply from node %u names PE %u, which is not on this node",
-                       peer_of(p, a->slot), m.origin_pe);
-        check_get_reply(p, a->slot, slot, capacity, &m, payload_bytes);
-        return slot->data + m.chunk_offset;
+        return reply_landing(p, a->slot, &m, payload_bytes) + m.chunk_offset;
     }
     return NULL;
 }
@@ -220,17 +191,6 @@ static void enqueue(struct osoe_progress *p, uint32_t slot, struct osoe_reply_qu
     mark_busy(p, slot);         /* possibly another connection than the one being read */
 }
 
-
-/* Publish a landing zone's completion: length or value, then ready, then the
- * wake. The waiter loads the wake word before the flag (§4.6), so a bump
- * between its load and its wait returns at once instead of sleeping stale. */
-static void land(struct osoe_landing_slot *slot)
-{
-    /* release: the bump after it is the waiter's futex word (§3.16). */
-    atomic_store_explicit(&slot->ready, 1, memory_order_release);
-    atomic_fetch_add_explicit(&slot->wake, 1, memory_order_seq_cst);
-    osoe_futex_wake(&slot->wake, INT_MAX, OSOE_FUTEX_SHARED);
-}
 
 /* ---- The internode tree (§5.3) ------------------------------------------ */
 
@@ -469,61 +429,38 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_GET_REPLY: {
         struct osoe_am_get_reply m;
         memcpy(&m, fixed, sizeof m);
-        if (m.token & OSOE_LANDING_NONBLOCKING) {
-            /* destination() has placed and checked any bytes; a reply with none
-             * never passed through it, so it is checked here, before it counts
-             * a byte or returns a credit - and every piece is, since the record
-             * it names must still be live. Nothing is published until the whole
-             * reply is in: the counters are the PE's only view of it. */
-            (void)nonblocking_landing(p, a->slot, &m, payload_bytes);
-            if (m.chunk_offset + payload_bytes >= m.total) {
-                p->host.landed(p->host.context, m.origin_pe, m.token, m.total);
-                /*
-                 * §3.8's credit comes back as the reply lands, which is here:
-                 * the PE copies it out only at its next quiet, and holding the
-                 * credit until then would keep its node-mates' gets waiting on
-                 * replies delivered long ago (reply.h). A blocking operation's
-                 * credit its caller returns, once it has read the slot.
-                 */
-                struct osoe_connection *connection =
-                    osoe_connection_to(p->area, peer_of(p, a->slot));
-                if (!connection)
-                    osoe_fatal("a get reply arrived from node %u, toward which this node "
-                               "has no connection", peer_of(p, a->slot));
-                osoe_credit_give(osoe_connection_credit(connection));
-            }
+        /* destination() has placed and checked any bytes; a reply with none
+         * never passed through it, so it is checked here, before it counts a
+         * byte or completes anything - and every piece is, since the record it
+         * names must still be in flight. Nothing is published until the whole
+         * reply is in: a get larger than an AM chunk arrives as several replies
+         * (§3.2), and a reply is not its caller's until it is complete (§4.6;
+         * an early version released the caller on the first chunk). */
+        (void)reply_landing(p, a->slot, &m, payload_bytes);
+        if (m.chunk_offset + payload_bytes < m.total)
+            break;
+        if (!(m.token & OSOE_LANDING_NONBLOCKING)) {
+            /* A blocking get: its thread copies the bytes out and returns the
+             * credit once it has read them. */
+            if (!p->host.completed(p->host.context, m.origin_pe, m.token, m.total, 0))
+                osoe_fatal("a get reply from node %u for PE %u carries token %#llx, which no "
+                           "thread of that PE waits for", peer_of(p, a->slot), m.origin_pe,
+                           (unsigned long long)m.token);
             break;
         }
-        uint32_t capacity = 0;
-        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
-                                                         &capacity);
-        /* destination() has checked a reply with bytes; one with none never
-         * passed through it, so every reply is checked here again before it
-         * lands anything (§3.4's trust boundary; review of the nonblocking
-         * gets, 2026-09-24 - the gap predated them). */
-        if (!slot)
-            osoe_fatal("a get reply from node %u names PE %u, which is not on this node",
-                       peer_of(p, a->slot), m.origin_pe);
-        check_get_reply(p, a->slot, slot, capacity, &m, payload_bytes);
+        p->host.landed(p->host.context, m.origin_pe, m.token, m.total);
         /*
-         * A get larger than one AM chunk arrives as several replies (§3.2), so
-         * `ready` is published only once the whole thing has landed - the
-         * caller waits for *its* reply (§4.6), and a reply is not its reply
-         * until it is complete. An earlier version set it on every chunk and
-         * the caller read a quarter of a get and carried on.
-         *
-         * The wake is bumped either way, because a waiter that re-checks is
-         * cheap and a waiter that sleeps through the last chunk is a hang.
+         * §3.8's credit comes back as the reply lands, which is here: the PE
+         * copies it out only at its next quiet, and holding the credit until
+         * then would keep its node-mates' gets waiting on replies delivered long
+         * ago (reply.h). A blocking operation's credit its caller returns, once
+         * it has read its reply.
          */
-        uint32_t landed = m.chunk_offset + payload_bytes;
-        atomic_store_explicit(&slot->length, landed, memory_order_release);
-        atomic_store_explicit(&slot->token, m.token, memory_order_release);
-        if (landed >= m.total) {
-            land(slot);
-        } else {
-            atomic_fetch_add_explicit(&slot->wake, 1, memory_order_seq_cst);
-            osoe_futex_wake(&slot->wake, INT_MAX, OSOE_FUTEX_SHARED);
-        }
+        struct osoe_connection *connection = osoe_connection_to(p->area, peer_of(p, a->slot));
+        if (!connection)
+            osoe_fatal("a get reply arrived from node %u, toward which this node has no "
+                       "connection", peer_of(p, a->slot));
+        osoe_credit_give(osoe_connection_credit(connection));
         break;
     }
 
@@ -564,20 +501,10 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_RMW_REPLY: {
         struct osoe_am_rmw_reply m;
         memcpy(&m, fixed, sizeof m);
-        uint32_t capacity = 0;
-        struct osoe_landing_slot *slot = p->host.landing(p->host.context, m.origin_pe,
-                                                         &capacity);
-        if (!slot)
-            osoe_fatal("an atomic's reply from node %u names PE %u, which is not on this "
-                       "node", peer_of(p, a->slot), m.origin_pe);
-        uint64_t armed = atomic_load_explicit(&slot->armed_token, memory_order_acquire);
-        if (m.token != armed)
-            osoe_fatal("an atomic's reply from node %u for PE %u carries token %llu; that "
-                       "PE is waiting for %llu", peer_of(p, a->slot), m.origin_pe,
-                       (unsigned long long)m.token, (unsigned long long)armed);
-        atomic_store_explicit(&slot->value, m.value, memory_order_release);
-        atomic_store_explicit(&slot->token, m.token, memory_order_release);
-        land(slot);
+        if (!p->host.completed(p->host.context, m.origin_pe, m.token, 0, m.value))
+            osoe_fatal("an atomic's reply from node %u for PE %u carries token %#llx, which "
+                       "no thread of that PE waits for", peer_of(p, a->slot), m.origin_pe,
+                       (unsigned long long)m.token);
         break;
     }
 

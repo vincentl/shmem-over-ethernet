@@ -106,6 +106,32 @@ static inline uint64_t osoe_internal_words_offset(uint32_t fanout, uint32_t pipe
     return (uint64_t)max_teams * osoe_internal_team_slots_bytes(fanout, pipeline);
 }
 
+/*
+ * Spare words of a team number's release counter line, past its first 64
+ * bytes (phase 1 step 8 slice 2): what a collective of the SHMEM layer needs
+ * symmetric by construction rather than by the allocator's history, since
+ * under THREAD_MULTIPLE a borrow from the heap may race an allocation on
+ * another thread, in a different order on each PE. Each is the team number's
+ * own, and one team's collectives are never concurrent (spec §9.4), so a word
+ * needs no more room than one collective at a time. The line's counter is
+ * written only by remote adds to its first eight bytes; these only by the
+ * collective that owns them, with plain stores, and read by node-mates.
+ */
+enum osoe_internal_team_spare {
+    OSOE_INTERNAL_SPLIT_NUMBER,         /* a split's first team number, broadcast */
+    OSOE_INTERNAL_COLLECT_LENGTH,       /* a member's collect length, for its lead */
+    OSOE_INTERNAL_COLLECT_TOTAL,        /* the lead's total of them, for its members */
+};
+
+static inline uint64_t osoe_internal_team_spare_word(uint32_t fanout, uint32_t pipeline,
+                                                     uint32_t max_teams, uint32_t team,
+                                                     enum osoe_internal_team_spare which)
+{
+    return osoe_internal_words_offset(fanout, pipeline, max_teams) +
+           (uint64_t)team * osoe_internal_team_words_bytes(fanout) +
+           (uint64_t)fanout * OSOE_INTERNAL_LINE_BYTES + 64 + (uint64_t)which * 8;
+}
+
 /* Where the count of team numbers claimed is: the line past every team
  * number's words. */
 static inline uint64_t osoe_internal_team_counter_offset(uint32_t fanout, uint32_t pipeline,

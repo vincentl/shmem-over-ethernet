@@ -55,6 +55,10 @@ struct osoe_context {
  */
 static struct osoe_context *pool;
 static uint32_t pool_count;
+/* Held while an element is claimed or given back, so that two threads creating
+ * contexts at once (spec §9.5: creation is not collective) take different
+ * ones; never across an operation or a wait. */
+static pthread_mutex_t pool_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static const long known_options = SHMEM_CTX_SERIALIZED | SHMEM_CTX_PRIVATE | SHMEM_CTX_NOSTORE;
 
@@ -136,10 +140,16 @@ struct osoe_transport_context *osoe_ctx_resolve_list(const char *routine, shmem_
     return c->transport;
 }
 
-/* The transport's spelling of the options (transport.h). */
+/* The transport's spelling of the options (transport.h): and, under
+ * SHMEM_THREAD_MULTIPLE, a context neither PRIVATE nor SERIALIZED is one
+ * several threads may use at once (§4.11's modes). */
 static unsigned transport_options(long options)
 {
     unsigned t = 0;
+    int level = SHMEM_THREAD_SINGLE;
+    pshmem_query_thread(&level);
+    if (level == SHMEM_THREAD_MULTIPLE && !(options & (SHMEM_CTX_PRIVATE | SHMEM_CTX_SERIALIZED)))
+        t |= OSOE_TRANSPORT_CONTEXT_CONCURRENT;
     if (options & SHMEM_CTX_SERIALIZED)
         t |= OSOE_TRANSPORT_CONTEXT_SERIALIZED;
     if (options & SHMEM_CTX_PRIVATE)
@@ -166,21 +176,25 @@ static int create(const char *routine, shmem_team_t team, const struct osoe_team
     if (!ctx)
         osoe_fatal("%s: ctx is a null pointer", routine);
     *ctx = SHMEM_CTX_INVALID;
+    pthread_mutex_lock(&pool_mutex);
+    int status = 1;
     for (uint32_t i = 1; i < pool_count; i++) {
         struct osoe_context *c = &pool[i];
         if (c->live)
             continue;
         struct osoe_transport_context *transport =
             osoe_transport_context_create(transport_options(options));
-        if (!transport)
-            return 1;
-        *c = (struct osoe_context){ .transport = transport, .team = team,
-                                    .descriptor = descriptor, .options = options,
-                                    .creator = pthread_self(), .live = true };
-        *ctx = (shmem_ctx_t)c;
-        return 0;
+        if (transport) {
+            *c = (struct osoe_context){ .transport = transport, .team = team,
+                                        .descriptor = descriptor, .options = options,
+                                        .creator = pthread_self(), .live = true };
+            *ctx = (shmem_ctx_t)c;
+            status = 0;
+        }
+        break;
     }
-    return 1;
+    pthread_mutex_unlock(&pool_mutex);
+    return status;
 }
 
 OSOE_API int pshmem_ctx_create(long options, shmem_ctx_t *ctx)
@@ -203,7 +217,9 @@ OSOE_API int pshmem_team_create_ctx(shmem_team_t team, long options, shmem_ctx_t
 static void destroy(struct osoe_context *c, const char *routine)
 {
     osoe_transport_context_destroy(c->transport, routine);
+    pthread_mutex_lock(&pool_mutex);
     *c = (struct osoe_context){ 0 };
+    pthread_mutex_unlock(&pool_mutex);
 }
 
 /*

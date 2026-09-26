@@ -73,18 +73,16 @@
 #define OSOE_AM_MAX_CREDITS     65536u
 
 /*
- * A PE's nonblocking gets in flight (§4.6, as built): how many, and the bytes
- * of landing arena their replies share. Every PE of a node has both in its
- * landing zone, in the control segment, so the defaults cost 256 KiB and a few
- * records a PE. The count's ceiling is the 16 bits a reply's token carries its
- * record's index in (node.h). Past either, a PE completes what it has in
- * flight before it asks for more.
+ * The bytes of a PE's landing zone, which every reply to its gets shares
+ * (§4.6, §4.11 item 7; node.h): 256 KiB by default, in the control segment,
+ * 256 extents of 1 KiB. Past it a PE completes what it has in flight before it
+ * asks for more.
  */
-#define OSOE_DEFAULT_GETS_IN_FLIGHT     64u
-#define OSOE_MAX_GETS_IN_FLIGHT         65536u
 #define OSOE_DEFAULT_GET_LANDING_BYTES  (UINT64_C(256) << 10)
-#define OSOE_MIN_GET_LANDING_BYTES      UINT64_C(64)
-#define OSOE_MAX_GET_LANDING_BYTES      (UINT64_C(1) << 30)
+/* Since layout 23 the zone is 1 KiB extents (node.h), at least one and at most
+ * as many as a token's 16 bits name, less the one that means none. */
+#define OSOE_MIN_GET_LANDING_BYTES      UINT64_C(1024)
+#define OSOE_MAX_GET_LANDING_BYTES      (UINT64_C(65535) * 1024)
 
 enum osoe_am_size_status {
     OSOE_AM_SIZE_OK,
@@ -121,7 +119,6 @@ struct osoe_am_config {
     uint64_t budget;        /* OSOE_AM_BUFFER_BUDGET */
     uint32_t credits;       /* OSOE_AM_CREDITS: §3.8's C, per connection */
     bool hugepages;         /* OSOE_AM_HUGEPAGES */
-    uint32_t gets_in_flight;        /* OSOE_GETS_IN_FLIGHT, per PE */
     uint64_t get_landing_bytes;     /* OSOE_GET_LANDING_BYTES, per PE */
 };
 

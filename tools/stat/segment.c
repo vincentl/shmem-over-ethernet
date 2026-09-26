@@ -35,9 +35,9 @@
  * rather than the job.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 232,
+_Static_assert(sizeof(struct osoe_segment_directory) == 256,
                "frozen by §3.14: append only. 136 at layout 6; 160 at layout 12; 208 at "
-               "layout 18; 232 at layout 21");
+               "layout 18; 232 at layout 21; 256 at layout 23");
 
 uint64_t osoe_segment_now_ns(void)
 {
@@ -657,4 +657,27 @@ int osoe_segment_list(char (*names)[OSOE_SEGMENT_NAME_MAX], int max)
     int n = l.found < max ? l.found : max;
     qsort(names, (size_t)n, OSOE_SEGMENT_NAME_MAX, by_name);
     return l.found;
+}
+
+bool osoe_segment_watch(const struct osoe_segment *s, uint32_t pe, uint64_t *word)
+{
+    *word = 0;
+    if (s->dir->layout >= 23 && OSOE_SEGMENT_HAS(s->dir, threads_per_pe) &&
+        s->dir->threads_per_pe > 0) {
+        if (pe >= s->dir->local_count || s->dir->thread_record_bytes < sizeof(uint64_t) ||
+            s->dir->threads_offset + s->dir->threads_bytes > s->bytes)
+            return false;
+        for (uint32_t i = 0; i < s->dir->threads_per_pe; i++) {
+            const unsigned char *record = s->map + s->dir->threads_offset +
+                                          ((uint64_t)pe * s->dir->threads_per_pe + i) *
+                                              s->dir->thread_record_bytes;
+            uint64_t v = __atomic_load_n((const uint64_t *)record, __ATOMIC_ACQUIRE);
+            if (v) {
+                *word = v;
+                break;
+            }
+        }
+        return true;
+    }
+    return osoe_segment_read_name(s, "pe.watch_rng", pe, word);
 }

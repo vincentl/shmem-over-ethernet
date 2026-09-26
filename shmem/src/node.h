@@ -30,7 +30,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 22
+#define OSOE_NODE_LAYOUT 23
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -124,16 +124,24 @@ enum osoe_team_number {
  * from another process, so it cannot be a pointer. */
 enum { OSOE_BLOCKED_ROUTINE_MAX = 32 };
 
+/* The most threads a PE may have in the library at once (OSOE_MAX_THREADS),
+ * and so the words of its `active` bitmap. */
+enum { OSOE_WATCH_ACTIVE_WORDS = 16, OSOE_MAX_THREADS_HIGHEST = OSOE_WATCH_ACTIVE_WORDS * 64 };
+
 struct osoe_pe_slot {
     _Alignas(OSOE_CACHELINE)
     _Atomic uint32_t phase;         /* enum osoe_phase; this PE only */
     _Atomic uint32_t agent_wake;    /* shared futex word: wakes this PE's agent */
-    /* The §4.9 watch slot: the range this PE waits on, packed by watch_range.h,
-     * and its futex word. Written by this PE, read by every writer that touches
-     * its memory. On their own cache line, so a notifying writer does not share
-     * one with the words this PE's own agent and rendezvous use. */
-    _Alignas(OSOE_CACHELINE) _Atomic uint64_t watch_rng;
-    _Atomic uint32_t watch_seq;
+    /* §4.11 item 3's `active` bitmap (layout 23; phase 1 step 8 slice 2): a
+     * bit per thread record of this PE (struct osoe_thread_record) holding a
+     * published watch. Set and cleared by this PE's waiting threads with
+     * locked instructions, loaded by every writer that touches this PE's
+     * memory, which then reads only the records whose bits are set - one load
+     * when nobody waits, the phase-1 slot's cost. On its own cache line, so a
+     * notifying writer shares none with the words this PE's own agent and
+     * rendezvous use. Until layout 23 the slot held the one watch a PE could
+     * have, which is a record with at most one bit set. */
+    _Alignas(OSOE_CACHELINE) _Atomic uint64_t watch_active[OSOE_WATCH_ACTIVE_WORDS];
     uint32_t rank;
     int32_t pid;                    /* this PE's process id, for liveness (§3.15) */
     int32_t tid;                    /* the initializing thread, for /proc/<pid>/task/<tid> */
@@ -276,6 +284,16 @@ struct osoe_segment_directory {
     uint64_t contexts_bytes;
     uint32_t context_bytes;          /* one block */
     uint32_t contexts_per_pe;        /* OSOE_MAX_CONTEXTS */
+
+    /*
+     * Appended at layout 23 (§4.11 item 3; phase 1 step 8 slice 2): each local
+     * PE's thread records, threads_per_pe (OSOE_MAX_THREADS) of them in
+     * local-id order, record i being the thread that holds counter block i.
+     */
+    uint64_t threads_offset;
+    uint64_t threads_bytes;
+    uint32_t thread_record_bytes;    /* one record */
+    uint32_t threads_per_pe;         /* OSOE_MAX_THREADS */
 };
 
 /*
@@ -648,12 +666,12 @@ struct osoe_node_header {
     char hostname[64];
 
     /*
-     * Appended at layout 16: each PE's landing zone also holds its nonblocking
-     * gets in flight (§4.6, as built). A zone is `dir.landing_slot_bytes`: the
-     * blocking slot, whose data area is `landing_data_bytes` - one AM chunk -
-     * then `landing_requests` records at `landing_requests_offset`, then an
-     * arena of `landing_arena_bytes` at `landing_arena_offset` for their
-     * replies. Offsets are within a zone.
+     * Appended at layout 16; their meaning since layout 23 (§4.11 item 7): a
+     * PE's zone (struct osoe_landing_zone) is its header and bitmap, then
+     * `landing_requests` extent records at `landing_requests_offset`, then
+     * the extents' `landing_arena_bytes` at `landing_arena_offset`, one
+     * record and OSOE_LANDING_EXTENT_BYTES an extent; `landing_data_bytes` is
+     * the largest piece a get lands at once. Offsets are within a zone.
      */
     uint32_t landing_data_bytes;
     uint32_t landing_requests;
@@ -683,6 +701,43 @@ struct osoe_node_header {
      * with osoe_node_team.
      */
     struct osoe_team_block team[];
+};
+
+/*
+ * A thread's record in the node segment (§4.11 items 3 and 5; layout 23):
+ * its watch - the range it waits on, packed as watch-range.h says, 0 for none,
+ * and the futex word a writer bumps - one per thread of the PE, so that two
+ * threads waiting at once each have their own and neither's wake is lost
+ * (tools/modelcheck/watch_list_model.py). Record i belongs to the thread that
+ * holds the PE's counter block i (metrics.c), claimed at the thread's first
+ * call and released at its exit; the PE's `active` bitmap (struct
+ * osoe_pe_slot) says which records hold a published range.
+ */
+struct osoe_thread_record {
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint64_t watch_range;
+    _Atomic uint32_t watch_sequence;
+    uint32_t reserved;
+
+    /*
+     * The thread's completion slot (§4.11 item 5): a blocking get or fetching
+     * AMO blocks its thread until its reply lands, so a thread has at most one
+     * outstanding, and every thread its own slot. The thread stores
+     * `armed_token` before its request goes out; the lead refuses a reply
+     * carrying any other (§3.4's trust boundary), and otherwise stores the
+     * value or the reply's length, then `ready`, then bumps `wake` and wakes -
+     * §4.6's wake-word pattern with one waiter and one writer. A get's bytes
+     * land in the extents its token names (struct osoe_landing_zone), not
+     * here. Until layout 23 the PE had one such slot, with its data.
+     */
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint32_t wake;
+    _Atomic uint32_t ready;             /* 0, or 1 once the reply is complete */
+    _Atomic uint32_t length;            /* bytes a get's reply carried */
+    uint32_t reserved2;
+    _Atomic uint64_t value;             /* a fetching AMO's result */
+    _Atomic uint64_t token;             /* the reply's */
+    _Atomic uint64_t armed_token;       /* the one the thread waits for */
 };
 
 /*
@@ -718,103 +773,88 @@ struct osoe_context_block {
     _Atomic uint64_t bytes_issued;
     _Atomic uint64_t bytes_landed;
     struct osoe_wait_word counter_wake;
+    /* Since layout 23 (§4.11 item 8): the bytes of its replies copied out to
+     * their `dest`, by whichever of the PE's threads claimed each (node.h,
+     * struct osoe_landing_record). A wait on the context is over when this
+     * reaches `bytes_issued`; a copier adds, then bumps `counter_wake`. */
+    _Atomic uint64_t bytes_copied;
 };
 
 enum { OSOE_CONTEXT_FREE = 0, OSOE_CONTEXT_LIVE = 1 };
 
 /*
- * A PE's landing zone (§3.12, §4.6): this slot, for its blocking gets and
- * fetching AMOs, then - since layout 16 - the records and the arena of its
- * nonblocking gets in flight (struct osoe_landing_request).
+ * A PE's landing zone (§3.12, §4.6, §4.11 item 7; layout 23, phase 1 step 8
+ * slice 2): where every reply to a get of the PE's, blocking or nonblocking,
+ * lands before it is copied to its `dest`.
  *
  * A get's `dest` may be a stack or malloc buffer that the lead's process cannot
  * see, so a reply cannot be written where the caller asked for it. It lands
  * here, in the node segment, and the *origin* copies it out - the calling
- * thread for a blocking get or fetching AMO, that PE's agent or the application
- * thread at quiet for a nonblocking one. This is the correction to the earlier
- * claim that the origin never needs a helper: it never needs one for progress,
- * but it does need its private memory written by a thread inside it.
+ * thread for a blocking get, and for a nonblocking one whichever of the PE's
+ * threads claims it first: its context's quiet, or an issue that found the
+ * zone full. It belongs in the control segment rather than the AM connection
+ * area because every backend needs it: the reason it exists is the address
+ * space boundary, not the network.
  *
- * It belongs in the control segment rather than the AM connection area because
- * it is needed by *every* backend: the reason it exists is the address space
- * boundary, not the network. An RDMA backend writing a reply straight into the
- * origin's memory still cannot write a private `dest`.
- *
- * One slot is enough for the blocking operations: under SERIALIZED a PE has at
- * most one outstanding (§4.6), so it is sized by L alone and not by node count.
- * Its nonblocking gets complete by the counters of their context's block
- * (struct osoe_context_block, layout 21; the slot held one pair per PE from
- * layout 16 to 20), §4.6's shape for them: the PE adds each one's bytes to
- * `bytes_issued` as it asks, the lead adds them to `bytes_landed` as the
- * whole reply lands, and a wait on the context waits for the two to be equal
- * and then copies its replies out.
+ * **The zone is `landing_extents` extents of OSOE_LANDING_EXTENT_BYTES**,
+ * claimed by compare-and-swap as a run of clear bits within one word of
+ * `bits`, so a piece of a get is at most 64 extents; a claimer that finds no
+ * run copies out landed replies it can claim, and then sleeps on `freed`,
+ * which every release bumps (tools/modelcheck/landing_extent_model.py). Every
+ * extent has a record (struct osoe_landing_record); a piece's is its first
+ * extent's. Until layout 23 the zone was one blocking slot of a chunk, then
+ * OSOE_GETS_IN_FLIGHT records, then an arena bumped from one end - one caller
+ * at a time.
  */
-struct osoe_landing_slot {
-    /*
-     * Per-operation completion, which counters cannot serve: a blocking
-     * caller waits for *its* reply, not for a byte count (§4.6).
-     */
-    _Alignas(OSOE_CACHELINE)
-    _Atomic uint32_t wake;
-    _Atomic uint32_t ready;             /* 0, or 1 once `data` and `value` are complete */
-    _Atomic uint32_t length;            /* bytes in `data` */
-    _Atomic uint64_t value;             /* a fetching AMO's result */
-    /*
-     * Which operation this reply belongs to. Under SERIALIZED a PE has one
-     * outstanding, so the slot could do without it - but a reply for an
-     * operation that has already been abandoned is then indistinguishable from
-     * the one being waited for, and §4.6 says the caller waits for *its* reply.
-     * Recording it makes "its" checkable rather than assumed.
-     */
-    _Atomic uint64_t token;
-    /*
-     * The token of the operation this slot's owner is waiting for, stored by
-     * the owner before its request is sent (layout 9). The lead refuses a reply
-     * carrying any other before writing a byte of it - an unsolicited or stale
-     * reply is a peer's bug, and landing it would corrupt this zone or, past
-     * its end, a sibling's (§3.4's trust boundary; second review, D4).
-     */
-    _Atomic uint64_t armed_token;
+enum { OSOE_LANDING_EXTENT_BYTES = 1024, OSOE_LANDING_RUN_MAX = 64 };
 
-    /* The reply bytes. One AM chunk is enough: a larger get is chunked on the
-     * wire (§3.2) and the origin copies each chunk out before the next lands. */
+struct osoe_landing_zone {
     _Alignas(OSOE_CACHELINE)
-    unsigned char data[];
+    struct osoe_wait_word freed;        /* bumped whenever extents are released */
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint64_t bits[];            /* ceil(landing_extents / 64) words */
 };
 
 /*
- * The top bit of a token names a nonblocking get's reply; its low 16 bits are
- * the index of its record among the PE's landing requests, and since layout
- * 21 bits 48 to 59 are the index of the context's block, which the lead
- * credits as the reply lands (progress-host.c): OSOE_MAX_CONTEXTS' ceiling is
- * what twelve bits hold. That leaves bits 16 to 47 for the sequence, 32 bits
- * where there were 47: a stale reply could match a record reused with the
- * same index only after 2^32 nonblocking gets. A blocking operation's token never has the top bit
- * (transport-am.c counts them from 1). The token is echoed by the target and
- * read by the origin alone, so the wire format is unchanged.
+ * A piece of a get in flight, at its first extent: its token, the bytes it
+ * asked for, and its state - FREE, ISSUED by its PE, LANDED by the lead once
+ * the whole reply is in, COPYING by the one thread whose compare-and-swap won
+ * it (tools/modelcheck/copy_out_claim_model.py), and back to FREE once its
+ * bytes are out and its extents released. A blocking get's record goes to
+ * LANDED_BLOCKING instead, which no other thread claims: its own thread copies
+ * it. The PE writes `token` and `length`, then `state` with release, before its
+ * request goes out; the lead finds the record by the index in the reply's
+ * token and refuses a reply whose token is not the record's, whose record is
+ * not ISSUED, or whose bytes would fall outside the piece (§3.4's trust
+ * boundary).
+ */
+enum osoe_landing_state {
+    OSOE_LANDING_FREE = 0,
+    OSOE_LANDING_ISSUED,
+    OSOE_LANDING_LANDED,
+    OSOE_LANDING_COPYING,
+    OSOE_LANDING_LANDED_BLOCKING,
+};
+
+struct osoe_landing_record {
+    _Atomic uint64_t token;
+    _Atomic uint32_t length;
+    _Atomic uint32_t state;             /* enum osoe_landing_state */
+};
+
+/*
+ * A token (layout 23): the top bit names a nonblocking get; bits 48 to 59
+ * the block its completion goes to - a nonblocking get's context block, or a
+ * blocking operation's thread record; bits 16 to 47 a sequence; and the low
+ * 16 bits the piece's first extent, or OSOE_LANDING_NO_EXTENT for a fetching
+ * AMO, whose reply is a value. The token is echoed by the target and read by
+ * the origin alone, so the wire format is unchanged.
  */
 #define OSOE_LANDING_NONBLOCKING (UINT64_C(1) << 63)
-#define OSOE_LANDING_REQUEST_MASK UINT64_C(0xffff)
-#define OSOE_LANDING_CONTEXT_SHIFT 48
-#define OSOE_LANDING_CONTEXT_MASK UINT64_C(0xfff)
-
-/*
- * A nonblocking get in flight (§4.6, as built): where in its PE's landing arena
- * the reply lands, and how long it is. The PE writes `offset` and `length`, then
- * `token` with release, before its request goes out - the send's reservation
- * and commit order it before any reply can exist - and clears `token` once the
- * reply is copied out. The lead finds the record by the index in the reply's
- * token and refuses a reply whose token is not the record's, or whose bytes
- * would fall outside the record's range (§3.4's trust boundary, as for the
- * blocking slot's `armed_token`). Atomics throughout, because a stale or bogus
- * reply may read a record while its owner rewrites it; relaxed for the two
- * numbers, which the token's acquire orders when it matches.
- */
-struct osoe_landing_request {
-    _Atomic uint64_t token;
-    _Atomic uint32_t offset;            /* into the PE's landing arena */
-    _Atomic uint32_t length;            /* bytes its reply carries */
-};
+#define OSOE_LANDING_EXTENT_MASK UINT64_C(0xffff)
+#define OSOE_LANDING_NO_EXTENT UINT64_C(0xffff)
+#define OSOE_LANDING_OWNER_SHIFT 48
+#define OSOE_LANDING_OWNER_MASK UINT64_C(0xfff)
 
 /* Process-private view of the node. */
 struct osoe_node {
@@ -869,11 +909,11 @@ struct osoe_node {
     uint64_t statics_bytes;
     void **statics_of;
     unsigned char *landing;         /* the landing zones; index with osoe_node_landing */
-    uint32_t landing_slot_bytes;    /* a PE's whole zone, since layout 16 */
-    uint32_t landing_data_bytes;    /* the blocking slot's data: one AM chunk */
-    uint32_t landing_requests;      /* nonblocking gets a PE may have in flight */
-    uint32_t landing_requests_offset;
-    uint32_t landing_arena_offset;
+    uint32_t landing_slot_bytes;    /* a PE's whole zone */
+    uint32_t landing_data_bytes;    /* the largest piece: min(an AM chunk, a run of extents) */
+    uint32_t landing_requests;      /* extents, and so records, in a PE's zone */
+    uint32_t landing_requests_offset;   /* its records, from the zone's start */
+    uint32_t landing_arena_offset;      /* its extents' bytes, from the zone's start */
     uint32_t landing_arena_bytes;
     /* One record per peer connection, in peer-slot order, or NULL on a job of
      * one node (§3.14's connection scope). */
@@ -888,7 +928,18 @@ struct osoe_node {
      * (OSOE_MAX_CONTEXTS), indexed by osoe_node_context. */
     struct osoe_context_block *contexts;
     uint32_t contexts_per_pe;
+    /* Each local PE's thread records, `threads_per_pe` each (OSOE_MAX_THREADS),
+     * indexed by osoe_node_thread. */
+    struct osoe_thread_record *threads;
+    uint32_t threads_per_pe;
 };
+
+/* Local PE `local_id`'s thread record `index` (§4.11 item 3; layout 23). */
+static inline struct osoe_thread_record *osoe_node_thread(const struct osoe_node *n,
+                                                          uint32_t local_id, uint32_t index)
+{
+    return &n->threads[(size_t)local_id * n->threads_per_pe + index];
+}
 
 /* Local PE `local_id`'s context block `index` (§4.11; layout 21). */
 static inline struct osoe_context_block *osoe_node_context(const struct osoe_node *n,
@@ -915,22 +966,20 @@ static inline _Atomic uint32_t *osoe_node_published_epoch(const struct osoe_node
     return &n->epochs[(size_t)local_id * n->epoch_row_words + team];
 }
 
-/* This node's landing slot for a local PE: the start of its zone. The zone is
- * not a fixed-size type - its payloads are sized at run time - so it is indexed
+/* A local PE's landing zone. Its size is set at run time, so zones are indexed
  * by bytes, never by array. */
-static inline struct osoe_landing_slot *osoe_node_landing(const struct osoe_node *n,
+static inline struct osoe_landing_zone *osoe_node_landing(const struct osoe_node *n,
                                                           uint32_t local_id)
 {
-    return (struct osoe_landing_slot *)(n->landing +
-                                        (size_t)local_id * n->landing_slot_bytes);
+    return (struct osoe_landing_zone *)(n->landing + (size_t)local_id * n->landing_slot_bytes);
 }
 
-/* A local PE's nonblocking gets in flight: its records, and their arena. */
-static inline struct osoe_landing_request *osoe_node_landing_requests(const struct osoe_node *n,
-                                                                      uint32_t local_id)
+/* A local PE's extent records, and its extents' bytes. */
+static inline struct osoe_landing_record *osoe_node_landing_records(const struct osoe_node *n,
+                                                                    uint32_t local_id)
 {
-    return (struct osoe_landing_request *)((unsigned char *)osoe_node_landing(n, local_id) +
-                                           n->landing_requests_offset);
+    return (struct osoe_landing_record *)((unsigned char *)osoe_node_landing(n, local_id) +
+                                          n->landing_requests_offset);
 }
 
 static inline unsigned char *osoe_node_landing_arena(const struct osoe_node *n,

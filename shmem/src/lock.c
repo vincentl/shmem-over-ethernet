@@ -56,6 +56,7 @@
  * Complexity: O(1) remote operations per acquire and per release, and O(1)
  * wakes; O(locks held) to find a lock in the held list.
  */
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -118,21 +119,27 @@ static struct lock_place place_of(const char *routine, long *lock)
     return p;
 }
 
-/* The locks this PE holds, by key. One thread at a time calls in (the thread
- * levels osoe provides, §4.6), so the list needs no lock of its own. */
+/* The locks this PE holds, by key. Under SHMEM_THREAD_MULTIPLE several threads
+ * of the PE may call in at once, so the list takes a mutex (phase 1 step 8
+ * slice 2): set_lock and clear_lock already cost a network round trip, so it
+ * costs nothing measurable. The lock is the PE's, as the spec's locks are. */
 static uint64_t *held;
 static size_t held_count, held_capacity;
+static pthread_mutex_t held_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static bool holds(uint64_t key)
 {
-    for (size_t i = 0; i < held_count; i++)
-        if (held[i] == key)
-            return true;
-    return false;
+    pthread_mutex_lock(&held_mutex);
+    bool found = false;
+    for (size_t i = 0; i < held_count && !found; i++)
+        found = held[i] == key;
+    pthread_mutex_unlock(&held_mutex);
+    return found;
 }
 
 static void remember(uint64_t key)
 {
+    pthread_mutex_lock(&held_mutex);
     if (held_count == held_capacity) {
         size_t capacity = held_capacity ? 2 * held_capacity : 8;
         uint64_t *grown = realloc(held, capacity * sizeof *grown);
@@ -142,15 +149,18 @@ static void remember(uint64_t key)
         held_capacity = capacity;
     }
     held[held_count++] = key;
+    pthread_mutex_unlock(&held_mutex);
 }
 
 static void forget(uint64_t key)
 {
+    pthread_mutex_lock(&held_mutex);
     for (size_t i = 0; i < held_count; i++)
         if (held[i] == key) {
             held[i] = held[--held_count];
-            return;
+            break;
         }
+    pthread_mutex_unlock(&held_mutex);
 }
 
 static uint32_t rmw(const struct lock_place *p, int pe, uint64_t offset, enum osoe_rmw_op op,

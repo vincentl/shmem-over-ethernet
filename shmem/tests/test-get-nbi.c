@@ -168,10 +168,11 @@ int main(void)
     CHECK(changed == value(right, 0) + 1);
 
     /* ---- The zone's bound, working ----------------------------------------- *
-     * With OSOE_GETS_IN_FLIGHT below the gather's crossing gets, an issue found
-     * the records used up and completed what was in flight first. */
-    const char *limit = getenv("OSOE_GETS_IN_FLIGHT");
-    if (limit && remote > atoi(limit))
+     * With the zone's 1 KiB extents (OSOE_GET_LANDING_BYTES / 1024) fewer than
+     * the gather's crossing gets, each taking one, an issue found the zone full
+     * and completed what was in flight first. */
+    const char *limit = getenv("OSOE_GET_LANDING_BYTES");
+    if (limit && remote > atoi(limit) / 1024)
         CHECK(counter("am.landing_full") > 0);
 
     free(mine);

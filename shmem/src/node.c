@@ -33,10 +33,11 @@
  * appended, and never otherwise.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 232,
+_Static_assert(sizeof(struct osoe_segment_directory) == 256,
                "frozen by §3.14: append only. 136 at layouts 6 and 7; 160 at layout 12, "
                "with the connections section; 208 at layout 18, with the team blocks and "
-               "the published epochs; 232 at layout 21, with the context pools");
+               "the published epochs; 232 at layout 21, with the context pools; 256 at "
+               "layout 23, with the thread records");
 
 /*
  * Candidate heap bases, tried in order by the lead; the first where its own
@@ -536,13 +537,22 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      */
     struct osoe_am_config am;
     osoe_am_config_read(&am);
-    /* Since layout 16 a zone also holds the PE's nonblocking gets in flight:
-     * their records, then the arena their replies land in (§4.6, as built). */
-    uint64_t landing_requests_offset = align_up(sizeof(struct osoe_landing_slot) + am.chunk);
+    /* Since layout 23 a zone is extents (node.h): its header and bitmap, a
+     * record an extent, then the extents. A piece of a get is at most a run of
+     * 64 extents in one word of the bitmap, and at most a chunk, which the
+     * wire's largest message holds. */
+    uint64_t extents = am.get_landing_bytes / OSOE_LANDING_EXTENT_BYTES;
+    uint64_t landing_requests_offset =
+        align_up(sizeof(struct osoe_landing_zone) + (extents + 63) / 64 * sizeof(uint64_t));
     uint64_t landing_arena_offset =
-        align_up(landing_requests_offset +
-                 (uint64_t)am.gets_in_flight * sizeof(struct osoe_landing_request));
-    uint64_t landing_slot_bytes = align_up(landing_arena_offset + am.get_landing_bytes);
+        align_up(landing_requests_offset + extents * sizeof(struct osoe_landing_record));
+    uint64_t landing_arena_bytes = extents * OSOE_LANDING_EXTENT_BYTES;
+    uint64_t landing_slot_bytes = align_up(landing_arena_offset + landing_arena_bytes);
+    uint64_t largest_piece = (uint64_t)OSOE_LANDING_RUN_MAX * OSOE_LANDING_EXTENT_BYTES;
+    if (largest_piece > landing_arena_bytes)
+        largest_piece = landing_arena_bytes;
+    if (largest_piece > am.chunk)
+        largest_piece = am.chunk;
     uint64_t landing_offset = align_up(blocks_offset + blocks_bytes);
     uint64_t landing_bytes = (uint64_t)b->local_count * landing_slot_bytes;
 
@@ -574,7 +584,12 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint64_t contexts_offset = align_up(epochs_offset + epochs_bytes);
     uint64_t contexts_bytes = (uint64_t)b->local_count * b->max_contexts *
                               sizeof(struct osoe_context_block);
-    n->control_bytes = page_round(contexts_offset + contexts_bytes);
+    /* Each local PE's thread records (layout 23; §4.11 item 3): a cache line a
+     * thread, OSOE_MAX_THREADS of them a PE, one per counter block. */
+    uint64_t threads_offset = align_up(contexts_offset + contexts_bytes);
+    uint64_t threads_bytes = (uint64_t)b->local_count * per_pe *
+                             sizeof(struct osoe_thread_record);
+    n->control_bytes = page_round(threads_offset + threads_bytes);
 
     /*
      * The node's whole request, checked once and before any of it exists: this
@@ -672,14 +687,18 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->dir.contexts_bytes = contexts_bytes;
     h->dir.context_bytes = (uint32_t)sizeof(struct osoe_context_block);
     h->dir.contexts_per_pe = b->max_contexts;
+    h->dir.threads_offset = threads_offset;
+    h->dir.threads_bytes = threads_bytes;
+    h->dir.thread_record_bytes = (uint32_t)sizeof(struct osoe_thread_record);
+    h->dir.threads_per_pe = per_pe;
     h->dir.block_bytes = (uint32_t)sizeof(struct osoe_counter_block);
     memcpy((char *)p + metrics_offset, metrics, metrics_bytes);
     n->blocks = (struct osoe_counter_block *)((char *)p + blocks_offset);
-    h->landing_data_bytes = (uint32_t)am.chunk;
-    h->landing_requests = am.gets_in_flight;
+    h->landing_data_bytes = (uint32_t)largest_piece;
+    h->landing_requests = (uint32_t)extents;
     h->landing_requests_offset = (uint32_t)landing_requests_offset;
     h->landing_arena_offset = (uint32_t)landing_arena_offset;
-    h->landing_arena_bytes = (uint32_t)am.get_landing_bytes;
+    h->landing_arena_bytes = (uint32_t)landing_arena_bytes;
     n->landing = (unsigned char *)p + landing_offset;
     n->landing_slot_bytes = (uint32_t)landing_slot_bytes;
     n->landing_data_bytes = h->landing_data_bytes;
@@ -695,6 +714,8 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     n->epoch_row_words = (uint32_t)(epoch_row_bytes / sizeof(uint32_t));
     n->contexts = (struct osoe_context_block *)((char *)p + contexts_offset);
     n->contexts_per_pe = b->max_contexts;
+    n->threads = (struct osoe_thread_record *)((char *)p + threads_offset);
+    n->threads_per_pe = per_pe;
     /*
      * Which machine this logical node is on (§3.14): the node numbers a
      * hung collective names are logical, and a walk down the tree needs the
@@ -855,6 +876,8 @@ again:;
     n->epoch_row_words = h->dir.epoch_row_bytes / (uint32_t)sizeof(uint32_t);
     n->contexts = (struct osoe_context_block *)((char *)n->hdr + h->dir.contexts_offset);
     n->contexts_per_pe = h->dir.contexts_per_pe;
+    n->threads = (struct osoe_thread_record *)((char *)n->hdr + h->dir.threads_offset);
+    n->threads_per_pe = h->dir.threads_per_pe;
 
     /* The metric table is fixed for a build, so a mismatch is a mixed-library
      * job that the layout check above did not catch (§3.13's argument for

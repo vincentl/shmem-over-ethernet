@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -78,8 +79,8 @@ static bool placement(const struct osoe_allocator *a, size_t i, uint64_t size, u
     return true;
 }
 
-int osoe_allocator_take(struct osoe_allocator *a, uint64_t size, uint64_t align, long hints,
-                    uint64_t *offset)
+static int take_locked(struct osoe_allocator *a, uint64_t size, uint64_t align, long hints,
+                       uint64_t *offset)
 {
     if (align < OSOE_ALLOCATOR_ALIGN)
         align = OSOE_ALLOCATOR_ALIGN;
@@ -136,7 +137,7 @@ static void merge_with_next(struct osoe_allocator *a, size_t i)
     a->count--;
 }
 
-int osoe_allocator_give(struct osoe_allocator *a, uint64_t offset)
+static int give_locked(struct osoe_allocator *a, uint64_t offset)
 {
     size_t lo = find(a, offset);
     if (lo == a->count || a->blocks[lo].free)
@@ -151,8 +152,8 @@ int osoe_allocator_give(struct osoe_allocator *a, uint64_t offset)
     return 0;
 }
 
-int osoe_allocator_query(const struct osoe_allocator *a, uint64_t offset, uint64_t *size,
-                     long *hints)
+static int query_locked(const struct osoe_allocator *a, uint64_t offset, uint64_t *size,
+                        long *hints)
 {
     size_t i = find(a, offset);
     if (i == a->count || a->blocks[i].free)
@@ -162,7 +163,7 @@ int osoe_allocator_query(const struct osoe_allocator *a, uint64_t offset, uint64
     return 0;
 }
 
-int osoe_allocator_resize(struct osoe_allocator *a, uint64_t offset, uint64_t size)
+static int resize_locked(struct osoe_allocator *a, uint64_t offset, uint64_t size)
 {
     size_t i = find(a, offset);
     if (i == a->count || a->blocks[i].free)
@@ -212,7 +213,8 @@ int osoe_allocator_resize(struct osoe_allocator *a, uint64_t offset, uint64_t si
     return 0;
 }
 
-void osoe_allocator_levels(const struct osoe_allocator *a, uint64_t *in_use, uint64_t *largest_free)
+static void levels_locked(const struct osoe_allocator *a, uint64_t *in_use,
+                          uint64_t *largest_free)
 {
     uint64_t used = 0, largest = 0;
     for (size_t i = 0; i < a->count; i++) {
@@ -225,4 +227,77 @@ void osoe_allocator_levels(const struct osoe_allocator *a, uint64_t *in_use, uin
     }
     *in_use = used;
     *largest_free = largest;
+}
+
+/*
+ * The allocator's calls, one at a time: allocation is world-collective and
+ * the program orders it (spec §9.2), but under THREAD_MULTIPLE a collective on
+ * another team may ask what room an address has (osoe_allocator_room) while a
+ * thread allocates, so every call holds this mutex (phase 1 step 8 slice 2).
+ * Taken for each call and nothing more, never across a wait.
+ */
+static pthread_mutex_t allocator_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+int osoe_allocator_take(struct osoe_allocator *a, uint64_t size, uint64_t align, long hints,
+                        uint64_t *offset)
+{
+    pthread_mutex_lock(&allocator_mutex);
+    int status = take_locked(a, size, align, hints, offset);
+    pthread_mutex_unlock(&allocator_mutex);
+    return status;
+}
+
+int osoe_allocator_give(struct osoe_allocator *a, uint64_t offset)
+{
+    pthread_mutex_lock(&allocator_mutex);
+    int status = give_locked(a, offset);
+    pthread_mutex_unlock(&allocator_mutex);
+    return status;
+}
+
+int osoe_allocator_query(const struct osoe_allocator *a, uint64_t offset, uint64_t *size,
+                         long *hints)
+{
+    pthread_mutex_lock(&allocator_mutex);
+    int status = query_locked(a, offset, size, hints);
+    pthread_mutex_unlock(&allocator_mutex);
+    return status;
+}
+
+int osoe_allocator_resize(struct osoe_allocator *a, uint64_t offset, uint64_t size)
+{
+    pthread_mutex_lock(&allocator_mutex);
+    int status = resize_locked(a, offset, size);
+    pthread_mutex_unlock(&allocator_mutex);
+    return status;
+}
+
+void osoe_allocator_levels(const struct osoe_allocator *a, uint64_t *in_use,
+                           uint64_t *largest_free)
+{
+    pthread_mutex_lock(&allocator_mutex);
+    levels_locked(a, in_use, largest_free);
+    pthread_mutex_unlock(&allocator_mutex);
+}
+
+int osoe_allocator_room(const struct osoe_allocator *a, uint64_t offset, uint64_t *room)
+{
+    pthread_mutex_lock(&allocator_mutex);
+    /* The last block starting at or before `offset`. */
+    size_t lo = 0, hi = a->count;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (a->blocks[mid].offset <= offset)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+    int status = -1;
+    if (lo > 0 && !a->blocks[lo - 1].free &&
+        offset < a->blocks[lo - 1].offset + a->blocks[lo - 1].size) {
+        *room = a->blocks[lo - 1].offset + a->blocks[lo - 1].size - offset;
+        status = 0;
+    }
+    pthread_mutex_unlock(&allocator_mutex);
+    return status;
 }

@@ -267,6 +267,10 @@ static void session_start(void)
      * before its agent - their reader - exists.
      */
     osoe_transport_init();
+    /* The level was set before session_start; under MULTIPLE the default
+     * context and what every context shares take several threads at once. */
+    osoe_transport_threads(atomic_load_explicit(&thread_level, memory_order_acquire) ==
+                           SHMEM_THREAD_MULTIPLE);
     osoe_context_start();
     if (osoe_allocator_init(&osoe.allocator, osoe.node.heap_size) != 0)
         osoe_fatal("out of memory");

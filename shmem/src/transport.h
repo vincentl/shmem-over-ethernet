@@ -123,7 +123,20 @@ enum {
      * as the calling thread's stores, which the same fences order, so neither
      * of its paths skips them (phase 1 step 8's review, B1). */
     OSOE_TRANSPORT_CONTEXT_NOSTORE    = 1u << 2,
+    /* Several threads may call on the context at once: THREAD_MULTIPLE, and
+     * neither of the two options above that promise otherwise (§4.11's
+     * shared mode). The default context is so whenever the thread level is
+     * MULTIPLE (osoe_transport_threads). */
+    OSOE_TRANSPORT_CONTEXT_CONCURRENT = 1u << 3,
 };
+
+/*
+ * The thread level's consequence for the backend: `concurrent` when it is
+ * SHMEM_THREAD_MULTIPLE, so that the default context, and anything every
+ * context shares, may be called by several threads at once. Called by
+ * shmem_init after osoe_transport_init, before any other call here.
+ */
+void osoe_transport_threads(bool concurrent);
 
 /*
  * Create a context (§4.11's modes; phase 1 step 8): the backend's state for
