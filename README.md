@@ -202,5 +202,8 @@ computing - and output it holds in a buffer of its own, outside stdio, is lost.
 
 ## License
 
-Not yet chosen. Until a license is added, no rights are granted to use, copy,
-modify, or distribute this code.
+osoe is free software under the GNU Lesser General Public License, version 3
+([COPYING.LESSER](COPYING.LESSER)), which supplements the GNU General Public
+License, version 3 ([COPYING](COPYING)). A program linked against the
+library may carry any license its authors choose; changes to the library
+itself are shared under the same terms.
