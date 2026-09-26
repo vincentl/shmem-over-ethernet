@@ -72,7 +72,7 @@ struct osoe_bootstrap {
  * PE's internal region to about 160 MiB of address space at the default
  * fan-out and OSOE_COLLECTIVE_PIPELINE.
  */
-#define OSOE_MAX_TEAMS_DEFAULT 32u
+#define OSOE_MAX_TEAMS_DEFAULT 64u
 #define OSOE_MAX_TEAMS_LOWEST  4u
 #define OSOE_MAX_TEAMS_HIGHEST 1024u
 
@@ -84,7 +84,7 @@ struct osoe_bootstrap {
  * before phase 1 step 5 slice 5; each step of D costs every team number's
  * slots in the internal region again (internal-region.h). A PE's region is
  * OSOE_MAX_TEAMS x (fan-out + 1) x D slots of 16 KiB, and a line per counter:
- * 5 MiB at the defaults (32 teams, fan-out 4, D = 2), and at the extremes the
+ * 10 MiB at the defaults (64 teams, fan-out 4, D = 2), and at the extremes the
  * ranges allow (1,024 teams, fan-out 32, D = 8) 4.1 GiB, which the shared-memory
  * capacity check refuses at init on a machine without it (node.c).
  */

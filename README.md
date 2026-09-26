@@ -159,6 +159,7 @@ There is no single-PE default.
 | `OSOE_NO_PROGRESS_TIMEOUT` | no | Seconds a wait may go without progress before it ends the job naming what it waited for; unset, no wait gives up (design §3.15). Replaces `OSOE_BOOTSTRAP_TIMEOUT`, which is retired |
 | `OSOE_HEAP_BASE` | no | Address for each PE's own heap, e.g. `0x100000000000`, if the defaults are taken. A multiple of the page size, which is 16 KiB on a Raspberry Pi 5 |
 | `OSOE_HEAP_SHIFT` | no | A test mode: a size, a whole number of pages, e.g. `2m`. Each PE maps its own heap that far times its rank past the base, so no two PEs share a symmetric address (design §8.2) |
+| `OSOE_MAX_TEAMS` | no | Teams in existence job-wide at once, the three predefined included; `4` to `1024`, default `64`. Must agree across PEs: it sizes every per-team structure, and a `shmem_team_split_2d` claims a number for every row and column at once (design §5.7) |
 | `OSOE_GETS_IN_FLIGHT` | no | Nonblocking gets across nodes each PE may have in flight, one per piece of at most a chunk; default `64`, at most `65536`. Past it a PE completes what is in flight before it asks for more (design §4.6) |
 | `OSOE_GET_LANDING_BYTES` | no | Bytes of each PE's landing zone their replies share, in `/dev/shm`; a decimal byte count from `64` to `1073741824`, default `262144` (256 KiB) (design §4.6) |
 | `OSOE_KEEPALIVE` | no | `IDLE,INTERVAL,COUNT` or `0`: TCP keepalive on the connections between nodes, in seconds, seconds and probes; default `60,10,6` (design §3.15). Jobs of more than one node only |

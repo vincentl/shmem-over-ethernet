@@ -1003,7 +1003,7 @@ step 7):* only those below `team_numbers_published`, the node's high-water mark
 of published team records, which each record's writer raises after publishing
 it and the lead's agent loads once a pass: team numbers are never reused
 (§5.7), so a pass costs the numbers issued so far, up to the highest published
-on the node, and not O(`OSOE_MAX_TEAMS`), 32 by default and 1,024 at most.
+on the node, and not O(`OSOE_MAX_TEAMS`), 64 by default and 1,024 at most.
 
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
@@ -4554,7 +4554,7 @@ so it cannot perform a world-collective allocation.
 **the same parameter bounds the control queue (§3.8)** and the team range
 allocator. Three constraints resolve against one number — one thing to document,
 one place to fail loudly. *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`,
-default 32, between 4 and 1,024, read at each session's first init and agreed at
+default 64 (32 until 2026-09-26), between 4 and 1,024, read at each session's first init and agreed at
 the job rendezvous (§6.2) and between a node's PEs; it sizes each node's team
 blocks, each PE's published epochs, the internal region's per-team blocks
 (§5.8) and the progress thread's per-team state, and from the split that
@@ -4698,8 +4698,8 @@ to its root, so a position's counter is fed by different children over the
 team's life: each node adds to its per-position bases what its own tree says
 each position received, and the argument for early arrivals (§5.5 as built)
 carries over, since no node starts the next collective before holding this one's
-last release. D pieces cost D times the internal region's slots: at D = 2, 32
-teams and a fan-out of 4, 5 MiB a PE, touched only by a team's local leads.
+last release. D pieces cost D times the internal region's slots: at D = 2, 64
+teams and a fan-out of 4, 10 MiB a PE, touched only by a team's local leads.
 
 *As built* (phase 1 step 5 slice 5; `internode-generic.c`, `internal-region.h`;
 `docs/prompts/phase1-step5-slice5-prompt.md`). D is `OSOE_COLLECTIVE_PIPELINE`,
@@ -4926,7 +4926,7 @@ bytes on x86-64 and 128 on aarch64, so that nodes of different architectures
 compute the same offsets. *Since phase 1 step 5 slice 5* each team number's
 slots are (fan-out + 1) × D, D per child position and D for releases, and its
 words fan-out + 1, an arrival counter per child position and a release counter
-("Pipelined pieces", above). About 5 MiB a PE at the default 32 teams, a
+("Pipelined pieces", above). About 10 MiB a PE at the default 64 teams, a
 fan-out of 4 and D = 2, of which a team touches only its own slots and words,
 and only on its leads. And since the second slice of step 7 one line more,
 whose first word counts the team numbers claimed, on world PE 0 alone
@@ -6967,8 +6967,9 @@ which has two states per pair, so a third backend needs a selector of its own
   A number needs to be unique only among the teams that share a node, and each
   team one number on all its nodes: a colouring every PE could compute from the
   grid and the rank map would give a grid O(PEs per node) numbers, on the path to
-  RoCE at ~10⁶ PEs. *For the author (2026-09-26); proposed: raise the default to
-  64 now, and design the colouring with the RoCE backend.*
+  RoCE at ~10⁶ PEs. *Decided 2026-09-26: the default is 64 (applied the same
+  day, with the numbers of §5.7 and §5.8); the colouring waits for a RoCE
+  backend, which is post-release (§1).*
 - **`SHMEM_THREAD_MULTIPLE`: points §4.11 leaves open.** None blocks phase 1.
   - **A full thread table.** A PE's `OSOE_MAX_THREADS` blocks can all be taken by
     live threads. Aborting with a diagnostic naming the variable is loud and simple.
