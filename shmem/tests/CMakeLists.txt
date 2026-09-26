@@ -1500,6 +1500,32 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(shmem.team-storage.local-order.internode PROPERTIES LABELS "tier2"
     TIMEOUT 90)
 endif()
+
+# The generic gather's own checks, each ending the job by name before a byte
+# of the gather lands (test-gather-misuse.c; phase 1 step 5 slice 6): a collect
+# into a dest shorter than its result, SOS's shmem_team_b2b_collectives'
+# mistake, whose lead's own copy of its members' blocks overwrites the room
+# holding the places; and a lead's descriptor counting one member more on its
+# node than the rank map does. White-box, for the second, like team-storage's.
+add_executable(shmem_test_gather-misuse test-gather-misuse.c ${osoe_library_sources})
+target_include_directories(shmem_test_gather-misuse PRIVATE ../src ../include)
+target_link_libraries(shmem_test_gather-misuse PRIVATE osoe_base rt Threads::Threads
+  PkgConfig::LIBURING)
+osoe_warnings(shmem_test_gather-misuse)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.gather-misuse.short-dest
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MISUSE=short-dest
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
+            $<TARGET_FILE:shmem_test_gather-misuse>)
+  set_tests_properties(shmem.gather-misuse.short-dest PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "shmem_long_collect: team 0's member [0-9]+ has its place at byte [0-9]+ of a result of 320 bytes, out of the places' order: the layout was overwritten")
+  add_test(NAME shmem.gather-misuse.local-count
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MISUSE=local-count
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
+            $<TARGET_FILE:shmem_test_gather-misuse>)
+  set_tests_properties(shmem.gather-misuse.local-count PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "test-gather-misuse: the rank map puts 2 of team 0's members on this node, and the team lists 3 here")
+endif()
 # Team creation (phase 1 step 7 slice 2; test-team-split.c): halves, evens and
 # odds, one PE, the world reversed, grids of the world and of a split, SHARED
 # split, splits of splits, and two teams whose local leads coincide running

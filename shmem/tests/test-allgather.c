@@ -9,8 +9,9 @@
  *   - fcollects of blocks of 1 byte, 8 bytes and 64 KiB, and a collect whose
  *     blocks differ, some empty, every byte checked against the member whose
  *     place it is;
- *   - fcollects into the program's statics, zero-initialized and not, where
- *     the gather puts into a peer's statics rather than its heap;
+ *   - fcollects into the program's statics, zero-initialized and not, and a
+ *     collect into them, where the gather puts into a peer's statics rather
+ *     than its heap;
  *   - fcollects back to back into one dest, no barrier between, the team's
  *     rank 0 - a lead - reading each result only after a pause while every
  *     other PE goes on to the next: a lead that wrote rank 0's dest before
@@ -59,6 +60,7 @@ static int node_of_rank[MAX_PES];
 static unsigned char static_source[STATIC_BLOCK];
 static unsigned char static_dest_zeroed[MAX_PES * STATIC_BLOCK];
 static unsigned char static_dest_initialized[MAX_PES * STATIC_BLOCK] = { 1 };
+static unsigned char static_collect_dest[MAX_PES * 2 * 997 + MAX_PES];
 
 /* A team as the test expects it. */
 struct team_case {
@@ -245,6 +247,7 @@ static void gathers_on(const struct team_case *t, unsigned char *dest, unsigned 
     fcollect_longs(t, long_dest, long_source, 1);
     fcollect_into(t, dest, source, LARGE_BLOCK, 2, true, false);
     collect(t, dest, source, 3);
+    collect(t, static_collect_dest, source, 6);
     fcollect_into(t, static_dest_zeroed, static_source, STATIC_BLOCK, 4, true, false);
     fcollect_into(t, static_dest_initialized, static_source, STATIC_BLOCK, 5, true, false);
 
