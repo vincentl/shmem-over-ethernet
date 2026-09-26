@@ -1477,10 +1477,7 @@ endif()
 # on a block map, an interleaved one and four nodes of one PE, where {0, 1} and
 # {0, 2} meet at PE 0 from two other nodes; and under force-remote, where each
 # PE's SHARED is itself. The program makes about thirty teams, whose numbers are
-# never reused, so it runs with 64. And exhaustion: under OSOE_MAX_TEAMS=4 one
-# number is left, and every split after the first returns nonzero on every PE,
-# PE 0 naming the variable once for each; the exit status is not what passes it,
-# so every failure a run can show fails it by its words.
+# never reused, so it runs with 64.
 add_executable(shmem_test_team-split test-team-split.c
   ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 target_include_directories(shmem_test_team-split PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
@@ -1493,16 +1490,33 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
             $<TARGET_FILE:osoe-launch> -n ${count} -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
   set_tests_properties(shmem.team-split.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
+
+# The split's three ways to fail for want of what it needs, each a mode of the
+# program on four PEs (the program's comment), judged by what PE 0 says rather
+# than by the exit status - so every failure a run can show fails it by its
+# words: exhaust, under OSOE_MAX_TEAMS=8, where two split_2d calls fail at the
+# claim and take nothing - PE 0 saying 2 numbers had been claimed before each -
+# so that three splits after them still fit, and then the numbers run out, 5
+# claimed; too-many, under OSOE_MAX_TEAMS=4, a split_2d of five teams refused
+# before any claim and the one number then still there; and full, the heap
+# filled to its last block under SHMEM_SYMMETRIC_SIZE=1m.
+function(osoe_team_split_mode mode label launch environment pass)
+  add_test(NAME shmem.team-split.${mode}.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SPLIT=${mode} ${environment}
+            $<TARGET_FILE:osoe-launch> ${launch} -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
+  set_tests_properties(shmem.team-split.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "${pass}"
+    FAIL_REGULAR_EXPRESSION "CHECK[(]|exited with status|killed by signal|timeout after")
+endfunction()
+set(osoe_team_split_exhaust_environment OSOE_MAX_TEAMS=8 SHMEM_SYMMETRIC_SIZE=16m)
 set(osoe_team_split_exhausted
-  PASS_REGULAR_EXPRESSION
-  "OSOE_MAX_TEAMS is 4, 3 of them predefined.*every split past the last number failed on every PE"
-  FAIL_REGULAR_EXPRESSION "CHECK[(]|exited with status|killed by signal|timeout after")
-add_test(NAME shmem.team-split.exhaust.L4
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SPLIT=exhaust OSOE_MAX_TEAMS=4
-          SHMEM_SYMMETRIC_SIZE=16m
-          $<TARGET_FILE:osoe-launch> -n 4 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
-set_tests_properties(shmem.team-split.exhaust.L4 PROPERTIES LABELS "tier2" TIMEOUT 90
-  ${osoe_team_split_exhausted})
+  "the 4 teams this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 2 have been claimed.*the 5 teams this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 2 have been claimed.*the 1 team this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 5 have been claimed.*every check of this mode passed")
+set(osoe_team_split_full "the symmetric heap has no 16 bytes free.*every check of this mode passed")
+osoe_team_split_mode(exhaust L4 "-n;4" "${osoe_team_split_exhaust_environment}"
+  "${osoe_team_split_exhausted}")
+osoe_team_split_mode(too-many L4 "-n;4" "OSOE_MAX_TEAMS=4;SHMEM_SYMMETRIC_SIZE=16m"
+  "this call creates 5 teams, more than a session can ever have: OSOE_MAX_TEAMS is 4.*the 1 team this call creates: OSOE_MAX_TEAMS is 4, 3 of them predefined, and 1 has been claimed.*every check of this mode passed")
+osoe_team_split_mode(full L4 "-n;4" "SHMEM_SYMMETRIC_SIZE=1m" "${osoe_team_split_full}")
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(team-split 0,0,1,1 ${osoe_team_split_environment})
   osoe_tier2_map_test(team-split 0,1,2,0,1,0 ${osoe_team_split_environment})
@@ -1513,13 +1527,10 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             $<TARGET_FILE:shmem_test_team-split>)
   set_tests_properties(shmem.team-split.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
     TIMEOUT 90)
-  add_test(NAME shmem.team-split.exhaust.0-0-1-1
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SPLIT=exhaust OSOE_MAX_TEAMS=4
-            SHMEM_SYMMETRIC_SIZE=16m
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
-            $<TARGET_FILE:shmem_test_team-split>)
-  set_tests_properties(shmem.team-split.exhaust.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90
-    ${osoe_team_split_exhausted})
+  osoe_team_split_mode(exhaust 0-0-1-1 "-n;4;-m;0,0,1,1" "${osoe_team_split_exhaust_environment}"
+    "${osoe_team_split_exhausted}")
+  osoe_team_split_mode(full 0-0-1-1 "-n;4;-m;0,0,1,1" "SHMEM_SYMMETRIC_SIZE=1m"
+    "${osoe_team_split_full}")
 endif()
 
 set(osoe_get_nbi_small OSOE_GETS_IN_FLIGHT=4 OSOE_GET_LANDING_BYTES=512

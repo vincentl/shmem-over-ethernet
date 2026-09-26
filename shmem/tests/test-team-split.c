@@ -36,11 +36,20 @@
  * no team counts another's arrivals, which counters shared between two teams
  * would make it do, evens and odds arriving in turn.
  *
- * OSOE_TEST_SPLIT=exhaust instead runs out of team numbers: under
- * OSOE_MAX_TEAMS=4 one number is left, the first split takes it, and every
- * later split returns nonzero on every parent PE - the number of a team since
- * destroyed included, since numbers are never reused - while the team made
- * still works. PE 0 says so last.
+ * Three modes, on four PEs, instead run out of what a split needs; each has
+ * PE 0 say last that every check passed, since each is judged by what PE 0
+ * says rather than by the exit status:
+ * - OSOE_TEST_SPLIT=exhaust, under OSOE_MAX_TEAMS=8, five numbers for created
+ *   teams: two splits take two, and two split_2d calls needing four and five
+ *   fail at the claim and take none, so the numbers left still serve three
+ *   splits that fit; then every split fails, a destroyed team's number not
+ *   given back, while the teams made still work;
+ * - OSOE_TEST_SPLIT=too-many, under OSOE_MAX_TEAMS=4: a split_2d creating five
+ *   teams is refused before anything is claimed, and the one number serves
+ *   the split after it;
+ * - OSOE_TEST_SPLIT=full, under a small SHMEM_SYMMETRIC_SIZE: the heap filled
+ *   to its last block, a split returns nonzero on every PE, PE 0 saying the
+ *   heap had no room, and succeeds once the blocks are given back.
  */
 #define _GNU_SOURCE
 #include <stdbool.h>
@@ -461,36 +470,131 @@ static bool statuses_agree(int status)
     return dest[0] == 0 || dest[0] == npes;
 }
 
+/* Every check of a mode passed, said by PE 0 last: what its registration's
+ * regular expression needs, since it does not judge by the exit status. */
+static void mode_passed(void)
+{
+    shmem_barrier_all();
+    if (me == 0 && CHECK_DONE() == 0)
+        fprintf(stderr, "PE 0: every check of this mode passed\n");
+}
+
+/*
+ * OSOE_TEST_SPLIT=exhaust, four PEs under OSOE_MAX_TEAMS=8: five numbers for
+ * created teams. Two splits take two. A split_2d needing four, and one of the
+ * first team needing five, fail at the claim and take none - PE 0's
+ * diagnostics say 2 were claimed before each - so a split that fits still
+ * succeeds, and two more use the numbers up; then every split fails, a
+ * destroyed team's number not given back, and PE 0 says 5 were claimed.
+ */
 static void exhaust(void)
 {
-    shmem_team_t made = SHMEM_TEAM_INVALID;
+    CHECK_FATAL(npes == 4);
+    shmem_team_t made = SHMEM_TEAM_INVALID, evens = SHMEM_TEAM_INVALID;
     int status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made);
+    CHECK(status == 0 && statuses_agree(status));
+    status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 2, 2, NULL, 0, &evens);
     CHECK(status == 0 && statuses_agree(status));
     check_team(made, &world_expected, SHMEM_TEAM_WORLD, &world_expected, 0);
 
-    /* One number was left, and that team has it: claims from world PE 0, and
-     * from the team made, whose rank 0 is also PE 0. */
-    shmem_team_t more = SHMEM_TEAM_WORLD;
-    status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, 1, NULL, 0, &more);
-    CHECK(status != 0 && more == SHMEM_TEAM_INVALID && statuses_agree(status));
-    more = SHMEM_TEAM_WORLD;
-    status = shmem_team_split_strided(made, npes - 1, -1, npes, NULL, 0, &more);
-    CHECK(status != 0 && more == SHMEM_TEAM_INVALID && statuses_agree(status));
-    /* More teams than there are numbers: refused before any claim. */
+    /* Three left: a grid of two rows and two columns needs four, and one of
+     * rows of one - four rows, a column - needs five. */
     shmem_team_t x = SHMEM_TEAM_WORLD, y = SHMEM_TEAM_WORLD;
+    status = shmem_team_split_2d(SHMEM_TEAM_WORLD, 2, NULL, 0, &x, NULL, 0, &y);
+    CHECK(status != 0 && x == SHMEM_TEAM_INVALID && y == SHMEM_TEAM_INVALID &&
+          statuses_agree(status));
+    x = y = SHMEM_TEAM_WORLD;
     status = shmem_team_split_2d(made, 1, NULL, 0, &x, NULL, 0, &y);
     CHECK(status != 0 && x == SHMEM_TEAM_INVALID && y == SHMEM_TEAM_INVALID &&
           statuses_agree(status));
 
-    /* The team made still works, and its number stays taken once it is gone. */
+    /* The three are still there: the team made, reversed, takes one. */
+    shmem_team_t back = SHMEM_TEAM_INVALID;
+    status = shmem_team_split_strided(made, npes - 1, -1, npes, NULL, 0, &back);
+    CHECK(status == 0 && statuses_agree(status));
+    struct expected back_expected = strided(&world_expected, npes - 1, -1, npes);
+    check_team(back, &back_expected, made, &world_expected, 0);
+    exercise(back, &back_expected);
+    shmem_team_t first = SHMEM_TEAM_INVALID, last = SHMEM_TEAM_INVALID;
+    status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, 1, NULL, 0, &first);
+    CHECK(status == 0 && statuses_agree(status));
+    status = shmem_team_split_strided(SHMEM_TEAM_WORLD, npes - 1, 1, 1, NULL, 0, &last);
+    CHECK(status == 0 && statuses_agree(status));
+
+    /* None left, and a destroyed team gives none back. */
+    shmem_team_t more = SHMEM_TEAM_WORLD;
+    status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, 1, NULL, 0, &more);
+    CHECK(status != 0 && more == SHMEM_TEAM_INVALID && statuses_agree(status));
+    shmem_team_destroy(evens);
+    more = SHMEM_TEAM_WORLD;
+    status = shmem_team_split_strided(made, 0, 1, npes, NULL, 0, &more);
+    CHECK(status != 0 && more == SHMEM_TEAM_INVALID && statuses_agree(status));
+
+    /* The teams made still work. */
+    exercise(made, &world_expected);
+    shmem_barrier_all();
+    shmem_team_destroy(first);
+    shmem_team_destroy(last);
+    shmem_team_destroy(back);
+    shmem_team_destroy(made);
+    mode_passed();
+}
+
+/*
+ * OSOE_TEST_SPLIT=too-many, four PEs under OSOE_MAX_TEAMS=4: one number. A
+ * split_2d creating five teams is refused before anything is claimed, which
+ * PE 0 says, and the one number is still there for the split after it.
+ */
+static void too_many(void)
+{
+    CHECK_FATAL(npes == 4);
+    shmem_team_t x = SHMEM_TEAM_WORLD, y = SHMEM_TEAM_WORLD;
+    int status = shmem_team_split_2d(SHMEM_TEAM_WORLD, 1, NULL, 0, &x, NULL, 0, &y);
+    CHECK(status != 0 && x == SHMEM_TEAM_INVALID && y == SHMEM_TEAM_INVALID &&
+          statuses_agree(status));
+    shmem_team_t made = SHMEM_TEAM_INVALID;
+    status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made);
+    CHECK(status == 0 && statuses_agree(status));
+    check_team(made, &world_expected, SHMEM_TEAM_WORLD, &world_expected, 0);
+    exercise(made, &world_expected);
+    shmem_team_t more = SHMEM_TEAM_WORLD;
+    status = shmem_team_split_strided(made, 0, 1, 1, NULL, 0, &more);
+    CHECK(status != 0 && more == SHMEM_TEAM_INVALID && statuses_agree(status));
+    shmem_team_destroy(made);
+    mode_passed();
+}
+
+/*
+ * OSOE_TEST_SPLIT=full, under a small SHMEM_SYMMETRIC_SIZE: the heap filled
+ * block by block, halving the block as each stops fitting, until not even the
+ * allocator's smallest does; a split then returns nonzero on every PE, PE 0
+ * saying why, and succeeds once the blocks are given back.
+ */
+static void heap_full(void)
+{
+    enum { MAX_BLOCKS = 128 };
+    void *blocks[MAX_BLOCKS];
+    int count = 0;
+    for (size_t size = (size_t)1 << 30; size >= 16 && count < MAX_BLOCKS;) {
+        void *block = shmem_malloc(size);
+        if (block)
+            blocks[count++] = block;
+        else
+            size /= 2;
+    }
+    CHECK_FATAL(count < MAX_BLOCKS);
+    shmem_team_t made = SHMEM_TEAM_WORLD;
+    int status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made);
+    CHECK(status != 0 && made == SHMEM_TEAM_INVALID && statuses_agree(status));
+    while (count > 0)
+        shmem_free(blocks[--count]);
+    made = SHMEM_TEAM_INVALID;
+    status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made);
+    CHECK(status == 0 && statuses_agree(status));
+    check_team(made, &world_expected, SHMEM_TEAM_WORLD, &world_expected, 0);
     exercise(made, &world_expected);
     shmem_team_destroy(made);
-    more = SHMEM_TEAM_WORLD;
-    status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &more);
-    CHECK(status != 0 && more == SHMEM_TEAM_INVALID && statuses_agree(status));
-    shmem_barrier_all();
-    if (me == 0 && CHECK_DONE() == 0)
-        fprintf(stderr, "PE 0: every split past the last number failed on every PE\n");
+    mode_passed();
 }
 
 int main(void)
@@ -511,6 +615,10 @@ int main(void)
     const char *mode = getenv("OSOE_TEST_SPLIT");
     if (mode && strcmp(mode, "exhaust") == 0) {
         exhaust();
+    } else if (mode && strcmp(mode, "too-many") == 0) {
+        too_many();
+    } else if (mode && strcmp(mode, "full") == 0) {
+        heap_full();
     } else {
         halves();
         evens_and_odds();
