@@ -208,7 +208,9 @@ uint32_t osoe_internode_team_lead(uint32_t team, uint32_t index);
 /*
  * Up, as the call above, and asked where it is: this node's members of team
  * `team`, as team ranks in ascending order, `*count` of them - the members
- * whose places in a gather's result are this node's to fill (below). O(1).
+ * whose places in a gather's result are this node's to fill (below) - or NULL
+ * and 0 where this process holds no descriptor for the team, which on the
+ * thread the data half runs on is a bug to name. O(1).
  */
 const uint32_t *osoe_internode_team_local_ranks(uint32_t team, uint32_t *count);
 

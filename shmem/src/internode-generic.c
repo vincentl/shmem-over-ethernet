@@ -662,10 +662,16 @@ static uint64_t place_of(const uint64_t *places, size_t block, uint64_t r)
  * ranks, as Slurm's block distribution makes the world's, zeroes two runs.
  */
 static void zero_others(uint32_t team, unsigned char *buffer, size_t bytes, size_t block,
-                        const uint64_t *places)
+                        const uint64_t *places, const char *routine)
 {
     uint32_t count = 0;
     const uint32_t *ranks = osoe_internode_team_local_ranks(team, &count);
+    /* No list is no member here that this process knows of, and zeroing every
+     * place would pass on nothing of this node's: named, as lead_of names a
+     * position with no lead. */
+    if (!ranks)
+        osoe_fatal("%s: team %u has no members on this node that this process knows of",
+                   routine, team);
     uint64_t from = 0;
     for (uint32_t m = 0; m < count; m++) {
         uint64_t at = place_of(places, block, ranks[m]);
@@ -687,7 +693,7 @@ void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer,
                                     size_t block, const uint64_t *places, const char *routine)
 {
     struct generic_team *team_phase = registered_team(team, routine);
-    zero_others(team, buffer, bytes, block, places);
+    zero_others(team, buffer, bytes, block, places, routine);
     uint32_t width = bytes % 8 == 0 && (uintptr_t)buffer % 8 == 0 ? 8 : 1;
     struct osoe_element element = { OSOE_ELEMENT_UNSIGNED_INTEGER, width };
     osoe_combine_function combine = osoe_combine_lookup(OSOE_REDUCTION_OR, element);
