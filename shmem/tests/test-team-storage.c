@@ -46,7 +46,10 @@
  * osoe-stat names teams 3 and 4 by their numbers, with their records as the
  * map implies them - team 4's after it is destroyed, since a record outlives
  * its team - and the node's own. The two left alive at the end are the
- * session's end to free.
+ * session's end to free. And a fourth team, the world again, has node 0's
+ * record published 300 ms late, by a wrapped function of the link, while
+ * every member syncs on it the moment its split returns: the split's sync over
+ * its parent is what makes that safe (check_parent_sync).
  *
  * OSOE_TEST_MAP gives the map, and OSOE_TEST_LEADS each node's lead's rank
  * where a hand-given order makes it other than the node's lowest.
@@ -61,10 +64,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <shmem.h>
 
 #include "check.h"
+#include "collective-tree.h"
 #include "node.h"
 #include "state.h"
 #include "team.h"
@@ -316,6 +321,53 @@ static void check_created_teams(const uint32_t *node_of, uint32_t nodes, const u
     check_collectives(node_team, n, shmem_team_my_pe(node_team));
 }
 
+/*
+ * The split's sync over its parent orders every node's record of the new team
+ * before any collective on it (node.h): the protocol's linchpin, over a window
+ * of microseconds that no run meets by chance. So one record is made late on
+ * purpose. The program links with --wrap=osoe_collective_tree (CMakeLists.txt),
+ * which write_record asks for the node's place in a team's tree just before
+ * it publishes the record, and the wrapper sleeps first when this process has
+ * asked it to: PE 0 does, node 0's local lead of a team of the whole world, so
+ * node 0's record of it is published 300 ms late. Every member syncs on the
+ * team the moment its split returns: without the parent's sync, the other
+ * nodes' arrivals would reach node 0 - the root - before its record, and a
+ * node 0 member's own before it too, and the job would end naming the team.
+ * The library is the one the job runs; only the link differs. On one node the
+ * tree is never asked for, and nothing waits.
+ */
+static long record_delay_milliseconds;
+
+bool __real_osoe_collective_tree(const uint32_t *nodes, uint32_t count, uint32_t node,
+                                 uint32_t fanout, struct osoe_collective_tree *tree);
+bool __wrap_osoe_collective_tree(const uint32_t *nodes, uint32_t count, uint32_t node,
+                                 uint32_t fanout, struct osoe_collective_tree *tree);
+
+bool __wrap_osoe_collective_tree(const uint32_t *nodes, uint32_t count, uint32_t node,
+                                 uint32_t fanout, struct osoe_collective_tree *tree)
+{
+    if (record_delay_milliseconds > 0) {
+        struct timespec pause = { record_delay_milliseconds / 1000,
+                                  (record_delay_milliseconds % 1000) * 1000 * 1000 };
+        nanosleep(&pause, NULL);
+        record_delay_milliseconds = 0;
+    }
+    return __real_osoe_collective_tree(nodes, count, node, fanout, tree);
+}
+
+static void check_parent_sync(void)
+{
+    if (me == 0)
+        record_delay_milliseconds = 300;
+    shmem_team_t late = SHMEM_TEAM_INVALID;
+    CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &late) == 0);
+    record_delay_milliseconds = 0;
+    /* First, before any collective of the world's could order anything. */
+    CHECK(shmem_team_sync(late) == 0);
+    check_collectives(late, npes, me);
+    shmem_team_destroy(late);
+}
+
 /* Run osoe-stat with `args` on this node's control segment. */
 static int run_stat(const char *args, char *out, size_t len)
 {
@@ -485,6 +537,7 @@ int main(void)
     check_world(node_of, nodes, gtids, local_count);
     check_shared(gtids, local_count);
     check_created_teams(node_of, nodes, gtids, local_count);
+    check_parent_sync();
     shmem_team_destroy(reverse_team);
 
     /* Each node's lowest and highest rank: the leads there of the world again

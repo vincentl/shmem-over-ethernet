@@ -1439,6 +1439,9 @@ endif()
 # internode phase meets the node at its local id 0, rank 1 (OSOE_TEST_LEADS).
 add_executable(shmem_test_team-storage test-team-storage.c ${osoe_library_sources})
 target_include_directories(shmem_test_team-storage PRIVATE ../src ../include)
+# The split's parent sync, tested by delaying one node's record: team.c's call
+# to the tree function goes through the test's wrapper (check_parent_sync).
+target_link_options(shmem_test_team-storage PRIVATE "LINKER:--wrap=osoe_collective_tree")
 target_link_libraries(shmem_test_team-storage PRIVATE osoe_base rt Threads::Threads
   PkgConfig::LIBURING)
 osoe_warnings(shmem_test_team-storage)
