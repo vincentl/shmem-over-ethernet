@@ -748,17 +748,25 @@ static int contexts_requested(const char *routine, const char *argument,
 
 /*
  * No team number is left for a call creating `count` teams (§5.7), said once,
- * by the parent's rank 0, which made the claim: the split fails on every PE of
- * its parent, as spec §9.4.6 says a team that cannot be created does.
+ * by the parent's rank 0, which made the claim - or would have, for a call
+ * creating more teams than there are numbers at all: the split fails on every
+ * PE of its parent, as spec §9.4.6 says a team that cannot be created does.
  */
-static void out_of_numbers(const char *routine, uint32_t count, uint64_t claimed)
+static void out_of_numbers(const char *routine, uint32_t count, bool claimed, uint64_t before)
 {
-    fprintf(stderr, "osoe: PE %u: %s: no team numbers are left for the %u team%s this call "
-            "creates: OSOE_MAX_TEAMS is %u, %u of them predefined, %llu claimed before this "
-            "call, and a number is never reused within a session (design §5.7); the split "
-            "returns nonzero on every PE of its parent team\n", osoe.bootstrap.rank, routine,
-            count, count == 1 ? "" : "s", osoe.bootstrap.max_teams, OSOE_PREDEFINED_TEAMS,
-            (unsigned long long)claimed);
+    uint32_t max = osoe.bootstrap.max_teams;
+    if (claimed)
+        fprintf(stderr, "osoe: PE %u: %s: no team numbers are left for the %u team%s this call "
+                "creates: OSOE_MAX_TEAMS is %u, %u of them predefined, %llu were claimed "
+                "before this call, and a number is never reused within a session (design "
+                "§5.7); the split returns nonzero on every PE of its parent team\n",
+                osoe.bootstrap.rank, routine, count, count == 1 ? "" : "s", max,
+                OSOE_PREDEFINED_TEAMS, (unsigned long long)before);
+    else
+        fprintf(stderr, "osoe: PE %u: %s: this call creates %u teams, more than a session can "
+                "ever have: OSOE_MAX_TEAMS is %u, %u of them predefined (design §5.7); the "
+                "split returns nonzero on every PE of its parent team\n", osoe.bootstrap.rank,
+                routine, count, max, OSOE_PREDEFINED_TEAMS);
 }
 
 /*
@@ -778,7 +786,7 @@ static uint64_t claim(const char *routine, uint32_t count)
                                           sizeof(uint64_t), count, 0, OSOE_TRANSPORT_FETCH);
     if (claimed <= max && OSOE_PREDEFINED_TEAMS + claimed + count <= max)
         return OSOE_PREDEFINED_TEAMS + claimed;
-    out_of_numbers(routine, count, claimed);
+    out_of_numbers(routine, count, true, claimed);
     return 0;
 }
 
@@ -904,7 +912,7 @@ static int split(const char *routine, shmem_team_t parent_handle, struct osoe_te
      * every parent PE computes the count alike, as it checked the arguments. */
     if (count > osoe.bootstrap.max_teams - OSOE_PREDEFINED_TEAMS) {
         if (parent->me == 0)
-            out_of_numbers(routine, count, 0);
+            out_of_numbers(routine, count, false, 0);
         return 1;
     }
 
