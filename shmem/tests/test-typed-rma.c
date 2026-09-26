@@ -345,10 +345,13 @@ static int me, n, right, left;
         /* Block-strided: bsize 2, nblocks 3, dst stride 3 (a gap after each     \
          * block, the nine elements this target was sized for) and sst 2 ==     \
          * bsize (contiguous source) - the strides differ, as the typed         \
-         * block-strided test's do. */                                          \
+         * block-strided test's do. The barrier comes before remote is zeroed:  \
+         * a left neighbour's iget above reads this PE's remote, and zeroing it \
+         * unbarriered would race that read (file header comment). */           \
         unsigned char block_src[3 * 2 * WIDTH], block_back[3 * 2 * WIDTH];      \
         for (int i = 0; i < 3 * 2 * WIDTH; i++)                                  \
             block_src[i] = (unsigned char)(0xC0 + i);                           \
+        shmem_barrier_all();                                                     \
         for (int i = 0; i < NELEMS * WIDTH; i++)                                \
             remote[i] = 0;                                                       \
         shmem_barrier_all();                                                     \
@@ -430,10 +433,17 @@ static void strided_batching_check(void)
     uint64_t before = counter("am.wakes_deferred");
     shmem_long_iput(remote, src, 2, 1, N, right);
     uint64_t deferred = counter("am.wakes_deferred") - before;
-    if (deferred != (crosses ? N - 1 : 0))
-        fprintf(stderr, "PE %d: an iput of %d elements %s deferred %llu wakes\n", me, N,
-                crosses ? "across nodes" : "to a node-mate", (unsigned long long)deferred);
-    CHECK(deferred == (crosses ? N - 1 : 0));
+    /* Under OSOE_FORCE_REMOTE, shmem_ptr denies the pointer without moving the
+     * route: a put to a genuine node-mate still applies in the calling thread
+     * and defers nothing (design notes §8.1, "only the pointer is denied"), so
+     * "crosses" over-counts there and this assertion cannot tell a real
+     * cross-node put from a denied-pointer one. */
+    if (!getenv("OSOE_FORCE_REMOTE")) {
+        if (deferred != (crosses ? N - 1 : 0))
+            fprintf(stderr, "PE %d: an iput of %d elements %s deferred %llu wakes\n", me, N,
+                    crosses ? "across nodes" : "to a node-mate", (unsigned long long)deferred);
+        CHECK(deferred == (crosses ? N - 1 : 0));
+    }
 
     shmem_barrier_all();
     for (int i = 0; i < N; i++)
@@ -461,10 +471,15 @@ static void block_strided_batching_check(void)
     uint64_t before = counter("am.wakes_deferred");
     shmem_long_ibput(remote, src, DST_STRIDE, BSIZE, BSIZE, NBLOCKS, right);
     uint64_t deferred = counter("am.wakes_deferred") - before;
-    if (deferred != (crosses ? (uint64_t)(NBLOCKS - 1) : 0))
-        fprintf(stderr, "PE %d: an ibput of %d blocks %s deferred %llu wakes\n", me, NBLOCKS,
-                crosses ? "across nodes" : "to a node-mate", (unsigned long long)deferred);
-    CHECK(deferred == (crosses ? (uint64_t)(NBLOCKS - 1) : 0));
+    /* Under OSOE_FORCE_REMOTE, "crosses" over-counts (strided_batching_check's
+     * comment, above, has why) and this assertion cannot tell a real
+     * cross-node put from a denied-pointer one. */
+    if (!getenv("OSOE_FORCE_REMOTE")) {
+        if (deferred != (crosses ? (uint64_t)(NBLOCKS - 1) : 0))
+            fprintf(stderr, "PE %d: an ibput of %d blocks %s deferred %llu wakes\n", me, NBLOCKS,
+                    crosses ? "across nodes" : "to a node-mate", (unsigned long long)deferred);
+        CHECK(deferred == (crosses ? (uint64_t)(NBLOCKS - 1) : 0));
+    }
 
     shmem_barrier_all();
     for (int b = 0; b < NBLOCKS; b++)
