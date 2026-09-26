@@ -4544,8 +4544,8 @@ returns nonzero on all of them, and what the spec leaves undefined, a stride of
 0 with a size other than 1 or a non-positive `xrange`, ends the job by name;
 the claim, by the parent's rank 0, of a number for every team the call creates,
 one for `split_strided` and every row and column for `split_2d`; a broadcast
-over the parent of the first number, in eight bytes each parent PE borrows from
-the heap for the call; each member's
+over the parent of the first number, in the allocator's smallest block, 16
+bytes, which each parent PE borrows from the heap for the call; each member's
 descriptor - its node's members in team-rank order, O(*L*), whether the team
 spans nodes, O(1), and on each node's local lead the node set, O(*S*) or
 O(*S* log *S*), §5.2; each member node's record, written by the team's local
@@ -4560,7 +4560,8 @@ with one diagnostic naming `OSOE_MAX_TEAMS` and the count claimed, so a later
 call that fits still gets them; with an add, a `split_2d` of many rows that
 failed would have used up the numbers of every split after it (review of the
 slice, M2). A call that creates more teams than a session can have at all is
-refused before claiming, said once by rank 0. A created team's handle is its
+refused before claiming, and a heap without the 16 bytes before claiming too,
+each said once by rank 0. A created team's handle is its
 descriptor's address, in a
 per-process pool indexed by number, so a handle never issued or already
 destroyed is named without being read through. Destroy is a sync over the

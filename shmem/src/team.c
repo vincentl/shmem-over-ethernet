@@ -32,8 +32,9 @@
  *      a claim that would pass OSOE_MAX_TEAMS takes none, so the numbers left
  *      stay for a call that fits;
  *   3. a broadcast over the parent carries the first number, or 0 for a claim
- *      that failed, in eight bytes every parent PE borrows from the symmetric
- *      heap for the call, as collect borrows its lengths' room;
+ *      that failed, in the allocator's smallest block - 16 bytes, for an
+ *      eight-byte word - which every parent PE borrows from the symmetric heap
+ *      for the call, as collect borrows its lengths' room;
  *   4. every member builds its descriptor: its node's members in O(L), and
  *      from them whether the team spans nodes, O(1); and each node's local
  *      lead of the team - the one PE per node that needs it - the team's node
@@ -977,15 +978,23 @@ static int split(const char *routine, shmem_team_t parent_handle, struct osoe_te
 
     /* The room the first number travels in, at the same place on every parent
      * PE: the allocator is a function of its calls alone (§4.4), and a take and
-     * its give leave it as it was. A heap without eight bytes to spare answers
-     * nonzero on every parent PE alike, before anything is claimed. */
+     * its give leave it as it was. It takes its smallest block, 16 bytes, for
+     * the eight-byte word. A heap without it answers nonzero on every parent PE
+     * alike, before anything is claimed, and the parent's rank 0 says so. */
     uint64_t offset;
     int taken = osoe_allocator_take(&osoe.allocator, sizeof(uint64_t), sizeof(uint64_t), 0,
                                     &offset);
     if (taken < 0)
         osoe_fatal("%s: out of memory for the symmetric heap's own records", routine);
-    if (taken > 0)
+    if (taken > 0) {
+        if (parent->me == 0)
+            fprintf(stderr, "osoe: PE %u: %s: the symmetric heap has no %llu bytes free for "
+                    "the word a split broadcasts its team numbers in (SHMEM_SYMMETRIC_SIZE is "
+                    "%llu bytes); the split returns nonzero on every PE of its parent team\n",
+                    osoe.bootstrap.rank, routine, (unsigned long long)OSOE_ALLOCATOR_ALIGN,
+                    (unsigned long long)osoe.node.heap_size);
         return 1;
+    }
     uint64_t *word = (uint64_t *)((unsigned char *)osoe.node.heap_of[osoe.bootstrap.local_id] +
                                   offset);
     if (parent->me == 0)
