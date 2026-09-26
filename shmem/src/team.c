@@ -18,7 +18,7 @@
  * leads, and its ranks as world ranks (team.h).
  *
  * **Teams are created by splitting a parent** (spec §9.4.6, §9.4.7; phase 1
- * step 7 slice 2, docs/prompts/phase1-step7-slice2-prompt.md), collectively
+ * step 7 slice 2, docs/prompts/done/phase1-step7-slice2-prompt.md), collectively
  * over the parent, in this order:
  *
  *   1. every parent PE checks the arguments alike: the spec's failures return

@@ -11,7 +11,7 @@ say answers with a header-only segment.
 
 The whole protocol is those two fields plus the two shared words that carry a
 request across processes, and the second adversarial review found it wrong
-twice, in ways that hide each other (`docs/reviews/phase1-step2-slice1-correctness.md`,
+twice, in ways that hide each other (`docs/reviews/archive/phase1-step2-slice1-correctness.md`,
 C1 and C2). This model is what that review said was owed.
 
 Variants

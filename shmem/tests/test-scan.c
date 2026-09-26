@@ -1,6 +1,6 @@
 /*
  * The prefix scans (spec §9.10.10; design §5.8; phase 1 step 10 slice 1,
- * docs/prompts/phase1-step10-slice1-prompt.md), checked by value: team rank
+ * docs/prompts/done/phase1-step10-slice1-prompt.md), checked by value: team rank
  * r's source element j is distinct per (r, j), so a result missing a rank's
  * contribution, or holding one it should not, shows.
  *

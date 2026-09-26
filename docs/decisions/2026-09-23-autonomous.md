@@ -213,7 +213,7 @@ budget refuses first, and the test now says so and skips.
 ## Step 4, first slice
 
 **11. Step 4's first slice was briefed without the author**
-(`docs/prompts/phase1-step4-slice1-prompt.md`): the abort crossing nodes,
+(`docs/prompts/done/phase1-step4-slice1-prompt.md`): the abort crossing nodes,
 every PE ending when its node aborts, liveness without the watchdog, and
 keepalive. The Slurm fixtures and the heap-base shift are left for the next
 slice. The brief follows §3.15 and §7.1 as written.
@@ -313,7 +313,7 @@ themselves. The switch is a second off-switch beside `OSOE_WATCHDOG`; drop
 both if the watchdog is retired.
 
 **19. Step 4's second slice is briefed, and its Slurm part waits for the
-author** (`docs/prompts/phase1-step4-slice2-prompt.md`). It covers the
+author** (`docs/prompts/done/phase1-step4-slice2-prompt.md`). It covers the
 heap-base shift, the Slurm fixtures, and the multi-node lead's pidfds on its
 ring. The fixtures must be *captured* from `srun`, and the VM has no Slurm.
 Debian's `slurm-wlm` is available, but installing and running Slurm daemons

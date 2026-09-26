@@ -3,7 +3,7 @@
 **Status: written on 2026-09-26 (late evening); question C, which the
 approved proposal said this slice would stop and ask, answered by the author
 the same evening: C4, below.** The rest follows the proposal's decisions 1,
-7-11 as approved (`docs/prompts/phase1-step8-slice1-prompt.md`;
+7-11 as approved (`docs/prompts/done/phase1-step8-slice1-prompt.md`;
 `docs/decisions/2026-09-26-day.md`).
 
 You are making osoe (OpenSHMEM Over Ethernet) provide
@@ -25,7 +25,7 @@ The author's goals, the axes to judge the work by:
 2. The spec: §9.2 (thread levels), §9.5 (contexts' options under threads),
    §9.4 and §9.10's thread-safety paragraphs (a team's collectives are not
    concurrent; different teams' may be).
-3. `docs/prompts/phase1-step8-slice1-prompt.md`, "Proposed decisions" 1 and
+3. `docs/prompts/done/phase1-step8-slice1-prompt.md`, "Proposed decisions" 1 and
    7-11, as approved.
 4. Design §4.6 (as built: the landing zone, the blocking slot, the records and
    arena; contexts), §4.9 (the watch), §4.11 whole, §3.14 (counter blocks,

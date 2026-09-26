@@ -95,7 +95,7 @@ each says how to undo it.
    removed `shmem.collective-divergence.gather`), and a counted, not computed,
    share count.
 6. **Step 9 opened without a question** - block-strided RMA - since every form
-   follows one the library already has (`docs/prompts/phase1-step9-slice1-prompt.md`).
+   follows one the library already has (`docs/prompts/done/phase1-step9-slice1-prompt.md`).
    Sessions (§9.9) turned out to exist already, their hints accepted and
    ignored as the spec allows; the status page said otherwise and is corrected.
 7. **Housekeeping, at the author's request on the morning of the 26th**: every
@@ -108,7 +108,7 @@ each says how to undo it.
 
 ## Questions for the author
 
-**A. Step 8: contexts and `THREAD_MULTIPLE`** (`docs/prompts/phase1-step8-slice1-prompt.md`,
+**A. Step 8: contexts and `THREAD_MULTIPLE`** (`docs/prompts/done/phase1-step8-slice1-prompt.md`,
 eleven numbered decisions; slice 1's build brief is drafted there too). Three
 slices: contexts, serial only; then threads, with an interim per-context mutex
 on shareable contexts; then §4.11's lock-free shared mode. The choices that are

@@ -87,7 +87,7 @@
  * some calls and hand the rest to it, deciding per call and inside the backend,
  * so nothing above this header asks what a backend supports (§4.10). That is
  * the difference from the negotiated collective offload the RoCE review rejects
- * (docs/reviews/roce-transport.md §8.4): this is a mandatory operation with a
+ * (docs/reviews/archive/roce-transport.md §8.4): this is a mandatory operation with a
  * generic fallback. AM hands every call to it. **The choice must be the same
  * on every node**: a function of the call's arguments - team, count or bytes,
  * operation, element - and of configuration every node agreed at the
@@ -360,7 +360,7 @@ void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t 
 
 /*
  * The internode phase of a prefix scan (spec §9.10.10; phase 1 step 10 slice
- * 1, docs/prompts/phase1-step10-slice1-prompt.md): the one data-half call
+ * 1, docs/prompts/done/phase1-step10-slice1-prompt.md): the one data-half call
  * **every member** makes, on its own thread, not the team's local lead alone.
  * `rank` is the caller's team rank; on return `dest` holds the sum of every
  * member's `source`, `count` elements of `element`, over ranks 0 .. rank

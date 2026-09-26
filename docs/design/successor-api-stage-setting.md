@@ -2,11 +2,11 @@
 
 **Status:** stage-setting, with a strawman to argue against. Not a decision
 record; nothing here binds osoe. Written 2026-09-20 from the second adversarial
-review (`docs/reviews/phase1-step2-slice1-review.md`), whose investigators were
+review (`docs/reviews/archive/phase1-step2-slice1-review.md`), whose investigators were
 each asked to note where the OpenSHMEM API itself forced cost, complexity or an
 unscalable structure on the implementation.
 
-**Prior art in this repository.** `docs/reviews/core-api.md` surveyed six
+**Prior art in this repository.** `docs/reviews/archive/core-api.md` surveyed six
 production transports and proposed a minimal *core* underneath OpenSHMEM 1.4–1.6;
 osoe's §4.10 boundary (`shmem/src/transport.h`) is an independent arrival at
 nearly the same shape. This document asks the next question: if that core is
@@ -91,7 +91,7 @@ Each lesson names the review finding it came from.
 
 The author's hypothesis was that PCIe atomics match RoCE atomics. It is half
 right, and the right half is the interesting one (full table with sources:
-`docs/reviews/phase1-step2-slice1-roce-seam.md` §6).
+`docs/reviews/archive/phase1-step2-slice1-roce-seam.md` §6).
 
 | Fabric | Operations | Widths | CPU-coherent? |
 |---|---|---|---|

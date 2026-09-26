@@ -2,7 +2,7 @@
 
 You are continuing implementation work on **osoe** (OpenSHMEM Over Ethernet) on
 branch `phase1-slice2`. A previous session completed roughly the first third of
-the slice. **Read `docs/prompts/phase1-step1-slice2-prompt.md` first** — it is the
+the slice. **Read `docs/prompts/done/phase1-step1-slice2-prompt.md` first** — it is the
 slice's brief, and every rule in it still applies unchanged. This document says
 what has been done since, what was decided and why, and what is left.
 
@@ -58,7 +58,7 @@ from scratch; if you disagree, raise it.
    encodings; they are now one. The old one also had two latent defects — a
    shift of 4294967295 in its saturating case, confirmed under UBSan, and a loop
    that did not terminate when a range's ends differed in bit 63.
-2. **A RoCE exercise was reviewed and folded in.** `docs/reviews/roce-transport.md`
+2. **A RoCE exercise was reviewed and folded in.** `docs/reviews/archive/roce-transport.md`
    is the analysis. The boundary carries RDMA; of six losses, four are RoCE's own
    or a phase boundary. §4.10 gained: dispatch per `(pe, operation class)`; every
    blocking call sweeps at least every `OSOE_SWEEP_NS`; `OSOE_TP_MORE` specified
@@ -167,7 +167,7 @@ one deliberately stalled, checking the heartbeat and the "blocked in" records.
 
 ## Rules, unchanged and load-bearing
 
-Everything in `docs/prompts/phase1-step1-slice2-prompt.md` still applies. The ones
+Everything in `docs/prompts/done/phase1-step1-slice2-prompt.md` still applies. The ones
 most easily lost:
 
 - **C11 `<stdatomic.h>` only**, named ISO orders: loads `acquire`, CAS and

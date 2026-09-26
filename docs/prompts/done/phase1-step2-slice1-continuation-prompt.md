@@ -3,7 +3,7 @@
 You are continuing implementation work on **osoe** (OpenSHMEM Over Ethernet) on
 branch `phase1-step2-slice1`. A previous session built everything below the
 §4.10 boundary and proved it works; what is left is joining it to the SHMEM
-layer. **Read `docs/prompts/phase1-step2-slice1-prompt.md` first** — it is the
+layer. **Read `docs/prompts/done/phase1-step2-slice1-prompt.md` first** — it is the
 slice's brief and every rule in it still applies. This document says what has
 been done, what was decided and why, and what is left.
 

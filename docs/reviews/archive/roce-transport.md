@@ -3,7 +3,7 @@
 High-level plan and cost estimate for a RoCEv2 backend behind the §4.10 boundary.
 Date: 2026-09-17.
 
-Inputs: `shmem/src/transport.h`, `docs/reviews/core-api.md` (cited as CORE §x),
+Inputs: `shmem/src/transport.h`, `docs/reviews/archive/core-api.md` (cited as CORE §x),
 `docs/design/shmem-ethernet-design.md` (cited as §x).
 
 **Status.** Analysis, not a decision. The decisions it argued for live in

@@ -11,7 +11,7 @@ It produced two **uncommitted, unreviewed** documents:
 
 | File | What it is |
 |---|---|
-| `docs/reviews/roce-transport.md` | The analysis. A RoCE backend plan, a per-operation cost model, what RoCE features the boundary can and cannot reach, and an estimate of what is left on the table. |
+| `docs/reviews/archive/roce-transport.md` | The analysis. A RoCE backend plan, a per-operation cost model, what RoCE features the boundary can and cannot reach, and an estimate of what is left on the table. |
 | `docs/design/transport-boundary-changes.md` | The proposal. Ten amendments (A1–A10) to `shmem-ethernet-design.md`, then Part B: six recommendations (B1–B6) that change what this slice does. |
 
 Read the proposal first; read the analysis when you need the reasoning behind an
@@ -30,7 +30,7 @@ and they are not decisions. Three specific cautions:
    deliberately. Both documents were corrected, and A1 now rests on a performance
    estimate alone. Treat that as evidence about the documents' reliability, not
    as the last error in them.
-3. **`docs/reviews/roce-transport.md` is new, not the committed record** your
+3. **`docs/reviews/archive/roce-transport.md` is new, not the committed record** your
    rules tell you to leave alone. You may correct it. Prefer correcting it over
    letting it diverge from what you conclude.
 
@@ -144,7 +144,7 @@ commit as the code.
 - **Then delete `docs/design/transport-boundary-changes.md`.** It says so itself
   (§14). Leaving it is a second, diverging record of decisions the design doc now
   owns.
-- **Decide with the user what happens to `docs/reviews/roce-transport.md`.** It is
+- **Decide with the user what happens to `docs/reviews/archive/roce-transport.md`.** It is
   analysis, not a decision, and it is the only place the RoCE cost model and the
   eight verification items are written down. It probably belongs in the committed
   record — but it is the user's call, not yours.

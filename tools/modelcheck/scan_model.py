@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A prefix scan over a team's members, for shmem_sum_inscan and shmem_sum_exscan
 (spec §9.10.10; design §5.8, "Prefix scans"; the proposal in
-docs/prompts/phase1-step10-slice1-prompt.md).
+docs/prompts/done/phase1-step10-slice1-prompt.md).
 
 Every member takes part on its own thread, at its team rank's place in a
 pre-order k-ary tree over the ranks 0 .. M - 1: a place covering ranks

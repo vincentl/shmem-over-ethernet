@@ -57,7 +57,7 @@ internode phase rather than growing a new primitive."
 
 **What rests on it.** §2.2's placement of every future collective (reduce,
 broadcast, collect, alltoall, scans) inside the AM engine; the RoCE tier's
-largest recorded loss (`docs/reviews/roce-transport.md` §8.4, lines 607–630:
+largest recorded loss (`docs/reviews/archive/roce-transport.md` §8.4, lines 607–630:
 in-network reduction, multicast, triggered operations all "require the backend
 to see `shmem_barrier_all` as a barrier"); P3.
 

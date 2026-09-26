@@ -8,7 +8,7 @@
 2. **Cross-check.** The lead read the full design and checked the load-bearing facts.
 3. **Refutation.** Every finding rated *design change needed* or worse went to a fresh refuter whose job was to disprove it: reproduce the failure, find doc text that already handles it, or find spec text that permits the behaviour.
 
-Severities below are **after** refutation. Reviewer reports, refutation reports, models and experiment code are in [`evidence/`](evidence/). Where a report names a session-scratchpad path (`scratchpad/exp/<area>/`), look in `evidence/<area>/` instead.
+Severities below are **after** refutation. Reviewer reports, refutation reports, models and experiment code are in [`evidence/`](../evidence/). Where a report names a session-scratchpad path (`scratchpad/exp/<area>/`), look in `evidence/<area>/` instead.
 
 **Evidence labels.**
 - **documented** — spec section or URL.
@@ -413,6 +413,6 @@ Most rows below were rated *design change* or *blocking* by a reviewer and downg
 - **Ubuntu packages:** https://packages.ubuntu.com/noble/liburing-dev (2.5-1build1); https://packages.ubuntu.com/resolute/liburing-dev (2.14-1).
 - **GitHub runner images:** https://github.com/actions/runner-images (Ubuntu 24.04 and 26.04 READMEs).
 - **Experiments:** Lima VM, Debian 13, kernel `6.12.95+deb13-cloud-arm64`, liburing 2.9, GCC 14.2 (aarch64 and x86-64 cross).
-  - Code and outputs: [`evidence/`](evidence/).
-  - Reviewer reports: [`evidence/reports/`](evidence/reports/).
-  - Refutation reports: [`evidence/refutation/`](evidence/refutation/).
+  - Code and outputs: [`evidence/`](../evidence/).
+  - Reviewer reports: [`evidence/reports/`](../evidence/reports/).
+  - Refutation reports: [`evidence/refutation/`](../evidence/refutation/).

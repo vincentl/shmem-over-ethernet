@@ -29,7 +29,7 @@ middle from a correct one proves nothing about the predicate. Elements here are
 one grain apart for that reason.
 
 Which coverage predicate to use is a separate question, answered in
-`docs/design/evidence/watch-options/` and `docs/reviews/watch-notification-options.md`.
+`docs/design/evidence/watch-options/` and `docs/reviews/archive/watch-notification-options.md`.
 This model is the protocol around whichever one is chosen.
 
 Run it with `python3 range_watch_model.py [substring ...]`; every case finishes in

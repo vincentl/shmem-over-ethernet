@@ -8,7 +8,7 @@ subagent reports as a claim to verify, not a conclusion.**
 The first round reviewed a design. This round reviews **an implementation** —
 about 13,750 lines of C, 131 tests, and a design document that has grown to
 4,420 lines and now records decisions made *against* code. Read
-`docs/reviews/phase1-step2-slice1-what-changed.md` first: it says what exists,
+`docs/reviews/archive/phase1-step2-slice1-what-changed.md` first: it says what exists,
 what does not, which first-round conclusions have been reversed, and where the
 evidence is known to be thin.
 
@@ -104,7 +104,7 @@ negotiation; repeated `init`/`finalize` and `shmem_query_initialized`;
 `shmem_pe_quiet`'s completion set; `put_signal` atomicity; the deprecated
 routines and Annex F's header location; and the environment variables of §8.
 
-**Deliverable:** `docs/reviews/phase1-step2-slice1-conformance.md`.
+**Deliverable:** `docs/reviews/archive/phase1-step2-slice1-conformance.md`.
 
 ## Question 2: Is it correct?
 
@@ -147,7 +147,7 @@ part most likely to be wrong in a way no test shows.
 
   The three were fixed; the population they came from was not surveyed.
 
-**Deliverable:** `docs/reviews/phase1-step2-slice1-correctness.md`.
+**Deliverable:** `docs/reviews/archive/phase1-step2-slice1-correctness.md`.
 
 ## Question 3: Will it run anywhere else?
 
@@ -173,7 +173,7 @@ Slurm, or over a socket. Judge how much of that is a gap and how much is a risk.
   and the malformed-segment tests exist — but is the trust boundary *stated*
   anywhere, and what is assumed about a buggy or hostile peer?
 
-**Deliverable:** `docs/reviews/phase1-step2-slice1-portability.md`.
+**Deliverable:** `docs/reviews/archive/phase1-step2-slice1-portability.md`.
 
 ## Question 4: Is §4.10 the seam an RoCE port needs?
 
@@ -197,7 +197,7 @@ this slice closed §10's `osoe_transport_sync` question against the code.
 - Consider the counterfactual: name the parts a porter would have to rewrite
   that this design promises they would not.
 
-**Deliverable:** `docs/reviews/phase1-step2-slice1-roce-seam.md`.
+**Deliverable:** `docs/reviews/archive/phase1-step2-slice1-roce-seam.md`.
 
 ## Question 5: Will it perform, and will it hold at scale?
 
@@ -221,7 +221,7 @@ Also: what happens *at the limits* — when a credit runs out, a buffer stays
 full, a reply pool empties, or a peer is slow? Which of those degrade and which
 abort?
 
-**Deliverable:** `docs/reviews/phase1-step2-slice1-performance-and-scale.md`.
+**Deliverable:** `docs/reviews/archive/phase1-step2-slice1-performance-and-scale.md`.
 
 ## Question 6: When it breaks, can you tell why? And what is deferred?
 
@@ -241,7 +241,7 @@ the equivalent elsewhere. `SHMEM_THREAD_MULTIPLE` (§4.11), symmetric statics
 (§4.3), teams beyond the predefined two, locks, and the typed RMA cross product
 are the ones to press on.
 
-**Deliverable:** `docs/reviews/phase1-step2-slice1-diagnosability-and-deferrals.md`.
+**Deliverable:** `docs/reviews/archive/phase1-step2-slice1-diagnosability-and-deferrals.md`.
 
 ---
 
@@ -271,7 +271,7 @@ handles it, or find spec text that permits the behaviour. Keep only findings tha
 survive. List refuted ones briefly with the reason — those are as useful to the
 author as the survivors.
 
-## Synthesis: `docs/reviews/phase1-step2-slice1-review.md`
+## Synthesis: `docs/reviews/archive/phase1-step2-slice1-review.md`
 
 - **Verdict**, one paragraph: merge this branch as it stands, merge after
   specific changes, or rethink — and why.

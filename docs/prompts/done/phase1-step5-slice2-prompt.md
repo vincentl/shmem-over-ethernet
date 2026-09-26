@@ -38,7 +38,7 @@ the author's review.*
 3. §4.10: no capability queries above the boundary, binding at build time,
    every blocking call sweeps.
 4. §5.5's as-built paragraph and §5.8 whole, rules 1-4 especially.
-5. `docs/reviews/roce-transport.md` §6 "Not reachable through this boundary" and
+5. `docs/reviews/archive/roce-transport.md` §6 "Not reachable through this boundary" and
    §8.4: negotiated collective offload stays rejected, a *mandatory operation with
    a generic fallback* does not.
 6. `collectives.c`, `internode-am.c`, `wait.c`, `cmake/CheckBoundary.cmake`.

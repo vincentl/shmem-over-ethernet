@@ -64,7 +64,7 @@ for.
    correctness depends on process-private state is not merely slow here, it is
    silently wrong.
 9. **A backend may have no writer at all.** A RoCE backend sees no target-side
-   event (`docs/reviews/roce-transport.md` §4.7); its per-node wake poller keeps
+   event (`docs/reviews/archive/roce-transport.md` §4.7); its per-node wake poller keeps
    a *shadow copy of the watched bytes* and compares. Whatever is published must
    therefore tell a poller **which bytes to shadow**, not only whether a given
    write matters.
@@ -773,7 +773,7 @@ is a page and its cost is a fault.
 
 ## 8. What other implementations do
 
-`docs/reviews/core-api.md` §2.7 is the collection and the claim in the task
+`docs/reviews/archive/core-api.md` §2.7 is the collection and the claim in the task
 holds up when read against it, with one correction.
 
 - The **fallback** every portable implementation uses is "poll with backoff plus

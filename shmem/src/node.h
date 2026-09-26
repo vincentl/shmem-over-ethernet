@@ -749,7 +749,7 @@ struct osoe_thread_record {
  * state word and shmem_ctx_destroy releases it, so a destroyed context's
  * block serves a later creation. Fixed-size, one cache line: the pool is O(1)
  * per context whatever the job's size, which is the proposal's bound
- * (docs/prompts/phase1-step8-slice1-prompt.md, decision 2).
+ * (docs/prompts/done/phase1-step8-slice1-prompt.md, decision 2).
  *
  * The rest of a context - its dirty set, O(nodes) virtual - is process
  * memory of the PE that owns it (transport-am.c).

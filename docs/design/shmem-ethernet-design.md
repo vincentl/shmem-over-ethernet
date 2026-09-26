@@ -38,7 +38,7 @@ that they are not silently reversed.
   road to a *functional* verbs backend is Soft-RoCE (`rdma_rxe`, in Debian's
   generic kernel, not its cloud kernel) over tier 3's veth pairs; it can test
   that the seams carry verbs, and nothing about performance, XRC (V1 of
-  `docs/reviews/roce-transport.md` §10) or NIC atomics. It is post-release
+  `docs/reviews/archive/roce-transport.md` §10) or NIC atomics. It is post-release
   work, if hardware is still far off then.
 
 ### Framing
@@ -2240,7 +2240,7 @@ and `.init_array` pointers, which differ per process once libc is ASLR'd.
 Sharing them corrupts every process simultaneously, and carving around them is
 more fragile than generating the script.
 
-**As built (phase 1 step 6, slice 1; `docs/prompts/phase1-step6-slice1-prompt.md`).**
+**As built (phase 1 step 6, slice 1; `docs/prompts/done/phase1-step6-slice1-prompt.md`).**
 Phase 2 directly: phase 1.5 would have been slow by design and thrown away, and
 the wrapper it waited for exists. The decisions are Claude's, for the author's
 review; the adversarial review of the slice corrected several claims below.
@@ -2931,7 +2931,7 @@ the block and 6 on the shift, leaving no room for the region; and decoding a
 shift count from a packed field produced two latent defects — a shift of
 4294967295 in the saturating case, and a loop that does not terminate when a
 range's ends differ in bit 63. The replacement has no variable shift and no loop.
-`docs/reviews/watch-notification-options.md` has the measurements and the
+`docs/reviews/archive/watch-notification-options.md` has the measurements and the
 alternatives, including why a 128-bit atomic word and a Bloom-filter signature
 were rejected.)*
 
@@ -3149,7 +3149,7 @@ exactly as it does to a set-style AMO: a `seq_cst` store, not a `release` one.
 > addressed as `(pe, region, offset)`. It never calls the AM layer.**
 
 AM is the only network implementation, and §2.2 makes puts and gets AM handlers.
-Nothing in §4 should know that. The core-API study (`docs/reviews/core-api.md`
+Nothing in §4 should know that. The core-API study (`docs/reviews/archive/core-api.md`
 §8.3) proposed naming the boundary in these terms so a future RDMA backend can
 replace the handlers without touching this section. It costs one internal header,
 `shmem/src/transport.h`, which states the full contract. This section records the
@@ -3424,7 +3424,7 @@ instead of pushing every on-node rmw through NIC loopback.
 ### 4.11 `SHMEM_THREAD_MULTIPLE`
 
 > **Designed and model-checked; being built in three slices** (phase 1 step 8,
-> `docs/prompts/phase1-step8-slice1-prompt.md`). Slice 1, contexts in serial
+> `docs/prompts/done/phase1-step8-slice1-prompt.md`). Slice 1, contexts in serial
 > mode, is built (below, "Context modes"); until slice 2 phase 1 provides up
 > to `SERIALIZED` (§4.6). Under `MULTIPLE`, a context that promises serialization
 > (`SHMEM_CTX_PRIVATE` or `SHMEM_CTX_SERIALIZED`) keeps the §4.6 structures unchanged.
@@ -4524,7 +4524,7 @@ which the team's record holds, rather than from its node number.
 
 *As built: collect, fcollect, alltoall and alltoalls* (phase 1 step 5 slice 4;
 `collectives.c`, `collect.c`, `alltoall.c`;
-`docs/prompts/phase1-step5-slice4-prompt.md`, whose decisions are Claude's for
+`docs/prompts/done/phase1-step5-slice4-prompt.md`, whose decisions are Claude's for
 the author's review; the adversarial review of the slice reshaped the seam and
 collect's lengths). **fcollect is the accumulator with places**: once every
 member has arrived, the lead copies each local member's block to its rank's
@@ -4614,7 +4614,7 @@ edge never exceed teams job-wide, so the job-wide count is a safe bound, and the
 node-wide pool (§3.8) keeps it from costing memory per connection.
 
 **The team range allocator and the split protocol**, open here until phase 1
-step 7, were designed and approved (`docs/prompts/phase1-step7-slice1-prompt.md`,
+step 7, were designed and approved (`docs/prompts/done/phase1-step7-slice1-prompt.md`,
 `docs/decisions/2026-09-25.md`): a team is a number, job-wide and never reused
 within a session, claimed by the parent's rank 0 with one fetching add on a
 counter in world PE 0's internal page (as built, a compare-and-swap, below);
@@ -4624,7 +4624,7 @@ collective over the parent and ends with a sync over it. Step 7's first slice
 built the storage, and its second the split.
 
 *As built (phase 1 step 7 slice 2; `team.c`,
-`docs/prompts/phase1-step7-slice2-prompt.md`).* The counter is the internal
+`docs/prompts/done/phase1-step7-slice2-prompt.md`).* The counter is the internal
 region's last line (§5.8), used on world PE 0 alone. A split runs, over its
 parent: the argument checks, alike on every parent PE - an invalid triplet
 returns nonzero on all of them, and what the spec leaves undefined, a stride of
@@ -4747,7 +4747,7 @@ last release. D pieces cost D times the internal region's slots: at D = 2, 64
 teams and a fan-out of 4, 10 MiB a PE, touched only by a team's local leads.
 
 *As built* (phase 1 step 5 slice 5; `internode-generic.c`, `internal-region.h`;
-`docs/prompts/phase1-step5-slice5-prompt.md`). D is `OSOE_COLLECTIVE_PIPELINE`,
+`docs/prompts/done/phase1-step5-slice5-prompt.md`). D is `OSOE_COLLECTIVE_PIPELINE`,
 default 2, between 1 and 8, read at init beside the fan-out and `OSOE_MAX_TEAMS`
 and agreed at the rendezvous as they are (§6.2), since it fixes the internal
 region's offsets - and, with the fan-out, between a node's PEs at the node's
@@ -4797,7 +4797,7 @@ and floor rather than ceiling of log2 N steps - and found that sending the last
 step's full 2^s shares, past N - 2^s, only rewrites shares the receiver holds.
 
 *As built* (phase 1 step 5 slice 6; `internode-generic.c`, `internal-region.h`;
-`docs/prompts/phase1-step5-slice6-prompt.md`). Every team the generic
+`docs/prompts/done/phase1-step5-slice6-prompt.md`). Every team the generic
 implementation serves takes it, the predefined teams and those a split creates,
 over the reduction tree's positions: the team's sorted node set, this node's
 position from its record and any other's lead through
@@ -4997,7 +4997,7 @@ backend defines them; each may hand any call to the generic implementation,
 the first slice built, and a backend that offloads some pairs gives it the
 rest. That is a mandatory operation with a generic fallback, which the RoCE
 review's case against negotiated offload does not reach
-(`docs/reviews/roce-transport.md` §8.4). The combine functions are per element
+(`docs/reviews/archive/roce-transport.md` §8.4). The combine functions are per element
 (`combine.c`), thirteen of them, so two types that are one element cannot be
 reduced differently.)*
 
@@ -5066,7 +5066,7 @@ stalls everything behind it. Rejected: a rank-level parallel prefix even when ru
 are long, which multiplies the rounds by the local member count for nothing.)*
 
 *As built - not the runs above* (phase 1 step 10 slice 1;
-`docs/prompts/phase1-step10-slice1-prompt.md`; the author's design A of
+`docs/prompts/done/phase1-step10-slice1-prompt.md`; the author's design A of
 2026-09-26). **Every member holds its team rank's place in a pre-order k-ary
 tree over the ranks**, k the agreed fan-out: a place covering [a, b) is rank
 a, its children split [a + 1, b) into at most k consecutive blocks, so every
@@ -5890,7 +5890,7 @@ it.
 | `shmem_pe_accessible`, `shmem_addr_accessible` | Part of the API | Step 1, and not stubs. Every PE of an osoe job runs the same executable by construction, so `pe_accessible` is whether `pe` names a PE of this job. `addr_accessible` additionally requires the address to be symmetric: in the heap, or since step 6 among the statics of a program linked with `oshcc` (§4.3). An automatic address answers 0, and so does a static in a program built without the wrapper - stated by the query rather than discovered at the first put |
 | `shmem_signal_fetch`, `shmem_signal_wait_until` | Part of §9.8 and §9.11 | Step 1, with the other signal routines |
 | Name-shifted deprecated routines | §10 item 1 wants a `pshmem_` entry point for every function | **Not done**, and recorded as known non-conformance below: the spec does not say how to shift a name that never had a `shmem_` prefix, and guessing wrong helps nobody |
-| Deprecated active-set constants (F.2.8) and routines | `SHMEM_SYNC_VALUE` and the `pSync` sizes; `shmem_barrier`, `shmem_sync`, `shmem_broadcast32`/`64`, the `_to_all` reductions of Table 11, `shmem_collect32`/`64`, `shmem_fcollect32`/`64`, `shmem_alltoall32`/`64`, `shmem_alltoalls32`/`64` | The constants at step 1. **The routines at step 5, over the whole job and nothing else** - at the author's direction of 2026-09-24 to implement them so that corpus programs can be tested against osoe, with the whole-job rule and its scope Claude's decisions for the author's review (`docs/prompts/phase1-step5-slice3-prompt.md`): an active set of every PE - `PE_start` 0, `logPE_stride` 0, `PE_size` the job's - is the world team, and any other ends the job by name. Step 1 had refused the routines at the link, on the grounds that a wrong answer is worse than a missing symbol; that still holds, and a named refusal at run time is neither. It is the active set every corpus program that still calls these passes (ISx, PRK, bale and hclib's copies) - of which PRK's and bale's run on heap data, where ISx and hclib's reduce symmetric statics, which osoe has for a program linked with `oshcc` since step 6 (§4.3) - and forming a group for an arbitrary set of PEs is machinery osoe does not have. `pSync` and `pWrk` are neither read nor written, which leaves `pSync` as the spec requires it to be found afterwards and makes the reuse rules hold trivially. `broadcast32`/`64` leave the root's own `dest` alone, as the spec says; when the root is its node's lead, the node's copy is the root's `source`, read by the internode phase and the copy-outs and never written (`collectives.c`). The active-set forms of collect, fcollect, alltoall and alltoalls came with their team forms (step 5 slice 4), under the same rule |
+| Deprecated active-set constants (F.2.8) and routines | `SHMEM_SYNC_VALUE` and the `pSync` sizes; `shmem_barrier`, `shmem_sync`, `shmem_broadcast32`/`64`, the `_to_all` reductions of Table 11, `shmem_collect32`/`64`, `shmem_fcollect32`/`64`, `shmem_alltoall32`/`64`, `shmem_alltoalls32`/`64` | The constants at step 1. **The routines at step 5, over the whole job and nothing else** - at the author's direction of 2026-09-24 to implement them so that corpus programs can be tested against osoe, with the whole-job rule and its scope Claude's decisions for the author's review (`docs/prompts/done/phase1-step5-slice3-prompt.md`): an active set of every PE - `PE_start` 0, `logPE_stride` 0, `PE_size` the job's - is the world team, and any other ends the job by name. Step 1 had refused the routines at the link, on the grounds that a wrong answer is worse than a missing symbol; that still holds, and a named refusal at run time is neither. It is the active set every corpus program that still calls these passes (ISx, PRK, bale and hclib's copies) - of which PRK's and bale's run on heap data, where ISx and hclib's reduce symmetric statics, which osoe has for a program linked with `oshcc` since step 6 (§4.3) - and forming a group for an arbitrary set of PEs is machinery osoe does not have. `pSync` and `pWrk` are neither read nor written, which leaves `pSync` as the spec requires it to be found afterwards and makes the reuse rules hold trivially. `broadcast32`/`64` leave the root's own `dest` alone, as the spec says; when the root is its node's lead, the node's copy is the root's `source`, read by the internode phase and the copy-outs and never written (`collectives.c`). The active-set forms of collect, fcollect, alltoall and alltoalls came with their team forms (step 5 slice 4), under the same rule |
 | `shmem_ctx_session_start`, `_stop` (§9.9) | Part of the API | Step 1, as no-ops. The spec says sessions "do not affect the completion or ordering semantics of any OpenSHMEM routines", so doing nothing conforms. They are worth having now because the thing a session would inform is §3.9's aggregation through `OSOE_TRANSPORT_MORE`, and §4.10 already records them as that flag's first driver: the backend that can act on them should not also have to introduce them |
 
 **Known non-conformance: the deprecated routines have no name-shifted entry
@@ -6878,7 +6878,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Team-based allocation | **Does not exist through 1.6.** 1.6 change #10 states malloc and friends are world-team collective (§4.5) |
 | PMIx on the actual nodes | **Moot.** Nothing links against PMIx or PMI-2 on the default path (§6) |
 | `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7). *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`, read at each session's first init and agreed at the rendezvous, sizing everything indexed by team number, the control queue's term too since the split creates teams |
-| Team range allocator and split protocol | **Built** (approved 2026-09-25; §5.7, `docs/prompts/phase1-step7-slice1-prompt.md`, `docs/prompts/phase1-step7-slice2-prompt.md`): team numbers claimed from a counter on world PE 0 and never reused within a session, storage per number on every node, a record per member node that the progress thread learns a team from, the split collective over its parent and ending with a sync over it. Phase 1 step 7's first slice built the storage, its second creation: `shmem_team_split_strided`, `shmem_team_split_2d`, `shmem_team_destroy` |
+| Team range allocator and split protocol | **Built** (approved 2026-09-25; §5.7, `docs/prompts/done/phase1-step7-slice1-prompt.md`, `docs/prompts/done/phase1-step7-slice2-prompt.md`): team numbers claimed from a counter on world PE 0 and never reused within a session, storage per number on every node, a record per member node that the progress thread learns a team from, the split collective over its parent and ending with a sync over it. Phase 1 step 7's first slice built the storage, its second creation: `shmem_team_split_strided`, `shmem_team_split_2d`, `shmem_team_destroy` |
 | How a PE blocks in `wait_until` | **One watch slot per local PE with a 32-bit futex sequence word** (§4.9). Futexing on the `ivar` itself was withdrawn, since 64-bit futexes do not exist, and the hash table was replaced once waits were seen to be on the caller's own variable |
 | io_uring ring bound | **Two bounds, two rings.** CQ is sized from the provided-buffer ring (§3.3). Verified by `tools/probe` |
 | Reduction `dest` versus 1.6 change #17 | **Not a conflict** — same arrays means same symmetric offset. The surrounding text exposed three real bugs, fixed by a single-writer lead that leaves last (§5.5) |
@@ -6928,7 +6928,7 @@ Recorded rather than deleted, so they are not reopened from memory.
   backend's constant today; measuring the hop latency *h* and per-message cost *o*
   at init and choosing *k* from their ratio is the next step, once a real fabric
   exists to measure. The optimum is broad, so this is refinement, not a fix.
-  *Measured on the Pi cluster, 2026-09-26 (`docs/pi-cluster.md` §10):* on four
+  *Measured on the Pi cluster, 2026-09-26 (`docs/pi-cluster-results.md`):* on four
   nodes over gigabit Ethernet the large-message optimum is not broad. A 1 MiB
   broadcast at the default fan-out of 4 (one level) takes 36.6 ms at D = 1 and
   27.2 ms at any D ≥ 2, because the root sends three copies over one link and
@@ -6949,7 +6949,7 @@ is coming soon. Every item below stays open on those terms, and a Soft-RoCE
 functional backend is the post-release road to the ones a device is not
 strictly needed for.*
 
-`docs/reviews/roce-transport.md` planned a RoCEv2 backend behind §4.10 to test
+`docs/reviews/archive/roce-transport.md` planned a RoCEv2 backend behind §4.10 to test
 whether the boundary can carry RDMA at all, and estimated what it leaves on the
 table. Its hardware facts are **recalled**, not measured — its §10 lists eight
 things to verify before any number is quoted as a result — so nothing below is
@@ -7106,7 +7106,7 @@ which has two states per pair, so a third backend needs a selector of its own
 
 ### Review of 2026-09-16
 
-`docs/reviews/design-soundness.md`, an adversarial review with a refutation pass,
+`docs/reviews/archive/design-soundness.md`, an adversarial review with a refutation pass,
 reported 2 blocking findings, 9 design changes, 18 clarifications, and minor
 items. Each was checked independently against the spec, the design text, and the
 development VM before being folded in.

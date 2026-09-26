@@ -42,7 +42,7 @@ Meaning of phase/step/slice: `docs/prompts/README.md`.
    `connection-area.[ch]`, `am.[ch]`.
 5. `tools/probe` — every kernel assumption this step depends on is already
    checked there; run it first on any machine.
-6. `docs/reviews/phase1-step2-slice1-review.md` findings D2, D3, D12 and the
+6. `docs/reviews/archive/phase1-step2-slice1-review.md` findings D2, D3, D12 and the
    `algorithmic-scaling` report's finding 9 (the eager full mesh), for what this
    step is expected to inherit rather than repeat.
 

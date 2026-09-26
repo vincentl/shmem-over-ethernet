@@ -15,9 +15,9 @@ setup is unchanged: see "Setting up on a new machine" in
 ## Read first
 
 1. `CLAUDE.md` — naming, delegation, mechanical-rename rules.
-2. `docs/reviews/phase1-step2-slice1-review.md` — the synthesis. Finding IDs
+2. `docs/reviews/archive/phase1-step2-slice1-review.md` — the synthesis. Finding IDs
    below (B1, D1…D15) are its IDs.
-3. `docs/reviews/phase1-step2-slice1-correctness.md` — C1–C9, with the evidence.
+3. `docs/reviews/archive/phase1-step2-slice1-correctness.md` — C1–C9, with the evidence.
 4. The evidence you will reuse, under
    `docs/reviews/evidence/phase1-step2-slice1/`: `protocols/` (`ack-echo.*`,
    `naive-echo-fix.patch`, `quiet-stress.*`, `reservation_model.py`),

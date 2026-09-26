@@ -104,7 +104,7 @@ a test across two processes is corroboration rather than the proof.
 
 ## The acknowledgement protocol (`ack_model.py`, phase 1 step 2 slice 2)
 
-The second review (`docs/reviews/phase1-step2-slice1-correctness.md`, C1 and
+The second review (`docs/reviews/archive/phase1-step2-slice1-correctness.md`, C1 and
 C2) found the protocol wrong twice, each defect hiding the other, and said a
 model was owed. Three variants, two properties, and the verdicts the review
 predicted - with one correction to the property it predicted them against.

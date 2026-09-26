@@ -86,7 +86,8 @@ clean because the pattern itself never matched anything.
 
 ## Review documents are named for the work they reviewed
 
-`docs/reviews/` holds the record of each adversarial review. A review's files
+`docs/reviews/archive/` holds the record of each finished adversarial review;
+`docs/reviews/adversarial-review-prompt.md` is how one is run. A review's files
 carry the phase, step and slice they were run against — for example
 `phase1-step2-slice1-design-soundness.md` — so that a finding can be traced to
 the state of the tree that produced it. The first round predates the convention

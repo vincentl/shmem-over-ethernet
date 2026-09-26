@@ -26,7 +26,7 @@ Evidence lives in the per-topic reports under `docs/reviews/evidence/q2/`. Citat
 | ARCH | `q2-architect.md` | revision 1 of this proposal |
 | SPEC Lnnnn | `docs/reference/OpenSHMEM-1.6.pdf` | line number in `pdftotext -layout` output of the 1.6 spec (not committed; regenerate to follow a line cite) |
 | osoe §x | `docs/design/shmem-ethernet-design.md` | osoe design notes |
-| DS | `docs/reviews/design-soundness.md` | osoe design-soundness review |
+| DS | `docs/reviews/archive/design-soundness.md` | osoe design-soundness review |
 
 ### Evidence labels
 
@@ -814,7 +814,7 @@ Changes from revision 1 are marked †.
 
 ## 8. Relation to osoe
 
-Everything about osoe below is *documented* in `docs/design/shmem-ethernet-design.md` or `docs/reviews/design-soundness.md`.
+Everything about osoe below is *documented* in `docs/design/shmem-ethernet-design.md` or `docs/reviews/archive/design-soundness.md`.
 
 ### 8.1 osoe as a substrate for the core
 
