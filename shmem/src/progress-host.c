@@ -60,11 +60,13 @@ static void *resolve(void *context, uint32_t pe, uint16_t region, uint64_t offse
         return NULL;
     if (region == OSOE_REGION_INTERNAL) {
         /* The library's own region, the tail of the same mapping
-         * (internal-region.h): sized by the fan-out every node agrees on. */
+         * (internal-region.h): sized by the fan-out and the team count every
+         * node agrees on. */
         if (offset > osoe.node.internal_bytes || length > osoe.node.internal_bytes - offset)
             osoe_fatal("a peer addressed %u bytes at offset %llu of PE %u's internal "
                        "region, which is %llu bytes; the nodes disagree about "
-                       "OSOE_COLLECTIVE_FANOUT or run different libraries", length,
+                       "OSOE_COLLECTIVE_FANOUT or OSOE_MAX_TEAMS, or run different libraries",
+                       length,
                        (unsigned long long)offset, pe,
                        (unsigned long long)osoe.node.internal_bytes);
         return (char *)osoe.node.heap_of[local] + osoe.node.internal_offset + offset;

@@ -94,34 +94,36 @@
 #include "state.h"
 #include "transport.h"
 
-/* The internal region's layout (internal-region.h): the slots, then the control
- * words, per team an eight-byte arrival word (children's pieces in) and release
- * word (the parent's pieces down), each on a cache line of its own. */
-enum { TEAM_WORDS_BYTES = 2 * OSOE_CACHELINE };
-_Static_assert(OSOE_PREDEFINED_TEAMS * TEAM_WORDS_BYTES <= OSOE_INTERNAL_WORDS_BYTES,
-               "every predefined team's words fit the internal region's page of them");
-
-/* Slot `position` holds that child's partial result; the one after the last
- * child's holds what the parent sends down. Only the world team spans nodes
- * today, so the slots are its; a split team (§7.3) will need its own. */
-static uint64_t child_slot(uint32_t position)
-{
-    return (uint64_t)position * OSOE_INTERNAL_SLOT_BYTES;
-}
-
-static uint64_t release_slot(void)
-{
-    return child_slot(osoe.bootstrap.collective_fanout);
-}
-
+/*
+ * The internal region's layout (internal-region.h): the words area - per team
+ * number an eight-byte arrival word (children's pieces in) and release word
+ * (the parent's pieces down), each on a cache line of its own - then a block
+ * of slots per team number. Slot `position` of a team's block holds that
+ * child's partial result; the one after the last child's holds what the
+ * parent sends down. Each team number has its own, so two teams whose trees
+ * share a lead put into different places (§7.3).
+ */
 static uint64_t arrivals_word(uint32_t team)
 {
-    return child_slot(osoe.bootstrap.collective_fanout + 1) + (uint64_t)team * TEAM_WORDS_BYTES;
+    return (uint64_t)team * OSOE_INTERNAL_TEAM_WORDS_BYTES;
 }
 
 static uint64_t release_word(uint32_t team)
 {
     return arrivals_word(team) + OSOE_CACHELINE;
+}
+
+static uint64_t child_slot(uint32_t team, uint32_t position)
+{
+    uint64_t block = osoe_internal_words_bytes(osoe.bootstrap.max_teams) +
+                     (uint64_t)team *
+                         osoe_internal_team_slots_bytes(osoe.bootstrap.collective_fanout);
+    return block + (uint64_t)position * OSOE_INTERNAL_SLOTS_PER_CHILD * OSOE_INTERNAL_SLOT_BYTES;
+}
+
+static uint64_t release_slot(uint32_t team)
+{
+    return child_slot(team, osoe.bootstrap.collective_fanout);
 }
 
 /* This PE's own internal region, at `offset`. */
@@ -370,7 +372,7 @@ static void lead_piece(struct generic_team *g, uint32_t team, const struct piece
                          OSOE_BLOCKED_DETAIL_EPOCH, expected->epoch);
         if (combine)
             for (uint32_t c = 0; c < tree->children; c++) {
-                const unsigned char *slot = internal(child_slot(c));
+                const unsigned char *slot = internal(child_slot(team, c));
                 check_piece(slot, expected, "a child's partial result", tree->child[c],
                             routine);
                 combine(at, slot + HEADER_BYTES, bytes / width);
@@ -379,10 +381,10 @@ static void lead_piece(struct generic_team *g, uint32_t team, const struct piece
     if (tree->parent != UINT32_MAX) {
         if (combine) {
             osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL,
-                               child_slot(tree->position), expected, HEADER_BYTES,
+                               child_slot(team, tree->position), expected, HEADER_BYTES,
                                OSOE_TRANSPORT_MORE);
             osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL,
-                               child_slot(tree->position) + HEADER_BYTES, at, bytes,
+                               child_slot(team, tree->position) + HEADER_BYTES, at, bytes,
                                OSOE_TRANSPORT_MORE);
         }
         osoe_transport_rmw(context, (int)tree->parent, OSOE_REGION_INTERNAL, arrivals_word(team),
@@ -391,15 +393,15 @@ static void lead_piece(struct generic_team *g, uint32_t team, const struct piece
         osoe_region_wait(routine, OSOE_REGION_INTERNAL, release_word(team), 8, false,
                          OSOE_COMPARISON_EQUAL, g->releases_expected,
                          OSOE_BLOCKED_DETAIL_EPOCH, expected->epoch);
-        const unsigned char *slot = internal(release_slot());
+        const unsigned char *slot = internal(release_slot(team));
         check_piece(slot, expected, "the result from the parent", tree->parent, routine);
         memcpy(at, slot + HEADER_BYTES, bytes);
     }
     for (uint32_t c = 0; c < tree->children; c++) {
-        osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL, release_slot(),
-                           expected, HEADER_BYTES, OSOE_TRANSPORT_MORE);
         osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL,
-                           release_slot() + HEADER_BYTES, at, bytes, OSOE_TRANSPORT_MORE);
+                           release_slot(team), expected, HEADER_BYTES, OSOE_TRANSPORT_MORE);
+        osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL,
+                           release_slot(team) + HEADER_BYTES, at, bytes, OSOE_TRANSPORT_MORE);
         osoe_transport_rmw(context, (int)tree->child[c], OSOE_REGION_INTERNAL, release_word(team),
                            OSOE_RMW_ADD, 8, 1, 0,
                            OSOE_TRANSPORT_FENCED |

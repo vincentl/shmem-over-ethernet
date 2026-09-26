@@ -877,7 +877,8 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     /* The heap, then OSOE_REGION_INTERNAL, in one object (internal-region.h):
      * the allocator is given heap_size and never reaches the tail. */
     n->internal_offset = page_round(b->symmetric_size ? b->symmetric_size : 1);
-    n->internal_bytes = page_round(osoe_internal_region_bytes(b->collective_fanout));
+    n->internal_bytes = page_round(osoe_internal_region_bytes(b->collective_fanout,
+                                                              b->max_teams));
     n->heap_bytes = n->internal_offset + n->internal_bytes;
     n->heap_of = calloc(b->local_count, sizeof *n->heap_of);
     if (!n->heap_of)
