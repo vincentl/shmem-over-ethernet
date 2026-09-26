@@ -51,10 +51,12 @@ static pid_t init_pid;
 static uint32_t sessions;       /* completed or current full sessions */
 
 /*
- * The thread level (§9.2, §4.6). osoe provides up to SHMEM_THREAD_SERIALIZED;
- * SHMEM_THREAD_MULTIPLE is §4.11 and is not implemented, so a request for it is
- * answered with SERIALIZED rather than refused - the interface exists precisely
- * so that a program can ask for more than it gets and find out.
+ * The thread level (§9.2, §4.6, §4.11). osoe provides every level, and since
+ * phase 1 step 8 slice 2 SHMEM_THREAD_MULTIPLE to a program that asks for it
+ * with shmem_init_thread. shmem_init lets the implementation choose (§9.2.2),
+ * and osoe chooses SERIALIZED, OSOE_INIT_LEVEL: what MULTIPLE adds - a mutex
+ * around every call on a shareable context, until §4.11's lock-free shared
+ * mode (slice 3) - is a cost only a program with threads should pay.
  *
  * The level is fixed by the *first* initialization of a session and does not
  * change afterwards, which spec §9.2.1 permits in as many words ("may not be
@@ -63,8 +65,9 @@ static uint32_t sessions;       /* completed or current full sessions */
  * time, including before any init, where the answer is the level a
  * shmem_init would provide.
  */
-#define OSOE_THREAD_MAX SHMEM_THREAD_SERIALIZED
-static _Atomic int thread_level = OSOE_THREAD_MAX;
+#define OSOE_THREAD_MAX SHMEM_THREAD_MULTIPLE
+#define OSOE_INIT_LEVEL SHMEM_THREAD_SERIALIZED
+static _Atomic int thread_level = OSOE_INIT_LEVEL;
 
 /*
  * What SHMEM_INFO prints (§8). The spec says "print helpful text about all
@@ -370,8 +373,8 @@ OSOE_API void pshmem_init(void)
     pthread_mutex_lock(&lifecycle);
     if (refcount == 0) {
         /* Initialized by shmem_init, the implementation chooses the level
-         * (§9.2.2), and osoe chooses the most it has. */
-        atomic_store_explicit(&thread_level, OSOE_THREAD_MAX, memory_order_release);
+         * (§9.2.2): SERIALIZED, which costs no program anything (above). */
+        atomic_store_explicit(&thread_level, OSOE_INIT_LEVEL, memory_order_release);
         session_start();
     }
     refcount++;
@@ -410,7 +413,7 @@ OSOE_API void pshmem_finalize(void)
         atomic_store_explicit(&osoe_initialized, 0, memory_order_release);
         /* A fresh session may be initialized at a different level. Until it
          * is, the answer is the one a shmem_init would give. */
-        atomic_store_explicit(&thread_level, OSOE_THREAD_MAX, memory_order_release);
+        atomic_store_explicit(&thread_level, OSOE_INIT_LEVEL, memory_order_release);
     }
     pthread_mutex_unlock(&lifecycle);
 }

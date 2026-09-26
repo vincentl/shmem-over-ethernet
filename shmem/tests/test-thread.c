@@ -56,10 +56,11 @@ int main(void)
     CHECK(SHMEM_THREAD_FUNNELED < SHMEM_THREAD_SERIALIZED);
     CHECK(SHMEM_THREAD_SERIALIZED < SHMEM_THREAD_MULTIPLE);
 
-    /* More than osoe has: the answer is what it has, and it is not a failure. */
+    /* MULTIPLE, since phase 1 step 8 slice 2, when asked for; a level past
+     * the four is clamped to the most there is (init.c). */
     int provided = -1;
-    CHECK(shmem_init_thread(SHMEM_THREAD_MULTIPLE, &provided) == 0);
-    CHECK(provided == SHMEM_THREAD_SERIALIZED);
+    CHECK(shmem_init_thread(SHMEM_THREAD_MULTIPLE + 5, &provided) == 0);
+    CHECK(provided == SHMEM_THREAD_MULTIPLE);
     shmem_query_thread(&level);
     CHECK(level == provided);
 
@@ -67,9 +68,9 @@ int main(void)
      * (§9.2.1). */
     int nested = -1;
     CHECK(shmem_init_thread(SHMEM_THREAD_SINGLE, &nested) == 0);
-    CHECK(nested == SHMEM_THREAD_SERIALIZED);
+    CHECK(nested == SHMEM_THREAD_MULTIPLE);
     shmem_query_thread(&level);
-    CHECK(level == SHMEM_THREAD_SERIALIZED);
+    CHECK(level == SHMEM_THREAD_MULTIPLE);
     shmem_finalize();                   /* the nested one */
 
     int me = shmem_my_pe(), n = shmem_n_pes();
@@ -79,7 +80,8 @@ int main(void)
     *counter = 0;
     shmem_barrier_all();
 
-    /* SERIALIZED for real: two threads of this PE, never concurrent. */
+    /* Two threads of this PE taking turns, as SERIALIZED would ask; under
+     * MULTIPLE it holds all the same (test-multiple.c is the concurrent one). */
     /* A failed create leaves t undefined, and joining an undefined pthread_t
      * below is not something continuing past can survive. */
     pthread_t t;

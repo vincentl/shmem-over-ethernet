@@ -40,10 +40,16 @@
  * above this header asks what a backend supports. A backend without native
  * support emulates underneath (§4.10).
  *
- * Threads. Phase 1 provides up to SHMEM_THREAD_SERIALIZED (§4.6): at most one
- * thread of a PE is inside these calls at a time, though it need not be the
- * same thread each time. Nothing here is safe to call concurrently.
- * SHMEM_THREAD_MULTIPLE is open (§10).
+ * Threads (§4.11). Under SHMEM_THREAD_MULTIPLE every operation may be called
+ * by any number of threads at once, on the same context or different ones,
+ * except where the context's mode forbids it: a context created without
+ * OSOE_TRANSPORT_CONTEXT_CONCURRENT, or any context below MULTIPLE, is serial,
+ * and the caller guarantees one call on it at a time. A fence or wait covers
+ * every operation on its context whose call returned before the fence or wait
+ * was called. A thread holds at most one watch. osoe_transport_notify may run
+ * in any number of threads and processes at once. Phase 1 step 8 slice 2 holds
+ * a concurrent context's mutex for each call; §4.11's lock-free shared mode
+ * (slice 3) replaces it.
  *
  * Errors. There is no error return. A transport failure aborts the job
  * (§3.15). That is the right contract because something outside the job - the

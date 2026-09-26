@@ -1618,6 +1618,24 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(get-nbi 0,1,2,0,1,0 ${osoe_get_nbi_small})
 endif()
 
+# SHMEM_THREAD_MULTIPLE (design §4.11; phase 1 step 8 slice 2;
+# test-multiple.c): worker threads of every PE in the library at once, on
+# private contexts and on the default one, waiting several at a time - under
+# tsan on one node, which is where it sees a race - and across nodes on a block
+# and an interleaved map, with a small landing zone so that threads' pieces
+# contend for its extents; and a full thread table ending the job by name.
+osoe_tier2_test(multiple)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(multiple 0,0,1,1 OSOE_GET_LANDING_BYTES=8192)
+  osoe_tier2_map_test(multiple 0,1,2,0,1,0 OSOE_GET_LANDING_BYTES=8192)
+endif()
+add_test(NAME shmem.multiple.exhaust
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MULTIPLE=exhaust OSOE_MAX_THREADS=3
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_multiple>)
+set_tests_properties(shmem.multiple.exhaust PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "more threads of this PE are in the library than OSOE_MAX_THREADS=3 allows")
+target_link_libraries(shmem_test_multiple PRIVATE Threads::Threads)
+
 # The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on
 # one node, where the team's local lead scans; across nodes on a block, an
 # interleaved and an uneven map, and under force-remote, where every member
