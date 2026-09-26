@@ -1,0 +1,6 @@
+srun: error: pi-001: task 0: Exited with exit code 1
+srun: Terminating StepId=583.0
+osoe: PE 0: OSOE_AM_CHUNK=24576 is not a power of two
+osoe: PE 0: control segment /osoe.583.0.0.0 (osoe-stat /osoe.583.0.0.0, while any PE of this node is alive)
+srun: error: pi-002: task 1: Terminated
+srun: Force Terminated StepId=583.0

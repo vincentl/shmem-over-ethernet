@@ -16,6 +16,11 @@
  *     landed pieces, its own or other threads', and wait for room);
  *   - on the default context, which every thread shares: a fetch-add on one
  *     counter at PE 0, a blocking get and a nonblocking one;
+ *   - on the default context too, a put of its own words to the right
+ *     neighbour, a quiet (a pe_quiet naming that neighbour on odd rounds),
+ *     and a blocking get of them back, by value: every other thread is
+ *     issuing and quieting on the same context meanwhile, which since phase
+ *     1 step 8 slice 3 takes no lock to issue (§4.11 items 1, 2 and 4);
  *   - a distributed lock, one per worker number, which the same-numbered
  *     workers of every PE contend for, around a get and a put of a count at
  *     PE 0 - so several threads of one PE hold different locks at once;
@@ -55,6 +60,8 @@ static uint64_t *shared_flag;   /* one word two workers of each PE wait on */
 static uint64_t *counter;       /* at PE 0: every worker's increments */
 static long *locks;             /* [THREADS]: one lock per worker number */
 static long *locked_count;      /* [THREADS], at PE 0: counted under the locks */
+static long *shared_rows;       /* [THREADS][WORDS]: the left neighbour's default-context puts */
+static long *shared_rows_back;  /* [THREADS][WORDS]: the right neighbour's */
 static pthread_mutex_t report = PTHREAD_MUTEX_INITIALIZER;
 static int failures;
 
@@ -154,6 +161,29 @@ static void *work(void *argument)
                      value(left, t, 0, i));
                 break;
             }
+        /* Its own words through the shared default context and back: a
+         * quiet, or a pe_quiet naming the neighbour, completes this thread's
+         * put whatever the other threads are doing on the context. */
+        long own[WORDS], back[WORDS];
+        for (int i = 0; i < WORDS; i++)
+            own[i] = value(me, t, round + 1000, i);
+        shmem_long_put(&shared_rows[t * WORDS], own, WORDS, right);
+        /* And to the left neighbour, on another node on an interleaved map,
+         * which a pe_quiet naming only the right one leaves outstanding: a
+         * full quiet another thread began before it must not take it for one
+         * (with OSOE_CHECK_QUIET, the library checks every wait's promise). */
+        shmem_long_put(&shared_rows_back[t * WORDS], own, WORDS, left);
+        if (round % 2)
+            shmem_pe_quiet(&right, 1);
+        else
+            shmem_quiet();
+        shmem_long_get(back, &shared_rows[t * WORDS], WORDS, right);
+        for (int i = 0; i < WORDS; i++)
+            if (back[i] != own[i]) {
+                fail("its own put on the default context, read back after a quiet", t, round,
+                     back[i], own[i]);
+                break;
+            }
         /* A count kept by a get and a put, under this worker number's lock. */
         shmem_set_lock(&locks[t]);
         long count = shmem_long_g(&locked_count[t], 0);
@@ -171,6 +201,26 @@ static void *work(void *argument)
     if (t < 2)
         shmem_uint64_wait_until(shared_flag, SHMEM_CMP_GE, (uint64_t)w->wave + 1);
     shmem_ctx_destroy(ctx);
+    return NULL;
+}
+
+/* Puts and nonblocking gets on the default context and nothing else: no
+ * quiet, no blocking operation, no wait - the calls a context's mutex must
+ * not be taken for. Each get has a destination of its own, which outlives the
+ * thread: they complete at the main thread's quiet, after it has gone, and any
+ * of the PE's threads may copy one out. */
+static long issue_got[THREADS][ROUNDS][WORDS];
+
+static void *issue_only(void *argument)
+{
+    int t = (int)(intptr_t)argument;
+    long own[WORDS];
+    for (int i = 0; i < WORDS; i++)
+        own[i] = value(me, t, 2000, i);
+    for (int k = 0; k < ROUNDS; k++) {
+        shmem_long_put(&shared_rows[t * WORDS], own, WORDS, right);
+        shmem_long_get_nbi(issue_got[t][k], &fixed[t * WORDS], WORDS, right);
+    }
     return NULL;
 }
 
@@ -212,8 +262,10 @@ int main(void)
     counter = shmem_calloc(1, sizeof *counter);
     locks = shmem_calloc(THREADS, sizeof *locks);
     locked_count = shmem_calloc(THREADS, sizeof *locked_count);
+    shared_rows = shmem_calloc(THREADS * WORDS, sizeof *shared_rows);
+    shared_rows_back = shmem_calloc(THREADS * WORDS, sizeof *shared_rows_back);
     CHECK_FATAL(words && fixed && landing && flags && shared_flag && counter && locks &&
-                locked_count);
+                locked_count && shared_rows && shared_rows_back);
     for (int t = 0; t < THREADS; t++)
         for (int i = 0; i < WORDS; i++)
             fixed[t * WORDS + i] = value(me, t, 0, i);
@@ -253,6 +305,26 @@ int main(void)
          * it still reads them. */
         shmem_barrier_all();
     }
+    /* Issue takes no lock (§4.11 item 4; phase 1 step 8 slice 3): threads
+     * putting and getting on the default context, toward a neighbour on
+     * another node, leave the count of context-mutex acquisitions where it
+     * was; only a wait takes the mutex. Checked before any wait. */
+    if (shmem_ptr(fixed, right) == NULL) {
+        uint64_t locks_before = counter_total("am.context_locks");
+        pthread_t issuers[THREADS];
+        for (int t = 0; t < THREADS; t++)
+            CHECK_FATAL(pthread_create(&issuers[t], NULL, issue_only, (void *)(intptr_t)t) == 0);
+        for (int t = 0; t < THREADS; t++)
+            CHECK_FATAL(pthread_join(issuers[t], NULL) == 0);
+        CHECK(counter_total("am.context_locks") == locks_before);
+        shmem_quiet();
+        for (int t = 0; t < THREADS; t++)
+            for (int k = 0; k < ROUNDS; k++)
+                if (issue_got[t][k][5] != value(right, t, 0, 5))
+                    fail("a nonblocking get issued alone, after the quiet", t, k,
+                         issue_got[t][k][5], value(right, t, 0, 5));
+    }
+    shmem_barrier_all();
     /* With a small landing zone and a neighbour on another node, each
      * thread's pieces overfilled it: an issue found no room at least once,
      * which is what makes the room-making path part of what this test ran.
@@ -270,6 +342,8 @@ int main(void)
             fail("the count kept under a lock", t, -1, locked_count[t], (long)npes * ROUNDS * 2);
     CHECK(failures == 0);
     shmem_barrier_all();
+    shmem_free(shared_rows_back);
+    shmem_free(shared_rows);
     shmem_free(locked_count);
     shmem_free(locks);
     shmem_free(counter);

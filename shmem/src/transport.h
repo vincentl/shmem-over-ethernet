@@ -47,9 +47,9 @@
  * and the caller guarantees one call on it at a time. A fence or wait covers
  * every operation on its context whose call returned before the fence or wait
  * was called. A thread holds at most one watch. osoe_transport_notify may run
- * in any number of threads and processes at once. Phase 1 step 8 slice 2 holds
- * a concurrent context's mutex for each call; §4.11's lock-free shared mode
- * (slice 3) replaces it.
+ * in any number of threads and processes at once. How the AM backend does it
+ * is its own (§4.11's shared mode, phase 1 step 8 slice 3): issue takes no
+ * lock, and a wait serializes with other waits on its context.
  *
  * Errors. There is no error return. A transport failure aborts the job
  * (§3.15). That is the right contract because something outside the job - the

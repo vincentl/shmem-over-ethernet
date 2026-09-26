@@ -1,0 +1,20 @@
+osoe-bench pes=2 remote_target=1 local_target=-1
+latency put+quiet target=1 where=remote bytes=8 median_us=171.0 fastest_us=166.6
+latency get target=1 where=remote bytes=8 median_us=172.1 fastest_us=171.2
+latency put+quiet target=1 where=remote bytes=64 median_us=172.1 fastest_us=118.7
+latency get target=1 where=remote bytes=64 median_us=173.5 fastest_us=172.3
+latency put+quiet target=1 where=remote bytes=512 median_us=180.5 fastest_us=179.5
+latency get target=1 where=remote bytes=512 median_us=181.9 fastest_us=180.7
+latency put+quiet target=1 where=remote bytes=4096 median_us=186.8 fastest_us=185.2
+latency get target=1 where=remote bytes=4096 median_us=171.3 fastest_us=164.9
+latency put+quiet target=1 where=remote bytes=32768 median_us=427.0 fastest_us=379.8
+latency get target=1 where=remote bytes=32768 median_us=417.6 fastest_us=380.0
+latency put+quiet target=1 where=remote bytes=262144 median_us=2374.9 fastest_us=2352.0
+latency get target=1 where=remote bytes=262144 median_us=2931.0 fastest_us=2886.5
+latency put+quiet target=1 where=remote bytes=1048576 median_us=9097.6 fastest_us=9071.0
+latency get target=1 where=remote bytes=1048576 median_us=11229.2 fastest_us=11158.5
+bandwidth put target=1 where=remote bytes=4096 mib_per_s=110.9
+bandwidth put target=1 where=remote bytes=65536 mib_per_s=111.5
+bandwidth put target=1 where=remote bytes=262144 mib_per_s=111.5
+bandwidth put target=1 where=remote bytes=1048576 mib_per_s=111.5
+bandwidth put target=1 where=remote bytes=4194304 mib_per_s=111.5

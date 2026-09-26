@@ -1,0 +1,9 @@
+== none (0 mutated lines)
+100% tests passed, 0 tests failed out of 2
+== bit_first_moved (1 mutated lines)
+    Test #334: shmem.multiple.checked.0-1 ...........***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.07 sec
+    Test #335: shmem.multiple.checked.0-1-2-0-1-0 ...***Failed  Error regular expression found in output. Regex=[OSOE_CHECK_QUIET:]  0.08 sec
+0% tests passed, 2 tests failed out of 2
+== bit_first (1 mutated lines)
+100% tests passed, 0 tests failed out of 2
+DONE

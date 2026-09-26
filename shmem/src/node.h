@@ -30,7 +30,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 23
+#define OSOE_NODE_LAYOUT 24
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -770,14 +770,29 @@ struct osoe_context_block {
      * The reply's token names the block (OSOE_LANDING_CONTEXT_SHIFT), so the
      * lead credits the right context without the wire changing.
      */
-    _Atomic uint64_t bytes_issued;
+    _Atomic uint64_t bytes_issued[2];
     _Atomic uint64_t bytes_landed;
     struct osoe_wait_word counter_wake;
     /* Since layout 23 (§4.11 item 8): the bytes of its replies copied out to
      * their `dest`, by whichever of the PE's threads claimed each (node.h,
      * struct osoe_landing_record). A wait on the context is over when this
      * reaches `bytes_issued`; a copier adds, then bumps `counter_wake`. */
-    _Atomic uint64_t bytes_copied;
+    _Atomic uint64_t bytes_copied[2];
+    /*
+     * Since layout 24 (§4.11 items 1 and 2; phase 1 step 8 slice 3): a shared
+     * context's gets count in the pair `generation & 1` names - issued and
+     * copied alike, the pair travelling in the token (OSOE_LANDING_PAIR) - so
+     * that a quiet can close a pair while other threads issue into the other.
+     * A quiet, holding the context's mutex, bumps `generation` and waits for
+     * the pair it closed; `full` is the generation the last full quiet
+     * opened, which a quiet begun before it may piggyback on. A serial
+     * context uses pair 0 and never moves `generation`. Both are 64 bits:
+     * a pe_quiet or a wait for gets moves `generation` without `full`, and
+     * a 32-bit difference between them wraps after 2^31 of those, when a
+     * quiet would piggyback with puts in flight (review of slice 3, B1).
+     */
+    _Atomic uint64_t generation;
+    _Atomic uint64_t full;
 };
 
 enum { OSOE_CONTEXT_FREE = 0, OSOE_CONTEXT_LIVE = 1 };
@@ -845,7 +860,9 @@ struct osoe_landing_record {
 /*
  * A token (layout 23): the top bit names a nonblocking get; bits 48 to 59
  * the block its completion goes to - a nonblocking get's context block, or a
- * blocking operation's thread record; bits 16 to 47 a sequence; and the low
+ * blocking operation's thread record; bit 47, since layout 24, the counter
+ * pair a shared context's nonblocking get counts in (struct
+ * osoe_context_block); bits 16 to 46 a sequence; and the low
  * 16 bits the piece's first extent, or OSOE_LANDING_NO_EXTENT for a fetching
  * AMO, whose reply is a value. The token is echoed by the target and read by
  * the origin alone, so the wire format is unchanged.
@@ -855,6 +872,8 @@ struct osoe_landing_record {
 #define OSOE_LANDING_NO_EXTENT UINT64_C(0xffff)
 #define OSOE_LANDING_OWNER_SHIFT 48
 #define OSOE_LANDING_OWNER_MASK UINT64_C(0xfff)
+#define OSOE_LANDING_PAIR (UINT64_C(1) << 47)
+#define OSOE_LANDING_SEQUENCE_MASK UINT64_C(0x7fffffff)
 
 /* Process-private view of the node. */
 struct osoe_node {

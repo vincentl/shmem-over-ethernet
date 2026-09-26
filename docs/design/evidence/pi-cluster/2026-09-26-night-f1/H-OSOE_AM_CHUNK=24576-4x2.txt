@@ -1,0 +1,19 @@
+osoe: PE 2: OSOE_AM_CHUNK=24576 is not a power of two
+osoe: PE 2: control segment /osoe.577.0.1.0 (osoe-stat /osoe.577.0.1.0, while any PE of this node is alive)
+osoe: PE 6: OSOE_AM_CHUNK=24576 is not a power of two
+osoe: PE 6: control segment /osoe.577.0.3.0 (osoe-stat /osoe.577.0.3.0, while any PE of this node is alive)
+osoe: PE 0: OSOE_AM_CHUNK=24576 is not a power of two
+osoe: PE 0: control segment /osoe.577.0.0.0 (osoe-stat /osoe.577.0.0.0, while any PE of this node is alive)
+osoe: PE 4: OSOE_AM_CHUNK=24576 is not a power of two
+osoe: PE 4: control segment /osoe.577.0.2.0 (osoe-stat /osoe.577.0.2.0, while any PE of this node is alive)
+srun: error: pi-002: task 2: Exited with exit code 1
+srun: Terminating StepId=577.0
+srun: error: pi-004: task 6: Exited with exit code 1
+slurmstepd-pi-001: error: *** STEP 577.0 ON pi-001 CANCELLED AT 2026-09-26T18:22:56 ***
+srun: error: pi-002: task 3: Terminated
+srun: error: pi-004: task 7: Terminated
+srun: error: pi-001: task 0: Exited with exit code 1
+srun: error: pi-001: task 1: Terminated
+srun: error: pi-003: task 4: Exited with exit code 1
+srun: error: pi-003: task 5: Terminated
+srun: Force Terminated StepId=577.0

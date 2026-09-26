@@ -3446,8 +3446,9 @@ instead of pushing every on-node rmw through NIC loopback.
 > **Designed and model-checked; being built in three slices** (phase 1 step 8,
 > `docs/prompts/done/phase1-step8-slice1-prompt.md`). Slice 1, contexts in serial
 > mode, is built (below, "Context modes"); slice 2 provides `MULTIPLE`, with
-> an interim mutex on shareable contexts where items 1, 2 and 4 put lock-free
-> issue (below, "As built, slice 2"); slice 3 replaces the mutex. Under `MULTIPLE`, a context that promises serialization
+> an interim mutex on shareable contexts (below, "As built, slice 2"); slice 3
+> builds items 1, 2 and 4, lock-free issue with the mutex on waits alone
+> (below, "As built, slice 3"). Under `MULTIPLE`, a context that promises serialization
 > (`SHMEM_CTX_PRIVATE` or `SHMEM_CTX_SERIALIZED`) keeps the §4.6 structures unchanged.
 > A shareable context, `SHMEM_CTX_DEFAULT` included, keeps a lock-free issue path and
 > serializes its quiets with a per-context mutex. Under that mutex, a generation word
@@ -3550,7 +3551,7 @@ and quiets on one context can fill it and complete another's gets early -
 correct, and a coupling in time between contexts that slice 2's extents,
 reused one by one, removes.
 
-*As built, slice 2* (`docs/prompts/phase1-step8-slice2-prompt.md`;
+*As built, slice 2* (`docs/prompts/done/phase1-step8-slice2-prompt.md`;
 `metrics.c`, `watch.c`, `transport-am.c`, `progress-host.c`, `node.h` layout
 23). `shmem_init_thread` provides `MULTIPLE` when asked; `shmem_init` stays at
 `SERIALIZED` (§4.6). What exists:
@@ -3584,6 +3585,40 @@ reused one by one, removes.
 - **The blocked record** stays one per PE: the first of its threads to wait
   owns it until its outermost wait ends, so `osoe-stat` shows one waiting
   thread whole; the other threads' waits show in their watch records.
+
+*As built, slice 3* (`docs/prompts/phase1-step8-slice3-prompt.md`;
+`transport-am.c`, `node.h` layout 24). Items 1, 2 and 4 as designed, over
+slice 2's structures:
+
+- **Get completion**: the context block holds `generation`, `full` and two
+  pairs, `bytes_issued[2]` and `bytes_copied[2]`. A shared context's
+  nonblocking get counts in the pair of the generation it loaded and loads it
+  again, taking the add back and retrying on a change (`am.issue_retries`);
+  the pair travels in the token's bit 47, so the copier credits it. A serial
+  context uses pair 0 and its pending list, unchanged.
+- **The dirty set**: per peer slot, a highest segment raised by
+  compare-and-swap and then a bit, both in process memory. A wait loads the
+  slot's number, asks the peer through it, waits for that number - not for
+  the slot's current one, which another thread's put may raise after the ask
+  (the first build waited for that and hung) - then clears the bit and looks
+  again. Fence reads the bits without a lock.
+- **The mutex** is taken by waits alone - quiet, `pe_quiet`, a wait for gets,
+  destroy's quiet - and counted (`am.context_locks`). A wait loads the
+  generation, takes the mutex, and piggybacks when `full` is past it;
+  otherwise it bumps the generation, completes the closed pair, waits for the
+  dirty set, and a full quiet stores `full`.
+- **How a quiet finds its landed pieces** (the brief's decision 5): it scans
+  the PE's landing records for its context's owner bits and claims each by
+  slice 2's compare-and-swap. No word of its own, so nothing new to model.
+
+**The timing** (`osoe-bench threads`, one PE's threads on the default context
+toward another node; `docs/pi-cluster-results.md`). On the Pis, four threads
+went from 0.89 of one thread's rate to about 1.4; one thread is unchanged.
+In the VM, four threads on four cores beside the agents are oversubscribed
+and show nothing; issue alone, without quiets, rose 10-25% at two and four
+threads. What bounds the rest lies below the context - the node's shared
+connection buffer or its one progress thread, not yet told apart - and is
+the next limit, not this slice's.
 
 Its test, `test-multiple.c`, runs four threads a PE in two waves on one node,
 on block and interleaved maps and, under tsan, on one PE a node - where every
@@ -3725,7 +3760,13 @@ bytes) and a `high_seg` word per node (8 bytes per node).
   load `high_seg[n]`, ask for an acknowledgement through it (§3.4), and wait for
   `acked[n] >= high_seg`.
   Clear the bit, re-load `high_seg[n]` and `acked[n]`, and if the node is still
-  behind, set the bit again and repeat.
+  behind, set the bit again and move on. *(Changed 2026-09-26, approved by the
+  author: the design said "and repeat", and a quiet that waits again can be
+  held for ever, with the mutex, by a thread that keeps putting to the node -
+  the review of step 8 slice 3, S1. The one wait already covers every put
+  that returned before the call, since each raised `high_seg[n]` before the
+  quiet loaded it; the re-set hands a later put to the next quiet.
+  `dirty_set_model.py`'s variant `resetstop` passes every design case.)*
 - **Fence** reads the bits and flushes, and never clears, so it takes no lock.
 - **`shmem_ctx_pe_quiet`** clears only its listed nodes' bits, under the same mutex.
   It still bumps the generation for gets, since it waits on every get (§4.6). It
@@ -6951,7 +6992,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Development environment | **Lima + Debian 13 on Apple Silicon**; CI deferred; a physical Pi for the kernel fork, NIC, and page size (§8.5) |
 | Which process hosts progress | **An agent thread in every PE; the local lead's runs the transport** (§3.12). A helper process was rejected on setup complexity, supervision, statics access, and exit status |
 | Phase-1 thread level | **Up to `SHMEM_THREAD_SERIALIZED`** (§4.6). Revised from `SINGLE`: nothing in phase 1 depends on which thread calls, only on one caller at a time. `MULTIPLE` is designed but not scheduled (below) |
-| `SHMEM_THREAD_MULTIPLE` design | **Designed and model-checked; being built in three slices, contexts (serial) and `MULTIPLE` with an interim mutex done** (§4.11, phase 1 step 8). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
+| `SHMEM_THREAD_MULTIPLE` design | **Designed, model-checked and built** in three slices: contexts (serial), `MULTIPLE` with an interim mutex, lock-free issue (§4.11, phase 1 step 8). Serial mode for `PRIVATE` and `SERIALIZED` contexts. On shareable contexts, lock-free issue and a per-context quiet mutex, with a generation word and two get-counter pairs; dirty bits cleared under the mutex; one block per thread holding its watch record and completion slot. Review D6 item 2's `landed >= snapshot` rule was found unsound and not adopted. Open points below |
 | Atomics | **ISO C11 `<stdatomic.h>` with named orders only; no intrinsics or assembly** (§3.16). Consequence: no spin-before-block |
 | Introspection export | **Shared-memory control segment read by an installed `osoe-stat`** (§3.14). No HTTP server and no metrics files in the library; Prometheus through node_exporter's textfile collector, deferred until there is a reason for a third formatter. **Revised in phase 1 step 2 slice 2:** the control segment's name is removed during init like every other object's, and `osoe-stat` finds a live job through `/proc/<pid>/fd` of any of its PEs; `OSOE_KEEP_CONTROL_SEGMENT=1` restores the old behaviour for post-mortem work. The original entry kept the name until finalize, accepting a small leak on crash — on the reasoning that uncooperative reading needed a name. It did not: it needed a rendezvous, and `/proc` is one that no crash can strand (§3.14). The reader shares only the frozen directory and the metric descriptor with the writer and finds everything else by name, which a tier-1 test enforces by handing it a segment this build did not write. The flight recorder is deferred to step 2, with its design standing: its events do not exist yet |
 | Vendor liburing or use the distribution's? | **Distribution's, ≥ 2.6.** Older OS releases are unsupported rather than accommodated with a bundled copy (§1) |

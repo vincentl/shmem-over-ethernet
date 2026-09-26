@@ -173,3 +173,58 @@ programs at 4 × 2: `mt_a2a`, `mt_contention`, `mt_membar`, `threading`,
 `thread_wait` and `query_thread` pass; `mt_lock_test` needs build flags from
 SOS's makefile that this session's script did not pass (it passes in the
 VM's sweep, which does).
+
+**Step 8 slice 3's timing** (`threads-bench/`): `osoe-bench threads`, PE 0's
+threads sharing the default context, 8-byte puts and nonblocking gets toward
+the other node with a quiet every 32 pairs, two Pis, three runs each:
+
+| threads | under slice 2's mutex | slice 3, lock-free issue |
+|---|---|---|
+| 1 | 327-379 k ops/s | 334-388 k |
+| 2 | 325-330 k | 348-370 k |
+| 4 | 317-320 k | 454-565 k |
+
+Four threads went from 0.89 of one thread's rate to about 1.4, which is the
+brief's claim. In the VM the four-thread run shares four cores with both PEs'
+agents and shows no change; issue alone there rose 10-25% at two and four
+threads.
+
+## F1, investigated (2026-09-26, night)
+
+Main `96b2e0f`, about an hour of cluster time, no root. Raw outputs and
+every script: `docs/design/evidence/pi-cluster/2026-09-26-night-f1/`; a
+probe, `f1probe.c`, times `shmem_fcollectmem` at any block size.
+
+**What F1 is.** Rare, enormous stalls - one to four calls in 200, each 0.5 to
+36 seconds, the retransmission timeout doubling six or seven times - at four
+nodes only: at 4 × 1 with blocks of 24 to 36 KiB, at 4 × 2 with 16 KiB. On
+any three of the four nodes, osoe never stalls.
+
+**It follows pi-002.** Across four placements of the ranks on the nodes,
+pi-002 held ranks 1, 0, 3 and 2, and took 90 to 110 new timeouts every run,
+the other nodes at most 13 once. Its retransmissions are spurious - every one
+is reported back as a duplicate - so its data arrives and the
+acknowledgements come back late. No NIC counts an error, drop, overrun or
+pause frame; no kernel counts a receive drop; the four nodes' kernels, TCP
+settings, offloads and links are identical.
+
+**Plain TCP does not trigger it.** A Python program doing the same four-node
+exchange (`tcp-bruck.py`), steps one after the other or both at once, ran
+1,500 rounds at 24 and 32 KiB without a round over 2 ms. So osoe's traffic
+triggers something on pi-002's path that this simpler traffic does not.
+
+**No software setting cures it; each moves it.**
+
+| tried | result |
+|---|---|
+| `TCP_RTO_MIN_US` 5 ms | stalls of 34-50 ms a call on average, as many timeouts |
+| pacing at 100 and 60 MB/s | stalls stay at one shape or the other; 60 MB/s halves the stream |
+| send buffer 64 and 32 KiB | stalls stay |
+| Reno instead of Cubic | stalls stay |
+| linear retransmission timeouts | a 27 s stall still |
+| the allgather's puts in 16 KiB pieces | stalls stay |
+| a 32 KiB chunk; a 256 KiB buffer | stalls stay |
+| a 16 KiB chunk | **the stalls move**: 4 × 1 at 24-28 KiB (up to 20 s), 4 × 2 at 12 KiB (up to 18 s) |
+
+The session's earlier "a 16 KiB chunk ends F1" held only at the sizes it
+measured.

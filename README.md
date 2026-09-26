@@ -6,8 +6,8 @@ libraries.
 
 **Status:** phase 1, through step 7 (team creation), step 8's first slice
 (contexts), step 9's first slice (block-strided RMA) and step 10's (the
-prefix scans), and step 8's second, `SHMEM_THREAD_MULTIPLE`; its third, a
-lock-free default context, follows (design §7.1, §4.11). Jobs run on one node or across
+prefix scans), and step 8's second and third, `SHMEM_THREAD_MULTIPLE` with
+lock-free issue on shared contexts (design §7.1, §4.11). Jobs run on one node or across
 nodes over TCP and io_uring, started by `srun` or by `osoe-launch`:
 initialization and every thread level, `SHMEM_THREAD_MULTIPLE` when
 `shmem_init_thread` asks for it (`shmem_init` gives `SHMEM_THREAD_SERIALIZED`), the symmetric
@@ -36,8 +36,8 @@ Contexts - `shmem_ctx_create`, `shmem_team_create_ctx` and every RMA, AMO and
 ordering routine on them, with team-relative PE numbering - are there; a
 context created `SHMEM_CTX_PRIVATE` or `SHMEM_CTX_SERIALIZED` is serial, one
 call at a time. Under `SHMEM_THREAD_MULTIPLE` any other context, the default
-included, takes any number of threads at once; for now each call on it holds
-the context's mutex.
+included, takes any number of threads at once: they issue without a lock,
+and their quiets on it take turns.
 
 The prefix scans, `shmem_sum_inscan` and `shmem_sum_exscan`, over every type
 SUM takes, are there too (design §5.8).

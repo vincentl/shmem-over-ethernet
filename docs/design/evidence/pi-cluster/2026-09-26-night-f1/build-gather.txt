@@ -1,0 +1,4 @@
+[ 16%] Built target osoe_base
+[ 25%] Building C object shmem/CMakeFiles/osoe.dir/src/internode-generic.c.o
+[ 25%] Linking C shared library libosoe.so
+[100%] Built target osoe

@@ -432,7 +432,12 @@ first session's numbers are in the expectations above, where they apply.
 The third session (`docs/pi-cluster-results.md`) did the last list's F1
 levers, F2's sweep and the SOS context and scan programs. What is left:
 
-1. **F1's lost segments, with root.** Which link drops them is what a
+1. **F1: pi-002's link first, then its lost segments with root.** The night
+   of 2026-09-26 traced F1 to pi-002 whatever rank it holds
+   (`docs/pi-cluster-results.md`, "F1, investigated"). Move pi-002 to another
+   switch port with another cable and PoE port, then rerun
+   `docs/design/evidence/pi-cluster/2026-09-26-night-f1/f1-session.sh`'s
+   phase A. If the stalls stay with pi-002, capture: Which link drops them is what a
    capture shows and counters cannot: on `pi-002` and on the node it sends
    to in the exchange,
 
@@ -442,10 +447,8 @@ levers, F2's sweep and the SOS context and scan programs. What is left:
 
    during `srun -K1 -N4 --ntasks-per-node=2 ./osu_oshm_fcollect -m 16384:16384 -i 50`
    from `$W/osu/c/openshmem`. Needs the author (sudo asks for a password).
-2. **Would a 16 KiB `OSOE_AM_CHUNK` cost anything?** It removed F1's
-   losses. Run §6's `osoe-bench` and the OSU fcollect, broadcast and put
-   bandwidth sweeps at 4 × 1 and 4 × 4 with `OSOE_AM_CHUNK=16384` and without;
-   if the stream holds 111 MiB/s, the default should change.
+2. *(Done: a 16 KiB chunk costs gets 1.5× and does not cure F1, only moves
+   it.)*
 3. **The vanished node** (§7), with its PoE port power-cycled after. Needs
    the author at the switch.
 4. **Step 8 slice 3's timing**: `osoe-bench`'s threads line before and
