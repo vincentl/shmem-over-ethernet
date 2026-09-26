@@ -448,7 +448,7 @@ levers, F2's sweep and the SOS context and scan programs. What is left:
    if the stream holds 111 MiB/s, the default should change.
 3. **The vanished node** (§7), with its PoE port power-cycled after. Needs
    the author at the switch.
-4. **After step 8 slice 2 lands**: SOS's nine threaded programs at 4 × 2,
-   and `shmem_test_multiple` under Slurm at 4 × 2.
+4. **Step 8 slice 3's timing**: `osoe-bench`'s threads line before and
+   after the slice, at 4 × 1 (the brief's speed claim).
 
 Bring back the pcap, the sweeps, and anything that failed.

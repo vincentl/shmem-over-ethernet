@@ -1,0 +1,15 @@
+16:55:24 build exit 0
+16:55:27 tier2 threads: 100% tests passed, 0 tests failed out of 47
+16:55:27 shmem_test_multiple [-N4 --ntasks-per-node=2] landing 8192 exit 0
+16:55:28 shmem_test_multiple [-N4 --ntasks-per-node=2] landing 262144 exit 0
+16:55:28 shmem_test_multiple [-N4 --ntasks-per-node=1] landing 8192 exit 0
+16:55:29 shmem_test_multiple [-N4 --ntasks-per-node=1] landing 262144 exit 0
+16:55:29 mt_a2a 4x2 exit 0
+16:55:30 mt_contention 4x2 exit 0
+16:55:30 mt_lock_test: build failed
+16:56:26 mt_membar 4x2 exit 0
+16:56:26 threading 4x2 exit 0
+16:56:27 thread_wait 4x2 exit 0
+16:56:28 query_thread 4x2 exit 0
+16:56:28 gettid_register: no source
+16:56:28 DONE
