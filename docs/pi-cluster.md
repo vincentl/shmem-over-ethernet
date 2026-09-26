@@ -471,8 +471,21 @@ in order, with `W=~/osoe-corpus` and `OSHCC` as in §8:
    done
    ```
 
+   And **the allgather** (merged the same day): fcollect and collect now move
+   each node's blocks once, in ceil(log2 N) steps, where the first session's
+   16 x 1 MiB fcollect took 773 ms through the tree. Every size, at one and
+   four PEs a node - small blocks too, where the VM measured the allgather
+   slower than the tree (280 against 176 us for 8 bytes a PE on four nodes),
+   which real links will price differently:
+
+   ```sh
+   for ppn in 1 4; do
+     srun -K1 -N4 --ntasks-per-node=$ppn ./osu_oshm_fcollect > ~/osu-fcollect-allgather-4x$ppn.txt
+   done
+   ```
+
 8. Optionally, **§7's vanished node**, with its PoE port power-cycled after.
 
-Bring back what §9 lists, and `sos.txt`, the `osu-*-1x2.txt`, `osu-*-4x*.txt`
-and `osu-*-k*-d*.txt` files, both halves of the test suite's summary, and the
-two start-up times.
+Bring back what §9 lists, and `sos.txt`, the `osu-*-1x2.txt`, `osu-*-4x*.txt`,
+`osu-*-k*-d*.txt` and `osu-fcollect-allgather-*.txt` files, both halves of the
+test suite's summary, and the two start-up times.
