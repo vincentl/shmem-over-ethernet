@@ -28,9 +28,9 @@ cmake_minimum_required(VERSION 3.25)
 # the same runtime, one of the stances the successor-API notes weigh
 # (docs/design/successor-api-stage-setting.md §6). It is about includes: the
 # backend still calls the upcalls the API defines - osoe_internode_released,
-# and the three a data half asks of a team, osoe_internode_team_lead,
-# osoe_internode_team_local_ranks and osoe_internode_team_world_ranks - which
-# internode.h declares.
+# and the two a data half asks of a team, osoe_internode_team_lead and
+# osoe_internode_team_local_ranks - which internode.h declares. (A third, the
+# team's world ranks, went when the team's record carried them: decision E.)
 #
 # **An include is judged by the file it resolves to**, quoted or angled, the
 # way the build's include path finds it - shmem/src, the repository root, the

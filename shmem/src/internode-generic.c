@@ -148,8 +148,9 @@
  *
  * **The shares' members are found once per team** (find_intervals), at its
  * first gather, since they depend on the team and the rank map alone: the
- * team's ranks walked in order, their world ranks from the team's mapping
- * (osoe_internode_team_world_ranks) and their nodes from the rank map's runs,
+ * team's ranks walked in order, their world ranks from the progression the
+ * team's record carries (node.h, decision E) and their nodes from the rank
+ * map's runs,
  * each stretch of members on one node joining the list of every step whose
  * shares include its node, merged with the interval before it when the two
  * touch. A list holds intervals of consecutive team ranks, and consecutive
@@ -917,12 +918,18 @@ static void find_intervals(struct generic_team *team_phase, uint32_t team, const
     if (!team_phase->step_intervals || !walk.steps_joined)
         osoe_fatal("%s: out of memory for team %u's gather", routine, team);
 
-    uint32_t rank = 0, world = 0, count;
-    int32_t stride = 1;
-    while ((count = osoe_internode_team_world_ranks(team, rank, &world, &stride)) > 0) {
-        if (stride == 0 && count > 1)
-            osoe_fatal("%s: team %u's ranks from %u on are all world rank %u", routine, team,
-                       rank, world);
+    /* The team's members as world ranks, from its record on this node, which
+     * this thread - the team's local lead here - wrote (node.h, decision E):
+     * one progression, walked once. */
+    const struct osoe_team_record *record = &osoe_node_team(&osoe.node, team)->record;
+    if (!atomic_load_explicit(&record->published, memory_order_acquire) || !record->strided)
+        osoe_fatal("%s: team %u's record here is %s", routine, team,
+                   record->strided ? "not published" : "not a progression of world ranks");
+    uint32_t rank = 0, world = record->world_start, count = record->members;
+    int32_t stride = record->world_stride;
+    if (stride == 0 && count > 1)
+        osoe_fatal("%s: team %u's ranks are all world rank %u", routine, team, world);
+    if (count > 0) {
         for (uint32_t k = 0; k < count;) {
             int64_t w = (int64_t)world + (int64_t)k * stride;
             const struct osoe_rank_run *run =

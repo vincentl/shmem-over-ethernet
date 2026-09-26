@@ -4826,10 +4826,12 @@ its gathers per team, and its gather *x* waits for *x* + 1.
 
 **Which members' blocks each step sends is found once per team**, at its
 first gather, after the lead has entered: it depends on the team and the rank
-map alone. A walk of the team's ranks in order - their world ranks as
-progressions from a third upcall, `osoe_internode_team_world_ranks`, since a
-created team's mapping is its descriptor's, above the seam, and its members
-on another node can be found no other way; their nodes from the rank map's
+map alone. A walk of the team's ranks in order - their world ranks as the
+progression the team's record carries since layout 22 (the author's decision
+E of 2026-09-26: every team with an internode phase is strided in world ranks,
+so a backend learns a team from its record alone; from phase 1 step 5 slice 6
+until then a third upcall, `osoe_internode_team_world_ranks`, asked the
+descriptor above the seam); their nodes from the rank map's
 runs, a stretch of one node's members at a time under a block distribution
 and one member at a time, by arithmetic, under a cyclic one - puts each
 stretch in the list of every step whose shares include its node, merged with

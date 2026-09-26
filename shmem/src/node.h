@@ -30,7 +30,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 21
+#define OSOE_NODE_LAYOUT 22
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -548,6 +548,22 @@ struct osoe_team_record {
     /* Each child node's lead's rank - for the predefined teams the rank at its
      * local id 0 - in the order of the children's positions. */
     uint32_t child[OSOE_COLLECTIVE_FANOUT_MAX];
+    /*
+     * Layout 22 (the author's decision E of 2026-09-26; phase 1 step 10 slice
+     * 1): the team's ranks as world ranks, so a backend maps any member from
+     * the record alone - team rank r is world rank `world_start` + r x
+     * `world_stride`, for r below `members`. Every team descending from
+     * SHMEM_TEAM_WORLD is such a progression (spec §9.4.6: a split of a
+     * progression by a progression is one), and only SHMEM_TEAM_SHARED's
+     * family is not; that family never leaves a node, so it has no internode
+     * phase, and its record says `strided` 0 and nothing below asks. Until
+     * layout 22 a backend asked the SHMEM layer, through
+     * osoe_internode_team_world_ranks, which is gone.
+     */
+    uint32_t members;
+    uint32_t world_start;
+    int32_t world_stride;
+    uint32_t strided;               /* 1 for a progression, 0 for a table */
 };
 
 /*
