@@ -44,7 +44,25 @@ static void finalize_at_exit(void)
     pshmem_finalize();              /* stands aside on an abort's exit (abort.h) */
 }
 
-OSOE_API void start_pes(int npes)
+/*
+ * The profiling names (spec §10 item 1; design §7.4). The spec asks for a
+ * `pshmem_` entry point for every function and does not say how to shift a
+ * name that never had a `shmem_` prefix, so both readings are provided: `p`
+ * and the name - `pstart_pes`, `p_my_pe`, `pshmalloc` - which is what Sandia
+ * OpenSHMEM defines and so what existing profiling tools call, and the literal
+ * `pshmem_` and the name - `pshmem_start_pes`, `pshmem__my_pe`. The `p` form
+ * is the definition; the `pshmem_` form is a second strong name for it, and
+ * the old name a weak alias a tool may replace, as every `shmem_` routine is.
+ * (Until 2026-09-26 neither existed, a known non-conformance; the author
+ * chose to provide both.)
+ */
+#define OSOE_DEPRECATED_NAMES(name)                                           \
+    extern __typeof__(p##name) name                                          \
+        __attribute__((weak, alias("p" #name), visibility("default")));      \
+    extern __typeof__(p##name) pshmem_##name                                 \
+        __attribute__((alias("p" #name), visibility("default")));
+
+OSOE_API void pstart_pes(int npes)
 {
     (void)npes;                     /* meaningless since before this project */
     if (started)
@@ -55,35 +73,43 @@ OSOE_API void start_pes(int npes)
     atexit(finalize_at_exit);
 }
 
-OSOE_API int _my_pe(void)
+OSOE_API int p_my_pe(void)
 {
     return pshmem_my_pe();
 }
 
-OSOE_API int _num_pes(void)
+OSOE_API int p_num_pes(void)
 {
     return pshmem_n_pes();
 }
 
-OSOE_API void *shmalloc(size_t size)
+OSOE_API void *pshmalloc(size_t size)
 {
     return pshmem_malloc(size);
 }
 
-OSOE_API void shfree(void *ptr)
+OSOE_API void pshfree(void *ptr)
 {
     pshmem_free(ptr);
 }
 
-OSOE_API void *shrealloc(void *ptr, size_t size)
+OSOE_API void *pshrealloc(void *ptr, size_t size)
 {
     return pshmem_realloc(ptr, size);
 }
 
-OSOE_API void *shmemalign(size_t alignment, size_t size)
+OSOE_API void *pshmemalign(size_t alignment, size_t size)
 {
     return pshmem_align(alignment, size);
 }
+
+OSOE_DEPRECATED_NAMES(start_pes)
+OSOE_DEPRECATED_NAMES(_my_pe)
+OSOE_DEPRECATED_NAMES(_num_pes)
+OSOE_DEPRECATED_NAMES(shmalloc)
+OSOE_DEPRECATED_NAMES(shfree)
+OSOE_DEPRECATED_NAMES(shrealloc)
+OSOE_DEPRECATED_NAMES(shmemalign)
 
 /*
  * SHMEM_CACHE (Annex F.2.7). "Originally implemented for systems with

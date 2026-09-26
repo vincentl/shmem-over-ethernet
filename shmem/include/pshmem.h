@@ -138,11 +138,27 @@ void pshmem_ctx_session_start(shmem_ctx_t ctx, long options,
 void pshmem_ctx_session_stop(shmem_ctx_t ctx);
 
 /*
- * SHMEM_CACHE (Annex F.2.7). The other deprecated routines - start_pes,
- * _my_pe, shmalloc and the rest - have no `shmem_` prefix, so there is no
- * `pshmem_` spelling of them: §10's profiling interface is defined over the
- * `shmem_` namespace, and a `pstart_pes` would be an invention.
+ * The deprecated routines without a `shmem_` prefix (Annex F), under both
+ * readings of spec §10 item 1: `p` and the name, as Sandia OpenSHMEM spells
+ * them, and `pshmem_` and the name. One function each; the old name is a
+ * weak alias of it.
  */
+void pstart_pes(int npes);
+int p_my_pe(void);
+int p_num_pes(void);
+void *pshmalloc(size_t size);
+void pshfree(void *ptr);
+void *pshrealloc(void *ptr, size_t size);
+void *pshmemalign(size_t alignment, size_t size);
+void pshmem_start_pes(int npes);
+int pshmem__my_pe(void);
+int pshmem__num_pes(void);
+void *pshmem_shmalloc(size_t size);
+void pshmem_shfree(void *ptr);
+void *pshmem_shrealloc(void *ptr, size_t size);
+void *pshmem_shmemalign(size_t alignment, size_t size);
+
+/* SHMEM_CACHE (Annex F.2.7). */
 void pshmem_clear_cache_inv(void);
 void pshmem_set_cache_inv(void);
 void pshmem_set_cache_line_inv(void *dest);

@@ -15,7 +15,8 @@ cmake_minimum_required(VERSION 3.25)
 # enough to cover them would admit anything.
 set(ALLOWED "^p?shmem_|^shmemx_")
 set(ALLOWED_EXACT
-  start_pes _my_pe _num_pes shmalloc shfree shrealloc shmemalign)
+  start_pes _my_pe _num_pes shmalloc shfree shrealloc shmemalign
+  pstart_pes p_my_pe p_num_pes pshmalloc pshfree pshrealloc pshmemalign)
 
 find_program(NM nm REQUIRED)
 execute_process(COMMAND "${NM}" -D --defined-only "${LIB}"

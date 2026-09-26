@@ -32,7 +32,22 @@
 #include "check.h"
 #include "invariants.h"
 
-static int mallocs, puts_made, adds;
+static int mallocs, puts_made, adds, old_mallocs, old_my_pes;
+
+/* The deprecated routines are interposable too, forwarding through either
+ * profiling spelling (spec §10 item 1): Sandia's `p` form and the literal
+ * `pshmem_` one. */
+void *shmalloc(size_t size)
+{
+    old_mallocs++;
+    return pshmalloc(size);
+}
+
+int _my_pe(void)
+{
+    old_my_pes++;
+    return pshmem__my_pe();
+}
 
 void *shmem_malloc(size_t size)
 {
@@ -112,6 +127,16 @@ int main(void)
      * pointer *is* shmem_malloc (spec §9.3.3), so the allocation happens - but
      * through pshmem_malloc, so the profiler's count does not move.
      */
+    /* The old names: the application's definitions run and forward. */
+    long *old = shmalloc(sizeof *old);
+    CHECK_FATAL(old != NULL);
+    CHECK(old_mallocs == 1);
+    CHECK(_my_pe() == me && old_my_pes == 1);
+    CHECK(p_my_pe() == me && pshmem__my_pe() == me && p_num_pes() == n &&
+          pshmem__num_pes() == n);
+    CHECK(old_my_pes == 1);                /* the p forms are not interposed */
+    pshmem_shfree(old);
+
     int before = mallocs;
     uint64_t *grown = shmem_realloc(NULL, 4096);
     CHECK(grown != NULL);
