@@ -102,8 +102,8 @@ enum osoe_abort_disposition {
  * region, the progress thread's and the backends' bookkeeping - and is
  * job-wide, so every node means the same team by it. The predefined teams take
  * the first three; teams created by shmem_team_split_* (phase 1 step 7 slice
- * 2) will take 3 to OSOE_MAX_TEAMS - 1, which is what every per-team array is
- * sized by (§5.7).
+ * 2) take 3 to OSOE_MAX_TEAMS - 1, each claimed once and never reused within a
+ * session, and every per-team array is sized by OSOE_MAX_TEAMS (§5.7).
  */
 enum osoe_team_number {
     OSOE_TEAM_WORLD = 0,
@@ -297,11 +297,11 @@ struct osoe_segment_directory {
  * here before a re-read would happen, and that arrival is then lost - a hang on
  * every other node, which is the worst place to debug it.
  *
- * A team with no internode phase never touches its entry. SHMEM_TEAM_SHARED is
- * one node by definition, so today only the world and finalize teams' are ever
- * written; it is per team anyway, because a split team (§7.3) spanning several
- * nodes is the next thing to arrive and sharing one word between two teams
- * would make a sync on one forward the arrival of the other.
+ * A team with no internode phase never touches its entry: SHMEM_TEAM_SHARED is
+ * one node by definition, and so is every team split from it. It is per team
+ * because the world, the finalize team and the teams a split creates across
+ * nodes each have one, and sharing one word between two teams would make a
+ * sync on one forward the arrival of the other.
  */
 struct osoe_arrival_handoff {
     /*
@@ -438,23 +438,26 @@ struct osoe_collective_state {
 /*
  * A team's record on this node (layout 18; phase 1 step 7): what this node's
  * progress thread and internode backend need of a team they may hold no
- * descriptor for. When split teams exist, the node lead's process - where the
- * progress thread runs - need not belong to a team at all, so it learns the
- * team here, by number, and never from a private descriptor.
+ * descriptor for. The node lead's process - where the progress thread runs -
+ * need not belong to a team a split creates at all, so it learns the team
+ * here, by number, and never from a private descriptor.
  *
  * Its content is §5.2's accounting as the node sees it: the team's members on
  * this node, and this node's place in the team's internode tree - O(k), the
  * part of the node set the tree keeps. Each neighbour node is named by its
- * lead's rank - for the predefined teams the rank at its local id 0 - which the
- * generic internode phase puts to, and from which the progress thread finds
- * the node numbers its messages go to.
+ * lead's rank - for the predefined teams the rank at its local id 0, for a
+ * created team its member with the lowest team rank there - which the generic
+ * internode phase puts to, and from which the progress thread finds the node
+ * numbers its messages go to.
  *
  * Written once, fields first and then `published` with a release store; a
  * reader loads `published` with acquire and reads the rest only once it is 1
  * (§3.16's single-writer publication). Never rewritten: a team number is not
- * reused within a session (§5.7), so neither is its record. A team of one -
- * SHMEM_TEAM_SHARED under force-remote - has none, since it touches nothing of
- * the node's. More than one cache line: the children's ranks alone are 128
+ * reused within a session (§5.7), so neither is its record, which outlives the
+ * team's destruction. SHMEM_TEAM_SHARED under force-remote has none: it is a
+ * different team of one on each PE of the node under the one number, and
+ * touches nothing of the node's. A created team of one has one, its number
+ * being its own. More than one cache line: the children's ranks alone are 128
  * bytes at the largest fan-out.
  *
  * **Who sees it, and why** (§3.16). The predefined teams' records are written
@@ -468,10 +471,44 @@ struct osoe_collective_state {
  * (internode-generic.c). The arrival counter carries them as well: the lead is
  * a member of every predefined team, and the member that posts an arrival
  * reads, with its own seq_cst add, a value in the release sequence of the
- * lead's add, which the lead made after writing them. A record a split writes
- * (slice 2) is written by the team's local lead while every process runs, and
- * needs its own argument: the split's sync over the parent team, which no
- * member leaves before every record of the new team is published.
+ * lead's add, which the lead made after writing them.
+ *
+ * **A created team's record** (phase 1 step 7 slice 2) is written by the
+ * team's local lead on this node - its member of lowest team rank here, in
+ * whatever process that is - while every process runs, and before that PE
+ * arrives at the split's sync over the parent team (team.c). Every reader sees
+ * it by orders that exist already, the sync carrying it:
+ *
+ * - **The team's members on this node**, on the arrival path and in the data
+ *   half. The local lead publishes the record, and raises
+ *   `team_numbers_published`, before its own arrival at the parent's sync, a
+ *   seq_cst add to the parent's `arrived`. The parent's epoch is released
+ *   here only after the last local arrival, a later add to the same counter,
+ *   and every add to it is a read-modify-write, so the last one reads a value
+ *   in the release sequence of the local lead's: the last arriver's release
+ *   bump of `released` - or, for a parent spanning nodes, the progress
+ *   thread's, below - follows the record, and each member's acquire of that
+ *   release precedes its return from the split, and so its first arrival at
+ *   the new team. (The data half reads this node's record on the local lead,
+ *   which wrote it.)
+ * - **This node's progress thread**, whose process need not hold a member.
+ *   For a parent spanning nodes the thread performs this node's arrival at the
+ *   parent's sync by acquiring the parent's arrival handoff, which the last
+ *   local arriver posted after its add, and so after the local lead's:
+ *   everything the thread does after that follows the record. It meets the
+ *   new team at one of two things. A local member's first post, which comes
+ *   after that member's return from the split, and is followed by its bump of
+ *   the lead's wake word, so the thread's load of `team_numbers_published`
+ *   after its load of that word sees the mark raised (internode-am.c). Or a
+ *   message about the new team from another node, which can only have been
+ *   sent once the parent's sync completed, which needed this node's arrival,
+ *   which the thread sent after its acquire of the handoff: the message's
+ *   receipt is later in the thread's own program order.
+ * - **A parent on one node** has children on one node, which send no messages
+ *   and have no internode phase for the thread to learn.
+ *
+ * osoe-stat reads a record from another process at any time, loading
+ * `published` with acquire.
  */
 struct osoe_team_record {
     _Alignas(OSOE_CACHELINE)
@@ -592,8 +629,8 @@ struct osoe_node_header {
      * created and not OSOE_MAX_TEAMS: numbers are never reused (§5.7), and a
      * node's are published in no particular order, so it is a high-water mark,
      * raised by each record's writer after its `published` and never lowered -
-     * a compare-and-swap that only raises it, since the writers of slice 2's
-     * records are the teams' local leads, in any process of the node. Raised as
+     * a compare-and-swap that only raises it, since the writers of created
+     * teams' records are their local leads, in any process of the node. Raised as
      * part of writing the record, so the record's argument for who sees it
      * covers it too. On its own line: every pass of the agent loads it.
      */

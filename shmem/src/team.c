@@ -17,23 +17,64 @@
  * descriptor holds is the team's shape: this node's members and which of them
  * leads, and its ranks as world ranks (team.h).
  *
- * Everything that would create a new team or context returns nonzero and
- * assigns the invalid handle. spec §9.5.1 says an unsuccessful context creation
- * "is not treated as an error", and §9.4 says a PE that is not a member of a
- * new team receives SHMEM_TEAM_INVALID, so a program written against the spec
- * already has the branch this takes.
+ * **Teams are created by splitting a parent** (spec §9.4.6, §9.4.7; phase 1
+ * step 7 slice 2, docs/prompts/phase1-step7-slice2-prompt.md), collectively
+ * over the parent, in this order:
+ *
+ *   1. every parent PE checks the arguments alike: the spec's failures return
+ *      nonzero on every one of them, and what it leaves undefined ends the job
+ *      by name;
+ *   2. the parent's rank 0 claims a number for each team the call creates,
+ *      with one fetching add on a counter in world PE 0's internal region
+ *      (internal-region.h) - numbers are job-wide and never reused within a
+ *      session (§5.7), so no late message or straggling reader of a team's
+ *      state ever meets another team under its number;
+ *   3. a broadcast over the parent carries the first number, or 0 for a claim
+ *      past OSOE_MAX_TEAMS, in eight bytes every parent PE borrows from the
+ *      symmetric heap for the call, as collect borrows its lengths' room;
+ *   4. every member builds its descriptor: its node's members in O(L), and the
+ *      team's node set in O(team size), the one step that is not logarithmic,
+ *      taken at creation only;
+ *   5. each node's local lead of the new team writes the team's record into
+ *      its node's block for the number and publishes it (node.h, where the
+ *      argument that every reader sees it is written);
+ *   6. a sync over the parent, so that no collective on the new team starts
+ *      anywhere before every member node's record is published;
+ *   7. members get the handle - the descriptor's address - and the others
+ *      SHMEM_TEAM_INVALID, every parent PE the same status.
+ *
+ * A created team's descriptor lives in this process's pool, one per number
+ * (osoe_team_of): a handle is accepted while it is the live descriptor for its
+ * number, and one never issued or already destroyed is named, never
+ * dereferenced. Destroying a team is a sync over its members, then its
+ * descriptor's arrays are freed and its number forgotten here; the number, and
+ * its blocks and records on every node, stay, since nothing reuses them.
+ *
+ * Contexts other than the default are not created: shmem_ctx_create and
+ * shmem_team_create_ctx return nonzero and assign SHMEM_CTX_INVALID, which
+ * spec §9.5.1 permits - an unsuccessful context creation "is not treated as an
+ * error" - so a program written against the spec already has the branch this
+ * takes.
  */
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <pshmem.h>
 #include <shmem.h>
 
+#include "allocator.h"
+#include "barrier.h"
 #include "collective-tree.h"
+#include "collectives.h"
 #include "export.h"
 #include "fatal.h"
+#include "internal-region.h"
+#include "internode.h"
 #include "job.h"
 #include "node.h"
 #include "state.h"
@@ -47,16 +88,36 @@ static struct osoe_team world_team, shared_team, finalize_team;
  * Every team this process has a descriptor for, by number: OSOE_MAX_TEAMS
  * entries. Each is stored with release once its descriptor is complete and
  * loaded with acquire (§3.16), so that a team created while other threads run
- * is never found half built. The node's progress thread does not look here: it
- * finds a team by number in the node's block (node.h), since the process it
- * runs in may hold no descriptor for the team at all.
+ * is never found half built; a destroyed team's entry is cleared. The node's
+ * progress thread does not look here: it finds a team by number in the node's
+ * block (node.h), since the process it runs in may hold no descriptor for the
+ * team at all.
  */
 static _Atomic(struct osoe_team *) *numbered;
 static uint32_t numbered_count;
 
+/*
+ * The descriptors of the teams a split creates, one per number from
+ * OSOE_PREDEFINED_TEAMS on, `created_count` of them. A created team's handle is
+ * its descriptor's address here, which is what lets osoe_team_of tell a handle
+ * it issued from one it did not, and a live one from a destroyed one, without
+ * reading through either: a handle is a descriptor only if it points into this
+ * array, and live only if `numbered` still holds it. A number is never reused,
+ * so neither is its descriptor: destroying the team frees the descriptor's
+ * arrays and leaves its number, to say which team the handle was. Untouched
+ * entries cost address space, not memory.
+ */
+static struct osoe_team *created;
+static uint32_t created_count;
+
 /* The predefined teams' local list, every local id in order - beyond what the
  * node and the bootstrap already hold, the one array their shapes need. */
 static uint32_t *identity;
+
+/* This node's world ranks in ascending order: the world and finalize teams'
+ * members here by team rank, which the internode backend asks for
+ * (osoe_internode_team_local_ranks). */
+static uint32_t *ranks_ascending;
 
 /* A team of one's list of local ranks: its only member is rank 0. */
 static const uint32_t rank_zero = 0;
@@ -69,17 +130,21 @@ static const uint32_t rank_zero = 0;
  * one that is not ascending). The members' team ranks, in the same order, are
  * the ranks the bootstrap lists by local id for the world and finalize teams,
  * and the local ids themselves for SHMEM_TEAM_SHARED. Design §5.2's lead, the
- * member with the lowest team rank, is the rule for teams created by a split
- * (slice 2), whose leads the internode phase will find through their records.
+ * member with the lowest team rank, is the rule for teams created by a split,
+ * whose leads the internode phase finds through their records.
  */
 static void predefined_local_shape(void)
 {
+    const struct osoe_node *n = &osoe.node;
     uint32_t count = osoe.bootstrap.local_count;
     identity = malloc(sizeof *identity * count);
-    if (!identity)
+    ranks_ascending = malloc(sizeof *ranks_ascending * count);
+    if (!identity || !ranks_ascending)
         osoe_fatal("out of memory describing this node's %u PEs", count);
-    for (uint32_t i = 0; i < count; i++)
+    for (uint32_t i = 0; i < count; i++) {
         identity[i] = i;
+        ranks_ascending[i] = n->local_block ? n->first_rank + i : n->sorted_rank[i];
+    }
 }
 
 /*
@@ -156,7 +221,7 @@ static struct osoe_team shared(void)
         strided = b->gtids[i] > b->gtids[i - 1] && b->gtids[i] - b->gtids[i - 1] == stride;
     if (strided) {
         t.world_start = b->gtids[0];
-        t.world_stride = count == 1 ? 1 : stride;
+        t.world_stride = count == 1 ? 1 : (int32_t)stride;
     } else {
         t.world_of_rank = b->gtids;
     }
@@ -177,23 +242,147 @@ static uint32_t lead_of(uint32_t node)
     return rank;
 }
 
+/* ---- a team's node set (§5.2) -------------------------------------------- */
+
+/*
+ * The logical nodes holding at least one of a team's members, ascending, and
+ * each one's lead: the rank the other nodes' leads put to there, and whose
+ * node the progress thread's messages for the team go to (node.h, the
+ * record). O(N) for a team of N nodes; built once, when the team is, and
+ * dropped once its record is written - but for the leads, which a created
+ * team's local lead keeps (team.h, `node_leads`).
+ */
+struct node_set {
+    uint32_t count;
+    uint32_t *nodes;
+    uint32_t *leads;
+};
+
+static void node_set_allocate(struct node_set *set, uint32_t count, const char *name)
+{
+    set->count = count;
+    set->nodes = malloc(sizeof *set->nodes * (count ? count : 1));
+    set->leads = malloc(sizeof *set->leads * (count ? count : 1));
+    if (!set->nodes || !set->leads)
+        osoe_fatal("out of memory describing %s's %u nodes", name, count);
+}
+
+static void node_set_free(struct node_set *set)
+{
+    free(set->nodes);
+    free(set->leads);
+    *set = (struct node_set){ 0 };
+}
+
+/* A predefined team's: every node, each led by its local id 0. */
+static void every_node(struct node_set *set, const char *name)
+{
+    node_set_allocate(set, osoe.job.node_count, name);
+    for (uint32_t n = 0; n < set->count; n++) {
+        set->nodes[n] = n;
+        set->leads[n] = lead_of(n);
+    }
+}
+
+/* Team rank `rank`'s node, which exists for every rank a team has. */
+static uint32_t node_of_member(const struct osoe_team *t, uint32_t rank, uint32_t *world)
+{
+    *world = (uint32_t)osoe_team_to_world(t, (int)rank);
+    uint32_t node = osoe_node_of(&osoe.job, *world);
+    if (node >= osoe.job.node_count)
+        osoe_fatal("%s's rank %u is PE %u, which the rank map places on no node", t->name, rank,
+                   *world);
+    return node;
+}
+
+/*
+ * A created team's node set (decision 4 of the slice's brief): a walk of the
+ * team's ranks, mapping each to its node, and per node its member with the
+ * lowest team rank for the lead.
+ *
+ * The walk goes in ascending world rank - team-rank order, or its reverse when
+ * a negative stride makes the team's world ranks descend - and a block
+ * distribution's nodes then come in ascending order too, each a run of
+ * members: the set is the runs, and each run's lead its member of lowest team
+ * rank, the first met, or the last when the walk goes backwards. O(size) node
+ * lookups (each O(log R), job.h) and O(nodes) memory. A team whose ranks visit
+ * a node twice or out of order - a cyclic distribution's, an interleaved
+ * map's - is walked once more, in team-rank order, into a table of the job's
+ * N nodes, where the first member met on each node is its lead: O(size)
+ * lookups again, O(N) words for the moment it takes, and O(N) to read the set
+ * out of it.
+ */
+static void created_node_set(const struct osoe_team *t, struct node_set *set)
+{
+    uint32_t members = t->members, nodes = osoe.job.node_count;
+    bool backwards = !t->world_of_rank && t->world_stride < 0;
+    node_set_allocate(set, members < nodes ? members : nodes, t->name);
+    uint32_t count = 0, world = 0;
+    bool in_order = true;
+    for (uint32_t i = 0; i < members && in_order; i++) {
+        uint32_t rank = backwards ? members - 1 - i : i;
+        uint32_t node = node_of_member(t, rank, &world);
+        if (count > 0 && node == set->nodes[count - 1]) {
+            if (backwards)
+                set->leads[count - 1] = world;      /* a lower team rank, the same node */
+            continue;
+        }
+        if ((count > 0 && node < set->nodes[count - 1]) || count == set->count) {
+            in_order = false;
+            break;
+        }
+        set->nodes[count] = node;
+        set->leads[count] = world;
+        count++;
+    }
+    if (in_order) {
+        set->count = count;
+        return;
+    }
+
+    node_set_free(set);
+    uint32_t *lead_on = malloc(sizeof *lead_on * nodes);
+    if (!lead_on)
+        osoe_fatal("out of memory finding %s's nodes among the job's %u", t->name, nodes);
+    memset(lead_on, 0xff, sizeof *lead_on * nodes);
+    count = 0;
+    for (uint32_t rank = 0; rank < members; rank++) {
+        uint32_t node = node_of_member(t, rank, &world);
+        if (lead_on[node] == UINT32_MAX) {
+            lead_on[node] = world;
+            count++;
+        }
+    }
+    node_set_allocate(set, count, t->name);
+    for (uint32_t node = 0, i = 0; node < nodes; node++)
+        if (lead_on[node] != UINT32_MAX) {
+            set->nodes[i] = node;
+            set->leads[i] = lead_on[node];
+            i++;
+        }
+    free(lead_on);
+}
+
 /*
  * Write `t`'s record into this node's block for its number and publish it
  * (node.h): what the node's progress thread and internode backend learn the
  * team from, the first time they meet it, rather than from a call made here.
+ * By the team's local lead on this node: for the predefined teams the node's
+ * lead, before its agent starts; for a created team its member with the lowest
+ * team rank here, before the split's sync over the parent (node.h says why
+ * that is enough).
  *
  * For a team spanning several nodes, this node's place in §5.3's k-ary tree
- * over its node set - the nodes holding at least one member, sorted - naming
- * each neighbour node by its lead's rank: for the predefined teams, the rank
- * at its local id 0. For the world and finalize teams that set
- * is every node, and so needs no computation; the list is built anyway,
- * because a split team's is a real computation and the tree should not be able
- * to tell the difference. O(N) once per team, freed at once: the record keeps
- * the O(k) of it the tree needs (§5.2).
+ * over `set`, its node set, naming each neighbour node by its lead's rank. The
+ * record keeps the O(k) of the set the tree needs (§5.2). The set's lead for
+ * this node must be the team's local lead here, which its local list names
+ * independently: the two are computed apart, and disagreeing would have the
+ * other nodes put to a PE that never reads its internal region for the team.
  */
-static void write_record(struct osoe_team *t, const char *name)
+static void write_record(const struct osoe_team *t, const char *name,
+                         const struct node_set *set)
 {
-    struct osoe_team_record *r = &t->block->record;
+    struct osoe_team_record *r = &osoe_node_team(&osoe.node, t->number)->record;
     r->local_members = t->local_members;
     r->nodes = t->nodes;
     r->index = 0;
@@ -202,26 +391,25 @@ static void write_record(struct osoe_team *t, const char *name)
     r->children = 0;
     snprintf(r->name, sizeof r->name, "%s", name);
     if (t->internode) {
-        uint32_t count = t->nodes;
-        uint32_t *nodes = malloc(sizeof *nodes * count);
-        if (!nodes)
-            osoe_fatal("out of memory describing %s's %u nodes", t->name, count);
-        for (uint32_t n = 0; n < count; n++)
-            nodes[n] = n;
+        uint32_t k = osoe.bootstrap.collective_fanout;
         struct osoe_collective_tree tree;
-        if (!osoe_collective_tree(nodes, count, osoe.job.node, osoe.bootstrap.collective_fanout,
-                                  &tree))
+        if (!set || set->count != t->nodes ||
+            !osoe_collective_tree(set->nodes, set->count, osoe.job.node, k, &tree))
             osoe_fatal("%s's node set (%u nodes) is not sorted, repeats a node, or leaves out "
-                       "node %u, which holds members", t->name, count, osoe.job.node);
-        free(nodes);
+                       "node %u, which holds members", t->name, set ? set->count : 0,
+                       osoe.job.node);
+        uint32_t lead = osoe.bootstrap.gtids[t->lead_local_id];
+        if (set->leads[tree.index] != lead)
+            osoe_fatal("%s's node set names PE %u as node %u's lead, and its members here name "
+                       "PE %u", t->name, set->leads[tree.index], osoe.job.node, lead);
         r->index = tree.index;
-        if (tree.parent != OSOE_COLLECTIVE_TREE_NONE) {
-            r->parent = lead_of(tree.parent);
-            r->position = (tree.index - 1) % tree.fanout;
+        if (tree.index > 0) {
+            r->parent = set->leads[(tree.index - 1) / k];
+            r->position = (tree.index - 1) % k;
         }
         r->children = tree.children;
         for (uint32_t j = 0; j < tree.children; j++)
-            r->child[j] = lead_of(tree.child[j]);
+            r->child[j] = set->leads[(uint64_t)k * tree.index + 1 + j];
     }
     /* release: the record, then the word its readers load first (§3.16). */
     atomic_store_explicit(&r->published, 1, memory_order_release);
@@ -246,12 +434,39 @@ static void take_number(struct osoe_team *t)
     atomic_store_explicit(&numbered[t->number], t, memory_order_release);
 }
 
+/* The number of the created team whose descriptor is at `team`, or UINT32_MAX
+ * if it is not one of the pool's: a comparison of addresses, never a read. */
+static uint32_t created_number(shmem_team_t team)
+{
+    uintptr_t at = (uintptr_t)team, base = (uintptr_t)created;
+    size_t size = sizeof *created;
+    if (!created || at < base || at - base >= (uintptr_t)created_count * size ||
+        (at - base) % size != 0)
+        return UINT32_MAX;
+    return OSOE_PREDEFINED_TEAMS + (uint32_t)((at - base) / size);
+}
+
+/* A created team gone from this process: its number is forgotten, its arrays
+ * freed, and the descriptor left saying which number it was (osoe_team_of). */
+static void forget(struct osoe_team *t)
+{
+    uint32_t number = t->number;
+    atomic_store_explicit(&numbered[number], NULL, memory_order_release);
+    free((void *)t->local_ids);
+    free((void *)t->local_ranks);
+    free((void *)t->world_of_rank);
+    free((void *)t->node_leads);
+    *t = (struct osoe_team){ .number = number, .destroyed = true };
+}
+
 void osoe_team_start(void)
 {
     numbered_count = osoe.bootstrap.max_teams;
+    created_count = numbered_count - OSOE_PREDEFINED_TEAMS;
     /* calloc: a null pointer in every entry, before any reader exists. */
     numbered = calloc(numbered_count, sizeof *numbered);
-    if (!numbered)
+    created = calloc(created_count, sizeof *created);
+    if (!numbered || !created)
         osoe_fatal("out of memory for %u teams", numbered_count);
     predefined_local_shape();
     world_team = every_pe("SHMEM_TEAM_WORLD", OSOE_TEAM_WORLD);
@@ -266,23 +481,40 @@ void osoe_team_start(void)
      * message it will take for these teams, which is the order a record needs
      * (node.h). The predefined teams include every local PE, the lead too, so
      * it knows each one's shape. A team of one has no record: it touches
-     * nothing of the node's (team.h).
+     * nothing of the node's (team.h). The world's node set is built anyway,
+     * although it is every node, so that the tree cannot tell it from a
+     * created team's: O(N) once per team, freed at once.
      */
     if (osoe.bootstrap.local_id == 0) {
-        write_record(&world_team, "world");
+        struct node_set every = { 0 };
+        if (world_team.internode)
+            every_node(&every, "the job");
+        write_record(&world_team, "world", &every);
         if (!shared_team.singleton)
-            write_record(&shared_team, "shared");
-        write_record(&finalize_team, "finalize");
+            write_record(&shared_team, "shared", NULL);
+        write_record(&finalize_team, "finalize", &every);
+        node_set_free(&every);
     }
 }
 
 void osoe_team_stop(void)
 {
+    /* Every created team the program did not destroy, as if it had. */
+    for (uint32_t number = OSOE_PREDEFINED_TEAMS; numbered && number < numbered_count; number++) {
+        struct osoe_team *t = atomic_load_explicit(&numbered[number], memory_order_acquire);
+        if (t)
+            forget(t);
+    }
+    free(created);
     free(numbered);
     free(identity);
+    free(ranks_ascending);
+    created = NULL;
+    created_count = 0;
     numbered = NULL;
     numbered_count = 0;
     identity = NULL;
+    ranks_ascending = NULL;
 }
 
 struct osoe_team *osoe_team_finalize(void)
@@ -318,9 +550,14 @@ struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team)
         return &world_team;
     if (team == SHMEM_TEAM_SHARED)
         return &shared_team;
-    osoe_fatal("%s: %p is not a team this library issued; only SHMEM_TEAM_WORLD and "
-               "SHMEM_TEAM_SHARED exist (shmem_team_split_* is not implemented)",
-               routine, (void *)team);
+    uint32_t number = created_number(team);
+    if (number == UINT32_MAX)
+        osoe_fatal("%s: %p is not a team this library issued", routine, (void *)team);
+    struct osoe_team *t = &created[number - OSOE_PREDEFINED_TEAMS];
+    if (atomic_load_explicit(&numbered[number], memory_order_acquire) != t)
+        osoe_fatal("%s: %p is team %u, which %s", routine, (void *)team, number,
+                   t->destroyed ? "this PE has destroyed" : "this PE was never given");
+    return t;
 }
 
 int osoe_team_to_world(const struct osoe_team *t, int pe)
@@ -329,13 +566,14 @@ int osoe_team_to_world(const struct osoe_team *t, int pe)
         return -1;
     if (t->world_of_rank)
         return (int)t->world_of_rank[pe];
-    return (int)(t->world_start + (uint32_t)pe * t->world_stride);
+    return (int)((int64_t)t->world_start + (int64_t)pe * t->world_stride);
 }
 
 /*
  * The world rank `world` as a number in `t`, or -1 if it is not a member: the
- * inverse of the mapping above, by arithmetic for a strided team and by a scan
- * of the table - at most the node's PEs - for one that is not.
+ * inverse of the mapping above, by arithmetic for a strided team - whose
+ * stride may be negative, never 0 - and by a scan of the table - at most the
+ * node's PEs - for one that is not.
  */
 static int world_to_team(const struct osoe_team *t, int world)
 {
@@ -348,10 +586,54 @@ static int world_to_team(const struct osoe_team *t, int world)
                 return (int)r;
         return -1;
     }
-    if (w < t->world_start || (w - t->world_start) % t->world_stride != 0)
+    int64_t offset = (int64_t)w - t->world_start;
+    if (offset % t->world_stride != 0)
         return -1;
-    uint32_t r = (w - t->world_start) / t->world_stride;
-    return r < t->members ? (int)r : -1;
+    int64_t r = offset / t->world_stride;
+    return r >= 0 && r < t->members ? (int)r : -1;
+}
+
+uint32_t osoe_team_node_index(const struct osoe_team *t, uint32_t node)
+{
+    if (!t->node_leads)
+        return t->number < OSOE_PREDEFINED_TEAMS && node < t->nodes ? node : UINT32_MAX;
+    uint32_t low = 0, high = t->nodes;
+    while (low < high) {
+        uint32_t middle = low + (high - low) / 2;
+        if (osoe_node_of(&osoe.job, t->node_leads[middle]) < node)
+            low = middle + 1;
+        else
+            high = middle;
+    }
+    return low < t->nodes && osoe_node_of(&osoe.job, t->node_leads[low]) == node ? low
+                                                                                 : UINT32_MAX;
+}
+
+/* ---- what the internode backend asks of a team (internode.h) ------------ */
+
+uint32_t osoe_internode_team_lead(uint32_t team, uint32_t index)
+{
+    const struct osoe_team *t = osoe_team_numbered(team);
+    if (!t || index >= t->nodes)
+        return UINT32_MAX;
+    if (t->node_leads)
+        return t->node_leads[index];
+    return team < OSOE_PREDEFINED_TEAMS ? osoe_job_node_lead(&osoe.job, index) : UINT32_MAX;
+}
+
+const uint32_t *osoe_internode_team_local_ranks(uint32_t team, uint32_t *count)
+{
+    const struct osoe_team *t = osoe_team_numbered(team);
+    *count = t ? t->local_members : 0;
+    if (!t)
+        return NULL;
+    /* The world's and finalize team's are listed in local-id order, which a
+     * hand-given order need not make ascending; every other team's list is
+     * ascending already - a created team's in team-rank order, SHARED's its
+     * local ids. */
+    if (team == OSOE_TEAM_WORLD || team == OSOE_TEAM_FINALIZE)
+        return ranks_ascending;
+    return t->local_ranks;
 }
 
 struct osoe_transport_context *osoe_ctx_of(const char *routine, shmem_ctx_t ctx)
@@ -382,18 +664,20 @@ OSOE_API int pshmem_team_n_pes(shmem_team_t team)
 
 /*
  * spec §9.4.4: a valid team returns 0, SHMEM_TEAM_INVALID returns nonzero and
- * does nothing, and a mask of 0 performs no action. Neither predefined team was
- * created with a configuration, so every field reads as its default.
+ * does nothing, and a mask of 0 performs no action. A created team answers
+ * with the configuration it was created with (§9.4.3); the predefined teams
+ * were created with none, so every field reads as its default.
  */
 OSOE_API int pshmem_team_get_config(shmem_team_t team, long config_mask,
                                    shmem_team_config_t *config)
 {
-    if (!osoe_team_of("shmem_team_get_config", team))
+    struct osoe_team *t = osoe_team_of("shmem_team_get_config", team);
+    if (!t)
         return 1;
     if (config_mask == 0 || !config)
         return 0;
     if (config_mask & SHMEM_TEAM_NUM_CONTEXTS)
-        config->num_contexts = 0;       /* the §9.4.3 default */
+        config->num_contexts = t->num_contexts;
     return 0;
 }
 
@@ -415,51 +699,349 @@ OSOE_API int pshmem_team_translate_pe(shmem_team_t src_team, int src_pe,
     return world_to_team(dst, world);
 }
 
-/* §7.3: plumbed, not implemented. The caller's branch for a non-member PE is
- * the branch it takes here. */
+/* ---- creating teams (§9.4.6, §9.4.7) ------------------------------------ */
+
+/* The parent ranks a created team is made of: start + stride x i, for every i
+ * below size. A strided split's triplet, and split_2d's rows (stride 1) and
+ * columns (stride xrange). */
+struct progression {
+    int64_t start;
+    int64_t stride;
+    uint32_t size;
+};
+
+/* One team of those a split creates, as this PE sees it. */
+struct membership {
+    uint32_t offset;                    /* its number, less the call's first */
+    bool member;                        /* whether this PE is in it */
+    struct progression ranks;
+    int num_contexts;                   /* spec §9.4.3, as this PE was given it */
+    shmem_team_t *handle;               /* where its handle goes */
+};
+
+static bool is_member(const struct progression *p, uint32_t parent_rank)
+{
+    int64_t offset = (int64_t)parent_rank - p->start;
+    if (p->stride == 0)
+        return offset == 0;
+    if (offset % p->stride != 0)
+        return false;
+    int64_t i = offset / p->stride;
+    return i >= 0 && i < p->size;
+}
+
+/*
+ * spec §9.4.3: the num_contexts a split's configuration asks for - the default,
+ * 0, unless the mask names the field. A mask that names it with no
+ * configuration to read it from is undefined, and ends the job by name.
+ */
+static int contexts_requested(const char *routine, const char *argument,
+                              const shmem_team_config_t *config, long mask)
+{
+    if (!(mask & SHMEM_TEAM_NUM_CONTEXTS))
+        return 0;
+    if (!config)
+        osoe_fatal("%s: %s is a null pointer, and its mask asks for its num_contexts",
+                   routine, argument);
+    return config->num_contexts;
+}
+
+/*
+ * No team number is left for a call creating `count` teams (§5.7), said once,
+ * by the parent's rank 0, which made the claim: the split fails on every PE of
+ * its parent, as spec §9.4.6 says a team that cannot be created does.
+ */
+static void out_of_numbers(const char *routine, uint32_t count, uint64_t claimed)
+{
+    fprintf(stderr, "osoe: PE %u: %s: no team numbers are left for the %u team%s this call "
+            "creates: OSOE_MAX_TEAMS is %u, %u of them predefined, %llu claimed before this "
+            "call, and a number is never reused within a session (design §5.7); the split "
+            "returns nonzero on every PE of its parent team\n", osoe.bootstrap.rank, routine,
+            count, count == 1 ? "" : "s", osoe.bootstrap.max_teams, OSOE_PREDEFINED_TEAMS,
+            (unsigned long long)claimed);
+}
+
+/*
+ * The parent's rank 0 claims the numbers of the `count` teams its call creates
+ * (step 2 of the file's comment): one blocking fetching add on world PE 0's
+ * counter (internal-region.h). The first is OSOE_PREDEFINED_TEAMS past the
+ * value fetched - or 0, which no created team has, when the claim would reach
+ * OSOE_MAX_TEAMS: the numbers stay counted, as every number claimed does.
+ */
+static uint64_t claim(const char *routine, uint32_t count)
+{
+    uint32_t max = osoe.bootstrap.max_teams;
+    uint64_t counter = osoe_internal_team_counter_offset(osoe.bootstrap.collective_fanout,
+                                                         osoe.bootstrap.collective_pipeline, max);
+    uint64_t claimed = osoe_transport_rmw(osoe_transport_context_default(), 0,
+                                          OSOE_REGION_INTERNAL, counter, OSOE_RMW_ADD,
+                                          sizeof(uint64_t), count, 0, OSOE_TRANSPORT_FETCH);
+    if (claimed <= max && OSOE_PREDEFINED_TEAMS + claimed + count <= max)
+        return OSOE_PREDEFINED_TEAMS + claimed;
+    out_of_numbers(routine, count, claimed);
+    return 0;
+}
+
+/*
+ * This PE's descriptor for team `number`, which its call has just claimed and
+ * whose members are the parent ranks `p` (steps 4 and 5 of the file's
+ * comment): its world mapping, composed from the parent's; its members on this
+ * node in team-rank order, by testing each local PE, O(L); its node set, once,
+ * O(size); and, on its local lead here, the record, written and published,
+ * and the node set's leads kept.
+ */
+static struct osoe_team *build(const struct osoe_team *parent, uint32_t number,
+                               const struct progression *p, int num_contexts)
+{
+    struct osoe_team *t = &created[number - OSOE_PREDEFINED_TEAMS];
+    *t = (struct osoe_team){
+        .number = number,
+        .members = p->size,
+        .singleton = p->size == 1,
+        .me = p->stride == 0 ? 0 : (uint32_t)(((int64_t)parent->me - p->start) / p->stride),
+        .num_contexts = num_contexts,
+    };
+    snprintf(t->label, sizeof t->label, "team %u", number);
+    t->name = t->label;
+
+    /* Team rank r is parent rank start + stride x r: a start and a stride in
+     * world ranks when the parent's are, and a table - of at most the node's
+     * PEs, a split of SHMEM_TEAM_SHARED's - when the parent has one. */
+    if (parent->world_of_rank) {
+        uint32_t *table = malloc(sizeof *table * p->size);
+        if (!table)
+            osoe_fatal("out of memory for %s's %u ranks", t->name, p->size);
+        for (uint32_t r = 0; r < p->size; r++)
+            table[r] = parent->world_of_rank[p->start + p->stride * r];
+        t->world_of_rank = table;
+    } else {
+        t->world_start = (uint32_t)osoe_team_to_world(parent, (int)p->start);
+        t->world_stride = p->size == 1 ? 1 : (int32_t)(p->stride * parent->world_stride);
+    }
+
+    /*
+     * This node's members in team-rank order (team.h): each local PE's world
+     * rank tested against the mapping, O(L). A strided team's ranks follow
+     * its world ranks, so the node's ranks walked in ascending order - which
+     * the node keeps (node.h) - list its members in team-rank order, or in
+     * reverse for a negative stride. A team with a table lies on this node, as
+     * its parent does, and is walked by team rank instead, each rank asked for
+     * its local id. The lead is the first: the lowest team rank here (§5.2).
+     */
+    const struct osoe_node *n = &osoe.node;
+    uint32_t capacity = t->world_of_rank ? t->members : n->local_count;
+    uint32_t *ids = malloc(sizeof *ids * capacity), *ranks = malloc(sizeof *ranks * capacity);
+    if (!ids || !ranks)
+        osoe_fatal("out of memory for %s's members on this node", t->name);
+    uint32_t count = 0;
+    if (t->world_of_rank) {
+        for (uint32_t r = 0; r < t->members; r++) {
+            int32_t local = osoe_node_local_id(n, t->world_of_rank[r]);
+            if (local >= 0) {
+                ids[count] = (uint32_t)local;
+                ranks[count++] = r;
+            }
+        }
+    } else {
+        for (uint32_t i = 0; i < n->local_count; i++) {
+            uint32_t world = n->local_block ? n->first_rank + i : n->sorted_rank[i];
+            int r = world_to_team(t, (int)world);
+            if (r >= 0) {
+                ids[count] = n->local_block ? i : n->sorted_local[i];
+                ranks[count++] = (uint32_t)r;
+            }
+        }
+        for (uint32_t i = 0; t->world_stride < 0 && i < count / 2; i++) {
+            uint32_t id = ids[i], rank = ranks[i];
+            ids[i] = ids[count - 1 - i];
+            ranks[i] = ranks[count - 1 - i];
+            ids[count - 1 - i] = id;
+            ranks[count - 1 - i] = rank;
+        }
+    }
+    if (count == 0 || ranks[0] > t->me)
+        osoe_fatal("%s: this PE, its rank %u, is not among its members on this node", t->name,
+                   t->me);
+    t->local_members = count;
+    t->local_ids = ids;
+    t->local_ranks = ranks;
+    t->lead_local_id = ids[0];
+
+    /* The node set: this node alone for a split of a parent on one node, which
+     * is every split of SHMEM_TEAM_SHARED; otherwise found by walking. */
+    struct node_set set = { 0 };
+    if (parent->nodes == 1) {
+        node_set_allocate(&set, 1, t->name);
+        set.nodes[0] = osoe.job.node;
+        set.leads[0] = osoe.bootstrap.gtids[t->lead_local_id];
+    } else {
+        created_node_set(t, &set);
+    }
+    t->nodes = set.count;
+    t->internode = set.count > 1;
+    if (osoe.bootstrap.local_id == t->lead_local_id) {
+        char name[16];
+        snprintf(name, sizeof name, "%u", number);
+        write_record(t, name, &set);
+        if (t->internode) {
+            t->node_leads = set.leads;
+            set.leads = NULL;
+        }
+    }
+    node_set_free(&set);
+    return t;
+}
+
+/*
+ * The protocol of the file's comment, from step 2, over parent `parent` - its
+ * handle `parent_handle` - for a call creating `count` teams, of which this PE
+ * sees `mine`: split_strided's one, split_2d's row and column.
+ */
+static int split(const char *routine, shmem_team_t parent_handle, struct osoe_team *parent,
+                 uint32_t count, const struct membership *mine, uint32_t mine_count)
+{
+    /* More teams than there are numbers fails before anything is claimed:
+     * every parent PE computes the count alike, as it checked the arguments. */
+    if (count > osoe.bootstrap.max_teams - OSOE_PREDEFINED_TEAMS) {
+        if (parent->me == 0)
+            out_of_numbers(routine, count, 0);
+        return 1;
+    }
+
+    /* The room the first number travels in, at the same place on every parent
+     * PE: the allocator is a function of its calls alone (§4.4), and a take and
+     * its give leave it as it was. A heap without eight bytes to spare answers
+     * nonzero on every parent PE alike, before anything is claimed. */
+    uint64_t offset;
+    int taken = osoe_allocator_take(&osoe.allocator, sizeof(uint64_t), sizeof(uint64_t), 0,
+                                    &offset);
+    if (taken < 0)
+        osoe_fatal("%s: out of memory for the symmetric heap's own records", routine);
+    if (taken > 0)
+        return 1;
+    uint64_t *word = (uint64_t *)((unsigned char *)osoe.node.heap_of[osoe.bootstrap.local_id] +
+                                  offset);
+    if (parent->me == 0)
+        *word = claim(routine, count);
+    osoe_broadcast(routine, parent_handle, word, word, 1, sizeof *word, 0, false);
+    uint64_t first = *word;
+    osoe_allocator_give(&osoe.allocator, offset);
+    if (first == 0)
+        return 1;
+
+    struct osoe_team *made[2] = { NULL, NULL };
+    for (uint32_t i = 0; i < mine_count; i++)
+        if (mine[i].member)
+            made[i] = build(parent, (uint32_t)first + mine[i].offset, &mine[i].ranks,
+                            mine[i].num_contexts);
+    /* Every member node's record is published before any member leaves this,
+     * and so before any collective on a new team starts (node.h). */
+    osoe_team_sync(parent, routine);
+    for (uint32_t i = 0; i < mine_count; i++)
+        if (made[i]) {
+            take_number(made[i]);
+            *mine[i].handle = (shmem_team_t)made[i];
+        }
+    return 0;
+}
+
+/*
+ * spec §9.4.6. The triplet names parent ranks start + stride x i for i below
+ * size; stride may be negative, the members then in reverse order of their
+ * parent ranks. A triplet that is not valid - size not positive, or a rank
+ * outside the parent, which is what a sequence that would wrap around has -
+ * returns nonzero on every parent PE; a stride of 0 with a size other than 1
+ * is undefined, and ends the job by name.
+ */
 OSOE_API int pshmem_team_split_strided(shmem_team_t parent_team, int start, int stride,
                                       int size, const shmem_team_config_t *config,
                                       long config_mask, shmem_team_t *new_team)
 {
-    (void)start;
-    (void)stride;
-    (void)size;
-    (void)config;
-    (void)config_mask;
-    osoe_team_of("shmem_team_split_strided", parent_team);
-    if (new_team)
-        *new_team = SHMEM_TEAM_INVALID;
-    return 1;
+    static const char routine[] = "shmem_team_split_strided";
+    struct osoe_team *parent = osoe_team_of(routine, parent_team);
+    if (!new_team)
+        osoe_fatal("%s: new_team is a null pointer", routine);
+    *new_team = SHMEM_TEAM_INVALID;
+    if (!parent)
+        return 1;
+    int contexts = contexts_requested(routine, "config", config, config_mask);
+    if (size < 1)
+        return 1;
+    if (stride == 0 && size != 1)
+        osoe_fatal("%s: stride 0 with size %d; spec §9.4.6 allows a stride of 0 only with a "
+                   "size of 1", routine, size);
+    int64_t last = (int64_t)start + (int64_t)stride * (size - 1);
+    if (start < 0 || (uint32_t)start >= parent->members || last < 0 || last >= parent->members)
+        return 1;
+    struct membership m = {
+        .ranks = { start, stride, (uint32_t)size },
+        .num_contexts = contexts,
+        .handle = new_team,
+    };
+    m.member = is_member(&m.ranks, parent->me);
+    return split(routine, parent_team, parent, 1, &m, 1);
 }
 
+/*
+ * spec §9.4.7. The parent's ranks laid out in rows of xrange - no more than the
+ * parent has - and every row a team and every column a team, all of them
+ * created by this one call: rows first, then columns, in the numbers it
+ * claims. A PE is in one of each, its x-axis team its row and its y-axis team
+ * its column. xrange not positive is undefined, and ends the job by name.
+ */
 OSOE_API int pshmem_team_split_2d(shmem_team_t parent_team, int xrange,
                                  const shmem_team_config_t *xaxis_config, long xaxis_mask,
                                  shmem_team_t *xaxis_team,
                                  const shmem_team_config_t *yaxis_config, long yaxis_mask,
                                  shmem_team_t *yaxis_team)
 {
-    (void)xrange;
-    (void)xaxis_config;
-    (void)xaxis_mask;
-    (void)yaxis_config;
-    (void)yaxis_mask;
-    osoe_team_of("shmem_team_split_2d", parent_team);
-    if (xaxis_team)
-        *xaxis_team = SHMEM_TEAM_INVALID;
-    if (yaxis_team)
-        *yaxis_team = SHMEM_TEAM_INVALID;
-    return 1;
+    static const char routine[] = "shmem_team_split_2d";
+    struct osoe_team *parent = osoe_team_of(routine, parent_team);
+    if (!xaxis_team || !yaxis_team)
+        osoe_fatal("%s: %s is a null pointer", routine,
+                   xaxis_team ? "yaxis_team" : "xaxis_team");
+    *xaxis_team = SHMEM_TEAM_INVALID;
+    *yaxis_team = SHMEM_TEAM_INVALID;
+    if (!parent)
+        return 1;
+    int x_contexts = contexts_requested(routine, "xaxis_config", xaxis_config, xaxis_mask);
+    int y_contexts = contexts_requested(routine, "yaxis_config", yaxis_config, yaxis_mask);
+    if (xrange < 1)
+        osoe_fatal("%s: xrange %d; spec §9.4.7 requires a positive one", routine, xrange);
+    uint32_t members = parent->members;
+    uint32_t columns = (uint32_t)xrange < members ? (uint32_t)xrange : members;
+    uint32_t rows = (members + columns - 1) / columns;
+    uint32_t x = parent->me % columns, y = parent->me / columns;
+    uint32_t row_size = members - y * columns < columns ? members - y * columns : columns;
+    struct membership m[2] = {
+        { .offset = y, .member = true,
+          .ranks = { (int64_t)y * columns, 1, row_size },
+          .num_contexts = x_contexts, .handle = xaxis_team },
+        { .offset = rows + x, .member = true,
+          .ranks = { x, columns, (members - x + columns - 1) / columns },
+          .num_contexts = y_contexts, .handle = yaxis_team },
+    };
+    return split(routine, parent_team, parent, rows + columns, m, 2);
 }
 
-/* spec §9.4.8: SHMEM_TEAM_INVALID does nothing, and destroying a predefined
- * team is undefined - which here means loud, since no other team can exist and
- * so every call naming one is a program bug. */
+/*
+ * spec §9.4.8: collective over the team's members (§5.7) - a sync over the
+ * team, and then this PE's descriptor goes. The number stays taken, and the
+ * team's blocks and records stay on every node: a late reader or a late
+ * message meets the team it was for, never another. SHMEM_TEAM_INVALID does
+ * nothing; a predefined team is undefined, which here means loud, and so is a
+ * handle never issued or already destroyed (osoe_team_of).
+ */
 OSOE_API void pshmem_team_destroy(shmem_team_t team)
 {
     if (team == SHMEM_TEAM_INVALID)
         return;
-    osoe_fatal("shmem_team_destroy: %s is a predefined team and cannot be destroyed",
-               osoe_team_of("shmem_team_destroy", team)->name);
+    struct osoe_team *t = osoe_team_of("shmem_team_destroy", team);
+    if (t->number < OSOE_PREDEFINED_TEAMS)
+        osoe_fatal("shmem_team_destroy: %s is a predefined team and cannot be destroyed",
+                   t->name);
+    osoe_team_sync(t, "shmem_team_destroy");
+    forget(t);
 }
 
 /*
@@ -491,7 +1073,8 @@ OSOE_API int pshmem_ctx_create(long options, shmem_ctx_t *ctx)
 OSOE_API int pshmem_team_create_ctx(shmem_team_t team, long options, shmem_ctx_t *ctx)
 {
     (void)options;
-    /* spec §9.5.2: an invalid team yields an invalid context and nonzero. */
+    /* spec §9.5.2: an invalid team yields an invalid context and nonzero; so,
+     * here, does every other, contexts beyond the default not being created. */
     osoe_team_of("shmem_team_create_ctx", team);
     if (ctx)
         *ctx = SHMEM_CTX_INVALID;

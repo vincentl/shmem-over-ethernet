@@ -1,12 +1,12 @@
 /*
  * Teams and contexts (§7.3; spec §9.4, §9.5).
  *
- * The parameter is on every entry point and only the predefined handles exist,
- * so most of what a test can check here is that the plumbing carries the
- * argument rather than ignoring it, and that the routines which must fail do
- * fail in the way the spec describes - returning nonzero and assigning
- * SHMEM_TEAM_INVALID or SHMEM_CTX_INVALID, which is a branch a spec-conforming
- * program already has.
+ * The parameter is on every entry point, and the splits create teams (phase 1
+ * step 7 slice 2; test-team-split.c exercises them). What this checks is that
+ * the plumbing carries the argument rather than ignoring it, that a split's
+ * teams answer the queries, and that the routines which must fail do fail in
+ * the way the spec describes - returning nonzero and assigning
+ * SHMEM_CTX_INVALID, which is a branch a spec-conforming program already has.
  *
  * Two things are more than plumbing.
  *
@@ -95,22 +95,34 @@ static void team_queries(void)
 
 static void splits_and_contexts(void)
 {
-    /* §7.3: these exist and refuse. A program written against the spec already
-     * branches on the non-member case, which is the branch it takes here. */
-    shmem_team_t made = SHMEM_TEAM_WORLD;
-    CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made) != 0);
-    CHECK(made == SHMEM_TEAM_INVALID);
+    /* The world again, as a team of its own: every PE, in the same order. */
+    shmem_team_t made = SHMEM_TEAM_INVALID;
+    CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made) == 0);
+    CHECK(made != SHMEM_TEAM_INVALID && made != SHMEM_TEAM_WORLD);
+    CHECK(shmem_team_n_pes(made) == npes && shmem_team_my_pe(made) == me);
+    CHECK(shmem_team_translate_pe(made, me, SHMEM_TEAM_WORLD) == me);
+    CHECK(shmem_team_sync(made) == 0);
 
-    shmem_team_t x = SHMEM_TEAM_WORLD, y = SHMEM_TEAM_WORLD;
-    CHECK(shmem_team_split_2d(SHMEM_TEAM_WORLD, 1, NULL, 0, &x, NULL, 0, &y) != 0);
-    CHECK(x == SHMEM_TEAM_INVALID && y == SHMEM_TEAM_INVALID);
+    /* §9.4.7: rows of one, so every PE its own row, and one column of all. */
+    shmem_team_t x = SHMEM_TEAM_INVALID, y = SHMEM_TEAM_INVALID;
+    CHECK(shmem_team_split_2d(SHMEM_TEAM_WORLD, 1, NULL, 0, &x, NULL, 0, &y) == 0);
+    CHECK(x != SHMEM_TEAM_INVALID && y != SHMEM_TEAM_INVALID);
+    CHECK(shmem_team_n_pes(x) == 1 && shmem_team_my_pe(x) == 0);
+    CHECK(shmem_team_n_pes(y) == npes && shmem_team_my_pe(y) == me);
 
+    /* Contexts beyond the default are still not created, on any team. */
     shmem_ctx_t ctx = SHMEM_CTX_DEFAULT;
     CHECK(shmem_ctx_create(0, &ctx) != 0);
     CHECK(ctx == SHMEM_CTX_INVALID);
     ctx = SHMEM_CTX_DEFAULT;
     CHECK(shmem_team_create_ctx(SHMEM_TEAM_WORLD, 0, &ctx) != 0);
     CHECK(ctx == SHMEM_CTX_INVALID);
+    ctx = SHMEM_CTX_DEFAULT;
+    CHECK(shmem_team_create_ctx(made, 0, &ctx) != 0);
+    CHECK(ctx == SHMEM_CTX_INVALID);
+    shmem_team_destroy(made);
+    shmem_team_destroy(x);
+    shmem_team_destroy(y);
 
     /* §9.5.4: the default context belongs to the world team. */
     shmem_team_t team = SHMEM_TEAM_INVALID;

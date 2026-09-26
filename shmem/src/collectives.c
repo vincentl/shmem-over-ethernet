@@ -61,16 +61,18 @@ struct reduction {
     osoe_combine_function combine;
 };
 
-/* The root's node as its index in the node set of `t` (team.c, the record):
- * for a team spanning every node that is the node's number. A team spanning
- * some of the nodes needs its set's positions, which are §7.3's. */
+/* The root's node as its position in the node set of `t` (team.h): for a
+ * predefined team, spanning every node, the node's number; for a created one,
+ * found in the list of its nodes' leads that its local lead keeps, which is
+ * the PE asking. */
 static uint32_t root_index(const struct osoe_team *t, int root_rank, const char *routine)
 {
-    if (t->nodes != osoe.job.node_count)
-        osoe_fatal("%s: %s spans %u of the job's %u nodes, and a broadcast's root is found "
-                   "only in a node set of every node", routine, t->name, t->nodes,
-                   osoe.job.node_count);
-    return osoe_node_of(&osoe.job, (uint32_t)root_rank);
+    uint32_t node = osoe_node_of(&osoe.job, (uint32_t)root_rank);
+    uint32_t index = osoe_team_node_index(t, node);
+    if (index == UINT32_MAX)
+        osoe_fatal("%s: the root, PE %d, is on node %u, which is not among %s's %u nodes",
+                   routine, root_rank, node, t->name, t->nodes);
+    return index;
 }
 
 /* The local PE with local id `local`'s copy of a symmetric object, at the
