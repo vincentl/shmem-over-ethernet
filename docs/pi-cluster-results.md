@@ -139,3 +139,28 @@ small messages pay: k = 4 is twice as fast up to 1 KiB and still ahead at 8 KiB.
 fan-out should fall with the message size, somewhere near 32 KiB here -
 a per-call choice of k by size, which the next measurement at more than four
 nodes would have to confirm before it is built.
+
+**Would a 16 KiB chunk cost anything?** (`chunk/`, the runbook's §11 item 2,
+run the same evening without root.) Two rounds, the default 64 KiB chunk and
+`OSOE_AM_CHUNK=16384` alternating, agree within a few percent:
+
+| | 64 KiB chunk | 16 KiB chunk |
+|---|---|---|
+| get, 32 KiB | 415 µs | 689-711 µs |
+| get, 256 KiB | 2.95 ms | 4.44-4.51 ms |
+| get, 1 MiB | 11.3-11.4 ms | 17.3-17.6 ms |
+| put and quiet, 1 MiB | 9.10 ms | 9.10 ms |
+| put stream | 111.5 MiB/s | 111.5 MiB/s |
+| pairs at 2 × 1 | 175-185 MiB/s | 155 MiB/s |
+| pairs at 4 × 4 | 437 MiB/s | 436-442 MiB/s |
+| fcollect 4 × 1, 32 KiB blocks | **122-138 ms** | 1.2 ms |
+| fcollect 4 × 4, 16 KiB blocks | 2.7 ms | 2.15 ms |
+| broadcast and reduce, 64 KiB-1 MiB | within 5% | within 5% |
+
+So **F1 is not only 4 × 2**: at 4 × 1 the default chunk stalls on 32 KiB
+blocks in both rounds, the same 32 KiB a node as 4 × 2 at 16 KiB. And a
+16 KiB chunk is not free: every get past a chunk pays about 1.5×, since a
+get asks one chunk at a time per reply credit. Whether to trade the gets for
+the collectives - or give collectives a chunk of their own - is the author's
+decision; nothing was changed. (`osu_oshm_put_bw` needs a `heap` argument the
+script did not pass; the bench's put stream stands in for it.)

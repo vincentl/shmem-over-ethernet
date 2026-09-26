@@ -1,0 +1,29 @@
+16:12:07 bench 2x1 default-a exit 0
+16:13:40 bench 4x4 default-a exit 0
+16:13:41 put_bw default-a exit 1
+16:16:10 fcollect N4x1 default-a exit 0
+16:16:30 broadcast N4x1 default-a exit 0
+16:17:20 fcollect N4x4 default-a exit 0
+16:17:35 broadcast N4x4 default-a exit 0
+16:19:11 bench 2x1 16384-a exit 0
+16:21:01 bench 4x4 16384-a exit 0
+16:21:01 put_bw 16384-a exit 1
+16:21:25 fcollect N4x1 16384-a exit 0
+16:21:39 broadcast N4x1 16384-a exit 0
+16:22:26 fcollect N4x4 16384-a exit 0
+16:22:40 broadcast N4x4 16384-a exit 0
+16:23:56 bench 2x1 default-b exit 0
+16:25:30 bench 4x4 default-b exit 0
+16:25:30 put_bw default-b exit 1
+16:28:33 fcollect N4x1 default-b exit 0
+16:28:52 broadcast N4x1 default-b exit 0
+16:29:47 fcollect N4x4 default-b exit 0
+16:30:07 broadcast N4x4 default-b exit 0
+16:31:44 bench 2x1 16384-b exit 0
+16:33:39 bench 4x4 16384-b exit 0
+16:33:44 put_bw 16384-b exit 1
+16:34:03 fcollect N4x1 16384-b exit 0
+16:34:17 broadcast N4x1 16384-b exit 0
+16:35:03 fcollect N4x4 16384-b exit 0
+16:35:23 broadcast N4x4 16384-b exit 0
+16:35:23 DONE

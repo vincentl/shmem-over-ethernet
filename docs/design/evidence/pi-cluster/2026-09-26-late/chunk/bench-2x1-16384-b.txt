@@ -1,0 +1,33 @@
+osoe-bench pes=2 remote_target=1 local_target=-1
+latency put+quiet target=1 where=remote bytes=8 median_us=169.7 fastest_us=167.1
+latency get target=1 where=remote bytes=8 median_us=171.9 fastest_us=170.1
+latency put+quiet target=1 where=remote bytes=64 median_us=172.2 fastest_us=170.4
+latency get target=1 where=remote bytes=64 median_us=173.0 fastest_us=171.9
+latency put+quiet target=1 where=remote bytes=512 median_us=180.0 fastest_us=178.0
+latency get target=1 where=remote bytes=512 median_us=180.7 fastest_us=178.5
+latency put+quiet target=1 where=remote bytes=4096 median_us=186.8 fastest_us=185.4
+latency get target=1 where=remote bytes=4096 median_us=171.5 fastest_us=145.6
+latency put+quiet target=1 where=remote bytes=32768 median_us=471.2 fastest_us=399.4
+latency get target=1 where=remote bytes=32768 median_us=695.8 fastest_us=663.8
+latency put+quiet target=1 where=remote bytes=262144 median_us=2372.4 fastest_us=2343.9
+latency get target=1 where=remote bytes=262144 median_us=4455.2 fastest_us=4235.2
+latency put+quiet target=1 where=remote bytes=1048576 median_us=9108.1 fastest_us=9078.3
+latency get target=1 where=remote bytes=1048576 median_us=17367.0 fastest_us=16496.6
+bandwidth put target=1 where=remote bytes=4096 mib_per_s=110.7
+bandwidth put target=1 where=remote bytes=65536 mib_per_s=111.2
+bandwidth put target=1 where=remote bytes=262144 mib_per_s=111.2
+bandwidth put target=1 where=remote bytes=1048576 mib_per_s=111.2
+bandwidth put target=1 where=remote bytes=4194304 mib_per_s=111.2
+atomic fetch-add target=1 where=remote median_us=171.0 fastest_us=167.1
+barrier pes=2 median_us=173.7 fastest_us=172.4
+reduce pes=2 bytes=8 median_us=188.1 fastest_us=186.9
+broadcast pes=2 bytes=8 median_us=184.1 fastest_us=182.8
+reduce pes=2 bytes=65536 median_us=1145.4 fastest_us=1065.0
+broadcast pes=2 bytes=65536 median_us=965.0 fastest_us=832.2
+fcollect pes=2 block=8 median_us=188.8 fastest_us=185.8
+alltoall pes=2 block=8 median_us=326.9 fastest_us=324.1
+fcollect pes=2 block=4096 median_us=199.5 fastest_us=195.2
+alltoall pes=2 block=4096 median_us=354.6 fastest_us=341.0
+pairs pe=0 target=1 bytes=1048576 mib_per_s=106.9
+pairs pe=1 target=0 bytes=1048576 mib_per_s=77.7
+pairs pes=2 total_mib_per_s=155.4
