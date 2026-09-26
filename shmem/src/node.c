@@ -512,8 +512,8 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
 
     /*
      * The header ends with one block per team number (layout 18, §5.7):
-     * OSOE_MAX_TEAMS of them, about 900 bytes each with 128-byte lines, so 28
-     * KiB of the segment at the default of 32 and under a megabyte at the most.
+     * OSOE_MAX_TEAMS of them, about 900 bytes each with 128-byte lines, so 56
+     * KiB of the segment at the default of 64 and under a megabyte at the most.
      * Sized by the count every node agreed, never by the teams that exist.
      */
     uint64_t teams_offset = offsetof(struct osoe_node_header, team);
@@ -572,7 +572,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * segment and every local PE's heap. The lead knows L and the heap size;
      * every PE has parsed the same size, or check_agreement fails them all. A
      * heap object is the heap and then its internal region (internal-region.h),
-     * about 5 MiB at the default 32 teams, fan-out of 4 and two pieces in
+     * about 10 MiB at the default 64 teams, fan-out of 4 and two pieces in
      * flight (OSOE_COLLECTIVE_PIPELINE), which is counted here with the heap
      * it follows.
      */

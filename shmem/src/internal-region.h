@@ -51,7 +51,7 @@
  * Every PE's heap carries one, and a team touches only its own slots and its
  * words' lines, and only on the leads of its nodes; the pages nobody writes
  * cost address space and the /dev/shm capacity check's share, not memory -
- * about 5 MiB a PE at the default 32 teams, a fan-out of 4 and D = 2, half of
+ * about 10 MiB a PE at the default 64 teams, a fan-out of 4 and D = 2, half of
  * that at D = 1; the allgather's words add 2.5 KiB a team number at a thousand
  * nodes. **Every node computes the same offsets**: the layout is fixed by the
  * fan-out, OSOE_MAX_TEAMS, D and the job's node count, which every node agrees
