@@ -223,7 +223,9 @@ const uint32_t *osoe_internode_team_local_ranks(uint32_t team, uint32_t *count);
  * Up, as the two calls above, and asked where they are: team `team`'s members
  * from team rank `rank` on as world ranks - the returned count of them, rank
  * `rank` + i being world rank `*world` + i x `*stride` - or 0 if `rank` is
- * past its last member. With the rank map (job.h) it says which node holds
+ * past its last member, or where this process holds no descriptor for the
+ * team, which on the thread the data half runs on is a bug to name, as for
+ * the call above. With the rank map (job.h) it says which node holds
  * any member's place in a gather's result, and so which of a result's bytes
  * are each node's to send (phase 1 step 5 slice 6). A team strided in world
  * ranks - the predefined teams spanning nodes, and every team a split makes

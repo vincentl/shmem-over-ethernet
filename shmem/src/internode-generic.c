@@ -898,6 +898,14 @@ static void build_ranges(struct gather *g, uint64_t bytes)
 {
     struct generic_team *team_phase = g->team_phase;
     const struct osoe_job *job = &osoe.job;
+    /* No list is a team this process holds no descriptor for, which on the
+     * thread the data half runs on - its local lead's - is a bug: named, as
+     * lead_of names a position with no lead, before the walk would find the
+     * team empty. */
+    uint32_t listed = 0;
+    if (!osoe_internode_team_local_ranks(g->team, &listed))
+        osoe_fatal("%s: team %u has no members on this node that this process knows of",
+                   g->routine, g->team);
     for (uint32_t s = 0; s < team_phase->steps; s++)
         team_phase->step_ranges[s].count = 0;
     g->here = 0;
@@ -939,8 +947,6 @@ static void build_ranges(struct gather *g, uint64_t bytes)
                    g->routine, g->team, rank,
                    (unsigned long long)place_of(g->places, g->block, rank),
                    (unsigned long long)bytes);
-    uint32_t listed = 0;
-    osoe_internode_team_local_ranks(g->team, &listed);
     if (g->here != listed)
         osoe_fatal("%s: the rank map puts %u of team %u's members on this node, and the team "
                    "lists %u here", g->routine, g->here, g->team, listed);
