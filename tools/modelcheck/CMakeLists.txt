@@ -12,12 +12,12 @@
 # case of 5.7 million states) and abort_exit (eleven minutes, a case of ten
 # million) - are why that preset is slow.
 #
-# The five that check §4.11's SHMEM_THREAD_MULTIPLE designs - dirty_set,
+# The six that check §4.11's SHMEM_THREAD_MULTIPLE designs - dirty_set,
 # watch_list, get_completion's generation-word cases (about 15 minutes, a case
 # of 19 million states), landing_extent and copy_out_claim (under a minute
-# together) - run only with OSOE_MULTIPLE_MODELS=ON: phase 1
-# ships up to SERIALIZED, and together they were three quarters of every
-# release run (test review, 2026-09-23). Turn it on when §4.11 is scheduled or
+# together), and pe_quiet (two minutes) - run only with
+# OSOE_MULTIPLE_MODELS=ON: phase 1 ships up to SERIALIZED, and together they
+# were three quarters of every release run (test review, 2026-09-23). Turn it on when §4.11 is scheduled or
 # engine.py changes; model.selftest holds the engine to its own cases, not to
 # these state spaces. get_completion's one case of what phase 1 ships, §4.6's
 # equality wait, runs regardless.
@@ -29,7 +29,8 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
                   chained_wake lead_wake rendezvous wait_word credit_wait tree_barrier close
                   abort abort_exit lock pipeline allgather)
   if(OSOE_MULTIPLE_MODELS)
-    list(APPEND osoe_models dirty_set get_completion watch_list landing_extent copy_out_claim)
+    list(APPEND osoe_models dirty_set get_completion watch_list landing_extent copy_out_claim
+                            pe_quiet)
   else()
     add_test(NAME model.get_completion.equality
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/get_completion_model.py

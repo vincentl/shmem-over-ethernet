@@ -3586,8 +3586,13 @@ bytes) and a `high_seg` word per node (8 bytes per node).
 - **`shmem_ctx_pe_quiet`** clears only its listed nodes' bits, under the same mutex.
   It still bumps the generation for gets, since it waits on every get (§4.6). It
   must never satisfy a full quiet's piggyback, so the piggyback test in item 1 reads
-  a second word, the generation closed by the last *full* quiet. This rule is not
-  in the models (§10).
+  a second word, `full`: the generation the last *full* quiet opened, which only a
+  full quiet stores, under the mutex. A quiet that loaded `e` at its call
+  piggybacks when `full` is past `e`, compared as a wrapping difference: a full
+  quiet then bumped after the call, and finished its wait and its flush of every
+  node before releasing the mutex. A `pe_quiet` piggybacks on the same test, since
+  a full quiet covers every node. `tools/modelcheck/pe_quiet_model.py` checks
+  this (§10).
 
 **Found by the models:**
 - **Clears without the mutex** (`unlocked`). Between one quiet's clear and its
@@ -6672,8 +6677,11 @@ which has two states per pair, so a third backend needs a selector of its own
     the claim, with the credit before the copy, or with the record freed at the
     claim.*
   - **`pe_quiet` and piggyback.** The rule that a full quiet never piggybacks on a
-    `pe_quiet` is stated in §4.11 item 2 but is not in the models. Add `pe_quiet`
-    to `get_completion_model.py` before implementing it.
+    `pe_quiet` is stated in §4.11 item 2. *Modeled 2026-09-26, in a model of its
+    own, `pe_quiet_model.py`, rather than in `get_completion_model.py`: the rule
+    is about puts, which that model does not carry. The design passes; it fails
+    with item 1's test on the generation word, with a `pe_quiet` storing `full`,
+    and with `full >= e`.*
   - **A quiet with nothing outstanding.** It would be cheaper to load both counter
     pairs and the bitmap and return, without taking the mutex, when all show
     nothing outstanding. That looks sound, but it is not modeled. It matters only

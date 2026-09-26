@@ -13,13 +13,14 @@ were run. Develop new models here.
 | `pipeline_model.py` | Pieces of a data collective pipelined through the internode tree, the author's decision of 2026-09-25 (§5.8) |
 | `allgather_model.py` | Bruck's allgather among node leads for fcollect's internode phase, the same decision (§5.8) |
 | `landing_extent_model.py`, `copy_out_claim_model.py` | §4.11's two open points the author decided on 2026-09-25: landing-zone extents claimed by CAS over a bitmap, and one copier per landed nonblocking get |
+| `pe_quiet_model.py` | §4.11 item 2's rule that a full quiet never piggybacks on a `pe_quiet`, which §10 had left unmodeled |
 | `selftest.py` | Checks that the reductions change no verdict; rerun it after changing the engine |
 
 **Where they run.** Every model is a ctest in the release preset only: a model
 is Python and gives the same verdict whichever preset built the library. The
-five of §4.11's `SHMEM_THREAD_MULTIPLE` designs (`get_completion` but for its
-phase-1 case, `dirty_set`, `watch_list`, `landing_extent`, `copy_out_claim`) run
-only with `OSOE_MULTIPLE_MODELS=ON`,
+six of §4.11's `SHMEM_THREAD_MULTIPLE` designs (`get_completion` but for its
+phase-1 case, `dirty_set`, `watch_list`, `landing_extent`, `copy_out_claim`,
+`pe_quiet`) run only with `OSOE_MULTIPLE_MODELS=ON`,
 since phase 1 ships up to `SERIALIZED` and they were three quarters of every
 release run; turn it on when §4.11 is scheduled or `engine.py` changes.
 
