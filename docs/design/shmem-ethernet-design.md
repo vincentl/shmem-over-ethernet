@@ -6731,6 +6731,17 @@ which has two states per pair, so a third backend needs a selector of its own
 - **The value of the reply credit `C`** (§3.8, §4.6). Large enough to be
   irrelevant to real codes, small enough that `connections × C` descriptors stay
   cheap; pick it from measurement.
+- **Team numbers for `split_2d`** (§5.7; the review of phase 1 step 7 slice 2).
+  A `split_2d` claims a number for each of its row and column teams at once, from
+  the job-wide space numbers are never reused in: a square grid over *P* PEs
+  takes 2√*P*, so above about 2.6 × 10⁵ PEs no grid can be made even at
+  `OSOE_MAX_TEAMS`' ceiling of 1,024, and at the default of 32 SOS's
+  `shmem_team_split_2d` loses some of its splits from six PEs (it still exits 0).
+  A number needs to be unique only among the teams that share a node, and each
+  team one number on all its nodes: a colouring every PE could compute from the
+  grid and the rank map would give a grid O(PEs per node) numbers, on the path to
+  RoCE at ~10⁶ PEs. *For the author (2026-09-26); proposed: raise the default to
+  64 now, and design the colouring with the RoCE backend.*
 - **`SHMEM_THREAD_MULTIPLE`: points §4.11 leaves open.** None blocks phase 1.
   - **A full thread table.** A PE's `OSOE_MAX_THREADS` blocks can all be taken by
     live threads. Aborting with a diagnostic naming the variable is loud and simple.
