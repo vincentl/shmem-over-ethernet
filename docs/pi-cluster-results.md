@@ -159,8 +159,8 @@ run the same evening without root.) Two rounds, the default 64 KiB chunk and
 
 So **F1 is not only 4 × 2**: at 4 × 1 the default chunk stalls on 32 KiB
 blocks in both rounds, the same 32 KiB a node as 4 × 2 at 16 KiB. And a
-16 KiB chunk is not free: every get past a chunk pays about 1.5×, since a
-get asks one chunk at a time per reply credit. Whether to trade the gets for
+16 KiB chunk is not free: every get past a chunk pays about 1.5×, for a
+reason not yet looked into. Whether to trade the gets for
 the collectives - or give collectives a chunk of their own - is the author's
 decision; nothing was changed. (`osu_oshm_put_bw` needs a `heap` argument the
 script did not pass; the bench's put stream stands in for it.)
