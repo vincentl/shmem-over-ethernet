@@ -5841,7 +5841,7 @@ routine: in flight together, up to the landing zone's records.
 
 **Block-strided `ibput`/`ibget` are built** (§9.6.1.4, §9.6.1.8; phase 1 step 9
 slice 1): the same generated families, the same `strided_put`/`strided_get`
-loop generalised from one element to one block of `bsize` elements, so
+loop generalized from one element to one block of `bsize` elements, so
 `ibput`/`ibget` cost `O(nblocks)` transport calls rather than `O(nblocks *
 bsize)` - each one a single contiguous transfer, not a loop over `bsize`
 elements. Batched the same way: every block but the last carries
@@ -5850,7 +5850,8 @@ by one wait for the gets alone, so a block size of 1 costs exactly what
 `iput`/`iget` costs (the spec's own Note: `shmem_ibput` with `bsize` 1 is
 `shmem_iput`). `dst` and `sst` must each be at least `bsize` (spec's
 Arguments); below that is undefined, and ends the job by name, as
-`shmem_team_split_strided`'s stride of 0 does (§5.7).
+`shmem_team_split_strided`'s stride of 0 does (§5.7). Both strides equal to
+`bsize` lay the blocks end to end, and move as one transfer of the whole.
 
 **The nonblocking fetching AMOs complete at issue** (§9.7.2): `fetch`, `swap`,
 `compare_swap`, `fetch_inc`, `fetch_add` and the three bitwise fetches, each
