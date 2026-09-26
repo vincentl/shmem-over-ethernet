@@ -90,9 +90,9 @@ static bool rank_in(const struct expected *e, int world, int *rank)
     return false;
 }
 
-static void nap_ms(long ms)
+static void sleep_milliseconds(long milliseconds)
 {
-    struct timespec ts = { ms / 1000, (ms % 1000) * 1000 * 1000 };
+    struct timespec ts = { milliseconds / 1000, (milliseconds % 1000) * 1000 * 1000 };
     nanosleep(&ts, NULL);
 }
 
@@ -392,7 +392,7 @@ static void coinciding_leads(void)
     for (int round = 0; round < 6; round++) {
         if (a != SHMEM_TEAM_INVALID) {
             if (me == 1)
-                nap_ms(20);
+                sleep_milliseconds(20);
             source[0] = me + 1 + round;
             CHECK(shmem_long_sum_reduce(a, dest, source, 1) == 0);
             CHECK(dest[0] == 1 + 2 + 2 * round);
@@ -409,7 +409,7 @@ static void coinciding_leads(void)
     for (int round = 0; round < 6; round++) {
         if (a != SHMEM_TEAM_INVALID) {
             if (me == 1)
-                nap_ms(20);
+                sleep_milliseconds(20);
             source[0] = 10L * me + round;
             CHECK(shmem_long_fcollect(a, dest, source, 1) == 0);
             CHECK(dest[0] == round && dest[1] == 10 + round);
