@@ -25,13 +25,15 @@
  *      nonzero on every one of them, and what it leaves undefined ends the job
  *      by name;
  *   2. the parent's rank 0 claims a number for each team the call creates,
- *      with one fetching add on a counter in world PE 0's internal region
- *      (internal-region.h) - numbers are job-wide and never reused within a
- *      session (§5.7), so no late message or straggling reader of a team's
- *      state ever meets another team under its number;
+ *      with a compare-and-swap on a counter in world PE 0's internal region
+ *      (internal-region.h), retried until it lands - numbers are job-wide and
+ *      never reused within a session (§5.7), so no late message or straggling
+ *      reader of a team's state ever meets another team under its number, and
+ *      a claim that would pass OSOE_MAX_TEAMS takes none, so the numbers left
+ *      stay for a call that fits;
  *   3. a broadcast over the parent carries the first number, or 0 for a claim
- *      past OSOE_MAX_TEAMS, in eight bytes every parent PE borrows from the
- *      symmetric heap for the call, as collect borrows its lengths' room;
+ *      that failed, in eight bytes every parent PE borrows from the symmetric
+ *      heap for the call, as collect borrows its lengths' room;
  *   4. every member builds its descriptor: its node's members in O(L), and
  *      from them whether the team spans nodes, O(1); and each node's local
  *      lead of the team - the one PE per node that needs it - the team's node
@@ -112,6 +114,14 @@ static uint32_t numbered_count;
  */
 static struct osoe_team *created;
 static uint32_t created_count;
+
+/*
+ * How many team numbers this PE last saw claimed, job-wide: where its next
+ * claim guesses the counter stands. A guess and no more - a stale one costs a
+ * compare-and-swap that fails and says where the counter is - and this PE's
+ * own, so a plain word; each session's counter, like its guess, starts at 0.
+ */
+static uint64_t claimed_seen;
 
 /* The predefined teams' local list, every local id in order - beyond what the
  * node and the bootstrap already hold, the one array their shapes need. */
@@ -478,6 +488,7 @@ static void forget(struct osoe_team *t)
 
 void osoe_team_start(void)
 {
+    claimed_seen = 0;
     numbered_count = osoe.bootstrap.max_teams;
     created_count = numbered_count - OSOE_PREDEFINED_TEAMS;
     /* calloc: a null pointer in every entry, before any reader exists. */
@@ -764,47 +775,71 @@ static int contexts_requested(const char *routine, const char *argument,
 }
 
 /*
- * No team number is left for a call creating `count` teams (§5.7), said once,
- * by the parent's rank 0, which made the claim - or would have, for a call
- * creating more teams than there are numbers at all: the split fails on every
- * PE of its parent, as spec §9.4.6 says a team that cannot be created does.
+ * No team numbers are left for a call creating `count` teams (§5.7), `before`
+ * having been claimed: said once, by the parent's rank 0, which found the
+ * counter so. The split takes none and fails on every PE of its parent, as spec
+ * §9.4.6 says a team that cannot be created does.
  */
-static void out_of_numbers(const char *routine, uint32_t count, bool claimed, uint64_t before)
+static void numbers_used_up(const char *routine, uint32_t count, uint64_t before)
 {
-    uint32_t max = osoe.bootstrap.max_teams;
-    if (claimed)
-        fprintf(stderr, "osoe: PE %u: %s: no team numbers are left for the %u team%s this call "
-                "creates: OSOE_MAX_TEAMS is %u, %u of them predefined, %llu were claimed "
-                "before this call, and a number is never reused within a session (design "
-                "§5.7); the split returns nonzero on every PE of its parent team\n",
-                osoe.bootstrap.rank, routine, count, count == 1 ? "" : "s", max,
-                OSOE_PREDEFINED_TEAMS, (unsigned long long)before);
-    else
-        fprintf(stderr, "osoe: PE %u: %s: this call creates %u teams, more than a session can "
-                "ever have: OSOE_MAX_TEAMS is %u, %u of them predefined (design §5.7); the "
-                "split returns nonzero on every PE of its parent team\n", osoe.bootstrap.rank,
-                routine, count, max, OSOE_PREDEFINED_TEAMS);
+    fprintf(stderr, "osoe: PE %u: %s: no team numbers are left for the %u team%s this call "
+            "creates: OSOE_MAX_TEAMS is %u, %u of them predefined, and %llu %s been claimed, "
+            "which a destroyed team does not give back (design §5.7); the split takes none "
+            "and returns nonzero on every PE of its parent team\n", osoe.bootstrap.rank, routine,
+            count, count == 1 ? "" : "s", osoe.bootstrap.max_teams, OSOE_PREDEFINED_TEAMS,
+            (unsigned long long)before, before == 1 ? "has" : "have");
+}
+
+/* A call creating more teams than a session can ever have, refused on every
+ * parent PE before anything is claimed: said once, by the parent's rank 0. */
+static void more_teams_than_numbers(const char *routine, uint32_t count)
+{
+    fprintf(stderr, "osoe: PE %u: %s: this call creates %u teams, more than a session can ever "
+            "have: OSOE_MAX_TEAMS is %u, %u of them predefined (design §5.7); the split returns "
+            "nonzero on every PE of its parent team\n", osoe.bootstrap.rank, routine, count,
+            osoe.bootstrap.max_teams, OSOE_PREDEFINED_TEAMS);
 }
 
 /*
  * The parent's rank 0 claims the numbers of the `count` teams its call creates
- * (step 2 of the file's comment): one blocking fetching add on world PE 0's
- * counter (internal-region.h). The first is OSOE_PREDEFINED_TEAMS past the
- * value fetched - or 0, which no created team has, when the claim would reach
- * OSOE_MAX_TEAMS: the numbers stay counted, as every number claimed does.
+ * (step 2 of the file's comment), compare-and-swapping world PE 0's counter
+ * (internal-region.h) from where it guesses the counter stands to `count`
+ * past it, and again from the value each failed exchange returns, until one
+ * lands. The first number is OSOE_PREDEFINED_TEAMS past the value exchanged.
+ * A claim the numbers left cannot hold takes none - its exchange writes back
+ * the value it found, which confirms the count it reports - and answers 0,
+ * which no created team has, so a later call that fits still gets them. The
+ * loop ends: the counter moves only by claims that land, and those stop at
+ * OSOE_MAX_TEAMS. One round trip when this PE's guess is right, which it is
+ * after its own last claim unless another parent has claimed since.
  */
 static uint64_t claim(const char *routine, uint32_t count)
 {
-    uint32_t max = osoe.bootstrap.max_teams;
+    uint32_t max_teams = osoe.bootstrap.max_teams;
     uint64_t counter = osoe_internal_team_counter_offset(osoe.bootstrap.collective_fanout,
-                                                         osoe.bootstrap.collective_pipeline, max);
-    uint64_t claimed = osoe_transport_rmw(osoe_transport_context_default(), 0,
-                                          OSOE_REGION_INTERNAL, counter, OSOE_RMW_ADD,
-                                          sizeof(uint64_t), count, 0, OSOE_TRANSPORT_FETCH);
-    if (claimed <= max && OSOE_PREDEFINED_TEAMS + claimed + count <= max)
-        return OSOE_PREDEFINED_TEAMS + claimed;
-    out_of_numbers(routine, count, true, claimed);
-    return 0;
+                                                         osoe.bootstrap.collective_pipeline,
+                                                         max_teams);
+    /* split has refused a count past this before calling. */
+    uint64_t room = max_teams - OSOE_PREDEFINED_TEAMS;
+    uint64_t expected = claimed_seen;
+    for (;;) {
+        bool fits = expected <= room - count;
+        uint64_t found = osoe_transport_rmw(osoe_transport_context_default(), 0,
+                                            OSOE_REGION_INTERNAL, counter, OSOE_RMW_CSWAP,
+                                            sizeof(uint64_t), fits ? expected + count : expected,
+                                            expected, OSOE_TRANSPORT_FETCH);
+        if (found != expected) {
+            expected = found;
+            continue;
+        }
+        if (fits) {
+            claimed_seen = expected + count;
+            return OSOE_PREDEFINED_TEAMS + expected;
+        }
+        claimed_seen = expected;
+        numbers_used_up(routine, count, expected);
+        return 0;
+    }
 }
 
 /*
@@ -936,7 +971,7 @@ static int split(const char *routine, shmem_team_t parent_handle, struct osoe_te
      * every parent PE computes the count alike, as it checked the arguments. */
     if (count > osoe.bootstrap.max_teams - OSOE_PREDEFINED_TEAMS) {
         if (parent->me == 0)
-            out_of_numbers(routine, count, false, 0);
+            more_teams_than_numbers(routine, count);
         return 1;
     }
 

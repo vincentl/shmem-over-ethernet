@@ -4530,7 +4530,8 @@ node-wide pool (§3.8) keeps it from costing memory per connection.
 step 7, were designed and approved (`docs/prompts/phase1-step7-slice1-prompt.md`,
 `docs/decisions/2026-09-25.md`): a team is a number, job-wide and never reused
 within a session, claimed by the parent's rank 0 with one fetching add on a
-counter in world PE 0's internal page; every node's block for the number holds
+counter in world PE 0's internal page (as built, a compare-and-swap, below);
+every node's block for the number holds
 the team's counters and, on each member node, its record; the split is
 collective over the parent and ends with a sync over it. Step 7's first slice
 built the storage, and its second the split.
@@ -4542,16 +4543,25 @@ parent: the argument checks, alike on every parent PE - an invalid triplet
 returns nonzero on all of them, and what the spec leaves undefined, a stride of
 0 with a size other than 1 or a non-positive `xrange`, ends the job by name;
 the claim, by the parent's rank 0, of a number for every team the call creates,
-one for `split_strided` and every row and column for `split_2d`, which fails
-the split on every parent PE, with one diagnostic naming `OSOE_MAX_TEAMS`, when
-it would reach the limit; a broadcast over the parent of the first number, in
-eight bytes each parent PE borrows from the heap for the call; each member's
+one for `split_strided` and every row and column for `split_2d`; a broadcast
+over the parent of the first number, in eight bytes each parent PE borrows from
+the heap for the call; each member's
 descriptor - its node's members in team-rank order, O(*L*), whether the team
 spans nodes, O(1), and on each node's local lead the node set, O(*S*) or
 O(*S* log *S*), §5.2; each member node's record, written by the team's local
 lead there; and the sync over the parent, which orders every record before any
 collective on the new team (`node.h` argues it, from orders that already
-existed). A created team's handle is its descriptor's address, in a
+existed). **The claim is a compare-and-swap**, where the approved design had a
+fetching add: rank 0 exchanges the counter from where it guesses it stands -
+the value it last saw, 0 at first - to that plus the call's count, and again
+from the value each failed exchange returns, until one lands. A claim the
+numbers left cannot hold takes none, and fails the split on every parent PE
+with one diagnostic naming `OSOE_MAX_TEAMS` and the count claimed, so a later
+call that fits still gets them; with an add, a `split_2d` of many rows that
+failed would have used up the numbers of every split after it (review of the
+slice, M2). A call that creates more teams than a session can have at all is
+refused before claiming, said once by rank 0. A created team's handle is its
+descriptor's address, in a
 per-process pool indexed by number, so a handle never issued or already
 destroyed is named without being read through. Destroy is a sync over the
 team's members, then the descriptor's arrays are freed; the number, its blocks

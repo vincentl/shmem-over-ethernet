@@ -32,9 +32,9 @@
  * Last, one more line: **the count of team numbers claimed** (§5.7; phase 1
  * step 7 slice 2), an eight-byte word at the line's start. Every PE's region
  * has the line and only world PE 0's is used: a split's parent rank 0 claims
- * the numbers its call creates with one fetching add there (team.c), so
- * numbers are job-wide and never reused within a session. It is not a team
- * number's word, and no collective counts on it.
+ * the numbers its call creates by compare-and-swap there (team.c), so numbers
+ * are job-wide and never reused within a session. It is not a team number's
+ * word, and no collective counts on it.
  *
  * Every PE's heap carries one, and a team touches only its own slots and its
  * words' lines, and only on the leads of its nodes; the pages nobody writes
