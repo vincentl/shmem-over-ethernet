@@ -125,7 +125,7 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   foreach(defect_line IN ITEMS
       "my-pe|start-pes: PE 1: _my_pe says 2 and _num_pes 4, where shmem_my_pe says 1"
       "put|start-pes: PE 2: word 32 of the shmalloc'd block holds [0-9]+ from PE 1"
-      "realloc|start-pes: PE 1: word 0 holds [0-9]+ after shrealloc"
+      "realloc|start-pes: PE 1: shrealloc to [0-9]+ bytes changed word 0, [0-9]+, expected [0-9]+"
       "align|start-pes: PE 1: shmemalign.64, 100. returned 0x[0-9a-f]+, not a multiple of 64")
     string(FIND "${defect_line}" "|" bar)
     string(SUBSTRING "${defect_line}" 0 ${bar} defect)

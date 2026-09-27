@@ -89,9 +89,9 @@ int main(int argc, char **argv)
     long *words = shmalloc(WORDS * sizeof *words);
     int *tally = shmalloc(2 * sizeof *tally);
     long source[WORDS];
-    if (!words || !tally) {
-        fail("shmalloc returned NULL");   /* alike on every PE: the allocation is collective */
-        return 1;
+    if (!words || !tally) {         /* a refusal, as osoe-pacer's at start: alike on every PE */
+        fprintf(stderr, "osoe-pacer-start-pes: PE %d: out of symmetric memory at start\n", me);
+        return 2;
     }
     int next = (me + 1) % n, previous = (me + n - 1) % n;
     for (int k = 0; k < WORDS; k++)
@@ -110,18 +110,21 @@ int main(int argc, char **argv)
     /* shrealloc: four times as large, the first words kept. */
     if (planted && strcmp(plant, "realloc") == 0)
         words[0]++;                 /* the planted defect: a word changed before the realloc */
+    /* One check: the block grew, and its words are the ones it held. */
     long *grown = shrealloc(words, 4 * WORDS * sizeof *grown);
-    int kept = grown != NULL;
+    int lost = grown ? -1 : WORDS;
     if (grown)
         words = grown;
-    for (int k = 0; k < WORDS && kept; k++)
-        if (words[k] != word_of(previous, k)) {
-            fail("word %d holds %ld after shrealloc, expected %ld, which it held before", k,
-                 words[k], word_of(previous, k));
-            kept = -1;
-        }
-    if (!kept)
-        fail("shrealloc to %zu bytes returned NULL", 4 * WORDS * sizeof *grown);
+    for (int k = 0; k < WORDS && grown && lost < 0; k++)
+        if (words[k] != word_of(previous, k))
+            lost = k;
+    if (lost >= 0) {
+        char what[96] = "returned NULL";
+        if (grown)
+            snprintf(what, sizeof what, "changed word %d, %ld, expected %ld", lost, words[lost],
+                     word_of(previous, lost));
+        fail("shrealloc to %zu bytes %s", 4 * WORDS * sizeof *grown, what);
+    }
 
     /* shmemalign: an address a multiple of the alignment asked. */
     void *aligned = shmemalign(ALIGNMENT, 100);

@@ -54,13 +54,13 @@ enum operation { AND, OR, XOR, MAX, MIN, SUM, PROD };
 
 struct to_all_case {
     const char *name;               /* "short_and" */
-    enum operation op;
+    enum operation operation;
     int complex_valued;
     size_t size;
     void (*call)(void *dest, const void *source, int nreduce, int start, int log_stride,
                  int size, void *work, long *sync);
-    void (*store)(void *array, size_t e, long long re, long long im);
-    void (*load)(const void *array, size_t e, long long *re, long long *im);
+    void (*store)(void *array, size_t e, long long real, long long imaginary);
+    void (*load)(const void *array, size_t e, long long *real, long long *imaginary);
 };
 
 #define TO_ALL_CALL(T, NAME, OP)                                                    \
@@ -72,26 +72,28 @@ struct to_all_case {
                                      log_stride, size, (T *)work, sync);            \
     }
 #define TO_ALL_REAL(T, NAME)                                                        \
-    static void store_##NAME(void *array, size_t e, long long re, long long im)     \
+    static void store_##NAME(void *array, size_t e, long long real, long long imaginary) \
     {                                                                               \
-        (void)im;                                                                   \
-        ((T *)array)[e] = (T)re;                                                    \
+        (void)imaginary;                                                            \
+        ((T *)array)[e] = (T)real;                                                  \
     }                                                                               \
-    static void load_##NAME(const void *array, size_t e, long long *re, long long *im) \
+    static void load_##NAME(const void *array, size_t e, long long *real,           \
+                            long long *imaginary)                                   \
     {                                                                               \
-        *re = (long long)((const T *)array)[e];                                     \
-        *im = 0;                                                                    \
+        *real = (long long)((const T *)array)[e];                                   \
+        *imaginary = 0;                                                             \
     }
 #define TO_ALL_COMPLEX(T, NAME)                                                     \
-    static void store_##NAME(void *array, size_t e, long long re, long long im)     \
+    static void store_##NAME(void *array, size_t e, long long real, long long imaginary) \
     {                                                                               \
-        ((T *)array)[e] = (T)re + (T)im * (T)I;                                     \
+        ((T *)array)[e] = (T)real + (T)imaginary * (T)I;                            \
     }                                                                               \
-    static void load_##NAME(const void *array, size_t e, long long *re, long long *im) \
+    static void load_##NAME(const void *array, size_t e, long long *real,           \
+                            long long *imaginary)                                   \
     {                                                                               \
         double _Complex v = (double _Complex)((const T *)array)[e];                 \
-        *re = (long long)creal(v);                                                  \
-        *im = (long long)cimag(v);                                                  \
+        *real = (long long)creal(v);                                                \
+        *imaginary = (long long)cimag(v);                                           \
     }
 
 #define TO_ALL_INTEGER_TYPES(X)                                                     \
@@ -137,13 +139,13 @@ enum { TO_ALL_CASES = sizeof to_all_cases / sizeof *to_all_cases };
 
 /* ---- the atomics ------------------------------------------------------------------ */
 
-enum amo_op { SET_FETCH, SWAP, CSWAP, FINC, INC, FADD, ADD };
+enum amo_operation { SET_FETCH, SWAP, CSWAP, FINC, INC, FADD, ADD };
 static const char *const amo_names[] = { "set_fetch", "swap", "cswap", "finc", "inc", "fadd",
                                          "add" };
 
 struct amo_case {
     const char *type;
-    enum amo_op op;
+    enum amo_operation operation;
     /* the case's own operation on `dest` at `pe`: what it returned, or 0 */
     uint64_t (*apply)(void *dest, uint64_t value, uint64_t cond, int pe, int generic);
     uint64_t (*fetch)(const void *source, int pe, int generic);     /* SET_FETCH's second half */
@@ -389,44 +391,45 @@ static int deprecated_setup(shmem_team_t team, const struct pacer_options *optio
 /* ---- to_all ----------------------------------------------------------------------- */
 
 /* Member r's input for element e: small whole numbers, every result exact. */
-static void input_of(enum operation op, int r, int size, size_t e, long round, long long *re,
-                     long long *im)
+static void input_of(enum operation operation, int r, int size, size_t e, long round,
+                     long long *real, long long *imaginary)
 {
-    *im = 0;
-    switch (op) {
-    case AND: *re = 0xff & ~(1LL << ((r + (long)e + round) % 8)); break;
-    case OR: *re = 1LL << ((r + (long)e + round) % 8); break;
-    case XOR: *re = (r * 5 + (long)e + round) % 16; break;
+    *imaginary = 0;
+    switch (operation) {
+    case AND: *real = 0xff & ~(1LL << ((r + (long)e + round) % 8)); break;
+    case OR: *real = 1LL << ((r + (long)e + round) % 8); break;
+    case XOR: *real = (r * 5 + (long)e + round) % 16; break;
     case MAX:
-    case MIN: *re = (r * 7 + (long)e + round) % 13 - 6; break;
+    case MIN: *real = (r * 7 + (long)e + round) % 13 - 6; break;
     case SUM:
-        *re = (r + (long)e + round) % 5 + 1;
-        *im = (r + 2 * (long)e) % 3;
+        *real = (r + (long)e + round) % 5 + 1;
+        *imaginary = (r + 2 * (long)e) % 3;
         break;
     default:                        /* PROD: ones, and one member's 2 - or 1 + i */
-        *re = r == (int)(((long)e + round) % size) ? 2 : 1;
-        *im = 0;
+        *real = r == (int)(((long)e + round) % size) ? 2 : 1;
+        *imaginary = 0;
         break;
     }
 }
 
-static void fold(enum operation op, int complex_valued, long long *re, long long *im,
-                 long long re2, long long im2)
+static void fold(enum operation operation, int complex_valued, long long *real,
+                 long long *imaginary, long long next_real, long long next_imaginary)
 {
-    switch (op) {
-    case AND: *re &= re2; break;
-    case OR: *re |= re2; break;
-    case XOR: *re ^= re2; break;
-    case MAX: *re = re2 > *re ? re2 : *re; break;
-    case MIN: *re = re2 < *re ? re2 : *re; break;
-    case SUM: *re += re2; *im += im2; break;
+    switch (operation) {
+    case AND: *real &= next_real; break;
+    case OR: *real |= next_real; break;
+    case XOR: *real ^= next_real; break;
+    case MAX: *real = next_real > *real ? next_real : *real; break;
+    case MIN: *real = next_real < *real ? next_real : *real; break;
+    case SUM: *real += next_real; *imaginary += next_imaginary; break;
     default:
         if (complex_valued) {
-            long long r = *re * re2 - *im * im2, i = *re * im2 + *im * re2;
-            *re = r;
-            *im = i;
+            long long product_real = *real * next_real - *imaginary * next_imaginary;
+            long long product_imaginary = *real * next_imaginary + *imaginary * next_real;
+            *real = product_real;
+            *imaginary = product_imaginary;
         } else {
-            *re *= re2;
+            *real *= next_real;
         }
         break;
     }
@@ -437,17 +440,17 @@ static void run_to_all(long round, const struct to_all_case *c, const struct act
     int nreduce = 1 + (int)(round % MOST_REDUCE);
     if (s->rank >= 0) {
         for (int e = 0; e < nreduce; e++) {
-            long long re, im;
-            input_of(c->op, s->rank, s->size, (size_t)e, round, &re, &im);
-            if (c->complex_valued && c->op == PROD)
-                im = re == 2 ? 1 : 0, re = 1;
+            long long real, imaginary;
+            input_of(c->operation, s->rank, s->size, (size_t)e, round, &real, &imaginary);
+            if (c->complex_valued && c->operation == PROD)
+                imaginary = real == 2 ? 1 : 0, real = 1;
             if (!c->complex_valued)
-                im = 0;
-            if (old.plant_reduce && old.me == 1 && c->op == SUM && e == 0) {
-                re++;               /* the planted defect: an input one too many */
+                imaginary = 0;
+            if (old.plant_reduce && old.me == 1 && c->operation == SUM && e == 0) {
+                real++;               /* the planted defect: an input one too many */
                 old.plant_reduce = 0;
             }
-            c->store(old.source, (size_t)e, re, im);
+            c->store(old.source, (size_t)e, real, imaginary);
         }
         c->call(old.dest, old.source, nreduce, s->start, s->log_stride, s->size, old.work,
                 old.sync);
@@ -460,27 +463,27 @@ static void check_to_all(long round, const struct to_all_case *c, const struct a
         return;
     int nreduce = 1 + (int)(round % MOST_REDUCE);
     for (int e = 0; e < nreduce; e++) {
-        long long want_re = 0, want_im = 0;
+        long long want_real = 0, want_imaginary = 0;
         for (int r = 0; r < s->size; r++) {
-            long long re, im;
-            input_of(c->op, r, s->size, (size_t)e, round, &re, &im);
-            if (c->complex_valued && c->op == PROD)
-                im = re == 2 ? 1 : 0, re = 1;
+            long long real, imaginary;
+            input_of(c->operation, r, s->size, (size_t)e, round, &real, &imaginary);
+            if (c->complex_valued && c->operation == PROD)
+                imaginary = real == 2 ? 1 : 0, real = 1;
             if (!c->complex_valued)
-                im = 0;
+                imaginary = 0;
             if (r == 0) {
-                want_re = re;
-                want_im = im;
+                want_real = real;
+                want_imaginary = imaginary;
             } else {
-                fold(c->op, c->complex_valued, &want_re, &want_im, re, im);
+                fold(c->operation, c->complex_valued, &want_real, &want_imaginary, real, imaginary);
             }
         }
-        long long have_re, have_im;
-        c->load(old.dest, (size_t)e, &have_re, &have_im);
-        if (have_re != want_re || have_im != want_im) {
+        long long have_real, have_imaginary;
+        c->load(old.dest, (size_t)e, &have_real, &have_imaginary);
+        if (have_real != want_real || have_imaginary != want_imaginary) {
             pacer_failure("deprecated round=%ld %s_to_all set=%d:%d:%d: element %d is %lld%+lldi, "
                           "expected %lld%+lldi", round, c->name, s->start, s->log_stride,
-                          s->size, e, have_re, have_im, want_re, want_im);
+                          s->size, e, have_real, have_imaginary, want_real, want_imaginary);
             return;
         }
     }
@@ -552,22 +555,33 @@ static void run_data(long round, enum family f, int bits, const struct active_se
         old.source[0] ^= 1;         /* the planted defect: a byte offered wrong */
         old.plant_data = 0;
     }
-    int start = s->start, log = s->log_stride, size = s->size;
+    int start = s->start, log_stride = s->log_stride, size = s->size;
+    size_t mine = f == COLLECT ? collect_count(s->rank, round) : d.nelems;
+    unsigned char *dest = old.dest, *source = old.source;
+    long *sync = old.sync;
     if (bits == 32) {
         switch (f) {
-        case BROADCAST: shmem_broadcast32(old.dest, old.source, d.nelems, d.root, start, log, size, old.sync); break;
-        case COLLECT: shmem_collect32(old.dest, old.source, collect_count(s->rank, round), start, log, size, old.sync); break;
-        case FCOLLECT: shmem_fcollect32(old.dest, old.source, d.nelems, start, log, size, old.sync); break;
-        case ALLTOALL: shmem_alltoall32(old.dest, old.source, d.nelems, start, log, size, old.sync); break;
-        default: shmem_alltoalls32(old.dest, old.source, d.dst, d.sst, d.nelems, start, log, size, old.sync); break;
+        case BROADCAST:
+            shmem_broadcast32(dest, source, mine, d.root, start, log_stride, size, sync);
+            break;
+        case COLLECT: shmem_collect32(dest, source, mine, start, log_stride, size, sync); break;
+        case FCOLLECT: shmem_fcollect32(dest, source, mine, start, log_stride, size, sync); break;
+        case ALLTOALL: shmem_alltoall32(dest, source, mine, start, log_stride, size, sync); break;
+        default:
+            shmem_alltoalls32(dest, source, d.dst, d.sst, mine, start, log_stride, size, sync);
+            break;
         }
     } else {
         switch (f) {
-        case BROADCAST: shmem_broadcast64(old.dest, old.source, d.nelems, d.root, start, log, size, old.sync); break;
-        case COLLECT: shmem_collect64(old.dest, old.source, collect_count(s->rank, round), start, log, size, old.sync); break;
-        case FCOLLECT: shmem_fcollect64(old.dest, old.source, d.nelems, start, log, size, old.sync); break;
-        case ALLTOALL: shmem_alltoall64(old.dest, old.source, d.nelems, start, log, size, old.sync); break;
-        default: shmem_alltoalls64(old.dest, old.source, d.dst, d.sst, d.nelems, start, log, size, old.sync); break;
+        case BROADCAST:
+            shmem_broadcast64(dest, source, mine, d.root, start, log_stride, size, sync);
+            break;
+        case COLLECT: shmem_collect64(dest, source, mine, start, log_stride, size, sync); break;
+        case FCOLLECT: shmem_fcollect64(dest, source, mine, start, log_stride, size, sync); break;
+        case ALLTOALL: shmem_alltoall64(dest, source, mine, start, log_stride, size, sync); break;
+        default:
+            shmem_alltoalls64(dest, source, d.dst, d.sst, mine, start, log_stride, size, sync);
+            break;
         }
     }
 }
@@ -677,14 +691,16 @@ static void run_amo(long round, const struct amo_case *c, int generic)
     int next = (old.me + 1) % old.n, previous = (old.me + old.n - 1) % old.n;
     uint64_t mine = amo_value(old.me, round), theirs = amo_value(previous, round);
     uint64_t sent = mine;
-    if (old.plant_word && old.me == 1 && c->op != FINC && c->op != INC && c->op != SET_FETCH) {
+    if (old.plant_word && old.me == 1 && c->operation != FINC && c->operation != INC &&
+        c->operation != SET_FETCH) {
         sent++;                     /* the planted defect: one value sent wrong */
         old.plant_word = 0;
     }
     uint64_t returned = c->apply(old.word, sent, AMO_START, next, generic);
     uint64_t want_returned = AMO_START;
-    int returns = c->op == SWAP || c->op == CSWAP || c->op == FINC || c->op == FADD;
-    if (c->op == SET_FETCH) {
+    int returns = c->operation == SWAP || c->operation == CSWAP || c->operation == FINC ||
+                  c->operation == FADD;
+    if (c->operation == SET_FETCH) {
         shmem_quiet();
         shmem_barrier_all();        /* every set landed before any fetch */
         returned = c->fetch(old.word, next, generic);
@@ -699,15 +715,15 @@ static void run_amo(long round, const struct amo_case *c, int generic)
     }
     if (returns && returned != want_returned)
         pacer_failure("deprecated round=%ld %s_%s: returned %llu, expected %llu", round, c->type,
-                      amo_names[c->op], (unsigned long long)returned,
+                      amo_names[c->operation], (unsigned long long)returned,
                       (unsigned long long)want_returned);
-    uint64_t want = c->op == FINC || c->op == INC      ? AMO_START + 1
-                    : c->op == FADD || c->op == ADD    ? AMO_START + theirs
+    uint64_t want = c->operation == FINC || c->operation == INC      ? AMO_START + 1
+                    : c->operation == FADD || c->operation == ADD    ? AMO_START + theirs
                                                        : theirs;
     uint64_t have = c->load(old.word);
     if (have != want)
         pacer_failure("deprecated round=%ld %s_%s: the word holds %llu after PE %d's, expected "
-                      "%llu", round, c->type, amo_names[c->op], (unsigned long long)have,
+                      "%llu", round, c->type, amo_names[c->operation], (unsigned long long)have,
                       previous, (unsigned long long)want);
 }
 
@@ -831,8 +847,7 @@ static void deprecated_step(long units, int last)
             run_barrier(round, index == BARRIER_FIRST ? BARRIER : SYNC, &s);
         } else if (index < WAIT_FIRST) {
             const struct amo_case *c = &amo_cases[index - AMO_FIRST];
-            if (c->op == CSWAP || c->op == SWAP || c->op == FINC || c->op == INC ||
-                c->op == FADD || c->op == ADD) {
+            if (c->operation != SET_FETCH) {
                 c->start(old.word, AMO_START, old.me);
                 shmem_quiet();
                 shmem_barrier_all();    /* every word at its start before anyone's operation */
