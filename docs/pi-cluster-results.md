@@ -322,3 +322,63 @@ and read as a fault; it was the plant caught, 56 failures a round as
 designed, and every case PE 1 cannot disturb right on 16 PEs over four
 nodes. It showed one failure split over several lines, now fixed, and that a
 planted run should say so, now done (`4a96354`; the record's item 8).
+
+## The pacer's second phase (2026-09-27)
+
+`task-stress-phase2`, 4 × 4, the runbook's §6 run by `pi-runs-phase2.sh`,
+`pi-runs-phase2b.sh` and `pi-cpu-bind.sh` under `nohup`, about two hours of
+cluster time. `mailbox` and `teams` ran ten minutes each in `release`,
+`threads` an hour in a `debug` build with the library's two test hooks on
+and a landing zone of 8 KiB. Outputs, scripts and the nodes' state:
+`docs/design/evidence/pi-cluster/2026-09-27/pacer/phase2/`, a directory a
+commit; the record: `docs/decisions/2026-09-27.md`, from item 11. `teams`
+and `threads` ran at `80c13ac`, whose exercises are those that merged;
+`mailbox` ran there and again at `01d003f`, after its round trip across nodes
+was added. The nodes had been up since 10:09, TCP and generic segmentation
+offload off, the `ondemand` governor, as for the first runs.
+
+**Every run ended `failures=0`**, and the hour of `threads` printed no
+`OSOE_CHECK_QUIET:` line: 1.71 × 10⁹ operations, private, serialized, default
+and team contexts in turn, four workers a PE, the check that a quiet on a
+shared context completes each thread's puts made inside the library on every
+one of them. No node's retransmission timeouts moved in any counted run.
+
+**`mailbox`**, 16 PEs, four messages a PE a round, a waiting form a round:
+
+| | 10 min at `80c13ac` | 10 min at `01d003f` |
+|---|---|---|
+| messages a second | 41,500 | 40,500 |
+| time in the mailbox between node-mates, median | 259 µs | 260 µs |
+| the same, 99th percentile | 10.5 ms | 11.3 ms |
+| round trip across nodes, four words each way, median | - | 175 µs |
+| the same, 99th percentile | - | 211 µs |
+
+The round trip is typed put-with-signal and a wait each way, against a bare
+io_uring echo's 153 to 156 µs (the floor, above). The tail between
+node-mates, forty times the median, is **the core a PE's threads share**:
+two minutes each way, back to back, at `01d003f`:
+
+| | messages a second | node-mates, median | node-mates, 99th percentile |
+|---|---|---|---|
+| Slurm's default binding, a core a task | 39,600 | 262 µs | 11.7 ms |
+| `--cpu-bind=none` | 249,500 | 183 µs | 0.47 ms |
+
+Six times the rate and a tail twenty-five times shorter, with nothing else
+changed. Each PE's main thread shares its bound core with its agent thread,
+and the node lead's agent drives the whole node's network traffic (design
+§3.12); the record's item 17 has the likely mechanism, and what to do about
+it is open. The `osoe-bench` pair above measured the same sharing on bare
+operations; on a pipelined pattern it is the largest single factor measured
+on this cluster.
+
+**`teams`**, 16 PEs: twelve team numbers spent - four strided teams and a
+4 × 4 grid's rows and columns - and 36,600 checked collectives a second over
+the job, 511,118 rounds of a collective on every PE's row and column at once
+and one on each strided team it belongs to.
+
+**`threads`**, 16 PEs of four workers each, for an hour: 474,000 operations a
+second from the first minute to the last, within 1%. Of every five-second
+step, a PE's workers spent 6.6 to 6.7 thread-seconds on the default and team
+contexts - the shared ones - and 4.3 on the private and serialized, for the
+same work: half again as much, which the record leaves to the project
+review.

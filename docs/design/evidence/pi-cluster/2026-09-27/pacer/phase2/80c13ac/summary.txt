@@ -1,0 +1,18 @@
+12:22:43 commit 80c13ac task-stress-phase2, copied 2026-09-27T12:21:21-04:00
+pi-001 up=8001s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-002 up=8016s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-003 up=8016s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-004 up=8000s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+12:22:46 quick exit 0 in 3 s: osoe-pacer failures=0 seconds=3.2 
+12:22:46     timeouts before: pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+12:22:46     timeouts after:  pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+12:32:48 mailbox exit 0 in 601 s: osoe-pacer failures=0 seconds=600.3 
+12:32:48     timeouts before: pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+12:32:48     timeouts after:  pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+12:42:54 teams exit 0 in 606 s: osoe-pacer failures=0 seconds=600.0 
+12:42:54     timeouts before: pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+12:42:54     timeouts after:  pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+13:42:54 threads-hour exit 0 in 3600 s: osoe-pacer failures=0 seconds=3600.0 
+13:42:54     timeouts before: pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+13:42:54     timeouts after:  pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+13:42:54 DONE

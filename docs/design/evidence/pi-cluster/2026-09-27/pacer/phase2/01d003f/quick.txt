@@ -1,0 +1,129 @@
+osoe-pacer library=osoe version=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=sort,alltoall,mailbox,teams
+exercise sort mode=rounds exchange=fetch-add ptr=yes keys=65536 capacity=77824 local_sort=lsd-scratch private=3.2m rounds=3 memory=1.2m
+exercise alltoall teams=world,even blocks=8,4096,65536 variants=alltoall,alltoallmem,alltoalls,put,get,signal,iput,ibput rounds=12 memory=5.1m
+exercise mailbox sends=4 slot=256 forms=20 round_trips=128 rounds=20 memory=4.8k
+exercise teams numbers=12 strided=4 grid=4x4 kinds=15 rounds=15 memory=8.0k
+sort t=0.1 round=1 keys=1048576 keys_per_s=15493611 mib_per_s=118.2 imbalance=1.007 generate_s=0.001 bin_s=0.001 exchange_s=0.028 sort_s=0.040 check_s=0.001 step_s=0.068 failures=0
+sort t=0.1 round=2 keys=2097152 keys_per_s=16580754 mib_per_s=126.5 imbalance=1.006 generate_s=0.001 bin_s=0.001 exchange_s=0.022 sort_s=0.039 check_s=0.001 step_s=0.063 failures=0
+sort t=0.2 round=3 keys=3145728 keys_per_s=16997522 mib_per_s=129.7 imbalance=1.007 generate_s=0.001 bin_s=0.001 exchange_s=0.021 sort_s=0.039 check_s=0.001 step_s=0.062 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=485.1 alltoallmem_us=526.2 alltoalls_us=382.8 put_us=393.3 get_us=546.1 signal_us=300.3 iput_us=352.6 ibput_us=344.4
+alltoall team=even block=8 exchanges=1 alltoall_us=371.5 alltoallmem_us=338.6 alltoalls_us=359.2 put_us=344.0 get_us=409.7 signal_us=192.7 iput_us=375.9 ibput_us=341.8
+alltoall t=0.0 round=1 exchanges=16 exchanges_per_s=1673 fill_s=0.000 exchange_s=0.009 check_s=0.000 step_s=0.010 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2915.5 alltoallmem_us=3209.0 alltoalls_us=9866.2 put_us=3224.5 get_us=3580.6 signal_us=2922.1 iput_us=9407.9 ibput_us=3394.9
+alltoall team=even block=4096 exchanges=1 alltoall_us=873.9 alltoallmem_us=1007.7 alltoalls_us=2969.8 put_us=805.6 get_us=1259.4 signal_us=637.9 iput_us=2897.3 ibput_us=815.8
+alltoall t=0.1 round=2 exchanges=32 exchanges_per_s=292 fill_s=0.001 exchange_s=0.053 check_s=0.001 step_s=0.055 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=37552.4 alltoallmem_us=36156.9 alltoalls_us=139491.8 put_us=37753.9 get_us=34987.3 signal_us=33057.2 iput_us=141725.9 ibput_us=35962.0
+alltoall team=even block=65536 exchanges=1 alltoall_us=9221.7 alltoallmem_us=10021.9 alltoalls_us=33050.8 put_us=8346.0 get_us=9180.0 signal_us=8523.8 iput_us=34232.0 ibput_us=8602.3
+alltoall t=0.7 round=3 exchanges=48 exchanges_per_s=25 fill_s=0.017 exchange_s=0.622 check_s=0.011 step_s=0.649 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=357.1 alltoallmem_us=371.7 alltoalls_us=386.9 put_us=369.0 get_us=546.4 signal_us=249.6 iput_us=362.1 ibput_us=384.2
+alltoall team=even block=8 exchanges=1 alltoall_us=348.7 alltoallmem_us=352.9 alltoalls_us=347.3 put_us=363.6 get_us=408.9 signal_us=190.9 iput_us=348.4 ibput_us=350.1
+alltoall t=0.7 round=4 exchanges=64 exchanges_per_s=1849 fill_s=0.000 exchange_s=0.008 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2982.4 alltoallmem_us=2822.6 alltoalls_us=9475.1 put_us=3166.3 get_us=3439.8 signal_us=2976.2 iput_us=8820.4 ibput_us=3151.4
+alltoall team=even block=4096 exchanges=1 alltoall_us=1023.1 alltoallmem_us=979.1 alltoalls_us=3560.5 put_us=806.4 get_us=1142.5 signal_us=640.9 iput_us=3148.3 ibput_us=838.2
+alltoall t=0.8 round=5 exchanges=80 exchanges_per_s=300 fill_s=0.001 exchange_s=0.052 check_s=0.001 step_s=0.053 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=31116.6 alltoallmem_us=36774.0 alltoalls_us=148546.6 put_us=32618.2 get_us=35522.9 signal_us=32781.4 iput_us=158165.0 ibput_us=31984.3
+alltoall team=even block=65536 exchanges=1 alltoall_us=7978.9 alltoallmem_us=8999.7 alltoalls_us=34400.6 put_us=8427.0 get_us=8932.2 signal_us=7958.5 iput_us=33159.5 ibput_us=8334.9
+alltoall t=1.4 round=6 exchanges=96 exchanges_per_s=25 fill_s=0.015 exchange_s=0.629 check_s=0.010 step_s=0.653 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=395.1 alltoallmem_us=358.8 alltoalls_us=353.8 put_us=369.5 get_us=429.4 signal_us=285.7 iput_us=359.7 ibput_us=364.0
+alltoall team=even block=8 exchanges=1 alltoall_us=363.5 alltoallmem_us=337.4 alltoalls_us=343.6 put_us=343.0 get_us=390.9 signal_us=216.3 iput_us=359.2 ibput_us=318.6
+alltoall t=1.4 round=7 exchanges=112 exchanges_per_s=1853 fill_s=0.000 exchange_s=0.008 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2852.1 alltoallmem_us=3079.2 alltoalls_us=8808.5 put_us=3050.1 get_us=3367.5 signal_us=2870.3 iput_us=8544.2 ibput_us=3061.5
+alltoall team=even block=4096 exchanges=1 alltoall_us=1051.4 alltoallmem_us=895.0 alltoalls_us=3071.4 put_us=825.7 get_us=1141.6 signal_us=630.6 iput_us=2869.4 ibput_us=797.7
+alltoall t=1.5 round=8 exchanges=128 exchanges_per_s=309 fill_s=0.001 exchange_s=0.050 check_s=0.001 step_s=0.052 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=31358.8 alltoallmem_us=32162.7 alltoalls_us=140031.8 put_us=32775.4 get_us=34282.6 signal_us=30174.6 iput_us=141000.0 ibput_us=34684.6
+alltoall team=even block=65536 exchanges=1 alltoall_us=8873.5 alltoallmem_us=10089.8 alltoalls_us=34488.8 put_us=8375.7 get_us=9578.1 signal_us=8112.6 iput_us=33496.5 ibput_us=7996.4
+alltoall t=2.1 round=9 exchanges=144 exchanges_per_s=26 fill_s=0.016 exchange_s=0.601 check_s=0.011 step_s=0.626 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=479.8 alltoallmem_us=365.2 alltoalls_us=368.2 put_us=362.4 get_us=495.3 signal_us=293.6 iput_us=373.5 ibput_us=364.5
+alltoall team=even block=8 exchanges=1 alltoall_us=348.7 alltoallmem_us=346.5 alltoalls_us=327.1 put_us=337.2 get_us=406.9 signal_us=199.8 iput_us=358.7 ibput_us=337.4
+alltoall t=2.1 round=10 exchanges=160 exchanges_per_s=1831 fill_s=0.000 exchange_s=0.008 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2913.2 alltoallmem_us=3094.3 alltoalls_us=8916.2 put_us=3070.8 get_us=3570.5 signal_us=2844.6 iput_us=8545.2 ibput_us=3041.5
+alltoall team=even block=4096 exchanges=1 alltoall_us=984.2 alltoallmem_us=953.6 alltoalls_us=2986.2 put_us=863.2 get_us=1132.3 signal_us=649.9 iput_us=3155.1 ibput_us=926.6
+alltoall t=2.2 round=11 exchanges=176 exchanges_per_s=306 fill_s=0.001 exchange_s=0.051 check_s=0.001 step_s=0.052 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=33767.2 alltoallmem_us=36775.9 alltoalls_us=147997.3 put_us=32775.7 get_us=35584.4 signal_us=32257.6 iput_us=141024.2 ibput_us=36066.7
+alltoall team=even block=65536 exchanges=1 alltoall_us=9527.5 alltoallmem_us=9331.4 alltoalls_us=35185.0 put_us=9731.1 get_us=9394.8 signal_us=8466.9 iput_us=34596.5 ibput_us=8567.2
+alltoall t=2.8 round=12 exchanges=192 exchanges_per_s=25 fill_s=0.015 exchange_s=0.625 check_s=0.011 step_s=0.650 failures=0
+mailbox node_mate_us median=204.7 p99=204.7
+mailbox round_trip_us median=174.7 p99=205.5 pairs=8
+mailbox t=0.0 round=1 messages=64 messages_per_s=272191 mib_per_s=36.7 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=230.2 p99=230.2
+mailbox round_trip_us median=175.8 p99=206.8 pairs=8
+mailbox t=0.0 round=2 messages=128 messages_per_s=266770 mib_per_s=34.3 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=211.6 p99=211.6
+mailbox round_trip_us median=174.1 p99=205.1 pairs=8
+mailbox t=0.1 round=3 messages=192 messages_per_s=273916 mib_per_s=34.6 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=242.1 p99=242.1
+mailbox round_trip_us median=169.8 p99=203.1 pairs=8
+mailbox t=0.1 round=4 messages=256 messages_per_s=261344 mib_per_s=32.6 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=214.4 p99=214.4
+mailbox round_trip_us median=175.8 p99=207.1 pairs=8
+mailbox t=0.1 round=5 messages=320 messages_per_s=305138 mib_per_s=39.9 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=214.6 p99=214.6
+mailbox round_trip_us median=170.1 p99=196.7 pairs=8
+mailbox t=0.1 round=6 messages=384 messages_per_s=243621 mib_per_s=32.8 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=221.9 p99=221.9
+mailbox round_trip_us median=169.8 p99=202.4 pairs=8
+mailbox t=0.2 round=7 messages=448 messages_per_s=277725 mib_per_s=38.3 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=4384.4 p99=4384.4
+mailbox round_trip_us median=169.7 p99=208.3 pairs=8
+mailbox t=0.2 round=8 messages=512 messages_per_s=14471 mib_per_s=1.9 send_s=0.004 wait_s=0.004 check_s=0.000 step_s=0.004 failures=0
+mailbox node_mate_us median=5464.0 p99=5465.2
+mailbox round_trip_us median=170.3 p99=206.2 pairs=8
+mailbox t=0.2 round=9 messages=576 messages_per_s=11681 mib_per_s=1.7 send_s=0.005 wait_s=0.005 check_s=0.000 step_s=0.005 failures=0
+mailbox node_mate_us median=5586.0 p99=5586.0
+mailbox round_trip_us median=173.4 p99=202.5 pairs=8
+mailbox t=0.2 round=10 messages=640 messages_per_s=11544 mib_per_s=1.5 send_s=0.005 wait_s=0.005 check_s=0.000 step_s=0.006 failures=0
+mailbox node_mate_us median=246.6 p99=246.6
+mailbox round_trip_us median=169.6 p99=203.3 pairs=8
+mailbox t=0.3 round=11 messages=704 messages_per_s=261105 mib_per_s=33.6 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=2740.1 p99=2740.1
+mailbox round_trip_us median=169.6 p99=202.7 pairs=8
+mailbox t=0.3 round=12 messages=768 messages_per_s=23354 mib_per_s=2.9 send_s=0.003 wait_s=0.003 check_s=0.000 step_s=0.003 failures=0
+mailbox round_trip_us median=170.6 p99=202.7 pairs=8
+mailbox t=0.3 round=13 messages=832 messages_per_s=252651 mib_per_s=36.6 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=208.9 p99=208.9
+mailbox round_trip_us median=173.6 p99=206.4 pairs=8
+mailbox t=0.3 round=14 messages=896 messages_per_s=305032 mib_per_s=37.7 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=203.7 p99=203.7
+mailbox round_trip_us median=169.9 p99=204.6 pairs=8
+mailbox t=0.4 round=15 messages=960 messages_per_s=309566 mib_per_s=35.1 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=239.6 p99=243.3
+mailbox round_trip_us median=169.6 p99=193.5 pairs=8
+mailbox t=0.4 round=16 messages=1024 messages_per_s=272277 mib_per_s=34.1 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=278.2 p99=278.2
+mailbox round_trip_us median=173.5 p99=205.7 pairs=8
+mailbox t=0.4 round=17 messages=1088 messages_per_s=230833 mib_per_s=30.7 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=246.1 p99=246.1
+mailbox round_trip_us median=174.3 p99=203.4 pairs=8
+mailbox t=0.4 round=18 messages=1152 messages_per_s=235151 mib_per_s=31.6 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=230.2 p99=230.2
+mailbox round_trip_us median=174.2 p99=205.1 pairs=8
+mailbox t=0.4 round=19 messages=1216 messages_per_s=274024 mib_per_s=32.8 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=242.3 p99=242.3
+mailbox round_trip_us median=169.5 p99=206.3 pairs=8
+mailbox t=0.5 round=20 messages=1280 messages_per_s=228300 mib_per_s=28.6 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+teams t=0.0 round=1 collectives=43 collectives_per_s=31676 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=2 collectives=86 collectives_per_s=36395 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=3 collectives=129 collectives_per_s=36954 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=4 collectives=172 collectives_per_s=40324 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=5 collectives=215 collectives_per_s=33601 grid_s=0.000 strided_s=0.001 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=6 collectives=258 collectives_per_s=40143 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=7 collectives=301 collectives_per_s=38256 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=8 collectives=344 collectives_per_s=37536 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=9 collectives=387 collectives_per_s=39738 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=10 collectives=430 collectives_per_s=29596 grid_s=0.001 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=11 collectives=473 collectives_per_s=35605 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=12 collectives=516 collectives_per_s=31634 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=13 collectives=559 collectives_per_s=37951 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=14 collectives=602 collectives_per_s=37703 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=15 collectives=645 collectives_per_s=39158 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+summary sort rounds=3 keys=3145728 seconds=0.2 keys_per_s=16332243 mib_per_s=124.6 imbalance=1.004 failures=0
+summary alltoall rounds=12 exchanges=192 seconds=2.8 exchanges_per_s=68 failures=0
+summary alltoall team=world block=8 exchanges=4 alltoall_us=471.8 alltoallmem_us=371.7 alltoalls_us=382.8 put_us=369.5 get_us=546.1 signal_us=293.6 iput_us=358.8 ibput_us=364.5
+summary alltoall team=world block=4096 exchanges=4 alltoall_us=2915.2 alltoallmem_us=3094.3 alltoalls_us=9475.1 put_us=3165.5 get_us=3570.5 signal_us=2922.1 iput_us=8820.4 ibput_us=3151.4
+summary alltoall team=world block=65536 exchanges=4 alltoall_us=33767.2 alltoallmem_us=36553.8 alltoalls_us=147740.0 put_us=32775.7 get_us=35522.9 signal_us=32257.6 iput_us=141725.9 ibput_us=35936.3
+summary alltoall team=even block=8 exchanges=4 alltoall_us=354.4 alltoallmem_us=338.6 alltoalls_us=343.6 put_us=343.0 get_us=408.9 signal_us=199.8 iput_us=359.2 ibput_us=337.5
+summary alltoall team=even block=4096 exchanges=4 alltoall_us=1023.1 alltoallmem_us=979.1 alltoalls_us=3071.4 put_us=825.7 get_us=1141.6 signal_us=640.9 iput_us=3097.8 ibput_us=838.2
+summary alltoall team=even block=65536 exchanges=4 alltoall_us=9202.9 alltoallmem_us=10021.9 alltoalls_us=34488.8 put_us=8427.0 get_us=9180.0 signal_us=8123.0 iput_us=34232.0 ibput_us=8567.2
+summary mailbox rounds=20 messages=1280 seconds=0.0 messages_per_s=58035 mib_per_s=7.5 failures=0
+summary teams rounds=15 collectives=645 seconds=0.0 collectives_per_s=36108 failures=0
+osoe-pacer failures=0 seconds=3.6

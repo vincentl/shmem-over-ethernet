@@ -1,0 +1,11 @@
+13:43:20 commit 01d003f task-stress-phase2, copied 2026-09-27T12:41:38-04:00
+13:43:24 quick exit 0 in 4 s: osoe-pacer failures=0 seconds=3.6
+13:43:24     timeouts before: pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+13:43:24     timeouts after:  pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+13:53:25 mailbox exit 0 in 601 s: osoe-pacer failures=0 seconds=600.0
+13:53:25     timeouts before: pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+13:53:25     timeouts after:  pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+13:53:25 DONE
+13:55:33 mailbox-unbound exit 0 in 126 s: osoe-pacer failures=0 seconds=120.0
+13:57:39 mailbox-bound exit 0 in 126 s: osoe-pacer failures=0 seconds=120.2
+13:57:39 CPU-BIND-DONE

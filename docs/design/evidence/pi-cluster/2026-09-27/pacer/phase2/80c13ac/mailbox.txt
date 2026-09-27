@@ -1,0 +1,252 @@
+osoe-pacer library=osoe version=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=mailbox
+exercise mailbox sends=4 slot=256 forms=20 seconds=600 memory=4.7k
+mailbox node_mate_us median=254.0 p99=254.0
+mailbox t=0.0 round=1 messages=64 messages_per_s=248417 mib_per_s=33.5 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=288.8 p99=5830.6
+mailbox t=0.0 round=9 messages=576 messages_per_s=41271 mib_per_s=5.5 send_s=0.010 wait_s=0.006 check_s=0.000 step_s=0.012 failures=0
+mailbox node_mate_us median=285.3 p99=16601.8
+mailbox t=0.1 round=73 messages=4672 messages_per_s=38052 mib_per_s=4.9 send_s=0.102 wait_s=0.041 check_s=0.006 step_s=0.108 failures=0
+mailbox node_mate_us median=276.7 p99=9654.3
+mailbox t=0.9 round=585 messages=37440 messages_per_s=39704 mib_per_s=5.2 send_s=0.736 wait_s=0.280 check_s=0.008 step_s=0.825 failures=0
+mailbox node_mate_us median=266.9 p99=10861.4
+mailbox t=6.1 round=3686 messages=235904 messages_per_s=38873 mib_per_s=5.0 send_s=4.498 wait_s=1.669 check_s=0.035 step_s=5.105 failures=0
+mailbox node_mate_us median=251.9 p99=10618.7
+mailbox t=10.8 round=6722 messages=430208 messages_per_s=41233 mib_per_s=5.4 send_s=4.096 wait_s=1.551 check_s=0.034 step_s=4.712 failures=0
+mailbox node_mate_us median=257.2 p99=11603.3
+mailbox t=15.9 round=9943 messages=636352 messages_per_s=40022 mib_per_s=5.2 send_s=4.488 wait_s=1.709 check_s=0.038 step_s=5.151 failures=0
+mailbox node_mate_us median=274.8 p99=11014.7
+mailbox t=20.9 round=13069 messages=836416 messages_per_s=39854 mib_per_s=5.2 send_s=4.443 wait_s=1.656 check_s=0.038 step_s=5.020 failures=0
+mailbox node_mate_us median=262.6 p99=10478.5
+mailbox t=25.9 round=16182 messages=1035648 messages_per_s=40093 mib_per_s=5.2 send_s=4.340 wait_s=1.634 check_s=0.038 step_s=4.969 failures=0
+mailbox node_mate_us median=262.9 p99=10962.1
+mailbox t=30.9 round=19314 messages=1236096 messages_per_s=40066 mib_per_s=5.2 send_s=4.419 wait_s=1.695 check_s=0.039 step_s=5.003 failures=0
+mailbox node_mate_us median=261.6 p99=10981.8
+mailbox t=35.9 round=22444 messages=1436416 messages_per_s=40519 mib_per_s=5.3 send_s=4.346 wait_s=1.562 check_s=0.038 step_s=4.944 failures=0
+mailbox node_mate_us median=259.2 p99=10669.4
+mailbox t=40.9 round=25609 messages=1638976 messages_per_s=40218 mib_per_s=5.2 send_s=4.466 wait_s=1.593 check_s=0.040 step_s=5.037 failures=0
+mailbox node_mate_us median=253.3 p99=11317.3
+mailbox t=46.0 round=28751 messages=1840064 messages_per_s=39665 mib_per_s=5.1 send_s=4.456 wait_s=1.618 check_s=0.045 step_s=5.070 failures=0
+mailbox node_mate_us median=254.5 p99=11715.4
+mailbox t=51.0 round=31849 messages=2038336 messages_per_s=39481 mib_per_s=5.1 send_s=4.430 wait_s=1.691 check_s=0.038 step_s=5.022 failures=0
+mailbox node_mate_us median=274.7 p99=11008.2
+mailbox t=56.1 round=34933 messages=2235712 messages_per_s=38972 mib_per_s=5.1 send_s=4.446 wait_s=1.732 check_s=0.048 step_s=5.065 failures=0
+mailbox node_mate_us median=269.1 p99=10796.6
+mailbox t=61.1 round=37977 messages=2430528 messages_per_s=38783 mib_per_s=5.0 send_s=4.416 wait_s=1.683 check_s=0.034 step_s=5.023 failures=0
+mailbox node_mate_us median=255.3 p99=11311.0
+mailbox t=65.9 round=41006 messages=2624384 messages_per_s=40291 mib_per_s=5.2 send_s=4.142 wait_s=1.651 check_s=0.035 step_s=4.811 failures=0
+mailbox node_mate_us median=256.8 p99=11333.2
+mailbox t=70.9 round=44153 messages=2825792 messages_per_s=39965 mib_per_s=5.2 send_s=4.421 wait_s=1.710 check_s=0.040 step_s=5.040 failures=0
+mailbox node_mate_us median=251.1 p99=11643.9
+mailbox t=75.9 round=47275 messages=3025600 messages_per_s=40215 mib_per_s=5.2 send_s=4.409 wait_s=1.685 check_s=0.039 step_s=4.968 failures=0
+mailbox node_mate_us median=268.9 p99=11235.9
+mailbox t=81.0 round=50416 messages=3226624 messages_per_s=39277 mib_per_s=5.1 send_s=4.499 wait_s=1.699 check_s=0.042 step_s=5.118 failures=0
+mailbox node_mate_us median=263.6 p99=11926.9
+mailbox t=86.0 round=53484 messages=3422976 messages_per_s=39293 mib_per_s=5.1 send_s=4.397 wait_s=1.688 check_s=0.038 step_s=4.997 failures=0
+mailbox node_mate_us median=258.1 p99=11238.9
+mailbox t=91.0 round=56553 messages=3619392 messages_per_s=39717 mib_per_s=5.1 send_s=4.300 wait_s=1.724 check_s=0.041 step_s=4.945 failures=0
+mailbox node_mate_us median=260.9 p99=11223.0
+mailbox t=96.0 round=59655 messages=3817920 messages_per_s=39406 mib_per_s=5.1 send_s=4.382 wait_s=1.751 check_s=0.041 step_s=5.038 failures=0
+mailbox node_mate_us median=265.4 p99=11251.3
+mailbox t=101.0 round=62733 messages=4014912 messages_per_s=39612 mib_per_s=5.1 send_s=4.409 wait_s=1.629 check_s=0.038 step_s=4.973 failures=0
+mailbox node_mate_us median=257.2 p99=11493.1
+mailbox t=105.9 round=65827 messages=4212928 messages_per_s=39888 mib_per_s=5.2 send_s=4.295 wait_s=1.553 check_s=0.046 step_s=4.964 failures=0
+mailbox node_mate_us median=272.2 p99=11012.8
+mailbox t=111.0 round=68943 messages=4412352 messages_per_s=39489 mib_per_s=5.1 send_s=4.352 wait_s=1.766 check_s=0.045 step_s=5.050 failures=0
+mailbox node_mate_us median=255.8 p99=11421.4
+mailbox t=116.2 round=72028 messages=4609792 messages_per_s=38151 mib_per_s=4.9 send_s=4.468 wait_s=1.738 check_s=0.035 step_s=5.175 failures=0
+mailbox node_mate_us median=267.5 p99=11141.6
+mailbox t=121.1 round=75008 messages=4800512 messages_per_s=38993 mib_per_s=5.1 send_s=4.291 wait_s=1.556 check_s=0.037 step_s=4.891 failures=0
+mailbox node_mate_us median=276.1 p99=10465.1
+mailbox t=126.0 round=78054 messages=4995456 messages_per_s=39544 mib_per_s=5.1 send_s=4.311 wait_s=1.642 check_s=0.044 step_s=4.930 failures=0
+mailbox node_mate_us median=257.9 p99=10522.6
+mailbox t=130.8 round=81143 messages=5193152 messages_per_s=41189 mib_per_s=5.3 send_s=4.188 wait_s=1.505 check_s=0.040 step_s=4.800 failures=0
+mailbox node_mate_us median=276.5 p99=10009.1
+mailbox t=135.7 round=84360 messages=5399040 messages_per_s=41604 mib_per_s=5.4 send_s=4.349 wait_s=1.625 check_s=0.041 step_s=4.949 failures=0
+mailbox node_mate_us median=263.9 p99=10618.3
+mailbox t=140.9 round=87610 messages=5607040 messages_per_s=39997 mib_per_s=5.2 send_s=4.568 wait_s=1.623 check_s=0.038 step_s=5.200 failures=0
+mailbox node_mate_us median=262.8 p99=11091.4
+mailbox t=146.0 round=90734 messages=5806976 messages_per_s=39779 mib_per_s=5.2 send_s=4.390 wait_s=1.626 check_s=0.040 step_s=5.026 failures=0
+mailbox node_mate_us median=257.7 p99=10568.8
+mailbox t=150.7 round=93841 messages=6005824 messages_per_s=42035 mib_per_s=5.5 send_s=4.094 wait_s=1.528 check_s=0.039 step_s=4.731 failures=0
+mailbox node_mate_us median=272.2 p99=10705.0
+mailbox t=155.8 round=97124 messages=6215936 messages_per_s=41523 mib_per_s=5.4 send_s=4.466 wait_s=1.700 check_s=0.038 step_s=5.060 failures=0
+mailbox node_mate_us median=260.9 p99=10693.9
+mailbox t=160.9 round=100367 messages=6423488 messages_per_s=40166 mib_per_s=5.2 send_s=4.530 wait_s=1.743 check_s=0.042 step_s=5.167 failures=0
+mailbox node_mate_us median=268.8 p99=10753.8
+mailbox t=166.0 round=103504 messages=6624256 messages_per_s=39938 mib_per_s=5.2 send_s=4.365 wait_s=1.688 check_s=0.040 step_s=5.027 failures=0
+mailbox node_mate_us median=260.3 p99=11365.0
+mailbox t=170.9 round=106624 messages=6823936 messages_per_s=40665 mib_per_s=5.3 send_s=4.281 wait_s=1.671 check_s=0.037 step_s=4.910 failures=0
+mailbox node_mate_us median=262.3 p99=11591.2
+mailbox t=176.0 round=109800 messages=7027200 messages_per_s=39548 mib_per_s=5.1 send_s=4.487 wait_s=1.796 check_s=0.041 step_s=5.140 failures=0
+mailbox node_mate_us median=273.5 p99=11135.1
+mailbox t=181.2 round=112889 messages=7224896 messages_per_s=38316 mib_per_s=5.0 send_s=4.517 wait_s=1.755 check_s=0.037 step_s=5.160 failures=0
+mailbox node_mate_us median=247.6 p99=10868.9
+mailbox t=185.9 round=115882 messages=7416448 messages_per_s=40761 mib_per_s=5.3 send_s=4.120 wait_s=1.569 check_s=0.043 step_s=4.699 failures=0
+mailbox node_mate_us median=257.2 p99=11492.7
+mailbox t=191.0 round=119066 messages=7620224 messages_per_s=39981 mib_per_s=5.2 send_s=4.467 wait_s=1.775 check_s=0.039 step_s=5.097 failures=0
+mailbox node_mate_us median=272.1 p99=10764.5
+mailbox t=196.0 round=122189 messages=7820096 messages_per_s=39413 mib_per_s=5.1 send_s=4.370 wait_s=1.788 check_s=0.039 step_s=5.071 failures=0
+mailbox node_mate_us median=258.0 p99=10252.7
+mailbox t=200.8 round=125268 messages=8017152 messages_per_s=41623 mib_per_s=5.4 send_s=4.184 wait_s=1.530 check_s=0.036 step_s=4.734 failures=0
+mailbox node_mate_us median=256.7 p99=11336.2
+mailbox t=205.9 round=128519 messages=8225216 messages_per_s=40207 mib_per_s=5.2 send_s=4.569 wait_s=1.732 check_s=0.041 step_s=5.175 failures=0
+mailbox node_mate_us median=247.9 p99=11783.9
+mailbox t=210.9 round=131660 messages=8426240 messages_per_s=40299 mib_per_s=5.2 send_s=4.358 wait_s=1.596 check_s=0.038 step_s=4.988 failures=0
+mailbox node_mate_us median=284.9 p99=11422.8
+mailbox t=216.2 round=134808 messages=8627712 messages_per_s=38237 mib_per_s=5.0 send_s=4.553 wait_s=1.859 check_s=0.049 step_s=5.269 failures=0
+mailbox node_mate_us median=241.2 p99=11572.2
+mailbox t=221.0 round=137795 messages=8818880 messages_per_s=39671 mib_per_s=5.1 send_s=4.176 wait_s=1.657 check_s=0.036 step_s=4.819 failures=0
+mailbox node_mate_us median=259.2 p99=10798.8
+mailbox t=225.9 round=140894 messages=9017216 messages_per_s=40521 mib_per_s=5.3 send_s=4.265 wait_s=1.643 check_s=0.038 step_s=4.895 failures=0
+mailbox node_mate_us median=260.0 p99=11177.4
+mailbox t=230.9 round=144059 messages=9219776 messages_per_s=40917 mib_per_s=5.3 send_s=4.355 wait_s=1.704 check_s=0.037 step_s=4.951 failures=0
+mailbox node_mate_us median=259.4 p99=11007.0
+mailbox t=235.9 round=147255 messages=9424320 messages_per_s=40901 mib_per_s=5.3 send_s=4.330 wait_s=1.635 check_s=0.037 step_s=5.001 failures=0
+mailbox node_mate_us median=248.0 p99=11595.3
+mailbox t=240.7 round=150450 messages=9628800 messages_per_s=42055 mib_per_s=5.5 send_s=4.288 wait_s=1.579 check_s=0.035 step_s=4.862 failures=0
+mailbox node_mate_us median=258.7 p99=10752.1
+mailbox t=245.8 round=153735 messages=9839040 messages_per_s=41872 mib_per_s=5.4 send_s=4.410 wait_s=1.601 check_s=0.039 step_s=5.021 failures=0
+mailbox node_mate_us median=255.3 p99=11555.1
+mailbox t=251.1 round=157006 messages=10048384 messages_per_s=39340 mib_per_s=5.1 send_s=4.674 wait_s=1.764 check_s=0.038 step_s=5.321 failures=0
+mailbox node_mate_us median=272.2 p99=10733.8
+mailbox t=255.9 round=160079 messages=10245056 messages_per_s=40661 mib_per_s=5.3 send_s=4.212 wait_s=1.621 check_s=0.041 step_s=4.837 failures=0
+mailbox node_mate_us median=261.1 p99=11291.4
+mailbox t=260.7 round=163255 messages=10448320 messages_per_s=42285 mib_per_s=5.5 send_s=4.227 wait_s=1.612 check_s=0.035 step_s=4.807 failures=0
+mailbox node_mate_us median=271.4 p99=9590.7
+mailbox t=265.7 round=166558 messages=10659712 messages_per_s=42311 mib_per_s=5.5 send_s=4.435 wait_s=1.634 check_s=0.043 step_s=4.996 failures=0
+mailbox node_mate_us median=256.7 p99=11102.3
+mailbox t=270.7 round=169863 messages=10871232 messages_per_s=42542 mib_per_s=5.5 send_s=4.371 wait_s=1.695 check_s=0.041 step_s=4.972 failures=0
+mailbox node_mate_us median=261.3 p99=9371.7
+mailbox t=275.6 round=173186 messages=11083904 messages_per_s=43008 mib_per_s=5.6 send_s=4.324 wait_s=1.586 check_s=0.040 step_s=4.945 failures=0
+mailbox node_mate_us median=248.0 p99=9152.2
+mailbox t=280.6 round=176546 messages=11298944 messages_per_s=43540 mib_per_s=5.6 send_s=4.340 wait_s=1.604 check_s=0.043 step_s=4.939 failures=0
+mailbox node_mate_us median=251.0 p99=9300.2
+mailbox t=285.6 round=179947 messages=11516608 messages_per_s=43633 mib_per_s=5.7 send_s=4.331 wait_s=1.666 check_s=0.041 step_s=4.989 failures=0
+mailbox node_mate_us median=258.3 p99=9376.8
+mailbox t=290.7 round=183355 messages=11734720 messages_per_s=42729 mib_per_s=5.5 send_s=4.455 wait_s=1.743 check_s=0.041 step_s=5.105 failures=0
+mailbox node_mate_us median=265.9 p99=9282.1
+mailbox t=295.7 round=186693 messages=11948352 messages_per_s=42158 mib_per_s=5.5 send_s=4.435 wait_s=1.838 check_s=0.044 step_s=5.067 failures=0
+mailbox node_mate_us median=251.6 p99=9783.5
+mailbox t=300.5 round=189986 messages=12159104 messages_per_s=44140 mib_per_s=5.7 send_s=4.166 wait_s=1.645 check_s=0.037 step_s=4.775 failures=0
+mailbox node_mate_us median=260.8 p99=10890.6
+mailbox t=305.7 round=193434 messages=12379776 messages_per_s=42831 mib_per_s=5.6 send_s=4.535 wait_s=1.757 check_s=0.037 step_s=5.152 failures=0
+mailbox node_mate_us median=255.8 p99=9555.4
+mailbox t=310.6 round=196780 messages=12593920 messages_per_s=43587 mib_per_s=5.7 send_s=4.280 wait_s=1.621 check_s=0.040 step_s=4.913 failures=0
+mailbox node_mate_us median=261.3 p99=9409.4
+mailbox t=315.7 round=200185 messages=12811840 messages_per_s=42867 mib_per_s=5.6 send_s=4.453 wait_s=1.652 check_s=0.041 step_s=5.084 failures=0
+mailbox node_mate_us median=261.3 p99=9168.2
+mailbox t=320.4 round=203533 messages=13026112 messages_per_s=45275 mib_per_s=5.9 send_s=4.138 wait_s=1.618 check_s=0.037 step_s=4.733 failures=0
+mailbox node_mate_us median=258.1 p99=9188.5
+mailbox t=325.6 round=207070 messages=13252480 messages_per_s=43705 mib_per_s=5.7 send_s=4.575 wait_s=1.716 check_s=0.045 step_s=5.179 failures=0
+mailbox node_mate_us median=285.0 p99=10236.2
+mailbox t=330.9 round=210484 messages=13470976 messages_per_s=40989 mib_per_s=5.3 send_s=4.585 wait_s=1.940 check_s=0.042 step_s=5.331 failures=0
+mailbox node_mate_us median=256.1 p99=8920.9
+mailbox t=335.6 round=213686 messages=13675904 messages_per_s=43544 mib_per_s=5.7 send_s=4.084 wait_s=1.564 check_s=0.039 step_s=4.706 failures=0
+mailbox node_mate_us median=257.9 p99=9427.6
+mailbox t=340.7 round=217087 messages=13893568 messages_per_s=43007 mib_per_s=5.6 send_s=4.461 wait_s=1.737 check_s=0.040 step_s=5.061 failures=0
+mailbox node_mate_us median=248.9 p99=8884.5
+mailbox t=345.6 round=220446 messages=14108544 messages_per_s=43846 mib_per_s=5.7 send_s=4.246 wait_s=1.693 check_s=0.041 step_s=4.903 failures=0
+mailbox node_mate_us median=263.3 p99=11231.3
+mailbox t=350.8 round=223871 messages=14327744 messages_per_s=42057 mib_per_s=5.5 send_s=4.513 wait_s=1.758 check_s=0.039 step_s=5.212 failures=0
+mailbox node_mate_us median=260.4 p99=9360.0
+mailbox t=355.6 round=227156 messages=14537984 messages_per_s=43581 mib_per_s=5.7 send_s=4.157 wait_s=1.610 check_s=0.038 step_s=4.824 failures=0
+mailbox node_mate_us median=242.9 p99=9322.3
+mailbox t=360.8 round=230560 messages=14755840 messages_per_s=42326 mib_per_s=5.5 send_s=4.428 wait_s=1.773 check_s=0.044 step_s=5.147 failures=0
+mailbox node_mate_us median=253.6 p99=9145.2
+mailbox t=365.5 round=233866 messages=14967424 messages_per_s=44532 mib_per_s=5.8 send_s=4.179 wait_s=1.606 check_s=0.048 step_s=4.751 failures=0
+mailbox node_mate_us median=254.9 p99=9405.0
+mailbox t=370.7 round=237345 messages=15190080 messages_per_s=43366 mib_per_s=5.6 send_s=4.464 wait_s=1.835 check_s=0.049 step_s=5.134 failures=0
+mailbox node_mate_us median=272.3 p99=9126.1
+mailbox t=375.7 round=240732 messages=15406848 messages_per_s=42735 mib_per_s=5.5 send_s=4.398 wait_s=1.833 check_s=0.051 step_s=5.072 failures=0
+mailbox node_mate_us median=249.0 p99=9412.0
+mailbox t=380.7 round=244070 messages=15620480 messages_per_s=43221 mib_per_s=5.6 send_s=4.315 wait_s=1.596 check_s=0.044 step_s=4.943 failures=0
+mailbox node_mate_us median=252.8 p99=9670.0
+mailbox t=385.6 round=247446 messages=15836544 messages_per_s=44063 mib_per_s=5.7 send_s=4.281 wait_s=1.698 check_s=0.041 step_s=4.904 failures=0
+mailbox node_mate_us median=256.8 p99=9157.8
+mailbox t=390.7 round=250888 messages=16056832 messages_per_s=42618 mib_per_s=5.5 send_s=4.514 wait_s=1.781 check_s=0.040 step_s=5.169 failures=0
+mailbox node_mate_us median=267.6 p99=8568.2
+mailbox t=395.5 round=254217 messages=16269888 messages_per_s=44445 mib_per_s=5.8 send_s=4.202 wait_s=1.648 check_s=0.049 step_s=4.794 failures=0
+mailbox node_mate_us median=264.0 p99=9551.2
+mailbox t=400.7 round=257689 messages=16492096 messages_per_s=43036 mib_per_s=5.6 send_s=4.528 wait_s=1.750 check_s=0.041 step_s=5.163 failures=0
+mailbox node_mate_us median=251.5 p99=9311.8
+mailbox t=405.7 round=261051 messages=16707264 messages_per_s=42867 mib_per_s=5.6 send_s=4.443 wait_s=1.699 check_s=0.038 step_s=5.019 failures=0
+mailbox node_mate_us median=252.6 p99=9404.6
+mailbox t=410.7 round=264399 messages=16921536 messages_per_s=42895 mib_per_s=5.6 send_s=4.385 wait_s=1.809 check_s=0.038 step_s=4.995 failures=0
+mailbox node_mate_us median=256.2 p99=9469.1
+mailbox t=415.7 round=267750 messages=17136000 messages_per_s=42795 mib_per_s=5.5 send_s=4.386 wait_s=1.718 check_s=0.053 step_s=5.011 failures=0
+mailbox node_mate_us median=255.4 p99=9072.0
+mailbox t=420.7 round=271093 messages=17349952 messages_per_s=42834 mib_per_s=5.6 send_s=4.399 wait_s=1.745 check_s=0.041 step_s=4.995 failures=0
+mailbox node_mate_us median=254.3 p99=8742.3
+mailbox t=425.6 round=274439 messages=17564096 messages_per_s=43949 mib_per_s=5.7 send_s=4.288 wait_s=1.663 check_s=0.037 step_s=4.873 failures=0
+mailbox node_mate_us median=261.8 p99=8813.1
+mailbox t=430.6 round=277872 messages=17783808 messages_per_s=43991 mib_per_s=5.7 send_s=4.393 wait_s=1.743 check_s=0.041 step_s=4.994 failures=0
+mailbox node_mate_us median=254.9 p99=9512.5
+mailbox t=435.6 round=281308 messages=18003712 messages_per_s=44202 mib_per_s=5.7 send_s=4.398 wait_s=1.639 check_s=0.037 step_s=4.975 failures=0
+mailbox node_mate_us median=250.3 p99=9685.4
+mailbox t=440.5 round=284761 messages=18224704 messages_per_s=45116 mib_per_s=5.9 send_s=4.310 wait_s=1.690 check_s=0.037 step_s=4.898 failures=0
+mailbox node_mate_us median=257.3 p99=9243.9
+mailbox t=445.7 round=288285 messages=18450240 messages_per_s=43056 mib_per_s=5.6 send_s=4.553 wait_s=1.782 check_s=0.039 step_s=5.238 failures=0
+mailbox node_mate_us median=256.6 p99=8890.8
+mailbox t=450.7 round=291648 messages=18665472 messages_per_s=43521 mib_per_s=5.7 send_s=4.303 wait_s=1.749 check_s=0.043 step_s=4.945 failures=0
+mailbox node_mate_us median=259.1 p99=9369.8
+mailbox t=455.7 round=295048 messages=18883072 messages_per_s=42707 mib_per_s=5.5 send_s=4.490 wait_s=1.701 check_s=0.039 step_s=5.095 failures=0
+mailbox node_mate_us median=261.4 p99=9428.8
+mailbox t=460.9 round=298384 messages=19096576 messages_per_s=41620 mib_per_s=5.4 send_s=4.485 wait_s=1.757 check_s=0.042 step_s=5.130 failures=0
+mailbox node_mate_us median=267.3 p99=9216.4
+mailbox t=465.9 round=301635 messages=19304640 messages_per_s=41668 mib_per_s=5.4 send_s=4.370 wait_s=1.863 check_s=0.036 step_s=4.993 failures=0
+mailbox node_mate_us median=259.1 p99=9048.8
+mailbox t=470.8 round=304890 messages=19512960 messages_per_s=42548 mib_per_s=5.5 send_s=4.254 wait_s=1.758 check_s=0.038 step_s=4.896 failures=0
+mailbox node_mate_us median=268.5 p99=9171.2
+mailbox t=475.7 round=308214 messages=19725696 messages_per_s=43105 mib_per_s=5.6 send_s=4.380 wait_s=1.782 check_s=0.042 step_s=4.935 failures=0
+mailbox node_mate_us median=256.5 p99=9153.1
+mailbox t=480.6 round=311581 messages=19941184 messages_per_s=43684 mib_per_s=5.7 send_s=4.328 wait_s=1.792 check_s=0.041 step_s=4.933 failures=0
+mailbox node_mate_us median=257.6 p99=9081.0
+mailbox t=485.7 round=314993 messages=20159552 messages_per_s=43035 mib_per_s=5.6 send_s=4.473 wait_s=1.914 check_s=0.047 step_s=5.074 failures=0
+mailbox node_mate_us median=257.1 p99=9622.6
+mailbox t=490.7 round=318355 messages=20374720 messages_per_s=42967 mib_per_s=5.6 send_s=4.357 wait_s=1.916 check_s=0.043 step_s=5.008 failures=0
+mailbox node_mate_us median=281.2 p99=9354.6
+mailbox t=495.7 round=321711 messages=20589504 messages_per_s=42754 mib_per_s=5.5 send_s=4.437 wait_s=1.937 check_s=0.049 step_s=5.024 failures=0
+mailbox node_mate_us median=253.5 p99=11353.2
+mailbox t=500.8 round=325051 messages=20803264 messages_per_s=42695 mib_per_s=5.5 send_s=4.400 wait_s=1.797 check_s=0.039 step_s=5.007 failures=0
+mailbox node_mate_us median=250.6 p99=9163.1
+mailbox t=505.7 round=328386 messages=21016704 messages_per_s=43187 mib_per_s=5.6 send_s=4.372 wait_s=1.701 check_s=0.044 step_s=4.942 failures=0
+mailbox node_mate_us median=255.5 p99=9393.6
+mailbox t=510.8 round=331759 messages=21232576 messages_per_s=42117 mib_per_s=5.5 send_s=4.521 wait_s=1.909 check_s=0.042 step_s=5.126 failures=0
+mailbox node_mate_us median=256.9 p99=9446.9
+mailbox t=515.6 round=335049 messages=21443136 messages_per_s=43771 mib_per_s=5.7 send_s=4.247 wait_s=1.761 check_s=0.035 step_s=4.810 failures=0
+mailbox node_mate_us median=261.4 p99=9110.8
+mailbox t=520.9 round=338468 messages=21661952 messages_per_s=41937 mib_per_s=5.4 send_s=4.583 wait_s=1.834 check_s=0.043 step_s=5.218 failures=0
+mailbox node_mate_us median=260.2 p99=9507.3
+mailbox t=525.8 round=341744 messages=21871616 messages_per_s=42143 mib_per_s=5.5 send_s=4.390 wait_s=1.831 check_s=0.037 step_s=4.975 failures=0
+mailbox node_mate_us median=258.2 p99=10327.9
+mailbox t=530.8 round=345036 messages=22082304 messages_per_s=42536 mib_per_s=5.5 send_s=4.400 wait_s=1.769 check_s=0.039 step_s=4.953 failures=0
+mailbox node_mate_us median=267.1 p99=10493.7
+mailbox t=535.8 round=348359 messages=22294976 messages_per_s=42063 mib_per_s=5.5 send_s=4.444 wait_s=1.854 check_s=0.043 step_s=5.056 failures=0
+mailbox node_mate_us median=247.8 p99=9839.9
+mailbox t=540.7 round=351645 messages=22505280 messages_per_s=43151 mib_per_s=5.6 send_s=4.301 wait_s=1.752 check_s=0.037 step_s=4.874 failures=0
+mailbox node_mate_us median=264.9 p99=10166.2
+mailbox t=545.8 round=355016 messages=22721024 messages_per_s=42333 mib_per_s=5.5 send_s=4.418 wait_s=1.900 check_s=0.050 step_s=5.096 failures=0
+mailbox node_mate_us median=255.3 p99=10628.8
+mailbox t=550.8 round=358323 messages=22932672 messages_per_s=42084 mib_per_s=5.5 send_s=4.413 wait_s=1.680 check_s=0.039 step_s=5.029 failures=0
+mailbox node_mate_us median=255.1 p99=10711.7
+mailbox t=556.1 round=361610 messages=23143040 messages_per_s=39890 mib_per_s=5.2 send_s=4.719 wait_s=1.819 check_s=0.038 step_s=5.274 failures=0
+mailbox node_mate_us median=265.8 p99=11080.5
+mailbox t=561.0 round=364726 messages=23342464 messages_per_s=41109 mib_per_s=5.3 send_s=4.213 wait_s=1.811 check_s=0.036 step_s=4.851 failures=0
+mailbox node_mate_us median=261.2 p99=10857.0
+mailbox t=566.0 round=367937 messages=23547968 messages_per_s=40518 mib_per_s=5.2 send_s=4.405 wait_s=1.875 check_s=0.040 step_s=5.072 failures=0
+mailbox node_mate_us median=262.8 p99=11589.9
+mailbox t=571.0 round=371102 messages=23750528 messages_per_s=40923 mib_per_s=5.3 send_s=4.374 wait_s=1.768 check_s=0.041 step_s=4.950 failures=0
+mailbox node_mate_us median=257.2 p99=10050.9
+mailbox t=575.9 round=374299 messages=23955136 messages_per_s=41398 mib_per_s=5.4 send_s=4.378 wait_s=1.708 check_s=0.037 step_s=4.942 failures=0
+mailbox node_mate_us median=275.1 p99=10015.7
+mailbox t=581.1 round=377533 messages=24162112 messages_per_s=40290 mib_per_s=5.2 send_s=4.541 wait_s=1.926 check_s=0.037 step_s=5.137 failures=0
+mailbox node_mate_us median=258.0 p99=11301.7
+mailbox t=586.1 round=380680 messages=24363520 messages_per_s=40074 mib_per_s=5.2 send_s=4.401 wait_s=1.782 check_s=0.040 step_s=5.026 failures=0
+mailbox node_mate_us median=267.4 p99=11420.4
+mailbox t=591.2 round=383810 messages=24563840 messages_per_s=39082 mib_per_s=5.1 send_s=4.511 wait_s=1.884 check_s=0.044 step_s=5.126 failures=0
+mailbox node_mate_us median=255.2 p99=9762.2
+mailbox t=595.9 round=386863 messages=24759232 messages_per_s=41759 mib_per_s=5.4 send_s=4.092 wait_s=1.631 check_s=0.035 step_s=4.679 failures=0
+mailbox node_mate_us median=272.2 p99=10938.3
+mailbox t=600.3 round=389536 messages=24930304 messages_per_s=39173 mib_per_s=5.1 send_s=3.843 wait_s=1.591 check_s=0.040 step_s=4.367 failures=0
+summary mailbox rounds=389536 messages=24930304 seconds=600.2 messages_per_s=41537 mib_per_s=5.4 failures=0
+osoe-pacer failures=0 seconds=600.3

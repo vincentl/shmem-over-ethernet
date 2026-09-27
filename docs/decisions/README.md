@@ -91,6 +91,10 @@ without the author, under a standing mandate, and the record carries the undo.
 - **The sort's oracle is count, sum, xor and a hash sum**: the first three are blind to a byte swapped between two keys. Claude, [2026-09-27](2026-09-27.md) item 3.
 - **A pacer exercise fits itself to the budget**, which bounds its symmetric and its private memory each; `step` is told which step is the last. Claude, [2026-09-27](2026-09-27.md) item 4.
 - **`parallel_print` syncs at least once a call**, and a program calling it on two teams in turn syncs the second team between them. Claude, [2026-09-27](2026-09-27.md) item 6.
+- **A plant a collective could absorb is forced**: each kind's wrong input is one its result cannot hide (past every input for max, below for min, 0 for and, all ones for or), or PE 1's own expectation where its input may not reach the result. Claude, [2026-09-27](2026-09-27.md) item 11.
+- **Across nodes the pacer times round trips, never one-way trips**: clocks differ between nodes, so one-way times are taken between node-mates only, and `mailbox` times a checked ping-pong between the PEs of one rank on paired nodes. Brief and Claude, [2026-09-27](2026-09-27.md) item 13.
+- **The pacer's `teams` makes its teams once, from a budget of 16 numbers**, and nothing in the tool destroys and re-splits in a loop: team numbers are never reused (design §5.7). Brief and Claude, [2026-09-27](2026-09-27.md) item 14.
+- **The pacer's `threads` tests run the library's two test hooks in every preset**, with a landing zone its gets overfill (`OSOE_GET_LANDING_BYTES=8192`), on five maps and on 0,1 under tsan. Claude, [2026-09-27](2026-09-27.md) item 15.
 
 ## License and release
 
