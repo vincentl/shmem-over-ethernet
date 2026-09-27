@@ -4708,8 +4708,10 @@ blocks, each PE's published epochs, the internal region's per-team blocks
 (§5.8) and the progress thread's per-team state, and from the split that
 creates teams the control queue's term (§3.8).
 
-**It counts teams in existence job-wide at once, including the predefined teams —
-not teams per PE.** The control-queue bound is per connection: the number of
+**It counts team numbers job-wide, including the predefined teams' — not teams per
+PE — and a number is never reused within a session (below), so it bounds the teams
+a session creates in its life, not only those alive at once: 61 at the default.**
+The control-queue bound is per connection: the number of
 distinct teams whose trees use that node pair. `shmem_team_split_2d` can put `L`
 different teams on one node pair while each PE belongs to only two, so a per-PE
 count makes the §3.8 assert fire on conforming programs (review C10). Teams per
