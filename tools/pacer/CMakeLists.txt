@@ -39,6 +39,16 @@ add_custom_command(
           ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
   COMMENT "pacer: generating the call-counting shim"
   VERBATIM)
+# Annex F's unprefixed routines, start_pes first, in a program of their own:
+# start_pes starts the library where shmem_init would, and ends it at exit.
+add_executable(osoe-pacer-start-pes start-pes.c)
+target_link_libraries(osoe-pacer-start-pes PRIVATE osoe)
+osoe_warnings(osoe-pacer-start-pes)
+add_executable(osoe-pacer-start-pes-counted start-pes.c ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c)
+target_link_libraries(osoe-pacer-start-pes-counted PRIVATE osoe)
+target_compile_definitions(osoe-pacer-start-pes-counted PRIVATE PACER_COUNTED=1)
+osoe_warnings(osoe-pacer-start-pes-counted)
+
 add_executable(osoe-pacer-counted ${osoe_pacer_sources} ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c)
 target_include_directories(osoe-pacer-counted PRIVATE ${PROJECT_SOURCE_DIR}
   ${PROJECT_SOURCE_DIR}/tools/stat)
@@ -104,6 +114,30 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(tools.pacer.mix-cycle.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
     PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
     FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+
+  # start_pes and the unprefixed routines, and each of their checks' plants:
+  # the failure line on PE 1 or the PE after it, and the job's count.
+  add_test(NAME tools.pacer.start-pes.0-0-1-1
+    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer-start-pes>)
+  set_tests_properties(tools.pacer.start-pes.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "start-pes failures=0\n"
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+  foreach(defect_line IN ITEMS
+      "my-pe|start-pes: PE 1: _my_pe says 2 and _num_pes 4, where shmem_my_pe says 1"
+      "put|start-pes: PE 2: word 32 of the shmalloc'd block holds [0-9]+ from PE 1"
+      "realloc|start-pes: PE 1: word 0 holds [0-9]+ after shrealloc"
+      "align|start-pes: PE 1: shmemalign.64, 100. returned 0x[0-9a-f]+, not a multiple of 64")
+    string(FIND "${defect_line}" "|" bar)
+    string(SUBSTRING "${defect_line}" 0 ${bar} defect)
+    math(EXPR after "${bar} + 1")
+    string(SUBSTRING "${defect_line}" ${after} -1 line)
+    add_test(NAME tools.pacer.plant.start-pes-${defect}
+      COMMAND osoe-launch -k -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer-start-pes>
+              --plant ${defect})
+    set_tests_properties(tools.pacer.plant.start-pes-${defect} PROPERTIES LABELS "tier2"
+      TIMEOUT 300 PASS_REGULAR_EXPRESSION "${line}.*start-pes failures=[1-9][0-9]* plant=${defect}"
+      FAIL_REGULAR_EXPRESSION "killed by signal|timeout after|left behind")
+  endforeach()
 
   # Annex F's routines through their whole cycle - every case on every active
   # set, by name and by the deprecated generics - on five PEs over three nodes,
