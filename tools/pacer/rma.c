@@ -25,8 +25,10 @@
  *
  * Every byte moved is (source, target, index, round)-determined. A round's
  * transfer case is round mod the 140 cases, on the default context in even
- * passes over them and a private one in odd, with the C11 generic in place of
- * the type's own name every other round where the type has one.
+ * passes over them and a private one in odd; where the type has a name of its
+ * own, the put side takes it and the get side the C11 generic, or the other
+ * way about, which flips every second pass - so four passes, 560 rounds, run
+ * every case in both spellings on both contexts.
  */
 #define _GNU_SOURCE
 #include <stddef.h>
@@ -644,7 +646,10 @@ static void transfer(long round, shmem_ctx_t ctx, const char *context)
     enum transfer_class form;
     const struct rma_kind *kind;
     transfer_case(round, &form, &kind);
-    int generic = kind->typed && (round / 2) % 2;
+    /* Half the cases start from the generic, and a case's spelling flips
+     * every second pass, its context every pass (rma_step). */
+    long pass = round / CASE_COUNT, index = round % CASE_COUNT;
+    int generic = kind->typed && (index / 2 + pass / 2) % 2;
     size_t w = (size_t)kind->size;
     struct transfer_layout layout;
     plan(form, round, kind->size, &layout);

@@ -234,16 +234,20 @@ done
 
 `osoe-pacer-counted`, built beside the tool, is the same program with a shim
 that counts every call of every routine the library declares; `--coverage
-FILE` writes which were called, how often, and which never were. One default
-run of every exercise gives the list:
+FILE` writes which were called, how often, and which never were. A quick run
+takes each case once, in one spelling and on one context; 560 rounds - `rma`'s
+cycle, each transfer case in both spellings on both contexts, with `atomics`'
+426 inside it - give the list:
 
 ```sh
 C=build/release/tools/pacer/osoe-pacer-counted
-srun -K1 -N4 --ntasks-per-node=4 $C --quick --coverage coverage.txt sort alltoall \
-    mailbox teams atomics rma locks memory collectives threads print
-``` `--teams-exhaust teams`, alone, splits until the
-job's team numbers are gone and checks that the split refuses alike on every
-PE; it is a test's, not a measurement.
+srun -K1 -N4 --ntasks-per-node=4 $C --quick --rounds 560 --coverage coverage.txt sort \
+    alltoall mailbox teams atomics rma locks memory collectives threads print
+```
+
+`--teams-exhaust teams`, alone, splits until the job's team numbers are gone
+and checks that the split refuses alike on every PE; it is a test's, not a
+measurement.
 
 Keep the outputs, under `docs/design/evidence/pi-cluster/<date>/pacer/`. The
 numbers for `docs/pi-cluster-results.md`: the sort's keys a second under each
