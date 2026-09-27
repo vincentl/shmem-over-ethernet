@@ -7246,6 +7246,6 @@ development VM before being folded in.
 - **License.** *Decided 2026-09-26 by the author: the GNU LGPL, version 3*
   (`COPYING.LESSER`, with the GPL it supplements in `COPYING`). A library
   under the LGPL may be linked into programs of any license, which is what an
-  OpenSHMEM implementation is for. Open for the release: whether the notice
-  says "version 3" or "version 3 or any later version", which decides each
-  file's SPDX identifier (`LGPL-3.0-only` or `LGPL-3.0-or-later`).
+  OpenSHMEM implementation is for. *Version 3 or any later version, the
+  author decided on 2026-09-26*: every source file carries
+  `SPDX-License-Identifier: LGPL-3.0-or-later`.

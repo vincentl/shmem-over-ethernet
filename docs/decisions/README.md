@@ -82,7 +82,7 @@ without the author, under a standing mandate, and the record carries the undo.
 
 ## License and release
 
-- **License: GNU LGPL version 3.** `COPYING` and `COPYING.LESSER`. Whether "v3 only" or "v3 or later" is still to ask at release; it decides the SPDX headers. Author, [2026-09-26-evening](2026-09-26-evening.md) item 3.
+- **License: GNU LGPL, version 3 or any later version.** `COPYING` and `COPYING.LESSER`; `SPDX-License-Identifier: LGPL-3.0-or-later` on every source file. Author, [2026-09-26-evening](2026-09-26-evening.md) items 3 and 14.
 
 ## Reversed
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
 // The public headers as C++ sees them (headers.c has the C modes): no C11
 // generics, and shmem_sync's two forms as overloads - the deprecated active-set
 // one with C linkage, the team one inline.
