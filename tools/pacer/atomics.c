@@ -374,7 +374,6 @@ static int atomics_rebind(shmem_team_t team, const struct pacer_options *options
         atomics.world[j] = shmem_team_translate_pe(team, j, SHMEM_TEAM_WORLD);
         atomics.here[j] = layout->node[atomics.world[j]] == layout->node[atomics.me_world];
     }
-    atomics.round = 0;
     atomics.updates = atomics.local_updates = atomics.remote_updates = 0;
     memset(atomics.phase, 0, sizeof atomics.phase);
     atomics.since = pacer_now();
@@ -403,6 +402,7 @@ static int atomics_setup(shmem_team_t team, const struct pacer_options *options)
     if (!atomics.table || !atomics.claims || !atomics.sums || !atomics.hashes ||
         !atomics.reduce_source || !atomics.reduce_result)
         return -1;
+    atomics.round = 0;     /* and on through every rebind: mix's periods */
     return atomics_rebind(team, options);
 }
 

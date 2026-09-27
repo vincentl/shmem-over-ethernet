@@ -359,7 +359,6 @@ static int collectives_rebind(shmem_team_t team, const struct pacer_options *opt
     memset(collectives.sample_count, 0, sizeof collectives.sample_count);
     for (int i = 0; i < TIMING_CASES; i++)
         collectives.fastest[i] = 1e30;
-    collectives.round = 0;
     collectives.last = 0;
     collectives.calls = collectives.bytes = 0;
     memset(collectives.phase, 0, sizeof collectives.phase);
@@ -384,6 +383,7 @@ static int collectives_setup(shmem_team_t team, const struct pacer_options *opti
     if (!collectives.source || !collectives.dest || !collectives.times ||
         !collectives.times_result || !collectives.expected || !collectives.owned)
         return -1;
+    collectives.round = 0;     /* and on through every rebind: mix's periods */
     return collectives_rebind(team, options);
 }
 
@@ -641,6 +641,11 @@ static void run_timed(int index, long round)
     struct timing_case timing = timing_case_of(index);
     struct team_view *team = &collectives.teams[timing.strided];
     if (team->rank < 0 || (size_t)timing.bytes > collectives.most_bytes)
+        return;
+    /* barrier_all is the whole job's: on a team of mix's, its members' call
+     * would be matched by the other PEs' next world collective - their sync at
+     * the period's end - and the job would fall out of step, then hang. */
+    if (timing.family == TIME_BARRIER && collectives.team != SHMEM_TEAM_WORLD)
         return;
     size_t bytes = (size_t)timing.bytes, m = (size_t)team->size, n = bytes / 8;
     int root = (int)(round % (long)m);

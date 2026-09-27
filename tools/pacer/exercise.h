@@ -155,8 +155,10 @@ struct pacer_exercise {
      * of the team it ran on last has ended its last step. Its symmetric
      * memory, sized at setup for the world, is kept; its state starts afresh
      * from `options`, the period's seed among them, so that nothing a
-     * previous period left can pass a check. Nonzero: it cannot run on
-     * `team` - sort and alltoall, for two, run on the world alone. */
+     * previous period left can pass a check - all but its round, which an
+     * exercise whose cases cycle carries on, so that short periods still
+     * reach every case in turn. Nonzero: it cannot run on `team` - sort and
+     * alltoall, for two, run on the world alone. */
     int (*rebind)(shmem_team_t team, const struct pacer_options *options);
 };
 

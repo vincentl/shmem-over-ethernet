@@ -92,6 +92,18 @@ foreach(map IN LISTS pacer_mix_maps)
 endforeach()
 
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  # mix long enough that every team exercise's rounds, carried from period to
+  # period, go through their cases on a team: 240 periods of three rounds take
+  # collectives past its 87 timing cases and its 105 rounds of typed ones. A
+  # world collective called on a team - the barrier its sweep once timed -
+  # hangs here, where the quick mix's 8 periods never reach it.
+  add_test(NAME tools.pacer.mix-cycle.0-0-1-1
+    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick --rounds 240
+            mix)
+  set_tests_properties(tools.pacer.mix-cycle.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+
   # The sort's other paths - the accumulating mode, the pull exchange, puts
   # where node-mates would take stores - so that every path of it runs too.
   add_test(NAME tools.pacer.sort-paths.0-0-1-1

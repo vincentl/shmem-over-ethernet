@@ -320,9 +320,12 @@ static uint64_t rma_memory(int npes, const struct pacer_options *options, char *
 }
 
 /* Onto a team, afresh: its ring, and the node-mates in it - a dense list,
- * which a strided team's local ranks are not. The flags start from zero, since
- * a period's rounds count from zero again; nothing is in flight, the last
- * period having ended in a quiet and a sync. */
+ * which a strided team's local ranks are not. The rounds carry on from the
+ * last period, alike on every member of a team, since a team's members run
+ * its periods together: so the halo's flag, which holds the rounds done and
+ * gains one a round, is set to them; the node-mates' flags are set outright
+ * each round, to the round plus one, above whatever an earlier period left.
+ * Nothing is in flight, the last period having ended in a quiet and a sync. */
 static int rma_rebind(shmem_team_t team, const struct pacer_options *options)
 {
     int n = shmem_team_n_pes(team);
@@ -340,10 +343,9 @@ static int rma_rebind(shmem_team_t team, const struct pacer_options *options)
         if (layout->node[p] == layout->node[rma.me_world] &&
             shmem_team_translate_pe(SHMEM_TEAM_WORLD, p, team) >= 0)
             rma.mates[rma.local_count++] = p;
-    *rma.flag = 0;
+    shmem_uint64_atomic_set(rma.flag, (uint64_t)rma.round, rma.me_world);
     for (int l = 0; l < rma.local_most; l++)
         rma.ptr_flags[l] = 0;
-    rma.round = 0;
     rma.bytes = rma.transfers = 0;
     memset(rma.phase, 0, sizeof rma.phase);
     shmem_team_sync(team);
@@ -372,6 +374,7 @@ static int rma_setup(shmem_team_t team, const struct pacer_options *options)
     if (!rma.halo || !rma.flag || !rma.inbox || !rma.source || !rma.ptr_slots ||
         !rma.ptr_flags || !rma.outgoing || !rma.incoming || !rma.halo_out)
         return -1;
+    rma.round = 0;     /* and on through every rebind: mix's periods */
     return rma_rebind(team, options);
 }
 

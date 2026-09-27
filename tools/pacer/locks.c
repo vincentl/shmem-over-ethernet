@@ -74,7 +74,6 @@ static int locks_rebind(shmem_team_t team, const struct pacer_options *options)
         locks.world[j] = shmem_team_translate_pe(team, j, SHMEM_TEAM_WORLD);
     for (int l = 0; l < LOCKS; l++)
         locks.counts[l] = locks.holders[l] = locks.taken[l] = 0;
-    locks.round = 0;
     locks.acquisitions = locks.longest_wait = 0;
     memset(locks.phase, 0, sizeof locks.phase);
     shmem_team_sync(team);
@@ -98,6 +97,7 @@ static int locks_setup(shmem_team_t team, const struct pacer_options *options)
     if (!locks.locks || !locks.counts || !locks.holders || !locks.taken || !locks.taken_total ||
         !locks.longest || !locks.longest_team)
         return -1;
+    locks.round = 0;     /* and on through every rebind: mix's periods */
     return locks_rebind(team, options);
 }
 
