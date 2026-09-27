@@ -1,0 +1,252 @@
+osoe-pacer library=osoe version=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=locks
+exercise locks locks=8 acquisitions=4 seconds=600 memory=336
+locks longest_wait_us=6546.2
+locks t=0.0 round=1 acquisitions=64 acquisitions_per_s=6518 wait_s=0.008 held_s=0.006 step_s=0.010 failures=0
+locks longest_wait_us=20486.6
+locks t=0.1 round=9 acquisitions=576 acquisitions_per_s=5735 wait_s=0.070 held_s=0.042 step_s=0.089 failures=0
+locks longest_wait_us=30351.9
+locks t=0.7 round=73 acquisitions=4672 acquisitions_per_s=6994 wait_s=0.448 held_s=0.245 step_s=0.586 failures=0
+locks longest_wait_us=50456.0
+locks t=5.1 round=585 acquisitions=37440 acquisitions_per_s=7391 wait_s=3.290 held_s=1.706 step_s=4.434 failures=0
+locks longest_wait_us=45969.8
+locks t=10.2 round=1162 acquisitions=74368 acquisitions_per_s=7332 wait_s=3.657 held_s=1.949 step_s=5.037 failures=0
+locks longest_wait_us=40054.0
+locks t=15.1 round=1734 acquisitions=110976 acquisitions_per_s=7425 wait_s=3.516 held_s=1.895 step_s=4.930 failures=0
+locks longest_wait_us=56370.7
+locks t=20.1 round=2314 acquisitions=148096 acquisitions_per_s=7399 wait_s=3.670 held_s=1.938 step_s=5.017 failures=0
+locks longest_wait_us=47372.4
+locks t=25.1 round=2892 acquisitions=185088 acquisitions_per_s=7483 wait_s=3.617 held_s=1.884 step_s=4.943 failures=0
+locks longest_wait_us=42940.1
+locks t=29.9 round=3476 acquisitions=222464 acquisitions_per_s=7722 wait_s=3.563 held_s=1.824 step_s=4.840 failures=0
+locks longest_wait_us=44652.9
+locks t=35.1 round=4079 acquisitions=261056 acquisitions_per_s=7432 wait_s=3.879 held_s=2.004 step_s=5.193 failures=0
+locks longest_wait_us=44130.2
+locks t=40.0 round=4659 acquisitions=298176 acquisitions_per_s=7513 wait_s=3.671 held_s=1.910 step_s=4.941 failures=0
+locks longest_wait_us=37953.3
+locks t=45.2 round=5245 acquisitions=335680 acquisitions_per_s=7321 wait_s=3.722 held_s=1.975 step_s=5.123 failures=0
+locks longest_wait_us=43716.4
+locks t=50.0 round=5816 acquisitions=372224 acquisitions_per_s=7512 wait_s=3.606 held_s=1.921 step_s=4.865 failures=0
+locks longest_wait_us=37979.0
+locks t=55.2 round=6402 acquisitions=409728 acquisitions_per_s=7218 wait_s=3.800 held_s=2.067 step_s=5.196 failures=0
+locks longest_wait_us=43747.2
+locks t=60.0 round=6965 acquisitions=445760 acquisitions_per_s=7461 wait_s=3.548 held_s=1.881 step_s=4.829 failures=0
+locks longest_wait_us=42442.9
+locks t=65.0 round=7547 acquisitions=483008 acquisitions_per_s=7518 wait_s=3.681 held_s=1.925 step_s=4.955 failures=0
+locks longest_wait_us=48087.5
+locks t=70.1 round=8134 acquisitions=520576 acquisitions_per_s=7413 wait_s=3.817 held_s=1.900 step_s=5.068 failures=0
+locks longest_wait_us=68102.5
+locks t=75.2 round=8713 acquisitions=557632 acquisitions_per_s=7194 wait_s=3.796 held_s=1.979 step_s=5.151 failures=0
+locks longest_wait_us=46883.1
+locks t=80.1 round=9275 acquisitions=593600 acquisitions_per_s=7345 wait_s=3.580 held_s=1.903 step_s=4.897 failures=0
+locks longest_wait_us=37322.2
+locks t=85.1 round=9848 acquisitions=630272 acquisitions_per_s=7408 wait_s=3.599 held_s=1.919 step_s=4.950 failures=0
+locks longest_wait_us=61393.4
+locks t=90.0 round=10426 acquisitions=667264 acquisitions_per_s=7501 wait_s=3.605 held_s=1.912 step_s=4.932 failures=0
+locks longest_wait_us=48905.8
+locks t=95.1 round=11012 acquisitions=704768 acquisitions_per_s=7344 wait_s=3.908 held_s=1.939 step_s=5.106 failures=0
+locks longest_wait_us=41757.3
+locks t=100.0 round=11585 acquisitions=741440 acquisitions_per_s=7572 wait_s=3.535 held_s=1.856 step_s=4.843 failures=0
+locks longest_wait_us=61011.8
+locks t=105.2 round=12176 acquisitions=779264 acquisitions_per_s=7198 wait_s=3.855 held_s=2.000 step_s=5.255 failures=0
+locks longest_wait_us=41425.5
+locks t=110.0 round=12738 acquisitions=815232 acquisitions_per_s=7446 wait_s=3.498 held_s=1.828 step_s=4.830 failures=0
+locks longest_wait_us=46037.7
+locks t=115.1 round=13319 acquisitions=852416 acquisitions_per_s=7345 wait_s=3.809 held_s=1.984 step_s=5.062 failures=0
+locks longest_wait_us=39442.0
+locks t=120.0 round=13892 acquisitions=889088 acquisitions_per_s=7460 wait_s=3.651 held_s=1.921 step_s=4.916 failures=0
+locks longest_wait_us=44007.9
+locks t=125.0 round=14474 acquisitions=926336 acquisitions_per_s=7472 wait_s=3.557 held_s=1.951 step_s=4.985 failures=0
+locks longest_wait_us=36254.3
+locks t=129.9 round=15057 acquisitions=963648 acquisitions_per_s=7590 wait_s=3.503 held_s=1.834 step_s=4.916 failures=0
+locks longest_wait_us=47470.3
+locks t=135.0 round=15649 acquisitions=1001536 acquisitions_per_s=7428 wait_s=3.781 held_s=1.912 step_s=5.101 failures=0
+locks longest_wait_us=50092.5
+locks t=139.9 round=16229 acquisitions=1038656 acquisitions_per_s=7595 wait_s=3.566 held_s=1.908 step_s=4.887 failures=0
+locks longest_wait_us=43307.9
+locks t=145.0 round=16822 acquisitions=1076608 acquisitions_per_s=7482 wait_s=3.744 held_s=2.018 step_s=5.073 failures=0
+locks longest_wait_us=66993.7
+locks t=150.1 round=17406 acquisitions=1113984 acquisitions_per_s=7283 wait_s=3.735 held_s=2.003 step_s=5.132 failures=0
+locks longest_wait_us=42817.7
+locks t=154.9 round=17974 acquisitions=1150336 acquisitions_per_s=7620 wait_s=3.550 held_s=1.860 step_s=4.771 failures=0
+locks longest_wait_us=39245.8
+locks t=160.0 round=18569 acquisitions=1188416 acquisitions_per_s=7437 wait_s=3.724 held_s=1.965 step_s=5.120 failures=0
+locks longest_wait_us=51918.2
+locks t=165.0 round=19150 acquisitions=1225600 acquisitions_per_s=7384 wait_s=3.803 held_s=1.957 step_s=5.036 failures=0
+locks longest_wait_us=41063.8
+locks t=170.1 round=19726 acquisitions=1262464 acquisitions_per_s=7349 wait_s=3.855 held_s=1.993 step_s=5.016 failures=0
+locks longest_wait_us=71961.1
+locks t=175.1 round=20300 acquisitions=1299200 acquisitions_per_s=7291 wait_s=3.701 held_s=1.941 step_s=5.038 failures=0
+locks longest_wait_us=69427.7
+locks t=179.9 round=20869 acquisitions=1335616 acquisitions_per_s=7659 wait_s=3.457 held_s=1.750 step_s=4.755 failures=0
+locks longest_wait_us=45670.3
+locks t=184.9 round=21467 acquisitions=1373888 acquisitions_per_s=7633 wait_s=3.694 held_s=1.923 step_s=5.014 failures=0
+locks longest_wait_us=55116.1
+locks t=190.1 round=22063 acquisitions=1412032 acquisitions_per_s=7345 wait_s=3.724 held_s=1.967 step_s=5.193 failures=0
+locks longest_wait_us=34704.0
+locks t=195.0 round=22636 acquisitions=1448704 acquisitions_per_s=7363 wait_s=3.675 held_s=1.931 step_s=4.981 failures=0
+locks longest_wait_us=36642.3
+locks t=200.1 round=23211 acquisitions=1485504 acquisitions_per_s=7309 wait_s=3.719 held_s=1.941 step_s=5.035 failures=0
+locks longest_wait_us=54917.7
+locks t=205.1 round=23781 acquisitions=1521984 acquisitions_per_s=7347 wait_s=3.738 held_s=1.940 step_s=4.965 failures=0
+locks longest_wait_us=46153.2
+locks t=210.1 round=24354 acquisitions=1558656 acquisitions_per_s=7249 wait_s=3.681 held_s=1.921 step_s=5.059 failures=0
+locks longest_wait_us=43379.4
+locks t=215.0 round=24920 acquisitions=1594880 acquisitions_per_s=7367 wait_s=3.641 held_s=1.869 step_s=4.917 failures=0
+locks longest_wait_us=42137.9
+locks t=219.9 round=25495 acquisitions=1631680 acquisitions_per_s=7522 wait_s=3.604 held_s=1.881 step_s=4.892 failures=0
+locks longest_wait_us=46593.2
+locks t=224.9 round=26082 acquisitions=1669248 acquisitions_per_s=7607 wait_s=3.596 held_s=1.925 step_s=4.939 failures=0
+locks longest_wait_us=51499.7
+locks t=230.1 round=26676 acquisitions=1707264 acquisitions_per_s=7232 wait_s=3.942 held_s=2.049 step_s=5.257 failures=0
+locks longest_wait_us=40817.9
+locks t=235.0 round=27240 acquisitions=1743360 acquisitions_per_s=7383 wait_s=3.550 held_s=1.836 step_s=4.889 failures=0
+locks longest_wait_us=44873.7
+locks t=240.1 round=27816 acquisitions=1780224 acquisitions_per_s=7307 wait_s=3.765 held_s=1.992 step_s=5.045 failures=0
+locks longest_wait_us=50031.4
+locks t=244.9 round=28386 acquisitions=1816704 acquisitions_per_s=7538 wait_s=3.620 held_s=1.862 step_s=4.839 failures=0
+locks longest_wait_us=39294.5
+locks t=250.0 round=28974 acquisitions=1854336 acquisitions_per_s=7379 wait_s=3.741 held_s=1.948 step_s=5.100 failures=0
+locks longest_wait_us=45141.8
+locks t=255.0 round=29550 acquisitions=1891200 acquisitions_per_s=7359 wait_s=3.764 held_s=1.926 step_s=5.009 failures=0
+locks longest_wait_us=48700.4
+locks t=260.1 round=30124 acquisitions=1927936 acquisitions_per_s=7244 wait_s=3.851 held_s=1.966 step_s=5.071 failures=0
+locks longest_wait_us=53702.9
+locks t=264.9 round=30689 acquisitions=1964096 acquisitions_per_s=7464 wait_s=3.579 held_s=1.867 step_s=4.844 failures=0
+locks longest_wait_us=44873.6
+locks t=270.0 round=31272 acquisitions=2001408 acquisitions_per_s=7309 wait_s=3.776 held_s=1.939 step_s=5.105 failures=0
+locks longest_wait_us=52165.2
+locks t=274.9 round=31842 acquisitions=2037888 acquisitions_per_s=7466 wait_s=3.584 held_s=1.878 step_s=4.886 failures=0
+locks longest_wait_us=41348.4
+locks t=279.9 round=32425 acquisitions=2075200 acquisitions_per_s=7531 wait_s=3.766 held_s=1.903 step_s=4.955 failures=0
+locks longest_wait_us=41104.7
+locks t=284.9 round=33013 acquisitions=2112832 acquisitions_per_s=7440 wait_s=3.815 held_s=2.021 step_s=5.058 failures=0
+locks longest_wait_us=36552.3
+locks t=289.9 round=33594 acquisitions=2150016 acquisitions_per_s=7432 wait_s=3.699 held_s=1.895 step_s=5.003 failures=0
+locks longest_wait_us=49056.9
+locks t=295.1 round=34174 acquisitions=2187136 acquisitions_per_s=7240 wait_s=3.789 held_s=1.943 step_s=5.127 failures=0
+locks longest_wait_us=49723.5
+locks t=300.1 round=34739 acquisitions=2223296 acquisitions_per_s=7229 wait_s=3.669 held_s=2.009 step_s=5.002 failures=0
+locks longest_wait_us=52013.3
+locks t=305.0 round=35303 acquisitions=2259392 acquisitions_per_s=7379 wait_s=3.593 held_s=1.852 step_s=4.891 failures=0
+locks longest_wait_us=49473.9
+locks t=309.8 round=35879 acquisitions=2296256 acquisitions_per_s=7583 wait_s=3.683 held_s=1.908 step_s=4.861 failures=0
+locks longest_wait_us=40489.2
+locks t=315.1 round=36471 acquisitions=2334144 acquisitions_per_s=7227 wait_s=3.967 held_s=2.014 step_s=5.243 failures=0
+locks longest_wait_us=44934.1
+locks t=319.9 round=37035 acquisitions=2370240 acquisitions_per_s=7402 wait_s=3.654 held_s=1.857 step_s=4.877 failures=0
+locks longest_wait_us=39936.8
+locks t=325.0 round=37613 acquisitions=2407232 acquisitions_per_s=7352 wait_s=3.753 held_s=1.922 step_s=5.031 failures=0
+locks longest_wait_us=49532.7
+locks t=329.9 round=38187 acquisitions=2443968 acquisitions_per_s=7455 wait_s=3.595 held_s=1.898 step_s=4.928 failures=0
+locks longest_wait_us=49546.0
+locks t=334.9 round=38769 acquisitions=2481216 acquisitions_per_s=7380 wait_s=3.718 held_s=1.930 step_s=5.047 failures=0
+locks longest_wait_us=43997.5
+locks t=340.0 round=39345 acquisitions=2518080 acquisitions_per_s=7318 wait_s=3.848 held_s=1.926 step_s=5.037 failures=0
+locks longest_wait_us=42795.7
+locks t=344.9 round=39916 acquisitions=2554624 acquisitions_per_s=7387 wait_s=3.702 held_s=1.983 step_s=4.947 failures=0
+locks longest_wait_us=40306.4
+locks t=350.0 round=40493 acquisitions=2591552 acquisitions_per_s=7316 wait_s=3.724 held_s=1.907 step_s=5.048 failures=0
+locks longest_wait_us=54306.0
+locks t=355.1 round=41064 acquisitions=2628096 acquisitions_per_s=7184 wait_s=3.714 held_s=1.899 step_s=5.087 failures=0
+locks longest_wait_us=42759.0
+locks t=359.9 round=41625 acquisitions=2664000 acquisitions_per_s=7426 wait_s=3.596 held_s=1.840 step_s=4.835 failures=0
+locks longest_wait_us=37097.6
+locks t=364.8 round=42205 acquisitions=2701120 acquisitions_per_s=7516 wait_s=3.742 held_s=1.924 step_s=4.939 failures=0
+locks longest_wait_us=35478.6
+locks t=369.8 round=42792 acquisitions=2738688 acquisitions_per_s=7569 wait_s=3.665 held_s=1.934 step_s=4.964 failures=0
+locks longest_wait_us=43358.6
+locks t=375.0 round=43383 acquisitions=2776512 acquisitions_per_s=7324 wait_s=3.803 held_s=1.996 step_s=5.164 failures=0
+locks longest_wait_us=52495.1
+locks t=379.8 round=43955 acquisitions=2813120 acquisitions_per_s=7577 wait_s=3.653 held_s=1.881 step_s=4.832 failures=0
+locks longest_wait_us=42200.2
+locks t=384.9 round=44546 acquisitions=2850944 acquisitions_per_s=7449 wait_s=3.708 held_s=1.955 step_s=5.078 failures=0
+locks longest_wait_us=42676.2
+locks t=389.8 round=45127 acquisitions=2888128 acquisitions_per_s=7621 wait_s=3.554 held_s=1.834 step_s=4.879 failures=0
+locks longest_wait_us=51037.7
+locks t=394.9 round=45722 acquisitions=2926208 acquisitions_per_s=7483 wait_s=3.891 held_s=2.023 step_s=5.089 failures=0
+locks longest_wait_us=42943.1
+locks t=399.9 round=46306 acquisitions=2963584 acquisitions_per_s=7441 wait_s=3.771 held_s=1.905 step_s=5.023 failures=0
+locks longest_wait_us=42266.7
+locks t=405.0 round=46887 acquisitions=3000768 acquisitions_per_s=7307 wait_s=3.706 held_s=2.000 step_s=5.089 failures=0
+locks longest_wait_us=39307.2
+locks t=409.8 round=47457 acquisitions=3037248 acquisitions_per_s=7531 wait_s=3.617 held_s=1.875 step_s=4.844 failures=0
+locks longest_wait_us=45463.9
+locks t=414.9 round=48045 acquisitions=3074880 acquisitions_per_s=7335 wait_s=3.780 held_s=2.028 step_s=5.130 failures=0
+locks longest_wait_us=53058.4
+locks t=419.9 round=48618 acquisitions=3111552 acquisitions_per_s=7350 wait_s=3.643 held_s=1.896 step_s=4.990 failures=0
+locks longest_wait_us=43574.6
+locks t=424.7 round=49192 acquisitions=3148288 acquisitions_per_s=7655 wait_s=3.543 held_s=1.902 step_s=4.799 failures=0
+locks longest_wait_us=45135.7
+locks t=430.0 round=49790 acquisitions=3186560 acquisitions_per_s=7247 wait_s=3.961 held_s=1.997 step_s=5.281 failures=0
+locks longest_wait_us=39907.1
+locks t=434.9 round=50356 acquisitions=3222784 acquisitions_per_s=7488 wait_s=3.578 held_s=1.907 step_s=4.838 failures=0
+locks longest_wait_us=45008.5
+locks t=439.9 round=50940 acquisitions=3260160 acquisitions_per_s=7396 wait_s=3.666 held_s=1.953 step_s=5.054 failures=0
+locks longest_wait_us=41693.2
+locks t=444.9 round=51517 acquisitions=3297088 acquisitions_per_s=7352 wait_s=3.652 held_s=1.913 step_s=5.023 failures=0
+locks longest_wait_us=54855.7
+locks t=450.0 round=52091 acquisitions=3333824 acquisitions_per_s=7251 wait_s=3.703 held_s=1.956 step_s=5.066 failures=0
+locks longest_wait_us=44489.7
+locks t=454.9 round=52657 acquisitions=3370048 acquisitions_per_s=7398 wait_s=3.615 held_s=1.867 step_s=4.897 failures=0
+locks longest_wait_us=45563.3
+locks t=459.9 round=53234 acquisitions=3406976 acquisitions_per_s=7430 wait_s=3.726 held_s=1.892 step_s=4.970 failures=0
+locks longest_wait_us=44472.1
+locks t=464.8 round=53814 acquisitions=3444096 acquisitions_per_s=7550 wait_s=3.644 held_s=1.835 step_s=4.916 failures=0
+locks longest_wait_us=60858.1
+locks t=469.8 round=54403 acquisitions=3481792 acquisitions_per_s=7458 wait_s=3.733 held_s=1.957 step_s=5.054 failures=0
+locks longest_wait_us=42630.7
+locks t=474.9 round=54985 acquisitions=3519040 acquisitions_per_s=7334 wait_s=3.725 held_s=1.967 step_s=5.079 failures=0
+locks longest_wait_us=37989.2
+locks t=480.0 round=55557 acquisitions=3555648 acquisitions_per_s=7149 wait_s=3.818 held_s=2.018 step_s=5.121 failures=0
+locks longest_wait_us=50632.9
+locks t=484.8 round=56115 acquisitions=3591360 acquisitions_per_s=7498 wait_s=3.523 held_s=1.844 step_s=4.763 failures=0
+locks longest_wait_us=49932.6
+locks t=490.0 round=56700 acquisitions=3628800 acquisitions_per_s=7214 wait_s=3.859 held_s=1.969 step_s=5.190 failures=0
+locks longest_wait_us=48661.5
+locks t=494.9 round=57263 acquisitions=3664832 acquisitions_per_s=7383 wait_s=3.566 held_s=1.865 step_s=4.880 failures=0
+locks longest_wait_us=79784.9
+locks t=499.9 round=57839 acquisitions=3701696 acquisitions_per_s=7294 wait_s=3.688 held_s=1.996 step_s=5.054 failures=0
+locks longest_wait_us=44827.5
+locks t=505.0 round=58408 acquisitions=3738112 acquisitions_per_s=7136 wait_s=3.834 held_s=1.926 step_s=5.103 failures=0
+locks longest_wait_us=54281.6
+locks t=509.9 round=58965 acquisitions=3773760 acquisitions_per_s=7392 wait_s=3.620 held_s=1.919 step_s=4.822 failures=0
+locks longest_wait_us=47914.8
+locks t=514.8 round=59542 acquisitions=3810688 acquisitions_per_s=7451 wait_s=3.686 held_s=1.916 step_s=4.956 failures=0
+locks longest_wait_us=62082.3
+locks t=519.9 round=60124 acquisitions=3847936 acquisitions_per_s=7393 wait_s=3.649 held_s=1.957 step_s=5.038 failures=0
+locks longest_wait_us=47951.3
+locks t=524.9 round=60701 acquisitions=3884864 acquisitions_per_s=7394 wait_s=3.595 held_s=1.928 step_s=4.995 failures=0
+locks longest_wait_us=38769.6
+locks t=529.7 round=61278 acquisitions=3921792 acquisitions_per_s=7556 wait_s=3.729 held_s=1.912 step_s=4.887 failures=0
+locks longest_wait_us=48760.8
+locks t=534.9 round=61868 acquisitions=3959552 acquisitions_per_s=7302 wait_s=3.972 held_s=2.013 step_s=5.171 failures=0
+locks longest_wait_us=45175.3
+locks t=539.8 round=62438 acquisitions=3996032 acquisitions_per_s=7491 wait_s=3.761 held_s=1.983 step_s=4.870 failures=0
+locks longest_wait_us=45266.2
+locks t=544.9 round=63023 acquisitions=4033472 acquisitions_per_s=7309 wait_s=3.730 held_s=1.973 step_s=5.122 failures=0
+locks longest_wait_us=39344.6
+locks t=549.9 round=63594 acquisitions=4070016 acquisitions_per_s=7315 wait_s=3.738 held_s=1.948 step_s=4.996 failures=0
+locks longest_wait_us=50505.7
+locks t=554.9 round=64165 acquisitions=4106560 acquisitions_per_s=7352 wait_s=3.714 held_s=1.887 step_s=4.971 failures=0
+locks longest_wait_us=54528.7
+locks t=559.7 round=64739 acquisitions=4143296 acquisitions_per_s=7618 wait_s=3.579 held_s=1.851 step_s=4.822 failures=0
+locks longest_wait_us=40006.4
+locks t=564.7 round=65334 acquisitions=4181376 acquisitions_per_s=7577 wait_s=3.635 held_s=1.962 step_s=5.026 failures=0
+locks longest_wait_us=46238.8
+locks t=569.8 round=65925 acquisitions=4219200 acquisitions_per_s=7461 wait_s=3.767 held_s=1.908 step_s=5.070 failures=0
+locks longest_wait_us=51029.5
+locks t=574.8 round=66507 acquisitions=4256448 acquisitions_per_s=7385 wait_s=3.786 held_s=1.890 step_s=5.043 failures=0
+locks longest_wait_us=38472.2
+locks t=579.8 round=67083 acquisitions=4293312 acquisitions_per_s=7449 wait_s=3.638 held_s=1.895 step_s=4.949 failures=0
+locks longest_wait_us=42232.8
+locks t=584.8 round=67664 acquisitions=4330496 acquisitions_per_s=7490 wait_s=3.555 held_s=1.902 step_s=4.965 failures=0
+locks longest_wait_us=41860.6
+locks t=589.8 round=68249 acquisitions=4367936 acquisitions_per_s=7386 wait_s=3.793 held_s=2.047 step_s=5.069 failures=0
+locks longest_wait_us=59293.8
+locks t=594.8 round=68826 acquisitions=4404864 acquisitions_per_s=7360 wait_s=3.733 held_s=1.950 step_s=5.017 failures=0
+locks longest_wait_us=42120.9
+locks t=599.8 round=69401 acquisitions=4441664 acquisitions_per_s=7475 wait_s=3.535 held_s=1.861 step_s=4.923 failures=0
+locks longest_wait_us=36488.1
+locks t=600.0 round=69429 acquisitions=4443456 acquisitions_per_s=7013 wait_s=0.197 held_s=0.106 step_s=0.256 failures=0
+summary locks rounds=69429 acquisitions=4443456 seconds=599.9 acquisitions_per_s=7407 failures=0
+osoe-pacer failures=0 seconds=600.0

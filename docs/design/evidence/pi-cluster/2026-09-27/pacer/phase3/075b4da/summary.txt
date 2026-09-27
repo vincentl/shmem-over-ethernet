@@ -1,0 +1,6 @@
+15:03:26 commit 075b4da task-stress-phase3, copied 2026-09-27T15:02:03-04:00
+15:03:27 quick rma exit 0 in 1 s: osoe-pacer failures=0 seconds=0.7
+15:07:20 coverage exit 0 in 225 s: osoe-pacer failures=0 seconds=224.9 shim called=1404 declared=1794
+    timeouts before: pi-001=5 pi-002=31 pi-003=13 pi-004=10 
+    timeouts after:  pi-001=5 pi-002=32 pi-003=13 pi-004=11 
+DONE

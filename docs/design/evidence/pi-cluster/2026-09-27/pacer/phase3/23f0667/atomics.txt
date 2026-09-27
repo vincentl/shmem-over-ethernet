@@ -1,0 +1,252 @@
+osoe-pacer library=osoe version=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=atomics
+exercise atomics cases=71 contexts=default,private,serialized slots=16 operations=64 claims=16 seconds=600 memory=704
+atomics local_per_s=282796 remote_per_s=809971
+atomics t=0.0 round=1 updates=1024 updates_per_s=1275007 issue_s=0.000 sync_s=0.001 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=345921 remote_per_s=1030371
+atomics t=0.0 round=9 updates=9216 updates_per_s=1583709 issue_s=0.000 sync_s=0.004 check_s=0.000 step_s=0.005 failures=0
+atomics local_per_s=39153 remote_per_s=117861
+atomics t=0.4 round=73 updates=70325 updates_per_s=157256 issue_s=0.267 sync_s=0.075 check_s=0.053 step_s=0.389 failures=0
+atomics local_per_s=43458 remote_per_s=130992
+atomics t=3.2 round=585 updates=563323 updates_per_s=174486 issue_s=1.861 sync_s=0.563 check_s=0.377 step_s=2.825 failures=0
+atomics local_per_s=42681 remote_per_s=127779
+atomics t=8.3 round=1491 updates=1433209 updates_per_s=170480 issue_s=3.342 sync_s=1.005 check_s=0.698 step_s=5.103 failures=0
+atomics local_per_s=42890 remote_per_s=129025
+atomics t=13.3 round=2378 updates=2280786 updates_per_s=171937 issue_s=3.222 sync_s=0.971 check_s=0.670 step_s=4.930 failures=0
+atomics local_per_s=43708 remote_per_s=130231
+atomics t=18.3 round=3277 updates=3150640 updates_per_s=173961 issue_s=3.259 sync_s=1.002 check_s=0.675 step_s=5.000 failures=0
+atomics local_per_s=42300 remote_per_s=127060
+atomics t=23.3 round=4175 updates=4003343 updates_per_s=169379 issue_s=3.304 sync_s=0.985 check_s=0.687 step_s=5.034 failures=0
+atomics local_per_s=43652 remote_per_s=131001
+atomics t=28.3 round=5066 updates=4870716 updates_per_s=174673 issue_s=3.266 sync_s=0.983 check_s=0.657 step_s=4.966 failures=0
+atomics local_per_s=42803 remote_per_s=128414
+atomics t=33.3 round=5963 updates=5730006 updates_per_s=171236 issue_s=3.259 sync_s=0.975 check_s=0.691 step_s=5.018 failures=0
+atomics local_per_s=42928 remote_per_s=128728
+atomics t=38.3 round=6856 updates=6585147 updates_per_s=171678 issue_s=3.237 sync_s=0.984 check_s=0.673 step_s=4.981 failures=0
+atomics local_per_s=43732 remote_per_s=131152
+atomics t=43.2 round=7752 updates=7452830 updates_per_s=174904 issue_s=3.233 sync_s=0.988 check_s=0.671 step_s=4.961 failures=0
+atomics local_per_s=41698 remote_per_s=125335
+atomics t=48.3 round=8655 updates=8305225 updates_per_s=167054 issue_s=3.296 sync_s=1.037 check_s=0.701 step_s=5.103 failures=0
+atomics local_per_s=43908 remote_per_s=131141
+atomics t=53.3 round=9539 updates=9170535 updates_per_s=175068 issue_s=3.246 sync_s=0.962 check_s=0.649 step_s=4.943 failures=0
+atomics local_per_s=42474 remote_per_s=127250
+atomics t=58.3 round=10433 updates=10020736 updates_per_s=169743 issue_s=3.259 sync_s=1.003 check_s=0.699 step_s=5.009 failures=0
+atomics local_per_s=43175 remote_per_s=129408
+atomics t=63.3 round=11325 updates=10880701 updates_per_s=172602 issue_s=3.245 sync_s=1.014 check_s=0.670 step_s=4.982 failures=0
+atomics local_per_s=43356 remote_per_s=129844
+atomics t=68.3 round=12220 updates=11747219 updates_per_s=173219 issue_s=3.261 sync_s=1.010 check_s=0.675 step_s=5.002 failures=0
+atomics local_per_s=42460 remote_per_s=127417
+atomics t=73.3 round=13114 updates=12601176 updates_per_s=169897 issue_s=3.284 sync_s=0.993 check_s=0.669 step_s=5.026 failures=0
+atomics local_per_s=43950 remote_per_s=131702
+atomics t=78.2 round=14003 updates=13461450 updates_per_s=175673 issue_s=3.197 sync_s=0.955 check_s=0.672 step_s=4.897 failures=0
+atomics local_per_s=42609 remote_per_s=127574
+atomics t=83.3 round=14910 updates=14332237 updates_per_s=170202 issue_s=3.336 sync_s=1.004 check_s=0.703 step_s=5.116 failures=0
+atomics local_per_s=42658 remote_per_s=128792
+atomics t=88.2 round=15796 updates=15179239 updates_per_s=171470 issue_s=3.230 sync_s=0.985 check_s=0.665 step_s=4.940 failures=0
+atomics local_per_s=43273 remote_per_s=129693
+atomics t=93.3 round=16692 updates=16045370 updates_per_s=172984 issue_s=3.279 sync_s=0.976 check_s=0.679 step_s=5.007 failures=0
+atomics local_per_s=42534 remote_per_s=127430
+atomics t=98.3 round=17586 updates=16899398 updates_per_s=169984 issue_s=3.273 sync_s=1.010 check_s=0.675 step_s=5.024 failures=0
+atomics local_per_s=43789 remote_per_s=131062
+atomics t=103.2 round=18475 updates=17759810 updates_per_s=174872 issue_s=3.201 sync_s=0.992 check_s=0.670 step_s=4.920 failures=0
+atomics local_per_s=42370 remote_per_s=126893
+atomics t=108.3 round=19378 updates=18616389 updates_per_s=169283 issue_s=3.298 sync_s=0.974 check_s=0.700 step_s=5.060 failures=0
+atomics local_per_s=43235 remote_per_s=129977
+atomics t=113.2 round=20270 updates=19479201 updates_per_s=173232 issue_s=3.256 sync_s=0.991 check_s=0.665 step_s=4.981 failures=0
+atomics local_per_s=42910 remote_per_s=128768
+atomics t=118.3 round=21165 updates=20345174 updates_per_s=171697 issue_s=3.252 sync_s=0.993 check_s=0.719 step_s=5.044 failures=0
+atomics local_per_s=42478 remote_per_s=127761
+atomics t=123.3 round=22052 updates=21192216 updates_per_s=170260 issue_s=3.261 sync_s=0.962 check_s=0.676 step_s=4.975 failures=0
+atomics local_per_s=43940 remote_per_s=130615
+atomics t=128.2 round=22943 updates=22054844 updates_per_s=174576 issue_s=3.211 sync_s=0.970 check_s=0.676 step_s=4.941 failures=0
+atomics local_per_s=42354 remote_per_s=126882
+atomics t=133.2 round=23844 updates=22909011 updates_per_s=169255 issue_s=3.287 sync_s=0.993 check_s=0.689 step_s=5.047 failures=0
+atomics local_per_s=43506 remote_per_s=130618
+atomics t=138.2 round=24736 updates=23776829 updates_per_s=174145 issue_s=3.255 sync_s=0.994 check_s=0.666 step_s=4.983 failures=0
+atomics local_per_s=42744 remote_per_s=128479
+atomics t=143.2 round=25630 updates=24634888 updates_per_s=171244 issue_s=3.260 sync_s=0.991 check_s=0.688 step_s=5.011 failures=0
+atomics local_per_s=43180 remote_per_s=129119
+atomics t=148.2 round=26522 updates=25488936 updates_per_s=172319 issue_s=3.255 sync_s=0.966 check_s=0.669 step_s=4.956 failures=0
+atomics local_per_s=43553 remote_per_s=130251
+atomics t=153.2 round=27421 updates=26359645 updates_per_s=173824 issue_s=3.246 sync_s=0.977 check_s=0.670 step_s=5.009 failures=0
+atomics local_per_s=42239 remote_per_s=126687
+atomics t=158.2 round=28318 updates=27209031 updates_per_s=168948 issue_s=3.263 sync_s=0.989 check_s=0.690 step_s=5.028 failures=0
+atomics local_per_s=43588 remote_per_s=130632
+atomics t=163.2 round=29210 updates=28076827 updates_per_s=174240 issue_s=3.249 sync_s=0.981 check_s=0.659 step_s=4.980 failures=0
+atomics local_per_s=42686 remote_per_s=128171
+atomics t=168.3 round=30105 updates=28939021 updates_per_s=170874 issue_s=3.286 sync_s=1.003 check_s=0.689 step_s=5.046 failures=0
+atomics local_per_s=43271 remote_per_s=129178
+atomics t=173.2 round=30991 updates=29785583 updates_per_s=172470 issue_s=3.197 sync_s=0.962 check_s=0.665 step_s=4.908 failures=0
+atomics local_per_s=43189 remote_per_s=129238
+atomics t=178.2 round=31893 updates=30658774 updates_per_s=172447 issue_s=3.284 sync_s=1.007 check_s=0.718 step_s=5.064 failures=0
+atomics local_per_s=42149 remote_per_s=126619
+atomics t=183.3 round=32783 updates=31507322 updates_per_s=168787 issue_s=3.276 sync_s=0.986 check_s=0.679 step_s=5.027 failures=0
+atomics local_per_s=43955 remote_per_s=131541
+atomics t=188.2 round=33668 updates=32365201 updates_per_s=175516 issue_s=3.171 sync_s=0.966 check_s=0.672 step_s=4.888 failures=0
+atomics local_per_s=40853 remote_per_s=122098
+atomics t=193.4 round=34573 updates=33225943 updates_per_s=162970 issue_s=3.329 sync_s=1.206 check_s=0.702 step_s=5.282 failures=0
+atomics local_per_s=43223 remote_per_s=128878
+atomics t=198.3 round=35429 updates=34057319 updates_per_s=172122 issue_s=3.146 sync_s=0.986 check_s=0.647 step_s=4.830 failures=0
+atomics local_per_s=43145 remote_per_s=129090
+atomics t=203.2 round=36315 updates=34904342 updates_per_s=172257 issue_s=3.203 sync_s=0.980 check_s=0.667 step_s=4.917 failures=0
+atomics local_per_s=43225 remote_per_s=130321
+atomics t=208.2 round=37215 updates=35774817 updates_per_s=173565 issue_s=3.266 sync_s=0.995 check_s=0.677 step_s=5.015 failures=0
+atomics local_per_s=42178 remote_per_s=126640
+atomics t=213.3 round=38112 updates=36627415 updates_per_s=168838 issue_s=3.293 sync_s=1.002 check_s=0.686 step_s=5.050 failures=0
+atomics local_per_s=43683 remote_per_s=131123
+atomics t=218.2 round=39000 updates=37491615 updates_per_s=174825 issue_s=3.240 sync_s=0.981 check_s=0.664 step_s=4.943 failures=0
+atomics local_per_s=42424 remote_per_s=127009
+atomics t=223.2 round=39898 updates=38344981 updates_per_s=169454 issue_s=3.271 sync_s=0.991 check_s=0.700 step_s=5.036 failures=0
+atomics local_per_s=43346 remote_per_s=129731
+atomics t=228.2 round=40789 updates=39204871 updates_per_s=173098 issue_s=3.242 sync_s=0.983 check_s=0.664 step_s=4.968 failures=0
+atomics local_per_s=43402 remote_per_s=129950
+atomics t=233.2 round=41685 updates=40071810 updates_per_s=173371 issue_s=3.272 sync_s=0.981 check_s=0.676 step_s=5.000 failures=0
+atomics local_per_s=42378 remote_per_s=127524
+atomics t=238.2 round=42580 updates=40925681 updates_per_s=169922 issue_s=3.294 sync_s=0.999 check_s=0.672 step_s=5.025 failures=0
+atomics local_per_s=43761 remote_per_s=131139
+atomics t=243.2 round=43470 updates=41788149 updates_per_s=174920 issue_s=3.207 sync_s=0.970 check_s=0.672 step_s=4.931 failures=0
+atomics local_per_s=42230 remote_per_s=127360
+atomics t=248.2 round=44372 updates=42647701 updates_per_s=169610 issue_s=3.302 sync_s=0.988 check_s=0.699 step_s=5.068 failures=0
+atomics local_per_s=43089 remote_per_s=129508
+atomics t=253.2 round=45261 updates=43504294 updates_per_s=172619 issue_s=3.237 sync_s=1.000 check_s=0.666 step_s=4.962 failures=0
+atomics local_per_s=43125 remote_per_s=129265
+atomics t=258.2 round=46156 updates=44369509 updates_per_s=172409 issue_s=3.267 sync_s=0.992 check_s=0.680 step_s=5.018 failures=0
+atomics local_per_s=42832 remote_per_s=127874
+atomics t=263.2 round=47047 updates=45220442 updates_per_s=170727 issue_s=3.256 sync_s=0.979 check_s=0.671 step_s=4.984 failures=0
+atomics local_per_s=43700 remote_per_s=130518
+atomics t=268.2 round=47940 updates=46085087 updates_per_s=174239 issue_s=3.214 sync_s=1.001 check_s=0.671 step_s=4.962 failures=0
+atomics local_per_s=42144 remote_per_s=126398
+atomics t=273.2 round=48839 updates=46935224 updates_per_s=168562 issue_s=3.288 sync_s=0.988 check_s=0.697 step_s=5.043 failures=0
+atomics local_per_s=43650 remote_per_s=130651
+atomics t=278.2 round=49730 updates=47803222 updates_per_s=174321 issue_s=3.281 sync_s=0.988 check_s=0.663 step_s=4.979 failures=0
+atomics local_per_s=42903 remote_per_s=128747
+atomics t=283.2 round=50624 updates=48664819 updates_per_s=171671 issue_s=3.271 sync_s=0.981 check_s=0.686 step_s=5.019 failures=0
+atomics local_per_s=42967 remote_per_s=128958
+atomics t=288.1 round=51514 updates=49514829 updates_per_s=171946 issue_s=3.211 sync_s=0.965 check_s=0.672 step_s=4.943 failures=0
+atomics local_per_s=43625 remote_per_s=130575
+atomics t=293.1 round=52414 updates=50386728 updates_per_s=174219 issue_s=3.250 sync_s=0.973 check_s=0.676 step_s=5.005 failures=0
+atomics local_per_s=42197 remote_per_s=126509
+atomics t=298.2 round=53313 updates=51236079 updates_per_s=168727 issue_s=3.282 sync_s=0.984 check_s=0.698 step_s=5.034 failures=0
+atomics local_per_s=43296 remote_per_s=129775
+atomics t=303.2 round=54205 updates=52104540 updates_per_s=173089 issue_s=3.264 sync_s=0.988 check_s=0.666 step_s=5.017 failures=0
+atomics local_per_s=42660 remote_per_s=128694
+atomics t=308.2 round=55093 updates=52955033 updates_per_s=171373 issue_s=3.247 sync_s=0.966 check_s=0.680 step_s=4.963 failures=0
+atomics local_per_s=42961 remote_per_s=129174
+atomics t=313.2 round=55987 updates=53815331 updates_per_s=172155 issue_s=3.249 sync_s=0.989 check_s=0.674 step_s=4.997 failures=0
+atomics local_per_s=43490 remote_per_s=130939
+atomics t=318.1 round=56881 updates=54681000 updates_per_s=174447 issue_s=3.246 sync_s=0.982 check_s=0.673 step_s=4.962 failures=0
+atomics local_per_s=42448 remote_per_s=127085
+atomics t=323.2 round=57781 updates=55535149 updates_per_s=169552 issue_s=3.279 sync_s=0.980 check_s=0.689 step_s=5.038 failures=0
+atomics local_per_s=43587 remote_per_s=130468
+atomics t=328.2 round=58674 updates=56403570 updates_per_s=174075 issue_s=3.255 sync_s=0.989 check_s=0.663 step_s=4.989 failures=0
+atomics local_per_s=42359 remote_per_s=126834
+atomics t=333.2 round=59569 updates=57265098 updates_per_s=169212 issue_s=3.309 sync_s=1.048 check_s=0.693 step_s=5.091 failures=0
+atomics local_per_s=43464 remote_per_s=129896
+atomics t=338.1 round=60447 updates=58109534 updates_per_s=173382 issue_s=3.183 sync_s=0.964 check_s=0.651 step_s=4.870 failures=0
+atomics local_per_s=42971 remote_per_s=129020
+atomics t=343.2 round=61348 updates=58975764 updates_per_s=172010 issue_s=3.279 sync_s=0.980 check_s=0.694 step_s=5.036 failures=0
+atomics local_per_s=42736 remote_per_s=128046
+atomics t=348.2 round=62242 updates=59830004 updates_per_s=170803 issue_s=3.269 sync_s=0.987 check_s=0.671 step_s=5.001 failures=0
+atomics local_per_s=43952 remote_per_s=131400
+atomics t=353.1 round=63135 updates=60694501 updates_per_s=175372 issue_s=3.219 sync_s=0.964 check_s=0.674 step_s=4.930 failures=0
+atomics local_per_s=42546 remote_per_s=127255
+atomics t=358.2 round=64040 updates=61559128 updates_per_s=169821 issue_s=3.304 sync_s=1.006 check_s=0.699 step_s=5.091 failures=0
+atomics local_per_s=43237 remote_per_s=129609
+atomics t=363.1 round=64928 updates=62412416 updates_per_s=172867 issue_s=3.209 sync_s=0.992 check_s=0.671 step_s=4.936 failures=0
+atomics local_per_s=43681 remote_per_s=130505
+atomics t=368.1 round=65827 updates=63281761 updates_per_s=174206 issue_s=3.262 sync_s=0.982 check_s=0.677 step_s=4.990 failures=0
+atomics local_per_s=42335 remote_per_s=126797
+atomics t=373.2 round=66727 updates=64135633 updates_per_s=169151 issue_s=3.281 sync_s=0.985 check_s=0.688 step_s=5.048 failures=0
+atomics local_per_s=43532 remote_per_s=130641
+atomics t=378.1 round=67618 updates=65002785 updates_per_s=174193 issue_s=3.260 sync_s=0.987 check_s=0.662 step_s=4.978 failures=0
+atomics local_per_s=42989 remote_per_s=128096
+atomics t=383.1 round=68512 updates=65855438 updates_per_s=171103 issue_s=3.251 sync_s=0.982 check_s=0.694 step_s=4.983 failures=0
+atomics local_per_s=42908 remote_per_s=129082
+atomics t=388.1 round=69409 updates=66718673 updates_per_s=172010 issue_s=3.272 sync_s=0.992 check_s=0.676 step_s=5.019 failures=0
+atomics local_per_s=43839 remote_per_s=131076
+atomics t=393.1 round=70302 updates=67583226 updates_per_s=174937 issue_s=3.221 sync_s=0.973 check_s=0.674 step_s=4.942 failures=0
+atomics local_per_s=40399 remote_per_s=121591
+atomics t=398.3 round=71205 updates=68436456 updates_per_s=162007 issue_s=3.308 sync_s=1.194 check_s=0.700 step_s=5.267 failures=0
+atomics local_per_s=43094 remote_per_s=129868
+atomics t=403.2 round=72062 updates=69268035 updates_per_s=172983 issue_s=3.140 sync_s=0.937 check_s=0.651 step_s=4.807 failures=0
+atomics local_per_s=43236 remote_per_s=129544
+atomics t=408.1 round=72953 updates=70125095 updates_per_s=172800 issue_s=3.223 sync_s=0.992 check_s=0.670 step_s=4.960 failures=0
+atomics local_per_s=43496 remote_per_s=130314
+atomics t=413.1 round=73851 updates=70995100 updates_per_s=173829 issue_s=3.272 sync_s=0.989 check_s=0.671 step_s=5.005 failures=0
+atomics local_per_s=42097 remote_per_s=125970
+atomics t=418.2 round=74748 updates=71847472 updates_per_s=168087 issue_s=3.296 sync_s=1.008 check_s=0.682 step_s=5.071 failures=0
+atomics local_per_s=43604 remote_per_s=131172
+atomics t=423.1 round=75632 updates=72707550 updates_per_s=174796 issue_s=3.226 sync_s=0.980 check_s=0.662 step_s=4.920 failures=0
+atomics local_per_s=42296 remote_per_s=126757
+atomics t=428.1 round=76530 updates=73555789 updates_per_s=169074 issue_s=3.263 sync_s=0.992 check_s=0.698 step_s=5.017 failures=0
+atomics local_per_s=43406 remote_per_s=130330
+atomics t=433.1 round=77424 updates=74424681 updates_per_s=173756 issue_s=3.289 sync_s=0.974 check_s=0.668 step_s=5.001 failures=0
+atomics local_per_s=43083 remote_per_s=129227
+atomics t=438.1 round=78317 updates=75288084 updates_per_s=172329 issue_s=3.270 sync_s=0.973 check_s=0.680 step_s=5.010 failures=0
+atomics local_per_s=42662 remote_per_s=128305
+atomics t=443.1 round=79208 updates=76138885 updates_per_s=170988 issue_s=3.250 sync_s=0.993 check_s=0.672 step_s=4.976 failures=0
+atomics local_per_s=41838 remote_per_s=125850
+atomics t=448.3 round=80103 updates=77005249 updates_per_s=167707 issue_s=3.256 sync_s=0.968 check_s=0.670 step_s=5.166 failures=0
+atomics local_per_s=42699 remote_per_s=128039
+atomics t=453.1 round=80969 updates=77835273 updates_per_s=170759 issue_s=3.178 sync_s=0.948 check_s=0.654 step_s=4.861 failures=0
+atomics local_per_s=42778 remote_per_s=127630
+atomics t=458.1 round=81859 updates=78683971 updates_per_s=170428 issue_s=3.229 sync_s=0.993 check_s=0.689 step_s=4.980 failures=0
+atomics local_per_s=42992 remote_per_s=129572
+atomics t=463.1 round=82752 updates=79545045 updates_per_s=172585 issue_s=3.241 sync_s=0.990 check_s=0.671 step_s=4.989 failures=0
+atomics local_per_s=43466 remote_per_s=129999
+atomics t=468.1 round=83646 updates=80410651 updates_per_s=173484 issue_s=3.250 sync_s=0.973 check_s=0.679 step_s=4.990 failures=0
+atomics local_per_s=42316 remote_per_s=127239
+atomics t=473.1 round=84541 updates=81265170 updates_per_s=169576 issue_s=3.290 sync_s=0.993 check_s=0.672 step_s=5.039 failures=0
+atomics local_per_s=43784 remote_per_s=130879
+atomics t=478.1 round=85429 updates=82125648 updates_per_s=174684 issue_s=3.196 sync_s=0.974 check_s=0.669 step_s=4.926 failures=0
+atomics local_per_s=42128 remote_per_s=126679
+atomics t=483.1 round=86330 updates=82978215 updates_per_s=168827 issue_s=3.254 sync_s=0.988 check_s=0.698 step_s=5.050 failures=0
+atomics local_per_s=43456 remote_per_s=130162
+atomics t=488.1 round=87222 updates=83843964 updates_per_s=173638 issue_s=3.251 sync_s=0.986 check_s=0.664 step_s=4.986 failures=0
+atomics local_per_s=41694 remote_per_s=124639
+atomics t=493.3 round=88116 updates=84708136 updates_per_s=166351 issue_s=3.240 sync_s=1.178 check_s=0.677 step_s=5.195 failures=0
+atomics local_per_s=43358 remote_per_s=130154
+atomics t=498.1 round=88976 updates=85535249 updates_per_s=173534 issue_s=3.116 sync_s=0.938 check_s=0.645 step_s=4.766 failures=0
+atomics local_per_s=41591 remote_per_s=125550
+atomics t=503.2 round=89878 updates=86387443 updates_per_s=167161 issue_s=3.294 sync_s=1.034 check_s=0.696 step_s=5.098 failures=0
+atomics local_per_s=42957 remote_per_s=129563
+atomics t=508.2 round=90762 updates=87252820 updates_per_s=172539 issue_s=3.250 sync_s=1.034 check_s=0.651 step_s=5.016 failures=0
+atomics local_per_s=42232 remote_per_s=127162
+atomics t=513.1 round=91643 updates=88091249 updates_per_s=169414 issue_s=3.205 sync_s=0.967 check_s=0.681 step_s=4.949 failures=0
+atomics local_per_s=43805 remote_per_s=131206
+atomics t=518.1 round=92533 updates=88955126 updates_per_s=175032 issue_s=3.220 sync_s=0.960 check_s=0.663 step_s=4.936 failures=0
+atomics local_per_s=42146 remote_per_s=127469
+atomics t=523.1 round=93434 updates=89815556 updates_per_s=169634 issue_s=3.294 sync_s=0.979 check_s=0.699 step_s=5.072 failures=0
+atomics local_per_s=43201 remote_per_s=129585
+atomics t=528.1 round=94322 updates=90668752 updates_per_s=172806 issue_s=3.231 sync_s=0.967 check_s=0.666 step_s=4.937 failures=0
+atomics local_per_s=43560 remote_per_s=130308
+atomics t=533.1 round=95221 updates=91538297 updates_per_s=173889 issue_s=3.272 sync_s=0.977 check_s=0.678 step_s=5.001 failures=0
+atomics local_per_s=42417 remote_per_s=127273
+atomics t=538.1 round=96119 updates=92391787 updates_per_s=169710 issue_s=3.312 sync_s=0.979 check_s=0.684 step_s=5.029 failures=0
+atomics local_per_s=43568 remote_per_s=130692
+atomics t=543.1 round=97011 updates=93259533 updates_per_s=174280 issue_s=3.246 sync_s=0.979 check_s=0.661 step_s=4.979 failures=0
+atomics local_per_s=42727 remote_per_s=128214
+atomics t=548.1 round=97906 updates=94112660 updates_per_s=170960 issue_s=3.246 sync_s=0.936 check_s=0.696 step_s=4.990 failures=0
+atomics local_per_s=43189 remote_per_s=129152
+atomics t=553.1 round=98802 updates=94974767 updates_per_s=172362 issue_s=3.249 sync_s=0.979 check_s=0.671 step_s=5.002 failures=0
+atomics local_per_s=43622 remote_per_s=130829
+atomics t=558.1 round=99697 updates=95841376 updates_per_s=174470 issue_s=3.234 sync_s=0.983 check_s=0.676 step_s=4.967 failures=0
+atomics local_per_s=42176 remote_per_s=126259
+atomics t=563.1 round=100597 updates=96693103 updates_per_s=168455 issue_s=3.285 sync_s=0.995 check_s=0.693 step_s=5.056 failures=0
+atomics local_per_s=43308 remote_per_s=130139
+atomics t=568.1 round=101487 updates=97560522 updates_per_s=173466 issue_s=3.261 sync_s=1.011 check_s=0.662 step_s=5.001 failures=0
+atomics local_per_s=42503 remote_per_s=127236
+atomics t=573.1 round=102376 updates=98403283 updates_per_s=169757 issue_s=3.229 sync_s=0.969 check_s=0.690 step_s=4.965 failures=0
+atomics local_per_s=43189 remote_per_s=129374
+atomics t=578.1 round=103271 updates=99270665 updates_per_s=172583 issue_s=3.280 sync_s=0.999 check_s=0.678 step_s=5.026 failures=0
+atomics local_per_s=43159 remote_per_s=129377
+atomics t=583.1 round=104161 updates=100132061 updates_per_s=172556 issue_s=3.256 sync_s=1.010 check_s=0.676 step_s=4.992 failures=0
+atomics local_per_s=42971 remote_per_s=128436
+atomics t=588.1 round=105052 updates=100982661 updates_per_s=171428 issue_s=3.253 sync_s=0.953 check_s=0.674 step_s=4.962 failures=0
+atomics local_per_s=43686 remote_per_s=130752
+atomics t=593.0 round=105949 updates=101851252 updates_per_s=174460 issue_s=3.231 sync_s=0.984 check_s=0.671 step_s=4.979 failures=0
+atomics local_per_s=42162 remote_per_s=126767
+atomics t=598.1 round=106849 updates=102702748 updates_per_s=168948 issue_s=3.280 sync_s=0.993 check_s=0.699 step_s=5.040 failures=0
+atomics local_per_s=43070 remote_per_s=129314
+atomics t=600.0 round=107193 updates=103038405 updates_per_s=172437 issue_s=1.293 sync_s=0.392 check_s=0.252 step_s=1.947 failures=0
+summary atomics rounds=107193 updates=103038405 seconds=600.0 updates_per_s=171745 failures=0
+osoe-pacer failures=0 seconds=600.0

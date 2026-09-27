@@ -1,0 +1,603 @@
+osoe-pacer library=osoe version=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=sort,alltoall,mailbox,teams,atomics,rma,locks,memory,collectives
+exercise sort mode=rounds exchange=fetch-add ptr=yes keys=65536 capacity=77824 local_sort=lsd-scratch private=3.2m rounds=3 memory=1.2m
+exercise alltoall teams=world,even blocks=8,4096,65536 variants=alltoall,alltoallmem,alltoalls,put,get,signal,iput,ibput rounds=12 memory=5.1m
+exercise mailbox sends=4 slot=256 forms=20 round_trips=128 rounds=20 memory=4.8k
+exercise teams numbers=12 strided=4 grid=4x4 kinds=15 rounds=15 memory=8.0k
+exercise atomics cases=71 contexts=default,private,serialized slots=16 operations=64 claims=16 rounds=71 memory=704
+exercise rma halo=8..1m cases=140 kinds=29 flags=atomic_add,signal_add,signal_set rounds=140 memory=1.2m
+exercise locks locks=8 acquisitions=4 rounds=16 memory=336
+exercise memory blocks=64 peak=8m kinds=malloc,calloc,align,malloc_with_hints rounds=24 memory=128m
+exercise collectives typed=314 timed=87 sizes=8..32k teams=world,even rounds=105 memory=1.1m
+sort t=0.1 round=1 keys=1048576 keys_per_s=15636019 mib_per_s=119.3 imbalance=1.007 generate_s=0.001 bin_s=0.001 exchange_s=0.026 sort_s=0.039 check_s=0.001 step_s=0.067 failures=0
+sort t=0.1 round=2 keys=2097152 keys_per_s=15839895 mib_per_s=120.8 imbalance=1.006 generate_s=0.001 bin_s=0.001 exchange_s=0.025 sort_s=0.039 check_s=0.001 step_s=0.066 failures=0
+sort t=0.2 round=3 keys=3145728 keys_per_s=15839922 mib_per_s=120.8 imbalance=1.007 generate_s=0.001 bin_s=0.001 exchange_s=0.031 sort_s=0.039 check_s=0.001 step_s=0.066 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=431.0 alltoallmem_us=427.0 alltoalls_us=366.3 put_us=364.7 get_us=494.4 signal_us=306.3 iput_us=369.8 ibput_us=376.7
+alltoall team=even block=8 exchanges=1 alltoall_us=340.7 alltoallmem_us=329.3 alltoalls_us=353.5 put_us=361.5 get_us=405.5 signal_us=263.2 iput_us=339.3 ibput_us=336.3
+alltoall t=0.0 round=1 exchanges=16 exchanges_per_s=1729 fill_s=0.000 exchange_s=0.009 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2906.2 alltoallmem_us=3207.7 alltoalls_us=8724.7 put_us=3230.1 get_us=4115.3 signal_us=2918.5 iput_us=8054.5 ibput_us=3227.3
+alltoall team=even block=4096 exchanges=1 alltoall_us=918.9 alltoallmem_us=952.8 alltoalls_us=3016.1 put_us=822.9 get_us=1193.7 signal_us=640.9 iput_us=3113.6 ibput_us=864.8
+alltoall t=0.1 round=2 exchanges=32 exchanges_per_s=304 fill_s=0.001 exchange_s=0.051 check_s=0.001 step_s=0.053 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=34389.2 alltoallmem_us=39043.0 alltoalls_us=151052.7 put_us=32537.6 get_us=35468.6 signal_us=33778.8 iput_us=132623.0 ibput_us=31874.5
+alltoall team=even block=65536 exchanges=1 alltoall_us=16744.5 alltoallmem_us=10485.2 alltoalls_us=34749.4 put_us=9162.6 get_us=9264.1 signal_us=8403.3 iput_us=35011.8 ibput_us=8879.9
+alltoall t=0.7 round=3 exchanges=48 exchanges_per_s=25 fill_s=0.015 exchange_s=0.626 check_s=0.011 step_s=0.651 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=376.6 alltoallmem_us=387.8 alltoalls_us=374.6 put_us=347.4 get_us=537.2 signal_us=287.1 iput_us=347.1 ibput_us=367.5
+alltoall team=even block=8 exchanges=1 alltoall_us=352.7 alltoallmem_us=363.2 alltoalls_us=333.6 put_us=321.0 get_us=409.0 signal_us=203.1 iput_us=334.9 ibput_us=362.4
+alltoall t=0.7 round=4 exchanges=64 exchanges_per_s=1872 fill_s=0.000 exchange_s=0.008 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2908.0 alltoallmem_us=2622.8 alltoalls_us=9548.3 put_us=3035.6 get_us=3403.9 signal_us=2870.5 iput_us=8924.2 ibput_us=2855.7
+alltoall team=even block=4096 exchanges=1 alltoall_us=923.9 alltoallmem_us=911.7 alltoalls_us=3023.0 put_us=909.2 get_us=1143.2 signal_us=642.5 iput_us=3128.0 ibput_us=818.5
+alltoall t=0.8 round=5 exchanges=80 exchanges_per_s=307 fill_s=0.001 exchange_s=0.050 check_s=0.001 step_s=0.052 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=32087.7 alltoallmem_us=33307.3 alltoalls_us=129263.1 put_us=36230.8 get_us=35772.8 signal_us=30740.3 iput_us=145323.9 ibput_us=32994.3
+alltoall team=even block=65536 exchanges=1 alltoall_us=8681.0 alltoallmem_us=9377.9 alltoalls_us=34482.9 put_us=8873.9 get_us=9820.6 signal_us=8551.1 iput_us=36081.9 ibput_us=8868.2
+alltoall t=1.4 round=6 exchanges=96 exchanges_per_s=25 fill_s=0.015 exchange_s=0.604 check_s=0.010 step_s=0.630 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=360.8 alltoallmem_us=371.9 alltoalls_us=374.7 put_us=372.7 get_us=468.2 signal_us=303.7 iput_us=395.6 ibput_us=371.2
+alltoall team=even block=8 exchanges=1 alltoall_us=357.2 alltoallmem_us=352.3 alltoalls_us=351.5 put_us=360.6 get_us=412.1 signal_us=190.2 iput_us=378.2 ibput_us=368.0
+alltoall t=1.4 round=7 exchanges=112 exchanges_per_s=1857 fill_s=0.000 exchange_s=0.008 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=3048.3 alltoallmem_us=2972.9 alltoalls_us=9283.5 put_us=2966.8 get_us=3372.0 signal_us=2606.6 iput_us=8920.9 ibput_us=2964.3
+alltoall team=even block=4096 exchanges=1 alltoall_us=981.5 alltoallmem_us=923.5 alltoalls_us=2983.4 put_us=1059.7 get_us=1175.1 signal_us=653.0 iput_us=3413.5 ibput_us=947.2
+alltoall t=1.5 round=8 exchanges=128 exchanges_per_s=302 fill_s=0.001 exchange_s=0.051 check_s=0.001 step_s=0.053 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=31174.0 alltoallmem_us=33752.5 alltoalls_us=143342.3 put_us=33301.1 get_us=35967.6 signal_us=30103.9 iput_us=141780.5 ibput_us=32528.0
+alltoall team=even block=65536 exchanges=1 alltoall_us=8371.1 alltoallmem_us=9522.1 alltoalls_us=34416.1 put_us=8697.1 get_us=8690.6 signal_us=8061.0 iput_us=33618.4 ibput_us=8127.6
+alltoall t=2.1 round=9 exchanges=144 exchanges_per_s=25 fill_s=0.017 exchange_s=0.607 check_s=0.011 step_s=0.632 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=363.4 alltoallmem_us=347.4 alltoalls_us=397.8 put_us=349.3 get_us=541.1 signal_us=254.0 iput_us=425.5 ibput_us=343.0
+alltoall team=even block=8 exchanges=1 alltoall_us=356.1 alltoallmem_us=339.6 alltoalls_us=352.0 put_us=332.1 get_us=407.2 signal_us=204.6 iput_us=315.1 ibput_us=340.2
+alltoall t=2.1 round=10 exchanges=160 exchanges_per_s=1863 fill_s=0.000 exchange_s=0.008 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2940.6 alltoallmem_us=3201.2 alltoalls_us=8972.7 put_us=3107.2 get_us=3456.1 signal_us=2864.1 iput_us=9255.1 ibput_us=3091.0
+alltoall team=even block=4096 exchanges=1 alltoall_us=901.4 alltoallmem_us=996.9 alltoalls_us=3474.7 put_us=897.1 get_us=1185.3 signal_us=639.6 iput_us=3367.3 ibput_us=894.0
+alltoall t=2.2 round=11 exchanges=176 exchanges_per_s=297 fill_s=0.001 exchange_s=0.052 check_s=0.001 step_s=0.054 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=28981.1 alltoallmem_us=33590.4 alltoalls_us=151359.7 put_us=43485.7 get_us=37706.2 signal_us=33080.1 iput_us=147280.7 ibput_us=33657.9
+alltoall team=even block=65536 exchanges=1 alltoall_us=9471.7 alltoallmem_us=9968.0 alltoalls_us=33859.0 put_us=9564.6 get_us=9907.6 signal_us=17151.0 iput_us=34903.7 ibput_us=9239.7
+alltoall t=2.8 round=12 exchanges=192 exchanges_per_s=24 fill_s=0.017 exchange_s=0.645 check_s=0.010 step_s=0.671 failures=0
+mailbox node_mate_us median=285.7 p99=285.7
+mailbox round_trip_us median=174.4 p99=205.4 pairs=8
+mailbox t=0.0 round=1 messages=64 messages_per_s=224475 mib_per_s=30.3 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=179.4 p99=179.4
+mailbox round_trip_us median=170.1 p99=205.8 pairs=8
+mailbox t=0.0 round=2 messages=128 messages_per_s=295361 mib_per_s=37.9 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=210.3 p99=210.3
+mailbox round_trip_us median=170.1 p99=189.9 pairs=8
+mailbox t=0.1 round=3 messages=192 messages_per_s=293554 mib_per_s=37.1 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=233.5 p99=233.5
+mailbox round_trip_us median=173.1 p99=201.8 pairs=8
+mailbox t=0.1 round=4 messages=256 messages_per_s=258916 mib_per_s=32.3 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=237.5 p99=238.1
+mailbox round_trip_us median=173.3 p99=199.2 pairs=8
+mailbox t=0.1 round=5 messages=320 messages_per_s=242850 mib_per_s=31.8 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=227.1 p99=227.1
+mailbox round_trip_us median=170.0 p99=206.1 pairs=8
+mailbox t=0.1 round=6 messages=384 messages_per_s=246506 mib_per_s=33.2 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=220.1 p99=220.1
+mailbox round_trip_us median=174.0 p99=203.7 pairs=8
+mailbox t=0.2 round=7 messages=448 messages_per_s=290811 mib_per_s=40.1 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=3858.1 p99=3858.1
+mailbox round_trip_us median=172.8 p99=203.3 pairs=8
+mailbox t=0.2 round=8 messages=512 messages_per_s=16443 mib_per_s=2.2 send_s=0.004 wait_s=0.004 check_s=0.000 step_s=0.004 failures=0
+mailbox node_mate_us median=5505.5 p99=5505.5
+mailbox round_trip_us median=169.8 p99=206.7 pairs=8
+mailbox t=0.2 round=9 messages=576 messages_per_s=11584 mib_per_s=1.6 send_s=0.006 wait_s=0.005 check_s=0.000 step_s=0.006 failures=0
+mailbox node_mate_us median=247.9 p99=247.9
+mailbox round_trip_us median=173.7 p99=202.9 pairs=8
+mailbox t=0.2 round=10 messages=640 messages_per_s=255679 mib_per_s=32.5 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=184.7 p99=184.7
+mailbox round_trip_us median=169.4 p99=194.0 pairs=8
+mailbox t=0.3 round=11 messages=704 messages_per_s=281778 mib_per_s=36.3 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=3948.8 p99=3948.8
+mailbox round_trip_us median=169.6 p99=197.3 pairs=8
+mailbox t=0.3 round=12 messages=768 messages_per_s=15993 mib_per_s=2.0 send_s=0.004 wait_s=0.004 check_s=0.000 step_s=0.004 failures=0
+mailbox round_trip_us median=172.8 p99=197.8 pairs=8
+mailbox t=0.3 round=13 messages=832 messages_per_s=256418 mib_per_s=37.2 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=222.9 p99=222.9
+mailbox round_trip_us median=170.0 p99=203.1 pairs=8
+mailbox t=0.3 round=14 messages=896 messages_per_s=285832 mib_per_s=35.3 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=225.2 p99=225.2
+mailbox round_trip_us median=169.5 p99=207.7 pairs=8
+mailbox t=0.4 round=15 messages=960 messages_per_s=259071 mib_per_s=29.3 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=219.1 p99=219.8
+mailbox round_trip_us median=172.7 p99=207.8 pairs=8
+mailbox t=0.4 round=16 messages=1024 messages_per_s=277860 mib_per_s=34.8 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=237.9 p99=237.9
+mailbox round_trip_us median=173.5 p99=205.8 pairs=8
+mailbox t=0.4 round=17 messages=1088 messages_per_s=248099 mib_per_s=33.0 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=228.7 p99=228.7
+mailbox round_trip_us median=173.3 p99=208.5 pairs=8
+mailbox t=0.4 round=18 messages=1152 messages_per_s=275181 mib_per_s=37.0 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=229.0 p99=229.0
+mailbox round_trip_us median=174.6 p99=202.0 pairs=8
+mailbox t=0.4 round=19 messages=1216 messages_per_s=252135 mib_per_s=30.2 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox node_mate_us median=192.5 p99=192.5
+mailbox round_trip_us median=169.5 p99=204.7 pairs=8
+mailbox t=0.5 round=20 messages=1280 messages_per_s=255566 mib_per_s=32.1 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+teams t=0.0 round=1 collectives=43 collectives_per_s=34316 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=2 collectives=86 collectives_per_s=38021 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=3 collectives=129 collectives_per_s=35866 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=4 collectives=172 collectives_per_s=36795 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=5 collectives=215 collectives_per_s=31949 grid_s=0.000 strided_s=0.001 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=6 collectives=258 collectives_per_s=38716 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=7 collectives=301 collectives_per_s=39233 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=8 collectives=344 collectives_per_s=34934 grid_s=0.000 strided_s=0.001 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=9 collectives=387 collectives_per_s=40659 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=10 collectives=430 collectives_per_s=29000 grid_s=0.001 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=11 collectives=473 collectives_per_s=37350 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=12 collectives=516 collectives_per_s=30832 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=13 collectives=559 collectives_per_s=37629 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=14 collectives=602 collectives_per_s=40113 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+teams t=0.0 round=15 collectives=645 collectives_per_s=39690 grid_s=0.000 strided_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=290919 remote_per_s=833237
+atomics t=0.0 round=1 updates=1024 updates_per_s=1379128 issue_s=0.000 sync_s=0.001 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=216171 remote_per_s=606725
+atomics t=0.0 round=2 updates=2048 updates_per_s=1551652 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=182701 remote_per_s=620241
+atomics t=0.0 round=3 updates=3072 updates_per_s=1489338 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=210350 remote_per_s=605553
+atomics t=0.0 round=4 updates=4096 updates_per_s=1542257 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=208338 remote_per_s=625013
+atomics t=0.0 round=5 updates=5120 updates_per_s=1513523 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=210555 remote_per_s=612378
+atomics t=0.0 round=6 updates=6144 updates_per_s=1495674 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=216489 remote_per_s=610691
+atomics t=0.0 round=7 updates=7168 updates_per_s=1499145 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=206649 remote_per_s=601018
+atomics t=0.0 round=8 updates=8192 updates_per_s=1474812 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=196140 remote_per_s=623645
+atomics t=0.0 round=9 updates=9216 updates_per_s=1479412 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=194491 remote_per_s=649403
+atomics t=0.0 round=10 updates=10240 updates_per_s=1550557 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=228237 remote_per_s=627860
+atomics t=0.0 round=11 updates=11264 updates_per_s=1528796 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=205788 remote_per_s=627123
+atomics t=0.0 round=12 updates=12288 updates_per_s=1533655 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.001 failures=0
+atomics local_per_s=27872 remote_per_s=91050
+atomics t=0.0 round=13 updates=13312 updates_per_s=127202 issue_s=0.008 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=30641 remote_per_s=88210
+atomics t=0.0 round=14 updates=14336 updates_per_s=128058 issue_s=0.007 sync_s=0.003 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=31545 remote_per_s=92695
+atomics t=0.0 round=15 updates=15360 updates_per_s=133870 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=32127 remote_per_s=93437
+atomics t=0.0 round=16 updates=16384 updates_per_s=134537 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=28939 remote_per_s=88654
+atomics t=0.1 round=17 updates=17408 updates_per_s=126220 issue_s=0.008 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=32130 remote_per_s=92970
+atomics t=0.1 round=18 updates=18432 updates_per_s=134485 issue_s=0.007 sync_s=0.003 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=31431 remote_per_s=93319
+atomics t=0.1 round=19 updates=19456 updates_per_s=134704 issue_s=0.007 sync_s=0.001 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=30162 remote_per_s=90485
+atomics t=0.1 round=20 updates=20480 updates_per_s=129472 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=30103 remote_per_s=86660
+atomics t=0.1 round=21 updates=21504 updates_per_s=124835 issue_s=0.008 sync_s=0.003 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=31773 remote_per_s=91937
+atomics t=0.1 round=22 updates=22528 updates_per_s=132752 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=32304 remote_per_s=91127
+atomics t=0.1 round=23 updates=23552 updates_per_s=132265 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=30711 remote_per_s=93099
+atomics t=0.1 round=24 updates=24576 updates_per_s=132900 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=14902 remote_per_s=42138
+atomics t=0.1 round=25 updates=24909 updates_per_s=63334 issue_s=0.003 sync_s=0.002 check_s=0.002 step_s=0.005 failures=0
+atomics local_per_s=12998 remote_per_s=42362
+atomics t=0.1 round=26 updates=25254 updates_per_s=61194 issue_s=0.003 sync_s=0.002 check_s=0.002 step_s=0.006 failures=0
+atomics local_per_s=13223 remote_per_s=37679
+atomics t=0.1 round=27 updates=25612 updates_per_s=55242 issue_s=0.004 sync_s=0.003 check_s=0.002 step_s=0.006 failures=0
+atomics local_per_s=10378 remote_per_s=39381
+atomics t=0.1 round=28 updates=25962 updates_per_s=53860 issue_s=0.004 sync_s=0.003 check_s=0.002 step_s=0.006 failures=0
+atomics local_per_s=15807 remote_per_s=40016
+atomics t=0.1 round=29 updates=26354 updates_per_s=60497 issue_s=0.004 sync_s=0.003 check_s=0.002 step_s=0.006 failures=0
+atomics local_per_s=15072 remote_per_s=43560
+atomics t=0.2 round=30 updates=26708 updates_per_s=64841 issue_s=0.003 sync_s=0.002 check_s=0.002 step_s=0.005 failures=0
+atomics local_per_s=14868 remote_per_s=44942
+atomics t=0.2 round=31 updates=27062 updates_per_s=65902 issue_s=0.003 sync_s=0.002 check_s=0.002 step_s=0.005 failures=0
+atomics local_per_s=16102 remote_per_s=44023
+atomics t=0.2 round=32 updates=27413 updates_per_s=66425 issue_s=0.003 sync_s=0.002 check_s=0.002 step_s=0.005 failures=0
+atomics local_per_s=16521 remote_per_s=45605
+atomics t=0.2 round=33 updates=27774 updates_per_s=68696 issue_s=0.003 sync_s=0.002 check_s=0.002 step_s=0.005 failures=0
+atomics local_per_s=16673 remote_per_s=45595
+atomics t=0.2 round=34 updates=28140 updates_per_s=69407 issue_s=0.003 sync_s=0.002 check_s=0.002 step_s=0.005 failures=0
+atomics local_per_s=14973 remote_per_s=39105
+atomics t=0.2 round=35 updates=28512 updates_per_s=58738 issue_s=0.004 sync_s=0.003 check_s=0.002 step_s=0.006 failures=0
+atomics local_per_s=12309 remote_per_s=43872
+atomics t=0.2 round=36 updates=28868 updates_per_s=61569 issue_s=0.003 sync_s=0.002 check_s=0.002 step_s=0.006 failures=0
+atomics local_per_s=30575 remote_per_s=96180
+atomics t=0.2 round=37 updates=29892 updates_per_s=136909 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.007 failures=0
+atomics local_per_s=28479 remote_per_s=91532
+atomics t=0.2 round=38 updates=30916 updates_per_s=129161 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=34498 remote_per_s=98306
+atomics t=0.2 round=39 updates=31940 updates_per_s=143779 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.007 failures=0
+atomics local_per_s=31494 remote_per_s=100138
+atomics t=0.2 round=40 updates=32964 updates_per_s=142111 issue_s=0.007 sync_s=0.001 check_s=0.000 step_s=0.007 failures=0
+atomics local_per_s=29044 remote_per_s=92349
+atomics t=0.2 round=41 updates=33988 updates_per_s=130870 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=32132 remote_per_s=94418
+atomics t=0.2 round=42 updates=35012 updates_per_s=136239 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=34960 remote_per_s=97628
+atomics t=0.2 round=43 updates=36036 updates_per_s=143421 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.007 failures=0
+atomics local_per_s=30163 remote_per_s=91921
+atomics t=0.3 round=44 updates=37060 updates_per_s=131622 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=30613 remote_per_s=92318
+atomics t=0.3 round=45 updates=38084 updates_per_s=132215 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=28337 remote_per_s=100059
+atomics t=0.3 round=46 updates=39108 updates_per_s=138387 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.007 failures=0
+atomics local_per_s=29711 remote_per_s=96530
+atomics t=0.3 round=47 updates=40132 updates_per_s=136546 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.007 failures=0
+atomics local_per_s=32422 remote_per_s=91459
+atomics t=0.3 round=48 updates=41156 updates_per_s=133497 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=29906 remote_per_s=93082
+atomics t=0.3 round=49 updates=42180 updates_per_s=132349 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.008 failures=0
+atomics local_per_s=31698 remote_per_s=98659
+atomics t=0.3 round=50 updates=43204 updates_per_s=140735 issue_s=0.007 sync_s=0.002 check_s=0.000 step_s=0.007 failures=0
+atomics local_per_s=22156 remote_per_s=66468
+atomics t=0.3 round=51 updates=43460 updates_per_s=110226 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=21398 remote_per_s=64194
+atomics t=0.3 round=52 updates=43716 updates_per_s=105404 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=21635 remote_per_s=64906
+atomics t=0.3 round=53 updates=43972 updates_per_s=106973 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=20567 remote_per_s=61700
+atomics t=0.3 round=54 updates=44228 updates_per_s=99016 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.003 failures=0
+atomics local_per_s=21454 remote_per_s=64363
+atomics t=0.3 round=55 updates=44484 updates_per_s=106219 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=20713 remote_per_s=62140
+atomics t=0.3 round=56 updates=44740 updates_per_s=101192 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.003 failures=0
+atomics local_per_s=21310 remote_per_s=63931
+atomics t=0.3 round=57 updates=44996 updates_per_s=105377 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=21605 remote_per_s=64816
+atomics t=0.3 round=58 updates=45252 updates_per_s=106758 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=21436 remote_per_s=64308
+atomics t=0.3 round=59 updates=45508 updates_per_s=104863 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=21639 remote_per_s=64917
+atomics t=0.3 round=60 updates=45764 updates_per_s=106659 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=20203 remote_per_s=60610
+atomics t=0.3 round=61 updates=46020 updates_per_s=98562 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.003 failures=0
+atomics local_per_s=20821 remote_per_s=62464
+atomics t=0.3 round=62 updates=46276 updates_per_s=102202 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.003 failures=0
+atomics local_per_s=21466 remote_per_s=64398
+atomics t=0.3 round=63 updates=46532 updates_per_s=106008 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=21151 remote_per_s=63452
+atomics t=0.3 round=64 updates=46788 updates_per_s=104509 issue_s=0.000 sync_s=0.000 check_s=0.002 step_s=0.002 failures=0
+atomics local_per_s=54404 remote_per_s=172058
+atomics t=0.4 round=65 updates=49860 updates_per_s=235693 issue_s=0.011 sync_s=0.005 check_s=0.000 step_s=0.013 failures=0
+atomics local_per_s=54539 remote_per_s=165336
+atomics t=0.4 round=66 updates=52932 updates_per_s=229737 issue_s=0.012 sync_s=0.005 check_s=0.000 step_s=0.013 failures=0
+atomics local_per_s=55219 remote_per_s=171866
+atomics t=0.4 round=67 updates=56004 updates_per_s=237482 issue_s=0.011 sync_s=0.004 check_s=0.000 step_s=0.013 failures=0
+atomics local_per_s=61817 remote_per_s=177959
+atomics t=0.4 round=68 updates=59076 updates_per_s=251776 issue_s=0.011 sync_s=0.004 check_s=0.000 step_s=0.012 failures=0
+atomics local_per_s=59137 remote_per_s=178339
+atomics t=0.4 round=69 updates=62148 updates_per_s=248289 issue_s=0.011 sync_s=0.004 check_s=0.000 step_s=0.012 failures=0
+atomics local_per_s=61758 remote_per_s=178699
+atomics t=0.4 round=70 updates=65220 updates_per_s=252683 issue_s=0.011 sync_s=0.002 check_s=0.000 step_s=0.012 failures=0
+atomics local_per_s=60433 remote_per_s=182247
+atomics t=0.4 round=71 updates=68292 updates_per_s=255154 issue_s=0.011 sync_s=0.004 check_s=0.000 step_s=0.012 failures=0
+rma t=0.0 round=1 transfers=32 transfers_per_s=20556 mib_per_s=2.6 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.0 round=2 transfers=64 transfers_per_s=17307 mib_per_s=4.9 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.0 round=3 transfers=96 transfers_per_s=18912 mib_per_s=14.4 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.0 round=4 transfers=128 transfers_per_s=21102 mib_per_s=41.9 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.0 round=5 transfers=160 transfers_per_s=17790 mib_per_s=278.6 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.0 round=6 transfers=192 transfers_per_s=5319 mib_per_s=665.3 halo_s=0.004 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.0 round=7 transfers=224 transfers_per_s=1648 mib_per_s=824.1 halo_s=0.015 transfer_s=0.011 ptr_s=0.000 check_s=0.003 step_s=0.019 failures=0
+rma t=0.0 round=8 transfers=256 transfers_per_s=21318 mib_per_s=6.4 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.0 round=9 transfers=288 transfers_per_s=17302 mib_per_s=5.8 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.0 round=10 transfers=320 transfers_per_s=24477 mib_per_s=6.9 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.0 round=11 transfers=352 transfers_per_s=22069 mib_per_s=44.9 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.0 round=12 transfers=384 transfers_per_s=14536 mib_per_s=229.5 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.1 round=13 transfers=416 transfers_per_s=5433 mib_per_s=680.9 halo_s=0.004 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.1 round=14 transfers=448 transfers_per_s=1676 mib_per_s=838.3 halo_s=0.015 transfer_s=0.010 ptr_s=0.000 check_s=0.003 step_s=0.019 failures=0
+rma t=0.1 round=15 transfers=480 transfers_per_s=23496 mib_per_s=1.1 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.1 round=16 transfers=512 transfers_per_s=22420 mib_per_s=2.7 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.1 round=17 transfers=544 transfers_per_s=21626 mib_per_s=9.2 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.1 round=18 transfers=576 transfers_per_s=17168 mib_per_s=40.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.1 round=19 transfers=608 transfers_per_s=17118 mib_per_s=268.3 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.1 round=20 transfers=640 transfers_per_s=5647 mib_per_s=706.4 halo_s=0.004 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.1 round=21 transfers=672 transfers_per_s=1802 mib_per_s=901.3 halo_s=0.014 transfer_s=0.010 ptr_s=0.000 check_s=0.003 step_s=0.018 failures=0
+rma t=0.1 round=22 transfers=704 transfers_per_s=21442 mib_per_s=8.8 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.1 round=23 transfers=736 transfers_per_s=23275 mib_per_s=10.3 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.1 round=24 transfers=768 transfers_per_s=18817 mib_per_s=12.5 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.1 round=25 transfers=800 transfers_per_s=16787 mib_per_s=33.7 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.1 round=26 transfers=832 transfers_per_s=17192 mib_per_s=270.5 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.1 round=27 transfers=864 transfers_per_s=5322 mib_per_s=666.5 halo_s=0.004 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.1 round=28 transfers=896 transfers_per_s=1807 mib_per_s=904.2 halo_s=0.014 transfer_s=0.009 ptr_s=0.000 check_s=0.003 step_s=0.018 failures=0
+rma t=0.1 round=29 transfers=928 transfers_per_s=23740 mib_per_s=21.8 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.1 round=30 transfers=960 transfers_per_s=19805 mib_per_s=2.4 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.1 round=31 transfers=992 transfers_per_s=17053 mib_per_s=7.3 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.1 round=32 transfers=1024 transfers_per_s=19733 mib_per_s=45.8 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.2 round=33 transfers=1056 transfers_per_s=14641 mib_per_s=229.1 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.2 round=34 transfers=1088 transfers_per_s=5722 mib_per_s=715.4 halo_s=0.004 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.2 round=35 transfers=1120 transfers_per_s=1764 mib_per_s=882.1 halo_s=0.014 transfer_s=0.010 ptr_s=0.000 check_s=0.003 step_s=0.018 failures=0
+rma t=0.2 round=36 transfers=1152 transfers_per_s=22062 mib_per_s=2.1 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.2 round=37 transfers=1184 transfers_per_s=23562 mib_per_s=5.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.2 round=38 transfers=1216 transfers_per_s=17594 mib_per_s=7.5 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.2 round=39 transfers=1248 transfers_per_s=16518 mib_per_s=32.6 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.2 round=40 transfers=1280 transfers_per_s=17139 mib_per_s=268.6 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.2 round=41 transfers=1312 transfers_per_s=5708 mib_per_s=714.1 halo_s=0.004 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.2 round=42 transfers=1344 transfers_per_s=1767 mib_per_s=883.7 halo_s=0.014 transfer_s=0.010 ptr_s=0.000 check_s=0.004 step_s=0.018 failures=0
+rma t=0.2 round=43 transfers=1376 transfers_per_s=22825 mib_per_s=4.3 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.2 round=44 transfers=1408 transfers_per_s=18544 mib_per_s=1.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.2 round=45 transfers=1440 transfers_per_s=17658 mib_per_s=5.1 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.2 round=46 transfers=1472 transfers_per_s=19950 mib_per_s=40.8 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.2 round=47 transfers=1504 transfers_per_s=14335 mib_per_s=226.6 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.2 round=48 transfers=1536 transfers_per_s=5444 mib_per_s=680.6 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.2 round=49 transfers=1568 transfers_per_s=1816 mib_per_s=908.1 halo_s=0.014 transfer_s=0.009 ptr_s=0.000 check_s=0.003 step_s=0.018 failures=0
+rma t=0.2 round=50 transfers=1600 transfers_per_s=22934 mib_per_s=2.2 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.3 round=51 transfers=1632 transfers_per_s=17105 mib_per_s=3.7 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=52 transfers=1664 transfers_per_s=21020 mib_per_s=9.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=53 transfers=1696 transfers_per_s=17253 mib_per_s=36.9 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=54 transfers=1728 transfers_per_s=17227 mib_per_s=269.6 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=55 transfers=1760 transfers_per_s=5541 mib_per_s=692.8 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.3 round=56 transfers=1792 transfers_per_s=1859 mib_per_s=929.9 halo_s=0.013 transfer_s=0.009 ptr_s=0.000 check_s=0.003 step_s=0.017 failures=0
+rma t=0.3 round=57 transfers=1824 transfers_per_s=20492 mib_per_s=3.8 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=58 transfers=1856 transfers_per_s=20670 mib_per_s=8.2 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=59 transfers=1888 transfers_per_s=17749 mib_per_s=5.6 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=60 transfers=1920 transfers_per_s=18420 mib_per_s=39.3 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=61 transfers=1952 transfers_per_s=14864 mib_per_s=233.6 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=62 transfers=1984 transfers_per_s=5492 mib_per_s=686.6 halo_s=0.004 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.3 round=63 transfers=2016 transfers_per_s=1818 mib_per_s=908.8 halo_s=0.014 transfer_s=0.009 ptr_s=0.000 check_s=0.003 step_s=0.018 failures=0
+rma t=0.3 round=64 transfers=2048 transfers_per_s=23512 mib_per_s=1.2 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.3 round=65 transfers=2080 transfers_per_s=24304 mib_per_s=1.3 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.3 round=66 transfers=2112 transfers_per_s=23718 mib_per_s=8.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.3 round=67 transfers=2144 transfers_per_s=17221 mib_per_s=36.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=68 transfers=2176 transfers_per_s=15013 mib_per_s=234.9 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.3 round=69 transfers=2208 transfers_per_s=6045 mib_per_s=755.7 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.005 failures=0
+rma t=0.3 round=70 transfers=2240 transfers_per_s=1940 mib_per_s=970.1 halo_s=0.013 transfer_s=0.008 ptr_s=0.000 check_s=0.003 step_s=0.016 failures=0
+rma t=0.4 round=71 transfers=2272 transfers_per_s=22324 mib_per_s=3.2 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.4 round=72 transfers=2304 transfers_per_s=24146 mib_per_s=5.2 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.4 round=73 transfers=2336 transfers_per_s=18887 mib_per_s=4.7 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.4 round=74 transfers=2368 transfers_per_s=22137 mib_per_s=43.7 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.4 round=75 transfers=2400 transfers_per_s=14483 mib_per_s=227.3 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.4 round=76 transfers=2432 transfers_per_s=5968 mib_per_s=747.1 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.005 failures=0
+rma t=0.4 round=77 transfers=2464 transfers_per_s=1848 mib_per_s=923.9 halo_s=0.013 transfer_s=0.009 ptr_s=0.000 check_s=0.003 step_s=0.017 failures=0
+rma t=0.4 round=78 transfers=2496 transfers_per_s=23267 mib_per_s=0.6 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.4 round=79 transfers=2528 transfers_per_s=19452 mib_per_s=1.9 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.4 round=80 transfers=2560 transfers_per_s=18797 mib_per_s=8.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.4 round=81 transfers=2592 transfers_per_s=21042 mib_per_s=42.1 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.4 round=82 transfers=2624 transfers_per_s=14888 mib_per_s=234.0 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.4 round=83 transfers=2656 transfers_per_s=6075 mib_per_s=759.5 halo_s=0.003 transfer_s=0.001 ptr_s=0.000 check_s=0.001 step_s=0.005 failures=0
+rma t=0.4 round=84 transfers=2688 transfers_per_s=1869 mib_per_s=934.3 halo_s=0.013 transfer_s=0.008 ptr_s=0.000 check_s=0.003 step_s=0.017 failures=0
+rma t=0.4 round=85 transfers=2720 transfers_per_s=23579 mib_per_s=0.6 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.4 round=86 transfers=2752 transfers_per_s=24116 mib_per_s=2.9 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.4 round=87 transfers=2784 transfers_per_s=23995 mib_per_s=12.4 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.4 round=88 transfers=2816 transfers_per_s=17249 mib_per_s=37.3 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.4 round=89 transfers=2848 transfers_per_s=14594 mib_per_s=234.3 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.4 round=90 transfers=2880 transfers_per_s=5817 mib_per_s=732.2 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.4 round=91 transfers=2912 transfers_per_s=1852 mib_per_s=926.3 halo_s=0.013 transfer_s=0.009 ptr_s=0.000 check_s=0.003 step_s=0.017 failures=0
+rma t=0.5 round=92 transfers=2944 transfers_per_s=24043 mib_per_s=1.4 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.5 round=93 transfers=2976 transfers_per_s=24497 mib_per_s=3.6 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.5 round=94 transfers=3008 transfers_per_s=18843 mib_per_s=9.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.5 round=95 transfers=3040 transfers_per_s=18206 mib_per_s=44.2 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.5 round=96 transfers=3072 transfers_per_s=14506 mib_per_s=233.6 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.5 round=97 transfers=3104 transfers_per_s=5543 mib_per_s=693.3 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.5 round=98 transfers=3136 transfers_per_s=1824 mib_per_s=912.3 halo_s=0.014 transfer_s=0.010 ptr_s=0.000 check_s=0.004 step_s=0.018 failures=0
+rma t=0.5 round=99 transfers=3168 transfers_per_s=23604 mib_per_s=6.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.5 round=100 transfers=3200 transfers_per_s=18086 mib_per_s=9.8 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.5 round=101 transfers=3232 transfers_per_s=23323 mib_per_s=17.8 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.5 round=102 transfers=3264 transfers_per_s=18362 mib_per_s=37.1 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.5 round=103 transfers=3296 transfers_per_s=16086 mib_per_s=253.5 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.5 round=104 transfers=3328 transfers_per_s=5307 mib_per_s=664.9 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.5 round=105 transfers=3360 transfers_per_s=1926 mib_per_s=963.9 halo_s=0.013 transfer_s=0.009 ptr_s=0.000 check_s=0.003 step_s=0.017 failures=0
+rma t=0.5 round=106 transfers=3392 transfers_per_s=23484 mib_per_s=1.7 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.5 round=107 transfers=3424 transfers_per_s=23929 mib_per_s=4.1 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.5 round=108 transfers=3456 transfers_per_s=22711 mib_per_s=12.0 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.5 round=109 transfers=3488 transfers_per_s=20956 mib_per_s=53.1 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.5 round=110 transfers=3520 transfers_per_s=15324 mib_per_s=248.4 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.5 round=111 transfers=3552 transfers_per_s=5562 mib_per_s=698.5 halo_s=0.003 transfer_s=0.001 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.6 round=112 transfers=3584 transfers_per_s=1830 mib_per_s=915.4 halo_s=0.014 transfer_s=0.008 ptr_s=0.000 check_s=0.003 step_s=0.017 failures=0
+rma t=0.6 round=113 transfers=3616 transfers_per_s=23615 mib_per_s=3.7 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.6 round=114 transfers=3648 transfers_per_s=24195 mib_per_s=8.2 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.6 round=115 transfers=3680 transfers_per_s=23674 mib_per_s=20.6 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+rma t=0.6 round=116 transfers=3712 transfers_per_s=18543 mib_per_s=59.7 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.6 round=117 transfers=3744 transfers_per_s=10269 mib_per_s=160.8 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.003 failures=0
+rma t=0.6 round=118 transfers=3776 transfers_per_s=4970 mib_per_s=621.5 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.6 round=119 transfers=3808 transfers_per_s=1719 mib_per_s=859.5 halo_s=0.014 transfer_s=0.009 ptr_s=0.000 check_s=0.003 step_s=0.019 failures=0
+rma t=0.6 round=120 transfers=3840 transfers_per_s=13273 mib_per_s=0.2 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.6 round=121 transfers=3872 transfers_per_s=13397 mib_per_s=0.5 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.6 round=122 transfers=3904 transfers_per_s=12851 mib_per_s=3.3 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.6 round=123 transfers=3936 transfers_per_s=12804 mib_per_s=25.4 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.6 round=124 transfers=3968 transfers_per_s=10171 mib_per_s=159.5 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.003 failures=0
+rma t=0.6 round=125 transfers=4000 transfers_per_s=4837 mib_per_s=604.9 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.007 failures=0
+rma t=0.6 round=126 transfers=4032 transfers_per_s=1774 mib_per_s=886.8 halo_s=0.013 transfer_s=0.009 ptr_s=0.000 check_s=0.003 step_s=0.018 failures=0
+rma t=0.6 round=127 transfers=4064 transfers_per_s=13136 mib_per_s=0.3 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.6 round=128 transfers=4096 transfers_per_s=13169 mib_per_s=0.8 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.6 round=129 transfers=4128 transfers_per_s=11709 mib_per_s=3.6 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.003 failures=0
+rma t=0.6 round=130 transfers=4160 transfers_per_s=12254 mib_per_s=24.7 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.003 failures=0
+rma t=0.6 round=131 transfers=4192 transfers_per_s=10152 mib_per_s=158.7 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.003 failures=0
+rma t=0.7 round=132 transfers=4224 transfers_per_s=4931 mib_per_s=616.5 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.006 failures=0
+rma t=0.7 round=133 transfers=4256 transfers_per_s=1881 mib_per_s=940.6 halo_s=0.012 transfer_s=0.008 ptr_s=0.000 check_s=0.003 step_s=0.017 failures=0
+rma t=0.7 round=134 transfers=4288 transfers_per_s=11814 mib_per_s=0.8 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.003 failures=0
+rma t=0.7 round=135 transfers=4320 transfers_per_s=13608 mib_per_s=0.5 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.002 failures=0
+rma t=0.7 round=136 transfers=4352 transfers_per_s=12758 mib_per_s=3.3 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.003 failures=0
+rma t=0.7 round=137 transfers=4384 transfers_per_s=11513 mib_per_s=22.8 halo_s=0.000 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.003 failures=0
+rma t=0.7 round=138 transfers=4416 transfers_per_s=10639 mib_per_s=166.9 halo_s=0.001 transfer_s=0.001 ptr_s=0.000 check_s=0.000 step_s=0.003 failures=0
+rma t=0.7 round=139 transfers=4448 transfers_per_s=4853 mib_per_s=606.9 halo_s=0.003 transfer_s=0.002 ptr_s=0.000 check_s=0.001 step_s=0.007 failures=0
+rma t=0.7 round=140 transfers=4480 transfers_per_s=1810 mib_per_s=905.3 halo_s=0.012 transfer_s=0.008 ptr_s=0.000 check_s=0.003 step_s=0.018 failures=0
+locks longest_wait_us=11451.0
+locks t=0.0 round=1 acquisitions=64 acquisitions_per_s=4228 wait_s=0.012 held_s=0.012 step_s=0.015 failures=0
+locks longest_wait_us=7722.1
+locks t=0.0 round=2 acquisitions=128 acquisitions_per_s=5951 wait_s=0.009 held_s=0.008 step_s=0.011 failures=0
+locks longest_wait_us=8265.7
+locks t=0.0 round=3 acquisitions=192 acquisitions_per_s=6111 wait_s=0.009 held_s=0.007 step_s=0.010 failures=0
+locks longest_wait_us=14400.4
+locks t=0.1 round=4 acquisitions=256 acquisitions_per_s=3691 wait_s=0.015 held_s=0.012 step_s=0.017 failures=0
+locks longest_wait_us=9004.6
+locks t=0.1 round=5 acquisitions=320 acquisitions_per_s=5428 wait_s=0.009 held_s=0.005 step_s=0.012 failures=0
+locks longest_wait_us=8806.8
+locks t=0.1 round=6 acquisitions=384 acquisitions_per_s=5581 wait_s=0.010 held_s=0.007 step_s=0.011 failures=0
+locks longest_wait_us=7613.9
+locks t=0.1 round=7 acquisitions=448 acquisitions_per_s=7038 wait_s=0.008 held_s=0.006 step_s=0.009 failures=0
+locks longest_wait_us=9737.9
+locks t=0.1 round=8 acquisitions=512 acquisitions_per_s=5485 wait_s=0.010 held_s=0.007 step_s=0.012 failures=0
+locks longest_wait_us=5194.8
+locks t=0.1 round=9 acquisitions=576 acquisitions_per_s=8020 wait_s=0.006 held_s=0.002 step_s=0.008 failures=0
+locks longest_wait_us=7912.7
+locks t=0.1 round=10 acquisitions=640 acquisitions_per_s=6289 wait_s=0.009 held_s=0.007 step_s=0.010 failures=0
+locks longest_wait_us=5643.4
+locks t=0.1 round=11 acquisitions=704 acquisitions_per_s=7688 wait_s=0.006 held_s=0.002 step_s=0.008 failures=0
+locks longest_wait_us=4546.9
+locks t=0.1 round=12 acquisitions=768 acquisitions_per_s=9350 wait_s=0.005 held_s=0.002 step_s=0.007 failures=0
+locks longest_wait_us=6135.8
+locks t=0.1 round=13 acquisitions=832 acquisitions_per_s=7187 wait_s=0.007 held_s=0.005 step_s=0.009 failures=0
+locks longest_wait_us=8025.1
+locks t=0.2 round=14 acquisitions=896 acquisitions_per_s=4088 wait_s=0.013 held_s=0.011 step_s=0.016 failures=0
+locks longest_wait_us=13066.6
+locks t=0.2 round=15 acquisitions=960 acquisitions_per_s=3953 wait_s=0.014 held_s=0.007 step_s=0.016 failures=0
+locks longest_wait_us=5765.3
+locks t=0.2 round=16 acquisitions=1024 acquisitions_per_s=7059 wait_s=0.007 held_s=0.004 step_s=0.009 failures=0
+memory t=0.0 round=1 operations=272 operations_per_s=27142 mib_per_s=1427.6 allocate_s=0.007 fill_s=0.003 check_s=0.000 step_s=0.010 failures=0
+memory t=0.0 round=2 operations=528 operations_per_s=24691 mib_per_s=1461.3 allocate_s=0.007 fill_s=0.003 check_s=0.000 step_s=0.010 failures=0
+memory t=0.0 round=3 operations=784 operations_per_s=30193 mib_per_s=1124.1 allocate_s=0.006 fill_s=0.002 check_s=0.001 step_s=0.008 failures=0
+memory t=0.0 round=4 operations=1040 operations_per_s=31409 mib_per_s=1716.6 allocate_s=0.004 fill_s=0.003 check_s=0.001 step_s=0.008 failures=0
+memory t=0.1 round=5 operations=1296 operations_per_s=11488 mib_per_s=2612.5 allocate_s=0.009 fill_s=0.011 check_s=0.002 step_s=0.022 failures=0
+memory t=0.1 round=6 operations=1552 operations_per_s=28060 mib_per_s=79.4 allocate_s=0.004 fill_s=0.000 check_s=0.004 step_s=0.009 failures=0
+memory t=0.1 round=7 operations=1808 operations_per_s=12386 mib_per_s=1206.6 allocate_s=0.010 fill_s=0.005 check_s=0.006 step_s=0.021 failures=0
+memory t=0.1 round=8 operations=2064 operations_per_s=12950 mib_per_s=824.1 allocate_s=0.009 fill_s=0.003 check_s=0.008 step_s=0.020 failures=0
+memory t=0.1 round=9 operations=2320 operations_per_s=11323 mib_per_s=1784.7 allocate_s=0.009 fill_s=0.008 check_s=0.005 step_s=0.023 failures=0
+memory t=0.2 round=10 operations=2576 operations_per_s=12347 mib_per_s=109.6 allocate_s=0.008 fill_s=0.000 check_s=0.012 step_s=0.021 failures=0
+memory t=0.2 round=11 operations=2832 operations_per_s=14726 mib_per_s=2476.1 allocate_s=0.008 fill_s=0.008 check_s=0.001 step_s=0.017 failures=0
+memory t=0.2 round=12 operations=3088 operations_per_s=17830 mib_per_s=1402.4 allocate_s=0.008 fill_s=0.004 check_s=0.002 step_s=0.014 failures=0
+memory t=0.2 round=13 operations=3344 operations_per_s=11673 mib_per_s=2609.1 allocate_s=0.009 fill_s=0.011 check_s=0.002 step_s=0.022 failures=0
+memory t=0.2 round=14 operations=3600 operations_per_s=17357 mib_per_s=345.9 allocate_s=0.006 fill_s=0.001 check_s=0.007 step_s=0.015 failures=0
+memory t=0.2 round=15 operations=3856 operations_per_s=13067 mib_per_s=1650.2 allocate_s=0.009 fill_s=0.006 check_s=0.004 step_s=0.020 failures=0
+memory t=0.3 round=16 operations=4112 operations_per_s=29239 mib_per_s=650.4 allocate_s=0.005 fill_s=0.001 check_s=0.003 step_s=0.009 failures=0
+memory t=0.3 round=17 operations=4368 operations_per_s=14028 mib_per_s=58.0 allocate_s=0.007 fill_s=0.000 check_s=0.010 step_s=0.018 failures=0
+memory t=0.3 round=18 operations=4624 operations_per_s=20907 mib_per_s=217.5 allocate_s=0.007 fill_s=0.001 check_s=0.005 step_s=0.012 failures=0
+memory t=0.3 round=19 operations=4880 operations_per_s=25372 mib_per_s=2112.5 allocate_s=0.006 fill_s=0.004 check_s=0.000 step_s=0.010 failures=0
+memory t=0.3 round=20 operations=5136 operations_per_s=21728 mib_per_s=2788.9 allocate_s=0.005 fill_s=0.006 check_s=0.000 step_s=0.012 failures=0
+memory t=0.3 round=21 operations=5392 operations_per_s=15345 mib_per_s=2511.5 allocate_s=0.008 fill_s=0.008 check_s=0.001 step_s=0.017 failures=0
+memory t=0.3 round=22 operations=5648 operations_per_s=14957 mib_per_s=1444.4 allocate_s=0.010 fill_s=0.005 check_s=0.002 step_s=0.017 failures=0
+memory t=0.4 round=23 operations=5904 operations_per_s=11438 mib_per_s=404.1 allocate_s=0.012 fill_s=0.002 check_s=0.008 step_s=0.022 failures=0
+memory t=0.4 round=24 operations=6592 operations_per_s=19087 mib_per_s=181.3 allocate_s=0.019 fill_s=0.001 check_s=0.016 step_s=0.036 failures=0
+collectives t=0.0 round=1 calls=120 calls_per_s=37208 mib_per_s=3.0 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.0 round=2 calls=232 calls_per_s=35438 mib_per_s=0.2 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.0 round=3 calls=352 calls_per_s=28795 mib_per_s=2.3 typed_s=0.001 timed_s=0.003 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.0 round=4 calls=464 calls_per_s=34206 mib_per_s=3.0 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.0 round=5 calls=584 calls_per_s=28592 mib_per_s=2.3 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.0 round=6 calls=696 calls_per_s=30257 mib_per_s=2.6 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.0 round=7 calls=816 calls_per_s=37129 mib_per_s=24.2 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.0 round=8 calls=928 calls_per_s=37763 mib_per_s=1.6 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.0 round=9 calls=1048 calls_per_s=26496 mib_per_s=17.2 typed_s=0.001 timed_s=0.003 check_s=0.000 step_s=0.005 failures=0
+collectives t=0.0 round=10 calls=1160 calls_per_s=31075 mib_per_s=21.7 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.0 round=11 calls=1280 calls_per_s=27654 mib_per_s=18.0 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.0 round=12 calls=1392 calls_per_s=29903 mib_per_s=20.9 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.1 round=13 calls=1512 calls_per_s=36406 mib_per_s=189.6 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.1 round=14 calls=1624 calls_per_s=35785 mib_per_s=12.5 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.1 round=15 calls=1744 calls_per_s=16222 mib_per_s=84.5 typed_s=0.001 timed_s=0.005 check_s=0.001 step_s=0.007 failures=0
+collectives t=0.1 round=16 calls=1856 calls_per_s=17425 mib_per_s=97.2 typed_s=0.001 timed_s=0.004 check_s=0.001 step_s=0.006 failures=0
+collectives t=0.1 round=17 calls=1976 calls_per_s=14565 mib_per_s=75.9 typed_s=0.001 timed_s=0.004 check_s=0.001 step_s=0.008 failures=0
+collectives t=0.1 round=18 calls=2088 calls_per_s=25650 mib_per_s=143.1 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.1 round=19 calls=2208 calls_per_s=28480 mib_per_s=1186.7 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.1 round=20 calls=2320 calls_per_s=22100 mib_per_s=61.7 typed_s=0.001 timed_s=0.002 check_s=0.001 step_s=0.005 failures=0
+collectives t=0.1 round=21 calls=2440 calls_per_s=6629 mib_per_s=276.2 typed_s=0.001 timed_s=0.005 check_s=0.011 step_s=0.018 failures=0
+collectives t=0.1 round=22 calls=2552 calls_per_s=6393 mib_per_s=285.4 typed_s=0.001 timed_s=0.005 check_s=0.011 step_s=0.018 failures=0
+collectives t=0.2 round=23 calls=2672 calls_per_s=2922 mib_per_s=121.8 typed_s=0.001 timed_s=0.026 check_s=0.011 step_s=0.041 failures=0
+collectives t=0.2 round=24 calls=2784 calls_per_s=20647 mib_per_s=921.7 typed_s=0.001 timed_s=0.003 check_s=0.000 step_s=0.005 failures=0
+collectives t=0.2 round=25 calls=2904 calls_per_s=8608 mib_per_s=2869.5 typed_s=0.001 timed_s=0.010 check_s=0.001 step_s=0.014 failures=0
+collectives t=0.2 round=26 calls=3016 calls_per_s=5572 mib_per_s=124.4 typed_s=0.002 timed_s=0.010 check_s=0.005 step_s=0.020 failures=0
+collectives t=0.3 round=27 calls=3136 calls_per_s=1075 mib_per_s=358.4 typed_s=0.001 timed_s=0.025 check_s=0.083 step_s=0.112 failures=0
+collectives t=0.4 round=28 calls=3248 calls_per_s=1012 mib_per_s=361.4 typed_s=0.002 timed_s=0.023 check_s=0.083 step_s=0.111 failures=0
+collectives t=0.6 round=29 calls=3368 calls_per_s=590 mib_per_s=196.7 typed_s=0.001 timed_s=0.096 check_s=0.084 step_s=0.203 failures=0
+collectives t=0.7 round=30 calls=3480 calls_per_s=4564 mib_per_s=1630.0 typed_s=0.001 timed_s=0.022 check_s=0.001 step_s=0.025 failures=0
+collectives t=0.7 round=31 calls=3520 calls_per_s=26383 typed_s=0.001 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=32 calls=3552 calls_per_s=20840 typed_s=0.001 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=33 calls=3592 calls_per_s=23632 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=34 calls=3624 calls_per_s=18815 typed_s=0.001 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=35 calls=3664 calls_per_s=26372 typed_s=0.001 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=36 calls=3696 calls_per_s=21116 typed_s=0.001 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=37 calls=3736 calls_per_s=23602 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=38 calls=3768 calls_per_s=18561 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=39 calls=3808 calls_per_s=26354 typed_s=0.001 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=40 calls=3840 calls_per_s=21288 typed_s=0.001 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=41 calls=3880 calls_per_s=23708 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=42 calls=3912 calls_per_s=18828 typed_s=0.001 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=0.7 round=43 calls=3992 calls_per_s=23646 mib_per_s=0.7 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.7 round=44 calls=4064 calls_per_s=23772 mib_per_s=0.1 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.7 round=45 calls=4144 calls_per_s=17319 mib_per_s=0.5 typed_s=0.002 timed_s=0.003 check_s=0.000 step_s=0.005 failures=0
+collectives t=0.7 round=46 calls=4216 calls_per_s=20174 mib_per_s=0.7 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.7 round=47 calls=4296 calls_per_s=20239 mib_per_s=0.6 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.7 round=48 calls=4368 calls_per_s=17096 mib_per_s=0.6 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.7 round=49 calls=4448 calls_per_s=22501 mib_per_s=5.5 typed_s=0.002 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.7 round=50 calls=4520 calls_per_s=20274 mib_per_s=0.7 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.7 round=51 calls=4600 calls_per_s=18460 mib_per_s=4.5 typed_s=0.001 timed_s=0.003 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.7 round=52 calls=4672 calls_per_s=21272 mib_per_s=5.8 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.7 round=53 calls=4752 calls_per_s=17708 mib_per_s=4.3 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.005 failures=0
+collectives t=0.7 round=54 calls=4824 calls_per_s=16262 mib_per_s=4.4 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.7 round=55 calls=4904 calls_per_s=22850 mib_per_s=44.6 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.7 round=56 calls=4976 calls_per_s=22341 mib_per_s=6.1 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=0.8 round=57 calls=5056 calls_per_s=12599 mib_per_s=24.6 typed_s=0.001 timed_s=0.004 check_s=0.001 step_s=0.006 failures=0
+collectives t=0.8 round=58 calls=5128 calls_per_s=13790 mib_per_s=29.9 typed_s=0.002 timed_s=0.002 check_s=0.001 step_s=0.005 failures=0
+collectives t=0.8 round=59 calls=5208 calls_per_s=13551 mib_per_s=26.5 typed_s=0.001 timed_s=0.003 check_s=0.001 step_s=0.006 failures=0
+collectives t=0.8 round=60 calls=5280 calls_per_s=16333 mib_per_s=35.4 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=0.8 round=61 calls=5360 calls_per_s=17295 mib_per_s=270.2 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.005 failures=0
+collectives t=0.8 round=62 calls=5432 calls_per_s=13256 mib_per_s=28.8 typed_s=0.002 timed_s=0.002 check_s=0.001 step_s=0.005 failures=0
+collectives t=0.8 round=63 calls=5512 calls_per_s=7325 mib_per_s=114.5 typed_s=0.001 timed_s=0.004 check_s=0.005 step_s=0.011 failures=0
+collectives t=0.8 round=64 calls=5584 calls_per_s=7148 mib_per_s=124.1 typed_s=0.001 timed_s=0.003 check_s=0.005 step_s=0.010 failures=0
+collectives t=0.8 round=65 calls=5664 calls_per_s=3175 mib_per_s=49.6 typed_s=0.003 timed_s=0.015 check_s=0.005 step_s=0.025 failures=0
+collectives t=0.8 round=66 calls=5736 calls_per_s=12500 mib_per_s=217.5 typed_s=0.002 timed_s=0.003 check_s=0.000 step_s=0.006 failures=0
+collectives t=0.8 round=67 calls=5816 calls_per_s=7387 mib_per_s=924.1 typed_s=0.002 timed_s=0.007 check_s=0.001 step_s=0.011 failures=0
+collectives t=0.9 round=68 calls=5888 calls_per_s=3559 mib_per_s=62.5 typed_s=0.003 timed_s=0.010 check_s=0.005 step_s=0.020 failures=0
+collectives t=0.9 round=69 calls=5968 calls_per_s=1356 mib_per_s=169.9 typed_s=0.003 timed_s=0.012 check_s=0.042 step_s=0.059 failures=0
+collectives t=1.0 round=70 calls=6040 calls_per_s=1232 mib_per_s=171.7 typed_s=0.003 timed_s=0.011 check_s=0.042 step_s=0.058 failures=0
+collectives t=1.1 round=71 calls=6120 calls_per_s=814 mib_per_s=101.7 typed_s=0.006 timed_s=0.041 check_s=0.042 step_s=0.098 failures=0
+collectives t=1.1 round=72 calls=6192 calls_per_s=2915 mib_per_s=405.0 typed_s=0.002 timed_s=0.022 check_s=0.001 step_s=0.025 failures=0
+collectives t=1.1 round=73 calls=6232 calls_per_s=24066 mib_per_s=0.3 typed_s=0.001 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=74 calls=6264 calls_per_s=19974 mib_per_s=0.8 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=75 calls=6304 calls_per_s=22392 mib_per_s=1.5 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=76 calls=6336 calls_per_s=17002 mib_per_s=2.8 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=77 calls=6376 calls_per_s=18140 mib_per_s=6.3 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=78 calls=6408 calls_per_s=14357 mib_per_s=10.5 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=79 calls=6448 calls_per_s=22515 mib_per_s=8.7 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=80 calls=6480 calls_per_s=14891 mib_per_s=16.3 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=81 calls=6520 calls_per_s=22840 mib_per_s=0.5 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=82 calls=6552 calls_per_s=18261 mib_per_s=0.2 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=83 calls=6592 calls_per_s=23009 mib_per_s=2.7 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=84 calls=6624 calls_per_s=18892 mib_per_s=1.8 typed_s=0.002 timed_s=0.000 check_s=0.000 step_s=0.002 failures=0
+collectives t=1.1 round=85 calls=6744 calls_per_s=32547 mib_per_s=1.8 typed_s=0.002 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.1 round=86 calls=6816 calls_per_s=18618 mib_per_s=4.1 typed_s=0.002 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.1 round=87 calls=6936 calls_per_s=29533 mib_per_s=11.1 typed_s=0.002 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=88 calls=7048 calls_per_s=27405 mib_per_s=8.1 typed_s=0.002 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=89 calls=7168 calls_per_s=38904 mib_per_s=0.3 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=1.2 round=90 calls=7280 calls_per_s=24049 mib_per_s=2.4 typed_s=0.002 timed_s=0.003 check_s=0.000 step_s=0.005 failures=0
+collectives t=1.2 round=91 calls=7400 calls_per_s=32507 mib_per_s=3.4 typed_s=0.002 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=92 calls=7512 calls_per_s=25078 mib_per_s=2.6 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=93 calls=7632 calls_per_s=27299 mib_per_s=6.9 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=94 calls=7744 calls_per_s=28866 mib_per_s=22.0 typed_s=0.002 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=95 calls=7864 calls_per_s=34483 mib_per_s=7.3 typed_s=0.002 timed_s=0.001 check_s=0.000 step_s=0.003 failures=0
+collectives t=1.2 round=96 calls=7976 calls_per_s=21515 mib_per_s=15.5 typed_s=0.002 timed_s=0.003 check_s=0.000 step_s=0.005 failures=0
+collectives t=1.2 round=97 calls=8096 calls_per_s=30316 mib_per_s=20.0 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=98 calls=8208 calls_per_s=22997 mib_per_s=16.4 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.005 failures=0
+collectives t=1.2 round=99 calls=8328 calls_per_s=28253 mib_per_s=19.2 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=100 calls=8440 calls_per_s=29284 mib_per_s=164.8 typed_s=0.002 timed_s=0.001 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=101 calls=8560 calls_per_s=29377 mib_per_s=13.5 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.004 failures=0
+collectives t=1.2 round=102 calls=8672 calls_per_s=14050 mib_per_s=79.7 typed_s=0.002 timed_s=0.004 check_s=0.001 step_s=0.008 failures=0
+collectives t=1.2 round=103 calls=8792 calls_per_s=16490 mib_per_s=90.1 typed_s=0.002 timed_s=0.003 check_s=0.001 step_s=0.007 failures=0
+collectives t=1.2 round=104 calls=8904 calls_per_s=12537 mib_per_s=70.9 typed_s=0.002 timed_s=0.004 check_s=0.001 step_s=0.009 failures=0
+collectives t=1.2 round=105 calls=9024 calls_per_s=24953 mib_per_s=130.6 typed_s=0.002 timed_s=0.002 check_s=0.000 step_s=0.005 failures=0
+summary sort rounds=3 keys=3145728 seconds=0.2 keys_per_s=15771357 mib_per_s=120.3 imbalance=1.004 failures=0
+summary alltoall rounds=12 exchanges=192 seconds=2.8 exchanges_per_s=68 failures=0
+summary alltoall team=world block=8 exchanges=4 alltoall_us=376.6 alltoallmem_us=387.8 alltoalls_us=374.6 put_us=354.4 get_us=527.2 signal_us=303.7 iput_us=395.6 ibput_us=367.5
+summary alltoall team=world block=4096 exchanges=4 alltoall_us=2940.6 alltoallmem_us=3158.8 alltoalls_us=9283.5 put_us=3107.2 get_us=3456.1 signal_us=2870.5 iput_us=8924.2 ibput_us=3091.0
+summary alltoall team=world block=65536 exchanges=4 alltoall_us=32087.7 alltoallmem_us=33752.5 alltoalls_us=151022.4 put_us=36230.8 get_us=35772.8 signal_us=31271.5 iput_us=145323.9 ibput_us=32944.0
+summary alltoall team=even block=8 exchanges=4 alltoall_us=353.4 alltoallmem_us=352.3 alltoalls_us=352.0 put_us=360.6 get_us=409.0 signal_us=204.6 iput_us=339.3 ibput_us=343.3
+summary alltoall team=even block=4096 exchanges=4 alltoall_us=923.9 alltoallmem_us=952.8 alltoalls_us=3023.0 put_us=909.2 get_us=1175.1 signal_us=640.9 iput_us=3301.3 ibput_us=894.0
+summary alltoall team=even block=65536 exchanges=4 alltoall_us=9471.7 alltoallmem_us=9968.0 alltoalls_us=34452.4 put_us=9162.6 get_us=9354.1 signal_us=8551.1 iput_us=35011.8 ibput_us=8879.9
+summary mailbox rounds=20 messages=1280 seconds=0.0 messages_per_s=72925 mib_per_s=9.5 failures=0
+summary teams rounds=15 collectives=645 seconds=0.0 collectives_per_s=35994 failures=0
+summary atomics rounds=71 updates=68292 seconds=0.4 updates_per_s=171181 failures=0
+summary rma rounds=140 transfers=4480 seconds=0.7 transfers_per_s=6862 mib_per_s=631.4 failures=0
+summary locks rounds=16 acquisitions=1024 seconds=0.2 acquisitions_per_s=5662 failures=0
+summary memory rounds=24 operations=6592 seconds=0.4 operations_per_s=16749 mib_per_s=1268.9 failures=0
+summary collectives rounds=105 calls=9024 seconds=1.2 calls_per_s=7511 mib_per_s=244.7 failures=0
+summary collectives team=world bytes=8 median reduce_us=201.7 broadcast_us=281.0 collect_us=528.8 fcollect_us=293.7 alltoall_us=385.5 scan_us=341.8
+summary collectives team=world bytes=8 fastest reduce_us=170.1 broadcast_us=130.1 collect_us=302.7 fcollect_us=105.8 alltoall_us=214.3 scan_us=231.3
+summary collectives team=world bytes=64 median reduce_us=205.2 broadcast_us=290.2 collect_us=581.6 fcollect_us=360.4 alltoall_us=424.1 scan_us=340.8
+summary collectives team=world bytes=64 fastest reduce_us=159.7 broadcast_us=26.4 collect_us=316.2 fcollect_us=106.9 alltoall_us=298.1 scan_us=246.6
+summary collectives team=world bytes=512 median reduce_us=218.2 broadcast_us=315.7 collect_us=926.7 fcollect_us=726.8 alltoall_us=883.4 scan_us=430.2
+summary collectives team=world bytes=512 fastest reduce_us=189.2 broadcast_us=26.9 collect_us=425.0 fcollect_us=217.1 alltoall_us=481.5 scan_us=261.9
+summary collectives team=world bytes=4096 median reduce_us=422.5 broadcast_us=431.1 collect_us=1070.7 fcollect_us=921.1 alltoall_us=4882.4 scan_us=637.1
+summary collectives team=world bytes=4096 fastest reduce_us=255.1 broadcast_us=160.9 collect_us=795.9 fcollect_us=598.6 alltoall_us=2240.6 scan_us=375.6
+summary collectives team=world bytes=32768 median reduce_us=2090.0 broadcast_us=2148.0 collect_us=4945.0 fcollect_us=4551.1 alltoall_us=18995.3 scan_us=4339.9
+summary collectives team=world bytes=32768 fastest reduce_us=1614.8 broadcast_us=811.4 collect_us=4480.5 fcollect_us=4253.2 alltoall_us=13381.5 scan_us=3956.5
+summary collectives team=even bytes=8 median reduce_us=200.0 broadcast_us=270.0 collect_us=544.9 fcollect_us=313.8 alltoall_us=328.7 scan_us=390.1
+summary collectives team=even bytes=8 fastest reduce_us=166.6 broadcast_us=68.9 collect_us=276.2 fcollect_us=111.4 alltoall_us=259.9 scan_us=244.0
+summary collectives team=even bytes=64 median reduce_us=200.4 broadcast_us=198.9 collect_us=538.4 fcollect_us=326.5 alltoall_us=373.1 scan_us=393.4
+summary collectives team=even bytes=64 fastest reduce_us=167.2 broadcast_us=168.2 collect_us=292.7 fcollect_us=127.6 alltoall_us=286.2 scan_us=244.8
+summary collectives team=even bytes=512 median reduce_us=227.0 broadcast_us=198.4 collect_us=750.5 fcollect_us=530.9 alltoall_us=502.7 scan_us=433.4
+summary collectives team=even bytes=512 fastest reduce_us=177.4 broadcast_us=28.0 collect_us=388.0 fcollect_us=147.9 alltoall_us=308.9 scan_us=259.8
+summary collectives team=even bytes=4096 median reduce_us=407.6 broadcast_us=437.1 collect_us=735.1 fcollect_us=552.1 alltoall_us=3048.3 scan_us=601.4
+summary collectives team=even bytes=4096 fastest reduce_us=251.6 broadcast_us=46.6 collect_us=561.4 fcollect_us=363.9 alltoall_us=686.9 scan_us=371.3
+summary collectives team=even bytes=32768 median reduce_us=1488.3 broadcast_us=1923.8 collect_us=2393.2 fcollect_us=2161.3 alltoall_us=7435.3 scan_us=4349.6
+summary collectives team=even bytes=32768 fastest reduce_us=1211.1 broadcast_us=605.5 collect_us=2174.5 fcollect_us=1948.4 alltoall_us=3846.0 scan_us=3977.9
+summary collectives sync_us=179.9 even_sync_us=178.5 barrier_all_us=180.0
+osoe-pacer failures=0 seconds=6.6

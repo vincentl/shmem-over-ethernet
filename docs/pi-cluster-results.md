@@ -382,3 +382,41 @@ step, a PE's workers spent 6.6 to 6.7 thread-seconds on the default and team
 contexts - the shared ones - and 4.3 on the private and serialized, for the
 same work: half again as much, which the record leaves to the project
 review.
+
+## The pacer's third phase (2026-09-27)
+
+`task-stress-phase3`, 4 × 4, the runbook's §6 run by `pi-runs-phase3.sh` and
+`pi-coverage-phase3b.sh` under `nohup`, about an hour of cluster time.
+`atomics`, `rma`, `locks`, `memory` and `collectives` ran ten minutes each in
+`release` at `23f0667`, which differs from the merged tree by names and by
+`rma`'s choice of spelling (the record's item 8); the counted build's
+coverage ran at `075b4da`, the merged code. Outputs, scripts and the nodes'
+state: `docs/design/evidence/pi-cluster/2026-09-27/pacer/phase3/`, a directory
+a commit; the record: `docs/decisions/2026-09-27-afternoon.md`. The nodes had
+been up since 10:09, as for phase 2's runs.
+
+**Every run ended `failures=0`.** Ten minutes each:
+
+| Exercise | Work | A second |
+|---|---|---|
+| `atomics`, 71 cases on three contexts | 103.0 M updates | 171,700; 43,100 to node-mates and 129,300 across nodes at the last checkpoint |
+| `rma`, the halo and 140 transfer cases | 4.53 M transfers | 7,540, 694 MiB/s |
+| `locks`, eight locks | 4.44 M acquisitions | 7,410; the longest wait at a checkpoint 80 ms |
+| `memory`, to 96 MiB and back | 1.68 M operations | 2,770, 2.2 GiB/s filled and checked |
+| `collectives`, 314 typed cases and the sweep | 184,000 calls | 300 |
+
+The runs of the first four moved no node's retransmission timeouts; the
+collectives' sweep added four and each of the two coverage runs two - their
+1 MiB alltoall puts 48 MiB a node through each link at once, F1's incast.
+
+**The collectives at 1 MiB a PE**, 16 PEs, the slowest PE's median: broadcast
+28.0 ms and reduce 29.7, the default fan-out's three copies over the root's
+link (27 ms at line rate; `osu_bcast` gave 27.2 above); fcollect 148.5 ms,
+118 its fastest call, against 107 ms for twelve MiB into each node at line
+rate; alltoall 575 ms against 429 ms for 48 MiB each way a node, 1.34×. The
+scan is the outlier: **134 ms on 16 PEs and 136 on 8**, since the internode
+scan moves its 4 KiB pieces one at a time up and down its tree (the record's
+measurements). At 8 bytes every family costs 130 to 530 µs, a team sync 170.
+
+**The counted build**: 560 rounds of every exercise called 1,404 of the
+1,794 routines the library declares; the record lists the 390 it did not.

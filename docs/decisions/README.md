@@ -95,6 +95,10 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Across nodes the pacer times round trips, never one-way trips**: clocks differ between nodes, so one-way times are taken between node-mates only, and `mailbox` times a checked ping-pong between the PEs of one rank on paired nodes. Brief and Claude, [2026-09-27](2026-09-27.md) item 13.
 - **The pacer's `teams` makes its teams once, from a budget of 16 numbers**, and nothing in the tool destroys and re-splits in a loop: team numbers are never reused (design §5.7). Brief and Claude, [2026-09-27](2026-09-27.md) item 14.
 - **The pacer's `threads` tests run the library's two test hooks in every preset**, with a landing zone its gets overfill (`OSOE_GET_LANDING_BYTES=8192`), on five maps and on 0,1 under tsan. Claude, [2026-09-27](2026-09-27.md) item 15.
+- **The pacer calls every typed routine by both spellings**, the C11 generic and the type's own name, since a generic cannot reach a routine whose type is another's typedef; `rma` flips a case's spelling every second pass, so four passes run both on both contexts. Claude, [2026-09-27-afternoon](2026-09-27-afternoon.md) items 2 and 8.
+- **The pacer checks what moves as bytes and what is computed as values**: RMA every byte of the region, gaps and canary included; `p`, `g`, atomics and collectives by oracles that do not depend on order; symmetry as offsets from an anchor, never as addresses. Claude, [2026-09-27-afternoon](2026-09-27-afternoon.md) items 2-5.
+- **Every collective the pacer times or checks follows a sync of its team**, so a dest is ready on every PE before any calls (§9.10). Claude, [2026-09-27-afternoon](2026-09-27-afternoon.md) item 5.
+- **`osoe-pacer-counted`** counts every call of every routine the library declares through a shim generated from the preprocessed `pshmem.h`, Annex F's routines under their unprefixed names; `--coverage` writes the count and what was never called. Claude, [2026-09-27-afternoon](2026-09-27-afternoon.md) item 6.
 
 ## License and release
 
