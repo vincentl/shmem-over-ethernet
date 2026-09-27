@@ -4,13 +4,45 @@
 # (docs/design/osoe-pacer-proposal.md). Not installed. base/size.c is compiled
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
-add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
+set(osoe_pacer_sources osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
   threads.c print.c atomics.c rma.c locks.c memory.c collectives.c
   ${PROJECT_SOURCE_DIR}/base/size.c)
+add_executable(osoe-pacer ${osoe_pacer_sources})
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR})
 find_package(Threads REQUIRED)
 target_link_libraries(osoe-pacer PRIVATE osoe Threads::Threads m)
 osoe_warnings(osoe-pacer)
+
+# osoe-pacer-counted: the same program with a shim that counts every call of
+# every routine the library declares (spec §10: every shmem_ name is a weak
+# alias of its pshmem_ routine, so a strong definition in the program counts
+# and forwards). generate-shim.py writes the shim from the preprocessor's
+# expansion of pshmem.h, whose declarations come from X-macro lists; nothing
+# in the generated file is edited by hand. --coverage FILE writes the report.
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
+  COMMAND ${CMAKE_C_COMPILER} -E -P -I${PROJECT_SOURCE_DIR}/shmem/include
+          ${PROJECT_SOURCE_DIR}/shmem/include/pshmem.h
+          -o ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
+  DEPENDS ${PROJECT_SOURCE_DIR}/shmem/include/pshmem.h
+          ${PROJECT_SOURCE_DIR}/shmem/include/shmem.h
+  COMMENT "pacer: preprocessing pshmem.h for the counting shim"
+  VERBATIM)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate-shim.py
+          ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
+          ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/generate-shim.py
+          ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
+  COMMENT "pacer: generating the call-counting shim"
+  VERBATIM)
+add_executable(osoe-pacer-counted ${osoe_pacer_sources} ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c)
+target_include_directories(osoe-pacer-counted PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(osoe-pacer-counted PRIVATE osoe Threads::Threads m)
+target_compile_definitions(osoe-pacer-counted PRIVATE PACER_COUNTED=1)
+osoe_warnings(osoe-pacer-counted)
 
 # ---- The pacer's tests, in every preset: PENDING THE AUTHOR'S DECISION ------
 #
@@ -241,6 +273,13 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
 
   # Splitting until the job's team numbers run out: the split must return
   # nonzero on every PE, and the job go on (design §5.7).
+  # The counted build: it runs, and its report counts what the run called.
+  add_test(NAME tools.pacer.counted.0-0-1-1
+    COMMAND sh -c "$<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer-counted> --quick --coverage coverage-test.txt sort atomics && head -1 coverage-test.txt"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(tools.pacer.counted.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "shim called=[1-9][0-9]+ declared=[1-9][0-9]+"
+    FAIL_REGULAR_EXPRESSION "failures=[1-9]|killed by signal|timeout after|left behind")
   add_test(NAME tools.pacer.teams-exhaust.0-0-1-1
     COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --teams-exhaust
             teams)

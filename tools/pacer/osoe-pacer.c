@@ -332,9 +332,9 @@ void pacer_size(char *text, size_t size, uint64_t bytes)
 
 /* ---- The command line --------------------------------------------------- */
 
+#ifdef PACER_COUNTED
 /* Where osoe-pacer-counted writes which routines were called (--coverage). */
 static const char *coverage;
-#ifdef PACER_COUNTED
 void pacer_shim_report(const char *path);   /* the generated shim's, collective */
 #endif
 
