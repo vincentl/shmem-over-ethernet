@@ -49,12 +49,13 @@
 #include "base/size.h"
 #include "exercise.h"
 #include "parallel-print.h"
+#include "random.h"
 
 /* The library's default heap, shmem/src/bootstrap.h's
  * OSOE_DEFAULT_SYMMETRIC_SIZE, which is internal. */
 #define DEFAULT_HEAP (UINT64_C(256) << 20)
 
-enum { FAILURE_LINES = 4, FAILURE_LINE = 320 };
+enum { FAILURE_LINES = 4, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
 
 static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_print };
 enum { KNOWN = sizeof known / sizeof *known };
@@ -65,6 +66,16 @@ static const char *const plant_names[PACER_PLANTS] = {
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print"
+};
+static const char *const plant_descriptions[PACER_PLANTS] = {
+    "",
+    "PE 1 changes a key after counting it",
+    "PE 1 skips its first local sort",
+    "PE 1 sends a key to the PE after its owner",
+    "PE 1 reserves, or declares, more than a PE holds, once",
+    "PE 1 flips a byte of one block in every variant",
+    "PE 1 writes a word into a gap of the next PE's strided dest",
+    "PE 1 hashes other text than it prints",
 };
 
 static void usage(FILE *out)
@@ -581,10 +592,82 @@ struct totals {
     double batch;                   /* this PE's, for the run's imbalance */
 };
 
-static void flush_failures(shmem_team_t team, int lines)
+/*
+ * A checkpoint's failure lines, by content: one fcollect of every member's
+ * line hashes, then a parallel_print a distinct line - in the order of the
+ * lowest rank holding each, then that rank's own order - in which every member
+ * holding the line offers it. So a failure is one line under all its PEs,
+ * however many others each recorded before it; printing each member's k-th
+ * line in call k, the first way, split a failure recorded third on one PE and
+ * second on another (the author's 16-PE run of 2026-09-27). At most
+ * DISTINCT_FAILURES lines a checkpoint, and the number of the rest is said.
+ */
+static uint64_t *failure_mine, *failure_all;    /* symmetric: [FAILURE_LINES], [.. * world] */
+
+struct failure_place {
+    uint64_t hash;
+    int rank, index;
+};
+static struct failure_place *failure_places;    /* [FAILURE_LINES * world] */
+
+static uint64_t line_hash(const char *text)
 {
-    for (int k = 0; k < lines; k++)
-        parallel_print(team, "%s", k < failures.lines ? failures.text[k] : "");
+    uint64_t h = random_finalize(random_name(text));
+    return h ? h : 1;
+}
+
+static int by_hash_then_place(const void *a, const void *b)
+{
+    const struct failure_place *x = a, *y = b;
+    if (x->hash != y->hash)
+        return x->hash < y->hash ? -1 : 1;
+    if (x->rank != y->rank)
+        return x->rank < y->rank ? -1 : 1;
+    return (x->index > y->index) - (x->index < y->index);
+}
+
+static int by_place(const void *a, const void *b)
+{
+    const struct failure_place *x = a, *y = b;
+    if (x->rank != y->rank)
+        return x->rank < y->rank ? -1 : 1;
+    return (x->index > y->index) - (x->index < y->index);
+}
+
+static void flush_failures(shmem_team_t team, int any)
+{
+    if (any) {
+        int n = shmem_team_n_pes(team);
+        for (int k = 0; k < FAILURE_LINES; k++)
+            failure_mine[k] = k < failures.lines ? line_hash(failures.text[k]) : 0;
+        shmem_fcollectmem(team, failure_all, failure_mine, sizeof *failure_mine * FAILURE_LINES);
+        /* Each hash at its first place: sorted by hash and place, a run's head. */
+        size_t count = 0, distinct = 0;
+        for (int r = 0; r < n; r++)
+            for (int k = 0; k < FAILURE_LINES; k++) {
+                uint64_t h = failure_all[(size_t)r * FAILURE_LINES + (size_t)k];
+                if (h)
+                    failure_places[count++] = (struct failure_place){ h, r, k };
+            }
+        qsort(failure_places, count, sizeof *failure_places, by_hash_then_place);
+        for (size_t i = 0; i < count; i++)
+            if (i == 0 || failure_places[i].hash != failure_places[i - 1].hash)
+                failure_places[distinct++] = failure_places[i];
+        qsort(failure_places, distinct, sizeof *failure_places, by_place);
+        size_t shown = distinct < DISTINCT_FAILURES ? distinct : DISTINCT_FAILURES;
+        for (size_t d = 0; d < shown; d++) {
+            const char *text = "";
+            for (int k = 0; k < failures.lines && !*text; k++)
+                if (failure_mine[k] == failure_places[d].hash)
+                    text = failures.text[k];
+            parallel_print(team, "%s", text);
+        }
+        if (distinct > shown && shmem_team_my_pe(team) == 0) {
+            printf("osoe-pacer: %zu more distinct failure lines at this checkpoint, not shown\n",
+                   distinct - shown);
+            fflush(stdout);
+        }
+    }
     failures.lines = 0;
     failures.count = 0;
 }
@@ -594,7 +677,8 @@ static double run_start;
 
 static void final_line(void)
 {
-    printf("osoe-pacer failures=%.0f seconds=%.1f\n", failures_total, pacer_now() - run_start);
+    printf("osoe-pacer failures=%.0f seconds=%.1f%s%s\n", failures_total, pacer_now() - run_start,
+           options.plant ? " plant=" : "", plant_names[options.plant]);
     fflush(stdout);
 }
 
@@ -755,17 +839,22 @@ int main(int argc, char **argv)
     sum_result = shmem_malloc(sizeof *sum_result * SUMS);
     max_source = shmem_malloc(sizeof *max_source * MAXIMA);
     max_result = shmem_malloc(sizeof *max_result * MAXIMA);
-    if (!sum_source || !sum_result || !max_source || !max_result) {
+    failure_mine = shmem_malloc(sizeof *failure_mine * FAILURE_LINES);
+    failure_all = shmem_malloc(sizeof *failure_all * FAILURE_LINES * (size_t)npes);
+    failure_places = malloc(sizeof *failure_places * FAILURE_LINES * (size_t)npes);
+    if (!sum_source || !sum_result || !max_source || !max_result || !failure_mine ||
+        !failure_all || !failure_places) {
         fprintf(stderr, "osoe-pacer: PE %d: out of memory at start\n", me);
         shmem_global_exit(2);
     }
 
     /* The budget, and what the tool keeps of the heap beside it: its own
-     * arrays, which grow 16 bytes a PE, and a margin for the small ones. */
+     * arrays, which grow 48 bytes a PE (parallel_print's records and the
+     * failure lines' hashes), and a margin for the small ones. */
     uint64_t heap = heap_size();
     options.memory = memory_share > 0 ? (uint64_t)((double)heap * memory_share / 100)
                                       : memory_size;
-    uint64_t kept = UINT64_C(16) * (uint64_t)npes + (UINT64_C(128) << 10);
+    uint64_t kept = UINT64_C(48) * (uint64_t)npes + (UINT64_C(128) << 10);
 
     char library[SHMEM_MAX_NAME_LEN] = "";
     shmem_info_get_name(library);
@@ -800,6 +889,9 @@ int main(int argc, char **argv)
         if (used < size)
             snprintf(line + used, size - used, "\n");
         fputs(line, stdout);
+        if (options.plant != PACER_PLANT_NONE)
+            printf("osoe-pacer planted %s: %s; checks must fail, and the exit status is 1\n",
+                   plant_names[options.plant], plant_descriptions[options.plant]);
         fflush(stdout);
     }
 
@@ -847,6 +939,7 @@ int main(int argc, char **argv)
         }
     }
     if (refused) {
+        free(failure_places);
         release_layout();
         parallel_print_finalize();
         shmem_finalize();
@@ -872,6 +965,9 @@ int main(int argc, char **argv)
         final_line();
     fflush(stdout);
 
+    free(failure_places);
+    shmem_free(failure_all);
+    shmem_free(failure_mine);
     shmem_free(max_result);
     shmem_free(max_source);
     shmem_free(sum_result);

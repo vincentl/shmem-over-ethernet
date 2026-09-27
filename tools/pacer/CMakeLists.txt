@@ -59,11 +59,15 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   # every check but the first go quiet unnoticed. The alltoall's totals say
   # that all eight variants caught it, every exchange. A `.` stands for each
   # `;` of a line, which would otherwise split the list of patterns.
+  # Every planted run also says so, in a line after the header and on its
+  # last line, so that it cannot be taken for a finding.
   function(pacer_plant defect exercise)
+    set(patterns "osoe-pacer planted ${defect}: PE 1 "
+        "osoe-pacer failures=[1-9][0-9]* seconds=[0-9.]+ plant=${defect}" ${ARGN})
     add_test(NAME tools.pacer.plant.${defect}
       COMMAND ${CMAKE_COMMAND} -DLAUNCH=$<TARGET_FILE:osoe-launch>
               -DPACER=$<TARGET_FILE:osoe-pacer>
-              "-DARGUMENTS=--quick;--plant;${defect};${exercise}" "-DPATTERNS=${ARGN}"
+              "-DARGUMENTS=--quick;--plant;${defect};${exercise}" "-DPATTERNS=${patterns}"
               "-DFAIL=killed by signal|timeout after|left behind"
               -P ${PROJECT_SOURCE_DIR}/cmake/PacerPlant.cmake)
     set_tests_properties(tools.pacer.plant.${defect} PROPERTIES LABELS "tier2" TIMEOUT 300)
@@ -92,8 +96,11 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "alltoall round=0 team=world block=8 alltoalls: 1 word outside the blocks written. the first at word 1 of dest, [0-9a-f]+"
     "summary alltoall rounds=12 exchanges=[0-9]+ seconds=[0-9.]+ exchanges_per_s=[0-9]+ failures=12"
     "osoe-pacer failures=12 ")
+  # PE 0 records this failure after two others, PEs 2 and 3 after one: the
+  # line under all three says the failure lines are grouped by content.
   pacer_plant(print-hash print
     "print round=0 same: returned 2 lines, expected 1"
+    ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
     "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
     "osoe-pacer failures=[1-9]")
 
