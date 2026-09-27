@@ -97,8 +97,9 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
     "osoe-pacer failures=[1-9]")
 
-  # parallel_print checking its own lines, which pins the label format.
-  foreach(map IN ITEMS 0,0,1,1 0,1,2,3)
+  # parallel_print checking its own lines, which pins the label format; on
+  # 0,1,0,1 too, the one map whose shared teams' labels have gaps.
+  foreach(map IN ITEMS 0,0,1,1 0,1,2,3 0,1,0,1)
     string(REPLACE "," "-" label "${map}")
     add_test(NAME tools.pacer.print.${label}
       COMMAND osoe-launch -n 4 -m ${map} -t 240 -- $<TARGET_FILE:osoe-pacer> --quick print)

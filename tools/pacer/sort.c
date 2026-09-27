@@ -14,7 +14,7 @@
  * round); the generating PE adds each to its count, sum and xor as it goes.
  *
  * **The push exchange** (--exchange fetch-add, ISx's): keys go into private
- * staging, a bin a destination, each bin R/N plus an eighth plus 64 keys; a
+ * staging, a bin a destination, each bin R/N plus an eighth plus 16 keys; a
  * bin that fills is sent early and refilled, so no key is dropped and the
  * slack stays small. Sending a bin is a shmem_uint64_atomic_fetch_add on the
  * destination's cursor - both cursors are one shmem_malloc_with_hints with
@@ -155,7 +155,7 @@ static uint64_t sort_memory(int npes, const struct pacer_options *options, char 
             snprintf(fields, size, "not even %d keys a round fit", MINIMUM_KEYS);
             return UINT64_MAX;
         }
-        bin_capacity = keys / n + keys / (8 * n) + 64;
+        bin_capacity = keys / n + keys / (8 * n) + 16;
         uint64_t staging = push ? n * bin_capacity : keys;
         uint64_t slack = keys + keys / 8;
         if (!accumulate) {

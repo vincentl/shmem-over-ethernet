@@ -69,9 +69,11 @@ static int print_setup(shmem_team_t team, const struct pacer_options *options)
     print.round = 0;
     print.lines = 0;
     int pes = pacer_layout()->pes;
-    /* A line holds a label of at most 12 characters a PE and a text of at most
-     * the capacity; N lines at most. */
-    print.size = (size_t)print.n * (PACER_MESSAGE_CAPACITY + 64) + (size_t)pes * 12 + 4096;
+    /* What one case prints, at most: N one-PE lines of a label and a text
+     * under 128 bytes (distinct, windows); or labels holding every PE, 12
+     * characters each, on a few lines (same, parity); or one text of the
+     * whole capacity (long). O(N), 140 bytes a PE. */
+    print.size = (size_t)pes * 140 + 2 * PACER_MESSAGE_CAPACITY + 4096;
     print.member = malloc((size_t)pes);
     print.capture = malloc(print.size);
     print.expected = malloc(print.size);
