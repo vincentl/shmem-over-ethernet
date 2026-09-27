@@ -4,7 +4,8 @@
 # (docs/design/osoe-pacer-proposal.md). Not installed. base/size.c is compiled
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
-add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c print.c
+add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c threads.c
+  print.c
   ${PROJECT_SOURCE_DIR}/base/size.c)
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR})
 find_package(Threads REQUIRED)

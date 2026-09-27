@@ -37,6 +37,7 @@
  * values, identical on every PE, so no PE can decide differently.
  */
 #define _GNU_SOURCE
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -58,16 +59,17 @@
 enum { FAILURE_LINES = 4, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
 
 static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_mailbox,
-                                                      &pacer_print };
+                                                      &pacer_threads, &pacer_print };
 enum { KNOWN = sizeof known / sizeof *known };
 
 static const char *const plant_names[PACER_PLANTS] = {
     "", "sort-key", "sort-order", "sort-range", "sort-capacity", "alltoall-byte", "alltoall-gap",
-    "print-hash", "mailbox-payload", "mailbox-signal", "mailbox-count"
+    "print-hash", "mailbox-payload", "mailbox-signal", "mailbox-count", "threads-row",
+    "threads-table", "threads-count"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
-    "mailbox"
+    "mailbox", "threads", "threads", "threads"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -81,6 +83,9 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 flips a byte of its first message",
     "PE 1 signals one message twice over",
     "PE 1 counts one message it read twice",
+    "PE 1's thread 0 puts one word other than it checks",
+    "PE 1 writes one word of its table wrong",
+    "PE 1's thread 0 counts one add short",
 };
 
 static void usage(FILE *out)
@@ -90,10 +95,12 @@ static void usage(FILE *out)
 "Puts the library through its paces: whole-job patterns from real OpenSHMEM\n"
 "codes, every result checked against an oracle, a line a checkpoint.\n"
 "\n"
-"Exercises, all but print when none is named:\n"
+"Exercises, all but threads and print when none is named:\n"
 "  sort      a streaming bucket sort, ISx's exchange: every key to its owner\n"
 "  alltoall  every-to-every exchange eight ways, on the world and on `even'\n"
 "  mailbox   messages with signals, waited for by every wait and test form\n"
+"  threads   worker threads on private, serialized, default and team contexts;\n"
+"            only when named, since it runs under SHMEM_THREAD_MULTIPLE\n"
 "  print     parallel_print checking its own lines; only when named\n"
 "\n"
 "Options:\n"
@@ -112,11 +119,13 @@ static void usage(FILE *out)
 "                      how the sort moves keys: reserve by fetch-add and push\n"
 "                      (default), or exchange counts and pull\n"
 "  --no-ptr            put to node-mates rather than store through shmem_ptr\n"
+"  --threads T         the threads exercise's workers a PE (default 4)\n"
 "  --stop-on-failure   end the job at the first checkpoint with a failure\n"
 "  --plant DEFECT      plant a defect a check must catch: sort-key, sort-order,\n"
 "                      sort-range, sort-capacity, alltoall-byte, alltoall-gap,\n"
-"                      print-hash, mailbox-payload, mailbox-signal or\n"
-"                      mailbox-count; always on PE 1, named in the header\n"
+"                      print-hash, mailbox-payload, mailbox-signal,\n"
+"                      mailbox-count, threads-row, threads-table or\n"
+"                      threads-count; always on PE 1, named in the header\n"
 "  --help              this, before shmem_init\n"
 "\n"
 "The last line is \"osoe-pacer failures=N seconds=S\"; the exit status is 1\n"
@@ -145,6 +154,9 @@ double pacer_now(void)
     return (double)t.tv_sec + (double)t.tv_nsec * 1e-9;
 }
 
+/* Worker threads report too: one lock around the lines and counts. */
+static pthread_mutex_t failures_lock = PTHREAD_MUTEX_INITIALIZER;
+
 static struct {
     long count;                     /* since the last checkpoint */
     long total;                     /* this PE's, over the run */
@@ -154,14 +166,16 @@ static struct {
 
 void pacer_failure(const char *format, ...)
 {
+    pthread_mutex_lock(&failures_lock);
     failures.count++;
     failures.total++;
-    if (failures.lines == FAILURE_LINES)
-        return;
-    va_list arguments;
-    va_start(arguments, format);
-    vsnprintf(failures.text[failures.lines++], FAILURE_LINE, format, arguments);
-    va_end(arguments);
+    if (failures.lines < FAILURE_LINES) {
+        va_list arguments;
+        va_start(arguments, format);
+        vsnprintf(failures.text[failures.lines++], FAILURE_LINE, format, arguments);
+        va_end(arguments);
+    }
+    pthread_mutex_unlock(&failures_lock);
 }
 
 /* Lines for the end: the exercise's own wait here until the driver has put
@@ -245,7 +259,7 @@ void pacer_size(char *text, size_t size, uint64_t bytes)
 /* ---- The command line --------------------------------------------------- */
 
 static struct pacer_options options = {
-    .seconds = 60, .report = 5, .seed = 1, .use_ptr = 1,
+    .seconds = 60, .report = 5, .seed = 1, .use_ptr = 1, .threads = 4,
 };
 static double memory_share = 50;    /* percent of the heap; 0 when a size was given */
 static uint64_t memory_size;
@@ -285,7 +299,8 @@ static int parse(int argc, char **argv)
             while (k < KNOWN && strcmp(argument, known[k]->name) != 0)
                 k++;
             if (k == KNOWN)
-                return refuse("no exercise '%s': sort, alltoall, mailbox, print", argument);
+                return refuse("no exercise '%s': sort, alltoall, mailbox, threads, print",
+                              argument);
             int again = 0;
             for (int j = 0; j < chosen_count; j++)
                 again |= chosen[j] == known[k];
@@ -322,7 +337,8 @@ static int parse(int argc, char **argv)
             continue;
         }
         static const char *const valued[] = { "--seconds", "--report", "--rounds", "--seed",
-                                              "--memory", "--sort", "--exchange", "--plant" };
+                                              "--memory", "--sort", "--exchange", "--plant",
+                                              "--threads" };
         int takes = 0;
         for (size_t k = 0; k < sizeof valued / sizeof *valued; k++)
             takes |= strcmp(name, valued[k]) == 0;
@@ -347,6 +363,12 @@ static int parse(int argc, char **argv)
             if (end == value || *end || rounds < 1)
                 return refuse("--rounds '%s': a whole number above 0", value);
             options.rounds = rounds;
+        } else if (strcmp(name, "--threads") == 0) {
+            char *end;
+            long count = strtol(value, &end, 10);
+            if (end == value || *end || count < 1 || count > 1023)
+                return refuse("--threads '%s': a whole number from 1 to 1023", value);
+            options.threads = (int)count;
         } else if (strcmp(name, "--seed") == 0) {
             char *end;
             unsigned long long seed = strtoull(value, &end, 0);
@@ -392,7 +414,8 @@ static int parse(int argc, char **argv)
             if (k == PACER_PLANTS)
                 return refuse("--plant '%s': sort-key, sort-order, sort-range, sort-capacity, "
                               "alltoall-byte, alltoall-gap, print-hash, mailbox-payload, "
-                              "mailbox-signal or mailbox-count", value);
+                              "mailbox-signal, mailbox-count, threads-row, threads-table or "
+                              "threads-count", value);
             options.plant = (enum pacer_plant)k;
         } else {
             return refuse("no option '%s'", name);
@@ -837,7 +860,24 @@ int main(int argc, char **argv)
     if (parsed != 0)
         return parsed;
 
-    shmem_init();
+    /* SHMEM_THREAD_MULTIPLE only when an exercise needs it, as osoe-bench's
+     * threads: the others should not pay for it. */
+    int multiple = 0;
+    for (int k = 0; k < chosen_count; k++)
+        multiple |= chosen[k]->multiple;
+    if (multiple) {
+        int provided = -1;
+        shmem_init_thread(SHMEM_THREAD_MULTIPLE, &provided);
+        if (provided != SHMEM_THREAD_MULTIPLE) {
+            if (shmem_my_pe() == 0)
+                fprintf(stderr, "osoe-pacer: the threads exercise needs SHMEM_THREAD_MULTIPLE, "
+                        "and the library gave %d\n", provided);
+            shmem_finalize();
+            return 2;
+        }
+    } else {
+        shmem_init();
+    }
     run_start = pacer_now();
     int me = shmem_my_pe(), npes = shmem_n_pes();
     if (parallel_print_init(PACER_MESSAGE_CAPACITY) != 0 || gather_layout() != 0) {

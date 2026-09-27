@@ -56,6 +56,9 @@ enum pacer_plant {
     PACER_PLANT_MAILBOX_PAYLOAD,    /* PE 1 flips a byte of its first message */
     PACER_PLANT_MAILBOX_SIGNAL,     /* PE 1 signals one message twice over */
     PACER_PLANT_MAILBOX_COUNT,      /* PE 1 counts one message it read twice */
+    PACER_PLANT_THREADS_ROW,        /* PE 1's thread 0 puts one word other than it checks */
+    PACER_PLANT_THREADS_TABLE,      /* PE 1 writes one word of its table wrong */
+    PACER_PLANT_THREADS_COUNT,      /* PE 1's thread 0 counts one add short */
     PACER_PLANTS
 };
 
@@ -71,6 +74,7 @@ struct pacer_options {
     int use_ptr;                    /* 0 under --no-ptr */
     int stop_on_failure;
     enum pacer_plant plant;
+    int threads;                    /* worker threads a PE, for the threads exercise */
 };
 
 /* parallel_print's text capacity, NUL included, as the driver sets it. */
@@ -91,6 +95,7 @@ struct pacer_exercise {
     const char *work;               /* what `work` counts, named in the line */
     const char *const *phases;      /* phase names, NULL-terminated, at most PACER_PHASES */
     long quick_rounds;              /* rounds under --quick */
+    int multiple;                   /* needs SHMEM_THREAD_MULTIPLE */
     uint64_t (*memory)(int npes, const struct pacer_options *options, char *fields,
                        size_t size);
     int (*setup)(shmem_team_t team, const struct pacer_options *options);
@@ -99,7 +104,8 @@ struct pacer_exercise {
     void (*teardown)(void);
 };
 
-extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_print;
+extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_threads,
+    pacer_print;
 
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,
@@ -118,9 +124,9 @@ const struct pacer_layout *pacer_layout(void);
 double pacer_now(void);
 
 /*
- * A failure found by this PE: counted, and the first few lines kept for the
- * next checkpoint, which prints them through parallel_print on the exercise's
- * team and clears them. The text is `exercise round=r what: value`, with what
+ * A failure found by this PE, by any of its threads: counted, and the first
+ * few lines kept for the next checkpoint, which prints them through
+ * parallel_print on the exercise's team and clears them. The text is `exercise round=r what: value`, with what
  * differs between PEs last, so that the same failure on many PEs is one line.
  */
 void pacer_failure(const char *format, ...) __attribute__((format(printf, 1, 2)));
