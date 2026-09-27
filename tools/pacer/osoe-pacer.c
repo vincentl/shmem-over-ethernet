@@ -286,12 +286,14 @@ static int chosen_count;
 static int refuse(const char *format, ...) __attribute__((format(printf, 1, 2)));
 static int refuse(const char *format, ...)
 {
+    /* Every PE refuses, before init, and a line in one fprintf is one write on
+     * the unbuffered stderr: PEs refusing at once do not splice their lines. */
+    char message[640];
     va_list arguments;
     va_start(arguments, format);
-    fputs("osoe-pacer: ", stderr);
-    vfprintf(stderr, format, arguments);
-    fputs(" (osoe-pacer --help)\n", stderr);
+    vsnprintf(message, sizeof message, format, arguments);
     va_end(arguments);
+    fprintf(stderr, "osoe-pacer: %s (osoe-pacer --help)\n", message);
     return 2;
 }
 
