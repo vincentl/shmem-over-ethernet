@@ -4,12 +4,12 @@
 # (docs/design/osoe-pacer-proposal.md). Not installed. base/size.c is compiled
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
-add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c threads.c
-  print.c
+add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
+  threads.c print.c
   ${PROJECT_SOURCE_DIR}/base/size.c)
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR})
 find_package(Threads REQUIRED)
-target_link_libraries(osoe-pacer PRIVATE osoe Threads::Threads)
+target_link_libraries(osoe-pacer PRIVATE osoe Threads::Threads m)
 osoe_warnings(osoe-pacer)
 
 # ---- The pacer's tests, in every preset: PENDING THE AUTHOR'S DECISION ------
@@ -107,11 +107,33 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "mailbox round=3 wait_until_all_vector from PE 1: signal 2, expected 1")
   pacer_plant(mailbox-count mailbox
     "mailbox round=19 count: PE [0-9]+ sent [0-9]+ here, [0-9]+ were read")
+  # threads' three and teams' three; the exhaust plant needs its mode.
+  pacer_plant(threads-row threads
+    "threads round=0 private row: thread 0 read back word 3 as [0-9a-f]+, not [0-9a-f]+")
+  pacer_plant(threads-table threads
+    "threads round=0 [a-z]+ table: thread [0-9]+ got word 5 of PE 1's row [0-9]+ as [0-9a-f]+")
+  pacer_plant(threads-count threads
+    "threads round=0 counter [0-9]+: holds [0-9]+, and [0-9]+ were added")
+  pacer_plant(teams-query teams
+    "teams [a-z]+: team_n_pes [0-9]+ and team_my_pe [0-9]+, expected [0-9]+ and [0-9]+")
+  pacer_plant(teams-collective teams
+    "teams round=0 row sum_reduce: element 0 is [0-9.]+, expected [0-9.]+")
+  pacer_plant(teams-exhaust "teams;--teams-exhaust"
+    "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
   pacer_plant(print-hash print
     "print round=0 same: returned 2 lines, expected 1"
     ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
     "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
     "osoe-pacer failures=[1-9]")
+
+  # Splitting until the job's team numbers run out: the split must return
+  # nonzero on every PE, and the job go on (design §5.7).
+  add_test(NAME tools.pacer.teams-exhaust.0-0-1-1
+    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --teams-exhaust
+            teams)
+  set_tests_properties(tools.pacer.teams-exhaust.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "teams exhausted after [0-9]+ splits.*osoe-pacer failures=0 "
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}")
 
   # parallel_print checking its own lines, which pins the label format; on
   # 0,1,0,1 too, the one map whose shared teams' labels have gaps.
@@ -124,4 +146,28 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
       FAIL_REGULAR_EXPRESSION "${pacer_failed}")
   endforeach()
 endif()
+# threads, under SHMEM_THREAD_MULTIPLE, with both of the library's test hooks
+# and a landing zone its gets overfill, as the library's own checked threaded
+# test runs (shmem/tests/CMakeLists.txt): OSOE_CHECK_QUIET checks every shared
+# wait's promise at its return, and OSOE_TEST_PERTURB widens the windows between
+# a protocol's steps. On the four maps and on 0,1,2,0,1,0, where the hook's own
+# race showed (docs/decisions/2026-09-27.md item 10); under tsan on 0,1, one PE a
+# node, where every writer of a PE's memory is a thread of the process tsan sees.
+set(pacer_threads_maps 0,0,0,0 0,1,2,3 0,0,0,1,1,2 0,1,0,1 0,1,2,0,1,0)
+if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(pacer_threads_maps 0,1)
+endif()
+foreach(map IN LISTS pacer_threads_maps)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME tools.pacer.threads.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1
+            OSOE_GET_LANDING_BYTES=8192
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 240 --
+            $<TARGET_FILE:osoe-pacer> --quick threads)
+  set_tests_properties(tools.pacer.threads.${label} PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}|OSOE_CHECK_QUIET:")
+endforeach()
 # ---- end of the pacer's tests ------------------------------------------------

@@ -59,17 +59,17 @@
 enum { FAILURE_LINES = 4, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
 
 static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_mailbox,
-                                                      &pacer_threads, &pacer_print };
+                                                      &pacer_teams, &pacer_threads, &pacer_print };
 enum { KNOWN = sizeof known / sizeof *known };
 
 static const char *const plant_names[PACER_PLANTS] = {
     "", "sort-key", "sort-order", "sort-range", "sort-capacity", "alltoall-byte", "alltoall-gap",
     "print-hash", "mailbox-payload", "mailbox-signal", "mailbox-count", "threads-row",
-    "threads-table", "threads-count"
+    "threads-table", "threads-count", "teams-query", "teams-collective", "teams-exhaust"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
-    "mailbox", "threads", "threads", "threads"
+    "mailbox", "threads", "threads", "threads", "teams", "teams", "teams"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -86,6 +86,9 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1's thread 0 puts one word other than it checks",
     "PE 1 writes one word of its table wrong",
     "PE 1's thread 0 counts one add short",
+    "PE 1 expects one query's answer off by one",
+    "PE 1 gives one reduction a wrong input",
+    "PE 1 claims one split more than it made",
 };
 
 static void usage(FILE *out)
@@ -99,6 +102,8 @@ static void usage(FILE *out)
 "  sort      a streaming bucket sort, ISx's exchange: every key to its owner\n"
 "  alltoall  every-to-every exchange eight ways, on the world and on `even'\n"
 "  mailbox   messages with signals, waited for by every wait and test form\n"
+"  teams     teams of every shape, their queries, collectives on rows and\n"
+"            columns at once\n"
 "  threads   worker threads on private, serialized, default and team contexts;\n"
 "            only when named, since it runs under SHMEM_THREAD_MULTIPLE\n"
 "  print     parallel_print checking its own lines; only when named\n"
@@ -120,12 +125,15 @@ static void usage(FILE *out)
 "                      (default), or exchange counts and pull\n"
 "  --no-ptr            put to node-mates rather than store through shmem_ptr\n"
 "  --threads T         the threads exercise's workers a PE (default 4)\n"
+"  --teams-exhaust     the teams exercise splits until a split fails, and\n"
+"                      stops; teams must be the only exercise named\n"
 "  --stop-on-failure   end the job at the first checkpoint with a failure\n"
 "  --plant DEFECT      plant a defect a check must catch: sort-key, sort-order,\n"
 "                      sort-range, sort-capacity, alltoall-byte, alltoall-gap,\n"
 "                      print-hash, mailbox-payload, mailbox-signal,\n"
-"                      mailbox-count, threads-row, threads-table or\n"
-"                      threads-count; always on PE 1, named in the header\n"
+"                      mailbox-count, threads-row, threads-table,\n"
+"                      threads-count, teams-query, teams-collective or\n"
+"                      teams-exhaust; always on PE 1, named in the header\n"
 "  --help              this, before shmem_init\n"
 "\n"
 "The last line is \"osoe-pacer failures=N seconds=S\"; the exit status is 1\n"
@@ -299,8 +307,8 @@ static int parse(int argc, char **argv)
             while (k < KNOWN && strcmp(argument, known[k]->name) != 0)
                 k++;
             if (k == KNOWN)
-                return refuse("no exercise '%s': sort, alltoall, mailbox, threads, print",
-                              argument);
+                return refuse("no exercise '%s': sort, alltoall, mailbox, teams, threads, "
+                              "print", argument);
             int again = 0;
             for (int j = 0; j < chosen_count; j++)
                 again |= chosen[j] == known[k];
@@ -318,9 +326,9 @@ static int parse(int argc, char **argv)
         name[length] = '\0';
 
         static const char *const flags[] = { "--help", "--quick", "--no-ptr",
-                                             "--stop-on-failure" };
+                                             "--stop-on-failure", "--teams-exhaust" };
         int flag = -1;
-        for (int k = 0; k < 4; k++)
+        for (int k = 0; k < 5; k++)
             if (strcmp(name, flags[k]) == 0)
                 flag = k;
         if (flag >= 0) {
@@ -334,6 +342,8 @@ static int parse(int argc, char **argv)
                 options.use_ptr = 0;
             if (flag == 3)
                 options.stop_on_failure = 1;
+            if (flag == 4)
+                options.teams_exhaust = 1;
             continue;
         }
         static const char *const valued[] = { "--seconds", "--report", "--rounds", "--seed",
@@ -414,18 +424,23 @@ static int parse(int argc, char **argv)
             if (k == PACER_PLANTS)
                 return refuse("--plant '%s': sort-key, sort-order, sort-range, sort-capacity, "
                               "alltoall-byte, alltoall-gap, print-hash, mailbox-payload, "
-                              "mailbox-signal, mailbox-count, threads-row, threads-table or "
-                              "threads-count", value);
+                              "mailbox-signal, mailbox-count, threads-row, threads-table, "
+                              "threads-count, teams-query, teams-collective or teams-exhaust",
+                              value);
             options.plant = (enum pacer_plant)k;
         } else {
             return refuse("no option '%s'", name);
         }
     }
-    if (chosen_count == 0) {        /* every exercise but print */
+    if (chosen_count == 0) {        /* every exercise but threads and print */
         chosen[chosen_count++] = &pacer_sort;
         chosen[chosen_count++] = &pacer_alltoall;
         chosen[chosen_count++] = &pacer_mailbox;
+        chosen[chosen_count++] = &pacer_teams;
     }
+    /* Exhausting the job's team numbers leaves none for any exercise after. */
+    if (options.teams_exhaust && (chosen_count != 1 || chosen[0] != &pacer_teams))
+        return refuse("--teams-exhaust uses up the job's team numbers: name teams alone");
     if (options.plant != PACER_PLANT_NONE) {
         int present = 0;
         for (int j = 0; j < chosen_count; j++)

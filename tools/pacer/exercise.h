@@ -59,6 +59,9 @@ enum pacer_plant {
     PACER_PLANT_THREADS_ROW,        /* PE 1's thread 0 puts one word other than it checks */
     PACER_PLANT_THREADS_TABLE,      /* PE 1 writes one word of its table wrong */
     PACER_PLANT_THREADS_COUNT,      /* PE 1's thread 0 counts one add short */
+    PACER_PLANT_TEAMS_QUERY,        /* PE 1 expects one query's answer off by one */
+    PACER_PLANT_TEAMS_COLLECTIVE,   /* PE 1 gives one reduction a wrong input */
+    PACER_PLANT_TEAMS_EXHAUST,      /* PE 1 claims one split more than it made */
     PACER_PLANTS
 };
 
@@ -75,6 +78,7 @@ struct pacer_options {
     int stop_on_failure;
     enum pacer_plant plant;
     int threads;                    /* worker threads a PE, for the threads exercise */
+    int teams_exhaust;              /* the teams exercise splits until a split fails */
 };
 
 /* parallel_print's text capacity, NUL included, as the driver sets it. */
@@ -104,8 +108,8 @@ struct pacer_exercise {
     void (*teardown)(void);
 };
 
-extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_threads,
-    pacer_print;
+extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_teams,
+    pacer_threads, pacer_print;
 
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,
