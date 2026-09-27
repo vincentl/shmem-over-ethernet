@@ -1,0 +1,15 @@
+[    0.567123] pcieport 0002:00:00.0: AER: enabled with IRQ 37
+[    0.567233] rp1 0002:01:00.0: bar0 len 0x4000, start 0x1f00410000, end 0x1f00413fff, flags, 0x40200
+[    0.567238] rp1 0002:01:00.0: bar1 len 0x400000, start 0x1f00000000, end 0x1f003fffff, flags, 0x40200
+[    0.567250] rp1 0002:01:00.0: enabling device (0000 -> 0002)
+[    0.567869] rp1 0002:01:00.0: chip_id 0x20001927
+[    0.586305] macb 1f00100000.ethernet eth0: Cadence GEM rev 0x00070109 at 0x1f00100000 irq 105 (2c:cf:67:c6:7d:83)
+[    0.764421] macb 1f00100000.ethernet eth0: PHY [1f00100000.ethernet-ffffffff:01] driver [Broadcom BCM54213PE] (irq=POLL)
+[    0.765300] macb 1f00100000.ethernet eth0: configuring for phy/rgmii-id link mode
+[    0.768270] macb 1f00100000.ethernet: gem-ptp-timer ptp clock registered.
+[    3.848647] macb 1f00100000.ethernet eth0: Link is Up - 1Gbps/Full - flow control tx
+[    3.886744]      device=eth0, hwaddr=2c:cf:67:c6:7d:83, ipaddr=10.0.1.1, mask=255.0.0.0, gw=255.255.255.255
+[    4.021935] rp1-firmware rp1_firmware: RP1 Firmware version 23fca1cd776798b50bd3e640ecb242215778e7f8
+[    4.031559] rp1-pio 1f00178000.pio: Created instance as pio0 (op count 33, 0 interrupts)
+[    4.640346] systemd[1]: Watchdog running with a hardware timeout of 1min.
+[ 2753.015650] macb 1f00100000.ethernet eth0: NETDEV WATCHDOG: CPU: 2: transmit queue 0 timed out 5652 ms

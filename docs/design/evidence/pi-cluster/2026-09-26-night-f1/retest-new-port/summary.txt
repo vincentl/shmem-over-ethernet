@@ -1,0 +1,22 @@
+21:27:10 A-4x1-a exit 0: 16384:slow=0,max_ms=1.1 20480:slow=0,max_ms=1.0 24576:slow=0,max_ms=1.2 28672:slow=3,max_ms=26934.7 32768:slow=3,max_ms=31509.5 36864:slow=3,max_ms=6602.8 40960:slow=1,max_ms=205.9 49152:slow=0,max_ms=2.1 
+21:27:10     timeouts before: pi-001=55 pi-002=0 pi-003=8 pi-004=8 
+21:27:10     timeouts after:  pi-001=63 pi-002=65 pi-003=8 pi-004=8 
+21:28:02 A-4x2-a exit 0: 8192:slow=0,max_ms=0.9 12288:slow=0,max_ms=1.2 16384:slow=2,max_ms=45184.9 20480:slow=0,max_ms=1.9 24576:slow=0,max_ms=2.2 
+21:28:02     timeouts before: pi-001=63 pi-002=65 pi-003=8 pi-004=8 
+21:28:02     timeouts after:  pi-001=63 pi-002=87 pi-003=8 pi-004=8 
+21:28:05 A-4x4-a exit 0: 4096:slow=0,max_ms=1.0 8192:slow=0,max_ms=1.6 12288:slow=0,max_ms=2.2 16384:slow=0,max_ms=2.8 
+21:28:05     timeouts before: pi-001=63 pi-002=87 pi-003=8 pi-004=8 
+21:28:05     timeouts after:  pi-001=63 pi-002=87 pi-003=8 pi-004=8 
+21:29:02 A-4x1-b exit 0: 16384:slow=0,max_ms=1.3 20480:slow=0,max_ms=1.0 24576:slow=0,max_ms=1.6 28672:slow=0,max_ms=7.7 32768:slow=0,max_ms=1.5 36864:slow=3,max_ms=12951.4 40960:slow=1,max_ms=207.1 49152:slow=0,max_ms=2.1 
+21:29:02     timeouts before: pi-001=63 pi-002=87 pi-003=8 pi-004=8 
+21:29:03     timeouts after:  pi-001=63 pi-002=127 pi-003=8 pi-004=8 
+21:30:02 A-4x2-b exit 0: 8192:slow=0,max_ms=1.1 12288:slow=1,max_ms=52613.9 16384:slow=2,max_ms=4680.7 20480:slow=0,max_ms=1.9 24576:slow=0,max_ms=2.1 
+21:30:02     timeouts before: pi-001=63 pi-002=127 pi-003=8 pi-004=8 
+21:30:03     timeouts after:  pi-001=63 pi-002=149 pi-003=8 pi-004=8 
+21:30:12 A-4x4-b exit 0: 4096:slow=0,max_ms=1.0 8192:slow=0,max_ms=1.6 12288:slow=0,max_ms=2.2 16384:slow=0,max_ms=2.7 
+21:30:12     timeouts before: pi-001=63 pi-002=149 pi-003=8 pi-004=8 
+21:30:12     timeouts after:  pi-001=63 pi-002=149 pi-003=8 pi-004=8 
+21:33:06 P-rank0-on-pi-002 exit 0: 28672:slow=5,max_ms=8989.8 32768:slow=2,max_ms=31298.7 28672:slow=4,max_ms=4032.0 32768:slow=4,max_ms=43599.0 
+21:33:06     timeouts before: 
+21:33:06     timeouts after:  
+21:33:06 DONE

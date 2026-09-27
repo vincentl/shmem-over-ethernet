@@ -1,0 +1,4 @@
+block 4096 median_us 876.6 mean_us 878.7 slow 0 max_ms 1.0
+block 8192 median_us 1468.4 mean_us 1473.7 slow 0 max_ms 1.6
+block 12288 median_us 2157.4 mean_us 2137.5 slow 0 max_ms 2.2
+block 16384 median_us 2394.2 mean_us 2397.5 slow 0 max_ms 2.7

@@ -228,3 +228,17 @@ triggers something on pi-002's path that this simpler traffic does not.
 
 The session's earlier "a 16 KiB chunk ends F1" held only at the sizes it
 measured.
+
+**After moving pi-002** to another switch port with another cable (the
+author, the same night; `retest-new-port/`): **no change.** pi-002, rebooted,
+went from 0 timeouts to 149 over the trigger map run twice, the others
+gaining at most 8; single stalls reached 52 s, at the same block sizes
+(4 × 1 at 28-36 KiB, 4 × 2 at 12-16 KiB). What else was compared, all alike
+on every node: the bootloader (2026-05-11, with the same 2026-05-26 update
+offered to all four), the RP1 firmware, the kernel and its command line,
+`config.txt`, the loaded modules, the NIC driver, energy-efficient Ethernet
+(enabled, inactive), and the supply - no node has throttled or dipped
+(`get_throttled` 0x0, 5.14-5.22 V). Two nodes' kernels, pi-001's and
+pi-004's, logged one NIC transmit-queue hang each earlier that day
+(`NETDEV WATCHDOG: transmit queue 0 timed out` after about 5.5 s); none
+happened during the retest.
