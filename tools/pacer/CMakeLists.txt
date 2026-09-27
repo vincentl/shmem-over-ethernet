@@ -307,6 +307,8 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
     "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
     "osoe-pacer failures=[1-9]")
+  pacer_plant(rma-signal rma
+    "rma round=140 put_signal_get float default: the signal from PE 0 reads [0-9]+, expected [0-9]+")
   pacer_plant(print-route print
     "print round=0 same, signal route: returned 2 lines, expected 1"
     "print round=0 same, signal route: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this.")

@@ -102,6 +102,7 @@ enum pacer_plant {
     PACER_PLANT_MEMORY_GRANTED,     /* PE 1 takes a refused realloc for granted */
     PACER_PLANT_PRINT_FOLD,         /* PE 1 folds host numbers without leading zeros */
     PACER_PLANT_PRINT_ROUTE,        /* PE 1's record by the signal route changed */
+    PACER_PLANT_RMA_SIGNAL,         /* PE 1 misreads one put_signal's signal */
     PACER_PLANTS
 };
 

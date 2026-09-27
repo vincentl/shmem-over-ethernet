@@ -78,7 +78,8 @@ static const char *const plant_names[PACER_PLANTS] = {
     "memory-agree", "collectives-reduce", "collectives-scan", "collectives-data",
     "collectives-gap", "atomics-fetch-count", "atomics-attempts", "rma-flag", "rma-single",
     "rma-ptr-null", "memory-realloc", "memory-refused", "collectives-status",
-    "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold", "print-route"
+    "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold", "print-route",
+    "rma-signal"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -87,7 +88,7 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "rma", "rma", "rma", "rma", "rma", "locks", "locks", "memory", "memory", "memory", "memory",
     "memory", "collectives", "collectives", "collectives", "collectives", "atomics", "atomics",
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
-    "memory", "print", "print"
+    "memory", "print", "print", "rma"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -147,6 +148,7 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 takes a refused realloc for granted",
     "PE 1 folds host numbers without their leading zeros",
     "PE 1 gives the signal route a record other than the fcollect's",
+    "PE 1 misreads the signal of one put_signal",
 };
 
 static void usage(FILE *out)

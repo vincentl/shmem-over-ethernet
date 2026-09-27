@@ -10,12 +10,17 @@
  *                 waits for its flag and checks the whole buffer: a put that
  *                 overtook its fence, on either path, shows. Sizes from 8 B to
  *                 1 MiB in turn; the put itself putmem, putmem_nbi or a typed
- *                 put in turn, the fence ordering the nonblocking one too
- *   a transfer    one case of five classes over every type of Table 5 and
+ *                 put in turn, the fence ordering the nonblocking one too - or
+ *                 putmem_signal or putmem_signal_nbi, which raise the flag
+ *                 themselves
+ *   a transfer    one case of seven classes over every type of Table 5 and
  *                 every size of the sized forms: put and get; iput and iget
  *                 with strides; ibput and ibget with blocks; put_nbi and
  *                 get_nbi in bursts, completed by quiet or by pe_quiet naming
- *                 the one target; p and g, element by element. The put side
+ *                 the one target; p and g, element by element; put_signal,
+ *                 and put_signal_nbi quieted, whose receiver waits for the
+ *                 signal and reads every byte then, before any sync - data
+ *                 that a signal overtook shows - beside a get. The put side
  *                 writes the next PE's inbox, the get side reads the previous
  *                 PE's source; both read every byte back, the gaps a strided
  *                 transfer must not touch and the bytes past its end among them
@@ -24,10 +29,10 @@
  *                 the stores when its flags say they are there
  *
  * Every byte moved is (source, target, index, round)-determined. A round's
- * transfer case is round mod the 140 cases, on the default context in even
+ * transfer case is round mod the 198 cases, on the default context in even
  * passes over them and a private one in odd; where the type has a name of its
  * own, the put side takes it and the get side the C11 generic, or the other
- * way about, which flips every second pass - so four passes, 560 rounds, run
+ * way about, which flips every second pass - so four passes, 792 rounds, run
  * every case in both spellings on both contexts.
  */
 #define _GNU_SOURCE
@@ -43,14 +48,18 @@
 #include "random.h"
 
 enum { REGION = 64 << 10, HALO_SIZES = 7, PTR_WORDS = 64, CANARY = 0xa5 };
-enum transfer_class { CONTIGUOUS, STRIDED, BLOCKS, NONBLOCKING, SINGLE, CLASSES };
+enum transfer_class { CONTIGUOUS, STRIDED, BLOCKS, NONBLOCKING, SINGLE, SIGNAL, SIGNAL_NBI,
+                      CLASSES };
 enum flag_method { ATOMIC_ADD, SIGNAL_ADD, SIGNAL_SET, FLAG_METHODS };
 
 static const char *const class_names[CLASSES] = {
-    "put_get", "iput_iget", "ibput_ibget", "nbi", "p_g"
+    "put_get", "iput_iget", "ibput_ibget", "nbi", "p_g", "put_signal_get",
+    "put_signal_nbi_get_nbi"
 };
 static const char *const flag_names[FLAG_METHODS] = { "atomic_add", "signal_add", "signal_set" };
-static const char *const put_names[3] = { "putmem", "putmem_nbi", "uint64_put" };
+enum { HALO_PUTS = 5 };
+static const char *const put_names[HALO_PUTS] = { "putmem", "putmem_nbi", "uint64_put",
+                                                  "putmem_signal", "putmem_signal_nbi" };
 static const char *const phase_names[] = { "halo", "transfer", "ptr", "check", NULL };
 
 /*
@@ -80,6 +89,11 @@ struct rma_kind {
     uint64_t (*g)(shmem_ctx_t ctx, int generic, const void *source, int pe);
     uint64_t (*load)(const void *slot);
     void (*store)(void *slot, uint64_t value);
+    /* put-with-signal, blocking and not: every kind's */
+    void (*put_signal)(shmem_ctx_t ctx, int generic, void *dest, const void *source, size_t n,
+                       uint64_t *signal, uint64_t value, int operation, int pe);
+    void (*put_signal_nbi)(shmem_ctx_t ctx, int generic, void *dest, const void *source,
+                           size_t n, uint64_t *signal, uint64_t value, int operation, int pe);
 };
 
 /* A typed routine by one of its spellings, context-free or on a context. */
@@ -174,10 +188,24 @@ struct rma_kind {
     {                                                                               \
         *(T *)slot = (T)value;                                                      \
     }                                                                               \
+    static void put_signal_##NAME(shmem_ctx_t ctx, int generic, void *dest,         \
+                                  const void *source, size_t n, uint64_t *signal,   \
+                                  uint64_t value, int operation, int pe)            \
+    {                                                                               \
+        TYPED(ctx, generic, NAME, put_signal, (T *)dest, (const T *)source, n, signal, \
+              value, operation, pe);                                                \
+    }                                                                               \
+    static void put_signal_nbi_##NAME(shmem_ctx_t ctx, int generic, void *dest,     \
+                                      const void *source, size_t n, uint64_t *signal, \
+                                      uint64_t value, int operation, int pe)        \
+    {                                                                               \
+        TYPED(ctx, generic, NAME, put_signal_nbi, (T *)dest, (const T *)source, n,  \
+              signal, value, operation, pe);                                        \
+    }                                                                               \
     static const struct rma_kind kind_##NAME = {                                    \
         #NAME, (int)sizeof(T), 1, put_##NAME, get_##NAME, iput_##NAME, iget_##NAME, \
         ibput_##NAME, ibget_##NAME, put_nbi_##NAME, get_nbi_##NAME, p_##NAME, g_##NAME, \
-        load_##NAME, store_##NAME };
+        load_##NAME, store_##NAME, put_signal_##NAME, put_signal_nbi_##NAME };
 
 #define SIZED_KIND(BITS)                                                            \
     static void put_##BITS(shmem_ctx_t ctx, int generic, void *dest, const void *source, \
@@ -230,9 +258,24 @@ struct rma_kind {
         (void)generic;                                                              \
         SIZED(ctx, get##BITS##_nbi, dest, source, n, pe);                           \
     }                                                                               \
+    static void put_signal_##BITS(shmem_ctx_t ctx, int generic, void *dest,         \
+                                  const void *source, size_t n, uint64_t *signal,   \
+                                  uint64_t value, int operation, int pe)            \
+    {                                                                               \
+        (void)generic;                                                              \
+        SIZED(ctx, put##BITS##_signal, dest, source, n, signal, value, operation, pe); \
+    }                                                                               \
+    static void put_signal_nbi_##BITS(shmem_ctx_t ctx, int generic, void *dest,     \
+                                      const void *source, size_t n, uint64_t *signal, \
+                                      uint64_t value, int operation, int pe)        \
+    {                                                                               \
+        (void)generic;                                                              \
+        SIZED(ctx, put##BITS##_signal_nbi, dest, source, n, signal, value, operation, pe); \
+    }                                                                               \
     static const struct rma_kind kind_##BITS = {                                    \
         "size" #BITS, BITS / 8, 0, put_##BITS, get_##BITS, iput_##BITS, iget_##BITS, \
-        ibput_##BITS, ibget_##BITS, put_nbi_##BITS, get_nbi_##BITS, NULL, NULL, NULL, NULL };
+        ibput_##BITS, ibget_##BITS, put_nbi_##BITS, get_nbi_##BITS, NULL, NULL, NULL, NULL, \
+        put_signal_##BITS, put_signal_nbi_##BITS };
 
 /* Table 5, as the specification lists it (§9.6), and the sized forms' sizes. */
 #define RMA_TYPES(X)                                                                \
@@ -253,15 +296,17 @@ RMA_SIZES(SIZED_KIND)
 static const struct rma_kind *const kinds[] = { RMA_TYPES(TYPED_ENTRY) RMA_SIZES(SIZED_ENTRY) };
 enum { KINDS = sizeof kinds / sizeof *kinds, TYPED_KINDS = 24 };
 
-/* The cases: four classes over every kind, and p and g over the typed ones. */
-enum { CASE_COUNT = 4 * KINDS + TYPED_KINDS };
+/* The cases: four classes over every kind, p and g over the typed ones, then
+ * put_signal and put_signal_nbi over every kind - after the others, so that
+ * the first 140 cases keep their rounds. */
+enum { SIGNAL_FIRST = 4 * KINDS + TYPED_KINDS, CASE_COUNT = SIGNAL_FIRST + 2 * KINDS };
 
 static struct {
     /* the plan */
     uint64_t seed;
     size_t halo_most;               /* the largest halo, bytes */
     int plant_halo, plant_put, plant_gap, plant_get, plant_get_gap, plant_ptr, plant_flag,
-        plant_single, plant_ptr_null;
+        plant_single, plant_ptr_null, plant_signal;
     /* the team */
     shmem_team_t team;
     int n, me, me_world, next, previous;    /* team ranks */
@@ -272,6 +317,7 @@ static struct {
     /* symmetric */
     unsigned char *halo;            /* [halo_most], written by the previous PE */
     uint64_t *flag;                 /* the halo's, raised by the previous PE */
+    uint64_t *signal;               /* a put_signal case's, set by the previous PE */
     unsigned char *inbox;           /* [REGION], written by the previous PE */
     unsigned char *source;          /* [REGION], read by the next PE */
     uint64_t *ptr_slots;            /* [local_most][PTR_WORDS], by the writer's local rank */
@@ -291,7 +337,7 @@ static uint64_t rma_memory(int npes, const struct pacer_options *options, char *
     for (int p = 0; p < layout->pes; p++)
         if (layout->local[p] + 1 > local_most)
             local_most = layout->local[p] + 1;
-    uint64_t fixed = 2 * REGION + (uint64_t)local_most * (PTR_WORDS + 1) * 8 + 8;
+    uint64_t fixed = 2 * REGION + (uint64_t)local_most * (PTR_WORDS + 1) * 8 + 16;
     size_t halo = 1 << 20;
     while (halo > 8 && fixed + halo > options->memory)
         halo /= 8;
@@ -312,10 +358,12 @@ static uint64_t rma_memory(int npes, const struct pacer_options *options, char *
     rma.plant_flag = options->plant == PACER_PLANT_RMA_FLAG;
     rma.plant_single = options->plant == PACER_PLANT_RMA_SINGLE;
     rma.plant_ptr_null = options->plant == PACER_PLANT_RMA_PTR_NULL;
+    rma.plant_signal = options->plant == PACER_PLANT_RMA_SIGNAL;
     char halo_text[32];
     pacer_size(halo_text, sizeof halo_text, halo);
-    snprintf(fields, size, "halo=8..%s cases=%d kinds=%d flags=atomic_add,signal_add,signal_set",
-             halo_text, CASE_COUNT, KINDS);
+    snprintf(fields, size, "halo=8..%s cases=%d kinds=%d flags=atomic_add,signal_add,signal_set "
+             "puts=putmem,putmem_nbi,uint64_put,putmem_signal,putmem_signal_nbi", halo_text,
+             CASE_COUNT, KINDS);
     return fixed + halo;
 }
 
@@ -344,6 +392,7 @@ static int rma_rebind(shmem_team_t team, const struct pacer_options *options)
             shmem_team_translate_pe(SHMEM_TEAM_WORLD, p, team) >= 0)
             rma.mates[rma.local_count++] = p;
     shmem_uint64_atomic_set(rma.flag, (uint64_t)rma.round, rma.me_world);
+    shmem_uint64_atomic_set(rma.signal, 0, rma.me_world);
     for (int l = 0; l < rma.local_most; l++)
         rma.ptr_flags[l] = 0;
     rma.bytes = rma.transfers = 0;
@@ -364,6 +413,7 @@ static int rma_setup(shmem_team_t team, const struct pacer_options *options)
         return -1;
     rma.halo = shmem_malloc(rma.halo_most);
     rma.flag = shmem_calloc(1, sizeof *rma.flag);
+    rma.signal = shmem_calloc(1, sizeof *rma.signal);
     rma.inbox = shmem_malloc(REGION);
     rma.source = shmem_malloc(REGION);
     rma.ptr_slots = shmem_calloc((size_t)rma.local_most * PTR_WORDS, sizeof *rma.ptr_slots);
@@ -371,7 +421,7 @@ static int rma_setup(shmem_team_t team, const struct pacer_options *options)
     rma.outgoing = malloc(REGION);
     rma.incoming = malloc(REGION);
     rma.halo_out = malloc(rma.halo_most);
-    if (!rma.halo || !rma.flag || !rma.inbox || !rma.source || !rma.ptr_slots ||
+    if (!rma.halo || !rma.flag || !rma.signal || !rma.inbox || !rma.source || !rma.ptr_slots ||
         !rma.ptr_flags || !rma.outgoing || !rma.incoming || !rma.halo_out)
         return -1;
     rma.round = 0;     /* and on through every rebind: mix's periods */
@@ -427,7 +477,7 @@ static void halo(long round, shmem_ctx_t ctx, const char *context)
     size_t bytes = sizes[round % HALO_SIZES];
     if (bytes > rma.halo_most)
         bytes = rma.halo_most;
-    int method = (int)(round % FLAG_METHODS), put = (int)((round / FLAG_METHODS) % 3);
+    int method = (int)(round % FLAG_METHODS), put = (int)((round / FLAG_METHODS) % HALO_PUTS);
     double started = pacer_now();
     fill(rma.halo_out, bytes, rma.me_world, rma.next_world, round);
     if (rma.plant_halo && rma.me_world == 1) {
@@ -442,18 +492,36 @@ static void halo(long round, shmem_ctx_t ctx, const char *context)
         ctx == SHMEM_CTX_DEFAULT ? shmem_putmem_nbi(rma.halo, rma.halo_out, bytes, rma.next_world)
                                  : shmem_ctx_putmem_nbi(ctx, rma.halo, rma.halo_out, bytes,
                                                         rma.next_world);
-    else if (ctx == SHMEM_CTX_DEFAULT)
+    else if (put == 2 && ctx == SHMEM_CTX_DEFAULT)
         shmem_uint64_put((uint64_t *)rma.halo, (const uint64_t *)rma.halo_out, bytes / 8,
                          rma.next_world);
-    else
+    else if (put == 2)
         shmem_ctx_uint64_put(ctx, (uint64_t *)rma.halo, (const uint64_t *)rma.halo_out,
                              bytes / 8, rma.next_world);
-    if (ctx == SHMEM_CTX_DEFAULT)
-        shmem_fence();
-    else
-        shmem_ctx_fence(ctx);
     uint64_t raised = (uint64_t)round + 1;
-    if (ctx == SHMEM_CTX_DEFAULT) {
+    if (put >= 3) {
+        /* The data and the flag in one call: the flag set to the rounds
+         * done, or added one to them, by the signal itself. */
+        if (method == ATOMIC_ADD)
+            method = SIGNAL_ADD;
+        int operation = method == SIGNAL_SET ? SHMEM_SIGNAL_SET : SHMEM_SIGNAL_ADD;
+        uint64_t value = method == SIGNAL_SET ? raised : 1;
+        if (put == 3 && ctx == SHMEM_CTX_DEFAULT)
+            shmem_putmem_signal(rma.halo, rma.halo_out, bytes, rma.flag, value, operation,
+                                rma.next_world);
+        else if (put == 3)
+            shmem_ctx_putmem_signal(ctx, rma.halo, rma.halo_out, bytes, rma.flag, value,
+                                    operation, rma.next_world);
+        else if (ctx == SHMEM_CTX_DEFAULT)
+            shmem_putmem_signal_nbi(rma.halo, rma.halo_out, bytes, rma.flag, value, operation,
+                                    rma.next_world);
+        else
+            shmem_ctx_putmem_signal_nbi(ctx, rma.halo, rma.halo_out, bytes, rma.flag, value,
+                                        operation, rma.next_world);
+        if (put == 4)               /* a nonblocking one's delivery waits for its quiet */
+            quiet_on(ctx);
+    } else if (ctx == SHMEM_CTX_DEFAULT) {
+        shmem_fence();
         if (method == ATOMIC_ADD)
             shmem_uint64_atomic_add(rma.flag, 1, rma.next_world);
         else if (method == SIGNAL_ADD)
@@ -461,6 +529,7 @@ static void halo(long round, shmem_ctx_t ctx, const char *context)
         else
             shmem_signal_set(rma.flag, raised, rma.next_world);
     } else {
+        shmem_ctx_fence(ctx);
         if (method == ATOMIC_ADD)
             shmem_ctx_uint64_atomic_add(ctx, rma.flag, 1, rma.next_world);
         else if (method == SIGNAL_ADD)
@@ -630,10 +699,47 @@ static void transfer_case(long round, enum transfer_class *form, const struct rm
     if (index < 4 * KINDS) {
         *form = (enum transfer_class)(index / KINDS);
         *kind = kinds[index % KINDS];
-    } else {
+    } else if (index < SIGNAL_FIRST) {
         *form = SINGLE;
         *kind = kinds[index - 4 * KINDS];
+    } else {
+        *form = (enum transfer_class)(SIGNAL + (index - SIGNAL_FIRST) / KINDS);
+        *kind = kinds[(index - SIGNAL_FIRST) % KINDS];
     }
+}
+
+/* A put_signal case's signal: set to the round plus one, or added one to the
+ * zero its receiver left, by the case and the pass - alike at both ends. */
+static void signal_of(long round, int *operation, uint64_t *value)
+{
+    long pass = round / CASE_COUNT, index = round % CASE_COUNT;
+    *operation = (index + pass) % 2 ? SHMEM_SIGNAL_SET : SHMEM_SIGNAL_ADD;
+    *value = *operation == SHMEM_SIGNAL_SET ? (uint64_t)round + 1 : 1;
+}
+
+/* A put_signal case at its receiver: the signal, then every byte of the
+ * inbox, read before any sync - data the signal overtook shows here - and the
+ * signal back to zero for the next case, before the round's syncs. */
+static void signaled(long round, const struct rma_kind *kind, enum transfer_class form,
+                     const struct transfer_layout *layout, const char *context)
+{
+    int operation;
+    uint64_t want;
+    signal_of(round, &operation, &want);
+    shmem_signal_wait_until(rma.signal, SHMEM_CMP_NE, 0);
+    uint64_t have = shmem_signal_fetch(rma.signal);
+    if (rma.plant_signal && rma.me_world == 1) {
+        have++;                     /* the planted defect: the signal misread once */
+        rma.plant_signal = 0;
+    }
+    if (have != want)
+        pacer_failure("rma round=%ld %s %s %s: the signal from PE %d reads %llu, expected %llu",
+                      round, class_names[form], kind->name, context, rma.previous_world,
+                      (unsigned long long)have, (unsigned long long)want);
+    expect(expected_bytes, owned_bytes, kind, form, layout, rma.previous_world, rma.me_world,
+           round);
+    compare(rma.inbox, round, "put, at its signal,", kind, form, context, rma.previous_world);
+    shmem_uint64_atomic_set(rma.signal, 0, rma.me_world);
 }
 
 /* The round's sources: this PE's `source`, which the next PE reads, and its
@@ -705,6 +811,21 @@ static void transfer(long round, shmem_ctx_t ctx, const char *context)
             kind->p(ctx, generic, rma.inbox + e * w, v, next);
         }
         break;
+    case SIGNAL:
+    case SIGNAL_NBI: {
+        int operation;
+        uint64_t value;
+        signal_of(round, &operation, &value);
+        if (form == SIGNAL) {
+            kind->put_signal(ctx, generic, rma.inbox, rma.outgoing, layout.count, rma.signal,
+                             value, operation, next);
+        } else {
+            kind->put_signal_nbi(ctx, generic, rma.inbox, rma.outgoing, layout.count,
+                                 rma.signal, value, operation, next);
+            quiet_on(ctx);          /* a nonblocking one's delivery waits for its quiet */
+        }
+        break;
+    }
     default:
         break;
     }
@@ -719,6 +840,7 @@ static void transfer(long round, shmem_ctx_t ctx, const char *context)
     memset(rma.incoming, CANARY, REGION);
     switch (form) {
     case CONTIGUOUS:
+    case SIGNAL:
         kind->get(ctx, !generic && kind->typed, rma.incoming, rma.source, layout.count, previous);
         break;
     case STRIDED:
@@ -730,6 +852,7 @@ static void transfer(long round, shmem_ctx_t ctx, const char *context)
                     layout.bsize, layout.count / layout.bsize, previous);
         break;
     case NONBLOCKING:
+    case SIGNAL_NBI:
         for (size_t first = 0; first < layout.count; first += 8) {
             size_t chunk = layout.count - first < 8 ? layout.count - first : 8;
             kind->get_nbi(ctx, !generic && kind->typed, rma.incoming + first * w,
@@ -744,6 +867,8 @@ static void transfer(long round, shmem_ctx_t ctx, const char *context)
     default:
         break;
     }
+    if (form == SIGNAL || form == SIGNAL_NBI)
+        signaled(round, kind, form, &layout, context);
     if (form == NONBLOCKING && round % 2) {
         int both[2] = { next, previous };
         if (ctx == SHMEM_CTX_DEFAULT)
@@ -901,6 +1026,7 @@ static void rma_teardown(void)
     shmem_free(rma.ptr_slots);
     shmem_free(rma.source);
     shmem_free(rma.inbox);
+    shmem_free(rma.signal);
     shmem_free(rma.flag);
     shmem_free(rma.halo);
     free(rma.halo_out);
