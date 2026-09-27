@@ -49,6 +49,7 @@
 
 #include "base/size.h"
 #include "exercise.h"
+#include "library-counters.h"
 #include "parallel-print.h"
 #include "random.h"
 
@@ -768,11 +769,13 @@ static const char *thread_level(void)
  * next reduction that writes it - the spec's "dest ready on every PE"
  * (§9.10), with no sync spent on it. */
 enum {
-    SUM_WORK, SUM_BYTES, SUM_BATCH, SUM_FAILURES, SUMS,
+    SUM_WORK, SUM_BYTES, SUM_BATCH, SUM_FAILURES, SUM_LIBRARY_NODES, SUM_LIBRARY,
+    SUMS = SUM_LIBRARY + PACER_LIBRARY_COUNTERS,
     MAX_STEP = 0, MAX_BATCH, MAX_ELAPSED, MAX_LINES, MAX_FINISHED, MAX_PHASE, MAXIMA =
         MAX_PHASE + PACER_PHASES
 };
 static double *sum_source, *sum_result, *max_source, *max_result;
+static int library_counters_open;   /* this PE reads its node's counters */
 
 struct totals {
     long rounds;
@@ -901,6 +904,17 @@ static void run_on(const struct pacer_exercise *exercise, shmem_team_t team, lon
         sum_source[SUM_BYTES] = counters.bytes;
         sum_source[SUM_BATCH] = counters.batch;
         sum_source[SUM_FAILURES] = (double)failures.count;
+        /* The library's counters, on the world alone: a team's checkpoint
+         * would sum only the nodes whose first PE is in it. They are read
+         * only here, so a world line's growth covers everything since the
+         * last - a mix's team periods between them included. */
+        double growth[PACER_LIBRARY_COUNTERS] = { 0 };
+        int library_here = team == SHMEM_TEAM_WORLD && library_counters_open;
+        if (library_here)
+            pacer_library_counters_growth(growth);
+        sum_source[SUM_LIBRARY_NODES] = library_here;
+        for (int k = 0; k < PACER_LIBRARY_COUNTERS; k++)
+            sum_source[SUM_LIBRARY + k] = growth[k];
         shmem_double_sum_reduce(team, sum_result, sum_source, SUMS);
         double sums[SUMS], maxima[MAXIMA];
         memcpy(sums, sum_result, sizeof sums);
@@ -942,6 +956,12 @@ static void run_on(const struct pacer_exercise *exercise, shmem_team_t team, lon
                 snprintf(line + used, size - used, " step_s=%.3f failures=%.0f\n",
                          step, totals.failures);
             fputs(line, stdout);
+            if (sums[SUM_LIBRARY_NODES] > 0) {
+                printf("%slibrary nodes=%.0f", prefix, sums[SUM_LIBRARY_NODES]);
+                for (int k = 0; k < PACER_LIBRARY_COUNTERS; k++)
+                    printf(" %s=%.0f", pacer_library_field_names[k], sums[SUM_LIBRARY + k]);
+                printf("\n");
+            }
             fflush(stdout);
         }
         flush_failures(team, (int)maxima[MAX_LINES]);
@@ -1198,6 +1218,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "osoe-pacer: PE %d: out of memory at start\n", me);
         shmem_global_exit(2);
     }
+    library_counters_open = pacer_library_counters_open();
     sum_source = shmem_malloc(sizeof *sum_source * SUMS);
     sum_result = shmem_malloc(sizeof *sum_result * SUMS);
     max_source = shmem_malloc(sizeof *max_source * MAXIMA);
@@ -1354,6 +1375,7 @@ int main(int argc, char **argv)
     shmem_free(max_source);
     shmem_free(sum_result);
     shmem_free(sum_source);
+    pacer_library_counters_close();
     release_layout();
     parallel_print_finalize();
 #ifdef PACER_COUNTED

@@ -5,10 +5,10 @@
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
 set(osoe_pacer_sources osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
-  threads.c print.c atomics.c rma.c locks.c memory.c collectives.c
-  ${PROJECT_SOURCE_DIR}/base/size.c)
+  threads.c print.c atomics.c rma.c locks.c memory.c collectives.c library-counters.c
+  ${PROJECT_SOURCE_DIR}/base/size.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 add_executable(osoe-pacer ${osoe_pacer_sources})
-target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR})
+target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/tools/stat)
 find_package(Threads REQUIRED)
 target_link_libraries(osoe-pacer PRIVATE osoe Threads::Threads m)
 osoe_warnings(osoe-pacer)
@@ -39,7 +39,8 @@ add_custom_command(
   COMMENT "pacer: generating the call-counting shim"
   VERBATIM)
 add_executable(osoe-pacer-counted ${osoe_pacer_sources} ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c)
-target_include_directories(osoe-pacer-counted PRIVATE ${PROJECT_SOURCE_DIR})
+target_include_directories(osoe-pacer-counted PRIVATE ${PROJECT_SOURCE_DIR}
+  ${PROJECT_SOURCE_DIR}/tools/stat)
 target_link_libraries(osoe-pacer-counted PRIVATE osoe Threads::Threads m)
 target_compile_definitions(osoe-pacer-counted PRIVATE PACER_COUNTED=1)
 osoe_warnings(osoe-pacer-counted)
@@ -111,16 +112,19 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   # `;` of a line, which would otherwise split the list of patterns.
   # Every planted run also says so, in a line after the header and on its
   # last line, so that it cannot be taken for a finding.
-  function(pacer_plant defect exercise)
+  function(pacer_plant_named name defect exercise)
     set(patterns "osoe-pacer planted ${defect}: PE 1[ ']"
         "osoe-pacer failures=[1-9][0-9]* seconds=[0-9.]+ plant=${defect}" ${ARGN})
-    add_test(NAME tools.pacer.plant.${defect}
+    add_test(NAME tools.pacer.plant.${name}
       COMMAND ${CMAKE_COMMAND} -DLAUNCH=$<TARGET_FILE:osoe-launch>
               -DPACER=$<TARGET_FILE:osoe-pacer>
               "-DARGUMENTS=--quick;--plant;${defect};${exercise}" "-DPATTERNS=${patterns}"
               "-DFAIL=killed by signal|timeout after|left behind"
               -P ${PROJECT_SOURCE_DIR}/cmake/PacerPlant.cmake)
-    set_tests_properties(tools.pacer.plant.${defect} PROPERTIES LABELS "tier2" TIMEOUT 300)
+    set_tests_properties(tools.pacer.plant.${name} PROPERTIES LABELS "tier2" TIMEOUT 300)
+  endfunction()
+  function(pacer_plant defect exercise)
+    pacer_plant_named(${defect} ${defect} "${exercise}" ${ARGN})
   endfunction()
   pacer_plant(sort-key sort
     "sort round=0 oracle: sum generated [0-9a-f]+, received [0-9a-f]+"
@@ -288,8 +292,6 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
     "osoe-pacer failures=[1-9]")
 
-  # Splitting until the job's team numbers run out: the split must return
-  # nonzero on every PE, and the job go on (design §5.7).
   # The counted build: it runs, and its report counts what the run called.
   add_test(NAME tools.pacer.counted.0-0-1-1
     COMMAND sh -c "$<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer-counted> --quick --coverage coverage-test.txt sort atomics && head -1 coverage-test.txt"
@@ -298,8 +300,18 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     PASS_REGULAR_EXPRESSION "shim called=[1-9][0-9]+ declared=[1-9][0-9]+"
     FAIL_REGULAR_EXPRESSION "failures=[1-9]|killed by signal|timeout after|left behind")
   # A plant fired inside a mix period, on PE 1's team.
-  pacer_plant(locks-count mix
+  pacer_plant_named(mix-locks-count locks-count mix
     "mix1.3. locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
+  # The library's counters: a world run on two nodes prints both nodes' growth,
+  # and bytes crossed between them - a reader that stops finding the segment,
+  # or a field, would otherwise leave the line out unnoticed.
+  add_test(NAME tools.pacer.library.0-0-1-1
+    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick sort)
+  set_tests_properties(tools.pacer.library.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "library nodes=2 bytes_sent=[1-9][0-9]* .*osoe-pacer failures=0 "
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+  # Splitting until the job's team numbers run out: the split must return
+  # nonzero on every PE, and the job go on (design §5.7).
   add_test(NAME tools.pacer.teams-exhaust.0-0-1-1
     COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --teams-exhaust
             teams)
