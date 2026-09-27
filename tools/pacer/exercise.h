@@ -106,6 +106,12 @@ enum pacer_plant {
     PACER_PLANT_WAITS_VALUE,        /* PE 1 writes one waited-for word wrong */
     PACER_PLANT_WAITS_INDEX,        /* PE 1 misjudges one index an _any form returned */
     PACER_PLANT_WAITS_EXCLUDED,     /* PE 1 misreads one return with every word excluded */
+    PACER_PLANT_DEPRECATED_REDUCE,  /* PE 1 gives one sum_to_all an input one too many */
+    PACER_PLANT_DEPRECATED_DATA,    /* PE 1 offers one byte wrong to an active-set collective */
+    PACER_PLANT_DEPRECATED_OUTSIDE, /* PE 1 changes its dest outside the active set */
+    PACER_PLANT_DEPRECATED_BARRIER, /* PE 1 skips its arrival at one active-set barrier */
+    PACER_PLANT_DEPRECATED_AMO,     /* PE 1 misreads one deprecated atomic's return */
+    PACER_PLANT_DEPRECATED_WAIT,    /* PE 1 writes one deprecated wait's word wrong */
     PACER_PLANTS
 };
 
@@ -170,7 +176,7 @@ struct pacer_exercise {
 
 extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_teams,
     pacer_threads, pacer_print, pacer_atomics, pacer_rma, pacer_locks, pacer_memory,
-    pacer_collectives, pacer_waits;
+    pacer_collectives, pacer_waits, pacer_deprecated;
 
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,

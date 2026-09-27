@@ -64,7 +64,8 @@ static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoa
                                                       &pacer_teams, &pacer_atomics, &pacer_rma,
                                                       &pacer_locks, &pacer_memory,
                                                       &pacer_waits, &pacer_collectives,
-                                                      &pacer_threads, &pacer_print };
+                                                      &pacer_threads, &pacer_print,
+                                                      &pacer_deprecated };
 enum { KNOWN = sizeof known / sizeof *known };
 
 static const char *const plant_names[PACER_PLANTS] = {
@@ -79,7 +80,9 @@ static const char *const plant_names[PACER_PLANTS] = {
     "collectives-gap", "atomics-fetch-count", "atomics-attempts", "rma-flag", "rma-single",
     "rma-ptr-null", "memory-realloc", "memory-refused", "collectives-status",
     "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold", "print-route",
-    "rma-signal", "waits-value", "waits-index", "waits-excluded"
+    "rma-signal", "waits-value", "waits-index", "waits-excluded", "deprecated-reduce",
+    "deprecated-data", "deprecated-outside", "deprecated-barrier", "deprecated-amo",
+    "deprecated-wait"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -88,7 +91,8 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "rma", "rma", "rma", "rma", "rma", "locks", "locks", "memory", "memory", "memory", "memory",
     "memory", "collectives", "collectives", "collectives", "collectives", "atomics", "atomics",
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
-    "memory", "print", "print", "rma", "waits", "waits", "waits"
+    "memory", "print", "print", "rma", "waits", "waits", "waits", "deprecated", "deprecated",
+    "deprecated", "deprecated", "deprecated", "deprecated"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -152,6 +156,12 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 writes one waited-for word wrong",
     "PE 1 misjudges one index an _any form returned",
     "PE 1 misreads one return with every word excluded",
+    "PE 1 gives one sum_to_all an input one too many",
+    "PE 1 offers one byte wrong to an active-set collective",
+    "PE 1 changes its dest outside the active set",
+    "PE 1 skips its arrival at one active-set barrier",
+    "PE 1 misreads one deprecated atomic's return",
+    "PE 1 writes one deprecated wait's word wrong",
 };
 
 static void usage(FILE *out)
@@ -180,6 +190,10 @@ static void usage(FILE *out)
 "  threads   worker threads on private, serialized, default and team contexts;\n"
 "            only when named, since it runs under SHMEM_THREAD_MULTIPLE\n"
 "  print     parallel_print checking its own lines; only when named\n"
+"  deprecated\n"
+"            Annex F's routines - the active-set collectives, the old atomic\n"
+"            names, the old waits, the cache routines - for coverage; only\n"
+"            when named, and on the world alone\n"
 "  mix       the world split into teams, each running mailbox, atomics, rma,\n"
 "            locks or collectives, out of step, the exercises rotating through\n"
 "            the teams, sort and alltoall on the world between; only when\n"

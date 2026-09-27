@@ -5,7 +5,8 @@
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
 set(osoe_pacer_sources osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
-  threads.c print.c atomics.c rma.c locks.c memory.c collectives.c waits.c library-counters.c
+  threads.c print.c atomics.c rma.c locks.c memory.c collectives.c waits.c deprecated.c
+  library-counters.c
   ${PROJECT_SOURCE_DIR}/base/size.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 add_executable(osoe-pacer ${osoe_pacer_sources})
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/tools/stat)
@@ -102,6 +103,19 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             mix)
   set_tests_properties(tools.pacer.mix-cycle.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
     PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+
+  # Annex F's routines through their whole cycle - every case on every active
+  # set, by name and by the deprecated generics - on five PEs over three nodes,
+  # interleaved; and every wait form of every type in both spellings.
+  add_test(NAME tools.pacer.deprecated.0-1-2-0-1
+    COMMAND osoe-launch -n 5 -m 0,1,2,0,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick
+            --rounds 368 deprecated)
+  add_test(NAME tools.pacer.waits.0-1-2
+    COMMAND osoe-launch -n 3 -m 0,1,2 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick
+            --rounds 336 waits)
+  set_tests_properties(tools.pacer.deprecated.0-1-2-0-1 tools.pacer.waits.0-1-2 PROPERTIES
+    LABELS "tier2" TIMEOUT 300 PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
     FAIL_REGULAR_EXPRESSION "${pacer_failed}")
 
   # The sort's other paths - the accumulating mode, the pull exchange, puts
@@ -307,6 +321,18 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
     "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
     "osoe-pacer failures=[1-9]")
+  pacer_plant(deprecated-reduce deprecated
+    "deprecated round=12 int_sum_to_all set=0:0:4: element 0 is [0-9]+.0i, expected [0-9]+.0i")
+  pacer_plant(deprecated-data deprecated
+    "deprecated round=46 collect32 set=1:1:2: byte 0 is [0-9a-f]+, not [0-9a-f]+")
+  pacer_plant(deprecated-outside deprecated
+    "deprecated round=45 broadcast64 set=0:1:2: byte 0 is a4, not a5, on a PE outside the set")
+  pacer_plant(deprecated-barrier deprecated
+    "deprecated round=54 barrier set=1:1:2: the first member counted 1 arrivals when it returned, expected 2")
+  pacer_plant(deprecated-amo deprecated
+    "deprecated round=56 int_set_fetch: returned [0-9]+, expected [0-9]+")
+  pacer_plant(deprecated-wait deprecated
+    "deprecated round=81 shmem_short_wait: the word from PE 1 holds [0-9]+, expected [0-9]+")
   pacer_plant(waits-value waits
     "waits round=1 long wait_until ne: word 0 from PE 1 holds [0-9]+, expected [0-9]+")
   pacer_plant(waits-index waits
