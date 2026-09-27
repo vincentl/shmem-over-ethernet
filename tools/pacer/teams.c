@@ -80,7 +80,8 @@ static struct {
     /* the plan */
     uint64_t seed;
     int exhaust;
-    int plant_query, plant_collective, plant_exhaust;
+    int plant_query, plant_collective, plant_exhaust, plant_member, plant_ring;
+    int query_planted, collective_planted[KINDS];
     int grid_size, columns, rows;   /* the grid's parent size, and its shape */
     int grid_row_index;             /* this PE's row in the grid, or -1 */
     int spent;                      /* team numbers */
@@ -124,6 +125,8 @@ static uint64_t teams_memory(int npes, const struct pacer_options *options, char
     teams.plant_query = options->plant == PACER_PLANT_TEAMS_QUERY;
     teams.plant_collective = options->plant == PACER_PLANT_TEAMS_COLLECTIVE;
     teams.plant_exhaust = options->plant == PACER_PLANT_TEAMS_EXHAUST;
+    teams.plant_member = options->plant == PACER_PLANT_TEAMS_MEMBER;
+    teams.plant_ring = options->plant == PACER_PLANT_TEAMS_RING;
     if (teams.exhaust) {
         snprintf(fields, size, "mode=exhaust");
         return 0;
@@ -185,32 +188,43 @@ static void check_queries(struct team *t, const struct team *world_team)
     const struct pacer_layout *layout = pacer_layout();
     int rank;
     int member = member_of(t, teams.me_world, &rank);
-    if (member != (t->handle != SHMEM_TEAM_INVALID)) {
+    int believed = member;
+    if (teams.plant_member && teams.me_world == 1 && t == &teams.teams[2]) {
+        believed = !member;         /* the planted defect: membership of "one" misjudged */
+        teams.plant_member = 0;
+    }
+    if (believed != (t->handle != SHMEM_TEAM_INVALID)) {
         pacer_failure("teams %s: this PE %s a member, and its handle %s SHMEM_TEAM_INVALID",
-                      t->name, member ? "is" : "is not", member ? "is" : "is not");
+                      t->name, believed ? "is" : "is not", believed ? "is" : "is not");
+        t->rank = member ? rank : -1;
         return;
     }
     t->rank = rank;
     if (!member)
         return;
-    int want_rank = rank;
-    if (teams.plant_query && teams.me_world == 1) {
-        want_rank++;                /* the planted defect: one answer not what it asks */
-        teams.plant_query = 0;
-    }
+    /* The planted defect: every expectation of one team off by one, so that
+     * each query's check fires once. */
+    int plant = teams.plant_query && teams.me_world == 1 && !teams.query_planted;
+    if (plant)
+        teams.query_planted = 1;
+    int want_rank = rank + plant;
     int n = shmem_team_n_pes(t->handle), my = shmem_team_my_pe(t->handle);
     if (n != t->size || my != want_rank)
         pacer_failure("teams %s: team_n_pes %d and team_my_pe %d, expected %d and %d", t->name,
                       n, my, t->size, want_rank);
     for (int r = 0; r < t->size; r++) {
         int world = shmem_team_translate_pe(t->handle, r, SHMEM_TEAM_WORLD);
-        if (world != t->start + r * t->stride) {
+        int want_world = t->start + r * t->stride + (plant && r == 0);
+        if (world != want_world) {
             pacer_failure("teams %s: rank %d translates to world PE %d, expected %d", t->name, r,
-                          world, t->start + r * t->stride);
+                          world, want_world);
             break;
         }
+    }
+    for (int r = 0; r < t->size; r++) {     /* apart, so each check stops only itself */
+        int world = t->start + r * t->stride;
         void *near = shmem_team_ptr(t->handle, t->longs[0], r);
-        int mate = layout->node[world] == layout->node[teams.me_world];
+        int mate = (layout->node[world] == layout->node[teams.me_world]) != (plant && r == 0);
         if ((near != NULL) != mate) {
             pacer_failure("teams %s: team_ptr to rank %d, world PE %d, is %s; it is %s", t->name,
                           r, world, near ? "not NULL" : "NULL",
@@ -221,6 +235,7 @@ static void check_queries(struct team *t, const struct team *world_team)
     for (int w = 0; w < world_team->size; w++) {
         int expected;
         member_of(t, w, &expected);
+        expected += plant && w == 0;
         int got = shmem_team_translate_pe(SHMEM_TEAM_WORLD, w, t->handle);
         if (got != expected) {
             pacer_failure("teams %s: world PE %d translates to rank %d, expected %d", t->name, w,
@@ -230,12 +245,13 @@ static void check_queries(struct team *t, const struct team *world_team)
     }
     shmem_team_config_t config = { .num_contexts = -1 };
     if (shmem_team_get_config(t->handle, SHMEM_TEAM_NUM_CONTEXTS, &config) != 0 ||
-        config.num_contexts != 0)
-        pacer_failure("teams %s: team_get_config gave num_contexts %d, expected 0", t->name,
-                      config.num_contexts);
+        config.num_contexts != plant)
+        pacer_failure("teams %s: team_get_config gave num_contexts %d, expected %d", t->name,
+                      config.num_contexts, plant);
     shmem_team_t named = SHMEM_TEAM_INVALID;
     t->has_ctx = shmem_team_create_ctx(t->handle, 0, &t->ctx) == 0;
-    if (!t->has_ctx || shmem_ctx_get_team(t->ctx, &named) != 0 || named != t->handle)
+    shmem_team_t expected_team = plant ? SHMEM_TEAM_WORLD : t->handle;
+    if (!t->has_ctx || shmem_ctx_get_team(t->ctx, &named) != 0 || named != expected_team)
         pacer_failure("teams %s: a context of the team %s", t->name,
                       t->has_ctx ? "names another team" : "could not be created");
 }
@@ -373,9 +389,10 @@ static int teams_setup(shmem_team_t team, const struct pacer_options *options)
     if (t[GRID_ROW].rank >= 0 && t[GRID_COLUMN].rank >= 0) {
         int through = shmem_team_translate_pe(t[GRID_ROW].handle, t[GRID_ROW].rank,
                                               t[GRID_COLUMN].handle);
-        if (through != t[GRID_COLUMN].rank)
+        int want = t[GRID_COLUMN].rank + (teams.plant_query && teams.me_world == 1);
+        if (through != want)
             pacer_failure("teams row: this PE's row rank %d translates to column rank %d, "
-                          "expected %d", t[GRID_ROW].rank, through, t[GRID_COLUMN].rank);
+                          "expected %d", t[GRID_ROW].rank, through, want);
     }
     shmem_team_sync(team);
     return 0;
@@ -419,10 +436,25 @@ static void collective(struct team *t, enum kind k, long round)
     if (k == PRODUCT)
         for (int e = 0; e < ELEMENTS; e++)
             source[e] = 1 + source[e] % 2;              /* no overflow: 2^m */
-    if (teams.plant_collective && teams.me_world == 1 && t == &teams.teams[GRID_ROW] &&
-        k == SUM) {
-        source[0] += 1;             /* the planted defect: a wrong input, once */
-        teams.plant_collective = 0;
+    /* The planted defect: PE 1's input to its row wrong once in every kind, by
+     * a change each kind's result cannot absorb - past every input for max,
+     * below for min, 0 for and, all ones for or; and for a broadcast or an
+     * exclusive scan, whose result PE 1's input may not reach, PE 1's own
+     * expectation. team_sync has no result to check. */
+    int plant = teams.plant_collective && teams.me_world == 1 && t == &teams.teams[GRID_ROW] &&
+                !teams.collective_planted[k] && k != SYNC;
+    if (plant) {
+        teams.collective_planted[k] = 1;
+        if (k == MAX)
+            source[0] = 1000;
+        else if (k == MIN)
+            source[0] = -1;
+        else if (k == PRODUCT)
+            source[0] = source[0] == 1 ? 2 : 1;
+        else if (k != BROADCAST && k != EXSCAN && k != ALLTOALL)
+            source[0] += 1;
+        words[0] = k == AND ? 0 : k == OR ? UINT64_MAX : words[0] ^ 1;
+        doubles[0] += 1;
     }
     double started = pacer_now();
     switch (k) {
@@ -443,7 +475,7 @@ static void collective(struct team *t, enum kind k, long round)
     case FCOLLECT: shmem_long_fcollect(t->handle, dest, source, 1); break;
     case ALLTOALL:
         for (int j = 0; j < m; j++)             /* block j for rank j: one element */
-            dest[m + j] = input(teams.me_world, round, j);
+            dest[m + j] = input(teams.me_world, round, j) + (plant && j == 0);
         shmem_long_alltoall(t->handle, dest, dest + m, 1);
         break;
     case INSCAN: shmem_long_sum_inscan(t->handle, dest, source, ELEMENTS); break;
@@ -476,6 +508,8 @@ static void collective(struct team *t, enum kind k, long round)
                 else
                     want += v;
             }
+            if (plant && k == EXSCAN && e == 0)
+                want++;
             if (k == DOUBLE_SUM) {
                 if (double_dest[e] != (double)want)
                     wrong(t, k, round, e, double_dest[e], (double)want);
@@ -499,11 +533,11 @@ static void collective(struct team *t, enum kind k, long round)
         break;
     case BROADCAST: {
         int root = (int)(round % m);
-        if (me != root)
-            for (int e = 0; e < ELEMENTS; e++)
-                if (dest[e] != input(world_of(t, root), round, e))
-                    wrong(t, k, round, e, (double)dest[e],
-                          (double)input(world_of(t, root), round, e));
+        for (int e = 0; e < ELEMENTS; e++) {
+            long want = input(world_of(t, root), round, e) + (plant && e == 0);
+            if ((me != root || plant) && (me == root ? source[e] : dest[e]) != want)
+                wrong(t, k, round, e, (double)(me == root ? source[e] : dest[e]), (double)want);
+        }
         break;
     }
     case COLLECT: {
@@ -542,6 +576,10 @@ static void round_trip(struct team *t, int index, long round)
     shmem_ctx_long_p(t->ctx, &teams.ring[index], value, next);
     shmem_ctx_quiet(t->ctx);
     long back = shmem_ctx_long_g(t->ctx, &teams.ring[index], next);
+    if (teams.plant_ring && teams.me_world == 1) {
+        value++;                    /* the planted defect: one round trip misjudged */
+        teams.plant_ring = 0;
+    }
     if (back != value)
         pacer_failure("teams round=%ld %s context: read back %ld from rank %d, not %ld", round,
                       t->name, back, next, value);
@@ -572,6 +610,7 @@ static void teams_step(long units, int last)
 
 static void teams_checkpoint(struct pacer_counters *counters)
 {
+    counters->finished = teams.exhaust;     /* exhausting is done at setup */
     counters->work = teams.collectives;
     for (int k = 0; k < 3; k++)
         counters->phase_seconds[k] = teams.phase[k];

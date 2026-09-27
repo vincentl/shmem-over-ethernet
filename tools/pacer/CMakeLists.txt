@@ -63,7 +63,7 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   # Every planted run also says so, in a line after the header and on its
   # last line, so that it cannot be taken for a finding.
   function(pacer_plant defect exercise)
-    set(patterns "osoe-pacer planted ${defect}: PE 1 "
+    set(patterns "osoe-pacer planted ${defect}: PE 1[ ']"
         "osoe-pacer failures=[1-9][0-9]* seconds=[0-9.]+ plant=${defect}" ${ARGN})
     add_test(NAME tools.pacer.plant.${defect}
       COMMAND ${CMAKE_COMMAND} -DLAUNCH=$<TARGET_FILE:osoe-launch>
@@ -115,9 +115,32 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   pacer_plant(threads-count threads
     "threads round=0 counter [0-9]+: holds [0-9]+, and [0-9]+ were added")
   pacer_plant(teams-query teams
-    "teams [a-z]+: team_n_pes [0-9]+ and team_my_pe [0-9]+, expected [0-9]+ and [0-9]+")
+    "teams [a-z]+: team_n_pes [0-9]+ and team_my_pe [0-9]+, expected [0-9]+ and [0-9]+"
+    "teams [a-z]+: rank 0 translates to world PE [0-9]+, expected [0-9]+"
+    "teams [a-z]+: team_ptr to rank 0, world PE [0-9]+, is [A-Za-z ]+. it is "
+    "teams [a-z]+: world PE 0 translates to rank -?[0-9]+, expected -?[0-9]+"
+    "teams [a-z]+: team_get_config gave num_contexts 0, expected 1"
+    "teams [a-z]+: a context of the team names another team"
+    "teams row: this PE's row rank [0-9]+ translates to column rank [0-9]+, expected [0-9]+")
   pacer_plant(teams-collective teams
-    "teams round=0 row sum_reduce: element 0 is [0-9.]+, expected [0-9.]+")
+    "teams round=[0-9]+ row sum_reduce: element 0 is"
+    "teams round=[0-9]+ row max_reduce: element 0 is 1000,"
+    "teams round=[0-9]+ row min_reduce: element 0 is -1,"
+    "teams round=[0-9]+ row prod_reduce: element 0 is"
+    "teams round=[0-9]+ row and_reduce: element 0 is 0000000000000000,"
+    "teams round=[0-9]+ row or_reduce: element 0 is ffffffffffffffff,"
+    "teams round=[0-9]+ row xor_reduce: element 0 is"
+    "teams round=[0-9]+ row double_sum_reduce: element 0 is"
+    "teams round=[0-9]+ row broadcast: element 0 is"
+    "teams round=[0-9]+ row collect: element 0 is"
+    "teams round=[0-9]+ row fcollect: element [0-9]+ is"
+    "teams round=[0-9]+ row alltoall: element [0-9]+ is"
+    "teams round=[0-9]+ row sum_inscan: element 0 is"
+    "teams round=[0-9]+ row sum_exscan: element 0 is")
+  pacer_plant(teams-member teams
+    "teams one: this PE is a member, and its handle is SHMEM_TEAM_INVALID")
+  pacer_plant(teams-ring teams
+    "teams round=0 strided context: read back [0-9]+ from rank [0-9]+, not [0-9]+")
   pacer_plant(teams-exhaust "teams;--teams-exhaust"
     "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
   pacer_plant(print-hash print

@@ -59,9 +59,11 @@ enum pacer_plant {
     PACER_PLANT_THREADS_ROW,        /* PE 1's thread 0 puts one word other than it checks */
     PACER_PLANT_THREADS_TABLE,      /* PE 1 writes one word of its table wrong */
     PACER_PLANT_THREADS_COUNT,      /* PE 1's thread 0 counts one add short */
-    PACER_PLANT_TEAMS_QUERY,        /* PE 1 expects one query's answer off by one */
-    PACER_PLANT_TEAMS_COLLECTIVE,   /* PE 1 gives one reduction a wrong input */
+    PACER_PLANT_TEAMS_QUERY,        /* PE 1 expects every answer about one team off by one */
+    PACER_PLANT_TEAMS_COLLECTIVE,   /* PE 1 gives its row a wrong input once in every kind */
     PACER_PLANT_TEAMS_EXHAUST,      /* PE 1 claims one split more than it made */
+    PACER_PLANT_TEAMS_MEMBER,       /* PE 1 misjudges its membership of one team */
+    PACER_PLANT_TEAMS_RING,         /* PE 1 misjudges one context round trip */
     PACER_PLANTS
 };
 
@@ -88,6 +90,7 @@ enum { PACER_MESSAGE_CAPACITY = 1024 };
 enum { PACER_PHASES = 5 };
 
 struct pacer_counters {
+    int finished;                   /* nothing more to do: this checkpoint is the last */
     double work;                    /* in the exercise's own unit: keys, exchanges, cases */
     double bytes;                   /* moved between PEs, for the rate */
     double batch;                   /* what one PE received, for the imbalance; 0 if none */

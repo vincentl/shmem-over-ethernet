@@ -56,7 +56,8 @@
  * OSOE_DEFAULT_SYMMETRIC_SIZE, which is internal. */
 #define DEFAULT_HEAP (UINT64_C(256) << 20)
 
-enum { FAILURE_LINES = 4, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
+enum { FAILURE_LINES = 8, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
+#define MOST_UNITS (1L << 24)
 
 static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_mailbox,
                                                       &pacer_teams, &pacer_threads, &pacer_print };
@@ -65,11 +66,12 @@ enum { KNOWN = sizeof known / sizeof *known };
 static const char *const plant_names[PACER_PLANTS] = {
     "", "sort-key", "sort-order", "sort-range", "sort-capacity", "alltoall-byte", "alltoall-gap",
     "print-hash", "mailbox-payload", "mailbox-signal", "mailbox-count", "threads-row",
-    "threads-table", "threads-count", "teams-query", "teams-collective", "teams-exhaust"
+    "threads-table", "threads-count", "teams-query", "teams-collective", "teams-exhaust",
+    "teams-member", "teams-ring"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
-    "mailbox", "threads", "threads", "threads", "teams", "teams", "teams"
+    "mailbox", "threads", "threads", "threads", "teams", "teams", "teams", "teams", "teams"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -86,9 +88,11 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1's thread 0 puts one word other than it checks",
     "PE 1 writes one word of its table wrong",
     "PE 1's thread 0 counts one add short",
-    "PE 1 expects one query's answer off by one",
-    "PE 1 gives one reduction a wrong input",
+    "PE 1 expects every answer about one team off by one",
+    "PE 1 gives its row a wrong input once in every collective",
     "PE 1 claims one split more than it made",
+    "PE 1 misjudges its membership of one team",
+    "PE 1 misjudges one context round trip",
 };
 
 static void usage(FILE *out)
@@ -132,8 +136,9 @@ static void usage(FILE *out)
 "                      sort-range, sort-capacity, alltoall-byte, alltoall-gap,\n"
 "                      print-hash, mailbox-payload, mailbox-signal,\n"
 "                      mailbox-count, threads-row, threads-table,\n"
-"                      threads-count, teams-query, teams-collective or\n"
-"                      teams-exhaust; always on PE 1, named in the header\n"
+"                      threads-count, teams-query, teams-collective,\n"
+"                      teams-exhaust, teams-member or teams-ring; always on\n"
+"                      PE 1, named in the header\n"
 "  --help              this, before shmem_init\n"
 "\n"
 "The last line is \"osoe-pacer failures=N seconds=S\"; the exit status is 1\n"
@@ -425,8 +430,8 @@ static int parse(int argc, char **argv)
                 return refuse("--plant '%s': sort-key, sort-order, sort-range, sort-capacity, "
                               "alltoall-byte, alltoall-gap, print-hash, mailbox-payload, "
                               "mailbox-signal, mailbox-count, threads-row, threads-table, "
-                              "threads-count, teams-query, teams-collective or teams-exhaust",
-                              value);
+                              "threads-count, teams-query, teams-collective, teams-exhaust, "
+                              "teams-member or teams-ring", value);
             options.plant = (enum pacer_plant)k;
         } else {
             return refuse("no option '%s'", name);
@@ -628,7 +633,7 @@ static const char *thread_level(void)
  * (§9.10), with no sync spent on it. */
 enum {
     SUM_WORK, SUM_BYTES, SUM_BATCH, SUM_FAILURES, SUMS,
-    MAX_STEP = 0, MAX_BATCH, MAX_ELAPSED, MAX_LINES, MAX_PHASE, MAXIMA =
+    MAX_STEP = 0, MAX_BATCH, MAX_ELAPSED, MAX_LINES, MAX_FINISHED, MAX_PHASE, MAXIMA =
         MAX_PHASE + PACER_PHASES
 };
 static double *sum_source, *sum_result, *max_source, *max_result;
@@ -766,6 +771,7 @@ static void run(const struct pacer_exercise *exercise, shmem_team_t team)
         max_source[MAX_BATCH] = counters.batch;
         max_source[MAX_ELAPSED] = pacer_now() - start;
         max_source[MAX_LINES] = failures.lines;
+        max_source[MAX_FINISHED] = counters.finished;
         for (int k = 0; k < PACER_PHASES; k++)
             max_source[MAX_PHASE + k] = counters.phase_seconds[k];
         shmem_double_max_reduce(team, max_result, max_source, MAXIMA);
@@ -812,7 +818,7 @@ static void run(const struct pacer_exercise *exercise, shmem_team_t team)
             }
             shmem_team_sync(team);  /* the global exit ends this */
         }
-        if (last)
+        if (last || maxima[MAX_FINISHED] > 0)
             break;
 
         /* The next step: about --report seconds, its units from the slowest PE's
@@ -827,6 +833,8 @@ static void run(const struct pacer_exercise *exercise, shmem_team_t team)
             per_unit = 1e-6;
         double wanted = options.report / per_unit;
         long next = wanted < 1 ? 1 : wanted > (double)units * 8 ? units * 8 : (long)wanted;
+        if (next > MOST_UNITS)
+            next = MOST_UNITS;      /* a step that costs nothing must not overflow the count */
         double remaining = options.seconds - elapsed;
         if (remaining <= (double)next * per_unit) {
             double fit = remaining / per_unit;
