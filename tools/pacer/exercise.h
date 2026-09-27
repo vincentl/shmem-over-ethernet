@@ -103,6 +103,9 @@ enum pacer_plant {
     PACER_PLANT_PRINT_FOLD,         /* PE 1 folds host numbers without leading zeros */
     PACER_PLANT_PRINT_ROUTE,        /* PE 1's record by the signal route changed */
     PACER_PLANT_RMA_SIGNAL,         /* PE 1 misreads one put_signal's signal */
+    PACER_PLANT_WAITS_VALUE,        /* PE 1 writes one waited-for word wrong */
+    PACER_PLANT_WAITS_INDEX,        /* PE 1 misjudges one index an _any form returned */
+    PACER_PLANT_WAITS_EXCLUDED,     /* PE 1 misreads one return with every word excluded */
     PACER_PLANTS
 };
 
@@ -167,7 +170,7 @@ struct pacer_exercise {
 
 extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_teams,
     pacer_threads, pacer_print, pacer_atomics, pacer_rma, pacer_locks, pacer_memory,
-    pacer_collectives;
+    pacer_collectives, pacer_waits;
 
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,

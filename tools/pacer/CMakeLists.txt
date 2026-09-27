@@ -5,7 +5,7 @@
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
 set(osoe_pacer_sources osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
-  threads.c print.c atomics.c rma.c locks.c memory.c collectives.c library-counters.c
+  threads.c print.c atomics.c rma.c locks.c memory.c collectives.c waits.c library-counters.c
   ${PROJECT_SOURCE_DIR}/base/size.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 add_executable(osoe-pacer ${osoe_pacer_sources})
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/tools/stat)
@@ -307,6 +307,12 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
     "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
     "osoe-pacer failures=[1-9]")
+  pacer_plant(waits-value waits
+    "waits round=1 long wait_until ne: word 0 from PE 1 holds [0-9]+, expected [0-9]+")
+  pacer_plant(waits-index waits
+    "waits round=24 int wait_until_any [a-z]+: returned index [0-3], which the status excludes")
+  pacer_plant(waits-excluded waits
+    "waits round=24 int wait_until_any [a-z]+: returned [0-9]+ with every word excluded, not SIZE_MAX")
   pacer_plant(rma-signal rma
     "rma round=140 put_signal_get float default: the signal from PE 0 reads [0-9]+, expected [0-9]+")
   pacer_plant(print-route print

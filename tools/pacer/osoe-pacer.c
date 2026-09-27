@@ -63,8 +63,8 @@ enum { FAILURE_LINES = 8, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
 static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_mailbox,
                                                       &pacer_teams, &pacer_atomics, &pacer_rma,
                                                       &pacer_locks, &pacer_memory,
-                                                      &pacer_collectives, &pacer_threads,
-                                                      &pacer_print };
+                                                      &pacer_waits, &pacer_collectives,
+                                                      &pacer_threads, &pacer_print };
 enum { KNOWN = sizeof known / sizeof *known };
 
 static const char *const plant_names[PACER_PLANTS] = {
@@ -79,7 +79,7 @@ static const char *const plant_names[PACER_PLANTS] = {
     "collectives-gap", "atomics-fetch-count", "atomics-attempts", "rma-flag", "rma-single",
     "rma-ptr-null", "memory-realloc", "memory-refused", "collectives-status",
     "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold", "print-route",
-    "rma-signal"
+    "rma-signal", "waits-value", "waits-index", "waits-excluded"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -88,7 +88,7 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "rma", "rma", "rma", "rma", "rma", "locks", "locks", "memory", "memory", "memory", "memory",
     "memory", "collectives", "collectives", "collectives", "collectives", "atomics", "atomics",
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
-    "memory", "print", "print", "rma"
+    "memory", "print", "print", "rma", "waits", "waits", "waits"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -149,6 +149,9 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 folds host numbers without their leading zeros",
     "PE 1 gives the signal route a record other than the fcollect's",
     "PE 1 misreads the signal of one put_signal",
+    "PE 1 writes one waited-for word wrong",
+    "PE 1 misjudges one index an _any form returned",
+    "PE 1 misreads one return with every word excluded",
 };
 
 static void usage(FILE *out)
@@ -168,6 +171,8 @@ static void usage(FILE *out)
 "  rma       a halo put and fenced to a flag, and every transfer of every\n"
 "            type and size, strided, blocked, nonblocking, and by shmem_ptr\n"
 "  locks     distributed locks guarding counts that are not atomic\n"
+"  waits     every wait and test form on every type it takes, by name and\n"
+"            by the C11 generic\n"
 "  memory    the heap's routines, collective and checked, up to the budget\n"
 "  collectives\n"
 "            every collective on every type, and each timed from 8 B to\n"
@@ -570,6 +575,7 @@ static int parse(int argc, char **argv)
         chosen[chosen_count++] = &pacer_atomics;
         chosen[chosen_count++] = &pacer_rma;
         chosen[chosen_count++] = &pacer_locks;
+        chosen[chosen_count++] = &pacer_waits;
         chosen[chosen_count++] = &pacer_memory;
         chosen[chosen_count++] = &pacer_collectives;
     }
