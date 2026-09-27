@@ -195,6 +195,29 @@ round and what differed; the command line and the header's seed reproduce it.
 `--rounds R` in place of `--seconds` makes a run of fixed length, and
 `--quick` is the smoke test every preset runs.
 
+Phase 2's exercises add three runs: `mailbox` (every wait and test form, a
+form a round) and `teams` (teams of every shape and collectives on a grid's
+rows and columns at once), ten minutes each in `release`; and an hour of
+`threads` - four worker threads a PE on private, serialized, default and team
+contexts - in a `debug` build, with the library's two test hooks on and a
+landing zone its gets overfill, which is where a race in the shared contexts
+would show:
+
+```sh
+srun -K1 -N4 --ntasks-per-node=4 $P --seconds 600 mailbox > pacer-mailbox.txt
+srun -K1 -N4 --ntasks-per-node=4 $P --seconds 600 teams > pacer-teams.txt
+cmake --preset debug && cmake --build build/debug -j4 --target osoe-pacer
+OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1 OSOE_GET_LANDING_BYTES=8192 \
+    srun -K1 -N4 --ntasks-per-node=4 build/debug/tools/pacer/osoe-pacer \
+    --seconds 3600 threads > pacer-threads-hour.txt
+```
+
+Each must end `failures=0`; the hour must also print no `OSOE_CHECK_QUIET:`
+line - the hook's own race is fixed (`docs/decisions/2026-09-27.md` item 10),
+so one now would be a finding. `--teams-exhaust teams`, alone, splits until the
+job's team numbers are gone and checks that the split refuses alike on every
+PE; it is a test's, not a measurement.
+
 Keep the outputs, under `docs/design/evidence/pi-cluster/<date>/pacer/`. The
 numbers for `docs/pi-cluster-results.md`: the sort's keys a second under each
 exchange (the `summary sort` lines), and the alltoall's microseconds at 8 B,
