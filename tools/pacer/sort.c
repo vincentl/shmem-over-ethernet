@@ -56,12 +56,13 @@
  * **The checks.** A batch: every key in this PE's range; its count, sum and
  * xor accumulated as it arrived; sorted - LSD radix with 16-bit digits into a
  * scratch in rounds mode - and non-decreasing afterwards, with the count, sum
- * and xor taken again so that a fault of this sort's own shows as the tool's.
+ * xor taken again so that a fault of this sort's own shows as the tool's.
  * **The oracle**, at every checkpoint: the sums over the team of the
- * generated counts and sums (shmem_uint64_sum_reduce) and the xor of their
- * xors (shmem_uint64_xor_reduce: a sum of per-PE xors is not the same for two
- * partitions of one set of keys) equal those received, or a failure line
- * says which differed. In rounds mode every round closes within its step; in
+ * generated counts, sums and hash sums (shmem_uint64_sum_reduce) and the xor
+ * of their xors (shmem_uint64_xor_reduce: a sum of per-PE xors is not the
+ * same for two partitions of one set of keys) equal those received, or a
+ * failure line says which differed. The hash sum is not the brief's; struct
+ * triple says why it is there. In rounds mode every round closes within its step; in
  * accumulate mode a cycle's keys join the oracle when the cycle closes.
  */
 #define _GNU_SOURCE
@@ -79,8 +80,14 @@ enum { CHUNK = 4096, MINIMUM_KEYS = 1024, RADIX = 65536, SMALL_SORT = 48 };
 enum phase { GENERATE, BIN, EXCHANGE, SORT, CHECK };
 static const char *const phase_names[] = { "generate", "bin", "exchange", "sort", "check", NULL };
 
+/* What the oracle compares of a set of keys. Count, sum and xor are the
+ * brief's; all three are linear, and blind alike to a byte swapped between two
+ * keys - or a bit set in one and cleared in another - which a torn copy makes
+ * and which, low in the keys, leaves both in range and in order. So a fourth:
+ * the sum of each key's fmix64, which any change of the set moves but with
+ * odds of 2^-64. */
 struct triple {
-    uint64_t count, sum, xor;
+    uint64_t count, sum, xor, hash;
 };
 
 static void triple_add(struct triple *t, uint64_t key)
@@ -88,6 +95,7 @@ static void triple_add(struct triple *t, uint64_t key)
     t->count++;
     t->sum += key;
     t->xor ^= key;
+    t->hash += random_finalize(key);
 }
 
 static struct {
@@ -137,7 +145,7 @@ static uint64_t sort_memory(int npes, const struct pacer_options *options, char 
     int push = options->exchange == PACER_EXCHANGE_FETCH_ADD;
     long fixed_rounds = options->rounds ? options->rounds : options->quick ? 3 : 0;
     uint64_t asked = options->quick ? 65536 : accumulate ? UINT64_C(1) << 20 : UINT64_C(4) << 20;
-    uint64_t small = 8 * 8 + (push ? 16 : 2 * 2 * n * 8);
+    uint64_t small = 14 * 8 + (push ? 16 : 2 * 2 * n * 8);
     uint64_t fixed = CHUNK * 8 + 3 * n * 8 + 3 * n * sizeof(int) +
                      (accumulate ? 0 : 4 * (uint64_t)RADIX * sizeof(size_t));
     uint64_t keys = asked, capacity = 0, bin_capacity = 0, symmetric = 0, private_bytes = 0;
@@ -266,8 +274,8 @@ static int sort_setup(shmem_team_t team, const struct pacer_options *options)
     sort.fill = calloc((size_t)n, sizeof *sort.fill);
     sort.next = calloc((size_t)n, sizeof *sort.next);
     sort.chunk = malloc(CHUNK * sizeof *sort.chunk);
-    sort.reduce_source = shmem_malloc(4 * sizeof *sort.reduce_source);
-    sort.reduce_result = shmem_malloc(4 * sizeof *sort.reduce_result);
+    sort.reduce_source = shmem_malloc(6 * sizeof *sort.reduce_source);
+    sort.reduce_result = shmem_malloc(8 * sizeof *sort.reduce_result);
     if (!sort.staging || !sort.fill || !sort.next || !sort.chunk || !sort.reduce_source ||
         !sort.reduce_result)
         return -1;
@@ -455,12 +463,14 @@ static void check_batch(uint64_t *keys, uint64_t count, long round)
         pacer_failure("sort round=%ld order: %llu keys follow a larger one; the first at %llu of "
                       "%llu", round, (unsigned long long)descents, (unsigned long long)at,
                       (unsigned long long)count);
-    if (after.count != before.count || after.sum != before.sum || after.xor != before.xor)
+    if (after.count != before.count || after.sum != before.sum || after.xor != before.xor ||
+        after.hash != before.hash)
         pacer_failure("sort round=%ld local sort: the batch changed while it was sorted - the "
                       "tool's own fault", round);
     sort.arrived.count += before.count;
     sort.arrived.sum += before.sum;
     sort.arrived.xor ^= before.xor;
+    sort.arrived.hash += before.hash;
     sort.batch += (double)count;
     sort.phase[CHECK] += pacer_now() - sorted;
 }
@@ -647,6 +657,7 @@ static void close_cycle(long round)
     sort.generated.count += sort.open_generated.count;
     sort.generated.sum += sort.open_generated.sum;
     sort.generated.xor ^= sort.open_generated.xor;
+    sort.generated.hash += sort.open_generated.hash;
     memset(&sort.open_generated, 0, sizeof sort.open_generated);
     sort.received = 0;
     sort.cycle_rounds = 0;
@@ -678,29 +689,36 @@ static void sort_step(long units, int last)
 
 static void sort_checkpoint(struct pacer_counters *counters)
 {
+    /* The sums reduce into the first six words, the xors into the last two, so
+     * that consecutive reductions never write the array the other just filled. */
     uint64_t *source = sort.reduce_source, *result = sort.reduce_result;
-    uint64_t sums[4], xors[2];
+    uint64_t sums[6], xors[2];
     source[0] = sort.generated.count;
     source[1] = sort.generated.sum;
-    source[2] = sort.arrived.count;
-    source[3] = sort.arrived.sum;
-    shmem_uint64_sum_reduce(sort.team, result, source, 4);
+    source[2] = sort.generated.hash;
+    source[3] = sort.arrived.count;
+    source[4] = sort.arrived.sum;
+    source[5] = sort.arrived.hash;
+    shmem_uint64_sum_reduce(sort.team, result, source, 6);
     memcpy(sums, result, sizeof sums);
     source[0] = sort.generated.xor;
     source[1] = sort.arrived.xor;
-    shmem_uint64_xor_reduce(sort.team, result + 2, source, 2);
-    memcpy(xors, result + 2, sizeof xors);
+    shmem_uint64_xor_reduce(sort.team, result + 6, source, 2);
+    memcpy(xors, result + 6, sizeof xors);
     if (sort.me == 0) {
         long round = sort.round - 1;
-        if (sums[0] != sums[2])
+        if (sums[0] != sums[3])
             pacer_failure("sort round=%ld oracle: count generated %llu, received %llu", round,
-                          (unsigned long long)sums[0], (unsigned long long)sums[2]);
-        if (sums[1] != sums[3])
+                          (unsigned long long)sums[0], (unsigned long long)sums[3]);
+        if (sums[1] != sums[4])
             pacer_failure("sort round=%ld oracle: sum generated %016llx, received %016llx", round,
-                          (unsigned long long)sums[1], (unsigned long long)sums[3]);
+                          (unsigned long long)sums[1], (unsigned long long)sums[4]);
         if (xors[0] != xors[1])
             pacer_failure("sort round=%ld oracle: xor generated %016llx, received %016llx", round,
                           (unsigned long long)xors[0], (unsigned long long)xors[1]);
+        if (sums[2] != sums[5])
+            pacer_failure("sort round=%ld oracle: hash generated %016llx, received %016llx",
+                          round, (unsigned long long)sums[2], (unsigned long long)sums[5]);
     }
     memset(&sort.generated, 0, sizeof sort.generated);
     memset(&sort.arrived, 0, sizeof sort.arrived);

@@ -71,6 +71,7 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   pacer_plant(sort-key sort
     "sort round=0 oracle: sum generated [0-9a-f]+, received [0-9a-f]+"
     "sort round=0 oracle: xor generated [0-9a-f]+, received [0-9a-f]+"
+    "sort round=0 oracle: hash generated [0-9a-f]+, received [0-9a-f]+"
     "osoe-pacer failures=[1-9]")
   pacer_plant(sort-order sort
     "sort round=0 order: [0-9]+ keys follow a larger one. the first at [0-9]+ of [0-9]+"
