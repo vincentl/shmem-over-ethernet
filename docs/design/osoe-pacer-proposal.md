@@ -4,11 +4,13 @@
 (`docs/decisions/2026-09-26-night.md`): the name, the labels, `parallel_print`
 kept in the tool, the phase order, the memory default and its option, the
 briefs' names. One point waits on the author after §3's explanation: whether
-the smoke tests join every preset's suite. Phases 1 to 3 are built
-(`docs/prompts/done/task-stress-phase1.md` to `-phase3.md`; the records, with
+the smoke tests join every preset's suite. All four phases are built
+(`docs/prompts/done/task-stress-phase1.md` to `-phase4.md`; the records, with
 where the tool differs from this proposal and why, are
-`docs/decisions/2026-09-27.md` and `2026-09-27-afternoon.md`); phase 4's
-brief is `docs/prompts/task-stress-phase4.md`.*
+`docs/decisions/2026-09-27.md`, `2026-09-27-afternoon.md` and
+`2026-09-27-evening.md`). Two more wait on the author, as phase 4's brief
+said they would: whether `osoe-pacer` is installed, and whether a soak joins
+the release checklist.*
 
 ## 0. What it is, and what it is not
 

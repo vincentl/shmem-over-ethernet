@@ -1,0 +1,76 @@
+=== pi-001
+node 0   pi-001            4/4  live  world    epoch 0/82  own no  children 0/3  next -    parent root  PE0 shmem_uint64_sum_reduce (epoch 83) 394.860 s
+node 0   pi-001            4/4  live  3        epoch 0/9904 own no  children 0/3  next -    parent root  PE0 shmem_uint64_sum_reduce (epoch 83) 394.860 s
+node 0   pi-001            4/4  live  4        epoch 0/9289 own no  children 0/3  next -    parent root  PE0 shmem_uint64_sum_reduce (epoch 83) 394.860 s
+node 0   pi-001            4/4  live  5        epoch 0/6259 own no  children 0/3  next -    parent root  PE0 shmem_uint64_sum_reduce (epoch 83) 394.860 s
+node 0   pi-001            4/4  live  6        epoch 0/1322 own no  children 0/3  next -    parent root  PE0 shmem_uint64_sum_reduce (epoch 83) 394.860 s
+node 0   pi-001            4/4  live  9        epoch 0/1104 own no  children 0/1  next -    parent root  PE0 shmem_uint64_sum_reduce (epoch 83) 394.860 s
+node 0   pi-001            4/4  live  10       epoch 0/550 own no  children 0/1  next -    parent root  PE0 shmem_uint64_sum_reduce (epoch 83) 394.860 s
+/osoe.770.0.0.0  layout 24  4 local PEs of 16  (job 770 step 0 node 0 session 0)
+  1228800 bytes, 203 metrics (checksum 0xd00ed846), 68 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     0     3095 mapped         82     4044  shmem_uint64_sum_reduce (epoch 83) for 394.863 s
+  1     1     3096 mapped         83     3994  shmem_uint64_xor_reduce (epoch 84) for 394.856 s
+  2     2     3097 mapped         83     4117  shmem_barrier_all (epoch 84) for 394.856 s
+  3     3     3098 mapped         83     4163  shmem_barrier_all (epoch 84) for 394.422 s
+
+ peer   seg sent      bytes   seg appl      bytes   ctrlq   bulkq  sent thru      acked     wanted
+    1     180166 1408029536     153836   21229112       0       0     180167     180165     180158
+    2     140672   22900296     141054   22474352       0       0     140673     140671     140669
+=== pi-002
+node 1   pi-002            4/4  live  world    epoch 0/82  own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 395.491 s
+node 1   pi-002            4/4  live  3        epoch 0/9904 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 395.491 s
+node 1   pi-002            4/4  live  4        epoch 0/9289 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 395.491 s
+node 1   pi-002            4/4  live  5        epoch 0/6259 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 395.491 s
+node 1   pi-002            4/4  live  6        epoch 0/1322 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 395.491 s
+/osoe.770.0.1.0  layout 24  4 local PEs of 16  (job 770 step 0 node 1 session 0)
+  1228800 bytes, 203 metrics (checksum 0xd00ed846), 68 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     4     3099 mapped         82     4050  shmem_uint64_sum_reduce (epoch 83) for 395.494 s
+  1     5     3100 mapped         83     4001  shmem_uint64_xor_reduce (epoch 84) for 395.492 s
+  2     6     3101 mapped         83     4125  shmem_barrier_all (epoch 84) for 395.492 s
+  3     7     3102 mapped         83     4176  shmem_barrier_all (epoch 84) for 395.058 s
+
+ peer   seg sent      bytes   seg appl      bytes   ctrlq   bulkq  sent thru      acked     wanted
+    0     153836   21229112     180166 1408029536       0       0     153837     153836     153829
+    2     165090 1406444000     139525   19166896       0       0     165091     165089     165087
+=== pi-003
+node 2   pi-003            4/4  live  world    epoch 0/82  own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.031 s
+node 2   pi-003            4/4  live  3        epoch 0/9904 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.031 s
+node 2   pi-003            4/4  live  4        epoch 0/9289 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.031 s
+node 2   pi-003            4/4  live  5        epoch 0/6259 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.031 s
+node 2   pi-003            4/4  live  6        epoch 0/1322 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.031 s
+node 2   pi-003            4/4  live  9        epoch 0/1104 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.031 s
+node 2   pi-003            4/4  live  10       epoch 0/550 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.031 s
+/osoe.770.0.2.0  layout 24  4 local PEs of 16  (job 770 step 0 node 2 session 0)
+  1228800 bytes, 203 metrics (checksum 0xd00ed846), 68 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     8     3102 mapped         82     4066  shmem_uint64_sum_reduce (epoch 83) for 397.034 s
+  1     9     3103 mapped         83     4023  shmem_uint64_xor_reduce (epoch 84) for 397.034 s
+  2    10     3104 mapped         83     4143  shmem_barrier_all (epoch 84) for 397.034 s
+  3    11     3105 mapped         83     4195  shmem_barrier_all (epoch 84) for 396.600 s
+
+ peer   seg sent      bytes   seg appl      bytes   ctrlq   bulkq  sent thru      acked     wanted
+    0     141054   22474352     140672   22900296       0       0     141055     141054     141052
+    1     139525   19166896     165090 1406444000       0       0     139526     139525     139524
+=== pi-004
+node 3   pi-004            4/4  live  world    epoch 0/82  own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.612 s
+node 3   pi-004            4/4  live  3        epoch 0/9904 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.612 s
+node 3   pi-004            4/4  live  4        epoch 0/9289 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.612 s
+node 3   pi-004            4/4  live  5        epoch 0/6259 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.612 s
+node 3   pi-004            4/4  live  6        epoch 0/1322 own no  children 0/0  next -    parent 0     PE0 shmem_uint64_sum_reduce (epoch 83) 397.612 s
+/osoe.770.0.3.0  layout 24  4 local PEs of 16  (job 770 step 0 node 3 session 0)
+  1228800 bytes, 203 metrics (checksum 0xd00ed846), 68 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0    12     3086 mapped         82     4071  shmem_uint64_sum_reduce (epoch 83) for 397.615 s
+  1    13     3087 mapped         83     4021  shmem_uint64_xor_reduce (epoch 84) for 397.609 s
+  2    14     3088 mapped         83     4144  shmem_barrier_all (epoch 84) for 397.609 s
+  3    15     3089 mapped         83     4193  shmem_barrier_all (epoch 84) for 397.175 s
+
+ peer   seg sent      bytes   seg appl      bytes   ctrlq   bulkq  sent thru      acked     wanted
+    0     178041 1407470808     145748   20934848       0       0     178042     178041     178034
+    1     114997   16620912     113212   16840296       0       0     114998     114996     114993

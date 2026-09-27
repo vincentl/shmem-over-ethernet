@@ -1,0 +1,36 @@
+18:27:38 commit 3d5bbe1 task-stress-phase4, copied 2026-09-27T16:53:46-04:00
+pi-001 up=29896s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-002 up=29911s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-003 up=29911s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-004 up=29895s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+18:27:45 quick exit 0 in 7 s: osoe-pacer failures=0 seconds=7.0
+18:27:45     timeouts before: pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:27:45     timeouts after:  pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:27:47 quick-mix exit 0 in 2 s: osoe-pacer failures=0 seconds=1.3
+18:27:47     timeouts before: pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:27:47     timeouts after:  pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:27:48 quick-deprecated exit 0 in 1 s: osoe-pacer failures=0 seconds=0.6
+18:27:48     timeouts before: pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:27:48     timeouts after:  pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:27:48 start-pes exit 0 in 0 s: start-pes failures=0
+18:27:48     timeouts before: pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:27:48     timeouts after:  pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:32:49 waits exit 0 in 301 s: osoe-pacer failures=0 seconds=300.0
+18:32:49     timeouts before: pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:32:49     timeouts after:  pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:37:54 deprecated exit 0 in 305 s: osoe-pacer failures=0 seconds=300.0
+18:37:54     timeouts before: pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:37:54     timeouts after:  pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:43:37 coverage exit 0 in 342 s: 
+18:43:37     timeouts before: pi-001=20 pi-002=60 pi-003=31 pi-004=37 
+18:43:37     timeouts after:  pi-001=21 pi-002=60 pi-003=33 pi-004=37 
+18:45:56 coverage-mix exit 0 in 139 s: 
+18:45:56     timeouts before: pi-001=21 pi-002=60 pi-003=33 pi-004=37 
+18:45:56     timeouts after:  pi-001=21 pi-002=60 pi-003=33 pi-004=37 
+18:46:02 coverage-start-pes exit 0 in 6 s: 
+18:46:02     timeouts before: pi-001=21 pi-002=60 pi-003=33 pi-004=37 
+18:46:02     timeouts after:  pi-001=21 pi-002=60 pi-003=33 pi-004=37 
+19:46:20 mix-1h exit 0 in 3618 s: osoe-pacer failures=0 seconds=3613.0
+19:46:20     timeouts before: pi-001=21 pi-002=60 pi-003=33 pi-004=37 
+19:46:21     timeouts after:  pi-001=31 pi-002=70 pi-003=41 pi-004=42 
+19:46:21 DONE

@@ -232,17 +232,45 @@ for e in atomics rma locks memory collectives; do
 done
 ```
 
+Phase 4's make it a stress. `mix` splits the world into four strided teams at
+4 × 4 - each with one PE on every node - and runs `mailbox`, `atomics`, `rma`,
+`locks` and `collectives` on them at once, each team its own exercise for a
+period of its own length, out of step, the exercises rotating through the
+teams, and `sort` or `alltoall` on the whole world every fourth period; a
+line's team is its prefix, `mix2`, and a world checkpoint adds a `library`
+line - bytes sent, nonblocking gets, a full landing zone, reserve stalls,
+wakes, time in barriers, over the nodes since the last. `--fold-nodes` labels
+a line every PE of a node says by the node's name. `waits` (every wait and
+test form on every type it takes) joined the default set; `deprecated`
+(Annex F's routines on four kinds of active set) and `osoe-pacer-start-pes`
+(`start_pes` and the unprefixed routines) run when named:
+
+```sh
+srun -K1 -N4 --ntasks-per-node=4 $P --seconds 3600 --fold-nodes mix > pacer-mix.txt
+srun -K1 -N4 --ntasks-per-node=4 $P --seconds 300 waits > pacer-waits.txt
+srun -K1 -N4 --ntasks-per-node=4 $P --seconds 300 deprecated > pacer-deprecated.txt
+srun -K1 -N4 --ntasks-per-node=4 build/release/tools/pacer/osoe-pacer-start-pes
+```
+
+A hung `mix` - every node's load at zero, nothing printed - is diagnosed with
+`osoe-stat JOB` on each node, which says what every PE is blocked in and at
+which collective epoch (`docs/decisions/2026-09-27-evening.md` item 2).
+
 `osoe-pacer-counted`, built beside the tool, is the same program with a shim
 that counts every call of every routine the library declares; `--coverage
 FILE` writes which were called, how often, and which never were. A quick run
-takes each case once, in one spelling and on one context; 560 rounds - `rma`'s
-cycle, each transfer case in both spellings on both contexts, with `atomics`'
-426 inside it - give the list:
+takes each case once, in one spelling and on one context; 792 rounds - `rma`'s
+cycle, each transfer case in both spellings on both contexts, with every
+other exercise's cycle inside it - give the list, and a `mix` and the
+`start_pes` program the rest:
 
 ```sh
 C=build/release/tools/pacer/osoe-pacer-counted
-srun -K1 -N4 --ntasks-per-node=4 $C --quick --rounds 560 --coverage coverage.txt sort \
-    alltoall mailbox teams atomics rma locks memory collectives threads print
+srun -K1 -N4 --ntasks-per-node=4 $C --quick --rounds 792 --coverage coverage.txt sort \
+    alltoall mailbox teams atomics rma locks waits memory collectives threads print deprecated
+srun -K1 -N4 --ntasks-per-node=4 $C --seconds 120 --coverage coverage-mix.txt mix
+srun -K1 -N4 --ntasks-per-node=4 build/release/tools/pacer/osoe-pacer-start-pes-counted \
+    --coverage coverage-start-pes.txt
 ```
 
 `--teams-exhaust teams`, alone, splits until the job's team numbers are gone

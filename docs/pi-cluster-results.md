@@ -420,3 +420,38 @@ measurements). At 8 bytes every family costs 130 to 530 µs, a team sync 170.
 
 **The counted build**: 560 rounds of every exercise called 1,404 of the
 1,794 routines the library declares; the record lists the 390 it did not.
+
+## The pacer's fourth phase (2026-09-27)
+
+`task-stress-phase4`, 4 × 4, release: three hours of `mix` at `b252b28` by
+`pi-soak-phase4a.sh`, then the tree that merged, `3d5bbe1`, by
+`pi-runs-phase4b.sh`, about five and a half hours of cluster time. Outputs,
+scripts and the nodes' state:
+`docs/design/evidence/pi-cluster/2026-09-27/pacer/phase4/`, a directory a
+commit, the long outputs gzipped; the record:
+`docs/decisions/2026-09-27-evening.md`. The nodes had been up since 10:09.
+
+**Every run ended `failures=0`**:
+
+| Run | What it did |
+|---|---|
+| `mix`, 3 h at `b252b28` | 916 periods: four teams of four, one PE of each on every node, each of five exercises on some team about 550 times; 229 world periods of `sort` and `alltoall`; 1.53 TB sent between the nodes |
+| `mix`, 1 h at `3d5bbe1` | 305 periods; 503 GB sent |
+| `waits`, 5 min | 583,288 rounds, every wait and test form of every type 3,472 times over; 124,000 words a second checked |
+| `deprecated`, 5 min | 265,439 rounds, every Annex F case on every active set 721 times over |
+| the quick runs, `start_pes` | the default set in 7 s; `mix`; `deprecated`'s whole cycle; the unprefixed routines |
+
+**The first attempt at `mix` hung** seven minutes in, every node's load at
+zero: `osoe-stat` on each node showed PEs in different collectives at one
+epoch - the tool's own fault, a team exercise calling the world's barrier
+(the record's item 2); its output and each node's `osoe-stat` are kept.
+
+**Retransmission timeouts**: the three hours of `mix` added 87 across the
+four nodes, the hour at `3d5bbe1` 33 - about one every two minutes, where the
+day's single exercises had added none or a handful. They are F1's, above;
+which of `mix`'s periods raises them is not yet known.
+
+**The counted builds** at `3d5bbe1`: 792 rounds of every exercise, a `mix`
+and the `start_pes` program call 1,792 of the 1,794 routines declared - all
+but `shmem_finalize`, called after the count is written, and
+`shmem_global_exit`, which no clean run calls.

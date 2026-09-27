@@ -1,0 +1,12 @@
+15:12:01 commit 73e7b19 task-stress-phase4, copied 2026-09-27T15:10:42-04:00
+pi-001 up=18160s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-002 up=18175s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-003 up=18175s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-004 up=18159s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+15:12:03 quick-mix exit 0 in 1 s: osoe-pacer failures=0 seconds=1.3
+15:12:03     timeouts before: pi-001=5 pi-002=32 pi-003=13 pi-004=11 
+15:12:03     timeouts after:  pi-001=5 pi-002=32 pi-003=13 pi-004=11 
+15:19:18 mix-3h exit 143 in 435 s: 
+15:19:18     timeouts before: pi-001=5 pi-002=32 pi-003=13 pi-004=11 
+15:19:18     timeouts after:  pi-001=5 pi-002=32 pi-003=13 pi-004=11 
+15:19:18 DONE

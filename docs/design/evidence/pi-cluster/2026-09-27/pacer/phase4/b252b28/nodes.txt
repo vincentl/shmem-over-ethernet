@@ -1,0 +1,4 @@
+pi-001 up=19075s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-002 up=19090s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-003 up=19090s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-004 up=19074s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 

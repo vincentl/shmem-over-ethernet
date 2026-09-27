@@ -3,12 +3,11 @@
 **Where the files are.** The open brief sits here; every finished one is in
 `done/`, under its own name, which this index still gives.
 
-**Open now:** `task-stress-phase4.md`, the stress tester's fourth phase:
-`mix`, exercises at once on teams out of step, the library's counters in the
-checkpoint line, labels folded to nodes, `parallel_print`'s second route and
-the deprecated forms (the proposal is `docs/design/osoe-pacer-proposal.md`;
-phases 1 to 3 are in `done/`, their records `docs/decisions/2026-09-27.md`
-and `2026-09-27-afternoon.md`). The table below stops at
+**Open now:** no brief. The stress tester's four phases are done - their
+briefs in `done/`, the proposal `docs/design/osoe-pacer-proposal.md`, the
+records `docs/decisions/2026-09-27.md`, `2026-09-27-afternoon.md` and
+`2026-09-27-evening.md` - and the README is merged; what the author planned
+next is a review of the whole project. The table below stops at
 step 4; the briefs after it are in `done/` and their outcomes in
 `docs/decisions/`.
 
