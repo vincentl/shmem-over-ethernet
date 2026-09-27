@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Atomic memory operations (spec §9.7) over the boundary's rmw (§4.10).
  *

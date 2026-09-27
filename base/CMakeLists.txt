@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # base: internal building blocks linked into libosoe. Never installed.
 #
 # An OBJECT library, not STATIC: target_link_libraries() then folds its object

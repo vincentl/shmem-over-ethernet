@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * osoe-launch - start L processes of one job on this machine, the way a Slurm
  * step would, for tests. Not installed.

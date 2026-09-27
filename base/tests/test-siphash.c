@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* SipHash-2-4 against the published test vectors: key 00..0f, and the message
  * 00, 01, ... of each length (the reference implementation's vectors.h; the
  * 15-byte one is the paper's worked example). */

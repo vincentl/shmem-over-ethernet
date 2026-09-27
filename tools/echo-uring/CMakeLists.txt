@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 add_executable(echo-uring echo-uring.c)
 target_link_libraries(echo-uring PRIVATE PkgConfig::LIBURING)
 osoe_warnings(echo-uring)

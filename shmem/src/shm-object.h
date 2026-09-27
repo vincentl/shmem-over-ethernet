@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Creating and opening the job's named shared-memory objects (§6.2).
  *

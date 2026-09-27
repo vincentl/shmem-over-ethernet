@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Every AMO type of Tables 6, 7 and 8, and the C11 type-generic interfaces
  * (spec §9.7; §7.4).

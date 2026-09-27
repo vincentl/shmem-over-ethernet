@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The deprecated active-set collectives (Annex F; design §7.4) over the whole
  * job, the only active set osoe runs them over: every _to_all operator on each

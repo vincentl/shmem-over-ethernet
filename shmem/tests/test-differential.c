@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The differential test: one program, every logical layout, identical results
  * (§8.1, §8.2).

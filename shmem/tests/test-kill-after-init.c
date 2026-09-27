@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * No death of any process strands a named object (§3.14, decided 2026-09-20).
  *

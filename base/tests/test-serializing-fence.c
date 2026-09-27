@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The serializing fence orders a store before a later load (§3.16, §4.6
  * rule 2): the store-buffering shape quiet needs, W->R, which is the stronger

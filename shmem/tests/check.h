@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Minimal test assertions shared by the tier-1 tests. */
 #ifndef OSOE_TEST_CHECK_H
 #define OSOE_TEST_CHECK_H

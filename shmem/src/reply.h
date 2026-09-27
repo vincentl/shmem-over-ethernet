@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Deferred reply queues and the per-connection credit (§3.8, §4.6).
  *

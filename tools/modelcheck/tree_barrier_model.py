@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """The internode tree of a barrier (design §5.3, internode.h; phase 1 step 2 slice 3).
 
 The AM backend's internode phase is a k-ary tree over the index of the

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A value one thread moves and others wait on, with no syscall per move when
  * nobody waits (design §3.11, §4.6; tools/modelcheck/wait_word_model.py).

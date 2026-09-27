@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Run one program under several logical node maps and require identical output
 # (design §8.1).
 #

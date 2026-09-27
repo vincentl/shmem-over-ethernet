@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The k-ary tree a team's internode phase runs over (§5.3; phase 1 step 2
  * slice 3).

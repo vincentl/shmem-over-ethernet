@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The node control segment and node-local rendezvous (§3.14, §6.2).
  *

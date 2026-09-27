@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The compiler wrapper, oshcc (design §4.3, §7.1): the name every OpenSHMEM
 # build system looks for - PRK's SHMEMCC, bale's CC=oshcc, ISx's and the NAS
 # benchmarks' makefiles - so a program builds against osoe without editing its

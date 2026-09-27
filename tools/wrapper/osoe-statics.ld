@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * osoe's symmetric statics (design §4.3): oshcc passes this to the linker, and
  * it gathers the program's writable data - every .data and .bss input section,

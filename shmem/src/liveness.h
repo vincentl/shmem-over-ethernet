@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Liveness (§3.15; phase 1 step 4 slice 1, part C).
  *

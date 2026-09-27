@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # osoe-bench: what the library costs on a cluster, one measurement a line (the
 # Pi runbook, docs/pi-cluster.md). Not installed. Its smoke test runs every
 # measurement once, quickly, on two logical nodes of two PEs; the numbers it

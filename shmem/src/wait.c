@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Point-to-point synchronization: shmem_wait_until, shmem_test and their
  * multiple-element forms (spec §9.11; design §4.9).

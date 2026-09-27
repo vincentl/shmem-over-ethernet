@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The send side finds its work without visiting every connection (§3.10;
  * phase 1 step 2 slice 3, part C).

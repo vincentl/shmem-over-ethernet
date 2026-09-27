@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * AM framing and the stream parser (§3.3, §3.4, §3.13).
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """The "blocked in" record: a multi-word record read without the job's help (§3.14).
 
 §3.14 requires that everything an investigator needs is readable from the named

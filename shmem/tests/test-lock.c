@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The distributed lock (spec §9.13; lock.c): mutual exclusion over a counter
  * on PE 0 that every PE increments by a get and a put - a lost update, from two

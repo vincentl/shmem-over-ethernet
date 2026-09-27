@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """An application thread waiting on the lead, without a syscall per event
 (design §3.11, §4.6; phase 1 step 3 slice 2).
 

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # A job never outlives its launcher (launch.c; review round two, omissions 6).
 #
 #   launcher-signals.sh LAUNCHER PROGRAM term|int|kill

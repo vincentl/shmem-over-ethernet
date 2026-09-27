@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A reply is not starved by puts (§3.8's DRAINING state; review round two, C7).
  *

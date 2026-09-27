@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The data path across a node boundary: put, fence and quiet (§4.6, §4.10).
  *

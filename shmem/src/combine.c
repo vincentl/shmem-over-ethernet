@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The reductions' combine functions, one per operation and element, and the
  * table that finds them (combine.h).

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Slurm's compressed host lists (§6.1, §6.2): SLURM_STEP_NODELIST, or its
  * OSOE_STEP_NODELIST mirror.

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The multiple-element waits and tests (spec §9.11.2-§9.11.14), every type, and
  * the two things about them that are easy to get wrong.

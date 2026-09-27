@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A quiesced pair of nodes falls silent (§3.4; review round two, C1).
  *

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The transport boundary (§4.10): dispatch on locality, and the far half.
  *

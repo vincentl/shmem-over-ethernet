@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A PE that leaves without shmem_finalize ends the job, naming itself (§6.4;
  * second review, D14).

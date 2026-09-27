@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The allocator is a pure deterministic function of its call sequence (§4.4,
  * invariant 6): two instances fed the same calls return the same offsets.

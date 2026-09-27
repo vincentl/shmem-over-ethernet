@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A PE that dies while its siblings are blocked in a library wait ends the job
  * with a loud failure naming where each survivor was, not a hang (§3.15), in

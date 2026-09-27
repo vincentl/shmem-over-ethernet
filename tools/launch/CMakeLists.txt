@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 add_executable(osoe-launch launch.c)
 target_link_libraries(osoe-launch PRIVATE osoe_base)
 osoe_warnings(osoe-launch)

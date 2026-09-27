@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Slurm's compressed host lists (§6.2): the parser §6.2 asked for with tier-1
  * tests, since it would otherwise first be debugged on a cluster. */
 #include <stdint.h>

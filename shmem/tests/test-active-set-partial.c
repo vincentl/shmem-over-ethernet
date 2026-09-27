@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The deprecated collectives on active sets that are not the whole job
  * (Annex F; phase 1 step 5 slice 7; active-set.c).

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Symmetric addresses in the calling PE (§4.1, §4.2, §4.3). */
 #ifndef OSOE_SYMMETRIC_H
 #define OSOE_SYMMETRIC_H

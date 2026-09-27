@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * shmem_malloc and shmem_free (spec §9.3.1, §9.3.2): size 0 and NULL need no
  * barrier; otherwise malloc barriers on exit and free on entry. Symmetry across

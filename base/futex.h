@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * futex2 wait and wake on 32-bit words (§3.10, §4.9, invariant 18).
  *

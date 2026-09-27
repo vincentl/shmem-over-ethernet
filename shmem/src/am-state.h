@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The AM backend's process-wide state (§3, §7.1 step 2), below the transport
  * boundary.

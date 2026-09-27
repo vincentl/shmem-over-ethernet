@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Watch slots: how a PE blocks on its own symmetric variable (§4.9).
  *

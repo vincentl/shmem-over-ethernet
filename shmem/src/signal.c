@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Signalling operations (spec §9.8, §9.11.15).
  *

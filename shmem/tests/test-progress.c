@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The progress loop between two logical nodes (§3.3, §3.7, §3.8, §3.9, §3.12).
  *

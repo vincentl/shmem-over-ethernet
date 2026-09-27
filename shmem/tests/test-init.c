@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Lifecycle: shmem_init, shmem_finalize, shmem_query_initialized, shmem_my_pe,
  * shmem_n_pes, including repeated and nested init/finalize (§6.4, spec §9.1). */
 #include <stdlib.h>

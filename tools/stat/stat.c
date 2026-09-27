@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * osoe-stat - read an osoe job's control segment from outside the job (§3.14).
  *

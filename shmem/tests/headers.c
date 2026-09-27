@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The public headers under every language standard they promise (C99, C11 and
  * C17 here; C++ in headers.cpp), with every warning an error. Declarations and

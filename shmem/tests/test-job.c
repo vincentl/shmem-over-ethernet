@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The job-wide rendezvous and the locality function (§6.2, §8.1).
  *

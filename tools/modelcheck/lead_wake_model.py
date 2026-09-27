@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Waking the lead only when it sleeps (design §3.10, §3.12; phase 1 step 2 slice 3, C2).
 
 Every remote operation used to end with a locked add on the lead's wake word and

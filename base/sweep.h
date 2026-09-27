@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The safety-sweep hook (§3.10, §3.15).
  *

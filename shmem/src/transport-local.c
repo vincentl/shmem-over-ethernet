@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The intranode path of the transport boundary (transport.h, §4.10).
  *

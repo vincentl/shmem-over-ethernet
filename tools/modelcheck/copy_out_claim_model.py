@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """One copier per landed nonblocking get (design §4.6 as built, §4.11).
 
 A nonblocking get's reply lands in the landing arena under a record, and is

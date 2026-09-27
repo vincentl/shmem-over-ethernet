@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * collect and fcollect (spec §9.10.8; collectives.c's gather, collect.c).
  *

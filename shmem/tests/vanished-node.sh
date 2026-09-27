@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # vanished-node.sh LAUNCHER PROGRAM RANKS MAP
 #
 # Tier 3 (tools/launch/tier3.sh, as WRAP): runs test-vanished-node.c's job on

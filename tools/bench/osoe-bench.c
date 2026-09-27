@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * osoe-bench - what the library costs on a cluster, one measurement a line.
  *

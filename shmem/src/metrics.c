@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The metric table and the per-thread counter blocks (§3.14). metrics.h states
  * the design; this is the table itself and the block claim.

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * alltoall and alltoalls (spec §9.10.5, §9.10.6; collectives.c's exchange,
  * alltoall.c): PE i's block j lands in PE j's dest block i.

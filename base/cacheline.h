@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Cache-line size used for _Alignas on shared words (§3.11, §3.14, §5.3).
  *

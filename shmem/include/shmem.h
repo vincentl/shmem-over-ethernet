@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * shmem.h - OpenSHMEM 1.6 application programming interface, as implemented
  * by osoe (OpenSHMEM Over Ethernet).

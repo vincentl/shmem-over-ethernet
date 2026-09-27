@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The two transfers every RMA routine is built on (rma.c): shmem_putmem and
  * shmem_getmem's bodies, with the routine a diagnostic names and the element

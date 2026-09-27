@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The AM sizing policy (§1, §3.2, §3.4).
  *

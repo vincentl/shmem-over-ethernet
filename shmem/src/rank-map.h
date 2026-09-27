@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Which node a rank is on, and its local id there, in space that follows the
  * shape of the job rather than its size (§6.2; phase 1 step 3).

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The compiler wrapper's test program: it builds with nothing but oshcc, runs,
  * and checks that it is the job the launcher started.

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Agent threads (§3.12). Every PE starts one in shmem_init, and lends it to
  * the backend through transport.h's osoe_transport_agent_pass, _wait and

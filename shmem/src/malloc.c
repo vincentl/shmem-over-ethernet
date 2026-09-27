@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Symmetric memory management (spec §9.3; design §4.4).
  *

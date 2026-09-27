@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The segment reader against a segment this build did not write (§3.14).
  *

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * What a core file holds (review round two, omissions 4): this PE's own heap,
  * and not its siblings' heaps or the node's connection area.

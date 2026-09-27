@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Init reclaims what a job killed during init left behind, and refuses what is
 # not a leftover (§6.2; review round two, D11 and D15).
 #

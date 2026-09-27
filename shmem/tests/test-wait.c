@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * shmem_wait_until and shmem_test (spec §9.11.1, §9.11.8) over the §4.9 watch
  * slot: a PE blocks on its own variable, another PE updates it with an AMO, and

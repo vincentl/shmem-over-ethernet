@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * osoe-stat against a live job, and against one deliberately stalled (§3.14).
  *

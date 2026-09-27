@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # osoe-stat is the one tool here that is installed (§3.14): it exists to be run
 # on a machine where a job has hung, which is not where the build tree is.
 add_executable(osoe-stat stat.c segment.c)

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Does the running kernel have the io_uring the AM backend's ring needs (§1,
  * §3.3)? Checked at start-up, beside the futex2 check, before anything is

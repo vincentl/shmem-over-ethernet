@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 find_package(Threads REQUIRED)
 
 foreach(name size environment node-map futex epoch stall-watch hostlist siphash)

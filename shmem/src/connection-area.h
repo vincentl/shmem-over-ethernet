@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The per-node AM connection area (§3.1, §3.4, §7.1 step 2).
  *

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # dead-pe-init.sh LAUNCHER PROGRAM
 #
 # Runs test-dead-pe.c's init case on 0,0,1: rank 0, node 0's lead, dies of

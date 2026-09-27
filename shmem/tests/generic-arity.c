@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A C11 generic called with the wrong number of arguments must not compile
  * (shmem.h: the OSOE_PICKn selections name, in every slot no right call

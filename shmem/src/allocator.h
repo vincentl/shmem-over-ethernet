@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The symmetric heap allocator (§4.4, invariant 6).
  *

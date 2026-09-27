@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* The symmetric-address checks every API entry point makes (§4.1, §4.2, §4.3). */
 #include <stdint.h>
 

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The lead's half of OSOE_JOB_SECRET (listener.c; §6.2), in one process
  * (tier 1): a caller that sends a correct hello but cannot prove the secret is

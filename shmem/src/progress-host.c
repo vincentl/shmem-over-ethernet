@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The node's progress engine, as a PE runs it (§3.12, §5.3).
  *

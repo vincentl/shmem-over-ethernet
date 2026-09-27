@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Ending the job (§3.15; phase 1 step 4): declaring the node's abort, and ending
  * a process because of one, whatever the process was doing.

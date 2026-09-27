@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * An LD_PRELOAD shim for one test: delay, by a second, every write(2) whose
  * bytes contain OSOE_TEST_SLOW_TEXT. Nothing else is touched.

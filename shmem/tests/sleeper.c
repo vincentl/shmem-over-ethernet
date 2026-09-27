@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A job that stays alive, for the launcher's signal tests (launcher-signals.sh).
  * Every PE says it is running once the whole job has initialized, then sleeps

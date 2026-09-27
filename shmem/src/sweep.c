@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The sweep (§3.15): what every library wait does when its safety-sweep
  * deadline expires (base/sweep.h) - never on the wake path, so a healthy wait

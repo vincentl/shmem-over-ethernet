@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """A full quiet never piggybacks on a pe_quiet (design §4.11 item 2, §10).
 
 Spec §9.12.3: shmem_ctx_pe_quiet completes the operations the calling PE issued

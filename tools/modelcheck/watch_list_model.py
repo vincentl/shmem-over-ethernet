@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Per-thread watch records for one PE under SHMEM_THREAD_MULTIPLE (design §4.11).
 
 Replaces the §4.9 single watch slot per PE when several threads of the PE wait at

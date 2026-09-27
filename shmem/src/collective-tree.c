@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* The k-ary tree over a team's participating nodes (collective-tree.h). */
 #include <stdbool.h>
 #include <stdint.h>

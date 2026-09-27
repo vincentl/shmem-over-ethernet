@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The compressed rank map (§6.2, rank-map.h): a node's ranks as progressions,
  * the job's runs built from every node's, lookups against the uncompressed map

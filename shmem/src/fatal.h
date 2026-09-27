@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Loud failure (§3.15). The library's error path is to print what went wrong,
  * naming the PE and, once it exists, the control segment an investigator

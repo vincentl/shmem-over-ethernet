@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A job that dies, dies everywhere (§3.15; phase 1 step 4).
  *

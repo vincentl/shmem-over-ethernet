@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* futex wrappers: absolute deadlines and wakes (§3.10, invariant 18). */
 #define _GNU_SOURCE
 #include <errno.h>

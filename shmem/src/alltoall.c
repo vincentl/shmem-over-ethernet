@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * alltoall and alltoalls (spec §9.10.5, §9.10.6): shmem_TYPENAME_alltoall and
  * shmem_TYPENAME_alltoalls for every standard RMA type of Table 5, and

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The progress thread's io_uring (§3.3, §3.10, §3.12; phase 1 step 3).
  *

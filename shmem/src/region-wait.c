@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Waiting for a word of this PE's own region (region-wait.h; §4.9). Moved out
  * of wait.c, which is the SHMEM layer's, so that the generic internode phase can

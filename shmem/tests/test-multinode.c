@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A job that spans logical nodes: init, barrier, finalize (§6.2, §5.3, §8.1).
  *

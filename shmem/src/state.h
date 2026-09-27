@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Process-wide library state, valid between the first shmem_init and the last
  * shmem_finalize. */
 #ifndef OSOE_STATE_H

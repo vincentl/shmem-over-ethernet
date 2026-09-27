@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # oshcc - compile and link an OpenSHMEM program against osoe.
 #
 # The C compiler osoe was built with - or $OSOE_CC, which may be several words,

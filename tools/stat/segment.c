@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The segment reader (segment.h). libc only, and no header from the library.
  */

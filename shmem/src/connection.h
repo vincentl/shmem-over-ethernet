@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Segment structure and the reservation protocol (§3.4, §3.5).
  *

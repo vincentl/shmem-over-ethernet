@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """The distributed lock of shmem_set_lock, shmem_test_lock and shmem_clear_lock
 (spec §9.13; design §4.12; lock.c).
 

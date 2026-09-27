@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Waiting for a reply credit, first come first served (design §3.11, §3.8;
 phase 1 step 3 slice 2).
 

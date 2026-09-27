@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # capture-slurm-fixtures.sh NAME OUTDIR [SRUN ARGS]...
 #
 # Runs `srun SRUN ARGS` with a task that records its SLURM_ environment, and

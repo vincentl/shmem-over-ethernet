@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """How the node leads close their connections at the end of a job (design §6.4;
 phase 1 step 3).
 

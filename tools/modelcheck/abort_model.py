@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """How an abort crosses nodes (design §3.15; phase 1 step 4).
 
 A job ends abnormally in one of three ways: a PE calls shmem_global_exit(status),

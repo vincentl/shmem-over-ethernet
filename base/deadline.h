@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Absolute deadlines (§3.10). futex_wait takes an absolute instant on a named
  * clock; a relative value passed there names an instant just after boot, so the

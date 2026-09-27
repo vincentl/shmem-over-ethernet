@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Two header-surface fixes from the conformance review, both proven by what
  * compiles rather than by a runtime CHECK:

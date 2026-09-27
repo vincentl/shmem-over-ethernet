@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Initialization lifecycle (§6.4): shmem_init, shmem_finalize,
  * shmem_query_initialized, shmem_my_pe, shmem_n_pes.

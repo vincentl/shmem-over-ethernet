@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The point-to-point waits and tests (§4.9), shared by shmem_wait_until,
  * shmem_test, their multiple-element forms and the signal routines (spec

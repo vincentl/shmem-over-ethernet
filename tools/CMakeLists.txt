@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Development tools. Built with the project, and not installed - except
 # osoe-stat, which is the one that has to exist on a machine where a job hung
 # (§3.14) rather than in someone's build tree, and the compiler wrapper, oshcc,

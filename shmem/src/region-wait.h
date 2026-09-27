@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Waiting for a word of this PE's own region to satisfy a comparison (§4.9):
  * the watch published before the first check, the sequence word loaded before

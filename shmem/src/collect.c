@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * collect and fcollect (spec §9.10.8): shmem_TYPENAME_collect and
  * shmem_TYPENAME_fcollect for every standard RMA type of Table 5, and

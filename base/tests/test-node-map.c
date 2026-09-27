@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* The §8.1 logical node map: parsing, and the per-rank bootstrap values a
  * launcher derives from it. Every one of §8.1's four poles appears here. */
 #include <stdint.h>

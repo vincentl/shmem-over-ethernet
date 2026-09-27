@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Symmetric statics (design §4.3; node.c, symmetric.c): the program's global
  * and static variables as symmetric objects, in a program linked as oshcc links

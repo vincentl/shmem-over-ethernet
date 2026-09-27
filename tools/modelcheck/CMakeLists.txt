@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The models run as tier-1 tests, not only as a recorded argument (§7.1 step 0,
 # §8.2). Each exits nonzero if any case disagrees with its expectation, so a
 # change to a protocol that breaks it fails the suite rather than waiting to be

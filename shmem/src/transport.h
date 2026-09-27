@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * transport.h - the boundary between the SHMEM layer and whatever carries
  * operations to other PEs (design §4.10).

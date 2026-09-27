@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * SHMEM_THREAD_MULTIPLE (spec §9.2; design §4.11; phase 1 step 8 slice 2):
  * several threads of each PE in the library at once, each checking its own

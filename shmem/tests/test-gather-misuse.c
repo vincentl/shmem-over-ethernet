@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The generic gather's own checks, each ending the job by name before a byte
  * of the gather lands (internode-generic.c; phase 1 step 5 slice 6). The test

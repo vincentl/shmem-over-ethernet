@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * internode.h over the AM layer (§5.3, §3.12).
  *

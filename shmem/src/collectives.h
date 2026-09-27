@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The data-carrying collectives (§5.5, §5.8; phase 1 step 5): the engines the
  * reductions (reductions.c), broadcast (broadcast.c), collect and fcollect

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * An internode quiet sweeps like every other wait (§4.10; review round two, D2).
  *

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * osoe_transport_set_range (§4.4, §4.10): the allocator tells the transport which
  * ranges carry remote atomics or signals.

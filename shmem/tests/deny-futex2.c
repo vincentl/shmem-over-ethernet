@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * deny-futex2 PROGRAM [ARGS]... - run PROGRAM as it would run on a kernel older
  * than Linux 6.7, where futex_wake (454), futex_wait (455) and futex_requeue

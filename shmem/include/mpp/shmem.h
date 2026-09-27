@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * mpp/shmem.h - the historical header location (Annex F).
  *

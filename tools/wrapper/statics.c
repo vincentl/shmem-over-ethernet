@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The wrapper's statics program (design §4.3): ISx's pattern, built with
  * nothing but oshcc - a global counter every PE adds to, and a static total

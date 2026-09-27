@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * OSOE_REGION_INTERNAL itself (§5.8; internal-region.h), below the collectives
  * that use it. Every PE puts a word into its right neighbour's region and adds

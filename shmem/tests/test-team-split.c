@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Team creation (spec §9.4.6-§9.4.8; phase 1 step 7 slice 2): the splits, and
  * every team routine and collective on the teams they create.

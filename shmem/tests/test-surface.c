@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The §7.4 mandatory surface: the parts of the specification that are required
  * for conformance and force no design decision (spec §9.1.7, §9.1.8, §9.9,

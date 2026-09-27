@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # A job that asks for more /dev/shm than there is is refused at init, by name,
 # instead of dying of SIGBUS later (§6.2; review round two, omissions 5).
 #

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Fetch the reading corpus: public OpenSHMEM code bases pinned in manifest.tsv.
 #
 # Each entry lands in corpus/<name>/ at exactly its pinned commit or tarball

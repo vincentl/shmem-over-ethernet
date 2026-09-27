@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Applying a read-modify-write to a word (§3.16, §4.1, §4.10).
  *

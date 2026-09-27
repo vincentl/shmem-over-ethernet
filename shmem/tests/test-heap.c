@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * shmem_calloc, shmem_realloc, shmem_align and shmem_malloc_with_hints
  * (spec §9.3.3-§9.3.6; design §4.4's edge semantics).

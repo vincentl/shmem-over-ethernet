@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * shmem_barrier_all blocks every PE until all have arrived (spec §9.10.1), and
  * every shmem_finalize is a barrier (§9.1.4). See arrivals.h for the check.

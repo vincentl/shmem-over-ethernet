@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A node lead's listening socket, the port rule by which another lead finds
  * it, and the hello that says who is on each end of a connection (§6.2; phase

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * PEs that call different collectives end the job by name (§5.5's "asserted on
  * receipt"; internode-generic.c's piece headers): the PE whose environment has

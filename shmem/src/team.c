@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Teams and contexts (§7.3; spec §9.4, §9.5).
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """How the node leads meet at init: the rendezvous tree (design §6.2; phase 1
 step 3 slice 1).
 

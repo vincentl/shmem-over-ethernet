@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The "blocked in" record (§3.14): where a PE is waiting, readable from another
  * process while it waits.

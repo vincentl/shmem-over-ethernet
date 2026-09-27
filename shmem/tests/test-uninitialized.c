@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A call before shmem_init or after the last shmem_finalize must be a named
  * fatal, not a segfault, a misleading message, a valid-looking wrong answer,

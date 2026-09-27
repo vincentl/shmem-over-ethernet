@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The generic internode phase of the data collectives (internode-generic.h;
  * §5.5, §5.8), moved behind internode.h from collectives.c, where phase 1 step

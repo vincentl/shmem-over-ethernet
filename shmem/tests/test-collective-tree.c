@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The internode tree's topology on its own (tier 1; §5.3, collective-tree.h).
  *

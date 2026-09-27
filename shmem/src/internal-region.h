@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * OSOE_REGION_INTERNAL (§5.8; phase 1 step 5): library scratch and collective
  * control words, "never visible to the application" (transport.h).

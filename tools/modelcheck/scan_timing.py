@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Timing beside scan_model.py (the rule of performance-claims-need-timing):
 how long a scan takes, in network hops, under the two designs the brief
 weighs (docs/prompts/done/phase1-step10-slice1-prompt.md).

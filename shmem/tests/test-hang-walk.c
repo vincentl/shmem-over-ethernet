@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Finding the PE that never arrived, by walking down the tree (§3.14, §5.3).
  *

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Atomic memory operations (spec §9.7) between local PEs: every operation is
  * applied exactly once and is atomic against every other path, whether issued

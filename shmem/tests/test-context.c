@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Contexts (spec §9.5; design §4.6, §4.11; phase 1 step 8 slice 1): creation
  * to exhaustion and back, the options, the implicit quiet of destroy, two

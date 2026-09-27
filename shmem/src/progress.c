@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* liburing.h, through wire.h, uses POSIX types (sigset_t, AT_FDCWD) that plain
  * C11 hides (portability review F12: feature macros are declared per file). */
 #define _GNU_SOURCE

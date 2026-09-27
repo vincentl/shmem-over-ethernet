@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The generic implementation of internode.h's data half (§5.5, §5.8; phase 1
  * step 5 slice 2): §5.3's tree of node leads over the transport's put, fenced

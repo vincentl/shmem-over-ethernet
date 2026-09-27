@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A loud failure writes its reason before it lets anyone else end the job
  * (fatal.h). The order is the whole point: publishing a rendezvous's `failed`

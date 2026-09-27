@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Library information routines and constants (§6, §9.1.11, §9.1.12). */
 #include <stdio.h>
 #include <string.h>

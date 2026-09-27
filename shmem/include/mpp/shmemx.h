@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * mpp/shmemx.h - the historical header location (Annex F.2.1), for the
  * extension namespace. Exactly a redirection, for the same reason

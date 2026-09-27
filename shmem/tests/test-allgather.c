@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * fcollect's and collect's internode phase, the allgather among node leads
  * (design §5.8, "An allgather for fcollect"; phase 1 step 5 slice 6;

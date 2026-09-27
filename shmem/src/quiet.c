@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Memory ordering: shmem_fence, shmem_quiet and shmem_pe_quiet
  * (spec §9.12.1-§9.12.3; design §4.6).

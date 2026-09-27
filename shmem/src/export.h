@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Symbol export control and the profiling interface (§7.4; spec §10).
  *

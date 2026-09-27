@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * SipHash-2-4 (Aumasson and Bernstein, 2012): a keyed hash that is a pseudo-
  * random function, so a digest proves knowledge of the key without revealing

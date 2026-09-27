@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Where a team's state lives, and how its shape is found (phase 1 step 7
  * slice 1): the descriptor's local list, the world mapping, each team's record,

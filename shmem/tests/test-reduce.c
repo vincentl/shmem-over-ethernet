@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The team-based reductions (spec §9.10.9; design §5.5, phase 1 step 5): every
  * operator family on types of each kind, one element, a few, and more than one

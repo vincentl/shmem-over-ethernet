@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """The chained release wake (design §5.3, base/epoch.c; phase 1 step 2 slice 3, E).
 
 A team's release on a node used to be one futex_wake(INT_MAX) on the release

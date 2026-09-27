@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The reply descriptor pool (§3.8; review round two, D1).
  *

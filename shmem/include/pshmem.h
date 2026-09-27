@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * pshmem.h - the OpenSHMEM profiling interface (spec §10).
  *

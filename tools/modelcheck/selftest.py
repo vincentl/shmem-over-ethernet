@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Checks that engine.py's state-space reductions change no verdict.
 
 Runs small cases of every model twice: with the reductions (folded gpre/gpost

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Accessibility queries (spec §9.1.7, §9.1.8).
  *

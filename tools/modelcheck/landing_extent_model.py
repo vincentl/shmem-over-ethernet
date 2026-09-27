@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Landing-zone extents for concurrent blocking gets (design §4.11, §3.12).
 
 Under SERIALIZED a PE lands a blocking get's reply in one slot, one caller at a

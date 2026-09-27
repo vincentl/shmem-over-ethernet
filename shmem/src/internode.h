@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * internode.h - the boundary between a collective's intranode phase and its
  * internode phase (design §5.1, §5.3, §10).

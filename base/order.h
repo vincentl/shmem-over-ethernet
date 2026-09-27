@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The two fences behind §4.6 rule 2 (§3.16): what orders the calling thread's
  * plain stores - a put's memcpy, a store through shmem_ptr - under Table 14.

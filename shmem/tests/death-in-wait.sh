@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # death-in-wait.sh LAUNCHER PROGRAM RANKS MAP WAIT ROUTINE
 #
 # Runs test-death-in-wait.c: the last rank dies while every other waits in WAIT

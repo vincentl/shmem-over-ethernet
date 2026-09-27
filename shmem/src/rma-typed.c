@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Typed and sized RMA (spec §9.6): every standard RMA type's put, get, p, g,
  * iput, iget and their nonblocking forms; the sized put8..128/get8..128 and

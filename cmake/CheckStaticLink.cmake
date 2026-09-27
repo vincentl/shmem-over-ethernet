@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 cmake_minimum_required(VERSION 3.25)
 
 # Configures and builds libosoe as a static archive in a scratch directory,

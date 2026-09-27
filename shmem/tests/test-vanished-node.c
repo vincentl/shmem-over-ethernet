@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A node that vanishes - its link dropping everything: no FIN, no reset - is
  * found by TCP keepalive (§3.15; phase 1 step 4 slice 1, part D). Tier 3 only,

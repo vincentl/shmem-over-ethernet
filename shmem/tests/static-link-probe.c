@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A tiny consumer of the installed API, compiled and linked by
  * cmake/CheckStaticLink.cmake against libosoe.a alone (portability review,

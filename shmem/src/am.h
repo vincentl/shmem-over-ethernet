@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Active messages: the handler table and the stream parser (§3.3, §3.7, §3.13).
  *

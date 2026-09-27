@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # global-exit.sh LAUNCHER PROGRAM RANKS MAP HOW STATUS [CALLER [MODE]]
 #
 # Runs test-global-exit.c's job - PE CALLER calls shmem_global_exit(HOW), or

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The nonblocking fetching AMOs (spec §9.7.2): after the call and a
  * shmem_quiet, *fetch holds the target's value from before the operation and

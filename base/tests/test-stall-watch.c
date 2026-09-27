@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* The no-progress rule (base/stall-watch.h): a watch reports a stall only when
  * its word has not changed for the whole limit, and never with a limit of 0. */
 #define _GNU_SOURCE

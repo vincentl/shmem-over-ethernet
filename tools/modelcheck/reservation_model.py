@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """§3.5's reservation protocol and §3.8's pre-open drain, as connection.c and
 progress.c implement them.
 

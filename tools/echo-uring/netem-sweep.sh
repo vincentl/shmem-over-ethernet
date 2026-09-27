@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # netem-sweep.sh ECHO_URING [ROUNDS] [MEBIBYTES]
 #
 # §8.3's experiment for the floor harness: two network namespaces joined by a

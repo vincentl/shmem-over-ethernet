@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * echo-uring (§8.4): the round-trip and bandwidth floor for step 3, and the
  * smallest reproducer of every io_uring shape the AM backend uses.

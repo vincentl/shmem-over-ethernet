@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* A child forked after shmem_init must not tear anything down (§6.4). */
 #include <stdio.h>
 #include <stdlib.h>

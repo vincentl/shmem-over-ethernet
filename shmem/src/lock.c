@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Distributed locks (spec §9.13; design §4.12): shmem_set_lock,
  * shmem_test_lock and shmem_clear_lock.

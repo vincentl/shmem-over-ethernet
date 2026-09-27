@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The reductions' combine functions (§5.5), one per operation and element
  * (internode.h), for the two places a reduction combines: the lead's intranode

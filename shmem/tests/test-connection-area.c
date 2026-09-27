@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The per-node connection area across processes (§3.4, §3.5, §3.12).
  *

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The no-progress rule (§3.15; decided 2026-09-20).
  *

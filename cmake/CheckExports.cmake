@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 cmake_minimum_required(VERSION 3.25)
 
 # Fails if a shared library exports any symbol outside the OpenSHMEM API.

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """The §4.9 watch slot, one per local PE, watching a byte range (design §4.9).
 
 Phase 1 provides up to SHMEM_THREAD_SERIALIZED, so a PE is in at most one wait

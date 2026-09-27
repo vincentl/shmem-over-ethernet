@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The library against its floor (§1, §8.4; phase 1 step 3 slice 2): the pins §1
  * asks for, measured inside one job of two logical nodes, one PE on each.

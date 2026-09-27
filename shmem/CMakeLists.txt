@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 find_package(Threads REQUIRED)
 
 # The backend behind transport.h and internode.h (§4.10), bound at build time:

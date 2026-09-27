@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # tier3.sh SHAPE NODES [NAME=VALUE]... -- LAUNCHER [LAUNCHER ARGS]...
 # tier3.sh clean
 #

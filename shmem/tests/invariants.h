@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Every invariant counter is zero at quiescence (§3.14 question 6, §8.2).
  *

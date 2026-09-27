@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The team-based reductions (spec §9.10.9): shmem_TYPENAME_OP_reduce for every
  * operator and type of Table 10, over the accumulator (collectives.c).

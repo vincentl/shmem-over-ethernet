@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Pipelined pieces through the internode tree (design §5.8, "Pipelined
  * pieces"; phase 1 step 5 slice 5; internode-generic.c). A data collective's

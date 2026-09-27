@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The §4.9 watched-range encoding (shmem/src/watch_range.h), on its own.
  *

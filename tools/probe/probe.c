@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Environment probe for the shmem-over-ethernet design assumptions.
  *

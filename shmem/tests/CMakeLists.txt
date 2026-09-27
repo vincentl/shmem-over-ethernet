@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 add_executable(shmem_test_info test-info.c)
 target_link_libraries(shmem_test_info PRIVATE osoe)
 osoe_warnings(shmem_test_info)

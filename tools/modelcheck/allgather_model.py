@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """An allgather among node leads, for fcollect's internode phase (design §5.8;
 internode.h, osoe_internode_collect).
 

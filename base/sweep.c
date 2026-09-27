@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 #include "base/sweep.h"
 
 /* Weak, so linking the SHMEM layer's sweep.c into the same library replaces

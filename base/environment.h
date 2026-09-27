@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Environment parsing. osoe's own variables use the OSOE_ prefix; SHMEM_
  * belongs to the specification (§6.2).

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 #include "base/siphash.h"
 
 static uint64_t rotate(uint64_t x, int b)

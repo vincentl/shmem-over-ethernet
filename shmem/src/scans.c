@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The prefix scans (spec §9.10.10): shmem_TYPENAME_sum_inscan and
  * shmem_TYPENAME_sum_exscan for every integer, floating and complex type Table

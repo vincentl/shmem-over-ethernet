@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * shmem_putmem, shmem_getmem and shmem_ptr between every pair of local PEs,
  * including a PE and itself (spec §9.6.1, §9.1.9); and symmetry of

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # dead-pe.sh LAUNCHER PROGRAM RANKS MAP DIES
 #
 # Runs test-dead-pe.c's job on MAP with world rank DIES killing itself, and

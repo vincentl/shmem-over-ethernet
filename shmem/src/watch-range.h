@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The watched range, packed into one word (§4.9, §4.11 item 3).
  *

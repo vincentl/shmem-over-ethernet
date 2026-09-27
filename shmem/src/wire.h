@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The node-pair wire (§3.1, §3.3; phase 1 step 3).
  *

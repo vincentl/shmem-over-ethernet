@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The broadcasts (spec §9.10.7): shmem_TYPENAME_broadcast for every standard
  * RMA type of Table 5, and shmem_broadcastmem, over the accumulator

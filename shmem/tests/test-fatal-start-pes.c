@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A loud failure ends the job, and does not first join a collective (§3.15;
  * second review, conformance F1).

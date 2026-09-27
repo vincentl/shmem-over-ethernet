@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The internode phase of a barrier, over the AM layer (§5.1, §5.3, §8.2).
  *

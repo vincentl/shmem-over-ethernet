@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The job-wide rendezvous over sockets (§6.2; phase 1 step 3).
  *

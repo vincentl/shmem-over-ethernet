@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The deprecated atomic memory operations (Annex F.2.12): shmem_TYPENAME_fetch,
  * _set, _swap, _cswap, _finc, _inc, _fadd and _add, and their C11 generic

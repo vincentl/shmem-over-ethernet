@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 #include <pshmem.h>
 #include <shmem.h>
 

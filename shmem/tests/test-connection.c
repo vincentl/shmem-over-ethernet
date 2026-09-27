@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The reservation protocol in C (§3.4, §3.5).
  *

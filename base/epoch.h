@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Collective epoch counters (§5.4, invariant 10).
  *

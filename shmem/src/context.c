@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Communication contexts (spec §9.5; design §4.6, §4.11, §7.3; phase 1 step
  * 8 slice 1): shmem_ctx_create, shmem_team_create_ctx, shmem_ctx_destroy and

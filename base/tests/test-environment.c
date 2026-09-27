@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* OSOE_ environment parsing (§6.2). */
 #define _GNU_SOURCE
 #include <stdint.h>

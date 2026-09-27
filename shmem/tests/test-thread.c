@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * shmem_init_thread and shmem_query_thread (spec §9.2; design §4.6).
  *

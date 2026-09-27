@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The rule by which a node listens somewhere other than its host list entry
  * (§6.2, listener.h): a name this host resolves to a loopback address - as

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Reading an osoe control segment from outside the job (design §3.14).
  *

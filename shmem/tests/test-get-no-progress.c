@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A blocking get names its target when it gives up (§4.10; diagnosability
  * review, D-6). shmem.stopped-node.no-progress covers the aggregate quiet

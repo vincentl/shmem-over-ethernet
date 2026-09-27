@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The team-based broadcast (spec §9.10.7; design §5.5, phase 1 step 5): from
  * every root in turn, so that the tree is rooted at every node and the root is

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The bootstrap against real launcher environments (§6.1, §8.2): each fixture
  * is one task's environment as srun set it - captured from a real step, or

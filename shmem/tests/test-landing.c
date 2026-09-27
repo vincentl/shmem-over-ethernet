@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The landing zones in the control segment (§3.12, §4.6, layout 6).
  *

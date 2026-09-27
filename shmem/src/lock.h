@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * What the rest of the library needs from the locks (lock.c): a word on
  * stderr when the last shmem_finalize begins with locks still held, since a PE

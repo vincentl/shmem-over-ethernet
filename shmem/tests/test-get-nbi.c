@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Nonblocking gets (spec §9.6.2; design §4.6, as built): shmem_getmem_nbi and
  * the typed forms, completed by quiet and by a barrier, to node-mates and

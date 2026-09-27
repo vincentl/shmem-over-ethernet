@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The prefix scans (spec §9.10.10; design §5.8; phase 1 step 10 slice 1,
  * docs/prompts/done/phase1-step10-slice1-prompt.md), checked by value: team rank

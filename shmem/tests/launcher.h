@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The launcher's variables, for a test, under the bootstrap's own rule (§6.1):
  * osoe-launch's OSOE_ names when OSOE_PROCID is set, srun's SLURM_ names

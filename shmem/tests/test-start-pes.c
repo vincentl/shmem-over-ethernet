@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * start_pes, and the implicit finalize it must carry (Annex F.2.2, F.2.3).
  *

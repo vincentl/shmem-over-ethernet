@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The typed and sized RMA routines of spec §9.6 and the typed put-with-signal
  * of §9.8.3-§9.8.4: shmem_TYPENAME_put/get/p/g/iput/iget/ibput/ibget and their

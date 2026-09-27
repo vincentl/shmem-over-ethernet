@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * A quiet waits as long as its peer keeps it waiting (§3.15; second review, D3).
  *
