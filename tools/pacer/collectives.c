@@ -228,18 +228,18 @@ enum { DATA_FAMILIES = TIME_SYNC, TIMING_CASES = DATA_FAMILIES * TIMING_SIZES * 
 
 static struct timing_case timing_case_of(int index)
 {
-    struct timing_case c;
+    struct timing_case timing;
     if (index < DATA_FAMILIES * TIMING_SIZES * 2) {
-        c.family = (enum timing_family)(index % DATA_FAMILIES);
-        c.bytes = timing_sizes[(index / DATA_FAMILIES) % TIMING_SIZES];
-        c.strided = index / (DATA_FAMILIES * TIMING_SIZES);
+        timing.family = (enum timing_family)(index % DATA_FAMILIES);
+        timing.bytes = timing_sizes[(index / DATA_FAMILIES) % TIMING_SIZES];
+        timing.strided = index / (DATA_FAMILIES * TIMING_SIZES);
     } else {
         int k = index - DATA_FAMILIES * TIMING_SIZES * 2;
-        c.family = k < 2 ? TIME_SYNC : TIME_BARRIER;
-        c.bytes = 0;
-        c.strided = k == 1;
+        timing.family = k < 2 ? TIME_SYNC : TIME_BARRIER;
+        timing.bytes = 0;
+        timing.strided = k == 1;
     }
-    return c;
+    return timing;
 }
 
 /* ---- the state ------------------------------------------------------------------ */
@@ -271,24 +271,24 @@ static struct {
     double fastest[TIMING_CASES];
     long round;
     double calls, bytes, phase[3];
-} coll;
+} collectives;
 
 static uint64_t collectives_memory(int npes, const struct pacer_options *options, char *fields,
                                    size_t size)
 {
-    coll.seed = options->seed;
-    coll.quick = options->quick;
-    coll.plant_reduce = options->plant == PACER_PLANT_COLLECTIVES_REDUCE;
-    coll.plant_scan = options->plant == PACER_PLANT_COLLECTIVES_SCAN;
-    coll.plant_data = options->plant == PACER_PLANT_COLLECTIVES_DATA;
-    coll.plant_gap = options->plant == PACER_PLANT_COLLECTIVES_GAP;
-    coll.plant_status = options->plant == PACER_PLANT_COLLECTIVES_STATUS;
-    coll.plant_timed = options->plant == PACER_PLANT_COLLECTIVES_TIMED;
-    coll.plant_timed_data = options->plant == PACER_PLANT_COLLECTIVES_TIMED_DATA;
+    collectives.seed = options->seed;
+    collectives.quick = options->quick;
+    collectives.plant_reduce = options->plant == PACER_PLANT_COLLECTIVES_REDUCE;
+    collectives.plant_scan = options->plant == PACER_PLANT_COLLECTIVES_SCAN;
+    collectives.plant_data = options->plant == PACER_PLANT_COLLECTIVES_DATA;
+    collectives.plant_gap = options->plant == PACER_PLANT_COLLECTIVES_GAP;
+    collectives.plant_status = options->plant == PACER_PLANT_COLLECTIVES_STATUS;
+    collectives.plant_timed = options->plant == PACER_PLANT_COLLECTIVES_TIMED;
+    collectives.plant_timed_data = options->plant == PACER_PLANT_COLLECTIVES_TIMED_DATA;
     /* Two buffers of a contribution from every member, and the typed cases'
      * strided blocks, within the budget. */
     size_t typed = (size_t)npes * MOST_ELEMENTS * 16 * 4;
-    size_t most = coll.quick ? 32768 : 1048576;
+    size_t most = collectives.quick ? 32768 : 1048576;
     while (most > 8 && 2 * ((uint64_t)npes * most + typed) + 4 * TIMING_CASES * 8 > options->memory)
         most /= 8;
     uint64_t symmetric = 2 * ((uint64_t)npes * most + typed) + 4 * TIMING_CASES * 8;
@@ -297,8 +297,8 @@ static uint64_t collectives_memory(int npes, const struct pacer_options *options
                  (unsigned long long)symmetric);
         return UINT64_MAX;
     }
-    coll.most_bytes = most;
-    coll.buffer_bytes = (size_t)npes * most + typed;
+    collectives.most_bytes = most;
+    collectives.buffer_bytes = (size_t)npes * most + typed;
     char most_text[32];
     pacer_size(most_text, sizeof most_text, most);
     snprintf(fields, size, "typed=%d timed=%d sizes=8..%s teams=world,even", TYPED_CASES,
@@ -306,46 +306,46 @@ static uint64_t collectives_memory(int npes, const struct pacer_options *options
     return symmetric;
 }
 
-static int view(struct team_view *v, shmem_team_t handle, const char *name)
+static int make_view(struct team_view *team, shmem_team_t handle, const char *name)
 {
-    v->handle = handle;
-    v->name = name;
-    v->size = handle == SHMEM_TEAM_INVALID ? 0 : shmem_team_n_pes(handle);
-    v->rank = handle == SHMEM_TEAM_INVALID ? -1 : shmem_team_my_pe(handle);
-    v->world = malloc(sizeof *v->world * (size_t)(v->size ? v->size : 1));
-    if (!v->world)
+    team->handle = handle;
+    team->name = name;
+    team->size = handle == SHMEM_TEAM_INVALID ? 0 : shmem_team_n_pes(handle);
+    team->rank = handle == SHMEM_TEAM_INVALID ? -1 : shmem_team_my_pe(handle);
+    team->world = malloc(sizeof *team->world * (size_t)(team->size ? team->size : 1));
+    if (!team->world)
         return -1;
-    for (int k = 0; k < v->size; k++)
-        v->world[k] = shmem_team_translate_pe(handle, k, SHMEM_TEAM_WORLD);
+    for (int k = 0; k < team->size; k++)
+        team->world[k] = shmem_team_translate_pe(handle, k, SHMEM_TEAM_WORLD);
     return 0;
 }
 
 static int collectives_setup(shmem_team_t team, const struct pacer_options *options)
 {
     (void)options;
-    coll.team = team;
-    coll.me_world = shmem_my_pe();
+    collectives.team = team;
+    collectives.me_world = shmem_my_pe();
     int n = shmem_team_n_pes(team);
     shmem_team_t even = SHMEM_TEAM_INVALID;
     if (shmem_team_split_strided(team, 0, 2, (n + 1) / 2, NULL, 0, &even) != 0)
         return -1;
-    if (view(&coll.teams[0], team, "world") || view(&coll.teams[1], even, "even"))
+    if (make_view(&collectives.teams[0], team, "world") || make_view(&collectives.teams[1], even, "even"))
         return -1;
-    coll.source = shmem_malloc(coll.buffer_bytes);
-    coll.dest = shmem_malloc(coll.buffer_bytes);
-    coll.times = shmem_calloc(2 * TIMING_CASES, sizeof *coll.times);
-    coll.times_result = shmem_calloc(2 * TIMING_CASES, sizeof *coll.times_result);
-    coll.expected = malloc(coll.buffer_bytes);
-    coll.owned = malloc(coll.buffer_bytes);
-    if (!coll.source || !coll.dest || !coll.times || !coll.times_result || !coll.expected ||
-        !coll.owned)
+    collectives.source = shmem_malloc(collectives.buffer_bytes);
+    collectives.dest = shmem_malloc(collectives.buffer_bytes);
+    collectives.times = shmem_calloc(2 * TIMING_CASES, sizeof *collectives.times);
+    collectives.times_result = shmem_calloc(2 * TIMING_CASES, sizeof *collectives.times_result);
+    collectives.expected = malloc(collectives.buffer_bytes);
+    collectives.owned = malloc(collectives.buffer_bytes);
+    if (!collectives.source || !collectives.dest || !collectives.times || !collectives.times_result || !collectives.expected ||
+        !collectives.owned)
         return -1;
-    memset(coll.sample_count, 0, sizeof coll.sample_count);
+    memset(collectives.sample_count, 0, sizeof collectives.sample_count);
     for (int i = 0; i < TIMING_CASES; i++)
-        coll.fastest[i] = 1e30;
-    coll.round = 0;
-    coll.calls = coll.bytes = 0;
-    memset(coll.phase, 0, sizeof coll.phase);
+        collectives.fastest[i] = 1e30;
+    collectives.round = 0;
+    collectives.calls = collectives.bytes = 0;
+    memset(collectives.phase, 0, sizeof collectives.phase);
     shmem_team_sync(team);
     return 0;
 }
@@ -371,14 +371,14 @@ static uint64_t input_of(enum operation op, int p, int k, int m, size_t e, long 
 }
 
 /* What this PE's dest element e must hold. */
-static uint64_t result_of(enum operation op, const struct team_view *v, size_t e, long round,
+static uint64_t result_of(enum operation op, const struct team_view *team, size_t e, long round,
                           int bits)
 {
     uint64_t mask = bits >= 64 ? UINT64_MAX : (UINT64_C(1) << bits) - 1;
     uint64_t r = op == AND ? mask : op == PROD ? 1 : op == MIN ? UINT64_MAX : 0;
-    int last = op == INSCAN ? v->rank : op == EXSCAN ? v->rank - 1 : v->size - 1;
+    int last = op == INSCAN ? team->rank : op == EXSCAN ? team->rank - 1 : team->size - 1;
     for (int k = 0; k <= last; k++) {
-        uint64_t x = input_of(op, v->world[k], k, v->size, e, round, bits);
+        uint64_t x = input_of(op, team->world[k], k, team->size, e, round, bits);
         switch (op) {
         case AND: r &= x; break;
         case OR: r |= x; break;
@@ -395,108 +395,108 @@ static uint64_t result_of(enum operation op, const struct team_view *v, size_t e
 /* Byte b of what world PE p offers in a data collective. */
 static unsigned char data_byte(int p, uint64_t b, long round)
 {
-    uint64_t w = random_mix(coll.seed ^ random_name("collectives"), (uint64_t)p, b >> 3,
+    uint64_t w = random_mix(collectives.seed ^ random_name("collectives"), (uint64_t)p, b >> 3,
                             (uint64_t)round);
     return (unsigned char)(w >> (8 * (b & 7)));
 }
 
 /* ---- one typed case -------------------------------------------------------------- */
 
-static void failure_line(long round, const struct typed_case *c, const struct team_view *v,
+static void failure_line(long round, const struct typed_case *typed, const struct team_view *team,
                          const char *what)
 {
-    pacer_failure("collectives round=%ld %s %s %s: %s", round, operation_names[c->operation],
-                  c->type, v->name, what);
+    pacer_failure("collectives round=%ld %s %s %s: %s", round, operation_names[typed->operation],
+                  typed->type, team->name, what);
 }
 
-static void run_typed(const struct typed_case *c, struct team_view *v, long round, int generic)
+static void run_typed(const struct typed_case *typed, struct team_view *team, long round, int generic)
 {
-    if (v->rank < 0)
+    if (team->rank < 0)
         return;
-    size_t w = (size_t)c->size, m = (size_t)v->size, n = 1 + (size_t)(round % MOST_ELEMENTS);
-    int bits = 8 * c->size > 64 ? 64 : 8 * c->size;
+    size_t w = (size_t)typed->size, m = (size_t)team->size, n = 1 + (size_t)(round % MOST_ELEMENTS);
+    int bits = 8 * typed->size > 64 ? 64 : 8 * typed->size;
     int root = (int)(round % (long)m);
     ptrdiff_t dst = 1 + round % 3, sst = 1 + (round / 3) % 3;
     double started = pacer_now();
-    enum operation op = c->operation;
+    enum operation op = typed->operation;
     /* What a typed case can reach: m blocks of the most elements, strided. */
     size_t reach = m * MOST_ELEMENTS * 16 * 3 + 64;
-    if (reach > coll.buffer_bytes)
-        reach = coll.buffer_bytes;
-    memset(coll.dest, CANARY, reach);
+    if (reach > collectives.buffer_bytes)
+        reach = collectives.buffer_bytes;
+    memset(collectives.dest, CANARY, reach);
     size_t n_here = n;                      /* collect: this member's own count */
-    if (c->values != BYTES) {
+    if (typed->values != BYTES) {
         for (size_t e = 0; e < n; e++) {
-            uint64_t x = input_of(op, coll.me_world, v->rank, (int)m, e, round, bits);
-            if (e == 0 && v->rank >= 0 && coll.me_world == 1) {
-                if (coll.plant_reduce && op <= PROD) {
+            uint64_t x = input_of(op, collectives.me_world, team->rank, (int)m, e, round, bits);
+            if (e == 0 && team->rank >= 0 && collectives.me_world == 1) {
+                if (collectives.plant_reduce && op <= PROD) {
                     /* The planted defect, forced past what the result absorbs. */
                     x = op == AND ? 0 : op == OR ? UINT64_MAX : op == XOR ? x ^ 1
                         : op == MAX ? 100 : op == MIN ? 0 : op == PROD ? 2 : x + 1;
-                    coll.plant_reduce = 0;
-                } else if (coll.plant_scan && (op == INSCAN || op == EXSCAN)) {
+                    collectives.plant_reduce = 0;
+                } else if (collectives.plant_scan && (op == INSCAN || op == EXSCAN)) {
                     x++;
-                    coll.plant_scan = 0;
+                    collectives.plant_scan = 0;
                 }
             }
-            c->store(coll.source + e * w, x);
+            typed->store(collectives.source + e * w, x);
         }
     } else {
         if (op == COLLECT)
-            n_here = 1 + (size_t)((v->rank + round) % 3);
+            n_here = 1 + (size_t)((team->rank + round) % 3);
         size_t bytes = m * MOST_ELEMENTS * 3 * w;  /* the most any case reads */
         for (size_t b = 0; b < bytes; b++)
-            coll.source[b] = data_byte(coll.me_world, b, round);
-        if (coll.plant_data && coll.me_world == 1 && op != BROADCAST) {
-            coll.source[0] ^= 1;    /* the planted defect: a byte every member reads */
-            coll.plant_data = 0;
+            collectives.source[b] = data_byte(collectives.me_world, b, round);
+        if (collectives.plant_data && collectives.me_world == 1 && op != BROADCAST) {
+            collectives.source[0] ^= 1;    /* the planted defect: a byte every member reads */
+            collectives.plant_data = 0;
         }
     }
-    shmem_team_sync(v->handle);     /* every dest ready before anyone calls */
-    int status = c->call(v->handle, coll.dest, coll.source, op == COLLECT ? n_here : n, generic,
+    shmem_team_sync(team->handle);     /* every dest ready before anyone calls */
+    int status = typed->call(team->handle, collectives.dest, collectives.source, op == COLLECT ? n_here : n, generic,
                          root, dst, sst);
-    coll.calls++;
-    coll.phase[0] += pacer_now() - started;
+    collectives.calls++;
+    collectives.phase[0] += pacer_now() - started;
     started = pacer_now();
-    if (coll.plant_status && coll.me_world == 1) {
+    if (collectives.plant_status && collectives.me_world == 1) {
         status = 1;                 /* the planted defect: a status misread */
-        coll.plant_status = 0;
+        collectives.plant_status = 0;
     }
     if (status != 0) {
         char what[64];
         snprintf(what, sizeof what, "returned %d", status);
-        failure_line(round, c, v, what);
-        coll.phase[2] += pacer_now() - started;
+        failure_line(round, typed, team, what);
+        collectives.phase[2] += pacer_now() - started;
         return;
     }
 
     /* The closed forms. */
     char what[192];
-    if (c->values != BYTES) {
+    if (typed->values != BYTES) {
         size_t count = op == INSCAN || op == EXSCAN || op <= PROD ? n : 0;
         for (size_t e = 0; e < count; e++) {
-            uint64_t want = result_of(op, v, e, round, bits);
-            uint64_t got = c->load(coll.dest + e * w);
-            if (c->values == INTEGER) {
+            uint64_t want = result_of(op, team, e, round, bits);
+            uint64_t got = typed->load(collectives.dest + e * w);
+            if (typed->values == INTEGER) {
                 uint64_t mask = bits >= 64 ? UINT64_MAX : (UINT64_C(1) << bits) - 1;
                 got &= mask;
             }
             if (got != want) {
                 snprintf(what, sizeof what, "element %zu is %llu, expected %llu", e,
                          (unsigned long long)got, (unsigned long long)want);
-                failure_line(round, c, v, what);
+                failure_line(round, typed, team, what);
                 break;
             }
         }
-        coll.phase[2] += pacer_now() - started;
+        collectives.phase[2] += pacer_now() - started;
         return;
     }
     /* The data collectives: where each byte comes from. */
-    memset(coll.expected, CANARY, reach);
-    memset(coll.owned, 0, reach);
+    memset(collectives.expected, CANARY, reach);
+    memset(collectives.owned, 0, reach);
     size_t extent = 0;
     for (size_t k = 0; k < m; k++) {
-        int p = v->world[k];
+        int p = team->world[k];
         size_t count = op == COLLECT ? 1 + (size_t)(((long)k + round) % 3) : n;
         size_t before = 0;
         if (op == COLLECT)
@@ -510,7 +510,7 @@ static void run_typed(const struct typed_case *c, struct team_view *v, long roun
                 case BROADCAST:
                     if (k != 0)
                         goto next_member;
-                    owner = v->world[root];
+                    owner = team->world[root];
                     at = e * w + b;
                     from = e * w + b;
                     break;
@@ -524,34 +524,34 @@ static void run_typed(const struct typed_case *c, struct team_view *v, long roun
                     break;
                 case ALLTOALL:
                     at = (k * n + e) * w + b;
-                    from = ((size_t)v->rank * n + e) * w + b;
+                    from = ((size_t)team->rank * n + e) * w + b;
                     break;
                 default:            /* alltoalls */
                     at = (k * n + e) * (size_t)dst * w + b;
-                    from = ((size_t)v->rank * n + e) * (size_t)sst * w + b;
+                    from = ((size_t)team->rank * n + e) * (size_t)sst * w + b;
                     break;
                 }
-                coll.expected[at] = data_byte(owner, from, round);
-                coll.owned[at] = 1;
+                collectives.expected[at] = data_byte(owner, from, round);
+                collectives.owned[at] = 1;
                 if (at + 1 > extent)
                     extent = at + 1;
             }
     next_member:;
     }
-    if (op == ALLTOALLS && coll.plant_gap && coll.me_world == 1 && dst > 1) {
-        coll.dest[w] = (unsigned char)~CANARY;  /* the planted defect: a byte in a gap */
-        coll.plant_gap = 0;
+    if (op == ALLTOALLS && collectives.plant_gap && collectives.me_world == 1 && dst > 1) {
+        collectives.dest[w] = (unsigned char)~CANARY;  /* the planted defect: a byte in a gap */
+        collectives.plant_gap = 0;
     }
     size_t checked = extent + 64 < reach ? extent + 64 : reach;
     for (size_t i = 0; i < checked; i++)
-        if (coll.dest[i] != coll.expected[i]) {
-            snprintf(what, sizeof what, "byte %zu is %02x, %s", i, coll.dest[i],
-                     coll.owned[i] ? "not what was sent" : "where nothing lands");
-            failure_line(round, c, v, what);
+        if (collectives.dest[i] != collectives.expected[i]) {
+            snprintf(what, sizeof what, "byte %zu is %02x, %s", i, collectives.dest[i],
+                     collectives.owned[i] ? "not what was sent" : "where nothing lands");
+            failure_line(round, typed, team, what);
             break;
         }
-    coll.bytes += (double)(extent);
-    coll.phase[2] += pacer_now() - started;
+    collectives.bytes += (double)(extent);
+    collectives.phase[2] += pacer_now() - started;
 }
 
 /* ---- one timing case -------------------------------------------------------------- */
@@ -563,37 +563,37 @@ static int by_value(const void *a, const void *b)
 }
 
 /* The byte form's result, or the long form's, against its closed form. */
-static void check_timed(const struct timing_case *c, const struct team_view *v, size_t bytes,
+static void check_timed(const struct timing_case *timing, const struct team_view *team, size_t bytes,
                         int root, long round)
 {
-    size_t m = (size_t)v->size, n = bytes / 8;
+    size_t m = (size_t)team->size, n = bytes / 8;
     char what[160];
-    const char *team = v->name;
-    if (c->family == TIME_REDUCE || c->family == TIME_SCAN) {
-        enum operation op = c->family == TIME_REDUCE ? SUM : INSCAN;
-        const long *dest = (const long *)coll.dest;
+    const char *team_name = team->name;
+    if (timing->family == TIME_REDUCE || timing->family == TIME_SCAN) {
+        enum operation op = timing->family == TIME_REDUCE ? SUM : INSCAN;
+        const long *dest = (const long *)collectives.dest;
         for (size_t e = 0; e < n; e++) {
-            uint64_t want = result_of(op, v, e, round, 64);
+            uint64_t want = result_of(op, team, e, round, 64);
             if ((uint64_t)dest[e] != want) {
                 snprintf(what, sizeof what, "element %zu of %zu is %ld, expected %llu", e, n,
                          dest[e], (unsigned long long)want);
                 pacer_failure("collectives round=%ld timed %s %s bytes=%zu: %s", round,
-                              timing_names[c->family], team, bytes, what);
+                              timing_names[timing->family], team_name, bytes, what);
                 return;
             }
         }
         return;
     }
-    size_t blocks = c->family == TIME_BROADCAST ? 1 : m;
+    size_t blocks = timing->family == TIME_BROADCAST ? 1 : m;
     for (size_t k = 0; k < blocks; k++) {
-        int owner = c->family == TIME_BROADCAST ? v->world[root] : v->world[k];
-        size_t from = c->family == TIME_ALLTOALL ? (size_t)v->rank * bytes : 0;
-        const unsigned char *at = coll.dest + k * bytes;
+        int owner = timing->family == TIME_BROADCAST ? team->world[root] : team->world[k];
+        size_t from = timing->family == TIME_ALLTOALL ? (size_t)team->rank * bytes : 0;
+        const unsigned char *at = collectives.dest + k * bytes;
         for (size_t b = 0; b < bytes; b++)
             if (at[b] != data_byte(owner, from + b, round)) {
                 pacer_failure("collectives round=%ld timed %s %s bytes=%zu: byte %zu of block %zu "
-                              "is %02x, not what PE %d sent", round, timing_names[c->family],
-                              team, bytes, b, k, at[b], owner);
+                              "is %02x, not what PE %d sent", round, timing_names[timing->family],
+                              team_name, bytes, b, k, at[b], owner);
                 return;
             }
     }
@@ -601,91 +601,91 @@ static void check_timed(const struct timing_case *c, const struct team_view *v, 
 
 static void run_timed(int index, long round)
 {
-    struct timing_case c = timing_case_of(index);
-    struct team_view *v = &coll.teams[c.strided];
-    if (v->rank < 0 || (size_t)c.bytes > coll.most_bytes)
+    struct timing_case timing = timing_case_of(index);
+    struct team_view *team = &collectives.teams[timing.strided];
+    if (team->rank < 0 || (size_t)timing.bytes > collectives.most_bytes)
         return;
-    size_t bytes = (size_t)c.bytes, m = (size_t)v->size, n = bytes / 8;
+    size_t bytes = (size_t)timing.bytes, m = (size_t)team->size, n = bytes / 8;
     int root = (int)(round % (long)m);
     /* The source, once: this member's contribution, or its block for each. */
-    if (c.family == TIME_REDUCE || c.family == TIME_SCAN) {
-        long *source = (long *)coll.source;
+    if (timing.family == TIME_REDUCE || timing.family == TIME_SCAN) {
+        long *source = (long *)collectives.source;
         for (size_t e = 0; e < n; e++)
-            source[e] = (long)input_of(SUM, coll.me_world, v->rank, (int)m, e, round, 64);
-        if (coll.plant_timed && coll.me_world == 1 && c.family == TIME_REDUCE) {
+            source[e] = (long)input_of(SUM, collectives.me_world, team->rank, (int)m, e, round, 64);
+        if (collectives.plant_timed && collectives.me_world == 1 && timing.family == TIME_REDUCE) {
             source[0]++;            /* the planted defect: a timed input wrong */
-            coll.plant_timed = 0;
+            collectives.plant_timed = 0;
         }
-    } else if (c.family != TIME_SYNC && c.family != TIME_BARRIER) {
-        size_t total = (c.family == TIME_ALLTOALL ? m : 1) * bytes;
+    } else if (timing.family != TIME_SYNC && timing.family != TIME_BARRIER) {
+        size_t total = (timing.family == TIME_ALLTOALL ? m : 1) * bytes;
         for (size_t b = 0; b < total; b++)
-            coll.source[b] = data_byte(coll.me_world, b, round);
-        if (coll.plant_timed_data && coll.me_world == 1 && c.family == TIME_COLLECT) {
-            coll.source[0] ^= 1;    /* the planted defect: a timed gather's byte wrong */
-            coll.plant_timed_data = 0;
+            collectives.source[b] = data_byte(collectives.me_world, b, round);
+        if (collectives.plant_timed_data && collectives.me_world == 1 && timing.family == TIME_COLLECT) {
+            collectives.source[0] ^= 1;    /* the planted defect: a timed gather's byte wrong */
+            collectives.plant_timed_data = 0;
         }
     }
     double times[REPEATS];
     for (int rep = 0; rep < REPEATS; rep++) {
-        shmem_team_sync(v->handle);         /* every dest ready, and a common start */
+        shmem_team_sync(team->handle);         /* every dest ready, and a common start */
         double started = pacer_now();
-        switch (c.family) {
+        switch (timing.family) {
         case TIME_REDUCE:
-            shmem_long_sum_reduce(v->handle, (long *)coll.dest, (const long *)coll.source, n);
+            shmem_long_sum_reduce(team->handle, (long *)collectives.dest, (const long *)collectives.source, n);
             break;
         case TIME_BROADCAST:
-            shmem_broadcastmem(v->handle, coll.dest, coll.source, bytes, root);
+            shmem_broadcastmem(team->handle, collectives.dest, collectives.source, bytes, root);
             break;
         case TIME_COLLECT:
-            shmem_collectmem(v->handle, coll.dest, coll.source, bytes);
+            shmem_collectmem(team->handle, collectives.dest, collectives.source, bytes);
             break;
         case TIME_FCOLLECT:
-            shmem_fcollectmem(v->handle, coll.dest, coll.source, bytes);
+            shmem_fcollectmem(team->handle, collectives.dest, collectives.source, bytes);
             break;
         case TIME_ALLTOALL:
-            shmem_alltoallmem(v->handle, coll.dest, coll.source, bytes);
+            shmem_alltoallmem(team->handle, collectives.dest, collectives.source, bytes);
             break;
         case TIME_SCAN:
-            shmem_long_sum_inscan(v->handle, (long *)coll.dest, (const long *)coll.source, n);
+            shmem_long_sum_inscan(team->handle, (long *)collectives.dest, (const long *)collectives.source, n);
             break;
         case TIME_SYNC:
-            shmem_team_sync(v->handle);
+            shmem_team_sync(team->handle);
             break;
         default:
             shmem_barrier_all();
             break;
         }
         times[rep] = pacer_now() - started;
-        coll.calls++;
-        coll.phase[1] += times[rep];
+        collectives.calls++;
+        collectives.phase[1] += times[rep];
         double checking = pacer_now();
-        if (c.family != TIME_SYNC && c.family != TIME_BARRIER)
-            check_timed(&c, v, bytes, root, round);
-        coll.phase[2] += pacer_now() - checking;
-        coll.bytes += (double)(bytes * (c.family == TIME_BROADCAST ? 1 : m));
+        if (timing.family != TIME_SYNC && timing.family != TIME_BARRIER)
+            check_timed(&timing, team, bytes, root, round);
+        collectives.phase[2] += pacer_now() - checking;
+        collectives.bytes += (double)(bytes * (timing.family == TIME_BROADCAST ? 1 : m));
     }
     qsort(times, REPEATS, sizeof *times, by_value);
-    int k = coll.sample_count[index] % 64;
-    coll.samples[index][k] = times[REPEATS / 2];
-    coll.sample_count[index]++;
-    if (times[0] < coll.fastest[index])
-        coll.fastest[index] = times[0];
+    int k = collectives.sample_count[index] % 64;
+    collectives.samples[index][k] = times[REPEATS / 2];
+    collectives.sample_count[index]++;
+    if (times[0] < collectives.fastest[index])
+        collectives.fastest[index] = times[0];
 }
 
 /* ---- the exercise ------------------------------------------------------------------ */
 
 static void collectives_step(long units, int last)
 {
-    coll.last = last;
-    for (long u = 0; u < units; u++, coll.round++) {
-        long round = coll.round;
+    collectives.last = last;
+    for (long u = 0; u < units; u++, collectives.round++) {
+        long round = collectives.round;
         for (int t = 0; t < TYPED_A_ROUND; t++) {
             int index = (int)((round * TYPED_A_ROUND + t) % TYPED_CASES);
-            run_typed(&typed_cases[index], &coll.teams[(round + t) % 2], round,
+            run_typed(&typed_cases[index], &collectives.teams[(round + t) % 2], round,
                       (int)((round / 2) % 2));
         }
         run_timed((int)(round % TIMING_CASES), round);
-        shmem_team_sync(coll.team);         /* every buffer free for the next round */
+        shmem_team_sync(collectives.team);         /* every buffer free for the next round */
     }
 }
 
@@ -694,70 +694,70 @@ static void collectives_step(long units, int last)
 static void summarize(void)
 {
     for (int i = 0; i < TIMING_CASES; i++) {
-        int count = coll.sample_count[i] < 64 ? coll.sample_count[i] : 64;
+        int count = collectives.sample_count[i] < 64 ? collectives.sample_count[i] : 64;
         double median = 0;
         if (count) {
             double sorted[64];
-            memcpy(sorted, coll.samples[i], sizeof(double) * (size_t)count);
+            memcpy(sorted, collectives.samples[i], sizeof(double) * (size_t)count);
             qsort(sorted, (size_t)count, sizeof *sorted, by_value);
             median = sorted[count / 2];
         }
-        coll.times[i] = median;
-        coll.times[TIMING_CASES + i] = -coll.fastest[i];    /* the largest of the negated */
+        collectives.times[i] = median;
+        collectives.times[TIMING_CASES + i] = -collectives.fastest[i];    /* the largest of the negated */
     }
-    shmem_double_max_reduce(coll.team, coll.times_result, coll.times, 2 * TIMING_CASES);
-    if (shmem_team_my_pe(coll.team) != 0)
+    shmem_double_max_reduce(collectives.team, collectives.times_result, collectives.times, 2 * TIMING_CASES);
+    if (shmem_team_my_pe(collectives.team) != 0)
         return;
     for (int strided = 0; strided < 2; strided++) {
-        for (int s = 0; s < TIMING_SIZES && (size_t)timing_sizes[s] <= coll.most_bytes; s++) {
+        for (int s = 0; s < TIMING_SIZES && (size_t)timing_sizes[s] <= collectives.most_bytes; s++) {
             char median[256], fastest[256];
             size_t used = 0, used_fastest = 0;
             for (int f = 0; f < DATA_FAMILIES; f++) {
                 int i = (strided * TIMING_SIZES + s) * DATA_FAMILIES + f;
                 used += (size_t)snprintf(median + used, sizeof median - used, " %s_us=%.1f",
-                                         timing_names[f], coll.times_result[i] * 1e6);
+                                         timing_names[f], collectives.times_result[i] * 1e6);
                 used_fastest += (size_t)snprintf(fastest + used_fastest,
                                                  sizeof fastest - used_fastest, " %s_us=%.1f",
                                                  timing_names[f],
-                                                 -coll.times_result[TIMING_CASES + i] * 1e6);
+                                                 -collectives.times_result[TIMING_CASES + i] * 1e6);
             }
             pacer_summary("summary collectives team=%s bytes=%d median%s",
-                          coll.teams[strided].name, timing_sizes[s], median);
+                          collectives.teams[strided].name, timing_sizes[s], median);
             pacer_summary("summary collectives team=%s bytes=%d fastest%s",
-                          coll.teams[strided].name, timing_sizes[s], fastest);
+                          collectives.teams[strided].name, timing_sizes[s], fastest);
         }
     }
     int base = DATA_FAMILIES * TIMING_SIZES * 2;
     pacer_summary("summary collectives sync_us=%.1f even_sync_us=%.1f barrier_all_us=%.1f",
-                  coll.times_result[base] * 1e6, coll.times_result[base + 1] * 1e6,
-                  coll.times_result[base + 2] * 1e6);
+                  collectives.times_result[base] * 1e6, collectives.times_result[base + 1] * 1e6,
+                  collectives.times_result[base + 2] * 1e6);
 }
 
 static void collectives_checkpoint(struct pacer_counters *counters)
 {
-    if (coll.last)
+    if (collectives.last)
         summarize();
-    counters->work = coll.calls;
-    counters->bytes = coll.bytes;
+    counters->work = collectives.calls;
+    counters->bytes = collectives.bytes;
     for (int k = 0; k < 3; k++)
-        counters->phase_seconds[k] = coll.phase[k];
-    coll.calls = coll.bytes = 0;
-    memset(coll.phase, 0, sizeof coll.phase);
+        counters->phase_seconds[k] = collectives.phase[k];
+    collectives.calls = collectives.bytes = 0;
+    memset(collectives.phase, 0, sizeof collectives.phase);
 }
 
 static void collectives_teardown(void)
 {
-    shmem_team_sync(coll.team);
-    if (coll.teams[1].handle != SHMEM_TEAM_INVALID)
-        shmem_team_destroy(coll.teams[1].handle);
-    shmem_free(coll.times_result);
-    shmem_free(coll.times);
-    shmem_free(coll.dest);
-    shmem_free(coll.source);
-    free(coll.owned);
-    free(coll.expected);
-    free(coll.teams[1].world);
-    free(coll.teams[0].world);
+    shmem_team_sync(collectives.team);
+    if (collectives.teams[1].handle != SHMEM_TEAM_INVALID)
+        shmem_team_destroy(collectives.teams[1].handle);
+    shmem_free(collectives.times_result);
+    shmem_free(collectives.times);
+    shmem_free(collectives.dest);
+    shmem_free(collectives.source);
+    free(collectives.owned);
+    free(collectives.expected);
+    free(collectives.teams[1].world);
+    free(collectives.teams[0].world);
 }
 
 const struct pacer_exercise pacer_collectives = {

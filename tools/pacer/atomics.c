@@ -464,11 +464,11 @@ static uint64_t add_start(int pe, int s, long round)
     return small((uint64_t)pe * 131 + (uint64_t)s * 7 + (uint64_t)round);
 }
 
-static void round_add(const struct amo_type *t, shmem_ctx_t ctx, int c, long round)
+static void round_add(const struct amo_type *type, shmem_ctx_t ctx, int context, long round)
 {
     int me = atomics.me;
     for (int s = 0; s < SLOTS; s++)
-        t->store(slot(s), add_start(me, s, round));
+        type->store(slot(s), add_start(me, s, round));
     shmem_team_sync(atomics.team);
     double started = pacer_now();
     uint64_t state = stream(ADD, me, round);
@@ -478,13 +478,13 @@ static void round_add(const struct amo_type *t, shmem_ctx_t ctx, int c, long rou
         draw(&state, &pe, &s, &extra);
         uint64_t amount = 1 + extra % 7;
         if (extra & 8) {
-            t->inc(ctx, slot(s), atomics.world[pe], i & 1);
+            type->inc(ctx, slot(s), atomics.world[pe], i & 1);
         } else {
             if (atomics.plant_add && atomics.me_world == 1) {
                 amount++;           /* the planted defect: one add more than drawn */
                 atomics.plant_add = 0;
             }
-            t->add(ctx, slot(s), amount, atomics.world[pe], i & 1);
+            type->add(ctx, slot(s), amount, atomics.world[pe], i & 1);
         }
         counted(pe);
     }
@@ -492,7 +492,7 @@ static void round_add(const struct amo_type *t, shmem_ctx_t ctx, int c, long rou
     complete_and_sync(ctx);
 
     started = pacer_now();
-    uint64_t mask = width_mask(t->size);
+    uint64_t mask = width_mask(type->size);
     for (int s = 0; s < SLOTS; s++)
         atomics.expected[s] = add_start(me, s, round);
     for (int p = 0; p < atomics.n; p++) {
@@ -506,10 +506,10 @@ static void round_add(const struct amo_type *t, shmem_ctx_t ctx, int c, long rou
         }
     }
     for (int s = 0; s < SLOTS; s++) {
-        uint64_t held = t->load(slot(s));
+        uint64_t held = type->load(slot(s));
         if (held != (atomics.expected[s] & mask)) {
             pacer_failure("atomics round=%ld add %s %s: slot %d holds %llu, expected %llu", round,
-                          t->name, context_names[c], s, (unsigned long long)held,
+                          type->name, context_names[context], s, (unsigned long long)held,
                           (unsigned long long)(atomics.expected[s] & mask));
             break;
         }
@@ -536,13 +536,13 @@ static void account(int pe, int s, uint64_t fetched, uint64_t start, uint64_t ma
     shmem_uint64_atomic_add(&atomics.hashes[s], hash_of(offset), atomics.world[pe]);
 }
 
-static void round_fetch_add(const struct amo_type *t, shmem_ctx_t ctx, int c, long round,
+static void round_fetch_add(const struct amo_type *type, shmem_ctx_t ctx, int context, long round,
                             int nbi)
 {
     int me = atomics.me;
-    uint64_t mask = width_mask(t->size);
+    uint64_t mask = width_mask(type->size);
     for (int s = 0; s < SLOTS; s++) {
-        t->store(slot(s), fetch_start(me, s, round));
+        type->store(slot(s), fetch_start(me, s, round));
         atomics.sums[s] = atomics.hashes[s] = 0;
     }
     shmem_team_sync(atomics.team);
@@ -560,12 +560,12 @@ static void round_fetch_add(const struct amo_type *t, shmem_ctx_t ctx, int c, lo
         if (nbi) {
             void *into = atomics.fetched + 8 * i;
             if (extra & 1)
-                t->fetch_inc_nbi(ctx, into, slot(s), world, i & 1);
+                type->fetch_inc_nbi(ctx, into, slot(s), world, i & 1);
             else
-                t->fetch_add_nbi(ctx, into, slot(s), 1, world, i & 1);
+                type->fetch_add_nbi(ctx, into, slot(s), 1, world, i & 1);
         } else {
-            uint64_t v = extra & 1 ? t->fetch_inc(ctx, slot(s), world, i & 1)
-                                   : t->fetch_add(ctx, slot(s), 1, world, i & 1);
+            uint64_t v = extra & 1 ? type->fetch_inc(ctx, slot(s), world, i & 1)
+                                   : type->fetch_add(ctx, slot(s), 1, world, i & 1);
             account(pe, s, v, fetch_start(pe, s, round), mask);
         }
         counted(pe);
@@ -575,12 +575,12 @@ static void round_fetch_add(const struct amo_type *t, shmem_ctx_t ctx, int c, lo
             shmem_ctx_quiet(ctx);
         shmem_quiet();
         for (int i = 0; i < OPERATIONS; i++)
-            account(pes[i], slots_drawn[i], t->load(atomics.fetched + 8 * i),
+            account(pes[i], slots_drawn[i], type->load(atomics.fetched + 8 * i),
                     fetch_start(pes[i], slots_drawn[i], round), mask);
     }
     if (atomics.plant_fetch_count && atomics.me_world == 1) {
         /* The planted defect: one increment more than the stream holds. */
-        uint64_t v = t->fetch_inc(SHMEM_CTX_DEFAULT, slot(slots_drawn[0]),
+        uint64_t v = type->fetch_inc(SHMEM_CTX_DEFAULT, slot(slots_drawn[0]),
                                   atomics.world[pes[0]], 0);
         account(pes[0], slots_drawn[0], v, fetch_start(pes[0], slots_drawn[0], round), mask);
         atomics.plant_fetch_count = 0;
@@ -601,24 +601,24 @@ static void round_fetch_add(const struct amo_type *t, shmem_ctx_t ctx, int c, lo
         }
     }
     for (int s = 0; s < SLOTS; s++) {
-        uint64_t k = count[s], held = t->load(slot(s));
+        uint64_t k = count[s], held = type->load(slot(s));
         uint64_t want = (fetch_start(me, s, round) + k) & mask, hash = 0;
         for (uint64_t u = 0; u < k; u++)
             hash += hash_of(u);
         if (held != want)
             pacer_failure("atomics round=%ld fetch_add %s %s: slot %d holds %llu after %llu "
-                          "increments, expected %llu", round, t->name, context_names[c], s,
+                          "increments, expected %llu", round, type->name, context_names[context], s,
                           (unsigned long long)held, (unsigned long long)k,
                           (unsigned long long)want);
         uint64_t sum = k ? k * (k - 1) / 2 : 0;
         if (atomics.sums[s] != sum)
             pacer_failure("atomics round=%ld fetch_add %s %s: slot %d handed out values "
                           "summing to %llu, not the %llu of its %llu increments", round,
-                          t->name, context_names[c], s, (unsigned long long)atomics.sums[s],
+                          type->name, context_names[context], s, (unsigned long long)atomics.sums[s],
                           (unsigned long long)sum, (unsigned long long)k);
         if (atomics.hashes[s] != hash)
             pacer_failure("atomics round=%ld fetch_add %s %s: slot %d handed out values "
-                          "hashing to %016llx, not %016llx", round, t->name, context_names[c], s,
+                          "hashing to %016llx, not %016llx", round, type->name, context_names[context], s,
                           (unsigned long long)atomics.hashes[s], (unsigned long long)hash);
     }
     atomics.phase[2] += pacer_now() - started;
@@ -633,11 +633,11 @@ static uint64_t token(int pe, int attempt)
     return 1 + (uint64_t)pe * ATTEMPTS + (uint64_t)attempt;
 }
 
-static void round_claim(const struct amo_type *t, shmem_ctx_t ctx, int c, long round, int nbi)
+static void round_claim(const struct amo_type *type, shmem_ctx_t ctx, int context, long round, int nbi)
 {
     int me = atomics.me;
     for (int s = 0; s < CLAIM_SLOTS; s++)
-        t->store(claim_slot(s), 0);
+        type->store(claim_slot(s), 0);
     shmem_team_sync(atomics.team);
     double started = pacer_now();
     uint64_t state = stream(CLAIM, me, round);
@@ -660,7 +660,7 @@ static void round_claim(const struct amo_type *t, shmem_ctx_t ctx, int c, long r
             if (atomics.plant_claim && atomics.me_world == 1 && held + j == CLAIMS - 1) {
                 /* The planted defect: the last claim believed, never made. */
                 atomics.plant_claim = 0;
-                t->store(atomics.fetched + 8 * j, 0);
+                type->store(atomics.fetched + 8 * j, 0);
                 if (!nbi) {
                     held_pe[held] = pes[j], held_slot[held] = slots_tried[j];
                     held_token[held++] = tokens[j];
@@ -668,10 +668,10 @@ static void round_claim(const struct amo_type *t, shmem_ctx_t ctx, int c, long r
                 continue;
             }
             if (nbi) {
-                t->store(atomics.fetched + 8 * j, UINT64_MAX);
-                t->compare_swap_nbi(ctx, atomics.fetched + 8 * j, target, 0, tokens[j],
+                type->store(atomics.fetched + 8 * j, UINT64_MAX);
+                type->compare_swap_nbi(ctx, atomics.fetched + 8 * j, target, 0, tokens[j],
                                     atomics.world[pes[j]], j & 1);
-            } else if (t->compare_swap(ctx, target, 0, tokens[j], atomics.world[pes[j]],
+            } else if (type->compare_swap(ctx, target, 0, tokens[j], atomics.world[pes[j]],
                                        attempt & 1) == 0) {
                 held_pe[held] = pes[j], held_slot[held] = slots_tried[j];
                 held_token[held++] = tokens[j];
@@ -683,7 +683,7 @@ static void round_claim(const struct amo_type *t, shmem_ctx_t ctx, int c, long r
                 shmem_ctx_quiet(ctx);
             shmem_quiet();
             for (int j = 0; j < batch && held < CLAIMS; j++)
-                if (t->load(atomics.fetched + 8 * j) == 0) {
+                if (type->load(atomics.fetched + 8 * j) == 0) {
                     held_pe[held] = pes[j], held_slot[held] = slots_tried[j];
                     held_token[held++] = tokens[j];
                 }
@@ -699,14 +699,14 @@ static void round_claim(const struct amo_type *t, shmem_ctx_t ctx, int c, long r
     started = pacer_now();
     if (held < CLAIMS)
         pacer_failure("atomics round=%ld claim %s %s: %d of %d claims after %d attempts, "
-                      "in a table half empty", round, t->name, context_names[c], held, CLAIMS,
+                      "in a table half empty", round, type->name, context_names[context], held, CLAIMS,
                       ATTEMPTS);
     for (int k = 0; k < held; k++) {
-        uint64_t v = t->fetch(SHMEM_CTX_DEFAULT, claim_slot(held_slot[k]),
+        uint64_t v = type->fetch(SHMEM_CTX_DEFAULT, claim_slot(held_slot[k]),
                               atomics.world[held_pe[k]], k & 1);
         if (v != held_token[k]) {
             pacer_failure("atomics round=%ld claim %s %s: slot %d of PE %d holds %llu, not "
-                          "this PE's claim %llu", round, t->name, context_names[c], held_slot[k],
+                          "this PE's claim %llu", round, type->name, context_names[context], held_slot[k],
                           atomics.world[held_pe[k]], (unsigned long long)v,
                           (unsigned long long)held_token[k]);
             break;
@@ -714,13 +714,13 @@ static void round_claim(const struct amo_type *t, shmem_ctx_t ctx, int c, long r
     }
     uint64_t mine = 0;
     for (int s = 0; s < CLAIM_SLOTS; s++)
-        mine += t->load(claim_slot(s)) != 0;
+        mine += type->load(claim_slot(s)) != 0;
     atomics.reduce_source[0] = mine;
     shmem_uint64_sum_reduce(atomics.team, atomics.reduce_result, atomics.reduce_source, 1);
     uint64_t total = atomics.reduce_result[0], want = (uint64_t)atomics.n * CLAIMS;
     if (total != want)
         pacer_failure("atomics round=%ld claim %s %s: the table holds %llu claims, not the "
-                      "%llu made", round, t->name, context_names[c], (unsigned long long)total,
+                      "%llu made", round, type->name, context_names[context], (unsigned long long)total,
                       (unsigned long long)want);
     atomics.phase[2] += pacer_now() - started;
 }
@@ -733,12 +733,12 @@ static uint64_t swap_value(uint64_t i, long round)
     return small(i * 3 + (uint64_t)round);
 }
 
-static void round_swap(const struct amo_type *t, shmem_ctx_t ctx, int c, long round, int nbi)
+static void round_swap(const struct amo_type *type, shmem_ctx_t ctx, int context, long round, int nbi)
 {
     int me = atomics.me, n = atomics.n;
     uint64_t hands[HANDS];
     for (int s = 0; s < SLOTS; s++)
-        t->store(slot(s), swap_value((uint64_t)me * SLOTS + (uint64_t)s, round));
+        type->store(slot(s), swap_value((uint64_t)me * SLOTS + (uint64_t)s, round));
     for (int j = 0; j < HANDS; j++)
         hands[j] = swap_value((uint64_t)n * SLOTS + (uint64_t)me * HANDS + (uint64_t)j, round);
     shmem_team_sync(atomics.team);
@@ -751,10 +751,10 @@ static void round_swap(const struct amo_type *t, shmem_ctx_t ctx, int c, long ro
             draw(&state, &pes[j], &slots_drawn[j], &extra);
             int world = atomics.world[pes[j]];
             if (nbi)
-                t->swap_nbi(ctx, atomics.fetched + 8 * j, slot(slots_drawn[j]), hands[j], world,
+                type->swap_nbi(ctx, atomics.fetched + 8 * j, slot(slots_drawn[j]), hands[j], world,
                             j & 1);
             else
-                hands[j] = t->swap(ctx, slot(slots_drawn[j]), hands[j], world, j & 1);
+                hands[j] = type->swap(ctx, slot(slots_drawn[j]), hands[j], world, j & 1);
             counted(pes[j]);
         }
         if (nbi) {
@@ -762,7 +762,7 @@ static void round_swap(const struct amo_type *t, shmem_ctx_t ctx, int c, long ro
                 shmem_ctx_quiet(ctx);
             shmem_quiet();
             for (int j = 0; j < HANDS; j++)
-                hands[j] = t->load(atomics.fetched + 8 * j);
+                hands[j] = type->load(atomics.fetched + 8 * j);
         }
         if (atomics.plant_swap && atomics.me_world == 1) {
             hands[0]++;             /* the planted defect: a token changed in hand */
@@ -777,7 +777,7 @@ static void round_swap(const struct amo_type *t, shmem_ctx_t ctx, int c, long ro
     for (int j = 0; j < HANDS; j++)
         sum += hands[j], hash += hash_of(hands[j]);
     for (int s = 0; s < SLOTS; s++) {
-        uint64_t v = t->load(slot(s));
+        uint64_t v = type->load(slot(s));
         sum += v, hash += hash_of(v);
     }
     atomics.reduce_source[0] = sum;
@@ -790,11 +790,11 @@ static void round_swap(const struct amo_type *t, shmem_ctx_t ctx, int c, long ro
     }
     if (atomics.reduce_result[0] != want_sum)
         pacer_failure("atomics round=%ld swap %s %s: the tokens sum to %llu, not the %llu "
-                      "they started at", round, t->name, context_names[c],
+                      "they started at", round, type->name, context_names[context],
                       (unsigned long long)atomics.reduce_result[0], (unsigned long long)want_sum);
     if (atomics.reduce_result[1] != want_hash)
         pacer_failure("atomics round=%ld swap %s %s: the tokens hash to %016llx, not the "
-                      "%016llx they started at", round, t->name, context_names[c],
+                      "%016llx they started at", round, type->name, context_names[context],
                       (unsigned long long)atomics.reduce_result[1],
                       (unsigned long long)want_hash);
     atomics.phase[2] += pacer_now() - started;
@@ -808,7 +808,7 @@ static uint64_t set_value(int writer, int s, long round)
     return small(((uint64_t)writer * SLOTS + (uint64_t)s) * 31 + (uint64_t)round);
 }
 
-static void round_set_fetch(const struct amo_type *t, shmem_ctx_t ctx, int c, long round,
+static void round_set_fetch(const struct amo_type *type, shmem_ctx_t ctx, int context, long round,
                             int nbi)
 {
     int me = atomics.me, n = atomics.n;
@@ -820,7 +820,7 @@ static void round_set_fetch(const struct amo_type *t, shmem_ctx_t ctx, int c, lo
             value++;                /* the planted defect: one value set wrong */
             atomics.plant_set = 0;
         }
-        t->set(ctx, slot(s), value, atomics.world[q], s & 1);
+        type->set(ctx, slot(s), value, atomics.world[q], s & 1);
         counted(q);
     }
     atomics.phase[0] += pacer_now() - started;
@@ -829,10 +829,10 @@ static void round_set_fetch(const struct amo_type *t, shmem_ctx_t ctx, int c, lo
     started = pacer_now();
     for (int s = 0; s < SLOTS; s++) {
         int writer = ((me - 1 - s) % n + n) % n;
-        uint64_t held = t->load(slot(s)), want = set_value(writer, s, round);
+        uint64_t held = type->load(slot(s)), want = set_value(writer, s, round);
         if (held != want) {
             pacer_failure("atomics round=%ld set_fetch %s %s: slot %d holds %llu, not the %llu "
-                          "PE %d set", round, t->name, context_names[c], s,
+                          "PE %d set", round, type->name, context_names[context], s,
                           (unsigned long long)held, (unsigned long long)want,
                           atomics.world[writer]);
             break;
@@ -842,9 +842,9 @@ static void round_set_fetch(const struct amo_type *t, shmem_ctx_t ctx, int c, lo
     for (int s = 0; s < SLOTS; s++) {
         int q = (me + 1 + s) % n;
         if (nbi)
-            t->fetch_nbi(ctx, atomics.fetched + 8 * s, slot(s), atomics.world[q], s & 1);
+            type->fetch_nbi(ctx, atomics.fetched + 8 * s, slot(s), atomics.world[q], s & 1);
         else
-            t->store(atomics.fetched + 8 * s, t->fetch(ctx, slot(s), atomics.world[q], s & 1));
+            type->store(atomics.fetched + 8 * s, type->fetch(ctx, slot(s), atomics.world[q], s & 1));
     }
     if (nbi) {
         if (ctx != SHMEM_CTX_DEFAULT)
@@ -852,10 +852,10 @@ static void round_set_fetch(const struct amo_type *t, shmem_ctx_t ctx, int c, lo
         shmem_quiet();
     }
     for (int s = 0; s < SLOTS; s++) {
-        uint64_t got = t->load(atomics.fetched + 8 * s), want = set_value(me, s, round);
+        uint64_t got = type->load(atomics.fetched + 8 * s), want = set_value(me, s, round);
         if (got != want) {
             pacer_failure("atomics round=%ld set_fetch %s %s: fetched %llu from slot %d of PE "
-                          "%d, which this PE set to %llu", round, t->name, context_names[c],
+                          "%d, which this PE set to %llu", round, type->name, context_names[context],
                           (unsigned long long)got, s, atomics.world[(me + 1 + s) % n],
                           (unsigned long long)want);
             break;
@@ -913,12 +913,12 @@ static const char *const operation_names[] = { "and", "or", "xor" };
 /* One pass: every target once, with the pass's operation and bit, fetching on
  * odd targets. A fetched value's own bit is predicted where this PE alone
  * owns it: clear before its or, set before its xor, clear before its and. */
-static void bitwise_pass(const struct amo_type *t, shmem_ctx_t ctx, int c, long round, int nbi,
+static void bitwise_pass(const struct amo_type *type, shmem_ctx_t ctx, int context, long round, int nbi,
                          int operation, int count, const int *pes, const int *slots_drawn)
 {
-    int width = 8 * t->size, me = atomics.me;
+    int width = 8 * type->size, me = atomics.me;
     uint64_t bit = UINT64_C(1) << (me % width);
-    uint64_t value = operation == AND ? ~bit & width_mask(t->size) : bit;
+    uint64_t value = operation == AND ? ~bit & width_mask(type->size) : bit;
     int exclusive = atomics.n <= width;
     uint64_t predicted = operation == XOR ? bit : 0;
     double started = pacer_now();
@@ -931,14 +931,14 @@ static void bitwise_pass(const struct amo_type *t, shmem_ctx_t ctx, int c, long 
         }
         if (k & 1) {
             if (nbi)
-                t->fetch_bitwise_nbi(ctx, operation, atomics.fetched + 8 * k,
+                type->fetch_bitwise_nbi(ctx, operation, atomics.fetched + 8 * k,
                                      slot(slots_drawn[k]), value, world, (k >> 1) & 1);
             else
-                t->store(atomics.fetched + 8 * k,
-                         t->fetch_bitwise(ctx, operation, slot(slots_drawn[k]), value, world,
+                type->store(atomics.fetched + 8 * k,
+                         type->fetch_bitwise(ctx, operation, slot(slots_drawn[k]), value, world,
                                           (k >> 1) & 1));
         } else {
-            t->bitwise(ctx, operation, slot(slots_drawn[k]), value, world, (k >> 1) & 1);
+            type->bitwise(ctx, operation, slot(slots_drawn[k]), value, world, (k >> 1) & 1);
         }
         counted(pes[k]);
     }
@@ -951,7 +951,7 @@ static void bitwise_pass(const struct amo_type *t, shmem_ctx_t ctx, int c, long 
     if (!exclusive)
         return;
     for (int k = 1; k < count; k += 2) {
-        uint64_t got = t->load(atomics.fetched + 8 * k) & bit;
+        uint64_t got = type->load(atomics.fetched + 8 * k) & bit;
         uint64_t want = predicted;
         if (k == 1 && operation == OR && atomics.plant_fetched_bit && atomics.me_world == 1) {
             want ^= bit;            /* the planted defect: one fetched bit misjudged */
@@ -959,7 +959,7 @@ static void bitwise_pass(const struct amo_type *t, shmem_ctx_t ctx, int c, long 
         }
         if (got != want) {
             pacer_failure("atomics round=%ld bitwise %s %s: fetch_%s from slot %d of PE %d "
-                          "returned bit %d %s, expected %s", round, t->name, context_names[c],
+                          "returned bit %d %s, expected %s", round, type->name, context_names[context],
                           operation_names[operation], slots_drawn[k], atomics.world[pes[k]],
                           me % width, got ? "set" : "clear", want ? "set" : "clear");
             break;
@@ -967,26 +967,26 @@ static void bitwise_pass(const struct amo_type *t, shmem_ctx_t ctx, int c, long 
     }
 }
 
-static void bitwise_check(const struct amo_type *t, int c, long round, const char *after,
+static void bitwise_check(const struct amo_type *type, int context, long round, const char *after,
                           const uint64_t *want)
 {
     for (int s = 0; s < SLOTS; s++) {
-        uint64_t held = t->load(slot(s));
+        uint64_t held = type->load(slot(s));
         if (held != want[s]) {
             pacer_failure("atomics round=%ld bitwise %s %s: after the %s pass slot %d holds "
-                          "%llx, expected %llx", round, t->name, context_names[c], after, s,
+                          "%llx, expected %llx", round, type->name, context_names[context], after, s,
                           (unsigned long long)held, (unsigned long long)want[s]);
             break;
         }
     }
 }
 
-static void round_bitwise(const struct amo_type *t, shmem_ctx_t ctx, int c, long round, int nbi)
+static void round_bitwise(const struct amo_type *type, shmem_ctx_t ctx, int context, long round, int nbi)
 {
-    int me = atomics.me, width = 8 * t->size;
+    int me = atomics.me, width = 8 * type->size;
     int pes[BITWISE_TARGETS], slots_drawn[BITWISE_TARGETS];
     for (int s = 0; s < SLOTS; s++)
-        t->store(slot(s), 0);
+        type->store(slot(s), 0);
     shmem_team_sync(atomics.team);
 
     /* What the passes must leave: the or of the bits of every PE that
@@ -1009,17 +1009,17 @@ static void round_bitwise(const struct amo_type *t, shmem_ctx_t ctx, int c, long
     int count = bitwise_targets(me, round, pes, slots_drawn);
     atomics.phase[2] += pacer_now() - started;
 
-    bitwise_pass(t, ctx, c, round, nbi, OR, count, pes, slots_drawn);
+    bitwise_pass(type, ctx, context, round, nbi, OR, count, pes, slots_drawn);
     complete_and_sync(ctx);
-    bitwise_check(t, c, round, "or", atomics.expected_or);
+    bitwise_check(type, context, round, "or", atomics.expected_or);
     shmem_team_sync(atomics.team);
-    bitwise_pass(t, ctx, c, round, nbi, XOR, count, pes, slots_drawn);
+    bitwise_pass(type, ctx, context, round, nbi, XOR, count, pes, slots_drawn);
     complete_and_sync(ctx);
-    bitwise_check(t, c, round, "xor", after_xor);
+    bitwise_check(type, context, round, "xor", after_xor);
     shmem_team_sync(atomics.team);
-    bitwise_pass(t, ctx, c, round, nbi, AND, count, pes, slots_drawn);
+    bitwise_pass(type, ctx, context, round, nbi, AND, count, pes, slots_drawn);
     complete_and_sync(ctx);
-    bitwise_check(t, c, round, "and", after_and);
+    bitwise_check(type, context, round, "and", after_and);
 }
 
 /* ---- the exercise ---------------------------------------------------------------- */
@@ -1030,15 +1030,15 @@ static void atomics_step(long units, int last)
     for (long u = 0; u < units; u++, atomics.round++) {
         long round = atomics.round;
         const struct amo_case *k = &cases[round % CASE_COUNT];
-        int c = (int)(round % CONTEXTS), nbi = (int)(round % 2);
-        shmem_ctx_t ctx = atomics.contexts[c];
+        int context = (int)(round % CONTEXTS), nbi = (int)(round % 2);
+        shmem_ctx_t ctx = atomics.contexts[context];
         switch (k->family) {
-        case ADD: round_add(k->type, ctx, c, round); break;
-        case FETCH_ADD: round_fetch_add(k->type, ctx, c, round, nbi); break;
-        case CLAIM: round_claim(k->type, ctx, c, round, nbi); break;
-        case SWAP: round_swap(k->type, ctx, c, round, nbi); break;
-        case SET_FETCH: round_set_fetch(k->type, ctx, c, round, nbi); break;
-        case BITWISE: round_bitwise(k->type, ctx, c, round, nbi); break;
+        case ADD: round_add(k->type, ctx, context, round); break;
+        case FETCH_ADD: round_fetch_add(k->type, ctx, context, round, nbi); break;
+        case CLAIM: round_claim(k->type, ctx, context, round, nbi); break;
+        case SWAP: round_swap(k->type, ctx, context, round, nbi); break;
+        case SET_FETCH: round_set_fetch(k->type, ctx, context, round, nbi); break;
+        case BITWISE: round_bitwise(k->type, ctx, context, round, nbi); break;
         default: break;
         }
     }

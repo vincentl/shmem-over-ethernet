@@ -41,7 +41,7 @@
 #include "random.h"
 
 enum { REGION = 64 << 10, HALO_SIZES = 7, PTR_WORDS = 64, CANARY = 0xa5 };
-enum class { CONTIGUOUS, STRIDED, BLOCKS, NONBLOCKING, SINGLE, CLASSES };
+enum transfer_class { CONTIGUOUS, STRIDED, BLOCKS, NONBLOCKING, SINGLE, CLASSES };
 enum flag_method { ATOMIC_ADD, SIGNAL_ADD, SIGNAL_SET, FLAG_METHODS };
 
 static const char *const class_names[CLASSES] = {
@@ -482,58 +482,58 @@ static void halo(long round, shmem_ctx_t ctx, const char *context)
 
 /* Where a transfer puts element k, and which element of the stream it is: the
  * stream's elements lie contiguous in `outgoing` and in `source`. */
-struct layout {
+struct transfer_layout {
     size_t count;                   /* elements moved */
     ptrdiff_t dst, sst;             /* strides, in elements; blocks: block strides */
     size_t bsize;                   /* elements a block; 0 but for blocks */
 };
 
-static void place(const struct layout *l, size_t k, size_t *at, size_t *from)
+static void place(const struct transfer_layout *layout, size_t k, size_t *at, size_t *from)
 {
-    if (l->bsize) {
-        size_t block = k / l->bsize, e = k % l->bsize;
-        *at = block * (size_t)l->dst + e;
-        *from = block * (size_t)l->sst + e;
+    if (layout->bsize) {
+        size_t block = k / layout->bsize, e = k % layout->bsize;
+        *at = block * (size_t)layout->dst + e;
+        *from = block * (size_t)layout->sst + e;
     } else {
-        *at = k * (size_t)l->dst;
-        *from = k * (size_t)l->sst;
+        *at = k * (size_t)layout->dst;
+        *from = k * (size_t)layout->sst;
     }
 }
 
 /* The first element place a strided or blocked transfer leaves empty: after
  * element 0 when the stride is more than one, after the first block. 0 when
  * there is none. */
-static size_t first_gap(enum class k, const struct layout *l)
+static size_t first_gap(enum transfer_class form, const struct transfer_layout *layout)
 {
-    if (k == STRIDED)
-        return l->dst > 1 ? 1 : 0;
-    if (k == BLOCKS)
-        return (size_t)l->dst > l->bsize ? l->bsize : 0;
+    if (form == STRIDED)
+        return layout->dst > 1 ? 1 : 0;
+    if (form == BLOCKS)
+        return (size_t)layout->dst > layout->bsize ? layout->bsize : 0;
     return 0;
 }
 
-static void plan(enum class k, long round, int size, struct layout *l)
+static void plan(enum transfer_class form, long round, int size, struct transfer_layout *layout)
 {
-    memset(l, 0, sizeof *l);
-    switch (k) {
+    memset(layout, 0, sizeof *layout);
+    switch (form) {
     case STRIDED:
-        l->count = 24;
-        l->dst = 1 + round % 3;
-        l->sst = 1 + (round / 3) % 3;
+        layout->count = 24;
+        layout->dst = 1 + round % 3;
+        layout->sst = 1 + (round / 3) % 3;
         break;
     case BLOCKS:
-        l->bsize = 1 + (size_t)(round % 4);
-        l->count = 6 * l->bsize;                    /* six blocks */
-        l->dst = (ptrdiff_t)l->bsize + 1 + round % 2;
-        l->sst = (ptrdiff_t)l->bsize + (round / 2) % 2;
+        layout->bsize = 1 + (size_t)(round % 4);
+        layout->count = 6 * layout->bsize;                    /* six blocks */
+        layout->dst = (ptrdiff_t)layout->bsize + 1 + round % 2;
+        layout->sst = (ptrdiff_t)layout->bsize + (round / 2) % 2;
         break;
     case SINGLE:
-        l->count = 8;
-        l->dst = l->sst = 1;
+        layout->count = 8;
+        layout->dst = layout->sst = 1;
         break;
     default:                        /* contiguous and nonblocking */
-        l->count = 32 + (size_t)(round % 64);
-        l->dst = l->sst = 1;
+        layout->count = 32 + (size_t)(round % 64);
+        layout->dst = layout->sst = 1;
         break;
     }
     (void)size;
@@ -550,15 +550,15 @@ static uint64_t value_of(int from, int to, size_t k, long round, int size)
 /* What `into` must hold after a transfer from `from` to `to`: the canary but
  * where an element lands. Returns the first byte past the last element. */
 static size_t expect(unsigned char *into, unsigned char *owned, const struct rma_kind *kind,
-                     enum class k, const struct layout *l, int from, int to, long round)
+                     enum transfer_class form, const struct transfer_layout *layout, int from, int to, long round)
 {
     size_t w = (size_t)kind->size, end = 0;
     memset(into, CANARY, REGION);
     memset(owned, 0, REGION);
-    for (size_t e = 0; e < l->count; e++) {
+    for (size_t e = 0; e < layout->count; e++) {
         size_t at, source;
-        place(l, e, &at, &source);
-        if (k == SINGLE) {
+        place(layout, e, &at, &source);
+        if (form == SINGLE) {
             kind->store(into + at * w, value_of(from, to, e, round, kind->size));
         } else {
             for (size_t b = 0; b < w; b++)
@@ -577,15 +577,15 @@ static unsigned char *expected_bytes, *owned_bytes;
  * and g carry values, compared as values: a long double's padding bytes are
  * nobody's. */
 static void compare(const unsigned char *have, long round, const char *what,
-                    const struct rma_kind *kind, enum class k, const char *context, int from)
+                    const struct rma_kind *kind, enum transfer_class form, const char *context, int from)
 {
     size_t w = (size_t)kind->size;
     for (size_t i = 0; i < REGION; i++) {
-        if (k == SINGLE && owned_bytes[i] && i % w == 0) {
+        if (form == SINGLE && owned_bytes[i] && i % w == 0) {
             uint64_t got = kind->load(have + i), want = kind->load(expected_bytes + i);
             if (got != want) {
                 pacer_failure("rma round=%ld %s %s %s %s: element %zu from PE %d is %llu, not "
-                              "%llu", round, class_names[k], kind->name, context, what, i / w,
+                              "%llu", round, class_names[form], kind->name, context, what, i / w,
                               from, (unsigned long long)got, (unsigned long long)want);
                 return;
             }
@@ -595,35 +595,35 @@ static void compare(const unsigned char *have, long round, const char *what,
         if (have[i] != expected_bytes[i]) {
             if (owned_bytes[i])
                 pacer_failure("rma round=%ld %s %s %s %s: byte %zu, of element %zu from PE %d, "
-                              "is %02x, not %02x", round, class_names[k], kind->name, context,
+                              "is %02x, not %02x", round, class_names[form], kind->name, context,
                               what, i, i / (size_t)kind->size, from, have[i], expected_bytes[i]);
             else
                 pacer_failure("rma round=%ld %s %s %s %s: byte %zu, where no element lands, is "
-                              "%02x, not the canary", round, class_names[k], kind->name, context,
+                              "%02x, not the canary", round, class_names[form], kind->name, context,
                               what, i, have[i]);
             return;
         }
     }
 }
 
-static void transfer_case(long round, enum class *k, const struct rma_kind **kind)
+static void transfer_case(long round, enum transfer_class *form, const struct rma_kind **kind)
 {
     int index = (int)(round % CASE_COUNT);
     if (index < 4 * KINDS) {
-        *k = (enum class)(index / KINDS);
+        *form = (enum transfer_class)(index / KINDS);
         *kind = kinds[index % KINDS];
     } else {
-        *k = SINGLE;
+        *form = SINGLE;
         *kind = kinds[index - 4 * KINDS];
     }
 }
 
 /* The round's sources: this PE's `source`, which the next PE reads, and its
  * `outgoing`, which it puts; its inbox cleared to the canary. */
-static void prepare(long round, enum class k, const struct rma_kind *kind)
+static void prepare(long round, enum transfer_class form, const struct rma_kind *kind)
 {
     size_t w = (size_t)kind->size;
-    if (k == SINGLE) {
+    if (form == SINGLE) {
         memset(rma.source, CANARY, REGION);
         for (size_t e = 0; e < 8; e++)
             kind->store(rma.source + e * w, value_of(rma.me_world, rma.next_world, e, round,
@@ -641,41 +641,41 @@ static void prepare(long round, enum class k, const struct rma_kind *kind)
 
 static void transfer(long round, shmem_ctx_t ctx, const char *context)
 {
-    enum class k;
+    enum transfer_class form;
     const struct rma_kind *kind;
-    transfer_case(round, &k, &kind);
+    transfer_case(round, &form, &kind);
     int generic = kind->typed && (round / 2) % 2;
     size_t w = (size_t)kind->size;
-    struct layout l;
-    plan(k, round, kind->size, &l);
+    struct transfer_layout layout;
+    plan(form, round, kind->size, &layout);
     double started = pacer_now();
 
     /* The put side, into the next PE's inbox. */
-    if (rma.plant_put && rma.me_world == 1 && k != SINGLE) {
+    if (rma.plant_put && rma.me_world == 1 && form != SINGLE) {
         rma.outgoing[0] ^= 1;       /* the planted defect: one element sent wrong */
         rma.plant_put = 0;
     }
     int next = rma.next_world, previous = rma.previous_world;
-    switch (k) {
+    switch (form) {
     case CONTIGUOUS:
-        kind->put(ctx, generic, rma.inbox, rma.outgoing, l.count, next);
+        kind->put(ctx, generic, rma.inbox, rma.outgoing, layout.count, next);
         break;
     case STRIDED:
-        kind->iput(ctx, generic, rma.inbox, rma.outgoing, l.dst, l.sst, l.count, next);
+        kind->iput(ctx, generic, rma.inbox, rma.outgoing, layout.dst, layout.sst, layout.count, next);
         break;
     case BLOCKS:
-        kind->ibput(ctx, generic, rma.inbox, rma.outgoing, l.dst, l.sst, l.bsize,
-                    l.count / l.bsize, next);
+        kind->ibput(ctx, generic, rma.inbox, rma.outgoing, layout.dst, layout.sst, layout.bsize,
+                    layout.count / layout.bsize, next);
         break;
     case NONBLOCKING:
-        for (size_t first = 0; first < l.count; first += l.count / 4 + 1) {
-            size_t chunk = l.count - first < l.count / 4 + 1 ? l.count - first : l.count / 4 + 1;
+        for (size_t first = 0; first < layout.count; first += layout.count / 4 + 1) {
+            size_t chunk = layout.count - first < layout.count / 4 + 1 ? layout.count - first : layout.count / 4 + 1;
             kind->put_nbi(ctx, generic, rma.inbox + first * w, rma.outgoing + first * w, chunk,
                           next);
         }
         break;
     case SINGLE:
-        for (size_t e = 0; e < l.count; e++) {
+        for (size_t e = 0; e < layout.count; e++) {
             uint64_t v = value_of(rma.me_world, next, e, round, kind->size);
             if (rma.plant_single && rma.me_world == 1) {
                 v++;                /* the planted defect: one value sent wrong */
@@ -687,43 +687,43 @@ static void transfer(long round, shmem_ctx_t ctx, const char *context)
     default:
         break;
     }
-    if (rma.plant_gap && rma.me_world == 1 && first_gap(k, &l)) {
+    if (rma.plant_gap && rma.me_world == 1 && first_gap(form, &layout)) {
         /* The planted defect: a byte into the first gap of the next PE's inbox. */
         unsigned char stray = (unsigned char)~CANARY;
-        shmem_putmem(rma.inbox + first_gap(k, &l) * w, &stray, 1, next);
+        shmem_putmem(rma.inbox + first_gap(form, &layout) * w, &stray, 1, next);
         rma.plant_gap = 0;
     }
 
     /* The get side, from the previous PE's source. */
     memset(rma.incoming, CANARY, REGION);
-    switch (k) {
+    switch (form) {
     case CONTIGUOUS:
-        kind->get(ctx, !generic && kind->typed, rma.incoming, rma.source, l.count, previous);
+        kind->get(ctx, !generic && kind->typed, rma.incoming, rma.source, layout.count, previous);
         break;
     case STRIDED:
-        kind->iget(ctx, !generic && kind->typed, rma.incoming, rma.source, l.dst, l.sst, l.count,
+        kind->iget(ctx, !generic && kind->typed, rma.incoming, rma.source, layout.dst, layout.sst, layout.count,
                    previous);
         break;
     case BLOCKS:
-        kind->ibget(ctx, !generic && kind->typed, rma.incoming, rma.source, l.dst, l.sst,
-                    l.bsize, l.count / l.bsize, previous);
+        kind->ibget(ctx, !generic && kind->typed, rma.incoming, rma.source, layout.dst, layout.sst,
+                    layout.bsize, layout.count / layout.bsize, previous);
         break;
     case NONBLOCKING:
-        for (size_t first = 0; first < l.count; first += 8) {
-            size_t chunk = l.count - first < 8 ? l.count - first : 8;
+        for (size_t first = 0; first < layout.count; first += 8) {
+            size_t chunk = layout.count - first < 8 ? layout.count - first : 8;
             kind->get_nbi(ctx, !generic && kind->typed, rma.incoming + first * w,
                           rma.source + first * w, chunk, previous);
         }
         break;
     case SINGLE:
-        for (size_t e = 0; e < l.count; e++)
+        for (size_t e = 0; e < layout.count; e++)
             kind->store(rma.incoming + e * w,
                         kind->g(ctx, !generic, rma.source + e * w, previous));
         break;
     default:
         break;
     }
-    if (k == NONBLOCKING && round % 2) {
+    if (form == NONBLOCKING && round % 2) {
         int both[2] = { next, previous };
         if (ctx == SHMEM_CTX_DEFAULT)
             shmem_pe_quiet(both, next == previous ? 1 : 2);
@@ -733,30 +733,30 @@ static void transfer(long round, shmem_ctx_t ctx, const char *context)
         quiet_on(ctx);
     }
     rma.transfers += 2;
-    rma.bytes += 2.0 * (double)(l.count * w);
+    rma.bytes += 2.0 * (double)(layout.count * w);
     rma.phase[1] += pacer_now() - started;
 
     started = pacer_now();
-    if (rma.plant_get_gap && rma.me_world == 1 && first_gap(k, &l)) {
-        rma.incoming[first_gap(k, &l) * w] = (unsigned char)~CANARY;   /* the planted defect */
+    if (rma.plant_get_gap && rma.me_world == 1 && first_gap(form, &layout)) {
+        rma.incoming[first_gap(form, &layout) * w] = (unsigned char)~CANARY;   /* the planted defect */
         rma.plant_get_gap = 0;
     }
-    expect(expected_bytes, owned_bytes, kind, k, &l, previous, rma.me_world, round);
-    compare(rma.incoming, round, "get", kind, k, context, previous);
+    expect(expected_bytes, owned_bytes, kind, form, &layout, previous, rma.me_world, round);
+    compare(rma.incoming, round, "get", kind, form, context, previous);
     rma.phase[3] += pacer_now() - started;
 }
 
 /* After the sync: the inbox, as the previous PE's put side left it. */
 static void check_inbox(long round, const char *context)
 {
-    enum class k;
+    enum transfer_class form;
     const struct rma_kind *kind;
-    transfer_case(round, &k, &kind);
-    struct layout l;
-    plan(k, round, kind->size, &l);
+    transfer_case(round, &form, &kind);
+    struct transfer_layout layout;
+    plan(form, round, kind->size, &layout);
     double started = pacer_now();
-    expect(expected_bytes, owned_bytes, kind, k, &l, rma.previous_world, rma.me_world, round);
-    compare(rma.inbox, round, "put", kind, k, context, rma.previous_world);
+    expect(expected_bytes, owned_bytes, kind, form, &layout, rma.previous_world, rma.me_world, round);
+    compare(rma.inbox, round, "put", kind, form, context, rma.previous_world);
     rma.phase[3] += pacer_now() - started;
 }
 
@@ -845,17 +845,17 @@ static void rma_step(long units, int last)
         int odd_pass = (int)((round / CASE_COUNT) % 2);
         shmem_ctx_t ctx = odd_pass ? rma.context : SHMEM_CTX_DEFAULT;
         const char *context = odd_pass ? "private" : "default";
-        enum class k;
+        enum transfer_class form;
         const struct rma_kind *kind;
-        transfer_case(round, &k, &kind);
-        prepare(round, k, kind);
+        transfer_case(round, &form, &kind);
+        prepare(round, form, kind);
         shmem_team_sync(rma.team);
         halo(round, ctx, context);
         transfer(round, ctx, context);
         shmem_quiet();
         shmem_team_sync(rma.team);
         check_inbox(round, context);
-        pointers(round, k != SINGLE);
+        pointers(round, form != SINGLE);
         shmem_team_sync(rma.team);  /* every check done before the next round writes */
     }
 }
