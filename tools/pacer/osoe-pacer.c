@@ -339,7 +339,7 @@ void pacer_shim_report(const char *path);   /* the generated shim's, collective 
 #endif
 
 static struct pacer_options options = {
-    .seconds = 60, .report = 5, .seed = 1, .use_ptr = 1, .threads = 4,
+    .seconds = 60, .report = 5, .seed = 1, .use_ptr = 1, .threads = 4, .period = 10,
 };
 static double memory_share = 50;    /* percent of the heap; 0 when a size was given */
 static uint64_t memory_size;
@@ -377,12 +377,15 @@ static int parse(int argc, char **argv)
     for (int i = 1; i < argc; i++) {
         const char *argument = argv[i];
         if (strncmp(argument, "--", 2) != 0) {
+            if (strcmp(argument, "mix") == 0) {
+                options.mixing = 1;
+                continue;
+            }
             int k = 0;
             while (k < KNOWN && strcmp(argument, known[k]->name) != 0)
                 k++;
             if (k == KNOWN)
-                return refuse("no exercise '%s': sort, alltoall, mailbox, teams, threads, "
-                              "print", argument);
+                return refuse("no exercise '%s'; --help lists them", argument);
             int again = 0;
             for (int j = 0; j < chosen_count; j++)
                 again |= chosen[j] == known[k];
@@ -422,7 +425,8 @@ static int parse(int argc, char **argv)
         }
         static const char *const valued[] = { "--seconds", "--report", "--rounds", "--seed",
                                               "--memory", "--sort", "--exchange", "--plant",
-                                              "--threads", "--coverage" };
+                                              "--threads", "--coverage", "--mix-teams",
+                                              "--period" };
         int takes = 0;
         for (size_t k = 0; k < sizeof valued / sizeof *valued; k++)
             takes |= strcmp(name, valued[k]) == 0;
@@ -453,6 +457,16 @@ static int parse(int argc, char **argv)
             if (end == value || *end || count < 1 || count > 1023)
                 return refuse("--threads '%s': a whole number from 1 to 1023", value);
             options.threads = (int)count;
+        } else if (strcmp(name, "--mix-teams") == 0) {
+            char *end;
+            long count = strtol(value, &end, 10);
+            if (end == value || *end || count < 1 || count > 5)
+                return refuse("--mix-teams '%s': a whole number from 1 to 5, one a team exercise",
+                              value);
+            options.mix_teams = (int)count;
+        } else if (strcmp(name, "--period") == 0) {
+            if (positive_number(value, &options.period) != 0)
+                return refuse("--period '%s': a number of seconds above 0", value);
         } else if (strcmp(name, "--coverage") == 0) {
 #ifdef PACER_COUNTED
             coverage = value;
@@ -507,6 +521,18 @@ static int parse(int argc, char **argv)
         } else {
             return refuse("no option '%s'", name);
         }
+    }
+    /* mix runs its own: the five team exercises, then the two of the world. */
+    if (options.mixing) {
+        if (chosen_count)
+            return refuse("mix runs its own exercises: name it alone");
+        chosen[chosen_count++] = &pacer_mailbox;
+        chosen[chosen_count++] = &pacer_atomics;
+        chosen[chosen_count++] = &pacer_rma;
+        chosen[chosen_count++] = &pacer_locks;
+        chosen[chosen_count++] = &pacer_collectives;
+        chosen[chosen_count++] = &pacer_sort;
+        chosen[chosen_count++] = &pacer_alltoall;
     }
     if (chosen_count == 0) {        /* every exercise but threads and print */
         chosen[chosen_count++] = &pacer_sort;
@@ -844,15 +870,16 @@ static void final_line(void)
     fflush(stdout);
 }
 
-static void run(const struct pacer_exercise *exercise, shmem_team_t team)
+/*
+ * One exercise's steps and checkpoints on a team, from the state setup or
+ * rebind left it in: `total_rounds` of them, or about `seconds`. Its lines
+ * start with `prefix` - mix's team name, or nothing. Its summary line is kept
+ * for the end of the run, or under mix printed at once.
+ */
+static void run_on(const struct pacer_exercise *exercise, shmem_team_t team, long total_rounds,
+                   double run_seconds, const char *prefix)
 {
     int me = shmem_team_my_pe(team), n = shmem_team_n_pes(team);
-    if (exercise->setup(team, &options) != 0) {
-        fprintf(stderr, "osoe-pacer: PE %d: %s could not set up\n", shmem_my_pe(), exercise->name);
-        shmem_global_exit(2);
-    }
-    long total_rounds = options.rounds ? options.rounds
-                        : options.quick ? exercise->quick_rounds : 0;
     int phases = 0;
     while (exercise->phases && exercise->phases[phases] && phases < PACER_PHASES)
         phases++;
@@ -898,8 +925,8 @@ static void run(const struct pacer_exercise *exercise, shmem_team_t team)
             char line[1024];
             size_t used = 0, size = sizeof line;
             double rate_seconds = step > 0 ? step : 1e-9;
-            used += (size_t)snprintf(line + used, size - used, "%s t=%.1f round=%ld %s=%.0f %s_per_s=%.0f",
-                                     exercise->name, elapsed, totals.rounds, exercise->work,
+            used += (size_t)snprintf(line + used, size - used, "%s%s t=%.1f round=%ld %s=%.0f %s_per_s=%.0f",
+                                     prefix, exercise->name, elapsed, totals.rounds, exercise->work,
                                      totals.work, exercise->work,
                                      sums[SUM_WORK] / rate_seconds);
             if (sums[SUM_BYTES] > 0 && used < size)
@@ -945,7 +972,7 @@ static void run(const struct pacer_exercise *exercise, shmem_team_t team)
         long next = wanted < 1 ? 1 : wanted > (double)units * 8 ? units * 8 : (long)wanted;
         if (next > MOST_UNITS)
             next = MOST_UNITS;      /* a step that costs nothing must not overflow the count */
-        double remaining = options.seconds - elapsed;
+        double remaining = run_seconds - elapsed;
         if (remaining <= (double)next * per_unit) {
             double fit = remaining / per_unit;
             next = fit < 1 ? 1 : (long)(fit + 0.5);
@@ -960,15 +987,14 @@ static void run(const struct pacer_exercise *exercise, shmem_team_t team)
     max_source[0] = totals.batch;
     shmem_double_max_reduce(team, max_result, max_source, 1);
     double batch_max = max_result[0];
-    exercise->teardown();
     failures_total += totals.failures;
 
     if (me == 0) {
         char line[512];
         double seconds = totals.seconds > 0 ? totals.seconds : 1e-9;
         size_t used = (size_t)snprintf(line, sizeof line,
-                                       "summary %s rounds=%ld %s=%.0f seconds=%.1f %s_per_s=%.0f",
-                                       exercise->name, totals.rounds, exercise->work,
+                                       "%ssummary %s rounds=%ld %s=%.0f seconds=%.1f %s_per_s=%.0f",
+                                       prefix, exercise->name, totals.rounds, exercise->work,
                                        totals.work, totals.seconds, exercise->work,
                                        totals.work / seconds);
         if (totals.bytes > 0 && used < sizeof line)
@@ -979,8 +1005,163 @@ static void run(const struct pacer_exercise *exercise, shmem_team_t team)
                                      batch_max / (batch_sum / n));
         if (used < sizeof line)
             snprintf(line + used, sizeof line - used, " failures=%.0f", totals.failures);
-        keep_summary_first(line);
+        if (options.mixing) {
+            printf("%s\n", line);
+            fflush(stdout);
+        } else {
+            keep_summary_first(line);
+        }
     }
+}
+
+static void run(const struct pacer_exercise *exercise, shmem_team_t team)
+{
+    if (exercise->setup(team, &options) != 0) {
+        fprintf(stderr, "osoe-pacer: PE %d: %s could not set up\n", shmem_my_pe(), exercise->name);
+        shmem_global_exit(2);
+    }
+    long total_rounds = options.rounds ? options.rounds
+                        : options.quick ? exercise->quick_rounds : 0;
+    run_on(exercise, team, total_rounds, options.seconds, "");
+    exercise->teardown();
+}
+
+/* ---- mix (proposal §4.9) ------------------------------------------------------ */
+
+static const char *line_prefix = "";
+
+const char *pacer_prefix(void)
+{
+    return line_prefix;
+}
+
+/*
+ * The world split into K strided teams, mix0 to mixK-1, and a sequence of
+ * periods. In a team period each team runs one exercise - team k the one at
+ * (k + q) mod 5 in the list below, q counting team periods - for its own
+ * seeded length, so the teams run out of step and no exercise is on two teams
+ * at once; every fourth period is sort or alltoall on the whole world, the
+ * teams' exercises paused. Every exercise is set up once, on the world, its
+ * symmetric memory sized there - allocation is collective over the world
+ * (§9.3) - and moved onto a period's team by its rebind, afresh, with the
+ * period's own seed. Between periods, a world sync.
+ */
+static const struct pacer_exercise *const mix_team_exercises[] = {
+    &pacer_mailbox, &pacer_atomics, &pacer_rma, &pacer_locks, &pacer_collectives
+};
+static const struct pacer_exercise *const mix_world_exercises[] = { &pacer_sort, &pacer_alltoall };
+enum { MIX_TEAM_EXERCISES = 5, MIX_WORLD_EXERCISES = 2, MIX_WORLD_EVERY = 4, MIX_QUICK_ROUNDS = 3 };
+
+static int mix_teams(int npes)
+{
+    int teams = options.mix_teams ? options.mix_teams : npes >= 8 ? 4 : npes >= 4 ? 2 : 1;
+    return teams < npes ? teams : npes;
+}
+
+/* The exercise team k runs in team period q, and whether period p is the
+ * world's: the schedule every PE computes alike. */
+static const struct pacer_exercise *mix_exercise(int k, long q)
+{
+    return mix_team_exercises[(k + q) % MIX_TEAM_EXERCISES];
+}
+
+static int mix_world_period(long p)
+{
+    return p % MIX_WORLD_EVERY == MIX_WORLD_EVERY - 1;
+}
+
+static void run_mix(int npes)
+{
+    int teams = mix_teams(npes), me_world = shmem_my_pe();
+    static char names[8][16];
+    shmem_team_t team = SHMEM_TEAM_INVALID;
+    int mine = me_world % teams;
+    for (int k = 0; k < teams; k++) {
+        shmem_team_t made = SHMEM_TEAM_INVALID;
+        if (shmem_team_split_strided(SHMEM_TEAM_WORLD, k, teams, (npes - k + teams - 1) / teams,
+                                     NULL, 0, &made) != 0) {
+            fprintf(stderr, "osoe-pacer: PE %d: mix could not make its teams\n", me_world);
+            shmem_global_exit(2);
+        }
+        if (k == mine) {
+            team = made;
+            snprintf(names[k], sizeof names[k], "mix%d", k);
+            parallel_print_name_team(team, names[k]);
+        }
+    }
+    struct pacer_options setup_options = options;
+    setup_options.memory = options.memory / (MIX_TEAM_EXERCISES + MIX_WORLD_EXERCISES);
+    const struct pacer_exercise *all[MIX_TEAM_EXERCISES + MIX_WORLD_EXERCISES];
+    for (int e = 0; e < MIX_TEAM_EXERCISES; e++)
+        all[e] = mix_team_exercises[e];
+    for (int e = 0; e < MIX_WORLD_EXERCISES; e++)
+        all[MIX_TEAM_EXERCISES + e] = mix_world_exercises[e];
+    for (int e = 0; e < MIX_TEAM_EXERCISES + MIX_WORLD_EXERCISES; e++)
+        if (all[e]->setup(SHMEM_TEAM_WORLD, &setup_options) != 0) {
+            fprintf(stderr, "osoe-pacer: PE %d: %s could not set up\n", me_world, all[e]->name);
+            shmem_global_exit(2);
+        }
+
+    double start = pacer_now();
+    long q = 0;
+    /* Quick: six team periods, so that each team meets every team exercise,
+     * and the two world periods among them. */
+    long periods = options.rounds ? options.rounds : options.quick ? 2 * MIX_WORLD_EVERY : 0;
+    for (long p = 0;; p++) {
+        if (periods ? p >= periods : pacer_now() - start >= options.seconds)
+            break;
+        struct pacer_options period = setup_options;
+        period.seed = random_mix(options.seed, random_name("mix"), (uint64_t)p, 0);
+        const struct pacer_exercise *exercise;
+        shmem_team_t on;
+        char prefix[16];
+        int world = mix_world_period(p);
+        if (world) {
+            exercise = mix_world_exercises[(p / MIX_WORLD_EVERY) % MIX_WORLD_EXERCISES];
+            on = SHMEM_TEAM_WORLD;
+            snprintf(prefix, sizeof prefix, "world ");
+        } else {
+            exercise = mix_exercise(mine, q);
+            on = team;
+            snprintf(prefix, sizeof prefix, "mix%d ", mine);
+        }
+        if (me_world == 0) {
+            printf("mix period=%ld", p);
+            if (world)
+                printf(" world=%s", exercise->name);
+            else
+                for (int k = 0; k < teams; k++)
+                    printf(" mix%d=%s", k, mix_exercise(k, q)->name);
+            printf("\n");
+            fflush(stdout);
+        }
+        if (exercise->rebind(on, &period) != 0) {
+            fprintf(stderr, "osoe-pacer: PE %d: %s cannot run on %s\n", me_world,
+                    exercise->name, prefix);
+            shmem_global_exit(2);
+        }
+        /* A team period's own length: half to one and a half --period, by
+         * the seed, so that the teams' steps and checkpoints fall out of step. */
+        double length = options.period;
+        if (!world)
+            length *= 0.5 + (double)(random_mix(period.seed, (uint64_t)mine, 1, 0) % 1000) / 1000;
+        line_prefix = prefix;
+        run_on(exercise, on, periods ? MIX_QUICK_ROUNDS : 0, length, prefix);
+        line_prefix = "";
+        shmem_quiet();
+        shmem_team_sync(SHMEM_TEAM_WORLD);      /* every team's period over */
+        if (!world)
+            q++;
+    }
+
+    /* Back to the world, whose members every teardown's syncs are. */
+    struct pacer_options final = setup_options;
+    for (int e = 0; e < MIX_TEAM_EXERCISES + MIX_WORLD_EXERCISES; e++) {
+        all[e]->rebind(SHMEM_TEAM_WORLD, &final);
+        all[e]->teardown();
+    }
+    parallel_print_name_team(team, NULL);
+    shmem_team_destroy(team);
 }
 
 int main(int argc, char **argv)
@@ -1105,7 +1286,11 @@ int main(int argc, char **argv)
     }
     for (int k = 0; k < chosen_count && !refused; k++) {
         char fields[512] = "";
-        uint64_t bytes = chosen[k]->memory(npes, &options, fields, sizeof fields);
+        /* Under mix every exercise is set up at once, each on a share. */
+        struct pacer_options sizing = options;
+        if (options.mixing)
+            sizing.memory = options.memory / (uint64_t)chosen_count;
+        uint64_t bytes = chosen[k]->memory(npes, &sizing, fields, sizeof fields);
         if (bytes > options.memory) {
             refused = 1;
             if (me == 0)
@@ -1136,8 +1321,17 @@ int main(int argc, char **argv)
 
     if (options.plant == PACER_PLANT_PRINT_HASH && me == 1)
         parallel_print_plant_hash(1);
-    for (int k = 0; k < chosen_count; k++)
-        run(chosen[k], SHMEM_TEAM_WORLD);
+    if (options.mixing) {
+        if (me == 0) {
+            printf("mix teams=%d period=%g world_every=%d\n", mix_teams(npes), options.period,
+                   MIX_WORLD_EVERY);
+            fflush(stdout);
+        }
+        run_mix(npes);
+    } else {
+        for (int k = 0; k < chosen_count; k++)
+            run(chosen[k], SHMEM_TEAM_WORLD);
+    }
 
     /* Every PE's count, whatever teams the exercises ran on. */
     sum_source[0] = (double)failures.total;

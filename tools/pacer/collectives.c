@@ -253,7 +253,7 @@ struct team_view {
 
 static struct {
     uint64_t seed;
-    int quick, last;
+    int quick, last, mixing;
     size_t most_bytes;              /* the timing sweep's largest contribution */
     int plant_reduce, plant_scan, plant_data, plant_gap, plant_status, plant_timed,
         plant_timed_data;
@@ -306,48 +306,85 @@ static uint64_t collectives_memory(int npes, const struct pacer_options *options
     return symmetric;
 }
 
-static int make_view(struct team_view *team, shmem_team_t handle, const char *name)
+/* A view of a team, into arrays made at setup for the world's size. */
+static void make_view(struct team_view *team, shmem_team_t handle, const char *name)
 {
     team->handle = handle;
     team->name = name;
     team->size = handle == SHMEM_TEAM_INVALID ? 0 : shmem_team_n_pes(handle);
     team->rank = handle == SHMEM_TEAM_INVALID ? -1 : shmem_team_my_pe(handle);
-    team->world = malloc(sizeof *team->world * (size_t)(team->size ? team->size : 1));
-    if (!team->world)
-        return -1;
     for (int k = 0; k < team->size; k++)
         team->world[k] = shmem_team_translate_pe(handle, k, SHMEM_TEAM_WORLD);
+}
+
+/* The even PEs of a team, split once for each team the exercise runs on and
+ * kept: a team's number is never reused (design §5.7), so a split a period
+ * would spend the job's numbers. */
+enum { PARENTS = 8 };
+static struct {
+    shmem_team_t parent, even;
+} evens[PARENTS];
+static int even_count;
+
+static int even_of(shmem_team_t team, shmem_team_t *even)
+{
+    for (int k = 0; k < even_count; k++)
+        if (evens[k].parent == team) {
+            *even = evens[k].even;
+            return 0;
+        }
+    if (even_count == PARENTS)
+        return -1;
+    *even = SHMEM_TEAM_INVALID;
+    int n = shmem_team_n_pes(team);
+    if (shmem_team_split_strided(team, 0, 2, (n + 1) / 2, NULL, 0, even) != 0)
+        return -1;
+    evens[even_count].parent = team;
+    evens[even_count++].even = *even;
+    return 0;
+}
+
+/* Onto a team, afresh: its view and its even PEs', the timing samples
+ * started over. */
+static int collectives_rebind(shmem_team_t team, const struct pacer_options *options)
+{
+    shmem_team_t even;
+    if (even_of(team, &even) != 0)
+        return -1;
+    collectives.team = team;
+    collectives.seed = options->seed;
+    collectives.mixing = options->mixing;
+    make_view(&collectives.teams[0], team, team == SHMEM_TEAM_WORLD ? "world" : "team");
+    make_view(&collectives.teams[1], even, "even");
+    memset(collectives.sample_count, 0, sizeof collectives.sample_count);
+    for (int i = 0; i < TIMING_CASES; i++)
+        collectives.fastest[i] = 1e30;
+    collectives.round = 0;
+    collectives.last = 0;
+    collectives.calls = collectives.bytes = 0;
+    memset(collectives.phase, 0, sizeof collectives.phase);
+    shmem_team_sync(team);
     return 0;
 }
 
 static int collectives_setup(shmem_team_t team, const struct pacer_options *options)
 {
-    (void)options;
-    collectives.team = team;
-    collectives.me_world = shmem_my_pe();
     int n = shmem_team_n_pes(team);
-    shmem_team_t even = SHMEM_TEAM_INVALID;
-    if (shmem_team_split_strided(team, 0, 2, (n + 1) / 2, NULL, 0, &even) != 0)
-        return -1;
-    if (make_view(&collectives.teams[0], team, "world") || make_view(&collectives.teams[1], even, "even"))
-        return -1;
+    collectives.me_world = shmem_my_pe();
+    for (int k = 0; k < 2; k++)
+        if (!(collectives.teams[k].world = malloc(sizeof(int) * (size_t)n)))
+            return -1;
     collectives.source = shmem_malloc(collectives.buffer_bytes);
     collectives.dest = shmem_malloc(collectives.buffer_bytes);
     collectives.times = shmem_calloc(2 * TIMING_CASES, sizeof *collectives.times);
-    collectives.times_result = shmem_calloc(2 * TIMING_CASES, sizeof *collectives.times_result);
+    collectives.times_result = shmem_calloc(2 * TIMING_CASES,
+                                            sizeof *collectives.times_result);
     collectives.expected = malloc(collectives.buffer_bytes);
     collectives.owned = malloc(collectives.buffer_bytes);
-    if (!collectives.source || !collectives.dest || !collectives.times || !collectives.times_result || !collectives.expected ||
-        !collectives.owned)
+    if (!collectives.source || !collectives.dest || !collectives.times ||
+        !collectives.times_result || !collectives.expected || !collectives.owned)
         return -1;
-    memset(collectives.sample_count, 0, sizeof collectives.sample_count);
-    for (int i = 0; i < TIMING_CASES; i++)
-        collectives.fastest[i] = 1e30;
-    collectives.round = 0;
-    collectives.calls = collectives.bytes = 0;
-    memset(collectives.phase, 0, sizeof collectives.phase);
-    shmem_team_sync(team);
-    return 0;
+    return collectives_rebind(team, options);
 }
 
 /* ---- inputs and their closed forms ---------------------------------------------- */
@@ -735,7 +772,7 @@ static void summarize(void)
 
 static void collectives_checkpoint(struct pacer_counters *counters)
 {
-    if (collectives.last)
+    if (collectives.last && !collectives.mixing)
         summarize();
     counters->work = collectives.calls;
     counters->bytes = collectives.bytes;
@@ -748,8 +785,10 @@ static void collectives_checkpoint(struct pacer_counters *counters)
 static void collectives_teardown(void)
 {
     shmem_team_sync(collectives.team);
-    if (collectives.teams[1].handle != SHMEM_TEAM_INVALID)
-        shmem_team_destroy(collectives.teams[1].handle);
+    for (int k = 0; k < even_count; k++)
+        if (evens[k].even != SHMEM_TEAM_INVALID)
+            shmem_team_destroy(evens[k].even);
+    even_count = 0;
     shmem_free(collectives.times_result);
     shmem_free(collectives.times);
     shmem_free(collectives.dest);
@@ -770,4 +809,5 @@ const struct pacer_exercise pacer_collectives = {
     .step = collectives_step,
     .checkpoint = collectives_checkpoint,
     .teardown = collectives_teardown,
+    .rebind = collectives_rebind,
 };

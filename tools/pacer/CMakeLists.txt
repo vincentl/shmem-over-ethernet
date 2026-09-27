@@ -73,6 +73,23 @@ foreach(map IN LISTS pacer_maps)
     FAIL_REGULAR_EXPRESSION "${pacer_failed}")
 endforeach()
 
+# mix: teams out of step, the exercises rotating through them, the world's
+# periods between (proposal §4.9) - three maps, the one-node map under tsan.
+set(pacer_mix_maps 0,0,1,1 0,1,2,3 0,0,0,1,1,2)
+if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(pacer_mix_maps 0,0,0,0)
+endif()
+foreach(map IN LISTS pacer_mix_maps)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME tools.pacer.mix.${label}
+    COMMAND osoe-launch -n ${count} -m ${map} -t 240 -- $<TARGET_FILE:osoe-pacer> --quick mix)
+  set_tests_properties(tools.pacer.mix.${label} PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+endforeach()
+
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   # The sort's other paths - the accumulating mode, the pull exchange, puts
   # where node-mates would take stores - so that every path of it runs too.
@@ -280,6 +297,9 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(tools.pacer.counted.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
     PASS_REGULAR_EXPRESSION "shim called=[1-9][0-9]+ declared=[1-9][0-9]+"
     FAIL_REGULAR_EXPRESSION "failures=[1-9]|killed by signal|timeout after|left behind")
+  # A plant fired inside a mix period, on PE 1's team.
+  pacer_plant(locks-count mix
+    "mix1.3. locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
   add_test(NAME tools.pacer.teams-exhaust.0-0-1-1
     COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --teams-exhaust
             teams)

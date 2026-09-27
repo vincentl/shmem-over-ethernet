@@ -319,28 +319,45 @@ static uint64_t rma_memory(int npes, const struct pacer_options *options, char *
     return fixed + halo;
 }
 
-static int rma_setup(shmem_team_t team, const struct pacer_options *options)
+/* Onto a team, afresh: its ring, and the node-mates in it - a dense list,
+ * which a strided team's local ranks are not. The flags start from zero, since
+ * a period's rounds count from zero again; nothing is in flight, the last
+ * period having ended in a quiet and a sync. */
+static int rma_rebind(shmem_team_t team, const struct pacer_options *options)
 {
-    (void)options;
     int n = shmem_team_n_pes(team);
+    const struct pacer_layout *layout = pacer_layout();
     rma.team = team;
     rma.n = n;
     rma.me = shmem_team_my_pe(team);
-    rma.me_world = shmem_my_pe();
+    rma.seed = options->seed;
     rma.next = (rma.me + 1) % n;
     rma.previous = (rma.me + n - 1) % n;
     rma.next_world = shmem_team_translate_pe(team, rma.next, SHMEM_TEAM_WORLD);
     rma.previous_world = shmem_team_translate_pe(team, rma.previous, SHMEM_TEAM_WORLD);
-    const struct pacer_layout *layout = pacer_layout();
-    rma.local_rank = layout->local[rma.me_world];
     rma.local_count = 0;
-    rma.mates = malloc(sizeof *rma.mates * (size_t)rma.local_most);
-    if (!rma.mates)
-        return -1;
     for (int p = 0; p < layout->pes; p++)
         if (layout->node[p] == layout->node[rma.me_world] &&
             shmem_team_translate_pe(SHMEM_TEAM_WORLD, p, team) >= 0)
-            rma.mates[layout->local[p]] = p, rma.local_count++;
+            rma.mates[rma.local_count++] = p;
+    *rma.flag = 0;
+    for (int l = 0; l < rma.local_most; l++)
+        rma.ptr_flags[l] = 0;
+    rma.round = 0;
+    rma.bytes = rma.transfers = 0;
+    memset(rma.phase, 0, sizeof rma.phase);
+    shmem_team_sync(team);
+    return 0;
+}
+
+static int rma_setup(shmem_team_t team, const struct pacer_options *options)
+{
+    const struct pacer_layout *layout = pacer_layout();
+    rma.me_world = shmem_my_pe();
+    rma.local_rank = layout->local[rma.me_world];
+    rma.mates = malloc(sizeof *rma.mates * (size_t)rma.local_most);
+    if (!rma.mates)
+        return -1;
     if (shmem_ctx_create(SHMEM_CTX_PRIVATE, &rma.context) != 0)
         return -1;
     rma.halo = shmem_malloc(rma.halo_most);
@@ -355,11 +372,7 @@ static int rma_setup(shmem_team_t team, const struct pacer_options *options)
     if (!rma.halo || !rma.flag || !rma.inbox || !rma.source || !rma.ptr_slots ||
         !rma.ptr_flags || !rma.outgoing || !rma.incoming || !rma.halo_out)
         return -1;
-    rma.round = 0;
-    rma.bytes = rma.transfers = 0;
-    memset(rma.phase, 0, sizeof rma.phase);
-    shmem_team_sync(team);
-    return 0;
+    return rma_rebind(team, options);
 }
 
 /* Byte i of what `from` sends `to` in a round, i counted from the start. */
@@ -804,12 +817,13 @@ static void pointers(long round, int source_is_pattern)
         shmem_fence();
         shmem_uint64_atomic_set(&rma.ptr_flags[rma.local_rank], raised, mate);
     }
+    const struct pacer_layout *layout = pacer_layout();
     for (int l = 0; l < rma.local_count; l++) {
-        int mate = rma.mates[l];
+        int mate = rma.mates[l], rank = layout->local[mate];
         if (mate == rma.me_world)
             continue;
-        shmem_uint64_wait_until(&rma.ptr_flags[l], SHMEM_CMP_GE, raised);
-        const uint64_t *slot = rma.ptr_slots + (size_t)l * PTR_WORDS;
+        shmem_uint64_wait_until(&rma.ptr_flags[rank], SHMEM_CMP_GE, raised);
+        const uint64_t *slot = rma.ptr_slots + (size_t)rank * PTR_WORDS;
         for (int i = 0; i < PTR_WORDS; i++)
             if (slot[i] != ptr_word(mate, rma.me_world, i, round)) {
                 pacer_failure("rma round=%ld ptr: word %d node-mate PE %d stored is %016llx, "
@@ -914,4 +928,5 @@ const struct pacer_exercise pacer_rma = {
     .step = rma_step,
     .checkpoint = rma_checkpoint,
     .teardown = rma_teardown,
+    .rebind = rma_rebind,
 };

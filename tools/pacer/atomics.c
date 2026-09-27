@@ -360,23 +360,36 @@ static uint64_t atomics_memory(int npes, const struct pacer_options *options, ch
     return symmetric;
 }
 
-static int atomics_setup(shmem_team_t team, const struct pacer_options *options)
+/* Onto a team, afresh: its members and which of them share this node; the
+ * table's slots are reset by each round before use. */
+static int atomics_rebind(shmem_team_t team, const struct pacer_options *options)
 {
-    (void)options;
     int n = shmem_team_n_pes(team);
+    const struct pacer_layout *layout = pacer_layout();
     atomics.team = team;
     atomics.n = n;
     atomics.me = shmem_team_my_pe(team);
-    atomics.me_world = shmem_my_pe();
-    const struct pacer_layout *layout = pacer_layout();
-    atomics.world = malloc(sizeof *atomics.world * (size_t)n);
-    atomics.here = malloc((size_t)n);
-    if (!atomics.world || !atomics.here)
-        return -1;
+    atomics.seed = options->seed;
     for (int j = 0; j < n; j++) {
         atomics.world[j] = shmem_team_translate_pe(team, j, SHMEM_TEAM_WORLD);
         atomics.here[j] = layout->node[atomics.world[j]] == layout->node[atomics.me_world];
     }
+    atomics.round = 0;
+    atomics.updates = atomics.local_updates = atomics.remote_updates = 0;
+    memset(atomics.phase, 0, sizeof atomics.phase);
+    atomics.since = pacer_now();
+    shmem_team_sync(team);
+    return 0;
+}
+
+static int atomics_setup(shmem_team_t team, const struct pacer_options *options)
+{
+    int n = shmem_team_n_pes(team);
+    atomics.me_world = shmem_my_pe();
+    atomics.world = malloc(sizeof *atomics.world * (size_t)n);
+    atomics.here = malloc((size_t)n);
+    if (!atomics.world || !atomics.here)
+        return -1;
     atomics.contexts[0] = SHMEM_CTX_DEFAULT;
     if (shmem_ctx_create(SHMEM_CTX_PRIVATE, &atomics.contexts[1]) != 0 ||
         shmem_ctx_create(SHMEM_CTX_SERIALIZED, &atomics.contexts[2]) != 0)
@@ -390,12 +403,7 @@ static int atomics_setup(shmem_team_t team, const struct pacer_options *options)
     if (!atomics.table || !atomics.claims || !atomics.sums || !atomics.hashes ||
         !atomics.reduce_source || !atomics.reduce_result)
         return -1;
-    atomics.round = 0;
-    atomics.updates = atomics.local_updates = atomics.remote_updates = 0;
-    memset(atomics.phase, 0, sizeof atomics.phase);
-    atomics.since = pacer_now();
-    shmem_team_sync(team);
-    return 0;
+    return atomics_rebind(team, options);
 }
 
 /* ---- what every round shares ------------------------------------------------ */
@@ -1052,7 +1060,7 @@ static void atomics_checkpoint(struct pacer_counters *counters)
     atomics.reduce_source[1] = (uint64_t)atomics.remote_updates;
     shmem_uint64_sum_reduce(atomics.team, atomics.reduce_result, atomics.reduce_source, 2);
     if (atomics.me == 0 && seconds > 0) {
-        printf("atomics local_per_s=%.0f remote_per_s=%.0f\n",
+        printf("%satomics local_per_s=%.0f remote_per_s=%.0f\n", pacer_prefix(),
                (double)atomics.reduce_result[0] / seconds,
                (double)atomics.reduce_result[1] / seconds);
         fflush(stdout);
@@ -1091,4 +1099,5 @@ const struct pacer_exercise pacer_atomics = {
     .step = atomics_step,
     .checkpoint = atomics_checkpoint,
     .teardown = atomics_teardown,
+    .rebind = atomics_rebind,
 };

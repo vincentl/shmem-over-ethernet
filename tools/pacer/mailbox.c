@@ -185,19 +185,19 @@ static uint64_t mailbox_memory(int npes, const struct pacer_options *options, ch
     return symmetric;
 }
 
-static int mailbox_setup(shmem_team_t team, const struct pacer_options *options)
+/* Onto a team, afresh: its members, sends, node-mates and pairs; every slot's
+ * words back to their starts, by atomic sets on this PE as a slot's receiver
+ * resets them; nothing is in flight, the last period having ended in a quiet
+ * and a sync. */
+static int mailbox_rebind(shmem_team_t team, const struct pacer_options *options)
 {
-    (void)options;
     int n = shmem_team_n_pes(team);
+    const struct pacer_layout *layout = pacer_layout();
     mailbox.team = team;
     mailbox.n = n;
     mailbox.me = shmem_team_my_pe(team);
-    mailbox.me_world = shmem_my_pe();
-    const struct pacer_layout *layout = pacer_layout();
-    mailbox.world = malloc(sizeof *mailbox.world * (size_t)n);
-    mailbox.node_mate = malloc(sizeof *mailbox.node_mate * (size_t)n);
-    if (!mailbox.world || !mailbox.node_mate)
-        return -1;
+    mailbox.seed = options->seed;
+    mailbox.sends = n < MAXIMUM_SENDS ? n : MAXIMUM_SENDS;
     mailbox.pairs = 0;
     for (int j = 0; j < n; j++) {
         int pe = mailbox.world[j] = shmem_team_translate_pe(team, j, SHMEM_TEAM_WORLD);
@@ -211,6 +211,38 @@ static int mailbox_setup(shmem_team_t team, const struct pacer_options *options)
         mailbox.partner = -1;       /* a partner outside the team plays no part */
     mailbox.serving = layout->node[mailbox.me_world] % 2 == 0;
     mailbox.echo_number = 0;
+    for (int j = 0; j < n; j++) {
+        mailbox.status[j] = 1;
+        mailbox.values[j] = 0;
+        mailbox.last_sent[j] = -1;
+        mailbox.last_down[j] = DOWN_START;
+        mailbox.received[j] = 0;
+        shmem_uint64_atomic_set(&mailbox.up[j], 0, mailbox.me_world);
+        shmem_uint64_atomic_set(&mailbox.down[j], DOWN_START, mailbox.me_world);
+        shmem_uint64_atomic_set(&mailbox.acknowledged[j], 0, mailbox.me_world);
+        mailbox.sent_to[j] = mailbox.claimed[j] = 0;
+    }
+    for (int w = 2 * ECHO_WORDS; w < 2 * ECHO_WORDS + 2; w++)
+        shmem_uint64_atomic_set(&mailbox.echo[w], 0, mailbox.me_world);
+    mailbox.round = 0;
+    mailbox.sample_count = mailbox.sample_seen = 0;
+    mailbox.sample_state = 1;
+    mailbox.work_state = (uint64_t)mailbox.me_world;
+    mailbox.messages = mailbox.bytes = 0;
+    memset(mailbox.phase, 0, sizeof mailbox.phase);
+    shmem_quiet();                  /* the starts, before anyone signals */
+    shmem_team_sync(team);
+    return 0;
+}
+
+static int mailbox_setup(shmem_team_t team, const struct pacer_options *options)
+{
+    int n = shmem_team_n_pes(team);
+    mailbox.me_world = shmem_my_pe();
+    mailbox.world = malloc(sizeof *mailbox.world * (size_t)n);
+    mailbox.node_mate = malloc(sizeof *mailbox.node_mate * (size_t)n);
+    if (!mailbox.world || !mailbox.node_mate)
+        return -1;
     size_t words = mailbox.words;
     mailbox.slots = shmem_malloc(sizeof *mailbox.slots * (size_t)n * words);
     mailbox.up = shmem_calloc((size_t)n, sizeof *mailbox.up);
@@ -228,28 +260,13 @@ static int mailbox_setup(shmem_team_t team, const struct pacer_options *options)
     mailbox.received = calloc((size_t)n, sizeof *mailbox.received);
     if (!mailbox.slots || !mailbox.up || !mailbox.down || !mailbox.acknowledged ||
         !mailbox.sent_to || !mailbox.claimed || !mailbox.echo || !mailbox.latency ||
-        !mailbox.status ||
-        !mailbox.values || !mailbox.indices || !mailbox.last_sent || !mailbox.last_down ||
-        !mailbox.received)
+        !mailbox.status || !mailbox.values || !mailbox.indices || !mailbox.last_sent ||
+        !mailbox.last_down || !mailbox.received)
         return -1;
     for (int k = 0; k < MAXIMUM_SENDS; k++)
         if (!(mailbox.message[k] = malloc(sizeof(uint64_t) * words)))
             return -1;
-    for (int j = 0; j < n; j++) {
-        mailbox.status[j] = 1;
-        mailbox.last_sent[j] = -1;
-        mailbox.last_down[j] = DOWN_START;
-        shmem_uint64_atomic_set(&mailbox.down[j], DOWN_START, mailbox.me_world);
-    }
-    mailbox.round = 0;
-    mailbox.sample_count = mailbox.sample_seen = 0;
-    mailbox.sample_state = 1;
-    mailbox.work_state = (uint64_t)mailbox.me_world;
-    mailbox.messages = mailbox.bytes = 0;
-    memset(mailbox.phase, 0, sizeof mailbox.phase);
-    shmem_quiet();                  /* the down words' starts, before anyone signals */
-    shmem_team_sync(team);
-    return 0;
+    return mailbox_rebind(team, options);
 }
 
 /* Round t's offsets: K distinct values in [0, n), alike on every PE. */
@@ -600,9 +617,11 @@ static void mailbox_checkpoint(struct pacer_counters *counters)
     }
     shmem_double_max_reduce(mailbox.team, latency + 4, latency, 4);
     if (mailbox.me == 0 && latency[4] >= 0)
-        printf("mailbox node_mate_us median=%.1f p99=%.1f\n", latency[4], latency[5]);
+        printf("%smailbox node_mate_us median=%.1f p99=%.1f\n", pacer_prefix(), latency[4],
+               latency[5]);
     if (mailbox.me == 0 && latency[6] >= 0)
-        printf("mailbox round_trip_us median=%.1f p99=%.1f pairs=%d\n", latency[6], latency[7],
+        printf("%smailbox round_trip_us median=%.1f p99=%.1f pairs=%d\n", pacer_prefix(),
+               latency[6], latency[7],
                mailbox.pairs);
     fflush(stdout);
     mailbox.sample_count = mailbox.sample_seen = 0;
@@ -660,4 +679,5 @@ const struct pacer_exercise pacer_mailbox = {
     .step = mailbox_step,
     .checkpoint = mailbox_checkpoint,
     .teardown = mailbox_teardown,
+    .rebind = mailbox_rebind,
 };

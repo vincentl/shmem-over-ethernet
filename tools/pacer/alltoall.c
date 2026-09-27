@@ -83,6 +83,7 @@ static struct {
     size_t largest;                 /* elements a block, at most */
     uint64_t seed;
     int plant_byte, plant_gap;
+    int mixing;                     /* under mix: no run summary, a period each */
     /* the teams: the exercise's and even */
     shmem_team_t teams[TEAMS];
     int *world[TEAMS];              /* team rank to world PE */
@@ -471,9 +472,10 @@ static void report(int run)
                     used += (size_t)snprintf(line + used, sizeof line - used, " %s_us=%.1f",
                                              variant_names[v], slowest[s * VARIANTS + v]);
                 if (run) {
-                    pacer_summary("%s", line);
+                    if (!alltoall.mixing)
+                        pacer_summary("%s", line);
                 } else {
-                    printf("%s\n", line);
+                    printf("%s%s\n", pacer_prefix(), line);
                     fflush(stdout);
                 }
             }
@@ -497,6 +499,28 @@ static void alltoall_checkpoint(struct pacer_counters *counters)
     alltoall.exchanges = 0;
     alltoall.diagnosed = 0;
     memset(alltoall.phase, 0, sizeof alltoall.phase);
+}
+
+/* The world again, afresh - a period of mix: alltoall runs on the world and
+ * its even PEs alone, both made at setup. */
+static int alltoall_rebind(shmem_team_t team, const struct pacer_options *options)
+{
+    if (team != alltoall.teams[0])
+        return -1;
+    alltoall.seed = options->seed;
+    alltoall.mixing = options->mixing;
+    for (int t = 0; t < TEAMS; t++)
+        for (int s = 0; s < SIZES; s++)
+            for (int v = 0; v < VARIANTS; v++) {
+                alltoall.checkpoint[t][s][v].count = alltoall.run[t][s][v].count = 0;
+                alltoall.checkpoint[t][s][v].seen = alltoall.run[t][s][v].seen = 0;
+            }
+    alltoall.unit = 0;
+    alltoall.exchanges = 0;
+    alltoall.diagnosed = 0;
+    memset(alltoall.phase, 0, sizeof alltoall.phase);
+    shmem_team_sync(team);
+    return 0;
 }
 
 static void alltoall_teardown(void)
@@ -529,4 +553,5 @@ const struct pacer_exercise pacer_alltoall = {
     .step = alltoall_step,
     .checkpoint = alltoall_checkpoint,
     .teardown = alltoall_teardown,
+    .rebind = alltoall_rebind,
 };

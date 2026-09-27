@@ -117,6 +117,9 @@ struct pacer_options {
     enum pacer_plant plant;
     int threads;                    /* worker threads a PE, for the threads exercise */
     int teams_exhaust;              /* the teams exercise splits until a split fails */
+    int mix_teams;                  /* mix: the teams the world is split into; 0 chooses */
+    double period;                  /* mix: a period's mean length, seconds */
+    int mixing;                     /* set by mix: summaries are mix's to print */
 };
 
 /* parallel_print's text capacity, NUL included, as the driver sets it. */
@@ -145,6 +148,14 @@ struct pacer_exercise {
     void (*step)(long units, int last);
     void (*checkpoint)(struct pacer_counters *counters);
     void (*teardown)(void);
+    /* For mix (proposal §4.9), and optional: move the set-up exercise onto
+     * `team` for a period. Every member of `team` calls it, once every member
+     * of the team it ran on last has ended its last step. Its symmetric
+     * memory, sized at setup for the world, is kept; its state starts afresh
+     * from `options`, the period's seed among them, so that nothing a
+     * previous period left can pass a check. Nonzero: it cannot run on
+     * `team` - sort and alltoall, for two, run on the world alone. */
+    int (*rebind)(shmem_team_t team, const struct pacer_options *options);
 };
 
 extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_teams,
@@ -170,6 +181,10 @@ const struct pacer_layout *pacer_layout(void);
 
 /* Seconds on a monotonic clock. */
 double pacer_now(void);
+
+/* What an exercise's own lines start with: nothing, or under mix its team's
+ * name and a space, so that a reader knows which team said it. */
+const char *pacer_prefix(void);
 
 /*
  * A failure found by this PE, by any of its threads: counted, and the first

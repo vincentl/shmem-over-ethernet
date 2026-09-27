@@ -60,19 +60,33 @@ static uint64_t locks_memory(int npes, const struct pacer_options *options, char
     return LOCKS * sizeof(long) * 5 + 2 * sizeof(double);
 }
 
-static int locks_setup(shmem_team_t team, const struct pacer_options *options)
+/* Onto a team, afresh: every lock is free - the last step's sections all
+ * cleared theirs - and every count and acquisition starts from zero, the
+ * team synced before any section begins. */
+static int locks_rebind(shmem_team_t team, const struct pacer_options *options)
 {
-    (void)options;
     int n = shmem_team_n_pes(team);
     locks.team = team;
     locks.n = n;
     locks.me = shmem_team_my_pe(team);
-    locks.me_world = shmem_my_pe();
-    locks.world = malloc(sizeof *locks.world * (size_t)n);
-    if (!locks.world)
-        return -1;
+    locks.seed = options->seed;
     for (int j = 0; j < n; j++)
         locks.world[j] = shmem_team_translate_pe(team, j, SHMEM_TEAM_WORLD);
+    for (int l = 0; l < LOCKS; l++)
+        locks.counts[l] = locks.holders[l] = locks.taken[l] = 0;
+    locks.round = 0;
+    locks.acquisitions = locks.longest_wait = 0;
+    memset(locks.phase, 0, sizeof locks.phase);
+    shmem_team_sync(team);
+    return 0;
+}
+
+static int locks_setup(shmem_team_t team, const struct pacer_options *options)
+{
+    locks.me_world = shmem_my_pe();
+    locks.world = malloc(sizeof *locks.world * (size_t)shmem_team_n_pes(team));
+    if (!locks.world)
+        return -1;
     /* A lock must be zero before first use (§9.13), on every PE. */
     locks.locks = shmem_calloc(LOCKS, sizeof *locks.locks);
     locks.counts = shmem_calloc(LOCKS, sizeof *locks.counts);
@@ -84,11 +98,7 @@ static int locks_setup(shmem_team_t team, const struct pacer_options *options)
     if (!locks.locks || !locks.counts || !locks.holders || !locks.taken || !locks.taken_total ||
         !locks.longest || !locks.longest_team)
         return -1;
-    locks.round = 0;
-    locks.acquisitions = locks.longest_wait = 0;
-    memset(locks.phase, 0, sizeof locks.phase);
-    shmem_team_sync(team);
-    return 0;
+    return locks_rebind(team, options);
 }
 
 static void locks_step(long units, int last)
@@ -151,7 +161,7 @@ static void locks_checkpoint(struct pacer_counters *counters)
     locks.longest[0] = locks.longest_wait;
     shmem_double_max_reduce(locks.team, locks.longest_team, locks.longest, 1);
     if (locks.me == 0) {
-        printf("locks longest_wait_us=%.1f\n", locks.longest_team[0] * 1e6);
+        printf("%slocks longest_wait_us=%.1f\n", pacer_prefix(), locks.longest_team[0] * 1e6);
         fflush(stdout);
     }
     locks.longest_wait = 0;
@@ -185,4 +195,5 @@ const struct pacer_exercise pacer_locks = {
     .step = locks_step,
     .checkpoint = locks_checkpoint,
     .teardown = locks_teardown,
+    .rebind = locks_rebind,
 };

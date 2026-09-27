@@ -732,6 +732,30 @@ static void sort_checkpoint(struct pacer_counters *counters)
     memset(sort.phase, 0, sizeof sort.phase);
 }
 
+/* The world again, afresh - a period of mix: sort runs on the world alone,
+ * its buffers and ownership laid out for it at setup. */
+static int sort_rebind(shmem_team_t team, const struct pacer_options *options)
+{
+    if (team != sort.team)
+        return -1;
+    sort.seed = options->seed;
+    sort.round = 0;
+    sort.cycle_rounds = 0;
+    sort.received = 0;
+    memset(&sort.open_generated, 0, sizeof sort.open_generated);
+    memset(&sort.generated, 0, sizeof sort.generated);
+    memset(&sort.arrived, 0, sizeof sort.arrived);
+    sort.work = sort.batch = 0;
+    memset(sort.phase, 0, sizeof sort.phase);
+    if (sort.push) {
+        shmem_uint64_atomic_set(&sort.cursors[0], 0, sort.me_world);
+        shmem_uint64_atomic_set(&sort.cursors[1], 0, sort.me_world);
+    }
+    shmem_quiet();
+    shmem_team_sync(team);
+    return 0;
+}
+
 static void sort_teardown(void)
 {
     shmem_quiet();
@@ -770,4 +794,5 @@ const struct pacer_exercise pacer_sort = {
     .step = sort_step,
     .checkpoint = sort_checkpoint,
     .teardown = sort_teardown,
+    .rebind = sort_rebind,
 };
