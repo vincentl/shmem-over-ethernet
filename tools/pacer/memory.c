@@ -10,7 +10,8 @@
  * is made; a realloc must keep the pattern of what it keeps, a free finds the
  * pattern whole - a block the allocator let overlap another's would not be.
  * A calloc's block is zero; an align's is aligned; every block is accessible
- * from this PE and the next (shmem_addr_accessible).
+ * from this PE and the next (shmem_addr_accessible), and the next PE is
+ * (shmem_pe_accessible).
  *
  * Symmetric means alike on every PE, and the check says so without assuming
  * that a symmetric object sits at one address everywhere, which the
@@ -204,7 +205,8 @@ static void allocate(uint64_t r)
                           (size_t)(at % alignment));
     }
     int here = shmem_addr_accessible(address, memory.me_world);
-    int there = shmem_addr_accessible(address, memory.next_world);
+    int there = shmem_addr_accessible(address, memory.next_world) &&
+                shmem_pe_accessible(memory.next_world);
     if (memory.plant_accessible && memory.me_world == 1) {
         there = !there;             /* the planted defect: one answer misread */
         memory.plant_accessible = 0;

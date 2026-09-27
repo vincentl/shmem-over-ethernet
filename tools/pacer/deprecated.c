@@ -752,7 +752,7 @@ static void run_wait(long round, enum wait_case w, int generic)
         have = (uint64_t)*(long long *)old.word;
         break;
     case WAIT_PLAIN:
-        shmem_wait((long *)old.word, 0);
+        (shmem_wait)((long *)old.word, 0);  /* the function, not the deprecated generic */
         have = (uint64_t)*(long *)old.word;
         break;
     case WAIT_UNTIL_PLAIN:

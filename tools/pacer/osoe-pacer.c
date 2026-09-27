@@ -837,6 +837,7 @@ static void flush_failures(shmem_team_t team, int any)
 }
 
 static double failures_total;       /* the job's, reduced after each exercise */
+static int initialized_before_init, initialized_before_init_ok;
 static double run_start;
 
 static void final_line(void)
@@ -1142,7 +1143,11 @@ static void run_mix(int npes)
         run_on(exercise, on, periods ? MIX_QUICK_ROUNDS : 0, length, prefix);
         line_prefix = "";
         shmem_quiet();
-        shmem_team_sync(SHMEM_TEAM_WORLD);      /* every team's period over */
+        /* Every team's period over: the world's sync, or its older name. */
+        if (p % 2)
+            shmem_sync_all();
+        else
+            shmem_team_sync(SHMEM_TEAM_WORLD);
         if (!world)
             q++;
     }
@@ -1167,6 +1172,10 @@ int main(int argc, char **argv)
     if (parsed != 0)
         return parsed;
 
+    initialized_before_init = -1;
+    shmem_query_initialized(&initialized_before_init);
+    initialized_before_init_ok = initialized_before_init == 0;
+
     /* SHMEM_THREAD_MULTIPLE only when an exercise needs it, as osoe-bench's
      * threads: the others should not pay for it. */
     int multiple = 0;
@@ -1187,6 +1196,16 @@ int main(int argc, char **argv)
     }
     run_start = pacer_now();
     int me = shmem_my_pe(), npes = shmem_n_pes();
+    /* Before init and after it, the library says which it is; and the
+     * profiling interface is told the default, which it must take. */
+    int initialized = -1;
+    shmem_query_initialized(&initialized);
+    if (!initialized_before_init_ok || initialized != 1) {
+        fprintf(stderr, "osoe-pacer: PE %d: shmem_query_initialized said %d before init and %d "
+                "after\n", me, initialized_before_init, initialized);
+        shmem_global_exit(2);
+    }
+    shmem_pcontrol(1);
     if (parallel_print_init(PACER_MESSAGE_CAPACITY) != 0 || gather_layout() != 0) {
         fprintf(stderr, "osoe-pacer: PE %d: out of memory at start\n", me);
         shmem_global_exit(2);

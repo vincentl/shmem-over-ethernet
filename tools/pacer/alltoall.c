@@ -338,11 +338,18 @@ static void run_exchange(int t, int s, enum variant v)
         shmem_team_sync(team);
         break;
     case GET:
+        /* Nonblocking gets completed by a quiet, or, every other time this
+         * variant runs, blocking ones: the exchange number goes up by the
+         * eight variants between two of its turns, so its parity would not. */
         shmem_team_sync(team);
         for (int k = 1; k <= n; k++) {
             int j = (me + k) % n;
-            shmem_getmem_nbi(dest + (size_t)j * words, source + (size_t)me * words, bytes,
+            if ((exchange / VARIANTS) % 2)
+                shmem_getmem(dest + (size_t)j * words, source + (size_t)me * words, bytes,
                              world[j]);
+            else
+                shmem_getmem_nbi(dest + (size_t)j * words, source + (size_t)me * words, bytes,
+                                 world[j]);
         }
         shmem_quiet();
         break;

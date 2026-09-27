@@ -6,9 +6,10 @@
  *   three typed cases   every typed routine of the team-based collectives in
  *                       turn - the reductions of Table 10 by operator and
  *                       type, the two sum scans, and broadcast, collect,
- *                       fcollect, alltoall and alltoalls over Table 5's types -
- *                       314 cases at a few elements each, on the world or the
- *                       strided team, the C11 generic or the type's own name
+ *                       fcollect, alltoall and alltoalls over Table 5's types
+ *                       and in their byte forms - 319 cases at a few elements
+ *                       each, on the world or the strided team, the C11
+ *                       generic or the type's own name
  *   one timing case     a collective's byte or long form at one size from 8 B
  *                       to 1 MiB (32 KiB under --quick), on the world or on the
  *                       strided team of the even PEs, called five times, each
@@ -152,6 +153,38 @@ struct typed_case {
                                                   sst, n);                            \
     }
 
+/* The byte forms, which have no generic: one "element" a byte. */
+static int broadcast_mem(shmem_team_t team, void *dest, const void *source, size_t n,
+                         int generic, int root, ptrdiff_t dst, ptrdiff_t sst)
+{
+    (void)generic, (void)dst, (void)sst;
+    return shmem_broadcastmem(team, dest, source, n, root);
+}
+static int collect_mem(shmem_team_t team, void *dest, const void *source, size_t n,
+                       int generic, int root, ptrdiff_t dst, ptrdiff_t sst)
+{
+    (void)generic, (void)root, (void)dst, (void)sst;
+    return shmem_collectmem(team, dest, source, n);
+}
+static int fcollect_mem(shmem_team_t team, void *dest, const void *source, size_t n,
+                        int generic, int root, ptrdiff_t dst, ptrdiff_t sst)
+{
+    (void)generic, (void)root, (void)dst, (void)sst;
+    return shmem_fcollectmem(team, dest, source, n);
+}
+static int alltoall_mem(shmem_team_t team, void *dest, const void *source, size_t n,
+                        int generic, int root, ptrdiff_t dst, ptrdiff_t sst)
+{
+    (void)generic, (void)root, (void)dst, (void)sst;
+    return shmem_alltoallmem(team, dest, source, n);
+}
+static int alltoalls_mem(shmem_team_t team, void *dest, const void *source, size_t n,
+                         int generic, int root, ptrdiff_t dst, ptrdiff_t sst)
+{
+    (void)generic, (void)root;
+    return shmem_alltoallsmem(team, dest, source, dst, sst, n);
+}
+
 /* Table 10 (as shmem.h lists it) and Table 5. */
 #define BITWISE_TYPES(X)                                                              \
     X(unsigned char, uchar) X(unsigned short, ushort) X(unsigned int, uint)           \
@@ -212,6 +245,12 @@ static const struct typed_case typed_cases[] = {
     INTEGER_TYPES(INTEGER_ARITHMETIC) FLOATING_TYPES(FLOATING_ARITHMETIC)
     COMPLEX_TYPES(COMPLEX_ARITHMETIC)
     DATA_TYPES(DATA_CASES)
+    /* the byte forms, last, so that every earlier case keeps its round */
+    { BROADCAST, "mem", 1, BYTES, broadcast_mem, NULL, NULL },
+    { COLLECT, "mem", 1, BYTES, collect_mem, NULL, NULL },
+    { FCOLLECT, "mem", 1, BYTES, fcollect_mem, NULL, NULL },
+    { ALLTOALL, "mem", 1, BYTES, alltoall_mem, NULL, NULL },
+    { ALLTOALLS, "mem", 1, BYTES, alltoalls_mem, NULL, NULL },
 };
 enum { TYPED_CASES = sizeof typed_cases / sizeof *typed_cases };
 
