@@ -242,3 +242,16 @@ offered to all four), the RP1 firmware, the kernel and its command line,
 pi-004's, logged one NIC transmit-queue hang each earlier that day
 (`NETDEV WATCHDOG: transmit queue 0 timed out` after about 5.5 s); none
 happened during the retest.
+
+**With pi-002's segmentation offload off** (`sudo ethtool -K eth0 tso off gso
+off` on pi-002 only, the author; `retest-tso-off/`): **no stalls.** Both
+rounds of the trigger map and the placement with rank 0 on pi-002 are clean
+- no call over 20 ms at any shape or size, the slowest 2.8 ms - and no node
+counted a retransmission timeout. It costs nothing measurable: with pi-002
+sending, an 8-byte put and quiet 171 us, a 1 MiB put 9.05 ms, the stream
+112.1 MiB/s, against 170 us, 9.10 ms and 111.5 MiB/s with pi-001 sending.
+**One confound:** all four nodes had rebooted a few minutes before, and two
+of them had logged a NIC transmit hang earlier that day, so a fresh boot of
+the peers could also explain it. pi-002 alone rebooted earlier still
+stalled at once; offload back on, on these same fresh nodes, is the control
+that separates the two.
