@@ -45,10 +45,20 @@
  * pair by pair.
  *
  * **It reports** messages a second, and the time from a node-mate's send to
- * this PE's reading of the message - one clock on one node; across nodes no
- * time is claimed - its median and 99th percentile, the slowest PE's. The
- * receiver is sending its own round meanwhile, so this is a message's time
- * in the mailbox as an application would see it, not a bare wake.
+ * this PE's reading of the message - one clock on one node - its median and
+ * 99th percentile, the slowest PE's. The receiver is sending its own round
+ * meanwhile, so this is a message's time in the mailbox as an application
+ * would see it, not a bare wake.
+ *
+ * **Across nodes**, where clocks differ, a round trip instead. At each
+ * checkpoint, with every PE's rounds done, each PE with a partner - the PE of
+ * its rank on the other node of its pair (pacer_layout) - plays ping-pong with
+ * it, the PE on the even node serving: ROUND_TRIPS messages of ECHO_WORDS
+ * words each way, put with the typed shmem_uint64_put_signal, the signal set to
+ * the message's number and taken by its receiver in a swap to 0, as a slot's
+ * up word is. Each is checked like a slot's message - the signal exactly,
+ * every word - and the server's round trips give the line's median and 99th
+ * percentile, the slowest server's.
  */
 #define _GNU_SOURCE
 #include <stdint.h>
@@ -62,6 +72,7 @@
 #include "random.h"
 
 enum { MAXIMUM_SENDS = 4, SAMPLES = 1024, WORK_BETWEEN_POLLS = 64 };
+enum { ROUND_TRIPS = 128, ECHO_WORDS = 4 };
 #define DOWN_START (UINT64_C(1) << 62)
 
 /* Prefixed: WAIT_ANY is <sys/wait.h>'s, which <stdlib.h> may bring in. */
@@ -110,18 +121,22 @@ static struct {
     int sends;                      /* K */
     size_t words;                   /* a slot's payload, in words */
     uint64_t seed;
-    int plant_payload, plant_signal, plant_count;
+    int plant_payload, plant_signal, plant_count, plant_round_trip;
     /* the team */
     shmem_team_t team;
     int n, me, me_world;
     int *world;                     /* team rank to world PE */
     int *node_mate;                 /* team rank: on this PE's node */
+    int partner;                    /* world PE on the paired node, or -1 */
+    int serving;                    /* this PE starts each round trip */
+    int pairs;                      /* the team's pairs */
     /* symmetric */
     uint64_t *slots;                /* [n][words]: sender s's slot at s */
     uint64_t *up, *down;            /* [n]: sender s's signal words */
     uint64_t *acknowledged;         /* [n]: the last round receiver r read, plus one */
     uint64_t *sent_to, *claimed;    /* [n]: for the pairwise count */
-    double *latency;                /* [4]: medians and 99th percentiles, reduced */
+    uint64_t *echo;                 /* the ping's landing, the pong's, their signals */
+    double *latency;                /* [8]: medians and 99th percentiles, reduced */
     /* private */
     uint64_t *message[MAXIMUM_SENDS];
     int *status;                    /* [n]: 0 while a slot is awaited */
@@ -132,6 +147,8 @@ static struct {
     uint64_t *received;             /* [n]: messages read from s */
     int expected[MAXIMUM_SENDS];
     double samples[SAMPLES];
+    double round_trips[ROUND_TRIPS];
+    uint64_t echo_number;
     long sample_count, sample_seen;
     uint64_t sample_state;
     long round;
@@ -151,7 +168,7 @@ static uint64_t mailbox_memory(int npes, const struct pacer_options *options, ch
             snprintf(fields, size, "%d PEs' slots of 32 bytes do not fit", npes);
             return UINT64_MAX;
         }
-        symmetric = n * (words * 8 + 5 * 8) + 4 * 8;
+        symmetric = n * (words * 8 + 5 * 8) + (2 * ECHO_WORDS + 2) * 8 + 8 * 8;
         uint64_t private_bytes = n * (4 + 8 + 8 + 8 + 8 + 8 + 4 + 4) + MAXIMUM_SENDS * words * 8;
         if (symmetric <= options->memory && private_bytes <= options->memory)
             break;
@@ -162,7 +179,9 @@ static uint64_t mailbox_memory(int npes, const struct pacer_options *options, ch
     mailbox.plant_payload = options->plant == PACER_PLANT_MAILBOX_PAYLOAD;
     mailbox.plant_signal = options->plant == PACER_PLANT_MAILBOX_SIGNAL;
     mailbox.plant_count = options->plant == PACER_PLANT_MAILBOX_COUNT;
-    snprintf(fields, size, "sends=%d slot=%zu forms=%d", mailbox.sends, words * 8, FORM_COUNT);
+    mailbox.plant_round_trip = options->plant == PACER_PLANT_MAILBOX_ROUND_TRIP;
+    snprintf(fields, size, "sends=%d slot=%zu forms=%d round_trips=%d", mailbox.sends, words * 8,
+             FORM_COUNT, ROUND_TRIPS);
     return symmetric;
 }
 
@@ -179,10 +198,19 @@ static int mailbox_setup(shmem_team_t team, const struct pacer_options *options)
     mailbox.node_mate = malloc(sizeof *mailbox.node_mate * (size_t)n);
     if (!mailbox.world || !mailbox.node_mate)
         return -1;
+    mailbox.pairs = 0;
     for (int j = 0; j < n; j++) {
-        mailbox.world[j] = shmem_team_translate_pe(team, j, SHMEM_TEAM_WORLD);
-        mailbox.node_mate[j] = layout->node[mailbox.world[j]] == layout->node[mailbox.me_world];
+        int pe = mailbox.world[j] = shmem_team_translate_pe(team, j, SHMEM_TEAM_WORLD);
+        mailbox.node_mate[j] = layout->node[pe] == layout->node[mailbox.me_world];
+        mailbox.pairs += layout->partner[pe] >= 0 && layout->node[pe] % 2 == 0 &&
+                         shmem_team_translate_pe(SHMEM_TEAM_WORLD, layout->partner[pe], team) >= 0;
     }
+    mailbox.partner = layout->partner[mailbox.me_world];
+    if (mailbox.partner >= 0 &&
+        shmem_team_translate_pe(SHMEM_TEAM_WORLD, mailbox.partner, team) < 0)
+        mailbox.partner = -1;       /* a partner outside the team plays no part */
+    mailbox.serving = layout->node[mailbox.me_world] % 2 == 0;
+    mailbox.echo_number = 0;
     size_t words = mailbox.words;
     mailbox.slots = shmem_malloc(sizeof *mailbox.slots * (size_t)n * words);
     mailbox.up = shmem_calloc((size_t)n, sizeof *mailbox.up);
@@ -190,7 +218,8 @@ static int mailbox_setup(shmem_team_t team, const struct pacer_options *options)
     mailbox.acknowledged = shmem_calloc((size_t)n, sizeof *mailbox.acknowledged);
     mailbox.sent_to = shmem_calloc((size_t)n, sizeof *mailbox.sent_to);
     mailbox.claimed = shmem_calloc((size_t)n, sizeof *mailbox.claimed);
-    mailbox.latency = shmem_calloc(4, sizeof *mailbox.latency);
+    mailbox.echo = shmem_calloc(2 * ECHO_WORDS + 2, sizeof *mailbox.echo);
+    mailbox.latency = shmem_calloc(8, sizeof *mailbox.latency);
     mailbox.status = malloc(sizeof *mailbox.status * (size_t)n);
     mailbox.values = calloc((size_t)n, sizeof *mailbox.values);
     mailbox.indices = malloc(sizeof *mailbox.indices * (size_t)n);
@@ -198,7 +227,8 @@ static int mailbox_setup(shmem_team_t team, const struct pacer_options *options)
     mailbox.last_down = malloc(sizeof *mailbox.last_down * (size_t)n);
     mailbox.received = calloc((size_t)n, sizeof *mailbox.received);
     if (!mailbox.slots || !mailbox.up || !mailbox.down || !mailbox.acknowledged ||
-        !mailbox.sent_to || !mailbox.claimed || !mailbox.latency || !mailbox.status ||
+        !mailbox.sent_to || !mailbox.claimed || !mailbox.echo || !mailbox.latency ||
+        !mailbox.status ||
         !mailbox.values || !mailbox.indices || !mailbox.last_sent || !mailbox.last_down ||
         !mailbox.received)
         return -1;
@@ -486,22 +516,95 @@ static int by_value(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
+/* ---- the round trip across nodes ------------------------------------------- */
+
+static uint64_t echo_word(int from, uint64_t number, int e)
+{
+    return random_mix(mailbox.seed ^ random_name("echo"), (uint64_t)from, number, (uint64_t)e);
+}
+
+static void echo_send(uint64_t *landing, uint64_t *signal, uint64_t number)
+{
+    uint64_t message[ECHO_WORDS], value = number;
+    for (int e = 0; e < ECHO_WORDS; e++)
+        message[e] = echo_word(mailbox.me_world, number, e);
+    if (mailbox.plant_round_trip && mailbox.me_world == 1) {
+        ((unsigned char *)&message[2])[0] ^= 1;    /* the planted defect, once: a byte */
+        value++;                                    /* and the signal */
+        mailbox.plant_round_trip = 0;
+    }
+    shmem_uint64_put_signal(landing, message, ECHO_WORDS, signal, value, SHMEM_SIGNAL_SET,
+                            mailbox.partner);
+}
+
+static void echo_receive(const uint64_t *landing, uint64_t *signal, uint64_t number,
+                         const char *what)
+{
+    (void)shmem_signal_wait_until(signal, SHMEM_CMP_NE, 0);
+    uint64_t value = shmem_uint64_atomic_swap(signal, 0, mailbox.me_world);
+    if (value != number)
+        pacer_failure("mailbox round=%ld round_trip %s from PE %d: signal %llu, expected %llu",
+                      mailbox.round - 1, what, mailbox.partner, (unsigned long long)value,
+                      (unsigned long long)number);
+    int wrong = 0, first = 0;
+    for (int e = 0; e < ECHO_WORDS; e++)
+        if (landing[e] != echo_word(mailbox.partner, number, e) && wrong++ == 0)
+            first = e;
+    if (wrong)
+        pacer_failure("mailbox round=%ld round_trip %s from PE %d: %d of %d words wrong; the "
+                      "first, word %d, is %016llx", mailbox.round - 1, what, mailbox.partner,
+                      wrong, ECHO_WORDS, first, (unsigned long long)landing[first]);
+}
+
+/* One untimed round trip first, so that neither side's lateness to the
+ * checkpoint is timed; then ROUND_TRIPS, the server timing each. */
+static void round_trips(void)
+{
+    uint64_t *ping = mailbox.echo, *pong = mailbox.echo + ECHO_WORDS;
+    uint64_t *ping_signal = mailbox.echo + 2 * ECHO_WORDS, *pong_signal = ping_signal + 1;
+    for (int i = -1; i < ROUND_TRIPS; i++) {
+        uint64_t number = ++mailbox.echo_number;
+        if (mailbox.serving) {
+            double started = pacer_now();
+            echo_send(ping, ping_signal, number);
+            echo_receive(pong, pong_signal, number, "pong");
+            if (i >= 0)
+                mailbox.round_trips[i] = (pacer_now() - started) * 1e6;
+        } else {
+            echo_receive(ping, ping_signal, number, "ping");
+            echo_send(pong, pong_signal, number);
+        }
+    }
+}
+
 static void mailbox_checkpoint(struct pacer_counters *counters)
 {
-    /* The time in the mailbox, node-mates only: each PE's median and 99th
-     * percentile, the slowest PE's; none claimed where no PE had a node-mate. */
+    /* The time in the mailbox, node-mates only, and the round trip across
+     * nodes, servers only: each PE's median and 99th percentile, the slowest
+     * PE's; none claimed where no PE had a node-mate, or a partner. */
     double *latency = mailbox.latency;
-    latency[0] = latency[1] = -1;
+    latency[0] = latency[1] = latency[2] = latency[3] = -1;
     if (mailbox.sample_count) {
         qsort(mailbox.samples, (size_t)mailbox.sample_count, sizeof *mailbox.samples, by_value);
         latency[0] = mailbox.samples[mailbox.sample_count / 2];
         latency[1] = mailbox.samples[(mailbox.sample_count * 99) / 100];
     }
-    shmem_double_max_reduce(mailbox.team, latency + 2, latency, 2);
-    if (mailbox.me == 0 && latency[2] >= 0) {
-        printf("mailbox node_mate_us median=%.1f p99=%.1f\n", latency[2], latency[3]);
-        fflush(stdout);
+    shmem_team_sync(mailbox.team);  /* every PE's rounds done: none crosses the round trips */
+    if (mailbox.partner >= 0) {
+        round_trips();
+        if (mailbox.serving) {
+            qsort(mailbox.round_trips, ROUND_TRIPS, sizeof *mailbox.round_trips, by_value);
+            latency[2] = mailbox.round_trips[ROUND_TRIPS / 2];
+            latency[3] = mailbox.round_trips[(ROUND_TRIPS * 99) / 100];
+        }
     }
+    shmem_double_max_reduce(mailbox.team, latency + 4, latency, 4);
+    if (mailbox.me == 0 && latency[4] >= 0)
+        printf("mailbox node_mate_us median=%.1f p99=%.1f\n", latency[4], latency[5]);
+    if (mailbox.me == 0 && latency[6] >= 0)
+        printf("mailbox round_trip_us median=%.1f p99=%.1f pairs=%d\n", latency[6], latency[7],
+               mailbox.pairs);
+    fflush(stdout);
     mailbox.sample_count = mailbox.sample_seen = 0;
 
     /* The pairwise count, at the end: what each PE says it sent here, against
@@ -528,6 +631,7 @@ static void mailbox_teardown(void)
     shmem_quiet();                  /* the last acknowledgements */
     shmem_team_sync(mailbox.team);
     shmem_free(mailbox.latency);
+    shmem_free(mailbox.echo);
     shmem_free(mailbox.claimed);
     shmem_free(mailbox.sent_to);
     shmem_free(mailbox.acknowledged);

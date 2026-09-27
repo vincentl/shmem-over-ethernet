@@ -56,6 +56,7 @@ enum pacer_plant {
     PACER_PLANT_MAILBOX_PAYLOAD,    /* PE 1 flips a byte of its first message */
     PACER_PLANT_MAILBOX_SIGNAL,     /* PE 1 signals one message twice over */
     PACER_PLANT_MAILBOX_COUNT,      /* PE 1 counts one message it read twice */
+    PACER_PLANT_MAILBOX_ROUND_TRIP, /* PE 1 sends one round-trip message wrong twice */
     PACER_PLANT_THREADS_ROW,        /* PE 1's thread 0 puts one word other than it checks */
     PACER_PLANT_THREADS_TABLE,      /* PE 1 writes one word of its table wrong */
     PACER_PLANT_THREADS_COUNT,      /* PE 1's thread 0 counts one add short */
@@ -117,13 +118,17 @@ extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pa
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,
  * nodes numbered in the order of their leads' world ranks (a node's lead is
- * its shared team's rank 0), and its rank on its node.
+ * its shared team's rank 0), and its rank on its node. Nodes pair off, 0 with
+ * 1, 2 with 3 and so on, and a PE's partner is the PE of its rank on the
+ * other node of its pair: -1 where that node, or a PE of that rank, is
+ * missing.
  */
 struct pacer_layout {
     int pes;
     int nodes;
     const int *node;                /* [pes] */
     const int *local;               /* [pes] */
+    const int *partner;             /* [pes] */
 };
 const struct pacer_layout *pacer_layout(void);
 

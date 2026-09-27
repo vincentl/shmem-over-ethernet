@@ -65,13 +65,14 @@ enum { KNOWN = sizeof known / sizeof *known };
 
 static const char *const plant_names[PACER_PLANTS] = {
     "", "sort-key", "sort-order", "sort-range", "sort-capacity", "alltoall-byte", "alltoall-gap",
-    "print-hash", "mailbox-payload", "mailbox-signal", "mailbox-count", "threads-row",
-    "threads-table", "threads-count", "teams-query", "teams-collective", "teams-exhaust",
-    "teams-member", "teams-ring"
+    "print-hash", "mailbox-payload", "mailbox-signal", "mailbox-count", "mailbox-round-trip",
+    "threads-row", "threads-table", "threads-count", "teams-query", "teams-collective",
+    "teams-exhaust", "teams-member", "teams-ring"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
-    "mailbox", "threads", "threads", "threads", "teams", "teams", "teams", "teams", "teams"
+    "mailbox", "mailbox", "threads", "threads", "threads", "teams", "teams", "teams", "teams",
+    "teams"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -85,6 +86,7 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 flips a byte of its first message",
     "PE 1 signals one message twice over",
     "PE 1 counts one message it read twice",
+    "PE 1 flips a byte of one round-trip message and signals it one too many",
     "PE 1's thread 0 puts one word other than it checks",
     "PE 1 writes one word of its table wrong",
     "PE 1's thread 0 counts one add short",
@@ -135,10 +137,10 @@ static void usage(FILE *out)
 "  --plant DEFECT      plant a defect a check must catch: sort-key, sort-order,\n"
 "                      sort-range, sort-capacity, alltoall-byte, alltoall-gap,\n"
 "                      print-hash, mailbox-payload, mailbox-signal,\n"
-"                      mailbox-count, threads-row, threads-table,\n"
-"                      threads-count, teams-query, teams-collective,\n"
-"                      teams-exhaust, teams-member or teams-ring; always on\n"
-"                      PE 1, named in the header\n"
+"                      mailbox-count, mailbox-round-trip, threads-row,\n"
+"                      threads-table, threads-count, teams-query,\n"
+"                      teams-collective, teams-exhaust, teams-member or\n"
+"                      teams-ring; always on PE 1, named in the header\n"
 "  --help              this, before shmem_init\n"
 "\n"
 "The last line is \"osoe-pacer failures=N seconds=S\"; the exit status is 1\n"
@@ -149,7 +151,7 @@ static void usage(FILE *out)
 
 static struct {
     int pes, nodes;
-    int *node, *local;
+    int *node, *local, *partner;
     int *count;                     /* [nodes]: PEs a node */
 } layout;
 
@@ -429,9 +431,9 @@ static int parse(int argc, char **argv)
             if (k == PACER_PLANTS)
                 return refuse("--plant '%s': sort-key, sort-order, sort-range, sort-capacity, "
                               "alltoall-byte, alltoall-gap, print-hash, mailbox-payload, "
-                              "mailbox-signal, mailbox-count, threads-row, threads-table, "
-                              "threads-count, teams-query, teams-collective, teams-exhaust, "
-                              "teams-member or teams-ring", value);
+                              "mailbox-signal, mailbox-count, mailbox-round-trip, threads-row, "
+                              "threads-table, threads-count, teams-query, teams-collective, "
+                              "teams-exhaust, teams-member or teams-ring", value);
             options.plant = (enum pacer_plant)k;
         } else {
             return refuse("no option '%s'", name);
@@ -468,8 +470,9 @@ static int gather_layout(void)
     int32_t *all = shmem_malloc(2 * sizeof *all * (size_t)n);
     layout.node = malloc(sizeof *layout.node * (size_t)n);
     layout.local = malloc(sizeof *layout.local * (size_t)n);
+    layout.partner = malloc(sizeof *layout.partner * (size_t)n);
     int *number = malloc(sizeof *number * (size_t)n);
-    if (!mine || !all || !layout.node || !layout.local || !number)
+    if (!mine || !all || !layout.node || !layout.local || !layout.partner || !number)
         return -1;
     mine[0] = shmem_team_translate_pe(SHMEM_TEAM_SHARED, 0, SHMEM_TEAM_WORLD);
     mine[1] = shmem_team_my_pe(SHMEM_TEAM_SHARED);
@@ -493,9 +496,30 @@ static int gather_layout(void)
         layout.local[p] = all[2 * p + 1];
         layout.count[layout.node[p]]++;
     }
+    /* Partners: each PE by its node and rank there, then the same rank on
+     * the other node of the pair. `number` is reused, as each node's first
+     * place in that order. */
+    int *placed = malloc(sizeof *placed * (size_t)n);
+    if (!placed)
+        return -1;
+    for (int k = 0, sum = 0; k < nodes; k++) {
+        number[k] = sum;
+        sum += layout.count[k];
+    }
+    for (int p = 0; p < n; p++)
+        placed[p] = -1;
+    for (int p = 0; p < n; p++)
+        if (layout.local[p] >= 0 && layout.local[p] < layout.count[layout.node[p]])
+            placed[number[layout.node[p]] + layout.local[p]] = p;
+    for (int p = 0; p < n; p++) {
+        int other = layout.node[p] ^ 1, rank = layout.local[p];
+        layout.partner[p] = other < nodes && rank >= 0 && rank < layout.count[other]
+                            ? placed[number[other] + rank] : -1;
+    }
+    free(placed);
     layout.pes = n;
     layout.nodes = nodes;
-    layout_view = (struct pacer_layout){ n, nodes, layout.node, layout.local };
+    layout_view = (struct pacer_layout){ n, nodes, layout.node, layout.local, layout.partner };
     free(number);
     shmem_free(all);
     shmem_free(mine);
@@ -505,6 +529,7 @@ static int gather_layout(void)
 static void release_layout(void)
 {
     free(layout.count);
+    free(layout.partner);
     free(layout.local);
     free(layout.node);
 }
@@ -985,6 +1010,12 @@ int main(int argc, char **argv)
         refused = 1;
         if (me == 0)
             fprintf(stderr, "osoe-pacer: --plant %s is planted on PE 1: run 2 PEs or more\n",
+                    plant_names[options.plant]);
+    } else if (options.plant == PACER_PLANT_MAILBOX_ROUND_TRIP && layout.partner[1] < 0) {
+        refused = 1;
+        if (me == 0)
+            fprintf(stderr, "osoe-pacer: --plant %s is planted in PE 1's round trips, and PE 1 "
+                    "has no partner: its node's pair needs a PE of its rank there\n",
                     plant_names[options.plant]);
     }
     for (int k = 0; k < chosen_count && !refused; k++) {
