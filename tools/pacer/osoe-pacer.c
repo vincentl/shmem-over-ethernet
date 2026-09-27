@@ -78,7 +78,7 @@ static const char *const plant_names[PACER_PLANTS] = {
     "memory-agree", "collectives-reduce", "collectives-scan", "collectives-data",
     "collectives-gap", "atomics-fetch-count", "atomics-attempts", "rma-flag", "rma-single",
     "rma-ptr-null", "memory-realloc", "memory-refused", "collectives-status",
-    "collectives-timed", "collectives-timed-data", "memory-granted"
+    "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -87,7 +87,7 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "rma", "rma", "rma", "rma", "rma", "locks", "locks", "memory", "memory", "memory", "memory",
     "memory", "collectives", "collectives", "collectives", "collectives", "atomics", "atomics",
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
-    "memory"
+    "memory", "print"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -145,6 +145,7 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 gives one timed reduction a wrong input",
     "PE 1 offers one byte wrong to a timed gather",
     "PE 1 takes a refused realloc for granted",
+    "PE 1 folds host numbers without their leading zeros",
 };
 
 static void usage(FILE *out)
@@ -171,6 +172,10 @@ static void usage(FILE *out)
 "  threads   worker threads on private, serialized, default and team contexts;\n"
 "            only when named, since it runs under SHMEM_THREAD_MULTIPLE\n"
 "  print     parallel_print checking its own lines; only when named\n"
+"  mix       the world split into teams, each running mailbox, atomics, rma,\n"
+"            locks or collectives, out of step, the exercises rotating through\n"
+"            the teams, sort and alltoall on the world between; only when\n"
+"            named, and named alone\n"
 "\n"
 "Options:\n"
 "  --seconds S         each exercise about S seconds (default 60)\n"
@@ -192,6 +197,11 @@ static void usage(FILE *out)
 "                      at most OSOE_MAX_THREADS (the library's, default 16)\n"
 "  --teams-exhaust     the teams exercise splits until a split fails, and\n"
 "                      stops; teams must be the only exercise named\n"
+"  --mix-teams K       mix: the teams the world is split into, 1 to 5 (default\n"
+"                      4 from 8 PEs, 2 from 4, else 1)\n"
+"  --period S          mix: a team period's mean length (default 10 seconds)\n"
+"  --fold-nodes        label a line by its hosts' names where it holds every PE\n"
+"                      of each: pi-[001-004] rather than [0-15]\n"
 "  --stop-on-failure   end the job at the first checkpoint with a failure\n"
 "  --coverage FILE     osoe-pacer-counted only: which routines were called, how\n"
 "                      often, and which never were, into FILE\n"
@@ -404,9 +414,10 @@ static int parse(int argc, char **argv)
         name[length] = '\0';
 
         static const char *const flags[] = { "--help", "--quick", "--no-ptr",
-                                             "--stop-on-failure", "--teams-exhaust" };
+                                             "--stop-on-failure", "--teams-exhaust",
+                                             "--fold-nodes" };
         int flag = -1;
-        for (int k = 0; k < 5; k++)
+        for (int k = 0; k < (int)(sizeof flags / sizeof *flags); k++)
             if (strcmp(name, flags[k]) == 0)
                 flag = k;
         if (flag >= 0) {
@@ -422,6 +433,8 @@ static int parse(int argc, char **argv)
                 options.stop_on_failure = 1;
             if (flag == 4)
                 options.teams_exhaust = 1;
+            if (flag == 5)
+                options.fold_nodes = 1;
             continue;
         }
         static const char *const valued[] = { "--seconds", "--report", "--rounds", "--seed",
@@ -646,94 +659,20 @@ static void release_layout(void)
     free(layout.node);
 }
 
-struct host {
-    const char *name;
-    size_t prefix;                  /* the name's length before its trailing digits */
-    unsigned long long number;
-    int width;                      /* digits kept with leading zeros; 0 when natural */
-    int numbered;
-};
-
-static int host_order(const void *a, const void *b)
-{
-    const struct host *x = a, *y = b;
-    size_t shorter = x->prefix < y->prefix ? x->prefix : y->prefix;
-    int c = strncmp(x->name, y->name, shorter);
-    if (c)
-        return c;
-    if (x->prefix != y->prefix)
-        return x->prefix < y->prefix ? -1 : 1;
-    if (x->numbered != y->numbered)
-        return x->numbered - y->numbered;
-    if (x->width != y->width)
-        return x->width - y->width;
-    return (x->number > y->number) - (x->number < y->number);
-}
-
 /* The nodes' host names, folded as Slurm folds a host list: pi-[001-004]. */
 static void fold_hosts(char *out, size_t size)
 {
-    struct host *hosts = calloc((size_t)layout.nodes, sizeof *hosts);
-    if (!hosts) {
+    const char **names = malloc(sizeof *names * (size_t)layout.nodes);
+    if (!names) {
         snprintf(out, size, "?");
         return;
     }
     int count = 0;
-    for (int node = 0; node < layout.nodes; node++) {
-        int pe = 0;
-        while (pe < layout.pes && layout.node[pe] != node)
-            pe++;
-        struct host h = { .name = parallel_print_host(pe) };
-        size_t length = strlen(h.name), start = length;
-        while (start > 0 && h.name[start - 1] >= '0' && h.name[start - 1] <= '9')
-            start--;
-        h.prefix = start;
-        h.numbered = start < length && length - start < 19;
-        if (h.numbered) {
-            h.number = strtoull(h.name + start, NULL, 10);
-            h.width = h.name[start] == '0' && length - start > 1 ? (int)(length - start) : 0;
-        } else {
-            h.prefix = length;
-        }
-        int seen = 0;
-        for (int j = 0; j < count && !seen; j++)
-            seen = strcmp(hosts[j].name, h.name) == 0;
-        if (!seen)
-            hosts[count++] = h;
-    }
-    qsort(hosts, (size_t)count, sizeof *hosts, host_order);
-    size_t used = 0;
-    out[0] = '\0';
-    for (int i = 0; i < count && used < size;) {
-        int j = i;              /* one prefix and width: one bracket */
-        while (j + 1 < count && hosts[i].numbered && hosts[j + 1].numbered &&
-               hosts[j + 1].prefix == hosts[i].prefix && hosts[j + 1].width == hosts[i].width &&
-               strncmp(hosts[j + 1].name, hosts[i].name, hosts[i].prefix) == 0)
-            j++;
-        if (used)
-            used += (size_t)snprintf(out + used, size - used, ",");
-        if (j == i) {
-            used += (size_t)snprintf(out + used, size - used, "%s", hosts[i].name);
-        } else {
-            used += (size_t)snprintf(out + used, size - used, "%.*s[", (int)hosts[i].prefix,
-                                     hosts[i].name);
-            for (int k = i; k <= j && used < size;) {
-                int m = k;
-                while (m + 1 <= j && hosts[m + 1].number == hosts[m].number + 1)
-                    m++;
-                used += (size_t)snprintf(out + used, size - used, "%s%0*llu", k > i ? "," : "",
-                                         hosts[k].width, hosts[k].number);
-                if (m > k && used < size)
-                    used += (size_t)snprintf(out + used, size - used, "-%0*llu", hosts[m].width,
-                                             hosts[m].number);
-                k = m + 1;
-            }
-            if (used < size)
-                used += (size_t)snprintf(out + used, size - used, "]");
-        }
-        i = j + 1;
-    }
-    free(hosts);
+    for (int pe = 0; pe < layout.pes && count < layout.nodes; pe++)
+        if (layout.local[pe] == 0)  /* a node's first PE */
+            names[count++] = parallel_print_host(pe);
+    parallel_print_fold_names(names, count, out, size);
+    free(names);
 }
 
 static uint64_t heap_size(void)
@@ -1267,6 +1206,8 @@ int main(int argc, char **argv)
                                      options.report);
         for (int k = 0; k < chosen_count && used < size; k++)
             used += (size_t)snprintf(line + used, size - used, k ? ",%s" : "%s", chosen[k]->name);
+        if (options.fold_nodes && used < size)
+            used += (size_t)snprintf(line + used, size - used, " labels=hosts");
         if (options.plant != PACER_PLANT_NONE && used < size)
             used += (size_t)snprintf(line + used, size - used, " plant=%s",
                                      plant_names[options.plant]);
@@ -1342,6 +1283,9 @@ int main(int argc, char **argv)
 
     if (options.plant == PACER_PLANT_PRINT_HASH && me == 1)
         parallel_print_plant_hash(1);
+    if (options.plant == PACER_PLANT_PRINT_FOLD && me == 1)
+        parallel_print_plant_fold(1);
+    parallel_print_fold_nodes(options.fold_nodes);
     if (options.mixing) {
         if (me == 0) {
             printf("mix teams=%d period=%g world_every=%d\n", mix_teams(npes), options.period,

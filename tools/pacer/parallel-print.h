@@ -17,6 +17,17 @@
  * group's lowest team rank. An empty text is silence, and a group of silent
  * PEs prints nothing, so a subset can report.
  *
+ * Folded to nodes (parallel_print_fold_nodes), a group that holds every PE
+ * of each host it touches is labeled by the hosts' names instead, folded the
+ * same way, and a team's name comes before them with an `@`:
+ *
+ *   pi-[001-004] round 7: 16.8 M keys exchanged
+ *   shared@pi-003 94 MiB/s
+ *   [0-2,4-15] connection to pi-004 lost
+ *
+ * A host is a host name, as gethostname gives it up to its first dot: nodes
+ * that share one - osoe-launch's logical nodes on one machine - fold together.
+ *
  * Written against the OpenSHMEM API alone, so that it builds against any
  * implementation: a failure of the tool can be told from one of the library
  * by building the same program there.
@@ -53,6 +64,18 @@ void parallel_print_finalize(void);
 /* A world PE's host name as gathered at init, up to its first dot. */
 const char *parallel_print_host(int pe);
 
+/* Local: 1 labels by host wherever a group holds every PE of each host it
+ * touches, and the names fit where the PE numbers would have; 0, the default,
+ * labels by PE numbers alone. Only a team's rank 0 writes labels, so a program
+ * sets it alike on every PE. Returns the previous setting. */
+int parallel_print_fold_nodes(int on);
+
+/* Local: `count` host names folded as Slurm folds a host list - a run of
+ * numbers under one prefix and width into brackets, duplicates dropped, the
+ * prefixes in order: pi-[001-002,004],login. Written into out as snprintf
+ * writes, cut to size; returns the length the whole list needs. */
+size_t parallel_print_fold_names(const char *const *names, int count, char *out, size_t size);
+
 /*
  * For osoe-pacer's print exercise and its planted defect alone.
  *
@@ -65,9 +88,13 @@ const char *parallel_print_host(int pe);
  *
  * _plant_hash: this PE hashes its text and one byte more, so its line parts
  * from those of every PE that said the same (osoe-pacer --plant print-hash).
+ *
+ * _plant_fold: this PE's parallel_print_fold_names writes numbers without
+ * their leading zeros (osoe-pacer --plant print-fold).
  */
 size_t parallel_print_window(size_t bytes);
 void parallel_print_capture(char *buffer, size_t size);
 void parallel_print_plant_hash(int on);
+void parallel_print_plant_fold(int on);
 
 #endif /* PACER_PARALLEL_PRINT_H */

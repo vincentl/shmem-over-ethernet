@@ -100,6 +100,7 @@ enum pacer_plant {
     PACER_PLANT_COLLECTIVES_TIMED,  /* PE 1 gives one timed reduction a wrong input */
     PACER_PLANT_COLLECTIVES_TIMED_DATA, /* PE 1 offers one byte wrong to a timed gather */
     PACER_PLANT_MEMORY_GRANTED,     /* PE 1 takes a refused realloc for granted */
+    PACER_PLANT_PRINT_FOLD,         /* PE 1 folds host numbers without leading zeros */
     PACER_PLANTS
 };
 
@@ -120,6 +121,7 @@ struct pacer_options {
     int mix_teams;                  /* mix: the teams the world is split into; 0 chooses */
     double period;                  /* mix: a period's mean length, seconds */
     int mixing;                     /* set by mix: summaries are mix's to print */
+    int fold_nodes;                 /* parallel_print labels by host where it can */
 };
 
 /* parallel_print's text capacity, NUL included, as the driver sets it. */

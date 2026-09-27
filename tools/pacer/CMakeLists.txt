@@ -258,6 +258,10 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   # The collectives' four, each on the first case PE 1 takes part in.
   pacer_plant(collectives-reduce collectives
     "collectives round=0 and_reduce uchar world: element 0 is 0, expected [0-9]+")
+  # --fold-nodes: that failure, which every PE of the one host reports alike, is
+  # labeled by the host's name - which ends in no bracket, as [0-3] would.
+  pacer_plant_named(collectives-reduce-folded collectives-reduce "--fold-nodes;collectives"
+    "[-A-Za-z0-9_]+ collectives round=0 and_reduce uchar world: element 0 is 0, expected [0-9]+")
   pacer_plant(collectives-scan collectives
     "collectives round=30 sum_inscan char world: element 0 is [0-9]+, expected [0-9]+")
   pacer_plant(collectives-data collectives
@@ -291,6 +295,10 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
     "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
     "osoe-pacer failures=[1-9]")
+  pacer_plant(print-fold print
+    "print round=0 fold: pi-001,pi-002,pi-003,pi-004 folded to pi-.1-4., expected pi-.001-004."
+    "print round=0 fold: pi-004,pi-001,pi-002,pi-001 folded to pi-.1-2,4., expected pi-.001-002,004."
+    "print round=0 fold: pi-003,login,pi-001,gpu08,gpu07 folded to gpu.7-8.,login,pi-.1,3., expected gpu.07-08.,login,pi-.001,003.")
 
   # The counted build: it runs, and its report counts what the run called.
   add_test(NAME tools.pacer.counted.0-0-1-1

@@ -39,10 +39,17 @@
  * distinct lines. Accepted for a console. The fix, if it is ever needed, is a
  * 128-bit record: two independent finalizers over the text, 24 bytes a PE.
  *
- * Memory, a PE, N the world: 16 N bytes symmetric, the 64 KiB arena, and 96 N
- * private (the sorted records, each owner's first record, a group's PEs, the
- * host names), with the text and line buffers. Every member sorts the
- * records, O(n log n) for a team of n; the labels' translation to world
+ * **Folding to nodes** is rank 0's alone, a group at a time: a tally of the
+ * group's PEs by host against each host's PEs, which init counted, then the
+ * hosts' names folded - O(k log k) for a group of k. A group is folded only
+ * when whole and when the names fit the room its PE numbers would have had,
+ * so a line never outgrows its buffer.
+ *
+ * Memory, a PE, N the world: 16 N bytes symmetric, the 64 KiB arena, and
+ * about 130 N private (the sorted records, each owner's first record, a
+ * group's PEs, the host names and each PE's host, a host's PEs, a group's
+ * tally and its names), with the text and line buffers. Every member sorts
+ * the records, O(n log n) for a team of n; the labels' translation to world
  * ranks is rank 0's alone.
  */
 #define _GNU_SOURCE
@@ -86,7 +93,13 @@ static struct {
     int *members;                   /* [world]: one group's world PEs */
     char *line;                     /* a label and a text */
     size_t line_size;
+    size_t label_room;              /* of line_size, what a label may take */
     char *hosts;                    /* [world][HOST] */
+    int *host_of;                   /* [world]: a PE's host, among the distinct names */
+    int *host_pes;                  /* [hosts]: the PEs a host has */
+    int *tally;                     /* [hosts]: a group's PEs a host; 0 between groups */
+    const char **fold_names;        /* [world]: a group's hosts, one PE's name each */
+    int fold;
     struct {
         shmem_team_t team;
         char name[NAME];
@@ -96,7 +109,17 @@ static struct {
     size_t capture_size;
     size_t captured;
     int plant_hash;
+    int plant_fold;
 } state = { .window = ARENA };
+
+/* A host name taken apart for folding: pi-003 is "pi-", 3, width 3. */
+struct host {
+    const char *name;
+    size_t prefix;                  /* the name's length before its trailing digits */
+    unsigned long long number;
+    int width;                      /* digits kept with leading zeros; 0 when natural */
+    int numbered;
+};
 
 static uint64_t hash_text(const char *text, size_t length, int planted)
 {
@@ -131,6 +154,108 @@ static int ascending(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
+/* World PEs by host name, then by number. */
+static int by_host_then_pe(const void *a, const void *b)
+{
+    int x = *(const int *)a, y = *(const int *)b;
+    int c = strcmp(state.hosts + (size_t)x * HOST, state.hosts + (size_t)y * HOST);
+    return c ? c : (x > y) - (x < y);
+}
+
+/* Prefixes in order, a name without a number before one with, then widths,
+ * then numbers: so that one bracket's names are adjacent, in order. */
+static int host_order(const void *a, const void *b)
+{
+    const struct host *x = a, *y = b;
+    size_t shorter = x->prefix < y->prefix ? x->prefix : y->prefix;
+    int c = strncmp(x->name, y->name, shorter);
+    if (c)
+        return c;
+    if (x->prefix != y->prefix)
+        return x->prefix < y->prefix ? -1 : 1;
+    if (x->numbered != y->numbered)
+        return x->numbered - y->numbered;
+    if (x->width != y->width)
+        return x->width - y->width;
+    return (x->number > y->number) - (x->number < y->number);
+}
+
+/* snprintf at out + *used, counting on past size what did not fit. */
+static void append(char *out, size_t size, size_t *used, const char *format, ...)
+    __attribute__((format(printf, 4, 5)));
+static void append(char *out, size_t size, size_t *used, const char *format, ...)
+{
+    va_list arguments;
+    va_start(arguments, format);
+    int n = *used < size ? vsnprintf(out + *used, size - *used, format, arguments)
+                         : vsnprintf(NULL, 0, format, arguments);
+    va_end(arguments);
+    if (n > 0)
+        *used += (size_t)n;
+}
+
+size_t parallel_print_fold_names(const char *const *names, int count, char *out, size_t size)
+{
+    if (size)
+        out[0] = '\0';
+    struct host *hosts = malloc(sizeof *hosts * (size_t)(count > 0 ? count : 1));
+    if (!hosts) {
+        size_t used = 0;
+        append(out, size, &used, "?");
+        return used;
+    }
+    for (int i = 0; i < count; i++) {
+        struct host h = { .name = names[i] };
+        size_t length = strlen(h.name), start = length;
+        while (start > 0 && h.name[start - 1] >= '0' && h.name[start - 1] <= '9')
+            start--;
+        h.prefix = start;
+        h.numbered = start < length && length - start < 19;
+        if (h.numbered) {
+            h.number = strtoull(h.name + start, NULL, 10);
+            h.width = h.name[start] == '0' && length - start > 1 ? (int)(length - start) : 0;
+        } else {
+            h.prefix = length;
+        }
+        hosts[i] = h;
+    }
+    qsort(hosts, (size_t)count, sizeof *hosts, host_order);
+    int distinct = 0;               /* one name is one order: duplicates are adjacent */
+    for (int i = 0; i < count; i++)
+        if (distinct == 0 || strcmp(hosts[distinct - 1].name, hosts[i].name) != 0)
+            hosts[distinct++] = hosts[i];
+
+    size_t used = 0;
+    for (int i = 0; i < distinct;) {
+        int j = i;                  /* one prefix and width: one bracket */
+        while (j + 1 < distinct && hosts[i].numbered && hosts[j + 1].numbered &&
+               hosts[j + 1].prefix == hosts[i].prefix && hosts[j + 1].width == hosts[i].width &&
+               strncmp(hosts[j + 1].name, hosts[i].name, hosts[i].prefix) == 0)
+            j++;
+        if (i > 0)
+            append(out, size, &used, ",");
+        if (j == i) {
+            append(out, size, &used, "%s", hosts[i].name);
+        } else {
+            append(out, size, &used, "%.*s[", (int)hosts[i].prefix, hosts[i].name);
+            for (int k = i; k <= j;) {
+                int m = k;
+                while (m + 1 <= j && hosts[m + 1].number == hosts[m].number + 1)
+                    m++;
+                int width = state.plant_fold ? 0 : hosts[k].width;
+                append(out, size, &used, "%s%0*llu", k > i ? "," : "", width, hosts[k].number);
+                if (m > k)
+                    append(out, size, &used, "-%0*llu", width, hosts[m].number);
+                k = m + 1;
+            }
+            append(out, size, &used, "]");
+        }
+        i = j + 1;
+    }
+    free(hosts);
+    return used;
+}
+
 int parallel_print_init(size_t capacity)
 {
     if (state.ready)
@@ -146,16 +271,23 @@ int parallel_print_init(size_t capacity)
     char *host = shmem_malloc(HOST);
     char *hosts = shmem_malloc((size_t)HOST * (size_t)world);
     /* A label is at most a prefix, a bracket, and every PE of the world with a
-     * separator; 12 characters hold any int and its comma. */
-    state.line_size = NAME + 48 + (size_t)world * 12 + state.capacity + 4;
+     * separator; 12 characters hold any int and its comma. A label by hosts
+     * gets the same room, or is not used. */
+    state.label_room = NAME + 48 + (size_t)world * 12;
+    state.line_size = state.label_room + state.capacity + 4;
     state.text = malloc(state.capacity);
     state.entries = malloc(sizeof *state.entries * (size_t)world);
     state.first = malloc(sizeof *state.first * (size_t)world);
     state.members = malloc(sizeof *state.members * (size_t)world);
     state.line = malloc(state.line_size);
     state.hosts = malloc((size_t)HOST * (size_t)world);
+    state.host_of = malloc(sizeof *state.host_of * (size_t)world);
+    state.host_pes = calloc((size_t)world, sizeof *state.host_pes);
+    state.tally = calloc((size_t)world, sizeof *state.tally);
+    state.fold_names = malloc(sizeof *state.fold_names * (size_t)world);
     if (!state.records || !state.mine || !state.arena || !host || !hosts || !state.text ||
-        !state.entries || !state.first || !state.members || !state.line || !state.hosts)
+        !state.entries || !state.first || !state.members || !state.line || !state.hosts ||
+        !state.host_of || !state.host_pes || !state.tally || !state.fold_names)
         return -1;
 
     memset(host, 0, HOST);
@@ -167,6 +299,21 @@ int parallel_print_init(size_t capacity)
     memcpy(state.hosts, hosts, (size_t)HOST * (size_t)world);
     shmem_free(hosts);
     shmem_free(host);
+
+    /* Each PE's host, numbered among the distinct names, and each host's PEs:
+     * the PEs sorted by name, a host a run. members serves as the order. */
+    for (int pe = 0; pe < world; pe++)
+        state.members[pe] = pe;
+    qsort(state.members, (size_t)world, sizeof *state.members, by_host_then_pe);
+    int distinct = 0;
+    for (int i = 0; i < world; i++) {
+        int pe = state.members[i];
+        if (i == 0 || strcmp(state.hosts + (size_t)state.members[i - 1] * HOST,
+                             state.hosts + (size_t)pe * HOST) != 0)
+            distinct++;
+        state.host_of[pe] = distinct - 1;
+        state.host_pes[distinct - 1]++;
+    }
     state.ready = 1;
     return 0;
 }
@@ -235,6 +382,41 @@ static void emit(const char *line, size_t length)
     state.capture[state.captured] = '\0';
 }
 
+/* Rank 0, folding to nodes: the label of the group in members[0, k) by its
+ * hosts' names, when it holds every PE of each host it touches and they fit
+ * the label's room. 1 when written at out + *used; 0, with nothing written,
+ * when the group keeps its PE numbers. */
+static int fold_label(const char *prefix, int k, char *out, size_t size, size_t *used)
+{
+    for (int i = 0; i < k; i++)
+        state.tally[state.host_of[state.members[i]]]++;
+    int whole = 1, names = 0;
+    for (int i = 0; i < k; i++) {
+        int h = state.host_of[state.members[i]];
+        if (state.tally[h] < 0)
+            continue;               /* its host is named already */
+        whole &= state.tally[h] == state.host_pes[h];
+        state.fold_names[names++] = state.hosts + (size_t)state.members[i] * HOST;
+        state.tally[h] = -1;
+    }
+    for (int i = 0; i < k; i++)
+        state.tally[state.host_of[state.members[i]]] = 0;
+    if (!whole)
+        return 0;
+    size_t start = *used;
+    if (prefix[0])
+        append(out, size, used, "%s@", prefix);
+    size_t room = state.label_room > *used ? state.label_room - *used : 0;
+    size_t needed = parallel_print_fold_names(state.fold_names, names, out + *used, room);
+    if (needed >= room) {
+        *used = start;
+        out[start] = '\0';
+        return 0;
+    }
+    *used += needed;
+    return 1;
+}
+
 /* Rank 0: the lines of one window, walking the owners as the packing did. */
 static void print_window(shmem_team_t team, int n, int count, int window)
 {
@@ -264,21 +446,26 @@ static void print_window(shmem_team_t team, int n, int count, int window)
 
             char *out = state.line;
             size_t size = state.line_size, used = 0;
-            used += (size_t)snprintf(out + used, size - used, "%s[", prefix);
-            for (int i = 0; i < k && used < size;) {
-                int j = i;
-                while (j + 1 < k && state.members[j + 1] == state.members[j] + 1)
-                    j++;
-                used += (size_t)snprintf(out + used, size - used, i ? ",%d" : "%d",
-                                         state.members[i]);
-                if (j > i && used < size)
-                    used += (size_t)snprintf(out + used, size - used, "-%d", state.members[j]);
-                i = j + 1;
+            const char *after = " ";
+            if (!state.fold || !fold_label(prefix, k, out, size, &used)) {
+                used += (size_t)snprintf(out + used, size - used, "%s[", prefix);
+                for (int i = 0; i < k && used < size;) {
+                    int j = i;
+                    while (j + 1 < k && state.members[j + 1] == state.members[j] + 1)
+                        j++;
+                    used += (size_t)snprintf(out + used, size - used, i ? ",%d" : "%d",
+                                             state.members[i]);
+                    if (j > i && used < size)
+                        used += (size_t)snprintf(out + used, size - used, "-%d",
+                                                 state.members[j]);
+                    i = j + 1;
+                }
+                after = "] ";
             }
             /* Bounded by the length the owner declared, not by its NUL: text
              * that did not arrive must not read past its slot. */
             if (used < size)
-                used += (size_t)snprintf(out + used, size - used, "] %.*s\n",
+                used += (size_t)snprintf(out + used, size - used, "%s%.*s\n", after,
                                          (int)owner->length, state.arena + offset);
             if (used >= size)
                 used = size - 1;
@@ -386,6 +573,10 @@ void parallel_print_finalize(void)
     shmem_free(state.arena);
     shmem_free(state.mine);
     shmem_free(state.records);
+    free(state.fold_names);
+    free(state.tally);
+    free(state.host_pes);
+    free(state.host_of);
     free(state.hosts);
     free(state.line);
     free(state.members);
@@ -421,4 +612,16 @@ void parallel_print_capture(char *buffer, size_t size)
 void parallel_print_plant_hash(int on)
 {
     state.plant_hash = on;
+}
+
+int parallel_print_fold_nodes(int on)
+{
+    int previous = state.fold;
+    state.fold = on;
+    return previous;
+}
+
+void parallel_print_plant_fold(int on)
+{
+    state.plant_fold = on;
 }
