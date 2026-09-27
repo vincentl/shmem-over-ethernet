@@ -3,12 +3,12 @@
 **Where the files are.** The open brief sits here; every finished one is in
 `done/`, under its own name, which this index still gives.
 
-**Open now:** `task-stress-phase1.md`, the stress tester's first phase:
-`osoe-pacer` running, with `parallel_print`, the streaming bucket sort and
-all-to-all seven ways (the proposal is `docs/design/osoe-pacer-proposal.md`,
-the decisions `docs/decisions/2026-09-26-night.md`). The table below stops at
-step 4; the briefs after it are in `done/` and their outcomes in
-`docs/decisions/`.
+**Open now:** `task-stress-phase2.md`, the stress tester's second phase:
+`threads`, `mailbox` and `teams`, the newest code under the test hooks (the
+proposal is `docs/design/osoe-pacer-proposal.md`; phase 1, `osoe-pacer`
+running, is in `done/` and its record `docs/decisions/2026-09-27.md`). The
+table below stops at step 4; the briefs after it are in `done/` and their
+outcomes in `docs/decisions/`.
 
 The brief each working session was given, kept so that a decision can be traced
 back to what was asked for as well as to what was done.

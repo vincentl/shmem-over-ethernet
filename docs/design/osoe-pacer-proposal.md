@@ -4,8 +4,10 @@
 (`docs/decisions/2026-09-26-night.md`): the name, the labels, `parallel_print`
 kept in the tool, the phase order, the memory default and its option, the
 briefs' names. One point waits on the author after §3's explanation: whether
-the smoke tests join every preset's suite. Phase 1's brief is
-`docs/prompts/task-stress-phase1.md`. Nothing here is built yet.*
+the smoke tests join every preset's suite. Phase 1 is built
+(`docs/prompts/done/task-stress-phase1.md`; the record, with where the tool
+differs from this proposal and why, is `docs/decisions/2026-09-27.md`); phase
+2's brief is `docs/prompts/task-stress-phase2.md`.*
 
 ## 0. What it is, and what it is not
 

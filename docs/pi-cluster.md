@@ -161,6 +161,48 @@ binding gives each of the four tasks one core, which its two threads share;
 unbound, they may use any of the node's four. The difference between the two
 runs is what the sharing costs.
 
+**The pacer.** `osoe-pacer` (`tools/pacer/`, the proposal in
+`docs/design/osoe-pacer-proposal.md`) is the other half: every PE in motion at
+once, for minutes, every result checked. PE 0 prints a header - the library,
+the job's shape (`layout` is PEs a node, `hosts` the nodes' names folded),
+the heap and the budget, the seed, and a line an exercise with the sizes it
+chose and the memory it uses - then a line every five seconds an exercise,
+`key=value` after its name, and at the end a `summary` line an exercise and
+`osoe-pacer failures=N seconds=S`. Where PEs differ, a line carries the PEs
+that said it, `[0-3,8-11]`. The sort (`sort`) reports keys a second and the
+seconds in each phase - generate, bin, exchange, sort, check - of the slowest
+PE; the alltoall (`alltoall`) a line a block size and team with every
+variant's median microseconds, the collective forms beside the same exchange
+written by hand.
+
+Four runs of ten minutes, each its own step:
+
+```sh
+P=build/release/tools/pacer/osoe-pacer
+srun -K1 -N4 --ntasks-per-node=4 $P --seconds 300 > pacer-default.txt
+SHMEM_SYMMETRIC_SIZE=1500m srun -K1 -N4 --ntasks-per-node=4 $P --seconds 600 \
+    --sort accumulate --memory 1g sort > pacer-accumulate.txt
+srun -K1 -N4 --ntasks-per-node=4 $P --seconds 600 --exchange alltoall sort > pacer-pull.txt
+srun -K1 -N4 --ntasks-per-node=4 $P --seconds 600 --no-ptr sort > pacer-no-ptr.txt
+```
+
+The first runs the sort and then the alltoall, five minutes each; the other
+three change only the sort. The accumulating sort fills a gibibyte a PE with
+keys, sorts it in place and checks it, over and over: four PEs' heaps of
+1500m fit a node's 8 GB `/dev/shm`, touched only as the keys arrive. Every run
+must end `failures=0` and exit 0. A failure line names its exercise, its
+round and what differed; the command line and the header's seed reproduce it.
+`--rounds R` in place of `--seconds` makes a run of fixed length, and
+`--quick` is the smoke test every preset runs.
+
+Keep the outputs, under `docs/design/evidence/pi-cluster/<date>/pacer/`. The
+numbers for `docs/pi-cluster-results.md`: the sort's keys a second under each
+exchange (the `summary sort` lines), and the alltoall's microseconds at 8 B,
+4 KiB and 64 KiB (the `summary alltoall team=world` lines) - its `alltoall_us`
+beside `osoe-bench`'s alltoall line at the same block, and its `put_us`, the
+exchange as an application would write it, beside its `alltoall_us`: what the
+library's collective buys.
+
 ## 7. Endings
 
 A global exit from one PE, while every other PE computes, must end every task

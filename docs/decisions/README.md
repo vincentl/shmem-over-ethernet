@@ -87,6 +87,10 @@ without the author, under a standing mandate, and the record carries the undo.
 - **`parallel_print`'s labels** are world PE numbers in Slurm's bracket syntax, with the team's name before the bracket on any team but the world. Author, [2026-09-26-night](2026-09-26-night.md) item 2.
 - **The pacer's memory budget** defaults to half the heap; `--memory` takes a size or a share, refused with the `SHMEM_SYMMETRIC_SIZE` to set when the heap cannot hold it. Author, [2026-09-26-night](2026-09-26-night.md) item 5.
 - **The pacer's briefs are `task-stress-phaseN.md`.** Author, [2026-09-26-night](2026-09-26-night.md) item 7.
+- **Every check of the pacer has a plant**, and a plant's test requires each line its checks print, in any order (`cmake/PacerPlant.cmake`). Author (the rule) and Claude (the script), [2026-09-27](2026-09-27.md) items 1-2.
+- **The sort's oracle is count, sum, xor and a hash sum**: the first three are blind to a byte swapped between two keys. Claude, [2026-09-27](2026-09-27.md) item 3.
+- **A pacer exercise fits itself to the budget**, which bounds its symmetric and its private memory each; `step` is told which step is the last. Claude, [2026-09-27](2026-09-27.md) item 4.
+- **`parallel_print` syncs at least once a call**, and a program calling it on two teams in turn syncs the second team between them. Claude, [2026-09-27](2026-09-27.md) item 6.
 
 ## License and release
 
