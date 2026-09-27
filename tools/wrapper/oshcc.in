@@ -27,6 +27,7 @@ library='@OSOE_WRAPPER_LIBRARY@'
 libraries='@OSOE_WRAPPER_LIBRARIES@'
 link_flags='@OSOE_WRAPPER_LINK_FLAGS@'
 statics='@OSOE_WRAPPER_STATICS_SCRIPT@'
+@OSOE_WRAPPER_RELOCATE@
 
 show=no
 case $1 in
