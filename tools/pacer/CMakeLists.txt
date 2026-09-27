@@ -5,7 +5,7 @@
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
 add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
-  threads.c print.c atomics.c
+  threads.c print.c atomics.c rma.c
   ${PROJECT_SOURCE_DIR}/base/size.c)
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR})
 find_package(Threads REQUIRED)
@@ -165,6 +165,21 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "atomics round=64 bitwise uint private: after the xor pass slot [0-9]+ holds [0-9a-f]+, expected [0-9a-f]+")
   pacer_plant(atomics-fetched-bit atomics
     "atomics round=64 bitwise uint private: fetch_or from slot [0-9]+ of PE [0-9]+ returned bit 1 clear, expected set")
+  # The rma's six. The source PE 1 corrupts is read twice - by the next PE's
+  # get and by its node-mate's loads through shmem_ptr - and both must see it.
+  pacer_plant(rma-halo rma
+    "rma round=0 halo putmem atomic_add default: byte 4 of 8 from PE 1 is [0-9a-f]+, not [0-9a-f]+, when the flag said it had landed")
+  pacer_plant(rma-put rma
+    "rma round=0 put_get float default put: byte 0, of element 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+")
+  pacer_plant(rma-gap rma
+    "rma round=29 iput_iget float default put: byte 4, where no element lands, is 5a, not the canary")
+  pacer_plant(rma-get rma
+    "rma round=0 put_get float default get: byte 0, of element 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+"
+    "rma round=0 ptr: byte 0 loaded from node-mate PE 1's source is [0-9a-f]+, not [0-9a-f]+")
+  pacer_plant(rma-get-gap rma
+    "rma round=29 iput_iget float default get: byte 4, where no element lands, is 5a, not the canary")
+  pacer_plant(rma-ptr rma
+    "rma round=0 ptr: word 32 node-mate PE 1 stored is [0-9a-f]+, not [0-9a-f]+, when its flag said it was there")
   pacer_plant(teams-exhaust "teams;--teams-exhaust"
     "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
   pacer_plant(print-hash print

@@ -72,6 +72,12 @@ enum pacer_plant {
     PACER_PLANT_ATOMICS_SET,        /* PE 1 sets one slot wrong */
     PACER_PLANT_ATOMICS_BITWISE,    /* PE 1 leaves out one xor */
     PACER_PLANT_ATOMICS_FETCHED_BIT, /* PE 1 misjudges one fetched bit */
+    PACER_PLANT_RMA_HALO,           /* PE 1 sends one halo byte wrong */
+    PACER_PLANT_RMA_PUT,            /* PE 1 puts one element wrong */
+    PACER_PLANT_RMA_GAP,            /* PE 1 writes a byte into a strided put's gap */
+    PACER_PLANT_RMA_GET,            /* PE 1 changes a byte of what others read */
+    PACER_PLANT_RMA_GET_GAP,        /* PE 1 writes a byte into its own get's gap */
+    PACER_PLANT_RMA_PTR,            /* PE 1 stores one word wrong through shmem_ptr */
     PACER_PLANTS
 };
 
@@ -120,7 +126,7 @@ struct pacer_exercise {
 };
 
 extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_teams,
-    pacer_threads, pacer_print, pacer_atomics;
+    pacer_threads, pacer_print, pacer_atomics, pacer_rma;
 
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,
