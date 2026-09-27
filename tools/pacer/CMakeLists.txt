@@ -5,7 +5,7 @@
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
 add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
-  threads.c print.c
+  threads.c print.c atomics.c
   ${PROJECT_SOURCE_DIR}/base/size.c)
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR})
 find_package(Threads REQUIRED)
@@ -15,7 +15,7 @@ osoe_warnings(osoe-pacer)
 # ---- The pacer's tests, in every preset: PENDING THE AUTHOR'S DECISION ------
 #
 # Whether these stay in every preset's suite, or move to a preset of their own
-# run by hand, is the author's to decide once he has seen what they cost
+# run by hand, is the author's to decide once they have seen what they cost
 # (proposal §3, "Tests"; docs/decisions/2026-09-26-night.md item 6). They are
 # this one block: deleting it removes them all.
 #
@@ -145,6 +145,26 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "teams one: this PE is a member, and its handle is SHMEM_TEAM_INVALID")
   pacer_plant(teams-ring teams
     "teams round=0 strided context: read back [0-9]+ from rank [0-9]+, not [0-9]+")
+  # The atomics' seven: each family's check, on the first round of its family
+  # - int for the first five, unsigned int for the bitwise two.
+  pacer_plant(atomics-add atomics
+    "atomics round=0 add int default: slot [0-9]+ holds [0-9]+, expected [0-9]+")
+  pacer_plant(atomics-fetch atomics
+    "atomics round=12 fetch_add int default: slot [0-9]+ handed out values summing to [0-9]+, not the [0-9]+ of its [0-9]+ increments"
+    "atomics round=12 fetch_add int default: slot [0-9]+ handed out values hashing to [0-9a-f]+, not [0-9a-f]+")
+  pacer_plant(atomics-claim atomics
+    "atomics round=24 claim int default: the table holds 63 claims, not the 64 made"
+    "atomics round=24 claim int default: slot [0-9]+ of PE [0-9]+ holds [0-9]+, not this PE's claim [0-9]+")
+  pacer_plant(atomics-swap atomics
+    "atomics round=36 swap int default: the tokens sum to [0-9]+, not the [0-9]+ they started at"
+    "atomics round=36 swap int default: the tokens hash to [0-9a-f]+, not the [0-9a-f]+ they started at")
+  pacer_plant(atomics-set atomics
+    "atomics round=50 set_fetch int serialized: fetched [0-9]+ from slot 0 of PE [0-9]+, which this PE set to [0-9]+"
+    "atomics round=50 set_fetch int serialized: slot 0 holds [0-9]+, not the [0-9]+ PE 1 set")
+  pacer_plant(atomics-bitwise atomics
+    "atomics round=64 bitwise uint private: after the xor pass slot [0-9]+ holds [0-9a-f]+, expected [0-9a-f]+")
+  pacer_plant(atomics-fetched-bit atomics
+    "atomics round=64 bitwise uint private: fetch_or from slot [0-9]+ of PE [0-9]+ returned bit 1 clear, expected set")
   pacer_plant(teams-exhaust "teams;--teams-exhaust"
     "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
   pacer_plant(print-hash print

@@ -60,19 +60,21 @@ enum { FAILURE_LINES = 8, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
 #define MOST_UNITS (1L << 24)
 
 static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_mailbox,
-                                                      &pacer_teams, &pacer_threads, &pacer_print };
+                                                      &pacer_teams, &pacer_atomics, &pacer_threads,
+                                                      &pacer_print };
 enum { KNOWN = sizeof known / sizeof *known };
 
 static const char *const plant_names[PACER_PLANTS] = {
     "", "sort-key", "sort-order", "sort-range", "sort-capacity", "alltoall-byte", "alltoall-gap",
     "print-hash", "mailbox-payload", "mailbox-signal", "mailbox-count", "mailbox-round-trip",
     "threads-row", "threads-table", "threads-count", "teams-query", "teams-collective",
-    "teams-exhaust", "teams-member", "teams-ring"
+    "teams-exhaust", "teams-member", "teams-ring", "atomics-add", "atomics-fetch",
+    "atomics-claim", "atomics-swap", "atomics-set", "atomics-bitwise", "atomics-fetched-bit"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
     "mailbox", "mailbox", "threads", "threads", "threads", "teams", "teams", "teams", "teams",
-    "teams"
+    "teams", "atomics", "atomics", "atomics", "atomics", "atomics", "atomics", "atomics"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -95,6 +97,13 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 claims one split more than it made",
     "PE 1 misjudges its membership of one team",
     "PE 1 misjudges one context round trip",
+    "PE 1 adds one more than it drew, once",
+    "PE 1 misreads one value a fetch_add returned",
+    "PE 1 believes one claim it never made",
+    "PE 1 changes one token in hand",
+    "PE 1 sets one slot wrong",
+    "PE 1 leaves out one xor",
+    "PE 1 misjudges one fetched bit",
 };
 
 static void usage(FILE *out)
@@ -110,6 +119,7 @@ static void usage(FILE *out)
 "  mailbox   messages with signals, waited for by every wait and test form\n"
 "  teams     teams of every shape, their queries, collectives on rows and\n"
 "            columns at once\n"
+"  atomics   every atomic operation on every type, on three contexts\n"
 "  threads   worker threads on private, serialized, default and team contexts;\n"
 "            only when named, since it runs under SHMEM_THREAD_MULTIPLE\n"
 "  print     parallel_print checking its own lines; only when named\n"
@@ -135,17 +145,16 @@ static void usage(FILE *out)
 "  --teams-exhaust     the teams exercise splits until a split fails, and\n"
 "                      stops; teams must be the only exercise named\n"
 "  --stop-on-failure   end the job at the first checkpoint with a failure\n"
-"  --plant DEFECT      plant a defect a check must catch: sort-key, sort-order,\n"
-"                      sort-range, sort-capacity, alltoall-byte, alltoall-gap,\n"
-"                      print-hash, mailbox-payload, mailbox-signal,\n"
-"                      mailbox-count, mailbox-round-trip, threads-row,\n"
-"                      threads-table, threads-count, teams-query,\n"
-"                      teams-collective, teams-exhaust, teams-member or\n"
-"                      teams-ring; always on PE 1, named in the header\n"
+"  --plant DEFECT      plant a defect a check must catch, from the list below;\n"
+"                      always on PE 1, and named in the header\n"
 "  --help              this, before shmem_init\n"
 "\n"
 "The last line is \"osoe-pacer failures=N seconds=S\"; the exit status is 1\n"
-"when N is not 0, and 2 when the command line or the budget is refused.\n");
+"when N is not 0, and 2 when the command line or the budget is refused.\n"
+"\n"
+"Defects --plant takes, and the exercise that must be named with each:\n");
+    for (int k = 1; k < PACER_PLANTS; k++)
+        fprintf(out, "  %-20s %-9s %s\n", plant_names[k], plant_exercise[k], plant_descriptions[k]);
 }
 
 /* ---- What the exercises are given (exercise.h) ------------------------- */
@@ -432,11 +441,7 @@ static int parse(int argc, char **argv)
             while (k < PACER_PLANTS && strcmp(value, plant_names[k]) != 0)
                 k++;
             if (k == PACER_PLANTS)
-                return refuse("--plant '%s': sort-key, sort-order, sort-range, sort-capacity, "
-                              "alltoall-byte, alltoall-gap, print-hash, mailbox-payload, "
-                              "mailbox-signal, mailbox-count, mailbox-round-trip, threads-row, "
-                              "threads-table, threads-count, teams-query, teams-collective, "
-                              "teams-exhaust, teams-member or teams-ring", value);
+                return refuse("--plant '%s': no such defect; --help lists them", value);
             options.plant = (enum pacer_plant)k;
         } else {
             return refuse("no option '%s'", name);
@@ -447,6 +452,7 @@ static int parse(int argc, char **argv)
         chosen[chosen_count++] = &pacer_alltoall;
         chosen[chosen_count++] = &pacer_mailbox;
         chosen[chosen_count++] = &pacer_teams;
+        chosen[chosen_count++] = &pacer_atomics;
     }
     /* Exhausting the job's team numbers leaves none for any exercise after. */
     if (options.teams_exhaust && (chosen_count != 1 || chosen[0] != &pacer_teams))

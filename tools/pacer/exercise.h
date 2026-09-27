@@ -65,6 +65,13 @@ enum pacer_plant {
     PACER_PLANT_TEAMS_EXHAUST,      /* PE 1 claims one split more than it made */
     PACER_PLANT_TEAMS_MEMBER,       /* PE 1 misjudges its membership of one team */
     PACER_PLANT_TEAMS_RING,         /* PE 1 misjudges one context round trip */
+    PACER_PLANT_ATOMICS_ADD,        /* PE 1 adds one more than it drew, once */
+    PACER_PLANT_ATOMICS_FETCH,      /* PE 1 misreads one value a fetch_add returned */
+    PACER_PLANT_ATOMICS_CLAIM,      /* PE 1 believes one claim it never made */
+    PACER_PLANT_ATOMICS_SWAP,       /* PE 1 changes one token in hand */
+    PACER_PLANT_ATOMICS_SET,        /* PE 1 sets one slot wrong */
+    PACER_PLANT_ATOMICS_BITWISE,    /* PE 1 leaves out one xor */
+    PACER_PLANT_ATOMICS_FETCHED_BIT, /* PE 1 misjudges one fetched bit */
     PACER_PLANTS
 };
 
@@ -113,7 +120,7 @@ struct pacer_exercise {
 };
 
 extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_teams,
-    pacer_threads, pacer_print;
+    pacer_threads, pacer_print, pacer_atomics;
 
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,
