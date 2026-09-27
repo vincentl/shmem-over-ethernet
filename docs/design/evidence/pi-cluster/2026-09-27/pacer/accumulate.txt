@@ -1,0 +1,114 @@
+osoe-pacer library=osoe version=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=1500m memory=1g seed=1 report=5 exercises=sort
+exercise sort mode=accumulate exchange=fetch-add ptr=yes keys=1048576 cycle=113 capacity=133304320 local_sort=msd-in-place private=9.1m seconds=600 memory=1017.1m
+sort t=0.3 round=1 keys=16777216 keys_per_s=59571941 mib_per_s=454.5 generate_s=0.007 bin_s=0.014 exchange_s=0.266 sort_s=0.000 check_s=0.000 step_s=0.282 failures=0
+sort t=2.9 round=9 keys=150994944 keys_per_s=52205740 mib_per_s=398.3 generate_s=0.050 bin_s=0.091 exchange_s=2.447 sort_s=0.000 check_s=0.000 step_s=2.571 failures=0
+sort t=8.1 round=24 keys=402653184 keys_per_s=47870521 mib_per_s=365.2 generate_s=0.090 bin_s=0.165 exchange_s=5.017 sort_s=0.000 check_s=0.000 step_s=5.257 failures=0
+sort t=12.9 round=38 keys=637534208 keys_per_s=49564813 mib_per_s=378.1 generate_s=0.089 bin_s=0.184 exchange_s=4.529 sort_s=0.000 check_s=0.000 step_s=4.739 failures=0
+sort t=17.4 round=52 keys=872415232 keys_per_s=51331565 mib_per_s=391.6 generate_s=0.093 bin_s=0.166 exchange_s=4.354 sort_s=0.000 check_s=0.000 step_s=4.576 failures=0
+sort t=22.8 round=67 keys=1124073472 keys_per_s=46837469 mib_per_s=357.3 generate_s=0.089 bin_s=0.168 exchange_s=5.138 sort_s=0.000 check_s=0.000 step_s=5.373 failures=0
+sort t=27.2 round=80 keys=1342177280 keys_per_s=49629321 mib_per_s=378.6 generate_s=0.089 bin_s=0.172 exchange_s=4.191 sort_s=0.000 check_s=0.000 step_s=4.395 failures=0
+sort t=31.7 round=94 keys=1577058304 keys_per_s=52141798 mib_per_s=397.8 generate_s=0.082 bin_s=0.155 exchange_s=4.283 sort_s=0.000 check_s=0.000 step_s=4.505 failures=0
+sort t=36.7 round=109 keys=1828716544 keys_per_s=50424813 mib_per_s=384.7 generate_s=0.093 bin_s=0.168 exchange_s=4.751 sort_s=0.000 check_s=0.000 step_s=4.991 failures=0
+sort t=51.2 round=124 keys=2080374784 keys_per_s=17398192 mib_per_s=132.7 imbalance=1.000 generate_s=0.091 bin_s=0.175 exchange_s=4.724 sort_s=8.672 check_s=0.981 step_s=14.465 failures=0
+sort t=52.7 round=129 keys=2164260864 keys_per_s=54293648 mib_per_s=414.2 generate_s=0.027 bin_s=0.057 exchange_s=1.466 sort_s=0.000 check_s=0.000 step_s=1.545 failures=0
+sort t=58.0 round=145 keys=2432696320 keys_per_s=50816894 mib_per_s=387.7 generate_s=0.099 bin_s=0.186 exchange_s=5.029 sort_s=0.000 check_s=0.000 step_s=5.282 failures=0
+sort t=63.0 round=160 keys=2684354560 keys_per_s=50179450 mib_per_s=382.8 generate_s=0.104 bin_s=0.171 exchange_s=4.785 sort_s=0.000 check_s=0.000 step_s=5.015 failures=0
+sort t=67.7 round=174 keys=2919235584 keys_per_s=50313994 mib_per_s=383.9 generate_s=0.089 bin_s=0.157 exchange_s=4.450 sort_s=0.000 check_s=0.000 step_s=4.668 failures=0
+sort t=72.3 round=188 keys=3154116608 keys_per_s=50331922 mib_per_s=384.0 generate_s=0.090 bin_s=0.162 exchange_s=4.448 sort_s=0.000 check_s=0.000 step_s=4.667 failures=0
+sort t=77.3 round=203 keys=3405774848 keys_per_s=50640477 mib_per_s=386.4 generate_s=0.095 bin_s=0.177 exchange_s=4.736 sort_s=0.000 check_s=0.000 step_s=4.970 failures=0
+sort t=82.2 round=218 keys=3657433088 keys_per_s=51093519 mib_per_s=389.8 generate_s=0.093 bin_s=0.170 exchange_s=4.687 sort_s=0.000 check_s=0.000 step_s=4.925 failures=0
+sort t=96.9 round=233 keys=3909091328 keys_per_s=17185859 mib_per_s=131.1 imbalance=1.000 generate_s=0.093 bin_s=0.173 exchange_s=4.985 sort_s=8.702 check_s=0.962 step_s=14.643 failures=0
+sort t=98.5 round=238 keys=3992977408 keys_per_s=51527805 mib_per_s=393.1 generate_s=0.028 bin_s=0.054 exchange_s=1.550 sort_s=0.000 check_s=0.000 step_s=1.628 failures=0
+sort t=103.5 round=253 keys=4244635648 keys_per_s=50050826 mib_per_s=381.9 generate_s=0.089 bin_s=0.172 exchange_s=4.794 sort_s=0.000 check_s=0.000 step_s=5.028 failures=0
+sort t=108.7 round=267 keys=4479516672 keys_per_s=45793032 mib_per_s=349.4 generate_s=0.079 bin_s=0.152 exchange_s=4.908 sort_s=0.000 check_s=0.000 step_s=5.129 failures=0
+sort t=113.1 round=280 keys=4697620480 keys_per_s=49464415 mib_per_s=377.4 generate_s=0.080 bin_s=0.148 exchange_s=4.203 sort_s=0.000 check_s=0.000 step_s=4.409 failures=0
+sort t=117.8 round=294 keys=4932501504 keys_per_s=50165777 mib_per_s=382.7 generate_s=0.098 bin_s=0.157 exchange_s=4.460 sort_s=0.000 check_s=0.000 step_s=4.682 failures=0
+sort t=122.5 round=308 keys=5167382528 keys_per_s=49934835 mib_per_s=381.0 generate_s=0.089 bin_s=0.164 exchange_s=4.485 sort_s=0.000 check_s=0.000 step_s=4.704 failures=0
+sort t=127.4 round=322 keys=5402263552 keys_per_s=48001031 mib_per_s=366.2 generate_s=0.097 bin_s=0.172 exchange_s=4.678 sort_s=0.000 check_s=0.000 step_s=4.893 failures=0
+sort t=132.1 round=336 keys=5637144576 keys_per_s=50033118 mib_per_s=381.7 generate_s=0.093 bin_s=0.159 exchange_s=4.474 sort_s=0.000 check_s=0.000 step_s=4.695 failures=0
+sort t=146.8 round=350 keys=5872025600 keys_per_s=15980962 mib_per_s=121.9 imbalance=1.000 generate_s=0.087 bin_s=0.169 exchange_s=5.019 sort_s=8.673 check_s=0.961 step_s=14.698 failures=0
+sort t=148.3 round=354 keys=5939134464 keys_per_s=44524752 mib_per_s=339.7 generate_s=0.025 bin_s=0.046 exchange_s=1.442 sort_s=0.000 check_s=0.000 step_s=1.507 failures=0
+sort t=152.6 round=367 keys=6157238272 keys_per_s=50237969 mib_per_s=383.3 generate_s=0.091 bin_s=0.144 exchange_s=4.134 sort_s=0.000 check_s=0.000 step_s=4.341 failures=0
+sort t=157.4 round=381 keys=6392119296 keys_per_s=49500685 mib_per_s=377.7 generate_s=0.092 bin_s=0.168 exchange_s=4.525 sort_s=0.000 check_s=0.000 step_s=4.745 failures=0
+sort t=162.1 round=395 keys=6627000320 keys_per_s=49199267 mib_per_s=375.4 generate_s=0.090 bin_s=0.162 exchange_s=4.558 sort_s=0.000 check_s=0.000 step_s=4.774 failures=0
+sort t=166.9 round=409 keys=6861881344 keys_per_s=49340097 mib_per_s=376.4 generate_s=0.094 bin_s=0.159 exchange_s=4.539 sort_s=0.000 check_s=0.000 step_s=4.760 failures=0
+sort t=171.5 round=423 keys=7096762368 keys_per_s=50734002 mib_per_s=387.1 generate_s=0.092 bin_s=0.166 exchange_s=4.413 sort_s=0.000 check_s=0.000 step_s=4.630 failures=0
+sort t=176.4 round=438 keys=7348420608 keys_per_s=51267776 mib_per_s=391.1 generate_s=0.095 bin_s=0.175 exchange_s=4.671 sort_s=0.000 check_s=0.000 step_s=4.909 failures=0
+sort t=191.1 round=453 keys=7600078848 keys_per_s=17102731 mib_per_s=130.5 imbalance=1.000 generate_s=0.089 bin_s=0.168 exchange_s=5.043 sort_s=8.706 check_s=0.983 step_s=14.715 failures=0
+sort t=192.7 round=458 keys=7683964928 keys_per_s=54336276 mib_per_s=414.6 generate_s=0.029 bin_s=0.055 exchange_s=1.465 sort_s=0.000 check_s=0.000 step_s=1.544 failures=0
+sort t=197.7 round=474 keys=7952400384 keys_per_s=53230051 mib_per_s=406.1 generate_s=0.095 bin_s=0.178 exchange_s=4.789 sort_s=0.000 check_s=0.000 step_s=5.043 failures=0
+sort t=202.7 round=489 keys=8204058624 keys_per_s=50670457 mib_per_s=386.6 generate_s=0.087 bin_s=0.167 exchange_s=4.728 sort_s=0.000 check_s=0.000 step_s=4.967 failures=0
+sort t=207.9 round=504 keys=8455716864 keys_per_s=48546630 mib_per_s=370.4 generate_s=0.088 bin_s=0.166 exchange_s=4.943 sort_s=0.000 check_s=0.000 step_s=5.184 failures=0
+sort t=212.5 round=518 keys=8690597888 keys_per_s=50757541 mib_per_s=387.2 generate_s=0.086 bin_s=0.160 exchange_s=4.408 sort_s=0.000 check_s=0.000 step_s=4.628 failures=0
+sort t=217.4 round=533 keys=8942256128 keys_per_s=51154166 mib_per_s=390.3 generate_s=0.093 bin_s=0.180 exchange_s=4.684 sort_s=0.000 check_s=0.000 step_s=4.920 failures=0
+sort t=222.2 round=548 keys=9193914368 keys_per_s=52830339 mib_per_s=403.1 generate_s=0.088 bin_s=0.168 exchange_s=4.524 sort_s=0.000 check_s=0.000 step_s=4.764 failures=0
+sort t=227.1 round=563 keys=9445572608 keys_per_s=51055953 mib_per_s=389.5 generate_s=0.094 bin_s=0.166 exchange_s=4.689 sort_s=0.000 check_s=0.000 step_s=4.929 failures=0
+sort t=242.0 round=578 keys=9697230848 keys_per_s=16932957 mib_per_s=129.2 imbalance=1.000 generate_s=0.087 bin_s=0.165 exchange_s=5.172 sort_s=8.668 check_s=0.961 step_s=14.862 failures=0
+sort t=243.7 round=583 keys=9781116928 keys_per_s=50211440 mib_per_s=383.1 generate_s=0.032 bin_s=0.060 exchange_s=1.593 sort_s=0.000 check_s=0.000 step_s=1.671 failures=0
+sort t=248.4 round=597 keys=10015997952 keys_per_s=49807999 mib_per_s=380.0 generate_s=0.084 bin_s=0.158 exchange_s=4.491 sort_s=0.000 check_s=0.000 step_s=4.716 failures=0
+sort t=253.3 round=611 keys=10250878976 keys_per_s=47772203 mib_per_s=364.5 generate_s=0.084 bin_s=0.156 exchange_s=4.696 sort_s=0.000 check_s=0.000 step_s=4.917 failures=0
+sort t=257.9 round=625 keys=10485760000 keys_per_s=50885897 mib_per_s=388.2 generate_s=0.084 bin_s=0.156 exchange_s=4.394 sort_s=0.000 check_s=0.000 step_s=4.616 failures=0
+sort t=263.0 round=640 keys=10737418240 keys_per_s=49336719 mib_per_s=376.4 generate_s=0.099 bin_s=0.172 exchange_s=4.868 sort_s=0.000 check_s=0.000 step_s=5.101 failures=0
+sort t=267.7 round=654 keys=10972299264 keys_per_s=50563363 mib_per_s=385.8 generate_s=0.083 bin_s=0.157 exchange_s=4.422 sort_s=0.000 check_s=0.000 step_s=4.645 failures=0
+sort t=272.6 round=669 keys=11223957504 keys_per_s=50439519 mib_per_s=384.8 generate_s=0.095 bin_s=0.172 exchange_s=4.749 sort_s=0.000 check_s=0.000 step_s=4.989 failures=0
+sort t=287.2 round=684 keys=11475615744 keys_per_s=17349157 mib_per_s=132.4 imbalance=1.000 generate_s=0.092 bin_s=0.171 exchange_s=4.866 sort_s=8.649 check_s=0.962 step_s=14.506 failures=0
+sort t=288.7 round=689 keys=11559501824 keys_per_s=52777130 mib_per_s=402.7 generate_s=0.034 bin_s=0.059 exchange_s=1.510 sort_s=0.000 check_s=0.000 step_s=1.589 failures=0
+sort t=293.9 round=704 keys=11811160064 keys_per_s=49236215 mib_per_s=375.6 generate_s=0.095 bin_s=0.172 exchange_s=4.871 sort_s=0.000 check_s=0.000 step_s=5.111 failures=0
+sort t=298.6 round=718 keys=12046041088 keys_per_s=50028763 mib_per_s=381.7 generate_s=0.086 bin_s=0.158 exchange_s=4.479 sort_s=0.000 check_s=0.000 step_s=4.695 failures=0
+sort t=303.2 round=732 keys=12280922112 keys_per_s=50120621 mib_per_s=382.4 generate_s=0.094 bin_s=0.156 exchange_s=4.465 sort_s=0.000 check_s=0.000 step_s=4.686 failures=0
+sort t=307.9 round=746 keys=12515803136 keys_per_s=50444348 mib_per_s=384.9 generate_s=0.088 bin_s=0.166 exchange_s=4.442 sort_s=0.000 check_s=0.000 step_s=4.656 failures=0
+sort t=313.0 round=761 keys=12767461376 keys_per_s=49698980 mib_per_s=379.2 generate_s=0.097 bin_s=0.177 exchange_s=4.826 sort_s=0.000 check_s=0.000 step_s=5.064 failures=0
+sort t=317.9 round=775 keys=13002342400 keys_per_s=47233234 mib_per_s=360.4 generate_s=0.081 bin_s=0.155 exchange_s=4.750 sort_s=0.000 check_s=0.000 step_s=4.973 failures=0
+sort t=322.7 round=789 keys=13237223424 keys_per_s=49375451 mib_per_s=376.7 generate_s=0.091 bin_s=0.172 exchange_s=4.541 sort_s=0.000 check_s=0.000 step_s=4.757 failures=0
+sort t=337.3 round=803 keys=13472104448 keys_per_s=16078412 mib_per_s=122.7 imbalance=1.000 generate_s=0.088 bin_s=0.156 exchange_s=4.918 sort_s=8.678 check_s=0.961 step_s=14.608 failures=0
+sort t=338.6 round=807 keys=13539213312 keys_per_s=51586540 mib_per_s=393.6 generate_s=0.024 bin_s=0.045 exchange_s=1.236 sort_s=0.000 check_s=0.000 step_s=1.301 failures=0
+sort t=343.6 round=822 keys=13790871552 keys_per_s=50482813 mib_per_s=385.2 generate_s=0.090 bin_s=0.167 exchange_s=4.751 sort_s=0.000 check_s=0.000 step_s=4.985 failures=0
+sort t=348.6 round=837 keys=14042529792 keys_per_s=50193768 mib_per_s=382.9 generate_s=0.102 bin_s=0.179 exchange_s=4.784 sort_s=0.000 check_s=0.000 step_s=5.014 failures=0
+sort t=353.4 round=851 keys=14277410816 keys_per_s=48582149 mib_per_s=370.7 generate_s=0.085 bin_s=0.157 exchange_s=4.609 sort_s=0.000 check_s=0.000 step_s=4.835 failures=0
+sort t=358.3 round=865 keys=14512291840 keys_per_s=48775455 mib_per_s=372.1 generate_s=0.093 bin_s=0.154 exchange_s=4.600 sort_s=0.000 check_s=0.000 step_s=4.816 failures=0
+sort t=363.1 round=879 keys=14747172864 keys_per_s=48157377 mib_per_s=367.4 generate_s=0.089 bin_s=0.158 exchange_s=4.659 sort_s=0.000 check_s=0.000 step_s=4.877 failures=0
+sort t=368.0 round=893 keys=14982053888 keys_per_s=48158863 mib_per_s=367.4 generate_s=0.085 bin_s=0.161 exchange_s=4.655 sort_s=0.000 check_s=0.000 step_s=4.877 failures=0
+sort t=382.2 round=907 keys=15216934912 keys_per_s=16547891 mib_per_s=126.3 imbalance=1.000 generate_s=0.090 bin_s=0.156 exchange_s=4.519 sort_s=8.681 check_s=0.961 step_s=14.194 failures=0
+sort t=383.6 round=911 keys=15284043776 keys_per_s=49339204 mib_per_s=376.4 generate_s=0.030 bin_s=0.047 exchange_s=1.300 sort_s=0.000 check_s=0.000 step_s=1.360 failures=0
+sort t=388.5 round=925 keys=15518924800 keys_per_s=47803654 mib_per_s=364.7 generate_s=0.092 bin_s=0.165 exchange_s=4.696 sort_s=0.000 check_s=0.000 step_s=4.913 failures=0
+sort t=393.2 round=939 keys=15753805824 keys_per_s=49802050 mib_per_s=380.0 generate_s=0.084 bin_s=0.167 exchange_s=4.499 sort_s=0.000 check_s=0.000 step_s=4.716 failures=0
+sort t=398.0 round=953 keys=15988686848 keys_per_s=48514678 mib_per_s=370.1 generate_s=0.088 bin_s=0.160 exchange_s=4.619 sort_s=0.000 check_s=0.000 step_s=4.841 failures=0
+sort t=402.7 round=967 keys=16223567872 keys_per_s=50159180 mib_per_s=382.7 generate_s=0.085 bin_s=0.165 exchange_s=4.465 sort_s=0.000 check_s=0.000 step_s=4.683 failures=0
+sort t=407.8 round=981 keys=16458448896 keys_per_s=46075348 mib_per_s=351.5 generate_s=0.091 bin_s=0.156 exchange_s=4.878 sort_s=0.000 check_s=0.000 step_s=5.098 failures=0
+sort t=412.3 round=994 keys=16676552704 keys_per_s=48287168 mib_per_s=368.4 generate_s=0.085 bin_s=0.152 exchange_s=4.313 sort_s=0.000 check_s=0.000 step_s=4.517 failures=0
+sort t=417.2 round=1008 keys=16911433728 keys_per_s=48852623 mib_per_s=372.7 generate_s=0.084 bin_s=0.158 exchange_s=4.589 sort_s=0.000 check_s=0.000 step_s=4.808 failures=0
+sort t=431.3 round=1022 keys=17146314752 keys_per_s=16596029 mib_per_s=126.6 imbalance=1.000 generate_s=0.085 bin_s=0.161 exchange_s=4.481 sort_s=8.687 check_s=0.961 step_s=14.153 failures=0
+sort t=432.6 round=1026 keys=17213423616 keys_per_s=50543112 mib_per_s=385.6 generate_s=0.028 bin_s=0.047 exchange_s=1.266 sort_s=0.000 check_s=0.000 step_s=1.328 failures=0
+sort t=437.8 round=1041 keys=17465081856 keys_per_s=48363009 mib_per_s=369.0 generate_s=0.104 bin_s=0.187 exchange_s=4.970 sort_s=0.000 check_s=0.000 step_s=5.204 failures=0
+sort t=442.6 round=1055 keys=17699962880 keys_per_s=49019327 mib_per_s=374.0 generate_s=0.090 bin_s=0.163 exchange_s=4.570 sort_s=0.000 check_s=0.000 step_s=4.792 failures=0
+sort t=447.3 round=1069 keys=17934843904 keys_per_s=49928909 mib_per_s=380.9 generate_s=0.088 bin_s=0.155 exchange_s=4.488 sort_s=0.000 check_s=0.000 step_s=4.704 failures=0
+sort t=452.0 round=1083 keys=18169724928 keys_per_s=50630521 mib_per_s=386.3 generate_s=0.093 bin_s=0.164 exchange_s=4.421 sort_s=0.000 check_s=0.000 step_s=4.639 failures=0
+sort t=457.2 round=1098 keys=18421383168 keys_per_s=47723444 mib_per_s=364.1 generate_s=0.090 bin_s=0.168 exchange_s=5.041 sort_s=0.000 check_s=0.000 step_s=5.273 failures=0
+sort t=461.8 round=1112 keys=18656264192 keys_per_s=51525387 mib_per_s=393.1 generate_s=0.090 bin_s=0.163 exchange_s=4.342 sort_s=0.000 check_s=0.000 step_s=4.559 failures=0
+sort t=466.6 round=1127 keys=18907922432 keys_per_s=52758334 mib_per_s=402.5 generate_s=0.088 bin_s=0.171 exchange_s=4.534 sort_s=0.000 check_s=0.000 step_s=4.770 failures=0
+sort t=481.4 round=1142 keys=19159580672 keys_per_s=16999567 mib_per_s=129.7 imbalance=1.000 generate_s=0.092 bin_s=0.171 exchange_s=5.131 sort_s=8.681 check_s=0.970 step_s=14.804 failures=0
+sort t=483.0 round=1147 keys=19243466752 keys_per_s=51007028 mib_per_s=389.2 generate_s=0.030 bin_s=0.056 exchange_s=1.566 sort_s=0.000 check_s=0.000 step_s=1.645 failures=0
+sort t=488.4 round=1162 keys=19495124992 keys_per_s=47237805 mib_per_s=360.4 generate_s=0.097 bin_s=0.179 exchange_s=5.092 sort_s=0.000 check_s=0.000 step_s=5.327 failures=0
+sort t=493.0 round=1176 keys=19730006016 keys_per_s=50878396 mib_per_s=388.2 generate_s=0.090 bin_s=0.166 exchange_s=4.397 sort_s=0.000 check_s=0.000 step_s=4.617 failures=0
+sort t=498.2 round=1191 keys=19981664256 keys_per_s=48029930 mib_per_s=366.4 generate_s=0.100 bin_s=0.174 exchange_s=5.008 sort_s=0.000 check_s=0.000 step_s=5.240 failures=0
+sort t=503.2 round=1205 keys=20216545280 keys_per_s=47512417 mib_per_s=362.5 generate_s=0.096 bin_s=0.164 exchange_s=4.725 sort_s=0.000 check_s=0.000 step_s=4.944 failures=0
+sort t=507.9 round=1219 keys=20451426304 keys_per_s=49380176 mib_per_s=376.7 generate_s=0.097 bin_s=0.176 exchange_s=4.542 sort_s=0.000 check_s=0.000 step_s=4.757 failures=0
+sort t=512.6 round=1233 keys=20686307328 keys_per_s=50062113 mib_per_s=381.9 generate_s=0.097 bin_s=0.174 exchange_s=4.475 sort_s=0.000 check_s=0.000 step_s=4.692 failures=0
+sort t=527.2 round=1247 keys=20921188352 keys_per_s=16084680 mib_per_s=122.7 imbalance=1.000 generate_s=0.095 bin_s=0.166 exchange_s=4.970 sort_s=8.667 check_s=0.962 step_s=14.603 failures=0
+sort t=528.5 round=1251 keys=20988297216 keys_per_s=51324505 mib_per_s=391.6 generate_s=0.026 bin_s=0.044 exchange_s=1.244 sort_s=0.000 check_s=0.000 step_s=1.308 failures=0
+sort t=533.7 round=1266 keys=21239955456 keys_per_s=49001174 mib_per_s=373.8 generate_s=0.097 bin_s=0.172 exchange_s=4.903 sort_s=0.000 check_s=0.000 step_s=5.136 failures=0
+sort t=538.4 round=1280 keys=21474836480 keys_per_s=49077568 mib_per_s=374.4 generate_s=0.095 bin_s=0.172 exchange_s=4.567 sort_s=0.000 check_s=0.000 step_s=4.786 failures=0
+sort t=543.2 round=1294 keys=21709717504 keys_per_s=49403257 mib_per_s=376.9 generate_s=0.095 bin_s=0.161 exchange_s=4.537 sort_s=0.000 check_s=0.000 step_s=4.754 failures=0
+sort t=548.1 round=1308 keys=21944598528 keys_per_s=47659326 mib_per_s=363.6 generate_s=0.095 bin_s=0.177 exchange_s=4.719 sort_s=0.000 check_s=0.000 step_s=4.928 failures=0
+sort t=552.8 round=1322 keys=22179479552 keys_per_s=50211361 mib_per_s=383.1 generate_s=0.084 bin_s=0.160 exchange_s=4.452 sort_s=0.000 check_s=0.000 step_s=4.678 failures=0
+sort t=557.4 round=1336 keys=22414360576 keys_per_s=51516791 mib_per_s=393.0 generate_s=0.087 bin_s=0.162 exchange_s=4.341 sort_s=0.000 check_s=0.000 step_s=4.559 failures=0
+sort t=562.6 round=1351 keys=22666018816 keys_per_s=47944417 mib_per_s=365.8 generate_s=0.097 bin_s=0.170 exchange_s=5.011 sort_s=0.000 check_s=0.000 step_s=5.249 failures=0
+sort t=576.8 round=1365 keys=22900899840 keys_per_s=16597684 mib_per_s=126.6 imbalance=1.000 generate_s=0.081 bin_s=0.157 exchange_s=4.463 sort_s=8.678 check_s=0.980 step_s=14.151 failures=0
+sort t=578.1 round=1369 keys=22968008704 keys_per_s=51706405 mib_per_s=394.5 generate_s=0.029 bin_s=0.053 exchange_s=1.242 sort_s=0.000 check_s=0.000 step_s=1.298 failures=0
+sort t=583.2 round=1384 keys=23219666944 keys_per_s=49402983 mib_per_s=376.9 generate_s=0.094 bin_s=0.174 exchange_s=4.859 sort_s=0.000 check_s=0.000 step_s=5.094 failures=0
+sort t=587.8 round=1398 keys=23454547968 keys_per_s=51039064 mib_per_s=389.4 generate_s=0.086 bin_s=0.158 exchange_s=4.375 sort_s=0.000 check_s=0.000 step_s=4.602 failures=0
+sort t=592.7 round=1413 keys=23706206208 keys_per_s=51114867 mib_per_s=390.0 generate_s=0.109 bin_s=0.177 exchange_s=4.693 sort_s=0.000 check_s=0.000 step_s=4.923 failures=0
+sort t=597.7 round=1428 keys=23957864448 keys_per_s=50318245 mib_per_s=383.9 generate_s=0.087 bin_s=0.163 exchange_s=4.759 sort_s=0.000 check_s=0.000 step_s=5.001 failures=0
+sort t=606.9 round=1435 keys=24075304960 keys_per_s=12780132 mib_per_s=97.5 imbalance=1.000 generate_s=0.043 bin_s=0.080 exchange_s=2.245 sort_s=6.278 check_s=0.671 step_s=9.189 failures=0
+summary sort rounds=1435 keys=24075304960 seconds=606.8 keys_per_s=39676271 mib_per_s=302.7 imbalance=1.000 failures=0
+osoe-pacer failures=0 seconds=606.9

@@ -255,3 +255,70 @@ of them had logged a NIC transmit hang earlier that day, so a fresh boot of
 the peers could also explain it. pi-002 alone rebooted earlier still
 stalled at once; offload back on, on these same fresh nodes, is the control
 that separates the two.
+
+## The pacer's first runs (2026-09-27)
+
+`task-stress-phase1` at `4a96354` (`osoe-pacer`, phase 1 of the stress tester),
+`release`, 4 × 4, the runbook's §6 run by `pi-runs.sh` under `nohup`, about 45
+minutes of cluster time. Raw outputs, the script and the nodes' state:
+`docs/design/evidence/pi-cluster/2026-09-27/pacer/`; the day's record:
+`docs/decisions/2026-09-27.md`. The four nodes had rebooted at 10:09 and all
+four ran with TCP and generic segmentation offload **off** - set at boot now,
+it seems, where F1's record left it off on `pi-002` alone - and the
+`ondemand` governor.
+
+**Every run ended `failures=0`**: every key of every round in its owner's
+range, sorted, and counted into the oracle; every word of every alltoall
+variant; for ten minutes each.
+
+**The sort**, 16 PEs:
+
+| run | keys a second | what a round costs |
+|---|---|---|
+| default: rounds of 4 M keys a PE, fetch-add and put, `shmem_ptr` to node-mates | 16.5 M | exchange 1.1 s, the pacer's own sort 2.8 s |
+| `--no-ptr`: puts to node-mates too | 16.2 M | exchange 1.1 to 1.2 s, sort 2.8 s |
+| `--exchange alltoall`: counts by alltoall, bins pulled by nonblocking gets | 12.1 M | exchange 3.3 to 6.0 s, sort 2.8 s |
+| `--sort accumulate --memory 1g`: 1 M keys a round into 1 GiB a PE | 39.7 M | every 113 rounds, 118 M keys a PE sorted in place in 8.7 s |
+
+Two readings. The rounds' rate is the tool's more than the library's: its
+16-bit LSD sort takes 2.8 s of every 4, on one Pi core a PE, while the
+exchange moves the job's 512 MiB in 1.1 s - about 465 MiB/s, the four links
+near line rate; `exchange_s` is the library's number. Stores through
+`shmem_ptr` buy nothing measurable here over puts: three keys in sixteen go to
+a node-mate. And **the pull exchange
+is three to five times slower than the push**: bins of about 2 MiB, gotten
+nonblocking from twelve remote PEs at once, move at 90 to 150 MiB/s where
+puts of the same bins move 465 - the gap earlier sessions saw between one
+1 MiB get and one 1 MiB put, much wider under load.
+
+**The alltoall**, the world's 16 PEs, the slowest PE's median in µs (whole
+five-minute run, 415 exchanges of each variant at each size):
+
+| block | `alltoall` | `alltoallmem` | `alltoalls` | put, quiet, sync | sync, get | `putmem_signal`, `wait_until_all` | `iput` | `ibput` |
+|---|---|---|---|---|---|---|---|---|
+| 8 B | 372 | 362 | 362 | 362 | 461 | 285 | 358 | 359 |
+| 512 B | 609 | 612 | 1,985 | 613 | 884 | 502 | 1,820 | 655 |
+| 4 KiB | 2,877 | 3,054 | 9,297 | 3,008 | 3,442 | 2,834 | 8,992 | 3,020 |
+| 64 KiB | 32,163 | 34,759 | 137,250 | 32,780 | 33,442 | 30,456 | 135,298 | 32,576 |
+
+What the library's collective buys over the same exchange written by hand -
+puts, a quiet, a sync - is **nothing measurable at 4 × 4**: within 4% either
+way at every size. Put-with-signal beats both, since it waits for its own
+data and no barrier: 23% at 8 B, 5% at 64 KiB. The strided forms cost three
+to four times as much from 512 B, one put an element (the ledger's "no
+strided primitive at the transport boundary"). `osoe-bench`'s alltoall line at
+the same shape, run last (PE 0's median, with every other PE in the call too):
+343 µs at 8 B and 2,840 µs at 4 KiB, against the pacer's slowest-PE medians of
+372 and 2,877 - the same collective, measured two ways.
+
+**Retransmission timeouts**, every node's count before and after each run:
+the default run 10 in all (2, 2, 5, 1), the accumulating sort 38 (1, 22, 7,
+9) - `pi-002`, F1's node, most - the pull run none, the `--no-ptr` run 4
+(0, 3, 1, 0). No round
+stalled for them: the checkpoints came every five seconds throughout.
+
+**The author's first run** was the planted one, `--plant print-hash print`,
+and read as a fault; it was the plant caught, 56 failures a round as
+designed, and every case PE 1 cannot disturb right on 16 PEs over four
+nodes. It showed one failure split over several lines, now fixed, and that a
+planted run should say so, now done (`4a96354`; the record's item 8).

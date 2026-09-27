@@ -1,0 +1,27 @@
+osoe-pacer library=osoe version=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=1500m memory=1g seed=1 report=5 exercises=sort
+exercise sort mode=accumulate exchange=fetch-add ptr=yes keys=1048576 cycle=113 capacity=133304320 local_sort=msd-in-place private=9.1m seconds=600 memory=1017.1m
+sort t=0.3 round=1 keys=16777216 keys_per_s=53572911 mib_per_s=408.7 generate_s=0.009 bin_s=0.014 exchange_s=0.294 sort_s=0.000 check_s=0.000 step_s=0.313 failures=0
+sort t=2.8 round=9 keys=150994944 keys_per_s=55094903 mib_per_s=420.3 generate_s=0.055 bin_s=0.094 exchange_s=2.310 sort_s=0.000 check_s=0.000 step_s=2.436 failures=0
+sort t=7.7 round=25 keys=419430400 keys_per_s=54519285 mib_per_s=415.9 generate_s=0.100 bin_s=0.177 exchange_s=4.668 sort_s=0.000 check_s=0.000 step_s=4.924 failures=0
+sort t=13.0 round=41 keys=687865856 keys_per_s=50814373 mib_per_s=387.7 generate_s=0.103 bin_s=0.179 exchange_s=5.033 sort_s=0.000 check_s=0.000 step_s=5.283 failures=0
+sort t=17.9 round=56 keys=939524096 keys_per_s=50796891 mib_per_s=387.5 generate_s=0.093 bin_s=0.174 exchange_s=4.718 sort_s=0.000 check_s=0.000 step_s=4.954 failures=0
+sort t=23.2 round=71 keys=1191182336 keys_per_s=47701627 mib_per_s=363.9 generate_s=0.096 bin_s=0.172 exchange_s=5.042 sort_s=0.000 check_s=0.000 step_s=5.276 failures=0
+sort t=28.1 round=85 keys=1426063360 keys_per_s=47554991 mib_per_s=362.8 generate_s=0.085 bin_s=0.161 exchange_s=4.721 sort_s=0.000 check_s=0.000 step_s=4.939 failures=0
+sort t=32.8 round=99 keys=1660944384 keys_per_s=50343754 mib_per_s=384.1 generate_s=0.094 bin_s=0.161 exchange_s=4.440 sort_s=0.000 check_s=0.000 step_s=4.666 failures=0
+sort t=47.3 round=114 keys=1912602624 keys_per_s=17402377 mib_per_s=132.8 imbalance=1.000 generate_s=0.086 bin_s=0.161 exchange_s=4.722 sort_s=8.690 check_s=0.982 step_s=14.461 failures=0
+sort t=49.0 round=119 keys=1996488704 keys_per_s=48509554 mib_per_s=370.1 generate_s=0.031 bin_s=0.054 exchange_s=1.650 sort_s=0.000 check_s=0.000 step_s=1.729 failures=0
+sort t=53.5 round=133 keys=2231369728 keys_per_s=51512526 mib_per_s=393.0 generate_s=0.089 bin_s=0.155 exchange_s=4.337 sort_s=0.000 check_s=0.000 step_s=4.560 failures=0
+sort t=58.5 round=148 keys=2483027968 keys_per_s=50891279 mib_per_s=388.3 generate_s=0.087 bin_s=0.173 exchange_s=4.712 sort_s=0.000 check_s=0.000 step_s=4.945 failures=0
+sort t=63.0 round=163 keys=2734686208 keys_per_s=56128396 mib_per_s=428.2 generate_s=0.086 bin_s=0.166 exchange_s=4.247 sort_s=0.000 check_s=0.000 step_s=4.484 failures=0
+sort t=68.1 round=179 keys=3003121664 keys_per_s=52791951 mib_per_s=402.8 generate_s=0.119 bin_s=0.188 exchange_s=4.832 sort_s=0.000 check_s=0.000 step_s=5.085 failures=0
+sort t=73.2 round=194 keys=3254779904 keys_per_s=49465264 mib_per_s=377.4 generate_s=0.095 bin_s=0.175 exchange_s=4.849 sort_s=0.000 check_s=0.000 step_s=5.088 failures=0
+sort t=77.9 round=208 keys=3489660928 keys_per_s=49888517 mib_per_s=380.6 generate_s=0.088 bin_s=0.157 exchange_s=4.488 sort_s=0.000 check_s=0.000 step_s=4.708 failures=0
+sort t=82.6 round=222 keys=3724541952 keys_per_s=49502325 mib_per_s=377.7 generate_s=0.086 bin_s=0.158 exchange_s=4.529 sort_s=0.000 check_s=0.000 step_s=4.745 failures=0
+sort t=96.8 round=236 keys=3959422976 keys_per_s=16515220 mib_per_s=126.0 imbalance=1.000 generate_s=0.083 bin_s=0.164 exchange_s=4.577 sort_s=8.698 check_s=0.963 step_s=14.222 failures=0
+sort t=98.0 round=240 keys=4026531840 keys_per_s=56601191 mib_per_s=431.8 generate_s=0.025 bin_s=0.044 exchange_s=1.122 sort_s=0.000 check_s=0.000 step_s=1.186 failures=0
+sort t=102.8 round=256 keys=4294967296 keys_per_s=56078196 mib_per_s=427.8 generate_s=0.096 bin_s=0.190 exchange_s=4.529 sort_s=0.000 check_s=0.000 step_s=4.787 failures=0
+sort t=108.1 round=272 keys=4563402752 keys_per_s=50944855 mib_per_s=388.7 generate_s=0.100 bin_s=0.187 exchange_s=5.014 sort_s=0.000 check_s=0.000 step_s=5.269 failures=0
+sort t=113.1 round=287 keys=4815060992 keys_per_s=49819823 mib_per_s=380.1 generate_s=0.102 bin_s=0.172 exchange_s=4.812 sort_s=0.000 check_s=0.000 step_s=5.051 failures=0
+sort t=117.7 round=301 keys=5049942016 keys_per_s=50978729 mib_per_s=388.9 generate_s=0.093 bin_s=0.156 exchange_s=4.385 sort_s=0.000 check_s=0.000 step_s=4.607 failures=0
+sort t=122.8 round=316 keys=5301600256 keys_per_s=49293161 mib_per_s=376.1 generate_s=0.091 bin_s=0.171 exchange_s=4.867 sort_s=0.000 check_s=0.000 step_s=5.105 failures=0
+sort t=127.5 round=330 keys=5536481280 keys_per_s=50869895 mib_per_s=388.1 generate_s=0.093 bin_s=0.159 exchange_s=4.397 sort_s=0.000 check_s=0.000 step_s=4.617 failures=0

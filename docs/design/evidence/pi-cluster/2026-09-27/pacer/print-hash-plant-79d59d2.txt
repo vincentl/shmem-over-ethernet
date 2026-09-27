@@ -1,0 +1,96 @@
+pi@pi-login:~/osoe-pacer $ srun -K1 -N4 --ntasks-per-node=4 build/release/tools/pacer/osoe-pacer --quick --plant print-hash print
+osoe-pacer library=osoe version=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=print plant=print-hash
+exercise print cases=same,parity,silent,distinct,even,shared,strided,windows,long window=64 outside_budget=yes rounds=3 memory=0
+[0,2-15] print round=0 same: every PE says this
+[1] print round=0 same: every PE says this
+[0,2,4,6,8,10,12,14] print round=0 parity: even
+[1] print round=0 parity: odd
+[3,5,7,9,11,13,15] print round=0 parity: odd
+[0,2,4,6,8,10,12,14] print round=0 silent: the odd PEs say nothing
+[0] print round=0 distinct: PE 0 of 16
+[1] print round=0 distinct: PE 1 of 16
+[2] print round=0 distinct: PE 2 of 16
+[3] print round=0 distinct: PE 3 of 16
+[4] print round=0 distinct: PE 4 of 16
+[5] print round=0 distinct: PE 5 of 16
+[6] print round=0 distinct: PE 6 of 16
+[7] print round=0 distinct: PE 7 of 16
+[8] print round=0 distinct: PE 8 of 16
+[9] print round=0 distinct: PE 9 of 16
+[10] print round=0 distinct: PE 10 of 16
+[11] print round=0 distinct: PE 11 of 16
+[12] print round=0 distinct: PE 12 of 16
+[13] print round=0 distinct: PE 13 of 16
+[14] print round=0 distinct: PE 14 of 16
+[15] print round=0 distinct: PE 15 of 16
+even[0,2,4,6,8,10,12,14] print round=0 even: the even team
+shared[0,2-3] print round=0 shared: node 0
+shared[1] print round=0 shared: node 0
+shared[12-15] print round=0 shared: node 3
+shared[4-7] print round=0 shared: node 1
+shared[8-11] print round=0 shared: node 2
+team(15:-1:3)[13-15] print round=0 strided: three from the last, backwards
+[0] print round=0 windows: PE 0
+[1] print round=0 windows: PE 1 .......
+[2] print round=0 windows: PE 2 ..............
+[3] print round=0 windows: PE 3 .....................
+[4] print round=0 windows: PE 4 .....
+[5] print round=0 windows: PE 5 ............
+[6] print round=0 windows: PE 6 ...................
+[7] print round=0 windows: PE 7 ...
+[8] print round=0 windows: PE 8 ..........
+[9] print round=0 windows: PE 9 .................
+[10] print round=0 windows: PE 10 .
+[11] print round=0 windows: PE 11 ........
+[12] print round=0 windows: PE 12 ...............
+[13] print round=0 windows: PE 13 ......................
+[14] print round=0 windows: PE 14 ......
+[15] print round=0 windows: PE 15 .............
+[0,2-15] print round=0 long: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+[1] print round=0 long: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+print t=0.0 round=1 lines=47 lines_per_s=3424 step_s=0.014 failures=56
+[0,2-15] print round=0 same: returned 2 lines, expected 1
+[1] print round=0 same: returned 2 lines, expected 1
+[0] print round=0 same: printed "[0,2-15] print round=0 same: every PE says this", expected "[0-15] print round=0 same: every PE says this"
+[1] print round=0 parity: returned 3 lines, expected 2
+[2-15] print round=0 parity: returned 3 lines, expected 2
+[0] print round=0 parity: returned 3 lines, expected 2
+[1] print round=0 shared: returned 2 lines, expected 1
+[2-3] print round=0 shared: returned 2 lines, expected 1
+[4-15] print round=0 long: returned 2 lines, expected 1
+[0] print round=0 parity: printed "[1] print round=0 parity: odd", expected "[1,3,5,7,9,11,13,15] print round=0 parity: odd"
+[1] print round=0 long: returned 2 lines, expected 1
+[2-3] print round=0 long: returned 2 lines, expected 1
+print t=0.0 round=2 lines=94 lines_per_s=3467 step_s=0.014 failures=112
+[0,2-15] print round=1 same: returned 2 lines, expected 1
+[1] print round=1 same: returned 2 lines, expected 1
+[0] print round=1 same: printed "[0,2-15] print round=1 same: every PE says this", expected "[0-15] print round=1 same: every PE says this"
+[1] print round=1 parity: returned 3 lines, expected 2
+[2-15] print round=1 parity: returned 3 lines, expected 2
+[0] print round=1 parity: returned 3 lines, expected 2
+[1] print round=1 shared: returned 2 lines, expected 1
+[2-3] print round=1 shared: returned 2 lines, expected 1
+[4-15] print round=1 long: returned 2 lines, expected 1
+[0] print round=1 parity: printed "[1] print round=1 parity: odd", expected "[1,3,5,7,9,11,13,15] print round=1 parity: odd"
+[1] print round=1 long: returned 2 lines, expected 1
+[2-3] print round=1 long: returned 2 lines, expected 1
+print t=0.0 round=3 lines=141 lines_per_s=3486 step_s=0.013 failures=168
+[0,2-15] print round=2 same: returned 2 lines, expected 1
+[1] print round=2 same: returned 2 lines, expected 1
+[0] print round=2 same: printed "[0,2-15] print round=2 same: every PE says this", expected "[0-15] print round=2 same: every PE says this"
+[1] print round=2 parity: returned 3 lines, expected 2
+[2-15] print round=2 parity: returned 3 lines, expected 2
+[0] print round=2 parity: returned 3 lines, expected 2
+[1] print round=2 shared: returned 2 lines, expected 1
+[2-3] print round=2 shared: returned 2 lines, expected 1
+[4-15] print round=2 long: returned 2 lines, expected 1
+[0] print round=2 parity: printed "[1] print round=2 parity: odd", expected "[1,3,5,7,9,11,13,15] print round=2 parity: odd"
+[1] print round=2 long: returned 2 lines, expected 1
+[2-3] print round=2 long: returned 2 lines, expected 1
+summary print rounds=3 lines=141 seconds=0.0 lines_per_s=3459 failures=168
+osoe-pacer failures=168 seconds=0.1
+srun: error: pi-001: tasks 0-3: Exited with exit code 1
+srun: Terminating StepId=697.0
+srun: error: pi-004: tasks 12-15: Exited with exit code 1
+srun: error: pi-003: tasks 8-11: Exited with exit code 1
+srun: error: pi-002: tasks 4-7: Exited with exit code 1

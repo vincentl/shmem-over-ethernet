@@ -1,0 +1,51 @@
+osoe-pacer library=osoe version=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=sort,alltoall
+exercise sort mode=rounds exchange=fetch-add ptr=yes keys=65536 capacity=77824 local_sort=lsd-scratch private=3.2m rounds=3 memory=1.2m
+exercise alltoall teams=world,even blocks=8,4096,65536 variants=alltoall,alltoallmem,alltoalls,put,get,signal,iput,ibput rounds=12 memory=5.1m
+sort t=0.1 round=1 keys=1048576 keys_per_s=16337734 mib_per_s=124.6 imbalance=1.007 generate_s=0.000 bin_s=0.001 exchange_s=0.023 sort_s=0.040 check_s=0.001 step_s=0.064 failures=0
+sort t=0.1 round=2 keys=2097152 keys_per_s=15620667 mib_per_s=119.2 imbalance=1.006 generate_s=0.000 bin_s=0.001 exchange_s=0.027 sort_s=0.039 check_s=0.001 step_s=0.067 failures=0
+sort t=0.2 round=3 keys=3145728 keys_per_s=15702260 mib_per_s=119.8 imbalance=1.007 generate_s=0.000 bin_s=0.001 exchange_s=0.027 sort_s=0.039 check_s=0.001 step_s=0.067 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=442.9 alltoallmem_us=361.5 alltoalls_us=398.8 put_us=379.4 get_us=513.1 signal_us=333.6 iput_us=391.9 ibput_us=386.5
+alltoall team=even block=8 exchanges=1 alltoall_us=342.3 alltoallmem_us=319.8 alltoalls_us=345.0 put_us=372.2 get_us=437.7 signal_us=194.6 iput_us=306.7 ibput_us=342.8
+alltoall t=0.0 round=1 exchanges=16 exchanges_per_s=1723 fill_s=0.000 exchange_s=0.009 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=3191.3 alltoallmem_us=3364.6 alltoalls_us=9089.4 put_us=3270.1 get_us=3498.5 signal_us=3112.2 iput_us=8748.5 ibput_us=3247.6
+alltoall team=even block=4096 exchanges=1 alltoall_us=927.1 alltoallmem_us=1014.0 alltoalls_us=2961.2 put_us=873.1 get_us=1249.7 signal_us=659.1 iput_us=3001.7 ibput_us=937.5
+alltoall t=0.1 round=2 exchanges=32 exchanges_per_s=296 fill_s=0.001 exchange_s=0.052 check_s=0.001 step_s=0.054 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=43183.4 alltoallmem_us=40741.9 alltoalls_us=140522.6 put_us=33347.9 get_us=35803.0 signal_us=33085.8 iput_us=150059.3 ibput_us=36932.5
+alltoall team=even block=65536 exchanges=1 alltoall_us=9312.0 alltoallmem_us=9652.7 alltoalls_us=39756.8 put_us=8798.4 get_us=10120.3 signal_us=9341.3 iput_us=34155.4 ibput_us=9071.5
+alltoall t=0.7 round=3 exchanges=48 exchanges_per_s=24 fill_s=0.017 exchange_s=0.647 check_s=0.011 step_s=0.672 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=367.1 alltoallmem_us=353.5 alltoalls_us=386.2 put_us=361.9 get_us=464.4 signal_us=250.8 iput_us=353.7 ibput_us=340.9
+alltoall team=even block=8 exchanges=1 alltoall_us=343.8 alltoallmem_us=368.7 alltoalls_us=366.9 put_us=332.9 get_us=388.7 signal_us=191.8 iput_us=308.8 ibput_us=366.2
+alltoall t=0.7 round=4 exchanges=64 exchanges_per_s=1885 fill_s=0.000 exchange_s=0.008 check_s=0.000 step_s=0.008 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2960.5 alltoallmem_us=2767.8 alltoalls_us=9247.9 put_us=3021.5 get_us=3337.1 signal_us=2909.3 iput_us=9036.9 ibput_us=3115.2
+alltoall team=even block=4096 exchanges=1 alltoall_us=902.3 alltoallmem_us=1013.0 alltoalls_us=2981.4 put_us=875.5 get_us=1171.7 signal_us=650.6 iput_us=3150.2 ibput_us=798.7
+alltoall t=0.8 round=5 exchanges=80 exchanges_per_s=303 fill_s=0.001 exchange_s=0.051 check_s=0.001 step_s=0.053 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=34110.4 alltoallmem_us=35687.9 alltoalls_us=148127.7 put_us=35956.1 get_us=34900.8 signal_us=31028.8 iput_us=141494.9 ibput_us=32734.6
+alltoall team=even block=65536 exchanges=1 alltoall_us=8875.4 alltoallmem_us=9238.4 alltoalls_us=34855.2 put_us=8817.2 get_us=9067.4 signal_us=8080.6 iput_us=34839.4 ibput_us=8420.3
+alltoall t=1.4 round=6 exchanges=96 exchanges_per_s=25 fill_s=0.017 exchange_s=0.623 check_s=0.011 step_s=0.648 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=334.3 alltoallmem_us=368.8 alltoalls_us=431.2 put_us=373.4 get_us=582.9 signal_us=284.4 iput_us=352.9 ibput_us=366.7
+alltoall team=even block=8 exchanges=1 alltoall_us=339.3 alltoallmem_us=332.2 alltoalls_us=339.5 put_us=349.3 get_us=396.8 signal_us=203.4 iput_us=342.8 ibput_us=338.6
+alltoall t=1.5 round=7 exchanges=112 exchanges_per_s=1848 fill_s=0.000 exchange_s=0.008 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2867.0 alltoallmem_us=2689.3 alltoalls_us=9678.6 put_us=3024.0 get_us=3328.4 signal_us=2772.3 iput_us=9255.0 ibput_us=2830.1
+alltoall team=even block=4096 exchanges=1 alltoall_us=991.7 alltoallmem_us=1015.0 alltoalls_us=2973.8 put_us=890.4 get_us=1160.2 signal_us=687.7 iput_us=3036.3 ibput_us=824.2
+alltoall t=1.5 round=8 exchanges=128 exchanges_per_s=306 fill_s=0.001 exchange_s=0.051 check_s=0.001 step_s=0.052 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=32179.9 alltoallmem_us=36532.2 alltoalls_us=142909.7 put_us=32029.1 get_us=33606.5 signal_us=30647.2 iput_us=144413.7 ibput_us=33758.3
+alltoall team=even block=65536 exchanges=1 alltoall_us=8546.9 alltoallmem_us=9047.1 alltoalls_us=33428.1 put_us=8506.8 get_us=8767.0 signal_us=7781.4 iput_us=34522.4 ibput_us=8397.9
+alltoall t=2.1 round=9 exchanges=144 exchanges_per_s=25 fill_s=0.017 exchange_s=0.611 check_s=0.011 step_s=0.635 failures=0
+alltoall team=world block=8 exchanges=1 alltoall_us=354.3 alltoallmem_us=373.8 alltoalls_us=377.2 put_us=374.1 get_us=456.3 signal_us=284.1 iput_us=356.6 ibput_us=351.6
+alltoall team=even block=8 exchanges=1 alltoall_us=339.8 alltoallmem_us=324.7 alltoalls_us=350.5 put_us=356.7 get_us=396.5 signal_us=204.6 iput_us=370.5 ibput_us=334.0
+alltoall t=2.2 round=10 exchanges=160 exchanges_per_s=1870 fill_s=0.000 exchange_s=0.008 check_s=0.000 step_s=0.009 failures=0
+alltoall team=world block=4096 exchanges=1 alltoall_us=2858.4 alltoallmem_us=3071.3 alltoalls_us=9375.9 put_us=3060.7 get_us=3930.4 signal_us=2804.2 iput_us=9139.8 ibput_us=2843.9
+alltoall team=even block=4096 exchanges=1 alltoall_us=1023.8 alltoallmem_us=915.3 alltoalls_us=3038.4 put_us=971.0 get_us=1175.3 signal_us=714.8 iput_us=3197.6 ibput_us=918.9
+alltoall t=2.2 round=11 exchanges=176 exchanges_per_s=297 fill_s=0.001 exchange_s=0.052 check_s=0.001 step_s=0.054 failures=0
+alltoall team=world block=65536 exchanges=1 alltoall_us=31478.1 alltoallmem_us=36872.0 alltoalls_us=147931.7 put_us=32945.9 get_us=44517.1 signal_us=31969.9 iput_us=146293.6 ibput_us=33347.4
+alltoall team=even block=65536 exchanges=1 alltoall_us=8191.8 alltoallmem_us=8748.6 alltoalls_us=34412.2 put_us=8402.2 get_us=9717.3 signal_us=8485.9 iput_us=32975.0 ibput_us=7882.0
+alltoall t=2.9 round=12 exchanges=192 exchanges_per_s=25 fill_s=0.015 exchange_s=0.626 check_s=0.011 step_s=0.652 failures=0
+summary sort rounds=3 keys=3145728 seconds=0.2 keys_per_s=15880506 mib_per_s=121.2 imbalance=1.004 failures=0
+summary alltoall rounds=12 exchanges=192 seconds=2.9 exchanges_per_s=67 failures=0
+summary alltoall team=world block=8 exchanges=4 alltoall_us=367.1 alltoallmem_us=367.6 alltoalls_us=398.8 put_us=371.4 get_us=513.1 signal_us=284.4 iput_us=356.6 ibput_us=364.6
+summary alltoall team=world block=4096 exchanges=4 alltoall_us=2960.5 alltoallmem_us=3071.3 alltoalls_us=9375.9 put_us=3060.7 get_us=3498.5 signal_us=2909.3 iput_us=9139.8 ibput_us=3115.2
+summary alltoall team=world block=65536 exchanges=4 alltoall_us=34110.4 alltoallmem_us=36872.0 alltoalls_us=145030.0 put_us=33347.9 get_us=35803.0 signal_us=31028.8 iput_us=146293.6 ibput_us=33758.3
+summary alltoall team=even block=8 exchanges=4 alltoall_us=339.8 alltoallmem_us=332.2 alltoalls_us=350.5 put_us=356.7 get_us=396.8 signal_us=203.4 iput_us=342.8 ibput_us=340.9
+summary alltoall team=even block=4096 exchanges=4 alltoall_us=991.7 alltoallmem_us=1013.0 alltoalls_us=2981.4 put_us=890.4 get_us=1175.3 signal_us=687.7 iput_us=3150.2 ibput_us=913.6
+summary alltoall team=even block=65536 exchanges=4 alltoall_us=8875.4 alltoallmem_us=9238.4 alltoalls_us=34855.2 put_us=8788.3 get_us=9717.3 signal_us=8485.9 iput_us=34522.4 ibput_us=8420.3
+osoe-pacer failures=0 seconds=3.1

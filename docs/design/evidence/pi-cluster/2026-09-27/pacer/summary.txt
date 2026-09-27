@@ -1,0 +1,24 @@
+11:11:34 commit 4a96354 task-stress-phase1, copied 2026-09-27T11:10:46-04:00
+pi-001 up=3733s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-002 up=3748s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-003 up=3748s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+pi-004 up=3732s governor=ondemand tcp-segmentation-offload:off generic-segmentation-offload:off 
+11:11:38 quick exit 0 in 4 s: osoe-pacer failures=0 seconds=3.1
+11:11:38     timeouts before: pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+11:11:38     timeouts after:  pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+11:21:39 default exit 0 in 601 s: osoe-pacer failures=0 seconds=600.7
+11:21:39     timeouts before: pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+11:21:39     timeouts after:  pi-001=2 pi-002=2 pi-003=5 pi-004=1 
+11:31:52 accumulate exit 0 in 613 s: osoe-pacer failures=0 seconds=606.9
+11:31:52     timeouts before: pi-001=2 pi-002=2 pi-003=5 pi-004=1 
+11:31:52     timeouts after:  pi-001=3 pi-002=24 pi-003=12 pi-004=10 
+11:42:05 pull exit 0 in 613 s: osoe-pacer failures=0 seconds=602.5
+11:42:05     timeouts before: pi-001=3 pi-002=24 pi-003=12 pi-004=10 
+11:42:05     timeouts after:  pi-001=3 pi-002=24 pi-003=12 pi-004=10 
+11:52:11 no-ptr exit 0 in 606 s: osoe-pacer failures=0 seconds=600.6
+11:52:11     timeouts before: pi-001=3 pi-002=24 pi-003=12 pi-004=10 
+11:52:11     timeouts after:  pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+11:52:32 bench-collectives exit 0 in 21 s: 
+11:52:32     timeouts before: pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+11:52:33     timeouts after:  pi-001=3 pi-002=27 pi-003=13 pi-004=10 
+11:52:33 DONE
