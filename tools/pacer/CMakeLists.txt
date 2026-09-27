@@ -373,6 +373,8 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "waits round=1 long wait_until ne: word 0 from PE 1 holds [0-9]+, expected [0-9]+")
   pacer_plant(waits-index waits
     "waits round=24 int wait_until_any [a-z]+: returned index [0-3], which the status excludes")
+  pacer_plant(waits-count waits
+    "waits round=36 int wait_until_some [a-z]+: returned [0-9]+ indices with [0-9]+ words left")
   pacer_plant(waits-excluded waits
     "waits round=24 int wait_until_any [a-z]+: returned [0-9]+ with every word excluded, not SIZE_MAX")
   pacer_plant(rma-signal rma

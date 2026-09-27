@@ -111,26 +111,24 @@ int main(int argc, char **argv)
     if (planted && strcmp(plant, "realloc") == 0)
         words[0]++;                 /* the planted defect: a word changed before the realloc */
     long *grown = shrealloc(words, 4 * WORDS * sizeof *grown);
-    if (!grown) {
-        fail("shrealloc to %zu bytes returned NULL", 4 * WORDS * sizeof *grown);
-    } else {
+    int kept = grown != NULL;
+    if (grown)
         words = grown;
-        for (int k = 0; k < WORDS; k++)
-            if (words[k] != word_of(previous, k)) {
-                fail("word %d holds %ld after shrealloc, expected %ld, which it held before",
-                     k, words[k], word_of(previous, k));
-                break;
-            }
-    }
+    for (int k = 0; k < WORDS && kept; k++)
+        if (words[k] != word_of(previous, k)) {
+            fail("word %d holds %ld after shrealloc, expected %ld, which it held before", k,
+                 words[k], word_of(previous, k));
+            kept = -1;
+        }
+    if (!kept)
+        fail("shrealloc to %zu bytes returned NULL", 4 * WORDS * sizeof *grown);
 
     /* shmemalign: an address a multiple of the alignment asked. */
     void *aligned = shmemalign(ALIGNMENT, 100);
     uintptr_t address = (uintptr_t)aligned;
     if (planted && strcmp(plant, "align") == 0)
         address++;                  /* the planted defect: the address misread */
-    if (!aligned)
-        fail("shmemalign(%d, 100) returned NULL", ALIGNMENT);
-    else if (address % ALIGNMENT != 0)
+    if (!aligned || address % ALIGNMENT != 0)
         fail("shmemalign(%d, 100) returned %#lx, not a multiple of %d", ALIGNMENT,
              (unsigned long)address, ALIGNMENT);
     shfree(aligned);

@@ -113,6 +113,7 @@ enum pacer_plant {
     PACER_PLANT_DEPRECATED_AMO,     /* PE 1 misreads one deprecated atomic's return */
     PACER_PLANT_DEPRECATED_WAIT,    /* PE 1 writes one deprecated wait's word wrong */
     PACER_PLANT_DEPRECATED_WORD,    /* PE 1 sends one deprecated atomic a wrong value */
+    PACER_PLANT_WAITS_COUNT,        /* PE 1 misreads one count a _some form returned */
     PACER_PLANTS
 };
 

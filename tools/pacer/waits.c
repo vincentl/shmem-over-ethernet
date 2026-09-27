@@ -250,7 +250,7 @@ static struct {
     int *world;                     /* [n]: members' world PEs */
     unsigned char *words;           /* symmetric, room for WORDS of the widest type */
     long round;
-    int plant_value, plant_index, plant_excluded;
+    int plant_value, plant_index, plant_excluded, plant_count;
     double checked, phase[3];
 } waits;
 
@@ -272,6 +272,7 @@ static uint64_t waits_memory(int npes, const struct pacer_options *options, char
     waits.plant_value = options->plant == PACER_PLANT_WAITS_VALUE;
     waits.plant_index = options->plant == PACER_PLANT_WAITS_INDEX;
     waits.plant_excluded = options->plant == PACER_PLANT_WAITS_EXCLUDED;
+    waits.plant_count = options->plant == PACER_PLANT_WAITS_COUNT;
     snprintf(fields, size, "types=%d forms=%d comparisons=6 words=%d cases=%d", TYPES, FORMS,
              WORDS, CASES);
     return WORDS * 8 + (uint64_t)npes * sizeof(int);
@@ -324,27 +325,27 @@ static int meets(uint64_t have, int cmp, uint64_t value)
     }
 }
 
-/* An index an _any or _some form returned: left in by the status, its word
- * meeting the comparison. Marks it handled. */
+/* An index an _any or _some form returned: one of the words, left in by
+ * the status, its word meeting the comparison - one check, which says which
+ * of the three it is not. Marks it handled. */
 static void take(long round, const struct wait_type *type, enum form form, int c, size_t index,
                  int *status, const uint64_t *thresholds)
 {
-    int excluded = index < WORDS && status[index];
+    char why[64] = "";
+    if (index >= WORDS)
+        snprintf(why, sizeof why, "past the %d words", WORDS);
+    else if (status[index])
+        snprintf(why, sizeof why, "which the status excludes");
+    else if (!meets(type->load(word_at(type, index)), comparisons[c], thresholds[index]))
+        snprintf(why, sizeof why, "whose word holds %llu",
+                 (unsigned long long)type->load(word_at(type, index)));
     if (waits.plant_index && waits.me_world == 1) {
-        excluded = 1;               /* the planted defect: an index misjudged once */
+        snprintf(why, sizeof why, "which the status excludes");     /* the planted defect */
         waits.plant_index = 0;
     }
-    if (index >= WORDS)
-        pacer_failure("waits round=%ld %s %s %s: returned index %zu of %d words", round,
-                      type->name, form_names[form], comparison_names[c], index, WORDS);
-    else if (excluded)
-        pacer_failure("waits round=%ld %s %s %s: returned index %zu, which the status "
-                      "excludes", round, type->name, form_names[form], comparison_names[c],
-                      index);
-    else if (!meets(type->load(word_at(type, index)), comparisons[c], thresholds[index]))
-        pacer_failure("waits round=%ld %s %s %s: returned index %zu, whose word holds %llu",
-                      round, type->name, form_names[form], comparison_names[c], index,
-                      (unsigned long long)type->load(word_at(type, index)));
+    if (why[0])
+        pacer_failure("waits round=%ld %s %s %s: returned index %zu, %s", round, type->name,
+                      form_names[form], comparison_names[c], index, why);
     if (index < WORDS)
         status[index] = 1;
 }
@@ -468,6 +469,10 @@ static void wait_for(long round, const struct wait_type *type, enum form form, i
                                                generic);
             if (count == 0 && (form == TEST_SOME || form == TEST_SOME_VECTOR))
                 continue;           /* nothing yet */
+            if (waits.plant_count && waits.me_world == 1) {
+                count += WORDS;     /* the planted defect: a count misread once */
+                waits.plant_count = 0;
+            }
             if (count == 0 || count > (size_t)left) {
                 pacer_failure("waits round=%ld %s %s %s: returned %zu indices with %d words "
                               "left", round, type->name, form_names[form], comparison_names[c],
