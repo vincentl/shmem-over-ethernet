@@ -365,6 +365,8 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "deprecated round=54 barrier set=1:1:2: the first member counted 1 arrivals when it returned, expected 2")
   pacer_plant(deprecated-amo deprecated
     "deprecated round=56 int_set_fetch: returned [0-9]+, expected [0-9]+")
+  pacer_plant(deprecated-word deprecated
+    "deprecated round=57 int_swap: the word holds [0-9]+ after PE 1's, expected [0-9]+")
   pacer_plant(deprecated-wait deprecated
     "deprecated round=81 shmem_short_wait: the word from PE 1 holds [0-9]+, expected [0-9]+")
   pacer_plant(waits-value waits

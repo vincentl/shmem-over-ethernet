@@ -82,7 +82,7 @@ static const char *const plant_names[PACER_PLANTS] = {
     "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold", "print-route",
     "rma-signal", "waits-value", "waits-index", "waits-excluded", "deprecated-reduce",
     "deprecated-data", "deprecated-outside", "deprecated-barrier", "deprecated-amo",
-    "deprecated-wait"
+    "deprecated-wait", "deprecated-word"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -92,7 +92,7 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "memory", "collectives", "collectives", "collectives", "collectives", "atomics", "atomics",
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
     "memory", "print", "print", "rma", "waits", "waits", "waits", "deprecated", "deprecated",
-    "deprecated", "deprecated", "deprecated", "deprecated"
+    "deprecated", "deprecated", "deprecated", "deprecated", "deprecated"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -162,6 +162,7 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 skips its arrival at one active-set barrier",
     "PE 1 misreads one deprecated atomic's return",
     "PE 1 writes one deprecated wait's word wrong",
+    "PE 1 sends one deprecated atomic a wrong value",
 };
 
 static void usage(FILE *out)

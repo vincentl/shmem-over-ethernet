@@ -281,7 +281,8 @@ static struct {
     unsigned char *word;            /* symmetric, 16 bytes: the atomics' and waits' word */
     unsigned char *expected;        /* [bytes] */
     long round;
-    int plant_reduce, plant_data, plant_outside, plant_barrier, plant_amo, plant_wait;
+    int plant_reduce, plant_data, plant_outside, plant_barrier, plant_amo, plant_wait,
+        plant_word;
     double cases, phase[2];
 } old;
 
@@ -352,6 +353,7 @@ static uint64_t deprecated_memory(int npes, const struct pacer_options *options,
     old.plant_barrier = options->plant == PACER_PLANT_DEPRECATED_BARRIER;
     old.plant_amo = options->plant == PACER_PLANT_DEPRECATED_AMO;
     old.plant_wait = options->plant == PACER_PLANT_DEPRECATED_WAIT;
+    old.plant_word = options->plant == PACER_PLANT_DEPRECATED_WORD;
     snprintf(fields, size, "cases=%d to_all=%d amo=%d waits=%d sets=whole,even,odd,upper",
              CASES, TO_ALL_CASES, AMO_CASES, WAIT_CASES);
     uint64_t bytes = memory_needed(npes);
@@ -674,7 +676,12 @@ static void run_amo(long round, const struct amo_case *c, int generic)
 {
     int next = (old.me + 1) % old.n, previous = (old.me + old.n - 1) % old.n;
     uint64_t mine = amo_value(old.me, round), theirs = amo_value(previous, round);
-    uint64_t returned = c->apply(old.word, mine, AMO_START, next, generic);
+    uint64_t sent = mine;
+    if (old.plant_word && old.me == 1 && c->op != FINC && c->op != INC && c->op != SET_FETCH) {
+        sent++;                     /* the planted defect: one value sent wrong */
+        old.plant_word = 0;
+    }
+    uint64_t returned = c->apply(old.word, sent, AMO_START, next, generic);
     uint64_t want_returned = AMO_START;
     int returns = c->op == SWAP || c->op == CSWAP || c->op == FINC || c->op == FADD;
     if (c->op == SET_FETCH) {

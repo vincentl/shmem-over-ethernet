@@ -112,6 +112,7 @@ enum pacer_plant {
     PACER_PLANT_DEPRECATED_BARRIER, /* PE 1 skips its arrival at one active-set barrier */
     PACER_PLANT_DEPRECATED_AMO,     /* PE 1 misreads one deprecated atomic's return */
     PACER_PLANT_DEPRECATED_WAIT,    /* PE 1 writes one deprecated wait's word wrong */
+    PACER_PLANT_DEPRECATED_WORD,    /* PE 1 sends one deprecated atomic a wrong value */
     PACER_PLANTS
 };
 
