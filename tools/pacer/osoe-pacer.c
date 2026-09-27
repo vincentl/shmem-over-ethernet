@@ -130,7 +130,8 @@ static void usage(FILE *out)
 "                      how the sort moves keys: reserve by fetch-add and push\n"
 "                      (default), or exchange counts and pull\n"
 "  --no-ptr            put to node-mates rather than store through shmem_ptr\n"
-"  --threads T         the threads exercise's workers a PE (default 4)\n"
+"  --threads T         the threads exercise's workers a PE (default 4); T + 1\n"
+"                      at most OSOE_MAX_THREADS (the library's, default 16)\n"
 "  --teams-exhaust     the teams exercise splits until a split fails, and\n"
 "                      stops; teams must be the only exercise named\n"
 "  --stop-on-failure   end the job at the first checkpoint with a failure\n"
@@ -456,6 +457,17 @@ static int parse(int argc, char **argv)
             return refuse("--plant %s is caught by the %s exercise, which is not named",
                           plant_names[options.plant], plant_exercise[options.plant]);
     }
+    /* The library admits OSOE_MAX_THREADS threads of a PE at once, the main
+     * one among them (default 16, README); one more ends the job. */
+    for (int k = 0; k < chosen_count; k++)
+        if (chosen[k] == &pacer_threads) {
+            const char *text = getenv("OSOE_MAX_THREADS");
+            char *end = NULL;
+            long most = text ? strtol(text, &end, 10) : 16;
+            if ((!text || (end != text && !*end)) && options.threads + 1 > most)
+                return refuse("--threads %d: with the main thread, more than OSOE_MAX_THREADS=%ld "
+                              "admits; raise it, to 1023 at most", options.threads, most);
+        }
     return 0;
 }
 
