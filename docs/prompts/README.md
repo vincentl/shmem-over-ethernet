@@ -3,9 +3,12 @@
 **Where the files are.** The open brief sits here; every finished one is in
 `done/`, under its own name, which this index still gives.
 
-**Open now:** `phase1-step8-slice3-prompt.md`, lock-free issue on shareable
-contexts. The table below stops at step 4; the briefs after it are in `done/`
-and their outcomes in `docs/decisions/`.
+**Open now:** `task-stress-phase1.md`, the stress tester's first phase:
+`osoe-pacer` running, with `parallel_print`, the streaming bucket sort and
+all-to-all seven ways (the proposal is `docs/design/osoe-pacer-proposal.md`,
+the decisions `docs/decisions/2026-09-26-night.md`). The table below stops at
+step 4; the briefs after it are in `done/` and their outcomes in
+`docs/decisions/`.
 
 The brief each working session was given, kept so that a decision can be traced
 back to what was asked for as well as to what was done.
@@ -29,7 +32,8 @@ A fourth numbering shares the word and is unrelated: **§4.3's** phases 1, 1.5 a
 §7.1 step 4.
 
 `task-*.md` files are one-off jobs — a merge, a review — rather than a slice of a
-step.
+step; the stress tester's phases, which belong to no §7.1 step, are
+`task-stress-phaseN.md`.
 
 **RoCE in the briefs.** Several briefs give "a path to RoCE at ~10⁶ PEs that no
 interface blocks" as an axis to judge the work by. That axis stands: it is a

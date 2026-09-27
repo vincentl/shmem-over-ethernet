@@ -3586,7 +3586,7 @@ reused one by one, removes.
   owns it until its outermost wait ends, so `osoe-stat` shows one waiting
   thread whole; the other threads' waits show in their watch records.
 
-*As built, slice 3* (`docs/prompts/phase1-step8-slice3-prompt.md`;
+*As built, slice 3* (`docs/prompts/done/phase1-step8-slice3-prompt.md`;
 `transport-am.c`, `node.h` layout 24). Items 1, 2 and 4 as designed, over
 slice 2's structures:
 

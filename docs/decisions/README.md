@@ -80,6 +80,14 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Slurm stays installed in the VM,** and fixtures come from real Slurm and the Pi cluster. [2026-09-24-overnight](2026-09-24-overnight.md) items 5-6.
 - **Disk.** Merged worktrees are removed; uncommitted work is archived first. Author, [2026-09-26-overnight](2026-09-26-overnight.md) item 7.
 
+## Tools
+
+- **A stress tester, `osoe-pacer`**, in `tools/pacer/`, built in four phases (`docs/design/osoe-pacer-proposal.md`); every exercise verifies; not installed until phase 4 decides. Author and Claude, [2026-09-26-night](2026-09-26-night.md) items 1 and 4.
+- **`parallel_print` stays in the tool**, written against the OpenSHMEM API alone; `shmemx.h` stays empty. Author, [2026-09-26-night](2026-09-26-night.md) item 3.
+- **`parallel_print`'s labels** are world PE numbers in Slurm's bracket syntax, with the team's name before the bracket on any team but the world. Author, [2026-09-26-night](2026-09-26-night.md) item 2.
+- **The pacer's memory budget** defaults to half the heap; `--memory` takes a size or a share, refused with the `SHMEM_SYMMETRIC_SIZE` to set when the heap cannot hold it. Author, [2026-09-26-night](2026-09-26-night.md) item 5.
+- **The pacer's briefs are `task-stress-phaseN.md`.** Author, [2026-09-26-night](2026-09-26-night.md) item 7.
+
 ## License and release
 
 - **License: GNU LGPL, version 3 or any later version.** `COPYING` and `COPYING.LESSER`; `SPDX-License-Identifier: LGPL-3.0-or-later` on every source file. Author, [2026-09-26-evening](2026-09-26-evening.md) items 3 and 14.

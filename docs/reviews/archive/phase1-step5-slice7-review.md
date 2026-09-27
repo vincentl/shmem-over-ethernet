@@ -207,7 +207,7 @@ partial-set routine.
 
 ### N3 — nit: the brief does not match what was built
 
-**Where:** `docs/prompts/phase1-step5-slice7-prompt.md`.
+**Where:** `docs/prompts/done/phase1-step5-slice7-prompt.md`.
 
 - **Slot map.** Decision 2 lists 66 total, 67 offset, 68/69 second pass. The code uses
   66 total, 67 offset, 68 grand, 69/70 second pass.
