@@ -61,7 +61,8 @@ enum { FAILURE_LINES = 8, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
 
 static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_mailbox,
                                                       &pacer_teams, &pacer_atomics, &pacer_rma,
-                                                      &pacer_locks, &pacer_memory, &pacer_threads,
+                                                      &pacer_locks, &pacer_memory,
+                                                      &pacer_collectives, &pacer_threads,
                                                       &pacer_print };
 enum { KNOWN = sizeof known / sizeof *known };
 
@@ -73,14 +74,15 @@ static const char *const plant_names[PACER_PLANTS] = {
     "atomics-claim", "atomics-swap", "atomics-set", "atomics-bitwise", "atomics-fetched-bit",
     "rma-halo", "rma-put", "rma-gap", "rma-get", "rma-get-gap", "rma-ptr", "locks-count",
     "locks-holder", "memory-fill", "memory-calloc", "memory-align", "memory-accessible",
-    "memory-agree"
+    "memory-agree", "collectives-reduce", "collectives-scan", "collectives-data",
+    "collectives-gap"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
     "mailbox", "mailbox", "threads", "threads", "threads", "teams", "teams", "teams", "teams",
     "teams", "atomics", "atomics", "atomics", "atomics", "atomics", "atomics", "atomics", "rma",
     "rma", "rma", "rma", "rma", "rma", "locks", "locks", "memory", "memory", "memory", "memory",
-    "memory"
+    "memory", "collectives", "collectives", "collectives", "collectives"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -123,6 +125,10 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 misreads an aligned address",
     "PE 1 misreads one addr_accessible",
     "PE 1 misrecords one allocation",
+    "PE 1 gives one reduction an input its result cannot absorb",
+    "PE 1 gives one scan an input one too many",
+    "PE 1 offers one byte wrong to a gather",
+    "PE 1 writes a byte into a gap of its own alltoalls dest",
 };
 
 static void usage(FILE *out)
@@ -143,6 +149,9 @@ static void usage(FILE *out)
 "            type and size, strided, blocked, nonblocking, and by shmem_ptr\n"
 "  locks     distributed locks guarding counts that are not atomic\n"
 "  memory    the heap's routines, collective and checked, up to the budget\n"
+"  collectives\n"
+"            every collective on every type, and each timed from 8 B to\n"
+"            1 MiB on the world and on a strided team\n"
 "  threads   worker threads on private, serialized, default and team contexts;\n"
 "            only when named, since it runs under SHMEM_THREAD_MULTIPLE\n"
 "  print     parallel_print checking its own lines; only when named\n"
@@ -479,6 +488,7 @@ static int parse(int argc, char **argv)
         chosen[chosen_count++] = &pacer_rma;
         chosen[chosen_count++] = &pacer_locks;
         chosen[chosen_count++] = &pacer_memory;
+        chosen[chosen_count++] = &pacer_collectives;
     }
     /* Exhausting the job's team numbers leaves none for any exercise after. */
     if (options.teams_exhaust && (chosen_count != 1 || chosen[0] != &pacer_teams))

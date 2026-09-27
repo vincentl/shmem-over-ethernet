@@ -85,6 +85,10 @@ enum pacer_plant {
     PACER_PLANT_MEMORY_ALIGN,       /* PE 1 misreads an aligned address */
     PACER_PLANT_MEMORY_ACCESSIBLE,  /* PE 1 misreads one addr_accessible */
     PACER_PLANT_MEMORY_AGREE,       /* PE 1 misrecords one allocation */
+    PACER_PLANT_COLLECTIVES_REDUCE, /* PE 1 gives one reduction a forcing input */
+    PACER_PLANT_COLLECTIVES_SCAN,   /* PE 1 gives one scan an input one too many */
+    PACER_PLANT_COLLECTIVES_DATA,   /* PE 1 offers one byte wrong to a gather */
+    PACER_PLANT_COLLECTIVES_GAP,    /* PE 1 writes a byte into its alltoalls gap */
     PACER_PLANTS
 };
 
@@ -133,7 +137,8 @@ struct pacer_exercise {
 };
 
 extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_teams,
-    pacer_threads, pacer_print, pacer_atomics, pacer_rma, pacer_locks, pacer_memory;
+    pacer_threads, pacer_print, pacer_atomics, pacer_rma, pacer_locks, pacer_memory,
+    pacer_collectives;
 
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,

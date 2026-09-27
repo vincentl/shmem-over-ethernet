@@ -5,7 +5,7 @@
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
 add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
-  threads.c print.c atomics.c rma.c locks.c memory.c
+  threads.c print.c atomics.c rma.c locks.c memory.c collectives.c
   ${PROJECT_SOURCE_DIR}/base/size.c)
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR})
 find_package(Threads REQUIRED)
@@ -196,6 +196,15 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "memory round=0 [a-z_]+: a block of [0-9]+ bytes is accessible from this PE and not accessible from PE 2")
   pacer_plant(memory-agree memory
     "memory round=0: the PEs' allocations differ, hashes from [0-9a-f]+ to [0-9a-f]+")
+  # The collectives' four, each on the first case PE 1 takes part in.
+  pacer_plant(collectives-reduce collectives
+    "collectives round=0 and_reduce uchar world: element 0 is 0, expected [0-9]+")
+  pacer_plant(collectives-scan collectives
+    "collectives round=30 sum_inscan char world: element 0 is [0-9]+, expected [0-9]+")
+  pacer_plant(collectives-data collectives
+    "collectives round=65 fcollect float world: byte [0-9]+ is [0-9a-f]+, not what was sent")
+  pacer_plant(collectives-gap collectives
+    "collectives round=76 alltoalls int world: byte [0-9]+ is a5, where nothing lands")
   pacer_plant(teams-exhaust "teams;--teams-exhaust"
     "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
   pacer_plant(print-hash print
