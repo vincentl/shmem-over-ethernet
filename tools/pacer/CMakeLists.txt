@@ -4,7 +4,7 @@
 # (docs/design/osoe-pacer-proposal.md). Not installed. base/size.c is compiled
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
-add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c print.c
+add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c print.c
   ${PROJECT_SOURCE_DIR}/base/size.c)
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR})
 find_package(Threads REQUIRED)
@@ -98,6 +98,14 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "osoe-pacer failures=12 ")
   # PE 0 records this failure after two others, PEs 2 and 3 after one: the
   # line under all three says the failure lines are grouped by content.
+  # The mailbox's three: a payload word, a signal word's value, and the count
+  # of what arrived, which only the last checkpoint's pairwise check sees.
+  pacer_plant(mailbox-payload mailbox
+    "mailbox round=0 wait_until_all from PE 1: 1 of [0-9]+ payload words wrong. the first, word 1, is [0-9a-f]+")
+  pacer_plant(mailbox-signal mailbox
+    "mailbox round=3 wait_until_all_vector from PE 1: signal 2, expected 1")
+  pacer_plant(mailbox-count mailbox
+    "mailbox round=19 count: PE [0-9]+ sent [0-9]+ here, [0-9]+ were read")
   pacer_plant(print-hash print
     "print round=0 same: returned 2 lines, expected 1"
     ".0,2-3. print round=0 parity: returned 3 lines, expected 2"

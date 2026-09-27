@@ -57,15 +57,17 @@
 
 enum { FAILURE_LINES = 4, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
 
-static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_print };
+static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_mailbox,
+                                                      &pacer_print };
 enum { KNOWN = sizeof known / sizeof *known };
 
 static const char *const plant_names[PACER_PLANTS] = {
     "", "sort-key", "sort-order", "sort-range", "sort-capacity", "alltoall-byte", "alltoall-gap",
-    "print-hash"
+    "print-hash", "mailbox-payload", "mailbox-signal", "mailbox-count"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
-    "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print"
+    "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
+    "mailbox"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -76,6 +78,9 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 flips a byte of one block in every variant",
     "PE 1 writes a word into a gap of the next PE's strided dest",
     "PE 1 hashes other text than it prints",
+    "PE 1 flips a byte of its first message",
+    "PE 1 signals one message twice over",
+    "PE 1 counts one message it read twice",
 };
 
 static void usage(FILE *out)
@@ -85,9 +90,10 @@ static void usage(FILE *out)
 "Puts the library through its paces: whole-job patterns from real OpenSHMEM\n"
 "codes, every result checked against an oracle, a line a checkpoint.\n"
 "\n"
-"Exercises, sort and alltoall when none is named:\n"
+"Exercises, all but print when none is named:\n"
 "  sort      a streaming bucket sort, ISx's exchange: every key to its owner\n"
 "  alltoall  every-to-every exchange eight ways, on the world and on `even'\n"
+"  mailbox   messages with signals, waited for by every wait and test form\n"
 "  print     parallel_print checking its own lines; only when named\n"
 "\n"
 "Options:\n"
@@ -108,8 +114,9 @@ static void usage(FILE *out)
 "  --no-ptr            put to node-mates rather than store through shmem_ptr\n"
 "  --stop-on-failure   end the job at the first checkpoint with a failure\n"
 "  --plant DEFECT      plant a defect a check must catch: sort-key, sort-order,\n"
-"                      sort-range, sort-capacity, alltoall-byte, alltoall-gap\n"
-"                      or print-hash; always on PE 1, named in the header\n"
+"                      sort-range, sort-capacity, alltoall-byte, alltoall-gap,\n"
+"                      print-hash, mailbox-payload, mailbox-signal or\n"
+"                      mailbox-count; always on PE 1, named in the header\n"
 "  --help              this, before shmem_init\n"
 "\n"
 "The last line is \"osoe-pacer failures=N seconds=S\"; the exit status is 1\n"
@@ -278,7 +285,7 @@ static int parse(int argc, char **argv)
             while (k < KNOWN && strcmp(argument, known[k]->name) != 0)
                 k++;
             if (k == KNOWN)
-                return refuse("no exercise '%s': sort, alltoall, print", argument);
+                return refuse("no exercise '%s': sort, alltoall, mailbox, print", argument);
             int again = 0;
             for (int j = 0; j < chosen_count; j++)
                 again |= chosen[j] == known[k];
@@ -384,15 +391,17 @@ static int parse(int argc, char **argv)
                 k++;
             if (k == PACER_PLANTS)
                 return refuse("--plant '%s': sort-key, sort-order, sort-range, sort-capacity, "
-                              "alltoall-byte, alltoall-gap or print-hash", value);
+                              "alltoall-byte, alltoall-gap, print-hash, mailbox-payload, "
+                              "mailbox-signal or mailbox-count", value);
             options.plant = (enum pacer_plant)k;
         } else {
             return refuse("no option '%s'", name);
         }
     }
-    if (chosen_count == 0) {
+    if (chosen_count == 0) {        /* every exercise but print */
         chosen[chosen_count++] = &pacer_sort;
         chosen[chosen_count++] = &pacer_alltoall;
+        chosen[chosen_count++] = &pacer_mailbox;
     }
     if (options.plant != PACER_PLANT_NONE) {
         int present = 0;

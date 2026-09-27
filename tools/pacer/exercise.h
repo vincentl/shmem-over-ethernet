@@ -53,6 +53,9 @@ enum pacer_plant {
     PACER_PLANT_ALLTOALL_BYTE,      /* PE 1 flips a byte of one block, each variant */
     PACER_PLANT_ALLTOALL_GAP,       /* PE 1 writes a word into a gap of a strided dest */
     PACER_PLANT_PRINT_HASH,         /* PE 1 hashes other text than it prints */
+    PACER_PLANT_MAILBOX_PAYLOAD,    /* PE 1 flips a byte of its first message */
+    PACER_PLANT_MAILBOX_SIGNAL,     /* PE 1 signals one message twice over */
+    PACER_PLANT_MAILBOX_COUNT,      /* PE 1 counts one message it read twice */
     PACER_PLANTS
 };
 
@@ -96,7 +99,7 @@ struct pacer_exercise {
     void (*teardown)(void);
 };
 
-extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_print;
+extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_print;
 
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,
