@@ -434,6 +434,13 @@ static int gather_layout(void)
     return 0;
 }
 
+static void release_layout(void)
+{
+    free(layout.count);
+    free(layout.local);
+    free(layout.node);
+}
+
 struct host {
     const char *name;
     size_t prefix;                  /* the name's length before its trailing digits */
@@ -558,7 +565,7 @@ static const char *thread_level(void)
  * (§9.10), with no sync spent on it. */
 enum {
     SUM_WORK, SUM_BYTES, SUM_BATCH, SUM_FAILURES, SUMS,
-    MAX_STEP = 0, MAX_NEGATIVE_STEP, MAX_BATCH, MAX_ELAPSED, MAX_LINES, MAX_PHASE, MAXIMA =
+    MAX_STEP = 0, MAX_BATCH, MAX_ELAPSED, MAX_LINES, MAX_PHASE, MAXIMA =
         MAX_PHASE + PACER_PHASES
 };
 static double *sum_source, *sum_result, *max_source, *max_result;
@@ -620,7 +627,6 @@ static void run(const struct pacer_exercise *exercise, shmem_team_t team)
         double sums[SUMS], maxima[MAXIMA];
         memcpy(sums, sum_result, sizeof sums);
         max_source[MAX_STEP] = seconds;
-        max_source[MAX_NEGATIVE_STEP] = -seconds;
         max_source[MAX_BATCH] = counters.batch;
         max_source[MAX_ELAPSED] = pacer_now() - start;
         max_source[MAX_LINES] = failures.lines;
@@ -836,6 +842,7 @@ int main(int argc, char **argv)
         }
     }
     if (refused) {
+        release_layout();
         parallel_print_finalize();
         shmem_finalize();
         return 2;
@@ -864,6 +871,7 @@ int main(int argc, char **argv)
     shmem_free(max_source);
     shmem_free(sum_result);
     shmem_free(sum_source);
+    release_layout();
     parallel_print_finalize();
     shmem_finalize();
     return failures_total != 0;

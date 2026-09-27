@@ -22,8 +22,9 @@
  *   teardown    free
  *
  * After each step the driver reduces the counters over the team - the sums of
- * work, bytes, batches and failures; the largest of each phase's seconds and
- * of the batches; the longest and shortest step - prints the checkpoint line
+ * work, bytes, batches and failures; the largest of each phase's seconds, of
+ * the batches and of the step itself (the shortest step would say nothing:
+ * every step ends in a collective of the team) - prints the checkpoint line
  * from the team's rank 0 and the failure lines through parallel_print, and
  * adapts `units` so that a step takes about --report seconds. Under --rounds a
  * checkpoint is a round. Nothing here needs a thread.
