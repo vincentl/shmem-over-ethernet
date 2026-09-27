@@ -82,7 +82,7 @@ static struct {
     int size_count;
     size_t largest;                 /* elements a block, at most */
     uint64_t seed;
-    int plant;
+    int plant_byte, plant_gap;
     /* the teams: the exercise's and even */
     shmem_team_t teams[TEAMS];
     int *world[TEAMS];              /* team rank to world PE */
@@ -193,7 +193,8 @@ static uint64_t alltoall_memory(int npes, const struct pacer_options *options, c
                  " variants=alltoall,alltoallmem,alltoalls,put,get,signal,iput,ibput");
     alltoall.largest = alltoall.sizes[alltoall.size_count - 1] / 8;
     alltoall.seed = options->seed;
-    alltoall.plant = options->plant == PACER_PLANT_ALLTOALL_BYTE;
+    alltoall.plant_byte = options->plant == PACER_PLANT_ALLTOALL_BYTE;
+    alltoall.plant_gap = options->plant == PACER_PLANT_ALLTOALL_GAP;
     return bytes;
 }
 
@@ -303,12 +304,19 @@ static void run_exchange(int t, int s, enum variant v)
         for (size_t e = 0; e < words; e++)
             source[source_index(v, j, e, words, n)] = word(base, e);
     }
-    if (alltoall.plant && alltoall.me_world == 1)
+    if (alltoall.plant_byte && alltoall.me_world == 1)
         ((unsigned char *)&source[source_index(v, (me + 1) % n, 0, words, n)])[0] ^= 1;
     double filled = pacer_now();
     alltoall.phase[0] += filled - started;
 
     shmem_team_sync(team);
+    if (v == COLLECTIVE_STRIDED && alltoall.plant_gap && alltoall.me_world == 1) {
+        /* The planted defect: a word into a gap of the next PE's dest, put and
+         * quieted before this PE enters the exchange that PE's return waits
+         * on - so it is there, every time, when that PE checks. */
+        shmem_uint64_p(dest + 1, ~CANARY, world[(me + 1) % n]);
+        shmem_quiet();
+    }
     double begin = pacer_now();
     switch (v) {
     case COLLECTIVE:
@@ -407,10 +415,10 @@ static void run_exchange(int t, int s, enum variant v)
                       origin);
     }
     if (trampled)
-        pacer_failure("alltoall round=%ld team=%s block=%zu %s: %zu words outside the blocks "
+        pacer_failure("alltoall round=%ld team=%s block=%zu %s: %zu %s outside the blocks "
                       "written; the first at word %zu of dest, %016llx", alltoall.unit, name,
-                      bytes, variant_names[v], trampled, first_gap,
-                      (unsigned long long)dest[first_gap]);
+                      bytes, variant_names[v], trampled, trampled == 1 ? "word" : "words",
+                      first_gap, (unsigned long long)dest[first_gap]);
     alltoall.phase[2] += pacer_now() - end;
 
     if (v == GET)

@@ -40,14 +40,20 @@
 enum pacer_sort_mode { PACER_SORT_ROUNDS, PACER_SORT_ACCUMULATE };
 enum pacer_exchange { PACER_EXCHANGE_FETCH_ADD, PACER_EXCHANGE_ALLTOALL };
 
-/* The planted defects of --plant (the brief's decision 9): each makes one
- * oracle fire, so that a ctest run can assert it still does. */
+/* The planted defects of --plant (the brief's decision 9, and three more the
+ * author added on 2026-09-27 so that every check has one): each makes its
+ * check fire - the capacity one the oracle too, since refused keys are lost -
+ * so that a ctest run can assert it still does. */
 enum pacer_plant {
     PACER_PLANT_NONE,
     PACER_PLANT_SORT_KEY,           /* PE 1 changes a key after counting it */
-    PACER_PLANT_SORT_ORDER,         /* PE 1 skips one round's local sort */
+    PACER_PLANT_SORT_ORDER,         /* PE 1 skips its first local sort */
+    PACER_PLANT_SORT_RANGE,         /* PE 1 sends a key to the PE after its owner */
+    PACER_PLANT_SORT_CAPACITY,      /* PE 1 reserves, or declares, more than a PE holds */
     PACER_PLANT_ALLTOALL_BYTE,      /* PE 1 flips a byte of one block, each variant */
+    PACER_PLANT_ALLTOALL_GAP,       /* PE 1 writes a word into a gap of a strided dest */
     PACER_PLANT_PRINT_HASH,         /* PE 1 hashes other text than it prints */
+    PACER_PLANTS
 };
 
 struct pacer_options {

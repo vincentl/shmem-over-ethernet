@@ -98,7 +98,7 @@ static struct {
     long cycle;                     /* accumulate: rounds a cycle */
     int accumulate, push, use_ptr;
     uint64_t seed;
-    int plant_key, plant_order;
+    int plant_key, plant_order, plant_range, plant_capacity;
     /* the team */
     shmem_team_t team;
     int n, me, me_world, my_index;
@@ -180,6 +180,8 @@ static uint64_t sort_memory(int npes, const struct pacer_options *options, char 
     sort.seed = options->seed;
     sort.plant_key = options->plant == PACER_PLANT_SORT_KEY;
     sort.plant_order = options->plant == PACER_PLANT_SORT_ORDER;
+    sort.plant_range = options->plant == PACER_PLANT_SORT_RANGE;
+    sort.plant_capacity = options->plant == PACER_PLANT_SORT_CAPACITY;
 
     char private_text[32];
     pacer_size(private_text, sizeof private_text, private_bytes);
@@ -319,6 +321,17 @@ static int planted_key(long round, uint64_t first)
     return sort.plant_key && sort.me_world == 1 && round == 0 && first == 0;
 }
 
+/* The node-major index a key goes to: its owner's - but for the planted range
+ * defect, PE 1's first key of round 0 goes to the PE after its owner, where
+ * it is still counted, so that the range check alone can see it. */
+static int destination(uint64_t key, long round, uint64_t first, size_t i)
+{
+    int index = owner(key);
+    if (sort.plant_range && sort.me_world == 1 && round == 0 && first == 0 && i == 0)
+        index = (index + 1) % sort.n;
+    return index;
+}
+
 /* ---- the local sorts -------------------------------------------------------- */
 
 /* LSD radix, four passes of 16-bit digits between keys and scratch, ending in
@@ -452,6 +465,21 @@ static void check_batch(uint64_t *keys, uint64_t count, long round)
     sort.phase[CHECK] += pacer_now() - sorted;
 }
 
+/* The push exchange's batch, from its cursor. A cursor past the capacity
+ * means reservations were refused, and their ranges never written: the buffer
+ * has holes, and checking it would only report its garbage. So the overflow
+ * is said once, and the batch left out - which the oracle then sees. */
+static void check_received(uint64_t *keys, uint64_t cursor, long round)
+{
+    if (cursor <= sort.capacity) {
+        check_batch(keys, cursor, round);
+        return;
+    }
+    pacer_failure("sort round=%ld capacity: reservations here reached %llu keys, past the %llu "
+                  "this PE holds; its batch goes unchecked", round, (unsigned long long)cursor,
+                  (unsigned long long)sort.capacity);
+}
+
 /* ---- the push exchange -------------------------------------------------------- */
 
 static void send_bin(int index, int parity, long round, int early)
@@ -461,11 +489,16 @@ static void send_bin(int index, int parity, long round, int early)
     uint64_t *bin = sort.staging + (size_t)index * sort.bin_capacity;
     int pe = sort.world[sort.order[index]];
     uint64_t *receive = sort.receive[parity];
-    uint64_t offset = shmem_uint64_atomic_fetch_add(&sort.cursors[parity], count, pe);
-    if (offset + count > sort.capacity) {
+    uint64_t reserve = count;
+    if (sort.plant_capacity && sort.me_world == 1) {
+        reserve += sort.capacity;   /* the planted defect: one reservation too many */
+        sort.plant_capacity = 0;
+    }
+    uint64_t offset = shmem_uint64_atomic_fetch_add(&sort.cursors[parity], reserve, pe);
+    if (offset + reserve > sort.capacity) {
         pacer_failure("sort round=%ld capacity: PE %d holds %llu keys; a reservation of %llu "
                       "reached %llu", round, pe, (unsigned long long)sort.capacity,
-                      (unsigned long long)count, (unsigned long long)(offset + count));
+                      (unsigned long long)reserve, (unsigned long long)(offset + reserve));
     } else {
         uint64_t *remote = sort.use_ptr ? shmem_ptr(receive, pe) : NULL;
         if (remote)
@@ -496,7 +529,7 @@ static void round_push(long round)
         sort.send_seconds = 0;
         for (size_t i = 0; i < m; i++) {
             uint64_t k = sort.chunk[i];
-            int index = owner(k);
+            int index = destination(k, round, first, i);
             sort.staging[(size_t)index * sort.bin_capacity + sort.fill[index]++] = k;
             if (sort.fill[index] == sort.bin_capacity)
                 send_bin(index, parity, round, 1);
@@ -518,7 +551,7 @@ static void round_push(long round)
 
     if (!sort.accumulate) {
         uint64_t cursor = shmem_uint64_atomic_fetch(&sort.cursors[parity], sort.me_world);
-        check_batch(sort.receive[parity], cursor < sort.capacity ? cursor : sort.capacity, round);
+        check_received(sort.receive[parity], cursor, round);
         /* Completed by the next round's quiet, before its sync. */
         shmem_uint64_atomic_set(&sort.cursors[parity], 0, sort.me_world);
     }
@@ -537,7 +570,7 @@ static void round_pull(long round)
         generate(&state, m, counted);
         double binning = pacer_now();
         for (size_t i = 0; i < m; i++)
-            sort.fill[owner(sort.chunk[i])]++;
+            sort.fill[destination(sort.chunk[i], round, first, i)]++;
         sort.phase[BIN] += pacer_now() - binning;
     }
     uint64_t offset = 0;
@@ -552,7 +585,7 @@ static void round_pull(long round)
         double binning = pacer_now();
         for (size_t i = 0; i < m; i++) {
             uint64_t k = sort.chunk[i];
-            int index = owner(k);
+            int index = destination(k, round, first, i);
             if (i == 0 && planted_key(round, first))
                 k ^= 1;             /* in the bin its original chose */
             sort.staging[sort.next[index]++] = k;
@@ -563,6 +596,11 @@ static void round_pull(long round)
         int index = sort.index_of[j];
         sort.pairs_out[2 * j] = sort.fill[index];
         sort.pairs_out[2 * j + 1] = sort.next[index] - sort.fill[index];
+    }
+    if (sort.plant_capacity && sort.me_world == 1) {
+        /* The planted defect: one count declared larger than the receiver holds. */
+        sort.pairs_out[2 * ((sort.me + 1) % n)] += sort.capacity;
+        sort.plant_capacity = 0;
     }
 
     double exchanging = pacer_now();
@@ -599,15 +637,13 @@ static void round_pull(long round)
 
 static void close_cycle(long round)
 {
-    uint64_t count;
     if (sort.push) {
         /* Nothing is sent until the sync below, so the cursor is still. */
         uint64_t cursor = shmem_uint64_atomic_fetch(&sort.cursors[0], sort.me_world);
-        count = cursor < sort.capacity ? cursor : sort.capacity;
+        check_received(sort.receive[0], cursor, round);
     } else {
-        count = sort.received;
+        check_batch(sort.receive[0], sort.received, round);
     }
-    check_batch(sort.receive[0], count, round);
     sort.generated.count += sort.open_generated.count;
     sort.generated.sum += sort.open_generated.sum;
     sort.generated.xor ^= sort.open_generated.xor;

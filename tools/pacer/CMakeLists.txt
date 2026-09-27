@@ -50,27 +50,51 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
     FAIL_REGULAR_EXPRESSION "${pacer_failed}")
 
-  # The planted defects: each oracle must still fire. A run that found a
-  # failure exits 1 by design, on every PE, so these run the launcher with -k -
-  # a PE that exits first must not have the others killed in their finalize -
-  # and fail only on a signal, the timeout or leftovers. The pattern is the
-  # failure line, then the nonzero count: CMake's `.` crosses lines.
-  foreach(plant IN ITEMS
-      "sort-key|sort|sort round=0 oracle: sum generated [0-9a-f]+, received [0-9a-f]+"
-      "sort-order|sort|sort round=0 order: [0-9]+ keys follow a larger one"
-      "alltoall-byte|alltoall|alltoall round=0 team=world block=8 alltoall: 1 of [0-9]+ words wrong; the first, word 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+: it matches no word sent"
-      "print-hash|print|print round=0 same: returned 2 lines, expected 1")
-    string(REPLACE "|" ";" plant "${plant}")
-    list(GET plant 0 defect)
-    list(GET plant 1 exercise)
-    list(GET plant 2 line)
+  # The planted defects: each check must still fire - the brief's four, and
+  # three more the author added on 2026-09-27 so that every check has one (the
+  # capacity plant loses keys, so the oracle fires beside it). Every line a
+  # plant's checks must print is required, each on its own, by
+  # cmake/PacerPlant.cmake: several PEs' lines come in an order that depends
+  # on who reserved first, and one pattern of "line, then count" would let
+  # every check but the first go quiet unnoticed. The alltoall's totals say
+  # that all eight variants caught it, every exchange. A `.` stands for each
+  # `;` of a line, which would otherwise split the list of patterns.
+  function(pacer_plant defect exercise)
     add_test(NAME tools.pacer.plant.${defect}
-      COMMAND osoe-launch -k -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick
-              --plant ${defect} ${exercise})
-    set_tests_properties(tools.pacer.plant.${defect} PROPERTIES LABELS "tier2" TIMEOUT 300
-      PASS_REGULAR_EXPRESSION "${line}.*osoe-pacer failures=[1-9]"
-      FAIL_REGULAR_EXPRESSION "killed by signal|timeout after|left behind")
-  endforeach()
+      COMMAND ${CMAKE_COMMAND} -DLAUNCH=$<TARGET_FILE:osoe-launch>
+              -DPACER=$<TARGET_FILE:osoe-pacer>
+              "-DARGUMENTS=--quick;--plant;${defect};${exercise}" "-DPATTERNS=${ARGN}"
+              "-DFAIL=killed by signal|timeout after|left behind"
+              -P ${PROJECT_SOURCE_DIR}/cmake/PacerPlant.cmake)
+    set_tests_properties(tools.pacer.plant.${defect} PROPERTIES LABELS "tier2" TIMEOUT 300)
+  endfunction()
+  pacer_plant(sort-key sort
+    "sort round=0 oracle: sum generated [0-9a-f]+, received [0-9a-f]+"
+    "sort round=0 oracle: xor generated [0-9a-f]+, received [0-9a-f]+"
+    "osoe-pacer failures=[1-9]")
+  pacer_plant(sort-order sort
+    "sort round=0 order: [0-9]+ keys follow a larger one. the first at [0-9]+ of [0-9]+"
+    "osoe-pacer failures=[1-9]")
+  pacer_plant(sort-range sort
+    "sort round=0 range: 1 of [0-9]+ keys belong elsewhere. the first, [0-9a-f]+, is PE [0-9]+'s"
+    "osoe-pacer failures=[1-9]")
+  pacer_plant(sort-capacity sort
+    "sort round=0 capacity: PE [0-9]+ holds [0-9]+ keys. a reservation of [0-9]+ reached [0-9]+"
+    "sort round=0 capacity: reservations here reached [0-9]+ keys, past the [0-9]+ this PE holds. its batch goes unchecked"
+    "sort round=0 oracle: count generated [0-9]+, received [0-9]+"
+    "osoe-pacer failures=[1-9]")
+  pacer_plant(alltoall-byte alltoall
+    "alltoall round=0 team=world block=8 alltoall: 1 of [0-9]+ words wrong. the first, word 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+: it matches no word sent"
+    "summary alltoall rounds=12 exchanges=[0-9]+ seconds=[0-9.]+ exchanges_per_s=[0-9]+ failures=96"
+    "osoe-pacer failures=96 ")
+  pacer_plant(alltoall-gap alltoall
+    "alltoall round=0 team=world block=8 alltoalls: 1 word outside the blocks written. the first at word 1 of dest, [0-9a-f]+"
+    "summary alltoall rounds=12 exchanges=[0-9]+ seconds=[0-9.]+ exchanges_per_s=[0-9]+ failures=12"
+    "osoe-pacer failures=12 ")
+  pacer_plant(print-hash print
+    "print round=0 same: returned 2 lines, expected 1"
+    "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
+    "osoe-pacer failures=[1-9]")
 
   # parallel_print checking its own lines, which pins the label format.
   foreach(map IN ITEMS 0,0,1,1 0,1,2,3)

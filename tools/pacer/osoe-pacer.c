@@ -59,9 +59,13 @@ enum { FAILURE_LINES = 4, FAILURE_LINE = 320 };
 static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoall, &pacer_print };
 enum { KNOWN = sizeof known / sizeof *known };
 
-static const char *const plant_names[] = { "", "sort-key", "sort-order", "alltoall-byte",
-                                           "print-hash" };
-static const char *const plant_exercise[] = { "", "sort", "sort", "alltoall", "print" };
+static const char *const plant_names[PACER_PLANTS] = {
+    "", "sort-key", "sort-order", "sort-range", "sort-capacity", "alltoall-byte", "alltoall-gap",
+    "print-hash"
+};
+static const char *const plant_exercise[PACER_PLANTS] = {
+    "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print"
+};
 
 static void usage(FILE *out)
 {
@@ -92,8 +96,9 @@ static void usage(FILE *out)
 "                      (default), or exchange counts and pull\n"
 "  --no-ptr            put to node-mates rather than store through shmem_ptr\n"
 "  --stop-on-failure   end the job at the first checkpoint with a failure\n"
-"  --plant DEFECT      plant a defect an oracle must catch: sort-key,\n"
-"                      sort-order, alltoall-byte or print-hash\n"
+"  --plant DEFECT      plant a defect a check must catch: sort-key, sort-order,\n"
+"                      sort-range, sort-capacity, alltoall-byte, alltoall-gap\n"
+"                      or print-hash; always on PE 1, named in the header\n"
 "  --help              this, before shmem_init\n"
 "\n"
 "The last line is \"osoe-pacer failures=N seconds=S\"; the exit status is 1\n"
@@ -364,11 +369,11 @@ static int parse(int argc, char **argv)
                 return refuse("--exchange '%s': fetch-add or alltoall", value);
         } else if (strcmp(name, "--plant") == 0) {
             int k = 1;
-            while (k <= PACER_PLANT_PRINT_HASH && strcmp(value, plant_names[k]) != 0)
+            while (k < PACER_PLANTS && strcmp(value, plant_names[k]) != 0)
                 k++;
-            if (k > PACER_PLANT_PRINT_HASH)
-                return refuse("--plant '%s': sort-key, sort-order, alltoall-byte or print-hash",
-                              value);
+            if (k == PACER_PLANTS)
+                return refuse("--plant '%s': sort-key, sort-order, sort-range, sort-capacity, "
+                              "alltoall-byte, alltoall-gap or print-hash", value);
             options.plant = (enum pacer_plant)k;
         } else {
             return refuse("no option '%s'", name);
