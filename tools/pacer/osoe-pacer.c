@@ -192,6 +192,8 @@ static void usage(FILE *out)
 "  --teams-exhaust     the teams exercise splits until a split fails, and\n"
 "                      stops; teams must be the only exercise named\n"
 "  --stop-on-failure   end the job at the first checkpoint with a failure\n"
+"  --coverage FILE     osoe-pacer-counted only: which routines were called, how\n"
+"                      often, and which never were, into FILE\n"
 "  --plant DEFECT      plant a defect a check must catch, from the list below;\n"
 "                      always on PE 1, and named in the header\n"
 "  --help              this, before shmem_init\n"
@@ -330,6 +332,12 @@ void pacer_size(char *text, size_t size, uint64_t bytes)
 
 /* ---- The command line --------------------------------------------------- */
 
+/* Where osoe-pacer-counted writes which routines were called (--coverage). */
+static const char *coverage;
+#ifdef PACER_COUNTED
+void pacer_shim_report(const char *path);   /* the generated shim's, collective */
+#endif
+
 static struct pacer_options options = {
     .seconds = 60, .report = 5, .seed = 1, .use_ptr = 1, .threads = 4,
 };
@@ -414,7 +422,7 @@ static int parse(int argc, char **argv)
         }
         static const char *const valued[] = { "--seconds", "--report", "--rounds", "--seed",
                                               "--memory", "--sort", "--exchange", "--plant",
-                                              "--threads" };
+                                              "--threads", "--coverage" };
         int takes = 0;
         for (size_t k = 0; k < sizeof valued / sizeof *valued; k++)
             takes |= strcmp(name, valued[k]) == 0;
@@ -445,6 +453,12 @@ static int parse(int argc, char **argv)
             if (end == value || *end || count < 1 || count > 1023)
                 return refuse("--threads '%s': a whole number from 1 to 1023", value);
             options.threads = (int)count;
+        } else if (strcmp(name, "--coverage") == 0) {
+#ifdef PACER_COUNTED
+            coverage = value;
+#else
+            return refuse("--coverage: this build counts nothing; osoe-pacer-counted does");
+#endif
         } else if (strcmp(name, "--seed") == 0) {
             char *end;
             unsigned long long seed = strtoull(value, &end, 0);
@@ -1148,6 +1162,10 @@ int main(int argc, char **argv)
     shmem_free(sum_source);
     release_layout();
     parallel_print_finalize();
+#ifdef PACER_COUNTED
+    if (coverage)
+        pacer_shim_report(coverage);
+#endif
     shmem_finalize();
     return failures_total != 0;
 }

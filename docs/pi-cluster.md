@@ -216,7 +216,32 @@ OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1 OSOE_GET_LANDING_BYTES=8192 \
 
 Each must end `failures=0`; the hour must also print no `OSOE_CHECK_QUIET:`
 line - the hook's own race is fixed (`docs/decisions/2026-09-27.md` item 10),
-so one now would be a finding. `--teams-exhaust teams`, alone, splits until the
+so one now would be a finding.
+
+Phase 3's exercises join the default set and take ten minutes each in
+`release`: `atomics` (every atomic operation of every type, on three contexts),
+`rma` (a fenced halo from 8 B to 1 MiB and every transfer of every type and
+size), `locks`, `memory` (the heap's routines, collective, up to three quarters
+of the budget and back) and `collectives` (every typed collective, and each
+collective timed from 8 B to 1 MiB on the world and on the even PEs, its
+summary lines the slowest PE's median and the fastest call):
+
+```sh
+for e in atomics rma locks memory collectives; do
+    srun -K1 -N4 --ntasks-per-node=4 $P --seconds 600 $e > pacer-$e.txt
+done
+```
+
+`osoe-pacer-counted`, built beside the tool, is the same program with a shim
+that counts every call of every routine the library declares; `--coverage
+FILE` writes which were called, how often, and which never were. One default
+run of every exercise gives the list:
+
+```sh
+C=build/release/tools/pacer/osoe-pacer-counted
+srun -K1 -N4 --ntasks-per-node=4 $C --quick --coverage coverage.txt sort alltoall \
+    mailbox teams atomics rma locks memory collectives threads print
+``` `--teams-exhaust teams`, alone, splits until the
 job's team numbers are gone and checks that the split refuses alike on every
 PE; it is a test's, not a measurement.
 
