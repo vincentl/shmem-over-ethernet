@@ -254,8 +254,27 @@ void osoe_transport_threads(bool concurrent)
 static bool check_quiet;
 static bool perturbing;
 static _Atomic uint64_t issue_clock;      /* nonblocking get calls returned */
-static _Atomic uint64_t *issue_stamp;     /* per extent: its call's clock, or unstamped */
+/*
+ * Per extent, the stamp of the call whose get it holds: that piece's issue
+ * number in the high 24 bits and the call's clock in the low 40, the clock all
+ * ones until the call returns. The issue number is there because a call
+ * stamps its extents only as it returns, and by then one may have been
+ * recycled - its reply landed, another thread copied it out and freed it, and
+ * a later get took the extent. So a stamp is a compare-and-swap from its own
+ * issue's unstamped word, and a late one lands nowhere else. As a plain store
+ * it stamped a stranger's get with an earlier call's clock, and a wait that
+ * began between the two read that get as one it had to complete: the
+ * OSOE_CHECK_QUIET firing of 2026-09-26, reproduced by osoe-pacer's threads
+ * exercise on 2026-09-27 in 5 of 11 runs, and in 0 of 12 once stamps were
+ * owned (docs/decisions/2026-09-27.md). A stamp 16 million issues late would
+ * wrap onto a live one; none is.
+ */
+static _Atomic uint64_t *issue_stamp;
 #define UNSTAMPED UINT64_MAX
+#define STAMP_BITS 40
+#define STAMP_MASK ((UINT64_C(1) << STAMP_BITS) - 1)
+#define ISSUE_MASK ((UINT64_C(1) << (64 - STAMP_BITS)) - 1)
+static _Atomic uint64_t issue_count;      /* nonblocking get pieces issued */
 
 static void perturb(void)
 {
@@ -1249,20 +1268,25 @@ static void pending_add(struct osoe_transport_context *c, uint32_t extent, uint6
  * no room - copies it into `dst`.
  */
 /* OSOE_CHECK_QUIET: the extents of the nonblocking get call in progress on
- * this thread, stamped together when the call returns. */
+ * this thread, and each one's issue number, stamped together when the call
+ * returns. */
 static _Thread_local uint32_t *call_extents;
+static _Thread_local uint64_t *call_issues;
 static _Thread_local uint32_t call_extent_count, call_extent_capacity;
 
-static void call_extent_add(uint32_t extent)
+static void call_extent_add(uint32_t extent, uint64_t issue)
 {
     if (call_extent_count == call_extent_capacity) {
         uint32_t capacity = call_extent_capacity ? 2 * call_extent_capacity : 16;
         uint32_t *grown = realloc(call_extents, capacity * sizeof *grown);
-        if (!grown)
+        uint64_t *issues = realloc(call_issues, capacity * sizeof *issues);
+        if (!grown || !issues)
             osoe_fatal("out of memory for OSOE_CHECK_QUIET's stamps");
         call_extents = grown;
+        call_issues = issues;
         call_extent_capacity = capacity;
     }
+    call_issues[call_extent_count] = issue;
     call_extents[call_extent_count++] = extent;
 }
 
@@ -1282,8 +1306,11 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
         uint32_t n = len > limit ? limit : (uint32_t)len;
         uint32_t extent = make_room(extents_for(n), "shmem_get_nbi");
         if (issue_stamp) {
-            atomic_store_explicit(&issue_stamp[extent], UNSTAMPED, memory_order_seq_cst);
-            call_extent_add(extent);
+            uint64_t issue = (atomic_fetch_add_explicit(&issue_count, 1, memory_order_seq_cst) +
+                              1) & ISSUE_MASK;
+            atomic_store_explicit(&issue_stamp[extent], (issue << STAMP_BITS) | STAMP_MASK,
+                                  memory_order_seq_cst);
+            call_extent_add(extent, issue);
         }
         unsigned pair = 0;
         if (c->concurrent) {
@@ -1338,8 +1365,15 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
     }
     if (issue_stamp) {
         uint64_t stamp = atomic_fetch_add_explicit(&issue_clock, 1, memory_order_seq_cst) + 1;
-        for (uint32_t i = 0; i < call_extent_count; i++)
-            atomic_store_explicit(&issue_stamp[call_extents[i]], stamp, memory_order_seq_cst);
+        for (uint32_t i = 0; i < call_extent_count; i++) {
+            uint64_t unstamped = (call_issues[i] << STAMP_BITS) | STAMP_MASK;
+            atomic_compare_exchange_strong_explicit(
+                &issue_stamp[call_extents[i]], &unstamped,
+                (call_issues[i] << STAMP_BITS) | (stamp & STAMP_MASK), memory_order_seq_cst,
+                memory_order_seq_cst);
+        }
+        free(call_issues);
+        call_issues = NULL;
         /* Freed with the call, not kept per thread: a thread-local list would
          * outlive its thread (asan, the verification of slice 3). */
         free(call_extents);
@@ -1735,8 +1769,8 @@ static void promise_check(const struct osoe_transport_context *c, struct quiet_p
         if (!(token & OSOE_LANDING_NONBLOCKING) ||
             ((token >> OSOE_LANDING_OWNER_SHIFT) & OSOE_LANDING_OWNER_MASK) != c->block)
             continue;
-        uint64_t stamp = atomic_load_explicit(&issue_stamp[e], memory_order_seq_cst);
-        if (stamp != UNSTAMPED && stamp <= p->clock)
+        uint64_t stamp = atomic_load_explicit(&issue_stamp[e], memory_order_seq_cst) & STAMP_MASK;
+        if (stamp != STAMP_MASK && stamp <= p->clock)
             osoe_fatal("OSOE_CHECK_QUIET: %s returned with a nonblocking get in flight that "
                        "returned before it was called (extent %u, call %llu of %llu)",
                        routine, e, (unsigned long long)stamp, (unsigned long long)p->clock);

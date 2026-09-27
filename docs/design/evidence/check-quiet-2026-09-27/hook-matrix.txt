@@ -1,0 +1,11 @@
+none: 0 mutated lines
+none [both hooks]: 0/10 failed. 
+noretag: 1 mutated lines
+noretag [both hooks]: 10/10 failed. osoe: PE 5: OSOE_CHECK_QUIET: shmem_quiet returned with a nonblocking get in flight that returned before it was called (extent 2, call 2 of 2)
+plain_max: 1 mutated lines
+plain_max [both hooks]: 10/10 failed. osoe: PE 2: OSOE_CHECK_QUIET: shmem_pe_quiet returned with node 0 acknowledged through segment 195, and this context had written through 196 before the call
+pe_quiet_stores_full: 1 mutated lines
+pe_quiet_stores_full [both hooks]: 10/10 failed. osoe: PE 1: OSOE_CHECK_QUIET: shmem_quiet returned with node 0 acknowledged through segment 3570, and this context had written through 3571 before the call
+bit_first_moved: 1 mutated lines
+bit_first_moved [both hooks]: 10/10 failed. osoe: PE 0: OSOE_CHECK_QUIET: shmem_quiet returned with node 1 acknowledged through segment 419, and this context had written through 421 before the call
+DONE

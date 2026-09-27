@@ -1,0 +1,11 @@
+osoe-pacer library=osoe version=1.6 thread=multiple pes=6 nodes=3 layout=3,2,1 hosts=lima-osoe heap=256m memory=128m seed=1 report=5 exercises=threads
+exercise threads threads=4 contexts=private,serialized,default,team row=128 gets=4 counters=8 seconds=15 memory=5.4k
+threads t=0.0 round=1 operations=1056 operations_per_s=267732 private_s=0.005 serialized_s=0.003 default_s=0.004 team_s=0.004 step_s=0.004 failures=0
+threads t=0.0 round=9 operations=9504 operations_per_s=363303 private_s=0.017 serialized_s=0.016 default_s=0.031 team_s=0.027 step_s=0.023 failures=0
+threads t=0.2 round=73 operations=77088 operations_per_s=408339 private_s=0.100 serialized_s=0.102 default_s=0.227 team_s=0.221 step_s=0.166 failures=0
+threads t=1.5 round=585 operations=617760 operations_per_s=410195 private_s=0.789 serialized_s=0.788 default_s=1.803 team_s=1.857 step_s=1.318 failures=0
+threads t=6.6 round=2527 operations=2668512 operations_per_s=405816 private_s=3.020 serialized_s=2.994 default_s=7.058 team_s=7.045 step_s=5.053 failures=0
+threads t=11.6 round=4448 operations=4697088 operations_per_s=405030 private_s=2.999 serialized_s=2.984 default_s=6.969 team_s=6.966 step_s=5.008 failures=0
+threads t=15.1 round=5758 operations=6080448 operations_per_s=399019 private_s=2.116 serialized_s=2.073 default_s=4.800 team_s=4.809 step_s=3.467 failures=0
+summary threads rounds=5758 operations=6080448 seconds=15.0 operations_per_s=404297 failures=0
+osoe-pacer failures=0 seconds=15.1
