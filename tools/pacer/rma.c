@@ -258,7 +258,8 @@ static struct {
     /* the plan */
     uint64_t seed;
     size_t halo_most;               /* the largest halo, bytes */
-    int plant_halo, plant_put, plant_gap, plant_get, plant_get_gap, plant_ptr;
+    int plant_halo, plant_put, plant_gap, plant_get, plant_get_gap, plant_ptr, plant_flag,
+        plant_single, plant_ptr_null;
     /* the team */
     shmem_team_t team;
     int n, me, me_world, next, previous;    /* team ranks */
@@ -306,6 +307,9 @@ static uint64_t rma_memory(int npes, const struct pacer_options *options, char *
     rma.plant_get = options->plant == PACER_PLANT_RMA_GET;
     rma.plant_get_gap = options->plant == PACER_PLANT_RMA_GET_GAP;
     rma.plant_ptr = options->plant == PACER_PLANT_RMA_PTR;
+    rma.plant_flag = options->plant == PACER_PLANT_RMA_FLAG;
+    rma.plant_single = options->plant == PACER_PLANT_RMA_SINGLE;
+    rma.plant_ptr_null = options->plant == PACER_PLANT_RMA_PTR_NULL;
     char halo_text[32];
     pacer_size(halo_text, sizeof halo_text, halo);
     snprintf(fields, size, "halo=8..%s cases=%d kinds=%d flags=atomic_add,signal_add,signal_set",
@@ -454,6 +458,10 @@ static void halo(long round, shmem_ctx_t ctx, const char *context)
 
     started = pacer_now();
     uint64_t flag = shmem_signal_fetch(rma.flag);
+    if (rma.plant_flag && rma.me_world == 1) {
+        raised++;                   /* the planted defect: the flag misread once */
+        rma.plant_flag = 0;
+    }
     if (flag != raised)
         pacer_failure("rma round=%ld halo %s %s: the flag reads %llu, expected %llu", round,
                       flag_names[method], context, (unsigned long long)flag,
@@ -669,9 +677,9 @@ static void transfer(long round, shmem_ctx_t ctx, const char *context)
     case SINGLE:
         for (size_t e = 0; e < l.count; e++) {
             uint64_t v = value_of(rma.me_world, next, e, round, kind->size);
-            if (rma.plant_put && rma.me_world == 1) {
-                v++;                /* the planted defect: one element sent wrong */
-                rma.plant_put = 0;
+            if (rma.plant_single && rma.me_world == 1) {
+                v++;                /* the planted defect: one value sent wrong */
+                rma.plant_single = 0;
             }
             kind->p(ctx, generic, rma.inbox + e * w, v, next);
         }
@@ -771,15 +779,22 @@ static void pointers(long round, int source_is_pattern)
         if (mate == rma.me_world)
             continue;
         uint64_t *slot = shmem_ptr(rma.ptr_slots + (size_t)rma.local_rank * PTR_WORDS, mate);
-        if (!slot) {
-            pacer_failure("rma round=%ld ptr: shmem_ptr to node-mate PE %d is NULL", round, mate);
-            continue;
+        int null = !slot;
+        if (rma.plant_ptr_null && rma.me_world == 1) {
+            null = 1;               /* the planted defect: a pointer taken for NULL */
+            rma.plant_ptr_null = 0;
         }
-        for (int i = 0; i < PTR_WORDS; i++)
-            slot[i] = ptr_word(rma.me_world, mate, i, round);
-        if (rma.plant_ptr && rma.me_world == 1) {
-            slot[PTR_WORDS / 2] ^= 1;   /* the planted defect: one word stored wrong */
-            rma.plant_ptr = 0;
+        if (null)
+            pacer_failure("rma round=%ld ptr: shmem_ptr to node-mate PE %d is NULL", round, mate);
+        /* Stores where there is a pointer; the flag always, so the node-mate
+         * never waits for what cannot come - its check then says what is missing. */
+        if (slot) {
+            for (int i = 0; i < PTR_WORDS; i++)
+                slot[i] = ptr_word(rma.me_world, mate, i, round);
+            if (rma.plant_ptr && rma.me_world == 1) {
+                slot[PTR_WORDS / 2] ^= 1;   /* the planted defect: one word stored wrong */
+                rma.plant_ptr = 0;
+            }
         }
         shmem_fence();
         shmem_uint64_atomic_set(&rma.ptr_flags[rma.local_rank], raised, mate);

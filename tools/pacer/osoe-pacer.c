@@ -73,16 +73,20 @@ static const char *const plant_names[PACER_PLANTS] = {
     "teams-exhaust", "teams-member", "teams-ring", "atomics-add", "atomics-fetch",
     "atomics-claim", "atomics-swap", "atomics-set", "atomics-bitwise", "atomics-fetched-bit",
     "rma-halo", "rma-put", "rma-gap", "rma-get", "rma-get-gap", "rma-ptr", "locks-count",
-    "locks-holder", "memory-fill", "memory-calloc", "memory-align", "memory-accessible",
+    "locks-holder", "memory-free", "memory-calloc", "memory-align", "memory-accessible",
     "memory-agree", "collectives-reduce", "collectives-scan", "collectives-data",
-    "collectives-gap"
+    "collectives-gap", "atomics-fetch-count", "atomics-attempts", "rma-flag", "rma-single",
+    "rma-ptr-null", "memory-realloc", "memory-refused", "collectives-status",
+    "collectives-timed", "collectives-timed-data", "memory-granted"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
     "mailbox", "mailbox", "threads", "threads", "threads", "teams", "teams", "teams", "teams",
     "teams", "atomics", "atomics", "atomics", "atomics", "atomics", "atomics", "atomics", "rma",
     "rma", "rma", "rma", "rma", "rma", "locks", "locks", "memory", "memory", "memory", "memory",
-    "memory", "collectives", "collectives", "collectives", "collectives"
+    "memory", "collectives", "collectives", "collectives", "collectives", "atomics", "atomics",
+    "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
+    "memory"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -120,7 +124,7 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 stores one word wrong through shmem_ptr",
     "PE 1 counts one acquisition twice",
     "PE 1 writes a holder word not its own",
-    "PE 1 overwrites a byte of a block",
+    "PE 1 overwrites a byte of a block it frees",
     "PE 1 writes a byte into a fresh calloc",
     "PE 1 misreads an aligned address",
     "PE 1 misreads one addr_accessible",
@@ -129,6 +133,17 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 gives one scan an input one too many",
     "PE 1 offers one byte wrong to a gather",
     "PE 1 writes a byte into a gap of its own alltoalls dest",
+    "PE 1 increments one slot once more than its stream says",
+    "PE 1 gives up claiming after its first claim",
+    "PE 1 misreads its halo flag once",
+    "PE 1 sends one value wrong by p",
+    "PE 1 takes one shmem_ptr to a node-mate for NULL",
+    "PE 1 overwrites a byte of a block it is about to realloc",
+    "PE 1 overwrites a byte of the block whose realloc is refused",
+    "PE 1 misreads one collective's status",
+    "PE 1 gives one timed reduction a wrong input",
+    "PE 1 offers one byte wrong to a timed gather",
+    "PE 1 takes a refused realloc for granted",
 };
 
 static void usage(FILE *out)

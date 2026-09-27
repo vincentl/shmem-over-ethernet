@@ -255,7 +255,8 @@ static struct {
     uint64_t seed;
     int quick, last;
     size_t most_bytes;              /* the timing sweep's largest contribution */
-    int plant_reduce, plant_scan, plant_data, plant_gap;
+    int plant_reduce, plant_scan, plant_data, plant_gap, plant_status, plant_timed,
+        plant_timed_data;
     shmem_team_t team;
     int me_world;
     struct team_view teams[2];      /* the exercise's team, and the even PEs of it */
@@ -281,6 +282,9 @@ static uint64_t collectives_memory(int npes, const struct pacer_options *options
     coll.plant_scan = options->plant == PACER_PLANT_COLLECTIVES_SCAN;
     coll.plant_data = options->plant == PACER_PLANT_COLLECTIVES_DATA;
     coll.plant_gap = options->plant == PACER_PLANT_COLLECTIVES_GAP;
+    coll.plant_status = options->plant == PACER_PLANT_COLLECTIVES_STATUS;
+    coll.plant_timed = options->plant == PACER_PLANT_COLLECTIVES_TIMED;
+    coll.plant_timed_data = options->plant == PACER_PLANT_COLLECTIVES_TIMED_DATA;
     /* Two buffers of a contribution from every member, and the typed cases'
      * strided blocks, within the budget. */
     size_t typed = (size_t)npes * MOST_ELEMENTS * 16 * 4;
@@ -454,6 +458,10 @@ static void run_typed(const struct typed_case *c, struct team_view *v, long roun
     coll.calls++;
     coll.phase[0] += pacer_now() - started;
     started = pacer_now();
+    if (coll.plant_status && coll.me_world == 1) {
+        status = 1;                 /* the planted defect: a status misread */
+        coll.plant_status = 0;
+    }
     if (status != 0) {
         char what[64];
         snprintf(what, sizeof what, "returned %d", status);
@@ -604,10 +612,18 @@ static void run_timed(int index, long round)
         long *source = (long *)coll.source;
         for (size_t e = 0; e < n; e++)
             source[e] = (long)input_of(SUM, coll.me_world, v->rank, (int)m, e, round, 64);
+        if (coll.plant_timed && coll.me_world == 1 && c.family == TIME_REDUCE) {
+            source[0]++;            /* the planted defect: a timed input wrong */
+            coll.plant_timed = 0;
+        }
     } else if (c.family != TIME_SYNC && c.family != TIME_BARRIER) {
         size_t total = (c.family == TIME_ALLTOALL ? m : 1) * bytes;
         for (size_t b = 0; b < total; b++)
             coll.source[b] = data_byte(coll.me_world, b, round);
+        if (coll.plant_timed_data && coll.me_world == 1 && c.family == TIME_COLLECT) {
+            coll.source[0] ^= 1;    /* the planted defect: a timed gather's byte wrong */
+            coll.plant_timed_data = 0;
+        }
     }
     double times[REPEATS];
     for (int rep = 0; rep < REPEATS; rep++) {

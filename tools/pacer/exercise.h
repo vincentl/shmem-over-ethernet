@@ -80,7 +80,7 @@ enum pacer_plant {
     PACER_PLANT_RMA_PTR,            /* PE 1 stores one word wrong through shmem_ptr */
     PACER_PLANT_LOCKS_COUNT,        /* PE 1 counts one acquisition twice */
     PACER_PLANT_LOCKS_HOLDER,       /* PE 1 writes a holder word not its own */
-    PACER_PLANT_MEMORY_FILL,        /* PE 1 overwrites a byte of a block */
+    PACER_PLANT_MEMORY_FREE,        /* PE 1 overwrites a byte of a block it frees */
     PACER_PLANT_MEMORY_CALLOC,      /* PE 1 writes a byte into a fresh calloc */
     PACER_PLANT_MEMORY_ALIGN,       /* PE 1 misreads an aligned address */
     PACER_PLANT_MEMORY_ACCESSIBLE,  /* PE 1 misreads one addr_accessible */
@@ -89,6 +89,17 @@ enum pacer_plant {
     PACER_PLANT_COLLECTIVES_SCAN,   /* PE 1 gives one scan an input one too many */
     PACER_PLANT_COLLECTIVES_DATA,   /* PE 1 offers one byte wrong to a gather */
     PACER_PLANT_COLLECTIVES_GAP,    /* PE 1 writes a byte into its alltoalls gap */
+    PACER_PLANT_ATOMICS_FETCH_COUNT, /* PE 1 increments one slot once more */
+    PACER_PLANT_ATOMICS_ATTEMPTS,   /* PE 1 gives up claiming after one claim */
+    PACER_PLANT_RMA_FLAG,           /* PE 1 misreads its halo flag once */
+    PACER_PLANT_RMA_SINGLE,         /* PE 1 sends one value wrong by p */
+    PACER_PLANT_RMA_PTR_NULL,       /* PE 1 takes one shmem_ptr for NULL */
+    PACER_PLANT_MEMORY_REALLOC,     /* PE 1 overwrites a byte of a block it reallocs */
+    PACER_PLANT_MEMORY_REFUSED,     /* PE 1 overwrites a byte of a block whose realloc is refused */
+    PACER_PLANT_COLLECTIVES_STATUS, /* PE 1 misreads one collective's status */
+    PACER_PLANT_COLLECTIVES_TIMED,  /* PE 1 gives one timed reduction a wrong input */
+    PACER_PLANT_COLLECTIVES_TIMED_DATA, /* PE 1 offers one byte wrong to a timed gather */
+    PACER_PLANT_MEMORY_GRANTED,     /* PE 1 takes a refused realloc for granted */
     PACER_PLANTS
 };
 

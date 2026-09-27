@@ -44,7 +44,8 @@ struct block {
 static struct {
     uint64_t seed;
     uint64_t budget;                /* the most the blocks may hold at once */
-    int plant_fill, plant_calloc, plant_align, plant_accessible, plant_agree;
+    int plant_free, plant_calloc, plant_align, plant_accessible, plant_agree, plant_realloc,
+        plant_refused, plant_granted;
     shmem_team_t team;
     int n, me, me_world, next_world;
     unsigned char *anchor;          /* made at setup: offsets are from here */
@@ -65,7 +66,10 @@ static uint64_t memory_memory(int npes, const struct pacer_options *options, cha
     memory.budget = options->memory / 4 * 3;
     if (options->quick && memory.budget > (UINT64_C(8) << 20))
         memory.budget = UINT64_C(8) << 20;      /* the smoke test's minute */
-    memory.plant_fill = options->plant == PACER_PLANT_MEMORY_FILL;
+    memory.plant_free = options->plant == PACER_PLANT_MEMORY_FREE;
+    memory.plant_realloc = options->plant == PACER_PLANT_MEMORY_REALLOC;
+    memory.plant_refused = options->plant == PACER_PLANT_MEMORY_REFUSED;
+    memory.plant_granted = options->plant == PACER_PLANT_MEMORY_GRANTED;
     memory.plant_calloc = options->plant == PACER_PLANT_MEMORY_CALLOC;
     memory.plant_align = options->plant == PACER_PLANT_MEMORY_ALIGN;
     memory.plant_accessible = options->plant == PACER_PLANT_MEMORY_ACCESSIBLE;
@@ -216,10 +220,6 @@ static void allocate(uint64_t r)
     b->size = size;
     b->tag = memory.made;
     fill(b);
-    if (memory.plant_fill && memory.me_world == 1) {
-        b->address[size / 2] ^= 1;  /* the planted defect: a byte of a block overwritten */
-        memory.plant_fill = 0;
-    }
     memory.used += size;
 }
 
@@ -227,6 +227,10 @@ static void release(int k)
 {
     struct block *b = &memory.blocks[k];
     double started = pacer_now();
+    if (memory.plant_free && memory.me_world == 1) {
+        b->address[b->size / 2] ^= 1;   /* the planted defect: a byte of a block overwritten */
+        memory.plant_free = 0;
+    }
     long at = damaged(b->address, b->size, b->tag);
     if (at >= 0)
         pacer_failure("memory round=%ld free: byte %ld of a block of %zu bytes is not what was "
@@ -241,12 +245,56 @@ static void release(int k)
     memory.blocks[k] = memory.blocks[--memory.count];
 }
 
+/* A realloc refused leaves its block as it was (§9.3.3). */
+static void refused(const struct block *b)
+{
+    long at = damaged(b->address, b->size, b->tag);
+    if (at >= 0)
+        pacer_failure("memory round=%ld realloc: a refused realloc left byte %ld of %zu not "
+                      "what was written", memory.round, at, b->size);
+}
+
+/* Once a run, a realloc no heap grants: refused alike everywhere - the round's
+ * hash says so - and the block left as it was. */
+static void impossible(void)
+{
+    struct block *b = &memory.blocks[0];
+    if (memory.plant_refused && memory.me_world == 1) {
+        b->address[0] ^= 1;         /* the planted defect: a byte the refusal must keep */
+        memory.plant_refused = 0;
+    }
+    size_t huge = SIZE_MAX / 4;
+    double started = pacer_now();
+    unsigned char *address = shmem_realloc(b->address, huge);
+    memory.phase[0] += pacer_now() - started;
+    memory.operations++;
+    agree(12, address, huge);
+    int granted = address != NULL;
+    if (memory.plant_granted && memory.me_world == 1) {
+        granted = !granted;         /* the planted defect: the answer misread */
+        memory.plant_granted = 0;
+    }
+    if (granted)
+        pacer_failure("memory round=%ld realloc: %zu bytes were granted, on a heap of far less",
+                      memory.round, huge);
+    if (address) {
+        unsigned char *back = shmem_realloc(address, b->size);
+        b->address = back ? back : address;
+    } else {
+        refused(b);
+    }
+}
+
 static void resize(int k, uint64_t r)
 {
     struct block *b = &memory.blocks[k];
     size_t size = r & 1 ? b->size / 2 + 8 : b->size * 2;
     if (size > b->size && memory.used + (size - b->size) > memory.budget)
         size = b->size / 2 + 8;
+    if (memory.plant_realloc && memory.me_world == 1) {
+        b->address[0] ^= 1;         /* the planted defect: a kept byte overwritten */
+        memory.plant_realloc = 0;
+    }
     double started = pacer_now();
     unsigned char *address = shmem_realloc(b->address, size);
     memory.phase[0] += pacer_now() - started;
@@ -254,11 +302,7 @@ static void resize(int k, uint64_t r)
     agree(11, address, size);
     started = pacer_now();
     if (!address) {
-        /* The block stands as it was (§9.3.3). */
-        long at = damaged(b->address, b->size, b->tag);
-        if (at >= 0)
-            pacer_failure("memory round=%ld realloc: a refused realloc left byte %ld of %zu "
-                          "not what was written", memory.round, at, b->size);
+        refused(b);
         memory.phase[2] += pacer_now() - started;
         return;
     }
@@ -295,6 +339,8 @@ static void memory_step(long units, int last)
             else
                 allocate(r >> 4);
         }
+        if (memory.round == 0 && memory.count)
+            impossible();
         if (last && u == units - 1)
             while (memory.count)
                 release(memory.count - 1);

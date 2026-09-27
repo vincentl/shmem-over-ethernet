@@ -321,7 +321,7 @@ static struct {
     /* the plan */
     uint64_t seed;
     int plant_add, plant_fetch, plant_claim, plant_swap, plant_set, plant_bitwise,
-        plant_fetched_bit;
+        plant_fetched_bit, plant_fetch_count, plant_attempts;
     /* the team */
     shmem_team_t team;
     int n, me, me_world;
@@ -352,6 +352,8 @@ static uint64_t atomics_memory(int npes, const struct pacer_options *options, ch
     atomics.plant_set = options->plant == PACER_PLANT_ATOMICS_SET;
     atomics.plant_bitwise = options->plant == PACER_PLANT_ATOMICS_BITWISE;
     atomics.plant_fetched_bit = options->plant == PACER_PLANT_ATOMICS_FETCHED_BIT;
+    atomics.plant_fetch_count = options->plant == PACER_PLANT_ATOMICS_FETCH_COUNT;
+    atomics.plant_attempts = options->plant == PACER_PLANT_ATOMICS_ATTEMPTS;
     (void)npes;
     snprintf(fields, size, "cases=%d contexts=default,private,serialized slots=%d "
              "operations=%d claims=%d", CASE_COUNT, SLOTS, OPERATIONS, CLAIMS);
@@ -576,6 +578,13 @@ static void round_fetch_add(const struct amo_type *t, shmem_ctx_t ctx, int c, lo
             account(pes[i], slots_drawn[i], t->load(atomics.fetched + 8 * i),
                     fetch_start(pes[i], slots_drawn[i], round), mask);
     }
+    if (atomics.plant_fetch_count && atomics.me_world == 1) {
+        /* The planted defect: one increment more than the stream holds. */
+        uint64_t v = t->fetch_inc(SHMEM_CTX_DEFAULT, slot(slots_drawn[0]),
+                                  atomics.world[pes[0]], 0);
+        account(pes[0], slots_drawn[0], v, fetch_start(pes[0], slots_drawn[0], round), mask);
+        atomics.plant_fetch_count = 0;
+    }
     atomics.phase[0] += pacer_now() - started;
     complete_and_sync(ctx);
 
@@ -678,6 +687,10 @@ static void round_claim(const struct amo_type *t, shmem_ctx_t ctx, int c, long r
                     held_pe[held] = pes[j], held_slot[held] = slots_tried[j];
                     held_token[held++] = tokens[j];
                 }
+        }
+        if (atomics.plant_attempts && atomics.me_world == 1 && held > 0) {
+            atomics.plant_attempts = 0;     /* the planted defect: giving up early */
+            break;
         }
     }
     atomics.phase[0] += pacer_now() - started;

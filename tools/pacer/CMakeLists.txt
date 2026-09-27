@@ -186,8 +186,14 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
   pacer_plant(locks-holder locks
     "locks round=0 lock [0-9]+: PE -1 holds its home's holder word while this PE is in the section")
-  pacer_plant(memory-fill memory
-    "memory round=[0-9]+ (realloc|free): .*byte [0-9]+ .*not what was written")
+  pacer_plant(memory-free memory
+    "memory round=2 free: byte [0-9]+ of a block of [0-9]+ bytes is not what was written there")
+  pacer_plant(memory-realloc memory
+    "memory round=0 realloc: of [0-9]+ bytes kept from [0-9]+, byte 0 is not what was written")
+  pacer_plant(memory-refused memory
+    "memory round=0 realloc: a refused realloc left byte 0 of [0-9]+ not what was written")
+  pacer_plant(memory-granted memory
+    "memory round=0 realloc: [0-9]+ bytes were granted, on a heap of far less")
   pacer_plant(memory-calloc memory
     "memory round=0 calloc: byte [0-9]+ of [0-9]+ is 01, not zero")
   pacer_plant(memory-align memory
@@ -205,6 +211,26 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "collectives round=65 fcollect float world: byte [0-9]+ is [0-9a-f]+, not what was sent")
   pacer_plant(collectives-gap collectives
     "collectives round=76 alltoalls int world: byte [0-9]+ is a5, where nothing lands")
+  # The checks the first plants could not reach: a slot's count, the claim
+  # budget, the halo's flag, p and g, a NULL shmem_ptr, a collective's status
+  # and the timing sweep's two checks.
+  pacer_plant(atomics-fetch-count atomics
+    "atomics round=12 fetch_add int default: slot [0-9]+ holds [0-9]+ after [0-9]+ increments, expected [0-9]+")
+  pacer_plant(atomics-attempts atomics
+    "atomics round=24 claim int default: 1 of 16 claims after [0-9]+ attempts, in a table half empty"
+    "atomics round=24 claim int default: the table holds 49 claims, not the 64 made")
+  pacer_plant(rma-flag rma
+    "rma round=0 halo atomic_add default: the flag reads 1, expected 2")
+  pacer_plant(rma-single rma
+    "rma round=116 p_g float default put: element 0 from PE 1 is [0-9]+, not [0-9]+")
+  pacer_plant(rma-ptr-null rma
+    "rma round=0 ptr: shmem_ptr to node-mate PE 0 is NULL")
+  pacer_plant(collectives-status collectives
+    "collectives round=0 and_reduce uchar world: returned 1")
+  pacer_plant(collectives-timed collectives
+    "collectives round=0 timed reduce world bytes=8: element 0 of 1 is [0-9]+, expected [0-9]+")
+  pacer_plant(collectives-timed-data collectives
+    "collectives round=2 timed collect world bytes=8: byte 0 of block 1 is [0-9a-f]+, not what PE 1 sent")
   pacer_plant(teams-exhaust "teams;--teams-exhaust"
     "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
   pacer_plant(print-hash print
