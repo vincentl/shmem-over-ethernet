@@ -19,9 +19,9 @@ The author's goals, the axes to judge the work by:
 Machine setup: "Setting up on a new machine" in `phase1-step2-slice1-prompt.md`.
 Meaning of phase/step/slice: `docs/prompts/README.md`.
 
-*Written by Claude on 2026-09-23 while the author was away, under his mandate to
+*Written by Claude on 2026-09-23 while the author was away, under their mandate to
 continue past slice boundaries (`docs/decisions/2026-09-23-autonomous.md`), and
-brought in line with his review of that log the same evening: Part A is done
+brought in line with their review of that log the same evening: Part A is done
 and merged (d5ca388); Part B is the Slurm path first, then fixtures captured
 from Slurm installed in the VM; Part C is not being built now.*
 

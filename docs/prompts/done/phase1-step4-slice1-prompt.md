@@ -23,7 +23,7 @@ The author's goals, the axes to judge the work by:
 Machine setup: "Setting up on a new machine" in `phase1-step2-slice1-prompt.md`.
 Meaning of phase/step/slice: `docs/prompts/README.md`.
 
-*Written by Claude on 2026-09-23 while the author was away, under his mandate to
+*Written by Claude on 2026-09-23 while the author was away, under their mandate to
 continue past slice boundaries (`docs/decisions/2026-09-23-autonomous.md`). It
 follows §3.15 and §7.1 as written; where it chooses between readings, it says
 so, and those choices are for the author to confirm.*

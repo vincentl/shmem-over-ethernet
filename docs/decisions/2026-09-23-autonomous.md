@@ -11,8 +11,8 @@ There is no git remote, so every merge here is local and nothing was pushed.
 
 ## Where things stand, and what needs you
 
-*Vincent reviewed every entry on his return the same evening; each question
-below carries his answer, and "The author's review" at the end records every
+*Vincent reviewed every entry on their return the same evening; each question
+below carries their answer, and "The author's review" at the end records every
 entry's.*
 
 On main: step 3 slice 2 (36b05fe), the osoe-stat branch (a0cded6), the test
@@ -317,7 +317,7 @@ author** (`docs/prompts/done/phase1-step4-slice2-prompt.md`). It covers the
 heap-base shift, the Slurm fixtures, and the multi-node lead's pidfds on its
 ring. The fixtures must be *captured* from `srun`, and the VM has no Slurm.
 Debian's `slurm-wlm` is available, but installing and running Slurm daemons
-in the author's VM is his call, as is a real cluster, or fixtures written
+in the author's VM is their call, as is a real cluster, or fixtures written
 from the documentation and marked as such. The brief says to stop there and
 ask.
 
@@ -478,7 +478,7 @@ proves `pidfd_open` polled on a ring beside a futex wait.
 
 ## The author's review, the same evening
 
-Vincent went through every entry on his return. Each is confirmed as built
+Vincent went through every entry on their return. Each is confirmed as built
 unless this section says otherwise.
 
 - **Confirmed as built:** 1–15, 16's pidfds from every agent's loop, 17, and

@@ -267,7 +267,7 @@ The author's goals, the axes to judge the work by:
 - The quick runs stay under about a minute a preset in release; if they
   cannot, shrink `--quick`, not the coverage.
 - Whether these stay in every preset's suite is the author's decision after
-  he has seen their cost (proposal §3); register them in one block with a
+  they have seen their cost (proposal §3); register them in one block with a
   comment saying so.
 - Before merge, the standard verification less the SOS sweep: the four
   presets, the plants (which are the mutations here, and permanent), and a
