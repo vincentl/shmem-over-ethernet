@@ -196,7 +196,9 @@ round and what differed; the command line and the header's seed reproduce it.
 `--quick` is the smoke test every preset runs.
 
 Phase 2's exercises add three runs: `mailbox` (every wait and test form, a
-form a round) and `teams` (teams of every shape and collectives on a grid's
+form a round; the time in the mailbox between node-mates, and a checked
+ping-pong's round trip at every checkpoint, each PE with the PE of its rank
+on the other node of its pair: `pi-001` with `pi-002`, `pi-003` with `pi-004`) and `teams` (teams of every shape and collectives on a grid's
 rows and columns at once), ten minutes each in `release`; and an hour of
 `threads` - four worker threads a PE on private, serialized, default and team
 contexts - in a `debug` build, with the library's two test hooks on and a
