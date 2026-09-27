@@ -39,13 +39,27 @@
  * distinct lines. Accepted for a console. The fix, if it is ever needed, is a
  * 128-bit record: two independent finalizers over the text, 24 bytes a PE.
  *
+ * **The signal route** (proposal §2.5) replaces step 3's fcollect with the
+ * tool's own dissemination: each member holds the records of the ranks from
+ * its own on, and in round k puts the first min(2^k, n - 2^k) of them to the
+ * member 2^k ranks before it, into the same places 2^k along, with
+ * shmem_putmem_signal adding one to a signal word of the round's, and waits
+ * for the member 2^k after to do the same. After ceil(log2 n) rounds each
+ * holds all n, which it copies into team rank order: the fcollect's array,
+ * by other means. A round has its own word, since the rounds' puts come from
+ * different members and may land in any order; each word counts every put
+ * this PE has taken in its round, against a count of its own calls that had
+ * that round. Nothing of the next call can land before this call's last wait:
+ * the sync every call ends with needs this PE, as it does for the fcollect.
+ *
  * **Folding to nodes** is rank 0's alone, a group at a time: a tally of the
  * group's PEs by host against each host's PEs, which init counted, then the
  * hosts' names folded - O(k log k) for a group of k. A group is folded only
  * when whole and when the names fit the room its PE numbers would have had,
  * so a line never outgrows its buffer.
  *
- * Memory, a PE, N the world: 16 N bytes symmetric, the 64 KiB arena, and
+ * Memory, a PE, N the world: 32 N bytes symmetric - the fcollect's array and
+ * the signal route's - with its 32 signal words, the 64 KiB arena, and
  * about 130 N private (the sorted records, each owner's first record, a
  * group's PEs, the host names and each PE's host, a host's PEs, a group's
  * tally and its names), with the text and line buffers. Every member sorts
@@ -64,7 +78,7 @@
 
 #include "parallel-print.h"
 
-enum { ARENA = 64 * 1024, HOST = 64, NAMES = 64, NAME = 32, SMALLEST = 16 };
+enum { ARENA = 64 * 1024, HOST = 64, NAMES = 64, NAME = 32, SMALLEST = 16, ROUNDS = 32 };
 
 struct record {
     uint64_t hash;
@@ -110,6 +124,11 @@ static struct {
     size_t captured;
     int plant_hash;
     int plant_fold;
+    int plant_route;
+    enum parallel_print_route route;
+    struct record *held;            /* symmetric, [world]: the signal route's records */
+    uint64_t *signals;              /* symmetric, [ROUNDS]: a word a round */
+    uint64_t expected[ROUNDS];      /* the puts each word has had by this call's end */
 } state = { .window = ARENA };
 
 /* A host name taken apart for folding: pi-003 is "pi-", 3, width 3. */
@@ -267,6 +286,8 @@ int parallel_print_init(size_t capacity)
      * fail alike too. */
     state.records = shmem_malloc(sizeof *state.records * (size_t)world);
     state.mine = shmem_malloc(sizeof *state.mine);
+    state.held = shmem_malloc(sizeof *state.held * (size_t)world);
+    state.signals = shmem_calloc(ROUNDS, sizeof *state.signals);
     state.arena = shmem_malloc(ARENA);
     char *host = shmem_malloc(HOST);
     char *hosts = shmem_malloc((size_t)HOST * (size_t)world);
@@ -285,7 +306,8 @@ int parallel_print_init(size_t capacity)
     state.host_pes = calloc((size_t)world, sizeof *state.host_pes);
     state.tally = calloc((size_t)world, sizeof *state.tally);
     state.fold_names = malloc(sizeof *state.fold_names * (size_t)world);
-    if (!state.records || !state.mine || !state.arena || !host || !hosts || !state.text ||
+    if (!state.records || !state.mine || !state.held || !state.signals || !state.arena ||
+        !host || !hosts || !state.text ||
         !state.entries || !state.first || !state.members || !state.line || !state.hosts ||
         !state.host_of || !state.host_pes || !state.tally || !state.fold_names)
         return -1;
@@ -380,6 +402,33 @@ static void emit(const char *line, size_t length)
     memcpy(state.capture + state.captured, line, length);
     state.captured += length;
     state.capture[state.captured] = '\0';
+}
+
+/* The signal route: every member's record into state.records, in team rank
+ * order, by dissemination (above). */
+static void disseminate(shmem_team_t team, int n, int me)
+{
+    int rounds = 0;
+    while (rounds < ROUNDS && (1 << rounds) < n)
+        rounds++;
+    for (int k = 0; k < rounds; k++)
+        state.expected[k]++;
+    state.held[0] = *state.mine;
+    if (state.plant_route)          /* the planted defect: this route's record changed */
+        state.held[0].hash ^= 1;
+    for (int k = 0; k < rounds; k++) {
+        int span = 1 << k, count = span < n - span ? span : n - span;
+        if (k > 0)                  /* what this round sends arrived in the rounds before */
+            shmem_signal_wait_until(&state.signals[k - 1], SHMEM_CMP_GE, state.expected[k - 1]);
+        int to = shmem_team_translate_pe(team, (me - span + n) % n, SHMEM_TEAM_WORLD);
+        shmem_putmem_signal(state.held + span, state.held, sizeof *state.held * (size_t)count,
+                            &state.signals[k], 1, SHMEM_SIGNAL_ADD, to);
+    }
+    if (rounds > 0)
+        shmem_signal_wait_until(&state.signals[rounds - 1], SHMEM_CMP_GE,
+                                state.expected[rounds - 1]);
+    for (int j = 0; j < n; j++)
+        state.records[(me + j) % n] = state.held[j];
 }
 
 /* Rank 0, folding to nodes: the label of the group in members[0, k) by its
@@ -501,7 +550,9 @@ int parallel_print(shmem_team_t team, const char *format, ...)
     /* 2 and 3. */
     state.mine->hash = length ? hash_text(state.text, length, state.plant_hash) : 0;
     state.mine->length = length;
-    if (shmem_fcollectmem(team, state.records, state.mine, sizeof *state.mine) != 0)
+    if (state.route == PARALLEL_PRINT_SIGNAL)
+        disseminate(team, n, me);
+    else if (shmem_fcollectmem(team, state.records, state.mine, sizeof *state.mine) != 0)
         return -1;
 
     /* 4. Everything needed from the records is copied out here, before the
@@ -571,6 +622,8 @@ void parallel_print_finalize(void)
     if (!state.ready)
         return;
     shmem_free(state.arena);
+    shmem_free(state.signals);
+    shmem_free(state.held);
     shmem_free(state.mine);
     shmem_free(state.records);
     free(state.fold_names);
@@ -624,4 +677,16 @@ int parallel_print_fold_nodes(int on)
 void parallel_print_plant_fold(int on)
 {
     state.plant_fold = on;
+}
+
+enum parallel_print_route parallel_print_route(enum parallel_print_route route)
+{
+    enum parallel_print_route previous = state.route;
+    state.route = route;
+    return previous;
+}
+
+void parallel_print_plant_route(int on)
+{
+    state.plant_route = on;
 }

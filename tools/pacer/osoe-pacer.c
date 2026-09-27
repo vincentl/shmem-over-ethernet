@@ -78,7 +78,7 @@ static const char *const plant_names[PACER_PLANTS] = {
     "memory-agree", "collectives-reduce", "collectives-scan", "collectives-data",
     "collectives-gap", "atomics-fetch-count", "atomics-attempts", "rma-flag", "rma-single",
     "rma-ptr-null", "memory-realloc", "memory-refused", "collectives-status",
-    "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold"
+    "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold", "print-route"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -87,7 +87,7 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "rma", "rma", "rma", "rma", "rma", "locks", "locks", "memory", "memory", "memory", "memory",
     "memory", "collectives", "collectives", "collectives", "collectives", "atomics", "atomics",
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
-    "memory", "print"
+    "memory", "print", "print"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -146,6 +146,7 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 offers one byte wrong to a timed gather",
     "PE 1 takes a refused realloc for granted",
     "PE 1 folds host numbers without their leading zeros",
+    "PE 1 gives the signal route a record other than the fcollect's",
 };
 
 static void usage(FILE *out)
@@ -202,6 +203,10 @@ static void usage(FILE *out)
 "  --period S          mix: a team period's mean length (default 10 seconds)\n"
 "  --fold-nodes        label a line by its hosts' names where it holds every PE\n"
 "                      of each: pi-[001-004] rather than [0-15]\n"
+"  --print-route fcollect|signal\n"
+"                      how parallel_print gathers what every PE says: the\n"
+"                      library's fcollect (default), or the tool's own puts\n"
+"                      with signals\n"
 "  --stop-on-failure   end the job at the first checkpoint with a failure\n"
 "  --coverage FILE     osoe-pacer-counted only: which routines were called, how\n"
 "                      often, and which never were, into FILE\n"
@@ -440,7 +445,7 @@ static int parse(int argc, char **argv)
         static const char *const valued[] = { "--seconds", "--report", "--rounds", "--seed",
                                               "--memory", "--sort", "--exchange", "--plant",
                                               "--threads", "--coverage", "--mix-teams",
-                                              "--period" };
+                                              "--period", "--print-route" };
         int takes = 0;
         for (size_t k = 0; k < sizeof valued / sizeof *valued; k++)
             takes |= strcmp(name, valued[k]) == 0;
@@ -481,6 +486,13 @@ static int parse(int argc, char **argv)
         } else if (strcmp(name, "--period") == 0) {
             if (positive_number(value, &options.period) != 0)
                 return refuse("--period '%s': a number of seconds above 0", value);
+        } else if (strcmp(name, "--print-route") == 0) {
+            if (strcmp(value, "fcollect") == 0)
+                options.print_signal = 0;
+            else if (strcmp(value, "signal") == 0)
+                options.print_signal = 1;
+            else
+                return refuse("--print-route '%s': fcollect or signal", value);
         } else if (strcmp(name, "--coverage") == 0) {
 #ifdef PACER_COUNTED
             coverage = value;
@@ -1208,6 +1220,8 @@ int main(int argc, char **argv)
             used += (size_t)snprintf(line + used, size - used, k ? ",%s" : "%s", chosen[k]->name);
         if (options.fold_nodes && used < size)
             used += (size_t)snprintf(line + used, size - used, " labels=hosts");
+        if (options.print_signal && used < size)
+            used += (size_t)snprintf(line + used, size - used, " print_route=signal");
         if (options.plant != PACER_PLANT_NONE && used < size)
             used += (size_t)snprintf(line + used, size - used, " plant=%s",
                                      plant_names[options.plant]);
@@ -1285,7 +1299,10 @@ int main(int argc, char **argv)
         parallel_print_plant_hash(1);
     if (options.plant == PACER_PLANT_PRINT_FOLD && me == 1)
         parallel_print_plant_fold(1);
+    if (options.plant == PACER_PLANT_PRINT_ROUTE && me == 1)
+        parallel_print_plant_route(1);
     parallel_print_fold_nodes(options.fold_nodes);
+    parallel_print_route(options.print_signal ? PARALLEL_PRINT_SIGNAL : PARALLEL_PRINT_FCOLLECT);
     if (options.mixing) {
         if (me == 0) {
             printf("mix teams=%d period=%g world_every=%d\n", mix_teams(npes), options.period,

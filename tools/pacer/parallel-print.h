@@ -53,8 +53,9 @@ int parallel_print_name_team(shmem_team_t team, const char *name);
 /* Collective on `team`: every member calls it, with its own text. Returns the
  * number of distinct lines printed, on every member; -1 before init, and on
  * SHMEM_TEAM_INVALID without taking part, so a PE outside a team may call it
- * alike. One fcollect, a put from each distinct text's owner, one sync. Its
- * quiet also completes the calling PE's earlier puts on the default context. */
+ * alike. One fcollect (or the signal route's rounds), a put from each distinct
+ * text's owner, one sync. Its quiet also completes the calling PE's earlier
+ * puts on the default context. */
 int parallel_print(shmem_team_t team, const char *format, ...)
     __attribute__((format(printf, 2, 3)));
 
@@ -63,6 +64,15 @@ void parallel_print_finalize(void);
 
 /* A world PE's host name as gathered at init, up to its first dot. */
 const char *parallel_print_host(int pe);
+
+/* The routes by which every member learns every member's record (proposal
+ * §2.5): the library's fcollect, the default, or dissemination by
+ * shmem_putmem_signal and waits on the signals, which the tool writes itself.
+ * The same lines either way, so a run that prints by both and compares them
+ * tests the one against the other. Local; every member of a team must choose
+ * the same. Returns the previous route. */
+enum parallel_print_route { PARALLEL_PRINT_FCOLLECT, PARALLEL_PRINT_SIGNAL };
+enum parallel_print_route parallel_print_route(enum parallel_print_route route);
 
 /* Local: 1 labels by host wherever a group holds every PE of each host it
  * touches, and the names fit where the PE numbers would have; 0, the default,
@@ -91,10 +101,15 @@ size_t parallel_print_fold_names(const char *const *names, int count, char *out,
  *
  * _plant_fold: this PE's parallel_print_fold_names writes numbers without
  * their leading zeros (osoe-pacer --plant print-fold).
+ *
+ * _plant_route: this PE's record, taken by the signal route alone, has its
+ * hash changed - alike for every member, which all read it from this PE - so
+ * that route's lines part where the fcollect's do not (--plant print-route).
  */
 size_t parallel_print_window(size_t bytes);
 void parallel_print_capture(char *buffer, size_t size);
 void parallel_print_plant_hash(int on);
 void parallel_print_plant_fold(int on);
+void parallel_print_plant_route(int on);
 
 #endif /* PACER_PARALLEL_PRINT_H */

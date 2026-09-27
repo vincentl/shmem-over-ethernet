@@ -31,6 +31,11 @@
  * and, on every PE, the fold itself: host lists written out here by hand,
  * folded, against their folds written out by hand.
  *
+ * Every case runs twice a round, by each of parallel_print's routes - the
+ * library's fcollect, then the tool's own dissemination by put-with-signal -
+ * against the one prediction: a differential test of the two, the signal
+ * route's failures saying so.
+ *
  * The first round shows what it printed; later rounds only check. A world
  * sync separates the cases: each has a team a PE of the last may not have
  * been in (parallel-print.c says why that needs one).
@@ -80,6 +85,7 @@ static struct {
     size_t size;
     char *text;                     /* LONG_TEXT + 1 */
     double lines;                   /* printed as a team's rank 0, since the checkpoint */
+    const char *route_name;         /* in a failure's line: "" or ", signal route" */
 } print;
 
 static uint64_t print_memory(int npes, const struct pacer_options *options, char *fields,
@@ -88,7 +94,8 @@ static uint64_t print_memory(int npes, const struct pacer_options *options, char
     (void)npes;
     (void)options;
     snprintf(fields, size, "cases=same,parity,silent,distinct,even,shared,strided,windows,long,"
-             "hosts,partial,folded,shared-folded,fold window=%d outside_budget=yes", WINDOW);
+             "hosts,partial,folded,shared-folded,fold routes=fcollect,signal window=%d "
+             "outside_budget=yes", WINDOW);
     return 0;                       /* parallel_print is outside the budget */
 }
 
@@ -108,6 +115,7 @@ static int print_setup(shmem_team_t team, const struct pacer_options *options)
     print.n = shmem_team_n_pes(team);
     print.round = 0;
     print.lines = 0;
+    print.route_name = "";
     int pes = pacer_layout()->pes;
     /* What one case prints, at most: N one-PE lines of a label and a text
      * under 128 bytes (distinct, windows); a line a host of two names and a
@@ -211,243 +219,257 @@ static void check(const char *name, shmem_team_t team, int returned, int lines)
     if (team == SHMEM_TEAM_INVALID)
         return;
     if (returned != lines)
-        pacer_failure("print round=%ld %s: returned %d lines, expected %d", print.round, name,
-                      returned, lines);
+        pacer_failure("print round=%ld %s%s: returned %d lines, expected %d", print.round, name,
+                      print.route_name, returned, lines);
     if (shmem_team_my_pe(team) != 0)
         return;
     print.lines += returned > 0 ? returned : 0;
     if (strcmp(print.capture, print.expected) != 0) {
         char got[96], wanted[96];
         first_difference(print.capture, print.expected, got, wanted, sizeof got);
-        pacer_failure("print round=%ld %s: printed \"%s\", expected \"%s\"", print.round, name,
-                      got, wanted);
+        pacer_failure("print round=%ld %s%s: printed \"%s\", expected \"%s\"", print.round,
+                      name, print.route_name, got, wanted);
     }
-    if (print.round == 0) {         /* show it once */
+    if (print.round == 0 && !*print.route_name) {   /* show it once */
         fputs(print.capture, stdout);
         fflush(stdout);
     }
 }
 
-static void print_step(long units, int last)
+/* Every case of a round, printed by the route parallel_print is set to. */
+static void cases(long r)
 {
-    (void)last;
     const struct pacer_layout *layout = pacer_layout();
     int pes = layout->pes, world = shmem_my_pe();
     char text[160], label[96];
-    int folding = parallel_print_fold_nodes(0);
-    parallel_print_capture(print.capture, print.size);
-    for (long u = 0; u < units; u++, print.round++) {
-        long r = print.round;
-        size_t used;
-        int returned;
+    size_t used;
+    int returned;
 
-        /* same */
-        snprintf(text, sizeof text, "print round=%ld same: every PE says this", r);
-        memset(print.member, 1, (size_t)pes);
-        used = 0;
+    /* same */
+    snprintf(text, sizeof text, "print round=%ld same: every PE says this", r);
+    memset(print.member, 1, (size_t)pes);
+    used = 0;
+    expect(&used, "", text);
+    returned = parallel_print(print.team, "%s", text);
+    check("same", print.team, returned, 1);
+    shmem_team_sync(print.team);
+
+    /* parity */
+    used = 0;
+    for (int parity = 0; parity < 2 && parity < pes; parity++) {
+        for (int p = 0; p < pes; p++)
+            print.member[p] = p % 2 == parity;
+        snprintf(text, sizeof text, "print round=%ld parity: %s", r, parity ? "odd" : "even");
         expect(&used, "", text);
-        returned = parallel_print(print.team, "%s", text);
-        check("same", print.team, returned, 1);
-        shmem_team_sync(print.team);
+    }
+    snprintf(text, sizeof text, "print round=%ld parity: %s", r, world % 2 ? "odd" : "even");
+    returned = parallel_print(print.team, "%s", text);
+    check("parity", print.team, returned, pes > 1 ? 2 : 1);
+    shmem_team_sync(print.team);
 
-        /* parity */
-        used = 0;
-        for (int parity = 0; parity < 2 && parity < pes; parity++) {
-            for (int p = 0; p < pes; p++)
-                print.member[p] = p % 2 == parity;
-            snprintf(text, sizeof text, "print round=%ld parity: %s", r, parity ? "odd" : "even");
-            expect(&used, "", text);
-        }
-        snprintf(text, sizeof text, "print round=%ld parity: %s", r, world % 2 ? "odd" : "even");
-        returned = parallel_print(print.team, "%s", text);
-        check("parity", print.team, returned, pes > 1 ? 2 : 1);
-        shmem_team_sync(print.team);
+    /* silent */
+    for (int p = 0; p < pes; p++)
+        print.member[p] = p % 2 == 0;
+    snprintf(text, sizeof text, "print round=%ld silent: the odd PEs say nothing", r);
+    used = 0;
+    expect(&used, "", text);
+    returned = parallel_print(print.team, "%s", world % 2 ? "" : text);
+    check("silent", print.team, returned, 1);
+    shmem_team_sync(print.team);
 
-        /* silent */
-        for (int p = 0; p < pes; p++)
-            print.member[p] = p % 2 == 0;
-        snprintf(text, sizeof text, "print round=%ld silent: the odd PEs say nothing", r);
-        used = 0;
+    /* distinct */
+    used = 0;
+    for (int p = 0; p < pes; p++) {
+        memset(print.member, 0, (size_t)pes);
+        print.member[p] = 1;
+        snprintf(text, sizeof text, "print round=%ld distinct: PE %d of %d", r, p, pes);
         expect(&used, "", text);
-        returned = parallel_print(print.team, "%s", world % 2 ? "" : text);
-        check("silent", print.team, returned, 1);
-        shmem_team_sync(print.team);
+    }
+    snprintf(text, sizeof text, "print round=%ld distinct: PE %d of %d", r, world, pes);
+    returned = parallel_print(print.team, "%s", text);
+    check("distinct", print.team, returned, pes);
+    shmem_team_sync(print.team);
 
-        /* distinct */
+    /* even */
+    for (int p = 0; p < pes; p++)
+        print.member[p] = p % 2 == 0;
+    snprintf(text, sizeof text, "print round=%ld even: the even team", r);
+    used = 0;
+    expect(&used, "even", text);
+    returned = parallel_print(print.even, "%s", text);
+    check("even", print.even, returned, 1);
+    shmem_team_sync(print.team);
+
+    /* shared: a line a node, the node's own */
+    int node = layout->node[world];
+    for (int p = 0; p < pes; p++)
+        print.member[p] = layout->node[p] == node;
+    snprintf(text, sizeof text, "print round=%ld shared: node %d", r, node);
+    used = 0;
+    expect(&used, "shared", text);
+    returned = parallel_print(SHMEM_TEAM_SHARED, "%s", text);
+    check("shared", SHMEM_TEAM_SHARED, returned, 1);
+    shmem_team_sync(print.team);
+
+    /* strided: team ranks 0, 1, 2 are world N-1, N-2, N-3 */
+    if (print.n >= 3) {
+        memset(print.member, 0, (size_t)pes);
+        for (int k = 0; k < 3; k++)
+            print.member[shmem_team_translate_pe(print.team, print.n - 1 - k,
+                                                 SHMEM_TEAM_WORLD)] = 1;
+        snprintf(label, sizeof label, "team(%d:-1:3)",
+                 shmem_team_translate_pe(print.team, print.n - 1, SHMEM_TEAM_WORLD));
+        snprintf(text, sizeof text, "print round=%ld strided: three from the last, backwards",
+                 r);
         used = 0;
-        for (int p = 0; p < pes; p++) {
-            memset(print.member, 0, (size_t)pes);
-            print.member[p] = 1;
-            snprintf(text, sizeof text, "print round=%ld distinct: PE %d of %d", r, p, pes);
-            expect(&used, "", text);
-        }
-        snprintf(text, sizeof text, "print round=%ld distinct: PE %d of %d", r, world, pes);
-        returned = parallel_print(print.team, "%s", text);
-        check("distinct", print.team, returned, pes);
+        expect(&used, label, text);
+        returned = parallel_print(print.strided, "%s", text);
+        check("strided", print.strided, returned, 1);
         shmem_team_sync(print.team);
+    }
 
-        /* even */
-        for (int p = 0; p < pes; p++)
-            print.member[p] = p % 2 == 0;
-        snprintf(text, sizeof text, "print round=%ld even: the even team", r);
-        used = 0;
-        expect(&used, "even", text);
-        returned = parallel_print(print.even, "%s", text);
-        check("even", print.even, returned, 1);
-        shmem_team_sync(print.team);
-
-        /* shared: a line a node, the node's own */
-        int node = layout->node[world];
-        for (int p = 0; p < pes; p++)
-            print.member[p] = layout->node[p] == node;
-        snprintf(text, sizeof text, "print round=%ld shared: node %d", r, node);
-        used = 0;
-        expect(&used, "shared", text);
-        returned = parallel_print(SHMEM_TEAM_SHARED, "%s", text);
-        check("shared", SHMEM_TEAM_SHARED, returned, 1);
-        shmem_team_sync(print.team);
-
-        /* strided: team ranks 0, 1, 2 are world N-1, N-2, N-3 */
-        if (print.n >= 3) {
-            memset(print.member, 0, (size_t)pes);
-            for (int k = 0; k < 3; k++)
-                print.member[shmem_team_translate_pe(print.team, print.n - 1 - k,
-                                                     SHMEM_TEAM_WORLD)] = 1;
-            snprintf(label, sizeof label, "team(%d:-1:3)",
-                     shmem_team_translate_pe(print.team, print.n - 1, SHMEM_TEAM_WORLD));
-            snprintf(text, sizeof text, "print round=%ld strided: three from the last, backwards",
-                     r);
-            used = 0;
-            expect(&used, label, text);
-            returned = parallel_print(print.strided, "%s", text);
-            check("strided", print.strided, returned, 1);
-            shmem_team_sync(print.team);
-        }
-
-        /* windows: texts of 25 to 60 bytes, windows of 64 */
-        used = 0;
-        for (int p = 0; p < pes; p++) {
-            memset(print.member, 0, (size_t)pes);
-            print.member[p] = 1;
-            int length = snprintf(text, sizeof text, "print round=%ld windows: PE %d ", r, p);
-            int target = length + p * 7 % 23;
-            while (length < target && length < 60)
-                text[length++] = '.';
-            text[length] = '\0';
-            expect(&used, "", text);
-        }
-        int length = snprintf(text, sizeof text, "print round=%ld windows: PE %d ", r, world);
-        int target = length + world * 7 % 23;
+    /* windows: texts of 25 to 60 bytes, windows of 64 */
+    used = 0;
+    for (int p = 0; p < pes; p++) {
+        memset(print.member, 0, (size_t)pes);
+        print.member[p] = 1;
+        int length = snprintf(text, sizeof text, "print round=%ld windows: PE %d ", r, p);
+        int target = length + p * 7 % 23;
         while (length < target && length < 60)
             text[length++] = '.';
         text[length] = '\0';
-        size_t window = parallel_print_window(WINDOW);
-        returned = parallel_print(print.team, "%s", text);
-        parallel_print_window(window);
-        check("windows", print.team, returned, pes);
-        shmem_team_sync(print.team);
+        expect(&used, "", text);
+    }
+    int length = snprintf(text, sizeof text, "print round=%ld windows: PE %d ", r, world);
+    int target = length + world * 7 % 23;
+    while (length < target && length < 60)
+        text[length++] = '.';
+    text[length] = '\0';
+    size_t window = parallel_print_window(WINDOW);
+    returned = parallel_print(print.team, "%s", text);
+    parallel_print_window(window);
+    check("windows", print.team, returned, pes);
+    shmem_team_sync(print.team);
 
-        /* long: cut to the capacity, less its NUL, ending in "..." */
-        length = snprintf(print.text, LONG_TEXT + 1, "print round=%ld long: ", r);
-        memset(print.text + length, 'x', (size_t)(LONG_TEXT - length));
-        print.text[LONG_TEXT] = '\0';
-        memset(print.member, 1, (size_t)pes);
-        char cut[PACER_MESSAGE_CAPACITY];
-        memcpy(cut, print.text, PACER_MESSAGE_CAPACITY - 4);
-        memcpy(cut + PACER_MESSAGE_CAPACITY - 4, "...", 4);
-        used = 0;
-        expect(&used, "", cut);
-        returned = parallel_print(print.team, "%s", print.text);
-        check("long", print.team, returned, 1);
-        shmem_team_sync(print.team);
+    /* long: cut to the capacity, less its NUL, ending in "..." */
+    length = snprintf(print.text, LONG_TEXT + 1, "print round=%ld long: ", r);
+    memset(print.text + length, 'x', (size_t)(LONG_TEXT - length));
+    print.text[LONG_TEXT] = '\0';
+    memset(print.member, 1, (size_t)pes);
+    char cut[PACER_MESSAGE_CAPACITY];
+    memcpy(cut, print.text, PACER_MESSAGE_CAPACITY - 4);
+    memcpy(cut + PACER_MESSAGE_CAPACITY - 4, "...", 4);
+    used = 0;
+    expect(&used, "", cut);
+    returned = parallel_print(print.team, "%s", print.text);
+    check("long", print.team, returned, 1);
+    shmem_team_sync(print.team);
 
-        /* Folded to nodes, from here to the round's end. */
-        parallel_print_fold_nodes(1);
+    /* Folded to nodes, from here to the round's end. */
+    parallel_print_fold_nodes(1);
 
-        /* hosts: a line a host, labeled by its name alone */
-        used = 0;
-        int lines = 0;
-        for (int p = 0; p < pes; p++)
-            if (print.host_first[p] == p) {
-                snprintf(text, sizeof text, "print round=%ld hosts: %s", r,
-                         parallel_print_host(p));
-                expect_labeled(&used, parallel_print_host(p), text);
-                lines++;
-            }
-        snprintf(text, sizeof text, "print round=%ld hosts: %s", r, parallel_print_host(world));
-        returned = parallel_print(print.team, "%s", text);
-        check("hosts", print.team, returned, lines);
-        shmem_team_sync(print.team);
-
-        /* partial: each host's last PE apart from the rest, each group's line
-         * at its lowest PE; a host of one PE is whole, and named */
-        used = 0;
-        lines = 0;
-        for (int p = 0; p < pes; p++) {
-            const char *host = parallel_print_host(p);
-            int lowest = print.host_first[p], highest = print.host_last[p];
-            if (p == lowest && lowest == highest) {
-                snprintf(text, sizeof text, "print round=%ld partial: %s, last", r, host);
-                expect_labeled(&used, host, text);
-                lines++;
-            } else if (p == lowest) {
-                for (int q = 0; q < pes; q++)
-                    print.member[q] = print.host_first[q] == lowest && q != highest;
-                snprintf(text, sizeof text, "print round=%ld partial: %s", r, host);
-                expect(&used, "", text);
-                lines++;
-            }
-            if (p == highest && lowest != highest) {
-                memset(print.member, 0, (size_t)pes);
-                print.member[p] = 1;
-                snprintf(text, sizeof text, "print round=%ld partial: %s, last", r, host);
-                expect(&used, "", text);
-                lines++;
-            }
+    /* hosts: a line a host, labeled by its name alone */
+    used = 0;
+    int lines = 0;
+    for (int p = 0; p < pes; p++)
+        if (print.host_first[p] == p) {
+            snprintf(text, sizeof text, "print round=%ld hosts: %s", r,
+                     parallel_print_host(p));
+            expect_labeled(&used, parallel_print_host(p), text);
+            lines++;
         }
-        snprintf(text, sizeof text, "print round=%ld partial: %s%s", r,
-                 parallel_print_host(world), print.host_last[world] == world ? ", last" : "");
-        returned = parallel_print(print.team, "%s", text);
-        check("partial", print.team, returned, lines);
-        shmem_team_sync(print.team);
+    snprintf(text, sizeof text, "print round=%ld hosts: %s", r, parallel_print_host(world));
+    returned = parallel_print(print.team, "%s", text);
+    check("hosts", print.team, returned, lines);
+    shmem_team_sync(print.team);
 
-        /* folded: every PE the same text, every host in the label - or the
-         * PEs, where the hosts' names outgrow the room PE numbers would take
-         * (parallel-print.c's label_room, 80 + 12 N) */
-        for (int p = 0; p < pes; p++)
-            print.names[p] = parallel_print_host(p);
-        size_t needed = parallel_print_fold_names(print.names, pes, print.label,
-                                                  print.label_size);
-        snprintf(text, sizeof text, "print round=%ld folded: every PE says this", r);
-        used = 0;
-        if (needed < 80 + 12 * (size_t)pes) {
-            expect_labeled(&used, print.label, text);
-        } else {
-            memset(print.member, 1, (size_t)pes);
+    /* partial: each host's last PE apart from the rest, each group's line
+     * at its lowest PE; a host of one PE is whole, and named */
+    used = 0;
+    lines = 0;
+    for (int p = 0; p < pes; p++) {
+        const char *host = parallel_print_host(p);
+        int lowest = print.host_first[p], highest = print.host_last[p];
+        if (p == lowest && lowest == highest) {
+            snprintf(text, sizeof text, "print round=%ld partial: %s, last", r, host);
+            expect_labeled(&used, host, text);
+            lines++;
+        } else if (p == lowest) {
+            for (int q = 0; q < pes; q++)
+                print.member[q] = print.host_first[q] == lowest && q != highest;
+            snprintf(text, sizeof text, "print round=%ld partial: %s", r, host);
             expect(&used, "", text);
+            lines++;
         }
-        returned = parallel_print(print.team, "%s", text);
-        check("folded", print.team, returned, 1);
-        shmem_team_sync(print.team);
+        if (p == highest && lowest != highest) {
+            memset(print.member, 0, (size_t)pes);
+            print.member[p] = 1;
+            snprintf(text, sizeof text, "print round=%ld partial: %s, last", r, host);
+            expect(&used, "", text);
+            lines++;
+        }
+    }
+    snprintf(text, sizeof text, "print round=%ld partial: %s%s", r,
+             parallel_print_host(world), print.host_last[world] == world ? ", last" : "");
+    returned = parallel_print(print.team, "%s", text);
+    check("partial", print.team, returned, lines);
+    shmem_team_sync(print.team);
 
-        /* shared-folded: a node alone on its host is named for it */
-        int alone = 1;              /* node: this PE's, as in shared */
-        for (int p = 0; p < pes && alone; p++)
-            alone = (layout->node[p] == node) == (print.host_first[p] == print.host_first[world]);
-        snprintf(text, sizeof text, "print round=%ld shared-folded: node %d", r, node);
-        used = 0;
-        if (alone) {
-            snprintf(label, sizeof label, "shared@%s", parallel_print_host(world));
-            expect_labeled(&used, label, text);
-        } else {
-            for (int p = 0; p < pes; p++)
-                print.member[p] = layout->node[p] == node;
-            expect(&used, "shared", text);
+    /* folded: every PE the same text, every host in the label - or the
+     * PEs, where the hosts' names outgrow the room PE numbers would take
+     * (parallel-print.c's label_room, 80 + 12 N) */
+    for (int p = 0; p < pes; p++)
+        print.names[p] = parallel_print_host(p);
+    size_t needed = parallel_print_fold_names(print.names, pes, print.label,
+                                              print.label_size);
+    snprintf(text, sizeof text, "print round=%ld folded: every PE says this", r);
+    used = 0;
+    if (needed < 80 + 12 * (size_t)pes) {
+        expect_labeled(&used, print.label, text);
+    } else {
+        memset(print.member, 1, (size_t)pes);
+        expect(&used, "", text);
+    }
+    returned = parallel_print(print.team, "%s", text);
+    check("folded", print.team, returned, 1);
+    shmem_team_sync(print.team);
+
+    /* shared-folded: a node alone on its host is named for it */
+    int alone = 1;              /* node: this PE's, as in shared */
+    for (int p = 0; p < pes && alone; p++)
+        alone = (layout->node[p] == node) == (print.host_first[p] == print.host_first[world]);
+    snprintf(text, sizeof text, "print round=%ld shared-folded: node %d", r, node);
+    used = 0;
+    if (alone) {
+        snprintf(label, sizeof label, "shared@%s", parallel_print_host(world));
+        expect_labeled(&used, label, text);
+    } else {
+        for (int p = 0; p < pes; p++)
+            print.member[p] = layout->node[p] == node;
+        expect(&used, "shared", text);
+    }
+    returned = parallel_print(SHMEM_TEAM_SHARED, "%s", text);
+    check("shared-folded", SHMEM_TEAM_SHARED, returned, 1);
+    shmem_team_sync(print.team);
+    parallel_print_fold_nodes(0);
+}
+
+static void print_step(long units, int last)
+{
+    (void)last;
+    int folding = parallel_print_fold_nodes(0);
+    enum parallel_print_route routing = parallel_print_route(PARALLEL_PRINT_FCOLLECT);
+    parallel_print_capture(print.capture, print.size);
+    for (long u = 0; u < units; u++, print.round++) {
+        long r = print.round;
+        /* Every case by each route, against one prediction: the signal
+         * route's lines must be the fcollect's. */
+        for (int route = 0; route < 2; route++) {
+            parallel_print_route(route ? PARALLEL_PRINT_SIGNAL : PARALLEL_PRINT_FCOLLECT);
+            print.route_name = route ? ", signal route" : "";
+            cases(r);
         }
-        returned = parallel_print(SHMEM_TEAM_SHARED, "%s", text);
-        check("shared-folded", SHMEM_TEAM_SHARED, returned, 1);
-        shmem_team_sync(print.team);
-        parallel_print_fold_nodes(0);
+        parallel_print_route(routing);
 
         /* the fold itself, here on every PE */
         for (size_t c = 0; c < sizeof fold_cases / sizeof *fold_cases; c++) {

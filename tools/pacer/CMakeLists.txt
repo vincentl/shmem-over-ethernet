@@ -307,10 +307,22 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
     "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
     "osoe-pacer failures=[1-9]")
+  pacer_plant(print-route print
+    "print round=0 same, signal route: returned 2 lines, expected 1"
+    "print round=0 same, signal route: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this.")
   pacer_plant(print-fold print
     "print round=0 fold: pi-001,pi-002,pi-003,pi-004 folded to pi-.1-4., expected pi-.001-004."
     "print round=0 fold: pi-004,pi-001,pi-002,pi-001 folded to pi-.1-2,4., expected pi-.001-002,004."
     "print round=0 fold: pi-003,login,pi-001,gpu08,gpu07 folded to gpu.7-8.,login,pi-.1,3., expected gpu.07-08.,login,pi-.001,003.")
+
+  # A run whose every parallel_print takes the signal route, the print
+  # exercise's cases by both: the same lines, and nothing hangs.
+  add_test(NAME tools.pacer.print-signal.0-1-2-3
+    COMMAND osoe-launch -n 4 -m 0,1,2,3 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick
+            --print-route signal print alltoall)
+  set_tests_properties(tools.pacer.print-signal.0-1-2-3 PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "print_route=signal.*osoe-pacer failures=0 "
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}")
 
   # The counted build: it runs, and its report counts what the run called.
   add_test(NAME tools.pacer.counted.0-0-1-1
