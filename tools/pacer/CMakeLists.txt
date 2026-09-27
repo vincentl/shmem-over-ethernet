@@ -5,7 +5,7 @@
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
 add_executable(osoe-pacer osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
-  threads.c print.c atomics.c rma.c
+  threads.c print.c atomics.c rma.c locks.c memory.c
   ${PROJECT_SOURCE_DIR}/base/size.c)
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR})
 find_package(Threads REQUIRED)
@@ -180,6 +180,22 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "rma round=29 iput_iget float default get: byte 4, where no element lands, is 5a, not the canary")
   pacer_plant(rma-ptr rma
     "rma round=0 ptr: word 32 node-mate PE 1 stored is [0-9a-f]+, not [0-9a-f]+, when its flag said it was there")
+  # The locks' two and the memory's five. The count stays one off once
+  # planted, so every later checkpoint says so too; the first is asserted.
+  pacer_plant(locks-count locks
+    "locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
+  pacer_plant(locks-holder locks
+    "locks round=0 lock [0-9]+: PE -1 holds its home's holder word while this PE is in the section")
+  pacer_plant(memory-fill memory
+    "memory round=[0-9]+ (realloc|free): .*byte [0-9]+ .*not what was written")
+  pacer_plant(memory-calloc memory
+    "memory round=0 calloc: byte [0-9]+ of [0-9]+ is 01, not zero")
+  pacer_plant(memory-align memory
+    "memory round=0 align: a block of [0-9]+ bytes aligned to [0-9]+ is at an address 1 past a multiple of it")
+  pacer_plant(memory-accessible memory
+    "memory round=0 [a-z_]+: a block of [0-9]+ bytes is accessible from this PE and not accessible from PE 2")
+  pacer_plant(memory-agree memory
+    "memory round=0: the PEs' allocations differ, hashes from [0-9a-f]+ to [0-9a-f]+")
   pacer_plant(teams-exhaust "teams;--teams-exhaust"
     "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
   pacer_plant(print-hash print
