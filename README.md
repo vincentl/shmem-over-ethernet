@@ -165,8 +165,9 @@ every node.
   spare. Slurm binds each task to one core by default, and a PE's progress
   thread then shares it with the PE: on the Pi cluster that costs a pipelined
   point-to-point pattern six times its rate.
-- **`OSOE_NO_PROGRESS_TIMEOUT=60`** while a cluster is new, so that a wait
-  that stops moving says what it waits for.
+- **`OSOE_NO_PROGRESS_TIMEOUT=60`** while a cluster is new, so that a wait on
+  the library's own progress - a connection's acknowledgements, buffer space,
+  a reply - that stops moving ends the job and says what it waited for.
 - **`OSOE_JOB_SECRET`**, 32 hexadecimal digits exported before `srun`, keeps
   other hosts out of the job's rendezvous (design §6.2).
 
@@ -206,7 +207,8 @@ osoe-stat --summary 1234  # each team's collective in progress, to walk a hang d
 ```
 
 A job that hangs shows, for every PE, the routine it is blocked in, the
-collective's epoch, and for how long.
+collective's epoch, and for how long - which is how a program's own deadlock
+is found, since nothing times it out (below).
 
 ## Design goals
 
@@ -230,7 +232,8 @@ collective's epoch, and for how long.
   over TCP from what the step's environment says.
 - **Loud, never hung.** A PE or a node that dies ends the whole job with a
   message naming it; no wait gives up merely because time has passed, but a
-  job told to (`OSOE_NO_PROGRESS_TIMEOUT`) reports what it waited for.
+  job told to (`OSOE_NO_PROGRESS_TIMEOUT`) ends a wait on the library's own
+  progress that has stopped moving, and says what it waited for.
 - **Observable from outside**: `osoe-stat` reads a running or hung job's
   counters and state from its control segment, without its cooperation.
 - **A path to RDMA that no interface blocks.** The transport and collective
@@ -360,9 +363,14 @@ specification or takes a choice the specification leaves open.
 - **A PE or a node that dies ends the whole job**, with a message naming it.
   There is no fault tolerance.
 - **No wait gives up by default**: set `OSOE_NO_PROGRESS_TIMEOUT` for a wait
-  that stops seeing progress to end the job naming what it waited for. A node
-  that vanishes without closing its connections is noticed by TCP keepalive,
-  in one to two minutes by default (`OSOE_KEEPALIVE`).
+  on the library's own progress - acknowledgements, buffer space, a reply, the
+  rendezvous - that stops moving to end the job naming what it waited for. A
+  node that vanishes without closing its connections is noticed by TCP
+  keepalive, in one to two minutes by default (`OSOE_KEEPALIVE`).
+- **A program's own deadlock is not detected**: a collective one PE never
+  enters, or a wait for a word nobody writes, waits for ever, since a PE may
+  compute for as long as it likes first. `osoe-stat` shows where each PE is
+  blocked.
 
 **Transport and API**
 
@@ -484,7 +492,7 @@ both are set the `SHMEM_` one controls.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_NO_PROGRESS_TIMEOUT` | `0` | Seconds a wait may see no progress before it ends the job, naming what it waited for; `0`, never. |
+| `OSOE_NO_PROGRESS_TIMEOUT` | `0` | Seconds a wait on the library's own progress - acknowledgements, buffer space, a reply, the rendezvous - may see none before it ends the job, naming what it waited for; `0`, never. A program's own waits and collectives are not timed. |
 | `OSOE_KEEPALIVE` | `60,10,6` | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes; `0` for none. |
 | `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. |
 | `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. |
