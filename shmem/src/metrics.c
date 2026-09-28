@@ -194,6 +194,10 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     PE("heap.bytes_in_use", heap_in_use, OSOE_MTYPE_U64, OSOE_MKIND_GAUGE, "bytes"),
     PE("heap.bytes_high_water", heap_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, "bytes"),
     PE("heap.largest_free_block", heap_largest_free, OSOE_MTYPE_U64, OSOE_MKIND_GAUGE, "bytes"),
+    /* The most pieces the PE's last scan across nodes had in flight (§5.8;
+     * layout 25): a count to pin the scan's overlap by. */
+    PE("pe.scan.most_pieces_in_flight", scan_most_in_flight, OSOE_MTYPE_U32, OSOE_MKIND_STATE,
+       ""),
     /*
      * Every team number's block (layout 18), one record per number. A reader
      * that walks them all - osoe-stat does - shows those whose record is

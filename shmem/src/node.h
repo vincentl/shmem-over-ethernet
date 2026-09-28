@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 24
+#define OSOE_NODE_LAYOUT 25
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -197,6 +197,18 @@ struct osoe_pe_slot {
     _Atomic uint64_t heap_in_use;
     _Atomic uint64_t heap_high_water;
     _Atomic uint64_t heap_largest_free;
+
+    /*
+     * Layout 25 (the scan's pieces in flight, 2026-09-27): the most pieces
+     * of a scan this PE had in flight at once - sent up and their down not yet
+     * taken - in its last scan over a team spanning nodes (§5.8, "Prefix
+     * scans"). min(OSOE_COLLECTIVE_PIPELINE, pieces) at a leaf of the scan's
+     * tree, which fills its window before it looks for a down. Written by the
+     * scanning thread before its scan returns, so a count pins the overlap
+     * where a time could only be compared, as the reductions' tree state does
+     * (team.tree.most_pieces_in_flight).
+     */
+    _Atomic uint32_t scan_most_in_flight;
 };
 
 /*

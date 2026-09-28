@@ -1708,6 +1708,23 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             $<TARGET_FILE:shmem_test_scan>)
   set_tests_properties(shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4 PROPERTIES LABELS "tier2"
     TIMEOUT 120)
+  # Pieces in flight (2026-09-27): one at a time, as first built, and four on
+  # the three-level tree, the leaves' counts pinned by the test; the most the
+  # agreement allows, eight, on four nodes.
+  add_test(NAME shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=1 OSOE_COLLECTIVE_FANOUT=2
+            $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
+            $<TARGET_FILE:shmem_test_scan>)
+  add_test(NAME shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=4 OSOE_COLLECTIVE_FANOUT=2
+            $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
+            $<TARGET_FILE:shmem_test_scan>)
+  add_test(NAME shmem.scan.pipeline-8.0-1-2-3
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=8
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 60 -- $<TARGET_FILE:shmem_test_scan>)
+  set_tests_properties(shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
+    shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4 PROPERTIES LABELS "tier2" TIMEOUT 120)
+  set_tests_properties(shmem.scan.pipeline-8.0-1-2-3 PROPERTIES LABELS "tier2" TIMEOUT 90)
 endif()
 
 # Contexts (spec §9.5; design §4.6, §4.11; phase 1 step 8 slice 1;

@@ -17,6 +17,12 @@
  * then the world (the model's CA); and three teams of two - {0, 3}, {0, 1},
  * {2, 1} - in that order (the model's ZXY), which span nodes on a map of one
  * PE a node.
+ *
+ * And the pieces in flight (the scan's pipeline, 2026-09-27): a scan of the
+ * world in MANY pieces, more than any window, after which every PE at a leaf
+ * of the scan's tree over the world's ranks reads, as osoe-stat does, that it
+ * had min(D, pieces) in flight - where one piece at a time would say 1 -
+ * whenever the world spans nodes and so scans by the tree.
  */
 #include <complex.h>
 #include <stdbool.h>
@@ -32,9 +38,11 @@
 #include "invariants.h"
 
 enum { LARGE = 2048 + 3 };   /* past a 4 KiB scan slot of longs, four times over */
+enum { SLOT_LONGS = 4096 / sizeof(long), MANY = 20 * SLOT_LONGS + 7 };   /* 21 pieces */
+enum { BUFFER_BYTES = MANY * sizeof(long) > LARGE * 16 ? MANY * sizeof(long) : LARGE * 16 };
 
 static int me, npes;
-static unsigned char *first, *second;   /* symmetric, LARGE x 16 bytes each */
+static unsigned char *first, *second;   /* symmetric, BUFFER_BYTES each */
 
 /* One type's scan over `team`, `n` elements, checked on every member. */
 #define SCAN_CHECK(T, NAME, VALUE)                                                    \
@@ -131,6 +139,53 @@ static void check_team(shmem_team_t team, const char *label)
     check_complexf(team, label, 7, true, false, false);
 }
 
+/* D and the fan-out as the library reads them: 2 and 4 by default. */
+static uint64_t setting(const char *name, uint64_t fallback)
+{
+    const char *value = getenv(name);
+    return value ? strtoull(value, NULL, 10) : fallback;
+}
+
+/* Whether team rank `rank` of `members` is a leaf of the scan's tree: a place
+ * covering [a, b) has children splitting [a + 1, b), and a leaf covers only
+ * itself (internode-generic.c, scan_place). */
+static bool scan_leaf(uint32_t members, uint32_t k, uint32_t rank)
+{
+    uint32_t a = 0, b = members;
+    while (a != rank) {
+        uint32_t rest = b - a - 1, n = rest < k ? rest : k;
+        uint32_t size = rest / n, longer = rest % n, start = a + 1;
+        for (uint32_t j = 0; j < n; j++) {
+            uint32_t end = start + size + (j < longer ? 1 : 0);
+            if (rank < end) {
+                a = start;
+                b = end;
+                break;
+            }
+            start = end;
+        }
+    }
+    return b - a == 1;
+}
+
+/* This PE's own slot's count of pieces in flight, found by its rank among
+ * every slot of its node's segment - not SHMEM_TEAM_SHARED's size, which
+ * OSOE_FORCE_REMOTE makes one. */
+static uint64_t most_in_flight(void)
+{
+    uint64_t value = UINT64_MAX, slots = 0;
+    CHECK(osoe_test_node_metric("node.local_count", &slots));
+    for (uint32_t i = 0; i < (uint32_t)slots; i++) {
+        uint64_t rank = UINT64_MAX;
+        if (osoe_test_scoped_metric("pe.rank", OSOE_MSCOPE_PE, i, &rank) && rank == (uint64_t)me) {
+            CHECK(osoe_test_scoped_metric("pe.scan.most_pieces_in_flight", OSOE_MSCOPE_PE, i,
+                                          &value));
+            break;
+        }
+    }
+    return value;
+}
+
 static shmem_team_t split(int start, int stride, int size)
 {
     shmem_team_t t = SHMEM_TEAM_INVALID;
@@ -144,8 +199,8 @@ int main(void)
     shmem_init();
     me = shmem_my_pe();
     npes = shmem_n_pes();
-    first = shmem_malloc((size_t)LARGE * 16);
-    second = shmem_malloc((size_t)LARGE * 16);
+    first = shmem_malloc(BUFFER_BYTES);
+    second = shmem_malloc(BUFFER_BYTES);
     CHECK_FATAL(first != NULL && second != NULL);
 
     shmem_team_t evens = split(0, 2, (npes + 1) / 2);
@@ -184,6 +239,25 @@ int main(void)
             check_long(x, "{0, 1}", LARGE, false, false, false);
             check_long(y, "{2, 1}", LARGE, true, true, false);
         }
+    shmem_barrier_all();
+
+    /* Many pieces, and how many went at once. A leaf fills its window before it
+     * looks for a down, so it says min(D, pieces) exactly; the world scans by
+     * the tree only when it spans nodes. */
+    check_long(SHMEM_TEAM_WORLD, "the world, in many pieces", MANY, true, false, false);
+    check_long(SHMEM_TEAM_WORLD, "the world, in many pieces", MANY, false, true, false);
+    if (shmem_team_n_pes(SHMEM_TEAM_SHARED) < npes &&
+        scan_leaf((uint32_t)npes, (uint32_t)setting("OSOE_COLLECTIVE_FANOUT", 4), (uint32_t)me)) {
+        uint64_t pieces = (MANY + SLOT_LONGS - 1) / SLOT_LONGS;
+        uint64_t window = setting("OSOE_COLLECTIVE_PIPELINE", 2);
+        uint64_t want = pieces < window ? pieces : window, most = most_in_flight();
+        if (most != want)
+            fprintf(stderr, "PE %d: a leaf of the scan's tree had %llu pieces in flight at "
+                    "most, not %llu (D %llu, %llu pieces)\n", me, (unsigned long long)most,
+                    (unsigned long long)want, (unsigned long long)window,
+                    (unsigned long long)pieces);
+        CHECK(most == want);
+    }
     shmem_barrier_all();
 
     /* SHMEM_TEAM_INVALID is answered nonzero (the spec leaves it undefined). */

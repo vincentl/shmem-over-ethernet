@@ -268,12 +268,22 @@ void osoe_segment_close(struct osoe_segment *s);
  *   20  team.tree.gather_steps and team.tree.gather_shares, in the same
  *       padding: the steps the node's lead made in its last gather, and the
  *       (node, step) pairs it sends them in (§5.8's allgather)
+ *   21  each local PE's pool of context blocks, appended (§4.11,
+ *       OSOE_MAX_CONTEXTS)
+ *   22  a team's record gives its members as a progression of world ranks
+ *       (the author's decision E)
+ *   23  a record per thread, each with its own watch word, and the PE slot's
+ *       bitmap of the records holding one; the landing zone in 1 KiB extents
+ *   24  a shared context's gets counted in two pairs by generation (§4.11
+ *       items 1 and 2)
+ *   25  pe.scan.most_pieces_in_flight, appended to the PE slot: the most
+ *       pieces the PE's last scan across nodes had in flight (§5.8's scans)
  *
- * None of 5 to 20 changed the watch word's encoding; 17 gave it a region value
- * it could already carry.
+ * None of 5 to 25 changed the watch word's encoding: 17 gave it a region
+ * value it could already carry, and 23 gave each thread a word of its own.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               24
+#define OSOE_SEGMENT_NEWEST_LAYOUT               25
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is

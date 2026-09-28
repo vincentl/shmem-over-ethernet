@@ -374,11 +374,12 @@ void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t 
  * The generic implementation: every member at its rank's place in a pre-order
  * k-ary tree over the ranks, k the agreed fan-out - each subtree a contiguous
  * range of ranks - its subtree's total sent up, the sum of every rank before
- * its subtree sent down, 2 ceil(log_k M) steps for M members. Its slots are
+ * its subtree sent down, 2 ceil(log_k M) steps for M members, a scan larger
+ * than a slot in pieces with the agreed D of them in flight. Its slots are
  * the team number's, in every member's internal region (internal-region.h;
- * tools/modelcheck/scan_model.py), so scans on different teams may run at once
- * on different threads. An RDMA backend runs it as it is, its puts and fenced
- * adds RDMA writes and atomics.
+ * tools/modelcheck/scan_model.py and scan_pipeline_model.py), so scans on
+ * different teams may run at once on different threads. An RDMA backend runs
+ * it as it is, its puts and fenced adds RDMA writes and atomics.
  */
 void osoe_internode_scan(uint32_t team, uint32_t rank, void *dest, const void *source,
                          size_t count, struct osoe_element element, bool inclusive,

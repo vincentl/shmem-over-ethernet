@@ -5210,6 +5210,25 @@ record (decision E); a team on one node is scanned by its local lead, in rank
 order, between the intranode arrival and release. A scan on a team spanning
 nodes takes no epoch: nothing of the node's counters is used.
 
+*Pipelined pieces* (the author's decision of 2026-09-27, after the Pi measured
+a 1 MiB scan at 134 ms where reduce took 30: its 4 KiB pieces went one at a
+time, each all the way up and down the tree). **A member keeps D pieces in
+flight**, D the reductions' agreed `OSOE_COLLECTIVE_PIPELINE`: a row of D
+up-slots per child position and a row of D down-slots, piece g of the team's
+scans in slot g mod D, and its loop is the reductions' - whichever input is
+ready, its children's totals for the next piece up while the window allows or
+the next piece's down. Five rules, each with a breakage the model shows failing
+(`tools/modelcheck/scan_pipeline_model.py`): a member sends piece q up only
+once it holds piece q - D's down; copies a down out before its next piece up
+can let its parent write the slot again; keeps one counter per child position;
+takes a piece down only once it took it up, since the downs it sends carry
+the totals of the children before each (at the root the one rule that orders
+the two); and keeps its own source and its children's totals for the D pieces
+in flight. The scans' area doubles at the default D of 2, to 2.6 MiB of
+address space a PE, touched only by scans. Each member publishes the most
+pieces it had in flight in its PE slot (layout 25), min(D, pieces) at a leaf,
+which the tests pin.
+
 ---
 
 ## 6. Bootstrap

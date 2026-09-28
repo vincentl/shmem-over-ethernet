@@ -1,0 +1,323 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+"""Pipelined pieces through a prefix scan's tree (spec §9.10.10; design §5.8,
+"Prefix scans"; the author's decision of 2026-09-27, "pipeline it").
+
+scan_model.py checks the scan as first built: every member at its team rank's
+place in a pre-order k-ary tree over the ranks, and a scan larger than a slot
+in pieces, each piece all the way up and down before the next. This model
+checks it with D pieces in flight, pipeline_model.py's rules carried over to
+the scan's tree:
+  * A member keeps D up-slots per child position and D down-slots, and piece g
+    goes in slot g mod D, g numbering the team's pieces over its life (every
+    member of a team moves the same pieces, so every member numbers alike).
+  * One counter per child position and one for downs, cumulative over the
+    team's life, compared as at least.
+  * A member sends piece q up only once it has consumed piece q - D's down:
+    its parent read piece q - D's total before sending that down, so the slot
+    is free.
+  * A member copies a down out before it does anything that lets its parent
+    write that slot again - the next piece it sends up.
+  * Whichever is ready: its children's totals for piece `up`, while the window
+    allows, or piece `down`'s down. The root's down is its own, zero, but it
+    takes a piece down only once it has taken it up - and so does every
+    member: a piece's down to child j carries the totals of children
+    0 .. j - 1, read when the piece went up.
+  * A member keeps its own source and its children's totals for the pieces in
+    flight, D of each, until each piece has gone down.
+
+Checked
+  SLOT     no slot is written while it holds a value not yet read.
+  VALUE    a value read from a slot is the piece waited for: its (scan, piece).
+  RESULT   every member's exclusive result for every piece is the exact sum of
+           the sources of the ranks before it: sources are distinct powers of
+           two per (scan, piece, rank), so a sum is a set.
+  and, by the engine: no stuck member, and every state can still finish.
+
+Teams: A is the members in world order, B the same members reversed, so the
+two trees differ; each has its own slots and counters, as built (scan_model.py,
+per_team). A case's order is the scans every member makes, "AB" one on A then
+one on B.
+
+Designs
+  design              as above.
+Breakages
+  window              a member sends piece q once it holds piece q - D - 1's
+                      down: one piece too many in flight (SLOT).
+  count_before_copy   a member counts a down consumed when it arrives, and
+                      copies it out only after whatever that count lets
+                      through - its next piece up, after which its parent may
+                      write the slot again (SLOT or VALUE).
+  root_early          the root takes a piece down before taking it up, so the
+                      downs it sends lack their children's totals (RESULT).
+  ring_short          a member keeps D - 1 pieces' totals, not D: a piece's
+                      totals are overwritten before it goes down (RESULT).
+  summed              one up counter per member, summed over positions: a fast
+                      child's next piece stands in for a slow child's (VALUE).
+
+Runs are SC; a put is fenced before the counter add that covers it
+(invariant 5), and waits are abstract (the region wait's wake is
+wait_word_model.py's).
+
+Usage: scan_pipeline_model.py [substring ...]   runs the cases whose names match
+"""
+import sys
+
+from engine import assemble, explore, report, select
+
+UP = lambda p, t, j, s: ('up', p, t, j, s)   # at PE p, team t: child position j's slot s
+UPC = lambda p, t, j: ('upc', p, t, j)       # its counter, cumulative
+DOWN = lambda p, t, s: ('down', p, t, s)     # at PE p, team t: down-slot s
+DOWNC = lambda p, t: ('downc', p, t)
+UNREAD = lambda key: ('$unread',) + key      # ghost: the slot holds a value not yet read
+TAG = lambda key: ('$tag',) + key            # ghost: (scan, piece) of the value in the slot
+OVERWRITE = ('$overwrite',)
+FIN = ('$fin',)
+
+TEAMS = {'A': lambda m: list(range(m)), 'B': lambda m: list(reversed(range(m)))}
+TEAM_NUMBER = {'A': 0, 'B': 1}
+
+
+def children(a, b, k):
+    """The children of the place covering [a, b): (first rank, end) of each."""
+    rest = b - (a + 1)
+    if rest <= 0:
+        return []
+    n = min(k, rest)
+    out, start = [], a + 1
+    for j in range(n):
+        size = rest // n + (1 if j < rest % n else 0)
+        out.append((start, start + size))
+        start += size
+    return out
+
+
+def places(members, k):
+    """rank -> (parent rank or None, position among its parent's children,
+    [child ranks])"""
+    info = {}
+
+    def walk(a, b, parent, position):
+        kids = children(a, b, k)
+        info[a] = (parent, position, [c for c, _ in kids])
+        for j, (c, e) in enumerate(kids):
+            walk(c, e, a, j)
+    walk(0, members, None, None)
+    return info
+
+
+def source(x, q, rank, members, pieces):
+    return 1 << ((x * pieces + q) * members + rank)
+
+
+def tag(x, q):
+    return 1000 * (x + 1) + q + 1
+
+
+def member(design, pe, members, k, depth, pieces, order):
+    """PE `pe`'s program: the scans of `order`, one after another, each its
+    loop over the pieces."""
+    window = depth + (1 if design == 'window' else 0)
+    ring = depth - 1 if design == 'ring_short' else depth
+    B = []
+    moved = {}                  # team -> pieces its scans moved before this one
+    for x, team in enumerate(order):
+        base = moved.get(team, 0)
+        moved[team] = base + pieces
+        after = f'@x{x + 1}_E' if x + 1 < len(order) else '@DONE'
+        # Each scan's program in a call of its own, so that every function and
+        # lambda below closes over this scan's names, not the last scan's.
+        B += one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base, after)
+    B += [('DONE', ('gpost', lambda M, L: ({FIN: M[FIN] + 1}, {}), '@END')),
+          ('END', ('done',))]
+    return assemble(B)
+
+
+def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base, after):
+    """Scan x of PE `pe`'s program: its loop over the pieces, entered at
+    x<x>_E and leaving to `after`."""
+    B = []
+    pes = TEAMS[team](members)
+    t = TEAM_NUMBER[team]
+    rank = pes.index(pe)
+    parent, position, kids = places(members, k)[rank]
+    ppe = None if parent is None else pes[parent]
+    kpes = [pes[c] for c in kids]
+    p = f'x{x}_'
+
+    def slot(q, base=base):
+        return (base + q) % depth
+
+    def local(name, q):
+        return f'{name}{q % ring}'
+
+    def arrived(M, q, base=base, kids=kids, t=t):
+        if design == 'summed':
+            return sum(M[UPC(pe, t, j)] for j in range(k)) >= len(kids) * (base + q + 1)
+        return all(M[UPC(pe, t, j)] >= base + q + 1 for j in range(len(kids)))
+
+    # Entry: nothing in flight, the ring's locals cleared.
+    entry = [('set', 'up', lambda L: 0), ('set', 'down', lambda L: 0),
+             ('set', 'pend', lambda L: 0)]
+    for q in range(ring):
+        entry.append(('set', f'own{q}', lambda L: 0))
+        for j in range(len(kids)):
+            entry.append(('set', f'c{j}_{q}', lambda L: 0))
+    for i, (op, var, fn) in enumerate(entry):
+        here = p + ('E' if i == 0 else f'E{i}')
+        nxt = '@' + p + (f'E{i + 1}' if i + 1 < len(entry) else 'LOOP')
+        B.append((here, (op, var, fn, nxt)))
+    B.append((p + 'LOOP', ('br', lambda L: L['down'] >= pieces and not L['pend'],
+                           after, '@' + p + 'CH')))
+
+    def choose(M, L, base=base, root=parent is None, t=t):
+        alts = []
+        if L['up'] < pieces and L['up'] < L['down'] + window and arrived(M, L['up']):
+            alts.append(({}, {'go': 1}, f'PE {pe}: piece {L["up"]} up'))
+        if L['pend']:
+            alts.append(({}, {'go': 3}, f'PE {pe}: copy out the down it counted'))
+        elif L['down'] < pieces and (L['down'] < L['up'] or (root and design == 'root_early')) \
+                and (root or M[DOWNC(pe, t)] >= base + L['down'] + 1):
+            alts.append(({}, {'go': 2}, f'PE {pe}: piece {L["down"]} down'))
+        return alts
+
+    B += [(p + 'CH', ('nd', choose, '@' + p + 'GO')),
+          (p + 'GO', ('br', lambda L: L['go'] == 1, '@' + p + 'U', '@' + p + 'GO2')),
+          (p + 'GO2', ('br', lambda L: L['go'] == 2, '@' + p + 'D', '@' + p + 'L'))]
+
+    # Up: each child's total for piece `up`, kept, then the subtree's up.
+    up = []
+    for j in range(len(kids)):
+        up.append((f'U{j}', ('check', lambda M, L, j=j, t=t:
+                             None if M[TAG(UP(pe, t, j, slot(L['up'])))] == tag(x, L['up']) else
+                             f'PE {pe} read up-slot {j} with tag '
+                             f'{M[TAG(UP(pe, t, j, slot(L["up"])))]}, waiting for piece '
+                             f'{L["up"]} of scan {x} ({tag(x, L["up"])})')))
+        up.append((f'UT{j}', ('ghost', lambda M, L, j=j, t=t:
+                              ({UNREAD(UP(pe, t, j, slot(L['up']))): 0},
+                               {local(f'c{j}_', L['up']): M[UP(pe, t, j, slot(L['up']))]}))))
+    up.append(('UO', ('ghost', lambda M, L, rank=rank:
+                      ({}, {local('own', L['up']): source(x, L['up'], rank, members, pieces)}))))
+    if ppe is not None:
+        def put_up(M, L, t=t, ppe=ppe, position=position, n=len(kids)):
+            key = UP(ppe, t, position, slot(L['up']))
+            if M[UNREAD(key)]:
+                return [({OVERWRITE: 1}, {}, 'overwrite')]
+            total = L[local('own', L['up'])] + sum(L[local(f'c{j}_', L['up'])] for j in range(n))
+            return [({key: total, UNREAD(key): 1, TAG(key): tag(x, L['up'])}, {},
+                     f'PE {pe} puts piece {L["up"]}\'s subtree total into PE {ppe}\'s '
+                     f'up-slot {position}')]
+        up += [('UP', ('nd', put_up)),
+               ('UPO', ('check', lambda M, L: None if not M[OVERWRITE] else
+                        f'PE {pe} overwrote an unread up-slot')),
+               ('UPA', ('add', lambda L, t=t, ppe=ppe, position=position: UPC(ppe, t, position),
+                        lambda L: 1, '_'))]
+    up.append(('UN', ('set', 'up', lambda L: L['up'] + 1)))
+
+    # Down: the sum before this subtree, checked, then one to each child.
+    def down_steps(prefix, var):
+        D = []
+        if ppe is not None:
+            D += [(f'{prefix}V', ('check', lambda M, L, t=t:
+                                  None if M[TAG(DOWN(pe, t, slot(L[var])))] == tag(x, L[var]) else
+                                  f'PE {pe} read its down-slot with tag '
+                                  f'{M[TAG(DOWN(pe, t, slot(L[var])))]}, waiting for piece '
+                                  f'{L[var]} of scan {x} ({tag(x, L[var])})')),
+                  (f'{prefix}T', ('ghost', lambda M, L, t=t:
+                                  ({UNREAD(DOWN(pe, t, slot(L[var]))): 0},
+                                   {'before': M[DOWN(pe, t, slot(L[var]))]})))]
+        else:
+            D.append((f'{prefix}T', ('set', 'before', lambda L: 0)))
+        D.append((f'{prefix}X', ('check', lambda M, L, rank=rank:
+                                 None if L['before'] == sum(source(x, L[var], r, members, pieces)
+                                                            for r in range(rank)) else
+                                 f'PE {pe}\'s exclusive result for piece {L[var]} of scan {x} '
+                                 f'is {L["before"]:b}')))
+        for j, kpe in enumerate(kpes):
+            def put_down(M, L, j=j, kpe=kpe, t=t):
+                key = DOWN(kpe, t, slot(L[var]))
+                if M[UNREAD(key)]:
+                    return [({OVERWRITE: 1}, {}, 'overwrite')]
+                value = L['before'] + L[local('own', L[var])] + \
+                    sum(L[local(f'c{i}_', L[var])] for i in range(j))
+                return [({key: value, UNREAD(key): 1, TAG(key): tag(x, L[var])}, {},
+                         f'PE {pe} puts piece {L[var]}\'s sum before child {j} into PE '
+                         f'{kpe}\'s down-slot')]
+            D += [(f'{prefix}Q{j}', ('nd', put_down)),
+                  (f'{prefix}QO{j}', ('check', lambda M, L: None if not M[OVERWRITE] else
+                                      f'PE {pe} overwrote an unread down-slot')),
+                  (f'{prefix}QA{j}', ('add', lambda L, kpe=kpe, t=t: DOWNC(kpe, t),
+                                      lambda L: 1, '_'))]
+        return D
+
+    if design == 'count_before_copy':
+        down = [('DC', ('set', 'pend', lambda L: 1)),
+                ('DN', ('set', 'down', lambda L: L['down'] + 1))]
+        late = [('LF', ('set', 'fw', lambda L: L['down'] - 1))] + down_steps('L', 'fw') + \
+               [('LP', ('set', 'pend', lambda L: 0))]
+    else:
+        down = down_steps('D', 'down') + [('DN', ('set', 'down', lambda L: L['down'] + 1))]
+        late = [('LX', ('br', lambda L: True, '@' + p + 'LOOP', '@' + p + 'LOOP'))]
+
+    for seq, start in ((up, 'U'), (down, 'D'), (late, 'L')):
+        for i, (lab, ins) in enumerate(seq):
+            here = p + (start if i == 0 else lab) if i == 0 else p + lab
+            nxt = '@' + p + seq[i + 1][0] if i + 1 < len(seq) else '@' + p + 'LOOP'
+            if ins[0] == 'br':
+                B.append((here, ins))
+            else:
+                B.append((here, ins + (nxt,)))
+    return B
+
+
+def case(design, members, k, depth, pieces, order):
+    threads = [member(design, pe, members, k, depth, pieces, order) for pe in range(members)]
+    mem = {FIN: 0, OVERWRITE: 0}
+    for p in range(members):
+        for t in TEAM_NUMBER.values():
+            mem[DOWNC(p, t)] = 0
+            for s in range(depth):
+                mem[DOWN(p, t, s)] = mem[UNREAD(DOWN(p, t, s))] = mem[TAG(DOWN(p, t, s))] = 0
+            for j in range(k):
+                mem[UPC(p, t, j)] = 0
+                for s in range(depth):
+                    key = UP(p, t, j, s)
+                    mem[key] = mem[UNREAD(key)] = mem[TAG(key)] = 0
+    name = (f'scan-pipeline/{design} members={members} k={k} depth={depth} pieces={pieces} '
+            f'order={order}')
+    return name, threads, mem, members
+
+
+# (design, members, fan-out, depth, pieces, order, expect_ok)
+CASES = [
+    ('design', 3, 2, 2, 3, 'A', True),           # a root and two leaves
+    ('design', 4, 1, 2, 3, 'A', True),           # a chain: members both parent and child
+    ('design', 4, 1, 1, 3, 'A', True),           # depth 1 is the scan as first built
+    ('design', 4, 2, 2, 3, 'AA', True),          # the ring carried from one scan to the next
+    ('design', 4, 2, 2, 2, 'AB', True),          # two teams, two trees, two sets of slots
+    ('design', 4, 1, 3, 4, 'A', True),           # deeper than the pieces' halfway
+    ('design', 5, 2, 2, 3, 'A', True),           # a member with children below the root
+    ('design', 3, 1, 2, 3, 'ABA', True),         # back to A: its slots where it left them
+    ('window', 3, 1, 2, 4, 'A', False),
+    ('count_before_copy', 3, 1, 2, 4, 'A', False),
+    ('root_early', 3, 2, 2, 3, 'A', False),
+    ('ring_short', 3, 1, 2, 4, 'A', False),
+    ('summed', 3, 2, 2, 3, 'A', False),
+]
+
+
+def main():
+    want = select(sys.argv)
+    ok = True
+    for design, members, k, depth, pieces, order, expect in CASES:
+        name, threads, mem, n = case(design, members, k, depth, pieces, order)
+        if not want(name):
+            continue
+        res = explore(name, threads, mem, max_seconds=900, liveness_max_states=3_000_000,
+                      done=lambda M, n=n: M[FIN] == n)
+        ok &= report(res, expect_ok=expect)
+    return 0 if ok else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
