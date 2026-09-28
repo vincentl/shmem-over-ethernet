@@ -526,18 +526,14 @@ done | tee ~/sos.txt
 
 The development VM ran them on two PEs over two logical nodes and on four over
 two (`build/scratch/sos/sweep.sh`): 147 built and exited 0 on both on
-2026-09-24, and 150 on 2026-09-26 at `e61a172`, after team creation.
-**What to expect** of the rest:
+2026-09-24; 150 on 2026-09-26 at `e61a172`, after team creation; and 159 at
+`fa59c93` that evening, after contexts and `SHMEM_THREAD_MULTIPLE` - the eight
+threaded programs (`mt_a2a`, `mt_contention`, `mt_lock_test`, `mt_membar`,
+`thread_wait`, `threading`, `web`, `spec-example/shmem_ctx`) and
+`spec-example/shmem_team_context` among them. **What to expect** of the rest:
 - `c11_shmem_test_all_any_some` and `c11_shmem_wait_until_all_any_some` do not
   build: they pass `short *` to the `_all`/`_any`/`_some` generics, which
   OpenSHMEM 1.5 defined over Table 6's AMO types alone - SOS's extension.
-- `mt_a2a`, `mt_contention`, `mt_lock_test`, `mt_membar`, `thread_wait`,
-  `threading`, `web` and `spec-example/shmem_ctx` exit 1: they need
-  `SHMEM_THREAD_MULTIPLE`, and osoe provides `SERIALIZED` (design §4.11).
-- `spec-example/shmem_team_context` exits 1: it needs contexts beyond the
-  default (§7.3), which step 8 proposes
-  (`docs/prompts/done/phase1-step8-slice1-prompt.md`). The other team tests pass
-  since team creation (phase 1 step 7 slice 2, 2026-09-26).
 - `shmem_team_b2b_collectives` collects 40 longs into a destination of 10 on
   the VM's 0,0,1,1 map, and osoe stops it by name where the old gather
   corrupted memory silently; whether 4 × 2 trips it is a finding either way.

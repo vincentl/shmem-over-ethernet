@@ -54,6 +54,10 @@ without the author, under a standing mandate, and the record carries the undo.
 - **`OSOE_CHECK_QUIET` and `OSOE_TEST_PERTURB`** are test hooks kept in the library, off by default, and the threaded test runs with both in every preset: together they catch the race mutations the tests otherwise cannot see. Claude, recommended to the author, [2026-09-26-evening](2026-09-26-evening.md) item 12.
 - **Team destroy** tears down its shareable contexts and is fatal, by name, on a live private one; finalize destroys what is left. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 2.
 - **Cross-node scans** use slots and counters per team number, never shared per-PE slots, so threads cannot race on them. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 5.
+- **Cross-node scans keep D pieces in flight**, the reductions' `OSOE_COLLECTIVE_PIPELINE`, by five rules the scan model checks: the window, copy before count, a counter per child position, down only after up, and D pieces' totals and source kept. Author ("pipeline it"), [2026-09-28-overnight](2026-09-28-overnight.md) item 1.
+- **A program's own deadlock ends the job once it is proved**: each PE counts its threads asleep in library waits, counted at the sleep and never across a post; a node's lead samples in two halves with a pass of its engine between; the root runs two collections `OSOE_DEADLOCK_SECONDS` apart, every node quiet and unmoved. A thread the library cannot see, or a stopped process, is never judged deadlocked. Author ("build it"), built by Claude, [2026-09-28-overnight](2026-09-28-overnight.md) item 2.
+- **A vanished node with data in flight is found within keepalive's budget**: once a keepalive interval the lead reads `TCP_INFO`, and a peer whose kernel has acknowledged nothing for the whole budget while segments wait ends the job, naming it; a stopped peer's kernel still acknowledges, so it is waited for. Claude, found by tier 3, [2026-09-28-overnight](2026-09-28-overnight.md) item 4.
+- **Every agent asks for a short scheduler slice and may run on any CPU of its node's tasks**, the union of the bindings the PEs publish; the PEs' own threads keep theirs, and nothing of the system's configuration changes. Author (the question) and Claude, [2026-09-28-overnight](2026-09-28-overnight.md) item 3.
 
 ## Settings and defaults
 
@@ -62,6 +66,8 @@ without the author, under a standing mandate, and the record carries the undo.
 - **`OSOE_MAX_THREADS`** counts application threads, default 16, at most 1,023; the agent's block is one more, and a thread past it ends the job by name. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 9.
 - **`shmem_init` gives `SERIALIZED`**; `shmem_init_thread` gives `MULTIPLE` when asked. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 9.
 - **`OSOE_COLLECTIVE_PIPELINE`** defaults to 2, from 1 to 8, agreed at rendezvous. [2026-09-26-overnight](2026-09-26-overnight.md) item 1.
+- **`OSOE_DEADLOCK_SECONDS`** defaults to 10, at most 86,400; 0 turns detection off. Claude, [2026-09-28-overnight](2026-09-28-overnight.md) item 2.
+- **`OSOE_AGENT_SLICE_US`** defaults to 100 µs, from 100 to 100,000, or 0 for the kernel's own; **`OSOE_AGENT_CPUS`** defaults to `node`, and `task` keeps each agent on its PE's CPUs. Claude, [2026-09-28-overnight](2026-09-28-overnight.md) item 3.
 - **Keepalive** is 60 s idle, 10 s between probes, 6 probes; `TCP_USER_TIMEOUT` is not set; `OSOE_KEEPALIVE` overrides. Claude, [2026-09-23-autonomous](2026-09-23-autonomous.md) item 17.
 - **`OSOE_HEAP_BASE`** must be page-aligned, and an unaligned one is refused by name. Claude, [2026-09-24-overnight](2026-09-24-overnight.md) item 17.
 - **The `/dev/shm` capacity check** refuses by default; `OSOE_SHM_CAPACITY_CHECK=0` makes it a report. Design §6.2.
@@ -124,3 +130,4 @@ without the author, under a standing mandate, and the record carries the undo.
 - The exit hand-off inside `exit()`, removed once only the caller exits ([2026-09-24-overnight](2026-09-24-overnight.md) item 10).
 - An abort flooding down the tree, replaced by the abortive goodbye ([2026-09-23-autonomous](2026-09-23-autonomous.md) item 12).
 - Slurm fixtures written from documentation, replaced by captured ones ([2026-09-24-day](2026-09-24-day.md)).
+- A cross-node scan's pieces one at a time ([2026-09-26-evening](2026-09-26-evening.md) item 5), replaced by D in flight ([2026-09-28-overnight](2026-09-28-overnight.md) item 1).

@@ -507,3 +507,38 @@ has the rest. Every later run held a session open on each node.
 `mailbox`, pull and sort runs, none on pi-002; 8 in the ten minutes of
 `mix`, five on pi-002. The nodes' `ip -s link` counters show no error, drop
 or miss since the morning's boot, over a billion packets each way a node.
+
+## The scan, the progress thread, and an hour of `mix` (2026-09-28, overnight)
+
+At `8deb4ec` to `f561e2d`, 4 × 4, release; the record is
+`docs/decisions/2026-09-28-overnight.md`.
+
+**The scan pipelined**: a 1 MiB scan of longs, the slowest PE's median of 21,
+every result checked - 139.3 ms before (136.5 again), 145.1 at D = 1, 83.5 at
+D = 2, the default, 59.0 at D = 4 and 47.9 at D = 8, against a floor of about
+36 ms, node 0's link carrying 4 MiB each way; a reduce beside it 30 ms
+throughout (49.5 at D = 1).
+
+**The progress thread under Slurm's binding**, now built into the library:
+
+| a mailbox, 16 PEs, 60 s | messages a second |
+|---|---|
+| bound, the kernel's slice, the agent on its PE's core | 42,900 |
+| bound, the agent widened to its node's cores | 51,300 |
+| bound, the agent's 100 µs slice (the default) | 57,500 to 62,900 |
+| bound, both | 58,500 |
+| unbound, the default | 257,000 to 259,000 |
+
+`osoe-bench`, three runs each way alternating, with and without the slice:
+no difference in small operations, and every separated one the slice's -
+a 64 KiB reduce 2,388 against 3,155 µs, alltoall 9% faster. Two runs each
+way, widened and not, both with the slice: widened, every small collective
+slower in both - an 8-byte reduce 223 against 200 µs, a broadcast 221
+against 197, a barrier 191 against 178, a 64 KiB reduce 2,819 against 2,385
+- so the widening is an option (`OSOE_AGENT_CPUS=node`), not the default.
+
+**An hour of `mix`** at `5f99dd3`, Slurm's default binding, the deadlock
+detector on at its default: 3,608 s, `failures=0`, 504 MB sent by the
+library, and nothing declared deadlocked. A second hour at `f561e2d`, with the
+check that finds a vanished node with data in flight: 3,603 s, `failures=0`,
+605 MB sent, and nothing declared deadlocked or vanished.

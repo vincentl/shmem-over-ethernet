@@ -1749,7 +1749,8 @@ to the rule above - time only paces the looking.
   has (on AM, a collective's arrivals); then `/proc` again, the engine quiet, and
   the words, unmoved. A half that sees a thread awake - most likely a sweep's -
   or an acknowledgement still coming looks again a millisecond later, for up to
-  a sweep interval, while nothing moves.
+  5 ms, while nothing moves: longer would only hold up the node's engine when
+  the thread is one that computes.
 - *Rounds.* Once the root's own node - node 0's lead looks at its PEs' words
   each sweep interval - has had every PE waiting and nothing to send for a
   second, the root samples itself and asks every other node for a sample. If
@@ -1758,7 +1759,11 @@ to the rule above - time only paces the looking.
   again and asks again. If every node was quiet again, its activity unmoved
   since its first sample began, the job is deadlocked: every node prints its
   PEs, those waiting at the same place on one line, with the routine, the
-  detail and how long, and the job ends with status 1.
+  detail and how long, and the job ends with status 1. The root asks every
+  node directly, not up the collective tree: a round is O(N) small messages at
+  the root, at most one a second and only while its node looks quiet, where
+  the tree would make it O(log N) - the refinement once a job of hundreds of
+  nodes runs.
 - *Why that is proof.* With t* the end of the first collection, every node's two
   samples bracket t*, and nothing happened at any node between them. A message
   in flight at t* was sent before its sender's first sample ended, since the
@@ -1788,11 +1793,22 @@ to the rule above - time only paces the looking.
   never blocked, too. io_uring's workers are left out by the kernel's
   `PF_IO_WORKER` flag, not by their `iou-` names, which a program's own
   thread may share.
+- *Probes are data in flight.* A round's probe toward a node that has vanished
+  is data TCP keepalive does not probe, so the detector depends on the check
+  that finds such a node by its kernel's silence within keepalive's budget
+  (below, "As built: keepalive"). Before that check existed, a probe hid a
+  vanished node for the kernel's fifteen minutes; tier 3's vanished-node tests
+  found it.
 - *Cost.* Nothing on any path that does not sleep. A wait that sleeps pays one
   locked add as it first sleeps and one as it ends. The root's lead reads L
   words each sweep interval; a round, once the root's node has looked quiet for
   a second, costs a message to and from each node and a sample of each, whose
-  `/proc` reads are made only where every PE has a thread waiting. The pool of
+  `/proc` reads are made only where every PE has a thread waiting, and which
+  holds the node's engine up for 5 ms at most. After each round that fails the
+  root waits twice as long before the next, up to `OSOE_DEADLOCK_SECONDS`,
+  until its node is seen to move - so a threaded program whose PEs each keep a
+  thread waiting while another computes, which a count of waits alone takes
+  for quiet, pays a round every ten seconds at most. The pool of
   reply descriptors holds one more a peer for the detector's messages (§3.8), of
   which a connection has at most one queued.
 
@@ -7156,6 +7172,16 @@ Recorded rather than deleted, so they are not reopened from memory.
   development host) and fails on loopback (1.7×), as §8.3 predicted. Still owed:
   two real hosts, and a Pi, whose slower `memcpy` puts its copy-to-wire ratio in
   the tens, *recalled*. The small-message *rate* is not measured yet.
+  *Measured on the Pi cluster, 2026-09-26 and 27 (`docs/pi-cluster-results.md`):*
+  an 8-byte put and quiet between two nodes 169-175 µs against a bare io_uring
+  echo's 153-156 (1.08× the floor, a get 1.09×), and a stream at 111 of the
+  echo's 112 MiB/s, so the latency half holds on real hosts as on the veth
+  pairs. The rate: `osoe-pacer mailbox`, 16 PEs on four nodes, 243,000 to
+  257,000 messages a second with every thread free to run anywhere, and 38,900
+  where Slurm binds each task to one core and the node's progress thread waits
+  behind its PE - 62,900 since the agent asks for a short scheduler slice
+  (§3.11). What is left is refinement: the small-message rate bound, and
+  x86-64 hosts, which nothing here has yet run on.
 - **The internode tree's fan-out from measured costs** (§5.3). The default is the
   backend's constant today; measuring the hop latency *h* and per-message cost *o*
   at init and choosing *k* from their ratio is the next step, once a real fabric

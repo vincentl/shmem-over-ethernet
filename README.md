@@ -401,10 +401,12 @@ specification or takes a choice the specification leaves open.
   `OSOE_DEADLOCK_SECONDS` (10 by default) and nothing is in flight between
   them, the job ends with status 1, and each node lists where its PEs wait - a
   collective one PE never entered, a wait for a word nobody writes. A PE
-  computing for ever, or with a thread the library cannot see waiting - a
+  computing for ever, or with any thread outside the library's waits - a
   helper thread, an idle OpenMP pool - is never judged deadlocked, since it may
   yet move: such a hang waits for ever, and `osoe-stat` shows where each PE is
-  blocked. `OSOE_DEADLOCK_SECONDS=0` turns detection off.
+  blocked. A program woken only from outside the library - by a signal
+  handler's store, or another program writing memory it shares with a PE -
+  should turn detection off: `OSOE_DEADLOCK_SECONDS=0`.
 
 **Transport and API**
 
@@ -458,15 +460,16 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 560 tests in
+  run before every merge, on the exact tree that merges: about 620 tests in
   release; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the
   other three.
 - **Model checking.** Every lock-free and futex protocol - waking the
   progress thread, waits, the barrier tree, pipelined collectives, Bruck's
   allgather, the scans, get completion under `SHMEM_THREAD_MULTIPLE`,
-  rendezvous, abort - is checked exhaustively in small configurations by an
-  explicit-state model checker written for them (`tools/modelcheck`). Each
+  rendezvous, abort, and the proof a deadlock is found by - is checked
+  exhaustively in small configurations by an explicit-state model checker
+  written for them (`tools/modelcheck`). Each
   model also carries deliberately broken variants that must fail: a model
   that cannot fail proves nothing.
 - **Sandia OpenSHMEM's test suite**: 159 of its programs pass on two maps of
@@ -527,7 +530,7 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_NO_PROGRESS_TIMEOUT` | `0` | Seconds a wait on the library's own progress - acknowledgements, buffer space, a reply, the rendezvous - may see none before it ends the job, naming what it waited for; `0`, never. A program's own waits and collectives are not timed. |
-| `OSOE_KEEPALIVE` | `60,10,6` | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes; `0` for none. |
+| `OSOE_KEEPALIVE` | `60,10,6` | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes. Their total is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. |
 | `OSOE_DEADLOCK_SECONDS` | `10` | How long a job whose every PE waits in the library, with nothing moving on any node and nothing in flight, is watched before it ends as deadlocked, each node naming where its PEs wait: `1` to `86400`, or `0` for never. |
 | `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. |
 | `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. |
