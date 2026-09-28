@@ -51,7 +51,9 @@
  * {count, offset} a pair tells every receiver where each sender's bin for it
  * lies; the receiver gets them all with shmem_getmem_nbi at the running sum of
  * the counts, one shmem_quiet, checks, and a team sync keeps every sender
- * from refilling its staging while another PE may still be reading it.
+ * from refilling its staging while another PE may still be reading it. That
+ * sync is timed as its own phase, `sync`: it waits for every PE's check, which
+ * the exchange's time must not include if it is to compare with the push's.
  *
  * **The checks.** A batch: every key in this PE's range; its count, sum and
  * xor accumulated as it arrived; sorted - LSD radix with 11-bit digits into a
@@ -90,8 +92,10 @@ _Static_assert(DIGIT_BITS * (PASSES - 1) < 64 && DIGIT_BITS * PASSES >= 64,
                "the passes' digits cover a key's 64 bits, the last one partly");
 _Static_assert(PASSES % 2 == 0,
                "an even number of passes, so that the keys end where they started");
-enum phase { GENERATE, BIN, EXCHANGE, SORT, CHECK };
-static const char *const phase_names[] = { "generate", "bin", "exchange", "sort", "check", NULL };
+enum phase { GENERATE, BIN, EXCHANGE, SORT, CHECK, SYNC, PHASES };
+static const char *const phase_names[] = { "generate", "bin", "exchange", "sort", "check", "sync",
+                                           NULL };
+_Static_assert((int)PHASES <= (int)PACER_PHASES, "the driver's table has a place for every phase");
 
 /* What the oracle compares of a set of keys. Count, sum and xor are the
  * brief's; all three are linear, and blind alike to a byte swapped between two
@@ -144,7 +148,7 @@ static struct {
     struct triple open_generated;   /* accumulate: this cycle's, not yet checked */
     struct triple generated, arrived;   /* closed, since the checkpoint */
     double work, batch;
-    double phase[5];
+    double phase[PHASES];
     double send_seconds;            /* inside the binning loop */
 } sort;
 
@@ -650,9 +654,13 @@ static void round_pull(long round)
         sort.received = position;
     else
         check_batch(receive, position, round);
+    /* Its own phase: after this PE's check, the sync waits for every other
+     * PE's gets and check too. Counted in the exchange, it made the pull's
+     * exchange look three to five times the push's, whose sync comes before
+     * the check (2026-09-27-night item 2). */
     double syncing = pacer_now();
     shmem_team_sync(sort.team);     /* before any sender refills its staging */
-    sort.phase[EXCHANGE] += pacer_now() - syncing;
+    sort.phase[SYNC] += pacer_now() - syncing;
 }
 
 /* ---- accumulate: a cycle closes ------------------------------------------------ */
@@ -738,7 +746,7 @@ static void sort_checkpoint(struct pacer_counters *counters)
     counters->work = sort.work;
     counters->bytes = sort.work * 8;
     counters->batch = sort.batch;
-    for (int k = 0; k < 5; k++)
+    for (int k = 0; k < PHASES; k++)
         counters->phase_seconds[k] = sort.phase[k];
     sort.work = sort.batch = 0;
     memset(sort.phase, 0, sizeof sort.phase);

@@ -142,7 +142,7 @@ struct pacer_options {
 enum { PACER_MESSAGE_CAPACITY = 1024 };
 
 /* The phases an exercise may time, named by its `phases` list. */
-enum { PACER_PHASES = 5 };
+enum { PACER_PHASES = 6 };
 
 struct pacer_counters {
     int finished;                   /* nothing more to do: this checkpoint is the last */
