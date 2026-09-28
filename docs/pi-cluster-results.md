@@ -455,3 +455,55 @@ which of `mix`'s periods raises them is not yet known.
 and the `start_pes` program call 1,792 of the 1,794 routines declared - all
 but `shmem_finalize`, called after the count is written, and
 `shmem_global_exit`, which no clean run calls.
+
+## The author's questions, measured (2026-09-27, night)
+
+4 × 4, release: main's code (`3d5bbe1`) for the threads and the gets, the
+branch `pacer-decisions` (`6ac31fc`) for the sort's digits and `mix` with
+`waits`; about an hour of cluster time. Each node's threads were read from
+`/proc` twice a window - time running, time runnable but waiting, the
+switches each thread chose and those it did not - and some runs changed the
+first PE's agent partway through with `taskset` or `sched_setattr`. Scripts,
+samples and outputs: `docs/design/evidence/pi-cluster/2026-09-27/agent-placement/`;
+the record: `docs/decisions/2026-09-27-night.md`. The nodes have one thread a
+core (Cortex-A76, no SMT) and Slurm 24.11.5 binds each of a node's four tasks
+to one core unless told otherwise.
+
+**The node's progress thread under Slurm's binding** (`mailbox`, 16 PEs):
+
+| how the job ran | messages a second | the first PE's agent: running, waiting |
+|---|---|---|
+| bound, Slurm's default | 38,900 | 12%, 29% |
+| bound; the agent alone given all four cores | 52,000 | 15%, 26% |
+| bound; the agent asking for a 0.1 ms slice | 63,500 | 19%, 26% |
+| bound; both | 67,500 | 20%, 24% |
+| unbound, `--cpu-bind=none` | 243,000 to 249,000 | 68-71%, 1-2% |
+| unbound, with the slice | 255,000 | 71%, 1% |
+
+Bound, three cores sit near 13% while the thread that moves the node's
+messages waits for the fourth; moving or hurrying it adds up to 70% to the
+bound rate, and only unbinding every thread gives the sixfold.
+
+**The gets** (the sort's pull, 67 M keys a round; the push's round 4.07 s):
+5.61 s a round bound and 5.19 unbound at the default 256 KiB landing arena,
+4.85 at 1 MiB, 4.26 at 4 MiB. The pull's `exchange_s` had held the round's
+closing sync, which waits for every PE's sort: the three-to-five-fold gap
+the first runs reported was mostly that (`7a14994` times it apart).
+
+**The sort's digits**: at 11 bits the local sort takes 0.69 s a round where
+16 took 2.80; a round 1.88 s against 4.08, 35.7 M keys a second against 16.4.
+
+**`mix` with `waits`**, ten minutes at `6ac31fc`: 52 periods, `waits` on each
+team six or seven times, `failures=0`.
+
+**A start that hung**: the first `pull-widened` never got past `shmem_init`
+on pi-001. systemd-logind's `RemoveIPC`, on by default here, deleted pi's
+files in `/dev/shm` ten seconds after the measurement's last ssh session on
+the node ended, while two of the node's PEs had not yet opened the control
+segment by name. A probe on pi-002 showed the removal; the record's item 6
+has the rest. Every later run held a session open on each node.
+
+**Retransmission timeouts**: 4 across the nodes in the 35 minutes of
+`mailbox`, pull and sort runs, none on pi-002; 8 in the ten minutes of
+`mix`, five on pi-002. The nodes' `ip -s link` counters show no error, drop
+or miss since the morning's boot, over a billion packets each way a node.

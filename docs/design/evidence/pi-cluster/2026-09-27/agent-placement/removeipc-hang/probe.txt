@@ -1,0 +1,23 @@
+The RemoveIPC probe, 2026-09-27 22:00, run from the author's Mac (ssh reaches
+each node through pi-login), after job 828 was cancelled and with no other
+session of pi on pi-002:
+
+$ ssh pi-002 'loginctl list-sessions --no-legend | grep -c " pi "; touch /dev/shm/removeipc-probe && ls -la /dev/shm/removeipc-probe'
+2
+-rw-rw-r-- 1 pi pi 0 Sep 27 22:00 /dev/shm/removeipc-probe
+probe written at 22:00:42; waiting 20 s with no session of pi on pi-002
+
+$ ssh pi-002 'ls -la /dev/shm/removeipc-probe; journalctl --since "-40s" -o short-precise | grep -E "user@1000|Removed session|Stopping" | tail -4'
+ls: cannot access '/dev/shm/removeipc-probe': No such file or directory
+Sep 27 22:00:52.552893 pi-002 systemd[1]: Stopped user@1000.service - User Manager for UID 1000.
+Sep 27 22:00:52.583888 pi-002 systemd[1]: Stopping user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Sep 27 22:01:03.100590 pi-002 systemd[1]: Starting user@1000.service - User Manager for UID 1000...
+Sep 27 22:01:03.362870 pi-002 systemd[1]: Started user@1000.service - User Manager for UID 1000.
+
+(The two sessions counted were the probe's own ssh session and its user
+manager's. The file was gone when pi's user manager stopped, ten seconds
+after the session ended.)
+
+logind's configuration on pi-001 (the same image on all four): nothing set;
+the commented defaults in /etc/systemd/logind.conf are #UserStopDelaySec=10
+and #RemoveIPC=yes.

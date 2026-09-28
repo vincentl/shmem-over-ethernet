@@ -1,0 +1,221 @@
+/osoe.828.0.0.0  layout 24  4 local PEs of 16  (job 828 step 0 node 0 session 0)
+  1228800 bytes, 203 metrics (checksum 0xd00ed846), 68 blocks of 512 bytes
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     0     7390 joined          0        0  -
+  1     0        0 empty           0        0  -
+  2     0        0 empty           0        0  -
+  3     3     7393 joined          0        0  -
+
+ peer   seg sent      bytes   seg appl      bytes   ctrlq   bulkq  sent thru      acked     wanted
+    0          0          0          0          0       0       0          0          0          0
+    0          0          0          0          0       0       0          0          0          0
+/osoe.828.0.0.0  layout 24  4 local PEs of 16  (job 828 step 0 node 0 session 0)
+  1228800 bytes, 203 metrics (checksum 0xd00ed846), 68 blocks of 512 bytes
+
+  directory
+    directory_bytes                  256 bytes (this reader knows 256)
+    slots                            58368 + 4 * 640
+    metrics                          60928 + 203 * 64
+    blocks                           73984 + 68 * 512 (17 per PE)
+    connections                      1174784 + 3 * 128
+    teams                            1024 + 64 * 896
+    epochs                           1175168 + 4 * 256
+
+  node
+    team.world.arrived               0
+    team.world.released              0
+    team.world.copied                0
+    team.shared.arrived              0
+    team.shared.released             0
+    team.shared.copied               0
+    team.finalize.arrived            0
+    team.finalize.released           0
+    team.world.arrival_posted        0
+    team.shared.arrival_posted       0
+    team.finalize.arrival_posted     0
+    team.world.tree.epoch_open       0
+    team.world.tree.epoch_closed     0
+    team.world.tree.own_arrived      0
+    team.world.tree.children         0
+    team.world.tree.children_arrived 0
+    team.world.tree.lowest_missing   0
+    team.world.tree.parent           0
+    team.world.tree.fanout           0
+    team.finalize.tree.epoch_open    0
+    team.finalize.tree.epoch_closed  0
+    team.finalize.tree.own_arrived   0
+    team.finalize.tree.children      0
+    team.finalize.tree.children_arrived 0
+    team.finalize.tree.lowest_missing 0
+    team.finalize.tree.parent        0
+    node.aborting                    0
+    node.abort_pe                    0
+    node.world_size                  16
+    node.job                         828
+    node.step                        0
+    node.id                          0
+    node.session                     0
+    node.heap_base                   17592186044416
+    node.ready                       1
+    node.joined                      2
+    node.mapped                      0
+    node.finalized                   0
+    node.failed                      0
+    node.team_numbers_published      0
+    node.local_count                 4
+    node.blocks_per_pe               17
+    transport.am.segments_sent       0
+    transport.am.header_only_sent    0
+    transport.am.segments_applied    0
+    transport.am.messages_applied    0
+    transport.am.reply_reservation_failures 0
+pid 7390 wchan futex_do_wait fds: 0 -> pipe:[33657] ;1 -> pipe:[33658] ;2 -> pipe:[33659] ;3 -> /dev/shm/osoe.828.0.0.0 (deleted);
+pid 7391 wchan hrtimer_nanosleep fds: 0 -> pipe:[33660] ;1 -> pipe:[33661] ;2 -> pipe:[33662] ;
+pid 7392 wchan hrtimer_nanosleep fds: 0 -> pipe:[33663] ;1 -> pipe:[33664] ;2 -> pipe:[33665] ;
+pid 7393 wchan futex_do_wait fds: 0 -> pipe:[33666] ;1 -> pipe:[33667] ;2 -> pipe:[33668] ;3 -> /dev/shm/osoe.828.0.0.0 (deleted);
+Sep 27 21:55:30.859065 pi-001 sshd-session[7322]: Accepted publickey for pi from 10.0.0.1 port 52534 ssh2: RSA SHA256:(redacted)
+Sep 27 21:55:30.861542 pi-001 sshd-session[7322]: pam_unix(sshd:session): session opened for user pi(uid=1000) by pi(uid=0)
+Sep 27 21:55:30.870026 pi-001 systemd-logind[520]: New session 70 of user pi.
+Sep 27 21:55:30.871265 pi-001 systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
+Sep 27 21:55:30.872827 pi-001 systemd[1]: Starting user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Sep 27 21:55:30.907221 pi-001 systemd[1]: Finished user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Sep 27 21:55:30.909654 pi-001 systemd[1]: Starting user@1000.service - User Manager for UID 1000...
+Sep 27 21:55:30.943137 pi-001 (systemd)[7329]: pam_unix(systemd-user:session): session opened for user pi(uid=1000) by pi(uid=0)
+Sep 27 21:55:30.945968 pi-001 systemd-logind[520]: New session 71 of user pi.
+Sep 27 21:55:31.077173 pi-001 systemd[7329]: Queued start job for default target default.target.
+Sep 27 21:55:31.089118 pi-001 systemd[7329]: Created slice app.slice - User Application Slice.
+Sep 27 21:55:31.089156 pi-001 systemd[7329]: Reached target paths.target - Paths.
+Sep 27 21:55:31.089201 pi-001 systemd[7329]: Reached target timers.target - Timers.
+Sep 27 21:55:31.090631 pi-001 systemd[7329]: Starting dbus.socket - D-Bus User Message Bus Socket...
+Sep 27 21:55:31.090951 pi-001 systemd[7329]: Listening on dirmngr.socket - GnuPG network certificate management daemon.
+Sep 27 21:55:31.091022 pi-001 systemd[7329]: Listening on gpg-agent-browser.socket - GnuPG cryptographic agent and passphrase cache (access for web browsers).
+Sep 27 21:55:31.091072 pi-001 systemd[7329]: Listening on gpg-agent-extra.socket - GnuPG cryptographic agent and passphrase cache (restricted).
+Sep 27 21:55:31.092244 pi-001 systemd[7329]: Starting gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation)...
+Sep 27 21:55:31.093493 pi-001 systemd[7329]: Starting gpg-agent.socket - GnuPG cryptographic agent and passphrase cache...
+Sep 27 21:55:31.093631 pi-001 systemd[7329]: Listening on keyboxd.socket - GnuPG public key management service.
+Sep 27 21:55:31.095010 pi-001 systemd[7329]: Starting ssh-agent.socket - OpenSSH Agent socket...
+Sep 27 21:55:31.114399 pi-001 systemd[7329]: Listening on dbus.socket - D-Bus User Message Bus Socket.
+Sep 27 21:55:31.122831 pi-001 systemd[7329]: Listening on ssh-agent.socket - OpenSSH Agent socket.
+Sep 27 21:55:31.123945 pi-001 systemd[7329]: Listening on gpg-agent.socket - GnuPG cryptographic agent and passphrase cache.
+Sep 27 21:55:31.124300 pi-001 systemd[7329]: Listening on gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation).
+Sep 27 21:55:31.124430 pi-001 systemd[7329]: Reached target sockets.target - Sockets.
+Sep 27 21:55:31.124494 pi-001 systemd[7329]: Reached target basic.target - Basic System.
+Sep 27 21:55:31.124648 pi-001 systemd[1]: Started user@1000.service - User Manager for UID 1000.
+Sep 27 21:55:31.125944 pi-001 systemd[1]: Started session-70.scope - Session 70 of User pi.
+Sep 27 21:55:31.127066 pi-001 systemd[7329]: Started mpris-proxy.service - Bluetooth mpris proxy.
+Sep 27 21:55:31.127109 pi-001 systemd[7329]: Reached target default.target - Main User Target.
+Sep 27 21:55:31.127392 pi-001 systemd[7329]: Startup finished in 164ms.
+Sep 27 21:55:31.144992 pi-001 systemd[7329]: Created slice session.slice - User Core Session Slice.
+Sep 27 21:55:31.146623 pi-001 systemd[7329]: Starting dbus.service - D-Bus User Message Bus...
+Sep 27 21:55:31.166028 pi-001 systemd[7329]: Started dbus.service - D-Bus User Message Bus.
+Sep 27 21:55:31.193725 pi-001 sshd-session[7356]: Received disconnect from 10.0.0.1 port 52534:11: disconnected by user
+Sep 27 21:55:31.193791 pi-001 sshd-session[7356]: Disconnected from user pi 10.0.0.1 port 52534
+Sep 27 21:55:31.194397 pi-001 sshd-session[7322]: pam_unix(sshd:session): session closed for user pi
+Sep 27 21:55:31.196800 pi-001 systemd[1]: session-70.scope: Deactivated successfully.
+Sep 27 21:55:31.197890 pi-001 systemd-logind[520]: Session 70 logged out. Waiting for processes to exit.
+Sep 27 21:55:31.198555 pi-001 systemd-logind[520]: Removed session 70.
+Sep 27 21:55:34.062549 pi-001 sshd-session[7359]: Accepted publickey for pi from 10.0.0.1 port 52548 ssh2: RSA SHA256:(redacted)
+Sep 27 21:55:34.064996 pi-001 sshd-session[7359]: pam_unix(sshd:session): session opened for user pi(uid=1000) by pi(uid=0)
+Sep 27 21:55:34.068389 pi-001 systemd-logind[520]: New session 72 of user pi.
+Sep 27 21:55:34.096272 pi-001 systemd[1]: Started session-72.scope - Session 72 of User pi.
+Sep 27 21:55:34.157179 pi-001 sshd-session[7369]: Received disconnect from 10.0.0.1 port 52548:11: disconnected by user
+Sep 27 21:55:34.157250 pi-001 sshd-session[7369]: Disconnected from user pi 10.0.0.1 port 52548
+Sep 27 21:55:34.157848 pi-001 sshd-session[7359]: pam_unix(sshd:session): session closed for user pi
+Sep 27 21:55:34.160112 pi-001 systemd[1]: session-72.scope: Deactivated successfully.
+Sep 27 21:55:34.160834 pi-001 systemd-logind[520]: Session 72 logged out. Waiting for processes to exit.
+Sep 27 21:55:34.161698 pi-001 systemd-logind[520]: Removed session 72.
+Sep 27 21:55:37.412224 pi-001 slurmd[667]: slurmd-pi-001: launch task StepId=828.0 request from UID:1000 GID:1000 HOST:10.0.0.1 PORT:32918
+Sep 27 21:55:37.412646 pi-001 slurmd[667]: slurmd-pi-001: task/affinity: lllp_distribution: JobId=828 implicit auto binding: sockets,one_thread, dist 8192
+Sep 27 21:55:37.412646 pi-001 slurmd[667]: slurmd-pi-001: task/affinity: _task_layout_lllp_cyclic: _task_layout_lllp_cyclic
+Sep 27 21:55:37.412646 pi-001 slurmd[667]: slurmd-pi-001: task/affinity: _lllp_generate_cpu_bind: _lllp_generate_cpu_bind jobid [828]: mask_cpu,one_thread, 0x1,0x2,0x4,0x8
+Sep 27 21:55:44.255277 pi-001 systemd[1]: Stopping user@1000.service - User Manager for UID 1000...
+Sep 27 21:55:44.257053 pi-001 systemd[7329]: Activating special unit exit.target...
+Sep 27 21:55:44.257147 pi-001 systemd[7329]: Stopped target default.target - Main User Target.
+Sep 27 21:55:44.257347 pi-001 systemd[7329]: Stopping mpris-proxy.service - Bluetooth mpris proxy...
+Sep 27 21:55:44.260053 pi-001 systemd[7329]: Stopped mpris-proxy.service - Bluetooth mpris proxy.
+Sep 27 21:55:44.261411 pi-001 systemd[7329]: Stopping dbus.service - D-Bus User Message Bus...
+Sep 27 21:55:44.272887 pi-001 systemd[7329]: Stopped dbus.service - D-Bus User Message Bus.
+Sep 27 21:55:44.273312 pi-001 systemd[7329]: Removed slice session.slice - User Core Session Slice.
+Sep 27 21:55:44.273343 pi-001 systemd[7329]: Stopped target basic.target - Basic System.
+Sep 27 21:55:44.273388 pi-001 systemd[7329]: Stopped target paths.target - Paths.
+Sep 27 21:55:44.273419 pi-001 systemd[7329]: Stopped target sockets.target - Sockets.
+Sep 27 21:55:44.273458 pi-001 systemd[7329]: Stopped target timers.target - Timers.
+Sep 27 21:55:44.273780 pi-001 systemd[7329]: Closed dbus.socket - D-Bus User Message Bus Socket.
+Sep 27 21:55:44.273893 pi-001 systemd[7329]: Closed dirmngr.socket - GnuPG network certificate management daemon.
+Sep 27 21:55:44.273988 pi-001 systemd[7329]: Closed gpg-agent-browser.socket - GnuPG cryptographic agent and passphrase cache (access for web browsers).
+Sep 27 21:55:44.274080 pi-001 systemd[7329]: Closed gpg-agent-extra.socket - GnuPG cryptographic agent and passphrase cache (restricted).
+Sep 27 21:55:44.275086 pi-001 systemd[7329]: Stopping gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation)...
+Sep 27 21:55:44.275993 pi-001 systemd[7329]: Stopping gpg-agent.socket - GnuPG cryptographic agent and passphrase cache...
+Sep 27 21:55:44.276121 pi-001 systemd[7329]: Closed keyboxd.socket - GnuPG public key management service.
+Sep 27 21:55:44.277059 pi-001 systemd[7329]: Stopping ssh-agent.socket - OpenSSH Agent socket...
+Sep 27 21:55:44.316284 pi-001 systemd[7329]: Closed gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation).
+Sep 27 21:55:44.317020 pi-001 systemd[7329]: Closed gpg-agent.socket - GnuPG cryptographic agent and passphrase cache.
+Sep 27 21:55:44.318703 pi-001 systemd[7329]: Closed ssh-agent.socket - OpenSSH Agent socket.
+Sep 27 21:55:44.321415 pi-001 systemd[7329]: Removed slice app.slice - User Application Slice.
+Sep 27 21:55:44.321457 pi-001 systemd[7329]: Reached target shutdown.target - Shutdown.
+Sep 27 21:55:44.321623 pi-001 systemd[7329]: Finished systemd-exit.service - Exit the Session.
+Sep 27 21:55:44.321660 pi-001 systemd[7329]: Reached target exit.target - Exit the Session.
+Sep 27 21:55:44.337683 pi-001 systemd-logind[520]: Removed session 71.
+Sep 27 21:55:44.339288 pi-001 systemd[1]: user@1000.service: Deactivated successfully.
+Sep 27 21:55:44.339730 pi-001 systemd[1]: Stopped user@1000.service - User Manager for UID 1000.
+Sep 27 21:55:44.358922 pi-001 systemd[1]: Stopping user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Sep 27 21:55:44.414181 pi-001 systemd[1]: run-user-1000.mount: Deactivated successfully.
+Sep 27 21:55:44.415140 pi-001 systemd[1]: user-runtime-dir@1000.service: Deactivated successfully.
+Sep 27 21:55:44.415364 pi-001 systemd[1]: Stopped user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Sep 27 21:55:44.417275 pi-001 systemd[1]: Removed slice user-1000.slice - User Slice of UID 1000.
+Sep 27 21:56:02.188484 pi-001 sshd-session[7413]: Accepted publickey for pi from 10.0.0.1 port 33618 ssh2: RSA SHA256:(redacted)
+Sep 27 21:56:02.191294 pi-001 sshd-session[7413]: pam_unix(sshd:session): session opened for user pi(uid=1000) by pi(uid=0)
+Sep 27 21:56:02.200431 pi-001 systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
+Sep 27 21:56:02.202120 pi-001 systemd[1]: Starting user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Sep 27 21:56:02.204047 pi-001 systemd-logind[520]: New session 73 of user pi.
+Sep 27 21:56:02.236599 pi-001 systemd[1]: Finished user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Sep 27 21:56:02.239182 pi-001 systemd[1]: Starting user@1000.service - User Manager for UID 1000...
+Sep 27 21:56:02.272069 pi-001 (systemd)[7420]: pam_unix(systemd-user:session): session opened for user pi(uid=1000) by pi(uid=0)
+Sep 27 21:56:02.275297 pi-001 systemd-logind[520]: New session 74 of user pi.
+Sep 27 21:56:02.409988 pi-001 systemd[7420]: Queued start job for default target default.target.
+Sep 27 21:56:02.445213 pi-001 systemd[7420]: Created slice app.slice - User Application Slice.
+Sep 27 21:56:02.445252 pi-001 systemd[7420]: Reached target paths.target - Paths.
+Sep 27 21:56:02.445295 pi-001 systemd[7420]: Reached target timers.target - Timers.
+Sep 27 21:56:02.446643 pi-001 systemd[7420]: Starting dbus.socket - D-Bus User Message Bus Socket...
+Sep 27 21:56:02.446933 pi-001 systemd[7420]: Listening on dirmngr.socket - GnuPG network certificate management daemon.
+Sep 27 21:56:02.447045 pi-001 systemd[7420]: Listening on gpg-agent-browser.socket - GnuPG cryptographic agent and passphrase cache (access for web browsers).
+Sep 27 21:56:02.447122 pi-001 systemd[7420]: Listening on gpg-agent-extra.socket - GnuPG cryptographic agent and passphrase cache (restricted).
+Sep 27 21:56:02.448559 pi-001 systemd[7420]: Starting gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation)...
+Sep 27 21:56:02.450359 pi-001 systemd[7420]: Starting gpg-agent.socket - GnuPG cryptographic agent and passphrase cache...
+Sep 27 21:56:02.450537 pi-001 systemd[7420]: Listening on keyboxd.socket - GnuPG public key management service.
+Sep 27 21:56:02.452185 pi-001 systemd[7420]: Starting ssh-agent.socket - OpenSSH Agent socket...
+Sep 27 21:56:02.471918 pi-001 systemd[7420]: Listening on dbus.socket - D-Bus User Message Bus Socket.
+Sep 27 21:56:02.479840 pi-001 systemd[7420]: Listening on gpg-agent.socket - GnuPG cryptographic agent and passphrase cache.
+Sep 27 21:56:02.480298 pi-001 systemd[7420]: Listening on ssh-agent.socket - OpenSSH Agent socket.
+Sep 27 21:56:02.481255 pi-001 systemd[7420]: Listening on gpg-agent-ssh.socket - GnuPG cryptographic agent (ssh-agent emulation).
+Sep 27 21:56:02.481422 pi-001 systemd[7420]: Reached target sockets.target - Sockets.
+Sep 27 21:56:02.481477 pi-001 systemd[7420]: Reached target basic.target - Basic System.
+Sep 27 21:56:02.481628 pi-001 systemd[1]: Started user@1000.service - User Manager for UID 1000.
+Sep 27 21:56:02.482936 pi-001 systemd[1]: Started session-73.scope - Session 73 of User pi.
+Sep 27 21:56:02.483632 pi-001 systemd[7420]: Started mpris-proxy.service - Bluetooth mpris proxy.
+Sep 27 21:56:02.483674 pi-001 systemd[7420]: Reached target default.target - Main User Target.
+Sep 27 21:56:02.483725 pi-001 systemd[7420]: Startup finished in 191ms.
+Sep 27 21:56:02.499405 pi-001 systemd[7420]: Created slice session.slice - User Core Session Slice.
+Sep 27 21:56:02.500894 pi-001 systemd[7420]: Starting dbus.service - D-Bus User Message Bus...
+Sep 27 21:56:02.518319 pi-001 systemd[7420]: Started dbus.service - D-Bus User Message Bus.
+Sep 27 21:56:02.634787 pi-001 sshd-session[7447]: Received disconnect from 10.0.0.1 port 33618:11: disconnected by user
+Sep 27 21:56:02.634869 pi-001 sshd-session[7447]: Disconnected from user pi 10.0.0.1 port 33618
+Sep 27 21:56:02.635503 pi-001 sshd-session[7413]: pam_unix(sshd:session): session closed for user pi
+Sep 27 21:56:02.637855 pi-001 systemd[1]: session-73.scope: Deactivated successfully.
+Sep 27 21:56:02.639079 pi-001 systemd-logind[520]: Session 73 logged out. Waiting for processes to exit.
+Sep 27 21:56:02.639762 pi-001 systemd-logind[520]: Removed session 73.
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+               828      main osoe-pac       pi  R       4:52      4 pi-[001-004]
+JobId=828 JobName=osoe-pacer
+   UserId=pi(1000) GroupId=pi(1000) MCS_label=N/A
+   Priority=1 Nice=0 Account=(null) QOS=(null)
+   JobState=RUNNING Reason=None Dependency=(null)
+   Requeue=1 Restarts=0 BatchFlag=0 Reboot=0 ExitCode=0:0
+   RunTime=00:04:52 TimeLimit=UNLIMITED TimeMin=N/A
+   SubmitTime=2026-09-27T21:55:37 EligibleTime=2026-09-27T21:55:37
+   AccrueTime=Unknown
+   StartTime=2026-09-27T21:55:37 EndTime=Unknown Deadline=N/A
+   SuspendTime=None SecsPreSuspend=0 LastSchedEval=2026-09-27T21:55:37 Scheduler=Main
+   Partition=main AllocNode:Sid=pi-login:71760
+   ReqNodeList=(null) ExcNodeList=(null)

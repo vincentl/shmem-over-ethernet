@@ -1,0 +1,13 @@
+22:14:21 start: unbound with the agent's slice, then sort 16 against 11, then mix with waits
+22:15:06 agent-slice.sh 100000: 4 lead agents changed
+22:16:06 mailbox-unbound-slice exit 0 in 103 s: osoe-pacer failures=0 seconds=95.1
+22:18:17 sort-16 exit 0 in 129 s: osoe-pacer failures=0 seconds=122.6
+22:18:17     timeouts before: pi-001=33 pi-002=70 pi-003=41 pi-004=42 
+22:18:19     timeouts after:  pi-001=34 pi-002=70 pi-003=41 pi-004=42 
+22:20:22 sort-11 exit 0 in 121 s: osoe-pacer failures=0 seconds=120.4
+22:20:22     timeouts before: pi-001=34 pi-002=70 pi-003=41 pi-004=42 
+22:20:25     timeouts after:  pi-001=34 pi-002=70 pi-003=42 pi-004=42 
+22:30:41 mix-waits exit 0 in 614 s: osoe-pacer failures=0 seconds=608.6
+22:30:41     timeouts before: pi-001=34 pi-002=70 pi-003=42 pi-004=42 
+22:30:43     timeouts after:  pi-001=34 pi-002=75 pi-003=44 pi-004=43 
+22:30:43 DRIVER3-DONE

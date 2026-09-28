@@ -1,0 +1,22 @@
+21:46:55 start: 3d5bbe1, release, from the Mac
+21:48:22 mailbox-bound exit 0 in 83 s: osoe-pacer failures=0 seconds=79.9
+21:49:48 mailbox-unbound exit 0 in 84 s: osoe-pacer failures=0 seconds=80.0
+21:50:39 widened: 4 lead agents
+21:51:34 mailbox-widened exit 0 in 104 s: osoe-pacer failures=0 seconds=94.6
+21:53:38 pull-bound exit 0 in 122 s: osoe-pacer failures=0 seconds=106.7
+21:55:33 pull-unbound exit 0 in 113 s: osoe-pacer failures=0 seconds=103.8
+21:56:40 widened: 0 lead agents
+22:00:37 pull-widened exit 143 in 300 s: 
+22:00:37 AGENT-PLACEMENT-DONE
+22:02:01 start: slices, 3d5bbe1, release, from the Mac, sessions held open
+22:03:09 agent-widen.sh 0-3: 4 lead agents changed
+22:04:31 pull-widened exit 0 in 147 s: osoe-pacer failures=0 seconds=134.3
+22:05:16 agent-slice.sh 100000: 4 lead agents changed
+22:06:15 mailbox-slice exit 0 in 103 s: osoe-pacer failures=0 seconds=95.1
+22:07:01 agent-slice.sh 100000 0-3: 8 lead agents changed
+22:08:02 mailbox-slice-widened exit 0 in 102 s: osoe-pacer failures=0 seconds=95.1
+22:09:11 agent-slice.sh 100000: 4 lead agents changed
+22:10:29 pull-slice exit 0 in 145 s: osoe-pacer failures=0 seconds=131.2
+22:12:21 pull-landing-1m exit 0 in 110 s: osoe-pacer failures=0 seconds=101.9
+22:14:14 pull-landing-4m exit 0 in 111 s: osoe-pacer failures=0 seconds=102.4
+22:14:14 SLICES-DONE

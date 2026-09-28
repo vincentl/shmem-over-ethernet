@@ -121,11 +121,22 @@ cmake --install build/release --prefix /opt/osoe
 ```
 
 installs the library, its headers - `shmem.h`, `pshmem.h`, `shmemx.h`, and the
-`mpp/` forms older programs include - `oshcc` and `osoe-stat`: all that a node
-running jobs needs. The installed `oshcc` finds the rest from where it is, so
-the prefix may be chosen at install time and a package may stage it elsewhere.
-`osoe-launch`, `osoe-bench` and `osoe-pacer` stay in the build tree: they are
-for development, tests and measurement.
+`mpp/` forms older programs include - `oshcc`, `osoe-stat` and `osoe-pacer`:
+all that a node running jobs needs, and a check that osoe works there. The
+installed programs find the rest from where they are, so the prefix may be
+chosen at install time and a package may stage it elsewhere. `osoe-launch` and
+`osoe-bench` stay in the build tree: they are for development, tests and
+measurement.
+
+Once installed, run the stress tester's smoke test under the cluster's launcher:
+
+```sh
+srun -K1 --cpu-bind=none -N4 --ntasks-per-node=4 /opt/osoe/bin/osoe-pacer --quick
+```
+
+It runs its exercises at small sizes, checks every result, and ends with
+`osoe-pacer failures=0` and exit status 0 - in 7 s on the Pi cluster's 16 PEs.
+`osoe-pacer --help` lists what else it runs.
 
 ### Building a program
 
@@ -162,8 +173,11 @@ every node.
 - **`-K1`** (or `KillOnBadExit=1`), so that a task that fails at start-up ends
   the rest rather than leaving them waiting (design §3.15).
 - **`--cpu-bind=none`**, or two CPUs a task (`-c 2`) where there are cores to
-  spare. Slurm binds each task to one core by default, and a PE's progress
-  thread then shares it with the PE: on the Pi cluster that costs a pipelined
+  spare; `SLURM_CPU_BIND=none` in the environment does the same. Where a node
+  runs as many tasks as it has cores, Slurm binds each task to one core by
+  default, and the thread that moves every message of the node - the progress
+  thread of its first PE - is bound with that PE: it waits behind the PE's own
+  thread while the other cores idle. On the Pi cluster that costs a pipelined
   point-to-point pattern six times its rate.
 - **`OSOE_NO_PROGRESS_TIMEOUT=60`** while a cluster is new, so that a wait on
   the library's own progress - a connection's acknowledgements, buffer space,
@@ -354,9 +368,19 @@ specification or takes a choice the specification leaves open.
   node.
 - **A host name that resolves only to IPv6 is refused.**
 - **Run with `--cpu-bind=none`, or two CPUs a task.** Slurm binds each task to
-  one core by default, and a PE's agent thread then shares it with the PE's
-  own: on the Pi cluster that costs a pipelined point-to-point pattern six
+  one core by default where a node has as many tasks as cores, and the node's
+  progress thread then waits behind its first PE's own thread on that PE's
+  core: on the Pi cluster that costs a pipelined point-to-point pattern six
   times its rate.
+- **A login that ends on a node just before a job starts there can stall the
+  job's start.** systemd-logind deletes a user's files in `/dev/shm` about ten
+  seconds after the user's last login session on a machine ends (`RemoveIPC`,
+  on by default), and a PE still in `shmem_init` may need a name there that its
+  node-mates made. A running job is safe - osoe removes every name once init
+  is done - but a start caught in those seconds can wait for ever. Set
+  `RemoveIPC=no` in `logind.conf` on compute nodes, as PostgreSQL's
+  documentation also advises, or enable lingering (`loginctl enable-linger`)
+  for the users who run jobs.
 
 **Failures**
 

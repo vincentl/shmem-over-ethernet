@@ -1,0 +1,8 @@
+pi-001 lead agent 9067: tid 9067 before: policy 0 nice 0 slice 2100000 ns; after: policy 0 nice 0 slice 100000 ns
+pi-001 lead agent 9067: pid 9067's current affinity list: 0 pid 9067's new affinity list: 0-3 
+pi-002 lead agent 8683: tid 8683 before: policy 0 nice 0 slice 2100000 ns; after: policy 0 nice 0 slice 100000 ns
+pi-002 lead agent 8683: pid 8683's current affinity list: 0 pid 8683's new affinity list: 0-3 
+pi-003 lead agent 8408: tid 8408 before: policy 0 nice 0 slice 2100000 ns; after: policy 0 nice 0 slice 100000 ns
+pi-003 lead agent 8408: pid 8408's current affinity list: 0 pid 8408's new affinity list: 0-3 
+pi-004 lead agent 8284: tid 8284 before: policy 0 nice 0 slice 2100000 ns; after: policy 0 nice 0 slice 100000 ns
+pi-004 lead agent 8284: pid 8284's current affinity list: 0 pid 8284's new affinity list: 0-3 

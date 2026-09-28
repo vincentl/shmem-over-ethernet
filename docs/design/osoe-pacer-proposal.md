@@ -3,14 +3,14 @@
 *Proposed 2026-09-26 and decided with the author the same night
 (`docs/decisions/2026-09-26-night.md`): the name, the labels, `parallel_print`
 kept in the tool, the phase order, the memory default and its option, the
-briefs' names. One point waits on the author after §3's explanation: whether
-the smoke tests join every preset's suite. All four phases are built
+briefs' names. All four phases are built
 (`docs/prompts/done/task-stress-phase1.md` to `-phase4.md`; the records, with
 where the tool differs from this proposal and why, are
 `docs/decisions/2026-09-27.md`, `2026-09-27-afternoon.md` and
-`2026-09-27-evening.md`). Two more wait on the author, as phase 4's brief
-said they would: whether `osoe-pacer` is installed, and whether a soak joins
-the release checklist.*
+`2026-09-27-evening.md`). The three points left to the author were settled
+the same night (`docs/decisions/2026-09-27-night.md`): the smoke tests run in
+every preset, `osoe-pacer` is installed, and an hour of `mix` joins the
+release checklist.*
 
 ## 0. What it is, and what it is not
 
@@ -605,7 +605,8 @@ checked against the header rather than remembered.
 
 Decided with the author on 2026-09-26 (`docs/decisions/2026-09-26-night.md`):
 
-1. `tools/pacer/osoe-pacer`, not installed until phase 4 decides.
+1. `tools/pacer/osoe-pacer`, not installed until phase 4 decides - installed
+   since 2026-09-27-night.
 2. World PE numbers in Slurm's bracket syntax; a team's name before the
    bracket on any team but the world; node folding later, as an option.
 3. `parallel_print` stays in the tool.
@@ -613,8 +614,8 @@ Decided with the author on 2026-09-26 (`docs/decisions/2026-09-26-night.md`):
 5. The memory default of half the heap, and `--memory` to go higher, as a
    size or a share, refused with the variable to set when the heap cannot
    hold it.
-6. Smoke tests in every preset: *pending* the author's reading of §3's
-   explanation. The brief registers them; they are one block to remove.
+6. Smoke tests in every preset: decided yes on 2026-09-27-night, after §3's
+   explanation and the four phases' costs.
 7. The briefs are `task-stress-phaseN.md`.
 
 ## 8. Prior art read for this

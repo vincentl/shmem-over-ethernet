@@ -1,0 +1,4 @@
+pi-001 lead pid 8351 agent 8357: pid 8357's current affinity list: 0 pid 8357's new affinity list: 0-3 
+pi-002 lead pid 7969 agent 7974: pid 7974's current affinity list: 0 pid 7974's new affinity list: 0-3 
+pi-003 lead pid 7692 agent 7697: pid 7697's current affinity list: 0 pid 7697's new affinity list: 0-3 
+pi-004 lead pid 7570 agent 7575: pid 7575's current affinity list: 0 pid 7575's new affinity list: 0-3 

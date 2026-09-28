@@ -31,6 +31,14 @@ Keep the output: it goes in the notes with the results.
 - A Pi 5's kernel uses 16 KiB pages where the VM's uses 4 KiB. osoe sizes every mapping by the page it is given (design §8.5), and this is the first run that proves it. `OSOE_HEAP_BASE`, if you set it, must be a multiple of that page.
 - Memory: a node's four PEs hold about 1 GiB of `/dev/shm` at the default heap, 256 MiB a PE, touched only as it is used, and about 47 MiB besides: each PE's internal region, about 11 MiB - 10 since `OSOE_MAX_TEAMS` went to 64 by default on 2026-09-26 (5 MiB at the 32 both sessions ran at, since phase 1 step 5 slice 5 gave every team number's block of it room for two pieces in flight per child, `OSOE_COLLECTIVE_PIPELINE`) and 1.3 MiB of the scans' slots since phase 1 step 10 - 45 MiB for the four, address space touched only by a team's leads, and the scans' by its members - the node's control segment, 1.3 MiB, and its connection buffers, 0.8 MiB (the last two measured on the VM's 4-node, 4-PE map; the region's size is computed, and was 2.5 MiB a PE before the slice). A 16 GB node's `/dev/shm` is 8 GB by default.
 - The governor matters to every time below: `ondemand` clocks a core down between trips, so write down which one ran. Both sessions so far ran `ondemand`.
+- **A login session on a node can stall a job starting there.** The nodes run
+  systemd-logind with its default `RemoveIPC=yes`: ten seconds after pi's last
+  session on a node ends, every file of pi's in `/dev/shm` goes, and a job
+  still in `shmem_init` then waits for ever (2026-09-27-night item 6). A
+  script that reaches the nodes over ssh while jobs start holds a session open
+  on each for its whole run (`ssh pi-00N sleep 7200 &`). The cure is
+  `RemoveIPC=no` in `/etc/systemd/logind.conf`, or `loginctl enable-linger pi`,
+  on each node - sudo, the author's.
 - The switch: compute node `pi-00X` is on port X and the head node on port 9; the switch is unmanaged as far as known, so it has no counters to read. What TCP saw of it is in `nstat -az TcpRetransSegs TcpExtTCPTimeouts` on each node.
 - The fifth line shows what each node's own name resolves to there. On this cluster the image's `/etc/hosts` maps each name to its 10.0.1.N address. A stock Raspberry Pi OS maps a host's own name to 127.0.1.1, which its peers cannot reach; osoe then listens at the node's address toward the others instead (design §6.1), and `SHMEM_DEBUG=1` says so per node.
 
@@ -159,7 +167,10 @@ The last pair is the experiment the design most wants from four-core nodes.
 Each PE has an agent thread beside its main thread (§3.12), and Slurm's default
 binding gives each of the four tasks one core, which its two threads share;
 unbound, they may use any of the node's four. The difference between the two
-runs is what the sharing costs.
+runs is what the sharing costs. Only the first PE's agent is busy - it moves
+every message of the node - and bound, it waits behind that PE's main thread
+while the other cores idle: `docs/decisions/2026-09-27-night.md` item 1 has
+the threads measured, and what moving it or shortening its slice recovers.
 
 **The pacer.** `osoe-pacer` (`tools/pacer/`, the proposal in
 `docs/design/osoe-pacer-proposal.md`) is the other half: every PE in motion at

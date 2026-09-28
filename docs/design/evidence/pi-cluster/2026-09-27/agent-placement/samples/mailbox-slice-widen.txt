@@ -1,0 +1,4 @@
+pi-001 lead agent 8716: tid 8716 before: policy 0 nice 0 slice 2100000 ns; after: policy 0 nice 0 slice 100000 ns
+pi-002 lead agent 8329: tid 8329 before: policy 0 nice 0 slice 2100000 ns; after: policy 0 nice 0 slice 100000 ns
+pi-003 lead agent 8054: tid 8054 before: policy 0 nice 0 slice 2100000 ns; after: policy 0 nice 0 slice 100000 ns
+pi-004 lead agent 7932: tid 7932 before: policy 0 nice 0 slice 2100000 ns; after: policy 0 nice 0 slice 100000 ns
