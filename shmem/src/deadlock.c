@@ -99,9 +99,11 @@ void osoe_wait_ends(void)
  * sleeps; -1 when one does not - it runs, it was woken and has not run yet, it
  * is stopped or traced, it waits on a disk - or /proc cannot say. The
  * application's threads are every task but the PE's agent and io_uring's
- * workers, which the kernel runs as threads of the process that submits
- * ("iou-...").
+ * workers, which the kernel runs as threads of the process that submits and
+ * marks PF_IO_WORKER in the flags /proc gives: by the flag, not by the
+ * "iou-" name, which a thread of the program's may also take.
  */
+#define TASK_IO_WORKER 0x10u           /* the kernel's PF_IO_WORKER */
 static int threads_asleep(const struct osoe_pe_slot *s)
 {
     int32_t agent = atomic_load_explicit(&s->agent_tid, memory_order_acquire);
@@ -125,13 +127,16 @@ static int threads_asleep(const struct osoe_pe_slot *s)
         size_t n = fread(line, 1, sizeof line - 1, f);
         fclose(f);
         line[n] = '\0';
-        /* "tid (comm) S ...": the command may hold spaces and parentheses. */
-        const char *open = strchr(line, '('), *close = strrchr(line, ')');
-        if (!open || !close || close[1] != ' ')
+        /* "tid (comm) S ppid pgrp session tty tpgid flags ...": the command may
+         * hold spaces and parentheses, so the fields are read after its last. */
+        const char *close = strrchr(line, ')');
+        char state;
+        unsigned flags;
+        if (!close || sscanf(close + 1, " %c %*d %*d %*d %*d %*d %u", &state, &flags) != 2)
             count = -1;
-        else if (strncmp(open + 1, "iou-", 4) == 0)
+        else if (flags & TASK_IO_WORKER)
             continue;
-        else if (close[2] != 'S')
+        else if (state != 'S')
             count = -1;
         else
             count++;
@@ -159,6 +164,34 @@ static struct {
 
 static uint64_t *words;         /* each local PE's `waits`, as a half last read them */
 static int *asleep;             /* and its threads as /proc listed them */
+/* Each local PE's `sweeps` when this node's first sample of a round held. */
+static uint64_t *first_sweeps;
+
+/*
+ * Whether every waiting thread has swept since the first sample: each PE's
+ * sweep count (node.h) risen by at least the threads it has waiting, which a
+ * sweep interval's sleeps make certain many times over within
+ * OSOE_DEADLOCK_SECONDS. The argument's premise, checked rather than assumed:
+ * a condition made true with no wake is found by its waiter at its next sweep
+ * - unless the waiter's timer is so slack, or the PE so frozen, that it never
+ * sweeps, and then nothing is declared.
+ */
+static bool record_sweeps(void)
+{
+    for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++)
+        first_sweeps[i] = atomic_load_explicit(&osoe.node.slots[i].sweeps, memory_order_seq_cst);
+    return true;
+}
+
+static bool every_waiter_swept(void)
+{
+    for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++) {
+        uint64_t now = atomic_load_explicit(&osoe.node.slots[i].sweeps, memory_order_seq_cst);
+        if (now - first_sweeps[i] < (uint32_t)words[i])
+            return false;
+    }
+    return true;
+}
 
 /* Every local PE's `waits` word, its changes summed: one load each. */
 static uint64_t read_waits(void)
@@ -206,12 +239,13 @@ static bool threads_are_waits(void)
  */
 static bool first_words(void)
 {
+    uint64_t changes = read_waits();
+    if (!every_pe_waits())
+        return false;
     uint64_t applied;
     /* Asks the peers for the acknowledgements quiet needs, which the pass sends. */
     (void)osoe_transport_agent_node_quiet(&applied);
-    half.activity = read_waits() + applied;
-    if (!every_pe_waits())
-        return false;
+    half.activity = changes + applied;
     half.taken = true;
     half.seen = false;
     half.deadline_ns = osoe_now_ns() + SAMPLE_PATIENCE_NS;
@@ -395,8 +429,10 @@ static void start_afresh(void)
     half.taken = half.seen = false;
     free(words);
     free(asleep);
+    free(first_sweeps);
     words = NULL;
     asleep = NULL;
+    first_sweeps = NULL;
 }
 
 static uint32_t peers(void)
@@ -468,9 +504,10 @@ static void sampled(bool ok, uint64_t activity)
         if (probe.phase == 1) {
             sampled_round = probe.round;
             sampled_first = activity;
-            report.ok = ok;
+            report.ok = ok && record_sweeps();
         } else {
-            report.ok = ok && sampled_round == probe.round && activity == sampled_first;
+            report.ok = ok && sampled_round == probe.round && activity == sampled_first &&
+                        every_waiter_swept();
         }
         osoe_transport_agent_deadlock_send(probe_from, &report);
         return;
@@ -481,6 +518,7 @@ static void sampled(bool ok, uint64_t activity)
             return;
         }
         first_activity = activity;
+        (void)record_sweeps();
         round_number++;
         if (peers() == 0) {
             stage = BETWEEN;
@@ -492,7 +530,7 @@ static void sampled(bool ok, uint64_t activity)
         all_ok = true;
         send_all(OSOE_DEADLOCK_PROBE, 1);
     } else if (stage == SECOND_SAMPLE) {
-        if (!ok || activity != first_activity) {
+        if (!ok || activity != first_activity || !every_waiter_swept()) {
             watch_again();
             return;
         }
@@ -523,7 +561,8 @@ bool osoe_deadlock_tick(void)
     if (!words) {
         words = calloc(osoe.bootstrap.local_count, sizeof *words);
         asleep = calloc(osoe.bootstrap.local_count, sizeof *asleep);
-        if (!words || !asleep)
+        first_sweeps = calloc(osoe.bootstrap.local_count, sizeof *first_sweeps);
+        if (!words || !asleep || !first_sweeps)
             osoe_fatal("the deadlock detector: out of memory for %" PRIu32 " local PEs",
                        osoe.bootstrap.local_count);
     }
@@ -562,10 +601,11 @@ bool osoe_deadlock_tick(void)
         stage = FIRST_SAMPLE;
         return begin_sample();
     case BETWEEN:
-        /* Give up early once the root's own node has moved. */
+        /* Give up early once the root's own node has moved: seen to move. */
         (void)osoe_transport_agent_node_idle(&applied);
         if (read_waits() + applied != first_activity) {
             watch_again();
+            rounds_failed = 0;
             return false;
         }
         if (now - between_since_ns < quiet_needed_ns)

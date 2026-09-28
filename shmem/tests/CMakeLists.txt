@@ -1771,9 +1771,11 @@ foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,1,1" "helper|
   list(GET parts 0 mode)
   list(GET parts 1 map)
   string(REPLACE "," "-" label "${map}")
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
   add_test(NAME shmem.deadlock.${mode}.${label}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
-            $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
             $<TARGET_FILE:shmem_test_deadlock> ${mode})
   set_tests_properties(shmem.deadlock.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION "DEADLOCK TEST OK: ${mode}"

@@ -23,6 +23,9 @@
  *               computing for four seconds: every node looks quiet to a count
  *               of waits alone, and a round is begun and found busy each time
  *
+ * The helper thread is named as io_uring names its workers, "iou-helper", so a
+ * detector that told them apart by name would not see it.
+ *
  * The last PE, so that across nodes the root's node is the one that waits:
  * it begins rounds, and the last node's reports end each.
  *
@@ -123,6 +126,7 @@ int main(int argc, char **argv)
                 fprintf(stderr, "CHECK(pthread_create) failed\n");
                 return 1;
             }
+            (void)pthread_setname_np(helper, "iou-helper");
             shmem_int_wait_until(flag, SHMEM_CMP_NE, 0);
             pthread_join(helper, NULL);
         }

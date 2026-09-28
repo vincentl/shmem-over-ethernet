@@ -680,6 +680,10 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
                 count_if_lost(&word->word, slept_on, routine);
             break;
         }
+        /* The nudge is the lead's to see, so not a waiting thread's to make
+         * (base/sweep.h): this thread stops waiting for it, and sleep_on counts
+         * it again. */
+        osoe_wait_ends();
         osoe_connection_area_mark(&osoe_am.area, peer);
         osoe_progress_host_wake_lead();
         slept_on = seen;

@@ -62,6 +62,12 @@ void osoe_missed_wake(const char *routine);
  * Weak do-nothing definitions here, as for the sweep; the SHMEM layer's count
  * them (deadlock.c): one locked add as a wait first sleeps and one as it ends,
  * on a path that has already paid for a futex call.
+ *
+ * The count is per thread, and trusts that a wait ends by returning: a thread
+ * that leaves one by siglongjmp from a signal handler, or is cancelled in one,
+ * stays counted, and a forked child that waits in the library counts in its
+ * parent's word. OpenSHMEM defines none of these; a program that does any
+ * of them turns the detector off (OSOE_DEADLOCK_SECONDS=0).
  */
 void osoe_wait_sleeps(void);
 void osoe_wait_ends(void);

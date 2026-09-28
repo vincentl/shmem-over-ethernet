@@ -1768,8 +1768,11 @@ to the rule above - time only paces the looking.
   flight and nothing was queued - a state no later event can leave. A condition
   that came true with no wake - a store through `shmem_ptr`, a lost wake - is
   found by its waiter within a sweep interval, far inside the wait between the
-  collections, which ends its wait and moves the activity. The model checks the
-  argument, and that each ingredient is needed: activity without the applied
+  collections, which ends its wait and moves the activity; and that premise is
+  checked, not assumed: each PE's sweep count must have risen, between a
+  node's two samples, by at least the threads it has waiting - a timer so
+  slack, or a PE so frozen, that a waiter never sweeps leaves nothing
+  declared. The model checks the argument, and that each ingredient is needed: activity without the applied
   messages, quiet without acknowledgements or without the idle check, halves
   with no pass between, waits counted from the start of a routine that posts,
   one collection, or quiet without the PEs' waits each declares a job that could
@@ -1778,8 +1781,13 @@ to the rule above - time only paces the looking.
   not know waiting - one computing, one in a condition variable, an idle OpenMP
   pool - or a stopped process; a job moved only from outside the library, by a
   signal handler's store or another program writing memory it shares with a PE,
-  which no SHMEM program relies on. A wait the library has not taught the
-  count - init's rendezvous - leaves its PE never blocked, too.
+  which no SHMEM program relies on; and, outside what OpenSHMEM defines, a
+  thread that leaves a wait by `siglongjmp` or cancellation, or a forked child
+  that waits in the library, either of which leaves the count wrong. A wait
+  the library has not taught the count - init's rendezvous - leaves its PE
+  never blocked, too. io_uring's workers are left out by the kernel's
+  `PF_IO_WORKER` flag, not by their `iou-` names, which a program's own
+  thread may share.
 - *Cost.* Nothing on any path that does not sleep. A wait that sleeps pays one
   locked add as it first sleeps and one as it ends. The root's lead reads L
   words each sweep interval; a round, once the root's node has looked quiet for
