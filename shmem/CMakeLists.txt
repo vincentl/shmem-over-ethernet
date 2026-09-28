@@ -36,6 +36,7 @@ add_library(osoe
   src/barrier.c
   src/bootstrap.c
   src/collective-tree.c
+  src/deadlock.c
   src/deprecated.c
   src/fatal.c
   src/info.c

@@ -38,4 +38,32 @@ void osoe_sweep_expired(const char *routine);
  */
 void osoe_missed_wake(const char *routine);
 
+/*
+ * A library wait, as the deadlock detector counts it (§3.15,
+ * shmem/src/deadlock.h).
+ *
+ * osoe_wait_sleeps: the calling thread is about to sleep in a wait whose
+ * condition it has just found false. osoe_wait_ends: it has stopped waiting -
+ * its condition held, or it is about to do something another thread or node
+ * could see. A wait calls the first before every sleep and the second as it
+ * leaves; each does nothing when the thread is already counted that way, so a
+ * sleep that ends with the condition still false - a sweep, a spurious wake -
+ * costs the detector nothing, and a wait that never sleeps never calls either.
+ *
+ * The contract that makes the count evidence: a thread between the two only
+ * loads its condition and sleeps, never for longer than a sweep interval at a
+ * time (OSOE_SWEEP_NS), and posts nothing, stores nothing another PE could
+ * read and wakes nobody. A routine that posts and then waits - a barrier's
+ * arrival, then its release - begins counting after the post. So a thread
+ * counted as waiting throughout an interval did nothing in it that anyone
+ * could see, and one whose condition came true with no wake has found out
+ * within a sweep interval, and stopped.
+ *
+ * Weak do-nothing definitions here, as for the sweep; the SHMEM layer's count
+ * them (deadlock.c): one locked add as a wait first sleeps and one as it ends,
+ * on a path that has already paid for a futex call.
+ */
+void osoe_wait_sleeps(void);
+void osoe_wait_ends(void);
+
 #endif /* OSOE_BASE_SWEEP_H */

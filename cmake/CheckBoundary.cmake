@@ -52,14 +52,15 @@ set(OSOE_API
   barrier.h collectives.h context.h export.h lock.h rma.h symmetric.h team.h wait.h)
 
 # The runtime: initialization's machinery and the agent (§6, §3.12), and the
-# library's own services - fatal, abort, liveness, the sweep, metrics, the
-# blocked record, waiting on a word of one's own region - which the API and the
-# backends both build on. Above the boundary, like the API.
+# library's own services - fatal, abort, liveness, the sweep, the deadlock
+# detector, metrics, the blocked record, waiting on a word of one's own region -
+# which the API and the backends both build on. Above the boundary, like the
+# API.
 set(OSOE_RUNTIME
-  abort.c agent.c allocator.c bootstrap.c fatal.c liveness.c metrics.c region-wait.c
-  sweep.c
-  abort.h agent.h allocator.h blocked.h bootstrap.h fatal.h liveness.h metrics.h
-  region-wait.h state.h)
+  abort.c agent.c allocator.c bootstrap.c deadlock.c fatal.c liveness.c metrics.c
+  region-wait.c sweep.c
+  abort.h agent.h allocator.h blocked.h bootstrap.h deadlock.h fatal.h liveness.h
+  metrics.h region-wait.h state.h)
 
 # The AM backend (§3): the files a second backend replaces. No file above may
 # reach any of them.

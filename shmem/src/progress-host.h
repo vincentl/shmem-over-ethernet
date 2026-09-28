@@ -113,4 +113,16 @@ void osoe_progress_host_wake_lead(void);
  */
 uint64_t osoe_progress_host_acked(uint32_t peer);
 
+/*
+ * The deadlock detector's calls (transport.h's node_idle, node_quiet and
+ * deadlock_send; §3.15, deadlock.h), on the lead's agent: the engine's view of
+ * whether this node owes the network anything, and a detector message queued
+ * toward another node's lead. On a node that is not the lead of a multi-node
+ * job, idle and quiet with nothing applied.
+ */
+struct osoe_deadlock_message;
+bool osoe_progress_host_idle(uint64_t *applied);
+bool osoe_progress_host_quiet(uint64_t *applied);
+void osoe_progress_host_deadlock_send(uint32_t node, const struct osoe_deadlock_message *m);
+
 #endif /* OSOE_PROGRESS_HOST_H */

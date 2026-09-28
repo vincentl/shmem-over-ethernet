@@ -22,6 +22,7 @@
 #include "abort.h"
 #include "am-state.h"
 #include "connection-area.h"
+#include "deadlock.h"
 #include "fatal.h"
 #include "internode.h"
 #include "job.h"
@@ -258,6 +259,13 @@ static void release(void *context, uint32_t team, uint32_t epoch)
     osoe_internode_released(team, epoch);
 }
 
+/* A deadlock detector message from another node's lead (progress.h). */
+static void deadlock_arrived(void *context, uint32_t node, const struct osoe_deadlock_message *m)
+{
+    (void)context;
+    osoe_deadlock_message(node, m);
+}
+
 /* A peer's abortive goodbye (progress.h): this node aborts too, on behalf of
  * the same PE and with the same status and disposition - unless it already has,
  * and then the first declaration stands (node.c) - and its agent, woken by the
@@ -380,8 +388,14 @@ void osoe_progress_host_start(uint32_t session)
      * 2; the first slice counted the predefined three). The per-team state
      * below is sized by it too, since it is indexed by number.
      */
+    /*
+     * And one a peer for the deadlock detector's messages (§3.15), of which a
+     * connection has at most one queued: the root asks each node once a
+     * collection and a node answers once, each only after what came before
+     * has been answered (deadlock.c).
+     */
     uint32_t teams = osoe.bootstrap.max_teams;
-    uint32_t descriptors = peers * (osoe_am.area.credits + OSOE_REPLY_SLACK) +
+    uint32_t descriptors = peers * (osoe_am.area.credits + OSOE_REPLY_SLACK + 1) +
                            OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) * teams;
     osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
@@ -417,7 +431,7 @@ void osoe_progress_host_start(uint32_t session)
     free(peers_address);
 
     struct osoe_progress_host host = { resolve, notify, release, NULL, abort_arrived,
-                                       landing_request, landed, completed };
+                                       landing_request, landed, completed, deadlock_arrived };
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, &osoe_am.ring,
                        osoe_am.descriptor, descriptors, osoe_am.scratch,
                        (uint32_t)osoe_am.area.chunk_bytes, &host);
@@ -626,6 +640,33 @@ bool osoe_progress_host_poll(void)
         if (atomic_load_explicit(&a->dirty[w], memory_order_seq_cst) != 0)
             return true;
     return false;
+}
+
+bool osoe_progress_host_idle(uint64_t *applied)
+{
+    if (!osoe_am.internode || !osoe_am.lead) {
+        *applied = 0;
+        return true;
+    }
+    *applied = osoe_am.progress.application_applied;
+    return osoe_progress_idle(&osoe_am.progress);
+}
+
+bool osoe_progress_host_quiet(uint64_t *applied)
+{
+    if (!osoe_am.internode || !osoe_am.lead) {
+        *applied = 0;
+        return true;
+    }
+    return osoe_progress_quiet(&osoe_am.progress, applied);
+}
+
+void osoe_progress_host_deadlock_send(uint32_t node, const struct osoe_deadlock_message *m)
+{
+    if (!osoe_am.internode || !osoe_am.lead)
+        osoe_fatal("a deadlock detector message toward node %u from a node with no network",
+                   node);
+    osoe_progress_deadlock_send(&osoe_am.progress, node, m);
 }
 
 bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen)

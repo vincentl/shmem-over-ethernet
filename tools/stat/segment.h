@@ -278,12 +278,15 @@ void osoe_segment_close(struct osoe_segment *s);
  *       items 1 and 2)
  *   25  pe.scan.most_pieces_in_flight, appended to the PE slot: the most
  *       pieces the PE's last scan across nodes had in flight (§5.8's scans)
+ *   26  the PE slot's `waits` - threads asleep in library waits, and how often
+ *       that has changed - and its agent's thread id, appended, for the
+ *       deadlock detector (§3.15)
  *
- * None of 5 to 25 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 26 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, and 23 gave each thread a word of its own.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               25
+#define OSOE_SEGMENT_NEWEST_LAYOUT               26
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is

@@ -88,6 +88,8 @@ static void wait_eq(struct osoe_epoch *e, uint32_t target, const char *routine, 
         uint32_t v = atomic_load_explicit(&e->count_compare_only_by_equality,
                                           memory_order_acquire);
         if (v == target) {
+            if (slept)
+                osoe_wait_ends();       /* the detector's count (sweep.h) */
             /* Reached, but only noticed because the sweep expired: if the
              * release landed well before the deadline, its wake never came. */
             if (timed_out && wake_was_lost(e, &sweep))
@@ -106,6 +108,7 @@ static void wait_eq(struct osoe_epoch *e, uint32_t target, const char *routine, 
         }
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         slept = true;
+        osoe_wait_sleeps();
         timed_out = osoe_futex_wait_bitset(&e->count_compare_only_by_equality, v,
                                            parity(target), &sweep,
                                            OSOE_FUTEX_SHARED) == ETIMEDOUT;

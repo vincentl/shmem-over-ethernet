@@ -233,6 +233,32 @@ void osoe_transport_agent_exit(void);
  */
 void osoe_transport_agent_abort(void);
 
+/*
+ * The deadlock detector's calls into the backend (§3.15, deadlock.h), all on
+ * a node lead's agent thread, between init and fini.
+ *
+ * node_idle: does this node owe the network nothing - nothing queued, sealed,
+ * sending or committed and unsent? What its PEs posted that the backend has
+ * yet to take - on AM, a collective's arrivals - it cannot see; a pass takes
+ * it. `applied` gets the application messages this node has applied,
+ * cumulative.
+ *
+ * node_quiet: idle, and has every segment this node sent that carried
+ * application work been applied by its peer? Where a peer has yet to
+ * acknowledge such a segment, the backend asks it to, so that a later call can
+ * say quiet: the acknowledgements are what make a message in flight visible
+ * to the detector. A job of one node has no network, and is idle and quiet with
+ * nothing applied.
+ *
+ * deadlock_send: carry `m` to `node`'s lead, whose backend hands it to
+ * osoe_deadlock_message there. Not application work: it counts in neither the
+ * sender's nor the receiver's activity, nor needs applying for quiet.
+ */
+struct osoe_deadlock_message;
+bool osoe_transport_agent_node_idle(uint64_t *applied);
+bool osoe_transport_agent_node_quiet(uint64_t *applied);
+void osoe_transport_agent_deadlock_send(uint32_t node, const struct osoe_deadlock_message *m);
+
 /* ---- Locality -------------------------------------------------------- */
 
 /*

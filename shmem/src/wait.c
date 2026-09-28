@@ -299,6 +299,8 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
         uint32_t seq = osoe_transport_watch_seq(watch);
         result = scan(w, base, mode, indices, start);
         if (scan_done(mode, result)) {
+            if (slept)
+                osoe_wait_ends();           /* the deadlock detector's count (base/sweep.h) */
             /* Table 6 only, so always four or eight bytes and always the
              * invariant - judged, and counted, where the scalar wait's is
              * (region-wait.h), so there is one place that decides. */
@@ -318,6 +320,7 @@ static size_t wait_many(const struct osoe_wait_many *w, enum many_mode mode, siz
 
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         slept_on = seq;
+        osoe_wait_sleeps();
         woken = osoe_transport_watch_wait(watch, seq, &sweep);
         timed_out = !woken;
         if (woken) {

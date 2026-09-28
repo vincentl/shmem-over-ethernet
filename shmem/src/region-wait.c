@@ -103,6 +103,8 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
         have = osoe_transport_load(region, offset, width);
         if (osoe_region_wait_satisfied(comparison, osoe_region_wait_extend(have, width, is_signed), want,
                                   is_signed)) {
+            if (slept)
+                osoe_wait_ends();           /* the deadlock detector's count (base/sweep.h) */
             /* The condition was true when the sweep expired: the update landed
              * while this PE slept, and its wake is lost or late (region-wait.h). */
             if (timed_out)
@@ -123,6 +125,7 @@ uint64_t osoe_region_wait(const char *routine, enum osoe_region region, uint64_t
 
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         slept_on = seq;
+        osoe_wait_sleeps();
         woken = osoe_transport_watch_wait(w, seq, &sweep);
         timed_out = !woken;
         if (woken) {
@@ -156,6 +159,8 @@ void osoe_region_wait_condition(const char *routine, enum osoe_region region, ui
     for (;;) {
         uint32_t seq = osoe_transport_watch_seq(w);
         if (holds(context)) {
+            if (slept)
+                osoe_wait_ends();
             if (timed_out)
                 osoe_region_wait_count_if_lost(w, slept_on, 8);
             break;
@@ -172,6 +177,7 @@ void osoe_region_wait_condition(const char *routine, enum osoe_region region, ui
 
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         slept_on = seq;
+        osoe_wait_sleeps();
         woken = osoe_transport_watch_wait(w, seq, &sweep);
         timed_out = !woken;
         if (woken) {

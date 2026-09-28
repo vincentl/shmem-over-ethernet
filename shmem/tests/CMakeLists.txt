@@ -1702,6 +1702,69 @@ set_tests_properties(shmem.agent-slice.set.L2 shmem.agent-slice.kernel.L2 PROPER
 set_tests_properties(shmem.agent-slice.refused.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
   PASS_REGULAR_EXPRESSION "OSOE_AGENT_SLICE_US=50: 0, or 100 to 100000 microseconds")
 
+# The deadlock detector (§3.15, deadlock.h; test-deadlock.c), at
+# OSOE_DEADLOCK_SECONDS=1: a job deadlocked on one node, across two, and on a
+# collective that does not match across two, ended naming where its PEs wait;
+# and a job that only looks deadlocked - its last PE computing, asleep outside
+# the library, or waiting for a thread of its own that the library cannot see
+# - on one node and across two, run to its end. Off, a deadlock runs to the
+# launcher's timeout; a setting it cannot read is refused by name.
+#
+# ThreadSanitizer runs a thread of its own in every process, which the detector
+# counts, rightly, as a thread the library cannot see: under it no job is
+# judged deadlocked, so the four that must be are not run there.
+add_executable(shmem_test_deadlock test-deadlock.c)
+target_link_libraries(shmem_test_deadlock PRIVATE osoe)
+osoe_warnings(shmem_test_deadlock)
+set(deadlock_cases
+    "waits|0,0,0,0|in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    "waits|0,0,1,1|in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    "mismatch|0,0,1,1|in shmem_barrier_all [(]epoch [0-9]+[)], for [0-9]+ s"
+    "mismatch|0,1,0,1|in shmem_barrier_all [(]epoch [0-9]+[)], for [0-9]+ s")
+if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(deadlock_cases "")
+endif()
+foreach(case IN LISTS deadlock_cases)
+  string(REPLACE "|" ";" parts "${case}")
+  list(GET parts 0 mode)
+  list(GET parts 1 map)
+  list(GET parts 2 where)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.deadlock.${mode}.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
+            $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 30 --
+            $<TARGET_FILE:shmem_test_deadlock> ${mode})
+  set_tests_properties(shmem.deadlock.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "every PE of the job waits in the library.*: PE [0-9, ]+ ${where}"
+    FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
+endforeach()
+foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,1,1" "helper|0,0,0,0"
+             "helper|0,0,1,1")
+  string(REPLACE "|" ";" parts "${case}")
+  list(GET parts 0 mode)
+  list(GET parts 1 map)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.deadlock.${mode}.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
+            $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_deadlock> ${mode})
+  set_tests_properties(shmem.deadlock.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "DEADLOCK TEST OK: ${mode}"
+    FAIL_REGULAR_EXPRESSION "osoe: deadlock|CHECK[(]")
+endforeach()
+add_test(NAME shmem.deadlock.off.0-0-1-1
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=0
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 6 --
+          $<TARGET_FILE:shmem_test_deadlock> waits)
+set_tests_properties(shmem.deadlock.off.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 6 s"
+  FAIL_REGULAR_EXPRESSION "osoe: deadlock|DEADLOCK TEST REACHED")
+add_test(NAME shmem.deadlock.refused.L2
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=soon
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_deadlock> computing)
+set_tests_properties(shmem.deadlock.refused.L2 PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_DEADLOCK_SECONDS=soon: 0 to turn deadlock detection off")
+
 # The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on
 # one node, where the team's local lead scans; across nodes on a block, an
 # interleaved and an uneven map, and under force-remote, where every member

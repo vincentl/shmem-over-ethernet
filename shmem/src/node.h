@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 25
+#define OSOE_NODE_LAYOUT 26
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -209,6 +209,20 @@ struct osoe_pe_slot {
      * (team.tree.most_pieces_in_flight).
      */
     _Atomic uint32_t scan_most_in_flight;
+
+    /*
+     * Layout 26 (the deadlock detector, 2026-09-28; §3.15, deadlock.h): this
+     * PE's threads asleep in library waits, in the low half, and how many
+     * times that number has changed, in the high half - one word, so the
+     * node's lead reads both at one instant. Moved by whichever of this PE's
+     * threads waits, one locked add as a wait first sleeps and one as it
+     * ends (base/sweep.h), and read by the lead's agent only when it samples
+     * its node.
+     */
+    _Atomic uint64_t waits;
+    /* This PE's agent's thread id, which the detector leaves out when it
+     * counts the PE's threads in /proc: published by the agent as it starts. */
+    _Atomic int32_t agent_tid;
 };
 
 /*

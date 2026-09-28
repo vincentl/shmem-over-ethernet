@@ -20,6 +20,7 @@ static const struct osoe_am_descriptor table[] = {
     [OSOE_AM_BARRIER_ARRIVE]  = { "barrier.arrive",  sizeof(struct osoe_am_barrier), false },
     [OSOE_AM_BARRIER_RELEASE] = { "barrier.release", sizeof(struct osoe_am_barrier), false },
     [OSOE_AM_ABORT]           = { "abort",           sizeof(struct osoe_am_abort),   false },
+    [OSOE_AM_DEADLOCK]        = { "deadlock",        sizeof(struct osoe_am_deadlock), false },
 };
 
 _Static_assert(sizeof table / sizeof *table == OSOE_AM_HANDLER_COUNT,

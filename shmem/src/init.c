@@ -26,6 +26,7 @@
 #include "base/sweep.h"
 #include "barrier.h"
 #include "context.h"
+#include "deadlock.h"
 #include "export.h"
 #include "fatal.h"
 #include "internode.h"
@@ -141,6 +142,11 @@ SHMEM_VENDOR_STRING " environment variables\n"
 "                           kernel's own; default 100, which lets a node's\n"
 "                           progress thread preempt sooner on a shared core\n"
 "                           (Linux 6.12 and later; §3.11)\n"
+"    OSOE_DEADLOCK_SECONDS  how long a job whose every PE waits in the library,\n"
+"                           nothing moving on any node and nothing in flight,\n"
+"                           is watched before it ends as deadlocked, naming\n"
+"                           where each PE waits: 1 to 86400, or 0 for never;\n"
+"                           default 10 (§3.15)\n"
 "\n"
 "  The bootstrap variables - PROCID, LOCALID, GTIDS, STEP_NUM_TASKS, NODEID,\n"
 "  STEP_NUM_NODES, STEP_NODELIST, JOB_ID and STEP_ID - are srun's, with SLURM_\n"
@@ -294,6 +300,7 @@ static void session_start(void)
         osoe_fatal("out of memory");
     osoe_internode_init();
     osoe_team_start();
+    osoe_deadlock_init();
     osoe_agent_start(&osoe.node.slots[osoe.bootstrap.local_id]);
     /*
      * No PE returns from init before its node's lead can speak for the node

@@ -12,3 +12,11 @@ __attribute__((weak)) void osoe_missed_wake(const char *routine)
 {
     (void)routine;
 }
+
+__attribute__((weak)) void osoe_wait_sleeps(void)
+{
+}
+
+__attribute__((weak)) void osoe_wait_ends(void)
+{
+}

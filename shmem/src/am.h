@@ -70,6 +70,13 @@ enum osoe_am_handler {
      * where a bare end of stream is a death (abort_model.py).
      */
     OSOE_AM_ABORT,
+    /*
+     * The deadlock detector's (§3.15, deadlock.h): a probe, a node's report, the
+     * root's declaration and a node's word that it said where its PEs wait,
+     * between two nodes' leads. Not application work: neither side counts it in
+     * its activity, nor needs it applied to be quiet.
+     */
+    OSOE_AM_DEADLOCK,
     OSOE_AM_HANDLER_COUNT
 };
 
@@ -150,7 +157,17 @@ struct osoe_am_abort {
     uint32_t reserved;
 };
 
+/* A deadlock detector message (deadlock.h's, and the node it came from). */
+struct osoe_am_deadlock {
+    uint32_t round;
+    uint16_t kind;              /* enum osoe_deadlock_kind */
+    uint16_t phase;
+    uint32_t ok;
+    uint32_t from_node;
+};
+
 _Static_assert(sizeof(struct osoe_am_put) % 8 == 0, "a fixed part must keep the payload 8-byte aligned");
+_Static_assert(sizeof(struct osoe_am_deadlock) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_abort) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_barrier) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_get_request) % 8 == 0, "as above");

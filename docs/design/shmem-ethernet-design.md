@@ -1701,6 +1701,73 @@ ends a wait promptly; what goes is only the fatal deadline. (`base/stall-watch.h
 is the one helper; §3.10's absolute futex deadlines are clock instants for one
 sweep-length sleep, and stay.)
 
+**A program's own deadlock ends the job, once it is proved** (the author's
+decision of 2026-09-27, "build it"; `deadlock.h`,
+`tools/modelcheck/deadlock_model.py`). A job is deadlocked when every PE waits
+inside the library, nothing any node sent is still in flight, and nothing waits
+to be sent: only a library operation satisfies a SHMEM wait, and none is left to
+happen. That is a state to prove, not a time to guess, so this is no exception
+to the rule above - time only paces the looking.
+
+- *What a node can see.* Each PE counts, in its slot's `waits` word (layout 26),
+  its threads asleep in library waits and every change in that number: a thread
+  counts from just before its wait first sleeps until the wait ends, and in
+  between does nothing another thread or node could see - a routine that posts
+  and then waits, as a barrier does, begins counting after the post
+  (`base/sweep.h`'s contract, which every sleeping loop keeps). `/proc` lists the
+  PE's threads, its agent's and io_uring's workers' aside, and whether each
+  sleeps; a thread woken and not yet run does not. The engine says whether the
+  node owes the network anything, and whether every segment it sent that carried
+  application work has been applied by its peer - asking the peer, where it has
+  not said so, with the late acknowledgement request §3.4 already has. The
+  node's *activity* is the changes in its PEs' words and the application
+  messages its engine applied.
+- *A sample* is taken by the node's lead's agent in two halves with a pass of
+  its engine between them: the words, then `/proc`, which must show as many
+  threads as the words count in waits, all asleep; the pass, which takes what
+  the PEs posted before they began to wait and the engine cannot see until it
+  has (on AM, a collective's arrivals); then `/proc` again, the engine quiet, and
+  the words, unmoved. A half that sees a thread awake - most likely a sweep's -
+  or an acknowledgement still coming looks again a millisecond later, for up to
+  a sweep interval, while nothing moves.
+- *Rounds.* Once the root's own node - node 0's lead looks at its PEs' words
+  each sweep interval - has had every PE waiting and nothing to send for a
+  second, the root samples itself and asks every other node for a sample. If
+  every node was quiet, it waits `OSOE_DEADLOCK_SECONDS` (default 10; 0 turns
+  detection off), giving up as soon as its own node moves, then samples itself
+  again and asks again. If every node was quiet again, its activity unmoved
+  since its first sample began, the job is deadlocked: every node prints its
+  PEs, those waiting at the same place on one line, with the routine, the
+  detail and how long, and the job ends with status 1.
+- *Why that is proof.* With t* the end of the first collection, every node's two
+  samples bracket t*, and nothing happened at any node between them. A message
+  in flight at t* was sent before its sender's first sample ended, since the
+  sender sent nothing after (a send needs a thread that runs, a message applied,
+  or a post, and the pass took the posts), so it was acknowledged by then:
+  applied before t*, a contradiction. So at t* every PE waited, nothing was in
+  flight and nothing was queued - a state no later event can leave. A condition
+  that came true with no wake - a store through `shmem_ptr`, a lost wake - is
+  found by its waiter within a sweep interval, far inside the wait between the
+  collections, which ends its wait and moves the activity. The model checks the
+  argument, and that each ingredient is needed: activity without the applied
+  messages, quiet without acknowledgements or without the idle check, halves
+  with no pass between, waits counted from the start of a routine that posts,
+  one collection, or quiet without the PEs' waits each declares a job that could
+  still move.
+- *What it cannot see, and so never ends*: a PE with a thread the library does
+  not know waiting - one computing, one in a condition variable, an idle OpenMP
+  pool - or a stopped process; a job moved only from outside the library, by a
+  signal handler's store or another program writing memory it shares with a PE,
+  which no SHMEM program relies on. A wait the library has not taught the
+  count - init's rendezvous - leaves its PE never blocked, too.
+- *Cost.* Nothing on any path that does not sleep. A wait that sleeps pays one
+  locked add as it first sleeps and one as it ends. The root's lead reads L
+  words each sweep interval; a round, once the root's node has looked quiet for
+  a second, costs a message to and from each node and a sample of each, whose
+  `/proc` reads are made only where every PE has a thread waiting. The pool of
+  reply descriptors holds one more a peer for the detector's messages (§3.8), of
+  which a connection has at most one queued.
+
 **A fatal writes its reason first.** The message goes to stderr, in one write,
 before the fatal publishes anything — a rendezvous's `failed` word, the node's
 abort — because anything published lets the other PEs stop, the launcher then

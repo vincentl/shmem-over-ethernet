@@ -10,6 +10,7 @@
 
 #include "base/futex.h"
 #include "fatal.h"
+#include "deadlock.h"
 #include "progress.h"
 #include "ring.h"
 #include "rmw.h"
@@ -136,6 +137,7 @@ static const char *reply_kind_name(uint16_t kind)
     case OSOE_REPLY_GET:     return "get";
     case OSOE_REPLY_RELEASE: return "collective release";
     case OSOE_REPLY_ARRIVE:  return "collective arrival";
+    case OSOE_REPLY_DEADLOCK: return "deadlock detector message";
     default:                 return "unknown";
     }
 }
@@ -362,6 +364,8 @@ static void complete(void *context, const struct osoe_message_header *header,
     osoe_counter_word_add(&p->metrics->messages_applied, 1);
     if (conn_metrics(p, a->slot))
         osoe_counter_word_add(&conn_metrics(p, a->slot)->messages_applied, 1);
+    if (header->kind != OSOE_AM_DEADLOCK)
+        p->application_applied++;
 
     switch (header->kind) {
     case OSOE_AM_PUT: {
@@ -520,6 +524,19 @@ static void complete(void *context, const struct osoe_message_header *header,
         break;
     }
 
+    case OSOE_AM_DEADLOCK: {
+        struct osoe_am_deadlock m;
+        memcpy(&m, fixed, sizeof m);
+        if (m.from_node != peer_of(p, a->slot))
+            osoe_fatal("a deadlock detector message from node %u names node %u",
+                       peer_of(p, a->slot), m.from_node);
+        struct osoe_deadlock_message d = { .round = m.round, .kind = m.kind, .phase = m.phase,
+                                           .ok = m.ok };
+        if (p->host.deadlock)
+            p->host.deadlock(p->host.context, m.from_node, &d);
+        break;
+    }
+
     default:
         break;
     }
@@ -668,17 +685,26 @@ static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_conne
         /* The two collective messages are the same payload in both directions
          * (§5.3): a team, an epoch, and which node it came from. */
         bool barrier = r->kind == OSOE_REPLY_RELEASE || r->kind == OSOE_REPLY_ARRIVE;
-        uint32_t fixed_bytes = barrier ? (uint32_t)sizeof(struct osoe_am_barrier)
-                                       : (uint32_t)sizeof(struct osoe_am_rmw_reply);
+        bool detector = r->kind == OSOE_REPLY_DEADLOCK;
+        uint32_t fixed_bytes = barrier    ? (uint32_t)sizeof(struct osoe_am_barrier)
+                               : detector ? (uint32_t)sizeof(struct osoe_am_deadlock)
+                                          : (uint32_t)sizeof(struct osoe_am_rmw_reply);
         if (!reserve_for_reply(connection, t, osoe_message_padded(fixed_bytes), &resv))
             return moved;                   /* no room: try again next pass */
         uint16_t kind = r->kind == OSOE_REPLY_RELEASE ? OSOE_AM_BARRIER_RELEASE
                       : r->kind == OSOE_REPLY_ARRIVE  ? OSOE_AM_BARRIER_ARRIVE
+                      : detector                      ? OSOE_AM_DEADLOCK
                                                       : OSOE_AM_RMW_REPLY;
         struct osoe_message_header h = { kind, 0, fixed_bytes };
         unsigned char *at = osoe_reservation_bytes(connection, &resv);
         memcpy(at, &h, sizeof h);
-        if (barrier) {
+        if (detector) {
+            struct osoe_am_deadlock m = { .round = (uint32_t)r->value,
+                                          .kind = (uint16_t)(r->value >> 32),
+                                          .phase = (uint16_t)(r->value >> 48),
+                                          .ok = (uint32_t)r->token, .from_node = p->node };
+            memcpy(at + sizeof h, &m, sizeof m);
+        } else if (barrier) {
             struct osoe_am_barrier m = { .team = r->origin_pe, .epoch = (uint32_t)r->value,
                                          .from_node = p->node };
             memcpy(at + sizeof h, &m, sizeof m);
@@ -794,7 +820,7 @@ static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connect
 {
     struct osoe_progress_connection *c = &p->connection[slot];
     unsigned char *base = connection->data + (size_t)k * connection->capacity;
-    uint32_t count = 0;
+    uint32_t count = 0, application = 0;
     for (uint32_t off = (uint32_t)sizeof(struct osoe_am_segment_header); off < bytes; ) {
         struct osoe_message_header h;
         memcpy(&h, base + off, sizeof h);
@@ -807,8 +833,12 @@ static void finalize(struct osoe_progress *p, uint32_t slot, struct osoe_connect
         (void)fixed;
         off += osoe_message_padded(h.len);
         count++;
+        if (h.kind != OSOE_AM_DEADLOCK)
+            application++;
     }
     uint64_t seq = atomic_load_explicit(&connection->s->buffer[k].seq, memory_order_acquire);
+    if (application > 0)
+        c->last_application_seq = seq;          /* the deadlock detector's (§3.15) */
     /* The goodbye is sealed last and alone (flush), so the sealed buffer is it
      * once one has been sealed; it asks nothing, since no answer could follow. */
     bool goodbye = c->goodbye == OSOE_GOODBYE_SEALED;
@@ -900,6 +930,8 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
      * asks_for_ack is what makes that safe.
      */
     uint64_t wanted = osoe_connection_ack_wanted(connection);
+    if (c->detector_wanted > wanted)
+        wanted = c->detector_wanted;            /* the deadlock detector asks too (§3.15) */
     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
     struct osoe_am_connection_metrics *cm = conn_metrics(p, slot);
     if (cm) {
@@ -1325,6 +1357,39 @@ bool osoe_progress_closed(const struct osoe_progress *p)
             return false;
     }
     return true;
+}
+
+bool osoe_progress_quiet(struct osoe_progress *p, uint64_t *applied)
+{
+    *applied = p->application_applied;
+    if (!osoe_progress_idle(p))
+        return false;
+    bool quiet = true;
+    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
+        struct osoe_progress_connection *c = &p->connection[slot];
+        if (p->wire[slot].send_error || c->acked >= c->last_application_seq)
+            continue;                   /* a reset peer is owed nothing */
+        quiet = false;
+        if (c->detector_wanted < c->last_application_seq) {
+            c->detector_wanted = c->last_application_seq;
+            mark_busy(p, slot);         /* so a pass seals the request */
+        }
+    }
+    return quiet;
+}
+
+void osoe_progress_deadlock_send(struct osoe_progress *p, uint32_t node,
+                                 const struct osoe_deadlock_message *m)
+{
+    uint32_t slot = osoe_progress_slot(p, node);
+    if (slot == OSOE_CONNECTION_NONE || !osoe_connection_to(p->area, node))
+        osoe_fatal("node %u: no connection toward node %u for the deadlock detector", p->node,
+                   node);
+    struct osoe_reply r = { .kind = OSOE_REPLY_DEADLOCK,
+                            .value = (uint64_t)m->round | (uint64_t)m->kind << 32 |
+                                     (uint64_t)m->phase << 48,
+                            .token = m->ok };
+    enqueue(p, slot, &p->connection[slot].queues.control, &r);
 }
 
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer)

@@ -338,7 +338,7 @@ int main(void)
     static struct osoe_progress_connection connections[1];
     static uint64_t busy[1];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
-                                       NULL, completed };
+                                       NULL, completed, NULL };
     struct osoe_progress p;
     osoe_progress_init(&p, &area, &wire, &ring, descriptors, DESCRIPTORS, scratch, SCRATCH,
                        &host);

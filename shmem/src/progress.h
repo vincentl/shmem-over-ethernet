@@ -41,6 +41,8 @@
 #include "node.h"
 #include "reply.h"
 
+struct osoe_deadlock_message;
+
 /* The engine holds these by pointer; wire.h and ring.h bring liburing.h, whose
  * POSIX types a strict-C11 file would then have to ask for. */
 struct osoe_wire;
@@ -97,6 +99,9 @@ struct osoe_progress_host {
      * waits for that token, a peer's bug. */
     bool (*completed)(void *context, uint32_t pe, uint64_t token, uint32_t length,
                       uint64_t value);
+    /* A deadlock detector message from `node`'s lead arrived (§3.15). NULL
+     * where there is no detector: the engine's own tests. */
+    void (*deadlock)(void *context, uint32_t node, const struct osoe_deadlock_message *m);
 };
 
 /*
@@ -168,6 +173,16 @@ struct osoe_progress_connection {
     bool owe_ack;
     uint64_t flagged;
     /*
+     * The deadlock detector's (§3.15): the last segment this node sealed that
+     * carried application work - any message but the detector's own - and how
+     * far the detector wants the peer to acknowledge. Quiet asks that the peer
+     * has applied every such segment; where it has not said so, the detector
+     * raises `detector_wanted`, which flush reads beside the writers' want, so
+     * a header-only segment asks the peer and its answer says.
+     */
+    uint64_t last_application_seq;
+    uint64_t detector_wanted;
+    /*
      * The lead itself left bytes in the open buffer: the pre-open drain wrote
      * replies into it just before it became reservable, after this pass's
      * chance to seal. No writer set a dirty bit for them, so this is what keeps
@@ -198,6 +213,9 @@ struct osoe_progress_connection {
 };
 
 struct osoe_progress {
+    /* Application messages applied - any but the detector's - cumulative: part
+     * of this node's activity for the deadlock detector (§3.15). */
+    uint64_t application_applied;
     struct osoe_connection_area *area;
     struct osoe_wire *wire;                     /* one per peer, by peer slot */
     struct osoe_ring *ring;                     /* carries every wire (ring.h) */
@@ -359,6 +377,18 @@ bool osoe_progress_aborted(const struct osoe_progress *p);
 
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
 uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);
+
+/*
+ * The deadlock detector's view (§3.15, transport.h's node_quiet): idle, and every
+ * connection's peer has applied the last segment that carried application
+ * work; where one has not said so, ask it. `applied`: the application messages
+ * applied, cumulative.
+ */
+bool osoe_progress_quiet(struct osoe_progress *p, uint64_t *applied);
+
+/* Queue a deadlock detector message toward `node`'s lead, on the control queue. */
+void osoe_progress_deadlock_send(struct osoe_progress *p, uint32_t node,
+                                 const struct osoe_deadlock_message *m);
 
 /* The highest sequence number `peer` has applied (§4.6's completion evidence). */
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer);

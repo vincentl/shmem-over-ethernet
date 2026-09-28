@@ -17,6 +17,7 @@
 #include "base/environment.h"
 #include "base/futex.h"
 #include "blocked.h"
+#include "deadlock.h"
 #include "fatal.h"
 #include "liveness.h"
 #include "metrics.h"
@@ -112,6 +113,9 @@ static void *agent_main(void *arg)
 {
     struct osoe_pe_slot *slot = arg;
     ask_for_short_slice(slice_us);
+    /* For the deadlock detector, which counts this PE's threads but this one
+     * (deadlock.h). */
+    atomic_store_explicit(&slot->agent_tid, (int32_t)syscall(SYS_gettid), memory_order_release);
     struct osoe_counter_block *b = osoe_metrics_block();
     /* Published before any work, so the block is in the table by the time
      * osoe_agent_start returns (§3.14). */
@@ -168,8 +172,15 @@ static void *agent_main(void *arg)
          *
          * A pass that moved something goes round again without sleeping: while
          * there is work, latency beats power (§3.10).
+         *
+         * Before the pass, the deadlock detector's look, on the node's lead
+         * (§3.15, deadlock.h): at most one a sweep interval while nothing is
+         * sampled, and a sample's two halves on two turns with this pass
+         * between them - the agent goes round without sleeping while one is
+         * half taken.
          */
-        if (osoe_transport_agent_pass())
+        bool sampling = slot == &osoe.node.slots[0] && osoe_deadlock_tick();
+        if (osoe_transport_agent_pass() || sampling)
             continue;
         /* The backend's wait, on the word and on whatever else it waits for
          * (transport.h): on the lead of a multi-node job, its ring. */

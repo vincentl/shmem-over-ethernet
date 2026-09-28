@@ -396,6 +396,21 @@ void osoe_transport_agent_abort(void)
     osoe_progress_host_abort();
 }
 
+bool osoe_transport_agent_node_idle(uint64_t *applied)
+{
+    return osoe_progress_host_idle(applied);
+}
+
+bool osoe_transport_agent_node_quiet(uint64_t *applied)
+{
+    return osoe_progress_host_quiet(applied);
+}
+
+void osoe_transport_agent_deadlock_send(uint32_t node, const struct osoe_deadlock_message *m)
+{
+    osoe_progress_host_deadlock_send(node, m);
+}
+
 struct osoe_transport_context *osoe_transport_context_default(void)
 {
     return &contexts[0];
@@ -585,6 +600,7 @@ static void am_wait_check(struct am_wait *w, uint64_t progress)
 
 static void am_wait_end(void)
 {
+    osoe_wait_ends();               /* the deadlock detector's count (base/sweep.h) */
     osoe_blocked_leave();
 }
 
@@ -596,6 +612,7 @@ static void am_wait_end(void)
 static bool sleep_on(struct osoe_wait_word *word, uint32_t seen)
 {
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+    osoe_wait_sleeps();
     return osoe_futex_wait(&word->word, seen, &sweep, OSOE_FUTEX_SHARED) == ETIMEDOUT;
 }
 
@@ -610,6 +627,7 @@ static bool sleep_on(struct osoe_wait_word *word, uint32_t seen)
  */
 static void count_if_lost(const _Atomic uint32_t *word, uint32_t seen, const char *routine)
 {
+    osoe_wait_ends();               /* the wait is over; this sleep is no wait's */
     struct timespec margin = { 0, 10000000 };       /* 10 ms, as epoch.c's */
     nanosleep(&margin, NULL);
     if (atomic_load_explicit(word, memory_order_acquire) == seen)
@@ -850,6 +868,9 @@ static bool copy_out(uint32_t extent)
     if (!atomic_compare_exchange_strong_explicit(&r->state, &landed_state, OSOE_LANDING_COPYING,
                                                  memory_order_seq_cst, memory_order_acquire))
         return false;
+    /* A copy another thread may be waiting for, which a waiting thread makes
+     * only once it has stopped waiting as the deadlock detector counts it. */
+    osoe_wait_ends();
     uint64_t token = atomic_load_explicit(&r->token, memory_order_acquire);
     uint32_t length = atomic_load_explicit(&r->length, memory_order_acquire);
     memcpy(copy_destination[extent],
@@ -913,6 +934,7 @@ static uint32_t make_room(uint32_t count, const char *routine)
             waiting = true;
         }
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_wait_sleeps();
         osoe_futex_wait(&freed->word, seen, &sweep, OSOE_FUTEX_SHARED);
         am_wait_check(&w, osoe_wait_word_load(freed));
     }
@@ -978,6 +1000,7 @@ static void take_credit(struct osoe_connection *connection, uint32_t peer, int p
         }
         slept_on = seen;
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_wait_sleeps();
         swept = osoe_futex_wait_bitset(&credit->wake, seen, osoe_credit_bit(ticket), &sweep,
                                        OSOE_FUTEX_SHARED) == ETIMEDOUT;
         am_wait_check(&w, osoe_credit_served_count(credit));
@@ -1012,6 +1035,7 @@ static void await_reply(struct osoe_thread_record *slot, uint64_t token, uint32_
             waiting = true;
         }
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_wait_sleeps();
         osoe_futex_wait(&slot->wake, seen, &sweep, OSOE_FUTEX_SHARED);
         am_wait_check(&w, atomic_load_explicit(&slot->wake, memory_order_acquire));
     }

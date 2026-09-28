@@ -102,6 +102,14 @@ enum osoe_reply_kind {
      * thread frees. Deferring costs a pass and cannot deadlock (§3.7).
      */
     OSOE_REPLY_ARRIVE,
+    /*
+     * A deadlock detector message (§3.15, deadlock.h), on the control queue:
+     * `value` carries the round, kind and phase, `token` the verdict. At most
+     * one a connection is queued at a time - the root asks each node once a
+     * collection, and a node answers once - so the pool holds one more
+     * descriptor a peer for them (progress-host.c).
+     */
+    OSOE_REPLY_DEADLOCK,
 };
 
 /*
