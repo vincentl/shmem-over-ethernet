@@ -2261,6 +2261,19 @@ if(OSOE_TIER3)
     osoe_tier3_test(alltoall.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_alltoall)
     osoe_tier3_test(statics.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_statics)
     osoe_tier3_test(lock.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_lock)
+    # The deadlock detector over the shaped link (§3.15): a deadlock across
+    # three nodes found through the delay and the loss, and a PE computing
+    # while the rest wait - which must not be taken for one - through the same.
+    osoe_tier3_test(deadlock.mismatch.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_deadlock
+                    ENV OSOE_DEADLOCK_SECONDS=1 ARGS mismatch)
+    set_tests_properties(tier3.${shape}.deadlock.mismatch.0-1-2-0-1-0 PROPERTIES
+      PASS_REGULAR_EXPRESSION "every PE of the job waits in the library"
+      FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|timeout after")
+    osoe_tier3_test(deadlock.computing.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_deadlock
+                    ENV OSOE_DEADLOCK_SECONDS=1 ARGS computing)
+    set_tests_properties(tier3.${shape}.deadlock.computing.0-1-2-0-1-0 PROPERTIES
+      PASS_REGULAR_EXPRESSION "DEADLOCK TEST OK: computing"
+      FAIL_REGULAR_EXPRESSION "osoe: deadlock|CHECK[(]")
     if(shape STREQUAL "pi")
       osoe_tier3_test(reduce.0-1-2-3-4.k2 pi 0,1,2,3,4 shmem_test_reduce
                       ENV OSOE_COLLECTIVE_FANOUT=2)
