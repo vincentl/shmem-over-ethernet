@@ -177,8 +177,9 @@ every node.
   runs as many tasks as it has cores, Slurm binds each task to one core by
   default, and the thread that moves every message of the node - the progress
   thread of its first PE - is bound with that PE: it waits behind the PE's own
-  thread while the other cores idle. On the Pi cluster that costs a pipelined
-  point-to-point pattern six times its rate.
+  thread while the other cores idle. On the Pi cluster that cost a pipelined
+  point-to-point pattern six times its rate; the progress thread's short
+  scheduler slice (`OSOE_AGENT_SLICE_US`, below) makes it four.
 - **`OSOE_NO_PROGRESS_TIMEOUT=60`** while a cluster is new, so that a wait on
   the library's own progress - a connection's acknowledgements, buffer space,
   a reply - that stops moving ends the job and says what it waited for.
@@ -531,6 +532,13 @@ both are set the `SHMEM_` one controls.
 | `OSOE_HEAP_BASE` | chosen | The address every PE maps its heap at, a multiple of the page size, if the library's own candidates are taken. The node's first PE's value is the node's. |
 | `OSOE_SHM_CAPACITY_CHECK` | `1` | `0`: a node whose heaps would not fit `/dev/shm`'s free space is warned, not refused. |
 | `OSOE_KEEP_CONTROL_SEGMENT` | `0` | `1`: the control segment keeps its name in `/dev/shm` until finalize, so a crash leaves it for `osoe-stat` to read; `osoe-stat --gc` removes such segments once their PEs are gone. |
+
+**The progress thread**: each PE's agent thread, which on a node's first PE
+moves every message of the node
+
+| Variable | Default | What it does |
+|---|---|---|
+| `OSOE_AGENT_SLICE_US` | `100` | The scheduler slice each agent thread asks for, in microseconds: `100` to `100000`, or `0` for the kernel's own. A short slice lets it preempt sooner when it wakes on a core it shares - the same fair share, no priority over anyone. Linux 6.12 and later; an older kernel ignores it. |
 
 **The transport's buffers**, which a program rarely needs to change
 
