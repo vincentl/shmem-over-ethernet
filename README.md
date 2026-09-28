@@ -294,7 +294,7 @@ is found, since nothing times it out (below).
 | barrier, sync, small reductions, broadcast | the node's PEs meet in shared memory; the node leads meet in a k-ary tree (`OSOE_COLLECTIVE_FANOUT`, default 4) | ⌈log_k n⌉ steps between nodes |
 | larger data collectives | pieces pipelined through that tree, two in flight (`OSOE_COLLECTIVE_PIPELINE`) | |
 | `fcollect` | Bruck's allgather among the node leads | ⌈log₂ n⌉ steps, each node's data crossing the network once |
-| prefix scans | a tree over the team's ranks | O(log N) rounds |
+| prefix scans | a tree over the team's ranks, its pieces pipelined as the other data collectives' are | O(log N) rounds |
 | `alltoall`, `alltoalls` | every block put directly, then a barrier | O(N) a PE - inherent: every PE has a block for every other |
 | a team | a number from a job-wide counter, and a record on each member node | O(1) a member after a one-time O(S log S) to build a split's node set |
 | waiting | futex words per kind of resource, not per PE | O(1) a waiter |
@@ -304,9 +304,7 @@ is found, since nothing times it out (below).
 Where the design admits a limit of its own: large reductions still send each
 node's whole vector up the tree and the result down, about twice the bytes of
 a ring or Rabenseifner's algorithm, until measurement picks the crossover;
-a scan larger than 4 KiB moves its pieces one at a time up and down its tree,
-so it is bound by the tree's latency rather than the network's bandwidth; the
-tree's fan-out is one fixed default, where on the Pi cluster it proved a
+the tree's fan-out is one fixed default, where on the Pi cluster it proved a
 bandwidth choice at large sizes; every pair of nodes connects at start-up, so
 the job holds n(n - 1)/2 connections, n - 1 a node; and team numbers, never
 reused, make a two-dimensional split of a whole job cost 2√N of them (below).
