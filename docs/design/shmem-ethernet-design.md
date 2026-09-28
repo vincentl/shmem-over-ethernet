@@ -1108,6 +1108,26 @@ the progress thread on its own core with cpusets — isolation without a priorit
 relationship — bearing in mind that it runs inside the lead task's Slurm cpuset
 (§3.12), so the job's CPU binding must leave room for it.
 
+*As built, where Slurm binds each task to one core* (the author's questions of
+2026-09-27; `agent.c`). A job whose tasks fill a node gets each bound to one
+core by default, and the node's progress thread, the lead's agent, was bound
+with its PE: on the Pi it was runnable and not running 29% of the time while
+three cores idled, and a pipelined mailbox ran at a sixth of its unbound rate.
+Two remedies, neither a priority and neither touching the system. Every agent
+asks for a short EEVDF slice (`sched_attr`'s `sched_runtime`, 100 µs by
+default, `OSOE_AGENT_SLICE_US`; Linux 6.12, no privilege): the same fair share,
+but a sooner preemption when it wakes. And, asked for with
+`OSOE_AGENT_CPUS=node`, every agent may run on any CPU of its node's tasks - the
+union of the bindings the PEs publish in their slots (layout 27), so the job's
+own cores and no other's. Bound, 16 PEs, a mailbox: 42,900 messages a second
+with neither, 51,300 widened, 57,500 with the slice, 58,500 with both;
+unbound, 259,000 either way. Beside the slice the widening bought nothing and
+cost every small collective, in both of two alternating `osoe-bench` runs: an
+8-byte reduce 223 against 200 µs, a barrier 191 against 178, a 64 KiB reduce
+2,819 against 2,385. So the slice is the default and the widening is not: it
+is for a kernel before 6.12, which ignores the slice, and a program bound by
+point-to-point messages.
+
 Keep futex words few (one per resource class per connection, not one per PE per
 connection) and cache-line aligned with `_Alignas`. Futex waits hash into kernel buckets by address; unrelated
 words can collide on the same bucket spinlock.

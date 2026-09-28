@@ -102,6 +102,57 @@ static uint32_t agent_slice_us(void)
 static uint32_t slice_us;           /* read once, before the agent starts */
 
 /*
+ * Where the agent may run (the author's question of 2026-09-27, "can't we
+ * reset the cpu mask on all spawned background threads?"). An agent is born
+ * with its PE's binding, and where Slurm binds each of a node's tasks to one
+ * core the node's progress thread waits behind its PE's main thread there
+ * while the job's other cores idle. OSOE_AGENT_CPUS=node lets every agent run
+ * on any CPU any PE of its node may - the union of the tasks' bindings,
+ * published in their slots (node.h) - which is the job's own allocation on
+ * this node, never a CPU the job was not given; the PEs' threads keep their
+ * bindings, and nothing of the system's configuration changes.
+ *
+ * It is not the default, because the short slice does its work better where
+ * the slice exists. On the Pi, 16 PEs bound one a core, a mailbox ran 42,900
+ * messages a second with neither, 51,300 widened, 57,500 with the slice and
+ * 58,500 with both - but beside the slice, widened, every small collective
+ * was slower in both of two alternating runs of osoe-bench: an 8-byte reduce
+ * 223 against 200 us, a broadcast 221 against 197, a barrier 191 against 178,
+ * a 64 KiB reduce 2,819 against 2,385. So `task`, the default, keeps each
+ * agent on its PE's CPUs, and `node` is for a kernel before Linux 6.12, which
+ * ignores the slice, running a program bound by point-to-point messages.
+ */
+static bool cpus_of_node;           /* OSOE_AGENT_CPUS: task, the default, or node */
+
+static bool agent_cpus_of_node(void)
+{
+    const char *value = getenv("OSOE_AGENT_CPUS");
+    if (!value || strcmp(value, "task") == 0)
+        return false;
+    if (strcmp(value, "node") == 0)
+        return true;
+    osoe_fatal("OSOE_AGENT_CPUS=%s: task, for its own PE's CPUs, or node, for any CPU of "
+               "this node's PEs", value);
+}
+
+/* The CPUs of every local PE's task, set on the calling thread; nothing where
+ * that adds none, or the kernel refuses (a cpuset that has since shrunk). */
+static void run_on_node_cpus(void)
+{
+    cpu_set_t node, current;
+    CPU_ZERO(&node);
+    for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++)
+        for (int cpu = 0; cpu < CPU_SETSIZE && cpu < OSOE_TASK_CPU_WORDS * 64; cpu++)
+            if (osoe.node.slots[i].task_cpus[cpu / 64] & (UINT64_C(1) << (cpu % 64)))
+                CPU_SET(cpu, &node);
+    if (CPU_COUNT(&node) == 0 || sched_getaffinity(0, sizeof current, &current) != 0)
+        return;
+    CPU_OR(&node, &node, &current);
+    if (!CPU_EQUAL(&node, &current))
+        (void)sched_setaffinity(0, sizeof node, &node);
+}
+
+/*
  * Stop protocol. The stopper stores stop_requested, then bumps agent_wake (a
  * locked instruction), then wakes. The agent loads agent_wake before it loads
  * stop_requested, then waits on the value it loaded. If the agent's load of
@@ -113,6 +164,10 @@ static void *agent_main(void *arg)
 {
     struct osoe_pe_slot *slot = arg;
     ask_for_short_slice(slice_us);
+    if (cpus_of_node)
+        run_on_node_cpus();
+    /* So top -H, ps and a debugger name the library's thread (15 characters). */
+    (void)pthread_setname_np(pthread_self(), "osoe-agent");
     /* For the deadlock detector, which counts this PE's threads but this one
      * (deadlock.h). */
     atomic_store_explicit(&slot->agent_tid, (int32_t)syscall(SYS_gettid), memory_order_release);
@@ -216,6 +271,7 @@ bool osoe_agent_is_this_thread(void)
 void osoe_agent_start(struct osoe_pe_slot *slot)
 {
     slice_us = agent_slice_us();
+    cpus_of_node = agent_cpus_of_node();
     atomic_store_explicit(&stop_requested, 0, memory_order_release);
     atomic_store_explicit(&agent_ready, 0, memory_order_release);
 

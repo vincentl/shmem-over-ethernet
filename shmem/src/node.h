@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 26
+#define OSOE_NODE_LAYOUT 27
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -129,6 +129,10 @@ enum { OSOE_BLOCKED_ROUTINE_MAX = 32 };
  * and so the words of its `active` bitmap. */
 enum { OSOE_WATCH_ACTIVE_WORDS = 16, OSOE_MAX_THREADS_HIGHEST = OSOE_WATCH_ACTIVE_WORDS * 64 };
 
+/* The CPUs a PE's task may run on, a bit each, as many as glibc's cpu_set_t
+ * holds (CPU_SETSIZE, 1024). */
+enum { OSOE_TASK_CPU_WORDS = 16 };
+
 struct osoe_pe_slot {
     _Alignas(OSOE_CACHELINE)
     _Atomic uint32_t phase;         /* enum osoe_phase; this PE only */
@@ -223,6 +227,18 @@ struct osoe_pe_slot {
     /* This PE's agent's thread id, which the detector leaves out when it
      * counts the PE's threads in /proc: published by the agent as it starts. */
     _Atomic int32_t agent_tid;
+
+    /*
+     * Layout 27 (the agents' CPUs, 2026-09-28; the author's question of
+     * 2026-09-27): the CPUs this PE's task may run on as its launcher left
+     * them - Slurm binds a node's tasks one core each when they fill it - a
+     * bit each, written with the fields above before this PE joins. With
+     * OSOE_AGENT_CPUS=node every agent may run on any CPU of its node's PEs
+     * (agent.c), so the node's progress thread need not wait behind its PE on
+     * one core while the job's other cores idle, and never runs on a CPU the
+     * job was not given.
+     */
+    uint64_t task_cpus[OSOE_TASK_CPU_WORDS];
 };
 
 /*

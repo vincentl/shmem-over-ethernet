@@ -1702,6 +1702,30 @@ set_tests_properties(shmem.agent-slice.set.L2 shmem.agent-slice.kernel.L2 PROPER
 set_tests_properties(shmem.agent-slice.refused.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
   PASS_REGULAR_EXPRESSION "OSOE_AGENT_SLICE_US=50: 0, or 100 to 100000 microseconds")
 
+# Where each agent may run (agent.c; test-agent-cpus.c): every PE bound to
+# one CPU before init, as Slurm binds tasks that fill a node, and the agent on
+# its own PE's CPU by default, on its node's PEs' CPUs with OSOE_AGENT_CPUS=node;
+# a value it does not know is refused by name.
+add_executable(shmem_test_agent-cpus test-agent-cpus.c)
+target_link_libraries(shmem_test_agent-cpus PRIVATE osoe)
+osoe_warnings(shmem_test_agent-cpus)
+add_test(NAME shmem.agent-cpus.task.0-0-1-1
+  COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
+add_test(NAME shmem.agent-cpus.node.0-0-1-1
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_CPUS=node
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
+add_test(NAME shmem.agent-cpus.node.L3
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_CPUS=node
+          $<TARGET_FILE:osoe-launch> -n 3 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
+set_tests_properties(shmem.agent-cpus.task.0-0-1-1 shmem.agent-cpus.node.0-0-1-1
+  shmem.agent-cpus.node.L3 PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "AGENT CPUS OK" FAIL_REGULAR_EXPRESSION "CHECK[(]")
+add_test(NAME shmem.agent-cpus.refused.L2
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_CPUS=all
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
+set_tests_properties(shmem.agent-cpus.refused.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "OSOE_AGENT_CPUS=all: task, for its own PE's CPUs, or node")
+
 # The deadlock detector (§3.15, deadlock.h; test-deadlock.c), at
 # OSOE_DEADLOCK_SECONDS=1: a job deadlocked on one node, across two, in a
 # second session after a finalize, and on a collective that does not match

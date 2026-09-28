@@ -178,8 +178,9 @@ every node.
   default, and the thread that moves every message of the node - the progress
   thread of its first PE - is bound with that PE: it waits behind the PE's own
   thread while the other cores idle. On the Pi cluster that cost a pipelined
-  point-to-point pattern six times its rate; the progress thread's short
-  scheduler slice (`OSOE_AGENT_SLICE_US`, below) makes it four.
+  point-to-point pattern six times its rate; the short scheduler slice osoe
+  asks for that thread (`OSOE_AGENT_SLICE_US`, below) makes it four, and only
+  unbinding the tasks recovers the rest.
 - **`OSOE_NO_PROGRESS_TIMEOUT=60`** while a cluster is new, so that a wait on
   the library's own progress - a connection's acknowledgements, buffer space,
   a reply - that stops moving ends the job and says what it waited for.
@@ -539,6 +540,7 @@ moves every message of the node
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_AGENT_SLICE_US` | `100` | The scheduler slice each agent thread asks for, in microseconds: `100` to `100000`, or `0` for the kernel's own. A short slice lets it preempt sooner when it wakes on a core it shares - the same fair share, no priority over anyone. Linux 6.12 and later; an older kernel ignores it. |
+| `OSOE_AGENT_CPUS` | `task` | Where each agent thread may run: `task`, on its own PE's CPUs; `node`, on any CPU any PE of its node was bound to - the job's own cores there, never another's. The PEs' threads keep their binding either way. `node` lifts a bound job's messages where the kernel ignores the slice (a fifth on the Pi's mailbox), but beside the slice it made the Pi's small collectives 7-18% slower. The thread is named `osoe-agent`, as `top -H` and `ps -L` show it. |
 
 **The transport's buffers**, which a program rarely needs to change
 

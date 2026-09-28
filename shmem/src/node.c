@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <pthread.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -1031,6 +1032,15 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     me->rank = b->rank;
     me->pid = (int32_t)getpid();
     me->tid = (int32_t)gettid();
+    /* Before any thread of the library's exists, so this is the task's own
+     * binding: what the node's agents may run on (agent.c). None known - a
+     * kernel that will not say - leaves the agents where they are. */
+    cpu_set_t task;
+    CPU_ZERO(&task);
+    if (sched_getaffinity(0, sizeof task, &task) == 0)
+        for (int cpu = 0; cpu < CPU_SETSIZE && cpu < OSOE_TASK_CPU_WORDS * 64; cpu++)
+            if (CPU_ISSET(cpu, &task))
+                me->task_cpus[cpu / 64] |= UINT64_C(1) << (cpu % 64);
     me->symmetric_size = b->symmetric_size;
     me->heap_bytes = n->heap_bytes;
     me->statics_bytes = n->statics_bytes;
