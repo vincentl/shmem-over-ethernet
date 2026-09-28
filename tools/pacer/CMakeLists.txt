@@ -115,10 +115,18 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   # a team - the barrier its sweep once timed - hangs here, where the quick
   # mix's 8 periods never reach it. The other team exercises call only their
   # team's collectives, whatever the round.
-  add_test(NAME tools.pacer.mix-cycle.0-0-1-1
-    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick --rounds 288
-            mix)
-  set_tests_properties(tools.pacer.mix-cycle.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
+  #
+  # Four teams, so eight PEs. Each team's stray world barrier puts the job one
+  # world collective out of step, and the next team's puts it back: on two
+  # teams, with six exercises, the two fall in adjacent periods with no world
+  # period between, cancel, and nothing hangs (the barrier's guard removed,
+  # every test passed - 2026-09-27-night). On four, a world period falls
+  # between the second team's and the third's, and its collectives do not
+  # match.
+  add_test(NAME tools.pacer.mix-cycle.0-0-0-0-1-1-1-1
+    COMMAND osoe-launch -n 8 -m 0,0,0,0,1,1,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick
+            --rounds 288 mix)
+  set_tests_properties(tools.pacer.mix-cycle.0-0-0-0-1-1-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
     PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
     FAIL_REGULAR_EXPRESSION "${pacer_failed}")
 
