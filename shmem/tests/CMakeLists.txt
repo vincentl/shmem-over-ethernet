@@ -1731,8 +1731,9 @@ set_tests_properties(shmem.agent-cpus.refused.L2 PROPERTIES LABELS "tier2" TIMEO
 # second session after a finalize, and on a collective that does not match
 # across two, ended naming where its PEs wait;
 # and a job that only looks deadlocked - its last PE computing, asleep outside
-# the library, or waiting for a thread of its own that the library cannot see
-# - on one node and across two, run to its end. Off, a deadlock runs to the
+# the library, or waiting for a thread of its own that the library cannot see,
+# or every PE waiting while a thread of its own computes - on one node and
+# across two, run to its end. Off, a deadlock runs to the
 # launcher's timeout; a setting it cannot read is refused by name.
 #
 # ThreadSanitizer runs a thread of its own in every process, which the detector
@@ -1765,7 +1766,7 @@ foreach(case IN LISTS deadlock_cases)
     FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
 endforeach()
 foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,1,1" "helper|0,0,0,0"
-             "helper|0,0,1,1")
+             "helper|0,0,1,1" "busy|0,0,0,0" "busy|0,0,1,1")
   string(REPLACE "|" ";" parts "${case}")
   list(GET parts 0 mode)
   list(GET parts 1 map)

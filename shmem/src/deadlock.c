@@ -32,8 +32,18 @@ enum { DEFAULT_SECONDS = 10, MAXIMUM_SECONDS = 86400 };
 
 /* How long the root's own node must look quiet before a round begins. A round
  * costs every node a sample, so a root that waits often - in a barrier while
- * other nodes compute - begins one at most this often. */
+ * other nodes compute - begins one at most this often; and after each round
+ * that fails, twice as long, up to OSOE_DEADLOCK_SECONDS, until the root's
+ * node is seen to move. A job whose root's PEs each keep a thread waiting
+ * while another computes looks quiet at every look, and pays a round each
+ * OSOE_DEADLOCK_SECONDS at most. */
 #define WATCH_NS (UINT64_C(1) * 1000000000)
+/* How long a half of a sample waits for a thread to fall asleep or an
+ * acknowledgement to come, looking each millisecond: a sweep's wake lasts
+ * microseconds and a round trip across Ethernet a fraction of a millisecond.
+ * A thread that computes does not stop, and a longer wait would only hold up
+ * the node's engine, which sleeps between the looks. */
+#define SAMPLE_PATIENCE_NS (UINT64_C(5) * 1000000)
 /* How long the root waits for every node to say where its PEs wait before it
  * ends the job regardless: a node that cannot answer cannot be helped by more. */
 #define DECLARE_GRACE_NS (UINT64_C(3) * 1000000000)
@@ -136,8 +146,9 @@ static int threads_asleep(const struct osoe_pe_slot *s)
  * after it has run. A half that sees a thread awake, or the network owed an
  * acknowledgement, looks again a millisecond later - the thread may be a
  * sweep's, awake for microseconds, and the acknowledgement a round trip away -
- * until `deadline`, as long as nothing moves; so the interval grows, and the
- * argument, which asks only that nothing moved within it, is unchanged.
+ * until `deadline`, SAMPLE_PATIENCE_NS on, as long as nothing moves; so the
+ * interval grows, and the argument, which asks only that nothing moved within
+ * it, is unchanged.
  */
 static struct {
     bool taken;                 /* a sample is in progress */
@@ -203,7 +214,7 @@ static bool first_words(void)
         return false;
     half.taken = true;
     half.seen = false;
-    half.deadline_ns = osoe_now_ns() + OSOE_SWEEP_NS;
+    half.deadline_ns = osoe_now_ns() + SAMPLE_PATIENCE_NS;
     return true;
 }
 
@@ -362,6 +373,7 @@ static enum stage stage;
 static uint32_t round_number, reports, declared;
 static bool all_ok;
 static uint64_t next_look_ns, quiet_since_ns, first_activity, between_since_ns, declared_at_ns;
+static uint32_t rounds_failed;          /* since the root's node was last seen to move */
 
 /* A node answering the root: the probe it answers, and its round's first sample. */
 static bool answering;
@@ -375,6 +387,7 @@ static void start_afresh(void)
     round_number = reports = declared = 0;
     all_ok = false;
     next_look_ns = quiet_since_ns = first_activity = between_since_ns = declared_at_ns = 0;
+    rounds_failed = 0;
     answering = false;
     probe = (struct osoe_deadlock_message){ 0 };
     probe_from = sampled_round = 0;
@@ -403,6 +416,18 @@ static void watch_again(void)
 {
     stage = WATCHING;
     quiet_since_ns = 0;
+    if (rounds_failed < 32)
+        rounds_failed++;
+}
+
+/* How long the root's node must look quiet before the next round (WATCH_NS). */
+static uint64_t watch_ns(void)
+{
+    uint64_t most = quiet_needed_ns > WATCH_NS ? quiet_needed_ns : WATCH_NS;
+    uint64_t wait = WATCH_NS;
+    for (uint32_t i = 0; i < rounds_failed && wait < most; i++)
+        wait *= 2;
+    return wait < most ? wait : most;
 }
 
 static void end_job(void)
@@ -527,11 +552,12 @@ bool osoe_deadlock_tick(void)
         (void)read_waits();
         if (!every_pe_waits() || !osoe_transport_agent_node_idle(&applied)) {
             quiet_since_ns = 0;
+            rounds_failed = 0;              /* seen to move */
             return false;
         }
         if (!quiet_since_ns)
             quiet_since_ns = now;
-        if (now - quiet_since_ns < WATCH_NS)
+        if (now - quiet_since_ns < watch_ns())
             return false;
         stage = FIRST_SAMPLE;
         return begin_sample();

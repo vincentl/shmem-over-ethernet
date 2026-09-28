@@ -60,7 +60,10 @@
  * not all waiting; at the root, a look at its own PEs' words each sweep
  * interval; and once the root's node has looked quiet for a second, a round:
  * a message to and from each node and a sample of each, whose /proc reads are
- * taken only where every PE has a thread waiting.
+ * taken only where every PE has a thread waiting, and which waits at most 5 ms
+ * for a thread to fall asleep. After each round that fails the root waits
+ * twice as long before the next, up to OSOE_DEADLOCK_SECONDS, until its node
+ * is seen to move.
  */
 #ifndef OSOE_DEADLOCK_H
 #define OSOE_DEADLOCK_H

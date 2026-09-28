@@ -19,6 +19,9 @@
  *   helper      the last PE waits for a flag that a thread of its own, outside
  *               the library, sets after four seconds; the rest wait in a
  *               barrier
+ *   busy        every PE waits for a flag that a thread of its own sets after
+ *               computing for four seconds: every node looks quiet to a count
+ *               of waits alone, and a round is begun and found busy each time
  *
  * The last PE, so that across nodes the root's node is the one that waits:
  * it begins rounds, and the last node's reports end each.
@@ -43,6 +46,17 @@ static double now(void)
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return (double)t.tv_sec + (double)t.tv_nsec / 1e9;
+}
+
+static void *compute_then_set(void *flag)
+{
+    volatile double sink = 0;
+    for (double end = now() + LOOKS_LIKE_ONE_SECONDS; now() < end;)
+        for (int i = 0; i < 100000; i++)
+            sink += i;
+    (void)sink;
+    atomic_store_explicit((_Atomic int *)flag, 1, memory_order_release);
+    return NULL;
 }
 
 static void *set_later(void *flag)
@@ -92,6 +106,15 @@ int main(int argc, char **argv)
             struct timespec t = { LOOKS_LIKE_ONE_SECONDS, 0 };
             nanosleep(&t, NULL);
         }
+        shmem_barrier_all();
+    } else if (strcmp(mode, "busy") == 0) {
+        pthread_t helper;
+        if (pthread_create(&helper, NULL, compute_then_set, flag) != 0) {
+            fprintf(stderr, "CHECK(pthread_create) failed\n");
+            return 1;
+        }
+        shmem_int_wait_until(flag, SHMEM_CMP_NE, 0);
+        pthread_join(helper, NULL);
         shmem_barrier_all();
     } else if (strcmp(mode, "helper") == 0) {
         if (me == last) {
