@@ -197,9 +197,9 @@ static void usage(FILE *out)
 "            names, the old waits, the cache routines - for coverage; only\n"
 "            when named, and on the world alone\n"
 "  mix       the world split into teams, each running mailbox, atomics, rma,\n"
-"            locks or collectives, out of step, the exercises rotating through\n"
-"            the teams, sort and alltoall on the world between; only when\n"
-"            named, and named alone\n"
+"            locks, collectives or waits, out of step, the exercises rotating\n"
+"            through the teams, sort and alltoall on the world between; only\n"
+"            when named, and named alone\n"
 "\n"
 "Options:\n"
 "  --seconds S         each exercise about S seconds (default 60)\n"
@@ -221,7 +221,7 @@ static void usage(FILE *out)
 "                      at most OSOE_MAX_THREADS (the library's, default 16)\n"
 "  --teams-exhaust     the teams exercise splits until a split fails, and\n"
 "                      stops; teams must be the only exercise named\n"
-"  --mix-teams K       mix: the teams the world is split into, 1 to 5 (default\n"
+"  --mix-teams K       mix: the teams the world is split into, 1 to 6 (default\n"
 "                      4 from 8 PEs, 2 from 4, else 1)\n"
 "  --period S          mix: a team period's mean length (default 10 seconds)\n"
 "  --fold-nodes        label a line by its hosts' names where it holds every PE\n"
@@ -502,8 +502,8 @@ static int parse(int argc, char **argv)
         } else if (strcmp(name, "--mix-teams") == 0) {
             char *end;
             long count = strtol(value, &end, 10);
-            if (end == value || *end || count < 1 || count > 5)
-                return refuse("--mix-teams '%s': a whole number from 1 to 5, one a team exercise",
+            if (end == value || *end || count < 1 || count > 6)
+                return refuse("--mix-teams '%s': a whole number from 1 to 6, one a team exercise",
                               value);
             options.mix_teams = (int)count;
         } else if (strcmp(name, "--period") == 0) {
@@ -571,7 +571,7 @@ static int parse(int argc, char **argv)
             return refuse("no option '%s'", name);
         }
     }
-    /* mix runs its own: the five team exercises, then the two of the world. */
+    /* mix runs its own: the six team exercises, then the two of the world. */
     if (options.mixing) {
         if (chosen_count)
             return refuse("mix runs its own exercises: name it alone");
@@ -580,6 +580,7 @@ static int parse(int argc, char **argv)
         chosen[chosen_count++] = &pacer_rma;
         chosen[chosen_count++] = &pacer_locks;
         chosen[chosen_count++] = &pacer_collectives;
+        chosen[chosen_count++] = &pacer_waits;
         chosen[chosen_count++] = &pacer_sort;
         chosen[chosen_count++] = &pacer_alltoall;
     }
@@ -1034,7 +1035,7 @@ const char *pacer_prefix(void)
 /*
  * The world split into K strided teams, mix0 to mixK-1, and a sequence of
  * periods. In a team period each team runs one exercise - team k the one at
- * (k + q) mod 5 in the list below, q counting team periods - for its own
+ * (k + q) mod 6 in the list below, q counting team periods - for its own
  * seeded length, so the teams run out of step and no exercise is on two teams
  * at once; every fourth period is sort or alltoall on the whole world, the
  * teams' exercises paused. Every exercise is set up once, on the world, its
@@ -1043,10 +1044,10 @@ const char *pacer_prefix(void)
  * period's own seed. Between periods, a world sync.
  */
 static const struct pacer_exercise *const mix_team_exercises[] = {
-    &pacer_mailbox, &pacer_atomics, &pacer_rma, &pacer_locks, &pacer_collectives
+    &pacer_mailbox, &pacer_atomics, &pacer_rma, &pacer_locks, &pacer_collectives, &pacer_waits
 };
 static const struct pacer_exercise *const mix_world_exercises[] = { &pacer_sort, &pacer_alltoall };
-enum { MIX_TEAM_EXERCISES = 5, MIX_WORLD_EXERCISES = 2, MIX_WORLD_EVERY = 4, MIX_QUICK_ROUNDS = 3 };
+enum { MIX_TEAM_EXERCISES = 6, MIX_WORLD_EXERCISES = 2, MIX_WORLD_EVERY = 4, MIX_QUICK_ROUNDS = 3 };
 
 static int mix_teams(int npes)
 {

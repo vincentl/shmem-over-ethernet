@@ -103,13 +103,15 @@ foreach(map IN LISTS pacer_mix_maps)
 endforeach()
 
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  # mix long enough that every team exercise's rounds, carried from period to
-  # period, go through their cases on a team: 240 periods of three rounds take
-  # collectives past its 87 timing cases and its 105 rounds of typed ones. A
-  # world collective called on a team - the barrier its sweep once timed -
-  # hangs here, where the quick mix's 8 periods never reach it.
+  # mix long enough that collectives' rounds, carried from period to period, go
+  # through its cases on a team: of 288 periods, 216 are the teams', 36 of them
+  # each team's collectives, whose three rounds apiece take it past its 87
+  # timing cases and its 105 rounds of typed ones. A world collective called on
+  # a team - the barrier its sweep once timed - hangs here, where the quick
+  # mix's 8 periods never reach it. The other team exercises call only their
+  # team's collectives, whatever the round.
   add_test(NAME tools.pacer.mix-cycle.0-0-1-1
-    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick --rounds 240
+    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick --rounds 288
             mix)
   set_tests_properties(tools.pacer.mix-cycle.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
     PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
@@ -403,9 +405,12 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(tools.pacer.counted.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
     PASS_REGULAR_EXPRESSION "shim called=[1-9][0-9]+ declared=[1-9][0-9]+"
     FAIL_REGULAR_EXPRESSION "failures=[1-9]|killed by signal|timeout after|left behind")
-  # A plant fired inside a mix period, on PE 1's team.
+  # Plants fired inside mix periods, on PE 1's team: locks' in its first team
+  # period, waits' in its fifth.
   pacer_plant_named(mix-locks-count locks-count mix
     "mix1.3. locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
+  pacer_plant_named(mix-waits-value waits-value mix
+    "mix1.3. waits round=1 long wait_until ne: word 0 from PE 1 holds [0-9]+, expected [0-9]+")
   # The library's counters: a world run on two nodes prints both nodes' growth,
   # and bytes crossed between them - a reader that stops finding the segment,
   # or a field, would otherwise leave the line out unnoticed.
