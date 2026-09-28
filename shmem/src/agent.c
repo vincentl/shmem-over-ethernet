@@ -2,14 +2,19 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <limits.h>
+#include <sched.h>
 #include <stdatomic.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #include "abort.h"
 #include "agent.h"
 #include "base/deadline.h"
+#include "base/environment.h"
 #include "base/futex.h"
 #include "blocked.h"
 #include "fatal.h"
@@ -37,6 +42,65 @@ static _Atomic uint32_t running;            /* process-private: started, not yet
 static _Atomic uint32_t agent_ready;        /* process-private */
 
 /*
+ * A short scheduler slice for the agent (§3.11; the night of 2026-09-27, item
+ * 1). Where Slurm binds each of a node's tasks to one core, the node's
+ * progress thread - the lead's agent - shares its core with the lead's main
+ * thread, and every message of the node waits while that thread runs out its
+ * slice: measured on the Pi, the lead's agent spent 29% of its time runnable
+ * and not running while three cores idled. Linux 6.12's EEVDF lets a
+ * SCHED_OTHER thread ask for a shorter slice (sched_attr's sched_runtime,
+ * 0.1 to 100 ms, no privilege needed), which lets it preempt sooner when it
+ * wakes: the same fair share, no priority over anyone (so not §3.11's
+ * real-time priority, which stays ruled out). At 0.1 ms a bound mailbox ran
+ * 1.6 times as fast, and an unbound one 2% faster. OSOE_AGENT_SLICE_US sets
+ * it, 100 to 100000 microseconds, and 0 leaves the kernel's own; a kernel
+ * without custom slices ignores or refuses the request, and either is fine.
+ * Applied to every agent, since the service threads wake rarely and briefly.
+ */
+enum { AGENT_SLICE_DEFAULT_US = 100, AGENT_SLICE_MIN_US = 100, AGENT_SLICE_MAX_US = 100000 };
+
+/* The kernel's struct sched_attr, as far as SCHED_ATTR_SIZE_VER1: glibc
+ * declares neither it nor a wrapper. */
+struct scheduling_attributes {
+    uint32_t size, policy;
+    uint64_t flags;
+    int32_t nice;
+    uint32_t priority;
+    uint64_t runtime, deadline, period;
+    uint32_t utilization_minimum, utilization_maximum;
+};
+
+static void ask_for_short_slice(uint32_t microseconds)
+{
+    if (microseconds == 0)
+        return;
+    struct scheduling_attributes attributes;
+    memset(&attributes, 0, sizeof attributes);
+    if (syscall(SYS_sched_getattr, 0, &attributes, sizeof attributes, 0) != 0 ||
+        attributes.policy != SCHED_OTHER)
+        return;                         /* a policy the application chose is its own */
+    attributes.size = sizeof attributes;
+    attributes.flags = 0;
+    attributes.runtime = (uint64_t)microseconds * 1000;
+    (void)syscall(SYS_sched_setattr, 0, &attributes, 0);
+}
+
+static uint32_t agent_slice_us(void)
+{
+    uint32_t microseconds = AGENT_SLICE_DEFAULT_US;
+    enum osoe_environment_status status = osoe_environment_u32("OSOE_AGENT_SLICE_US",
+                                                               &microseconds);
+    if (status == OSOE_ENVIRONMENT_INVALID ||
+        (status == OSOE_ENVIRONMENT_OK && microseconds != 0 &&
+         (microseconds < AGENT_SLICE_MIN_US || microseconds > AGENT_SLICE_MAX_US)))
+        osoe_fatal("OSOE_AGENT_SLICE_US=%s: 0, or %d to %d microseconds",
+                   getenv("OSOE_AGENT_SLICE_US"), AGENT_SLICE_MIN_US, AGENT_SLICE_MAX_US);
+    return microseconds;
+}
+
+static uint32_t slice_us;           /* read once, before the agent starts */
+
+/*
  * Stop protocol. The stopper stores stop_requested, then bumps agent_wake (a
  * locked instruction), then wakes. The agent loads agent_wake before it loads
  * stop_requested, then waits on the value it loaded. If the agent's load of
@@ -47,6 +111,7 @@ static _Atomic uint32_t agent_ready;        /* process-private */
 static void *agent_main(void *arg)
 {
     struct osoe_pe_slot *slot = arg;
+    ask_for_short_slice(slice_us);
     struct osoe_counter_block *b = osoe_metrics_block();
     /* Published before any work, so the block is in the table by the time
      * osoe_agent_start returns (§3.14). */
@@ -139,6 +204,7 @@ bool osoe_agent_is_this_thread(void)
 
 void osoe_agent_start(struct osoe_pe_slot *slot)
 {
+    slice_us = agent_slice_us();
     atomic_store_explicit(&stop_requested, 0, memory_order_release);
     atomic_store_explicit(&agent_ready, 0, memory_order_release);
 

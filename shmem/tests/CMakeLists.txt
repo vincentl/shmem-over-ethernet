@@ -1685,6 +1685,23 @@ add_test(NAME shmem.multiple.landing-unaligned
 set_tests_properties(shmem.multiple.landing-unaligned PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "OSOE_GET_LANDING_BYTES=1500 is not a multiple of the landing zone's 1024-byte extents")
 
+# The agent's scheduler slice (§3.11; test-agent-slice.c): the default, a set
+# one, the kernel's own, and a value out of range refused by name.
+osoe_tier2_test(agent-slice)
+add_test(NAME shmem.agent-slice.set.L2
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_SLICE_US=2500
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_agent-slice>)
+add_test(NAME shmem.agent-slice.kernel.L2
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_SLICE_US=0
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_agent-slice>)
+add_test(NAME shmem.agent-slice.refused.L2
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_SLICE_US=50
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_agent-slice>)
+set_tests_properties(shmem.agent-slice.set.L2 shmem.agent-slice.kernel.L2 PROPERTIES
+  LABELS "tier2" TIMEOUT 90)
+set_tests_properties(shmem.agent-slice.refused.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "OSOE_AGENT_SLICE_US=50: 0, or 100 to 100000 microseconds")
+
 # The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on
 # one node, where the team's local lead scans; across nodes on a block, an
 # interleaved and an uneven map, and under force-remote, where every member
