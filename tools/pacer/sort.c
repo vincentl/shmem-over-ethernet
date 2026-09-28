@@ -54,7 +54,7 @@
  * from refilling its staging while another PE may still be reading it.
  *
  * **The checks.** A batch: every key in this PE's range; its count, sum and
- * xor accumulated as it arrived; sorted - LSD radix with 16-bit digits into a
+ * xor accumulated as it arrived; sorted - LSD radix with 11-bit digits into a
  * scratch in rounds mode - and non-decreasing afterwards, with the count, sum
  * xor taken again so that a fault of this sort's own shows as the tool's.
  * **The oracle**, at every checkpoint: the sums over the team of the
@@ -76,7 +76,20 @@
 #include "exercise.h"
 #include "random.h"
 
-enum { CHUNK = 4096, MINIMUM_KEYS = 1024, RADIX = 65536, SMALL_SORT = 48 };
+enum { CHUNK = 4096, MINIMUM_KEYS = 1024, SMALL_SORT = 48 };
+/*
+ * The rounds' local sort: LSD radix of 11-bit digits (the author, 2026-09-27;
+ * 16 until then). A pass's 2,048 counters, 16 KiB, fit a Pi 5 core's 64 KiB
+ * L1, and its 2,048 streams of scattered writes its 512 KiB L2, where 16-bit
+ * digits' 65,536 of each fit neither: the sort was 70% of a round on the Pi.
+ * A key's 64 bits are not a whole number of 11-bit digits: six passes, the
+ * sixth reading the 9 bits left, its histogram's upper three quarters unused.
+ */
+enum { DIGIT_BITS = 11, RADIX = 1 << DIGIT_BITS, PASSES = (64 + DIGIT_BITS - 1) / DIGIT_BITS };
+_Static_assert(DIGIT_BITS * (PASSES - 1) < 64 && DIGIT_BITS * PASSES >= 64,
+               "the passes' digits cover a key's 64 bits, the last one partly");
+_Static_assert(PASSES % 2 == 0,
+               "an even number of passes, so that the keys end where they started");
 enum phase { GENERATE, BIN, EXCHANGE, SORT, CHECK };
 static const char *const phase_names[] = { "generate", "bin", "exchange", "sort", "check", NULL };
 
@@ -121,7 +134,7 @@ static struct {
     uint64_t *next;                 /* pull: where a destination's next key goes */
     uint64_t *pairs_out, *pairs_in; /* pull: symmetric, {count, offset} a pair */
     uint64_t *scratch;              /* rounds: the LSD sort's */
-    size_t (*digits)[RADIX];        /* rounds: the LSD sort's four histograms */
+    size_t (*digits)[RADIX];        /* rounds: the LSD sort's histograms, one a pass */
     uint64_t *chunk;
     uint64_t *reduce_source, *reduce_result;   /* symmetric: 4 sums, then 2 xors */
     /* progress */
@@ -147,7 +160,7 @@ static uint64_t sort_memory(int npes, const struct pacer_options *options, char 
     uint64_t asked = options->quick ? 65536 : accumulate ? UINT64_C(1) << 20 : UINT64_C(4) << 20;
     uint64_t small = 14 * 8 + (push ? 16 : 2 * 2 * n * 8);
     uint64_t fixed = CHUNK * 8 + 3 * n * 8 + 3 * n * sizeof(int) +
-                     (accumulate ? 0 : 4 * (uint64_t)RADIX * sizeof(size_t));
+                     (accumulate ? 0 : PASSES * (uint64_t)RADIX * sizeof(size_t));
     uint64_t keys = asked, capacity = 0, bin_capacity = 0, symmetric = 0, private_bytes = 0;
     long cycle = 0;
     for (;; keys /= 2) {
@@ -281,7 +294,7 @@ static int sort_setup(shmem_team_t team, const struct pacer_options *options)
         return -1;
     if (!sort.accumulate) {
         sort.scratch = malloc(bytes);
-        sort.digits = malloc(4 * sizeof *sort.digits);
+        sort.digits = malloc(PASSES * sizeof *sort.digits);
         if (!sort.scratch || !sort.digits)
             return -1;
     }
@@ -342,30 +355,29 @@ static int destination(uint64_t key, long round, uint64_t first, size_t i)
 
 /* ---- the local sorts -------------------------------------------------------- */
 
-/* LSD radix, four passes of 16-bit digits between keys and scratch, ending in
- * keys. */
+/* LSD radix, PASSES passes of DIGIT_BITS-bit digits between keys and scratch,
+ * ending in keys. Every histogram in one read of the keys; the last digit is
+ * whatever the shift leaves, fewer bits than the rest. */
 static void sort_lsd(uint64_t *keys, uint64_t *scratch, size_t count)
 {
-    memset(sort.digits, 0, 4 * sizeof *sort.digits);
+    memset(sort.digits, 0, PASSES * sizeof *sort.digits);
     for (size_t i = 0; i < count; i++) {
         uint64_t k = keys[i];
-        sort.digits[0][k & 0xffff]++;
-        sort.digits[1][(k >> 16) & 0xffff]++;
-        sort.digits[2][(k >> 32) & 0xffff]++;
-        sort.digits[3][k >> 48]++;
+        for (int d = 0; d < PASSES; d++)
+            sort.digits[d][(k >> (DIGIT_BITS * d)) & (RADIX - 1)]++;
     }
     uint64_t *from = keys, *to = scratch;
-    for (int d = 0; d < 4; d++) {
+    for (int d = 0; d < PASSES; d++) {
         size_t total = 0;
         for (size_t b = 0; b < RADIX; b++) {
             size_t c = sort.digits[d][b];
             sort.digits[d][b] = total;
             total += c;
         }
-        unsigned shift = 16 * (unsigned)d;
+        unsigned shift = DIGIT_BITS * (unsigned)d;
         for (size_t i = 0; i < count; i++) {
             uint64_t k = from[i];
-            to[sort.digits[d][(k >> shift) & 0xffff]++] = k;
+            to[sort.digits[d][(k >> shift) & (RADIX - 1)]++] = k;
         }
         uint64_t *swap = from;
         from = to;
