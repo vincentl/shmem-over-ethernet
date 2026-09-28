@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # osoe-pacer: puts the library through its paces - whole-job patterns from real
 # OpenSHMEM codes, every result checked against an oracle
-# (docs/design/osoe-pacer-proposal.md). Not installed. base/size.c is compiled
+# (docs/design/osoe-pacer-proposal.md). Installed beside oshcc and osoe-stat,
+# so that `osoe-pacer --quick` under a cluster's launcher says whether the
+# library works there; it finds the library from where it is, as oshcc does,
+# so the prefix may still be chosen at install time. base/size.c is compiled
 # in so that --memory and the heap's size parse exactly as the library parses
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
 set(osoe_pacer_sources osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
@@ -13,6 +16,8 @@ target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SO
 find_package(Threads REQUIRED)
 target_link_libraries(osoe-pacer PRIVATE osoe Threads::Threads m)
 osoe_warnings(osoe-pacer)
+set_target_properties(osoe-pacer PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+install(TARGETS osoe-pacer)
 
 # osoe-pacer-counted: the same program with a shim that counts every call of
 # every routine the library declares (spec §10: every shmem_ name is a weak
@@ -405,6 +410,18 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(tools.pacer.counted.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
     PASS_REGULAR_EXPRESSION "shim called=[1-9][0-9]+ declared=[1-9][0-9]+"
     FAIL_REGULAR_EXPRESSION "failures=[1-9]|killed by signal|timeout after|left behind")
+
+  # The installed program, under a prefix chosen at install time: it finds the
+  # library installed beside it, by its runpath from its own directory, not the
+  # build tree's, and runs. An install writes the build tree's manifest, as
+  # wrapper.installed's does, so the two take turns.
+  set(pacer_prefix ${CMAKE_CURRENT_BINARY_DIR}/installed)
+  add_test(NAME tools.pacer.installed.0-0-1-1
+    COMMAND sh -c "rm -rf ${pacer_prefix} && ${CMAKE_COMMAND} --install ${PROJECT_BINARY_DIR} --prefix ${pacer_prefix} > /dev/null && p=$(cd ${pacer_prefix} && pwd -P) && ldd ${pacer_prefix}/bin/osoe-pacer | grep -q \"libosoe[^ ]* => $p/bin/../${CMAKE_INSTALL_LIBDIR}/\" && $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 240 -- ${pacer_prefix}/bin/osoe-pacer --quick mailbox")
+  set_tests_properties(tools.pacer.installed.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
+    RESOURCE_LOCK osoe-install
+    PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}")
   # Plants fired inside mix periods, on PE 1's team: locks' in its first team
   # period, waits' in its fifth.
   pacer_plant_named(mix-locks-count locks-count mix

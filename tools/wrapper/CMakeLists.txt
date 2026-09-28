@@ -76,3 +76,6 @@ add_test(NAME wrapper.installed
   COMMAND sh -c "rm -rf ${prefix} && ${CMAKE_COMMAND} --install ${PROJECT_BINARY_DIR} --prefix ${prefix} > /dev/null && p=$(cd ${prefix} && pwd -P) && ${prefix}/bin/oshcc -show -o x x.c | grep -q -- \"-I$p/${CMAKE_INSTALL_INCLUDEDIR} .*-Xlinker $p/${CMAKE_INSTALL_LIBDIR}/osoe/osoe-statics.ld .*-L$p/${CMAKE_INSTALL_LIBDIR} \" && ${prefix}/bin/oshcc -o ${work}/installed ${CMAKE_CURRENT_SOURCE_DIR}/statics.c && $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 -- ${work}/installed")
 set_tests_properties(wrapper.hello wrapper.compile-then-link wrapper.show wrapper.statics
   wrapper.installed PROPERTIES LABELS "tier1" TIMEOUT 60)
+# An install writes the build tree's manifest: one at a time (the pacer's
+# installed test installs too).
+set_tests_properties(wrapper.installed PROPERTIES RESOURCE_LOCK osoe-install)
