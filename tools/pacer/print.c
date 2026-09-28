@@ -45,6 +45,14 @@
  * into runs - so that the two cannot share a mistake; a host's PEs, from a
  * sort of the PEs by name, not from parallel_print's tally. The work counted
  * is the lines printed, by each team's rank 0.
+ *
+ * **The predictions are quadratic, knowingly.** `distinct`, `windows` and
+ * `partial` predict a line at a time, each line from a membership array of
+ * the whole world, cleared and scanned: O(N^2) a round on every PE, where
+ * the tool's rule is O(N). The exercise runs only when named, at a test's
+ * sizes, and the author chose to leave it so (2026-09-27). Should `print` ever
+ * run where it shows, the fix is for the team's rank 0 alone to predict, over
+ * each line's range of PEs rather than the world.
  */
 #define _GNU_SOURCE
 #include <stdint.h>
