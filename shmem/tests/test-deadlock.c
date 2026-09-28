@@ -10,6 +10,7 @@
  * collections, and the samples.
  *
  *   waits       every PE waits in shmem_int_wait_until for a flag nobody sets
+ *   reinit      the same, in a second session after a finalize and an init
  *   mismatch    the even PEs in shmem_barrier_all, the odd ones in a wait: a
  *               collective that does not match, whose arrivals cross nodes
  *   computing   the last PE computes for four seconds while the rest wait in
@@ -56,6 +57,12 @@ static void *set_later(void *flag)
 int main(int argc, char **argv)
 {
     const char *mode = argc > 1 ? argv[1] : "waits";
+    if (strcmp(mode, "reinit") == 0) {
+        shmem_init();
+        shmem_barrier_all();
+        shmem_finalize();
+        mode = "waits";
+    }
     shmem_init();
     int me = shmem_my_pe(), last = shmem_n_pes() - 1;
     int *flag = shmem_malloc(sizeof *flag);

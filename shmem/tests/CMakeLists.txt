@@ -1703,8 +1703,9 @@ set_tests_properties(shmem.agent-slice.refused.L2 PROPERTIES LABELS "tier2" TIME
   PASS_REGULAR_EXPRESSION "OSOE_AGENT_SLICE_US=50: 0, or 100 to 100000 microseconds")
 
 # The deadlock detector (§3.15, deadlock.h; test-deadlock.c), at
-# OSOE_DEADLOCK_SECONDS=1: a job deadlocked on one node, across two, and on a
-# collective that does not match across two, ended naming where its PEs wait;
+# OSOE_DEADLOCK_SECONDS=1: a job deadlocked on one node, across two, in a
+# second session after a finalize, and on a collective that does not match
+# across two, ended naming where its PEs wait;
 # and a job that only looks deadlocked - its last PE computing, asleep outside
 # the library, or waiting for a thread of its own that the library cannot see
 # - on one node and across two, run to its end. Off, a deadlock runs to the
@@ -1719,6 +1720,7 @@ osoe_warnings(shmem_test_deadlock)
 set(deadlock_cases
     "waits|0,0,0,0|in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
     "waits|0,0,1,1|in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    "reinit|0,0,1,1|in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
     "mismatch|0,0,1,1|in shmem_barrier_all [(]epoch [0-9]+[)], for [0-9]+ s"
     "mismatch|0,1,0,1|in shmem_barrier_all [(]epoch [0-9]+[)], for [0-9]+ s")
 if(CMAKE_C_FLAGS MATCHES "sanitize=thread")

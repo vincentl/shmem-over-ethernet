@@ -44,8 +44,14 @@ enum { DEFAULT_SECONDS = 10, MAXIMUM_SECONDS = 86400 };
 
 static uint64_t quiet_needed_ns;        /* OSOE_DEADLOCK_SECONDS; 0: off */
 
+static void start_afresh(void);
+
 void osoe_deadlock_init(void)
 {
+    /* A program may finalize and initialize again: nothing of the last
+     * session's rounds - a probe half answered, a collection half heard -
+     * survives into this one's, whose connections and engine are new. */
+    start_afresh();
     uint32_t seconds = DEFAULT_SECONDS;
     enum osoe_environment_status status = osoe_environment_u32("OSOE_DEADLOCK_SECONDS", &seconds);
     if (status == OSOE_ENVIRONMENT_INVALID || seconds > MAXIMUM_SECONDS)
@@ -363,6 +369,23 @@ static struct osoe_deadlock_message probe;
 static uint32_t probe_from, sampled_round;
 static uint64_t sampled_first;
 
+static void start_afresh(void)
+{
+    stage = WATCHING;
+    round_number = reports = declared = 0;
+    all_ok = false;
+    next_look_ns = quiet_since_ns = first_activity = between_since_ns = declared_at_ns = 0;
+    answering = false;
+    probe = (struct osoe_deadlock_message){ 0 };
+    probe_from = sampled_round = 0;
+    sampled_first = 0;
+    half.taken = half.seen = false;
+    free(words);
+    free(asleep);
+    words = NULL;
+    asleep = NULL;
+}
+
 static uint32_t peers(void)
 {
     return osoe.job.node_count > 0 ? osoe.job.node_count - 1 : 0;
@@ -535,12 +558,17 @@ bool osoe_deadlock_tick(void)
 void osoe_deadlock_message(uint32_t node, const struct osoe_deadlock_message *m)
 {
     switch (m->kind) {
+    /*
+     * What the protocol never sends - a probe to the root or to a node still
+     * answering the last, a report the root did not ask for - is dropped, not
+     * fatal: the detector may fail to find a deadlock, and must never end a
+     * job that is not one. The tests that ask for a declaration are what
+     * would see such a message lose one.
+     */
     case OSOE_DEADLOCK_PROBE:
         /* Sampled from the agent's loop: its first half on the next turn. */
         if (osoe.job.node == 0 || answering || half.taken)
-            osoe_fatal("a deadlock detector probe from node %" PRIu32 " (round %" PRIu32
-                       ") while this node's lead %s", node, m->round,
-                       osoe.job.node == 0 ? "is the root" : "is still answering the last");
+            break;
         if (!quiet_needed_ns) {
             struct osoe_deadlock_message veto = { .round = m->round,
                                                   .kind = OSOE_DEADLOCK_REPORT,
@@ -555,9 +583,7 @@ void osoe_deadlock_message(uint32_t node, const struct osoe_deadlock_message *m)
     case OSOE_DEADLOCK_REPORT: {
         enum stage collecting = m->phase == 1 ? FIRST_COLLECTION : SECOND_COLLECTION;
         if (osoe.job.node != 0 || m->round != round_number || stage != collecting)
-            osoe_fatal("a deadlock detector report from node %" PRIu32 " for round %" PRIu32
-                       ", collection %u, which this node did not ask for", node, m->round,
-                       m->phase);
+            break;
         reports++;
         all_ok = all_ok && m->ok;
         if (reports < peers())
