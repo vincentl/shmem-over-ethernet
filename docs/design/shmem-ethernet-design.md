@@ -2015,11 +2015,20 @@ setting, 4 s, and the quiet completes. `TCP_USER_TIMEOUT` is not set. It bounds
 how long sent data may go unacknowledged, and Linux applies it to zero-window
 probing too, so a peer merely stopped with a full receive buffer would be
 declared dead after it: a fatal timeout by another name. With data in flight to
-a vanished node the kernel's own retransmission limit ends the connection
-instead, `tcp_retries2`, about fifteen minutes by default — slow, and a site
-that wants it faster lowers that sysctl, which bounds the same retransmissions
-for every connection on the host. `OSOE_KEEPALIVE=IDLE,INTERVAL,COUNT` overrides
-the values, and 0 turns keepalive off; tests make it short.
+a vanished node - which keepalive does not probe - the kernel's own
+retransmission limit ended the connection instead, `tcp_retries2`, about
+fifteen minutes by default. *Since 2026-09-28* the lead asks the kernel the
+same question keepalive asks, of the data: once a keepalive interval,
+`TCP_INFO` on each connection, and a peer whose kernel has acknowledged
+nothing for keepalive's whole budget (idle, then count probes an interval
+apart) while segments wait for acknowledgement ends the job, naming it, as an
+idle one would have (`osoe_progress_check_silent`). A peer merely stopped is
+not found: its kernel acknowledges what arrives, and one whose receive buffer
+is full is probed through a zero window, which leaves nothing outstanding.
+The deadlock detector made this needed, since its probe is data in flight
+toward a node that may have vanished in an otherwise idle job;
+`tier3.*.vanished-node` found it. `OSOE_KEEPALIVE=IDLE,INTERVAL,COUNT` overrides
+the values, and 0 turns keepalive, and this check, off; tests make it short.
 `tier3.*.vanished-node` cuts a node's link in both directions once the job is
 ready and quiet — no FIN, no reset — while the other node waits on it idle, and
 the job ends within keepalive's bound, every rank with the failure status. Quiet
@@ -2027,6 +2036,8 @@ matters: the first run cut the lossy link while one side still had a
 retransmission outstanding, and that side, correctly, waited on `tcp_retries2`
 rather than keepalive (TCP probes only a connection with nothing
 unacknowledged); the cut now comes two seconds after the job is ready.
+`tier3.*.vanished-node-inflight` puts data in flight on purpose after the cut,
+and the job ends within the same bound.
 
 #### The development watchdog, retired
 

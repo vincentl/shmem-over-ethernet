@@ -2349,6 +2349,17 @@ if(OSOE_TIER3)
       set_tests_properties(tier3.${shape}.vanished-node.${label}
         PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "VANISHED NODE OK")
     endforeach()
+    # The same with data in flight toward the node when it vanishes, which
+    # keepalive does not probe: found by the kernel's silence instead, within
+    # keepalive's budget (progress.c, osoe_progress_check_silent).
+    string(REPLACE ";" " " wrap
+           "${osoe_tier3};${shape};2;TIER3_CUT=1;OSOE_KEEPALIVE=1,1,3;OSOE_TEST_MODE=inflight;--")
+    add_test(NAME tier3.${shape}.vanished-node-inflight.0-1
+      COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+              sh ${CMAKE_CURRENT_SOURCE_DIR}/vanished-node.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_vanished-node> 2 0,1)
+    set_tests_properties(tier3.${shape}.vanished-node-inflight.0-1
+      PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "VANISHED NODE OK")
     add_test(NAME tier3.${shape}.differential
       COMMAND ${CMAKE_COMMAND}
               "-DWRAP=${osoe_tier3};${shape}"

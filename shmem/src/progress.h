@@ -344,6 +344,19 @@ void osoe_progress_meet_teams(struct osoe_progress *p, uint32_t count);
 bool osoe_progress_idle(struct osoe_progress *p);
 
 /*
+ * End the job naming any peer whose kernel has acknowledged nothing sent to it
+ * for `budget_ms` while data waits for acknowledgement (§3.15, wire.h's
+ * osoe_wire_silent_ms). Keepalive probes only an idle connection, so a peer
+ * that vanished with data in flight toward it was otherwise found only when
+ * the kernel gave up retransmitting, about fifteen minutes by default; with the
+ * budget keepalive itself is given, this says what keepalive would have. A
+ * peer merely stopped is not found: its kernel acknowledges what arrives, and
+ * one whose buffer is full is probed through a zero window with nothing
+ * outstanding.
+ */
+void osoe_progress_check_silent(struct osoe_progress *p, uint32_t budget_ms);
+
+/*
  * Close every connection (§6.4, close_model.py): each one, once it owes the
  * peer nothing, sends its goodbye - a header-only segment flagged
  * OSOE_AM_SEGMENT_GOODBYE, the last it will send - and then ends its stream;

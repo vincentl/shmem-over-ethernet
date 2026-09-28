@@ -21,6 +21,7 @@
 #include "base/wait-word.h"
 #include "abort.h"
 #include "am-state.h"
+#include "blocked.h"
 #include "connection-area.h"
 #include "deadlock.h"
 #include "fatal.h"
@@ -324,6 +325,30 @@ void osoe_progress_host_wake_lead(void)
 static bool flag_raised;
 
 /*
+ * The check keepalive cannot make (progress.h's osoe_progress_check_silent):
+ * the budget keepalive is given - idle, then count probes an interval apart -
+ * and at most one look an interval, so a vanished peer with data in flight is
+ * found as soon as an idle one would be. 0: keepalive is off, and so is this.
+ */
+static uint32_t silent_budget_ms;
+static uint64_t silent_interval_ns, next_silent_check_ns;
+
+static void silent_check_start(const struct osoe_bootstrap *b)
+{
+    next_silent_check_ns = 0;
+    if (b->keepalive_off) {
+        silent_budget_ms = 0;
+        return;
+    }
+    uint32_t idle = b->keepalive_idle_s ? b->keepalive_idle_s : OSOE_DEFAULT_KEEPALIVE_IDLE_S;
+    uint32_t interval = b->keepalive_interval_s ? b->keepalive_interval_s
+                                                : OSOE_DEFAULT_KEEPALIVE_INTERVAL_S;
+    uint32_t count = b->keepalive_count ? b->keepalive_count : OSOE_DEFAULT_KEEPALIVE_COUNT;
+    silent_budget_ms = (idle + interval * count) * 1000;
+    silent_interval_ns = (uint64_t)interval * 1000000000;
+}
+
+/*
  * Read from another process, since only the lead runs the engine. The value is
  * the lead's own bookkeeping and is written by that thread alone, so a reader
  * sees either the old value or the new one - and the old one only makes a wait
@@ -447,6 +472,7 @@ void osoe_progress_host_start(uint32_t session)
         atomic_store_explicit(&osoe.node.connection_metrics[c].peer,
                               c < osoe.job.node ? c : c + 1, memory_order_release);
     osoe_progress_attach(&osoe_am.progress, osoe_am.connection, osoe_am.busy);
+    silent_check_start(&osoe.bootstrap);
     flag_raised = false;
 }
 
@@ -630,6 +656,13 @@ bool osoe_progress_host_poll(void)
     if (flag_raised) {
         atomic_store_explicit(a->lead_sleeping, 0, memory_order_seq_cst);
         flag_raised = false;
+    }
+    if (silent_budget_ms) {
+        uint64_t now = osoe_now_ns();
+        if (now >= next_silent_check_ns) {
+            next_silent_check_ns = now + silent_interval_ns;
+            osoe_progress_check_silent(&osoe_am.progress, silent_budget_ms);
+        }
     }
     bool moved = osoe_internode_am_take_arrivals();
     if (osoe_progress_poll(&osoe_am.progress) || moved)

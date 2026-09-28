@@ -393,8 +393,9 @@ specification or takes a choice the specification leaves open.
 - **No wait gives up by default**: set `OSOE_NO_PROGRESS_TIMEOUT` for a wait
   on the library's own progress - acknowledgements, buffer space, a reply, the
   rendezvous - that stops moving to end the job naming what it waited for. A
-  node that vanishes without closing its connections is noticed by TCP
-  keepalive, in one to two minutes by default (`OSOE_KEEPALIVE`).
+  node that vanishes without closing its connections is noticed in one to two
+  minutes by default (`OSOE_KEEPALIVE`): by TCP keepalive when nothing was in
+  flight toward it, and by its kernel's silence when something was.
 - **A program's own deadlock ends the job only once it is proved.** When
   every PE of the job waits inside the library, nothing moves on any node for
   `OSOE_DEADLOCK_SECONDS` (10 by default) and nothing is in flight between

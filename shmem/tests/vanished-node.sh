@@ -13,7 +13,7 @@ out=$(${WRAP:-} "$LAUNCHER" -n "$RANKS" -m "$MAP" -t 60 -k -- "$PROGRAM" 2>&1)
 echo "$out"
 failed=$(printf '%s\n' "$out" | grep -c "exited with status 1\$")
 found=$(printf '%s\n' "$out" | grep -c "stopped answering")
-bad=$(printf '%s\n' "$out" | grep -c "NOT TERMINATED\|BARRIER RETURNED\|timeout after\|killed by signal")
+bad=$(printf '%s\n' "$out" | grep -c "NOT TERMINATED\|BARRIER RETURNED\|QUIET RETURNED\|timeout after\|killed by signal")
 echo "vanished node: found $found times, $failed of $RANKS ranks left with the failure" \
      "status, $bad bad"
 [ "$found" -ge 1 ] || exit 1

@@ -1359,6 +1359,20 @@ bool osoe_progress_closed(const struct osoe_progress *p)
     return true;
 }
 
+void osoe_progress_check_silent(struct osoe_progress *p, uint32_t budget_ms)
+{
+    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
+        struct osoe_wire *w = &p->wire[slot];
+        if (w->error || w->send_error || osoe_wire_ended(w))
+            continue;               /* already failed or ended: judged elsewhere */
+        uint32_t silent = osoe_wire_silent_ms(w);
+        if (silent >= budget_ms)
+            osoe_fatal("node %u: node %u stopped answering: its kernel has acknowledged "
+                       "nothing sent to it for %u s (§3.15). The host has vanished, or the "
+                       "network between is down", p->node, peer_of(p, slot), silent / 1000);
+    }
+}
+
 bool osoe_progress_quiet(struct osoe_progress *p, uint64_t *applied)
 {
     *applied = p->application_applied;

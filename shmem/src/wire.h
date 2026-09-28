@@ -149,6 +149,13 @@ bool osoe_wire_ended(const struct osoe_wire *w);
  * and once the connection has closed - a reset - since nothing will be. */
 bool osoe_wire_unacknowledged(const struct osoe_wire *w);
 
+/* How long, in milliseconds, the peer's kernel has acknowledged nothing while
+ * segments sent to it wait for acknowledgement (TCP_INFO's unacked and
+ * last_ack_recv): 0 when nothing is outstanding, with no socket, or when the
+ * kernel will not say. A zero-window probe of a peer whose receive buffer is
+ * full leaves nothing outstanding, so a peer merely stopped reads 0. */
+uint32_t osoe_wire_silent_ms(const struct osoe_wire *w);
+
 /* Close the socket; the caller has sent its end of stream and seen the peer's. */
 void osoe_wire_close(struct osoe_wire *w);
 

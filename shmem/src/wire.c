@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -146,9 +147,11 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, i
      * (progress.c). Not TCP_USER_TIMEOUT, which bounds how long sent data may
      * go unacknowledged and which Linux applies to zero-window probing too: a
      * peer merely stopped with a full receive buffer would be declared dead
-     * after it, a fatal timeout. With data in flight the kernel's own
-     * retransmission limit ends a vanished peer's connection instead
-     * (tcp_retries2: about fifteen minutes by default).
+     * after it, a fatal timeout. With data in flight, which keepalive does not
+     * probe, the lead asks TCP_INFO the same question within the same budget
+     * (osoe_wire_silent_ms, progress.c's osoe_progress_check_silent), where
+     * the kernel's own retransmission limit would take about fifteen minutes
+     * (tcp_retries2).
      */
     if (b->keepalive_off)
         return;
@@ -286,6 +289,17 @@ void osoe_wire_shutdown(struct osoe_wire *w)
 bool osoe_wire_ended(const struct osoe_wire *w)
 {
     return w->ended && w->queued == 0;
+}
+
+uint32_t osoe_wire_silent_ms(const struct osoe_wire *w)
+{
+    struct tcp_info info;
+    socklen_t len = sizeof info;
+    memset(&info, 0, sizeof info);
+    if (w->fd < 0 || getsockopt(w->fd, IPPROTO_TCP, TCP_INFO, &info, &len) != 0 ||
+        len < offsetof(struct tcp_info, tcpi_last_ack_recv) + sizeof info.tcpi_last_ack_recv)
+        return 0;
+    return info.tcpi_unacked > 0 ? info.tcpi_last_ack_recv : 0;
 }
 
 bool osoe_wire_unacknowledged(const struct osoe_wire *w)

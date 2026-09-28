@@ -314,8 +314,8 @@ A vanished node needs care here: these nodes boot from the network, so a node
 whose cable is pulled loses its root filesystem too, and will need its PoE port
 power-cycled afterwards. From the others' side it is still the test. With the
 connections idle, keepalive ends the job one to two minutes after the cut; with
-data in flight toward the lost node, the kernel's retransmission limit
-(`tcp_retries2`) decides instead, about fifteen minutes (design §3.15).
+data in flight toward the lost node, the lead finds its kernel silent within
+the same budget (design §3.15).
 
 ## 8. Programs from the corpus
 
