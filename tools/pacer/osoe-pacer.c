@@ -614,8 +614,9 @@ static int parse(int argc, char **argv)
             return refuse("--plant %s is caught by the %s exercise, which is not named",
                           plant_names[options.plant], plant_exercise[options.plant]);
     }
-    /* The library admits OSOE_MAX_THREADS threads of a PE at once, the main
-     * one among them (default 16, README); one more ends the job. */
+    /* The library admits OSOE_MAX_THREADS live threads of a PE that have
+     * called it, the main one among them (default 16, README); a thread keeps
+     * its place until it exits, and one more ends the job. */
     for (int k = 0; k < chosen_count; k++)
         if (chosen[k] == &pacer_threads) {
             const char *text = getenv("OSOE_MAX_THREADS");

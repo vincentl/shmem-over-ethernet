@@ -125,8 +125,9 @@ enum osoe_team_number {
  * from another process, so it cannot be a pointer. */
 enum { OSOE_BLOCKED_ROUTINE_MAX = 32 };
 
-/* The most threads a PE may have in the library at once (OSOE_MAX_THREADS),
- * and so the words of its `active` bitmap. */
+/* The most live threads of a PE that may have called the library
+ * (OSOE_MAX_THREADS: a thread keeps its place until it exits), and so the
+ * words of its `active` bitmap. */
 enum { OSOE_WATCH_ACTIVE_WORDS = 16, OSOE_MAX_THREADS_HIGHEST = OSOE_WATCH_ACTIVE_WORDS * 64 };
 
 /* The CPUs a PE's task may run on, a bit each, as many as glibc's cpu_set_t
