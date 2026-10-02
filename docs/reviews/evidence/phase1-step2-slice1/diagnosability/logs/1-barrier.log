@@ -1,5 +1,5 @@
 # job id (launcher pid) 628951
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --list
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --list
 /osoe.628951.0.0.0           layout 7  2 PEs, 2 live  151552 bytes
 /osoe.628951.0.0.conn.0      /dev/shm/osoe.628951.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 /osoe.628951.0.1.0           layout 7  2 PEs, 2 live  151552 bytes
@@ -11,7 +11,7 @@ $ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/bu
 /osoe.628951.0.wire.0.2.0    /dev/shm/osoe.628951.0.wire.0.2.0 is not an osoe control segment (magic 0x4000)
 /osoe.628951.0.wire.1.2.0    /dev/shm/osoe.628951.0.wire.1.2.0 is not an osoe control segment (magic 0x4000)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.0
 /osoe.628951.0.0.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 0 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -31,10 +31,10 @@ agent.last_wake_ns                      75216315979715            07521631597971
 thread.claimed                                      1            1             1
 thread.tid                                     628960       628962        628962
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.conn.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.0
 /osoe.628951.0.1.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 1 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -54,10 +54,10 @@ agent.last_wake_ns                      75216314146040            07521631414604
 thread.claimed                                      1            1             1
 thread.tid                                     628961       628959        628961
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.conn.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.1.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.0
 /osoe.628951.0.2.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 2 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -77,10 +77,10 @@ agent.last_wake_ns                      75216317777883            07521631777788
 thread.claimed                                      1            1             1
 thread.tid                                     628963       628964        628964
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.conn.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.2.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.0
 /osoe.628951.0.0.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 0 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -100,7 +100,7 @@ agent.last_wake_ns                      75216315979715            07521631597971
 thread.claimed                                      1            1             1
 thread.tid                                     628960       628962        628962
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.0.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.0.0
 /osoe.628951.0.0.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 0 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -110,13 +110,13 @@ block  PE      pid      tid          cpu    invol.csw  kind
     8   1   628954   628962         0 ns            3  agent
     9   1   628954   628954         0 ns            2  application
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.conn.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.0.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.0.conn.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.0.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.0
 /osoe.628951.0.1.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 1 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -136,7 +136,7 @@ agent.last_wake_ns                      75216314146040            07521631414604
 thread.claimed                                      1            1             1
 thread.tid                                     628961       628959        628961
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.1.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.1.0
 /osoe.628951.0.1.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 1 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -146,13 +146,13 @@ block  PE      pid      tid          cpu    invol.csw  kind
     8   1   628956   628959         0 ns            1  agent
     9   1   628956   628956         0 ns            0  application
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.conn.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.1.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.1.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.1.conn.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.1.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.1.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.0
 /osoe.628951.0.2.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 2 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -172,7 +172,7 @@ agent.last_wake_ns                      75216317777883            07521631777788
 thread.claimed                                      1            1             1
 thread.tid                                     628963       628964        628964
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.2.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.2.0
 /osoe.628951.0.2.0  layout 7  2 local PEs of 6  (job 628951 step 0 node 2 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -182,10 +182,10 @@ block  PE      pid      tid          cpu    invol.csw  kind
     8   1   628958   628964         0 ns            1  agent
     9   1   628958   628958         0 ns            3  application
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.conn.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.628951.0.2.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.2.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.2.conn.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.2.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.2.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
 -rw-------  1 vincent vincent 151552 Sep 20 13:42 osoe.628951.0.0.0

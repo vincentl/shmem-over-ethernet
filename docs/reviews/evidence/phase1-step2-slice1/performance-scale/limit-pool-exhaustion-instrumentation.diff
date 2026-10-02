@@ -1,4 +1,4 @@
---- /Users/vincent/shmem-over-ethernet/build/scratch/review-performance-scale/tree/shmem/src/progress.c	2026-09-20 13:05:35
+--- <repo>/build/scratch/review-performance-scale/tree/shmem/src/progress.c	2026-09-20 13:05:35
 +++ shmem/src/progress.c	2026-09-20 13:51:38
 @@ -1,6 +1,7 @@
  #include <stdatomic.h>

@@ -2,7 +2,7 @@
 # Kill a whole job, launcher included, with SIGKILL; then see what is left in
 # /dev/shm, what osoe-stat --gc removes, and whether a job with the SAME job id
 # starts on the same node afterwards.
-. /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/env.sh
+. <repo>/build/scratch/review-diagnosability/env.sh
 log=$E/logs/5c-sigkill-all.log
 job=77700123
 F=""; for r in 0 1 2 3; do F="$F -e $r:OSOE_JOB_ID=$job"; done

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Run inside the VM. $1 = tree (tree | tree-naive) under build/scratch/review-protocols.
-T=/Users/vincent/shmem-over-ethernet/build/scratch/review-protocols/$1
-E=/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/protocols
+T=<repo>/build/scratch/review-protocols/$1
+E=<repo>/docs/reviews/evidence/phase1-step2-slice1/protocols
 cc -O1 -I$T/shmem/include -o $T/build/quiet-large $E/quiet-large.c -L$T/build/debug/shmem -losoe -Wl,-rpath,$T/build/debug/shmem || exit 1
 for run in 1 2 3; do
   echo "== $1 run $run"

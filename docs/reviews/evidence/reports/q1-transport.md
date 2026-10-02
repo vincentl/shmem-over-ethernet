@@ -3,7 +3,7 @@
 Reviewer: TRANSPORT. Design: `docs/design/shmem-ethernet-design.md` (1,712 lines, read in full).
 Environment: Lima VM `shmem`, Debian 13, kernel `6.12.95+deb13-cloud-arm64`, liburing 2.9, gcc 14.2.
 
-Experiment root (not in repo): `/private/tmp/claude-501/-Users-vincent-Desktop-Maker-Space-shmem-over-ethernet/44d302eb-d705-4657-bc09-de98d0225328/scratchpad/exp/q1-transport/`
+Experiment root (not in repo): `/private/tmp/claude-501/<repo, dash-encoded>/44d302eb-d705-4657-bc09-de98d0225328/scratchpad/exp/q1-transport/`
 (abbreviated below as `EXP/`)
 
 | Artifact | Path |

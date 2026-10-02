@@ -7,14 +7,14 @@ causes in the source are left for a follow-up review.
 
 ## Method
 
-All work ran in `/Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree`,
+All work ran in `<repo>/build/scratch/review-load/tree`,
 a private rsync'd copy (`--exclude build --exclude corpus --exclude .git`), built
 once and never rebuilt again for the rest of the survey:
 
 ```
-mkdir -p /Users/vincent/shmem-over-ethernet/build/scratch/review-load
+mkdir -p <repo>/build/scratch/review-load
 rsync -a --delete --exclude build --exclude corpus --exclude .git \
-  /Users/vincent/shmem-over-ethernet/ /Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/
+  <repo>/ <repo>/build/scratch/review-load/tree/
 limactl shell osoe sh -c 'cd .../tree && cmake --preset release && cmake --build --preset release -j4'
 ```
 

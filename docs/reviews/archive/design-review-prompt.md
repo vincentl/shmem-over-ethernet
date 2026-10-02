@@ -12,7 +12,7 @@ as a claim to verify, not a conclusion.
 
 ## Context
 
-- **Repository:** `/Users/vincent/Desktop/Maker Space/shmem-over-ethernet`, project
+- **Repository:** `<repo>`, project
   **osoe** (OpenSHMEM Over Ethernet).
 - **Plan under review:** `docs/design/shmem-ethernet-design.md`, about 1,700 lines.
   It is a decision record: each section states a choice, its rationale, and the

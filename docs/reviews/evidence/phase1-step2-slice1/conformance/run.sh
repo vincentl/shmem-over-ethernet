@@ -2,7 +2,7 @@
 # Build and run the conformance probes against a PRIVATE build of the tree
 # (never build/debug). Run inside the Lima VM:
 #   limactl shell osoe sh docs/reviews/evidence/phase1-step2-slice1/conformance/run.sh
-ROOT=/Users/vincent/shmem-over-ethernet
+ROOT=<repo>
 TREE=$ROOT/build/scratch/review-conformance/tree
 B=$TREE/build/debug
 HERE=$ROOT/docs/reviews/evidence/phase1-step2-slice1/conformance

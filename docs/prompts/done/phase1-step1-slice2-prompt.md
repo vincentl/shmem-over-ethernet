@@ -7,7 +7,7 @@ the mechanical breadth that conformance needs.
 
 ## Context
 
-- **Repository:** `/Users/vincent/Desktop/Maker Space/shmem-over-ethernet`.
+- **Repository:** `<repo>`.
 - **Branch:** continue on **`phase1-slice2`**, which already carries three commits
   (the §4.9 watch-slot model, watch slots with `rmw` and `load` in the transport
   boundary and the `uint64`/`uint32` AMOs, and `shmem_wait_until`/`shmem_test`).

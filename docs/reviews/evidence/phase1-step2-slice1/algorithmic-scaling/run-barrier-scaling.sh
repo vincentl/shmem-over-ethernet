@@ -3,7 +3,7 @@
 # build of the tree (never the main build directories). Run inside the VM.
 # Results are "measured under contention": 4 cores, shared with other agents.
 set -e
-ROOT=/Users/vincent/shmem-over-ethernet
+ROOT=<repo>
 T=$ROOT/build/scratch/review-algorithmic-scaling/tree
 B=$T/build/release
 HERE=$ROOT/docs/reviews/evidence/phase1-step2-slice1/algorithmic-scaling

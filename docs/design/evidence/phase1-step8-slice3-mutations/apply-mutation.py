@@ -2,7 +2,7 @@
 """apply-mutation.py NAME: apply mutate.sh's mutation NAME to shmem/src/transport-am.c
 in the current directory; exits nonzero if its target is not there once."""
 import sys
-src = open('/Users/vincent/shmem-over-ethernet/build/scratch/slice3/mutate.sh').read()
+src = open('<repo>/build/scratch/slice3/mutate.sh').read()
 block = src[src.index("edits = {"):src.index("}\nold, new") + 1]
 ns = {}
 exec(block, ns)

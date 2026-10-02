@@ -28,9 +28,9 @@ exit=0
 exit=0
 [100%] Built target osoe_segment_test
 --- older writer (112) against the PRE-FIX reader check:
-/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:206: CHECK(s.table_usable) failed
-/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:210: CHECK(osoe_segment_read_name(&s, "node.world_size", 0, &v) && v == 7) failed
-/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:211: CHECK(osoe_segment_read_name(&s, "pe.rank", 0, &v) && v == 40) failed
-/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:212: CHECK(osoe_segment_read_name(&s, "pe.rank", 1, &v) && v == 41) failed
-/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/tools/stat/test-segment.c:213: CHECK(osoe_segment_read_name(&s, "pe.sweeps", 1, &v) && v == 1001) failed
+<repo>/build/scratch/review-premises/tree/tools/stat/test-segment.c:206: CHECK(s.table_usable) failed
+<repo>/build/scratch/review-premises/tree/tools/stat/test-segment.c:210: CHECK(osoe_segment_read_name(&s, "node.world_size", 0, &v) && v == 7) failed
+<repo>/build/scratch/review-premises/tree/tools/stat/test-segment.c:211: CHECK(osoe_segment_read_name(&s, "pe.rank", 0, &v) && v == 40) failed
+<repo>/build/scratch/review-premises/tree/tools/stat/test-segment.c:212: CHECK(osoe_segment_read_name(&s, "pe.rank", 1, &v) && v == 41) failed
+<repo>/build/scratch/review-premises/tree/tools/stat/test-segment.c:213: CHECK(osoe_segment_read_name(&s, "pe.sweeps", 1, &v) && v == 1001) failed
 exit=0

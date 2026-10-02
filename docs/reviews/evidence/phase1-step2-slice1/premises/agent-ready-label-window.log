@@ -1,11 +1,11 @@
 [100%] Built target osoe
 [ 95%] Built target osoe
 1/1 Test #105: shmem.stat.L1 ....................***Failed    3.01 sec
-/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/shmem/tests/test-stat.c:95: CHECK(strstr(out, "agent") != NULL) failed
+<repo>/build/scratch/review-premises/tree/shmem/tests/test-stat.c:95: CHECK(strstr(out, "agent") != NULL) failed
 	105 - shmem.stat.L1 (Failed)                            tier2
 1/1 Test #105: shmem.stat.L1 ....................***Failed    3.01 sec
-/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/shmem/tests/test-stat.c:95: CHECK(strstr(out, "agent") != NULL) failed
+<repo>/build/scratch/review-premises/tree/shmem/tests/test-stat.c:95: CHECK(strstr(out, "agent") != NULL) failed
 	105 - shmem.stat.L1 (Failed)                            tier2
 1/1 Test #105: shmem.stat.L1 ....................***Failed    3.01 sec
-/Users/vincent/shmem-over-ethernet/build/scratch/review-premises/tree/shmem/tests/test-stat.c:95: CHECK(strstr(out, "agent") != NULL) failed
+<repo>/build/scratch/review-premises/tree/shmem/tests/test-stat.c:95: CHECK(strstr(out, "agent") != NULL) failed
 	105 - shmem.stat.L1 (Failed)                            tier2

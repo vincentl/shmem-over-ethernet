@@ -39,5 +39,5 @@ The following tests FAILED:
 	 46 - shmem.internode.0-1-2-0-1-0 (Failed)              tier2
 	 47 - shmem.differential (Failed)                       tier2
 Errors while running CTest
-Output from these tests are in: /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/build/debug/Testing/Temporary/LastTest.log
+Output from these tests are in: <repo>/build/scratch/review-evidence-audit/tree/build/debug/Testing/Temporary/LastTest.log
 Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.

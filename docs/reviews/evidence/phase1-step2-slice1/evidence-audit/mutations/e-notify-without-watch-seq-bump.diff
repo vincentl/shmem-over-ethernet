@@ -1,5 +1,5 @@
---- /Users/vincent/shmem-over-ethernet/shmem/src/watch.c	2026-09-20 13:05:35
-+++ /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/src/watch.c	2026-09-20 17:05:09
+--- <repo>/shmem/src/watch.c	2026-09-20 13:05:35
++++ <repo>/build/scratch/review-evidence-audit/tree/shmem/src/watch.c	2026-09-20 17:05:09
 @@ -92,6 +92,6 @@
       * that the waiter's predicate then rejects cost a locked instruction and a
       * futex_wake syscall on a path whose floor is a memcpy (§8.4). */

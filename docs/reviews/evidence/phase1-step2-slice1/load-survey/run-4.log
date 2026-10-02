@@ -1,5 +1,5 @@
-Internal ctest changing into directory: /Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/build/release
-Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/build/release
+Internal ctest changing into directory: <repo>/build/scratch/review-load/tree/build/release
+Test project <repo>/build/scratch/review-load/tree/build/release
         Start 112: shmem.watchdog.off
         Start 113: shmem.watchdog.default
   1/131 Test #112: shmem.watchdog.off .........................   Passed    3.02 sec

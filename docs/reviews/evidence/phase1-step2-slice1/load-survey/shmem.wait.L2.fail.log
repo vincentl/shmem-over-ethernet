@@ -1,5 +1,5 @@
-Internal ctest changing into directory: /Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/build/release
-Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/build/release
+Internal ctest changing into directory: <repo>/build/scratch/review-load/tree/build/release
+Test project <repo>/build/scratch/review-load/tree/build/release
     Start 70: shmem.wait.L2
     Test #70: shmem.wait.L2 ....................   Passed    0.18 sec
     Start 70: shmem.wait.L2
@@ -12,8 +12,8 @@ Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/b
     Test #70: shmem.wait.L2 ....................   Passed    0.22 sec
     Start 70: shmem.wait.L2
     Test #70: shmem.wait.L2 ....................***Failed   60.02 sec
-/Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/shmem/tests/test-wait.c:39: CHECK(shmem_uint64_test(flag, SHMEM_CMP_EQ, 0) == 1) failed
-/Users/vincent/shmem-over-ethernet/build/scratch/review-load/tree/shmem/tests/test-wait.c:40: CHECK(shmem_uint64_test(flag, SHMEM_CMP_NE, 0) == 0) failed
+<repo>/build/scratch/review-load/tree/shmem/tests/test-wait.c:39: CHECK(shmem_uint64_test(flag, SHMEM_CMP_EQ, 0) == 1) failed
+<repo>/build/scratch/review-load/tree/shmem/tests/test-wait.c:40: CHECK(shmem_uint64_test(flag, SHMEM_CMP_NE, 0) == 0) failed
 osoe-launch: timeout after 60 s; killing 2 process(es)
 osoe-launch: rank 0 killed by signal 9
 osoe-launch: rank 1 killed by signal 9

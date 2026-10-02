@@ -6,7 +6,7 @@ and tools, and changes no library code or phase-1 behaviour.
 
 ## Context
 
-- **Repository:** `/Users/vincent/Desktop/Maker Space/shmem-over-ethernet`.
+- **Repository:** `<repo>`.
 - **Base:** the branch forked from `phase1-slice1` at `459262e` ("Document running
   a one-node job without Slurm") and has one commit on top.
 - **What it adds:**

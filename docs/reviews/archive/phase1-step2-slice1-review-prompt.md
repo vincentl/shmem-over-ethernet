@@ -14,7 +14,7 @@ evidence is known to be thin.
 
 ## Context
 
-- **Repository:** `/Users/vincent/shmem-over-ethernet`, project **osoe**.
+- **Repository:** `<repo>`, project **osoe**.
 - **Design doc:** `docs/design/shmem-ethernet-design.md`, a decision record —
   each section states a choice, its rationale, and what was rejected. §9 lists
   load-bearing invariants; §10 lists closed and open questions.

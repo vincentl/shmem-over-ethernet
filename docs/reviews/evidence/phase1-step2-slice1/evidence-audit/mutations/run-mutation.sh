@@ -3,7 +3,7 @@
 # Applies one mutation to the PRIVATE copy, records the diff, rebuilds debug, runs the
 # selected tests, then restores the file from the real tree. Never touches the real tree.
 set -u
-REAL=/Users/vincent/shmem-over-ethernet
+REAL=<repo>
 TREE=$REAL/build/scratch/review-evidence-audit/tree
 OUT=$REAL/docs/reviews/evidence/phase1-step2-slice1/evidence-audit/mutations
 name=$1; regex=$2; file=$3; expr=$4

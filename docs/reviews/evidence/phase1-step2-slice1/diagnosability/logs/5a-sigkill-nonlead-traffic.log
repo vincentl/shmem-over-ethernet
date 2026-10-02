@@ -1,7 +1,7 @@
 # hook: pid=$(pgrep -P $launcher -f hang | sed -n 4p); echo killing rank-3 pid $pid; kill -KILL $pid
 killing rank-3 pid 643086
 # job id (launcher pid) 643075
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --list
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --list
 /osoe.638752.0.0.0           layout 7  2 PEs, 2 live  151552 bytes
 /osoe.638752.0.0.conn.0      /dev/shm/osoe.638752.0.0.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 /osoe.638752.0.1.0           layout 7  2 PEs, 2 live  151552 bytes
@@ -35,7 +35,7 @@ $ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/bu
 /osoe.643103.0.job.0         /dev/shm/osoe.643103.0.job.0 is not an osoe control segment (magic 0x626f6a656f736f)
 /osoe.643103.0.wire.0.1.0    /dev/shm/osoe.643103.0.wire.0.1.0 is not an osoe control segment (magic 0x4000)
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.0.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.0.0
 /osoe.643075.0.0.0  layout 7  2 local PEs of 6  (job 643075 step 0 node 0 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -63,7 +63,7 @@ am.reserve_stalls                                   9            5            14
 thread.claimed                                      1            1             1
 thread.tid                                     643091       643095        643095
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.1.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.1.0
 /osoe.643075.0.1.0  layout 7  2 local PEs of 6  (job 643075 step 0 node 1 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -89,7 +89,7 @@ agent.last_wake_ns                      75433293129602            07543329312960
 thread.claimed                                      1            1             1
 thread.tid                                     643092       643093        643093
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.2.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.2.0
 /osoe.643075.0.2.0  layout 7  2 local PEs of 6  (job 643075 step 0 node 2 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -117,7 +117,7 @@ am.reserve_stalls                                   2            8            10
 thread.claimed                                      1            1             1
 thread.tid                                     643096       643094        643096
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.0.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.0.0
 /osoe.643075.0.0.0  layout 7  2 local PEs of 6  (job 643075 step 0 node 0 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -145,7 +145,7 @@ am.reserve_stalls                                  14            8            22
 thread.claimed                                      1            1             1
 thread.tid                                     643091       643095        643095
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.643075.0.0.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.643075.0.0.0
 /osoe.643075.0.0.0  layout 7  2 local PEs of 6  (job 643075 step 0 node 0 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -155,7 +155,7 @@ block  PE      pid      tid          cpu    invol.csw  kind
     8   1   643082   643095         0 ns            2  agent
     9   1   643082   643082     710.0 ms        17360  application
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.1.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.1.0
 /osoe.643075.0.1.0  layout 7  2 local PEs of 6  (job 643075 step 0 node 1 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -181,7 +181,7 @@ agent.last_wake_ns                      75433293129602            07543329312960
 thread.claimed                                      1            1             1
 thread.tid                                     643092       643093        643093
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.643075.0.1.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.643075.0.1.0
 /osoe.643075.0.1.0  layout 7  2 local PEs of 6  (job 643075 step 0 node 1 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -191,7 +191,7 @@ block  PE      pid      tid          cpu    invol.csw  kind
     8   1   643086   643093            -            -  agent
     9   1   643086   643086            -            -  application
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.2.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --counters --nonzero /dev/shm/osoe.643075.0.2.0
 /osoe.643075.0.2.0  layout 7  2 local PEs of 6  (job 643075 step 0 node 2 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 
@@ -219,7 +219,7 @@ am.reserve_stalls                                   8           11            19
 thread.claimed                                      1            1             1
 thread.tid                                     643096       643094        643096
 
-$ /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.643075.0.2.0
+$ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.643075.0.2.0
 /osoe.643075.0.2.0  layout 7  2 local PEs of 6  (job 643075 step 0 node 2 session 0)
   151552 bytes, 89 metrics (checksum 0x0c8d77e2), 16 blocks of 512 bytes
 

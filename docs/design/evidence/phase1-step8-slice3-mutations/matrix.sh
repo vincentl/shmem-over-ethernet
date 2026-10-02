@@ -3,7 +3,7 @@
 # alone, or both; ten runs each on 0,1,2,0,1,0, counting failures.
 exec 9>/tmp/osoe-vm.lock
 flock -w 3600 9 || exit 1
-R=/Users/vincent/shmem-over-ethernet; T=$R/build/scratch/wt/slice3; M=$R/build/scratch/wt/mutslice3
+R=<repo>; T=$R/build/scratch/wt/slice3; M=$R/build/scratch/wt/mutslice3
 O=$R/build/scratch/slice3/matrix.txt; : > $O
 cd $M
 for m in none noretag plain_max pe_quiet_stores_full bit_first_moved; do

@@ -2,7 +2,7 @@ import re,sys
 # Inputs, in the working directory: spec.txt (pdftotext -layout docs/reference/OpenSHMEM-1.6.pdf spec.txt)
 # and syms.txt (nm -D --defined-only libosoe.so | awk '{print $2, $3}').
 spec=open("spec.txt").read()
-hdr=open('/Users/vincent/shmem-over-ethernet/shmem/include/shmem.h').read()
+hdr=open('<repo>/shmem/include/shmem.h').read()
 syms=set(l.split()[1] for l in open('syms.txt') if len(l.split())==2)
 macros=set(re.findall(r'#define\s+(shmem_\w+)',hdr))
 have=syms|macros

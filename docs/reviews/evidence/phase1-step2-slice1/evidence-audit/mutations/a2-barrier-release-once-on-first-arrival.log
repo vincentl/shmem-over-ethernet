@@ -36,7 +36,7 @@ osoe-launch: rank 4 killed by signal 15
 
       Start  47: shmem.differential
 17/22 Test  #47: shmem.differential .........................***Failed    0.02 sec
-CMake Error at /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/cmake/Differential.cmake:34 (message):
+CMake Error at <repo>/build/scratch/review-evidence-audit/tree/cmake/Differential.cmake:34 (message):
   map 0,1,2,3,4,5 exited 1
 
   --- stdout ---

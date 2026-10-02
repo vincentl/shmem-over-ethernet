@@ -17,7 +17,7 @@ what must change before a stranger relies on that.
 
 ## Context
 
-- **Repository:** `/Users/vincent/shmem-over-ethernet`, `main` at the commit the
+- **Repository:** `<repo>`, `main` at the commit the
   author names when starting the review (`git log -1 main`). Review that commit:
   build it in a worktree of your own.
 - **Read first**, in order: `README.md` (the public face: what osoe is, how to

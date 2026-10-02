@@ -6,7 +6,7 @@ working slice of it into code, with a small design step first.
 
 ## Context
 
-- **Repository:** `/Users/vincent/Desktop/Maker Space/shmem-over-ethernet`.
+- **Repository:** `<repo>`.
 - **Design record:** `docs/design/shmem-ethernet-design.md` (~2,500 lines). Each
   section states a decision, its rationale, and rejected alternatives. §9 lists
   load-bearing invariants; §10 lists closed decisions and open questions. It has

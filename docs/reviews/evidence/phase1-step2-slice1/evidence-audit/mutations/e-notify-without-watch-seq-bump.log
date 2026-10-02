@@ -1,6 +1,6 @@
 [ 11%] Building C object shmem/CMakeFiles/osoe.dir/src/transport-am.c.o
 [ 12%] Building C object shmem/CMakeFiles/osoe.dir/src/watch.c.o
-Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/build/debug
+Test project <repo>/build/scratch/review-evidence-audit/tree/build/debug
       Start  10: shmem.watch-range
  1/35 Test  #10: shmem.watch-range ..........................   Passed    0.00 sec
       Start  35: shmem.multinode.0-0-0-0
@@ -31,10 +31,10 @@ invariants: invariant.missed_wake[25] is 1, not zero (§8.2)
 invariants: invariant.missed_wake[25] is 1, not zero (§8.2)
 invariants: invariant.missed_wake[25] is 1, not zero (§8.2)
 invariants: invariant.missed_wake[25] is 1, not zero (§8.2)
-/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:353: CHECK(osoe_invaria/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:353: CHECK(osoe_invariants_ok()) failed
+<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:353: CHECK(osoe_invaria<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:353: CHECK(osoe_invariants_ok()) failed
 nts_ok()) failed
-/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:353: CHECK(osoe_invariants_ok()) failed
-/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:353: CHECK(osoe_invariants_ok()) failed
+<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:353: CHECK(osoe_invariants_ok()) failed
+<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:353: CHECK(osoe_invariants_ok()) failed
 osoe-launch: rank 0 exited with status 1
 osoe-launch: rank 1 exited with status 1
 osoe-launch: rank 3 exited with status 1
@@ -65,11 +65,11 @@ osoe-launch: rank 2 exited with status 1
 invariants: invariant.missed_wake[1] is 2, not zero (§8.2)
 invariants: invariant.missed_wake[1] is 2, not zero (§8.2)
 invariants: invariant.missed_wake[1] is 2, not zero (§8.2)
-/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-signal.c:104: CHECK(osoe_invariants/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-signal.c:104: CHECK(osoe_invariants_ok()) failed
+<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-signal.c:104: CHECK(osoe_invariants<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-signal.c:104: CHECK(osoe_invariants_ok()) failed
 _ok()) failed
 invariants: invariant.missed_wake[1] is 2, not zero (§8.2)
-/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-signal.c:104: CHECK(osoe_invariants_ok()) failed
-/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-signal.c:104: CHECK(osoe_invariants_ok()) failed
+<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-signal.c:104: CHECK(osoe_invariants_ok()) failed
+<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-signal.c:104: CHECK(osoe_invariants_ok()) failed
 osoe-launch: rank 0 exited with status 1
 osoe-launch: rank 1 exited with status 1
 osoe-launch: rank 2 exited with status 1

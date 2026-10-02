@@ -1,20 +1,20 @@
 ##### compile-only probes
 --- pcontrol-from-shmem-header
-/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/pcontrol-from-shmem-header.c:8:5: error: implicit declaration of function ‘shmem_pcontrol’; did you mean ‘shmem_ptr’? [-Wimplicit-function-declaration]
+<repo>/docs/reviews/evidence/phase1-step2-slice1/conformance/pcontrol-from-shmem-header.c:8:5: error: implicit declaration of function ‘shmem_pcontrol’; did you mean ‘shmem_ptr’? [-Wimplicit-function-declaration]
 exit: NOT-BUILT
 --- mpp-shmemx-header
-/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/mpp-shmemx-header.c:4:10: fatal error: mpp/shmemx.h: No such file or directory
+<repo>/docs/reviews/evidence/phase1-step2-slice1/conformance/mpp-shmemx-header.c:4:10: fatal error: mpp/shmemx.h: No such file or directory
 exit: NOT-BUILT
 --- deprecated-amo-names
-/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:10:5: error: implicit declaration of function ‘shmem_long_inc’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
-/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:11:16: error: implicit declaration of function ‘shmem_long_finc’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
-/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:12:12: error: implicit declaration of function ‘shmem_long_cswap’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
-/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:13:12: error: implicit declaration of function ‘shmem_long_swap’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
-/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:14:5: error: implicit declaration of function ‘shmem_long_add’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
-/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:15:12: error: implicit declaration of function ‘shmem_long_fadd’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+<repo>/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:10:5: error: implicit declaration of function ‘shmem_long_inc’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+<repo>/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:11:16: error: implicit declaration of function ‘shmem_long_finc’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+<repo>/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:12:12: error: implicit declaration of function ‘shmem_long_cswap’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+<repo>/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:13:12: error: implicit declaration of function ‘shmem_long_swap’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+<repo>/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:14:5: error: implicit declaration of function ‘shmem_long_add’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
+<repo>/docs/reviews/evidence/phase1-step2-slice1/conformance/deprecated-amo-names.c:15:12: error: implicit declaration of function ‘shmem_long_fadd’; did you mean ‘shmem_long_wait’? [-Wimplicit-function-declaration]
 exit: NOT-BUILT
 --- spec-example-5
-/Users/vincent/shmem-over-ethernet/docs/reviews/evidence/phase1-step2-slice1/conformance/spec-example-5.c:12:7: error: implicit declaration of function ‘shmem_put’; did you mean ‘shmem_ptr’? [-Wimplicit-function-declaration]
+<repo>/docs/reviews/evidence/phase1-step2-slice1/conformance/spec-example-5.c:12:7: error: implicit declaration of function ‘shmem_put’; did you mean ‘shmem_ptr’? [-Wimplicit-function-declaration]
 exit: NOT-BUILT
 ##### spec examples, 4 PEs on 2 logical nodes (-m 0,0,1,1) and on one node
 --- spec-example-38 map 0,0,0,0: exit 0

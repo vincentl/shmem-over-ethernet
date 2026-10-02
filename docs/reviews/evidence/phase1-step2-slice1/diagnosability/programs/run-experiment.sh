@@ -2,7 +2,7 @@
 # run-experiment.sh NAME MAP COUNT TIMEOUT SETTLE -- hang-arguments...
 # Launches the hang program under osoe-launch, waits SETTLE seconds, then acts
 # as an operator with osoe-stat alone, logging the commands and their output.
-. /Users/vincent/shmem-over-ethernet/build/scratch/review-diagnosability/env.sh
+. <repo>/build/scratch/review-diagnosability/env.sh
 name=$1 map=$2 count=$3 timeout=$4 settle=$5; shift 6
 log=$E/logs/$name.log
 : > $log

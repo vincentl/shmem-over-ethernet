@@ -1,6 +1,6 @@
 [ 11%] Building C object shmem/CMakeFiles/osoe.dir/src/signal.c.o
 [ 12%] Building C object shmem/CMakeFiles/osoe.dir/src/transport-am.c.o
-Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/build/debug
+Test project <repo>/build/scratch/review-evidence-audit/tree/build/debug
       Start 35: shmem.multinode.0-0-0-0
  1/22 Test #35: shmem.multinode.0-0-0-0 ....................   Passed    0.33 sec
       Start 36: shmem.multinode.0-1-2
@@ -20,26 +20,26 @@ Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-au
       Start 43: shmem.internode.0-1-2
  9/22 Test #43: shmem.internode.0-1-2 ......................***Failed    0.07 sec
 PE 1: byte 3212 of 5000 from PE 2 is 0, expected 13
-/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:149: CHECK(bad < 0) failed
+<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:149: CHECK(bad < 0) failed
 osoe-launch: rank 1 exited with status 1
 
       Start 44: shmem.internode.0-0-1-1-2-2
 10/22 Test #44: shmem.internode.0-0-1-1-2-2 ................***Failed    0.14 sec
 PE 5: byte 3552 of 5000 from PE 2 is 0, expected 135
-/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:149: CHECK(bad < 0) failed
+<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:149: CHECK(bad < 0) failed
 osoe-launch: rank 5 exited with status 1
 
       Start 45: shmem.internode.0-0-0-1-2-2
 11/22 Test #45: shmem.internode.0-0-0-1-2-2 ................***Failed    0.13 sec
 PE 3: byte 3200 of 5000 from PE 5 is 0, expected 108
-/Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:149: CHECK(bad < 0) failed
+<repo>/build/scratch/review-evidence-audit/tree/shmem/tests/test-internode.c:149: CHECK(bad < 0) failed
 osoe-launch: rank 3 exited with status 1
 
       Start 46: shmem.internode.0-1-2-0-1-0
 12/22 Test #46: shmem.internode.0-1-2-0-1-0 ................   Passed    0.12 sec
       Start 47: shmem.differential
 13/22 Test #47: shmem.differential .........................***Failed    0.09 sec
-CMake Error at /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/cmake/Differential.cmake:72 (message):
+CMake Error at <repo>/build/scratch/review-evidence-audit/tree/cmake/Differential.cmake:72 (message):
   node map 0,1,2,3,4,5 disagrees with 0,0,0,0,0,0
 
   line 101:

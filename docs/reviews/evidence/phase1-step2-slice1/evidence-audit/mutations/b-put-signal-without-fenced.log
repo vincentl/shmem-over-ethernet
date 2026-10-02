@@ -2,7 +2,7 @@
 [ 12%] Building C object shmem/CMakeFiles/osoe.dir/src/signal.c.o
 [ 41%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/progress.c.o
 [ 50%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/progress.c.o
-Test project /Users/vincent/shmem-over-ethernet/build/scratch/review-evidence-audit/tree/build/debug
+Test project <repo>/build/scratch/review-evidence-audit/tree/build/debug
       Start 35: shmem.multinode.0-0-0-0
  1/16 Test #35: shmem.multinode.0-0-0-0 ....................   Passed    0.32 sec
       Start 36: shmem.multinode.0-1-2

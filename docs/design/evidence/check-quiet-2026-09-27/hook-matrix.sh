@@ -2,7 +2,7 @@
 # The slice-3 race mutations against the owner-checked stamp (wt/quiet-hook):
 # both hooks on, 0,1,2,0,1,0, ten runs each of the library's threaded test.
 exec 9>/tmp/osoe-vm.lock; flock -w 3600 9 || exit 1
-R=/Users/vincent/shmem-over-ethernet; Q=$R/build/scratch/wt/quiet-hook
+R=<repo>; Q=$R/build/scratch/wt/quiet-hook
 C=$R/build/scratch/pacer/check-quiet; O=$C/hook-matrix.txt; : > $O
 cd $Q
 for m in none noretag plain_max pe_quiet_stores_full bit_first_moved; do

@@ -3,7 +3,7 @@
 # threaded, context, get, lock and quiet tests three times each in release.
 exec 9>/tmp/osoe-vm.lock
 flock -w 3600 9 || { echo "lock busy" >&2; exit 1; }
-R=/Users/vincent/shmem-over-ethernet
+R=<repo>
 T=$R/build/scratch/wt/slice3
 M=$R/build/scratch/wt/mutslice3
 O=${OUT:-$R/build/scratch/slice3/m0}
