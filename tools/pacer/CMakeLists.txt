@@ -18,6 +18,9 @@ target_link_libraries(osoe-pacer PRIVATE osoe Threads::Threads m)
 osoe_warnings(osoe-pacer)
 set_target_properties(osoe-pacer PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 install(TARGETS osoe-pacer)
+# Its --version, which says the version CMake knows (cmake/OsoeVersion.cmake);
+# outside the block of tests below, which a decision may remove.
+osoe_version_test(tools.pacer.version $<TARGET_FILE:osoe-pacer> osoe-pacer)
 
 # Annex F's unprefixed routines, start_pes first, in a program of their own:
 # start_pes starts the library where shmem_init would, and ends it at exit.

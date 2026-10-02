@@ -53,6 +53,10 @@
 #include "parallel-print.h"
 #include "random.h"
 
+#ifndef OSOE_VERSION_STRING
+#error "OSOE_VERSION_STRING comes from CMake: see cmake/OsoeVersion.cmake"
+#endif
+
 /* The library's default heap, shmem/src/bootstrap.h's
  * OSOE_DEFAULT_SYMMETRIC_SIZE, which is internal. */
 #define DEFAULT_HEAP (UINT64_C(256) << 20)
@@ -236,6 +240,7 @@ static void usage(FILE *out)
 "  --plant DEFECT      plant a defect a check must catch, from the list below;\n"
 "                      always on PE 1, and named in the header\n"
 "  --help              this, before shmem_init\n"
+"  --version           osoe's version, before shmem_init\n"
 "\n"
 "The last line is \"osoe-pacer failures=N seconds=S\"; the exit status is 1\n"
 "when N is not 0, and 2 when the command line or the budget is refused.\n"
@@ -410,7 +415,7 @@ static int positive_number(const char *text, double *out)
     return 0;
 }
 
-/* 0, 1 for --help, or 2 when refused. */
+/* 0, 1 for --help, 3 for --version, or 2 when refused. */
 static int parse(int argc, char **argv)
 {
     for (int i = 1; i < argc; i++) {
@@ -443,7 +448,7 @@ static int parse(int argc, char **argv)
 
         static const char *const flags[] = { "--help", "--quick", "--no-ptr",
                                              "--stop-on-failure", "--teams-exhaust",
-                                             "--fold-nodes" };
+                                             "--fold-nodes", "--version" };
         int flag = -1;
         for (int k = 0; k < (int)(sizeof flags / sizeof *flags); k++)
             if (strcmp(name, flags[k]) == 0)
@@ -463,6 +468,8 @@ static int parse(int argc, char **argv)
                 options.teams_exhaust = 1;
             if (flag == 5)
                 options.fold_nodes = 1;
+            if (flag == 6)
+                return 3;
             continue;
         }
         static const char *const valued[] = { "--seconds", "--report", "--rounds", "--seed",
@@ -1170,6 +1177,10 @@ int main(int argc, char **argv)
     int parsed = parse(argc, argv);
     if (parsed == 1) {
         usage(stdout);
+        return 0;
+    }
+    if (parsed == 3) {
+        printf("osoe-pacer (osoe) " OSOE_VERSION_STRING "\n");
         return 0;
     }
     if (parsed != 0)

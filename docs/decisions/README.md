@@ -124,6 +124,7 @@ without the author, under a standing mandate, and the record carries the undo.
 
 - **License: GNU LGPL, version 3 or any later version.** `COPYING` and `COPYING.LESSER`; `SPDX-License-Identifier: LGPL-3.0-or-later` on every source file. Author, [2026-09-26-evening](2026-09-26-evening.md) items 3 and 14.
 - **An hour of `mix` on the cluster before every release tag**, on the release checklist. Author, [2026-09-27-night](2026-09-27-night.md) "What the answers changed".
+- **The version is 0.1.0, one value**: `project(osoe VERSION ...)` in the top-level `CMakeLists.txt`, which reaches the line `SHMEM_VERSION=1` prints, the first line of `SHMEM_INFO`'s text, every tool's `--version` (`oshcc`'s is `--showme:version`, since its `--version` is the compiler's, which build systems read), and the shared library's file name and soname. `SHMEM_VENDOR_STRING` stays "osoe", a name. Author, [2026-10-02](2026-10-02.md) item 7 (D8).
 - **The release checklist lives in the tree**, `docs/release-checklist.md`, moved there from the author's status page by the release-fixes brief. Author, [2026-10-02](2026-10-02.md) item 5.
 
 ## Reversed

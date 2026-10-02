@@ -26,6 +26,14 @@ if(BUILD_SHARED_LIBS)
     COMMAND ${CMAKE_COMMAND} -DLIB=$<TARGET_FILE:osoe>
             -P ${PROJECT_SOURCE_DIR}/cmake/CheckProfiling.cmake)
   set_tests_properties(shmem.profiling_aliases PROPERTIES LABELS "tier1" TIMEOUT 30)
+
+  # The library's file and soname carry the project's version (cmake/OsoeVersion.cmake):
+  # libosoe.so.<version>, and libosoe.so.<major> as its soname.
+  add_test(NAME shmem.version.library
+    COMMAND ${CMAKE_COMMAND} -DLIB=$<TARGET_FILE:osoe> -DVERSION=${PROJECT_VERSION}
+            -DSOVERSION=${PROJECT_VERSION_MAJOR}
+            -P ${PROJECT_SOURCE_DIR}/cmake/CheckLibraryVersion.cmake)
+  set_tests_properties(shmem.version.library PROPERTIES LABELS "tier1" TIMEOUT 30)
 endif()
 
 # The backend boundary (§4.10): no file above transport.h and internode.h may
@@ -2090,6 +2098,23 @@ foreach(layout "L2;2;-" "L4;4;-" "0-0-1-1;4;0,0,1,1")
       LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "DEATH IN WAIT OK")
   endforeach()
 endforeach()
+
+# The version (cmake/OsoeVersion.cmake): what the library prints at start-up
+# is compared with the project's own version, never with a copy of it.
+# SHMEM_VERSION=1 has every PE say "osoe <version>, OpenSHMEM 1.6" before the
+# rendezvous, so that a job that fails to start still says which library it
+# was; SHMEM_INFO=1 has a node's lead begin its text with "osoe <version>".
+add_test(NAME shmem.version.start-up
+  COMMAND osoe-launch -n 1 -t 60 -e 0:SHMEM_VERSION=1 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.version.start-up PROPERTIES
+  PASS_REGULAR_EXPRESSION "(^|\n)osoe: PE 0: osoe ${OSOE_VERSION_PATTERN}, OpenSHMEM 1[.]6\n")
+add_test(NAME shmem.version.info
+  COMMAND osoe-launch -n 1 -t 60 -e 0:SHMEM_INFO=1 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.version.info PROPERTIES
+  PASS_REGULAR_EXPRESSION "(^|\n)osoe ${OSOE_VERSION_PATTERN} environment variables\n")
+set_tests_properties(shmem.version.start-up shmem.version.info PROPERTIES
+  LABELS "tier2" TIMEOUT 90
+  FAIL_REGULAR_EXPRESSION "exited with status [1-9]|killed by signal|timeout after|left behind")
 
 # Init must refuse what it cannot run, saying why.
 add_test(NAME shmem.refuse.no_launcher

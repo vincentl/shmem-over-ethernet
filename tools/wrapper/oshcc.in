@@ -10,6 +10,8 @@
 # -print-*), and `oshcc -v` alone is the compiler's. `oshcc -show ...` prints
 # the command it would run instead of running it; --showme, --showme:compile
 # and --showme:link are Open MPI's spellings, which some build systems ask.
+# osoe's own version is --showme:version, in the same family: --version stays
+# the compiler's, which build systems run to tell what CC is.
 #
 # Symmetric statics (design §4.3): every compile gets -fno-pie and every link
 # of a program -no-pie and osoe's linker script, which gathers the program's
@@ -27,12 +29,14 @@ library='@OSOE_WRAPPER_LIBRARY@'
 libraries='@OSOE_WRAPPER_LIBRARIES@'
 link_flags='@OSOE_WRAPPER_LINK_FLAGS@'
 statics='@OSOE_WRAPPER_STATICS_SCRIPT@'
+version='@PROJECT_VERSION@'
 @OSOE_WRAPPER_RELOCATE@
 
 show=no
 case $1 in
     -show|--showme) show=yes; shift ;;
     --showme:compile) echo "-I$include -fno-pie"; exit 0 ;;
+    --showme:version) echo "oshcc (osoe) $version"; exit 0 ;;
     --showme:link)
         echo "-fno-pie -no-pie -Xlinker -T -Xlinker $statics $link_flags -L$library" \
              "$libraries -Xlinker -rpath -Xlinker $library"

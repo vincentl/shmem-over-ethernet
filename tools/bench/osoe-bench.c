@@ -4,6 +4,7 @@
  *
  *   srun -N4 --ntasks-per-node=4 osoe-bench [WHAT]...
  *   osoe-launch -n 8 -m 0,0,0,0,1,1,1,1 -- osoe-bench [WHAT]...
+ *   osoe-bench --version
  *
  * WHAT is any of latency, bandwidth, atomic, barrier, collectives and pairs;
  * all of them by default. And threads, only when named, since it initializes
@@ -49,6 +50,10 @@
 #include <time.h>
 
 #include <shmem.h>
+
+#ifndef OSOE_VERSION_STRING
+#error "OSOE_VERSION_STRING comes from CMake: see cmake/OsoeVersion.cmake"
+#endif
 
 enum { LATENCY_TRIPS = 2000, WARMUP = 200, STREAM_BYTES = 64 << 20, MAX_BYTES = 4 << 20 };
 
@@ -321,6 +326,11 @@ int main(int argc, char **argv)
 {
     static const char *const known[] = { "latency", "bandwidth", "atomic", "barrier",
                                          "collectives", "pairs", "threads", "quick" };
+    /* --version alone, before shmem_init, so that it needs no launcher. */
+    if (argc == 2 && strcmp(argv[1], "--version") == 0) {
+        printf("osoe-bench (osoe) " OSOE_VERSION_STRING "\n");
+        return 0;
+    }
     for (int i = 1; i < argc; i++) {
         size_t k = 0;
         while (k < sizeof known / sizeof *known && strcmp(argv[i], known[k]) != 0)

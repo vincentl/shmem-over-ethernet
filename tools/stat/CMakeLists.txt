@@ -7,6 +7,9 @@ target_link_libraries(osoe-stat PRIVATE rt)
 osoe_warnings(osoe-stat)
 install(TARGETS osoe-stat)
 
+# Its --version, which says the version CMake knows (cmake/OsoeVersion.cmake).
+osoe_version_test(stat.version $<TARGET_FILE:osoe-stat> osoe-stat)
+
 # The reader against a segment this build did not write: different record
 # layouts, a different table order, metrics it has never heard of, and a layout
 # version from the future (§3.14). This is the test of "a tool built from a

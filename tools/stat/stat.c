@@ -33,6 +33,10 @@
 
 #include "segment.h"
 
+#ifndef OSOE_VERSION_STRING
+#error "OSOE_VERSION_STRING comes from CMake: see cmake/OsoeVersion.cmake"
+#endif
+
 enum mode { MODE_LIST, MODE_COUNTERS, MODE_THREADS, MODE_DUMP, MODE_GC, MODE_SUMMARY };
 
 static bool opt_json;
@@ -1143,6 +1147,7 @@ static void usage(FILE *f)
 "  -j, --json        JSON instead of a table\n"
 "  -z, --nonzero     omit counters that are zero\n"
 "  -n, --interval S  repeat every S seconds\n"
+"      --version     print osoe's version\n"
 "  -h, --help\n");
 }
 
@@ -1156,6 +1161,9 @@ int main(int argc, char **argv)
         const char *a = argv[i];
         if (!strcmp(a, "-h") || !strcmp(a, "--help")) {
             usage(stdout);
+            return 0;
+        } else if (!strcmp(a, "--version")) {
+            printf("osoe-stat (osoe) " OSOE_VERSION_STRING "\n");
             return 0;
         } else if (!strcmp(a, "-c") || !strcmp(a, "--counters")) {
             m = MODE_COUNTERS; mode_set = true;

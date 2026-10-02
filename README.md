@@ -13,7 +13,8 @@ deprecated ones of its Annex F included. What departs from the
 specification, or takes a choice it leaves open, is listed under
 [Limits](#limits-and-where-osoe-departs-from-the-specification). osoe has not
 made a release yet: there is no version tag, and it is built and tested from
-the repository as it stands.
+the repository as it stands. The tree is version 0.1.0; [Installing](#installing)
+says where the library and the tools show it.
 
 ## OpenSHMEM in two minutes
 
@@ -77,10 +78,10 @@ srun -N2 --ntasks-per-node=4 ./ring
 - Linux 6.7 or newer
 - liburing 2.6 or newer
 - CMake 3.25 or newer, pkg-config, and a C11 compiler
-
 - Python 3, optionally: the model checker and the stress tester's counting
   build use it. Where CMake does not find it, it says so while configuring and
   leaves those out; nothing else needs it.
+
 Debian 13 (Trixie) and Raspberry Pi OS Trixie provide all of these from their
 own repositories. Older releases are not supported, even where the kernel is
 new enough: see the design notes, §1.
@@ -153,6 +154,17 @@ srun -K1 --cpu-bind=none -N4 --ntasks-per-node=4 /opt/osoe/bin/osoe-pacer --quic
 It runs its exercises at small sizes, checks every result, and ends with
 `osoe-pacer failures=0` and exit status 0 - in 7 s on the Pi cluster's 16 PEs.
 `osoe-pacer --help` lists what else it runs.
+
+The version is set once, by `project(osoe VERSION ...)` in `CMakeLists.txt`,
+and everything that names a version says it: `SHMEM_VERSION=1` makes every PE
+print a line ending `osoe 0.1.0, OpenSHMEM 1.6` at start-up, and `SHMEM_INFO=1`
+heads its text with `osoe 0.1.0 environment variables`; `osoe-stat`,
+`osoe-pacer`, `osoe-launch` and `osoe-bench` answer `--version` with one line,
+such as `osoe-stat (osoe) 0.1.0`; the shared library is `libosoe.so.0.1.0`, with
+the soname `libosoe.so.0`. `oshcc` answers `--showme:version` instead: its
+`--version` is still the C compiler's, which build systems run to learn what
+`CC` is. (`shmem_info_get_name` still returns `osoe`, a name, and
+`shmem_info_get_version` the specification's, 1.6.)
 
 ### Building a program
 
@@ -535,8 +547,8 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `SHMEM_SYMMETRIC_SIZE` | `256m` | Symmetric heap bytes a PE, with an optional `k`, `m`, `g` or `t` multiplier; at most 4 TiB. *Checked*. |
-| `SHMEM_VERSION` | unset | Set: every PE prints the library and the specification's version at start-up. |
-| `SHMEM_INFO` | unset | Set: each node's first PE prints the variables osoe reads, with their defaults. |
+| `SHMEM_VERSION` | unset | Set: every PE prints osoe's version and the specification's at start-up, as `osoe 0.1.0, OpenSHMEM 1.6`. |
+| `SHMEM_INFO` | unset | Set: each node's first PE prints the variables osoe reads, with their defaults, under a first line naming osoe's version. |
 | `SHMEM_DEBUG` | unset | Set: every PE prints what the library set up for it - its rank and node, its heap's size and address, its control segment's name. |
 
 **Limits**

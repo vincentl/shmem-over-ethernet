@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# What names a version is made from the one value project(osoe VERSION ...)
+# holds, in the top-level CMakeLists.txt.
+#
+# Every target is compiled with that value as the macro OSOE_VERSION_STRING, a
+# string literal such as "0.1.0": the library's start-up line and SHMEM_INFO's
+# text print it, and so does each tool's --version. It is set once, here, for
+# every target, rather than target by target: the library's own sources are
+# also compiled into white-box tests, each of which would have to remember it.
+# SHMEM_VENDOR_STRING (shmem.h) stays "osoe": it is a name, as other
+# implementations' are, and the version is a separate fact. oshcc, a script,
+# takes the value from its template instead (tools/wrapper/oshcc.in), and the
+# shared library's VERSION and SOVERSION come from PROJECT_VERSION
+# (shmem/CMakeLists.txt).
+add_compile_definitions(OSOE_VERSION_STRING="${PROJECT_VERSION}")
+
+# The same value as a regular expression, for a test that compares what a
+# program prints with what CMake knows: a dot in it matches only a dot.
+string(REPLACE "." "[.]" OSOE_VERSION_PATTERN "${PROJECT_VERSION}")
+
+# osoe_version_test(<test> <program> <tool> [<arguments>...]): a test that the
+# program, run with the arguments (--version without them), prints exactly
+# "<tool> (osoe) <version>" - the form every tool's --version takes - and exits 0.
+function(osoe_version_test test program tool)
+  set(arguments --version)
+  if(ARGN)
+    set(arguments ${ARGN})
+  endif()
+  add_test(NAME ${test}
+    COMMAND ${CMAKE_COMMAND} "-DPROGRAM=${program}" "-DARGUMENTS=${arguments}"
+            "-DEXPECTED=${tool} (osoe) ${PROJECT_VERSION}"
+            -P ${PROJECT_SOURCE_DIR}/cmake/CheckVersion.cmake)
+  set_tests_properties(${test} PROPERTIES LABELS "tier1" TIMEOUT 30)
+endfunction()

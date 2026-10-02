@@ -1,8 +1,13 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 cmake_minimum_required(VERSION 3.25)
 
+# The version, here and nowhere else: the line SHMEM_VERSION=1 prints and the
+# first line of SHMEM_INFO's text, every tool's --version (oshcc's is
+# --showme:version, which leaves --version the compiler's), and the shared
+# library's file name and soname all come from this value (cmake/OsoeVersion.cmake
+# says how). 0.1.0 is the first release's.
 project(osoe
-  VERSION 0.0.0
+  VERSION 0.1.0
   DESCRIPTION "OpenSHMEM 1.6 over Ethernet with io_uring"
   LANGUAGES C)
 
@@ -38,6 +43,7 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(GNUInstallDirs)
 include(CTest)
 include(OsoeWarnings)
+include(OsoeVersion)
 
 # liburing comes from the distribution; older releases are unsupported rather
 # than accommodated with a bundled copy (design notes, section 1).

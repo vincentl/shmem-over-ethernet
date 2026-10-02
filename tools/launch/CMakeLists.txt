@@ -3,6 +3,9 @@ add_executable(osoe-launch launch.c)
 target_link_libraries(osoe-launch PRIVATE osoe_base)
 osoe_warnings(osoe-launch)
 
+# Its --version, which says the version CMake knows (cmake/OsoeVersion.cmake).
+osoe_version_test(launch.version $<TARGET_FILE:osoe-launch> osoe-launch)
+
 # Self-tests: the launcher sets the bootstrap variables for every rank, fails on
 # a nonzero exit, and fails on timeout.
 add_test(NAME launch.env

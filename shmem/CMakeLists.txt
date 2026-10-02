@@ -84,6 +84,9 @@ target_include_directories(osoe
 # the AM backend's ring is its first user (phase 1 step 3).
 target_link_libraries(osoe PRIVATE osoe_base Threads::Threads PkgConfig::LIBURING)
 
+# The shared library's file is libosoe.so.<version> and its soname
+# libosoe.so.<major>, from the project's one version (cmake/OsoeVersion.cmake);
+# the start-up line and SHMEM_INFO's text print it too (init.c).
 set_target_properties(osoe PROPERTIES
   C_VISIBILITY_PRESET hidden
   VERSION ${PROJECT_VERSION}

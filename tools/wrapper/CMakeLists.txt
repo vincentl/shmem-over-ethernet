@@ -79,3 +79,12 @@ set_tests_properties(wrapper.hello wrapper.compile-then-link wrapper.show wrappe
 # An install writes the build tree's manifest: one at a time (the pacer's
 # installed test installs too).
 set_tests_properties(wrapper.installed PROPERTIES RESOURCE_LOCK osoe-install)
+
+# osoe's version is --showme:version, which says the version CMake knows
+# (cmake/OsoeVersion.cmake). --version stays the compiler's, as wrapper.show
+# also requires: build systems run it to tell what CC is, and one that read
+# "oshcc (osoe) <version>" there would not know it for a C compiler.
+osoe_version_test(wrapper.version ${oshcc} oshcc --showme:version)
+add_test(NAME wrapper.version-is-the-compilers
+  COMMAND sh -c "test \"$(${oshcc} --version)\" = \"$(${CMAKE_C_COMPILER} --version)\"")
+set_tests_properties(wrapper.version-is-the-compilers PROPERTIES LABELS "tier1" TIMEOUT 60)

@@ -5,6 +5,7 @@
  *
  *   osoe-launch -n L [-m MAP] [-t SECONDS] [-k] [-s] [-e RANK:NAME=VALUE]...
  *               [-N NAMESPACE_PREFIX] [-H HOST_LIST] -- PROGRAM [ARGS]...
+ *   osoe-launch --version
  *
  * Each process gets the OSOE_ bootstrap variables of design §6.2 - or, with
  * -s, the same variables named as srun names them, SLURM_ in place of OSOE_,
@@ -74,6 +75,10 @@
 
 #include "base/node-map.h"
 
+#ifndef OSOE_VERSION_STRING
+#error "OSOE_VERSION_STRING comes from CMake: see cmake/OsoeVersion.cmake"
+#endif
+
 enum { MAX_PROCS = 1024, MAX_OVERRIDES = 64 };
 
 struct override {
@@ -85,7 +90,8 @@ static void usage(void)
 {
     fprintf(stderr, "usage: osoe-launch -n L [-m NODE_MAP] [-t SECONDS] [-k] [-s] "
                     "[-e RANK:NAME=VALUE]... [-N NAMESPACE_PREFIX] [-H HOST_LIST] "
-                    "-- PROGRAM [ARGS]...\n");
+                    "-- PROGRAM [ARGS]...\n"
+                    "       osoe-launch --version\n");
     exit(2);
 }
 
@@ -281,6 +287,12 @@ int main(int argc, char **argv)
     const char *map_text = getenv("OSOE_NODE_MAP");
     struct override ov[MAX_OVERRIDES];
     int nov = 0;
+
+    /* --version alone, as every osoe tool answers it; getopt knows no long option. */
+    if (argc == 2 && strcmp(argv[1], "--version") == 0) {
+        printf("osoe-launch (osoe) " OSOE_VERSION_STRING "\n");
+        return 0;
+    }
 
     int opt;
     while ((opt = getopt(argc, argv, "+n:m:t:kse:N:H:")) != -1) {

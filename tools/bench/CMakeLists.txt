@@ -7,6 +7,9 @@ add_executable(osoe-bench osoe-bench.c)
 find_package(Threads REQUIRED)
 target_link_libraries(osoe-bench PRIVATE osoe Threads::Threads)
 osoe_warnings(osoe-bench)
+# Its --version, which says the version CMake knows (cmake/OsoeVersion.cmake);
+# it needs no launcher and starts no job, so it runs under every preset.
+osoe_version_test(tools.bench.version $<TARGET_FILE:osoe-bench> osoe-bench)
 # Not under ThreadSanitizer, like every test over a node map: a remote AMO's
 # write is ordered after the target's own earlier writes through another
 # process - a barrier across nodes - which it cannot see, and it reported the

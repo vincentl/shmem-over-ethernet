@@ -73,6 +73,17 @@ static uint32_t sessions;       /* completed or current full sessions */
 static _Atomic int thread_level = OSOE_INIT_LEVEL;
 
 /*
+ * What the library calls itself: the vendor string (shmem.h) and the project's
+ * version, which CMake gives libosoe as OSOE_VERSION_STRING from the one value
+ * that names it (cmake/OsoeVersion.cmake) - "osoe 0.1.0". SHMEM_VERSION's line
+ * and the first line of SHMEM_INFO's text begin with it.
+ */
+#ifndef OSOE_VERSION_STRING
+#error "OSOE_VERSION_STRING comes from CMake: see cmake/OsoeVersion.cmake"
+#endif
+#define OSOE_NAME_AND_VERSION SHMEM_VENDOR_STRING " " OSOE_VERSION_STRING
+
+/*
  * What SHMEM_INFO prints (§8). The spec says "print helpful text about all
  * these environment variables", so it is the specification's four plus the
  * OSOE_ ones a user of this implementation would otherwise have to read the
@@ -81,7 +92,7 @@ static _Atomic int thread_level = OSOE_INIT_LEVEL;
 static void print_info(void)
 {
     fprintf(stderr,
-SHMEM_VENDOR_STRING " environment variables\n"
+OSOE_NAME_AND_VERSION " environment variables\n"
 "\n"
 "  From the OpenSHMEM specification (§8). Each also has a deprecated SMA_\n"
 "  spelling; when both are set the SHMEM_ one controls.\n"
@@ -227,7 +238,7 @@ static void session_start(void)
      * which library it was and how to ask it for help.
      */
     if (osoe.bootstrap.print_version)
-        fprintf(stderr, "osoe: PE %u: " SHMEM_VENDOR_STRING ", OpenSHMEM %d.%d\n",
+        fprintf(stderr, "osoe: PE %u: " OSOE_NAME_AND_VERSION ", OpenSHMEM %d.%d\n",
                 osoe.bootstrap.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
     if (osoe.bootstrap.print_info && osoe.bootstrap.local_id == 0)
         print_info();
