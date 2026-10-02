@@ -24,5 +24,8 @@ The evidence under `docs/design/evidence/` and `docs/reviews/evidence/`, the
 finished briefs and the review prompts were written on the author's machine and
 name its paths where a command ran. On 2026-10-02 those paths were edited - the
 repository's own directory reads `<repo>`, any other path under the home
-directory reads `~` - and nothing else in those files was changed. A script that
-names `<repo>` records what ran; it is not one to run as written.
+directory reads `~` - and the four copies of the specification's examples
+(`spec-example-*.c`, in `docs/reviews/evidence/phase1-step2-slice1/conformance/`)
+were given the notice that the specification's permission asks for. Nothing
+else in those files was changed. A script that names `<repo>` records what ran;
+it is not one to run as written.
