@@ -16,22 +16,30 @@ from another process, while the PE may be publishing its next wait.
 
 Writer (the waiting PE, and the only writer):
     fetch_add(gen, 1)        -> odd: the fields are in flux
-    store routine, detail    plain stores; single-writer
+    store routine, detail    release stores of atomic words; single-writer
     fetch_add(gen, 1)        -> even: the fields are stable
 
-Reader (osoe-stat, another process; never writes):
+Reader (osoe-stat or the deadlock detector, another process; never writes):
     load gen; if odd, retry
-    load routine, detail
+    load routine, detail     acquire loads
     load gen again; if it changed, retry; else accept
 
 Two seq_cst read-modify-writes rather than a textbook seqlock. The usual form
 uses relaxed stores with a release fence between them, and §3.16 permits
 neither relaxed orders nor fences on protocol words; `fetch_add` naming seq_cst
-is a rule the project already has, and a locked read-modify-write is a full
-barrier on both targets, so the fields cannot escape the window in either
-direction. The cost is two locked instructions per *sleeping* wait - the record
-is published only after the first predicate check fails, so a wait that returns
-immediately pays nothing (§8.6 U1, U3).
+is a rule the project already has. The cost is two locked instructions per
+*sleeping* wait - the record is published only after the first predicate check
+fails, so a wait that returns immediately pays nothing (§8.6 U1, U3).
+
+What this model cannot see. The engine has two memory models, sequential
+consistency and x86-TSO, and both keep a thread's loads in order; aarch64, the
+project's target, does not. Until the round-three review (K1) the routine was a
+plain character array, and a reader's plain loads of it could be satisfied
+after its second load of the generation, pairing one wait's name with another's
+detail - 28,000 to 218,000 times in 60 to 90 million reads - while this model
+passed. The fields are now atomic words, stored with release and loaded with
+acquire, whose order C11 states for every target (shmem/src/blocked.c gives the
+argument), and shmem/tests/test-blocked-record.c checks it on the machine.
 
 Checked: the reader never accepts a torn record. Publication k writes k to both
 fields, so any accepted pair whose halves disagree came from two different

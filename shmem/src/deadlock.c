@@ -291,32 +291,7 @@ static enum sample_result go_on(void)
 
 /* ---- Saying where each PE waits -------------------------------------------- */
 
-struct waiting {
-    char routine[OSOE_BLOCKED_ROUTINE_MAX];
-    uint32_t kind;
-    uint64_t detail, since_ns;
-};
-
-/* A PE's "blocked in" record, read as osoe-stat reads it: the generation even
- * and unchanged around the fields (blocked.h). */
-static bool read_waiting(const struct osoe_pe_slot *s, struct waiting *w)
-{
-    for (int attempt = 0; attempt < 100; attempt++) {
-        uint64_t before = atomic_load_explicit(&s->blocked_gen, memory_order_seq_cst);
-        if (before & 1)
-            continue;
-        memcpy(w->routine, s->blocked_routine, sizeof w->routine);
-        w->routine[sizeof w->routine - 1] = '\0';
-        w->kind = atomic_load_explicit(&s->blocked_detail_kind, memory_order_acquire);
-        w->detail = atomic_load_explicit(&s->blocked_detail, memory_order_acquire);
-        w->since_ns = atomic_load_explicit(&s->blocked_since_ns, memory_order_acquire);
-        if (atomic_load_explicit(&s->blocked_gen, memory_order_seq_cst) == before)
-            return true;
-    }
-    return false;
-}
-
-static void describe(const struct waiting *w, char *out, size_t size)
+static void describe(const struct osoe_blocked_copy *w, char *out, size_t size)
 {
     switch (w->kind) {
     case OSOE_BLOCKED_DETAIL_NODE:
@@ -351,7 +326,7 @@ static void describe(const struct waiting *w, char *out, size_t size)
 static void report_local(void)
 {
     uint32_t count = osoe.bootstrap.local_count;
-    struct waiting *w = calloc(count, sizeof *w);
+    struct osoe_blocked_copy *w = calloc(count, sizeof *w);
     bool *said = calloc(count, sizeof *said);
     if (!w || !said) {
         free(w);
@@ -361,7 +336,7 @@ static void report_local(void)
     const char *host = osoe.node.hdr ? osoe.node.hdr->hostname : "?";
     uint64_t now = osoe_now_ns();
     for (uint32_t i = 0; i < count; i++)
-        if (!read_waiting(&osoe.node.slots[i], &w[i]) || !w[i].routine[0])
+        if (!osoe_blocked_read(&osoe.node.slots[i], &w[i]) || !w[i].routine[0])
             snprintf(w[i].routine, sizeof w[i].routine, "a wait it did not record");
     for (uint32_t i = 0; i < count; i++) {
         if (said[i])

@@ -19,6 +19,8 @@
 
 #include "segment.h"
 
+#include "../../base/atomic-name.h"
+
 /*
  * Only the two structures the design freezes may be known by layout, and a
  * reader that silently disagreed about their size would read nonsense from a
@@ -472,8 +474,19 @@ bool osoe_segment_read_str(const struct osoe_segment *s, const char *name, uint3
     if (!base || m->offset > rlen || rlen - m->offset < m->width)
         return false;
 
+    /* A name its writer may be rewriting - the "blocked in" record's routine -
+     * is kept as 64-bit atomic words (base/atomic-name.h, node.h), and must be
+     * read as words: plain loads of it are not ordered with the generation's
+     * second load (§3.14; blocked.c says why). Every string the library aligns
+     * and sizes so is read that way; anything else is copied. */
+    const unsigned char *at = base + m->offset;
+    if ((uintptr_t)at % 8 == 0 && m->width % 8 == 0) {
+        osoe_atomic_name_load((const _Atomic uint64_t *)(const void *)at, m->width / 8, buf,
+                              len);
+        return true;
+    }
     size_t n = m->width < len - 1 ? m->width : len - 1;
-    memcpy(buf, base + m->offset, n);
+    memcpy(buf, at, n);
     buf[n] = '\0';
     return true;
 }
@@ -486,7 +499,10 @@ uint32_t osoe_segment_block_pe(const struct osoe_segment *s, uint32_t block)
 
 /*
  * Load the generation, read the fields, load it again. Accept only an
- * unchanged even value; retry otherwise. A PE that republishes through every
+ * unchanged even value; retry otherwise. Every load is an acquire, the
+ * routine's name read as the words it is kept in (osoe_segment_read_str), so
+ * no field can be read after the second load of the generation: the library's
+ * own reader (shmem/src/blocked.c) gives the argument. A PE that republishes through every
  * attempt is publishing waits faster than this loop runs, which is a busy PE
  * and not the hung one this record exists for, so it is reported as unreadable
  * rather than retried forever.

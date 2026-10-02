@@ -555,37 +555,17 @@ uint64_t osoe_now_ns(void)
     return (uint64_t)ts.tv_sec * UINT64_C(1000000000) + (uint64_t)ts.tv_nsec;
 }
 
-/*
- * Bump the generation odd, write the fields, bump it even. Both bumps are
- * seq_cst read-modify-writes, which are full barriers on both targets, so no
- * field write can escape the window in either direction. §3.16 rules out the
- * textbook seqlock's relaxed stores and release fence, and this needs no rule
- * the project does not already have.
- */
+/* This PE's record (blocked.c has the protocol and why it holds). */
 static void publish(const char *routine, enum osoe_blocked_detail kind, uint64_t detail,
                     uint64_t since)
 {
-    struct osoe_pe_slot *me = &osoe.node.slots[osoe.bootstrap.local_id];
-
-    atomic_fetch_add_explicit(&me->blocked_gen, 1, memory_order_seq_cst);
-    if (routine) {
-        size_t n = strlen(routine);
-        if (n >= sizeof me->blocked_routine)
-            n = sizeof me->blocked_routine - 1;
-        memcpy(me->blocked_routine, routine, n);
-        memset(me->blocked_routine + n, 0, sizeof me->blocked_routine - n);
-    } else {
-        me->blocked_routine[0] = '\0';
-    }
-    atomic_store_explicit(&me->blocked_detail, detail, memory_order_release);
-    atomic_store_explicit(&me->blocked_detail_kind, (uint32_t)kind, memory_order_release);
-    atomic_store_explicit(&me->blocked_since_ns, since, memory_order_release);
-    atomic_fetch_add_explicit(&me->blocked_gen, 1, memory_order_seq_cst);
+    osoe_blocked_publish(&osoe.node.slots[osoe.bootstrap.local_id], routine, kind, detail,
+                         since);
 }
 
 /* The routine of the record, for this process's own agent (osoe_blocked_routine):
  * a pointer to a name with static storage, published alone, so that a thread
- * of this process reads it without the record's plain character stores. */
+ * of this process reads one word rather than the record's whole protocol. */
 static _Atomic(const char *) waiting_in;
 
 /*

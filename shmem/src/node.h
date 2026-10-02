@@ -163,21 +163,32 @@ struct osoe_pe_slot {
     /*
      * The §3.14 "blocked in" record, so a hung job says where each PE is
      * waiting. Written by this PE only when a wait is about to sleep - a wait
-     * that returns at once touches none of it - and read by osoe-stat from
-     * another process while this PE may be publishing its next wait.
+     * that returns at once touches none of it - and read from another process,
+     * by osoe-stat and by the deadlock detector's lead, while this PE may be
+     * publishing its next wait.
      *
      * `blocked_gen` is odd while the fields are in flux: the writer bumps it,
      * writes, and bumps again, both bumps seq_cst; a reader loads it, reads the
      * fields, and loads it again, accepting only an unchanged even value. Two
      * locked read-modify-writes rather than a textbook seqlock, because that
      * needs relaxed stores and a release fence and §3.16 permits neither.
-     * Model-checked in docs/design/evidence/blocked-record/.
+     * Every field is an atomic word, stored with release and loaded with
+     * acquire; blocked.c has the protocol and the argument, and
+     * tools/modelcheck/blocked_record_model.py the model.
+     *
+     * The routine's name is four such words holding its NUL-padded characters
+     * (base/atomic-name.h). It was a plain character array until the
+     * round-three review (K1): on aarch64 a reader's plain loads of it could be
+     * satisfied after its second load of the generation, so a record could
+     * pair one wait's name with another's detail. The bytes did not move - the
+     * same 32 at the same offset, and a reader that copies them still finds
+     * the name - so the layout number did not change for it.
      */
     _Alignas(OSOE_CACHELINE)
     _Atomic uint64_t blocked_gen;
     _Atomic uint64_t blocked_detail;     /* routine-specific: a PE, an epoch, an offset */
     _Atomic uint64_t blocked_since_ns;   /* CLOCK_MONOTONIC when the wait began */
-    char blocked_routine[OSOE_BLOCKED_ROUTINE_MAX];
+    _Atomic uint64_t blocked_routine[OSOE_BLOCKED_ROUTINE_MAX / 8];
     _Atomic uint32_t blocked_detail_kind;   /* enum osoe_blocked_detail; layout 9 */
 
     /* Liveness and progress, published by this PE (§3.14 question 1). Its

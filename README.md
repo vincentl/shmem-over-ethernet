@@ -464,14 +464,22 @@ that one could be added without touching the OpenSHMEM layer.
   release; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the
   other three.
-- **Model checking.** Every lock-free and futex protocol - waking the
+- **Model checking.** Every lock-free and futex protocol but one - waking the
   progress thread, waits, the barrier tree, pipelined collectives, Bruck's
   allgather, the scans, get completion under `SHMEM_THREAD_MULTIPLE`,
   rendezvous, abort, and the proof a deadlock is found by - is checked
   exhaustively in small configurations by an explicit-state model checker
   written for them (`tools/modelcheck`). Each
   model also carries deliberately broken variants that must fail: a model
-  that cannot fail proves nothing.
+  that cannot fail proves nothing. The one without a model is the deprecated
+  active-set collectives' (`active-set.c`). The checker runs a model under
+  sequential consistency or x86-TSO, and both keep a thread's loads in order,
+  which aarch64, the machines osoe is built for, does not: the "blocked in"
+  record's model passed while its routine name, then plain characters, could
+  be read torn on aarch64. That name was the one plain field the round-three
+  review's audit found rewritten while another process reads it; it is now
+  four atomic words, and `shmem.blocked-record` runs the record's own writer
+  against both of its readers on the machine.
 - **Sandia OpenSHMEM's test suite**: 159 of its programs pass on two maps of
   logical nodes. The four that do not are SOS's own: two use an extension of
   the type-generic interfaces, one overflows its own buffer (osoe stops it by

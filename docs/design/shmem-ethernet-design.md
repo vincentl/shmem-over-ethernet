@@ -1527,10 +1527,21 @@ headers would pass whenever the library agreed with itself.
   only an unchanged even value. Two locked operations rather than a textbook
   seqlock, because that needs relaxed stores and a release fence and §3.16
   permits neither, while `fetch_add` naming `seq_cst` is a rule the design
-  already has and is a full barrier on both targets. Model-checked in
-  `docs/design/evidence/blocked-record/`, which also shows the four ways to get
-  it wrong: no generation, bumping after the writes, letting a field write
-  escape above the opening bump, and a reader that does not re-read.
+  already has. **Every field is an atomic word**, stored with release and
+  loaded with acquire, the routine's name as four 64-bit words holding its
+  characters; `shmem/src/blocked.c` gives the argument in C11's terms, and
+  `base/atomic-name.h` the packing the writer and both readers share. The name
+  was a plain character array until the round-three review (K1): on aarch64 a
+  reader's plain loads may be satisfied after its second load of the
+  generation, and a litmus accepted 28,000 to 218,000 torn copies in 60 to 90
+  million reads. Its bytes stayed where they were, so the layout did not
+  change. Model-checked (`tools/modelcheck/blocked_record_model.py`, first in
+  `docs/design/evidence/blocked-record/`), which also shows the four ways to
+  get it wrong: no generation, bumping after the writes, letting a field write
+  escape above the opening bump, and a reader that does not re-read - under
+  sequential consistency and x86-TSO, which keep loads in order and so could
+  not show K1. `shmem.blocked-record` runs the code's writer against both
+  readers on the machine, and fails when the name's loads are made plain.
 
   **Published only when a wait is about to sleep**, never on entry. A wait whose
   predicate is already true touches no locked instruction and no clock — which

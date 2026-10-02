@@ -34,6 +34,7 @@ add_library(osoe
   src/alltoall.c
   src/amo.c
   src/barrier.c
+  src/blocked.c
   src/bootstrap.c
   src/collective-tree.c
   src/deadlock.c

@@ -217,6 +217,20 @@ osoe_warnings(shmem_test_fatal-order)
 add_test(NAME shmem.fatal-order COMMAND shmem_test_fatal-order)
 set_tests_properties(shmem.fatal-order PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# The "blocked in" record read while it is rewritten (§3.14; blocked.c): the
+# library's writer on one CPU, both readers on another - its own, which the
+# deadlock detector uses, and osoe-stat's, through a segment whose table points
+# into the same slot. The round-three review's litmus (K1) on the code itself;
+# it can fail only where loads are reordered, aarch64 among them. About 4 s.
+add_executable(shmem_test_blocked-record test-blocked-record.c test-blocked-record-stat.c
+  ../src/blocked.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_blocked-record PRIVATE ../src
+  ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_blocked-record PRIVATE osoe_base rt Threads::Threads)
+osoe_warnings(shmem_test_blocked-record)
+add_test(NAME shmem.blocked-record COMMAND shmem_test_blocked-record)
+set_tests_properties(shmem.blocked-record PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # Where a node listens when its own name resolves to a loopback address, as
 # Debian's /etc/hosts maps a host's own name to 127.0.1.1 (§6.2, listener.h).
 add_executable(shmem_test_own-address test-own-address.c)
