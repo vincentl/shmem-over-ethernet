@@ -977,6 +977,21 @@ add_test(NAME shmem.stopped-node.keepalive
           $<TARGET_FILE:shmem_test_stopped-node>)
 set_tests_properties(shmem.stopped-node.keepalive PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
+# A stopped node whose receive buffer is full (phase 1 release review, K5): the state
+# the test above never reaches, and the one the silent-peer check's condition
+# exists for - the kernel is asked how long its peer has acknowledged nothing
+# only while something sent is unacknowledged (wire.c, osoe_wire_silent_ms). 64 MiB
+# put toward node 1 while it is stopped shuts its window, which is probed with
+# nothing outstanding. Without the condition the job ends at about 12 s, naming a
+# node that was never gone, and every other stopped-node test still passes. The
+# stop is 15 s: 12 s let the removal through and 13 s did not, so that leaves
+# 2.8 s over the time the removal takes (the test's header has the arithmetic).
+# In every preset, as the stopped-node tests are.
+osoe_tier2_map_test(stopped-bulk 0,0,1 OSOE_TEST_STOP_MS=15000 OSOE_KEEPALIVE=1,1,3
+  SHMEM_SYMMETRIC_SIZE=128m)
+set_tests_properties(shmem.stopped-bulk.0-0-1 PROPERTIES
+  PASS_REGULAR_EXPRESSION "STOPPED BULK OK"
+  FAIL_REGULAR_EXPRESSION "stopped answering|CHECK[(]|osoe-launch: (rank|timeout)")
 
 # The other half of D-6 (diagnosability review): a blocking get waits for one
 # PE's reply, not a whole node's queue, so its no-progress fatal must name that

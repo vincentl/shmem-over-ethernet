@@ -2060,6 +2060,9 @@ apart) while segments wait for acknowledgement ends the job, naming it, as an
 idle one would have (`osoe_progress_check_silent`). A peer merely stopped is
 not found: its kernel acknowledges what arrives, and one whose receive buffer
 is full is probed through a zero window, which leaves nothing outstanding.
+`shmem.stopped-bulk` holds that second half: 64 MiB put toward a node stopped
+for 15 s, keepalive at its tightest. Without the condition that something is
+unacknowledged the check ends that job at about 12 s, and no other test notices.
 The deadlock detector made this needed, since its probe is data in flight
 toward a node that may have vanished in an otherwise idle job;
 `tier3.*.vanished-node` found it. `OSOE_KEEPALIVE=IDLE,INTERVAL,COUNT` overrides
