@@ -400,14 +400,18 @@ uint32_t osoe_metric_checksum(const struct osoe_metric_descriptor *t, uint32_t n
 /* ---- Per-thread blocks ------------------------------------------------ */
 
 /*
- * Application threads a PE may have in the library at once. The agent's own
- * block is on top of these, so a program's count is its own (the review of
- * phase 1 step 8 slice 2, B1: at 8 with the agent inside, SOS's eight-thread
- * programs ended the job). 16 rather than the node's CPU count, which a
- * four-core Pi would make 4: threads oversubscribe cores freely, and a
- * default that moves with the machine is one a program cannot rely on. Each
- * costs a counter block and a thread record, about 768 bytes of the node
- * segment a PE (decisions, 2026-09-26-evening).
+ * Application threads a PE may have alive that have called the library. Not
+ * threads in it at once: a thread takes a block at its first counted call and
+ * gives it back only when it exits (osoe_metrics_block, release_block), so a
+ * worker that made one call and lives on holds its block - the main thread and
+ * 15 such workers, calling strictly one after another, fill the 16 (the release
+ * review, C3). The agent's own block is on top of these, so a program's count
+ * is its own (the review of phase 1 step 8 slice 2, B1: at 8 with the agent
+ * inside, SOS's eight-thread programs ended the job). 16 rather than the
+ * node's CPU count, which a four-core Pi would make 4: threads oversubscribe
+ * cores freely, and a default that moves with the machine is one a program
+ * cannot rely on. Each costs a counter block and a thread record, about 768
+ * bytes of the node segment a PE (decisions, 2026-09-26-evening).
  */
 #define OSOE_DEFAULT_MAX_THREADS 16
 
@@ -428,10 +432,10 @@ static pthread_key_t release_key;
 static pthread_once_t release_once = PTHREAD_ONCE_INIT;
 
 /*
- * The block a thread gets when the pool is full, and the one every thread uses
- * before init and after fini. Thread-local, so it is never shared and the
- * single-writer rule holds without a condition; nobody reads it, which is what
- * threads.blocks_exhausted records.
+ * The block every thread uses before init and after fini; a thread that finds
+ * the pool full ends the job instead (osoe_metrics_block). Thread-local, so it
+ * is never shared and the single-writer rule holds without a condition; nobody
+ * reads it.
  */
 static _Thread_local struct osoe_counter_block orphan;
 
@@ -526,16 +530,17 @@ struct osoe_counter_block *osoe_metrics_block(void)
             return my_block;
         }
     }
-    /* No block left: every one belongs to a live thread of this PE, since a
-     * thread gives its block back at exit. A thread with none would have no
-     * record to wait in either (§4.11 item 5), so it ends the job by name at
-     * every thread level (decided 2026-09-25): a program with more live
-     * calling threads raises OSOE_MAX_THREADS. The PE's slot says so first,
-     * for osoe-stat. */
+    /* No block left: every one belongs to a live thread of this PE that has
+     * called the library, since a thread gives its block back only at exit,
+     * called again or not. A thread with none would have no record to wait in
+     * either (§4.11 item 5), so it ends the job by name at every thread level
+     * (decided 2026-09-25): a program with more live calling threads raises
+     * OSOE_MAX_THREADS. The PE's slot says so first, for osoe-stat. */
     atomic_fetch_add_explicit(&osoe.node.slots[osoe.bootstrap.local_id].blocks_exhausted, 1,
                               memory_order_seq_cst);
-    osoe_fatal("more threads of this PE are in the library than OSOE_MAX_THREADS=%u allows; "
-               "raise it (at most %u)", pool_blocks - 1, (unsigned)OSOE_MAX_THREADS_HIGHEST - 1);
+    osoe_fatal("more live threads of this PE have called the library than OSOE_MAX_THREADS=%u "
+               "allows (a thread keeps its place until it exits); raise it (at most %u)",
+               pool_blocks - 1, (unsigned)OSOE_MAX_THREADS_HIGHEST - 1);
 }
 
 uint32_t osoe_metrics_thread_index(void)

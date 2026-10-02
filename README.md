@@ -336,9 +336,13 @@ specification or takes a choice the specification leaves open.
 - **`shmem_init` provides `SHMEM_THREAD_SERIALIZED`** (a choice the
   specification leaves to the implementation); ask `shmem_init_thread` for
   `SHMEM_THREAD_MULTIPLE` to get it.
-- **At most `OSOE_MAX_THREADS` threads of a PE in the library at once**, the
-  main thread included - 16 by default, 1,023 at most. One more **ends the
-  job**, naming the variable.
+- **At most `OSOE_MAX_THREADS` live threads of a PE may have called the
+  library**, the main thread included - 16 by default, 1,023 at most. A thread
+  takes its place at its first call after `shmem_init` that does more than
+  report on the job (`shmem_my_pe` takes none) and gives it back only when it
+  exits, so workers that each make one call and live on count in full, though
+  never two are in the library at once. A call that finds every place held by
+  another live thread **ends the job**, naming the variable.
 - **At most `OSOE_MAX_CONTEXTS` contexts a PE at once**, the default context
   included - 64 by default, 4,096 at most; past it `shmem_ctx_create` returns
   nonzero.
@@ -523,7 +527,7 @@ both are set the `SHMEM_` one controls.
 |---|---|---|
 | `OSOE_MAX_TEAMS` | `64` | Team numbers a job uses in its life, the three predefined teams' included: `4` to `1024`. A destroyed team keeps its number, so this bounds the teams a job creates - 61 at the default - not only those alive at once. Each number costs every PE about 160 KiB of address space that only a team's leads touch. *Checked*. |
 | `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
-| `OSOE_MAX_THREADS` | `16` | Application threads of a PE in the library at once, the main thread included: `1` to `1023`. One more ends the job, naming the variable. The same on every PE of a node. |
+| `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. The same on every PE of a node. |
 | `OSOE_GET_LANDING_BYTES` | `262144` | Bytes of each PE's landing zone for the replies of its gets and fetching atomics, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. |
 
 **Collectives**

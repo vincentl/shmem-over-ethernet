@@ -1692,7 +1692,7 @@ add_test(NAME shmem.multiple.exhaust
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MULTIPLE=exhaust OSOE_MAX_THREADS=2
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_multiple>)
 set_tests_properties(shmem.multiple.exhaust PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "more threads of this PE are in the library than OSOE_MAX_THREADS=2 allows")
+  PASS_REGULAR_EXPRESSION "more live threads of this PE have called the library than OSOE_MAX_THREADS=2 allows")
 target_link_libraries(shmem_test_multiple PRIVATE Threads::Threads)
 # A landing zone that is not whole extents is refused by name, not rounded.
 add_test(NAME shmem.multiple.landing-unaligned
@@ -1700,6 +1700,27 @@ add_test(NAME shmem.multiple.landing-unaligned
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_multiple>)
 set_tests_properties(shmem.multiple.landing-unaligned PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "OSOE_GET_LANDING_BYTES=1500 is not a multiple of the landing zone's 1024-byte extents")
+
+# What OSOE_MAX_THREADS counts (test-thread-places.c): the live threads of a PE
+# that have called the library, not the threads in a call at once. A worker that
+# made one call and lives on holds its place, so the next one's first call ends
+# the job though no two were ever in the library together; and an exit gives a
+# place back, so many workers one after another need only one. The exhaust test
+# above parks its workers in waits, which fits either reading.
+add_executable(shmem_test_thread-places test-thread-places.c)
+target_link_libraries(shmem_test_thread-places PRIVATE osoe Threads::Threads)
+osoe_warnings(shmem_test_thread-places)
+add_test(NAME shmem.thread-places.held
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_THREADS=2
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_thread-places> held)
+set_tests_properties(shmem.thread-places.held PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "a worker made one call and lives on.*more live threads of this PE have called the library than OSOE_MAX_THREADS=2 allows")
+add_test(NAME shmem.thread-places.freed
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_THREADS=2
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_thread-places> freed)
+set_tests_properties(shmem.thread-places.freed PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "20 workers each made one call and exited"
+  FAIL_REGULAR_EXPRESSION "more live threads of this PE")
 
 # The agent's scheduler slice (§3.11; test-agent-slice.c): the default, a set
 # one, the kernel's own, and a value out of range refused by name.

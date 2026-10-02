@@ -200,11 +200,14 @@ const struct osoe_metric_descriptor *osoe_metrics_table(uint32_t *count);
 uint32_t osoe_metric_checksum(const struct osoe_metric_descriptor *t, uint32_t n);
 
 /*
- * This thread's counter block, claimed on first use and kept in thread-local
- * storage. A thread that finds no free block gets a process-private one and
- * bumps OSOE_C_THREADS_BLOCKS_EXHAUSTED in it: never an abort, and never a
- * block shared with another thread, so the single-writer rule holds without a
- * condition. OSOE_MAX_THREADS bounds the pool per PE.
+ * This thread's counter block, claimed at the thread's first counted call and
+ * kept in thread-local storage until the thread exits, whether or not it ever
+ * calls again. A thread that finds none free ends the job, naming
+ * OSOE_MAX_THREADS, at every thread level - a block is also the thread's record
+ * (§4.11 items 3 and 5) - after counting the event in its PE's slot; before init
+ * and after finalize every thread has a private block instead, never shared, so
+ * the single-writer rule holds without a condition. OSOE_MAX_THREADS bounds the
+ * pool per PE: the live threads that have called the library.
  */
 struct osoe_counter_block *osoe_metrics_block(void);
 
