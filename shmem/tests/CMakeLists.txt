@@ -2011,10 +2011,12 @@ endforeach()
 
 # A job that dies, dies everywhere (§3.15; phase 1 step 4): PE 0 calls
 # shmem_global_exit, or ends the job with a fatal, while every other PE computes
-# outside the library, where only its agent can end it. Every rank must leave
-# with the status - the caller's, or a fatal's failure - no rank may be killed
-# by the launcher or outlast its computing, and for a global exit every rank's
-# unflushed stdout must have been written (§9.1.6). See global-exit.sh. Across
+# outside the library, where only its agent can end it. For a global exit the
+# caller must leave with the status and every other rank with 0 (abort.h), for
+# a fatal every rank with the failure; the launcher's own status must be the
+# job's, as srun's is; no rank may be killed by the launcher or outlast its
+# computing, and for a global exit every rank's unflushed stdout must have been
+# written (§9.1.6). See global-exit.sh. Across
 # nodes a fatal travels as the lead's end of stream, which a peer takes for a
 # death; a global exit's status travels as the abortive goodbye before it
 # (abort_model.py), and a remote rank that left with the failure status instead
@@ -2069,6 +2071,26 @@ foreach(case "nonlead;7;7;1;compute" "fatal.nonlead;fatal;1;1;compute"
   set_tests_properties(shmem.global-exit.${label}.0-0-1-1
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endforeach()
+# A global exit with status 0: no rank leaves nonzero, and the launcher exits 0.
+add_test(NAME shmem.global-exit.zero.0-0-1-1
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 0 0 1 compute)
+set_tests_properties(shmem.global-exit.zero.0-0-1-1
+  PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+# Under a launcher that ends the job at the first bad exit, as srun -K1 does
+# (KILLS=yes: no -k), the round-three review's C2: every other PE leaves with
+# 0, so the caller's own exit is the first bad one, and it finishes - on one
+# node, and with a handler of a second on a non-lead caller. Before the change
+# the others' exits came first and the caller was killed inside its handler.
+add_test(NAME shmem.global-exit.kills.L4
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_global-exit> 4 - 7 7 0 compute)
+add_test(NAME shmem.global-exit.kills.slow-handler.0-0-1-1
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 slow-handler)
+set_tests_properties(shmem.global-exit.kills.L4 shmem.global-exit.kills.slow-handler.0-0-1-1
+  PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
+             PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   add_test(NAME shmem.global-exit.stream.0-0-1-1
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>

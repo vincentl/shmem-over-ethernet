@@ -199,7 +199,10 @@ the names in the step's node list, and the program must be at the same path on
 every node.
 
 - **`-K1`** (or `KillOnBadExit=1`), so that a task that fails at start-up ends
-  the rest rather than leaving them waiting (design §3.15).
+  the rest rather than leaving them waiting (design §3.15). A global exit
+  keeps its status beside it: every PE but the caller leaves with 0, so the
+  caller's own exit, after its handlers, is the first bad one Slurm sees - with
+  one limit across nodes, under "How a job ends".
 - **`--cpu-bind=none`**, or two CPUs a task (`-c 2`) where there are cores to
   spare; `SLURM_CPU_BIND=none` in the environment does the same. Where a node
   runs as many tasks as it has cores, Slurm binds each task to one core by
@@ -235,8 +238,12 @@ processes on 254 logical nodes. `-s` names the variables as `srun` does, so
 the job takes the bootstrap's Slurm path.
 
 It fails if any process fails, if the timeout (`-t SECONDS`, default 60)
-expires, or if the job leaves shared memory behind. `-e RANK:NAME=VALUE` sets a
-variable for one rank only. `-k` leaves the surviving processes alone when one
+expires, or if the job leaves shared memory behind, and its exit status is
+`srun`'s: the highest exit code of any rank - so a job ended by
+`shmem_global_exit(7)` exits 7 - or 128 plus the signal for a rank killed by
+a signal the launcher did not send itself, and 1 for a timeout or shared
+memory left behind when no rank reported more (`--help` says the same).
+`-e RANK:NAME=VALUE` sets a variable for one rank only. `-k` leaves the surviving processes alone when one
 fails, instead of terminating them, so that what ends the job is the library's
 own reaction rather than the launcher's.
 
@@ -717,11 +724,23 @@ rm -f /dev/shm/osoe.${SLURM_JOB_ID}.*
 ### How a job ends
 
 A PE that dies, or a node that vanishes, ends the whole job with a failure
-(design §3.15). `shmem_global_exit(status)` ends every PE with `status`: the
-calling PE with `exit`, so its `atexit` handlers run and its streams are
-flushed, as the specification asks; every other PE with its standard I/O
+(design §3.15). `shmem_global_exit(status)` ends every PE, and the job with
+`status`. The calling PE leaves with `exit(status)`, so its `atexit` handlers
+run and its streams are flushed, as the specification asks - for at most
+`OSOE_ABORT_GRACE_SECONDS`, 10 s, after which the library ends it with its
+standard output flushed. Every other PE leaves with 0, its standard I/O
 flushed and then `_exit`, so its handlers do not run - it is usually still
 computing - and output it holds in a buffer of its own, outside stdio, is lost.
+Only the caller's status is nonzero so that a launcher which ends the step at
+the first bad exit (`srun -K1`) sees none before the caller's own, which comes
+after its handlers; `srun` returns the highest status of its tasks, the
+caller's, and `osoe-launch` does the same. Two limits remain. A site that sets
+`WaitTime`, or `srun -W n`, ends the other tasks n seconds after the first one
+leaves, whatever its status. And across nodes under `-K1`, a PE of another
+node that is still ending when the caller's process ends is terminated by
+Slurm, and `srun` then returns 143: measured on two logical nodes in 2 and 7
+runs of 30 when the caller was not its node's first PE, and in none of 20 when
+it was, or on one node.
 A job proved deadlocked ends the same way as a failure, with status 1, after
 each node has printed where its PEs wait.
 

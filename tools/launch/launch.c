@@ -23,11 +23,15 @@
  * real step - so the library sees the same environment in a test as in
  * production and reads no test-only variable (base/node-map.h).
  *
- * Fails (exit 1) if any process exits nonzero or dies on a signal, if the
- * timeout (default 60 s) expires, or if the job left shared-memory objects
- * named /osoe.<job>.* behind after every process exited successfully: heap
- * names are removed once mapped and the control segment at the last finalize
- * (§6.2), so a clean job leaves none. Leftovers are removed in every case.
+ * Fails if any process exits nonzero or dies on a signal, if the timeout
+ * (default 60 s) expires, or if the job left shared-memory objects named
+ * /osoe.<job>.* behind after every process exited successfully: heap names are
+ * removed once mapped and the control segment at the last finalize (§6.2), so
+ * a clean job leaves none. Leftovers are removed in every case. Its status is
+ * srun's (design §3.15): the highest exit code of any rank, 128 plus the signal
+ * for a rank killed by a signal this launcher did not send itself, and 1 for
+ * the launcher's own findings - a timeout, leftovers - when no rank reported
+ * more; so a job ended by shmem_global_exit(status) exits with that status.
  * After the first failure the remaining processes get SIGTERM, then SIGKILL
  * two seconds later, since they are usually blocked waiting for the one that
  * failed. -k leaves them alone instead, so that what ends the job is the
@@ -86,13 +90,19 @@ struct override {
     char *assignment;       /* NAME=VALUE */
 };
 
-static void usage(void)
+static void usage(FILE *out, int status)
 {
-    fprintf(stderr, "usage: osoe-launch -n L [-m NODE_MAP] [-t SECONDS] [-k] [-s] "
-                    "[-e RANK:NAME=VALUE]... [-N NAMESPACE_PREFIX] [-H HOST_LIST] "
-                    "-- PROGRAM [ARGS]...\n"
-                    "       osoe-launch --version\n");
-    exit(2);
+    fprintf(out, "usage: osoe-launch -n L [-m NODE_MAP] [-t SECONDS] [-k] [-s] "
+                 "[-e RANK:NAME=VALUE]... [-N NAMESPACE_PREFIX] [-H HOST_LIST] "
+                 "-- PROGRAM [ARGS]...\n"
+                 "       osoe-launch --version\n");
+    if (out == stdout)
+        fprintf(out, "\nExit status, as srun's: the highest exit code of any rank; 128 plus "
+                     "the signal for a\nrank killed by a signal the launcher did not send "
+                     "itself; 1 for a timeout or\nshared memory left behind when no rank "
+                     "reported more; 128 plus the signal when the\nlauncher itself is "
+                     "interrupted; 2 for a bad argument.\n");
+    exit(status);
 }
 
 static long parse_long(const char *s, long lo, long hi, const char *what)
@@ -293,7 +303,8 @@ int main(int argc, char **argv)
         printf("osoe-launch (osoe) " OSOE_VERSION_STRING "\n");
         return 0;
     }
-
+    if (argc > 1 && strcmp(argv[1], "--help") == 0)
+        usage(stdout, 0);
     int opt;
     while ((opt = getopt(argc, argv, "+n:m:t:kse:N:H:")) != -1) {
         switch (opt) {
@@ -315,7 +326,7 @@ int main(int argc, char **argv)
         case 'e': {
             char *colon = strchr(optarg, ':');
             if (!colon || !strchr(colon, '=') || nov == MAX_OVERRIDES)
-                usage();
+                usage(stderr, 2);
             *colon = '\0';
             ov[nov].rank = parse_long(optarg, 0, MAX_PROCS - 1, "rank");
             ov[nov].assignment = colon + 1;
@@ -329,11 +340,11 @@ int main(int argc, char **argv)
             host_list = optarg;
             break;
         default:
-            usage();
+            usage(stderr, 2);
         }
     }
     if (n == 0 || optind >= argc)
-        usage();
+        usage(stderr, 2);
     char **prog = argv + optind;
 
     char job[32];
@@ -436,6 +447,11 @@ int main(int argc, char **argv)
     double deadline = now() + (double)timeout;
     double kill_at = 0;             /* SIGKILL time once a failure is seen */
     bool failed = false, timed_out = false;
+    /* The status, srun's way: the highest code a rank reported, and a signal
+     * as 128 plus it - unless this launcher sent it, after a failure, at the
+     * timeout or forwarding its own, when the rank's end is the launcher's. */
+    int highest = 0;
+    bool signalled[MAX_PROCS] = { false };
     int interrupted = 0;            /* SIGTERM or SIGINT received, once */
     long remaining = n;
 
@@ -451,6 +467,10 @@ int main(int argc, char **argv)
             done[r] = true;
             remaining--;
             bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
+            int code = WIFEXITED(status) ? WEXITSTATUS(status)
+                       : WIFSIGNALED(status) && !signalled[r] ? 128 + WTERMSIG(status) : 0;
+            if (code > highest)
+                highest = code;
             if (!ok) {
                 if (WIFSIGNALED(status))
                     fprintf(stderr, "osoe-launch: rank %ld killed by signal %d\n", r,
@@ -462,8 +482,10 @@ int main(int argc, char **argv)
                     failed = true;
                     if (!keep) {
                         for (long j = 0; j < n; j++)
-                            if (!done[j])
+                            if (!done[j]) {
                                 kill(pids[j], SIGTERM);
+                                signalled[j] = true;
+                            }
                         kill_at = now() + 2.0;
                     }
                 }
@@ -479,12 +501,16 @@ int main(int argc, char **argv)
             fprintf(stderr, "osoe-launch: timeout after %ld s; killing %ld process(es)\n",
                     timeout, remaining);
             for (long j = 0; j < n; j++)
-                if (!done[j])
+                if (!done[j]) {
                     kill(pids[j], SIGKILL);
+                    signalled[j] = true;
+                }
         } else if (kill_at > 0 && t >= kill_at) {
             for (long j = 0; j < n; j++)
-                if (!done[j])
+                if (!done[j]) {
                     kill(pids[j], SIGKILL);
+                    signalled[j] = true;
+                }
             kill_at = 0;
         }
 
@@ -500,8 +526,10 @@ int main(int argc, char **argv)
             fprintf(stderr, "osoe-launch: %s received; forwarded to %ld process(es)\n",
                     sig == SIGTERM ? "SIGTERM" : "SIGINT", remaining);
             for (long j = 0; j < n; j++)
-                if (!done[j])
+                if (!done[j]) {
                     kill(pids[j], sig);
+                    signalled[j] = true;
+                }
             if (kill_at == 0)
                 kill_at = now() + 2.0;
         }
@@ -526,5 +554,7 @@ int main(int argc, char **argv)
     }
     if (interrupted)
         return 128 + interrupted;
-    return failed ? 1 : 0;
+    if (highest == 0 && failed)
+        return 1;
+    return highest;
 }

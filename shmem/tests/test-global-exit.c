@@ -43,13 +43,19 @@
  *              only the caller's PE ends with exit, which runs it; every other
  *              ends with fflush and _exit, running none beside a main thread
  *              still computing
+ *   slow-handler
+ *              compute, with an atexit handler on the caller's PE alone that
+ *              takes a second and then prints a line: under a launcher that
+ *              ends the step at the first bad exit, the caller must still
+ *              finish it - every other PE leaves with 0, so the caller's own
+ *              exit is the first bad one
  *
  * In start-pes and returned, exit's lock (glibc 2.41) is held by the main
  * thread, which a non-caller's _exit does not wait on.
  *
- * global-exit.sh runs the job and requires every rank to have left with the
- * status - the caller's, or a fatal's failure - and, for a global exit, every
- * line to have been written. A PE still computing after 30 s says so and
+ * global-exit.sh runs the job and requires, for a global exit, the caller to
+ * have left with the status and every other PE with 0, and every line to have
+ * been written; for a fatal, every PE to have left with the failure status. A PE still computing after 30 s says so and
  * leaves with a status of its own, which fails the script. The caller says
  * when it ends the job, for the script to time the end.
  */
@@ -88,6 +94,13 @@ static void slow_handler(void)
     nanosleep(&slow, NULL);
 }
 
+static void slow_handler_ran(void)
+{
+    struct timespec second = { 1, 0 };
+    nanosleep(&second, NULL);
+    printf("PE %d: handler ran after a second\n", my_pe);
+}
+
 static double seconds(void)
 {
     struct timespec t;
@@ -108,6 +121,8 @@ int main(int argc, char **argv)
     my_pe = me;
     if (strcmp(mode, "handlers") == 0)
         atexit(handler_ran);
+    if (strcmp(mode, "slow-handler") == 0 && me == caller)
+        atexit(slow_handler_ran);
     printf("PE %d: computing\n", me);           /* buffered: flushed only by exit */
     if (me == caller && strcmp(mode, "immediate") == 0)
         end_the_job(how);

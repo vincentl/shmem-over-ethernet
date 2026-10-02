@@ -14,20 +14,27 @@
  *                   handlers stand aside while it ends this way - one is a
  *                   barrier (start_pes's finalize), the other declares an
  *                   abort that already is. On every other PE, fflush then
- *                   _exit(status), as a fatal ends: its main thread may still
- *                   be running the program, and no handler or destructor may
- *                   run beside it; and _exit takes no lock, where exit, since
- *                   glibc 2.41 (BZ 31997), waits for good on a thread already
- *                   inside exit - a main thread that returned from main.
+ *                   _exit(0), as a fatal ends but with 0: its main thread may
+ *                   still be running the program, and no handler or destructor
+ *                   may run beside it; and _exit takes no lock, where exit,
+ *                   since glibc 2.41 (BZ 31997), waits for good on a thread
+ *                   already inside exit - a main thread that returned from
+ *                   main. The status is the job's and the caller's, not each
+ *                   task's: a launcher that ends the step at the first bad exit
+ *                   (srun -K1, KillOnBadExit) then sees none before the
+ *                   caller's own, which comes after its handlers and its
+ *                   flush, and srun returns the highest code of all its tasks
+ *                   (the author's decision after the round-three review, C2).
  *   a fatal         _exit with the declarer's status, as a fatal does.
  *
  * Either way the end can wait on a lock another thread holds - a stream's, or
  * on the caller's PE exit's own, held by a thread already inside exit: a
  * program's handler in a library wait, or main returned into the library's
- * handler while another thread called shmem_global_exit - so _exit(status)
- * follows after OSOE_ABORT_GRACE_SECONDS, flushing stdout first if no thread
- * holds it: a process already ending, which is not a
- * wait that gives up because time passed. Exactly one thread of a process ends
+ * handler while another thread called shmem_global_exit - so _exit follows
+ * after OSOE_ABORT_GRACE_SECONDS, with the status the PE would have left with,
+ * flushing stdout first if no thread holds it: a process already ending,
+ * which is not a wait that gives up because time passed. A caller whose own
+ * handlers outlast it is ended so too. Exactly one thread of a process ends
  * it; any other that gets here waits for that to happen.
  *
  * The goodbyes take OSOE_ABORT_GRACE_SECONDS at most (progress-host.c) before
@@ -60,8 +67,8 @@ bool osoe_abort_pending(void);
 bool osoe_abort_stand_aside(void);
 
 /* Says that this process's program called shmem_global_exit: its PE ends with
- * exit, running its handlers, where every other PE ends with fflush and _exit.
- * Called before the declaration. */
+ * exit(status), running its handlers, where every other PE ends with fflush
+ * and _exit(0). Called before the declaration. */
 void osoe_abort_caller(void);
 
 /* End this process as the node's abort says. */

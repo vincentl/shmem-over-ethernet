@@ -91,7 +91,15 @@ _Noreturn void osoe_abort_end(void)
         for (;;)
             pause();                    /* another thread is ending this process */
     this_thread_ends = true;
-    grace_status = status;
+    /* A global exit's status is the job's and its caller's (spec §9.1.6): only
+     * the PE whose program called shmem_global_exit leaves with it, and every
+     * other PE leaves with 0, so that a launcher which ends the step at the
+     * first bad exit - srun -K1, KillOnBadExit - sees none before the caller's
+     * own, which comes after its handlers and its flush; srun returns the
+     * highest code of all its tasks, which is then the caller's. A fatal's
+     * status is every PE's. The grace below leaves with the same. */
+    bool caller = atomic_load_explicit(&called, memory_order_acquire) != 0;
+    grace_status = how == OSOE_ABORT_GLOBAL_EXIT && !caller ? 0 : status;
     /* With no thread to spare, the bound is SIGALRM's default action instead:
      * the process still ends, though by a signal and not with its status -
      * unless the program handles or blocks SIGALRM, when there is none. */
@@ -102,15 +110,15 @@ _Noreturn void osoe_abort_end(void)
         alarm(2 * OSOE_ABORT_GRACE_SECONDS);
     /* The caller's own PE ends as a program does, its handlers and then
      * stdio (spec §9.1.6). Every other ends as a fatal does, flushing and
-     * then _exit: its main thread may be running the program still, and a
-     * handler or destructor run beside it would pull state from under it -
-     * and _exit takes no lock, where exit waits for good on a thread already
-     * inside exit, since glibc 2.41 (BZ 31997). */
+     * then _exit, but with 0 (above): its main thread may be running the
+     * program still, and a handler or destructor run beside it would pull
+     * state from under it - and _exit takes no lock, where exit waits for good
+     * on a thread already inside exit, since glibc 2.41 (BZ 31997). */
     if (how == OSOE_ABORT_GLOBAL_EXIT) {
-        if (atomic_load_explicit(&called, memory_order_acquire) != 0)
+        if (caller)
             exit(status);
         fflush(NULL);
-        _exit(status);
+        _exit(0);
     }
     /* A fatal elsewhere on the node (or across the job): say so, once, for a PE
      * that was computing and would otherwise vanish without a word, and where

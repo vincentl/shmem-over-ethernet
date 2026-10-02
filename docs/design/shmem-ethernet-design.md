@@ -1929,8 +1929,9 @@ exit, the caller's PE — whichever PE's program called `shmem_global_exit` —
 ends with `exit(status)`, its handlers and then standard I/O as §9.1.6 asks,
 with the library's own atexit handlers and `shmem_finalize` standing aside,
 since the one is a barrier and the other would declare an abort that already
-is. Every other PE ends with `fflush` and then `_exit(status)`, as a fatal
-does: its main thread may still be running the program, and a handler or a
+is. Every other PE ends with `fflush` and then `_exit(0)`, as a fatal does but
+with 0. With `_exit`, because its main thread may still be running the
+program, and a handler or a
 C++ destructor run beside it would pull state from under it; and `_exit` takes
 no lock, where `exit` since glibc 2.41 (BZ 31997) takes one it never gives
 back, so that a second thread's `exit` waits for good on a main thread already
@@ -1940,12 +1941,28 @@ hand-off to the thread inside `exit`, now gone; `abort_exit_model.py`,
 `exit_everywhere`; `shmem.global-exit.handlers`, `.start-pes` and
 `.returned`). What a non-caller loses is what only its handlers would have
 flushed: output buffered outside stdio - a C++ stream not synchronized with it,
-a logger's own buffer. And one narrow case waits out the grace again: on the
+a logger's own buffer. With 0, because the status is the job's and the caller's,
+not each task's: a launcher which ends the step at the first bad exit —
+`srun -K1`, `KillOnBadExit` — then sees none before the caller's own, which
+comes after its handlers and its flush, and `srun`, which returns the highest
+code of its tasks, returns the caller's (the author's decision after the
+round-three review, whose C2 had the others' `_exit(status)` come first and
+Slurm kill the caller inside `exit`; measured under the VM's Slurm with
+handlers of 0 to 5 s; `abort_exit_model.py`'s STATUS,
+`shmem.global-exit.kills.*`). Two limits stay: a site's `WaitTime`, or
+`srun -W n`, ends the other tasks n seconds after the first leaves, whatever
+its code; and a PE of another node still ending when the caller's process ends
+is killed by such a launcher, which then reports its signal — measured in 2
+and 7 runs of 30 on two logical nodes when the caller is not its node's lead,
+whose goodbye then leaves after the caller's own agent has ended it, and in
+none of 20 when it is. And one narrow case waits out the grace again: on the
 caller's PE, another thread already inside `exit` - main returned into the
 library's handler while a second thread called `shmem_global_exit` - holds the
 lock the agent's `exit` needs (the model's `caller_exiting`). Because an end can still wait on a lock another thread holds —
-a stream's, or on the caller's PE `exit`'s own — `_exit(status)` follows after
-`OSOE_ABORT_GRACE_SECONDS` (10), flushing stdout first if no thread holds it.
+a stream's, or on the caller's PE `exit`'s own — `_exit` follows after
+`OSOE_ABORT_GRACE_SECONDS` (10), with the status the PE would have left with,
+flushing stdout first if no thread holds it; a caller whose own handlers
+outlast it is ended so too.
 That is not a wait that gives up because time passed: it ends a process that is
 already ending. On a fatal the agent says so once and `_exit`s with the
 declarer's status. On a global exit exactly one thread of a process ends it, and while the

@@ -6,8 +6,12 @@ abort_model.py decides how an abort crosses nodes: as an abortive goodbye, the
 last segment a dying lead sends on each connection, read before the end of
 stream it precedes. This model is the other half: which thread of which
 process ends it, and when, so that the goodbye is sent before the lead's
-sockets close, and so that every process of the job ends with a status some
-caller of shmem_global_exit gave (spec §9.1.6).
+sockets close, and so that the job ends with the status a caller of
+shmem_global_exit gave (spec §9.1.6) - the caller's process with it, every
+other with 0, so that a launcher which ends the step at the first bad exit
+(srun -K1, KillOnBadExit) sees none before the caller's own, which comes after
+its handlers and its flush; srun returns the highest exit code of all tasks
+(the author's decision of 2026-10-02, after the round-three review's C2).
 
 Every PE is a process with two threads, its main thread and its agent
 (§3.12). The lead's agent owns the node's sockets: only it can tell the other
@@ -67,9 +71,10 @@ Cases
             glibc 2.41 (BZ 31997) is never given back, so an exit(s) from any
             other thread would wait on it for good. Only a PE whose program
             called shmem_global_exit ends with exit(s), its handlers and then
-            stdio (spec §9.1.6); every other ends with fflush and _exit, which
-            takes no lock and runs no handler beside a main thread still
-            running (the author's decision after the third review).
+            stdio (spec §9.1.6); every other ends with fflush and _exit(0),
+            which takes no lock and runs no handler beside a main thread still
+            running (the author's decisions after the third review, and after
+            the round-three review for the 0).
   caller_exiting
             A's P calls it with 5 while another thread of A's P is inside exit
             holding its lock - main returned into the library's handler. The
@@ -107,7 +112,9 @@ Variants (each breaks one rule above)
   finalize_returns  shmem_finalize stands aside by returning, on any thread:
                     a main thread that reaches it once its agent is ending
                     the process returns into main's exit(0), a second exit
-                    beside the agent's (phase 1 step 4's review). STATUS.
+                    beside the agent's (phase 1 step 4's review). ONE_END:
+                    STATUS caught it while every process carried the status,
+                    and no longer can on a process that leaves with 0.
   no_init_wait      shmem_init returns before the lead's agent runs: a caller
                     straight after init finds its lead still connecting, and
                     the lead's main thread ends it with nobody sent a goodbye
@@ -120,13 +127,22 @@ Variants (each breaks one rule above)
                     CAS, the lead is woken by its pidfd and the others by
                     nothing. B's Q is the other that nothing wakes, so the
                     case that shows it has B's P call. STUCK.
+  status_everywhere every process a global exit ends leaves with the caller's
+                    status, as the code did until the round-three review: the
+                    first of them to leave is a bad exit before the caller's,
+                    and srun -K1 kills the caller inside exit. STATUS.
+  caller_zero       the caller's own process leaves with 0 as well, and the
+                    job's status is lost. STATUS.
 
 Properties
   TERMINATES  every process ends: no state is STUCK with a process alive and
               every thread asleep, and from every state some state in which all
               have ended is reachable (the trapped-state check).
-  STATUS      every process ends with a status some caller gave; in these
-              cases none is a fatal or a crash, so a failure never is.
+  STATUS      a process whose program called shmem_global_exit ends with a
+              status some caller gave; every other process ends with 0. In
+              these cases none is a fatal or a crash, so a failure never is.
+  ONE_END     a process is ended by the thread that claimed it (abort.c's
+              `ending`), never by a second thread beside it.
 
 Usage: abort_exit_model.py [substring ...]
 """
@@ -152,7 +168,7 @@ def is_lead(p):
 
 def WORD(x):        return ('$word', x)            # 0, or disposition * 16 + status
 def WAKE(p):        return ('$wake', p)            # the agent's wake word
-def ENDING(p):      return ('$ending', p)          # abort.c's process-private claim
+def ENDING(p):      return ('$ending', p)          # abort.c's claim: 0, MAIN or AGENT
 def ALIVE(p):       return ('$alive', p)
 def STAT(p):        return ('$status', p)          # the status it exited with
 def QUEUED(x, y):   return ('$queued', x, y)       # an ABORT x sent y and y has not read: its word
@@ -172,6 +188,17 @@ def disposition(word):
 
 def exit_status(word):
     return FAIL if disposition(word) == FATAL else word % 16
+
+
+def status_at_end(variant, M, p, word):
+    """What osoe_abort_end ends p with: a fatal's failure status; on a global
+    exit, the status for the process whose program called shmem_global_exit
+    and 0 for every other (abort.c)."""
+    if disposition(word) == FATAL:
+        return FAIL
+    if M[CALLED(p)]:
+        return 0 if variant == 'caller_zero' else word % 16
+    return word % 16 if variant == 'status_everywhere' else 0
 
 
 # ---- steps shared by every thread ------------------------------------------
@@ -284,8 +311,9 @@ def agent(variant, local, p, options):
                             w = upd[WORD(x)]
                         if M[ENDING(p)]:
                             return [(upd, {'pc': PC_PAUSE}, f'{name}: {q} has died; pauses')]
-                        upd[ENDING(p)] = 1
-                        u, _, lbl = end_process(M, p, exit_status(w), f'a fatal for {q}')
+                        upd[ENDING(p)] = AGENT
+                        u, _, lbl = end_process(M, p, status_at_end(variant, M, p, w),
+                                                f'a fatal for {q}')
                         upd.update(u)
                         return [(upd, {}, f'{name}: {q} has died - ' + lbl)]
                     loc = start_declaring(FATAL * 16 + FAIL, PC_TOP)
@@ -319,19 +347,22 @@ def agent(variant, local, p, options):
             # before it is gone, and other threads run meanwhile.
             if M[ENDING(p)]:
                 return [({}, {'pc': PC_PAUSE}, f'{name}: another thread ends this process')]
-            return [({ENDING(p): 1}, {'pc': PC_EXITING}, f'{name}: claims the process')]
+            return [({ENDING(p): AGENT}, {'pc': PC_EXITING}, f'{name}: claims the process')]
         if pc == PC_EXITING:
             # exit(s) only where this process's program called shmem_global_exit,
-            # and exit's lock is then needed; everywhere else fflush and _exit.
-            calls_exit = disposition(M[WORD(x)]) == GLOBAL and (
+            # and exit's lock is then needed; everywhere else fflush and _exit -
+            # with 0 on a global exit, the failure status on a fatal.
+            w = M[WORD(x)]
+            calls_exit = disposition(w) == GLOBAL and (
                 M[CALLED(p)] or variant == 'exit_everywhere')
             if calls_exit:
                 if M[EXIT_LOCK(p)] == MAIN:
                     return []           # exit's lock, held for good by the main thread
-                upd, _, lbl = end_process(M, p, exit_status(M[WORD(x)]), 'its agent, by exit')
+                upd, _, lbl = end_process(M, p, status_at_end(variant, M, p, w),
+                                          'its agent, by exit')
                 upd[EXIT_LOCK(p)] = AGENT
                 return [(upd, {}, lbl)]
-            return [end_process(M, p, exit_status(M[WORD(x)]), 'its agent, by _exit')]
+            return [end_process(M, p, status_at_end(variant, M, p, w), 'its agent, by _exit')]
         if pc == PC_PAUSE:
             return []                   # until the process ends
         raise AssertionError(pc)
@@ -351,8 +382,8 @@ def main_end(variant, M, p, name):
     if variant == 'caller_exits':
         if M[ENDING(p)]:
             return [({}, {'pc': PC_PAUSE}, f'{name}: another thread ends this process')]
-        u, _, lbl = end_process(M, p, exit_status(M[WORD(x)]), 'its caller')
-        u[ENDING(p)] = 1
+        u, _, lbl = end_process(M, p, status_at_end(variant, M, p, M[WORD(x)]), 'its caller')
+        u[ENDING(p)] = MAIN
         return [(u, {}, lbl)]
     return [({}, {'pc': PC_PAUSE}, f'{name}: waits for its agent to end the process')]
 
@@ -493,8 +524,9 @@ def connecting_lead(variant, local, p):
         if pc == PC_CONNECTING:
             w = M[WORD(x)]
             if w and disposition(w) == GLOBAL:
-                u, _, lbl = end_process(M, p, exit_status(w), 'its main thread, no agent yet')
-                u[ENDING(p)] = 1
+                u, _, lbl = end_process(M, p, status_at_end(variant, M, p, w),
+                                        'its main thread, no agent yet')
+                u[ENDING(p)] = MAIN
                 return [(u, {}, lbl)]
             return [({AGENT_UP(p): 1}, {'finished': 1},
                      f'{name}: has connected the mesh and starts its agent')]
@@ -526,22 +558,41 @@ def early_caller(variant, local, p, status):
 
 # ---- assembly -------------------------------------------------------------------
 
-def thread(step, initial, callers):
+BAD_STATUS_CALLER, BAD_STATUS_OTHER, BAD_SECOND_END = 1, 2, 3
+BAD = {
+    BAD_STATUS_CALLER: 'STATUS: a process whose program called shmem_global_exit exited with '
+                       'a status no caller gave',
+    BAD_STATUS_OTHER: 'STATUS: a process that did not call shmem_global_exit exited with a '
+                      'status other than 0',
+    BAD_SECOND_END: 'ONE_END: a thread ended a process another thread had claimed',
+}
+
+
+def thread(step, initial, callers, role):
+    """A thread of the role MAIN or AGENT, its steps checked for STATUS and
+    ONE_END as they are taken."""
     def checked(M, L):
         out = []
         for upd, loc, label in step(M, L):
             bad = 0
             for k, v in upd.items():
-                if k[0] == '$status' and v not in callers:
-                    bad = 1
+                if k[0] != '$status':
+                    continue
+                p = k[1]
+                if M[CALLED(p)]:
+                    if v not in callers:
+                        bad = BAD_STATUS_CALLER
+                elif v != 0:
+                    bad = BAD_STATUS_OTHER
+                if M[ENDING(p)] not in (0, role):
+                    bad = BAD_SECOND_END
             out.append((upd, dict(loc, bad=bad), label))
         return out
 
     return assemble([('INIT', ('set', 'pc', lambda L: initial, '@STEP')),
                      ('STEP', ('nd', checked, '@BAD?')),
                      ('BAD?', ('br', lambda L: L['bad'], '@FAIL', '@FINISHED?')),
-                     ('FAIL', ('check', lambda M, L: 'STATUS: a process exited with a status '
-                               'no caller of shmem_global_exit gave', '@END')),
+                     ('FAIL', ('check', lambda M, L: BAD[L['bad']], '@END')),
                      ('FINISHED?', ('br', lambda L: L['finished'], '@END', '@STEP')),
                      ('END', ('done',))])
 
@@ -567,26 +618,25 @@ def case(variant, which, options):
     threads = []
     for p in processes:
         step, initial = agent(variant, local, p, options)
-        threads.append(thread(step, initial, callers))
+        threads.append(thread(step, initial, callers, AGENT))
     for p, status in shape['callers'].items():
         step, initial = caller(variant, local, p, status)
-        threads.append(thread(step, initial, callers))
-    callers |= set(shape.get('early_callers', {}).values())
+        threads.append(thread(step, initial, callers, MAIN))
     for p in shape['waiters']:
         step, initial = waiter(variant, local, p)
-        threads.append(thread(step, initial, callers))
+        threads.append(thread(step, initial, callers, MAIN))
     for p in shape.get('finishers', ()):
         step, initial = finisher(variant, local, p)
-        threads.append(thread(step, initial, callers))
+        threads.append(thread(step, initial, callers, MAIN))
     for p in shape.get('connecting', ()):
         step, initial = connecting_lead(variant, local, p)
-        threads.append(thread(step, initial, callers))
+        threads.append(thread(step, initial, callers, MAIN))
     for p, status in shape.get('early_callers', {}).items():
         step, initial = early_caller(variant, local, p, status)
-        threads.append(thread(step, initial, callers))
+        threads.append(thread(step, initial, callers, MAIN))
     for p in shape.get('exiters', ()):
         step, initial = exiter(variant, local, p)
-        threads.append(thread(step, initial, callers))
+        threads.append(thread(step, initial, callers, MAIN))
     mem = {}
     for x in NODES:
         mem[WORD(x)] = 0
@@ -635,6 +685,8 @@ CASES = [
     ('built', 'exiting', BUILT, True),
     ('exit_everywhere', 'exiting', BUILT, False),
     ('built', 'caller_exiting', BUILT, False),     # ends at the grace in the code
+    ('status_everywhere', 'nonlead', BUILT, False),
+    ('caller_zero', 'nonlead', BUILT, False),
 ]
 
 if __name__ == '__main__':

@@ -73,7 +73,12 @@ Properties
   TERMINATES  every node ends: its sockets closed after the handshake, or its
               processes exited (the trapped-state check).
   STATUS      in a case with no crash and no fatal, every node whose processes
-              exit because of the abort exit with a status some caller gave.
+              exit because of the abort learns a status some caller gave, never
+              the failure a death leaves. The status here is the node's word,
+              what it learnt; its processes then leave with it if their program
+              called shmem_global_exit and with 0 if not (abort_exit_model.py,
+              since the round-three review), which is a process's concern and
+              not this model's.
   ONCE        no ABORT is sent twice on a connection, nor, in the tree, back
               to the node it came from.
 

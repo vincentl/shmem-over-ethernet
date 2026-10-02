@@ -459,13 +459,14 @@ OSOE_API void pshmem_finalize(void)
 }
 
 /*
- * spec §9.1.6: end every PE of the job with `status`, whatever each is doing
- * (design §3.15, phase 1 step 4). This PE declares its node's abort as a global
- * exit - the first declarer on a node wins, and the specification allows any
- * caller's status - which wakes every local agent to end its process (abort.h),
- * and then ends its own the same way: exit(status), so standard I/O is flushed.
- * Before init, or in a child forked after it, there is no job to end but this
- * process.
+ * spec §9.1.6: end every PE of the job, whatever each is doing, and the job
+ * with `status` (design §3.15, phase 1 step 4). This PE declares its node's
+ * abort as a global exit - the first declarer on a node wins, and the
+ * specification allows any caller's status - which wakes every local agent to
+ * end its process (abort.h), and then ends its own: exit(status), so its
+ * handlers run and standard I/O is flushed. Every other PE leaves with 0, so
+ * that the job's status is this one's (abort.h says why). Before init, or in a
+ * child forked after it, there is no job to end but this process.
  */
 OSOE_API void pshmem_global_exit(int status)
 {
