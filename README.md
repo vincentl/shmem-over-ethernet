@@ -68,7 +68,7 @@ int main(void)
 
 ```sh
 oshcc -O2 -o ring ring.c
-srun -N2 --ntasks-per-node=4 ./ring
+srun -K1 --cpu-bind=none -N2 --ntasks-per-node=4 ./ring
 ```
 
 ## Getting started
@@ -195,11 +195,15 @@ No PMI plugin is involved: each node's lead finds the others over TCP, on a
 port it derives from the job, step and node ids (`OSOE_PORT_RANGE`, default
 17000-26999), and then connects to each on a port the kernel chooses, so TCP
 must be open between the nodes, not only that range. Every node must resolve
-the names in the step's node list, and the program must be at the same path on
-every node.
+the names in the step's node list, each name to the same address on every node
+- a lead listens at the address its own host resolves its name to, and the
+others dial the address they resolve it to - and the program must be at the
+same path on every node.
 
 - **`-K1`** (or `KillOnBadExit=1`), so that a task that fails at start-up ends
-  the rest rather than leaving them waiting (design §3.15). A global exit
+  the rest rather than leaving them waiting (design §3.15): the library ends a
+  node whose PE fails, but not the other nodes, nor anything waiting for a
+  task that never reached it ("How a job starts", below). A global exit
   keeps its status beside it: every PE but the caller leaves with 0, and the
   caller leaves last, so its exit is the one bad one Slurm sees - with one
   limit, two callers on two nodes at once, under "How a job ends".
@@ -215,8 +219,9 @@ every node.
 - **`OSOE_NO_PROGRESS_TIMEOUT=60`** while a cluster is new, so that a wait on
   the library's own progress - a connection's acknowledgements, buffer space,
   a reply - that stops moving ends the job and says what it waited for.
-- **`OSOE_JOB_SECRET`**, 32 hexadecimal digits exported before `srun`, keeps
-  other hosts out of the job's rendezvous (design §6.2).
+- **`OSOE_JOB_SECRET`**, 32 hexadecimal digits exported before `srun`, keeps a
+  host that does not know it from joining the job (design §6.2) - and no more:
+  see "Trust", under "How a job starts".
 
 A program run straight from a batch script, not through `srun`, is refused,
 since it is no task of a step.
@@ -339,7 +344,7 @@ for.
 | `alltoall`, `alltoalls` | every block put directly, then a barrier | O(N) a PE - inherent: every PE has a block for every other |
 | a team | a number from a job-wide counter, and a record on each member node | O(1) a member after a one-time O(S log S) to build a split's node set |
 | waiting | futex words per kind of resource, not per PE | O(1) a waiter |
-| start-up | the node leads' rendezvous tree | ⌈log₈ n⌉ levels |
+| start-up | the node leads' rendezvous tree, then their mesh | ⌈log₈ n⌉ levels, then n - 1 connections a lead, made one after another |
 | `SHMEM_THREAD_MULTIPLE` | threads issue on a shared context without a lock; only quiet takes one, and concurrent quiets share one wait | O(1) an operation |
 
 Where the design admits a limit of its own: large reductions still send each
@@ -573,8 +578,11 @@ that one could be added without touching the OpenSHMEM layer.
 
 Unless a row says otherwise, give every PE the same value: `srun` and
 `osoe-launch` pass the environment to every task alike. The ones marked
-*checked* are compared at start-up, and a job whose PEs disagree ends naming
-the variable. `SHMEM_INFO` prints most of this list from the library itself.
+*checked* are compared at start-up: between the PEs of a node, which all end,
+the one that sees the difference naming the variable; and, where a row says so,
+between nodes, where the node that sees it ends naming the variable and both
+nodes, and the others say what they wait for until the launcher ends them ("How
+a job starts"). `SHMEM_INFO` prints most of this list from the library itself.
 
 **The specification's** (§8). Each also has a deprecated `SMA_` spelling; when
 both are set the `SHMEM_` one controls.
@@ -720,6 +728,43 @@ job creates in `/dev/shm` is named `osoe.` and the job's number, which is
 ```sh
 rm -f /dev/shm/osoe.${SLURM_JOB_ID}.*
 ```
+
+### How a job starts
+
+A node's PEs meet in its control segment in `/dev/shm`; then the node leads
+meet in a tree and connect their mesh (design §6.2). A failure on the way is
+loud, and how far it reaches depends on where it is:
+
+- **A PE that refuses** - its environment, the kernel, a `/dev/shm` too small
+  for the node's heaps - ends by name, and every other PE of its node ends
+  with it, saying that another local PE failed: the refusal is published in
+  the node's segment, which the lead makes first, before anything that can
+  refuse.
+- **A node whose lead finds the job disagreeing** - another node launched for
+  another count, a value the rows below mark *checked* between nodes - ends
+  naming the variable and both nodes. The other nodes keep waiting for it.
+- **A task that never reaches the library**, one that dies before
+  `shmem_init`, is noticed by nobody: its node's lead waits for it.
+
+Nothing that waits gives up because time has passed (design §3.15). Instead,
+every start-up wait that has lasted 30 seconds says what it waits for, once and
+then every minute: the lead names the local PEs that have not joined, and their
+ranks; a node's first other PE, while its lead has made no segment, names the
+lead; a lead calling another node names that node, its host-list entry, the
+address and ports it dialled and the last error ("Connection refused", "the
+connection timed out", "no answer to the hello"); a lead waiting to be called
+names the nodes it waits for. The launcher ends what remains - `srun -K1` at
+the first task that fails - and `OSOE_NO_PROGRESS_TIMEOUT` ends a wait that
+stops moving.
+
+**Trust.** osoe assumes a private cluster network, as Slurm does. With
+`OSOE_JOB_SECRET`, a host that does not know the secret cannot join the job:
+every lead proves it before it is counted, and nothing a caller claims is acted
+on before it has. The secret does not protect the job's start from a host that
+can reach the ports and holds connections open - a lead serves sixteen callers
+at once, and a full set leaves the rest waiting - nor the traffic after the
+handshake, which is not encrypted or authenticated. Without the secret, any
+host that can reach the ports can join.
 
 ### How a job ends
 
