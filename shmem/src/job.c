@@ -46,7 +46,8 @@ struct osoe_job_header {
     uint32_t world_size;
     uint32_t node_count;
     uint32_t run_count;
-    int32_t creator_pid;            /* for reclaiming a leftover (shm-object.h) */
+    int32_t creator_pid;            /* for reclaiming a leftover (shm-object.h), and
+                                     * for osoe-stat --gc to find one */
     /* Everything above is written before `ready`, a futex word that is its own
      * predicate: release (§3.16). */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t ready;
@@ -55,6 +56,16 @@ struct osoe_job_header {
     /* Then, each cache-line aligned: run_count runs, node_count addresses,
      * node_count blobs, node_count leads. */
 };
+
+/*
+ * osoe-stat --gc removes this object when a start leaves it behind. It reads the
+ * creator's pid at the offset asserted here and knows the magic by value
+ * (tools/stat/segment.c, which includes nothing from this directory): move the
+ * field and the build says so, and the tool's number moves with it; change the
+ * magic and the tool's copy does.
+ */
+_Static_assert(offsetof(struct osoe_job_header, creator_pid) == 24,
+               "osoe-stat --gc reads the creator's pid at byte 24 (tools/stat/segment.c)");
 
 static uint64_t align_line(uint64_t n)
 {

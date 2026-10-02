@@ -108,6 +108,11 @@ static void normalize(const char *in, char *out, size_t len)
     snprintf(out, len, "/%s", p);
 }
 
+void osoe_segment_normalize_name(const char *in, char *out, size_t len)
+{
+    normalize(in, out, len);
+}
+
 /* A path to open as it is, not an object name: /proc/<pid>/fd/<n>, or a plain
  * file anywhere but /dev/shm. */
 static bool is_plain_path(const char *spec)
@@ -659,6 +664,137 @@ bool osoe_segment_mapped(const char *name)
     }
     closedir(procs);
     return mapped;
+}
+
+/* ---- What a start-up leaves besides the control segment ------------- */
+
+/*
+ * What each header opens with (segment.h): the magic, the layout, and the
+ * creator's pid at a byte offset the library pins where it declares the
+ * header - struct osoe_job_header in job.c and struct osoe_connection_area_header
+ * in connection-area.c - the same numbers, so that moving a field fails the
+ * build there rather than --gc here.
+ */
+#define JOB_MAGIC UINT64_C(0x00626f6a656f736f)               /* "osoejob" */
+#define CONNECTION_AREA_MAGIC UINT64_C(0x61657261656f736f)   /* "osoearea" */
+enum {
+    JOB_CREATOR_OFFSET = 24,
+    CONNECTION_AREA_CREATOR_OFFSET = 20,
+    STARTUP_HEADER_READ_BYTES = 32,     /* what is read of either: both offsets and a pid fit */
+};
+_Static_assert(JOB_CREATOR_OFFSET + sizeof(int32_t) <= STARTUP_HEADER_READ_BYTES &&
+               CONNECTION_AREA_CREATOR_OFFSET + sizeof(int32_t) <= STARTUP_HEADER_READ_BYTES,
+               "osoe_startup_object_creator reads the creator's pid from the first bytes");
+
+/*
+ * A start-up object's name, without its slash: "osoe.", the job, step and node
+ * as decimal fields, "job." or "conn.", and the session. The control segment's
+ * is the same four numbers with nothing between (is_control_name), and a name
+ * of the step-2 job segment, which had no node, is neither.
+ */
+static enum osoe_startup_object_kind startup_kind(const char *n)
+{
+    if (strncmp(n, "osoe.", 5) != 0)
+        return OSOE_STARTUP_OBJECT_NONE;
+    const char *p = n + 5;
+    for (int field = 0; field < 3; field++) {
+        if (*p < '0' || *p > '9')
+            return OSOE_STARTUP_OBJECT_NONE;
+        while (*p >= '0' && *p <= '9')
+            p++;
+        if (*p++ != '.')
+            return OSOE_STARTUP_OBJECT_NONE;
+    }
+    enum osoe_startup_object_kind kind;
+    if (strncmp(p, "job.", 4) == 0) {
+        kind = OSOE_STARTUP_OBJECT_JOB;
+        p += 4;
+    } else if (strncmp(p, "conn.", 5) == 0) {
+        kind = OSOE_STARTUP_OBJECT_CONNECTION_AREA;
+        p += 5;
+    } else {
+        return OSOE_STARTUP_OBJECT_NONE;
+    }
+    if (*p < '0' || *p > '9')
+        return OSOE_STARTUP_OBJECT_NONE;
+    while (*p >= '0' && *p <= '9')
+        p++;
+    return *p == '\0' ? kind : OSOE_STARTUP_OBJECT_NONE;
+}
+
+enum osoe_startup_object_kind osoe_startup_object_kind_of(const char *name)
+{
+    char normal[OSOE_SEGMENT_NAME_MAX];
+    normalize(name, normal, sizeof normal);
+    return startup_kind(normal + 1);
+}
+
+int osoe_startup_object_list_named(char (*names)[OSOE_SEGMENT_NAME_MAX], int max)
+{
+    struct name_list l = { names, max, 0 };
+    DIR *d = opendir("/dev/shm");
+    if (d) {
+        const struct dirent *e;
+        while ((e = readdir(d))) {
+            if (startup_kind(e->d_name) == OSOE_STARTUP_OBJECT_NONE ||
+                strlen(e->d_name) + 2 > OSOE_SEGMENT_NAME_MAX)
+                continue;
+            char name[OSOE_SEGMENT_NAME_MAX];
+            snprintf(name, sizeof name, "/%.*s", OSOE_SEGMENT_NAME_MAX - 2, e->d_name);
+            add_name(&l, name);
+        }
+        closedir(d);
+    }
+    int n = l.found < max ? l.found : max;
+    qsort(names, (size_t)n, OSOE_SEGMENT_NAME_MAX, by_name);
+    return l.found;
+}
+
+int osoe_startup_object_creator(const char *name, char *err, size_t errlen)
+{
+    char normal[OSOE_SEGMENT_NAME_MAX];
+    normalize(name, normal, sizeof normal);
+    enum osoe_startup_object_kind kind = startup_kind(normal + 1);
+    if (kind == OSOE_STARTUP_OBJECT_NONE)
+        return fail(err, errlen, "/dev/shm%s is not a job's tables or connection area", normal);
+    const uint64_t magic = kind == OSOE_STARTUP_OBJECT_JOB ? JOB_MAGIC : CONNECTION_AREA_MAGIC;
+    const size_t offset = kind == OSOE_STARTUP_OBJECT_JOB ? JOB_CREATOR_OFFSET
+                                                           : CONNECTION_AREA_CREATOR_OFFSET;
+
+    int fd = shm_open(normal, O_RDONLY, 0);
+    if (fd < 0) {
+        if (errno == ENOENT)
+            return OSOE_CREATOR_ABSENT;
+        /* Every job that starts on a shared machine holds these for a moment,
+         * so another user's are routine, and not an error of this one's. */
+        if (errno == EACCES)
+            return OSOE_CREATOR_FORBIDDEN;
+        return fail(err, errlen, "cannot open /dev/shm%s: %s", normal, strerror(errno));
+    }
+    /* The object appears before it is sized and before its header is written
+     * (§6.2): a read that comes up short, or finds the magic still zero, is a
+     * creator that is not done, and nothing to remove. */
+    unsigned char head[STARTUP_HEADER_READ_BYTES];
+    ssize_t got = pread(fd, head, sizeof head, 0);
+    int error = errno;
+    close(fd);
+    if (got < 0)
+        return fail(err, errlen, "cannot read /dev/shm%s: %s", normal, strerror(error));
+    if ((size_t)got < sizeof(uint64_t))
+        return OSOE_CREATOR_UNRECORDED;
+    uint64_t found;
+    memcpy(&found, head, sizeof found);
+    if (found == 0)
+        return OSOE_CREATOR_UNRECORDED;
+    if (found != magic)
+        return fail(err, errlen, "/dev/shm%s is not an osoe %s (magic %#llx)", normal,
+                    kind == OSOE_STARTUP_OBJECT_JOB ? "job object" : "connection area",
+                    (unsigned long long)found);
+    int32_t pid;
+    if ((size_t)got < offset + sizeof pid)
+        return OSOE_CREATOR_UNRECORDED;
+    memcpy(&pid, head + offset, sizeof pid);
+    return pid > 0 ? pid : OSOE_CREATOR_UNRECORDED;
 }
 
 int osoe_segment_list(char (*names)[OSOE_SEGMENT_NAME_MAX], int max)

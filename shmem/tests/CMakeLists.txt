@@ -1078,6 +1078,20 @@ add_test(NAME shmem.leftovers.live
 set_tests_properties(shmem.leftovers.live PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "the refusal names the owner: yes")
 
+# A start that never finishes leaves its node's job tables and connection area
+# in /dev/shm - under srun nothing else removes them (the round-three review's
+# R5a) - and osoe-stat --gc removes them once nothing uses them, and not before.
+# One PE stops inside init after its node has joined, the start is cancelled,
+# and the job's names are counted before and after. See start-leftovers.sh.
+add_executable(shmem_test_stalled-start test-stalled-start.c)
+target_link_libraries(shmem_test_stalled-start PRIVATE osoe)
+osoe_warnings(shmem_test_stalled-start)
+add_test(NAME shmem.leftovers.gc
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/start-leftovers.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.leftovers.gc PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "START LEFTOVERS OK")
+
 # A job never outlives its launcher: SIGTERM and SIGINT are forwarded, and a
 # SIGKILLed launcher takes its PEs with it (launch.c; review round two,
 # omissions 6). See launcher-signals.sh.

@@ -1362,7 +1362,8 @@ tree.
 
 It is written **against the segment, not the library**: it includes nothing from
 `shmem/src` and nothing from `base/`, only libc and the two frozen structures
-above. That constraint is the mechanism. A reader with access to the library's
+above - and, for `--gc` alone, what two other objects open with (below). That
+constraint is the mechanism. A reader with access to the library's
 headers would find fields by `offsetof` like the library does, the table would
 describe nothing anyone depended on, and the first structural change would break
 every tool while the build still passed. Having no other way to find anything is
@@ -1384,13 +1385,35 @@ What it does:
   slot records — the cost rule below, that anything the kernel already tracks is
   read by the tool;
 - **human-readable and JSON** output;
-- **`--gc`** for segments left by crashed jobs. A segment is collectable when
+- **`--gc`** for what a job leaves in `/dev/shm`: segments left by a start that
+  died, or kept by `OSOE_KEEP_CONTROL_SEGMENT`, and the two objects a start of
+  a job of more than one node can leave. A segment is collectable when
   every PE that ever joined it is gone; one where *no* PE has joined yet is left
   alone, because that is a job in bootstrap and not a corpse. Heap objects are
   removed first, by the name each slot records, since removing the control
   segment first would strand them. A recycled pid can only make a dead job look
   alive, which costs a few megabytes of `/dev/shm` rather than removing a
-  running job's segment.
+  running job's segment. A segment still mapped by a live process is never
+  removed, whatever its slots say.
+
+  **Two objects besides the control segment.** A job of more than one node
+  names two more while it starts, a node's job tables and its connection area
+  (§6.2), and each loses its name when the last of the node's PEs has opened it.
+  A start that fails or is cancelled before that leaves them, with nothing to
+  say whose they are: by then the lead has removed the control segment's name,
+  and the heaps', once every PE had mapped the others' (the round-three review's
+  R5a). `--gc` collects them by the same rule, in terms of what they have, which
+  is no PE slots but a creator: an object is collectable when the creator
+  recorded in its header is gone and no live process maps it, and left alone
+  while the creator has not yet recorded itself, which is a start in bootstrap.
+  As with a control segment no PE has joined, an object whose creator died in
+  that moment stays, until a later job with the same ids reclaims it (§6.2) or a
+  site's epilog removes it. These objects are not self-describing, so this is
+  the one place `osoe-stat` knows a structure by value beyond the two above:
+  their magic numbers and the byte offset of the creator's pid. The library
+  asserts the offsets where it declares the headers (`job.c`,
+  `connection-area.c`), so that moving one fails the build and not `--gc`; the
+  numbers are in `tools/stat/segment.c`.
 
 Readers load with `memory_order_acquire` and accept values a moment stale.
 
@@ -5556,8 +5579,11 @@ finalize instead: each PE bumps `finalized`, exactly one increment reaches `L`,
 and that PE removes it. The session number keeps that safe — without it, a PE
 that finished and immediately re-initialized could recreate the name and a slower
 sibling would remove the new segment. The window that remains is init itself: a
-job killed there can leave names behind, and the next job with the same id
-reclaims them (below). Where hugetlbfs is mounted and has pages, heaps use it
+job killed there can leave names behind. A later job with the same ids reclaims
+the ones it meets when it creates its own, a leftover whose creator is gone
+(above); `osoe-stat --gc` removes them once nothing uses them (§3.14); and a
+site's epilog may remove `/dev/shm/osoe.<job>.*` at the end of every job. Where
+hugetlbfs is mounted and has pages, heaps use it
 under the same names; otherwise they fall back to regular shared memory.
 
 **Global.** The step's rendezvous server is the lead of node 0: the task with

@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "../../shmem/tests/check.h"
@@ -454,9 +455,155 @@ static void check_details(void)
     }
 }
 
+/*
+ * What a start that never finished leaves besides the control segment (segment.h):
+ * which names are those of a node's job tables and connection area, and what
+ * the head of each says of its creator. The magic numbers and the offsets of
+ * the pid are the library's, written out here as the reader has them - it
+ * includes nothing of the library's, and the library asserts the offsets where
+ * its headers are declared. What agrees with a real job is shmem.leftovers.gc's;
+ * these are the reader's own cases, and the ones a job cannot make.
+ */
+enum { JOB_PID_OFFSET = 24, CONNECTION_AREA_PID_OFFSET = 20 };
+#define JOB_MAGIC UINT64_C(0x00626f6a656f736f)               /* "osoejob" */
+#define CONNECTION_AREA_MAGIC UINT64_C(0x61657261656f736f)   /* "osoearea" */
+
+/* An object in /dev/shm of `len` bytes: the magic, then a pid at `pid_offset`
+ * when there is one, and zeros. */
+static void plant(const char *name, uint64_t magic, size_t pid_offset, int32_t pid, size_t len)
+{
+    unsigned char bytes[8192] = { 0 };
+    memcpy(bytes, &magic, sizeof magic);
+    if (pid != 0 && pid_offset + sizeof pid <= sizeof bytes)
+        memcpy(bytes + pid_offset, &pid, sizeof pid);
+    shm_unlink(name);
+    int fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
+    CHECK(fd >= 0);
+    if (fd < 0)
+        return;
+    CHECK(len <= sizeof bytes && write(fd, bytes, len) == (ssize_t)len);
+    close(fd);
+}
+
+static void check_startup_objects(void)
+{
+    static const struct {
+        const char *name;
+        enum osoe_startup_object_kind kind;
+    } names[] = {
+        { "osoe.1.0.0.job.0", OSOE_STARTUP_OBJECT_JOB },
+        { "/osoe.123.4.5.job.67", OSOE_STARTUP_OBJECT_JOB },
+        { "osoe.1.0.0.conn.12", OSOE_STARTUP_OBJECT_CONNECTION_AREA },
+        { "/dev/shm/osoe.1.0.2.conn.0", OSOE_STARTUP_OBJECT_CONNECTION_AREA },
+        { "osoe.1.0.0.0", OSOE_STARTUP_OBJECT_NONE },           /* a control segment */
+        { "osoe.1.0.0.0.heap.1", OSOE_STARTUP_OBJECT_NONE },
+        { "osoe.1.0.0.0.statics.1", OSOE_STARTUP_OBJECT_NONE },
+        { "osoe.1.0.job.0", OSOE_STARTUP_OBJECT_NONE },         /* step 2's, which had no node */
+        { "osoe.1.0.0.job", OSOE_STARTUP_OBJECT_NONE },
+        { "osoe.1.0.0.job.", OSOE_STARTUP_OBJECT_NONE },
+        { "osoe.1.0.0.job.x", OSOE_STARTUP_OBJECT_NONE },
+        { "osoe.1.0.0.job.0.x", OSOE_STARTUP_OBJECT_NONE },
+        { "osoe.1.0.0.jobs.0", OSOE_STARTUP_OBJECT_NONE },
+        { "osoe.1.0.0.connection.0", OSOE_STARTUP_OBJECT_NONE },
+        { "osoe.1.0.x.job.0", OSOE_STARTUP_OBJECT_NONE },
+        { "osoe..0.0.job.0", OSOE_STARTUP_OBJECT_NONE },
+        { "other.1.0.0.job.0", OSOE_STARTUP_OBJECT_NONE },
+        { "osoetest.1", OSOE_STARTUP_OBJECT_NONE },
+    };
+    for (size_t i = 0; i < sizeof names / sizeof names[0]; i++)
+        CHECK(osoe_startup_object_kind_of(names[i].name) == names[i].kind);
+
+    /* The creator each header records, in every state an object is in while it
+     * is made: not there, sized and not written, written to the magic and not
+     * to the pid, and done; and what is not an object of its kind at all. */
+    uint32_t base = UINT32_C(930000000) + (uint32_t)getpid() % 1000000;
+    char absent[96], empty[96], zeros[96], short_job[96], done_job[96], done_area[96],
+        no_pid[96], wrong[96], swapped[96], listed_control[96];
+    snprintf(absent, sizeof absent, "/osoe.%u.0.0.job.0", base);
+    snprintf(empty, sizeof empty, "/osoe.%u.0.1.job.0", base);
+    snprintf(zeros, sizeof zeros, "/osoe.%u.0.2.conn.0", base);
+    snprintf(short_job, sizeof short_job, "/osoe.%u.0.3.job.0", base);
+    snprintf(done_job, sizeof done_job, "/osoe.%u.0.4.job.0", base);
+    snprintf(done_area, sizeof done_area, "/osoe.%u.0.5.conn.0", base);
+    snprintf(no_pid, sizeof no_pid, "/osoe.%u.0.6.job.0", base);
+    snprintf(wrong, sizeof wrong, "/osoe.%u.0.7.job.0", base);
+    snprintf(swapped, sizeof swapped, "/osoe.%u.0.8.conn.0", base);
+    snprintf(listed_control, sizeof listed_control, "/osoe.%u.0.9.0", base);
+
+    plant(empty, 0, 0, 0, 0);
+    plant(zeros, 0, 0, 0, 8192);
+    plant(short_job, JOB_MAGIC, 0, 0, JOB_PID_OFFSET);          /* ends where the pid begins */
+    plant(done_job, JOB_MAGIC, JOB_PID_OFFSET, 4242, 8192);
+    plant(done_area, CONNECTION_AREA_MAGIC, CONNECTION_AREA_PID_OFFSET, 4343, 8192);
+    plant(no_pid, JOB_MAGIC, JOB_PID_OFFSET, 0, 8192);
+    plant(wrong, UINT64_C(0x2145534f544f4e), JOB_PID_OFFSET, 4242, 8192);
+    plant(swapped, JOB_MAGIC, CONNECTION_AREA_PID_OFFSET, 4343, 8192);   /* the other kind's magic */
+    plant(listed_control, 0, 0, 0, 8192);
+
+    /* Another user's, as far as this one can tell: no permission to open it. As
+     * root there is none to lack. */
+    char locked[96];
+    snprintf(locked, sizeof locked, "/osoe.%u.0.10.job.0", base);
+    plant(locked, JOB_MAGIC, JOB_PID_OFFSET, 4242, 8192);
+    int locked_fd = shm_open(locked, O_RDWR, 0);
+    CHECK(locked_fd >= 0 && fchmod(locked_fd, 0) == 0);
+    if (locked_fd >= 0)
+        close(locked_fd);
+
+    char err[256] = "";
+    CHECK(osoe_startup_object_creator(absent, err, sizeof err) == OSOE_CREATOR_ABSENT);
+    CHECK(osoe_startup_object_creator(locked, err, sizeof err) ==
+          (geteuid() == 0 ? 4242 : OSOE_CREATOR_FORBIDDEN));
+    CHECK(osoe_startup_object_creator(empty, err, sizeof err) == OSOE_CREATOR_UNRECORDED);
+    CHECK(osoe_startup_object_creator(zeros, err, sizeof err) == OSOE_CREATOR_UNRECORDED);
+    CHECK(osoe_startup_object_creator(short_job, err, sizeof err) == OSOE_CREATOR_UNRECORDED);
+    CHECK(osoe_startup_object_creator(no_pid, err, sizeof err) == OSOE_CREATOR_UNRECORDED);
+    CHECK(osoe_startup_object_creator(done_job, err, sizeof err) == 4242);
+    CHECK(osoe_startup_object_creator(done_area, err, sizeof err) == 4343);
+    /* The three spellings of one name, as for a segment. */
+    CHECK(osoe_startup_object_creator(done_job + 1, err, sizeof err) == 4242);
+    char path[128];
+    snprintf(path, sizeof path, "/dev/shm%s", done_job);
+    CHECK(osoe_startup_object_creator(path, err, sizeof err) == 4242);
+    /* Not an object of its kind: another magic, the other kind's, a name that is
+     * neither - none is something to remove. */
+    err[0] = '\0';
+    CHECK(osoe_startup_object_creator(wrong, err, sizeof err) == OSOE_CREATOR_UNREADABLE);
+    CHECK(strstr(err, "is not an osoe job object") != NULL);
+    err[0] = '\0';
+    CHECK(osoe_startup_object_creator(swapped, err, sizeof err) == OSOE_CREATOR_UNREADABLE);
+    CHECK(strstr(err, "is not an osoe connection area") != NULL);
+    err[0] = '\0';
+    CHECK(osoe_startup_object_creator(listed_control, err, sizeof err) == OSOE_CREATOR_UNREADABLE);
+    CHECK(err[0] != '\0');
+
+    /* The listing finds the objects planted above and none else of the job: not
+     * the control-segment-shaped one, and each once, in order. */
+    char found[64][OSOE_SEGMENT_NAME_MAX];
+    int total = osoe_startup_object_list_named(found, 64);
+    CHECK(total >= 9 && total <= 64);       /* the nine planted, and any a real job holds */
+    int seen = 0;
+    for (int i = 0; i < total && i < 64; i++) {
+        CHECK(i == 0 || strcmp(found[i - 1], found[i]) < 0);
+        char prefix[64];
+        snprintf(prefix, sizeof prefix, "/osoe.%u.0.", base);
+        if (strncmp(found[i], prefix, strlen(prefix)) == 0) {
+            seen++;
+            CHECK(strcmp(found[i], listed_control) != 0);
+        }
+    }
+    CHECK(seen == 9);
+
+    const char *planted[] = { empty, zeros, short_job, done_job, done_area, no_pid, wrong,
+                              swapped, locked, listed_control };
+    for (size_t i = 0; i < sizeof planted / sizeof planted[0]; i++)
+        shm_unlink(planted[i]);
+}
+
 int main(void)
 {
     check_details();
+    check_startup_objects();
 
     char name[64], file[96];
     snprintf(name, sizeof name, "/osoe-segment-test.%d", (int)getpid());

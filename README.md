@@ -600,7 +600,7 @@ both are set the `SHMEM_` one controls.
 | `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. |
 | `OSOE_HEAP_BASE` | chosen | The address every PE maps its heap at, a multiple of the page size, if the library's own candidates are taken. The node's first PE's value is the node's. |
 | `OSOE_SHM_CAPACITY_CHECK` | `1` | `0`: a node whose heaps would not fit `/dev/shm`'s free space is warned, not refused. |
-| `OSOE_KEEP_CONTROL_SEGMENT` | `0` | `1`: the control segment keeps its name in `/dev/shm` until finalize, so a crash leaves it for `osoe-stat` to read; `osoe-stat --gc` removes such segments once their PEs are gone. |
+| `OSOE_KEEP_CONTROL_SEGMENT` | `0` | `1`: the control segment keeps its name in `/dev/shm` until finalize, so a crash leaves it for `osoe-stat` to read; `osoe-stat --gc` removes such segments once their PEs are gone, as it does a [failed start's leftovers](#names-a-failed-start-leaves). |
 
 **The progress thread**: each PE's agent thread, which on a node's first PE
 moves every message of the node
@@ -670,8 +670,43 @@ OSOE_PROCID=1 OSOE_LOCALID=1 ./my_program
 wait
 ```
 
-A job that crashes can leave `/dev/shm/osoe.<job>.*` behind. Remove it before
-reusing the same job id.
+A start that fails can leave `/dev/shm/osoe.<job>.*` behind
+([below](#names-a-failed-start-leaves)). Remove it before reusing the same job
+id.
+
+### Names a failed start leaves
+
+osoe removes the names it makes during a start - unless `OSOE_KEEP_CONTROL_SEGMENT`
+keeps the control segment's - as soon as every PE that needs an object has it
+open, so a job that got through its start has none, however it ends. A start
+that fails or is cancelled leaves the names it had made by then: a node's
+control segment, `osoe.<job>.<step>.<node>.<session>`, and its heaps and
+statics (`….heap.<n>`, `….statics.<n>`) until every PE of the node has mapped
+the others', and, in a job of more than one node, its job tables and its
+connection buffers (`….job.<session>` and `….conn.<session>`) until every PE of
+the node has opened them. `<session>` is 0 for a program's first `shmem_init`
+and counts up with each initialization after a `shmem_finalize`.
+
+`osoe-stat --gc` removes what such a start left once nothing uses it: a control
+segment whose PEs are all gone, with the heaps and statics it names, and a
+node's job tables or connection buffers whose creating process is gone and
+which no live process maps. It leaves alone what a start still under way holds: a
+control segment no PE has joined yet, and an object whose creator has not yet
+recorded itself. A start that died in one of those moments leaves one that
+`--gc` cannot tell from that, which stays until a job with the same ids
+reclaims it or the epilog below removes it. `osoe-stat --gc` works on the
+machine it runs on and removes only what its user may, so a site runs it as
+root on each node. `osoe-launch` removes its own job's leftovers itself, and
+says which it found, except a control segment `OSOE_KEEP_CONTROL_SEGMENT`
+keeps, which it leaves for `--gc`.
+
+Under Slurm a site can also clear a job's names in its epilog. Every object a
+job creates in `/dev/shm` is named `osoe.` and the job's number, which is
+`SLURM_JOB_ID`:
+
+```sh
+rm -f /dev/shm/osoe.${SLURM_JOB_ID}.*
+```
 
 ### How a job ends
 

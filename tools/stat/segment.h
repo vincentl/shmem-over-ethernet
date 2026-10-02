@@ -403,4 +403,63 @@ int osoe_segment_list_named(char (*names)[OSOE_SEGMENT_NAME_MAX], int max);
  * remove a segment that is still mapped, whatever its slots say. */
 bool osoe_segment_mapped(const char *name);
 
+/* "/dev/shm/osoe.x", "osoe.x" and "/osoe.x" all name one object: `out` gets
+ * "/osoe.x". */
+void osoe_segment_normalize_name(const char *in, char *out, size_t len);
+
+/* ---- What a start-up leaves besides the control segment -------------- */
+
+/*
+ * A job of more than one node names two more objects in /dev/shm while it
+ * starts, and removes each when the last PE of the node has opened it (§6.2):
+ *
+ *   /osoe.<job>.<step>.<node>.job.<session>    the node's job tables
+ *   /osoe.<job>.<step>.<node>.conn.<session>   the node's connection area
+ *
+ * A start that fails, or is cancelled, before every PE of a node has opened
+ * them leaves them. By then the node's control segment and heaps have lost
+ * their names - the lead removes them once every PE holds a mapping - so a
+ * start that got this far leaves these two and nothing else, and there is no
+ * segment to say whose they are.
+ *
+ * Neither is self-describing, and this reader does not include the library's
+ * headers, so what it knows of them is what each header opens with, by layout:
+ * a 64-bit magic number, a 32-bit layout, and the pid of the process that
+ * created the object at a fixed byte offset (JOB_CREATOR_OFFSET and
+ * CONNECTION_AREA_CREATOR_OFFSET in segment.c). The library asserts the same
+ * offsets where it declares the headers, which is what fails the build, rather
+ * than --gc, when one moves.
+ */
+enum osoe_startup_object_kind {
+    OSOE_STARTUP_OBJECT_NONE,               /* the name is neither */
+    OSOE_STARTUP_OBJECT_JOB,
+    OSOE_STARTUP_OBJECT_CONNECTION_AREA,
+};
+
+/* Which of them `name` is, by its spelling alone; `name` as osoe_segment_open
+ * takes one. */
+enum osoe_startup_object_kind osoe_startup_object_kind_of(const char *name);
+
+/* Every such object that still has a name in /dev/shm - and, as these are
+ * removed within a moment of a start that succeeds, most of them belong to a
+ * start in progress - sorted, written into `names`. Returns how many there
+ * are, which may exceed `max`; at most `max` are written. */
+int osoe_startup_object_list_named(char (*names)[OSOE_SEGMENT_NAME_MAX], int max);
+
+/*
+ * What the header of the object `name` says of its creator, which must be one
+ * of the two kinds above. A pid greater than zero is the creator's, which it
+ * wrote once the object was sized and mapped; the object is the creator's for
+ * as long as the creator runs. The rest are not pids:
+ */
+enum {
+    OSOE_CREATOR_UNRECORDED = 0,    /* too short, or not yet written: still being created */
+    OSOE_CREATOR_UNREADABLE = -1,   /* cannot be opened, or is not an osoe object of its kind;
+                                     * the reason is in `err` */
+    OSOE_CREATOR_ABSENT = -2,       /* its name has been removed since it was listed */
+    OSOE_CREATOR_FORBIDDEN = -3,    /* another user's: mode 0600, so it cannot be opened, and
+                                     * is not this user's to remove */
+};
+int osoe_startup_object_creator(const char *name, char *err, size_t errlen);
+
 #endif /* OSOE_STAT_SEGMENT_H */

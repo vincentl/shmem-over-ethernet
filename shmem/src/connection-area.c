@@ -39,7 +39,8 @@ struct osoe_connection_area_header {
     uint32_t layout;
     uint32_t node;
     uint32_t nodes;
-    int32_t creator_pid;        /* for reclaiming a leftover (shm-object.h) */
+    int32_t creator_pid;        /* for reclaiming a leftover (shm-object.h), and
+                                 * for osoe-stat --gc to find one */
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
     uint64_t conns_offset;      /* nodes-1 struct osoe_connection_shared */
@@ -72,6 +73,16 @@ struct osoe_connection_area_header {
      * brief's rule: a line per word only if measurement says so). */
     uint64_t dirty_offset;
 };
+
+/*
+ * osoe-stat --gc removes this object when a start leaves it behind. It reads the
+ * creator's pid at the offset asserted here and knows the magic by value
+ * (tools/stat/segment.c, which includes nothing from this directory): move the
+ * field and the build says so, and the tool's number moves with it; change the
+ * magic and the tool's copy does.
+ */
+_Static_assert(offsetof(struct osoe_connection_area_header, creator_pid) == 20,
+               "osoe-stat --gc reads the creator's pid at byte 20 (tools/stat/segment.c)");
 
 static uint64_t align_up(uint64_t n)
 {

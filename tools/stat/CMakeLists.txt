@@ -32,4 +32,4 @@ set_tests_properties(stat.absent PROPERTIES LABELS "tier1" TIMEOUT 30
   WILL_FAIL FALSE)
 add_test(NAME stat.help COMMAND osoe-stat --help)
 set_tests_properties(stat.help PROPERTIES LABELS "tier1" TIMEOUT 30
-  PASS_REGULAR_EXPRESSION "remove named segments [(]OSOE_KEEP_CONTROL_SEGMENT[)] whose PEs")
+  PASS_REGULAR_EXPRESSION "remove what a job left named in /dev/shm.*[(][.]job[)].*[(][.]conn[)]")

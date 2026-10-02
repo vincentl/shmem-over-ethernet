@@ -1008,6 +1008,65 @@ static int gc_one(const char *name)
     return 0;
 }
 
+/*
+ * The same rule for a node's job tables and connection area (segment.h), in the
+ * terms of an object that has no PE slots. A control segment is collectable
+ * when every PE that joined it is gone, and left alone while none has joined or
+ * a live process still maps it; these are collectable when the process that
+ * created them is gone, and left alone while it has not recorded itself yet or
+ * a live process still maps them. The creator is the object's own word for who
+ * made it, as the slots are the control segment's, and a mapping is the
+ * kernel's, which is trusted over it: a process that has the object mapped is
+ * using it, whatever pid the header records. A recycled pid makes a dead start
+ * look alive, which costs space in /dev/shm until the next --gc, and never
+ * removes a running start's object.
+ *
+ * A start in progress holds one of these for as long as its slowest PE takes to
+ * open it, and --gc may run at any moment, so everything here that says "gone"
+ * is meant to be harmless: an object removed between the listing and the read
+ * is nothing to report.
+ */
+static int gc_startup_object(const char *given)
+{
+    char name[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_segment_normalize_name(given, name, sizeof name);
+    int creator = osoe_startup_object_creator(name, err, sizeof err);
+    if (creator == OSOE_CREATOR_UNREADABLE) {
+        fprintf(stderr, "osoe-stat: %s\n", err);
+        return 1;
+    }
+    if (creator == OSOE_CREATOR_ABSENT) {
+        printf("%s: already gone\n", name);
+        return 0;
+    }
+    if (creator == OSOE_CREATOR_FORBIDDEN) {
+        printf("%s: another user's; left alone\n", name);
+        return 0;
+    }
+    if (creator == OSOE_CREATOR_UNRECORDED) {
+        printf("%s: its creator has not recorded itself yet; left alone\n", name);
+        return 0;
+    }
+    if (!(kill((pid_t)creator, 0) != 0 && errno == ESRCH)) {
+        printf("%s: its creator, pid %d, is still running; left alone\n", name, creator);
+        return 0;
+    }
+    if (osoe_segment_mapped(name)) {
+        printf("%s: a live process still maps it; left alone\n", name);
+        return 0;
+    }
+    if (shm_unlink(name) != 0) {
+        if (errno == ENOENT) {
+            printf("%s: already gone\n", name);
+            return 0;
+        }
+        fprintf(stderr, "osoe-stat: cannot remove %s: %s\n", name, strerror(errno));
+        return 1;
+    }
+    printf("%s: removed\n", name);
+    return 0;
+}
+
 static int list_segments(void)
 {
     char names[64][OSOE_SEGMENT_NAME_MAX];
@@ -1142,8 +1201,13 @@ static void usage(FILE *f)
 "                    lowest child that has not - walk a hung collective down\n"
 "                    from the root by it (§5.3)\n"
 "  -l, --list        list the control segments in /dev/shm\n"
-"      --gc          remove named segments (OSOE_KEEP_CONTROL_SEGMENT) whose PEs\n"
-"                    are all gone and that no live process maps\n"
+"      --gc          remove what a job left named in /dev/shm that nothing uses:\n"
+"                    control segments (kept by OSOE_KEEP_CONTROL_SEGMENT, or left\n"
+"                    by a start that died while its node's PEs were joining)\n"
+"                    whose PEs are all gone, with the heaps they name; and a\n"
+"                    node's job tables (.job) and connection area (.conn), which\n"
+"                    a start that fails or is cancelled leaves, whose creator is\n"
+"                    gone. None is removed while a live process maps it\n"
 "  -j, --json        JSON instead of a table\n"
 "  -z, --nonzero     omit counters that are zero\n"
 "  -n, --interval S  repeat every S seconds\n"
@@ -1194,7 +1258,9 @@ int main(int argc, char **argv)
         int rc = 0;
         if (i < argc) {
             for (; i < argc; i++)
-                rc |= gc_one(argv[i]);
+                rc |= osoe_startup_object_kind_of(argv[i]) != OSOE_STARTUP_OBJECT_NONE
+                          ? gc_startup_object(argv[i])
+                          : gc_one(argv[i]);
             return rc;
         }
         /* Only named segments: one without a name is held open by a live job,
@@ -1203,8 +1269,18 @@ int main(int argc, char **argv)
         int found = osoe_segment_list_named(names, 64);
         for (int k = 0; k < found && k < 64; k++)
             rc |= gc_one(names[k]);
-        if (found == 0)
-            printf("no named osoe control segments in /dev/shm\n");
+        /* Then what a start leaves (segment.h): a node's job tables and
+         * connection area, named only until the last of its PEs has opened
+         * them. */
+        char objects[64][OSOE_SEGMENT_NAME_MAX];
+        int objects_found = osoe_startup_object_list_named(objects, 64);
+        for (int k = 0; k < objects_found && k < 64; k++)
+            rc |= gc_startup_object(objects[k]);
+        if (found == 0 && objects_found == 0)
+            printf("no named osoe segments, job tables or connection areas in /dev/shm\n");
+        if (found > 64 || objects_found > 64)
+            printf("(%d more not looked at; run --gc again)\n",
+                   (found > 64 ? found - 64 : 0) + (objects_found > 64 ? objects_found - 64 : 0));
         return rc;
     }
 
