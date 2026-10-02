@@ -20,6 +20,15 @@
  * writers on a pipe, which is what a test harness gives us, and is one call on
  * a terminal or a file either way.
  */
+static void (*last_word)(void *);
+static void *last_word_context;
+
+void osoe_fatal_last_word(void (*tell)(void *), void *context)
+{
+    last_word = tell;
+    last_word_context = context;
+}
+
 static _Noreturn void fatal(void (*publish)(void *), void *context, const char *fmt,
                             va_list ap)
 {
@@ -60,8 +69,14 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
         (void)ignored;
     }
 
-    if (publish)
+    if (publish) {
         publish(context);
+    } else if (last_word) {
+        /* Once: a fatal inside it would otherwise come back here for ever. */
+        void (*tell)(void *) = last_word;
+        last_word = NULL;
+        tell(last_word_context);
+    }
     /* Tell this node's other PEs: each stops at its next sweep rather than
      * waiting on something this PE will now never do (§3.15). Unless an abort
      * is already declared - then this PE is one of the ones stopping, or
@@ -90,6 +105,23 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
      * above, which is the one thing exit would have done that is wanted here.
      */
     _exit(EXIT_FAILURE);
+}
+
+void osoe_notice(const char *fmt, ...)
+{
+    char msg[1024], out[1100];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof msg, fmt, ap);
+    va_end(ap);
+    int n = osoe.bootstrap.have_rank
+            ? snprintf(out, sizeof out, "osoe: PE %u: %s\n", osoe.bootstrap.rank, msg)
+            : snprintf(out, sizeof out, "osoe: %s\n", msg);
+    if (n > 0) {
+        size_t len = (size_t)n < sizeof out ? (size_t)n : sizeof out - 1;
+        ssize_t ignored = write(STDERR_FILENO, out, len);
+        (void)ignored;
+    }
 }
 
 _Noreturn void osoe_fatal(const char *fmt, ...)

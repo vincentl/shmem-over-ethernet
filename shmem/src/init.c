@@ -228,9 +228,17 @@ static void exit_without_finalize(void)
     _exit(EXIT_FAILURE);
 }
 
+/* From the moment this PE knows who it is until its node has joined, a fatal
+ * of its own tells the node (node.h): the session is the one about to start. */
+static void identified(const struct osoe_bootstrap *b)
+{
+    osoe_node_refusal_arm(&osoe.node, b, sessions);
+}
+
 static void session_start(void)
 {
     osoe = (struct osoe_state){ 0 };
+    osoe_bootstrap_identified = identified;
     osoe_bootstrap_read(&osoe.bootstrap);
 
     /*
@@ -287,6 +295,9 @@ static void session_start(void)
      * the same sequence of sessions, so the numbers agree. */
     uint32_t session = sessions++;
     osoe_node_join(&osoe.node, &osoe.bootstrap, session);
+    /* Joined: from here a fatal tells the node by its abort word, which every
+     * wait of the node reads. */
+    osoe_node_refusal_disarm();
     /* Every local PE has published its pid: from here a death is watched for,
      * by the sweeps of init's own waits until the agent takes over (liveness.h). */
     osoe_liveness_start();

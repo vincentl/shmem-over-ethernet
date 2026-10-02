@@ -184,8 +184,22 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
     if (!mesh)
         osoe_listener_open(&own, b, session, NULL);
     for (uint32_t accepted = 0; accepted < b->node; accepted++) {
+        /* For the notice of a wait that lasts: the lower nodes still to call,
+         * the first few of them and how many in all. */
+        char expecting[160];
+        uint32_t missing = b->node - accepted, named = 0;
+        int used = snprintf(expecting, sizeof expecting, "%u lower node%s of the mesh (",
+                            missing, missing == 1 ? "" : "s");
+        for (uint32_t peer = 0; peer < b->node && used > 0 &&
+                                (size_t)used < sizeof expecting - 24; peer++)
+            if (wires[peer].fd < 0 && named++ < 8)
+                used += snprintf(expecting + used, sizeof expecting - (size_t)used, "%s%u",
+                                 named == 1 ? "node " : ", ", peer);
+        if (used > 0 && (size_t)used < sizeof expecting - 8)
+            snprintf(expecting + used, sizeof expecting - (size_t)used, "%s)",
+                     named > 8 ? ", ..." : "");
         uint32_t peer;
-        int fd = osoe_listener_accept(l, OSOE_HELLO_MESH, &peer);
+        int fd = osoe_listener_accept(l, OSOE_HELLO_MESH, &peer, expecting);
         if (peer >= b->node)
             osoe_fatal("node %u was connected to by node %u, which is not a lower node",
                        b->node, peer);

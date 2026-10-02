@@ -24,4 +24,22 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
 _Noreturn void osoe_fatal_then(void (*publish)(void *), void *context, const char *fmt, ...)
     __attribute__((format(printf, 3, 4)));
 
+/*
+ * A last word: what a fatal with nothing of its own to publish does after its
+ * message, while one is set - set from the moment a PE knows who it is until
+ * its node has joined, so that a PE refusing its own environment, or the
+ * kernel, tells its node rather than leaving its node-mates waiting in silence
+ * (node.c, osoe_node_tell_refusal; the round-three review's R8). NULL clears
+ * it. Process-wide: one thread runs init.
+ */
+void osoe_fatal_last_word(void (*tell)(void *), void *context);
+
+/*
+ * A notice: loud, and nothing more (§3.15). A start-up wait that has lasted 30 s
+ * says what it waits for, and again each minute (base/stall-watch.h), in one
+ * line written whole as a fatal's is, naming the PE once it is known. It ends
+ * nothing: no wait gives up because time has passed.
+ */
+void osoe_notice(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+
 #endif /* OSOE_FATAL_H */

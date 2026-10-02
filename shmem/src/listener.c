@@ -181,6 +181,11 @@ static void swept(const struct osoe_bootstrap *b, struct osoe_stall_watch *watch
         osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u is waiting for "
                    "node %u %s", (unsigned long long)osoe_stall_watch_seconds(watch), b->node,
                    peer, what);
+    if (osoe_stall_watch_notice_due(watch))
+        osoe_notice("shmem_init on node %u has waited %llu s for node %u %s its part of the "
+                    "rendezvous (%llu bytes so far); still waiting", b->node,
+                    (unsigned long long)osoe_stall_watch_waited_seconds(watch), peer, what,
+                    (unsigned long long)moved);
 }
 
 /* Read exactly n bytes from node `peer`, or return false on end of stream, on an
@@ -190,7 +195,7 @@ static bool read_all(const struct osoe_bootstrap *b, int fd, void *bytes, size_t
                      uint64_t limit_ns, uint32_t peer)
 {
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
     uint64_t start = now_ns(), moved = 0;
     for (char *at = bytes; n > 0; ) {
         uint64_t wait_ns = OSOE_SWEEP_NS;
@@ -235,7 +240,7 @@ static bool write_all(const struct osoe_bootstrap *b, int fd, const void *bytes,
                       uint32_t peer)
 {
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
     uint64_t moved = 0;
     for (const char *at = bytes; n > 0; ) {
         ssize_t k = send(fd, at, n, MSG_NOSIGNAL | MSG_DONTWAIT);
@@ -302,11 +307,37 @@ static bool try_listen(struct osoe_listener *l, const struct sockaddr_in *addres
     return false;
 }
 
+/*
+ * A caller part-way through the hello. Before its answer the hello is read
+ * within HELLO_NS of its accept; after an ACCEPTED answer, its confirmation is
+ * waited for as long as it takes (listener.h).
+ */
+struct osoe_listener_caller {
+    int fd;                     /* -1: the place is free */
+    bool answered;              /* ACCEPTED sent; its confirmation is what comes */
+    uint32_t purpose;           /* the purpose it was answered for */
+    uint64_t hello_until_ns;    /* before the answer: when its hello is late */
+    size_t got;                 /* bytes of the hello, then of the confirmation */
+    struct hello hello;
+    struct answer answer;
+    struct confirmation confirmation;
+};
+
+static void callers_open(struct osoe_listener *l)
+{
+    l->callers = calloc(OSOE_LISTENER_CALLERS, sizeof *l->callers);
+    if (!l->callers)
+        osoe_fatal("out of memory");
+    for (uint32_t i = 0; i < OSOE_LISTENER_CALLERS; i++)
+        l->callers[i].fd = -1;
+}
+
 void osoe_listener_open(struct osoe_listener *l, const struct osoe_bootstrap *b,
                         uint32_t session, const struct sockaddr_in *address)
 {
     *l = (struct osoe_listener){ .fd = -1, .node = b->node, .session = session,
                                  .bootstrap = b };
+    callers_open(l);
     for (uint32_t i = 0; i < CANDIDATES; i++)
         if (try_listen(l, address, osoe_listener_candidate(b, b->node, i)))
             return;
@@ -320,6 +351,7 @@ void osoe_listener_open_any_port(struct osoe_listener *l, const struct osoe_boot
 {
     *l = (struct osoe_listener){ .fd = -1, .node = b->node, .session = session,
                                  .bootstrap = b };
+    callers_open(l);
     if (!try_listen(l, address, 0))
         osoe_fatal("node %u could not listen on any port", b->node);
 }
@@ -329,84 +361,282 @@ void osoe_listener_close(struct osoe_listener *l)
     if (l->fd >= 0)
         close(l->fd);
     l->fd = -1;
+    if (l->callers) {
+        for (uint32_t i = 0; i < OSOE_LISTENER_CALLERS; i++)
+            if (l->callers[i].fd >= 0)
+                close(l->callers[i].fd);
+        free(l->callers);
+        l->callers = NULL;
+    }
+}
+
+/* A place's caller is done with, one way or the other. */
+static void caller_drop(struct osoe_listener_caller *c)
+{
+    close(c->fd);
+    c->fd = -1;
+}
+
+/* Read what has arrived of the hello or the confirmation; true once it is all
+ * there. A caller that closed or failed is dropped (`*gone`). */
+static bool caller_read(struct osoe_listener_caller *c, void *into, size_t n, bool *gone)
+{
+    while (c->got < n) {
+        ssize_t k = recv(c->fd, (char *)into + c->got, n - c->got, MSG_DONTWAIT);
+        if (k > 0) {
+            c->got += (size_t)k;
+            continue;
+        }
+        if (k < 0 && errno == EINTR)
+            continue;
+        if (k < 0 && errno == EAGAIN)
+            return false;
+        *gone = true;                   /* end of stream, or an error */
+        return false;
+    }
+    return true;
+}
+
+/*
+ * What a hello claims about the launch, judged once it may be acted on: as it
+ * arrives without a secret, after its caller's proof with one (listener.h).
+ * Fatal on a count that differs - the one value that shapes the rendezvous's
+ * waits (rendezvous.h) - or, from a caller for this purpose, a node that cannot
+ * be this job's.
+ */
+static void judge_counts(const struct osoe_listener *l, const struct hello *h)
+{
+    const struct osoe_bootstrap *b = l->bootstrap;
+    if (h->node_count != b->node_count || h->world_size != b->world_size)
+        osoe_fatal("node %u, launched for %u tasks on %u nodes, was called by node %u, "
+                   "launched for %u tasks on %u nodes: every lead must be given the same",
+                   l->node, b->world_size, b->node_count, h->from_node, h->world_size,
+                   h->node_count);
+}
+
+static void judge_claim(const struct osoe_listener *l, const struct hello *h)
+{
+    const struct osoe_bootstrap *b = l->bootstrap;
+    if (h->from_node >= b->node_count || h->from_node == l->node)
+        osoe_fatal("node %u was called by a lead claiming to be node %u of a job of %u "
+                   "nodes", l->node, h->from_node, b->node_count);
+}
+
+/*
+ * A caller whose hello has arrived: answered, and either kept for its
+ * confirmation (ACCEPTED) or dropped.
+ */
+static void caller_answer(struct osoe_listener *l, struct osoe_listener_caller *c,
+                          enum osoe_hello_purpose purpose)
+{
+    const struct osoe_bootstrap *b = l->bootstrap;
+    const struct hello *h = &c->hello;
+    if (h->magic != HELLO_MAGIC || h->version != HELLO_VERSION) {
+        caller_drop(c);                 /* a stranger */
+        return;
+    }
+    struct answer a = { HELLO_MAGIC, HELLO_VERSION, ACCEPTED, l->node, b->secured,
+                        fresh_nonce(), 0 };
+    /* Without a secret nothing can be proved, and a hello is judged as it
+     * arrives, in the order it always was; with one, its claims wait for the
+     * proof (caller_confirmed). */
+    if (h->job != b->job || h->step != b->step || h->session != l->session ||
+        h->to_node != l->node)
+        a.verdict = NOT_THIS_NODE;
+    else if (!b->secured)
+        judge_counts(l, h);
+    if (a.verdict == ACCEPTED && h->purpose != (uint32_t)purpose)
+        a.verdict = NOT_YET;
+    else if (a.verdict == ACCEPTED && !b->secured)
+        judge_claim(l, h);
+    if (a.verdict == ACCEPTED && b->secured)
+        a.proof = proof(b, ANSWER_TAG, h, a.nonce);
+    /* The answer fits any socket buffer: one send, and a caller that is not
+     * there to take it is dropped. */
+    bool sent = send(c->fd, &a, sizeof a, MSG_NOSIGNAL | MSG_DONTWAIT) == (ssize_t)sizeof a;
+    if (a.verdict != ACCEPTED || !sent) {
+        caller_drop(c);
+        return;
+    }
+    c->answer = a;
+    c->answered = true;
+    c->purpose = (uint32_t)purpose;
+    c->got = 0;
+}
+
+/*
+ * A caller whose confirmation has arrived: the connection to return, or -1 if
+ * it is no lead of this job. With a secret the hello's claims are judged here,
+ * once proved (listener.h).
+ */
+static int caller_confirmed(struct osoe_listener *l, struct osoe_listener_caller *c,
+                            uint32_t *peer)
+{
+    const struct osoe_bootstrap *b = l->bootstrap;
+    if (c->confirmation.magic != HELLO_MAGIC) {
+        caller_drop(c);
+        return -1;
+    }
+    /* A caller that cannot prove the secret is not counted, and nothing it
+     * claimed is acted on: whatever it is, it is not a lead of this job. */
+    if (b->secured && c->confirmation.proof != proof(b, CONFIRM_TAG, &c->hello, c->answer.nonce)) {
+        fprintf(stderr, "osoe: node %u refused a caller claiming to be node %u of this "
+                        "job: it does not know OSOE_JOB_SECRET\n", l->node, c->hello.from_node);
+        caller_drop(c);
+        return -1;
+    }
+    if (b->secured) {
+        judge_counts(l, &c->hello);
+        judge_claim(l, &c->hello);
+    }
+    int fd = c->fd;
+    c->fd = -1;
+    int flags = fcntl(fd, F_GETFL);
+    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+    *peer = c->hello.from_node;
+    return fd;
 }
 
 int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpose,
-                         uint32_t *peer)
+                         uint32_t *peer, const char *expecting)
 {
     const struct osoe_bootstrap *b = l->bootstrap;
+    if (!expecting)
+        expecting = "another node";
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+    struct pollfd p[1 + OSOE_LISTENER_CALLERS];
+    uint32_t at[1 + OSOE_LISTENER_CALLERS];
     for (;;) {
-        struct pollfd p = { .fd = l->fd, .events = POLLIN };
-        int r = poll(&p, 1, (int)(OSOE_SWEEP_NS / 1000000));
-        if (r < 0 && errno != EINTR)
-            osoe_fatal("waiting for connections: %s", strerror(errno));
-        if (r <= 0) {
+        /* At the sweep's cadence whatever arrives meanwhile, so that callers
+         * that come and go cannot keep the sweep from running. */
+        if (osoe_deadline_expired(&sweep)) {
+            sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_sweep_expired("shmem_init");
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u is "
-                           "waiting for another node to connect to its port %u",
+                           "waiting for %s to connect to its port %u",
                            (unsigned long long)osoe_stall_watch_seconds(&watch), l->node,
-                           l->port);
-            continue;
+                           expecting, l->port);
+            if (osoe_stall_watch_notice_due(&watch)) {
+                uint32_t part = 0;
+                for (uint32_t i = 0; i < OSOE_LISTENER_CALLERS; i++)
+                    part += l->callers[i].fd >= 0;
+                osoe_notice("shmem_init on node %u has waited %llu s for %s to call it on "
+                            "port %u (%u caller%s part-way through the hello); still waiting",
+                            l->node, (unsigned long long)osoe_stall_watch_waited_seconds(&watch),
+                            expecting, l->port, part, part == 1 ? "" : "s");
+            }
         }
-        int fd = accept4(l->fd, NULL, NULL, SOCK_CLOEXEC);
-        if (fd < 0) {
-            if (errno == EINTR || errno == EAGAIN || errno == ECONNABORTED)
+        /* A caller already confirmed between calls cannot be: each is returned
+         * as its confirmation arrives. So poll the listening socket, while a
+         * place is free, and every caller part-way through. */
+        uint32_t count = 0;
+        uint64_t now = now_ns(), wait_ns = OSOE_SWEEP_NS;
+        bool room = false;
+        for (uint32_t i = 0; i < OSOE_LISTENER_CALLERS; i++) {
+            struct osoe_listener_caller *c = &l->callers[i];
+            if (c->fd < 0) {
+                room = true;
                 continue;
-            osoe_fatal("accepting a connection on port %u: %s", l->port, strerror(errno));
+            }
+            if (!c->answered) {
+                if (now >= c->hello_until_ns) {
+                    caller_drop(c);     /* a stranger, or a caller that gave up */
+                    room = true;
+                    continue;
+                }
+                if (c->hello_until_ns - now < wait_ns)
+                    wait_ns = c->hello_until_ns - now;
+            } else if (c->purpose != (uint32_t)purpose) {
+                continue;               /* answered for another purpose: its call */
+            }
+            p[count] = (struct pollfd){ .fd = c->fd, .events = POLLIN };
+            at[count++] = i;
         }
-        struct hello h;
-        if (!read_all(b, fd, &h, sizeof h, HELLO_NS, UINT32_MAX) ||
-            h.magic != HELLO_MAGIC || h.version != HELLO_VERSION) {
-            close(fd);                  /* a stranger, or a caller that gave up */
+        if (room) {
+            p[count] = (struct pollfd){ .fd = l->fd, .events = POLLIN };
+            at[count++] = UINT32_MAX;
+        }
+        int r = poll(p, count, (int)((wait_ns + 999999) / 1000000));
+        if (r < 0 && errno != EINTR)
+            osoe_fatal("waiting for connections: %s", strerror(errno));
+        if (r <= 0)
             continue;
+        for (uint32_t k = 0; k < count; k++) {
+            if (!p[k].revents)
+                continue;
+            if (at[k] == UINT32_MAX) {
+                int fd = accept4(l->fd, NULL, NULL, SOCK_CLOEXEC | SOCK_NONBLOCK);
+                if (fd < 0) {
+                    if (errno == EINTR || errno == EAGAIN || errno == ECONNABORTED)
+                        continue;
+                    osoe_fatal("accepting a connection on port %u: %s", l->port,
+                               strerror(errno));
+                }
+                for (uint32_t i = 0; i < OSOE_LISTENER_CALLERS; i++)
+                    if (l->callers[i].fd < 0) {
+                        l->callers[i] = (struct osoe_listener_caller){
+                            .fd = fd, .hello_until_ns = now_ns() + HELLO_NS };
+                        break;
+                    }
+                continue;
+            }
+            struct osoe_listener_caller *c = &l->callers[at[k]];
+            bool gone = false;
+            if (!c->answered) {
+                if (caller_read(c, &c->hello, sizeof c->hello, &gone))
+                    caller_answer(l, c, purpose);
+                else if (gone)
+                    caller_drop(c);
+            } else if (caller_read(c, &c->confirmation, sizeof c->confirmation, &gone)) {
+                int fd = caller_confirmed(l, c, peer);
+                if (fd >= 0)
+                    return fd;
+            } else if (gone) {
+                caller_drop(c);         /* the caller gave up before our answer came */
+            }
         }
-        struct answer a = { HELLO_MAGIC, HELLO_VERSION, ACCEPTED, l->node, b->secured,
-                            fresh_nonce(), 0 };
-        if (h.job != b->job || h.step != b->step || h.session != l->session ||
-            h.to_node != l->node)
-            a.verdict = NOT_THIS_NODE;
-        else if (h.node_count != b->node_count || h.world_size != b->world_size)
-            osoe_fatal("node %u, launched for %u tasks on %u nodes, was called by node %u, "
-                       "launched for %u tasks on %u nodes: every lead must be given the same",
-                       l->node, b->world_size, b->node_count, h.from_node, h.world_size,
-                       h.node_count);
-        else if (h.purpose != (uint32_t)purpose)
-            a.verdict = NOT_YET;
-        else if (h.from_node >= b->node_count || h.from_node == l->node)
-            osoe_fatal("node %u was called by a lead claiming to be node %u of a job of %u "
-                       "nodes", l->node, h.from_node, b->node_count);
-        if (a.verdict == ACCEPTED && b->secured)
-            a.proof = proof(b, ANSWER_TAG, &h, a.nonce);
-        bool sent = write_all(b, fd, &a, sizeof a, h.from_node);
-        if (a.verdict != ACCEPTED || !sent) {
-            close(fd);
-            continue;
-        }
-        struct confirmation c;
-        if (!read_all(b, fd, &c, sizeof c, 0, h.from_node) || c.magic != HELLO_MAGIC) {
-            close(fd);                  /* the caller gave up before our answer came */
-            continue;
-        }
-        /* A caller that cannot prove the secret is not counted, and not
-         * answered further: whatever it is, it is not a lead of this job. */
-        if (b->secured && c.proof != proof(b, CONFIRM_TAG, &h, a.nonce)) {
-            fprintf(stderr, "osoe: node %u refused a caller claiming to be node %u of this "
-                            "job: it does not know OSOE_JOB_SECRET\n", l->node, h.from_node);
-            close(fd);
-            continue;
-        }
-        *peer = h.from_node;
-        return fd;
     }
 }
 
 /* ---- calling ---------------------------------------------------------- */
 
-/* A connection to host:port, or -1 if nothing listens there within PROBE_NS. */
-static int dial(const struct sockaddr_in *host, uint16_t port)
+/*
+ * What a caller last met, for its notice (listener.h): the node it calls, as
+ * its host list entry and the address dialled, what happened, and when.
+ */
+struct attempt {
+    char last[96];
+    uint64_t at_ns;
+};
+
+static void attempted(struct attempt *t, const char *what)
+{
+    snprintf(t->last, sizeof t->last, "%s", what);
+    t->at_ns = now_ns();
+}
+
+static void notice_calling(const struct osoe_bootstrap *b, const struct osoe_stall_watch *watch,
+                           uint32_t node, const struct sockaddr_in *host, const char *ports,
+                           const struct attempt *t)
+{
+    char entry[256] = "?", ip[INET_ADDRSTRLEN] = "?";
+    if (b->node_list)
+        osoe_hostlist_entry(b->node_list, node, entry, sizeof entry);
+    inet_ntop(AF_INET, &host->sin_addr, ip, sizeof ip);
+    uint64_t ago_ms = t->at_ns ? (now_ns() - t->at_ns) / UINT64_C(1000000) : 0;
+    osoe_notice("shmem_init on node %u has waited %llu s for node %u (%s, at %s) to answer on "
+                "%s: %s, %llu.%llu s ago; still waiting", b->node,
+                (unsigned long long)osoe_stall_watch_waited_seconds(watch), node, entry, ip,
+                ports, t->at_ns ? t->last : "not tried yet",
+                (unsigned long long)(ago_ms / 1000), (unsigned long long)(ago_ms % 1000 / 100));
+}
+
+/* A connection to host:port, or -1 if nothing listens there within PROBE_NS,
+ * with what went wrong in `t`. */
+static int dial(const struct sockaddr_in *host, uint16_t port, struct attempt *t)
 {
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
     if (fd < 0)
@@ -415,14 +645,17 @@ static int dial(const struct sockaddr_in *host, uint16_t port)
     a.sin_port = htons(port);
     if (connect(fd, (struct sockaddr *)&a, sizeof a) != 0) {
         if (errno != EINPROGRESS) {
+            attempted(t, strerror(errno));
             close(fd);
             return -1;
         }
         struct pollfd p = { .fd = fd, .events = POLLOUT };
         int error = 0;
         socklen_t length = sizeof error;
-        if (poll(&p, 1, (int)(PROBE_NS / 1000000)) != 1 ||
-            getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &length) != 0 || error != 0) {
+        int r = poll(&p, 1, (int)(PROBE_NS / 1000000));
+        if (r != 1 || getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &length) != 0 ||
+            error != 0) {
+            attempted(t, r == 0 ? "the connection timed out" : strerror(error ? error : errno));
             close(fd);
             return -1;
         }
@@ -437,19 +670,23 @@ int osoe_listener_connect_port(const struct osoe_bootstrap *b, uint32_t session,
                                enum osoe_hello_purpose purpose)
 {
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
+    struct attempt tried = { "", 0 };
+    char ports[32];
+    snprintf(ports, sizeof ports, "port %u", port);
     for (;;) {
         struct hello h = { HELLO_MAGIC, HELLO_VERSION, (uint32_t)purpose, b->job, b->step,
                            session, b->node, node, b->node_count, b->world_size,
                            fresh_nonce() };
-        int fd = dial(host, port);
+        int fd = dial(host, port, &tried);
         if (fd >= 0) {
             struct answer a;
             /* Told this port, so whoever answers is the peer or a
              * disagreement; no time limit on the answer, sweeping. */
             if (!write_all(b, fd, &h, sizeof h, node) || !read_all(b, fd, &a, sizeof a, 0, node)) {
+                attempted(&tried, "the connection closed before an answer to the hello");
                 close(fd);
             } else if (a.magic != HELLO_MAGIC || a.version != HELLO_VERSION ||
                        a.verdict == NOT_THIS_NODE || a.node != node) {
@@ -462,6 +699,7 @@ int osoe_listener_connect_port(const struct osoe_bootstrap *b, uint32_t session,
                     return fd;
                 close(fd);
             } else {
+                attempted(&tried, "it is busy with another purpose");
                 close(fd);              /* NOT_YET: the peer is busy with another purpose */
             }
         }
@@ -473,6 +711,8 @@ int osoe_listener_connect_port(const struct osoe_bootstrap *b, uint32_t session,
                            "not answered node %u on its port %u",
                            (unsigned long long)osoe_stall_watch_seconds(&watch), node, b->node,
                            port);
+            if (osoe_stall_watch_notice_due(&watch))
+                notice_calling(b, &watch, node, host, ports, &tried);
         }
         nanosleep(&back, NULL);
         if (back.tv_nsec < 10000000)
@@ -552,21 +792,37 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
                           enum osoe_hello_purpose purpose)
 {
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
+    /* The most telling thing any candidate said in the last round: an answer
+     * from the node beats a stranger's, which beats a port nobody holds. */
+    struct attempt tried = { "", 0 }, round = { "", 0 };
+    char ports[64];
+    snprintf(ports, sizeof ports, "its candidate ports in OSOE_PORT_RANGE=%u-%u", b->port_low,
+             b->port_high);
     for (;;) {
+        int telling = 0;        /* 0 nobody, 1 silence, 2 another node's, 3 the node's own */
+        round = (struct attempt){ "", 0 };
         for (uint32_t i = 0; i < CANDIDATES; i++) {
             struct hello h = { HELLO_MAGIC, HELLO_VERSION, (uint32_t)purpose, b->job, b->step,
                                session, b->node, node, b->node_count, b->world_size,
                                fresh_nonce() };
-            int fd = dial(host, osoe_listener_candidate(b, node, i));
-            if (fd < 0)
+            struct attempt dialled = { "", 0 };
+            int fd = dial(host, osoe_listener_candidate(b, node, i), &dialled);
+            if (fd < 0) {
+                if (telling == 0)
+                    round = dialled;
                 continue;
+            }
             struct answer a;
             if (!write_all(b, fd, &h, sizeof h, node) ||
                 !read_all(b, fd, &a, sizeof a, PROBE_NS, node) ||
                 a.magic != HELLO_MAGIC || a.version != HELLO_VERSION) {
+                if (telling < 1) {
+                    attempted(&round, "no answer to the hello on a candidate port");
+                    telling = 1;
+                }
                 close(fd);
                 continue;
             }
@@ -578,9 +834,18 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
                 continue;
             }
             close(fd);
-            if (a.verdict == NOT_YET)
+            if (a.verdict == NOT_YET) {
+                attempted(&round, "it answered, busy with another purpose");
+                telling = 3;
                 break;                  /* found, and not ready: wait, then again */
+            }
+            if (telling < 2) {
+                attempted(&round, "its candidate ports answered for another node or job");
+                telling = 2;
+            }
         }
+        if (round.at_ns)
+            tried = round;
         if (osoe_deadline_expired(&sweep)) {
             sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_sweep_expired("shmem_init");
@@ -590,6 +855,8 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
                            "OSOE_PORT_RANGE=%u-%u",
                            (unsigned long long)osoe_stall_watch_seconds(&watch), node, b->node,
                            CANDIDATES, b->port_low, b->port_high);
+            if (osoe_stall_watch_notice_due(&watch))
+                notice_calling(b, &watch, node, host, ports, &tried);
         }
         nanosleep(&back, NULL);
         if (back.tv_nsec < 10000000)

@@ -63,6 +63,8 @@ static uint32_t need_u32(const char *name)
     }
 }
 
+void (*osoe_bootstrap_identified)(const struct osoe_bootstrap *b);
+
 void osoe_bootstrap_read(struct osoe_bootstrap *b)
 {
     *b = (struct osoe_bootstrap){ 0 };
@@ -106,6 +108,10 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     default: osoe_fatal("%sJOB_ID='%s' is not a decimal number", prefix,
                         getenv(launcher_name("JOB_ID")));
     }
+    /* Who this PE is, so that every refusal below can tell its node (node.h).
+     * Everything before is the identity itself, and nothing can be told. */
+    if (osoe_bootstrap_identified)
+        osoe_bootstrap_identified(b);
 
     if (b->node_count == 0 || b->node >= b->node_count)
         osoe_fatal("%sNODEID=%u is not below %sSTEP_NUM_NODES=%u", prefix, b->node, prefix,

@@ -184,3 +184,16 @@ int main(void)
     osoe_ring_close(&ring);
     return CHECK_DONE();
 }
+
+/* The library's notice (fatal.h), which the listener's waits print once they
+ * have lasted (base/stall-watch.h): here, to stderr as it is. */
+void osoe_notice(const char *fmt, ...);
+void osoe_notice(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "osoe_notice: ");
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    va_end(ap);
+}

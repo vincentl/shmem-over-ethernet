@@ -299,8 +299,19 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
     for (uint32_t i = 0; i < OSOE_RENDEZVOUS_FANOUT; i++)
         child_fd[i] = -1;
     for (uint32_t accepted = 0; accepted < children; accepted++) {
+        /* For the notice of a wait that lasts: the children still to call. */
+        char nodes[96] = "";
+        int used = 0;
+        uint32_t missing = children - accepted;
+        for (uint32_t i = 0; i < children && used >= 0 && (size_t)used < sizeof nodes - 16; i++)
+            if (child_fd[i] < 0)
+                used += snprintf(nodes + used, sizeof nodes - (size_t)used, "%s%u",
+                                 used ? ", " : "", first_child + i);
+        char expecting[160];
+        snprintf(expecting, sizeof expecting, "node%s %s, its child%s in the rendezvous tree,",
+                 missing == 1 ? "" : "s", nodes, missing == 1 ? "" : "ren");
         uint32_t peer;
-        int fd = osoe_listener_accept(&l, OSOE_HELLO_RENDEZVOUS, &peer);
+        int fd = osoe_listener_accept(&l, OSOE_HELLO_RENDEZVOUS, &peer, expecting);
         /* The hello agreed on the node count, so only a second lead with one
          * node id can be a child this lead is not waiting for. */
         if (peer < first_child || peer >= first_child + children ||

@@ -20,8 +20,22 @@
  * connection it now owns, and would count a peer whose socket is already
  * closed. It counts a connection only once the confirmation arrives.
  *
+ * **Callers part-way through the hello are kept side by side** (the round-three
+ * review's N2): an accepted connection's hello is read within 0.1 s, as before -
+ * safe, since an unanswered caller retries - and a caller that has been answered
+ * waits in a small set, polled with the listening socket, for its
+ * confirmation, with no time limit: a caller that is answered writes its
+ * confirmation and carries on, and one dropped for time would end the job. One
+ * silent caller no longer holds the loop. With OSOE_JOB_SECRET, nothing a hello
+ * claims is acted on - a count that differs, a node out of range - until its
+ * caller has proved the secret; without one nothing can be proved, and the
+ * hello is judged as it arrives.
+ *
  * Every wait here sweeps (§4.10) and gives up only by the no-progress rule
  * (§3.15): a peer that has not started yet is waited for as long as it takes.
+ * Each says what it waits for once it has lasted 30 s, and every minute after:
+ * the node, its host list entry, the address and port dialled and the last
+ * error, or the nodes it waits to be called by (base/stall-watch.h).
  */
 #ifndef OSOE_LISTENER_H
 #define OSOE_LISTENER_H
@@ -40,12 +54,21 @@ enum osoe_hello_purpose {
     OSOE_HELLO_RENDEZVOUS,      /* a child of the rendezvous tree (§6.2) */
 };
 
+/* A caller part-way through the hello (listener.c). */
+struct osoe_listener_caller;
+
+/* The callers a listener keeps at once, part-way through the hello; a full
+ * set accepts no more until one finishes, and the rest wait in the kernel's
+ * backlog, as a caller of a lead that is busy waits. */
+enum { OSOE_LISTENER_CALLERS = 16 };
+
 struct osoe_listener {
     int fd;
     uint16_t port;              /* the candidate this lead bound */
     uint32_t node;
     uint32_t session;
     const struct osoe_bootstrap *bootstrap;
+    struct osoe_listener_caller *callers;   /* OSOE_LISTENER_CALLERS of them */
 };
 
 /*
@@ -70,10 +93,11 @@ void osoe_listener_close(struct osoe_listener *l);
  * Accept the next connection from this job and session for `purpose`, and
  * return its socket, with the caller's node in `peer`. Answers every other
  * caller - another job, another node of this job looking for someone else, the
- * wrong purpose - and keeps waiting.
+ * wrong purpose - and keeps waiting. `expecting` says whom it waits for, for
+ * its notice: "node 5", "nodes 1 and 3 of the mesh".
  */
 int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpose,
-                         uint32_t *peer);
+                         uint32_t *peer, const char *expecting);
 
 /*
  * Node `node`'s address from the host list: OSOE_STEP_NODELIST, which mirrors

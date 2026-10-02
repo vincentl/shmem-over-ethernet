@@ -1097,6 +1097,22 @@ static inline int32_t osoe_node_local_id(const struct osoe_node *n, uint32_t ran
 /* Rendezvous with the other local PEs; map every heap. Fatal on failure. */
 void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session);
 
+/*
+ * From the moment a PE knows who it is - its job, step, node and local id -
+ * until its node has joined, a fatal of its own tells its node before it goes
+ * (the round-three review's R8: a PE refusing its own environment, or the
+ * kernel, left its node-mates waiting in silence). The tale is the `failed`
+ * word every start-up wait of the node reads (§6.2): set in the control
+ * segment once this PE has it; otherwise, from the node's lead, in a tombstone
+ * - a control segment that is nothing but a header with `failed` set and
+ * `ready` never - and from any other PE, in the lead's segment, once the lead
+ * has made it, waiting at most OSOE_ABORT_GRACE_SECONDS for it. A PE that cannot
+ * read its own identity tells nobody; the 30 s notices of the others name it.
+ */
+void osoe_node_refusal_arm(struct osoe_node *n, const struct osoe_bootstrap *b,
+                           uint32_t session);
+void osoe_node_refusal_disarm(void);
+
 /* Unmap everything; the PE whose finalize is the node's last removes the
  * control segment's name. */
 void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b);

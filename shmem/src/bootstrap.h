@@ -113,6 +113,15 @@ struct osoe_bootstrap {
 
 /* Read and validate the environment; fatal on anything unusable. */
 void osoe_bootstrap_read(struct osoe_bootstrap *b);
+
+/*
+ * Called by osoe_bootstrap_read, if set, as soon as `b` holds the PE's
+ * identity - its job, step, node and local id - and before anything else of the
+ * environment is read: init arms the PE's refusal there (node.h), so that from
+ * then on a PE refusing its own environment tells its node. Unset in the tests
+ * below the library.
+ */
+extern void (*osoe_bootstrap_identified)(const struct osoe_bootstrap *b);
 void osoe_bootstrap_free(struct osoe_bootstrap *b);
 
 #endif /* OSOE_BOOTSTRAP_H */
