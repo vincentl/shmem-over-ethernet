@@ -70,10 +70,12 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
     if (osoe.bootstrap.have_rank && osoe.node.hdr) {
         osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE,
                                 OSOE_ABORT_FATAL);
-        /* A global exit declared first ends this PE as it ends every other, with
-         * its caller's status: what went wrong here may be that exit's own
-         * doing - a peer gone, a reply that will not come - and §9.1.6 gives
-         * the job the caller's status (abort.h). */
+        /* A global exit declared first ends this PE as it ends every other
+         * that did not call it, with 0, leaving the job the caller's status:
+         * what went wrong here may be that exit's own doing - a peer gone, a
+         * reply that will not come - and §9.1.6 gives the job the caller's
+         * status, which a launcher reads from the one task that leaves
+         * nonzero (abort.h). */
         uint32_t pe;
         int status;
         if (osoe_node_abort_read(&osoe.node, &pe, &status) == OSOE_ABORT_GLOBAL_EXIT)
