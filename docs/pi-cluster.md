@@ -267,8 +267,9 @@ A hung `mix` - every node's load at zero, nothing printed - is diagnosed with
 `osoe-stat JOB` on each node, which says what every PE is blocked in and at
 which collective epoch (`docs/decisions/2026-09-27-evening.md` item 2).
 
-`osoe-pacer-counted`, built beside the tool, is the same program with a shim
-that counts every call of every routine the library declares; `--coverage
+`osoe-pacer-counted`, built beside the tool where Python 3 is found (CMake says
+when it is not), is the same program with a shim that counts every call of every
+routine the library declares; `--coverage
 FILE` writes which were called, how often, and which never were. A quick run
 takes each case once, in one spelling and on one context; 792 rounds - `rma`'s
 cycle, each transfer case in both spellings on both contexts, with every

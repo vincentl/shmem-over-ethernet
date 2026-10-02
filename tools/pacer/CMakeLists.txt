@@ -19,47 +19,62 @@ osoe_warnings(osoe-pacer)
 set_target_properties(osoe-pacer PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 install(TARGETS osoe-pacer)
 
+# Annex F's unprefixed routines, start_pes first, in a program of their own:
+# start_pes starts the library where shmem_init would, and ends it at exit.
+add_executable(osoe-pacer-start-pes start-pes.c)
+target_link_libraries(osoe-pacer-start-pes PRIVATE osoe)
+osoe_warnings(osoe-pacer-start-pes)
+
 # osoe-pacer-counted: the same program with a shim that counts every call of
 # every routine the library declares (spec §10: every shmem_ name is a weak
 # alias of its pshmem_ routine, so a strong definition in the program counts
 # and forwards). generate-shim.py writes the shim from the preprocessor's
 # expansion of pshmem.h, whose declarations come from X-macro lists; nothing
 # in the generated file is edited by hand. --coverage FILE writes the report.
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
-  COMMAND ${CMAKE_C_COMPILER} -E -P -I${PROJECT_SOURCE_DIR}/shmem/include
-          ${PROJECT_SOURCE_DIR}/shmem/include/pshmem.h
-          -o ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
-  DEPENDS ${PROJECT_SOURCE_DIR}/shmem/include/pshmem.h
-          ${PROJECT_SOURCE_DIR}/shmem/include/shmem.h
-  COMMENT "pacer: preprocessing pshmem.h for the counting shim"
-  VERBATIM)
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c
-  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate-shim.py
-          ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
-          ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/generate-shim.py
-          ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
-  COMMENT "pacer: generating the call-counting shim"
-  VERBATIM)
-# Annex F's unprefixed routines, start_pes first, in a program of their own:
-# start_pes starts the library where shmem_init would, and ends it at exit.
-add_executable(osoe-pacer-start-pes start-pes.c)
-target_link_libraries(osoe-pacer-start-pes PRIVATE osoe)
-osoe_warnings(osoe-pacer-start-pes)
-add_executable(osoe-pacer-start-pes-counted start-pes.c ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c)
-target_link_libraries(osoe-pacer-start-pes-counted PRIVATE osoe)
-target_compile_definitions(osoe-pacer-start-pes-counted PRIVATE PACER_COUNTED=1)
-osoe_warnings(osoe-pacer-start-pes-counted)
+# osoe-pacer-start-pes-counted is the Annex F program the same way.
+#
+# Python 3 writes the shim, and nothing else in the build needs it but the
+# models (tools/modelcheck/CMakeLists.txt). So it is optional, found or not as
+# for the models: where it is found these two programs and their test are
+# built, and where it is not they are left out, with a status message. A
+# machine without Python still builds, installs and tests everything else.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
+    COMMAND ${CMAKE_C_COMPILER} -E -P -I${PROJECT_SOURCE_DIR}/shmem/include
+            ${PROJECT_SOURCE_DIR}/shmem/include/pshmem.h
+            -o ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
+    DEPENDS ${PROJECT_SOURCE_DIR}/shmem/include/pshmem.h
+            ${PROJECT_SOURCE_DIR}/shmem/include/shmem.h
+    COMMENT "pacer: preprocessing pshmem.h for the counting shim"
+    VERBATIM)
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate-shim.py
+            ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
+            ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/generate-shim.py
+            ${CMAKE_CURRENT_BINARY_DIR}/pshmem-preprocessed.i
+    COMMENT "pacer: generating the call-counting shim"
+    VERBATIM)
+  add_executable(osoe-pacer-start-pes-counted start-pes.c
+    ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c)
+  target_link_libraries(osoe-pacer-start-pes-counted PRIVATE osoe)
+  target_compile_definitions(osoe-pacer-start-pes-counted PRIVATE PACER_COUNTED=1)
+  osoe_warnings(osoe-pacer-start-pes-counted)
 
-add_executable(osoe-pacer-counted ${osoe_pacer_sources} ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c)
-target_include_directories(osoe-pacer-counted PRIVATE ${PROJECT_SOURCE_DIR}
-  ${PROJECT_SOURCE_DIR}/tools/stat)
-target_link_libraries(osoe-pacer-counted PRIVATE osoe Threads::Threads m)
-target_compile_definitions(osoe-pacer-counted PRIVATE PACER_COUNTED=1)
-osoe_warnings(osoe-pacer-counted)
+  add_executable(osoe-pacer-counted ${osoe_pacer_sources}
+    ${CMAKE_CURRENT_BINARY_DIR}/pacer-shim.c)
+  target_include_directories(osoe-pacer-counted PRIVATE ${PROJECT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(osoe-pacer-counted PRIVATE osoe Threads::Threads m)
+  target_compile_definitions(osoe-pacer-counted PRIVATE PACER_COUNTED=1)
+  osoe_warnings(osoe-pacer-counted)
+else()
+  message(STATUS "python3 not found: osoe-pacer-counted and osoe-pacer-start-pes-counted "
+                 "will not be built, nor their test run")
+endif()
 
 # ---- The pacer's tests, in every preset: PENDING THE AUTHOR'S DECISION ------
 #
@@ -411,13 +426,16 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     PASS_REGULAR_EXPRESSION "print_route=signal.*osoe-pacer failures=0 "
     FAIL_REGULAR_EXPRESSION "${pacer_failed}")
 
-  # The counted build: it runs, and its report counts what the run called.
-  add_test(NAME tools.pacer.counted.0-0-1-1
-    COMMAND sh -c "$<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer-counted> --quick --coverage coverage-test.txt sort atomics && head -1 coverage-test.txt"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-  set_tests_properties(tools.pacer.counted.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
-    PASS_REGULAR_EXPRESSION "shim called=[1-9][0-9]+ declared=[1-9][0-9]+"
-    FAIL_REGULAR_EXPRESSION "failures=[1-9]|killed by signal|timeout after|left behind")
+  # The counted build: it runs, and its report counts what the run called. It
+  # exists only where Python 3 does (above).
+  if(Python3_Interpreter_FOUND)
+    add_test(NAME tools.pacer.counted.0-0-1-1
+      COMMAND sh -c "$<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer-counted> --quick --coverage coverage-test.txt sort atomics && head -1 coverage-test.txt"
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    set_tests_properties(tools.pacer.counted.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
+      PASS_REGULAR_EXPRESSION "shim called=[1-9][0-9]+ declared=[1-9][0-9]+"
+      FAIL_REGULAR_EXPRESSION "failures=[1-9]|killed by signal|timeout after|left behind")
+  endif()
 
   # The installed program, under a prefix chosen at install time: it finds the
   # library installed beside it, by its runpath from its own directory, not the

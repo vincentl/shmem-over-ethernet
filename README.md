@@ -78,6 +78,9 @@ srun -N2 --ntasks-per-node=4 ./ring
 - liburing 2.6 or newer
 - CMake 3.25 or newer, pkg-config, and a C11 compiler
 
+- Python 3, optionally: the model checker and the stress tester's counting
+  build use it. Where CMake does not find it, it says so while configuring and
+  leaves those out; nothing else needs it.
 Debian 13 (Trixie) and Raspberry Pi OS Trixie provide all of these from their
 own repositories. Older releases are not supported, even where the kernel is
 new enough: see the design notes, §1.
@@ -496,7 +499,8 @@ that one could be added without touching the OpenSHMEM layer.
   every atomic, transfer and collective, and all of them at once on teams out
   of step - every result checked against an oracle, and every oracle checked
   by a planted defect it must catch. A build of it that counts every call
-  shows which of the library's 1,794 routines a run reaches.
+  (`osoe-pacer-counted`, built where Python 3 is found) shows which of the
+  library's 1,794 routines a run reaches.
 - **A Raspberry Pi 5 cluster** over gigabit Ethernet, where puts, gets and
   atomics run within 8 to 13% of a bare io_uring TCP echo's round trip, streams
   run at line rate, and a 16-PE barrier takes about 180 µs

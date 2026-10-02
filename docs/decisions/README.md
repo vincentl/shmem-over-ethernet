@@ -73,7 +73,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Keepalive** is 60 s idle, 10 s between probes, 6 probes; `TCP_USER_TIMEOUT` is not set; `OSOE_KEEPALIVE` overrides. Claude, [2026-09-23-autonomous](2026-09-23-autonomous.md) item 17.
 - **`OSOE_HEAP_BASE`** must be page-aligned, and an unaligned one is refused by name. Claude, [2026-09-24-overnight](2026-09-24-overnight.md) item 17.
 - **The `/dev/shm` capacity check** refuses by default; `OSOE_SHM_CAPACITY_CHECK=0` makes it a report. Design §6.2.
-- **Dependencies.** The distribution's liburing 2.6 or later, never a bundled copy; CMake 3.25 or later. Design §1.
+- **Dependencies.** The distribution's liburing 2.6 or later, never a bundled copy; CMake 3.25 or later. Design §1. Python 3 is optional: the model checker and the stress tester's counting build use it, and where CMake does not find it they are left out. Claude, on the plan's recommendation (`docs/prompts/phase1-release-fixes-plan.md` §4.5), built by the release-fixes brief, Part 1 item 6.
 - **Names.** The library is `libosoe` with hidden visibility; `OSOE_`/`osoe_` are internal, `SHMEM_` belongs to the specification. Design §1.
 
 ## How work is done
