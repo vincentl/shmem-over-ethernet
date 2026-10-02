@@ -10,7 +10,9 @@
  * seen: a memcpy of 64 KiB that had not finished would leave the tail unwritten.
  *
  * Then signal_add and signal_set racing a waiter, signal_fetch, and the return
- * value of signal_wait_until.
+ * value of signal_wait_until. Then the C11 forms of signal_add and signal_set
+ * that take a context first, on the default context and on one of the
+ * program's own: the call itself is what shmem.h must make compile.
  */
 #define _GNU_SOURCE
 #include <stdint.h>
@@ -93,6 +95,36 @@ int main(void)
               == ((uint64_t)k << 32 | 0xabcd));
         shmem_barrier_all();
     }
+
+    /* The C11 spellings that begin with a context (§9.8.5, §9.8.7), which
+     * shmem.h tells from the three-argument ones above by counting arguments:
+     * the same two updates, on the default context - where they must do what
+     * the three-argument forms just did - and on a context of the program's
+     * own. Each round adds 1 on one and 2 on the other, so a form that set
+     * where it should add, or lost an update, leaves the total short of the 3
+     * a round that the waiter wants. */
+    shmem_ctx_t ctx;
+    CHECK_FATAL(shmem_ctx_create(0, &ctx) == 0);
+    *sig = 0;
+    shmem_barrier_all();
+    for (int k = 1; k <= ROUNDS; k++) {
+        shmem_signal_add(SHMEM_CTX_DEFAULT, sig, 1, right);
+        shmem_signal_add(ctx, sig, 2, right);
+        uint64_t got = shmem_signal_wait_until(sig, SHMEM_CMP_GE, (uint64_t)k * 3);
+        CHECK(got >= (uint64_t)k * 3);
+    }
+    CHECK(shmem_signal_fetch(sig) == (uint64_t)ROUNDS * 3);
+    /* And the set, a round on each context in turn, each waited for by its
+     * exact value. */
+    shmem_barrier_all();
+    for (int k = 1; k <= ROUNDS; k++) {
+        uint64_t v = (uint64_t)k << 32 | 0x1234;
+        shmem_signal_set(k % 2 ? ctx : SHMEM_CTX_DEFAULT, sig, v, right);
+        CHECK(shmem_signal_wait_until(sig, SHMEM_CMP_EQ, v) == v);
+        shmem_barrier_all();
+    }
+    shmem_ctx_quiet(ctx);
+    shmem_ctx_destroy(ctx);
 
     /* A signal to the PE's own signal object, which the waiter is about to
      * check: already satisfied, so the wait returns without blocking. */

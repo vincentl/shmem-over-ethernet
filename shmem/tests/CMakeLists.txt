@@ -1257,7 +1257,9 @@ endif()
 # selection serves.
 foreach(pair "fetch_add_nbi:osoe_shmem_atomic_fetch_add_nbi_takes_four_or_five_arguments"
              "fetch_add:osoe_shmem_atomic_fetch_add_takes_three_or_four_arguments"
-             "put:osoe_shmem_put_takes_four_or_five_arguments")
+             "put:osoe_shmem_put_takes_four_or_five_arguments"
+             "signal_add:osoe_shmem_signal_add_takes_three_or_four_arguments"
+             "signal_set:osoe_shmem_signal_set_takes_three_or_four_arguments")
   string(REPLACE ":" ";" pair "${pair}")
   list(GET pair 0 call)
   list(GET pair 1 complaint)

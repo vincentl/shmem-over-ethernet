@@ -179,6 +179,14 @@ void shmem_putmem_signal_nbi(void *dest, const void *source, size_t nelems,
 void shmem_ctx_putmem_signal_nbi(shmem_ctx_t ctx, void *dest, const void *source,
                                  size_t nelems, uint64_t *sig_addr, uint64_t signal,
                                  int sig_op, int pe);
+/* Below, the signal updates: the three-argument spelling here and the named
+ * shmem_ctx_ one. The spec's C11 synopsis (§9.8.5, §9.8.7) also gives the
+ * routine itself a leading context, shmem_signal_add(ctx, sig_addr, signal,
+ * pe); it shares the name, so C11 counts the arguments to tell them apart (with
+ * the generics, below) and C++ overloads (at the end), as for shmem_sync. The
+ * macros come after these declarations, so the function itself stays reachable
+ * as (shmem_signal_add)(...), which is also how a definition of it - an
+ * interposer's (§10) - is written. */
 void shmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe);
 void shmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe);
 void shmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal, int pe);
@@ -1503,6 +1511,37 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
                osoe_shmem_put_signal_nbi_takes_seven_or_eight_arguments,         \
                osoe_shmem_put_signal_nbi_takes_seven_or_eight_arguments, )(__VA_ARGS__)
 
+/*
+ * The signal updates (§9.8.7, §9.8.5) have a C11 synopsis of their own: the
+ * routine with a leading context, shmem_signal_add(ctx, sig_addr, signal, pe),
+ * beside the C/C++ one without, shmem_signal_add(sig_addr, signal, pe), whose
+ * context-taking spelling there is shmem_ctx_signal_add. Same name, different
+ * argument count, so the count picks, as for shmem_sync below. The pointer is a
+ * plain uint64_t * either way, so nothing is selected on a type and no
+ * _Generic is involved. The three-argument form is called by its parenthesized
+ * name, which no function-like macro expands, so the function is reached
+ * through the name of its own macro; the four-argument form is the named
+ * shmem_ctx_ routine. Fewer than three arguments name an identifier nothing
+ * declares, so the mistake does not compile - where an empty choice would have
+ * compiled to an update that never happened.
+ */
+#define OSOE_SIGNAL_SET_3(sig_addr, signal, pe)                                  \
+    (shmem_signal_set)((sig_addr), (signal), (pe))
+#define OSOE_SIGNAL_SET_4(ctx, sig_addr, signal, pe)                             \
+    shmem_ctx_signal_set((ctx), (sig_addr), (signal), (pe))
+#define shmem_signal_set(...)                                                    \
+    OSOE_PICK4(__VA_ARGS__, OSOE_SIGNAL_SET_4, OSOE_SIGNAL_SET_3,                \
+               osoe_shmem_signal_set_takes_three_or_four_arguments,              \
+               osoe_shmem_signal_set_takes_three_or_four_arguments, )(__VA_ARGS__)
+#define OSOE_SIGNAL_ADD_3(sig_addr, signal, pe)                                  \
+    (shmem_signal_add)((sig_addr), (signal), (pe))
+#define OSOE_SIGNAL_ADD_4(ctx, sig_addr, signal, pe)                             \
+    shmem_ctx_signal_add((ctx), (sig_addr), (signal), (pe))
+#define shmem_signal_add(...)                                                    \
+    OSOE_PICK4(__VA_ARGS__, OSOE_SIGNAL_ADD_4, OSOE_SIGNAL_ADD_3,                \
+               osoe_shmem_signal_add_takes_three_or_four_arguments,              \
+               osoe_shmem_signal_add_takes_three_or_four_arguments, )(__VA_ARGS__)
+
 
 /* ---- Collectives (spec §9.10.7, §9.10.9) ------------------------------ */
 
@@ -1722,6 +1761,21 @@ void shmem_pcontrol(int level, ...);
 static inline int shmem_sync(shmem_team_t team)
 {
     return shmem_team_sync(team);
+}
+
+/* spec §9.8.7's and §9.8.5's shmem_signal_set(ctx, ...) and shmem_signal_add(ctx,
+ * ...), which C11 dispatches by argument count (above): C++ overloads them
+ * beside the ones with C linkage that take no context. */
+static inline void shmem_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
+                                    int pe)
+{
+    shmem_ctx_signal_set(ctx, sig_addr, signal, pe);
+}
+
+static inline void shmem_signal_add(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
+                                    int pe)
+{
+    shmem_ctx_signal_add(ctx, sig_addr, signal, pe);
 }
 #endif
 

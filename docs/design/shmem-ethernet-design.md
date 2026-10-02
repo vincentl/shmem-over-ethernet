@@ -6197,7 +6197,10 @@ put-with-signal and put-with-signal-nbi families sit beside `putmem_signal`
 uses, on the same "a type appears once" principle as the AMO tables (§7.3).
 The C11 generic macros cover `put`/`get`/`p`/`g`/`iput`/`iget`/`put_nbi`/
 `get_nbi`/`put_signal`/`put_signal_nbi`, each with and without a leading
-context, dispatched on arity first as the AMO generics are (§7.3). Every
+context, dispatched on arity first as the AMO generics are (§7.3).
+`signal_set` and `signal_add` (§9.8.7, §9.8.5) take a leading context in C11
+the same way, by arity alone, since their pointer is a plain `uint64_t *` and
+there is no type to select on; C++ overloads them, as it does `shmem_sync`. Every
 routine reaches the transport through the body of `putmem` or `getmem` with its
 element width and its own name as parameters (`rma.h`), so a bad PE or a
 non-symmetric address is reported as `shmem_double_put`'s, not as the byte

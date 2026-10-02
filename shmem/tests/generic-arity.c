@@ -8,12 +8,13 @@
  * without a word unless -Wall asked about an unused value.
  *
  * shmem.generic-arity.* compile this once per family the selection serves - a
- * nonblocking AMO, a blocking one, an RMA - each with one wrong call, and pass
- * when the compiler's complaint names the function.
+ * nonblocking AMO, a blocking one, an RMA, a signal update - each with one
+ * wrong call, and pass when the compiler's complaint names the function.
  */
 #include <shmem.h>
 
 long target, fetched;
+uint64_t signal_word;
 
 void wrong_arity(void);
 void wrong_arity(void)
@@ -24,5 +25,9 @@ void wrong_arity(void)
     (void)shmem_atomic_fetch_add(&target, 0);            /* value left out */
 #elif defined(OSOE_TEST_ARITY_put)
     shmem_put(&target, &fetched, 1);                     /* pe left out */
+#elif defined(OSOE_TEST_ARITY_signal_add)
+    shmem_signal_add(&signal_word, 1);                   /* pe left out */
+#elif defined(OSOE_TEST_ARITY_signal_set)
+    shmem_signal_set(&signal_word, 1);                   /* pe left out */
 #endif
 }
