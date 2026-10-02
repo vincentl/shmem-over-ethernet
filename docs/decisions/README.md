@@ -17,7 +17,9 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Scans modeled before built, right after step 8 slice 1.** Author, [2026-09-26-day](2026-09-26-day.md) item 6.
 - **Scan design A.** Every member scans at its team rank's place in a pre-order k-ary tree, on its own thread. Author, [2026-09-26-evening](2026-09-26-evening.md) item 4.
 - **collect's lengths through the reduction tree.** Per-member lengths travel through the tree's fixed per-team slots into private memory, never a symmetric heap borrow. Author, [2026-09-26-evening](2026-09-26-evening.md) item 6.
-- **Team creation as proposed.** A runtime `OSOE_MAX_TEAMS`, per-team storage blocks, team numbers from one counter never reused. Author, [2026-09-25](2026-09-25.md) item 1.
+- **Team creation as proposed.** A runtime `OSOE_MAX_TEAMS`, per-team storage blocks. Author, [2026-09-25](2026-09-25.md) item 1. *Its team numbers from one counter, never reused, are reversed (below).*
+- **Team numbers are each member PE's resource, given back at destroy; a team keeps counters and small slots, a PE lends the large ones.** The two steps of `docs/design/team-resources-proposal.md`, both before the first tag; a significant rewrite accepted for the better design. Author, [2026-10-02](2026-10-02.md) item 2.
+- **The release fixes before the tag** are the plan's (`docs/prompts/phase1-release-fixes-plan.md` §2) as the brief `docs/prompts/task-release-fixes.md` carries them: D1 and D3 the author's, D2 confirmed, D4 to D9 as recommended. Author, [2026-10-02](2026-10-02.md) items 1, 3 and 7.
 - **Large collectives get both fixes.** A pipelined internode tree, then a dedicated internode allgather. Author, [2026-09-25](2026-09-25.md) item 2.
 - **Small gathers keep Bruck's cost.** No two-slot staging and no crossover. Author, [2026-09-26-day](2026-09-26-day.md) item 5.
 - **No strided primitive at the transport boundary.** `iput` batches puts; `iget` uses the nonblocking get. Author, [2026-09-24-overnight](2026-09-24-overnight.md), "Typed RMA".
@@ -36,7 +38,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Job handshake.** An optional `OSOE_JOB_SECRET`, proved by a SipHash-2-4 challenge, never sent. Design §6.2.
 - **Abort.** An abortive goodbye on every open connection, not a flood down the tree. Claude, confirmed by the author, [2026-09-23-autonomous](2026-09-23-autonomous.md) item 12.
 - **The abort word.** One 64-bit word claimed by one CAS; the lead's agent re-wakes every local agent. Claude, [2026-09-23-autonomous](2026-09-23-autonomous.md) items 13-14.
-- **Global exit.** Only the calling PE runs `exit(status)`; every other PE flushes and calls `_exit(status)`. Claude, [2026-09-24-overnight](2026-09-24-overnight.md) item 10.
+- **Global exit.** Only the calling PE runs `exit(status)`; every other PE flushes and calls `_exit` - with status 0, so that a launcher ending the step at the first bad exit sees none before the caller's own, and the job's status is the caller's. Claude, [2026-09-24-overnight](2026-09-24-overnight.md) item 10; the status, Author, [2026-10-02](2026-10-02.md) item 1 (decided, built on the release-fixes brief).
 - **A reset connection** is judged only once the peer's goodbye and end of stream have both arrived. Claude, model-checked, [2026-09-24-overnight](2026-09-24-overnight.md), "Question 10".
 - **PE deaths** are found by pidfds each agent polls in its own sweep. Claude, confirmed by the author, [2026-09-24-overnight](2026-09-24-overnight.md) items 11-13.
 - **No development watchdog.** The ending agent names the routine its PE was blocked in, in every build. Claude, confirmed by the author, [2026-09-24-overnight](2026-09-24-overnight.md) items 11-13.
@@ -61,7 +63,7 @@ without the author, under a standing mandate, and the record carries the undo.
 
 ## Settings and defaults
 
-- **`OSOE_MAX_TEAMS`** defaults to 64, at most 1,024. Author, [2026-09-26-day](2026-09-26-day.md) item 4.
+- **`OSOE_MAX_TEAMS`** defaults to 64, at most 1,024. Author, [2026-09-26-day](2026-09-26-day.md) item 4. *Becomes the numbers one PE may hold at once, default 256, with the team redesign's step E; `OSOE_TEAM_BLOCKS` (a node's pool of team blocks, default 1,024) with step D and `OSOE_SMALL_COLLECTIVE_BYTES` (the largest collective that moves through a team's own slots, default 1 KiB, agreed at the rendezvous) with step E. Author, [2026-10-02](2026-10-02.md) item 8 - decided, built on the team slices.*
 - **`OSOE_MAX_CONTEXTS`** defaults to 64, from 1 to 4,096, agreed by a node's PEs at start. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 2.
 - **`OSOE_MAX_THREADS`** counts application threads, default 16, at most 1,023; the agent's block is one more, and a thread past it ends the job by name. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 9.
 - **`shmem_init` gives `SERIALIZED`**; `shmem_init_thread` gives `MULTIPLE` when asked. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 9.
@@ -76,7 +78,8 @@ without the author, under a standing mandate, and the record carries the undo.
 
 ## How work is done
 
-- **Merge as each slice verifies**, and keep going without waiting, with every decision written down with its undo. The author's standing direction, [2026-09-23-autonomous](2026-09-23-autonomous.md).
+- **Merge as each slice verifies**, and keep going without waiting, with every decision written down with its undo. The author's standing direction, [2026-09-23-autonomous](2026-09-23-autonomous.md); reaffirmed as "merge into `main` at green checkpoints" for the release fixes and the team slices, [2026-10-02](2026-10-02.md) item 4.
+- **The README is true of the tree at every commit.** A change carries the README sentences for what it changes; a sentence later work will replace says so ("temporary", "work in progress"). Author, [2026-10-02](2026-10-02.md) item 6.
 - **Verification before merge**, on the exact tree that merges: four presets, tier 3, mutations on a copy, the load loop, the SOS sweep, and an adversarial review whose findings are fixed first. [2026-09-24-day](2026-09-24-day.md).
 - **A speed claim needs a timing simulation** beside its model. [2026-09-26-day](2026-09-26-day.md).
 - **A subagent's report is evidence, not a verdict.** [2026-09-26-day](2026-09-26-day.md).
@@ -120,10 +123,12 @@ without the author, under a standing mandate, and the record carries the undo.
 ## License and release
 
 - **License: GNU LGPL, version 3 or any later version.** `COPYING` and `COPYING.LESSER`; `SPDX-License-Identifier: LGPL-3.0-or-later` on every source file. Author, [2026-09-26-evening](2026-09-26-evening.md) items 3 and 14.
-- **An hour of `mix` on the cluster before every release tag**, on the status page's release checklist. Author, [2026-09-27-night](2026-09-27-night.md) "What the answers changed".
+- **An hour of `mix` on the cluster before every release tag**, on the release checklist. Author, [2026-09-27-night](2026-09-27-night.md) "What the answers changed".
+- **The release checklist lives in the tree**, `docs/release-checklist.md`, moved there from the author's status page by the release-fixes brief. Author, [2026-10-02](2026-10-02.md) item 5.
 
 ## Reversed
 
+- Team numbers from one job-wide counter, never reused ([2026-09-25](2026-09-25.md) item 1), replaced by numbers held per PE and given back at destroy ([2026-10-02](2026-10-02.md) item 2; decided, built on the proposal's slices).
 - `OSOE_MAX_TEAMS` default 32, replaced by 64 ([2026-09-26-day](2026-09-26-day.md) item 4).
 - The internode team-world-ranks upcall, replaced by the record's start and stride ([2026-09-26-day](2026-09-26-day.md) item 7).
 - `OSOE_LIVENESS` and `OSOE_WATCHDOG`, removed with the watchdog ([2026-09-24-overnight](2026-09-24-overnight.md) items 11-13).

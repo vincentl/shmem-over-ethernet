@@ -3,12 +3,16 @@
 **Where the files are.** The open brief sits here; every finished one is in
 `done/`, under its own name, which this index still gives.
 
-**Open now:** no brief. The stress tester's four phases are done - their
-briefs in `done/`, the proposal `docs/design/osoe-pacer-proposal.md` - and so
-is the work the author asked for after them (`docs/decisions/2026-09-27-night.md`
-and `2026-09-28-overnight.md`). Next is the review before the first release,
-whose prompt is `docs/reviews/adversarial-review-prompt.md`. The table below
-gives every finished brief, in the order the work was done.
+**Open now:** one session's prompt, `task-first-release.md` (the arc, the
+order, how to spend the session), over two briefs written 2026-10-02 after the round-three review
+(`docs/reviews/archive/phase1-release-review.md`) and the plan that validated
+its findings (`phase1-release-fixes-plan.md`): `task-release-fixes.md`, every
+fix before the first release but the teams, and
+`phase1-step7-slice3-prompt.md`, step D of the team redesign
+(`docs/design/team-resources-proposal.md`); step E's brief follows D's merge
+point. The review lead's own brief, `phase1-release-fixes-prompt.md`, is
+answered by the plan and kept as given. The table below gives every finished
+brief, in the order the work was done, and these at its end.
 
 The brief each working session was given, kept so that a decision can be traced
 back to what was asked for as well as to what was done.
@@ -83,3 +87,8 @@ and `docs/reviews/` do track the current names.
 | `task-stress-phase2.md` | Add `mailbox` (a checked round-trip ping-pong), `teams` (many created and used at once) and `threads` (`SHMEM_THREAD_MULTIPLE`'s shared-context path) to `osoe-pacer`, aimed at step 8 slice 3's lock-free path and an unreproduced `OSOE_CHECK_QUIET` firing | merged, `41b37bd`. Debug 503, release 525, asan 502, tsan 366 pass, 33 pacer tests among them. On the Pi, an hour of `threads` under both debug test hooks ran 1.71 × 10⁹ operations at 474,000 a second with no `OSOE_CHECK_QUIET` firing; ten minutes of `teams` spent 12 of the default 64 team numbers, which are never given back. `mailbox`'s 11.7 ms tail latency traced to Slurm's default binding sharing a core between a PE's main and agent threads; unbound, the rate was 6.3 times higher and the tail 25 times shorter. See `docs/decisions/2026-09-27.md`, "Phase 2" |
 | `task-stress-phase3.md` | Add `atomics`, `rma`, `locks`, `memory` and `collectives` exercises to `osoe-pacer`, covering every AMO, RMA form, lock and collective at every size, and `osoe-pacer-counted`, a shim generated from `pshmem.h` that counts every routine an exercise calls | merged, `075b4da`. Debug 539, release 561, asan 538 and tsan 366 tests passed just before item 8's one-line fix, which moved no check; 69 pacer tests, 35 mutations each caught by its own plant. On the Pi (4 × 4, ten minutes each): atomics 171,700 updates a second, rma 694 MiB/s, locks 7,410 acquisitions a second, memory 2.2 GiB/s; a 1 MiB broadcast ran near its 27 ms bound, alltoall at 575 ms against 429. The counted build found 1,404 of 1,794 declared routines called; the rest - deprecated forms and untyped put_signal and wait variants - were phase 4's. See `docs/decisions/2026-09-27-afternoon.md` |
 | `task-stress-phase4.md` | Add `mix` - teams running different exercises out of step, for hours, as a soak - the library's own counters in the checkpoint line, and the deprecated Annex F forms, closing the counted build's coverage gap | merged, `3d5bbe1`. 98 pacer tests, 18 new mutations each caught; four presets pass. The first soak hung on a stray `barrier_all`, fixed. On the Pi, three hours of `mix` ran 916 periods and 1.53 TB with `failures=0`; the counted build reached 1,792 of 1,794 declared routines. The author later took two recommendations from here: install `osoe-pacer`, and run an hour of `mix` before every release tag. See `docs/decisions/2026-09-27-evening.md` |
+| `phase1-release-fixes-prompt.md` | The review lead's brief after the round-three review (2026-09-28): the sixteen findings and its own fix sketches | answered by `phase1-release-fixes-plan.md` (2026-10-01/02): all sixteen hold; three of its fixes corrected (plan §1, points 3 to 5). Kept as given |
+| `phase1-release-fixes-plan.md` | The plan: each finding described, checked and given its options; nine decisions D1 to D9 for the author | D1 to D3 decided by the author on 2026-10-02 (only the caller carries a global exit's status; the start-up fixes' middle option; the team redesign, both steps before the tag), D4 to D9 as recommended (`docs/decisions/2026-10-02.md`) |
+| `task-release-fixes.md` | Every fix before the first release but the teams, for a fresh session: the record, the small code fixes, global exit, start-up, the README and records, the repository scrub, the whole-tree verification | open |
+| `phase1-step7-slice3-prompt.md` | §7.1 step 7, slice 3: step D of the team redesign - a team number held by each member PE and given back at destroy; the node blocks from a pool found by name; two parts and a merge point before step E | open |
+| `task-first-release.md` | The opening prompt of the session that takes the tree from the round-three review to the first tag: the arc, the order of the briefs, subagents and adversarial reads | open |
