@@ -528,6 +528,20 @@ that one could be added without touching the OpenSHMEM layer.
   undefined.
 - **Applications**: ISx, NPB IS, the Parallel Research Kernels and the
   OpenSHMEM examples, built with `oshcc`.
+- **`shmem.floor`'s pins.** In each of seven pairs, in a job of two nodes on one
+  machine, `shmem.floor` times the library's get, put with quiet, and fetch-add
+  against 8-byte round trips on a bare io_uring TCP connection between the same
+  two processes, and the library's stream against a stream on that connection;
+  it prints every ratio, each the median of the pairs. Three pins on them - a
+  get's, a put-and-quiet's or a fetch-add's fastest round trip at most 3 times
+  the connection's; a put-and-quiet's or a fetch-add's median at most 1.5 times
+  a get's; the stream at least a tenth of the connection's - are the project's
+  regression guard, set from runs on its own machines. They exist only in an
+  optimized build without a sanitizer (the `release` preset), and are checked
+  only when asked: with `OSOE_TEST_FLOOR_PINS=1` in the environment, or by
+  configuring with `-DOSOE_TEST_PINS=ON`, which sets it for `ctest`. Without
+  it the test prints its ratios, says it checked no pin, and passes.
+  `env.echo-uring`'s own two pins are checked in every such build.
 - **A stress tester**, `osoe-pacer`: whole-job patterns from real OpenSHMEM
   programs - a streaming sort, all-to-all exchanges, mailboxes, teams, threads,
   every atomic, transfer and collective, and all of them at once on teams out

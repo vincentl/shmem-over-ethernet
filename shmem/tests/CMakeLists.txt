@@ -448,10 +448,14 @@ set_tests_properties(shmem.job.secret.different PROPERTIES
 # io_uring round trips on a raw connection between the job's two processes
 # interleaved with the library's get, put and quiet and fetch-add, then a
 # stream on each. The pins (test-floor.c) are checked in the optimized,
-# uninstrumented build only; the other presets run the paths and the
-# invariants. Not under ThreadSanitizer, for shmem.internode's reason below:
-# the lead's agent applies PE 0's puts to a heap whose owner last touched it
-# before a barrier that runs through another process.
+# uninstrumented build only, and only when asked: they are the project's
+# regression guard, set on its own machines, so the project's runs configure
+# with -DOSOE_TEST_PINS=ON and a stranger's `cmake --workflow` does not; the
+# test then prints its ratios and says it checked none. The other presets run
+# the paths and the invariants. Not under ThreadSanitizer, for shmem.internode's
+# reason below: the lead's agent applies PE 0's puts to a heap whose owner last
+# touched it before a barrier that runs through another process.
+option(OSOE_TEST_PINS "check shmem.floor's performance pins, tier 3's included (in an optimized build): the project's regression guard, set on its own machines" OFF)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   add_executable(shmem_test_floor test-floor.c ${PROJECT_SOURCE_DIR}/base/hostlist.c
     ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
@@ -462,6 +466,9 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   add_test(NAME shmem.floor
     COMMAND osoe-launch -n 2 -m 0,1 -t 150 -- $<TARGET_FILE:shmem_test_floor>)
   set_tests_properties(shmem.floor PROPERTIES LABELS "tier2" TIMEOUT 180)
+  if(OSOE_TEST_PINS)
+    set_tests_properties(shmem.floor PROPERTIES ENVIRONMENT "OSOE_TEST_FLOOR_PINS=1")
+  endif()
 endif()
 
 # The lead's half of the secret (tier 1): a caller whose hello is right in every
@@ -2379,7 +2386,14 @@ if(OSOE_TIER3)
                     ENV OSOE_COLLECTIVE_FANOUT=4 ${osoe_tier3_wire} SHMEM_SYMMETRIC_SIZE=16M)
     osoe_tier3_test(job.0-1-2-3 ${shape} 0,1,2,3 shmem_test_job)
     # A 64 MiB stream: at 1 Gbit/s the default gigabyte takes nine seconds a trial.
-    osoe_tier3_test(floor ${shape} 0,1 shmem_test_floor ARGS 64)
+    # The pins are checked only when asked (shmem.floor's comment above), and sudo
+    # does not pass on ctest's environment, so the job's is given them here.
+    set(osoe_tier3_floor_environment)
+    if(OSOE_TEST_PINS)
+      set(osoe_tier3_floor_environment ENV OSOE_TEST_FLOOR_PINS=1)
+    endif()
+    osoe_tier3_test(floor ${shape} 0,1 shmem_test_floor ${osoe_tier3_floor_environment}
+                    ARGS 64)
     foreach(map 0,1 0,1,2,0,1,0)
       string(REPLACE "," ";" ranks "${map}")
       list(LENGTH ranks count)

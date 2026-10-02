@@ -42,7 +42,19 @@
  * Pins are checked in an optimized, uninstrumented build only, as echo-uring's
  * are: under a sanitizer a program measures its own instrumentation. There the
  * stream is 64 MiB unless an argument says otherwise, since only the paths are
- * being run. Every build ends, as every tier-2 test does, by requiring each
+ * being run.
+ *
+ * And only when asked, with OSOE_TEST_FLOOR_PINS=1 in the environment, which the
+ * project's own runs set through -DOSOE_TEST_PINS=ON (this directory's
+ * CMakeLists.txt). The numbers are the project's regression guard, set from runs
+ * on its own machines, and a ratio of one thread's work against the machine's
+ * loopback memcpy is another machine's to differ in: the stream's has measured
+ * 0.0999 against its pin of 0.10 beside a parallel test run in a fresh VM, and
+ * 0.103 at its lowest idle. A stranger's first `cmake --workflow` must not go red
+ * on a library that works. Unasked, the ratios are printed all the same, and the
+ * report ends with a line that says no pin was checked and how to ask.
+ *
+ * Every build ends, as every tier-2 test does, by requiring each
  * invariant counter to be zero - invariant.missed_wake among them, which a wait
  * that lost its wake and found its value on a sweep counts (§3.11).
  */
@@ -278,8 +290,17 @@ static double library_stream(unsigned char *area, const unsigned char *piece, ui
     return (double)bytes / ((double)(now_ns() - a) / 1e9);
 }
 
+/* Whether the pins are asked for (see the file's comment). Only "1" asks. */
+static bool pins_asked(void)
+{
+    const char *asked = getenv("OSOE_TEST_FLOOR_PINS");
+    return asked != NULL && strcmp(asked, "1") == 0;
+}
+
 static bool report(struct trip trips[PAIRS][KINDS], const double streams[2][PAIRS])
 {
+    /* The pins that exist in this build, and are asked for. */
+    const bool check = PINNED && pins_asked();
     double fastest[KINDS][PAIRS], median[KINDS][PAIRS], internal[KINDS][PAIRS], stream[PAIRS];
     for (int p = 0; p < PAIRS; p++) {
         printf("pair %d fastest_us", p);
@@ -303,7 +324,7 @@ static bool report(struct trip trips[PAIRS][KINDS], const double streams[2][PAIR
     for (int k = GET; k < KINDS; k++) {
         struct spread s = spread_of(fastest[k]);
         printf("  fastest %s/floor=%.3f (%.2f-%.2f)\n", kind_name[k], s.median, s.low, s.high);
-        if (PINNED && s.median > FASTEST) {
+        if (check && s.median > FASTEST) {
             printf("FAIL: a %s's fastest trip is %.2fx the floor's, pinned at most %.1fx\n",
                    kind_name[k], s.median, FASTEST);
             ok = false;
@@ -312,7 +333,7 @@ static bool report(struct trip trips[PAIRS][KINDS], const double streams[2][PAIR
     for (int k = PUT_QUIET; k < KINDS; k++) {
         struct spread s = spread_of(internal[k]);
         printf("  median %s/get=%.3f (%.2f-%.2f)\n", kind_name[k], s.median, s.low, s.high);
-        if (PINNED && s.median > INTERNAL) {
+        if (check && s.median > INTERNAL) {
             printf("FAIL: a %s costs %.2fx a get, pinned at most %.1fx: a wait that polls, "
                    "or a wake too many\n", kind_name[k], s.median, INTERNAL);
             ok = false;
@@ -320,7 +341,7 @@ static bool report(struct trip trips[PAIRS][KINDS], const double streams[2][PAIR
     }
     struct spread s = spread_of(stream);
     printf("  stream library/floor=%.3f (%.3f-%.3f)\n", s.median, s.low, s.high);
-    if (PINNED && s.median < STREAM) {
+    if (check && s.median < STREAM) {
         printf("FAIL: the stream runs at %.3fx the floor's, pinned at least %.2fx\n", s.median,
                STREAM);
         ok = false;
@@ -332,6 +353,12 @@ static bool report(struct trip trips[PAIRS][KINDS], const double streams[2][PAIR
     }
     if (!PINNED)
         printf("pins not checked: an instrumented or unoptimized build measures itself\n");
+    else if (!check)
+        printf("pins not checked: they are the project's regression guard (a fastest trip at "
+               "most %.1fx the floor's, a median at most %.1fx a get's, the stream at least "
+               "%.2fx the floor's), set on its own machines; set OSOE_TEST_FLOOR_PINS=1 to "
+               "check them, as cmake -DOSOE_TEST_PINS=ON does for ctest\n",
+               FASTEST, INTERNAL, STREAM);
     return ok;
 }
 
