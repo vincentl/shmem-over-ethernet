@@ -91,7 +91,20 @@ Builds use CMake presets and run on Linux only. Each preset builds under
 `build/<preset>`, which git ignores:
 
 ```sh
-cmake --workflow --preset release    # configure, build, and test
+cmake --workflow --preset release    # configure, build, and test, without the models
+```
+
+That builds one file at a time and runs the tests one at a time - more than 600
+of them, checks of the build itself and jobs of a few processes. On four cores
+of an idle virtual machine it took about five minutes: one for the build, four
+for the tests. The 24 tests of the model checker (`tools/modelcheck`, which
+needs Python 3) take about an hour, and check the design, which does not vary
+with the machine. They have a label of their own, `model`, which the `release`
+preset leaves out and the `models` preset runs alone, in the same build:
+
+```sh
+ctest --preset models                # the models, once the release build exists
+cmake --workflow --preset models     # or from a clean tree: configure, build, then them
 ```
 
 Presets: `debug`, `release` (optimized, with debug info), `asan`
@@ -467,8 +480,9 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 620 tests in
-  release; fewer under ThreadSanitizer, which cannot see an ordering that runs
+  run before every merge, on the exact tree that merges: more than 600 tests in
+  release, and the 24 models beside them, which run in that build only; fewer
+  under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the
   other three.
 - **Model checking.** Every lock-free and futex protocol but one - waking the

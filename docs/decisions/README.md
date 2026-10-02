@@ -83,7 +83,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Verification before merge**, on the exact tree that merges: four presets, tier 3, mutations on a copy, the load loop, the SOS sweep, and an adversarial review whose findings are fixed first. [2026-09-24-day](2026-09-24-day.md).
 - **A speed claim needs a timing simulation** beside its model. [2026-09-26-day](2026-09-26-day.md).
 - **A subagent's report is evidence, not a verdict.** [2026-09-26-day](2026-09-26-day.md).
-- **Model-checker scripts run once, in the release preset.** Claude, [2026-09-23-autonomous](2026-09-23-autonomous.md) item 9.
+- **Model-checker scripts run once, in the release preset.** Claude, [2026-09-23-autonomous](2026-09-23-autonomous.md) item 9. They carry the ctest label `model`, which the `release` test preset leaves out - they are most of an hour - and the `models` test preset runs alone; the README's first command is the suite without them. Author, [2026-10-02](2026-10-02.md) item 7 (D7).
 - **The costly THREAD_MULTIPLE models are opt-in** with `OSOE_MULTIPLE_MODELS=ON`. Claude, [2026-09-23-autonomous](2026-09-23-autonomous.md) item 10.
 - **The VM is shared.** Long runs take the lock, measurements never overlap another session's, and runs are killed by PID. [2026-09-26-day](2026-09-26-day.md).
 - **Slurm stays installed in the VM,** and fixtures come from real Slurm and the Pi cluster. [2026-09-24-overnight](2026-09-24-overnight.md) items 5-6.

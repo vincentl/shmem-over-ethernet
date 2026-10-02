@@ -18,7 +18,10 @@ were run. Develop new models here.
 | `selftest.py` | Checks that the reductions change no verdict; rerun it after changing the engine |
 
 **Where they run.** Every model is a ctest in the release preset only: a model
-is Python and gives the same verdict whichever preset built the library. The
+is Python and gives the same verdict whichever preset built the library. They
+carry the label `model` beside `tier1`, and take most of an hour, so the
+`release` test preset leaves that label out and the `models` preset runs it
+alone (`ctest --preset models`). Without Python 3 none is registered. The
 six of §4.11's `SHMEM_THREAD_MULTIPLE` designs (`get_completion` but for its
 phase-1 case, `dirty_set`, `watch_list`, `landing_extent`, `copy_out_claim`,
 `pe_quiet`) run only with `OSOE_MULTIPLE_MODELS=ON`,

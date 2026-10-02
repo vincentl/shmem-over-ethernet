@@ -6923,7 +6923,12 @@ git. Four properties are deliberate:
 `cmake --workflow --preset <name>` configures, builds, and runs the tests in one
 step. Tests carry ctest labels: `env` for `tools/probe`, and tier labels
 (`tier1`, …, §8.2) as the suites arrive, so `ctest --preset debug -L tier1` runs
-what CI can run anywhere.
+what CI can run anywhere. The model checker's tests (`tools/modelcheck`, which
+needs Python 3) carry `model` beside `tier1`. They take about an hour and run in
+the release build only, so the `release` test preset leaves that label out and
+the `models` preset runs it alone: `ctest --preset models`, or `cmake --workflow
+--preset models` from a clean tree. The project's own verification is the four
+presets and `models`.
 
 **Page size.** The VM runs 4K pages; Raspberry Pi OS on a Pi 5 defaults to 16K.
 Nothing may hardcode 4096 — including the §4.3 linker script, which aligns to

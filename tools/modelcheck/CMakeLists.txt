@@ -8,10 +8,16 @@
 # A model is Python and gives the same verdict whichever preset built the
 # library, so running it in four presets buys nothing: every model runs in the
 # release preset only, which keeps it from being skipped. The large ones -
-# tree_barrier (five logical nodes, every node's thread real), close (a
-# million states with the trapped-state check), abort (six minutes, a fatal's
-# case of 5.7 million states) and abort_exit (eleven minutes, a case of ten
-# million) - are why that preset is slow.
+# tree_barrier (five logical nodes, every node's thread real; 11 minutes),
+# close (a million states with the trapped-state check), abort (a fatal's case
+# of 5.7 million states; 18 minutes) and abort_exit (a case of ten million; 17)
+# - make the 24 models 55 minutes of the 61 the release workflow took (the
+# release-fixes plan's measurement, in the review's VM). So every model carries
+# the label "model" beside "tier1": the release test preset leaves that label
+# out, and the "models" test preset runs it alone (CMakePresets.json;
+# `ctest --preset models`, or the workflow of that name, which configures and
+# builds the release tree first). A model added here takes the label in the
+# loop below, never by its own add_test.
 #
 # The six that check §4.11's SHMEM_THREAD_MULTIPLE designs - dirty_set,
 # watch_list, get_completion's generation-word cases (about 15 minutes, a case
@@ -36,16 +42,17 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     add_test(NAME model.get_completion.equality
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/get_completion_model.py
               equality)
-    set_tests_properties(model.get_completion.equality PROPERTIES LABELS "tier1" TIMEOUT 600)
+    set_tests_properties(model.get_completion.equality PROPERTIES LABELS "tier1;model"
+                         TIMEOUT 600)
   endif()
   foreach(name IN LISTS osoe_models)
     add_test(NAME model.${name}
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${name}_model.py)
-    set_tests_properties(model.${name} PROPERTIES LABELS "tier1" TIMEOUT 2400)
+    set_tests_properties(model.${name} PROPERTIES LABELS "tier1;model" TIMEOUT 2400)
   endforeach()
   add_test(NAME model.selftest
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/selftest.py)
-  set_tests_properties(model.selftest PROPERTIES LABELS "tier1" TIMEOUT 600)
+  set_tests_properties(model.selftest PROPERTIES LABELS "tier1;model" TIMEOUT 600)
 elseif(NOT Python3_Interpreter_FOUND)
   message(STATUS "python3 not found: the concurrency models will not run as tests")
 endif()
