@@ -1118,6 +1118,16 @@ set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES PASS_REGULAR_
   "/dev/shm has [0-9]+ MiB free, but this node's connection area.*launcher exited 1"
   SKIP_RETURN_CODE 77)
 
+# The notice that the connection buffers were shrunk to fit the budget is one
+# line a node, from its lead, not one a PE (the round-three review's P3: 128,000
+# lines at 500 nodes of 256 PEs): three nodes of three PEs, and a buffer the
+# budget cannot hold. See shrink-notice.sh.
+add_test(NAME shmem.am-size.notice
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/shrink-notice.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_barrier>)
+set_tests_properties(shmem.am-size.notice PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "SHRINK NOTICE OK")
+
 # A kernel without futex2 (Linux < 6.7) is refused at init by name, before any
 # object exists (§1; review round two, portability F3). deny-futex2 makes the
 # three calls fail with ENOSYS, as such a kernel does. Before, both PEs died of

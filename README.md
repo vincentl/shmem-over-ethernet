@@ -385,6 +385,14 @@ specification or takes a choice the specification leaves open.
 - **A node's heaps live in `/dev/shm`**, and start-up refuses a job whose
   heaps would not fit its free space (`OSOE_SHM_CAPACITY_CHECK=0` warns
   instead).
+- **At the defaults a job has at most 1,025 nodes.** A node's connection
+  buffers - two for each other node, 128 KiB each - must fit
+  `OSOE_AM_BUFFER_BUDGET`, 256 MiB: the buffers of 1,025 nodes come to exactly
+  that and 1,026 are refused at start-up, naming the budget. The budget
+  shrinks the buffers only down to twice `OSOE_AM_CHUNK`, and the default
+  buffer is that size, so at the defaults nothing can shrink: raise the budget
+  or lower the chunk. Where a raised `OSOE_AM_BUFFER` does shrink, each node's
+  lead prints one line saying so.
 - **Global and static variables are symmetric only in a program linked by
   `oshcc`**, which links it without position independence and with osoe's
   linker script. Passing a static where a symmetric address is required in
@@ -594,7 +602,7 @@ moves every message of the node
 |---|---|---|
 | `OSOE_AM_CHUNK` | `65536` | The largest message on a connection: a power of two from `1024` to `1048576`; larger transfers are split. |
 | `OSOE_AM_BUFFER` | twice the chunk | Bytes of each connection's buffer: a power of two up to 1 GiB. |
-| `OSOE_AM_BUFFER_BUDGET` | 256 MiB | A node's ceiling on its connections' buffers together; the buffers shrink, saying so, to fit. |
+| `OSOE_AM_BUFFER_BUDGET` | `268435456` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. The default buffer is the floor, so at the defaults 1,025 nodes fit and 1,026 are refused: raise the budget or lower the chunk. |
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: map the node's connection buffers with huge pages, falling back, with a warning, when there are none. |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into. |

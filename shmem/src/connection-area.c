@@ -203,11 +203,16 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         break;
     case OSOE_AM_SIZE_SHRUNK:
         /* Loud, because it changes aggregation behaviour and the operator
-         * chose neither the size nor the shrink. */
-        fprintf(stderr, "osoe: connection buffers reduced from %llu to %llu bytes to "
-                        "fit OSOE_AM_BUFFER_BUDGET=%llu over %u nodes\n",
-                (unsigned long long)config.buffer, (unsigned long long)buffer,
-                (unsigned long long)config.budget, nodes);
+         * chose neither the size nor the shrink. Once a node, from its lead
+         * (§6.2), as print_info is (init.c): a node's PEs read one environment
+         * and reach one size - a PE that did not is refused below, by name -
+         * so a line from each said nothing more, and was 128,000 lines at 500
+         * nodes of 256 PEs. */
+        if (b->local_id == 0)
+            fprintf(stderr, "osoe: connection buffers reduced from %llu to %llu bytes to "
+                            "fit OSOE_AM_BUFFER_BUDGET=%llu over %u nodes\n",
+                    (unsigned long long)config.buffer, (unsigned long long)buffer,
+                    (unsigned long long)config.budget, nodes);
         break;
     case OSOE_AM_SIZE_NO_ROOM:
         osoe_fatal("%u nodes need %llu bytes of connection buffers at the smallest "

@@ -61,6 +61,17 @@ int main(void)
     CHECK(499 * 2 * chosen == MB(124) + KB(768));
 
     /*
+     * Where the defaults end, which the README's Limits state: the default
+     * buffer is the floor, so the budget cannot shrink it and is a ceiling on
+     * the node count instead. 1,024 peers' two buffers of 128 KiB are exactly
+     * the 256 MiB, so 1,025 nodes fit and 1,026 are refused.
+     */
+    CHECK(osoe_am_choose_buffer(chunk, floor, budget, 1025, &chosen) == OSOE_AM_SIZE_OK);
+    CHECK(chosen == floor && 1024 * 2 * chosen == budget);
+    CHECK(osoe_am_choose_buffer(chunk, floor, budget, 1026, &chosen) == OSOE_AM_SIZE_NO_ROOM);
+    CHECK(chosen == floor);
+
+    /*
      * No PE dimension anywhere. The area is a function of node count and
      * buffer size only, which is the §1 constraint stated as an assertion: a
      * node of 1 PE and a node of 256 PEs cost exactly the same, because every
