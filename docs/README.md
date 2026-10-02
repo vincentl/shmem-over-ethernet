@@ -1,7 +1,9 @@
 # Where to find what
 
-Start with the status page (Claude Docs, "osoe — project status"): where the
-project stands, what waits on the author, and the release checklist. Then:
+Start with the decisions index, `docs/decisions/README.md`: what is decided and
+still holds, and who decided it. What waits on the author is at the end of the
+newest dated record beside it, and what a release needs is in
+`docs/release-checklist.md`. Then:
 
 | Question | Where |
 |---|---|

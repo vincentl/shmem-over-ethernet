@@ -165,3 +165,6 @@ record alone. Kept as built unless the author prefers the record.
 lists the questions at its top; the night's review scripts, timing simulations
 and model variants are in `build/scratch/evidence-2026-09-26/`; verification
 outputs under `build/scratch/{pipeline,teams/split,allgather,ibput,flake}/`.
+
+*Added 2026-10-02: the status page is private to the author and is not in this
+repository. The paragraph above stays as it was written.*
