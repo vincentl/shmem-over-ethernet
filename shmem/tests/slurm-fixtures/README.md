@@ -13,3 +13,13 @@ group or a path (`SLURM_JOB_USER`, `SLURM_JOB_UID`, `SLURM_JOB_GID`,
   them, since a fixture written from the documentation can only repeat what its
   writer understood.
 - `osoe-*`: `osoe-launch`'s own names, for the rule that decides between them.
+
+The `captured-*` files were captured on the development VM (`dev/lima/create.sh`
+makes it). Its host name and its address on Lima's private network, which
+`srun` had put in them, are replaced after the capture, by `vm-0` and
+`192.0.2.1` (an address reserved for documentation, RFC 5737): they name a
+development machine, not a cluster, and nothing needs them. The bootstrap reads
+neither address variable, and of the node names only `SLURM_STEP_NODELIST`,
+which the fixture's `# expect:` line echoes in `hosts=` and so spells the same
+way. A new capture on that VM needs the same replacement by hand;
+`capture-slurm-fixtures.sh` keeps what it saw.
