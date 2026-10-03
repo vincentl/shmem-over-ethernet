@@ -1,0 +1,21 @@
+# date: 2026-09-28T06:43:24-04:00
+# host: pi-login
+# command: srun -K1 -N2 --ntasks-per-node=1 -c4 -w pi-\[001-002\] --time=6 /home/pi/osoe-f561e2d/build/release/shmem/tests/shmem_test_floor
+pair 0 fastest_us floor=155.0 get=172.1 put_quiet=170.8 fetch_add=172.2 median_us floor=158.7 get=174.9 put_quiet=173.2 fetch_add=174.6 stream_mib_per_s floor=112 library=112
+pair 1 fastest_us floor=155.9 get=171.7 put_quiet=170.3 fetch_add=171.6 median_us floor=157.9 get=174.7 put_quiet=172.7 fetch_add=173.8 stream_mib_per_s floor=112 library=112
+pair 2 fastest_us floor=132.7 get=171.9 put_quiet=170.5 fetch_add=171.9 median_us floor=157.9 get=174.9 put_quiet=172.9 fetch_add=174.1 stream_mib_per_s floor=112 library=112
+pair 3 fastest_us floor=154.9 get=159.2 put_quiet=168.0 fetch_add=169.4 median_us floor=157.9 get=174.7 put_quiet=172.9 fetch_add=174.1 stream_mib_per_s floor=112 library=112
+pair 4 fastest_us floor=157.3 get=172.9 put_quiet=171.7 fetch_add=171.2 median_us floor=158.8 get=175.5 put_quiet=173.7 fetch_add=175.1 stream_mib_per_s floor=112 library=112
+pair 5 fastest_us floor=156.5 get=171.6 put_quiet=168.3 fetch_add=171.7 median_us floor=158.8 get=174.2 put_quiet=172.7 fetch_add=174.1 stream_mib_per_s floor=112 library=112
+pair 6 fastest_us floor=155.1 get=137.7 put_quiet=162.5 fetch_add=171.8 median_us floor=158.7 get=174.3 put_quiet=172.9 fetch_add=174.2 stream_mib_per_s floor=112 library=112
+ratio, the median of 7 pairs (range):
+  fastest get/floor=1.099 (0.89-1.29)
+  fastest put_quiet/floor=1.092 (1.05-1.28)
+  fastest fetch_add/floor=1.101 (1.09-1.30)
+  median put_quiet/get=0.990 (0.99-0.99)
+  median fetch_add/get=0.997 (0.99-1.00)
+  stream library/floor=0.999 (0.999-0.999)
+  reported: median get/floor=1.105 (1.10-1.11)
+  reported: median put_quiet/floor=1.094 (1.09-1.09)
+  reported: median fetch_add/floor=1.101 (1.10-1.10)
+# exit: 0 elapsed_s: 138.46 end: 2026-09-28T06:45:42-04:00

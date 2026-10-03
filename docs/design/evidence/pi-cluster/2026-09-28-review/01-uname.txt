@@ -1,0 +1,8 @@
+# date: 2026-09-28T06:40:33-04:00
+# host: pi-login
+# command: srun -N4 -n4 --time=1 uname -a
+Linux pi-003 6.18.50+rpt-rpi-2712 #1 SMP PREEMPT Debian 1:6.18.50-1+rpt1 (2026-09-11) aarch64 GNU/Linux
+Linux pi-004 6.18.50+rpt-rpi-2712 #1 SMP PREEMPT Debian 1:6.18.50-1+rpt1 (2026-09-11) aarch64 GNU/Linux
+Linux pi-002 6.18.50+rpt-rpi-2712 #1 SMP PREEMPT Debian 1:6.18.50-1+rpt1 (2026-09-11) aarch64 GNU/Linux
+Linux pi-001 6.18.50+rpt-rpi-2712 #1 SMP PREEMPT Debian 1:6.18.50-1+rpt1 (2026-09-11) aarch64 GNU/Linux
+# exit: 0 elapsed_s: 0.12 end: 2026-09-28T06:40:33-04:00

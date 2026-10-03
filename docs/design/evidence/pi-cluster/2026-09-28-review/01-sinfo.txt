@@ -1,0 +1,7 @@
+# date: 2026-09-28T06:40:33-04:00
+# host: pi-login
+# command: sinfo -a -l
+Mon Sep 28 06:40:33 2026
+PARTITION AVAIL  TIMELIMIT   JOB_SIZE ROOT OVERSUBS     GROUPS  NODES       STATE RESERVATION NODELIST
+main*        up   infinite 1-infinite   no       NO        all      4        idle             pi-[001-004]
+# exit: 0 elapsed_s: 0.01 end: 2026-09-28T06:40:33-04:00

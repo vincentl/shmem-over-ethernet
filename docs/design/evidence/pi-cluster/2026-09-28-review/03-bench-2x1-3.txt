@@ -1,0 +1,25 @@
+# date: 2026-09-28T06:57:17-04:00
+# host: pi-login
+# command: srun -K1 -N2 --ntasks-per-node=1 -c4 -w pi-\[001-002\] --time=4 /home/pi/osoe-f561e2d/build/release/tools/bench/osoe-bench latency bandwidth atomic
+osoe-bench pes=2 remote_target=1 local_target=-1
+latency put+quiet target=1 where=remote bytes=8 median_us=167.9 fastest_us=165.5
+latency get target=1 where=remote bytes=8 median_us=169.1 fastest_us=163.8
+latency put+quiet target=1 where=remote bytes=64 median_us=169.6 fastest_us=166.9
+latency get target=1 where=remote bytes=64 median_us=171.7 fastest_us=170.5
+latency put+quiet target=1 where=remote bytes=512 median_us=179.6 fastest_us=178.6
+latency get target=1 where=remote bytes=512 median_us=181.3 fastest_us=179.3
+latency put+quiet target=1 where=remote bytes=4096 median_us=195.3 fastest_us=188.7
+latency get target=1 where=remote bytes=4096 median_us=172.6 fastest_us=161.2
+latency put+quiet target=1 where=remote bytes=32768 median_us=421.5 fastest_us=367.3
+latency get target=1 where=remote bytes=32768 median_us=411.7 fastest_us=386.8
+latency put+quiet target=1 where=remote bytes=262144 median_us=2385.7 fastest_us=2342.6
+latency get target=1 where=remote bytes=262144 median_us=3017.1 fastest_us=2957.5
+latency put+quiet target=1 where=remote bytes=1048576 median_us=9052.3 fastest_us=9030.3
+latency get target=1 where=remote bytes=1048576 median_us=11595.2 fastest_us=11465.4
+bandwidth put target=1 where=remote bytes=4096 mib_per_s=111.2
+bandwidth put target=1 where=remote bytes=65536 mib_per_s=112.1
+bandwidth put target=1 where=remote bytes=262144 mib_per_s=112.1
+bandwidth put target=1 where=remote bytes=1048576 mib_per_s=112.1
+bandwidth put target=1 where=remote bytes=4194304 mib_per_s=112.1
+atomic fetch-add target=1 where=remote median_us=173.6 fastest_us=169.1
+# exit: 0 elapsed_s: 65.80 end: 2026-09-28T06:58:23-04:00

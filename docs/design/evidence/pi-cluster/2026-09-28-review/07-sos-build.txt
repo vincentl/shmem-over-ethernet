@@ -1,0 +1,7 @@
+# date: 2026-09-28T07:37:12-04:00
+# host: pi-login
+# command: /home/pi/review-r3/sos-build.sh
+programs: 165, built: 163, failed: 2
+unit/c11_shmem_test_all_any_some: build failed: error: ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+unit/c11_shmem_wait_until_all_any_some: build failed: error: ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+# exit: 0 elapsed_s: 17.78 end: 2026-09-28T07:37:30-04:00

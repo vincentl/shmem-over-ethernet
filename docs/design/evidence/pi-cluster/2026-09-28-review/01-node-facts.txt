@@ -1,0 +1,88 @@
+# date: 2026-09-28T06:40:34-04:00
+# host: pi-login
+# command: srun -N4 -n4 --time=1 /home/pi/review-r3/node-facts.sh
+pi-004 uptime: 73872.07s loadavg: 0.00 0.00 0.00 1/176 11592
+pi-001 uptime: 73872.89s loadavg: 0.07 0.03 0.01 1/175 12390
+pi-002 uptime: 73887.94s loadavg: 0.00 0.00 0.00 1/177 12028
+pi-004 governor: ondemand cur_khz: 1700000 1700000 1700000 1700000
+pi-001 governor: ondemand cur_khz: 1700000 1700000 1700000 1700000
+pi-004 io_uring_disabled: 0
+pi-001 io_uring_disabled: 0
+pi-004 mtu: eth0=1500 lo=65536
+pi-004 eth0 speed: 1000 duplex: full
+pi-001 mtu: eth0=1500 lo=65536
+pi-002 governor: ondemand cur_khz: 1800000 1800000 1800000 1800000
+pi-001 eth0 speed: 1000 duplex: full
+pi-002 io_uring_disabled: 0
+pi-003 uptime: 73888.04s loadavg: 0.00 0.00 0.00 1/175 11760
+pi-004 offloads: tcp-segmentation-offload:off generic-segmentation-offload:off generic-receive-offload:on
+pi-002 mtu: eth0=1500 lo=65536
+pi-001 offloads: tcp-segmentation-offload:off generic-segmentation-offload:off generic-receive-offload:on
+pi-003 governor: ondemand cur_khz: 1600000 1600000 1600000 1600000
+pi-002 eth0 speed: 1000 duplex: full
+pi-003 io_uring_disabled: 0
+pi-004 coalesce: rx-usecs:	49 rx-frames:	n/a tx-usecs:	49 tx-frames:	n/a
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+pi-003 mtu: eth0=1500 lo=65536
+pi-001 coalesce: rx-usecs:	49 rx-frames:	n/a tx-usecs:	49 tx-frames:	n/a
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+pi-004 tcp:
+pi-002 offloads: tcp-segmentation-offload:off generic-segmentation-offload:off generic-receive-offload:on
+awk: line 1: illegal reference to variable k
+pi-003 eth0 speed: 1000 duplex: full
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+pi-001 tcp:
+pi-002 coalesce: rx-usecs:	49 rx-frames:	n/a tx-usecs:	49 tx-frames:	n/a
+pi-004 link: 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000  link/ether xx:xx:xx:xx:xx:xx brd xx:xx:xx:xx:xx:xx  RX: bytes packets errors dropped missed mcast   1098406405550 1397647981 0 0 0 10   TX: bytes packets errors dropped carrier collsns   1121051548735 1413158849 0 0 0 0
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+pi-003 offloads: tcp-segmentation-offload:off generic-segmentation-offload:off generic-receive-offload:on
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+pi-002 tcp:
+pi-001 link: 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000  link/ether xx:xx:xx:xx:xx:xx brd xx:xx:xx:xx:xx:xx  RX: bytes packets errors dropped missed mcast   1181083110082 1554974258 0 0 0 12   TX: bytes packets errors dropped carrier collsns   1215263937051 1550262135 0 0 0 0
+pi-004 shm: tmpfs           8.0G     0  8.0G   0% /dev/shm
+pi-003 coalesce: rx-usecs:	49 rx-frames:	n/a tx-usecs:	49 tx-frames:	n/a
+pi-001 shm: tmpfs           8.0G     0  8.0G   0% /dev/shm
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+pi-002 link: 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000  link/ether xx:xx:xx:xx:xx:xx brd xx:xx:xx:xx:xx:xx  RX: bytes packets errors dropped missed mcast   1142598121889 1457979413 0 0 0 36   TX: bytes packets errors dropped carrier collsns   1160180130778 1450396160 0 0 0 0
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+awk: line 1: illegal reference to variable k
+pi-003 tcp:
+pi-004 rmem_max=4194304 wmem_max=4194304 tcp_rmem='16384	131072	33554432' tcp_wmem='16384	16384	4194304' cc=cubic
+pi-004 sched: 2100000
+pi-002 shm: tmpfs           8.0G     0  8.0G   0% /dev/shm
+pi-001 rmem_max=4194304 wmem_max=4194304 tcp_rmem='16384	131072	33554432' tcp_wmem='16384	16384	4194304' cc=cubic
+pi-001 sched: 2100000
+pi-003 link: 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000  link/ether xx:xx:xx:xx:xx:xx brd xx:xx:xx:xx:xx:xx  RX: bytes packets errors dropped missed mcast   1120621066034 1444008462 0 0 0 36   TX: bytes packets errors dropped carrier collsns   1142355945649 1450436847 0 0 0 0
+pi-002 rmem_max=4194304 wmem_max=4194304 tcp_rmem='16384	131072	33554432' tcp_wmem='16384	16384	4194304' cc=cubic
+pi-003 shm: tmpfs           8.0G     0  8.0G   0% /dev/shm
+pi-002 sched: 2100000
+pi-003 rmem_max=4194304 wmem_max=4194304 tcp_rmem='16384	131072	33554432' tcp_wmem='16384	16384	4194304' cc=cubic
+pi-003 sched: 2100000
+# exit: 0 elapsed_s: 0.16 end: 2026-09-28T06:40:34-04:00

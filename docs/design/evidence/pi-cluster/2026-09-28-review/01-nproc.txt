@@ -1,0 +1,8 @@
+# date: 2026-09-28T06:40:33-04:00
+# host: pi-login
+# command: srun -N4 -n4 --time=1 nproc
+1
+1
+1
+1
+# exit: 0 elapsed_s: 0.09 end: 2026-09-28T06:40:33-04:00

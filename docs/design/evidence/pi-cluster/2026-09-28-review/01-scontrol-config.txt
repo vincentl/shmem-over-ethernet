@@ -1,0 +1,19 @@
+# date: 2026-09-28T06:40:33-04:00
+# host: pi-login
+# command: sh -c scontrol\ show\ config\ \|\ grep\ -i\ -E\ \"TaskPlugin\|KillOnBadExit\|SelectType\|MpiDefault\|Prolog\|Epilog\"
+EpilogMsgTime           = 2000 usec
+KillOnBadExit           = 0
+MpiDefault              = (null)
+PrologEpilogTimeout     = 65534
+PrologFlags             = (null)
+ResvEpilog              = (null)
+ResvProlog              = (null)
+SelectType              = select/cons_tres
+SelectTypeParameters    = CR_CORE_MEMORY
+SrunEpilog              = (null)
+SrunProlog              = (null)
+TaskEpilog              = (null)
+TaskPlugin              = task/cgroup,task/affinity
+TaskPluginParam         = (null type)
+TaskProlog              = (null)
+# exit: 0 elapsed_s: 0.01 end: 2026-09-28T06:40:33-04:00

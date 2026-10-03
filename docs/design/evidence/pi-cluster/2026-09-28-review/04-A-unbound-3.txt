@@ -1,0 +1,14 @@
+# date: 2026-09-28T07:48:29-04:00
+# host: pi-login
+# command: srun -K1 -N4 --ntasks-per-node=4 --time=3 --cpu-bind=none /home/pi/osoe-f561e2d/build/release/tools/bench/osoe-bench barrier collectives
+osoe-bench pes=16 remote_target=4 local_target=1
+barrier pes=16 median_us=200.9 fastest_us=173.8
+reduce pes=16 bytes=8 median_us=223.6 fastest_us=206.5
+broadcast pes=16 bytes=8 median_us=220.6 fastest_us=203.2
+reduce pes=16 bytes=65536 median_us=2792.1 fastest_us=2420.3
+broadcast pes=16 bytes=65536 median_us=1889.3 fastest_us=1739.5
+fcollect pes=16 block=8 median_us=285.6 fastest_us=137.1
+alltoall pes=16 block=8 median_us=348.1 fastest_us=270.8
+fcollect pes=16 block=4096 median_us=790.2 fastest_us=586.5
+alltoall pes=16 block=4096 median_us=2509.9 fastest_us=2186.9
+# exit: 0 elapsed_s: 26.10 end: 2026-09-28T07:48:55-04:00

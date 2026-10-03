@@ -1,0 +1,40 @@
+# date: 2026-09-28T06:45:42-04:00
+# host: pi-login
+# command: srun -K1 -N2 --ntasks-per-node=1 -c4 -w pi-\[001-002\] --time=5 /home/pi/review-r3/echo-pair.sh --mebibytes 256
+task 0 on pi-001: server pi-001 port 29117
+task 1 on pi-002: server pi-001 port 29117
+small enobufs=246 rearms=246
+small short_sends=7 (client)
+small stream_mib_per_s=91.2 mebibytes=1
+uring round_trip_ns min=152111 median=156982 p99=159555 rounds=20000
+blocking round_trip_ns min=148592 median=154611 p99=156704 rounds=20000
+uring stream_mib_per_s=112.2 mebibytes=256
+blocking stream_mib_per_s=112.2 mebibytes=256
+uring round_trip_ns min=109444 median=156667 p99=159777 rounds=20000
+blocking round_trip_ns min=140981 median=154241 p99=156963 rounds=20000
+uring stream_mib_per_s=112.2 mebibytes=256
+blocking stream_mib_per_s=112.2 mebibytes=256
+uring round_trip_ns min=155036 median=156925 p99=159593 rounds=20000
+blocking round_trip_ns min=149556 median=154408 p99=156648 rounds=20000
+uring stream_mib_per_s=112.2 mebibytes=256
+blocking stream_mib_per_s=112.2 mebibytes=256
+uring round_trip_ns min=153667 median=156871 p99=159834 rounds=20000
+blocking round_trip_ns min=151741 median=154407 p99=156796 rounds=20000
+uring stream_mib_per_s=112.2 mebibytes=256
+blocking stream_mib_per_s=112.2 mebibytes=256
+uring round_trip_ns min=151648 median=157055 p99=159629 rounds=20000
+blocking round_trip_ns min=152704 median=154685 p99=156703 rounds=20000
+uring stream_mib_per_s=112.2 mebibytes=256
+blocking stream_mib_per_s=112.2 mebibytes=256
+uring round_trip_ns min=143944 median=156833 p99=159834 rounds=20000
+blocking round_trip_ns min=125092 median=154315 p99=156686 rounds=20000
+uring stream_mib_per_s=112.2 mebibytes=256
+blocking stream_mib_per_s=112.2 mebibytes=256
+uring round_trip_ns min=152111 median=156852 p99=159445 rounds=20000
+blocking round_trip_ns min=149408 median=154482 p99=156741 rounds=20000
+uring stream_mib_per_s=112.2 mebibytes=256
+blocking stream_mib_per_s=112.2 mebibytes=256
+memory copy_mib_per_s=5506.4 copy8_seq_cst_fence_ns=5.61
+ratio one_way_latency_over_copy8=13965 copy_bandwidth_over_stream=49.07
+ratio uring_over_blocking fastest_round_trip=1.018 median_round_trip=1.016 stream=1.000 (median of 7 pairs)
+# exit: 0 elapsed_s: 81.25 end: 2026-09-28T06:47:04-04:00

@@ -1,0 +1,4 @@
+# date: 2026-09-28T07:41:29-04:00
+# host: pi-login
+# command: timeout 120 srun -K1 -N4 --ntasks-per-node=2 --time=3 ./unit/bigget -l 100
+# exit: 0 elapsed_s: 22.16 end: 2026-09-28T07:41:51-04:00

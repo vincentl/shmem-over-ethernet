@@ -1,0 +1,6 @@
+# date: 2026-09-28T07:54:22-04:00
+# host: pi-login
+# command: srun -N2 --ntasks-per-node=1 --time=1 /home/pi/review-r3/ring
+PE 1 of 2: my box holds 0
+PE 0 of 2: my box holds 1
+# exit: 0 elapsed_s: 0.12 end: 2026-09-28T07:54:23-04:00

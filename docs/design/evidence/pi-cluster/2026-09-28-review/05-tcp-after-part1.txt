@@ -1,0 +1,8 @@
+# date: 2026-09-28T07:24:13-04:00
+# host: pi-login
+# command: srun -N4 -n4 --time=1 /home/pi/review-r3/tcp-counters.sh
+pi-004 TCPLostRetransmit=11106 TCPTimeouts=72 TCPSpuriousRTOs=1 OutSegs=1448951661 RetransSegs=2582286
+pi-002 TCPLostRetransmit=17520 TCPTimeouts=92 TCPSpuriousRTOs=0 OutSegs=1502306460 RetransSegs=2666428
+pi-003 TCPLostRetransmit=14099 TCPTimeouts=63 TCPSpuriousRTOs=0 OutSegs=1487372729 RetransSegs=2620736
+pi-001 TCPLostRetransmit=10721 TCPTimeouts=40 TCPSpuriousRTOs=0 OutSegs=1636590068 RetransSegs=2481714
+# exit: 0 elapsed_s: 0.09 end: 2026-09-28T07:24:14-04:00

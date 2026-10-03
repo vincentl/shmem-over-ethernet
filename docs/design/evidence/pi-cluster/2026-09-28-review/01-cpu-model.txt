@@ -1,0 +1,8 @@
+# date: 2026-09-28T06:40:34-04:00
+# host: pi-login
+# command: srun -N4 -n4 --time=1 sh -c echo\ \$\(hostname\):\ \$\(cat\ /proc/cpuinfo\ \|\ grep\ -m1\ -i\ model\)
+pi-001: Model : Raspberry Pi 5 Model B Rev 1.1
+pi-004: Model : Raspberry Pi 5 Model B Rev 1.1
+pi-003: Model : Raspberry Pi 5 Model B Rev 1.1
+pi-002: Model : Raspberry Pi 5 Model B Rev 1.1
+# exit: 0 elapsed_s: 0.11 end: 2026-09-28T06:40:34-04:00

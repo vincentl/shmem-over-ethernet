@@ -1,0 +1,8 @@
+# date: 2026-09-28T08:07:09-04:00
+# host: pi-login
+# command: srun -N4 -n4 --time=1 sh -c echo\ \$\(hostname\):\ \$\(ls\ -A\ /dev/shm\ \|\ wc\ -l\)\ entries\ \$\(ls\ -A\ /dev/shm\ \|\ tr\ \"\\n\"\ \"\ \"\)
+pi-001: 0 entries
+pi-004: 0 entries
+pi-003: 0 entries
+pi-002: 0 entries
+# exit: 0 elapsed_s: 0.13 end: 2026-09-28T08:07:09-04:00

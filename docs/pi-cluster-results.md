@@ -24,9 +24,16 @@ every table shows is the Pi's network stack, not the library.
 168-181, fetch-add 162-176; a 1 MiB put 9.1 ms and get 11.2 ms (the get gap of
 the first session, unchanged); every stream 111.5 MiB/s from 64 KiB up; a
 barrier 178-184 µs at 2, 4 and 16 PEs; sixteen PEs streaming pairwise 440
-MiB/s in all, four links at line rate. **Bound against unbound at 4 × 4**:
-168.6 against 170.5 µs for the put, every line within 5%. The agent thread
-sharing a core with its PE costs nothing measurable here.
+MiB/s in all, four links at line rate. **Bound against unbound at 4 × 4**: the
+remote puts, gets and fetch-adds, and one PE's put stream, are all within 5% of
+each other (the 8-byte put 168.6 against 170.5 µs), but 19 of the 66 lines the
+two runs share (`bench-4x4.txt` against `bench-4x4-unbound.txt`) are not.
+Unbound the barrier took 191.6 µs against 177.7 (7.8% longer), an 8-byte
+fcollect 288.2 against 257.1 (12%), a 4 KiB fcollect 839.6 against 704.8 (19%),
+and the node-local 64 KiB put stream moved 12,389 MiB/s against 31,816. The
+agent thread sharing a core with its PE costs the 8-byte put and get nothing
+measurable; what it costs a pipelined point-to-point pattern is measured below
+(the night of 2026-09-27).
 
 **The test suite, split as §2 has it.** Tier 1 on the head node: 95 of 95,
 1,485 s of which 1,300 were the three model checks. Tier 2 on one compute node
@@ -529,9 +536,11 @@ throughout (49.5 at D = 1).
 | bound, both | 58,500 |
 | unbound, the default | 257,000 to 259,000 |
 
-`osoe-bench`, three runs each way alternating, with and without the slice:
-no difference in small operations, and every separated one the slice's -
-a 64 KiB reduce 2,388 against 3,155 µs, alltoall 9% faster. Two runs each
+`osoe-bench`, three runs each way alternating, with and without the slice: a
+64 KiB reduce 2,388 against 3,155 µs, alltoall 9% faster. The note that stood
+here, "no difference in small operations", does not hold: the round-three
+review repeated the matrix on 2026-09-28 (the section below) and found the
+slice costs the barrier and small collectives, bound and unbound. Two runs each
 way, widened and not, both with the slice: widened, every small collective
 slower in both - an 8-byte reduce 223 against 200 µs, a broadcast 221
 against 197, a barrier 191 against 178, a 64 KiB reduce 2,819 against 2,385
@@ -542,3 +551,42 @@ detector on at its default: 3,608 s, `failures=0`, 504 MB sent by the
 library, and nothing declared deadlocked. A second hour at `f561e2d`, with the
 check that finds a vanished node with data in flight: 3,603 s, `failures=0`,
 605 MB sent, and nothing declared deadlocked or vanished.
+
+## The round-three review's session (2026-09-28, morning)
+
+Tree `f561e2d`, source-identical to `b0e0b53` (the sha256 of all 357 tracked
+source files), `release`; four Pi 5, kernel 6.18.50, 16 KiB pages, Slurm
+24.11.5, NICs with interrupt coalescing at 49 µs; 116 runs between 06:40 and
+08:07, driven from `pi-login`. Raw outputs: `docs/design/evidence/pi-cluster/2026-09-28-review/`
+holds 137 of the 138, every one the numbers below come from, with trailing
+spaces stripped and the nodes' hardware addresses removed from
+`01-node-facts.txt`; the 138th, `ip link`'s output, is those addresses
+alone.
+
+**Reproduced.** The README's smoke test in 6.8 to 7.3 s, `failures=0` in 37 runs
+over five shapes. The floor: fastest get 1.098 to 1.100 of the echo's, put and
+quiet 1.089 to 1.092, fetch-add 1.099 to 1.101 (three runs, spread at most
+0.006), the stream 0.999. Put streams 112.1 MiB/s from 64 KiB to 4 MiB; a 1 MiB
+get 85 to 86 (76 to 77% of that). A mailbox bound against unbound: 6.9×, and
+4.0× with the slice. `OSOE_AGENT_CPUS=node`, bound and beside the slice, 7 to
+18% slower on small collectives. Eighteen minutes of `mix` over two seeds, 90
+periods, 159 GB sent, `failures=0`, nothing declared deadlocked or vanished,
+`/dev/shm` empty. SOS at 4 × 2: 165 programs, 163 build, 161 pass
+(`bigget -l 100` in 22.2 s; `unit/spam` takes 83.5 s and `unit/mt_membar` 50.6 s
+against the runbook's 120 s); the four that do not are the four documented.
+
+**Corrected.** A 16-PE barrier is 176 to 183 µs under Slurm's default binding
+and 196 to 208 unbound (four runs each); small collectives cost 4 to 17% more
+unbound. And the agent's 100 µs slice, both sides (4 × 4, 16 PEs, three
+alternating runs each way, medians in µs; the mailbox one 60 s run a setting;
+each cell gives slice 100 / slice 0, then what the slice does to the time, or to
+the messages a second):
+
+| | bound (Slurm's default), slice 100 / slice 0 | unbound (`--cpu-bind=none`), slice 100 / slice 0 |
+|---|---|---|
+| mailbox, messages a second | 63,942 / 37,383: 1.7× more with the slice | 256,248 / 250,092: 2% more |
+| 64 KiB reduce | 2,388 / 3,130: 24% less time | 2,802 / 2,800: the same |
+| 4 KiB alltoall | 2,541 / 2,818: 10% less time | 2,515 / 2,742: 8% less time |
+| barrier | 180.9 / 167.4: 8% more time | 200.9 / 196.4: 2 to 4% more time |
+| 8-byte reduce | 211.1 / 190.6: 11% more time | 223.6 / 202.3: 11% more time |
+| 8-byte broadcast | 211.2 / 187.4: 13% more time | 220.2 / 197.5: 11% more time |

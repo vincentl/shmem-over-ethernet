@@ -1,0 +1,20 @@
+# date: 2026-09-28T06:40:34-04:00
+# host: pi-login
+# command: srun -N4 --ntasks-per-node=4 --time=1 sh -c echo\ \$\(hostname\)\ task\ \$SLURM_PROCID:\ \$\(grep\ Cpus_allowed_list\ /proc/self/status\)
+pi-001 task 0: Cpus_allowed_list: 0
+pi-002 task 4: Cpus_allowed_list: 0
+pi-001 task 1: Cpus_allowed_list: 1
+pi-002 task 5: Cpus_allowed_list: 1
+pi-002 task 6: Cpus_allowed_list: 2
+pi-001 task 2: Cpus_allowed_list: 2
+pi-002 task 7: Cpus_allowed_list: 3
+pi-001 task 3: Cpus_allowed_list: 3
+pi-003 task 8: Cpus_allowed_list: 0
+pi-003 task 11: Cpus_allowed_list: 3
+pi-003 task 10: Cpus_allowed_list: 2
+pi-003 task 9: Cpus_allowed_list: 1
+pi-004 task 12: Cpus_allowed_list: 0
+pi-004 task 13: Cpus_allowed_list: 1
+pi-004 task 15: Cpus_allowed_list: 3
+pi-004 task 14: Cpus_allowed_list: 2
+# exit: 0 elapsed_s: 0.20 end: 2026-09-28T06:40:34-04:00
