@@ -734,13 +734,18 @@ computing - and output it holds in a buffer of its own, outside stdio, is lost.
 Only the caller's status is nonzero so that a launcher which ends the step at
 the first bad exit (`srun -K1`) sees none before the caller's own, which comes
 after its handlers; `srun` returns the highest status of its tasks, the
-caller's, and `osoe-launch` does the same. Two limits remain. A site that sets
-`WaitTime`, or `srun -W n`, ends the other tasks n seconds after the first one
-leaves, whatever its status. And across nodes under `-K1`, a PE of another
-node that is still ending when the caller's process ends is terminated by
-Slurm, and `srun` then returns 143: measured on two logical nodes in 2 and 7
-runs of 30 when the caller was not its node's first PE, and in none of 20 when
-it was, or on one node.
+caller's, and `osoe-launch` does the same. When several PEs call it at once,
+the job's status is one of theirs, as §9.1.6 asks, and a caller whose call
+another's has already ended leaves as the others do. Two limits remain. A site
+that sets `WaitTime`, or `srun -W n`, ends the other tasks n seconds after the
+first one leaves, whatever its status. And under `-K1`, a PE still ending when
+the caller's process ends is terminated by Slurm, and `srun` then returns 143,
+not the status: on another node, a PE its lead is still telling - measured on
+two logical nodes in 2 and 7 runs of 30 when the caller was not its node's
+first PE, and in none of 20 when it was; on any node, one whose flush waits on
+a lock, its main thread reading standard input, or has megabytes to write; and
+a second caller, killed inside its handlers by the first one's end. A fix is
+being decided (temporary).
 A job proved deadlocked ends the same way as a failure, with status 1, after
 each node has printed where its PEs wait.
 

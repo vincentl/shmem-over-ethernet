@@ -1949,13 +1949,21 @@ code of its tasks, returns the caller's (the author's decision after the
 round-three review, whose C2 had the others' `_exit(status)` come first and
 Slurm kill the caller inside `exit`; measured under the VM's Slurm with
 handlers of 0 to 5 s; `abort_exit_model.py`'s STATUS,
-`shmem.global-exit.kills.*`). Two limits stay: a site's `WaitTime`, or
+`shmem.global-exit.kills.*`). Callers racing each other leave the job one of
+their statuses, as §9.1.6 asks: the first declaration on a node fixes the
+status there, and a caller whose agent ends it before its own call is seen
+leaves as a non-caller does. Two limits stay: a site's `WaitTime`, or
 `srun -W n`, ends the other tasks n seconds after the first leaves, whatever
-its code; and a PE of another node still ending when the caller's process ends
-is killed by such a launcher, which then reports its signal — measured in 2
-and 7 runs of 30 on two logical nodes when the caller is not its node's lead,
-whose goodbye then leaves after the caller's own agent has ended it, and in
-none of 20 when it is. And one narrow case waits out the grace again: on the
+its code; and a PE still ending when the caller's process ends is killed by
+such a launcher, which then reports its signal (143 from `srun`). On another
+node, one its lead is still telling — measured in 2 and 7 runs of 30 on two
+logical nodes when the caller is not its node's lead, whose goodbye then
+leaves after the caller's own agent has ended it, and in none of 20 when it
+is. On any node, one whose flush waits on a lock - its main thread in
+`fgets(stdin)` holds stdin's - or has megabytes to write; and a second caller,
+killed inside its handlers when the first one's process ends (Part 2's
+adversarial read, 2026-10-02; the fix, the caller leaving last, is the
+author's to decide). And one narrow case waits out the grace again: on the
 caller's PE, another thread already inside `exit` - main returned into the
 library's handler while a second thread called `shmem_global_exit` - holds the
 lock the agent's `exit` needs (the model's `caller_exiting`). Because an end can still wait on a lock another thread holds —
