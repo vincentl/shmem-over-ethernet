@@ -18,11 +18,12 @@
 # MAP is the node map, or - for one node. CALLER (0) and MODE (compute) are
 # test-global-exit.c's: which PE ends the job, and when and beside what. -k
 # leaves the survivors to the library. KILLS=yes runs the launcher without it,
-# so that it ends the job at the first bad exit as srun -K1 does: the caller's
-# exit must then be the first bad one, and finish - its line and, in
+# so that it ends the job at the first bad exit as srun -K1 does: the PE
+# carrying the status leaves last (abort.c), so its exit, the one bad one,
+# must find no rank for the launcher to kill, and finish - every line and, in
 # slow-handler, its handler's written - and the launcher's status must be the
-# caller's. A rank the launcher kills after the caller has left is counted and
-# said, not failed: it was ending already. A non-lead's fatal must name its
+# carrier's. In two-callers the PE after CALLER calls too, with STATUS + 1, and
+# either may carry; the other leaves with 0. A non-lead's fatal must name its
 # caller on every node, which only its lead's abortive goodbye can carry
 # there. The job must end within 6 s of the caller's end, before the grace,
 # 10 s, but where MODE holds stdout and the grace is what ends it.
@@ -50,10 +51,16 @@ echo "$out"
 nonzero=$(printf '%s\n' "$out" | grep -c "exited with status [0-9]*\$")
 with_status=$(printf '%s\n' "$out" | grep -c "exited with status $STATUS\$")
 caller_left=$(printf '%s\n' "$out" | grep -c "rank $CALLER exited with status $STATUS\$")
+# Two callers: the one whose declaration won carries its status.
+expected=$STATUS
+if [ "$MODE" = two-callers ]; then
+    second=$(( (CALLER + 1) % RANKS ))
+    second_status=$((STATUS + 1))
+    second_left=$(printf '%s\n' "$out" | grep -c "rank $second exited with status $second_status\$")
+    [ "$second_left" -eq 1 ] && caller_left=1 && expected=$second_status
+fi
 written=$(printf '%s\n' "$out" | grep -c "^PE [0-9]*: computing\$")
-caller_written=$(printf '%s\n' "$out" | grep -c "^PE $CALLER: computing\$")
 killed=$(printf '%s\n' "$out" | grep -c "killed by signal")
-caller_killed=$(printf '%s\n' "$out" | grep -c "rank $CALLER killed by signal")
 stuck=$(printf '%s\n' "$out" | grep -c "NOT TERMINATED\|timeout after")
 # A fatal's goodbye names the caller on every other node; lost, those nodes
 # end with the failure too, but naming a PE of their own. Only where the
@@ -74,31 +81,27 @@ echo "global exit: $nonzero of $RANKS ranks left nonzero, $with_status with stat
      "written; $killed ranks killed, $stuck still computing; $strays ends naming another" \
      "PE, $lost goodbyes lost; ended ${took} s after the caller"
 [ "$stuck" -eq 0 ] || exit 1
-[ "$launched" -eq "$STATUS" ] || exit 1
+[ "$launched" -eq "$expected" ] || exit 1
 if [ "$HOW" = fatal ]; then
     [ "$with_status" -eq "$RANKS" ] && [ "$killed" -eq 0 ] || exit 1
     if [ "$speaks" = yes ]; then
         [ "$strays" -eq 0 ] && [ "$lost" -eq 0 ] || exit 1
     fi
-elif [ -n "$KEEP" ]; then
-    # The caller alone leaves nonzero, with STATUS; a status of 0 leaves no line.
+else
+    # The carrier alone leaves nonzero, with its status - a status of 0 leaves
+    # no line - and nobody is killed: under -k by nothing, and without it by
+    # the launcher, since the carrier's exit, the one bad one, comes last.
     if [ "$STATUS" -eq 0 ]; then
         [ "$nonzero" -eq 0 ] || exit 1
     else
         [ "$nonzero" -eq 1 ] && [ "$caller_left" -eq 1 ] || exit 1
     fi
     [ "$killed" -eq 0 ] || exit 1
-else
-    # Without -k: the caller's exit is the first bad one and finishes.
-    [ "$caller_killed" -eq 0 ] && [ "$nonzero" -eq 1 ] && [ "$caller_left" -eq 1 ] || exit 1
-    [ "$caller_written" -eq 1 ] || exit 1
-    echo "ranks still ending when the caller left, killed by the launcher: $killed"
 fi
 # Every line written, but for a fatal, which flushes nothing, and for an exit
 # straight after init, which other PEs may meet before their own init returns
-# - though not the caller, whose own line its agent's exit flushes. Without -k
-# a rank the launcher kills writes nothing, and only the caller's is required.
-if [ "$flushes" = yes ] && [ -n "$KEEP" ]; then
+# - though not the caller, whose own line its agent's exit flushes.
+if [ "$flushes" = yes ]; then
     [ "$written" -eq "$RANKS" ] || exit 1
 elif [ "$HOW" != fatal ]; then
     [ "$written" -ge 1 ] || exit 1

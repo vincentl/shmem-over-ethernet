@@ -578,6 +578,15 @@ static void close_connections(void)
  * stream for a death, which is what it is for that peer. Called on the agent
  * thread, whose ring this is.
  */
+/* Whether world rank `rank` is one of this node's PEs. */
+static bool local_rank(uint32_t rank)
+{
+    for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++)
+        if (osoe.bootstrap.gtids[i] == rank)
+            return true;
+    return false;
+}
+
 void osoe_progress_host_abort(void)
 {
     if (!osoe_am.internode || !osoe_am.lead)
@@ -590,6 +599,21 @@ void osoe_progress_host_abort(void)
     osoe_progress_abort(&osoe_am.progress, pe, status, (uint32_t)how);
     struct osoe_deadline grace = osoe_deadline_in(UINT64_C(1000000000) * OSOE_ABORT_GRACE_SECONDS);
     while (!osoe_progress_aborted(&osoe_am.progress) && !osoe_deadline_expired(&grace))
+        if (!osoe_progress_poll(&osoe_am.progress))
+            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
+    /*
+     * A global exit called on this node: the PE carrying its status leaves
+     * last (abort.h), so this lead outlasts every other node first. Each other
+     * lead ends only after its own node's PEs, and its end ends its stream, so
+     * once every stream has ended nothing of the job runs but this node. Not
+     * a node whose own goodbye named another caller: it carries that one, and
+     * each waiting for the other would only run both to the bound.
+     */
+    if (how != OSOE_ABORT_GLOBAL_EXIT || !local_rank(pe))
+        return;
+    struct osoe_deadline last = osoe_deadline_in(UINT64_C(1000000000) *
+                                                 OSOE_ABORT_LEAD_WAIT_SECONDS);
+    while (!osoe_progress_peers_ended(&osoe_am.progress, pe) && !osoe_deadline_expired(&last))
         if (!osoe_progress_poll(&osoe_am.progress))
             osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
 }

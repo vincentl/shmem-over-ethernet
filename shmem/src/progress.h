@@ -202,11 +202,13 @@ struct osoe_progress_connection {
      * The abort (osoe_progress_abort, abort_model.py). `abort_done`: this
      * connection has sent its abortive goodbye and ended its stream, or has
      * nobody to tell - its normal goodbye already went, the peer died, or the
-     * peer's own abort arrived (`peer_aborted`). `abort_sent`: bytes of the
-     * abortive goodbye the wire has taken.
+     * peer's own abort arrived (`peer_aborted`), naming the rank
+     * `peer_abort_origin`. `abort_sent`: bytes of the abortive goodbye the
+     * wire has taken.
      */
     bool abort_done;
     bool peer_aborted;
+    uint32_t peer_abort_origin;
     uint32_t abort_sent;
     struct osoe_am_parser parser;
     struct osoe_reply_queues queues;
@@ -387,6 +389,11 @@ void osoe_progress_abort(struct osoe_progress *p, uint32_t pe, int32_t status,
 /* Every connection has had its abortive goodbye acknowledged by the peer's
  * kernel, or has nobody to tell. O(N) calls to the kernel. */
 bool osoe_progress_aborted(const struct osoe_progress *p);
+
+/* Every peer's stream has ended, by its end of stream or an error, but a peer
+ * whose own abort named a rank other than `carrier`: a node carrying its own
+ * caller of shmem_global_exit (abort.h). O(N). */
+bool osoe_progress_peers_ended(const struct osoe_progress *p, uint32_t carrier);
 
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
 uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);

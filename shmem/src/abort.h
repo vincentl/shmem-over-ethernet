@@ -9,8 +9,10 @@
  * are the only way the rest of the job learns anything. So every PE's agent
  * now reads the word at each turn of its loop, and a PE whose node aborts ends:
  *
- *   a global exit   on the caller's PE, exit(status): its handlers, then
- *                   standard I/O, as §9.1.6 asks. The library's own atexit
+ *   a global exit   on the PE its node's word names - the carrier, the caller
+ *                   whose declaration won - exit(status): its handlers, then
+ *                   standard I/O, as §9.1.6 asks; on a caller whose
+ *                   declaration lost, exit(0). The library's own atexit
  *                   handlers stand aside while it ends this way - one is a
  *                   barrier (start_pes's finalize), the other declares an
  *                   abort that already is. On every other PE, fflush then
@@ -19,12 +21,21 @@
  *                   may run beside it; and _exit takes no lock, where exit,
  *                   since glibc 2.41 (BZ 31997), waits for good on a thread
  *                   already inside exit - a main thread that returned from
- *                   main. The status is the job's and the caller's, not each
- *                   task's: a launcher that ends the step at the first bad exit
- *                   (srun -K1, KillOnBadExit) then sees none before the
- *                   caller's own, which comes after its handlers and its
- *                   flush, and srun returns the highest code of all its tasks
- *                   (the author's decision after the round-three review, C2).
+ *                   main. The status is the job's and the carrier's, not each
+ *                   task's (the author's decision after the round-three review,
+ *                   C2), and the carrier leaves last (the author's decision of
+ *                   2026-10-02, after Part 2's adversarial read): a launcher
+ *                   that ends the step at the first bad exit (srun -K1,
+ *                   KillOnBadExit) kills every task still running then, a
+ *                   killed task counts 143, and srun returns the highest code
+ *                   of all its tasks. So the carrier waits for every other PE
+ *                   of its node before its end; a lead of a job of more than
+ *                   one node waits for its node's others but the carrier before
+ *                   its own, whose end of stream then tells the carrier's node
+ *                   that its node is done; and the carrier's node's lead waits
+ *                   for every other node's end of stream after its goodbyes
+ *                   (progress-host.c) - but a node whose goodbye named another
+ *                   caller, which carries that one.
  *   a fatal         _exit with the declarer's status, as a fatal does.
  *
  * Either way the end can wait on a lock another thread holds - a stream's, or
@@ -38,7 +49,11 @@
  * it; any other that gets here waits for that to happen.
  *
  * The goodbyes take OSOE_ABORT_GRACE_SECONDS at most (progress-host.c) before
- * the grace starts, so a process ends within twice that of the abort.
+ * the grace starts, so a process ends within twice that of the abort - but on a
+ * global exit, where the waits above add theirs (OSOE_ABORT_*_WAIT_SECONDS), up
+ * to four times it for the carrier and its node's lead, for a PE stopped
+ * outright; a PE whose own end is held ends by its grace, and the waits for it
+ * with it.
  */
 #ifndef OSOE_ABORT_H
 #define OSOE_ABORT_H
@@ -49,6 +64,20 @@
 #include "node.h"
 
 enum { OSOE_ABORT_GRACE_SECONDS = 10 };
+
+/*
+ * How long, on a global exit, a PE waits for others to end before its own end
+ * begins (abort.c): a lead for its node's other PEs and, on the node whose PE
+ * carries the status, for the other nodes' ends of stream (progress-host.c);
+ * the carrier for every other PE of its node, its lead last of them. Each
+ * outlasts the grace of what it waits for, so that a PE whose flush is held
+ * still ends before it, by its own grace; only a process stopped outright is
+ * left behind. The waits come before the grace, which then bounds the end.
+ */
+enum {
+    OSOE_ABORT_LEAD_WAIT_SECONDS = 2 * OSOE_ABORT_GRACE_SECONDS,
+    OSOE_ABORT_CARRIER_WAIT_SECONDS = 3 * OSOE_ABORT_GRACE_SECONDS,
+};
 
 /* Whether the node has aborted: one acquire load, for the agent's loop. */
 bool osoe_abort_pending(void);

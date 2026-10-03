@@ -519,6 +519,7 @@ static void complete(void *context, const struct osoe_message_header *header,
         struct osoe_am_abort m;
         memcpy(&m, fixed, sizeof m);
         c->peer_aborted = true;
+        c->peer_abort_origin = m.origin_pe;
         if (p->host.abort)
             p->host.abort(p->host.context, m.origin_pe, m.status, m.disposition);
         break;
@@ -1340,6 +1341,18 @@ bool osoe_progress_aborted(const struct osoe_progress *p)
         if (c->abort_sent == p->abort_segment_bytes && !c->peer_aborted &&
             !p->wire[slot].error && !p->wire[slot].send_error &&
             osoe_wire_unacknowledged(&p->wire[slot]))
+            return false;
+    }
+    return true;
+}
+
+bool osoe_progress_peers_ended(const struct osoe_progress *p, uint32_t carrier)
+{
+    for (uint32_t slot = 0; slot + 1 < p->nodes; slot++) {
+        const struct osoe_progress_connection *c = &p->connection[slot];
+        if (c->peer_aborted && c->peer_abort_origin != carrier)
+            continue;
+        if (!osoe_wire_ended(&p->wire[slot]) && !p->wire[slot].error)
             return false;
     }
     return true;

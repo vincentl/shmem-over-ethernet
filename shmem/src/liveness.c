@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/syscall.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "abort.h"
@@ -119,6 +120,38 @@ static int open_watch(uint32_t i, pid_t pid)
                 (int)pid, strerror(errno));
     }
     return PID;
+}
+
+void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until)
+{
+    for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++) {
+        if (i == osoe.bootstrap.local_id || i == besides)
+            continue;
+        const struct osoe_pe_slot *s = &osoe.node.slots[i];
+        /* The pid is published before the release store of the phase. */
+        if (atomic_load_explicit(&s->phase, memory_order_acquire) == OSOE_PHASE_EMPTY ||
+            s->pid <= 0)
+            continue;
+        int fd = (int)syscall(SYS_pidfd_open, (pid_t)s->pid, 0);
+        if (fd < 0) {
+            if (errno == ESRCH)
+                continue;               /* ended already */
+            struct timespec millisecond = { 0, 1000 * 1000 };
+            while (!(kill((pid_t)s->pid, 0) != 0 && errno == ESRCH) &&
+                   !osoe_deadline_expired(until))
+                nanosleep(&millisecond, NULL);
+        } else {
+            struct pollfd ended_watch = { .fd = fd, .events = POLLIN };
+            while (!osoe_deadline_expired(until)) {
+                int r = poll(&ended_watch, 1, 100);
+                if (r > 0 || (r < 0 && errno != EINTR))
+                    break;
+            }
+            close(fd);
+        }
+        if (osoe_deadline_expired(until))
+            return;
+    }
 }
 
 void osoe_liveness_check(void)

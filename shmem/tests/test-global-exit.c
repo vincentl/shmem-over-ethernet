@@ -52,6 +52,11 @@
  *              the caller holds stdout's lock as it ends the job, so exit's
  *              flush waits on it and the grace ends the caller - with the
  *              caller's status
+ *   two-callers
+ *              compute, and the PE after the caller calls shmem_global_exit
+ *              too, with STATUS + 1, at the same moment: the declaration that
+ *              wins carries its status and leaves last; the other caller
+ *              leaves with 0 (abort.c)
  *   slow-handler
  *              compute, with an atexit handler on the caller's PE alone that
  *              takes a second and then prints a line: under a launcher that
@@ -171,10 +176,13 @@ int main(int argc, char **argv)
                 end_the_job(how);
         }
     } else {
-        if (me == caller) {
+        int second = strcmp(mode, "two-callers") == 0 ? (caller + 1) % npes : -1;
+        if (me == caller || me == second) {
+            char second_how[16];
+            snprintf(second_how, sizeof second_how, "%d", atoi(how) + 1);
             struct timespec settle = { 0, 200 * 1000 * 1000 };
             nanosleep(&settle, NULL);           /* the others are computing by now */
-            end_the_job(how);
+            end_the_job(me == second ? second_how : how);
         }
         volatile unsigned long spins = 0;
         while (seconds() < start + COMPUTE_SECONDS)

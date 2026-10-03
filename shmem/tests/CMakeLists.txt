@@ -2094,20 +2094,47 @@ add_test(NAME shmem.global-exit.zero.0-0-1-1
           $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 0 0 1 compute)
 set_tests_properties(shmem.global-exit.zero.0-0-1-1
   PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+# Two callers at once on one node: the declaration that wins carries its status
+# and leaves last; the other caller leaves with 0 (abort.c).
+add_test(NAME shmem.global-exit.two-callers.0-0-1-1
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 two-callers)
+set_tests_properties(shmem.global-exit.two-callers.0-0-1-1
+  PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 # Under a launcher that ends the job at the first bad exit, as srun -K1 does
-# (KILLS=yes: no -k), the round-three review's C2: every other PE leaves with
-# 0, so the caller's own exit is the first bad one, and it finishes - on one
-# node, and with a handler of a second on a non-lead caller. Before the change
-# the others' exits came first and the caller was killed inside its handler.
-add_test(NAME shmem.global-exit.kills.L4
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_global-exit> 4 - 7 7 0 compute)
-add_test(NAME shmem.global-exit.kills.slow-handler.0-0-1-1
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 slow-handler)
-set_tests_properties(shmem.global-exit.kills.L4 shmem.global-exit.kills.slow-handler.0-0-1-1
-  PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
-             PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+# (KILLS=yes: no -k): the PE carrying the status leaves last (abort.c), so its
+# exit, the one bad one, finds no rank to kill, and it finishes. The round-three
+# review's C2, where the others' exits came first and killed the caller inside
+# its handler: on one node, and with a handler of a second on a non-lead
+# caller. Then what Part 2's adversarial read found the caller could leave
+# before: another node's PEs, still being told, for a non-lead caller on either
+# node (2 and 7 runs of 30 under srun before); a second caller, inside its
+# handlers; and PEs whose end waits on stdout's lock, which their grace ends
+# after 10 s - not under tsan, whose _exit waits on the lock for good (below).
+foreach(case "L4;4;-;0;compute" "slow-handler.0-0-1-1;4;0,0,1,1;1;slow-handler"
+             "nonlead.0-0-1-1;4;0,0,1,1;1;compute"
+             "nonlead-other-node.0-0-1-1;4;0,0,1,1;3;compute"
+             "two-callers.0-0-1-1;4;0,0,1,1;0;two-callers")
+  list(GET case 0 label)
+  list(GET case 1 count)
+  list(GET case 2 map)
+  list(GET case 3 caller)
+  list(GET case 4 mode)
+  add_test(NAME shmem.global-exit.kills.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7 ${caller} ${mode})
+  set_tests_properties(shmem.global-exit.kills.${label}
+    PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
+               PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endforeach()
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.global-exit.kills.held-stdout.0-0-1-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 held-stdout)
+  set_tests_properties(shmem.global-exit.kills.held-stdout.0-0-1-1
+    PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
+               PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endif()
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   add_test(NAME shmem.global-exit.stream.0-0-1-1
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>

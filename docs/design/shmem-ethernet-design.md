@@ -1924,9 +1924,12 @@ computing outside the library, where nothing else of it runs. The lead's agent,
 finding the word, first wakes every local agent again: a declarer's own agent
 can end its process before the declarer has woken the rest, and the lead's
 agent, woken first, closes that gap for all of them (O(L) once per node;
-`abort_exit_model.py`, `no_rewake`). The agent ends the process. On a global
-exit, the caller's PE — whichever PE's program called `shmem_global_exit` —
-ends with `exit(status)`, its handlers and then standard I/O as §9.1.6 asks,
+`abort_exit_model.py`, `no_rewake`) - on a global exit a second line now,
+since the carrier's process outlives its node (below). The agent ends the
+process. On a global
+exit, the caller's PE — the PE its node's word names, whose declaration won:
+the *carrier* — ends with `exit(status)`, its handlers and then standard I/O
+as §9.1.6 asks, and a caller whose declaration lost with `exit(0)`,
 with the library's own atexit handlers and `shmem_finalize` standing aside,
 since the one is a barrier and the other would declare an abort that already
 is. Every other PE ends with `fflush` and then `_exit(0)`, as a fatal does but
@@ -1951,19 +1954,38 @@ Slurm kill the caller inside `exit`; measured under the VM's Slurm with
 handlers of 0 to 5 s; `abort_exit_model.py`'s STATUS,
 `shmem.global-exit.kills.*`). Callers racing each other leave the job one of
 their statuses, as §9.1.6 asks: the first declaration on a node fixes the
-status there, and a caller whose agent ends it before its own call is seen
-leaves as a non-caller does. Two limits stay: a site's `WaitTime`, or
-`srun -W n`, ends the other tasks n seconds after the first leaves, whatever
-its code; and a PE still ending when the caller's process ends is killed by
-such a launcher, which then reports its signal (143 from `srun`). On another
-node, one its lead is still telling — measured in 2 and 7 runs of 30 on two
-logical nodes when the caller is not its node's lead, whose goodbye then
-leaves after the caller's own agent has ended it, and in none of 20 when it
-is. On any node, one whose flush waits on a lock - its main thread in
-`fgets(stdin)` holds stdin's - or has megabytes to write; and a second caller,
-killed inside its handlers when the first one's process ends (Part 2's
-adversarial read, 2026-10-02; the fix, the caller leaving last, is the
-author's to decide). And one narrow case waits out the grace again: on the
+status there, and every other caller leaves with 0.
+
+**The carrier leaves last.** Such a launcher kills every task still running at
+the first bad exit, and a killed task counts 143, which `srun`'s status would
+then be: measured, before this, on two logical nodes in 2 and 7 runs of 30 when
+the caller was not its node's lead - its goodbye leaving after the caller's own
+agent had ended it - and on any node for a PE whose flush waited on a lock or
+had megabytes to write, and for a second caller, killed inside its handlers
+(Part 2's adversarial read, 2026-10-02). So, the author's decision of that
+evening, the carrier's end waits until nothing else of the job runs. The
+carrier waits for every other PE of its node, by pidfds opened then
+(`osoe_liveness_outlast`), before its own end begins. A lead of a job of more
+than one node waits for its node's others but the carrier before its own end,
+so that its end of stream - its end makes it - tells the carrier's node that
+its node is done; and the carrier's node's lead, after its goodbyes, waits for
+every other node's end of stream (`progress-host.c`), but a node whose own
+goodbye named another caller (`peer_abort_origin`), which carries that one -
+each waiting for the other would only run both to the bound. The waits are
+bounded, `OSOE_ABORT_LEAD_WAIT_SECONDS` (20) and
+`OSOE_ABORT_CARRIER_WAIT_SECONDS` (30), each above the grace of what it waits
+for: a PE whose end is held still ends first, by its own grace, and a lead's
+grace, started before its wait, itself waits for the lead's node before
+`_exit`, so graces never stack beneath one another (`abort_exit_model.py`'s
+NO_KILL and JOB_STATUS, with srun -K1 as a thread that kills; its variants
+`no_carrier_wait`, `no_lead_wait`, `no_remote_wait`, `wait_every_node`,
+`no_exclusion`, `called_carries`; `shmem.global-exit.kills.*` require no rank
+killed). Two limits stay: a site's `WaitTime`, or `srun -W n`, ends the other
+tasks n seconds after the first leaves, whatever its code; and two PEs of two
+nodes calling at once, each first on its own node, each carry their node's end,
+and the first to leave can still have a PE of the other killed (the model's
+`both` with `kills`). A process stopped outright outlasts every bound, and is
+left behind. And one narrow case waits out the grace again: on the
 caller's PE, another thread already inside `exit` - main returned into the
 library's handler while a second thread called `shmem_global_exit` - holds the
 lock the agent's `exit` needs (the model's `caller_exiting`). Because an end can still wait on a lock another thread holds —

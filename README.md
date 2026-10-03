@@ -200,9 +200,9 @@ every node.
 
 - **`-K1`** (or `KillOnBadExit=1`), so that a task that fails at start-up ends
   the rest rather than leaving them waiting (design §3.15). A global exit
-  keeps its status beside it: every PE but the caller leaves with 0, so the
-  caller's own exit, after its handlers, is the first bad one Slurm sees - with
-  one limit across nodes, under "How a job ends".
+  keeps its status beside it: every PE but the caller leaves with 0, and the
+  caller leaves last, so its exit is the one bad one Slurm sees - with one
+  limit, two callers on two nodes at once, under "How a job ends".
 - **`--cpu-bind=none`**, or two CPUs a task (`-c 2`) where there are cores to
   spare; `SLURM_CPU_BIND=none` in the environment does the same. Where a node
   runs as many tasks as it has cores, Slurm binds each task to one core by
@@ -731,21 +731,24 @@ run and its streams are flushed, as the specification asks - for at most
 standard output flushed. Every other PE leaves with 0, its standard I/O
 flushed and then `_exit`, so its handlers do not run - it is usually still
 computing - and output it holds in a buffer of its own, outside stdio, is lost.
-Only the caller's status is nonzero so that a launcher which ends the step at
-the first bad exit (`srun -K1`) sees none before the caller's own, which comes
-after its handlers; `srun` returns the highest status of its tasks, the
-caller's, and `osoe-launch` does the same. When several PEs call it at once,
-the job's status is one of theirs, as §9.1.6 asks, and a caller whose call
-another's has already ended leaves as the others do. Two limits remain. A site
-that sets `WaitTime`, or `srun -W n`, ends the other tasks n seconds after the
-first one leaves, whatever its status. And under `-K1`, a PE still ending when
-the caller's process ends is terminated by Slurm, and `srun` then returns 143,
-not the status: on another node, a PE its lead is still telling - measured on
-two logical nodes in 2 and 7 runs of 30 when the caller was not its node's
-first PE, and in none of 20 when it was; on any node, one whose flush waits on
-a lock, its main thread reading standard input, or has megabytes to write; and
-a second caller, killed inside its handlers by the first one's end. A fix is
-being decided (temporary).
+
+The caller is the only task that leaves nonzero, and it leaves last. A
+launcher that ends the step at the first bad exit (`srun -K1`) kills every
+task still running then, and a killed task counts 143, which `srun`'s status -
+the highest of its tasks' - would then be. So the caller waits until every
+other PE has ended before its own end begins: its node's PEs, and its node's
+lead the other nodes, each of whose leads waits for its own node first. A PE
+whose own end is held - a flush waiting on a lock - ends by its grace, and the
+caller after it. `srun` then returns the caller's status, and `osoe-launch`
+does the same. When several PEs call it at once, the job's status is one of
+theirs, as §9.1.6 asks: on each node the first call carries it, and the other
+callers leave with 0 after their handlers.
+
+Two limits remain. A site that sets `WaitTime`, or `srun -W n`, ends the
+other tasks n seconds after the first one leaves, whatever its status. And
+under `-K1`, two PEs of two nodes that call `shmem_global_exit` at the same
+moment each carry their own node's end, and whichever leaves first can still
+have Slurm kill a PE of the other node: `srun` may then return 143.
 A job proved deadlocked ends the same way as a failure, with status 1, after
 each node has printed where its PEs wait.
 

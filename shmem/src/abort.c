@@ -12,13 +12,21 @@
 
 #include "abort.h"
 #include "agent.h"
+#include "base/deadline.h"
 #include "blocked.h"
+#include "liveness.h"
 #include "state.h"
 
 static _Atomic uint32_t ending;         /* process-private: a thread is ending it */
 static _Thread_local bool this_thread_ends;     /* ...and it is this one */
 static _Atomic uint32_t called;         /* this process called shmem_global_exit */
 static int grace_status;
+/* What this process's end waits for first, on a global exit (osoe_abort_end):
+ * a lead's node, so that its end of stream tells the truth. Written before the
+ * grace thread is created, which waits for it too. */
+static bool outlasts;
+static uint32_t outlast_besides;
+static struct osoe_deadline outlast_until;
 
 bool osoe_abort_pending(void)
 {
@@ -61,6 +69,10 @@ static void *grace(void *unused)
     until.tv_sec += OSOE_ABORT_GRACE_SECONDS;
     while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &until, NULL) == EINTR)
         ;
+    /* Not before what this end must outlast: the grace bounds a process's own
+     * end, not the order of ends a global exit keeps (osoe_abort_end). */
+    if (outlasts)
+        osoe_liveness_outlast(outlast_besides, &outlast_until);
     /* An end still waiting may be waiting on a lock another thread holds -
      * a stream's, or on the caller's PE exit's own, held by a thread in a
      * program's handler (abort.h): stdout's buffered lines are then what can
@@ -100,15 +112,42 @@ _Noreturn void osoe_abort_end(void)
     sigemptyset(&broken_pipe);
     sigaddset(&broken_pipe, SIGPIPE);
     pthread_sigmask(SIG_BLOCK, &broken_pipe, NULL);
-    /* A global exit's status is the job's and its caller's (spec §9.1.6): only
-     * the PE whose program called shmem_global_exit leaves with it, and every
-     * other PE leaves with 0, so that a launcher which ends the step at the
-     * first bad exit - srun -K1, KillOnBadExit - sees none before the caller's
-     * own, which comes after its handlers and its flush; srun returns the
-     * highest code of all its tasks, which is then the caller's. A fatal's
-     * status is every PE's. The grace below leaves with the same. */
+    /*
+     * A global exit's status is the job's and its caller's (spec §9.1.6): one
+     * PE leaves with it, the one its node's word names - the carrier, whose
+     * declaration won - and every other PE leaves with 0, a caller whose own
+     * declaration lost among them. A launcher which ends the step at the first
+     * bad exit - srun -K1, KillOnBadExit - kills every task still running then,
+     * and a killed task counts 143, which srun's status, the highest of all its
+     * tasks', would be; so the carrier also leaves last (abort.h): it waits for
+     * every other PE of its node to end - its lead last of them, which has
+     * outlasted the other nodes - and only then begins its own end. A lead of
+     * a job of more than one node waits for its node's others but the carrier,
+     * so that its end of stream, which its end makes, tells the carrier's node
+     * that its whole node is done (progress-host.c). A fatal's status is every
+     * PE's, and nobody waits. The grace below leaves with the same.
+     */
     bool caller = atomic_load_explicit(&called, memory_order_acquire) != 0;
-    grace_status = how == OSOE_ABORT_GLOBAL_EXIT && !caller ? 0 : status;
+    bool carrier = how == OSOE_ABORT_GLOBAL_EXIT && pe == osoe.bootstrap.rank;
+    grace_status = how == OSOE_ABORT_GLOBAL_EXIT && !carrier ? 0 : status;
+    /* The carrier's wait comes before its grace, which then bounds its own
+     * end - its handlers and its flush - as it bounds any caller's. A lead's
+     * comes after its grace starts and its flush: a lead whose flush is held
+     * still ends by its grace, with what it waits for ended first (grace),
+     * rather than a grace after a wait after another's grace. */
+    if (carrier) {
+        struct osoe_deadline until = osoe_deadline_in(UINT64_C(1000000000) *
+                                                      OSOE_ABORT_CARRIER_WAIT_SECONDS);
+        osoe_liveness_outlast(UINT32_MAX, &until);
+    } else if (how == OSOE_ABORT_GLOBAL_EXIT && osoe.bootstrap.local_id == 0 &&
+               osoe.bootstrap.node_count > 1) {
+        outlast_besides = UINT32_MAX;               /* none here: another node's */
+        for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++)
+            if (osoe.bootstrap.gtids[i] == pe)
+                outlast_besides = i;
+        outlast_until = osoe_deadline_in(UINT64_C(1000000000) * OSOE_ABORT_LEAD_WAIT_SECONDS);
+        outlasts = true;
+    }
     /* With no thread to spare, the bound is SIGALRM's default action instead:
      * the process still ends, though by a signal and not with its status -
      * unless the program handles or blocks SIGALRM, when there is none. */
@@ -116,17 +155,23 @@ _Noreturn void osoe_abort_end(void)
     if (pthread_create(&t, NULL, grace, NULL) == 0)
         pthread_detach(t);
     else
-        alarm(2 * OSOE_ABORT_GRACE_SECONDS);
-    /* The caller's own PE ends as a program does, its handlers and then
-     * stdio (spec §9.1.6). Every other ends as a fatal does, flushing and
-     * then _exit, but with 0 (above): its main thread may be running the
-     * program still, and a handler or destructor run beside it would pull
-     * state from under it - and _exit takes no lock, where exit waits for good
-     * on a thread already inside exit, since glibc 2.41 (BZ 31997). */
+        alarm(2 * OSOE_ABORT_GRACE_SECONDS + (outlasts ? OSOE_ABORT_LEAD_WAIT_SECONDS : 0));
+    /* A caller's own PE ends as a program does, its handlers and then stdio
+     * (spec §9.1.6) - the carrier with the status, a caller whose declaration
+     * lost with 0. Every other ends as a fatal does, flushing and then _exit,
+     * but with 0 (above): its main thread may be running the program still,
+     * and a handler or destructor run beside it would pull state from under it
+     * - and _exit takes no lock, where exit waits for good on a thread already
+     * inside exit, since glibc 2.41 (BZ 31997). */
     if (how == OSOE_ABORT_GLOBAL_EXIT) {
-        if (caller)
-            exit(status);
+        if (caller) {
+            if (outlasts)
+                osoe_liveness_outlast(outlast_besides, &outlast_until);
+            exit(carrier ? status : 0);
+        }
         fflush(NULL);
+        if (outlasts)
+            osoe_liveness_outlast(outlast_besides, &outlast_until);
         _exit(0);
     }
     /* A fatal elsewhere on the node (or across the job): say so, once, for a PE
