@@ -166,18 +166,118 @@ notice, the pins, the build without Python, the label, the version, the thread p
 And a note for the next release: `libosoe.so.0` is the soname of every 0.x version, so
 whether 0.2 takes a new one is that release's to decide.
 
+## Part 2: a global exit's status is the caller's, and the caller leaves last (D1)
+
+Branch `global-exit-status`, built in two stages: D1 as the author decided it, every PE
+but the caller of `shmem_global_exit(status)` leaving with 0; then, when building it
+showed `srun -K1` could still return 143, the caller leaving last - the author's answer
+the same night (`2026-10-02.md` item 9).
+
+1. **The status** (D1). The model first: `abort_exit_model.py`'s STATUS restated - a
+   process whose program called ends with a status some caller gave, every other with
+   0 - with two variants that must fail, `status_everywhere` (the code as it was) and
+   `caller_zero`. The restatement hid one old variant, `finalize_returns` (a second
+   `exit` beside the agent's), which STATUS had caught only because every process
+   carried the status; a property ONE_END - a process is ended by the thread that
+   claimed it - now catches it for its own reason. The code is the plan's two measured
+   lines and the comments of `abort.c`, `abort.h`, `init.c` and `fatal.c` (a fatal that
+   loses to a global exit leaves with 0 too). `osoe-launch`'s status became `srun`'s:
+   the highest exit code of any rank, 128 plus the signal for a rank killed by one it
+   did not send, 1 for its own findings when no rank reported more. Tests:
+   `global-exit.sh` requires one nonzero line, the caller's, and the launcher's
+   status; new `zero`, and without `-k`, as `srun -K1` runs, `kills.L4` and
+   `kills.slow-handler`. Mutations: non-callers carrying the status fail 14 of 23
+   global-exit tests, the caller leaving with 0 15, the launcher's old 1 15. Under the
+   VM's Slurm (`srun -K1 --cpu-bind=none -N1 -n4`): handlers of 0 ms to 5 s on PE 0,
+   300 ms on PE 3, status 0, and without `-K1` - `srun` returned the status every time,
+   every handler finished and stdout was flushed.
+2. **Found, and put to the author.** `srun -K1` kills every task still running at the
+   first nonzero exit, and a killed task counts 143, which `srun`'s status then is. On
+   two logical nodes a non-lead caller left before the other node's PEs had ended in 2
+   and 7 runs of 30 (a lead caller in none of 20): its agent ended it at once, while
+   its lead still had the goodbye to send.
+3. **The first adversarial read** (a fresh agent, given the branch at `443b2f7` and the
+   brief's property). The change's own lines held: every way a process ends on a
+   global exit computes one status from the disposition and `called`, and `called`
+   reaches the agent as §3.16 says. Eight findings: the race of item 2 on one node too
+   (a non-caller whose flush waits on stdin's lock, one with megabytes buffered, 2 of
+   30 runs of `kills.L4`'s own setup) - put to the author with the rest; the tests
+   could not see a late end (a mutant ending every other PE 8 s late passed 8 of 10:
+   every mode now bounds the end at 6 s, but the grace's own, and the mutant fails 13
+   of 25); two callers on a node, the second killed inside its handlers (none of the
+   values passed, against §9.1.6) - the same fix; the grace's status tested by
+   nothing (two modes now hold stdout's lock for good, on every other PE and on the
+   caller, and each mutant fails one); `osoe-launch` discarding a rank's own signal
+   when it died before the launcher's SIGTERM (it keeps which signals it sent now);
+   racing callers' statuses (stated); the model has no grace thread (informational);
+   and a PE ended by its own thread dying of SIGPIPE (the ending thread holds SIGPIPE
+   back now, as the agent holds every signal).
+4. **The caller leaves last** (the author's answer). The model first:
+   `abort_exit_model.py` gains `srun -K1` as a thread that kills every process still
+   running after the first nonzero exit, and the properties NO_KILL and JOB_STATUS;
+   the word carries the declarer's rank. Every built case passes with it and with
+   liveness (to 9.6 million states, two callers on one node); two callers on two nodes
+   at once fails NO_KILL, the residual stated; each rule's variant fails as named
+   (`no_carrier_wait`, `no_lead_wait`, `no_remote_wait` and the code before,
+   `called_carries`, NO_KILL; `wait_every_node` and `no_exclusion` STUCK;
+   `caller_zero` JOB_STATUS). Three old cases turned: with the carrier outliving its
+   lead the declarer's wakes always finish first, so `nonlead` passes without sweeps
+   or pidfds (`no_carrier_wait` still shows Part B's finding), `no_rewake` passes (the
+   rewake is a second line), and `pidfd_fatal` shows its violation on node B. The
+   code: the carrier is the PE the word names; it waits for every other PE of its node
+   by pidfds (`osoe_liveness_outlast`, no lock, no allocation) before its end; a lead
+   of a job of several nodes waits for its node's others but the carrier before its
+   `_exit`, its grace started first and waiting too; the carrier's node's lead waits
+   after its goodbyes for every other node's end of stream, but a node whose goodbye
+   named another caller (`peer_abort_origin`). Bounds 20 s and 30 s. A first build
+   started a lead's grace after its wait and stacked graces (30 s in `held-stdout`).
+   Tests: without `-k` no rank may be killed and every line must be written; new,
+   non-lead callers on either node, two callers on one node, every other PE holding
+   stdout.
+5. **Measured after it**, under the VM's Slurm: a caller on PE 0, 1 or 3, ten runs
+   each, returned 7 thirty times of thirty; two callers with 7 and 8 and handlers of
+   300 and 450 ms returned 7 or 8 ten of ten, the carrier's handler finishing every
+   time; a PE blocked in `fgets` on a stdin that never ends returned 7 in 10 to 11 s,
+   three of three (143 before); every other PE holding 16 MiB of stdout returned 7 five
+   of five, every line written. Under `osoe-launch` without `-k` on `0,0,1,1`, a
+   non-lead caller on node 0 and on node 1, thirty runs each: no rank killed, 7 every
+   time.
+6. **The second adversarial read** (a fresh agent, given the model and code commits
+   `023b8b9` and `c42961d` and the property). Sound: the carrier and status rules, no
+   cycle of waits on a node, every wait bounded, no lock or allocation on the end path,
+   no new fatal while polling during the abort, fatals unchanged, and further runs
+   under `KILLS=yes` clean. Five findings:
+   - *Three nodes and a relayed goodbye* (high): a node told by a third sent the
+     carrier's node a goodbye and ended its stream at once, which that node took for
+     its PEs having ended; `srun -K1` then killed them, 8 runs in 40 with a PE there
+     held. The model, of two nodes, relays no goodbye and ends a stream only at a
+     process's end. On a global exit the engine now leaves the stream to the process's
+     end (`keep_stream`); `kills.held-other-node.0-2-2-1` fails 4 runs in 20 with the
+     shutdown put back, and passed 10 of 10 as built.
+   - *Two of the three waits could be deleted with every test passing* (medium): the
+     held-stdout test holds every PE, leads too, whose graces lined the ends up.
+     `kills.held-other-node.0-0-1-1` holds one non-lead of the other node and fails
+     with either lead's wait gone.
+   - *The bounds* (low-medium): a lead of the carrier's node starts its grace after its
+     goodbyes and its wait for the other nodes, five graces at the outside, not four as
+     written; `abort.h`, §3.15 and the README say the bounds as they are, and that
+     processes held in several places at once can run one out.
+   - *A lead that called and lost had its handlers cut* when its wait outran its grace
+     (low): it waits before its grace starts now, as the carrier does.
+   - *`osoe_liveness_outlast` opened each pidfd only on reaching its PE* (low): a PE
+     reaped meanwhile could be looked for by a recycled pid; it opens a batch of 64
+     before waiting on any.
+7. **Under tsan** the two grace tests hung: tsan's `_exit` takes stdout's lock. A program
+   whose main thread holds the lock and whose second thread calls `_exit` after a second
+   ends in 1.0 s built plainly and not at all with `-fsanitize=thread`; the held-stdout
+   tests are left out of the tsan build.
+
+**Verification**, on the tree that merges (`80fbdc7`), in `osoe-load`, pins on: debug 627
+of 627, release 627 of 627 (the models left to their preset), asan 626 of 626, tsan 411 of
+411; tier 3's global-exit tests twice, 18 of 18. The model whole on the host, every case as
+expected (9 min 30 s).
+
 ## Still with the author
 
-- **A global exit's last PE** (put on 2026-10-02, Part 2; widened the same evening by
-  Part 2's adversarial read): `srun -K1` kills a PE still ending when the caller has
-  left, and then returns 143. First measured on two logical nodes for a caller that is
-  not its node's first PE (2 and 7 runs of 30); the read found it on one node too - a
-  PE whose flush waits on a lock, or has megabytes to write - and with two callers on a
-  node, where Slurm kills the one that finishes second inside its handlers, so the
-  status is none of the values passed (§9.1.6). Recommended: one PE carries the status
-  and leaves last, waiting, within the grace, for its node's other PEs and then for the
-  other nodes; the same-node half alone is about half a day, both about two days. The
-  alternatives: a stated limit, or only a non-lead caller waiting for its lead. Part
-  2's record gives the measurements.
 - **The release checklist** (`docs/release-checklist.md`, with the repository scrub) is
   a draft until the author has read it.
