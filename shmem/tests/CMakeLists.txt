@@ -319,45 +319,89 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
     TIMEOUT 60 PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
 endif()
 
+# A refusal must end the job, or say why it cannot: the round-three review's R8
+# found a PE that outlived the refusal of another waiting for ever and printing
+# nothing, which a suite that lets the launcher end the survivors cannot see. These
+# tests run the job under osoe-launch -k (refusal.sh), which leaves them alone, so
+# that a hang is the launcher's timeout. Of RANKS ranks, WAITING are left to it:
+# those that wait for a node or a PE that will not come, whose wait's notice must
+# name what is missing before then - after 30 s in a job, after
+# OSOE_TEST_NOTICE_SECONDS here - since no wait gives up because time has passed
+# (§3.15). Every other rank ends by itself with a failure status, and each PATTERN
+# is written before the timeout. WAITING 0 is a refusal that ends the whole job.
+#
+#   osoe_refusal_test(NAME RANKS WAITING [SECONDS S] [ENV NAME=VALUE...]
+#                     [LAUNCH LAUNCHER-ARGS...] [PATTERNS PATTERN...]
+#                     PROGRAM WORDS...)
+function(osoe_refusal_test name ranks waiting)
+  cmake_parse_arguments(PARSE_ARGV 3 refusal "" "SECONDS" "ENV;LAUNCH;PATTERNS;PROGRAM")
+  if(NOT refusal_SECONDS)
+    set(refusal_SECONDS 8)
+  endif()
+  add_test(NAME ${name}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_NOTICE_SECONDS=2 ${refusal_ENV}
+            sh ${CMAKE_CURRENT_SOURCE_DIR}/refusal.sh $<TARGET_FILE:osoe-launch>
+            ${ranks} ${waiting} ${refusal_PATTERNS}
+            -- ${refusal_LAUNCH} -t ${refusal_SECONDS} -- ${refusal_PROGRAM})
+  math(EXPR refusal_budget "${refusal_SECONDS} + 30")
+  set_tests_properties(${name} PROPERTIES LABELS "tier2" TIMEOUT ${refusal_budget}
+    PASS_REGULAR_EXPRESSION "REFUSAL OK")
+endfunction()
+
+# What the notice of a lead that dials its parent says went wrong, which is
+# "Connection refused" when the parent has ended and nothing listens on its
+# candidate ports - unless something does: another job's lead of this machine,
+# which tests running beside each other make likely enough to see (one run in a
+# hundred), and whose answer is "not this node", or a listener that does not
+# answer. Nothing else will do: the error must be the dial's, not "not tried yet".
+set(osoe_dial_error
+    "(Connection refused|no answer to the hello on a candidate port|its candidate ports answered for another node or job)")
+
 # The values every node must agree on are checked up the rendezvous tree, each
 # by the parent that sees the disagreement, naming both nodes (§6.2). Node 2's
-# parent is node 0 at the tree's fan-out of 8.
-add_test(NAME shmem.job.disagree.symmetric-size
-  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 2:SHMEM_SYMMETRIC_SIZE=64M --
-          $<TARGET_FILE:shmem_test_job>)
-add_test(NAME shmem.job.disagree.fanout
-  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 2:OSOE_COLLECTIVE_FANOUT=2 --
-          $<TARGET_FILE:shmem_test_job>)
-set_tests_properties(shmem.job.disagree.symmetric-size shmem.job.disagree.fanout
-  PROPERTIES LABELS "tier2" TIMEOUT 60)
-set_tests_properties(shmem.job.disagree.symmetric-size PROPERTIES PASS_REGULAR_EXPRESSION
-  "node 2 [(]or a node below it[)] has SHMEM_SYMMETRIC_SIZE [0-9]+; node 0 has")
-set_tests_properties(shmem.job.disagree.fanout PROPERTIES PASS_REGULAR_EXPRESSION
-  "node 2 [(]or a node below it[)] has OSOE_COLLECTIVE_FANOUT=2; node 0 has 4")
+# parent is node 0 at the tree's fan-out of 8. The root that refuses ends, and
+# its callers see their connection close: each of them ends, naming the lead it
+# lost.
+osoe_refusal_test(shmem.job.disagree.symmetric-size 3 0
+  LAUNCH -n 3 -m 0,1,2 -e 2:SHMEM_SYMMETRIC_SIZE=64M
+  PATTERNS "node 2 [(]or a node below it[)] has SHMEM_SYMMETRIC_SIZE [0-9]+; node 0 has"
+           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+           "node 2: the rendezvous lost node 0, its parent in the rendezvous tree"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
+osoe_refusal_test(shmem.job.disagree.fanout 3 0
+  LAUNCH -n 3 -m 0,1,2 -e 2:OSOE_COLLECTIVE_FANOUT=2
+  PATTERNS "node 2 [(]or a node below it[)] has OSOE_COLLECTIVE_FANOUT=2; node 0 has 4"
+           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+           "node 2: the rendezvous lost node 0, its parent in the rendezvous tree"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
 
 # OSOE_MAX_TEAMS is agreed the same way (§5.7): team numbers are job-wide, and
 # a node counting to another number lays its team state out differently. Two
 # nodes, the second's lead given 128 teams to the first's default 64.
-add_test(NAME shmem.job.disagree.max-teams
-  COMMAND osoe-launch -n 2 -m 0,1 -t 30 -e 1:OSOE_MAX_TEAMS=128 --
-          $<TARGET_FILE:shmem_test_job>)
-set_tests_properties(shmem.job.disagree.max-teams PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=128; node 0 has 64")
+osoe_refusal_test(shmem.job.disagree.max-teams 2 0
+  LAUNCH -n 2 -m 0,1 -e 1:OSOE_MAX_TEAMS=128
+  PATTERNS "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=128; node 0 has 64"
+           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
 
 # Between the PEs of one node too: the lead sizes the team blocks, the rows of
 # published epochs and the internal regions by its count, and a PE with
 # another would index them by its own (node.c). A real program, since it is the
-# node's rendezvous and not the job's that sees it.
-add_test(NAME shmem.max-teams.local-disagree
-  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_MAX_TEAMS=128 -- $<TARGET_FILE:shmem_test_rma>)
-set_tests_properties(shmem.max-teams.local-disagree PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS differs between PEs: the local lead has 64, this PE has 128")
+# node's rendezvous and not the job's that sees it. The PE that finds the
+# difference names it and the lead, which has only the node's segment to hear it
+# through, ends with "another local PE failed".
+osoe_refusal_test(shmem.max-teams.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_MAX_TEAMS=128
+  PATTERNS "osoe: PE 1: OSOE_MAX_TEAMS differs between PEs: the local lead has 64, this PE has 128"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
 # And the lead's count the larger, whose segment then has room for more than
 # the member counts on: refused the same way.
-add_test(NAME shmem.max-teams.local-disagree.lead
-  COMMAND osoe-launch -n 2 -t 30 -e 0:OSOE_MAX_TEAMS=128 -- $<TARGET_FILE:shmem_test_rma>)
-set_tests_properties(shmem.max-teams.local-disagree.lead PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS differs between PEs: the local lead has 128, this PE has 64")
+osoe_refusal_test(shmem.max-teams.local-disagree.lead 2 0
+  LAUNCH -n 2 -e 0:OSOE_MAX_TEAMS=128
+  PATTERNS "osoe: PE 1: OSOE_MAX_TEAMS differs between PEs: the local lead has 128, this PE has 64"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
 # And outside its range, or not a number, it is refused by name at init: at
 # least one team beyond the three predefined, and at most 1,024.
@@ -373,12 +417,11 @@ endforeach()
 # place them in the internal region, so a node with another number puts a piece
 # where its parent keeps another. Two nodes, the second's lead given 4 to the
 # first's default 2; and outside 1 to 8, or not a number, refused at init.
-add_test(NAME shmem.job.disagree.pipeline
-  COMMAND osoe-launch -n 2 -m 0,1 -t 30 -e 1:OSOE_COLLECTIVE_PIPELINE=4 --
-          $<TARGET_FILE:shmem_test_job>)
-set_tests_properties(shmem.job.disagree.pipeline PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION
-  "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=4; node 0 has 2")
+osoe_refusal_test(shmem.job.disagree.pipeline 2 0
+  LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_PIPELINE=4
+  PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=4; node 0 has 2"
+           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
 foreach(value 0 9 x)
   add_test(NAME shmem.collective-pipeline.invalid.${value}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${value}
@@ -391,16 +434,16 @@ endforeach()
 # they size every PE's internal region, and a created team's local lead may be
 # any PE of the node, building its tree and keeping its window by its own
 # (node.c, open_control).
-add_test(NAME shmem.collective-fanout.local-disagree
-  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_COLLECTIVE_FANOUT=2 -- $<TARGET_FILE:shmem_test_rma>)
-set_tests_properties(shmem.collective-fanout.local-disagree PROPERTIES LABELS "tier2"
-  TIMEOUT 60 PASS_REGULAR_EXPRESSION
-  "OSOE_COLLECTIVE_FANOUT differs between PEs: the local lead has 4, this PE has 2")
-add_test(NAME shmem.collective-pipeline.local-disagree
-  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_COLLECTIVE_PIPELINE=4 -- $<TARGET_FILE:shmem_test_rma>)
-set_tests_properties(shmem.collective-pipeline.local-disagree PROPERTIES LABELS "tier2"
-  TIMEOUT 60 PASS_REGULAR_EXPRESSION
-  "OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 2, this PE has 4")
+osoe_refusal_test(shmem.collective-fanout.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_FANOUT=2
+  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_FANOUT differs between PEs: the local lead has 4, this PE has 2"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
+osoe_refusal_test(shmem.collective-pipeline.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_PIPELINE=4
+  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 2, this PE has 4"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
 # The node count is the value that shapes the waits: a lead expects children by
 # its own count, so one given too many waits for children that do not exist.
@@ -408,18 +451,37 @@ set_tests_properties(shmem.collective-pipeline.local-disagree PROPERTIES LABELS 
 # its children, so the first edge that disagrees refuses the job, rather than
 # every lead waiting with no message (tools/modelcheck/rendezvous_model.py).
 # Node 1 given 10 nodes expects a child 9; node 0 given 9 expects 1 to 8.
-add_test(NAME shmem.job.disagree.node-count
-  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 1:OSOE_STEP_NUM_NODES=10
-          -e 1:OSOE_STEP_NODELIST=127.0.0.[1-10] -- $<TARGET_FILE:shmem_test_job>)
-add_test(NAME shmem.job.disagree.root-node-count
-  COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 0:OSOE_STEP_NUM_NODES=9
-          -e 0:OSOE_STEP_NODELIST=127.0.0.[1-9] -- $<TARGET_FILE:shmem_test_job>)
-set_tests_properties(shmem.job.disagree.node-count shmem.job.disagree.root-node-count
-  PROPERTIES LABELS "tier2" TIMEOUT 60)
-set_tests_properties(shmem.job.disagree.node-count PROPERTIES PASS_REGULAR_EXPRESSION
-  "node 0, launched for 3 tasks on 3 nodes, was called by node 1, launched for 3 tasks on 10 nodes")
-set_tests_properties(shmem.job.disagree.root-node-count PROPERTIES PASS_REGULAR_EXPRESSION
-  "node 0, launched for 3 tasks on 9 nodes, was called by node [12], launched for 3 tasks on 3 nodes")
+#
+# Without a secret nothing a caller says can be proved, so a lead judges a hello
+# as it arrives and ends at the first whose counts differ, before it has answered
+# it. Its caller is left with a closed connection and then with a port nobody
+# holds, and retries; its notice says what it sees - the node it calls, the host
+# list's entry for it, the address dialled, "Connection refused" (the round-three
+# review's N1: nothing was said at all). With a secret the lead answers first, and
+# the callers it answered end: see below. Node 2's hello is a good one, and node 2
+# ends if the lead answered it before it read node 1's, or else is one more node
+# retrying against a closed port. Which comes first is not the test's to choose,
+# so it requires either of node 2, and node 1 to wait.
+osoe_refusal_test(shmem.job.disagree.node-count 3 1-2
+  LAUNCH -n 3 -m 0,1,2 -e 1:OSOE_STEP_NUM_NODES=10 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-10]"
+  PATTERNS "node 0, launched for 3 tasks on 3 nodes, was called by node 1, launched for 3 tasks on 10 nodes"
+           "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+           "node 2: the rendezvous lost node 0, its parent in the rendezvous tree|osoe_notice: shmem_init on node 2 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
+# The same with one caller: node 1 is a leaf in either view, and has nothing to
+# wait for but the lead it called, which ended on its hello and left it
+# the refused connection to retry.
+osoe_refusal_test(shmem.job.disagree.leaf-node-count 2 1
+  LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NUM_NODES=3 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-3]"
+  PATTERNS "node 0, launched for 2 tasks on 2 nodes, was called by node 1, launched for 2 tasks on 3 nodes"
+           "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
+osoe_refusal_test(shmem.job.disagree.root-node-count 3 2
+  LAUNCH -n 3 -m 0,1,2 -e 0:OSOE_STEP_NUM_NODES=9 -e "0:OSOE_STEP_NODELIST=127.0.0.[1-9]"
+  PATTERNS "node 0, launched for 3 tasks on 9 nodes, was called by node [12], launched for 3 tasks on 3 nodes"
+           "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+           "osoe_notice: shmem_init on node 2 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
 
 # OSOE_JOB_SECRET (§6.2, §10): leads that share it meet; a lead that has none,
 # or a different one, is refused by name - by the proof in the hello, which a
@@ -428,21 +490,220 @@ set(osoe_secret 0123456789abcdef0123456789abcdef)
 add_test(NAME shmem.job.secret
   COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
           $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 30 -- $<TARGET_FILE:shmem_test_job>)
-add_test(NAME shmem.job.secret.missing
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
-          $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 -e 1:OSOE_JOB_SECRET= --
-          $<TARGET_FILE:shmem_test_job>)
-add_test(NAME shmem.job.secret.different
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
-          $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30
-          -e 1:OSOE_JOB_SECRET=fedcba9876543210fedcba9876543210 --
-          $<TARGET_FILE:shmem_test_job>)
-set_tests_properties(shmem.job.secret shmem.job.secret.missing shmem.job.secret.different
-  PROPERTIES LABELS "tier2" TIMEOUT 60)
-set_tests_properties(shmem.job.secret.missing PROPERTIES
-  PASS_REGULAR_EXPRESSION "node 0 has an OSOE_JOB_SECRET and node 1 has none")
-set_tests_properties(shmem.job.secret.different PROPERTIES
-  PASS_REGULAR_EXPRESSION "a proof of a different OSOE_JOB_SECRET")
+set_tests_properties(shmem.job.secret PROPERTIES LABELS "tier2" TIMEOUT 60)
+# A caller that finds the lead's answer is not one it can accept - a secret on
+# one side only, or two - ends by itself naming it, before it confirms. The lead
+# it called has not counted it and waits for it still: its notice names the node
+# and the port it waits on.
+osoe_refusal_test(shmem.job.secret.missing 2 1
+  ENV OSOE_JOB_SECRET=${osoe_secret}
+  LAUNCH -n 2 -m 0,1 -e 1:OSOE_JOB_SECRET=
+  PATTERNS "node 0 has an OSOE_JOB_SECRET and node 1 has none"
+           "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
+osoe_refusal_test(shmem.job.secret.different 2 1
+  ENV OSOE_JOB_SECRET=${osoe_secret}
+  LAUNCH -n 2 -m 0,1 -e 1:OSOE_JOB_SECRET=fedcba9876543210fedcba9876543210
+  PATTERNS "a proof of a different OSOE_JOB_SECRET"
+           "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
+
+# A genuine mislaunch with a secret. The lead judges a hello's counts and claims
+# only once its caller has proved the secret (listener.h), so that a host that
+# does not know it cannot end a node's start-up with one hello (the round-three
+# review's N2); it answers, then, and refuses its caller by name afterwards. A
+# caller that sees its connection close ends, naming the lead it lost, where
+# without a secret it retried a refused connection for ever
+# (shmem.job.disagree.leaf-node-count). Two nodes, so that one caller is in
+# question and the order of two is not: node 0 given 3 nodes, and in the next
+# test node 1, a leaf in either view, given 3. In both the lead names both counts
+# and node 1 ends.
+osoe_refusal_test(shmem.job.secret.disagree.root-node-count 2 0
+  ENV OSOE_JOB_SECRET=${osoe_secret}
+  LAUNCH -n 2 -m 0,1 -e 0:OSOE_STEP_NUM_NODES=3 -e "0:OSOE_STEP_NODELIST=127.0.0.[1-3]"
+  PATTERNS "node 0, launched for 2 tasks on 3 nodes, was called by node 1, launched for 2 tasks on 2 nodes"
+           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
+osoe_refusal_test(shmem.job.secret.disagree.leaf-node-count 2 0
+  ENV OSOE_JOB_SECRET=${osoe_secret}
+  LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NUM_NODES=3 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-3]"
+  PATTERNS "node 0, launched for 2 tasks on 2 nodes, was called by node 1, launched for 2 tasks on 3 nodes"
+           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
+# Node 1 given 10 nodes is a lead of children in its own view, and waits for the
+# first of them, node 9, before it reads anything from the lead it called. The
+# lead ends naming both counts, and node 1 is left waiting for a node that its
+# real job does not have, which its notice names: as ever, a lead given too large
+# a count waits for children that do not exist (rendezvous.c).
+osoe_refusal_test(shmem.job.secret.disagree.node-count 2 1
+  ENV OSOE_JOB_SECRET=${osoe_secret}
+  LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NUM_NODES=10 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-10]"
+  PATTERNS "node 0, launched for 2 tasks on 2 nodes, was called by node 1, launched for 2 tasks on 10 nodes"
+           "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 9, its child in the rendezvous tree, to call it on port [0-9]+"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
+
+# A start-up that goes wrong before the node has joined (the round-three
+# review's R8; §6.2). Every PE checks every setting before its node joins, so a
+# bad value given to all of them is refused by each, and one PE's difference from
+# its lead is named by it and ends the node; the PE that refuses its own
+# environment, which has no segment to say so in, tells its node by a tombstone
+# (the lead) or in the lead's segment (any other); and what cannot be told - a PE
+# that never calls shmem_init - is named by the notice of whoever waits. See
+# refusal.sh; node.c, osoe_node_refusal_arm.
+#
+# OSOE_MAX_THREADS: 0 is refused by every PE, and 8 against the lead's 16 by the
+# PE that has it - which names the difference - and ends the node.
+osoe_refusal_test(shmem.start-up.max-threads.zero 2 0
+  ENV OSOE_MAX_THREADS=0
+  LAUNCH -n 2
+  PATTERNS "osoe: PE 0: OSOE_MAX_THREADS='0' is not a number of threads from 1 to [0-9]+"
+           "osoe: PE 1: OSOE_MAX_THREADS='0' is not a number of threads from 1 to [0-9]+"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+osoe_refusal_test(shmem.start-up.max-threads.differs 3 0
+  LAUNCH -n 3 -e 2:OSOE_MAX_THREADS=8
+  PATTERNS "osoe: PE 2: OSOE_MAX_THREADS differs between PEs: the local lead has [0-9]+, this PE has 8"
+           "osoe: PE 0: another local PE failed during rendezvous"
+           "osoe: PE 1: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+
+# The landing zone's size likewise, and a size that is not whole extents is
+# refused by each PE, where only the lead's layout of it once was.
+osoe_refusal_test(shmem.start-up.landing-bytes.differs 2 0
+  LAUNCH -n 2 -e 1:OSOE_GET_LANDING_BYTES=8192
+  PATTERNS "osoe: PE 1: OSOE_GET_LANDING_BYTES differs between PEs: the local lead has [0-9]+, this PE has 8192"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+osoe_refusal_test(shmem.start-up.landing-bytes.partial-extent 2 0
+  ENV OSOE_GET_LANDING_BYTES=2000
+  LAUNCH -n 2
+  PATTERNS "osoe: PE 0: OSOE_GET_LANDING_BYTES=2000 is not a multiple of the landing zone's [0-9]+-byte extents"
+           "osoe: PE 1: OSOE_GET_LANDING_BYTES=2000 is not a multiple of the landing zone's [0-9]+-byte extents"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+
+# The AM layer's settings and the wire's, which a lead alone read before: the lead
+# when it laid out the segment, and the wire's after the rendezvous and on a job
+# of several nodes only, so that a job of one node accepted OSOE_WIRE_BYTES=abc
+# without a word. Each PE refuses its own.
+foreach(case_expect
+    "am-chunk|OSOE_AM_CHUNK|abc|OSOE_AM_CHUNK='abc' is not a decimal byte count"
+    "am-buffer|OSOE_AM_BUFFER|abc|OSOE_AM_BUFFER='abc' is not a decimal byte count"
+    "am-buffer-budget|OSOE_AM_BUFFER_BUDGET|abc|OSOE_AM_BUFFER_BUDGET='abc' is not a decimal byte count"
+    "am-credits|OSOE_AM_CREDITS|abc|OSOE_AM_CREDITS='abc' is not between [0-9]+ and [0-9]+"
+    "am-hugepages|OSOE_AM_HUGEPAGES|2|OSOE_AM_HUGEPAGES='2' is not 0 or 1"
+    "landing-bytes|OSOE_GET_LANDING_BYTES|abc|OSOE_GET_LANDING_BYTES='abc' is not a decimal byte count"
+    "wire-bytes|OSOE_WIRE_BYTES|abc|OSOE_WIRE_BYTES='abc' is not a byte count between 64 and 1048576")
+  string(REPLACE "|" ";" parts "${case_expect}")
+  list(GET parts 0 label)
+  list(GET parts 1 variable)
+  list(GET parts 2 value)
+  list(GET parts 3 expect)
+  osoe_refusal_test(shmem.start-up.${label}.invalid 2 0
+    ENV ${variable}=${value}
+    LAUNCH -n 2
+    PATTERNS "osoe: PE 0: ${expect}" "osoe: PE 1: ${expect}"
+    PROGRAM $<TARGET_FILE:shmem_test_init>)
+endforeach()
+
+# A non-lead whose OSOE_AM_BUFFER made a larger connection area than its lead's
+# once waited for ever for the object to grow, which the lead sizes in one step.
+# It refuses at once, by name, and the job ends: the other PE of its node by the
+# node's abort, and the PEs of the other node as the lead they wait for ends.
+osoe_refusal_test(shmem.start-up.am-buffer.differs 4 0
+  LAUNCH -n 4 -m 0,0,1,1 -e 1:OSOE_AM_BUFFER=262144
+  PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 is [0-9]+ bytes, as the local lead's OSOE_AM_[*] settings made it; this PE's make it [0-9]+: every PE of a job must set OSOE_AM_[*] the same"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+# And the lead's the larger: the object is whole before the PE looks, and its
+# header says what it was made with.
+osoe_refusal_test(shmem.start-up.am-buffer.lead-larger 4 0
+  LAUNCH -n 4 -m 0,0,1,1 -e 0:OSOE_AM_BUFFER=262144
+  PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 was created with different AM sizing [(]buffer 262144 chunk [0-9]+ nodes 2, not [0-9]+/[0-9]+/2[)]: every PE of a job must set OSOE_AM_[*] the same"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+
+# A PE whose own environment is bad refuses it before its node has joined, and
+# its node-mates end with "another local PE failed" instead of waiting for it:
+# a non-lead tells the lead's segment, and a lead - which has no segment yet -
+# leaves a tombstone for the others to find.
+# A start-up that ends in milliseconds says nothing of waiting: a notice is due
+# only once a wait has lasted (the second pattern of each, with the hook at 5 s so
+# that a machine that stalls for 2 does not make one due).
+osoe_refusal_test(shmem.start-up.own-environment.non-lead 3 0
+  ENV OSOE_TEST_NOTICE_SECONDS=5
+  LAUNCH -n 3 -e 2:SHMEM_SYMMETRIC_SIZE=abc
+  PATTERNS "osoe: PE 2: SHMEM_SYMMETRIC_SIZE='abc' is invalid"
+           "!has waited [0-9]+ s"
+           "osoe: PE 0: another local PE failed during rendezvous"
+           "osoe: PE 1: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+osoe_refusal_test(shmem.start-up.own-environment.lead 3 0
+  ENV OSOE_TEST_NOTICE_SECONDS=5
+  LAUNCH -n 3 -e 0:SHMEM_SYMMETRIC_SIZE=abc
+  PATTERNS "osoe: PE 0: SHMEM_SYMMETRIC_SIZE='abc' is invalid"
+           "!has waited [0-9]+ s"
+           "osoe: PE 1: another local PE failed during rendezvous"
+           "osoe: PE 2: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+
+# A PE that cannot read its own identity - its job, step, node or local id - has
+# no segment to tell and no node to tell it to: it ends, and the notice of the
+# PEs that wait for it names it as it names one that never came (below).
+osoe_refusal_test(shmem.start-up.own-identity.non-lead 2 1
+  LAUNCH -n 2 -e 1:OSOE_LOCALID=x
+  PATTERNS "osoe: PE 1: OSOE_LOCALID='x' is not a decimal number"
+           "osoe: PE 0: shmem_init on node 0 has waited [0-9]+ s for local PEs to join the node [(]call shmem_init[)]: 1 of 2 have; still waiting for local id 1 [(]rank 1[)]"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+osoe_refusal_test(shmem.start-up.own-identity.lead 3 2
+  LAUNCH -n 3 -e 0:OSOE_LOCALID=x
+  PATTERNS "osoe: PE 0: OSOE_LOCALID='x' is not a decimal number"
+           "osoe: PE 1: shmem_init on node 0 has waited [0-9]+ s for the local lead, rank 0, to create the node's control segment /osoe[.][0-9]+[.]0[.]0[.]0, which does not exist yet"
+           "!osoe: PE 2: shmem_init on node"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+
+# A PE that exits before shmem_init runs no library code and tells nobody. The
+# node's other PEs wait for it - no wait gives up - and the notice of the wait
+# says who: the lead names the local PEs that have not joined, by local id and
+# rank, and says it again after twice the interval (the second pattern: a notice
+# that came after 5 s of a wait whose first came at 2); and while the lead has
+# made no segment to speak through, local id 1 names the lead, once for the node,
+# not once a PE.
+osoe_refusal_test(shmem.start-up.never-calls-init.non-lead 3 2
+  SECONDS 10
+  LAUNCH -n 3
+  PATTERNS "osoe: PE 0: shmem_init on node 0 has waited [0-9]+ s for local PEs to join the node [(]call shmem_init[)]: 2 of 3 have; still waiting for local id 2 [(]rank 2[)]"
+           "osoe: PE 0: shmem_init on node 0 has waited ([5-9]|1[0-9]) s for local PEs to join the node"
+  PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/exit-before-init.sh 2 $<TARGET_FILE:shmem_test_init>)
+# Unless the job asks for it - OSOE_NO_PROGRESS_TIMEOUT, which is never by default -
+# when the node ends by itself, naming the same. The lead and the PE that has
+# joined wait alike, and the one whose limit comes first says it; the other ends
+# with that or with "another local PE failed", whichever it sees first.
+osoe_refusal_test(shmem.start-up.never-calls-init.no-progress-timeout 3 0
+  ENV OSOE_NO_PROGRESS_TIMEOUT=3
+  LAUNCH -n 3
+  PATTERNS "osoe: PE [01]: no local PE has joined for OSOE_NO_PROGRESS_TIMEOUT seconds; missing local ids: 2 [(]rank 2[)]"
+  PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/exit-before-init.sh 2 $<TARGET_FILE:shmem_test_init>)
+osoe_refusal_test(shmem.start-up.never-calls-init.lead 3 2
+  LAUNCH -n 3
+  PATTERNS "osoe: PE 1: shmem_init on node 0 has waited [0-9]+ s for the local lead, rank 0, to create the node's control segment /osoe[.][0-9]+[.]0[.]0[.]0, which does not exist yet"
+           "!osoe: PE 2: shmem_init on node"
+  PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/exit-before-init.sh 0 $<TARGET_FILE:shmem_test_init>)
+
+# A node that refuses leaves the other nodes waiting for it (a refusing node
+# telling its neighbours is not done), and the lead of each says for whom: here
+# the PEs of node 1 end naming the difference between them, or the lead's own
+# environment, and node 0's lead names node 1, the port it waits on and that
+# nothing has called it. Node 0's other PE waits for its lead, which says nothing
+# for the node twice. Both PEs of node 1 compare their sizes, and the one that
+# is told the other has failed first ends with that instead.
+osoe_refusal_test(shmem.start-up.node-refuses.size-mismatch 4 2
+  LAUNCH -n 4 -m 0,0,1,1 -e 3:SHMEM_SYMMETRIC_SIZE=64M
+  PATTERNS "osoe: PE [23]: SHMEM_SYMMETRIC_SIZE differs between PEs"
+           "osoe: PE 0: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+osoe_refusal_test(shmem.start-up.node-refuses.own-environment-lead 4 2
+  LAUNCH -n 4 -m 0,0,1,1 -e 2:SHMEM_SYMMETRIC_SIZE=abc
+  PATTERNS "osoe: PE 2: SHMEM_SYMMETRIC_SIZE='abc' is invalid"
+           "osoe: PE 3: another local PE failed during rendezvous"
+           "osoe: PE 0: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
 
 # The library against its floor (§1, §8.4): in each of seven pairs, 8-byte
 # io_uring round trips on a raw connection between the job's two processes
@@ -1132,6 +1393,16 @@ add_test(NAME shmem.dev-shm-capacity.connections
 add_test(NAME shmem.dev-shm-capacity.warned
   COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
           $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> warned)
+# And the node's PEs end with it. The lead checks the room once its control
+# segment exists, so that the refusal has the segment's `failed` word to go
+# through: checked before, its node-mates waited for a segment that never came
+# (the round-three review's R8). Run with -k, so that the launcher ends none of
+# them for it.
+add_test(NAME shmem.dev-shm-capacity.node-ends
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> node-ends)
+set_tests_properties(shmem.dev-shm-capacity.node-ends PROPERTIES
+  LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "REFUSAL OK")
 set_tests_properties(shmem.dev-shm-capacity.heaps shmem.dev-shm-capacity.connections
   shmem.dev-shm-capacity.warned PROPERTIES LABELS "tier2" TIMEOUT 60)
 set_tests_properties(shmem.dev-shm-capacity.warned PROPERTIES PASS_REGULAR_EXPRESSION
@@ -1962,10 +2233,11 @@ foreach(pair
   set_tests_properties(shmem.context.misuse.${which} PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "${expression}")
 endforeach()
-add_test(NAME shmem.max-contexts.local-disagree
-  COMMAND osoe-launch -n 2 -t 30 -e 1:OSOE_MAX_CONTEXTS=128 -- $<TARGET_FILE:shmem_test_rma>)
-set_tests_properties(shmem.max-contexts.local-disagree PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "OSOE_MAX_CONTEXTS differs between PEs: the local lead has 64, this PE has 128")
+osoe_refusal_test(shmem.max-contexts.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_MAX_CONTEXTS=128
+  PATTERNS "osoe: PE 1: OSOE_MAX_CONTEXTS differs between PEs: the local lead has 64, this PE has 128"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
 foreach(value 0 4097 x)
   add_test(NAME shmem.max-contexts.invalid.${value}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_CONTEXTS=${value}
@@ -2264,25 +2536,28 @@ set_tests_properties(shmem.refuse.slurm_not_a_step PROPERTIES
   PASS_REGULAR_EXPRESSION "inside Slurm job 4242 but not in a step of it")
 # A multi-node job is no longer refused; shmem.multinode.* is what it does
 # instead, and shmem.init.* still covers the one-node case.
-add_test(NAME shmem.refuse.bad_size
-  COMMAND osoe-launch -n 2 -t 60 -e 0:SHMEM_SYMMETRIC_SIZE=12q -e 1:SHMEM_SYMMETRIC_SIZE=12q
-          -- $<TARGET_FILE:shmem_test_init>)
-set_tests_properties(shmem.refuse.bad_size PROPERTIES
-  PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE='12q' is invalid")
-add_test(NAME shmem.refuse.size_mismatch
-  COMMAND osoe-launch -n 3 -t 60 -e 2:SHMEM_SYMMETRIC_SIZE=2m
-          -- $<TARGET_FILE:shmem_test_init>)
-set_tests_properties(shmem.refuse.size_mismatch PROPERTIES
-  PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE differs between PEs")
+# Run with -k (refusal.sh): every PE ends by itself - here each refuses the
+# size it was given - or the node's PEs would wait for the one that failed.
+osoe_refusal_test(shmem.refuse.bad_size 2 0
+  LAUNCH -n 2 -e 0:SHMEM_SYMMETRIC_SIZE=12q -e 1:SHMEM_SYMMETRIC_SIZE=12q
+  PATTERNS "osoe: PE 0: SHMEM_SYMMETRIC_SIZE='12q' is invalid"
+           "osoe: PE 1: SHMEM_SYMMETRIC_SIZE='12q' is invalid"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+# The PEs compare their sizes, and each that finds a difference says so; one
+# that is already told another failed ends with that instead.
+osoe_refusal_test(shmem.refuse.size_mismatch 3 0
+  LAUNCH -n 3 -e 2:SHMEM_SYMMETRIC_SIZE=2m
+  PATTERNS "osoe: PE [012]: SHMEM_SYMMETRIC_SIZE differs between PEs"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
 # The deprecated SMA_ spelling (spec §8, Annex F) must be honoured the same
 # way, down to the same validation (conformance review F3): before F3's fix,
 # bootstrap.c read SHMEM_SYMMETRIC_SIZE only and SMA_SYMMETRIC_SIZE=12q was
 # silently ignored, so this job would have run instead of refusing.
-add_test(NAME shmem.refuse.bad_size_sma
-  COMMAND osoe-launch -n 2 -t 60 -e 0:SMA_SYMMETRIC_SIZE=12q -e 1:SMA_SYMMETRIC_SIZE=12q
-          -- $<TARGET_FILE:shmem_test_init>)
-set_tests_properties(shmem.refuse.bad_size_sma PROPERTIES
-  PASS_REGULAR_EXPRESSION "SHMEM_SYMMETRIC_SIZE='12q' is invalid")
+osoe_refusal_test(shmem.refuse.bad_size_sma 2 0
+  LAUNCH -n 2 -e 0:SMA_SYMMETRIC_SIZE=12q -e 1:SMA_SYMMETRIC_SIZE=12q
+  PATTERNS "osoe: PE 0: SHMEM_SYMMETRIC_SIZE='12q' is invalid"
+           "osoe: PE 1: SHMEM_SYMMETRIC_SIZE='12q' is invalid"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
 # A zero heap is syntactically valid and never useful (conformance review F9 /
 # omissions 11): every shmem_malloc would fail on every PE.
 add_test(NAME shmem.refuse.zero_size
@@ -2330,8 +2605,7 @@ set_tests_properties(shmem.refuse.nonsymmetric_put PROPERTIES
   PASS_REGULAR_EXPRESSION
   "shmem_putmem: .* is not within the symmetric heap, and this program was not linked with oshcc")
 set_tests_properties(shmem.refuse.no_launcher shmem.refuse.slurm_not_a_step
-  shmem.refuse.bad_size shmem.refuse.bad_size_sma shmem.refuse.zero_size
-  shmem.refuse.size_mismatch shmem.refuse.nonsymmetric_put PROPERTIES
+  shmem.refuse.zero_size shmem.refuse.nonsymmetric_put PROPERTIES
   LABELS "tier2" TIMEOUT 90)
 
 # A call before shmem_init, or after the last shmem_finalize, must be a named

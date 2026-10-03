@@ -3,7 +3,7 @@
 # A job that asks for more /dev/shm than there is is refused at init, by name,
 # instead of dying of SIGBUS later (§6.2; review round two, omissions 5).
 #
-#   dev-shm-capacity.sh LAUNCHER PROGRAM heaps|connections|warned
+#   dev-shm-capacity.sh LAUNCHER PROGRAM heaps|connections|warned|node-ends
 #
 # Sizes the request from what is free now, so it exceeds this machine's
 # /dev/shm whatever that is:
@@ -15,6 +15,13 @@
 #   warned       heaps, with OSOE_SHM_CAPACITY_CHECK=0: the shortfall is
 #                reported and the job runs, since it touches almost none of
 #                the heap it asked for.
+#   node-ends    heaps, and both PEs must end by themselves: the lead naming
+#                the shortfall, the other "another local PE failed during
+#                rendezvous", neither killed by the launcher (-k, refusal.sh).
+#                The lead checks the room once the control segment exists, so
+#                that there is a `failed` word to refuse through; checked
+#                before, its node-mate waited for a segment that never came.
+#                The segment's name stays, failed, as any failed job's does.
 set -u
 LAUNCHER=$1 PROGRAM=$2 MODE=$3
 free=$(df --output=avail -B1 /dev/shm | tail -1 | tr -d ' ')
@@ -31,6 +38,14 @@ heaps)
 warned)
     OSOE_SHM_CAPACITY_CHECK=0 "$LAUNCHER" -n 2 -t 30 -e 0:SHMEM_SYMMETRIC_SIZE=$free \
         -e 1:SHMEM_SYMMETRIC_SIZE=$free -- "$PROGRAM"
+    ;;
+node-ends)
+    exec sh "$(dirname "$0")/refusal.sh" "$LAUNCHER" 2 0 \
+        "osoe: PE 0: /dev/shm has [0-9]+ MiB free, but this node's control segment and 2 heaps" \
+        "osoe: PE 1: another local PE failed during rendezvous" \
+        "osoe-launch: left behind: /dev/shm/osoe[.][0-9]+[.]0[.]0[.]0\$" \
+        -- -n 2 -t 8 -e 0:SHMEM_SYMMETRIC_SIZE=$free -e 1:SHMEM_SYMMETRIC_SIZE=$free \
+        -- "$PROGRAM"
     ;;
 connections)
     gib=1073741824

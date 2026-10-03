@@ -207,14 +207,21 @@ int main(void)
 }
 
 /* The library's notice (fatal.h), which the listener's waits print once they
- * have lasted (base/stall-watch.h): here, to stderr as it is. */
+ * have lasted (base/stall-watch.h): to stderr, one write(2) as the library's is,
+ * so that the notices of two leads that wait at once do not run into one line -
+ * shmem.job.disagree.root-node-count has two, and refusal.sh reads them. */
 void osoe_notice(const char *fmt, ...);
 void osoe_notice(const char *fmt, ...)
 {
+    char msg[512];
+    int n = snprintf(msg, sizeof msg, "osoe_notice: ");
     va_list ap;
     va_start(ap, fmt);
-    fprintf(stderr, "osoe_notice: ");
-    vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n");
+    n += vsnprintf(msg + n, sizeof msg - (size_t)n - 1, fmt, ap);
     va_end(ap);
+    if (n > (int)sizeof msg - 2)
+        n = (int)sizeof msg - 2;
+    msg[n++] = '\n';
+    ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n);
+    (void)ignored;
 }
