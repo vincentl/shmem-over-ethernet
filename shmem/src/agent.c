@@ -16,6 +16,8 @@
 #include "base/deadline.h"
 #include "base/environment.h"
 #include "base/futex.h"
+#include "base/stall-watch.h"
+#include "base/sweep.h"
 #include "blocked.h"
 #include "deadlock.h"
 #include "fatal.h"
@@ -292,14 +294,38 @@ void osoe_agent_start(struct osoe_pe_slot *slot)
         osoe_fatal("cannot start the agent thread: %s", strerror(r));
     atomic_store_explicit(&running, 1, memory_order_release);
 
-    /* Wait for it to be in the metric table before anyone can look (above). */
-    struct osoe_deadline until = osoe_deadline_in(OSOE_SWEEP_NS * 100);
+    /* Wait for it to be in the metric table before anyone can look (above).
+     * Nothing on its way there waits for anything, so this ends once the
+     * thread runs, and has no bound: no wait gives up because time has passed
+     * (§3.15). It had one, 10 s, which on a machine too loaded to run a new
+     * thread in that time would have ended the job (the README's check of
+     * 2026-10-03). A start-up wait like the others (Part 6's adversarial
+     * reads): it sweeps for the abort word - the local PEs' liveness being the
+     * agent's from here, since `running` says it runs (sweep.c) - ends at
+     * OSOE_NO_PROGRESS_TIMEOUT where that is set, and on the node's lead, whose
+     * agent its node-mates wait for in turn (init.c), says what it waits for
+     * once it has lasted 30 s: one line a node. */
+    struct osoe_stall_watch watch;
+    if (osoe.bootstrap.local_id == 0)
+        osoe_stall_watch_begin_noticed(&watch, 0, osoe.bootstrap.no_progress_ns);
+    else
+        osoe_stall_watch_begin(&watch, 0, osoe.bootstrap.no_progress_ns);
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     while (atomic_load_explicit(&agent_ready, memory_order_acquire) == 0) {
-        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_futex_wait(&agent_ready, 0, &sweep, OSOE_FUTEX_PRIVATE);
-        if (osoe_deadline_expired(&until) &&
-            atomic_load_explicit(&agent_ready, memory_order_acquire) == 0)
-            osoe_fatal("the agent thread did not start");
+        if (!osoe_deadline_expired(&sweep))
+            continue;
+        if (osoe_stall_watch_stalled(&watch, 0))
+            osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): this PE's agent "
+                       "thread, created, has not started",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch));
+        if (osoe_stall_watch_notice_due(&watch))
+            osoe_notice("shmem_init on node %u has waited %llu s for its lead's agent thread, "
+                        "created and not yet run by the system, to start; still waiting",
+                        osoe.bootstrap.node,
+                        (unsigned long long)osoe_stall_watch_waited_seconds(&watch));
+        osoe_sweep_expired("shmem_init");
+        sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     }
 }
 

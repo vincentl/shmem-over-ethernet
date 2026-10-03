@@ -23,6 +23,7 @@
 #include "base/deadline.h"
 #include "base/futex.h"
 #include "base/ring-check.h"
+#include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "barrier.h"
 #include "context.h"
@@ -377,11 +378,25 @@ static void session_start(void)
         atomic_store_explicit(speaks, 1, memory_order_release);
         osoe_futex_wake(speaks, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
+        /* Silent, as job.c's follow is: the lead speaks for the node, and what
+         * it is doing meanwhile - meeting the other nodes, starting its agent -
+         * has notices of its own. The deadline outlives a wake, so a signal
+         * cannot hold the sweep off, and OSOE_NO_PROGRESS_TIMEOUT ends the wait
+         * as it ends the node's others (Part 6's adversarial reads). */
+        struct osoe_stall_watch watch;
+        osoe_stall_watch_begin(&watch, 0, osoe.bootstrap.no_progress_ns);
+        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         while (atomic_load_explicit(speaks, memory_order_acquire) == 0) {
-            struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_futex_wait(speaks, 0, &sweep, OSOE_FUTEX_SHARED);
-            if (osoe_deadline_expired(&sweep))
-                osoe_sweep_expired("shmem_init");
+            if (!osoe_deadline_expired(&sweep))
+                continue;
+            if (osoe_stall_watch_stalled(&watch, 0))
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead, "
+                           "rank %u, has not started its agent thread",
+                           (unsigned long long)osoe_stall_watch_seconds(&watch),
+                           osoe.bootstrap.gtids[0]);
+            osoe_sweep_expired("shmem_init");
+            sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         }
     }
     init_pid = getpid();
