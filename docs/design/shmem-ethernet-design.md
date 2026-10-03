@@ -484,11 +484,11 @@ quadratic: 60 MB at 16 logical nodes, about 1 GB at 64, 16 GB at 256. Lowering
 logical nodes cost about 1 GB at the default chunk and 129 MB at 8 KiB. Tier-2
 tests set the sizes explicitly rather than inheriting the production default.
 
-**Huge pages are off by default, the opposite of the rule for heaps** (§6.2),
-and the inversion is deliberate. Heaps are touched densely; connection buffers
-are touched sparsely, because a halo exchange faults six peers' worth of the
-whole area. `hugetlbfs` pages are reserved up front, so opting in trades away
-exactly the demand paging that makes a large node count affordable.
+**Huge pages are off by default**, and heaps do not use them either (§6.2).
+Connection buffers are touched sparsely, because a halo exchange faults six
+peers' worth of the whole area; `hugetlbfs` pages are reserved up front, so
+opting in trades away exactly the demand paging that makes a large node count
+affordable.
 
 **Known and not addressed: NUMA first touch.** On a multi-socket node the lead
 creates the area, so first touch places every buffer on the lead's NUMA node and
@@ -1199,7 +1199,8 @@ thread inside it.
 **Progress thread count** is set by memory bandwidth, not PE count. On a Pi it is
 one: the lead's agent itself. At 256 PEs perhaps four, all in the lead process,
 sharded by peer node so each connection has exactly one owner and each stream
-keeps single-threaded ordering.
+keeps single-threaded ordering *(not built: one thread, the lead's agent,
+whatever the PE count - README, Limits)*.
 
 **Why threads in every PE rather than a helper process:**
 
@@ -1320,22 +1321,25 @@ that is stuck. Memory can be read without the job's cooperation.
   finds every team by walking the team scope, and `osoe-stat` shows each whose
   record is published as `team.<name>.*`.
 
-- **Counters are bounded per PE, and exhaustion is visible rather than fatal.**
-  `OSOE_MAX_THREADS` blocks per PE, claimed by CAS on first use. A thread that
-  finds none gets a **process-private block**, and the *fact* is recorded as
-  `invariant.blocks_exhausted` **in the PE's slot, not in a counter block**.
-  That distinction is the whole point and an earlier version of this line got it
-  wrong: a thread with no block writes to memory nobody outside the process can
-  read, so a counter kept there is exactly the one counter that can never be
-  seen — including by the §8.2 assertion that exists to see it. It is written by
-  whichever thread ran out, so it is a `seq_cst` read-modify-write rather than
-  this PE's single-writer publication, on a path taken at most once per thread. Not an abort: §4.11 proposes aborting when a
-  PE's thread table fills, because there correctness depends on having a record,
-  but here only the metrics do — and a job that dies because it made a ninth
-  thread would be a worse failure than a job whose ninth thread is not counted.
-  Not a shared block either, which would break §3.16's single-writer rule on
-  every counter. The private block makes the fallback path identical to the
-  normal one, so nothing has to test whether it is initialized.
+- **Counters are bounded per PE, and exhaustion ends the job, naming
+  `OSOE_MAX_THREADS`.** `OSOE_MAX_THREADS` blocks per PE and the agent's one
+  more, claimed by CAS on first use. A thread that finds none ends the job
+  (below), and the *fact* is first recorded as `invariant.blocks_exhausted` **in
+  the PE's slot, not in a counter block**. That distinction is the whole point
+  and an earlier version of this line got it wrong: a thread with no block
+  writes to memory nobody outside the process can read, so a counter kept there
+  is exactly the one counter that can never be seen — including by the §8.2
+  assertion that exists to see it. It is written by whichever thread ran out, so
+  it is a `seq_cst` read-modify-write rather than this PE's single-writer
+  publication, on a path taken at most once per thread. *As first designed,
+  exhaustion was visible rather than fatal:* §4.11 proposed aborting when a PE's
+  thread table fills, because there correctness depends on having a record, but
+  here only the metrics did — and a job that dies because it made a ninth thread
+  would be a worse failure than a job whose ninth thread is not counted. So a
+  thread that found none got a **process-private block**, not a shared one,
+  which would break §3.16's single-writer rule on every counter; the private
+  block made the fallback path identical to the normal one, so nothing had to
+  test whether it was initialized.
 
   *Changed in phase 1 step 8 slice 2.* A block now also indexes the thread's
   record of §4.11 items 3 and 5, and a thread without one would have nowhere to
@@ -1348,8 +1352,9 @@ that is stuck. Memory can be read without the job's cooperation.
   release of the pool share a mutex, so a thread exiting during a finalize
   never stores into a segment being unmapped. `OSOE_MAX_THREADS` counts the
   application's threads, default 16 and at most 1,023, and the agent's block
-  is one more (review of the slice, B1: with the agent inside a default of 8,
-  SOS's eight-thread programs ended the job).
+  is one more (review of the slice, B1, by its arithmetic and not run: with the
+  agent inside a default of 8, SOS's eight-thread programs would have ended the
+  job).
 - **On abort**, the library prints the control segment's name to standard error, so
   whoever reads the message knows what to point `osoe-stat` at.
 
@@ -1848,15 +1853,23 @@ to the rule above - time only paces the looking.
   still move.
 - *What it cannot see, and so never ends*: a PE with a thread the library does
   not know waiting - one computing, one in a condition variable, an idle OpenMP
-  pool - or a stopped process; a job moved only from outside the library, by a
-  signal handler's store or another program writing memory it shares with a PE,
-  which no SHMEM program relies on; and, outside what OpenSHMEM defines, a
+  pool - or a stopped process; and, outside what OpenSHMEM defines, a
   thread that leaves a wait by `siglongjmp` or cancellation, or a forked child
   that waits in the library, either of which leaves the count wrong. A wait
   the library has not taught the count - init's rendezvous - leaves its PE
   never blocked, too. io_uring's workers are left out by the kernel's
   `PF_IO_WORKER` flag, not by their `iou-` names, which a program's own
   thread may share.
+- *What reaches a PE from outside the library, which it cannot see either*: a
+  signal handler's store, another program writing memory it shares with a PE,
+  which no SHMEM program relies on. No sample reads a timer: a pending `alarm`
+  lives in the kernel. A program woken only from outside the library should turn
+  detection off, `OSOE_DEADLOCK_SECONDS=0`, as the README says. The round-three
+  review ran one (K2): a PE waiting on a flag that its own `SIGALRM` handler
+  sets, the others in a barrier, `OSOE_DEADLOCK_SECONDS=1`. In both of the
+  handler's modes, a plain store and a library call, the detector reported the
+  job deadlocked, each PE's wait 2 s old by its own report, and the job ended
+  with status 1.
 - *Probes are data in flight.* A round's probe toward a node that has vanished
   is data TCP keepalive does not probe, so the detector depends on the check
   that finds such a node by its kernel's silence within keepalive's budget
@@ -2361,11 +2374,11 @@ target = base_of[t][region] + (a - base_of[me][region]);
 ```
 
 **Costs.** Every process reserves L × `SHMEM_SYMMETRIC_SIZE` of virtual address
-space — 256 GiB for 256 PEs at 1 GiB, comfortable in 48-bit aarch64. `memfd` pages
-are committed only when touched; hugetlbfs pages are reserved up front, so L
-heaps' worth of huge pages must exist before init, with a fallback to regular
-pages when they do not (the development VM has none). `SHMEM_SYMMETRIC_SIZE` must
-agree across PEs and is checked at rendezvous.
+space — 256 GiB for 256 PEs at 1 GiB, comfortable in 48-bit aarch64. Heap pages
+are committed only when touched. They are ordinary pages: a hugetlbfs option,
+reserved up front with a fallback when there are none, was designed and is not
+built (§6.2). `SHMEM_SYMMETRIC_SIZE` must agree across PEs and is checked at
+rendezvous.
 
 The progress thread maps the same physical pages as the owning PE and its local
 siblings, so remote AMOs applied by the progress thread and local AMOs issued by
@@ -4163,10 +4176,17 @@ its §3.14 counter block and "blocked in" record.
   cannot exit inside a call, so the block's bit and slot are idle then.
 - `PRIVATE` contexts cache the creator's block.
 
-**How many.** `T` blocks per PE, read from `OSOE_MAX_THREADS` at the first init, as
-`max_teams` is (§5.7). The default is the node's online CPU count. At 128 bytes per
-block, 256 PEs × 64 blocks is 2 MiB of node segment. What happens when a PE's
-table is full is open (§10).
+**How many.** `T` blocks per PE, `OSOE_MAX_THREADS` of them - 16 by default, at
+most 1,023 - and the agent's one more, read at the first init as `max_teams` is
+(§5.7). The default is not the node's online CPU count, as this section first
+said: a four-core Pi would get 4, threads oversubscribe cores freely, and a
+default that moves with the machine is one a program cannot rely on (phase 1
+step 8 slice 2, review B1, by its arithmetic and not run: at 8 with the agent
+inside, SOS's eight-thread programs would have ended the job). A block is a
+counter block and a thread record, about 768 bytes on aarch64, so 256 PEs × 17
+blocks is 3.2 MiB of node segment. A PE whose table is full ends the job, naming
+the variable (§10, decided 2026-09-25); a thread gives its block back when it
+exits, not when its call returns.
 
 *(Rejected:*
 - *One slot per PE behind a mutex: a 1 MB get would hold up every other thread's
@@ -4900,14 +4920,17 @@ at a time, 510 at 400 nodes of 256 PEs and *k* = 4 for one long each, about D
 times fewer with the pipeline - which made it the one internode phase whose
 latency grew faster than log *N*, the exception §1's goal carried until the
 allgather replaced it.)* **collect's places
-are the prefix sums of every member's length**: every member takes the same
-room from the symmetric heap, a word per member and one more, and writes its
-length in the last; the lead gathers the lengths into
-its own room, turns them into places and the total, and the other members read
-the total alone - so the P words are the lead's to touch, and a non-lead's cost
-is a page. The room is given back before returning; a take and its give leave
-the allocator as it was (§4.4), on the PEs of a team smaller than the job as on
-the others, and a heap without the room answers nonzero on every member alike.
+are the prefix sums of every member's length**: each member leaves its length
+in its own word of the team number's line of the internal region, the lead sets
+its members' lengths at their ranks in a vector of the team's size in its own
+private memory, the internode reduction's tree sums the nodes' vectors, 8-byte
+integers, into every lead's, and the lead turns the result into places and the
+total, which its members read after the release. Nothing is borrowed from the
+symmetric heap (§4.11, the author's C4). The lengths cost O(*P*) bytes a level
+of the tree in every call, 8 a PE - at 500 nodes of 256 PEs, 8 × 128,000 = 1 MB
+reduced, and about 5 MB out of each interior lead (the release review's P6) -
+where `fcollect`'s fixed block needs no such pass; the data itself keeps the
+allgather.
 A scan (§9.10.10, built since phase 1 step 10) gives each PE its own place in O(1) memory.
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put
@@ -5712,9 +5735,12 @@ sibling would remove the new segment. The window that remains is init itself: a
 job killed there can leave names behind. A later job with the same ids reclaims
 the ones it meets when it creates its own, a leftover whose creator is gone
 (above); `osoe-stat --gc` removes them once nothing uses them (§3.14); and a
-site's epilog may remove `/dev/shm/osoe.<job>.*` at the end of every job. Where
-hugetlbfs is mounted and has pages, heaps use it
-under the same names; otherwise they fall back to regular shared memory.
+site's epilog may remove `/dev/shm/osoe.<job>.*` at the end of every job. Heaps
+are ordinary pages of `/dev/shm`, under the same names: no code asks for huge
+pages for them (`MAP_HUGETLB` is used only by the connection area, when
+`OSOE_AM_HUGEPAGES=1`, §3.4). Every process maps every node-mate's heap, so a
+PE's page tables grow with the bytes it touches in all of them; a hugetlbfs path
+was designed and is not built.
 
 **Global.** The step's rendezvous server is the lead of node 0: the task with
 `SLURM_NODEID == 0` and `SLURM_LOCALID == 0`, on the first host of
