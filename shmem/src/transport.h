@@ -117,6 +117,17 @@ struct osoe_deadline;
 void osoe_transport_init(void);
 void osoe_transport_fini(void);
 
+struct osoe_bootstrap;
+
+/*
+ * Every setting the backend reads, checked as values only by every PE before
+ * its node joins, so that a bad one ends the job at once and by name rather
+ * than one PE alone, or none (the round-three review's R8): the AM backend's,
+ * OSOE_AM_* and OSOE_GET_LANDING_BYTES, and its wires'. Ends the PE with a
+ * fatal on a bad value; their users read them again where they use them.
+ */
+void osoe_transport_settings_check(const struct osoe_bootstrap *b);
+
 struct osoe_transport_context *osoe_transport_context_default(void);
 
 /* A context's options at creation: spec §9.5's three, as the backend sees them

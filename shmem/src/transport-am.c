@@ -56,6 +56,7 @@
 #include "state.h"
 #include "transport.h"
 #include "transport-local.h"
+#include "wire.h"
 
 /* The peer slot for a node, as the connection area and the progress loop both
  * index it: node order with this node left out (§3.4). */
@@ -300,6 +301,13 @@ static bool environment_flag(const char *name)
     if (osoe_environment_u32(name, &v) == OSOE_ENVIRONMENT_INVALID || v > 1)
         osoe_fatal("%s='%s' is not 0 or 1", name, getenv(name));
     return v == 1;
+}
+
+void osoe_transport_settings_check(const struct osoe_bootstrap *b)
+{
+    struct osoe_am_config am;
+    osoe_am_config_read(&am);
+    osoe_wire_settings_check(b);
 }
 
 void osoe_transport_init(void)
