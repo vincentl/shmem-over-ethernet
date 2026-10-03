@@ -1761,6 +1761,21 @@ ends a wait promptly; what goes is only the fatal deadline. (`base/stall-watch.h
 is the one helper; §3.10's absolute futex deadlines are clock instants for one
 sweep-length sleep, and stay.)
 
+**A start-up wait says what it waits for** (the round-three review's R8 and
+N1; the author's D2, 2026-10-02). A job whose start had gone wrong - a peer
+unreachable, a PE that never called `shmem_init`, a node that refused - waited
+in silence until the launcher ended it, with nothing on stderr. Now every wait
+of `shmem_init` that has lasted 30 s prints a notice, and again every minute,
+and changes nothing: it reads how long the wait has lasted, not whether
+anything moved, so it is no exception to the rule above. One line a node: the
+lead prints for the wait it is in - the local PEs that have not joined or
+mapped, with their ranks; the node it calls, its host-list entry, the address
+and ports dialled, and the last error and when; the nodes it waits to be called
+by - and of the others only local id 1, and only while the lead has no segment
+to speak through. `base/stall-watch.h`'s noticed watches carry the timing,
+`osoe_notice` the line; `OSOE_TEST_NOTICE_SECONDS` shortens the 30 s for tests,
+and is no setting.
+
 **A program's own deadlock ends the job, once it is proved** (the author's
 decision of 2026-09-27, "build it"; `deadlock.h`,
 `tools/modelcheck/deadlock_model.py`). A job is deadlocked when every PE waits
@@ -5599,6 +5614,33 @@ its counts keep moving, and by default forever (§3.15's no-progress rule): with
 `OSOE_NO_PROGRESS_TIMEOUT` set, a count that stands still that long ends the job
 naming the local ids that never arrived.
 
+**Nothing refuses before there is a segment to say so in** (the round-three
+review's R8; the author's D2). `failed` lives in the control segment, so a
+refusal before the lead has made it left the node's other PEs waiting for a
+segment that never came - the likeliest first-day failure, a `/dev/shm` too
+small for the node's heaps, among them. Three rules close it:
+
+- *Every PE checks every setting* in its own bootstrap and init, before its node
+  joins - until the review the lead alone checked seven, as it laid out the
+  segment, and the leads alone the wire's - and a node's PEs are compared on
+  every one that lays out the segment (`OSOE_MAX_TEAMS`, `OSOE_MAX_CONTEXTS`,
+  `OSOE_MAX_THREADS`, `OSOE_COLLECTIVE_FANOUT`, `OSOE_COLLECTIVE_PIPELINE`,
+  `OSOE_GET_LANDING_BYTES`, `SHMEM_SYMMETRIC_SIZE`), through `failed`.
+- *The lead makes the segment before anything that can refuse*: the `/dev/shm`
+  check comes after it exists and refuses through `failed`; the pages the lead
+  writes first are allocated, not only sized, so a `/dev/shm` too full even for
+  those refuses by name rather than by SIGBUS. The name stays, a failed job's
+  leftover.
+- *A PE that refuses before its node has joined tells the node*: from the
+  moment it knows its job, step, node and local id until its node has joined, a
+  fatal of its own runs a last word (`fatal.h`, `node.h`) - `failed` in the
+  segment if it has it; otherwise, from the lead, a *tombstone*, a control
+  segment that is nothing but a header with `failed` set; from any other PE,
+  `failed` in the lead's segment, waiting at most the abort grace for it. A PE
+  that cannot read its own identity tells nobody, and a task that never reaches
+  the library cannot: the notices of §3.15 name both, and the launcher ends
+  them.
+
 **Removing names: as soon as everyone who must open an object has.** Every object
 is opened only during init, and each name is removed the moment the last process
 that needs it has it open, so that after init nothing this job created in
@@ -5769,6 +5811,22 @@ among themselves: the root's group completes a smaller job while the other
 waits for a listener that has closed. That is two launches sharing one job's
 ids, indistinguishable from one slow launch without a time limit, which §3.15
 rules out; the no-progress rule is the answer there.
+
+**A lead serves callers part-way through the hello side by side, and acts on a
+hello only once it may** (the round-three review's N2). Read one at a time, a
+hello followed by silence held the listener for good, and a hello's counts,
+judged as it arrived, let a host that knew no secret end a lead's start with a
+wrong one. Now an accepted connection's hello is read within 0.1 s - safe,
+since an unanswered caller retries - and an answered caller waits, for its
+confirmation and with no time limit, in a set of sixteen polled with the
+listening socket: a caller that is answered writes its confirmation and
+carries on, and one dropped for time would end the job. A full set accepts no
+more until a place frees; the rest wait in the backlog, as a busy lead's
+callers do. With `OSOE_JOB_SECRET`, a hello's counts and node claim are judged
+only after its caller has proved the secret; without one nothing can be
+proved, and the hello is judged as it arrives. `rendezvous_model.py` abstracts
+a connection as the parent's accept, which none of this changes: the counts
+are still judged before the parent counts the child.
 
 Every read and write of the rendezvous waits as long as its peer takes,
 sweeping, and ends the job naming the peer only by the no-progress rule
