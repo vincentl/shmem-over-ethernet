@@ -448,10 +448,13 @@ int main(int argc, char **argv)
     double kill_at = 0;             /* SIGKILL time once a failure is seen */
     bool failed = false, timed_out = false;
     /* The status, srun's way: the highest code a rank reported, and a signal
-     * as 128 plus it - unless this launcher sent it, after a failure, at the
-     * timeout or forwarding its own, when the rank's end is the launcher's. */
+     * as 128 plus it - unless this launcher sent that signal, after a failure,
+     * at the timeout or forwarding its own, when the rank's end is the
+     * launcher's. Which signals were sent is kept a rank, not only whether: a
+     * rank that died of its own signal before the launcher's reached it, and
+     * was reaped after, still counts (the adversarial read of 2026-10-02). */
     int highest = 0;
-    bool signalled[MAX_PROCS] = { false };
+    uint64_t sent[MAX_PROCS] = { 0 };       /* bit s: signal s was sent */
     int interrupted = 0;            /* SIGTERM or SIGINT received, once */
     long remaining = n;
 
@@ -468,7 +471,9 @@ int main(int argc, char **argv)
             remaining--;
             bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
             int code = WIFEXITED(status) ? WEXITSTATUS(status)
-                       : WIFSIGNALED(status) && !signalled[r] ? 128 + WTERMSIG(status) : 0;
+                       : WIFSIGNALED(status) &&
+                                 !(sent[r] & UINT64_C(1) << (WTERMSIG(status) & 63))
+                           ? 128 + WTERMSIG(status) : 0;
             if (code > highest)
                 highest = code;
             if (!ok) {
@@ -484,7 +489,7 @@ int main(int argc, char **argv)
                         for (long j = 0; j < n; j++)
                             if (!done[j]) {
                                 kill(pids[j], SIGTERM);
-                                signalled[j] = true;
+                                sent[j] |= UINT64_C(1) << SIGTERM;
                             }
                         kill_at = now() + 2.0;
                     }
@@ -503,13 +508,13 @@ int main(int argc, char **argv)
             for (long j = 0; j < n; j++)
                 if (!done[j]) {
                     kill(pids[j], SIGKILL);
-                    signalled[j] = true;
+                    sent[j] |= UINT64_C(1) << SIGKILL;
                 }
         } else if (kill_at > 0 && t >= kill_at) {
             for (long j = 0; j < n; j++)
                 if (!done[j]) {
                     kill(pids[j], SIGKILL);
-                    signalled[j] = true;
+                    sent[j] |= UINT64_C(1) << SIGKILL;
                 }
             kill_at = 0;
         }
@@ -528,7 +533,7 @@ int main(int argc, char **argv)
             for (long j = 0; j < n; j++)
                 if (!done[j]) {
                     kill(pids[j], sig);
-                    signalled[j] = true;
+                    sent[j] |= UINT64_C(1) << sig;
                 }
             if (kill_at == 0)
                 kill_at = now() + 2.0;
