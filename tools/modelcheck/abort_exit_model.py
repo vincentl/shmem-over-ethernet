@@ -7,11 +7,23 @@ last segment a dying lead sends on each connection, read before the end of
 stream it precedes. This model is the other half: which thread of which
 process ends it, and when, so that the goodbye is sent before the lead's
 sockets close, and so that the job ends with the status a caller of
-shmem_global_exit gave (spec §9.1.6) - the caller's process with it, every
-other with 0, so that a launcher which ends the step at the first bad exit
-(srun -K1, KillOnBadExit) sees none before the caller's own, which comes after
-its handlers and its flush; srun returns the highest exit code of all tasks
-(the author's decision of 2026-10-02, after the round-three review's C2).
+shmem_global_exit gave (spec §9.1.6). One process leaves with it, the carrier
+- the PE its node's word names, whose declaration won - and every other with
+0 (the author's decision of 2026-10-02, after the round-three review's C2). A
+launcher which ends the step at the first bad exit (srun -K1, KillOnBadExit)
+kills every task still running then, and a killed task counts 143, which
+srun's status, the highest of all its tasks', would then be; so the carrier
+also leaves last (the author's decision of the same evening, after Part 2's
+adversarial read found the race on one node too):
+
+  * The carrier, before its end, waits for every other PE of its node to end
+    (pidfds).
+  * A lead, before its end, waits for every other PE of its node but the
+    carrier: its end ends its stream, which tells the carrier's node that this
+    node is done.
+  * The lead of the carrier's node, after its goodbye, waits for the other
+    node's end of stream - but not for a node whose goodbye named another
+    caller, which carries that one (two callers on two nodes at once).
 
 Every PE is a process with two threads, its main thread and its agent
 (§3.12). The lead's agent owns the node's sockets: only it can tell the other
@@ -75,6 +87,9 @@ Cases
             which takes no lock and runs no handler beside a main thread still
             running (the author's decisions after the third review, and after
             the round-three review for the 0).
+  same_node_both
+            B's P calls it with 5 and B's Q with 6, at once: one wins B's word
+            and carries; the other leaves with 0, after its handlers.
   caller_exiting
             A's P calls it with 5 while another thread of A's P is inside exit
             holding its lock - main returned into the library's handler. The
@@ -98,14 +113,24 @@ Options
             own agent can end its process before the declarer reaches the
             lead's wake word, and then only a sweep, or Part C's pidfd, wakes
             the lead. That finding is what makes the pidfd more than liveness
-            for a crash.
+            for a crash. Since the carrier leaves last, its process cannot end
+            before its node's lead, so the declarer's bumps always finish
+            first, and the case passes without sweeps or pidfds; the variant
+            no_carrier_wait still shows the finding.
+  kills     srun -K1: after the first nonzero exit, a launcher thread kills
+            every process still running, one step each, interleaved with
+            everything else. On in every built case it can pass; with it,
+            two callers on two nodes at once (`both`) fail NO_KILL - the
+            residual the README states.
 
 Variants (each breaks one rule above)
   caller_exits      the caller ends its process itself. On the lead, the
                     process ends before its agent can send: STATUS.
   pidfd_fatal       the lead's agent takes a sibling's death for a fatal
                     rather than declaring one, and ends through the fatal path
-                    without sending: STATUS.
+                    without sending: STATUS. Shown on B with its Q, which ends
+                    at once while B's lead may still be at its pass: the
+                    carrier now outlives its lead, so A's P cannot show it.
   wake_first        a declarer bumps the wake words before the CAS: an agent
                     can take the bump, find the word still clear, and sleep on
                     the new value. STUCK.
@@ -126,21 +151,42 @@ Variants (each breaks one rule above)
                     declarer's own agent ending its process right after the
                     CAS, the lead is woken by its pidfd and the others by
                     nothing. B's Q is the other that nothing wakes, so the
-                    case that shows it has B's P call. STUCK.
+                    case that shows it has B's P call. STUCK until the carrier
+                    left last; now the declarer's process outlives its bumps,
+                    and the rewake is a second line - kept, and passing.
   status_everywhere every process a global exit ends leaves with the caller's
                     status, as the code did until the round-three review: the
                     first of them to leave is a bad exit before the caller's,
                     and srun -K1 kills the caller inside exit. STATUS.
-  caller_zero       the caller's own process leaves with 0 as well, and the
-                    job's status is lost. STATUS.
+  caller_zero       the carrier leaves with 0 as well, and the job's status is
+                    lost. JOB_STATUS.
+  called_carries    the code before the carrier: every process whose program
+                    called leaves with the status, and nobody waits. NO_KILL -
+                    with one caller, the caller leaving before the other node
+                    has been told; with two on a node, the first of them.
+  no_carrier_wait   the carrier does not wait for its node. NO_KILL.
+  no_lead_wait      a lead does not wait for its node before its end of
+                    stream: the carrier's node takes it for the node's end.
+                    NO_KILL.
+  no_remote_wait    the carrier's node's lead does not wait for the other
+                    node. NO_KILL.
+  wait_every_node   every lead waits for the other node's end, not only the
+                    carrier's: each waits for the other. STUCK (the code's
+                    bound would end both, and then race).
+  no_exclusion      the carrier's node's lead waits for a node whose goodbye
+                    named another caller, which waits for it in turn. STUCK.
 
 Properties
   TERMINATES  every process ends: no state is STUCK with a process alive and
               every thread asleep, and from every state some state in which all
               have ended is reachable (the trapped-state check).
-  STATUS      a process whose program called shmem_global_exit ends with a
-              status some caller gave; every other process ends with 0. In
+  STATUS      a process whose program called shmem_global_exit ends with 0 or
+              a status some caller gave; every other process ends with 0. In
               these cases none is a fatal or a crash, so a failure never is.
+  JOB_STATUS  srun's status, the highest of every process's, is a status some
+              caller gave.
+  NO_KILL     with `kills`: no process is still running at the first nonzero
+              exit, for srun -K1 to kill.
   ONE_END     a process is ended by the thread that claimed it (abort.c's
               `ending`), never by a second thread beside it.
 
@@ -151,6 +197,7 @@ import sys
 from engine import DEL, assemble, explore, report, select
 
 FAIL = 1                        # the status a fatal leaves with
+KILLED = 15                     # a process the launcher kills: 128 + SIGTERM, 143, in the code
 FATAL, GLOBAL = 1, 2            # the word's dispositions
 MAIN, AGENT = 1, 2              # the holders of exit's lock
 NODES = ('A', 'B')
@@ -160,13 +207,15 @@ PEER = {'A': 'B', 'B': 'A'}
 LOCAL = {'A': ('LA', 'PA'), 'B': ('LB', 'PB')}
 LOCAL_WITH_Q = {'A': ('LA', 'PA'), 'B': ('LB', 'PB', 'QB')}
 NODE_OF = {p: x for x in NODES for p in LOCAL_WITH_Q[x]}
+RANK = {'LA': 1, 'PA': 2, 'LB': 3, 'PB': 4, 'QB': 5}
+NAME_OF = {r: p for p, r in RANK.items()}
 
 
 def is_lead(p):
     return p in ('LA', 'LB')
 
 
-def WORD(x):        return ('$word', x)            # 0, or disposition * 16 + status
+def WORD(x):        return ('$word', x)            # 0, or word_of(disposition, rank, status)
 def WAKE(p):        return ('$wake', p)            # the agent's wake word
 def ENDING(p):      return ('$ending', p)          # abort.c's claim: 0, MAIN or AGENT
 def ALIVE(p):       return ('$alive', p)
@@ -180,10 +229,22 @@ def REAPED(p):      return ('$reaped', p)          # the lead's agent has had p'
 def AGENT_UP(p):    return ('$agent_up', p)        # p's agent has started (init.c)
 def EXIT_LOCK(p):   return ('$exit_lock', p)       # who holds exit's lock: 0, MAIN or AGENT
 def CALLED(p):      return ('$called', p)          # p's program called shmem_global_exit
+def ORIGIN(x, y):   return ('$origin', x, y)       # the rank y's ABORT named, once x read it
+def KILLING():      return ('$killing',)           # a process has left nonzero: -K1 ends the rest
+
+
+def word_of(disposition, rank, status):
+    """The abort word: how the job ends, the rank that declared it, the
+    status (node.h's OSOE_ABORT_*_SHIFT). A fatal's rank is 0 here."""
+    return disposition * 256 + rank * 16 + status
+
+
+def rank_of(word):
+    return (word // 16) % 16
 
 
 def disposition(word):
-    return word // 16
+    return word // 256
 
 
 def exit_status(word):
@@ -192,21 +253,51 @@ def exit_status(word):
 
 def status_at_end(variant, M, p, word):
     """What osoe_abort_end ends p with: a fatal's failure status; on a global
-    exit, the status for the process whose program called shmem_global_exit
-    and 0 for every other (abort.c)."""
+    exit, the status for the PE its node's word names - the carrier - and 0
+    for every other, a caller whose declaration lost among them (abort.c)."""
     if disposition(word) == FATAL:
         return FAIL
-    if M[CALLED(p)]:
+    if variant == 'called_carries':
+        return word % 16 if M[CALLED(p)] else 0
+    if variant == 'status_everywhere':
+        return word % 16
+    if rank_of(word) == RANK[p]:
         return 0 if variant == 'caller_zero' else word % 16
-    return word % 16 if variant == 'status_everywhere' else 0
+    return 0
+
+
+def waits_for(variant, local, M, p):
+    """Who p's end waits for, on a global exit (abort.c): the carrier for every
+    other PE of its node, so that it leaves last; a lead for every other but
+    the carrier, so that its end of stream - its end makes it - tells the
+    carrier's node that its whole node is done. Nobody else waits."""
+    x = NODE_OF[p]
+    w = M[WORD(x)]
+    if disposition(w) != GLOBAL or variant == 'called_carries':
+        return ()
+    if rank_of(w) == RANK[p]:
+        return () if variant == 'no_carrier_wait' else tuple(q for q in local[x] if q != p)
+    if is_lead(p) and variant != 'no_lead_wait':
+        return tuple(q for q in local[x] if q != p and RANK[q] != rank_of(w))
+    return ()
+
+
+def carrier_node(M, x):
+    """Whether node x's word names one of its own PEs: a global exit called
+    here, whose lead waits for the other nodes to end."""
+    w = M[WORD(x)]
+    return disposition(w) == GLOBAL and NODE_OF[NAME_OF[rank_of(w)]] == x
 
 
 # ---- steps shared by every thread ------------------------------------------
 
 def end_process(M, p, status, label):
     """p ends: its threads stop; a lead's kernel ends its stream after what it
-    queued."""
+    queued. A nonzero status is a bad exit, which srun -K1 answers by ending
+    every task still running (the launcher thread, with the `kills` option)."""
     upd = {ALIVE(p): 0, STAT(p): status}
+    if status != 0:
+        upd[KILLING()] = 1
     x = NODE_OF[p]
     if is_lead(p):
         upd[KFIN(x, PEER[x])] = 1
@@ -250,7 +341,7 @@ def finish_declaring(L):
 # ---- the agent --------------------------------------------------------------
 
 (PC_TOP, PC_WORD, PC_WORK, PC_WAIT, PC_REWAKE, PC_SEND, PC_END, PC_PAUSE,
- PC_EXITING) = range(9)
+ PC_EXITING, PC_REMOTE) = range(10)
 
 
 def agent(variant, local, p, options):
@@ -289,14 +380,14 @@ def agent(variant, local, p, options):
             # The lead's pass: one completion, then round again.
             if M[QUEUED(y, x)]:
                 value = M[QUEUED(y, x)]
-                upd = {QUEUED(y, x): 0, HEARD(x, y): 1}
+                upd = {QUEUED(y, x): 0, HEARD(x, y): 1, ORIGIN(x, y): rank_of(value)}
                 loc = start_declaring(value, PC_TOP)
                 return [(upd, loc, f'{name}: reads {y}\'s ABORT (status {exit_status(value)})')]
             if M[KFIN(y, x)] and not M[EOF(x, y)]:
                 upd = {EOF(x, y): 1}
                 if M[HEARD(x, y)]:
                     return [(upd, {'pc': PC_TOP}, f'{name}: reads {y}\'s end of stream, after its ABORT')]
-                loc = start_declaring(FATAL * 16 + FAIL, PC_TOP)
+                loc = start_declaring(word_of(FATAL, 0, FAIL), PC_TOP)
                 return [(upd, loc, f'{name}: reads {y}\'s end of stream without a word: a death')]
             for q in local[x]:
                 if q != p and options['pidfd'] and not M[ALIVE(q)] and not M[REAPED(q)]:
@@ -307,7 +398,7 @@ def agent(variant, local, p, options):
                         # the agent, so without the abortive goodbye.
                         w = M[WORD(x)]
                         if w == 0:
-                            upd[WORD(x)] = FATAL * 16 + FAIL
+                            upd[WORD(x)] = word_of(FATAL, 0, FAIL)
                             w = upd[WORD(x)]
                         if M[ENDING(p)]:
                             return [(upd, {'pc': PC_PAUSE}, f'{name}: {q} has died; pauses')]
@@ -316,7 +407,7 @@ def agent(variant, local, p, options):
                                                 f'a fatal for {q}')
                         upd.update(u)
                         return [(upd, {}, f'{name}: {q} has died - ' + lbl)]
-                    loc = start_declaring(FATAL * 16 + FAIL, PC_TOP)
+                    loc = start_declaring(word_of(FATAL, 0, FAIL), PC_TOP)
                     return [(upd, loc, f'{name}: {q}\'s pidfd completes: declares its death')]
             return [({}, {'pc': PC_WAIT}, f'{name}: nothing to do')]
         if pc == PC_WAIT:
@@ -336,11 +427,36 @@ def agent(variant, local, p, options):
             return [({WAKE(q): M[WAKE(q)] + 1}, {'k': k + 1}, f'{name}: wakes {q}\'s agent again')]
         if pc == PC_SEND:
             # The abortive goodbye, unless the peer's stream ended without one.
+            # Then, on the carrier's node, the other nodes' ends (PC_REMOTE).
             dead_peer = M[EOF(x, y)] and not M[HEARD(x, y)]
+            w = M[WORD(x)]
+            remote = disposition(w) == GLOBAL and variant not in ('called_carries',
+                                                                 'no_remote_wait') and (
+                carrier_node(M, x) or variant == 'wait_every_node')
+            then = PC_REMOTE if remote else PC_END
             if not M[SENT(x, y)] and not dead_peer:
-                return [({QUEUED(x, y): M[WORD(x)], SENT(x, y): 1}, {'pc': PC_END},
+                return [({QUEUED(x, y): M[WORD(x)], SENT(x, y): 1}, {'pc': then},
                          f'{name}: sends {y} the abortive goodbye')]
-            return [({}, {'pc': PC_END}, f'{name}: has told every peer')]
+            return [({}, {'pc': then}, f'{name}: has told every peer')]
+        if pc == PC_REMOTE:
+            # The carrier's node's lead waits for the other node's end of
+            # stream, reading what comes before it - but not for a node whose
+            # goodbye named another caller, which carries its own.
+            w = M[WORD(x)]
+            excluded = (M[HEARD(x, y)] and M[ORIGIN(x, y)] != rank_of(w)
+                        and variant != 'no_exclusion')
+            if M[EOF(x, y)]:
+                return [({}, {'pc': PC_END}, f'{name}: {y} has ended')]
+            if excluded:
+                return [({}, {'pc': PC_END},
+                         f'{name}: {y} carries {NAME_OF[M[ORIGIN(x, y)]]}; waits no longer')]
+            if M[QUEUED(y, x)]:
+                value = M[QUEUED(y, x)]
+                return [({QUEUED(y, x): 0, HEARD(x, y): 1, ORIGIN(x, y): rank_of(value)}, {},
+                         f'{name}: reads {y}\'s ABORT, naming {NAME_OF[rank_of(value)]}')]
+            if M[KFIN(y, x)]:
+                return [({EOF(x, y): 1}, {}, f'{name}: reads {y}\'s end of stream')]
+            return []                   # waits on its ring for what the peer sends
         if pc == PC_END:
             # osoe_abort_end from the agent: claim the process, then end it -
             # two steps, since exit runs the process's handlers and flushes
@@ -353,6 +469,10 @@ def agent(variant, local, p, options):
             # and exit's lock is then needed; everywhere else fflush and _exit -
             # with 0 on a global exit, the failure status on a fatal.
             w = M[WORD(x)]
+            # Before its end, a carrier or a lead waits for the PEs whose end
+            # must come first (waits_for: pidfds in the code).
+            if any(M[ALIVE(q)] for q in waits_for(variant, local, M, p)):
+                return []
             calls_exit = disposition(w) == GLOBAL and (
                 M[CALLED(p)] or variant == 'exit_everywhere')
             if calls_exit:
@@ -401,7 +521,7 @@ def caller(variant, local, p, status):
         pc = L['pc']
         if pc == PC_CALL:
             # abort.c records the call before declaring (osoe_abort_caller).
-            return [({CALLED(p): 1}, start_declaring(GLOBAL * 16 + status, PC_MAIN_END),
+            return [({CALLED(p): 1}, start_declaring(word_of(GLOBAL, RANK[p], status), PC_MAIN_END),
                      f'{name}: calls shmem_global_exit({status})')]
         if pc == PC_MAIN_END:
             return main_end(variant, M, p, name)
@@ -558,13 +678,16 @@ def early_caller(variant, local, p, status):
 
 # ---- assembly -------------------------------------------------------------------
 
-BAD_STATUS_CALLER, BAD_STATUS_OTHER, BAD_SECOND_END = 1, 2, 3
+BAD_STATUS_CALLER, BAD_STATUS_OTHER, BAD_SECOND_END, BAD_KILL, BAD_JOB = 1, 2, 3, 4, 5
 BAD = {
     BAD_STATUS_CALLER: 'STATUS: a process whose program called shmem_global_exit exited with '
-                       'a status no caller gave',
+                       'a status neither 0 nor one a caller gave',
     BAD_STATUS_OTHER: 'STATUS: a process that did not call shmem_global_exit exited with a '
                       'status other than 0',
     BAD_SECOND_END: 'ONE_END: a thread ended a process another thread had claimed',
+    BAD_KILL: 'NO_KILL: a process was still running at the first nonzero exit, and srun -K1 '
+              'killed it',
+    BAD_JOB: 'JOB_STATUS: srun\'s status, the highest of every task\'s, is no caller\'s',
 }
 
 
@@ -580,7 +703,7 @@ def thread(step, initial, callers, role):
                     continue
                 p = k[1]
                 if M[CALLED(p)]:
-                    if v not in callers:
+                    if v != 0 and v not in callers:
                         bad = BAD_STATUS_CALLER
                 elif v != 0:
                     bad = BAD_STATUS_OTHER
@@ -597,11 +720,43 @@ def thread(step, initial, callers, role):
                      ('END', ('done',))])
 
 
+def launcher(processes, callers, kills):
+    """srun, with -K1 under the `kills` option: once any task has left with a
+    nonzero status, every task still running is sent SIGTERM - one step each,
+    in any order and interleaved with everything else, as slurmstepd's signal
+    reaches each when it does - and leaves with 143. At the end, srun's own
+    status: the highest of every task's, which must be a caller's."""
+    def step(M, L):
+        alive = [p for p in processes if M[ALIVE(p)]]
+        if not alive:
+            job = max(M[STAT(p)] for p in processes)
+            return [({}, {'finished': 1, 'bad': 0 if job in callers else BAD_JOB},
+                     f'srun returns {job}')]
+        if not (kills and M[KILLING()]):
+            return []
+        out = []
+        for q in alive:
+            upd = {ALIVE(q): 0, STAT(q): KILLED}
+            if is_lead(q):
+                x = NODE_OF[q]
+                upd[KFIN(x, PEER[x])] = 1
+            out.append((upd, {'bad': BAD_KILL}, f'srun -K1 kills {q}, still running'))
+        return out
+
+    return assemble([('INIT', ('set', 'pc', lambda L: 0, '@STEP')),
+                     ('STEP', ('nd', step, '@BAD?')),
+                     ('BAD?', ('br', lambda L: L['bad'], '@FAIL', '@FINISHED?')),
+                     ('FAIL', ('check', lambda M, L: BAD[L['bad']], '@END')),
+                     ('FINISHED?', ('br', lambda L: L['finished'], '@END', '@STEP')),
+                     ('END', ('done',))])
+
+
 CASES_OF = {
     'nonlead': {'callers': {'PA': 5}, 'waiters': ('LA',), 'local': LOCAL},
     'lead': {'callers': {'LA': 5}, 'waiters': (), 'local': LOCAL},
     'both': {'callers': {'PA': 5, 'PB': 6}, 'waiters': (), 'local': LOCAL},
     'on_b': {'callers': {'PB': 5}, 'waiters': (), 'local': LOCAL_WITH_Q},
+    'same_node_both': {'callers': {'PB': 5, 'QB': 6}, 'waiters': (), 'local': LOCAL_WITH_Q},
     'finish': {'callers': {'PA': 5}, 'waiters': (), 'finishers': ('LA',), 'local': LOCAL},
     'early': {'callers': {}, 'early_callers': {'PA': 5}, 'waiters': (), 'connecting': ('LA',),
               'local': LOCAL},
@@ -637,11 +792,12 @@ def case(variant, which, options):
     for p in shape.get('exiters', ()):
         step, initial = exiter(variant, local, p)
         threads.append(thread(step, initial, callers, MAIN))
-    mem = {}
+    threads.append(launcher(processes, callers, options['kills']))
+    mem = {KILLING(): 0}
     for x in NODES:
         mem[WORD(x)] = 0
         y = PEER[x]
-        for k in (QUEUED, KFIN, SENT, HEARD, EOF):
+        for k in (QUEUED, KFIN, SENT, HEARD, EOF, ORIGIN):
             mem[k(x, y)] = 0
     for p in processes:
         mem[WAKE(p)] = 0
@@ -663,30 +819,41 @@ def run(variant, which, options, out=sys.stdout):
                    liveness=True, max_seconds=1800, liveness_max_states=12_000_000)
 
 
-BUILT = {'pidfd': True, 'sweeps': False}
-PART_B = {'pidfd': False, 'sweeps': True}
-NO_HELP = {'pidfd': False, 'sweeps': False}
+BUILT = {'pidfd': True, 'sweeps': False, 'kills': False}
+KILLS = {'pidfd': True, 'sweeps': False, 'kills': True}
+PART_B = {'pidfd': False, 'sweeps': True, 'kills': False}
+NO_HELP = {'pidfd': False, 'sweeps': False, 'kills': False}
 
 CASES = [
-    ('built', 'nonlead', BUILT, True),
-    ('built', 'lead', BUILT, True),
+    ('built', 'nonlead', KILLS, True),
+    ('built', 'lead', KILLS, True),
+    ('built', 'on_b', KILLS, True),
+    ('built', 'same_node_both', KILLS, True),
     ('built', 'both', BUILT, True),
-    ('built', 'on_b', BUILT, True),
+    ('built', 'both', KILLS, False),            # the residual: two nodes, two callers
     ('built', 'nonlead', PART_B, True),
-    ('built', 'nonlead', NO_HELP, False),     # Part B needs its sweeps: the finding
+    ('built', 'nonlead', NO_HELP, True),        # the carrier's wait: no sweep needed
+    ('no_carrier_wait', 'nonlead', NO_HELP, False),     # Part B's finding, without it
     ('caller_exits', 'lead', BUILT, False),
-    ('pidfd_fatal', 'nonlead', BUILT, False),
+    ('pidfd_fatal', 'on_b', BUILT, False),
     ('wake_first', 'nonlead', BUILT, False),
-    ('no_rewake', 'on_b', {'pidfd': True, 'sweeps': False}, False),
-    ('built', 'finish', BUILT, True),
+    ('no_rewake', 'on_b', BUILT, True),         # a second line now (see the variant)
+    ('built', 'finish', KILLS, True),
     ('finalize_returns', 'finish', BUILT, False),
-    ('built', 'early', BUILT, True),
+    ('built', 'early', KILLS, True),
     ('no_init_wait', 'early', BUILT, False),
-    ('built', 'exiting', BUILT, True),
+    ('built', 'exiting', KILLS, True),
     ('exit_everywhere', 'exiting', BUILT, False),
     ('built', 'caller_exiting', BUILT, False),     # ends at the grace in the code
     ('status_everywhere', 'nonlead', BUILT, False),
     ('caller_zero', 'nonlead', BUILT, False),
+    ('called_carries', 'nonlead', KILLS, False),
+    ('called_carries', 'same_node_both', KILLS, False),
+    ('no_carrier_wait', 'nonlead', KILLS, False),
+    ('no_lead_wait', 'nonlead', KILLS, False),
+    ('no_remote_wait', 'nonlead', KILLS, False),
+    ('wait_every_node', 'nonlead', KILLS, False),
+    ('no_exclusion', 'both', BUILT, False),
 ]
 
 if __name__ == '__main__':
