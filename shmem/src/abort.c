@@ -91,6 +91,15 @@ _Noreturn void osoe_abort_end(void)
         for (;;)
             pause();                    /* another thread is ending this process */
     this_thread_ends = true;
+    /* SIGPIPE held back in this thread, as the agent holds every signal back
+     * in its own (agent.c): a flush into a pipe whose reader is gone then
+     * fails with EPIPE, and the PE leaves with the status below rather than by
+     * the signal - one end, whichever thread makes it (Part 2's adversarial
+     * read, 2026-10-02). */
+    sigset_t broken_pipe;
+    sigemptyset(&broken_pipe);
+    sigaddset(&broken_pipe, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &broken_pipe, NULL);
     /* A global exit's status is the job's and its caller's (spec §9.1.6): only
      * the PE whose program called shmem_global_exit leaves with it, and every
      * other PE leaves with 0, so that a launcher which ends the step at the
