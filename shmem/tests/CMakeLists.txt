@@ -1463,6 +1463,42 @@ add_test(NAME env.probe.old-kernel COMMAND deny-futex2 $<TARGET_FILE:probe>)
 set_tests_properties(env.probe.old-kernel PROPERTIES LABELS "env" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "FAIL futex_wait, named shm, woken by other process")
 
+# io_uring refused in each place shmem_init's check enters it (deny-io-uring.c):
+# the probe fails its check of shmem_init's, naming the place; a job of two
+# nodes is refused by name before anything is made, the sysctl named only where
+# it can be the cause; and a job of one node, which opens no ring, runs. Before
+# Part 6's adversarial reads the check missed `enable` and `enter`, and a job
+# ended after its PEs had left shmem_init.
+add_executable(deny-io-uring deny-io-uring.c)
+osoe_warnings(deny-io-uring)
+set(osoe_io_uring_refused_setup "an io_uring created SINGLE_ISSUER, R_DISABLED and CQSIZE")
+set(osoe_io_uring_refused_enable "an io_uring enabled after it was created R_DISABLED")
+set(osoe_io_uring_refused_enter "an io_uring that can be entered to wait for completions")
+foreach(where setup enable enter)
+  add_test(NAME env.probe.no-io-uring-${where}
+    COMMAND deny-io-uring ${where} $<TARGET_FILE:probe>)
+  set_tests_properties(env.probe.no-io-uring-${where} PROPERTIES LABELS "env" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "FAIL shmem_init's io_uring check +${osoe_io_uring_refused_${where}}")
+  add_test(NAME shmem.refuse.no-io-uring-${where}
+    COMMAND deny-io-uring ${where} $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 --
+            $<TARGET_FILE:shmem_test_init>)
+  if(where STREQUAL "setup")
+    set(osoe_hint " .*which usually means the kernel.io_uring_disabled sysctl is set")
+    set(osoe_not "left behind")
+  else()
+    set(osoe_hint "")
+    set(osoe_not "left behind|io_uring_disabled|submission failed|cannot enable")
+  endif()
+  set_tests_properties(shmem.refuse.no-io-uring-${where} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION
+      "osoe needs io_uring with ${osoe_io_uring_refused_${where}} for a job of 2 nodes${osoe_hint}"
+    FAIL_REGULAR_EXPRESSION "${osoe_not}")
+endforeach()
+add_test(NAME shmem.no-io-uring.one-node
+  COMMAND deny-io-uring setup $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
+          $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.no-io-uring.one-node PROPERTIES LABELS "tier2" TIMEOUT 60)
+
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)

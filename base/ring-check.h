@@ -11,11 +11,17 @@
 /*
  * Returns 0, or the errno of what failed, with `*facility` naming it: a ring
  * created SINGLE_ISSUER, R_DISABLED and with an explicit completion queue size
- * (§3.3), a registered provided-buffer ring, and the RECV, SEND and FUTEX_WAIT
- * opcodes. FUTEX_WAIT is Linux 6.7, which also brings everything older in the
- * list (multishot receive is 6.0). EPERM usually means io_uring is disabled by
- * the kernel.io_uring_disabled sysctl.
+ * (§3.3); enabled, and entered to wait for completions, as the agent's first
+ * pass does with its own (ring.c) - a kernel or a filter that refused only
+ * those ended a job after its PEs had left shmem_init (Part 6's adversarial
+ * reads); its list of opcodes, with RECV, SEND and FUTEX_WAIT in it; and a
+ * registered provided-buffer ring. FUTEX_WAIT is Linux 6.7, which also brings
+ * everything older in the list (multishot receive is 6.0).
  */
 int osoe_ring_check(const char **facility);
+
+/* The facility named when creating the ring failed: the one step the
+ * kernel.io_uring_disabled sysctl refuses, with EPERM. */
+extern const char osoe_ring_check_creating[];
 
 #endif /* OSOE_BASE_RING_CHECK_H */

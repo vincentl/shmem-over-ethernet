@@ -5,7 +5,9 @@
  * Checks the kernel facilities the design document relies on (see its §8.5):
  * io_uring ring setup, IORING_OP_FUTEX_WAIT, multishot recv with a provided
  * buffer ring, cross-process futexes on a named shared-memory object (by
- * futex_wait and by io_uring), and 64-bit futex support.
+ * futex_wait and by io_uring), and 64-bit futex support - and makes the
+ * io_uring check shmem_init makes (base/ring-check.c), so that a kernel this
+ * passes is one a job of several nodes starts on.
  * Run it first on any new machine.
  *
  *   cmake --workflow --preset debug        (runs it as the env.probe test)
@@ -33,6 +35,8 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "base/ring-check.h"
 
 #ifndef __NR_futex_wake
 #define __NR_futex_wake 454
@@ -235,10 +239,25 @@ static void probe_uring_setup(void)
     io_uring_prep_futex_wait(sqe, &w, 6, FUTEX_BITSET_MATCH_ANY, FUTEX2_SIZE_U32 | FUTEX2_PRIVATE, 0);
     io_uring_submit(&ring);
     struct io_uring_cqe *cqe;
-    io_uring_wait_cqe(&ring, &cqe);
-    CHECK("uring futex_wait stale value -> -EAGAIN", cqe->res == -EAGAIN, "res=%d", cqe->res);
-    io_uring_cqe_seen(&ring, cqe);
+    /* A ring that cannot be entered completes nothing: say so, rather than
+     * read a completion that never came (Part 6's adversarial read). */
+    int waited = io_uring_wait_cqe(&ring, &cqe);
+    CHECK("uring futex_wait stale value -> -EAGAIN", waited == 0 && cqe->res == -EAGAIN,
+          "res=%d", waited == 0 ? cqe->res : waited);
+    if (waited == 0)
+        io_uring_cqe_seen(&ring, cqe);
     io_uring_queue_exit(&ring);
+}
+
+/* shmem_init's own check, through the same function, rather than a copy of
+ * it here that could fall behind: a ring set up R_DISABLED, enabled and
+ * entered, the SEND opcode among the others, and a provided-buffer ring (§1). */
+static void probe_init_ring_check(void)
+{
+    const char *facility = "";
+    int e = osoe_ring_check(&facility);
+    CHECK("shmem_init's io_uring check", e == 0, "%s%s%s", e ? facility : "",
+          e ? ": " : "", e ? strerror(e) : "");
 }
 
 /* Multishot recv with a provided buffer ring over real TCP loopback (3.3). */
@@ -307,6 +326,9 @@ static void probe_multishot(void)
 
 int main(void)
 {
+    /* A line at a time, so that what was checked survives a crash when stdout
+     * is a pipe, as under srun. */
+    setvbuf(stdout, NULL, _IOLBF, 0);
     struct utsname u;
     uname(&u);
     printf("info kernel %s %s, page size %ld, liburing %d.%d\n", u.release, u.machine,
@@ -316,6 +338,7 @@ int main(void)
     probe_shared_futex(true);
     probe_unlinked_reopen();
     probe_uring_setup();
+    probe_init_ring_check();
     probe_multishot();
     printf("%s (%d failures)\n", fails ? "PROBE FAILED" : "PROBE PASSED", fails);
     return fails != 0;

@@ -294,8 +294,9 @@ static void session_start(void)
         osoe_fatal("osoe needs io_uring with %s for a job of %u nodes (it fails with "
                    "\"%s\"%s); this kernel is %s", facility, osoe.bootstrap.node_count,
                    strerror(ring_error),
-                   ring_error == EPERM ? ", which usually means the kernel.io_uring_disabled "
-                                         "sysctl is set" : "", release);
+                   ring_error == EPERM && facility == osoe_ring_check_creating
+                       ? ", which usually means the kernel.io_uring_disabled sysctl is set"
+                       : "", release);
     }
     osoe_node_refusal_arm(&osoe.node, &osoe.bootstrap, sessions);
 
