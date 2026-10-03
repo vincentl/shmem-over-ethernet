@@ -2071,6 +2071,17 @@ foreach(case "nonlead;7;7;1;compute" "fatal.nonlead;fatal;1;1;compute"
   set_tests_properties(shmem.global-exit.${label}.0-0-1-1
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endforeach()
+# The grace's own status (abort.c), which nothing else reaches: every other PE
+# holding stdout's lock, so its flush cannot end it and the grace does, with 0;
+# and the caller holding it, so exit's flush waits and the grace ends the caller
+# with its status. About 10 s each (OSOE_ABORT_GRACE_SECONDS).
+foreach(mode held-stdout caller-held-stdout)
+  add_test(NAME shmem.global-exit.${mode}.0-0-1-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 ${mode})
+  set_tests_properties(shmem.global-exit.${mode}.0-0-1-1
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endforeach()
 # A global exit with status 0: no rank leaves nonzero, and the launcher exits 0.
 add_test(NAME shmem.global-exit.zero.0-0-1-1
   COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>

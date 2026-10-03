@@ -33,9 +33,12 @@
 LAUNCHER=$1 PROGRAM=$2 RANKS=$3 MAP=$4 HOW=$5 STATUS=$6 CALLER=${7:-0} MODE=${8:-compute}
 KEEP=-k
 [ "${KILLS:-}" = yes ] && KEEP=
-# A fatal, or an end straight after init, flushes nothing a PE had not written.
+# A fatal, or an end straight after init, flushes nothing a PE had not written;
+# nor does an end the grace makes for a PE whose stdout is held, which skips a
+# stream it cannot lock (abort.c).
 flushes=yes
 [ "$HOW" = fatal ] || [ "$MODE" = immediate ] && flushes=no
+case $MODE in held-stdout|caller-held-stdout) flushes=no ;; esac
 if [ "$MAP" = - ]; then
     out=$(${WRAP:-} "$LAUNCHER" -n "$RANKS" -t 60 $KEEP -- "$PROGRAM" "$HOW" "$CALLER" "$MODE" 2>&1)
 else
@@ -114,5 +117,9 @@ handlers)
 slow-handler)
     # The caller's handler takes a second, and the caller must finish it.
     printf '%s\n' "$out" | grep -q "^PE $CALLER: handler ran after a second\$" || exit 1 ;;
+held-stdout|caller-held-stdout)
+    # Ended by the grace, OSOE_ABORT_GRACE_SECONDS (10 s), and not before:
+    # otherwise the grace's own status was never what the statuses above saw.
+    [ -n "$began" ] && awk -v t="$took" 'BEGIN { exit !(t >= 9) }' || exit 1 ;;
 esac
 echo "GLOBAL EXIT OK"

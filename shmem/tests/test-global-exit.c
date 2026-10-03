@@ -43,6 +43,15 @@
  *              only the caller's PE ends with exit, which runs it; every other
  *              ends with fflush and _exit, running none beside a main thread
  *              still computing
+ *   held-stdout
+ *              compute, every other PE holding stdout's lock (flockfile)
+ *              meanwhile: its end's flush cannot take it, so the library's
+ *              grace ends it, after OSOE_ABORT_GRACE_SECONDS - with 0, as any
+ *              PE but the caller leaves (abort.c's grace_status)
+ *   caller-held-stdout
+ *              the caller holds stdout's lock as it ends the job, so exit's
+ *              flush waits on it and the grace ends the caller - with the
+ *              caller's status
  *   slow-handler
  *              compute, with an atexit handler on the caller's PE alone that
  *              takes a second and then prints a line: under a launcher that
@@ -123,6 +132,10 @@ int main(int argc, char **argv)
         atexit(handler_ran);
     if (strcmp(mode, "slow-handler") == 0 && me == caller)
         atexit(slow_handler_ran);
+    /* Held for good: nothing of this program unlocks it (see the modes). */
+    if ((strcmp(mode, "held-stdout") == 0 && me != caller) ||
+        (strcmp(mode, "caller-held-stdout") == 0 && me == caller))
+        flockfile(stdout);
     printf("PE %d: computing\n", me);           /* buffered: flushed only by exit */
     if (me == caller && strcmp(mode, "immediate") == 0)
         end_the_job(how);
