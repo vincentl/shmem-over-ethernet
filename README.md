@@ -955,6 +955,9 @@ osoe is free software: you can redistribute it and modify it under the terms
 of the GNU Lesser General Public License, version 3 or (at your option) any
 later version ([COPYING.LESSER](COPYING.LESSER)), which supplements the GNU
 General Public License, version 3 ([COPYING](COPYING)). Every source file says
-so in one line, `SPDX-License-Identifier: LGPL-3.0-or-later`. A program linked
+so in one line, `SPDX-License-Identifier: LGPL-3.0-or-later`; the four programs
+copied from the OpenSHMEM specification's examples, kept as evidence in
+`docs/reviews/evidence/phase1-step2-slice1/conformance/`, are the
+specification's, not osoe's, and carry its notice instead. A program linked
 against the library may carry any license its authors choose; changes to the
 library itself are shared under the same terms.

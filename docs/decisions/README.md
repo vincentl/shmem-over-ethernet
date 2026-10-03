@@ -124,10 +124,11 @@ without the author, under a standing mandate, and the record carries the undo.
 
 ## License and release
 
-- **License: GNU LGPL, version 3 or any later version.** `COPYING` and `COPYING.LESSER`; `SPDX-License-Identifier: LGPL-3.0-or-later` on every source file. Author, [2026-09-26-evening](2026-09-26-evening.md) items 3 and 14.
+- **License: GNU LGPL, version 3 or any later version.** `COPYING` and `COPYING.LESSER`; `SPDX-License-Identifier: LGPL-3.0-or-later` on every source file but the four copies of the specification's examples kept as evidence, which are the specification's and carry its notice instead. Author, [2026-09-26-evening](2026-09-26-evening.md) items 3 and 14; the line on the evidence's programs and `dev/lima`, [2026-10-02](2026-10-02.md) item 7.
 - **An hour of `mix` on the cluster before every release tag**, on the release checklist. Author, [2026-09-27-night](2026-09-27-night.md) "What the answers changed".
 - **The version is 0.1.0, one value**: `project(osoe VERSION ...)` in the top-level `CMakeLists.txt`, which reaches the line `SHMEM_VERSION=1` prints, the first line of `SHMEM_INFO`'s text, every tool's `--version` (`oshcc`'s is `--showme:version`, since its `--version` is the compiler's, which build systems read), and the shared library's file name and soname. `SHMEM_VENDOR_STRING` stays "osoe", a name. Author, [2026-10-02](2026-10-02.md) item 7 (D8); built in [2026-10-02-release-fixes](2026-10-02-release-fixes.md) Part 1 item 8, where `oshcc`'s spelling is Claude's.
 - **The release checklist lives in the tree**, `docs/release-checklist.md`, moved there from the author's status page by the release-fixes brief. Author, [2026-10-02](2026-10-02.md) item 5.
+- **The tree names no one's machine.** The evidence, the finished briefs and the review prompts write the repository's directory as `<repo>` and any other path under a home directory as `~` (a script that names `<repo>` records what ran; it is not one to run as written), and `docs/README.md` says so; the captured Slurm fixtures name `vm-0` and `192.0.2.1`, not the development VM, and `shmem/tests/slurm-fixtures/README.md` says why. Author (D9, as the plan recommended), [2026-10-02](2026-10-02.md) item 7; built by Part 5 of `docs/prompts/task-release-fixes.md`.
 
 ## Reversed
 
