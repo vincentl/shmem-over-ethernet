@@ -57,7 +57,7 @@ set(OSOE_API
 # which the API and the backends both build on. Above the boundary, like the
 # API.
 set(OSOE_RUNTIME
-  abort.c agent.c allocator.c bootstrap.c deadlock.c fatal.c liveness.c metrics.c
+  abort.c agent.c allocator.c blocked.c bootstrap.c deadlock.c fatal.c liveness.c metrics.c
   region-wait.c sweep.c
   abort.h agent.h allocator.h blocked.h bootstrap.h deadlock.h fatal.h liveness.h
   metrics.h region-wait.h state.h)
