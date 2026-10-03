@@ -277,6 +277,96 @@ of 627, release 627 of 627 (the models left to their preset), asan 626 of 626, t
 411; tier 3's global-exit tests twice, 18 of 18. The model whole on the host, every case as
 expected (9 min 30 s).
 
+## Part 3: start-up says what it waits for, and a refusal tells the node (D2)
+
+Branch `startup-loud`: the round-three review's R8, N1 and N2, on the author's middle
+option. No wait gives up because time has passed (§3.15); a notice is not an end.
+
+1. **Every start-up wait is said** after 30 s, and every minute after - one line a node:
+   the lead names the local PEs not joined or mapped, with their ranks; local id 1,
+   while the lead has made no segment, or a leftover of another launch stands in its
+   place, names the lead; a lead calling another node names it, its host-list entry, the
+   address and ports dialled and the dial's last error, which `dial` used to throw away;
+   a lead waiting to be called names the nodes it waits for; a mesh connection that has
+   stopped names the peer's address and port. `OSOE_TEST_NOTICE_SECONDS` shortens the
+   30 s for tests.
+2. **Every PE checks every setting that shapes the node or the job before its node
+   joins** (3a.1). A Sonnet sweep found seven checked by the lead alone - not the brief's
+   two - and the wire's by leads alone, after the rendezvous, never on one node. Every
+   PE now reads and checks each, through `transport.h` for the backend's own;
+   `OSOE_MAX_THREADS` and `OSOE_GET_LANDING_BYTES` are compared between a node's PEs, as
+   the teams' and contexts' already were (the README marks them *checked*); a non-lead
+   whose connection-area settings outgrew its lead's, which waited for ever, is refused
+   by name. Six settings of the agent and the detector are checked after the join, and
+   end the job through the abort word.
+3. **A refusal before the segment tells the node.** The lead makes its segment before it
+   checks `/dev/shm`; a PE that refuses before its node joins runs a last word - `failed`
+   in the segment, or from a lead with none a *tombstone*, a header with `failed` set, or
+   from any other PE `failed` in the lead's segment, waited for within the abort grace.
+   The kernel checks tell nobody: every local PE refuses the kernel itself, before
+   anything is made, as §1 promises - armed, the tombstone's wake was the futex2 call that
+   had failed (`shmem.refuse.old-kernel`, found when the suite first ran whole).
+4. **The listener keeps callers part-way through the hello in a set of 16**, and with
+   `OSOE_JOB_SECRET` judges a hello's counts and node claim only after the caller has
+   proved the secret. A full set stops accepting, and callers wait in the backlog, rather
+   than answering NOT_YET as the brief proposed: callers retry either way.
+5. **A failed start's leftovers.** `osoe-stat --gc` removes a control segment no PE
+   joined once the process that made it (`node.creator_pid`, a new metric) is gone and
+   nothing maps it, and a tombstone once nothing maps it; it lists and shows a tombstone
+   as one.
+6. **Fixed when the suite first ran whole after the rebase**: `init.c` reached below the
+   backend boundary (`shmem.boundary`, and the strict C11 build through `liburing.h`).
+7. **The tests** (a Sonnet subagent): a driver, `refusal.sh`, runs a job with `-k` and
+   requires every rank to end by itself with a failure, or the given number left to the
+   launcher's timeout with their notices said first; 16 refusal tests converted to it and
+   27 new - every setting's refusal on every PE and on one, the `/dev/shm` refusal, a
+   PE's own environment, a PE that never calls `shmem_init`, mislaunched counts with and
+   without a secret - and a tier 3 test of a wrong address for a peer. Mutations, each
+   seen to fail: the room check before the segment (only with the tombstone gone too),
+   the tombstone skipped, each comparison removed, the connection-area size refusal
+   removed, the notices' parts removed one by one, the claims judged before the proof,
+   the set of one caller. Before and after on `main`: every case the brief listed left a
+   PE to the timeout, or ran silently to exit 0, before; all end now. The tests found
+   three waits more: one swept once a round of 32 dials, each most of a second of ARP's
+   for an unroutable peer, so its notice came near 50 s (it sweeps between dials now);
+   one told a lead that never came, after its no-progress limit, for 10 s more (it tells
+   nobody now); and the connection area's two waits were silent (noticed now). Left as
+   they are, and stated: a refusing node's neighbours in the tree end with it, but a node
+   that has not reached it waits, saying so; a secret's mislaunched non-leaf waits naming
+   a child that does not exist.
+8. **The adversarial read** (a fresh agent, given the branch and Part 3's brief). Sound:
+   the last word, the order of `create_control`, every setting validated by every PE, the
+   proof before the claims, `--gc`'s new rules. Findings, and what was done:
+   - *A failed start's leftover made the next start with the same ids fail* (medium), 4
+     times in 10: a node-mate read its `failed` before the new lead reclaimed it - a
+     requeued Slurm job without the epilog, a reused launcher pid, a hand-set job id. The
+     header records the launch (`SLURM_RESTART_COUNT`, or `OSOE_LAUNCH`, which
+     `osoe-launch` sets afresh; layout 28), and a node-mate waits past a ready or failed
+     segment of another launch, saying so, as `tell_the_lead` does
+     (`shmem.start-up.same-ids`, five starts of five).
+   - *A lead that died with its segment made left its node-mates silent* (low): liveness
+     starts after the join; they watch its pid during it now
+     (`shmem.start-up.lead-ends-in-join`).
+   - *README and design sentences that were not true*: other nodes do not all keep
+     waiting for a refusing node; "every start-up wait says" is one line a node; a
+     refusal reaches its node-mates within 10 s of its lead's segment; the settings
+     checked after the join. Rewritten.
+   - *Tests that passed with their property broken*: a non-lead's notice after the
+     segment exists is forbidden now; an unproved hello claiming a node outside the job
+     is sent; tier 3's wrong address must be named within 20 s, not 60; `--gc` removes a
+     tombstone the library made. Each fails with its fix undone.
+   - *A process on a lead's host answering on its port first can end a caller* that has
+     a secret, which takes it for a job with another secret: stated in the README's Trust
+     paragraph, not changed - a real mismatch must still end naming itself.
+
+**Verification**, on the tree that merges (`7458fb8`, rebased onto Part 2), in `osoe-load`,
+pins on: debug 657 of 657, release 657 of 657, asan 656 of 656, tsan 441 of 441; tier 3's
+start-up and global-exit tests twice, 22 of 22. Before the rebase, on `bcbc7e0`, the same
+presets and tier 3's start-up tests passed whole, and the read's four new tests each failed
+with its fix undone; one release run had failed only `shmem.floor`'s get pin, under the
+host's load from two reviewers' builds (4.70 times the floor against 3.0), and passed three
+of three idle.
+
 ## Still with the author
 
 - **The release checklist** (`docs/release-checklist.md`, with the repository scrub) is
