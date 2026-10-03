@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # What does a job killed with SIGKILL leave in /dev/shm, and how much of it does
 # `osoe-stat --gc` remove? Usage: stale-segments.sh <build dir> <program that inits and sleeps>
 set -u

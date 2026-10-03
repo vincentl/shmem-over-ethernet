@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Slice 3's mutations on a copy (wt/mutslice3), each shown in its build; the
 # threaded, context, get, lock and quiet tests three times each in release.
 exec 9>/tmp/osoe-vm.lock

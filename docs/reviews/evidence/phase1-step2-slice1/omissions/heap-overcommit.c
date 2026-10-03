@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* A symmetric heap larger than /dev/shm can back. shmem_init and shmem_malloc
  * both succeed (ftruncate is sparse); who pays, and when? Map 0,1,1: PE 0 puts
  * into PE 2's heap, which node 1's lead (PE 1) applies on PE 2's behalf. */

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # F1 phase G: only the internode allgather's puts cut to 16 KiB pieces
 # (OSOE_EXPERIMENT_GATHER_PIECE), the chunk left at 64 KiB for everything else.
 set -u

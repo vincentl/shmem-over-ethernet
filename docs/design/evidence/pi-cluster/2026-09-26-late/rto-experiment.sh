@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # F1 experiment (2026-09-26 late): is the 16 KiB fcollect at 4 x 2 slow because
 # switch losses each cost the kernel's 200 ms minimum retransmission timeout?
 # A scratch copy of main with one env-gated setsockopt(TCP_RTO_MIN_US), swapped

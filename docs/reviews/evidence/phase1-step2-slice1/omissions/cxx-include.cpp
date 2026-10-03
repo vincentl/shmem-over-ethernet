@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
 // Does a C++ translation unit survive every public header, and what does a
 // C++ caller actually get?
 #include <shmem.h>

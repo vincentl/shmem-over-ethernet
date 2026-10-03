@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Evidence for finding P2 (report.md), second program: a put of many chunks,
  * then quiet, at DEFAULT sizes (64 KiB chunk, 128 KiB buffers, 16 KiB wire).

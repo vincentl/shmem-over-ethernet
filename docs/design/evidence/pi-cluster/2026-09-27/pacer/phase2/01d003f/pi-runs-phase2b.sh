@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # pi-runs-phase2b.sh: phase 2's tip after the round trip was added (01d003f,
 # ~/osoe-pacer-01d003f): once pi-runs-phase2.sh has finished, the quick run and
 # mailbox's ten minutes again, in release at 4 x 4. Outputs in

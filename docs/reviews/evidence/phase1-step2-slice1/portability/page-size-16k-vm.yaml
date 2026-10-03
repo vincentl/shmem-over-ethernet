@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # A throwaway second Lima VM used by the portability review to boot Debian 13's
 # 16 KiB-page arm64 kernel (linux-image-arm64-16k), the closest available stand-in
 # for the Raspberry Pi 5's 16 KiB-page kernel. Created with:

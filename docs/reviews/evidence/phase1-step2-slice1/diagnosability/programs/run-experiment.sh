@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # run-experiment.sh NAME MAP COUNT TIMEOUT SETTLE -- hang-arguments...
 # Launches the hang program under osoe-launch, waits SETTLE seconds, then acts
 # as an operator with osoe-stat alone, logging the commands and their output.

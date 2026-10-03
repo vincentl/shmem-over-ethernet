@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Extra checks on the recorded models, run from the review's evidence directory.
 
 1. AG EF termination. engine.explore() reports LOST WAKE / STUCK only at states

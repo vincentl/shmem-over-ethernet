@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * probe-extra - the checks tools/probe does not make, written by the
  * portability review. Each is something the design relies on (or will in

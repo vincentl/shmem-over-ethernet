@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # local-driver.sh: agent-placement.sh's runs, driven from the author's Mac,
 # since only a hop from here carries the key the compute nodes accept. The
 # job's step runs on pi-login under ssh; the samples and the widening go to

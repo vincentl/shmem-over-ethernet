@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* A small whole-job program for odd shapes: uneven PEs per node, one PE per
  * node, P not a power of two, one PE in total. */
 #include <stdio.h>

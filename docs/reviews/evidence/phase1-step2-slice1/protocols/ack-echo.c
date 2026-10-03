@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Evidence for the acknowledgement echo (report.md, finding P1).
  *

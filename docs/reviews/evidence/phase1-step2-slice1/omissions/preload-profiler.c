@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* An LD_PRELOAD tool in the style of spec §10.2: defines shmem_X, calls pshmem_X. */
 #include <stdio.h>
 #include <pshmem.h>

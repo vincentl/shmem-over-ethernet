@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* What a real code does: system(), popen(), and a fork() child that leaves with
  * exit() rather than _exit() - so atexit handlers and stdio run in the child. */
 #include <stdio.h>

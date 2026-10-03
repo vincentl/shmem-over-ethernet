@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # agent-widen.sh CPUS: give the lead's agent thread on this node the affinity
 # CPUS (0-3: the node's four cores, every core the step's cgroup allows),
 # leaving every PE's main thread and every other agent as Slurm bound them.

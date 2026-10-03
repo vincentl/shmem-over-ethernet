@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """tcp-bruck.py BLOCK [ITERATIONS]: osoe's four-node allgather traffic over
 plain TCP, no osoe code. Rank r (SLURM_PROCID, on 10.0.1.r+1) keeps one
 connection to each other rank; each iteration sends BLOCK bytes to r-1 while

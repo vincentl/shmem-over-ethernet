@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Run inside the VM. $1 = private tree root, $2 = dir with the built programs.
 T=${1:?}; O=${2:?}; L=$T/build/debug/tools/launch/osoe-launch
 snapshot() { echo "  /dev/shm: $(ls /dev/shm | grep -c "^osoe\.$1\.") objects, $(du -ck /dev/shm/osoe.$1.* 2>/dev/null | tail -1 | cut -f1) KiB resident; sleeper processes: $(pgrep -f "$O/sleeper" | wc -l)"; }

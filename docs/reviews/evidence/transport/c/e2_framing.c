@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* E2: multishot recv + provided buffers delivers arbitrary byte boundaries.
  * (a) 100 records of 3000 bytes, 4096-byte pbufs: how many records straddle a CQE boundary.
  * (b) a single 64 KB "segment" with 8 x 4096 pbufs, receiver holds pbufs until the segment

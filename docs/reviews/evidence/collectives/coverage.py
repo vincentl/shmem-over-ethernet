@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Coverage (counts every reachable edge, not just BFS-tree edges): confirm interesting transitions are actually reachable in the passing runs.
 import model, collections
 def cov(cfg, pats):

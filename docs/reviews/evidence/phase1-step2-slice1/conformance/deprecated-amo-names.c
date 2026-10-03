@@ -19,3 +19,5 @@ int main(void)
     shmem_finalize();
     return (int)old;
 }
+
+/* SPDX-License-Identifier: LGPL-3.0-or-later */

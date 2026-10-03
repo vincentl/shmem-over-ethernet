@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Spec 9.11.10: "If an entry i in ivars within the test set satisfies the test
  * condition, a series of calls to shmem_test_any must eventually return i."
  * (the same sentence is in 9.11.3 for shmem_wait_until_any). Elements 0 and 3

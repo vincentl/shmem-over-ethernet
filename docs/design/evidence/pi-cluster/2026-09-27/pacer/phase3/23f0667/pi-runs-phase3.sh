@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # pi-runs-phase3.sh: the pacer's measurements of phase 3
 # (docs/prompts/task-stress-phase3.md) at 4 x 4 from ~/osoe-pacer-phase3: the
 # quick run of every exercise, ten minutes each of atomics, rma, locks,

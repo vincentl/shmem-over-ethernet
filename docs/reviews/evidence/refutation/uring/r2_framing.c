@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* R2: is the B4 stall intrinsic or a pbuf-sizing artefact of "hold until segment complete"?
  * One 64 KB segment over TCP loopback, 4096 B pbufs.
  *  (a) ring = 8 pbufs, hold-until-complete  (reviewer's case)

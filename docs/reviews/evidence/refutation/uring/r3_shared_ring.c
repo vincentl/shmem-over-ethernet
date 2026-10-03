@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* R3: two connections share one 32x4096 pbuf ring (128 KB). Each sends a 128 KB segment in two
  * halves; both first halves are sent before either second half. Policy: hold pbufs until the
  * connection's segment is complete. Then the same with stream-parse (recycle every CQE). */

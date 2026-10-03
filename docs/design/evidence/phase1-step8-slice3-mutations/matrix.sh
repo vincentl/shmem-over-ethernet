@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Which hook catches each race mutation: OSOE_CHECK_QUIET alone, OSOE_TEST_PERTURB
 # alone, or both; ten runs each on 0,1,2,0,1,0, counting failures.
 exec 9>/tmp/osoe-vm.lock

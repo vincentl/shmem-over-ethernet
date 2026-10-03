@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # After step 8 slice 2 (main bc5fbb6): the runbook's §11 item 4 - SOS's threaded
 # programs and shmem_test_multiple under Slurm at 4 x 2, and the thread tests
 # of tier 2. Outputs in ~/pi-results-threads.

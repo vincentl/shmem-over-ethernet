@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* A third party's first program, compiled against the *installed* tree only. */
 #include <stdio.h>
 #include <shmem.h>

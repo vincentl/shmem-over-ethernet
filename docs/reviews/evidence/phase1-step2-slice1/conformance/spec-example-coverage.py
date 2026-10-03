@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 import re,sys
 # Inputs, in the working directory: spec.txt (pdftotext -layout docs/reference/OpenSHMEM-1.6.pdf spec.txt)
 # and syms.txt (nm -D --defined-only libosoe.so | awk '{print $2, $3}').

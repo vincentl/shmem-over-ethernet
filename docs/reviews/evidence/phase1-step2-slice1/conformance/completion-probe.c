@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Two completion guarantees, checked from a PE that is neither the origin nor
  * the target, which is where "visible to all PEs" (spec 9.12.2, 9.12.3) can be
  * seen to fail:

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Every C11 generic of shmem.h, on every type of spec Tables 6, 7, 8 and 12,
  * with and without a context. Compile-only: -std=c11 -pedantic -Wall -Wextra -Werror. */
 #include <stddef.h>

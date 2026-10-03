@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """The internode arrival handoff (design §5.3, §3.12, §4.9).
 
 §5.3 says whichever local member's increment reaches the epoch's arrival target

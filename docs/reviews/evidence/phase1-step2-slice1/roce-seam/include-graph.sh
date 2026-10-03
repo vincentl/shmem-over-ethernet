@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Transitive project-header closure of every .c file in shmem/src, and which
 # SHMEM-layer files (those implementing pshmem_* entry points, or named by the
 # review brief) reach an AM-layer header. Run from the repository root.

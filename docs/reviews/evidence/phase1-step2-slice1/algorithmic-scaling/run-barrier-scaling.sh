@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Review evidence: build and run barrier-scaling.c against a PRIVATE release
 # build of the tree (never the main build directories). Run inside the VM.
 # Results are "measured under contention": 4 cores, shared with other agents.

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """fuzz-stat.py SEGMENT OSOE_STAT [ROUNDS]
 
 Copy a live control segment, damage the copy, and run osoe-stat over it in each

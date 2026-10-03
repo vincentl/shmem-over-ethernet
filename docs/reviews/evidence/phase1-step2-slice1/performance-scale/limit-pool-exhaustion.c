@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Limits experiment 1: the reply-descriptor pool is sized `peers x C` for gets
  * (reply.h, progress-host.c:233) but collective forwards draw on the same pool

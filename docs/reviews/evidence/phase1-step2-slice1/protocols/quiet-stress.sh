@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Run inside the VM. $1 = tree (tree | tree-naive) under build/scratch/review-protocols.
 T=<repo>/build/scratch/review-protocols/$1
 E=<repo>/docs/reviews/evidence/phase1-step2-slice1/protocols

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """
 Exhaustive interleaving model of design §3.4/§3.5/§3.8 (buffer reservation,
 seal/submit/recycle, DRAINING) for ONE connection, two buffers, small writers.

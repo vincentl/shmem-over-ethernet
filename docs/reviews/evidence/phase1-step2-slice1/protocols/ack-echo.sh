@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Run inside the VM from the private tree: build/scratch/review-protocols/tree
 # (a copy of the repository with ack-echo.patch applied and the debug preset built).
 set -e

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """apply-mutation.py NAME: apply mutate.sh's mutation NAME to shmem/src/transport-am.c
 in the current directory; exits nonzero if its target is not there once."""
 import sys

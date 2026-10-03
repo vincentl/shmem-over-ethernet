@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # pi-runs.sh: the pacer's measurements of phase 1 (docs/pi-cluster.md §6) at
 # 4 x 4, release, from ~/osoe-pacer; outputs in ~/pacer-results. Each node's
 # retransmission timeouts are read before and after every run, as F1's retests

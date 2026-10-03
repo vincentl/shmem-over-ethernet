@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # vm-mix-hour.sh: an hour of mix on the VM, the four smoke maps' largest
 # (0,0,0,1,1,2), from phase 4's verified tree (64d8d39) in wt/pacer4-verify,
 # release; after verify8.sh, under the VM's lock.

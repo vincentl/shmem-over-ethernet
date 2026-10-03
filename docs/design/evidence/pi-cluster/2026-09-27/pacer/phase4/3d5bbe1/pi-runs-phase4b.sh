@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # pi-runs-phase4b.sh: phase 4's measurements of its verified tree (3d5bbe1)
 # at 4 x 4 from ~/osoe-pacer-phase4b, release, after the first soak's DONE:
 # the quick runs, five minutes each of waits and deprecated, the counted

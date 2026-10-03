@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Run inside the VM as a user with sudo. A private mount namespace gets a 64 MiB
 # /dev/shm; nothing outside the namespace sees it.
 T=${1:?}; E=$(cd $(dirname "$0") && pwd); U=$(id -un)

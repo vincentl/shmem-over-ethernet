@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Annex C makes every call into an uninitialized library undefined, and gives
  * "may abort immediately" as the example. Design section 3.15 promises loud
  * failure. This calls one routine before shmem_init (or after the last

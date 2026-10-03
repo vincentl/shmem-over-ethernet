@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Does an unaligned 64-bit atomic fault on this machine? (design §3.4 says it
  * does on aarch64.) Prints the outcome for offsets 0..7 within a buffer. */
 #include <signal.h>

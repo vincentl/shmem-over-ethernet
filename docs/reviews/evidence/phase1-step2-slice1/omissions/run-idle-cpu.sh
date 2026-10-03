@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # CPU consumed by a job whose PEs are all asleep in the application (sleep(30)):
 # what the library's own threads cost a 4-core node. Measured under contention.
 T=${1:?}; O=${2:?}; L=$T/build/debug/tools/launch/osoe-launch

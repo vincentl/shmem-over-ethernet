@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 set -x
 cd /tmp/omx && gcc -O -o sib sib.c && ./sib
 cat /proc/sys/kernel/yama/ptrace_scope

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Reply credits and the queue bounds they enforce (design §3.8, §3.12, §4.6).
 
 §3.8 bounds the target's deferred reply queues with a per-connection credit

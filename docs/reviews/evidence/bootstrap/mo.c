@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 #include <stdatomic.h>
 #include <stdint.h>
 _Atomic uint32_t head, filled;

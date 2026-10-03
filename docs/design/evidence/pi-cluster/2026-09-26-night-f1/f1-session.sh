@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # F1, 2026-09-26 night: map the trigger, find the losing flow, try socket
 # knobs that shape bursts without shrinking the chunk. Main's library for A
 # and B; C swaps in ~/osoe-f1, main plus env-gated setsockopt calls, by

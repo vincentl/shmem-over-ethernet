@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """The node-pair wire: a byte stream and its wake protocol (design §3.1, §3.10).
 
 §7.1 step 2 runs the AM layer's queues in memory rather than on sockets, so that

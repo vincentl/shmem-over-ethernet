@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Prints the real sizes the scale table is computed from. Built against a
  * private copy of the tree: see run-struct-sizes.sh. */
 #include <stdio.h>

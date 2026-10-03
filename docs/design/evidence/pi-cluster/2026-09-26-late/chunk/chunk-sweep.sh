@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Would a 16 KiB OSOE_AM_CHUNK cost anything? (runbook §11 item 2, 2026-09-26
 # late). osoe-bench and OSU's fcollect, broadcast and put bandwidth at the
 # default chunk and at 16 KiB, alternating, on main a4ca6c4. Outputs in ~/pi-results-chunk.

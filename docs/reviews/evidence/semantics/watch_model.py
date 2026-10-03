@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Exhaustive interleaving model of the design §4.9 watch-table waiter/waker protocol.
 
 Memory models:

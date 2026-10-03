@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # pi-soak-phase4a.sh: phase 4's first soak (docs/prompts/task-stress-phase4.md,
 # "The measurement") at 4 x 4 from ~/osoe-pacer-phase4, release: the quick mix,
 # then three hours of mix with labels folded to nodes. Outputs in

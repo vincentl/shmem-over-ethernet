@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* E5: io_uring send of 4 MB on TCP loopback with small SO_SNDBUF and a slow reader:
  * does the CQE report a short send (no MSG_WAITALL)? */
 #define _GNU_SOURCE

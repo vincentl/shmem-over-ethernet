@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * hang.c - deliberately hang an osoe job in one of several ways, so that an
  * operator holding only osoe-stat can be asked what went wrong.

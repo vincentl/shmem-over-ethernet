@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The store-buffering shape (Dekker, SB) on aarch64, for §3.16's two-sided
  * rule and for quiet (§4.6).

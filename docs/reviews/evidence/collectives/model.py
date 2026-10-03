@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """
 Exhaustive interleaving model of design §5.4-§5.5 (epoch counters, reduction
 destination, barrier arrival) plus an abstract internode tree (§5.1, §5.3).

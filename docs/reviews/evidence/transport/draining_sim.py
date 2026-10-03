@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """
 §3.8 starvation guard, simulated at segment granularity for one connection A->B.
 Node B has P PEs each looping on a blocking shmem_getmem of GET bytes from node A.

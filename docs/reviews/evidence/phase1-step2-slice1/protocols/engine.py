@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Exhaustive interleaving engine for osoe concurrency models (design §4.11).
 
 Descends from the review's watch model

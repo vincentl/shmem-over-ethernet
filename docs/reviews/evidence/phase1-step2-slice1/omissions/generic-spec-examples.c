@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* The generic names the spec's own examples use that shmem.h does not define. */
 #include <shmem.h>
 int main(void) {

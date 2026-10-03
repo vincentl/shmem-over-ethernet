@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # F1 phase E: do the timeouts follow pi-002 or the rank it holds? And does
 # plain TCP with both exchange steps at once stall?
 set -u

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Spec 9.1.1, 9.1.4, 9.1.5, 9.2.1, 9.2.2 and 9.1.13 in one sequence. */
 #include <shmem.h>
 #include <stdio.h>

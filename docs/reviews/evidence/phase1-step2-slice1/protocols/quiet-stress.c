@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Evidence for finding P2 (report.md): with the acknowledgement echo removed
  * the obvious way (naive-echo-fix.patch), quiet can wait for an acknowledgement

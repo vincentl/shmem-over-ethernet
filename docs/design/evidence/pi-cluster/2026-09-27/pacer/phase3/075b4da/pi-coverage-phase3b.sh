@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The counted build of 075b4da over rma's full cycle, 560 rounds, at 4 x 4.
 cd ~/osoe-pacer-phase3 || exit 1
 O=~/pacer-results-phase3b

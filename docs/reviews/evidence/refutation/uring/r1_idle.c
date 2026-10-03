@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* R1: §3.10 idle loop with a REAL multishot TCP recv as the competing CQE source.
  * mode 0 = literal doc loop (arm futex wait every idle iteration)
  * mode 1 = armed flag (arm only if no futex wait outstanding)

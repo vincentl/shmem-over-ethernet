@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Store-buffer (SB / Dekker) litmus test for §3.16's two-sided rule.
  *

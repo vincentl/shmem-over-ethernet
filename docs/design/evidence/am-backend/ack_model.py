@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """The acknowledgement protocol between two node leads (design §3.4, §4.6).
 
 `shmem_quiet` has no handle, so a writer cannot name what it is waiting for.

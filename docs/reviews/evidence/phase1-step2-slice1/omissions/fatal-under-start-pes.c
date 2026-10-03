@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* osoe_fatal() leaves through exit(), which runs atexit handlers - and
  * start_pes registers shmem_finalize as one. So a PE that the library has just
  * declared dead goes on to enter a *collective*. PE 0 makes a put the library

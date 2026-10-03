@@ -26,6 +26,12 @@ name its paths where a command ran. On 2026-10-02 those paths were edited - the
 repository's own directory reads `<repo>`, any other path under the home
 directory reads `~` - and the four copies of the specification's examples
 (`spec-example-*.c`, in `docs/reviews/evidence/phase1-step2-slice1/conformance/`)
-were given the notice that the specification's permission asks for. Nothing
-else in those files was changed. A script that names `<repo>` records what ran;
-it is not one to run as written.
+were given the notice that the specification's permission asks for. The same
+day every other program in those two trees, and the two files in `dev/lima/`,
+was given the project's license line, `SPDX-License-Identifier:
+LGPL-3.0-or-later`: first in the file, or second where the first line is a
+shebang, and last in the three probes in that `conformance/` directory whose
+compiler errors `run.out` records by line number, so that those numbers stay
+true. The specification's examples are the specification's, and have none.
+Nothing else in those files was changed. A script that names `<repo>` records
+what ran; it is not one to run as written.

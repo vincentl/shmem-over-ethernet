@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Step 8 slice 3's before: osoe-bench's threads line on two Pis, three runs,
 # on the tree in ~/osoe-slice3 (the bench added on slice 2's library).
 set -u

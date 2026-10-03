@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Spec section 6: library constants are compile-time constants (usable as
  * array sizes and case labels). Section 7: handles are at least link-time
  * constants, usable "in initialization expressions or assignments".

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Does an io_uring send on a TCP socket with a small SO_SNDBUF complete short?
  * And does MSG_WAITALL make io_uring retry internally to full length? */
 #define _GNU_SOURCE

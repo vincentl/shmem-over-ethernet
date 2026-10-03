@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Build and run the conformance probes against a PRIVATE build of the tree
 # (never build/debug). Run inside the Lima VM:
 #   limactl shell osoe sh docs/reviews/evidence/phase1-step2-slice1/conformance/run.sh

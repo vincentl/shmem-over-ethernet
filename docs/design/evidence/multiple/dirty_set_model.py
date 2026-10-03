@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """The dirty set of a shareable context under SHMEM_THREAD_MULTIPLE (design §4.11).
 
 One node pair, one context. Several threads issue puts to the node on the

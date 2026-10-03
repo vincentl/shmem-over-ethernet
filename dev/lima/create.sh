@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Create and start the osoe development VM.
 #
 # The repository is mounted writable at the same absolute path it has on the

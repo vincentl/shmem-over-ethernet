@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # agent-slice.sh NS [CPUS]: ask for an NS-ns slice for the lead's agent on this
 # node (set-slice), and widen its affinity to CPUS when given.
 ns=$1 cpus=${2:-}

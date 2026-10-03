@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # pi-cpu-bind.sh: does mailbox's tail between node-mates come from each PE's
 # threads sharing one core? Slurm binds each of a node's four tasks to one
 # core, which a PE's main thread and its agent share (runbook §6). Once

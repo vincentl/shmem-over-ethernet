@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * What carries fence's store ordering on aarch64 (§4.6 rule 2; second review,
  * atomics F5)?

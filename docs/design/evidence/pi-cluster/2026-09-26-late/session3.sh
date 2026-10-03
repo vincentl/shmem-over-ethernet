@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The Pi cluster's third session (2026-09-26 late evening), docs/pi-cluster.md
 # §11 items 1, 2 and 4, on main a4ca6c4: build, probe, tier 2, SOS's context and
 # scan programs, F1's fcollect at 4 x 2 with 16 KiB blocks (TCP counters read on

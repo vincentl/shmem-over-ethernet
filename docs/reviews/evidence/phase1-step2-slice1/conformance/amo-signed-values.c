@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Negative operands through the C11 generic AMOs at both widths, and every
  * exact-width and size type reaching a routine. The boundary carries a
  * uint64_t; a 32-bit compare_swap whose cond is -1 must still match. */

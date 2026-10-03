@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Run inside the VM. T = private copy of the tree with a release build.
 # Links the library's own objects because the internal symbols are hidden in libosoe.so.
 T=<repo>/build/scratch/review-performance-scale/tree

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * osoe_connection_drain_reserve (connection.c:149) against the two calls that
  * bracket it in §3.5's state machine, FREE -> DRAINING -> OPEN.

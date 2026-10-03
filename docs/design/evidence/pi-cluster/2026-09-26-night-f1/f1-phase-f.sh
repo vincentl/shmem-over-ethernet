@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # F1 phase F: TCP_THIN_LINEAR_TIMEOUTS on osoe's sockets, which keeps a thin
 # stream's retransmission timeout from doubling - a bound on a stall's length.
 set -u

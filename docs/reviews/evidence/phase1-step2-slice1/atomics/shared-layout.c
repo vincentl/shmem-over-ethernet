@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Measure the layout of every structure that lives in shared memory and is
  * declared in a header: offsets, sizes, alignments, and which cache line each

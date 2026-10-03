@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* E3: (a) futex wake(1) order for SCHED_OTHER waiters queued in sequence, plus one
  * SCHED_FIFO waiter queued LAST (needs root). (b) one futex word shared by two resource
  * classes with wake-one: a descriptor release wakes a buffer-space waiter; the

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The slice-3 race mutations against the owner-checked stamp (wt/quiet-hook):
 # both hooks on, 0,1,2,0,1,0, ten runs each of the library's threaded test.
 exec 9>/tmp/osoe-vm.lock; flock -w 3600 9 || exit 1

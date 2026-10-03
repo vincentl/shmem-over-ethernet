@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # F1 phase I: with a 16 KiB chunk, does the stall move to other block sizes?
 set -u
 O=~/pi-results-f1; say() { echo "$(date +%T) $*" | tee -a $O/summary.txt; }

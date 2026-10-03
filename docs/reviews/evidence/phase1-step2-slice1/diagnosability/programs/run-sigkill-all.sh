@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Kill a whole job, launcher included, with SIGKILL; then see what is left in
 # /dev/shm, what osoe-stat --gc removes, and whether a job with the SAME job id
 # starts on the same node afterwards.

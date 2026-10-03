@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
 // The C11 generic names from C++: spec §9.7 gives them to C11 only, so what
 // does a C++ program that uses them see?
 #include <shmem.h>

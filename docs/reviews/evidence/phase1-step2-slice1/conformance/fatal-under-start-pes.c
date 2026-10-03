@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* A loud failure (design section 3.15) in a program that initialized with
  * start_pes. osoe_fatal ends in exit(), exit() runs the atexit handler that
  * start_pes registered, and that handler is shmem_finalize - a collective.

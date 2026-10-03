@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # F1 phase D: plain TCP with osoe's exchange; node subsets with osoe.
 set -u
 O=~/pi-results-f1; say() { echo "$(date +%T) $*" | tee -a $O/summary.txt; }

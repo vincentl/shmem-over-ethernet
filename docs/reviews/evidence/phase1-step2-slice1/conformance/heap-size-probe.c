@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Reports whether a 2 MiB allocation fits, so the effective symmetric heap size
  * can be observed from outside: run with SHMEM_SYMMETRIC_SIZE=1m and with the
  * deprecated SMA_SYMMETRIC_SIZE=1m (spec section 8, Annex F.2.9). */

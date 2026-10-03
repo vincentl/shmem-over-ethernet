@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Rendezvous burst model: N "PEs" connect simultaneously to one "rank 0"
  * listener (backlog B) and send a 16-byte hello. The server accepts and reads
  * each hello serially (per-connection work W microseconds, modelling

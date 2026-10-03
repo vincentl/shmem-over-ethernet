@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # usage: run-mutation.sh <name> <ctest -R regex> <file relative to tree> <perl -0pi expression>
 # Applies one mutation to the PRIVATE copy, records the diff, rebuilds debug, runs the
 # selected tests, then restores the file from the real tree. Never touches the real tree.

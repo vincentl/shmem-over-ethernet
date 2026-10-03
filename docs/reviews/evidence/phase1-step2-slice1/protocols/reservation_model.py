@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """§3.5's reservation protocol, as connection.c and progress.c implement it.
 
 The two first-round models (docs/reviews/evidence/transport/resv_model.py,

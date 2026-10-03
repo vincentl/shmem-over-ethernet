@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Does changing the *coverage predicate* of the §4.9 watch slot change the
 protocol?  (docs/design/watch-notification-options.md)
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Get completion on a shareable context under SHMEM_THREAD_MULTIPLE (design §4.11).
 
 Spec §9.12.2: quiet "ensures completion of all operations ... issued by the

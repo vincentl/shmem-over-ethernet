@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* set-slice TID NS: ask the scheduler for an NS-nanosecond slice for thread TID,
  * a SCHED_OTHER thread staying SCHED_OTHER at its nice (EEVDF's custom slice,
  * sched_attr::sched_runtime, Linux 6.12 and later). Prints before and after. */

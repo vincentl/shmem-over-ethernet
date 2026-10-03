@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 import sys
 from collections import deque
 OPEN,SEALED,SENDING,FREE,DRAIN="OPEN","SEALED","SENDING","FREE","DRAINING"

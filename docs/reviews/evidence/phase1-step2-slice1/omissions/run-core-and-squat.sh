@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 T=${1:?}; E=$(cd $(dirname "$0") && pwd); L=$T/build/debug/tools/launch/osoe-launch
 gcc -std=c11 -O1 -g -I$T/shmem/include $E/core-size.c -o /tmp/omx/core-size -L$T/build/debug/shmem -losoe -Wl,-rpath,$T/build/debug/shmem || exit 1
 echo "## core file of one PE of two, each with 64 MiB of heap touched (coredump_filter=$(cat /proc/self/coredump_filter), core_pattern=$(cat /proc/sys/kernel/core_pattern))"

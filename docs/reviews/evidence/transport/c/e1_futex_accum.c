@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* E1: the §3.10 idle loop, literally: each idle iteration submits a NEW
  * IORING_OP_FUTEX_WAIT. If the loop is woken by some other CQE (recv/send),
  * the previous futex wait stays armed in the kernel. Count them, then show

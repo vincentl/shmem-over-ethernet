@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* f1probe BLOCK... : time shmem_fcollectmem on the world team for each block
  * size, 200 calls after 20 warm-up, printing the median, the mean, and how
  * many calls took over 20 ms (a retransmission-timeout-sized stall). */

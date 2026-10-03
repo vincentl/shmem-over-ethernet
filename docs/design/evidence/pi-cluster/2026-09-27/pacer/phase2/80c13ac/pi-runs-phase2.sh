@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # pi-runs-phase2.sh: the pacer's measurements of phase 2
 # (docs/prompts/task-stress-phase2.md) at 4 x 4 from ~/osoe-pacer: mailbox and
 # teams ten minutes each in release, then an hour of threads in a debug build

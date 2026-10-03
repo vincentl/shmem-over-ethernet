@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 import sys, collections
 # sample lines: label time node pid procid tid role cpus psr run_ns wait_ns slices vol invol
 def load(path):

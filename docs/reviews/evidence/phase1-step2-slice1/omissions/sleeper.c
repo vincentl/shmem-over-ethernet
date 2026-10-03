@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* A job that is alive for a while, for signal experiments. PE `argv[1]` (if
  * given) leaves in the way argv[2] names instead of finalizing. */
 #include <stdio.h>

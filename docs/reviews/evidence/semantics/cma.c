@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 #define _GNU_SOURCE
 #include <sys/uio.h>
 #include <sys/wait.h>

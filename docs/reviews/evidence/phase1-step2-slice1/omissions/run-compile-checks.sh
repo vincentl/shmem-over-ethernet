@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Run inside the VM. $1 = private tree root.
 T=${1:?tree}; E=$(dirname "$0"); I="-I$T/shmem/include"; L="-L$T/build/debug/shmem -losoe -Wl,-rpath,$T/build/debug/shmem"
 O=${TMPDIR:-/tmp}/omissions-$$; mkdir -p $O

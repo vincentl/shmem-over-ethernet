@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Spec section 7: SHMEM_TEAM_SHARED is "the team of all PEs that would mutually
  * return a non-null address from a call to shmem_ptr or shmem_team_ptr for all
  * symmetric heap objects". Checks, for every world PE, that membership of

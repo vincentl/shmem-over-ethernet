@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # F1 retest after pi-002's move to a new switch port and cable (2026-09-26,
 # night): the trigger map at three shapes and two rank placements, every
 # node's TCP timeouts read before and after each run. Outputs in ~/pi-results-f1-retest.

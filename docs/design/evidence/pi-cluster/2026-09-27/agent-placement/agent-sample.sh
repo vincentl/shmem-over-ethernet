@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # agent-sample.sh LABEL: one line per thread of every osoe-pacer PE on this
 # node, from /proc - what the scheduler did to each thread so far:
 #   LABEL time node pid procid tid role cpus_allowed last_cpu run_ns
