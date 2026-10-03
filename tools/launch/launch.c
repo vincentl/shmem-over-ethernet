@@ -73,6 +73,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/random.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -148,6 +149,7 @@ static pid_t launcher_pid;
 static const char *namespace_prefix;    /* -N: tier 3's per-node network namespaces */
 static const char *host_list;           /* -H: their addresses, as OSOE_STEP_NODELIST */
 static const char *launcher_prefix = "OSOE_";  /* -s: "SLURM_", srun's names (§6.1) */
+static char launch_text[24];            /* OSOE_LAUNCH: which launch of this job id */
 
 /* One of the bootstrap's launcher variables, under this launch's names. */
 static void set_launcher_variable(const char *suffix, const char *value)
@@ -219,6 +221,9 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
     set_launcher_variable("STEP_NUM_NODES", buf);
     set_launcher_variable("JOB_ID", job);
     set_launcher_variable("STEP_ID", "0");
+    /* Under srun's names a first run has no restart count, as under srun. */
+    if (strcmp(launcher_prefix, "OSOE_") == 0)
+        setenv_or_die("OSOE_LAUNCH", launch_text);
     set_launcher_variable("GTIDS", p->gtids);
 
     /*
@@ -349,6 +354,13 @@ int main(int argc, char **argv)
 
     char job[32];
     snprintf(job, sizeof job, "%ld", (long)getpid());
+    /* Which launch of that id this is (bootstrap.h): the id is this process's
+     * pid, which a later launcher can have again, and a leftover of this one
+     * must not read as that one's. */
+    uint64_t launch = 0;
+    if (getrandom(&launch, sizeof launch, 0) != (ssize_t)sizeof launch)
+        launch = (uint64_t)time(NULL) << 22 ^ (uint64_t)getpid();
+    snprintf(launch_text, sizeof launch_text, "%llu", (unsigned long long)launch);
 
     /*
      * Where each rank runs. Without a map the job is one logical node and rank

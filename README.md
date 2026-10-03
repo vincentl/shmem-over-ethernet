@@ -202,11 +202,12 @@ same path on every node.
 
 - **`-K1`** (or `KillOnBadExit=1`), so that a task that fails at start-up ends
   the rest rather than leaving them waiting (design §3.15): the library ends a
-  node whose PE fails, but not the other nodes, nor anything waiting for a
-  task that never reached it ("How a job starts", below). A global exit
-  keeps its status beside it: every PE but the caller leaves with 0, and the
-  caller leaves last, so its exit is the one bad one Slurm sees - with one
-  limit, two callers on two nodes at once, under "How a job ends".
+  node whose PE fails, and the nodes already connected to it, but not a node
+  that has not reached it yet, nor anything waiting for a task that never
+  reached the library ("How a job starts", below). A global exit keeps its
+  status beside it: every PE but the caller leaves with 0, and the caller
+  leaves last, so its exit is the one bad one Slurm sees - with one limit, two
+  callers on two nodes at once, under "How a job ends".
 - **`--cpu-bind=none`**, or two CPUs a task (`-c 2`) where there are cores to
   spare; `SLURM_CPU_BIND=none` in the environment does the same. Where a node
   runs as many tasks as it has cores, Slurm binds each task to one core by
@@ -581,8 +582,9 @@ Unless a row says otherwise, give every PE the same value: `srun` and
 *checked* are compared at start-up: between the PEs of a node, which all end,
 the one that sees the difference naming the variable; and, where a row says so,
 between nodes, where the node that sees it ends naming the variable and both
-nodes, and the others say what they wait for until the launcher ends them ("How
-a job starts"). `SHMEM_INFO` prints most of this list from the library itself.
+nodes, the nodes already connected to it end with it, and a node not yet
+connected says what it waits for until the launcher ends it ("How a job
+starts"). `SHMEM_INFO` prints most of this list from the library itself.
 
 **The specification's** (§8). Each also has a deprecated `SMA_` spelling; when
 both are set the `SHMEM_` one controls.
@@ -742,19 +744,25 @@ loud, and how far it reaches depends on where it is:
   saying that another local PE failed: the refusal is published in the node's
   segment, which the lead makes before it checks `/dev/shm`, or, by a lead that
   refuses before it has made one, in a *tombstone* it leaves under the
-  segment's name. A kernel too old for osoe each PE refuses by itself, before
+  segment's name. A PE that refuses while its lead has made no segment waits up
+  to 10 s for one to publish in; past that, its lead's notice names it
+  instead. A kernel too old for osoe each PE refuses by itself, before
   anything is made.
 - **A node whose lead finds the job disagreeing** - another node launched for
   another count, a value the rows below mark *checked* between nodes - ends
-  naming the variable and both nodes. The other nodes keep waiting for it.
+  naming the variable and both nodes. The nodes already connected to it in the
+  rendezvous tree end with it, having lost it, and the loss travels down the
+  tree; a node that has not reached it yet says what it waits for.
 - **A task that never reaches the library**, one that dies before
   `shmem_init`, is noticed by nobody: its node's lead waits for it.
 
 Nothing that waits gives up because time has passed (design §3.15). Instead,
-every start-up wait that has lasted 30 seconds says what it waits for, once and
-then every minute: the lead names the local PEs that have not joined, and their
-ranks; a node's first other PE, while its lead has made no segment, names the
-lead; a lead calling another node names that node, its host-list entry, the
+once a start-up wait has lasted 30 seconds its node says what it waits for, in
+one line and then every minute - the lead for the node, since its other PEs
+wait on it, and they end by themselves if its process ends: the lead names the
+local PEs that have not joined, and their ranks; a node's first other PE, while
+its lead has made no segment, names the lead; a lead calling another node names
+that node, its host-list entry, the
 address and ports it dialled and the last error ("Connection refused", "the
 connection timed out", "no answer to the hello"); a lead waiting to be called
 names the nodes it waits for. The launcher ends what remains - `srun -K1` at
@@ -766,9 +774,11 @@ stops moving.
 every lead proves it before it is counted, and nothing a caller claims is acted
 on before it has. The secret does not protect the job's start from a host that
 can reach the ports and holds connections open - a lead serves sixteen callers
-at once, and a full set leaves the rest waiting - nor the traffic after the
-handshake, which is not encrypted or authenticated. Without the secret, any
-host that can reach the ports can join.
+at once, and a full set leaves the rest waiting - nor from a process on a lead's
+host that holds a port the lead would answer on and answers first, which a
+caller takes for a job launched with another secret and ends; nor the traffic
+after the handshake, which is not encrypted or authenticated. Without the
+secret, any host that can reach the ports can join.
 
 ### How a job ends
 

@@ -323,6 +323,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * start under way as long as it lives, and a failed start's once it is
      * gone, which osoe-stat --gc removes (§3.14). */
     ND("node.creator_pid", creator_pid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
+    ND("node.launch", launch, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     /* The rendezvous words (§6.2). A job stuck in bootstrap is stuck in one of
      * these, and which one says how far it got. */
     ND("node.ready", ready, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),

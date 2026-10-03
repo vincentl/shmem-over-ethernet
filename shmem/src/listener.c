@@ -174,18 +174,29 @@ static uint64_t now_ns(void)
  * stopped ends naming it after OSOE_NO_PROGRESS_TIMEOUT (by default, never).
  */
 static void swept(const struct osoe_bootstrap *b, struct osoe_stall_watch *watch,
-                  uint64_t moved, uint32_t peer, const char *what)
+                  uint64_t moved, uint32_t peer, const char *what, int fd)
 {
     osoe_sweep_expired("shmem_init");
     if (osoe_stall_watch_stalled(watch, moved))
         osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u is waiting for "
                    "node %u %s", (unsigned long long)osoe_stall_watch_seconds(watch), b->node,
                    peer, what);
-    if (osoe_stall_watch_notice_due(watch))
-        osoe_notice("shmem_init on node %u has waited %llu s for node %u %s its part of the "
-                    "rendezvous (%llu bytes so far); still waiting", b->node,
-                    (unsigned long long)osoe_stall_watch_waited_seconds(watch), peer, what,
-                    (unsigned long long)moved);
+    if (osoe_stall_watch_notice_due(watch)) {
+        /* Where the connection goes, as the calling loop's notice says it:
+         * the README promises the address and port of a node not answering. */
+        struct sockaddr_in at;
+        socklen_t at_bytes = sizeof at;
+        char where[64] = "";
+        char address[INET_ADDRSTRLEN];
+        if (getpeername(fd, (struct sockaddr *)&at, &at_bytes) == 0 &&
+            at.sin_family == AF_INET &&
+            inet_ntop(AF_INET, &at.sin_addr, address, sizeof address))
+            snprintf(where, sizeof where, ", at %s port %u,", address, ntohs(at.sin_port));
+        osoe_notice("shmem_init on node %u has waited %llu s for node %u%s %s its part of "
+                    "the rendezvous (%llu bytes so far); still waiting", b->node,
+                    (unsigned long long)osoe_stall_watch_waited_seconds(watch), peer, where,
+                    what, (unsigned long long)moved);
+    }
 }
 
 /* Read exactly n bytes from node `peer`, or return false on end of stream, on an
@@ -212,7 +223,7 @@ static bool read_all(const struct osoe_bootstrap *b, int fd, void *bytes, size_t
             return false;
         if (r <= 0) {
             if (!limit_ns)
-                swept(b, &watch, moved, peer, "to send");
+                swept(b, &watch, moved, peer, "to send", fd);
             continue;
         }
         ssize_t k = recv(fd, at, n, MSG_DONTWAIT);
@@ -259,7 +270,7 @@ static bool write_all(const struct osoe_bootstrap *b, int fd, const void *bytes,
         if (r < 0 && errno != EINTR)
             return false;
         if (r <= 0)
-            swept(b, &watch, moved, peer, "to receive");
+            swept(b, &watch, moved, peer, "to receive", fd);
     }
     return true;
 }
@@ -626,12 +637,16 @@ static void notice_calling(const struct osoe_bootstrap *b, const struct osoe_sta
     if (b->node_list)
         osoe_hostlist_entry(b->node_list, node, entry, sizeof entry);
     inet_ntop(AF_INET, &host->sin_addr, ip, sizeof ip);
-    uint64_t ago_ms = t->at_ns ? (now_ns() - t->at_ns) / UINT64_C(1000000) : 0;
+    char last[sizeof t->last + 48] = "not tried yet";
+    if (t->at_ns) {
+        uint64_t ago_ms = (now_ns() - t->at_ns) / UINT64_C(1000000);
+        snprintf(last, sizeof last, "%s, %llu.%llu s ago", t->last,
+                 (unsigned long long)(ago_ms / 1000), (unsigned long long)(ago_ms % 1000 / 100));
+    }
     osoe_notice("shmem_init on node %u has waited %llu s for node %u (%s, at %s) to answer on "
-                "%s: %s, %llu.%llu s ago; still waiting", b->node,
+                "%s: %s; still waiting", b->node,
                 (unsigned long long)osoe_stall_watch_waited_seconds(watch), node, entry, ip,
-                ports, t->at_ns ? t->last : "not tried yet",
-                (unsigned long long)(ago_ms / 1000), (unsigned long long)(ago_ms % 1000 / 100));
+                ports, last);
 }
 
 /* A connection to host:port, or -1 if nothing listens there within PROBE_NS,

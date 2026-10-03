@@ -670,7 +670,30 @@ osoe_refusal_test(shmem.start-up.never-calls-init.non-lead 3 2
   LAUNCH -n 3
   PATTERNS "osoe: PE 0: shmem_init on node 0 has waited [0-9]+ s for local PEs to join the node [(]call shmem_init[)]: 2 of 3 have; still waiting for local id 2 [(]rank 2[)]"
            "osoe: PE 0: shmem_init on node 0 has waited ([5-9]|1[0-9]) s for local PEs to join the node"
+           "!osoe: PE 1: shmem_init on node"
   PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/exit-before-init.sh 2 $<TARGET_FILE:shmem_test_init>)
+# A lead that ends after it has made the segment, while the node joins: the
+# node's other PEs, which wait on its count and print no notice of their own,
+# end by themselves naming it, where they were silent (the adversarial read of
+# 2026-10-03). See lead-ends.sh.
+osoe_refusal_test(shmem.start-up.lead-ends-in-join 3 0
+  LAUNCH -n 3
+  PATTERNS "osoe: PE 1: the local lead, rank 0 [(]pid [0-9]+[)], has ended while this PE waited for local PEs to join the node"
+  PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/lead-ends.sh 3 2 $<TARGET_FILE:shmem_test_init>)
+# A start by the ids of one that failed, its tombstone still standing: it runs,
+# five times of five. See start-same-ids.sh.
+add_test(NAME shmem.start-up.same-ids
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/start-same-ids.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.start-up.same-ids PROPERTIES LABELS "tier2" TIMEOUT 150
+  PASS_REGULAR_EXPRESSION "SAME IDS OK")
+# The tombstone a refusing lead leaves, as the library makes it, kept by the
+# launcher: osoe-stat shows it as one, and --gc removes it.
+add_test(NAME shmem.start-up.tombstone-gc
+  COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 \"$0\" -n 3 -t 20 -k -e 0:OSOE_MAX_THREADS=0 -- \"$1\" & L=$!; wait $L; \"$2\" /osoe.$L.0.0.0; \"$2\" --gc /osoe.$L.0.0.0"
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.start-up.tombstone-gc PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "a failed start's tombstone - .*/osoe[.][0-9]+[.]0[.]0[.]0: removed")
 # Unless the job asks for it - OSOE_NO_PROGRESS_TIMEOUT, which is never by default -
 # when the node ends by itself, naming the same. The lead and the PE that has
 # joined wait alike, and the one whose limit comes first says it; the other ends
@@ -2858,7 +2881,7 @@ if(OSOE_TIER3)
   # that is the dial's, kept, where it was thrown away. It comes at the first
   # dial to end past the 2 s the test hook asks, since the loop sweeps between
   # dials; when it swept only between rounds of node 0's 32 candidate ports, it
-  # came some 25 s of ARP's later, which the launcher's 60 s still allows for.
+  # came some 25 s of ARP's later, which the launcher's 20 s does not allow.
   # Node 0, which nobody calls,
   # names node 1 and the port it waits on. Both are left to the launcher's
   # timeout. See refusal.sh and tools/launch/tier3.sh.
@@ -2868,7 +2891,7 @@ if(OSOE_TIER3)
             sh ${CMAKE_CURRENT_SOURCE_DIR}/refusal.sh $<TARGET_FILE:osoe-launch> 2 2
             "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]10[.]99[.]0[.]77, at 10[.]99[.]0[.]77[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: (No route to host|Host is down|Network is unreachable|the connection timed out)"
             "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
-            -- -n 2 -m 0,1 -t 60 -e 1:OSOE_STEP_NODELIST=10.99.0.77,10.99.0.2
+            -- -n 2 -m 0,1 -t 20 -e 1:OSOE_STEP_NODELIST=10.99.0.77,10.99.0.2
             -- $<TARGET_FILE:shmem_test_job>)
   set_tests_properties(tier3.pi.start-up.wrong-address PROPERTIES LABELS "tier3" TIMEOUT 120
     PASS_REGULAR_EXPRESSION "REFUSAL OK")

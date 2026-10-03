@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 27
+#define OSOE_NODE_LAYOUT 28
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -674,6 +674,10 @@ struct osoe_node_header {
     uint32_t world_size;
     uint64_t heap_base;             /* B, where every PE maps its own heap (§4.1) */
     int32_t creator_pid;            /* the lead, for reclaiming a leftover (shm-object.h) */
+    /* Layout 28: the launch these ids belong to (bootstrap.h), so that a
+     * node-mate tells a leftover of another launch by the same names from
+     * this one's segment (open_control). */
+    uint64_t launch;
     /* Layout 19: the lead's OSOE_COLLECTIVE_FANOUT and OSOE_COLLECTIVE_PIPELINE.
      * They size every PE's internal region (internal-region.h), and a team's
      * local lead - any of the node's PEs once teams are created (§5.2) - runs

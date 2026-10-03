@@ -292,12 +292,14 @@ void osoe_segment_close(struct osoe_segment *s);
  *       deadlock detector (§3.15)
  *   27  the PE slot's `task_cpus`, appended: the CPUs its task was bound to,
  *       which every agent of the node may run on
+ *   28  the header's `launch`, which launch of the job's ids made the segment,
+ *       and `creator_pid` as a metric
  *
- * None of 5 to 27 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 28 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, and 23 gave each thread a word of its own.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               27
+#define OSOE_SEGMENT_NEWEST_LAYOUT               28
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is

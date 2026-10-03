@@ -1769,15 +1769,19 @@ sweep-length sleep, and stay.)
 **A start-up wait says what it waits for** (the round-three review's R8 and
 N1; the author's D2, 2026-10-02). A job whose start had gone wrong - a peer
 unreachable, a PE that never called `shmem_init`, a node that refused - waited
-in silence until the launcher ended it, with nothing on stderr. Now every wait
-of `shmem_init` that has lasted 30 s prints a notice, and again every minute,
-and changes nothing: it reads how long the wait has lasted, not whether
-anything moved, so it is no exception to the rule above. One line a node: the
-lead prints for the wait it is in - the local PEs that have not joined or
-mapped, with their ranks; the node it calls, its host-list entry, the address
-and ports dialled, and the last error and when; the nodes it waits to be called
-by - and of the others only local id 1, and only while the lead has no segment
-to speak through. `base/stall-watch.h`'s noticed watches carry the timing,
+in silence until the launcher ended it, with nothing on stderr. Now a wait of
+`shmem_init` that has lasted 30 s is said, by a notice, and again every minute,
+and the notice changes nothing: it reads how long the wait has lasted, not
+whether anything moved, so it is no exception to the rule above. One line a
+node: the lead prints for the wait it is in - the local PEs that have not
+joined or mapped, with their ranks; the node it calls, its host-list entry, the
+address and ports dialled, and the last error and when; the nodes it waits to
+be called by - and of the others only local id 1, for the waits the lead is not
+in: while the lead has no segment to speak through, or a leftover of another
+launch by the same names still stands in its place, and while the lead makes
+the node's connection area. The others wait on the lead, and end if its process
+ends: during the node's join by its pid in the header (`lead_ended`), and after
+it by liveness (§3.15). `base/stall-watch.h`'s noticed watches carry the timing,
 `osoe_notice` the line; `OSOE_TEST_NOTICE_SECONDS` shortens the 30 s for tests,
 and is no setting.
 
@@ -5625,12 +5629,27 @@ refusal before the lead has made it left the node's other PEs waiting for a
 segment that never came - the likeliest first-day failure, a `/dev/shm` too
 small for the node's heaps, among them. Three rules close it:
 
-- *Every PE checks every setting* in its own bootstrap and init, before its node
-  joins - until the review the lead alone checked seven, as it laid out the
-  segment, and the leads alone the wire's - and a node's PEs are compared on
-  every one that lays out the segment (`OSOE_MAX_TEAMS`, `OSOE_MAX_CONTEXTS`,
-  `OSOE_MAX_THREADS`, `OSOE_COLLECTIVE_FANOUT`, `OSOE_COLLECTIVE_PIPELINE`,
-  `OSOE_GET_LANDING_BYTES`, `SHMEM_SYMMETRIC_SIZE`), through `failed`.
+- *Every PE checks every setting that shapes the node or the job* in its own
+  bootstrap and init, before its node joins - until the review the lead alone
+  checked seven, as it laid out the segment, and the leads alone the wire's -
+  and a node's PEs are compared on every one that lays out the segment
+  (`OSOE_MAX_TEAMS`, `OSOE_MAX_CONTEXTS`, `OSOE_MAX_THREADS`,
+  `OSOE_COLLECTIVE_FANOUT`, `OSOE_COLLECTIVE_PIPELINE`,
+  `OSOE_GET_LANDING_BYTES`, `SHMEM_SYMMETRIC_SIZE`), through `failed`. The
+  agent's and the detector's (`OSOE_AGENT_SLICE_US`, `OSOE_AGENT_CPUS`,
+  `OSOE_DEADLOCK_SECONDS`, `OSOE_CHECK_QUIET`, `OSOE_FORCE_REMOTE`, and the test
+  hook `OSOE_TEST_PERTURB`) every PE checks after the join, as it starts its
+  agent, where a bad one ends the job through the abort word: loud, naming the
+  PE, but with "the job is aborting on behalf of PE n" on the others.
+- *A launch is told from another by the same names*: a requeued Slurm job keeps
+  its job id and starts its steps again, and an `osoe-launch` job's id is its
+  launcher's pid, so a failed start's leftover can carry this start's names. The
+  header records the launch (`SLURM_RESTART_COUNT`, or `OSOE_LAUNCH`, which
+  `osoe-launch` sets afresh each time; layout 28), and a node-mate takes a ready
+  or failed segment of another launch for the leftover it is, waiting for this
+  launch's lead to reclaim it, as `tell_the_lead` does (the adversarial read of
+  2026-10-03: a refusal's leftover had made the next start with the same ids
+  fail, four times in ten).
 - *The lead makes the segment before anything that can refuse*: the `/dev/shm`
   check comes after it exists and refuses through `failed`; the pages the lead
   writes first are allocated, not only sized, so a `/dev/shm` too full even for

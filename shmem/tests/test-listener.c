@@ -140,7 +140,21 @@ int main(void)
     refused(fd);
     real_peer_joins(&node1, &loopback, t);
 
-    /* 3. N2's other half: a stranger that says hello and then nothing, holding
+    /* 3. The same for the node a hello claims: one outside the job, which the
+     * lead also judges only after the proof - a lead that judged it on arrival
+     * ended the job, and no test sent one (the adversarial read of
+     * 2026-10-03). */
+    CHECK_FATAL(pthread_create(&t, NULL, accept_one, NULL) == 0);
+    struct hello far = h;
+    far.from_node = 7;
+    far.nonce = fresh_nonce();
+    fd = stranger(&node1, &loopback, &far, &a);
+    CHECK(a.verdict == ACCEPTED);
+    CHECK_FATAL(write_all(&node1, fd, &nonsense, sizeof nonsense, 0));
+    refused(fd);
+    real_peer_joins(&node1, &loopback, t);
+
+    /* 4. N2's other half: a stranger that says hello and then nothing, holding
      * its connection open. Before, the lead read its confirmation with no limit
      * and served no one else; now the real peer is counted beside it. */
     CHECK_FATAL(pthread_create(&t, NULL, accept_one, NULL) == 0);

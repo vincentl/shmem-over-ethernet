@@ -279,10 +279,13 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         /* The name appears before the object is sized and before the header is
          * written, so wait for the length here and for `ready` below (§6.2). */
 again:;
-        /* Noticed, as every start-up wait is (§3.15): the tests of 2026-10-02
-         * found this one silent. */
+        /* Noticed, by local id 1 alone - one line a node, the lead being the one
+         * waited for (§3.15): the tests of 2026-10-02 found this wait silent. */
         struct osoe_stall_watch watch;
-        osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+        if (b->local_id == 1)
+            osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+        else
+            osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         struct timespec back = { 0, 200000 };
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         for (;;) {
@@ -399,7 +402,10 @@ again:;
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
         struct osoe_stall_watch watch;
-        osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+        if (b->local_id == 1)
+            osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+        else
+            osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
         while (atomic_load_explicit(&h->ready, memory_order_acquire) == 0) {
             /* A leftover the local lead is about to reclaim will never be
              * ready: start over (shm-object.h). */

@@ -109,6 +109,21 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     default: osoe_fatal("%sJOB_ID='%s' is not a decimal number", prefix,
                         getenv(launcher_name("JOB_ID")));
     }
+    /*
+     * Which launch of these ids this is. A requeued Slurm job keeps its job id
+     * and starts its steps from 0 again, and an osoe-launch job's id is its
+     * launcher's pid, so a failed start's leftover can carry this start's very
+     * names: a node-mate reading its `failed` or its `ready` would end, or
+     * join a dead node, before this start's lead reclaimed it (the adversarial
+     * read of 2026-10-03). The segment records its launch, and a node-mate
+     * takes one from another launch for the leftover it is (node.c). Slurm
+     * counts its requeues in SLURM_RESTART_COUNT, set from the first; the
+     * launcher sets OSOE_LAUNCH; either may be unset, and reads as 0.
+     */
+    const char *launch_name = strcmp(prefix, "SLURM_") == 0 ? "SLURM_RESTART_COUNT"
+                                                            : "OSOE_LAUNCH";
+    if (osoe_environment_u64(launch_name, &b->launch) == OSOE_ENVIRONMENT_INVALID)
+        osoe_fatal("%s='%s' is not a decimal number", launch_name, getenv(launch_name));
     /* Who this PE is, so that every refusal below can tell its node (node.h).
      * Everything before is the identity itself, and nothing can be told. */
     if (osoe_bootstrap_identified)

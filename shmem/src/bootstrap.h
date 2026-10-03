@@ -26,6 +26,8 @@ struct osoe_bootstrap {
     uint32_t *gtids;            /* world rank of each local id */
     uint64_t job;               /* JOB_ID */
     uint32_t step;              /* STEP_ID */
+    uint64_t launch;            /* which launch of these ids: SLURM_RESTART_COUNT under
+                                 * Slurm, OSOE_LAUNCH otherwise; 0 when not given */
     uint64_t symmetric_size;    /* SHMEM_SYMMETRIC_SIZE, or the default */
     uint64_t no_progress_ns;    /* OSOE_NO_PROGRESS_TIMEOUT, seconds; 0 = never (§3.15) */
     uint64_t heap_base;         /* OSOE_HEAP_BASE, 0 if unset */

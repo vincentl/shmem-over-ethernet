@@ -198,6 +198,7 @@ static struct {
     struct osoe_node *node;
     char name[sizeof ((struct osoe_node *)0)->control_name];
     uint64_t job;
+    uint64_t launch;
     uint32_t step, node_id, session;
     bool lead;
 } refusal;
@@ -237,6 +238,7 @@ static void tombstone(void)
     h->dir.header_bytes = (uint32_t)sizeof *h;
     h->dir.segment_bytes = bytes;
     h->job = refusal.job;
+    h->launch = refusal.launch;
     h->step = refusal.step;
     h->node = refusal.node_id;
     h->session = refusal.session;
@@ -268,11 +270,20 @@ static void tell_the_lead(void)
             close(fd);
             if (h == MAP_FAILED)
                 return;
-            atomic_store_explicit(&h->failed, 1, memory_order_release);
-            osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
-            osoe_futex_wake(&h->joined, INT_MAX, OSOE_FUTEX_SHARED);
-            osoe_futex_wake(&h->mapped, INT_MAX, OSOE_FUTEX_SHARED);
-            return;
+            /* Not a leftover of another launch by the same names, which this
+             * launch's lead is about to reclaim (open_control). */
+            if ((atomic_load_explicit(&h->ready, memory_order_acquire) ||
+                 atomic_load_explicit(&h->failed, memory_order_acquire)) &&
+                h->launch != refusal.launch) {
+                munmap(h, sizeof *h);
+                fd = -1;
+            } else {
+                atomic_store_explicit(&h->failed, 1, memory_order_release);
+                osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
+                osoe_futex_wake(&h->joined, INT_MAX, OSOE_FUTEX_SHARED);
+                osoe_futex_wake(&h->mapped, INT_MAX, OSOE_FUTEX_SHARED);
+                return;
+            }
         }
         if (fd >= 0)
             close(fd);
@@ -303,6 +314,7 @@ void osoe_node_refusal_arm(struct osoe_node *n, const struct osoe_bootstrap *b,
     refusal.node = n;
     control_name(refusal.name, sizeof refusal.name, b, session);
     refusal.job = b->job;
+    refusal.launch = b->launch;
     refusal.step = b->step;
     refusal.node_id = b->node;
     refusal.session = session;
@@ -336,6 +348,20 @@ static void describe_missing(struct osoe_node *n, const struct osoe_bootstrap *b
  * have not done - every minute from 30 s; the others leave the node's notice to
  * it (base/stall-watch.h).
  */
+/*
+ * Whether the node's lead has ended: its process gone, by the pid it recorded
+ * in the header. Liveness watches it only from after the join (liveness.h);
+ * before, a lead that died with its segment made left the node's other PEs
+ * waiting on its count in silence, since the lead is the one that speaks for
+ * the node (the adversarial read of 2026-10-03). A segment of another launch
+ * is never this far (open_control).
+ */
+static bool lead_ended(const struct osoe_node *n)
+{
+    int32_t pid = n->hdr->creator_pid;
+    return pid > 0 && kill((pid_t)pid, 0) != 0 && errno == ESRCH;
+}
+
 static int wait_count(struct osoe_node *n, const struct osoe_bootstrap *b, _Atomic uint32_t *word,
                       uint32_t target, enum osoe_phase phase, const char *doing)
 {
@@ -350,6 +376,13 @@ static int wait_count(struct osoe_node *n, const struct osoe_bootstrap *b, _Atom
         check_failed(n);
         if (v == target)
             return 0;
+        if (b->local_id != 0 && lead_ended(n)) {
+            char msg[256];
+            snprintf(msg, sizeof msg, "the local lead, rank %u (pid %d), has ended while this "
+                     "PE waited for local PEs to %s", b->gtids[0], (int)n->hdr->creator_pid,
+                     doing);
+            fail_rendezvous(n, msg);
+        }
         if (osoe_stall_watch_stalled(&watch, v))
             return -1;
         if (osoe_stall_watch_notice_due(&watch)) {
@@ -781,6 +814,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->dir.header_bytes = (uint32_t)header_bytes;
     h->dir.segment_bytes = n->control_bytes;
     h->job = b->job;
+    h->launch = b->launch;
     h->step = b->step;
     h->node = b->node;
     h->session = session;
@@ -878,8 +912,10 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * heap object is the heap and then its internal region (internal-region.h),
      * about 11 MiB at the default 64 teams, fan-out of 4 and two pieces in
      * flight (OSOE_COLLECTIVE_PIPELINE), which is counted here with the heap
-     * it follows. Pages cost only once written, so nothing above has taken
-     * the room this asks for.
+     * it follows. Pages cost only once written, so the room above has taken
+     * is only the segment's first pages, allocated so that they could be
+     * written (a little over 72 KiB, counted again in `wanted`: a check that
+     * errs by that much toward refusing).
      */
     uint64_t wanted = n->control_bytes +
                       (uint64_t)b->local_count * (n->heap_bytes + n->statics_bytes);
@@ -959,15 +995,40 @@ again:;
 
     /* Sized is not ready: the lead publishes `ready` after the header. What
      * was opened may also be a leftover the lead is about to reclaim, which
-     * will never be ready (shm-object.h): then start over. */
+     * will never be ready (shm-object.h): then start over. And a leftover of
+     * another launch by the same names - a requeued job, a reused pid - may
+     * be ready, or failed, already: its `launch` says so, read after the
+     * acquire load that published it (the adversarial read of 2026-10-03),
+     * and it is waited past as one not yet reclaimed is. */
     for (;;) {
-        if (atomic_load_explicit(&n->hdr->ready, memory_order_acquire))
+        bool ready = atomic_load_explicit(&n->hdr->ready, memory_order_acquire) != 0;
+        bool failed = atomic_load_explicit(&n->hdr->failed, memory_order_acquire) != 0;
+        bool another_launch = (ready || failed) && n->hdr->launch != b->launch;
+        if (ready && !another_launch)
             break;
-        if (osoe_shm_orphaned(n->control_fd)) {
+        if (another_launch || osoe_shm_orphaned(n->control_fd)) {
             munmap(n->hdr, n->control_bytes);
             close(n->control_fd);
             n->hdr = NULL;
             n->control_fd = -1;
+            if (another_launch) {
+                /* Until this launch's lead reclaims it - and said, as every
+                 * start-up wait is: the first loop, which maps a sized object
+                 * at once, never reaches its own notice here. */
+                if (osoe_stall_watch_stalled(&watch, 0))
+                    osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): %s is "
+                               "another launch's, and the local lead has not reclaimed it",
+                               (unsigned long long)osoe_stall_watch_seconds(&watch),
+                               n->control_name);
+                if (osoe_stall_watch_notice_due(&watch))
+                    osoe_notice("shmem_init on node %u has waited %llu s for the local lead, "
+                                "rank %u, to reclaim %s, which another launch of this job's "
+                                "ids left; still waiting", b->node,
+                                (unsigned long long)osoe_stall_watch_waited_seconds(&watch),
+                                b->gtids[0], n->control_name);
+                struct timespec reclaim = { 0, 10 * 1000 * 1000 };
+                nanosleep(&reclaim, NULL);
+            }
             goto again;
         }
         check_failed(n);
