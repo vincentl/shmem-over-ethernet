@@ -627,6 +627,7 @@ enum {
     GC_HEAP    = 8,             /* char[56] */
     GC_STATICS = 64,            /* char[56] */
     GC_NAME_BYTES = 56,
+    GC_CREATOR = 128,           /* i32, in the header: node.creator_pid */
 };
 
 /* A name into a slot's field, which the new object's zeros terminate. */
@@ -637,10 +638,14 @@ static void put_name(unsigned char *field, const char *name)
     memcpy(field, name, n < GC_NAME_BYTES ? n : GC_NAME_BYTES - 1);
 }
 
+/* Every slot at `phase` (0: not joined), every PE gone, and the segment's
+ * maker `creator`. */
 static void *build_collectable(const char *name, const char *names[LOCAL_COUNT][2],
-                               size_t *bytes)
+                               uint32_t phase, int32_t creator, size_t *bytes)
 {
     struct osoe_metric_descriptor table[] = {
+        desc("node.creator_pid", "", OSOE_MTYPE_I32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,
+             GC_CREATOR),
         desc("pe.phase", "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_PE, 4, GC_PHASE),
         desc("pe.pid", "", OSOE_MTYPE_I32, OSOE_MKIND_STATE, OSOE_MSCOPE_PE, 4, GC_PID),
         desc("pe.heap_name", "", OSOE_MTYPE_STRING, OSOE_MKIND_STATE, OSOE_MSCOPE_PE,
@@ -691,9 +696,10 @@ static void *build_collectable(const char *name, const char *names[LOCAL_COUNT][
     memcpy(p, &d, sizeof d);
     memcpy(p + metrics_off, table, (size_t)d.metrics_bytes);
 
+    *(int32_t *)(p + GC_CREATOR) = creator;
     for (uint32_t i = 0; i < LOCAL_COUNT; i++) {
         unsigned char *slot = p + slots_off + (uint64_t)i * SLOT_BYTES;
-        *(uint32_t *)(slot + GC_PHASE) = 3;                 /* joined */
+        *(uint32_t *)(slot + GC_PHASE) = phase;
         *(int32_t *)(slot + GC_PID) = INT32_MAX;            /* past any pid_max: gone */
         put_name(slot + GC_HEAP, names[i][0]);
         put_name(slot + GC_STATICS, names[i][1]);
@@ -768,7 +774,7 @@ static void check_gc_refusals(void)
     const char *names[LOCAL_COUNT][2] = { { foreign, own }, { look_alike, fifo } };
     shm_unlink(segment);
     size_t bytes = 0;
-    void *p = build_collectable(segment, names, &bytes);
+    void *p = build_collectable(segment, names, 3, INT32_MAX, &bytes);   /* joined, gone */
     CHECK(p != NULL);
     if (p)
         munmap(p, bytes);       /* a mapping of this process's would keep the segment */
@@ -816,11 +822,87 @@ static void check_gc_refusals(void)
     }
 }
 
+/*
+ * What a start leaves of its own (stat.c, §3.14): a segment no PE has joined,
+ * which is a start under way while the process that made it lives and a failed
+ * start's once it is gone, and a tombstone, a directory alone, collectable once
+ * nothing maps it. These are the cases a job cannot be made to stand still in:
+ * a maker not yet recorded, one still running - this test - and a tombstone
+ * still mapped.
+ */
+static void check_gc_starts(void)
+{
+    const char *tool = getenv("OSOE_TEST_STAT");
+    if (!tool) {
+        fprintf(stderr, "OSOE_TEST_STAT is not set\n");
+        CHECK(0);
+        return;
+    }
+    int pid = (int)getpid();
+    const char *none[LOCAL_COUNT][2] = { { "", "" }, { "", "" } };
+    const struct {
+        int32_t creator;
+        const char *said;
+    } cases[] = {
+        { 0, "no PE has joined yet; left alone" },
+        { pid, "no PE has joined yet, and the process that made it runs; left alone" },
+        { INT32_MAX, "removed" },
+    };
+    char out[8192], want[256], segment[64];
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        snprintf(segment, sizeof segment, "/osoe-gc-start.%d.%zu", pid, i);
+        shm_unlink(segment);
+        size_t bytes = 0;
+        void *p = build_collectable(segment, none, 0, cases[i].creator, &bytes);
+        CHECK(p != NULL);
+        if (p)
+            munmap(p, bytes);
+        CHECK(run_gc(tool, segment, out, sizeof out) == 0);
+        snprintf(want, sizeof want, "%s: %s", segment, cases[i].said);
+        CHECK(strstr(out, want) != NULL);
+        CHECK(named(segment) == (cases[i].creator != INT32_MAX));
+        shm_unlink(segment);
+    }
+
+    /* A tombstone, as node.c writes one: mapped by this process, then not. */
+    snprintf(segment, sizeof segment, "/osoe-gc-tombstone.%d", pid);
+    shm_unlink(segment);
+    int fd = shm_open(segment, O_CREAT | O_EXCL | O_RDWR, 0600);
+    CHECK(fd >= 0 && ftruncate(fd, 4096) == 0);
+    unsigned char *t = fd >= 0 ? mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+                               : MAP_FAILED;
+    if (fd >= 0)
+        close(fd);
+    CHECK(t != MAP_FAILED);
+    if (t == MAP_FAILED)
+        return;
+    struct osoe_segment_directory d;
+    memset(&d, 0, sizeof d);
+    d.magic = OSOE_SEGMENT_MAGIC;
+    d.layout = OSOE_SEGMENT_NEWEST_LAYOUT;
+    d.directory_bytes = (uint32_t)sizeof d;
+    d.header_bytes = HEADER_BYTES;
+    d.segment_bytes = 4096;
+    memcpy(t, &d, sizeof d);
+    CHECK(run_gc(tool, segment, out, sizeof out) == 0);
+    snprintf(want, sizeof want, "%s: a failed start's tombstone that a live process still "
+             "maps; left alone", segment);
+    CHECK(strstr(out, want) != NULL);
+    CHECK(named(segment));
+    munmap(t, 4096);
+    CHECK(run_gc(tool, segment, out, sizeof out) == 0);
+    snprintf(want, sizeof want, "%s: removed", segment);
+    CHECK(strstr(out, want) != NULL);
+    CHECK(!named(segment));
+    shm_unlink(segment);
+}
+
 int main(void)
 {
     check_details();
     check_startup_objects();
     check_gc_refusals();
+    check_gc_starts();
 
     char name[64], file[96];
     snprintf(name, sizeof name, "/osoe-segment-test.%d", (int)getpid());

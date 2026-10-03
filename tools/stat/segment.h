@@ -412,6 +412,16 @@ int osoe_segment_list_named(char (*names)[OSOE_SEGMENT_NAME_MAX], int max);
  * remove a segment that is still mapped, whatever its slots say. */
 bool osoe_segment_mapped(const char *name);
 
+/*
+ * Whether the segment is a failed start's tombstone: a directory and nothing
+ * after it - no PE slots, no metric table - which a node's lead that refuses
+ * before its control segment exists leaves under that segment's name, so that
+ * the node's other PEs, opening the name, find the refusal (§6.2). Told from
+ * the frozen directory alone; what the header holds beyond it, `failed` among
+ * it, is the library's and unread here.
+ */
+bool osoe_segment_is_tombstone(const struct osoe_segment *s);
+
 /* "/dev/shm/osoe.x", "osoe.x" and "/osoe.x" all name one object: `out` gets
  * "/osoe.x". */
 void osoe_segment_normalize_name(const char *in, char *out, size_t len);

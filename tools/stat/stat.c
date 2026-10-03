@@ -1019,6 +1019,33 @@ static int gc_one(const char *name)
         fprintf(stderr, "osoe-stat: %s\n", err);
         return 1;
     }
+    /*
+     * A failed start's tombstone (segment.h) has no slots to say who is gone,
+     * and its writer, the node's lead, maps it until that lead ends: it is
+     * collectable once no live process maps it. A node-mate that had not
+     * opened it by then is told nothing - it waits as for a lead that never
+     * came, saying so, until its launcher ends it (§3.15).
+     */
+    if (!s.table_usable && osoe_segment_is_tombstone(&s)) {
+        char tombstone[OSOE_SEGMENT_NAME_MAX];
+        snprintf(tombstone, sizeof tombstone, "%s", s.name);
+        osoe_segment_close(&s);
+        if (osoe_segment_mapped(tombstone)) {
+            printf("%s: a failed start's tombstone that a live process still maps; "
+                   "left alone\n", tombstone);
+            return 0;
+        }
+        if (shm_unlink(tombstone) != 0) {
+            if (errno == ENOENT) {
+                printf("%s: already gone\n", tombstone);
+                return 0;
+            }
+            fprintf(stderr, "osoe-stat: cannot remove %s: %s\n", tombstone, strerror(errno));
+            return 1;
+        }
+        printf("%s: removed\n", tombstone);
+        return 0;
+    }
     if (!s.table_usable) {
         fprintf(stderr, "osoe-stat: %s has no readable metric table; not removing it\n",
                 s.name);
@@ -1027,15 +1054,31 @@ static int gc_one(const char *name)
     }
     bool any_joined = false;
     bool gone = all_pes_gone(&s, &any_joined);
-    /* The slots are the job's word for who it is; the kernel's is who maps the
-     * object. A segment still mapped by a live process is never removed,
-     * whatever its slots say - a recycled pid or a PE that died mid-join could
-     * otherwise make a live job look dead. */
-    bool mapped = gone && any_joined && osoe_segment_mapped(s.name);
-    if (!gone || !any_joined || mapped) {
-        printf("%s: %s\n", s.name, !any_joined ? "no PE has joined yet; left alone"
-                                  : mapped ? "a live process still maps it; left alone"
-                                           : "still has live PEs; left alone");
+    /*
+     * A segment no PE has joined is a start under way while the lead that made
+     * it lives, and a failed start's once that lead is gone - one that died, or
+     * refused, before any PE joined (§6.2). A library from before
+     * node.creator_pid does not say who made it, and its segment is left
+     * alone, as every such segment was.
+     */
+    int64_t creator = 0;
+    if (!any_joined) {
+        uint64_t recorded = 0;
+        if (osoe_segment_read_name(&s, "node.creator_pid", 0, &recorded))
+            creator = (int64_t)recorded;
+        gone = creator > 0 && kill((pid_t)creator, 0) != 0 && errno == ESRCH;
+    }
+    /* The slots and the creator are the job's word for who it is; the
+     * kernel's is who maps the object. A segment still mapped by a live
+     * process is never removed, whatever its slots say - a recycled pid or a
+     * PE that died mid-join could otherwise make a live job look dead. */
+    bool mapped = gone && osoe_segment_mapped(s.name);
+    if (!gone || mapped) {
+        printf("%s: %s; left alone\n", s.name,
+               mapped ? "a live process still maps it"
+               : any_joined ? "still has live PEs"
+               : creator > 0 ? "no PE has joined yet, and the process that made it runs"
+                             : "no PE has joined yet");
         osoe_segment_close(&s);
         return 0;
     }
@@ -1158,6 +1201,17 @@ static int list_segments(void)
                 printf("%-28s %s\n", names[i], err);
             continue;
         }
+        if (!s.table_usable && osoe_segment_is_tombstone(&s)) {
+            if (opt_json) {
+                printf("%s{\"segment\":", i ? "," : "");
+                json_str(stdout, s.name);
+                printf(",\"tombstone\":true}");
+            } else {
+                printf("%-28s a failed start's tombstone\n", s.name);
+            }
+            osoe_segment_close(&s);
+            continue;
+        }
         uint64_t live = 0;
         for (uint32_t p = 0; p < s.local_count; p++) {
             uint64_t pid = 0, phase = 0;
@@ -1197,6 +1251,14 @@ static int show(const char *name, enum mode m)
     if (osoe_segment_open(&s, name, err, sizeof err) != 0) {
         fprintf(stderr, "osoe-stat: %s\n", err);
         return 1;
+    }
+    if (!s.table_usable && osoe_segment_is_tombstone(&s)) {
+        printf("%s: a failed start's tombstone - the node's lead refused before its "
+               "segment existed, and left this in its place to tell the node's other PEs. "
+               "Nothing else to show; osoe-stat --gc removes it once no process maps it.\n",
+               s.name);
+        osoe_segment_close(&s);
+        return 0;
     }
     if (!s.table_usable) {
         /* The directory is frozen so that exactly this case is still useful. */

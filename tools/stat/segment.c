@@ -639,6 +639,14 @@ int osoe_segment_list_named(char (*names)[OSOE_SEGMENT_NAME_MAX], int max)
     return l.found;
 }
 
+bool osoe_segment_is_tombstone(const struct osoe_segment *s)
+{
+    const struct osoe_segment_directory *d = s->dir;
+    return d && OSOE_SEGMENT_HAS(d, metrics_count) && d->local_count == 0 &&
+           d->slots_offset == 0 && d->metrics_count == 0 && d->metrics_offset == 0 &&
+           d->header_bytes != 0 && d->segment_bytes == s->bytes;
+}
+
 bool osoe_segment_mapped(const char *name)
 {
     char want[OSOE_SEGMENT_NAME_MAX + 16];

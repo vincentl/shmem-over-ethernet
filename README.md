@@ -709,13 +709,15 @@ the node has opened them. `<session>` is 0 for a program's first `shmem_init`
 and counts up with each initialization after a `shmem_finalize`.
 
 `osoe-stat --gc` removes what such a start left once nothing uses it: a control
-segment whose PEs are all gone, with the heaps and statics it names, and a
-node's job tables or connection buffers whose creating process is gone and
-which no live process maps. It leaves alone what a start still under way holds: a
-control segment no PE has joined yet, and an object whose creator has not yet
-recorded itself. A start that died in one of those moments leaves one that
-`--gc` cannot tell from that, which stays until a job with the same ids
-reclaims it or the epilog below removes it. `osoe-stat --gc` works on the
+segment whose PEs are all gone, with the heaps and statics it names; one no PE
+joined, once the process that made it is gone and no live process maps it; the
+tombstone a lead that refuses before it has a segment leaves under its name
+(below), once no live process maps it; and a node's job tables or connection
+buffers whose creating process is gone and which no live process maps. It
+leaves alone what a start still under way holds, and an object whose creator
+has not yet recorded itself: a start that died in that moment leaves one that
+`--gc` cannot tell from a start under way, which stays until a job with the
+same ids reclaims it or the epilog below removes it. `osoe-stat --gc` works on the
 machine it runs on and removes only what its user may, so a site runs it as
 root on each node. `osoe-launch` removes its own job's leftovers itself, and
 says which it found, except a control segment `OSOE_KEEP_CONTROL_SEGMENT`
@@ -735,11 +737,13 @@ A node's PEs meet in its control segment in `/dev/shm`; then the node leads
 meet in a tree and connect their mesh (design §6.2). A failure on the way is
 loud, and how far it reaches depends on where it is:
 
-- **A PE that refuses** - its environment, the kernel, a `/dev/shm` too small
-  for the node's heaps - ends by name, and every other PE of its node ends
-  with it, saying that another local PE failed: the refusal is published in
-  the node's segment, which the lead makes first, before anything that can
-  refuse.
+- **A PE that refuses** - its environment, a `/dev/shm` too small for the
+  node's heaps - ends by name, and every other PE of its node ends with it,
+  saying that another local PE failed: the refusal is published in the node's
+  segment, which the lead makes before it checks `/dev/shm`, or, by a lead that
+  refuses before it has made one, in a *tombstone* it leaves under the
+  segment's name. A kernel too old for osoe each PE refuses by itself, before
+  anything is made.
 - **A node whose lead finds the job disagreeing** - another node launched for
   another count, a value the rows below mark *checked* between nodes - ends
   naming the variable and both nodes. The other nodes keep waiting for it.

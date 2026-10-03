@@ -1390,8 +1390,13 @@ What it does:
 - **`--gc`** for what a job leaves in `/dev/shm`: segments left by a start that
   died, or kept by `OSOE_KEEP_CONTROL_SEGMENT`, and the two objects a start of
   a job of more than one node can leave. A segment is collectable when
-  every PE that ever joined it is gone; one where *no* PE has joined yet is left
-  alone, because that is a job in bootstrap and not a corpse. Heap objects are
+  every PE that ever joined it is gone. One where *no* PE has joined is a job
+  in bootstrap while the lead that made it lives, and a corpse once it is gone:
+  collectable then, by `node.creator_pid`, if no live process maps it - a
+  library from before that metric does not say, and its segment is left alone.
+  A *tombstone* (§6.2), which has a directory and nothing after it, is told by
+  its directory alone and collectable once no live process maps it, since its
+  writer maps it until it ends. Heap objects are
   removed first, by the name each slot records, since removing the control
   segment first would strand them. A recycled pid can only make a dead job look
   alive, which costs a few megabytes of `/dev/shm` rather than removing a
@@ -5639,7 +5644,10 @@ small for the node's heaps, among them. Three rules close it:
   `failed` in the lead's segment, waiting at most the abort grace for it. A PE
   that cannot read its own identity tells nobody, and a task that never reaches
   the library cannot: the notices of §3.15 name both, and the launcher ends
-  them.
+  them. Nor does a refusal of the kernel, which every local PE makes by itself
+  before anything is made (§1): a tombstone would tell nobody anything, and its
+  wake is the futex2 call that failed. A tombstone's name stays, as a refused
+  segment's does: `osoe-stat --gc` removes both (§3.14).
 
 **Removing names: as soon as everyone who must open an object has.** Every object
 is opened only during init, and each name is removed the moment the last process
