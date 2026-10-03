@@ -367,6 +367,49 @@ with its fix undone; one release run had failed only `shmem.floor`'s get pin, un
 host's load from two reviewers' builds (4.70 times the floor against 3.0), and passed three
 of three idle.
 
+## Part 4: the README and the records
+
+The documentation-only items of the brief's Part 4, each part's own README sentences
+having travelled with it. A peer drafted every item read-only against `main` at
+`9bbac4f` - the passage it replaces, the text, what it rests on - with four readers
+checking roughly 600 citations and numbers, the Pi numbers recomputed from the review's
+raw files (`build/scratch/release-fixes/part4-drafts.md`); a Sonnet subagent applied the
+drafts, a second finished them after the first was stopped, with seven corrections a
+citation check found; this session read the README's diff whole and regrouped the
+commits so that none leaves the README's lists broken, as two intermediate ones had.
+
+- **Taken without the author**: the Pi session's raw files committed, 137 of 138 -
+  `/home/pi` is the cluster's stock account, as in 13 files already tracked - with
+  trailing spaces stripped and the nodes' hardware addresses removed from
+  `01-node-facts.txt`; `ip link`'s output, those addresses alone, left out. The second
+  review's "SHARP is InfiniBand's" left out, as nothing in the tree proves it. The
+  review's C5 (`iput` strides of zero or less, mismatched allocation sizes) not added: no
+  draft carried its evidence.
+- **Changed from the drafts**: "the echo moved 10 to 14.5" to 10 to 12.7, the drafter's
+  six idle runs - the 14.5 has no raw log; "at most 16 PEs a node" to 15, the widest
+  test, with timing at 4 on the Pi and the barrier alone to 32 in the VM; the review's
+  B1 "would have ended", a prediction from the counts and not a run.
+- **The records**: `docs/pi-cluster-results.md`'s "every line within 5 %" and the
+  slice's "no difference", both false of their own raw files, corrected; design §3.14,
+  §3.15, §4.11, §5, §6.2, §4.1 and §3.4 where they disagreed with the code; the
+  decisions index's `OSOE_AGENT_CPUS`.
+- **Left**: design §5.7's split "borrowed from the heap", which step D rewrites; stale
+  comments in `team.c`, `metrics.c` and `connection-area.c`.
+- **The final reads** (the brief's): the stranger's read of the whole README and a check
+  of every sentence against its source: (pending).
+
+## Part 5: the repository
+
+Branch `repository-scrub`, by a Sonnet subagent, rebased onto `main` after Part 4 and
+its audits run again over the whole tree: no tracked file names the author's home
+directory (218 places before, `<repo>` and `~` in their place; a control finds the
+pattern where it is); every source file carries `SPDX-License-Identifier:
+LGPL-3.0-or-later` but the specification's four examples, kept with its notice (160 files
+before, 4 after); the captured Slurm fixtures name no development machine (`vm-0`,
+`192.0.2.1`), and their README says the VM that `dev/lima` makes has no Slurm. The
+release checklist moved into the tree, `docs/release-checklist.md`, a draft until the
+author reads it. The debug suite on the rebased branch: 657 of 657.
+
 ## Still with the author
 
 - **The release checklist** (`docs/release-checklist.md`, with the repository scrub) is
