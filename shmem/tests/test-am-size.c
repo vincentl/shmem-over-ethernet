@@ -30,6 +30,18 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
     exit(1);
 }
 
+/* And its start-up notice (fatal.h), which a wait here prints after 30 s. */
+void osoe_notice(const char *fmt, ...);
+void osoe_notice(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "osoe_notice: ");
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    va_end(ap);
+}
+
 enum { K = 1024 };
 #define KB(n) ((uint64_t)(n) * K)
 #define MB(n) ((uint64_t)(n) * K * K)

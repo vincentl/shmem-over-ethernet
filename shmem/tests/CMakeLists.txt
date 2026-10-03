@@ -2855,9 +2855,11 @@ if(OSOE_TIER3)
   # namespace has, as a typo in a host list would: its connects find no route, each
   # after ARP has given up, and it retries - nothing gives up (§3.15) - and its
   # notice names node 0, the host list's entry, the address dialled and the error;
-  # that is the dial's, kept, where it was thrown away. It comes once a round of
-  # node 0's 32 candidate ports has gone by, some 25 s of ARP's, not at the 2 s
-  # the test hook asks: hence the launcher's 60 s. Node 0, which nobody calls,
+  # that is the dial's, kept, where it was thrown away. It comes at the first
+  # dial to end past the 2 s the test hook asks, since the loop sweeps between
+  # dials; when it swept only between rounds of node 0's 32 candidate ports, it
+  # came some 25 s of ARP's later, which the launcher's 60 s still allows for.
+  # Node 0, which nobody calls,
   # names node 1 and the port it waits on. Both are left to the launcher's
   # timeout. See refusal.sh and tools/launch/tier3.sh.
   string(REPLACE ";" " " wrap "${osoe_tier3};pi;2;OSOE_TEST_NOTICE_SECONDS=2;--")

@@ -938,10 +938,14 @@ again:;
         } else if (errno != ENOENT) {
             osoe_fatal("the control segment: %s", err);
         }
-        if (osoe_stall_watch_stalled(&watch, 0))
+        if (osoe_stall_watch_stalled(&watch, 0)) {
+            /* Nothing to tell: the lead's segment, which the last word would
+             * wait the abort grace for, is what has not come (node.h). */
+            osoe_node_refusal_disarm();
             osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead "
                        "has not created %s",
                        (unsigned long long)osoe_stall_watch_seconds(&watch), n->control_name);
+        }
         if (osoe_stall_watch_notice_due(&watch))
             osoe_notice("shmem_init on node %u has waited %llu s for the local lead, rank %u, "
                         "to create the node's control segment %s, which %s; still waiting",

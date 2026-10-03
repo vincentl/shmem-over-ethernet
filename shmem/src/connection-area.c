@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -278,13 +279,16 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         /* The name appears before the object is sized and before the header is
          * written, so wait for the length here and for `ready` below (§6.2). */
 again:;
+        /* Noticed, as every start-up wait is (§3.15): the tests of 2026-10-02
+         * found this one silent. */
         struct osoe_stall_watch watch;
-        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+        osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
         struct timespec back = { 0, 200000 };
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         for (;;) {
             char err[256];
             fd = osoe_shm_open_ours(a->name, err, sizeof err);
+            bool exists = fd >= 0;
             if (fd >= 0) {
                 struct stat st;
                 if (fstat(fd, &st) == 0 && (uint64_t)st.st_size >= a->bytes)
@@ -309,6 +313,13 @@ again:;
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not created %s",
                            (unsigned long long)osoe_stall_watch_seconds(&watch), a->name);
+            if (osoe_stall_watch_notice_due(&watch))
+                osoe_notice("shmem_init on node %u has waited %llu s for the local lead, "
+                            "rank %u, to create the node's connection area %s, which %s; "
+                            "still waiting", b->node,
+                            (unsigned long long)osoe_stall_watch_waited_seconds(&watch),
+                            b->gtids[0], a->name,
+                            exists ? "exists but is not sized yet" : "does not exist yet");
             /* §4.10: every wait sweeps - a local lead that died before sizing
              * the area would leave its siblings here for good. */
             if (osoe_deadline_expired(&sweep)) {
@@ -388,7 +399,7 @@ again:;
         osoe_futex_wake(&h->ready, INT_MAX, OSOE_FUTEX_SHARED);
     } else {
         struct osoe_stall_watch watch;
-        osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+        osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
         while (atomic_load_explicit(&h->ready, memory_order_acquire) == 0) {
             /* A leftover the local lead is about to reclaim will never be
              * ready: start over (shm-object.h). */
@@ -409,6 +420,12 @@ again:;
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not finished creating %s",
                            (unsigned long long)osoe_stall_watch_seconds(&watch), a->name);
+            if (osoe_stall_watch_notice_due(&watch))
+                osoe_notice("shmem_init on node %u has waited %llu s for the local lead, "
+                            "rank %u, to finish the node's connection area %s, which it "
+                            "has created; still waiting", b->node,
+                            (unsigned long long)osoe_stall_watch_waited_seconds(&watch),
+                            b->gtids[0], a->name);
         }
         if (h->magic != OSOE_CONNECTION_AREA_MAGIC || h->layout != OSOE_CONNECTION_AREA_LAYOUT ||
             h->buffer_bytes != buffer || h->chunk_bytes != config.chunk ||

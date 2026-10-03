@@ -787,6 +787,30 @@ void osoe_listener_own_address(const struct osoe_bootstrap *b, struct sockaddr_i
                 self_ip, local_ip, other);
 }
 
+/*
+ * The calling loop's sweep: the abort word, OSOE_NO_PROGRESS_TIMEOUT and the
+ * notice, between dials as well as between rounds. A dial to an address that
+ * never answers ARP takes most of a second, and a round 32 of them, so a check
+ * once a round put the 30 s notice near 50 s (the tier-3 test of 2026-10-02).
+ */
+static void calling_sweep(const struct osoe_bootstrap *b, struct osoe_stall_watch *watch,
+                          struct osoe_deadline *sweep, const struct sockaddr_in *host,
+                          uint32_t node, const char *ports, const struct attempt *tried)
+{
+    if (!osoe_deadline_expired(sweep))
+        return;
+    *sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+    osoe_sweep_expired("shmem_init");
+    if (osoe_stall_watch_stalled(watch, 0))
+        osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u has "
+                   "not answered node %u on any of its %u candidate ports in "
+                   "OSOE_PORT_RANGE=%u-%u",
+                   (unsigned long long)osoe_stall_watch_seconds(watch), node, b->node,
+                   CANDIDATES, b->port_low, b->port_high);
+    if (osoe_stall_watch_notice_due(watch))
+        notice_calling(b, watch, node, host, ports, tried);
+}
+
 int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
                           const struct sockaddr_in *host, uint32_t node,
                           enum osoe_hello_purpose purpose)
@@ -805,6 +829,7 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
         int telling = 0;        /* 0 nobody, 1 silence, 2 another node's, 3 the node's own */
         round = (struct attempt){ "", 0 };
         for (uint32_t i = 0; i < CANDIDATES; i++) {
+            calling_sweep(b, &watch, &sweep, host, node, ports, round.at_ns ? &round : &tried);
             struct hello h = { HELLO_MAGIC, HELLO_VERSION, (uint32_t)purpose, b->job, b->step,
                                session, b->node, node, b->node_count, b->world_size,
                                fresh_nonce() };
@@ -846,18 +871,7 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
         }
         if (round.at_ns)
             tried = round;
-        if (osoe_deadline_expired(&sweep)) {
-            sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-            osoe_sweep_expired("shmem_init");
-            if (osoe_stall_watch_stalled(&watch, 0))
-                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u has "
-                           "not answered node %u on any of its %u candidate ports in "
-                           "OSOE_PORT_RANGE=%u-%u",
-                           (unsigned long long)osoe_stall_watch_seconds(&watch), node, b->node,
-                           CANDIDATES, b->port_low, b->port_high);
-            if (osoe_stall_watch_notice_due(&watch))
-                notice_calling(b, &watch, node, host, ports, &tried);
-        }
+        calling_sweep(b, &watch, &sweep, host, node, ports, &tried);
         nanosleep(&back, NULL);
         if (back.tv_nsec < 10000000)
             back.tv_nsec *= 2;
