@@ -395,8 +395,10 @@ commits so that none leaves the README's lists broken, as two intermediate ones 
   decisions index's `OSOE_AGENT_CPUS`.
 - **Left**: design §5.7's split "borrowed from the heap", which step D rewrites; stale
   comments in `team.c`, `metrics.c` and `connection-area.c`.
-- **The final reads** (the brief's): the stranger's read of the whole README and a check
-  of every sentence against its source: (pending).
+- **The final reads** (the brief's), on `main` at `1eee438`: a stranger's read of the
+  whole README by a fresh reader taking the part of an MPI and OpenMP programmer new to
+  SHMEM, and a check of every claim against its source by six readers in ranges -
+  about 730 claims, 60 flagged. Their fixes are Part 6's, below.
 
 ## Part 5: the repository
 
@@ -409,6 +411,142 @@ before, 4 after); the captured Slurm fixtures name no development machine (`vm-0
 `192.0.2.1`), and their README says the VM that `dev/lima` makes has no Slurm. The
 release checklist moved into the tree, `docs/release-checklist.md`, a draft until the
 author reads it. The debug suite on the rebased branch: 657 of 657.
+
+## Part 6: the whole
+
+`main` at `1eee438`, Parts 1 to 5 merged, verified as the brief asks; then what those
+runs and Part 4's final reads found, fixed on `release-part6`.
+
+- **The four presets in `osoe`**, configured with `-DOSOE_TEST_PINS=ON`, four tests at
+  a time: debug 657 of 657, asan 656 of 656, tsan 441 of 441, and release 656 of 657 -
+  `shmem.floor`'s three fastest-trip pins at 3.34, 3.23 and 3.07 against 3.0, while the
+  suite under load ran in `osoe-load` on the same host. Alone in `osoe-load`, five runs
+  passed every pin: the fastest trips 1.9 to 2.3 times the floor's, the stream
+  0.20 to 0.21 of it (`docs/design/evidence/release-fixes/floor-idle.txt`). `tier3`: 104
+  of 104. `models`: 24 of 24 in 29 minutes, one at a time (`model.abort` 592 s,
+  `model.abort_exit` 532, `model.tree_barrier` 309).
+- **The stranger's path, from a clean clone, in `osoe`** - not `osoe-load` as the brief
+  has it, since `osoe` is the VM with Slurm: `cmake --workflow --preset release`, exit 0
+  in 591 s, 657 of 657; configured without Python, CMake named the two things it leaves
+  out and 656 of 656 passed; `cmake --install` put `oshcc`, `osoe-pacer` and
+  `osoe-stat` in the prefix; `ring.c`, built by the installed `oshcc` and run by `srun
+  -K1 --cpu-bind=none -N1 -n4`, printed its four lines and exited 0; the global-exit
+  example under `srun -K1`, three runs, each exited 7 with its handler run once and its
+  four lines.
+- **The README's command, idle in `osoe-load`**: the build 61 s, one file at a time; the
+  tests 442 s, one at a time, 657 of 657.
+- **Under eight busy loops in `osoe-load`**: 656 of 657, `shmem.reply` past its 60 s -
+  the review's K3. Its four threads waited for their tickets with `sched_yield`, and
+  under the loops two runs in ten stalled past 120 s at 0.1% of a CPU: starved, not
+  spinning. On Linux's EEVDF scheduler a yield pushes the yielder's deadline back a
+  slice, and only a sleep resets it - 100 yields and then a sleep stalled as well. A
+  waiter that sleeps at once ends under load, but let the test-then-decrement mutant
+  pass 9 runs of 10: the queue then stands, and the free credit is seldom contended. The
+  waiter now watches with plain loads 10,000 times and then sleeps on the credit's word
+  as the library does: idle 0.01 s, the mutant caught 20 runs of 20; under the loops 20
+  runs within 0.25 s. (What it misses under the loops, the adversarial read below
+  measured.)
+- **The final reads' fixes in the code.** `env.probe` makes `shmem_init`'s own io_uring
+  check, through the same function (`base/ring-check.c`), so that the README's "every
+  facility osoe relies on" is true: it had tried neither an `R_DISABLED` ring nor the
+  `SEND` opcode. With io_uring denied it fails that check by name. And the agent
+  thread's start had a 10 s bound, which would have ended a job whose machine was too
+  loaded to run a new thread by then; it waits without one (§3.15).
+- **The README, against the final reads**: what has run, and where (16 PEs across
+  machines; the VM daily and the Pi cluster the target); GCC or Clang, the packages, a
+  node that only runs jobs, and the distributions that fall short; the x86-64 sentence
+  confined to the tree it was true of; the build's time and `-j`; the prefix on every
+  node, and the linker script among what is installed; C++ through `OSOE_CC`; the lead
+  defined, a loopback name, the network used, the path that `srun` needs; `-c 2`
+  struck, which no run supports, and the binding's numbers in one place with what
+  unbinding costs; a batch script with its secret; `osoe-stat` on each node; an index
+  of what to do when a job fails; the design's claims made exact (the collectives'
+  levels, fence, the boundary, a futex wake, a team's costs, the waiting row,
+  `MULTIPLE`'s locks, the tree's bytes); the team limits marked temporary; the landing
+  zone and the nonblocking fetching atomics; limits not listed before (65,535 PEs a
+  node, descriptors, `-static`, heterogeneous jobs, MPI); RemoveIPC's remedies untried;
+  numbers recomputed from raw files (the mailbox's 256,000, `shmem_ptr`'s 28 µs, the
+  loopback stream from a committed run);
+  the SOS sweep's counts with their tree and PE count; the Pi's offload setting, F1, and
+  a line for a cluster that stalls the same way; the models' 29 minutes and the six
+  `MULTIPLE` models opt-in; the keepalive budget; the grace a constant; "the rows
+  above"; the test hooks' rows as the code has them (`OSOE_FORCE_REMOTE` leaves the
+  traffic in shared memory; the quiet check and the perturbation act on contexts that
+  threads share), and `OSOE_TEST_NOTICE_SECONDS`, `OSOE_LAUNCH` and `OSOE_CORPUS`
+  listed; a job's ids free again once it has started; `OSOE_HEAP_BASE` in place of the
+  candidates; the `tier3` preset named; the Pi's round trips in microseconds; io_uring's
+  sysctl among the requirements; the two meanings of *checked*. Design §3.12 says a
+  fetching atomic's reply takes no extent of the landing zone.
+- **The adversarial reads** (a fresh agent, given the diff and the properties: the
+  credit test still catches the two-step take and ends under load; the probe fails
+  wherever `shmem_init` refuses for io_uring; no path leaves the agent's start waiting
+  in silence; every changed sentence true). The code's three held - no lost wake in the
+  waiter, the probe's check the library's own, no path on which the agent never
+  starts while the process lives - and it found, all fixed but the one refuted, with
+  what a second fresh reader found in the fixes to the waits and the ring check:
+  - *Under the busy loops the waiter often misses the mutant*: caught in 58 runs of 90
+    in release and 6 of 20 in debug, every time under asan and tsan; idle 50 of 50 in
+    release, two of them by the timeout, and 20 of 20 in each other preset. The figure
+    "7 of 10" above this record first gave was of a waiter watching 1,000 times, not
+    the one committed. The test's comments now say what was measured: it guards the
+    suite's idle run. Under tsan and the loops it took 5 to 32 s of its 60, the
+    margin left as it is, since no run puts tsan under load.
+  - *The agent's start was a start-up wait that neither swept nor said what it
+    waited for*: it now sweeps for the abort word - the local PEs' liveness is the
+    agent's from there - ends at `OSOE_NO_PROGRESS_TIMEOUT` where that is set, and on
+    the node's lead says what it waits for after 30 s, one line a node. The non-leads'
+    wait for the lead's agent already swept; it stays silent, as `job.c`'s matching
+    wait is - a notice there, which this part first added, a second reader found
+    doubling the lead's own and naming the wrong cause - and now ends at the timeout
+    too, and keeps its sweep's deadline across a wake, which a signal every few
+    milliseconds had held off.
+  - *`shmem_init`'s io_uring check never enabled the ring it made `R_DISABLED`, nor
+    entered it*, both of which the agent does on its first pass: under a filter
+    refusing only one of them, `env.probe` passed - or crashed, reading a completion
+    that never came - and a two-node job ended after a PE had left `shmem_init`. The
+    check now enables the ring and makes the agent's own call, a wait for completions
+    with a zero timeout; it reads the list of opcodes for an error of its own, naming
+    it; and it names the `kernel.io_uring_disabled` sysctl only where the ring's
+    creation is what failed, the one step the sysctl refuses. The probe reads no
+    completion it did not get, and writes a line at a time. Contrived, since every
+    kernel from 6.7 has these calls, and now tested: `deny-io-uring` refuses
+    `io_uring_setup`, the enabling or the entering, and `env.probe.no-io-uring-*`,
+    `shmem.refuse.no-io-uring-*` and `shmem.no-io-uring.one-node` check the probe's
+    failure, the job's refusal by name before anything is made, and a one-node job
+    that runs.
+  - *The README*: the Pi's round trips taken from a run with the offload on - the runs
+    with it off give 172 to 176 µs against 158 to 159, 9 to 11%; F1's stalls reach 52
+    s, and the offload is not their settled cure; the slice's "1.3" and `node`'s "a
+    fifth", which this pass had replaced with the means of runs whose setting was
+    changed partway through, restored from the overnight record; the team row's costs
+    are in members, not nodes; the fan-out's 1.5 times needs a pipeline 4 to 8 deep;
+    alltoall and collect's lengths among the collectives that are not logarithmic; the
+    SOS sweep's "other two on one map", which no record holds, struck; the batch script
+    sets `OSOE_NO_PROGRESS_TIMEOUT`; a start's leftovers, which a later start by the
+    same ids reclaims; and a dozen narrower words. The models' comments in their
+    `CMakeLists.txt` and README, stale on why the six are opt-in, corrected.
+  - *Refuted*: that the README's timings lacked committed evidence - this record, which
+    gives them, merges with them.
+- **The branch, verified** in `osoe-load`, configured with `-DOSOE_TEST_PINS=ON`, four
+  tests at a time, as it merged: debug 664 of 664, release 664 of 664, asan 663 of
+  663, tsan 448 of 448. Under eight busy loops, 662 of 664, where two earlier runs of
+  the branch that day had passed every test: `env.echo-uring`'s stream pin, 0.42 of a
+  blocking stream against at least 0.50 - a timing pin measured under load, which Part
+  1 left unswitched since it held idle ten runs of ten, and which this record leaves
+  so - and `shmem.strict-c11`, the whole library rebuilt, past its 180 s; its timeout
+  is 600 s now (the round-three review's K3), and under the loops again, beside three
+  other build checks, it took 89 and 42 s.
+- **Taken without the author**: the six `SHMEM_THREAD_MULTIPLE` models stay opt-in, as
+  the brief says, and the README says so. Run once on this branch in `osoe-x86`, all six
+  passed, every broken variant failing as it should (`dirty_set` 345 s, `get_completion`
+  867, `watch_list` 28, `landing_extent` 3, `copy_out_claim` 17, `pe_quiet` 52: 22
+  minutes in all). The checklist gains a run of them
+  on the tagged tree, and the README's commands run on the Pi cluster as written - the
+  ring with `-K1 --cpu-bind=none` across two nodes, the batch script, `env.probe` on
+  every node, `osoe-stat` on a running job's nodes - none of which a run has done yet.
+- **Removed**: `build/scratch/wt/review-r3`, `build/scratch/wt/part6` and
+  `build/scratch/part6-clone`. Kept until the tag, at the author's word: `osoe-load`
+  and `osoe-x86`.
 
 ## Still with the author
 

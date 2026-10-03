@@ -68,7 +68,7 @@
     { "name": "release", "displayName": "Every test but the models",
       "configurePreset": "release", "output": { "outputOnFailure": true },
       "filter": { "exclude": { "label": "^model$" } } },
-    { "name": "models", "displayName": "The models alone: about an hour",
+    { "name": "models", "displayName": "The models alone: about half an hour",
       "configurePreset": "release", "output": { "outputOnFailure": true },
       "filter": { "include": { "label": "^model$" } },
       "execution": { "noTestsAction": "error" } },

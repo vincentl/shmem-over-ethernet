@@ -1,0 +1,107 @@
+# shmem.floor, alone, five runs, pins on (-DOSOE_TEST_PINS=ON), release build
+# 2026-10-03, the osoe-load VM: Debian 13, Linux 6.12.95+deb13-cloud-arm64, 4 CPUs, running
+# nothing else - right after the release suite, whose load the averages below still show
+# tree: main at 1eee438 plus the release fixes' Part 6 (shmem.reply's waiter, env.probe's check);
+# nothing shmem.floor measures differs from 1eee438. Run by
+#   ctest --test-dir build -R '^shmem\.floor$' --output-on-failure -V
+# Streams in MiB/s; trips in microseconds; ratios the median of the 7 pairs (range).
+== shmem.floor, pins on, alone, run 1, load 2.49 2.66 2.89, 15:09:19
+110: pair 0 fastest_us floor=15.4 get=29.5 put_quiet=29.3 fetch_add=29.5 median_us floor=27.0 get=54.9 put_quiet=54.6 fetch_add=54.3 stream_mib_per_s floor=13973 library=2864
+110: pair 1 fastest_us floor=20.0 get=37.9 put_quiet=45.5 fetch_add=43.9 median_us floor=28.5 get=55.3 put_quiet=55.2 fetch_add=54.8 stream_mib_per_s floor=13781 library=3054
+110: pair 2 fastest_us floor=18.5 get=46.4 put_quiet=43.8 fetch_add=45.1 median_us floor=28.8 get=56.1 put_quiet=56.0 fetch_add=55.5 stream_mib_per_s floor=14765 library=2933
+110: pair 3 fastest_us floor=15.5 get=29.0 put_quiet=29.2 fetch_add=29.2 median_us floor=28.6 get=55.7 put_quiet=55.7 fetch_add=55.3 stream_mib_per_s floor=15204 library=3011
+110: pair 4 fastest_us floor=15.3 get=29.5 put_quiet=29.4 fetch_add=29.4 median_us floor=27.0 get=54.3 put_quiet=54.3 fetch_add=54.1 stream_mib_per_s floor=13098 library=3029
+110: pair 5 fastest_us floor=18.0 get=41.0 put_quiet=40.5 fetch_add=43.0 median_us floor=28.2 get=55.3 put_quiet=55.2 fetch_add=54.8 stream_mib_per_s floor=14713 library=3060
+110: pair 6 fastest_us floor=15.0 get=28.7 put_quiet=28.7 fetch_add=28.7 median_us floor=28.3 get=55.2 put_quiet=55.1 fetch_add=54.8 stream_mib_per_s floor=14641 library=3014
+110: ratio, the median of 7 pairs (range):
+110:   fastest get/floor=1.916 (1.87-2.50)
+110:   fastest put_quiet/floor=1.921 (1.88-2.36)
+110:   fastest fetch_add/floor=1.924 (1.88-2.43)
+110:   median put_quiet/get=0.998 (1.00-1.00)
+110:   median fetch_add/get=0.991 (0.99-1.00)
+110:   stream library/floor=0.206 (0.198-0.231)
+110:   reported: median get/floor=1.951 (1.94-2.03)
+110:   reported: median put_quiet/floor=1.948 (1.94-2.02)
+110:   reported: median fetch_add/floor=1.938 (1.93-2.01)
+The following tests passed:
+100% tests passed, 0 tests failed out of 1
+== shmem.floor, pins on, alone, run 2, load 2.37 2.64 2.87, 15:09:25
+110: pair 0 fastest_us floor=15.5 get=29.5 put_quiet=29.3 fetch_add=29.3 median_us floor=27.2 get=54.3 put_quiet=54.3 fetch_add=54.0 stream_mib_per_s floor=14614 library=3051
+110: pair 1 fastest_us floor=15.7 get=30.3 put_quiet=30.2 fetch_add=30.2 median_us floor=28.5 get=55.0 put_quiet=55.0 fetch_add=54.5 stream_mib_per_s floor=14601 library=3373
+110: pair 2 fastest_us floor=17.9 get=43.8 put_quiet=45.3 fetch_add=42.7 median_us floor=27.6 get=54.9 put_quiet=54.6 fetch_add=54.4 stream_mib_per_s floor=14160 library=3094
+110: pair 3 fastest_us floor=18.9 get=42.8 put_quiet=44.7 fetch_add=41.6 median_us floor=28.3 get=55.2 put_quiet=55.0 fetch_add=54.7 stream_mib_per_s floor=14488 library=3075
+110: pair 4 fastest_us floor=18.4 get=46.5 put_quiet=45.9 fetch_add=43.5 median_us floor=28.0 get=54.6 put_quiet=54.4 fetch_add=54.3 stream_mib_per_s floor=14748 library=3063
+110: pair 5 fastest_us floor=20.0 get=49.0 put_quiet=42.3 fetch_add=43.3 median_us floor=28.2 get=54.8 put_quiet=54.7 fetch_add=54.4 stream_mib_per_s floor=14757 library=3012
+110: pair 6 fastest_us floor=19.4 get=43.8 put_quiet=40.8 fetch_add=43.7 median_us floor=27.5 get=54.8 put_quiet=54.7 fetch_add=54.3 stream_mib_per_s floor=14800 library=2929
+110: ratio, the median of 7 pairs (range):
+110:   fastest get/floor=2.260 (1.90-2.53)
+110:   fastest put_quiet/floor=2.108 (1.89-2.54)
+110:   fastest fetch_add/floor=2.200 (1.89-2.39)
+110:   median put_quiet/get=0.998 (0.99-1.00)
+110:   median fetch_add/get=0.992 (0.99-0.99)
+110:   stream library/floor=0.209 (0.198-0.231)
+110:   reported: median get/floor=1.950 (1.93-2.00)
+110:   reported: median put_quiet/floor=1.945 (1.93-2.00)
+110:   reported: median fetch_add/floor=1.938 (1.92-1.99)
+The following tests passed:
+100% tests passed, 0 tests failed out of 1
+== shmem.floor, pins on, alone, run 3, load 2.26 2.61 2.86, 15:09:30
+110: pair 0 fastest_us floor=14.9 get=28.5 put_quiet=28.3 fetch_add=28.3 median_us floor=28.2 get=54.9 put_quiet=54.9 fetch_add=54.6 stream_mib_per_s floor=14306 library=3033
+110: pair 1 fastest_us floor=18.6 get=45.1 put_quiet=44.8 fetch_add=43.0 median_us floor=28.7 get=54.9 put_quiet=54.9 fetch_add=54.5 stream_mib_per_s floor=14396 library=3521
+110: pair 2 fastest_us floor=19.5 get=38.7 put_quiet=41.7 fetch_add=42.2 median_us floor=27.9 get=54.9 put_quiet=54.8 fetch_add=54.4 stream_mib_per_s floor=14629 library=3014
+110: pair 3 fastest_us floor=16.2 get=30.0 put_quiet=30.3 fetch_add=29.5 median_us floor=28.2 get=54.8 put_quiet=54.8 fetch_add=54.4 stream_mib_per_s floor=14265 library=2965
+110: pair 4 fastest_us floor=15.3 get=28.6 put_quiet=28.8 fetch_add=28.5 median_us floor=28.2 get=55.0 put_quiet=54.8 fetch_add=54.5 stream_mib_per_s floor=14732 library=3051
+110: pair 5 fastest_us floor=15.5 get=29.6 put_quiet=29.5 fetch_add=29.4 median_us floor=27.8 get=55.1 put_quiet=55.0 fetch_add=54.6 stream_mib_per_s floor=14132 library=3062
+110: pair 6 fastest_us floor=19.9 get=45.6 put_quiet=45.1 fetch_add=43.8 median_us floor=28.3 get=55.2 put_quiet=55.0 fetch_add=54.7 stream_mib_per_s floor=14192 library=3087
+110: ratio, the median of 7 pairs (range):
+110:   fastest get/floor=1.916 (1.86-2.43)
+110:   fastest put_quiet/floor=1.906 (1.87-2.41)
+110:   fastest fetch_add/floor=1.905 (1.83-2.32)
+110:   median put_quiet/get=0.999 (1.00-1.00)
+110:   median fetch_add/get=0.992 (0.99-0.99)
+110:   stream library/floor=0.212 (0.206-0.245)
+110:   reported: median get/floor=1.953 (1.91-1.98)
+110:   reported: median put_quiet/floor=1.947 (1.91-1.98)
+110:   reported: median fetch_add/floor=1.935 (1.90-1.97)
+The following tests passed:
+100% tests passed, 0 tests failed out of 1
+== shmem.floor, pins on, alone, run 4, load 2.16 2.58 2.85, 15:09:36
+110: pair 0 fastest_us floor=15.3 get=29.2 put_quiet=29.1 fetch_add=29.0 median_us floor=27.1 get=54.3 put_quiet=54.3 fetch_add=53.9 stream_mib_per_s floor=14541 library=2961
+110: pair 1 fastest_us floor=19.2 get=42.6 put_quiet=41.7 fetch_add=41.3 median_us floor=28.7 get=55.1 put_quiet=55.0 fetch_add=54.5 stream_mib_per_s floor=14412 library=3000
+110: pair 2 fastest_us floor=15.4 get=29.3 put_quiet=29.3 fetch_add=29.3 median_us floor=28.0 get=54.5 put_quiet=54.5 fetch_add=54.1 stream_mib_per_s floor=14961 library=3048
+110: pair 3 fastest_us floor=21.0 get=46.8 put_quiet=45.3 fetch_add=41.9 median_us floor=27.6 get=54.3 put_quiet=54.6 fetch_add=54.0 stream_mib_per_s floor=14519 library=2921
+110: pair 4 fastest_us floor=15.4 get=30.1 put_quiet=30.0 fetch_add=29.9 median_us floor=28.1 get=55.0 put_quiet=55.1 fetch_add=54.4 stream_mib_per_s floor=14912 library=2671
+110: pair 5 fastest_us floor=20.5 get=44.8 put_quiet=36.9 fetch_add=41.5 median_us floor=27.8 get=55.1 put_quiet=55.0 fetch_add=54.5 stream_mib_per_s floor=14471 library=2741
+110: pair 6 fastest_us floor=20.0 get=42.5 put_quiet=41.8 fetch_add=45.9 median_us floor=28.4 get=55.0 put_quiet=55.0 fetch_add=54.6 stream_mib_per_s floor=14498 library=2671
+110: ratio, the median of 7 pairs (range):
+110:   fastest get/floor=2.127 (1.91-2.22)
+110:   fastest put_quiet/floor=1.951 (1.80-2.17)
+110:   fastest fetch_add/floor=1.990 (1.90-2.30)
+110:   median put_quiet/get=1.000 (1.00-1.00)
+110:   median fetch_add/get=0.992 (0.99-0.99)
+110:   stream library/floor=0.201 (0.179-0.208)
+110:   reported: median get/floor=1.954 (1.92-2.00)
+110:   reported: median put_quiet/floor=1.957 (1.92-2.00)
+110:   reported: median fetch_add/floor=1.935 (1.90-1.99)
+The following tests passed:
+100% tests passed, 0 tests failed out of 1
+== shmem.floor, pins on, alone, run 5, load 2.15 2.57 2.85, 15:09:42
+110: pair 0 fastest_us floor=15.3 get=29.3 put_quiet=28.9 fetch_add=29.1 median_us floor=28.1 get=54.6 put_quiet=54.6 fetch_add=54.3 stream_mib_per_s floor=14498 library=2721
+110: pair 1 fastest_us floor=20.3 get=42.5 put_quiet=43.6 fetch_add=44.4 median_us floor=28.3 get=55.6 put_quiet=55.4 fetch_add=55.1 stream_mib_per_s floor=14561 library=2908
+110: pair 2 fastest_us floor=15.0 get=29.6 put_quiet=29.5 fetch_add=29.4 median_us floor=27.3 get=55.0 put_quiet=54.8 fetch_add=54.6 stream_mib_per_s floor=8521 library=3476
+110: pair 3 fastest_us floor=16.6 get=31.5 put_quiet=29.9 fetch_add=29.7 median_us floor=28.3 get=55.0 put_quiet=54.9 fetch_add=54.6 stream_mib_per_s floor=15647 library=2886
+110: pair 4 fastest_us floor=18.1 get=42.5 put_quiet=42.0 fetch_add=42.7 median_us floor=28.6 get=55.3 put_quiet=55.0 fetch_add=54.7 stream_mib_per_s floor=14433 library=3063
+110: pair 5 fastest_us floor=16.2 get=30.1 put_quiet=30.0 fetch_add=29.7 median_us floor=28.4 get=55.3 put_quiet=55.2 fetch_add=54.8 stream_mib_per_s floor=14129 library=4870
+110: pair 6 fastest_us floor=15.2 get=29.5 put_quiet=29.3 fetch_add=29.3 median_us floor=27.5 get=54.7 put_quiet=54.7 fetch_add=54.3 stream_mib_per_s floor=11689 library=3101
+110: ratio, the median of 7 pairs (range):
+110:   fastest get/floor=1.940 (1.86-2.34)
+110:   fastest put_quiet/floor=1.926 (1.80-2.31)
+110:   fastest fetch_add/floor=1.923 (1.79-2.36)
+110:   median put_quiet/get=0.998 (0.99-1.00)
+110:   median fetch_add/get=0.992 (0.99-0.99)
+110:   stream library/floor=0.212 (0.184-0.408)
+110:   reported: median get/floor=1.947 (1.93-2.02)
+110:   reported: median put_quiet/floor=1.944 (1.92-2.01)
+110:   reported: median fetch_add/floor=1.932 (1.91-2.00)
+The following tests passed:
+100% tests passed, 0 tests failed out of 1

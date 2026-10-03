@@ -19,14 +19,17 @@ were run. Develop new models here.
 
 **Where they run.** Every model is a ctest in the release preset only: a model
 is Python and gives the same verdict whichever preset built the library. They
-carry the label `model` beside `tier1`, and take most of an hour, so the
+carry the label `model` beside `tier1`, and take about half an hour (29
+minutes in the development VM, 2026-10-03), so the
 `release` test preset leaves that label out and the `models` preset runs it
 alone (`ctest --preset models`). Without Python 3 none is registered. The
 six of §4.11's `SHMEM_THREAD_MULTIPLE` designs (`get_completion` but for its
 phase-1 case, `dirty_set`, `watch_list`, `landing_extent`, `copy_out_claim`,
 `pe_quiet`) run only with `OSOE_MULTIPLE_MODELS=ON`,
-since phase 1 ships up to `SERIALIZED` and they were three quarters of every
-release run; turn it on when §4.11 is scheduled or `engine.py` changes.
+since the first three alone were about 18 minutes of every release run when
+the models ran in it, and phase 1 then stopped at `SERIALIZED`. The library
+provides `MULTIPLE` now: turn it on when §4.11's code or `engine.py` changes,
+and before a release; on 2026-10-03 the six took 22 minutes.
 
 ## Writing a model
 

@@ -11,8 +11,9 @@
 # tree_barrier (five logical nodes, every node's thread real; 11 minutes),
 # close (a million states with the trapped-state check), abort (a fatal's case
 # of 5.7 million states; 18 minutes) and abort_exit (a case of ten million; 17)
-# - make the 24 models 55 minutes of the 61 the release workflow took (the
-# release-fixes plan's measurement, in the review's VM). So every model carries
+# - made the 24 models 55 minutes of the 61 the release workflow took (the
+# release-fixes plan's measurement, in the review's VM; one at a time on
+# 2026-10-03 they took 29 minutes in the development VM). So every model carries
 # the label "model" beside "tier1": the release test preset leaves that label
 # out, and the "models" test preset runs it alone (CMakePresets.json;
 # `ctest --preset models`, or the workflow of that name, which configures and
@@ -23,11 +24,13 @@
 # watch_list, get_completion's generation-word cases (about 15 minutes, a case
 # of 19 million states), landing_extent and copy_out_claim (under a minute
 # together), and pe_quiet (two minutes) - run only with
-# OSOE_MULTIPLE_MODELS=ON: phase 1 ships up to SERIALIZED, and together they
-# were three quarters of every release run (test review, 2026-09-23). Turn it on when §4.11 is scheduled or
-# engine.py changes; model.selftest holds the engine to its own cases, not to
-# these state spaces. get_completion's one case of what phase 1 ships, §4.6's
-# equality wait, runs regardless.
+# OSOE_MULTIPLE_MODELS=ON. They were made opt-in when phase 1 stopped at
+# SERIALIZED and the first three alone were about 18 minutes of every release
+# run (the test review of 2026-09-23); the library provides MULTIPLE now, so
+# turn it on when §4.11's code or engine.py changes, and before a release (the
+# release checklist). model.selftest holds the engine to its own cases, not
+# to these state spaces. get_completion's one case of what a SERIALIZED
+# library needs, §4.6's equality wait, runs regardless.
 find_package(Python3 COMPONENTS Interpreter)
 option(OSOE_MULTIPLE_MODELS "run the models of the SHMEM_THREAD_MULTIPLE designs (§4.11)" OFF)
 

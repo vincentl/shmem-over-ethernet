@@ -48,8 +48,14 @@ done; an open one, what is left.
 ## Added by the release fixes
 
 - [ ] **The four presets, `models`, `tier3` and the suite under load** on the
-  tree to be tagged (`ctest --preset models` is about an hour; the `release`
-  preset leaves the models out).
+  tree to be tagged (`ctest --preset models` is about half an hour; the `release`
+  preset leaves the models out), and the six `SHMEM_THREAD_MULTIPLE` models
+  once, configured with `-DOSOE_MULTIPLE_MODELS=ON`: the library provides
+  `MULTIPLE`, and no preset runs them.
+- [ ] **The README's commands on the Pi cluster as written**: the ring with
+  `srun -K1 --cpu-bind=none -N2 --ntasks-per-node=4`, the batch script with its
+  secret, `env.probe` on every node, and `osoe-stat` on a running job's
+  nodes.
 - [ ] **`shmem_global_exit` under Slurm, by hand**, since no ctest runs under
   Slurm: `srun -K1 --cpu-bind=none -N1 -n4` with the caller's `atexit` handler
   taking 0 ms, 200 ms, 1 s and 5 s, the caller at PE 0 and at PE 3, and a

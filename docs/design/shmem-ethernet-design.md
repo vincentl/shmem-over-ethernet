@@ -85,9 +85,13 @@ moved into init — and refuses by name otherwise, before it creates anything in
 new headers. Init checks what the library uses: the futex2 calls always, and
 since phase 1 step 3, for a job that spans nodes - the one kind that opens a ring
 - an io_uring created `SINGLE_ISSUER`, `R_DISABLED` and with an explicit CQ size,
-a registered provided-buffer ring, and the `RECV`, `SEND` and `FUTEX_WAIT` opcodes
-(`base/ring-check.c`). A one-node job on a machine whose `kernel.io_uring_disabled`
-sysctl forbids io_uring still runs.
+then enabled and entered as the agent's first pass does with its own, a
+registered provided-buffer ring, and the `RECV`, `SEND` and `FUTEX_WAIT` opcodes
+(`base/ring-check.c`; the enabling and the entering since the release fixes'
+Part 6, whose adversarial reads found a job ending after its PEs had left
+`shmem_init` where only those were refused). `env.probe` makes the same check
+through the same function. A one-node job on a machine whose
+`kernel.io_uring_disabled` sysctl forbids io_uring still runs.
 
 **CMake is a build tool, not a dependency chain.** What this project exists to
 avoid is a dependency tree that does not build on the target hardware, not the
@@ -1184,7 +1188,9 @@ so the zone is sized by `L` and not by node count; nonblocking gets change that,
 and the `bytes_issued`/`bytes_landed` pair beside it is already the shape §4.6
 specifies for them. *(They did, at layout 16: each zone now also holds its PE's
 nonblocking gets in flight, records and an arena, §4.6 as built.)* The progress thread writes reply chunks and fetching-AMO results
-there, and the *origin* copies into `dest`:
+there, and the *origin* copies into `dest` *(as built, a fetching AMO's result is
+a value written into the calling thread's reply slot, and takes no extent of the
+zone: `transport-am.c`, `OSOE_LANDING_NO_EXTENT`)*:
 
 - blocking get or fetching AMO: the calling thread, already waiting in the
   library;
@@ -7131,7 +7137,8 @@ git. Four properties are deliberate:
 step. Tests carry ctest labels: `env` for `tools/probe`, and tier labels
 (`tier1`, …, §8.2) as the suites arrive, so `ctest --preset debug -L tier1` runs
 what CI can run anywhere. The model checker's tests (`tools/modelcheck`, which
-needs Python 3) carry `model` beside `tier1`. They take about an hour and run in
+needs Python 3) carry `model` beside `tier1`. They take about half an hour (29
+minutes in the development VM on 2026-10-03) and run in
 the release build only, so the `release` test preset leaves that label out and
 the `models` preset runs it alone: `ctest --preset models`, or `cmake --workflow
 --preset models` from a clean tree. The project's own verification is the four
