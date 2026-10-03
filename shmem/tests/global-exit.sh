@@ -24,9 +24,8 @@
 # caller's. A rank the launcher kills after the caller has left is counted and
 # said, not failed: it was ending already. A non-lead's fatal must name its
 # caller on every node, which only its lead's abortive goodbye can carry
-# there. Where MODE puts a main thread inside exit, the job must end within
-# 6 s of the caller's end: exit's lock then left waiting would end it only at
-# the grace, 10 s.
+# there. The job must end within 6 s of the caller's end, before the grace,
+# 10 s, but where MODE holds stdout and the grace is what ends it.
 # WRAP, if set, is a command the launcher runs under: tier 3 runs it through
 # tools/launch/tier3.sh, so that each node has a network namespace and a shaped
 # link of its own (shmem/tests/CMakeLists.txt).
@@ -104,11 +103,20 @@ if [ "$flushes" = yes ] && [ -n "$KEEP" ]; then
 elif [ "$HOW" != fatal ]; then
     [ "$written" -ge 1 ] || exit 1
 fi
-# Where a main thread is inside exit, ended well before the grace (abort.h,
-# 10 s), at which an exit left waiting on it would end instead.
+# Ended well before the grace (abort.h, 10 s), at which an end left waiting
+# would come instead - a main thread inside exit, in start-pes and returned; a
+# PE whose end is late, which a launcher ending the step at the first bad exit
+# would kill and report (the adversarial read of 2026-10-02: a mutant ending
+# every other PE 8 s late passed eight of ten of these). Where the grace is
+# what ends the job, at it and not before: otherwise the grace's own status was
+# never what the statuses above saw.
 case $MODE in
-start-pes|returned)
+held-stdout|caller-held-stdout)
+    [ -n "$began" ] && awk -v t="$took" 'BEGIN { exit !(t >= 9) }' || exit 1 ;;
+*)
     [ -n "$began" ] && awk -v t="$took" 'BEGIN { exit !(t < 6) }' || exit 1 ;;
+esac
+case $MODE in
 handlers)
     # exit on the caller's PE only, which runs its handler; _exit elsewhere.
     ran=$(printf '%s\n' "$out" | grep -c "^PE [0-9]*: handler ran\$")
@@ -117,9 +125,5 @@ handlers)
 slow-handler)
     # The caller's handler takes a second, and the caller must finish it.
     printf '%s\n' "$out" | grep -q "^PE $CALLER: handler ran after a second\$" || exit 1 ;;
-held-stdout|caller-held-stdout)
-    # Ended by the grace, OSOE_ABORT_GRACE_SECONDS (10 s), and not before:
-    # otherwise the grace's own status was never what the statuses above saw.
-    [ -n "$began" ] && awk -v t="$took" 'BEGIN { exit !(t >= 9) }' || exit 1 ;;
 esac
 echo "GLOBAL EXIT OK"
