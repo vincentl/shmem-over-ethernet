@@ -25,6 +25,7 @@
 #include "base/ring-check.h"
 #include "base/sweep.h"
 #include "barrier.h"
+#include "connection-area.h"
 #include "context.h"
 #include "deadlock.h"
 #include "export.h"
@@ -37,6 +38,7 @@
 #include "state.h"
 #include "team.h"
 #include "transport.h"
+#include "wire.h"
 
 struct osoe_state osoe;
 
@@ -290,6 +292,18 @@ static void session_start(void)
                    ring_error == EPERM ? ", which usually means the kernel.io_uring_disabled "
                                          "sysctl is set" : "", release);
     }
+
+    /*
+     * Every setting is checked by every PE before its node joins (the
+     * round-three review's R8): until then the AM layer's (OSOE_AM_*,
+     * OSOE_GET_LANDING_BYTES) were read by the lead alone as it laid out the
+     * segment, and the wire's by leads alone after the rendezvous, so a bad
+     * value ended one PE and left the rest waiting, or was never read. Values
+     * only; their users read them again where they use them.
+     */
+    struct osoe_am_config am;
+    osoe_am_config_read(&am);
+    osoe_wire_settings_check(&osoe.bootstrap);
 
     /* A re-init after a full teardown is a fresh session (§6.4). Every PE runs
      * the same sequence of sessions, so the numbers agree. */

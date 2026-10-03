@@ -655,7 +655,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * one. The header records where each begins, which is the whole directory
      * osoe-stat needs before it can read the rest by name.
      */
-    uint32_t per_pe = osoe_metrics_blocks_per_pe();
+    uint32_t per_pe = b->max_threads + 1;      /* and the agent's (bootstrap.h) */
     uint32_t metrics_count;
     const struct osoe_metric_descriptor *metrics = osoe_metrics_table(&metrics_count);
 
@@ -688,13 +688,8 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     /* Since layout 23 a zone is extents (node.h): its header and bitmap, a
      * record an extent, then the extents. A piece of a get is at most a run of
      * 64 extents in one word of the bitmap, and at most a chunk, which the
-     * wire's largest message holds. */
-    /* Whole extents or nothing: a size that is not one is refused by name
-     * rather than quietly rounded down (review of step 8 slice 2). */
-    if (am.get_landing_bytes % OSOE_LANDING_EXTENT_BYTES != 0)
-        osoe_fatal("OSOE_GET_LANDING_BYTES=%llu is not a multiple of the landing zone's "
-                   "%u-byte extents", (unsigned long long)am.get_landing_bytes,
-                   (unsigned)OSOE_LANDING_EXTENT_BYTES);
+     * wire's largest message holds. Whole extents, which osoe_am_config_read
+     * holds every PE to. */
     uint64_t extents = am.get_landing_bytes / OSOE_LANDING_EXTENT_BYTES;
     uint64_t landing_requests_offset =
         align_up(sizeof(struct osoe_landing_zone) + (extents + 63) / 64 * sizeof(uint64_t));
@@ -1026,6 +1021,26 @@ again:;
         char msg[256];
         snprintf(msg, sizeof msg, "OSOE_MAX_CONTEXTS differs between PEs: the local lead has "
                  "%u, this PE has %u (§4.11)", h->dir.contexts_per_pe, b->max_contexts);
+        fail_rendezvous(n, msg);
+    }
+    /* And by its OSOE_MAX_THREADS, which sizes every PE's counter blocks and
+     * thread records: this PE would claim past its own (the round-three
+     * review's C3; until then a non-lead never read the variable). */
+    if (h->dir.blocks_per_pe != b->max_threads + 1) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_MAX_THREADS differs between PEs: the local lead has "
+                 "%u, this PE has %u (§3.14)", h->dir.blocks_per_pe - 1, b->max_threads);
+        fail_rendezvous(n, msg);
+    }
+    /* And by its OSOE_GET_LANDING_BYTES, which sizes every PE's landing zone:
+     * this PE's gets would be counted against a zone of another size. */
+    struct osoe_am_config am;
+    osoe_am_config_read(&am);
+    if (h->landing_arena_bytes != am.get_landing_bytes) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_GET_LANDING_BYTES differs between PEs: the local lead "
+                 "has %u, this PE has %llu (§3.12)", h->landing_arena_bytes,
+                 (unsigned long long)am.get_landing_bytes);
         fail_rendezvous(n, msg);
     }
     if (h->job != b->job || h->step != b->step || h->node != b->node ||

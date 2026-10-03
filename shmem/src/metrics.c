@@ -399,21 +399,9 @@ uint32_t osoe_metric_checksum(const struct osoe_metric_descriptor *t, uint32_t n
 
 /* ---- Per-thread blocks ------------------------------------------------ */
 
-/*
- * Application threads a PE may have alive that have called the library. Not
- * threads in it at once: a thread takes a block at its first counted call and
- * gives it back only when it exits (osoe_metrics_block, release_block), so a
- * worker that made one call and lives on holds its block - the main thread and
- * 15 such workers, calling strictly one after another, fill the 16 (the release
- * review, C3). The agent's own block is on top of these, so a program's count
- * is its own (the review of phase 1 step 8 slice 2, B1: at 8 with the agent
- * inside, SOS's eight-thread programs ended the job). 16 rather than the
- * node's CPU count, which a four-core Pi would make 4: threads oversubscribe
- * cores freely, and a default that moves with the machine is one a program
- * cannot rely on. Each costs a counter block and a thread record, about 768
- * bytes of the node segment a PE (decisions, 2026-09-26-evening).
- */
-#define OSOE_DEFAULT_MAX_THREADS 16
+/* A PE's blocks: OSOE_MAX_THREADS of them, read and checked by every PE in the
+ * bootstrap (bootstrap.h says why 16), and the agent's one more; the lead lays
+ * them out (node.c, create_control) and every PE is held to its count. */
 
 static struct osoe_counter_block *pool;         /* this PE's slice of the node pool */
 static uint32_t pool_blocks;
@@ -454,18 +442,6 @@ static bool records_concurrent;
 void osoe_metrics_threads(bool concurrent)
 {
     records_concurrent = concurrent;
-}
-
-uint32_t osoe_metrics_blocks_per_pe(void)
-{
-    uint32_t n = OSOE_DEFAULT_MAX_THREADS;
-    /* A malformed value is an error, never a default (base/environment.h): a typo in a
-     * launch script must fail at init rather than quietly change the pool. */
-    if (osoe_environment_u32("OSOE_MAX_THREADS", &n) == OSOE_ENVIRONMENT_INVALID || n == 0 ||
-        n > OSOE_MAX_THREADS_HIGHEST - 1)
-        osoe_fatal("OSOE_MAX_THREADS='%s' is not a number of threads from 1 to %u",
-                   getenv("OSOE_MAX_THREADS"), (unsigned)OSOE_MAX_THREADS_HIGHEST - 1);
-    return n + 1;       /* and the agent's */
 }
 
 void osoe_metrics_init(struct osoe_counter_block *blocks, uint32_t per_pe, uint32_t local_id)

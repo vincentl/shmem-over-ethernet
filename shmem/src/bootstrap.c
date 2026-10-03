@@ -10,6 +10,7 @@
 #include "base/hostlist.h"
 #include "base/size.h"
 #include "bootstrap.h"
+#include "node.h"
 #include "fatal.h"
 #include "watch-range.h"
 
@@ -276,6 +277,17 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         b->max_contexts < OSOE_MAX_CONTEXTS_LOWEST || b->max_contexts > OSOE_MAX_CONTEXTS_HIGHEST)
         osoe_fatal("OSOE_MAX_CONTEXTS='%s' is not between %u and %u", getenv("OSOE_MAX_CONTEXTS"),
                    OSOE_MAX_CONTEXTS_LOWEST, OSOE_MAX_CONTEXTS_HIGHEST);
+
+    /* OSOE_MAX_THREADS (bootstrap.h): here, by every PE, where until the
+     * round-three review only the lead read it, as it laid out the segment - a
+     * bad value given to every PE then ended the lead by name and left the
+     * others waiting, and one given to a single non-lead was never read. A
+     * malformed value is an error, never a default (base/environment.h). */
+    b->max_threads = OSOE_MAX_THREADS_DEFAULT;
+    if (osoe_environment_u32("OSOE_MAX_THREADS", &b->max_threads) == OSOE_ENVIRONMENT_INVALID ||
+        b->max_threads == 0 || b->max_threads > OSOE_MAX_THREADS_HIGHEST - 1)
+        osoe_fatal("OSOE_MAX_THREADS='%s' is not a number of threads from 1 to %u",
+                   getenv("OSOE_MAX_THREADS"), (unsigned)OSOE_MAX_THREADS_HIGHEST - 1);
 
     /*
      * How many pieces of a data collective each lead of the internode tree

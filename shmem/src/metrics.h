@@ -218,9 +218,6 @@ struct osoe_counter_block *osoe_metrics_block(void);
 void osoe_metrics_init(struct osoe_counter_block *pool, uint32_t per_pe, uint32_t local_id);
 void osoe_metrics_fini(void);
 
-/* How many blocks each PE gets: OSOE_MAX_THREADS, read at first init (§5.7),
- * and one more for the PE's agent. */
-uint32_t osoe_metrics_blocks_per_pe(void);
 
 /* Whether several threads of this PE may call the library at once
  * (THREAD_MULTIPLE), set at each session's start: the blocked record takes a

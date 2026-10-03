@@ -19,6 +19,7 @@
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "connection-area.h"
+#include "node.h"
 #include "fatal.h"
 #include "shm-object.h"
 
@@ -193,6 +194,13 @@ void osoe_am_config_read(struct osoe_am_config *c)
     c->get_landing_bytes = env_bytes("OSOE_GET_LANDING_BYTES", OSOE_DEFAULT_GET_LANDING_BYTES,
                                      OSOE_MIN_GET_LANDING_BYTES, OSOE_MAX_GET_LANDING_BYTES,
                                      false);
+    /* Whole extents or nothing: a size that is not one is refused by name
+     * rather than quietly rounded down (review of step 8 slice 2) - here, where
+     * every PE reads it, and not only the lead that lays the zones out. */
+    if (c->get_landing_bytes % OSOE_LANDING_EXTENT_BYTES != 0)
+        osoe_fatal("OSOE_GET_LANDING_BYTES=%llu is not a multiple of the landing zone's "
+                   "%u-byte extents", (unsigned long long)c->get_landing_bytes,
+                   (unsigned)OSOE_LANDING_EXTENT_BYTES);
 }
 
 void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe_bootstrap *b,
@@ -281,6 +289,19 @@ again:;
                 struct stat st;
                 if (fstat(fd, &st) == 0 && (uint64_t)st.st_size >= a->bytes)
                     break;
+                /* The lead sizes the area in one step, from nothing to the
+                 * whole of it, so a size that is neither is the lead's, and
+                 * smaller than this PE's settings make it: they differ, and
+                 * waiting for it to grow would be waiting for ever (the
+                 * round-three review's settings sweep). A larger one is
+                 * refused below, by the header. */
+                if (fstat(fd, &st) == 0 && st.st_size > 0) {
+                    close(fd);
+                    osoe_fatal("connection area %s is %llu bytes, as the local lead's "
+                               "OSOE_AM_* settings made it; this PE's make it %llu: every "
+                               "PE of a job must set OSOE_AM_* the same", a->name,
+                               (unsigned long long)st.st_size, (unsigned long long)a->bytes);
+                }
                 close(fd);
             } else if (errno != ENOENT) {
                 osoe_fatal("the connection area: %s", err);

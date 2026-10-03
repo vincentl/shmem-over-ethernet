@@ -121,6 +121,11 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
  * disabled until enabled; and a connected socket made wire `slot` of it, toward
  * node `peer`.
  */
+/* Read and check OSOE_WIRE_BYTES, _BUFFERS, _SPLIT and _SEED, fatal on a bad
+ * one: every PE at init (init.c), where only a lead read them, and only on a
+ * job of several nodes, until the round-three review's settings sweep. */
+void osoe_wire_settings_check(const struct osoe_bootstrap *b);
+
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
                          const struct osoe_bootstrap *b);
 void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,

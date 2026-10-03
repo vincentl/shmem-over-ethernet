@@ -36,6 +36,8 @@ struct osoe_bootstrap {
     uint32_t max_teams;         /* OSOE_MAX_TEAMS: teams in existence job-wide at once (§5.7) */
     uint32_t max_contexts;      /* OSOE_MAX_CONTEXTS: contexts a PE may have at once, the
                                  * default one included (§4.11; phase 1 step 8) */
+    uint32_t max_threads;       /* OSOE_MAX_THREADS: live threads of a PE that have called
+                                 * the library, the main one included (§3.14) */
     uint32_t collective_pipeline;   /* OSOE_COLLECTIVE_PIPELINE: D, a data collective's
                                      * pieces in flight per level of the tree (§5.8) */
     uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
@@ -107,6 +109,27 @@ struct osoe_bootstrap {
 #define OSOE_COLLECTIVE_PIPELINE_DEFAULT 2u
 #define OSOE_COLLECTIVE_PIPELINE_LOWEST  1u
 #define OSOE_COLLECTIVE_PIPELINE_HIGHEST 8u
+
+/*
+ * OSOE_MAX_THREADS: the application threads a PE may have alive that have
+ * called the library, the main one included - not threads in it at once. A
+ * thread takes a counter block and a thread record of the node segment at its
+ * first counted call and gives them back only when it exits (metrics.c,
+ * osoe_metrics_block and release_block), so a worker that made one call and
+ * lives on holds its block: the main thread and 15 such workers, calling
+ * strictly one after another, fill the 16 (the release review, C3). The
+ * agent's block is one more. 16 by default: at 8 with the agent inside, SOS's
+ * eight-thread programs ended the job (phase 1 step 8 slice 2, B1); and 16
+ * rather than the node's CPU count, which a four-core Pi
+ * would make 4 - threads oversubscribe cores freely, and a default that moves
+ * with the machine is one a program cannot rely on. Each costs about 768 bytes
+ * of the node segment a PE (decisions, 2026-09-26-evening). At most
+ * OSOE_MAX_THREADS_HIGHEST - 1, node.h's bound on the active bitmap less the
+ * agent. Read and checked by every PE, and compared between a node's PEs, since
+ * the lead lays out every PE's blocks by its own (node.c; the round-three
+ * review's R8).
+ */
+#define OSOE_MAX_THREADS_DEFAULT 16u
 
 /* The default SHMEM_SYMMETRIC_SIZE: 256 MiB (§4.4). */
 #define OSOE_DEFAULT_SYMMETRIC_SIZE (UINT64_C(256) << 20)

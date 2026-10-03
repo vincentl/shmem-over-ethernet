@@ -100,6 +100,12 @@ static void read_settings(struct wire_settings *s, const struct osoe_bootstrap *
                 (unsigned long long)s->seed);
 }
 
+void osoe_wire_settings_check(const struct osoe_bootstrap *b)
+{
+    struct wire_settings s;
+    read_settings(&s, b, false);
+}
+
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
                          const struct osoe_bootstrap *b)
 {
