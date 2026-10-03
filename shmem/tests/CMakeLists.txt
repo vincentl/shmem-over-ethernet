@@ -2849,4 +2849,25 @@ if(OSOE_TIER3)
               -P ${PROJECT_SOURCE_DIR}/cmake/Differential.cmake)
     set_tests_properties(tier3.${shape}.differential PROPERTIES LABELS "tier3" TIMEOUT 1300)
   endforeach()
+
+  # N1 (the round-three review): a lead that cannot reach a peer says so, where it
+  # once retried in silence. Node 1's host list puts node 0 at an address no
+  # namespace has, as a typo in a host list would: its connects find no route, each
+  # after ARP has given up, and it retries - nothing gives up (§3.15) - and its
+  # notice names node 0, the host list's entry, the address dialled and the error;
+  # that is the dial's, kept, where it was thrown away. It comes once a round of
+  # node 0's 32 candidate ports has gone by, some 25 s of ARP's, not at the 2 s
+  # the test hook asks: hence the launcher's 60 s. Node 0, which nobody calls,
+  # names node 1 and the port it waits on. Both are left to the launcher's
+  # timeout. See refusal.sh and tools/launch/tier3.sh.
+  string(REPLACE ";" " " wrap "${osoe_tier3};pi;2;OSOE_TEST_NOTICE_SECONDS=2;--")
+  add_test(NAME tier3.pi.start-up.wrong-address
+    COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+            sh ${CMAKE_CURRENT_SOURCE_DIR}/refusal.sh $<TARGET_FILE:osoe-launch> 2 2
+            "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]10[.]99[.]0[.]77, at 10[.]99[.]0[.]77[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: (No route to host|Host is down|Network is unreachable|the connection timed out)"
+            "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+            -- -n 2 -m 0,1 -t 60 -e 1:OSOE_STEP_NODELIST=10.99.0.77,10.99.0.2
+            -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(tier3.pi.start-up.wrong-address PROPERTIES LABELS "tier3" TIMEOUT 120
+    PASS_REGULAR_EXPRESSION "REFUSAL OK")
 endif()
