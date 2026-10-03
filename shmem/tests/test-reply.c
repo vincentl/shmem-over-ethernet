@@ -21,7 +21,6 @@
  * against the real CAS as well.
  */
 #include <pthread.h>
-#include <sched.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -30,6 +29,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "base/deadline.h"
+#include "base/futex.h"
 #include "check.h"
 #include "reply.h"
 
@@ -80,10 +81,11 @@ static uint32_t enqueue(struct osoe_reply_queue *q, uint32_t pe, uint32_t length
  * One credit, not three, and that is the whole reason this case works. With
  * three the exhausted state is rare - threads release instantly, so two of them
  * almost never read the last credit at the same moment - and a test-then-
- * decrement take passed 6 runs of 6. With one, exhaustion is the common case,
- * the window between the load and the decrement is open constantly, and the
- * same mutation fails 6 of 6. A contention test that does not contend proves
- * nothing, and the difference here is one constant.
+ * decrement take passed 6 runs of 6. With one, exhaustion is the common case:
+ * the window between the load and the decrement opens each time the queue of
+ * tickets drains, which idle is often, and the same mutation fails 6 of 6. A
+ * contention test that does not contend proves nothing, and the difference
+ * here is one constant.
  */
 enum { THREADS = 4, ROUNDS = 50000, CREDITS = 1 };
 static struct osoe_credit shared_credit;
@@ -93,17 +95,46 @@ static _Atomic uint32_t over_limit;
 /* Take, hold briefly, return. A credit handed out twice shows as more holders
  * than credits - which is exactly the over-subscription the peer's pool would
  * suffer, on a node with no way to detect it (§3.8's distributed invariant).
+ *
  * A take that finds none free joins the queue, and the credit is this
- * thread's once its ticket is served: it spins for that here, where the
- * library sleeps on the credit's word (transport-am.c). */
+ * thread's once its ticket is served. It watches for that with plain loads
+ * for a while, then sleeps on the credit's word as the library does
+ * (transport-am.c's take_credit): the word first, then the ticket, then a
+ * sleep on the ticket's bit, swept like every wait. The watch is what keeps
+ * the race open - a waiter that slept at once kept the queue standing, the
+ * free credit was seldom contended, and a test-then-decrement take passed 9
+ * runs of 10. And it watches with loads, not sched_yield, as it once did:
+ * under eight busy loops on four cores, two runs in ten of that stalled past
+ * 120 s at 0.1% of a CPU, the yielding waiters starved behind the loops rather
+ * than spinning (the release review's K3) - each yield pushes the yielder's
+ * deadline back a slice on Linux's EEVDF scheduler, and a sleep is what resets
+ * it. As it is, idle, the mutant fails 50 runs of 50 in the release build -
+ * two of them by hanging until the timeout - and every one of 20 in each
+ * other preset; and under the busy loops every run ends, within about 1 s
+ * (within 32 s under ThreadSanitizer, of its 60). There the mutant is often
+ * missed - caught in 58 runs of 90 in release and 6 of 20 in debug, though
+ * every time under asan and tsan: the loops keep the queue standing. So this
+ * guards the suite's idle run, as the suite runs (Part 6's adversarial read,
+ * 2026-10-03). */
+enum { WATCH = 10000 };
+
 static void *hammer(void *unused)
 {
     (void)unused;
     for (int r = 0; r < ROUNDS; r++) {
         uint32_t ticket;
         if (!osoe_credit_take(&shared_credit, &ticket))
-            while (!osoe_credit_served(&shared_credit, ticket))
-                sched_yield();
+            for (int watched = 0;; watched++) {
+                uint32_t seen = atomic_load_explicit(&shared_credit.wake,
+                                                     memory_order_acquire);
+                if (osoe_credit_served(&shared_credit, ticket))
+                    break;
+                if (watched < WATCH)
+                    continue;
+                struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+                osoe_futex_wait_bitset(&shared_credit.wake, seen, osoe_credit_bit(ticket),
+                                       &sweep, OSOE_FUTEX_SHARED);
+            }
         uint32_t held = atomic_fetch_add(&concurrently_held, 1) + 1;
         if (held > CREDITS)
             atomic_fetch_add(&over_limit, 1);
