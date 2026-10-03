@@ -82,6 +82,10 @@ srun -K1 --cpu-bind=none -N2 --ntasks-per-node=4 ./ring
   build use it. Where CMake does not find it, it says so while configuring and
   leaves those out; nothing else needs it.
 
+osoe has run on aarch64, on the Raspberry Pi cluster and in an aarch64 virtual
+machine. On x86-64 it builds and passes its one-node tests, and has not run
+between nodes: see Limits, "Launching".
+
 Debian 13 (Trixie) and Raspberry Pi OS Trixie provide all of these from their
 own repositories. Older releases are not supported, even where the kernel is
 new enough: see the design notes, §1.
@@ -113,8 +117,12 @@ Presets: `debug`, `release` (optimized, with debug info), `asan`
 (ThreadSanitizer).
 
 The `env.probe` test checks that the running kernel provides every io_uring and
-futex facility osoe relies on. If it fails, nothing else will work on that
-machine.
+futex facility osoe relies on. If a futex check fails, no job will run there:
+osoe needs the futex2 calls of Linux 6.7 for a job of any size. If only
+io_uring checks fail - the kernel's `kernel.io_uring_disabled` sysctl is set,
+say - a job on one node still runs, since it opens no ring; a job of more than
+one node is refused at `shmem_init`, naming the facility that is missing, for
+the io_uring facilities `shmem_init` checks (`env.probe` tests a few more).
 
 ### Developing on macOS
 
@@ -216,7 +224,12 @@ same path on every node.
   thread while the other cores idle. On the Pi cluster that cost a pipelined
   point-to-point pattern six times its rate; the short scheduler slice osoe
   asks for that thread (`OSOE_AGENT_SLICE_US`, below) makes it four, and only
-  unbinding the tasks recovers the rest.
+  unbinding the tasks recovers the rest. Unbinding costs as well: on the Pi
+  cluster the small collectives took 4 to 17% longer unbound - a 16-PE barrier
+  196 to 208 µs against 176 to 183, an 8-byte broadcast 4% longer, an 8-byte
+  reduce 6%, a 4 KiB fcollect 16% and a 64 KiB reduce 17% - so a program bound
+  by small collectives rather than by pipelined messages may prefer Slurm's
+  binding.
 - **`OSOE_NO_PROGRESS_TIMEOUT=60`** while a cluster is new, so that a wait on
   the library's own progress - a connection's acknowledgements, buffer space,
   a reply - that stops moving ends the job and says what it waited for.
@@ -284,7 +297,12 @@ for.
   of a node meet in shared memory, and then the *nodes* meet. Nothing may
   scale with the number of PEs where it can scale with the number of nodes.
   Between nodes, algorithms are logarithmic in the node count, in time and in
-  memory; within a node, linear or better in the PEs there.
+  memory; within a node, linear or better in the PEs there - tested with at most
+  15 PEs on a node, and timed with 4 on the Pi cluster and, for the barrier
+  alone, up to 32 on one four-core virtual machine (design §5.3): a node's
+  barrier arrival is one cache line that all its PEs add to, and in a reduction
+  the node's lead PE combines the node's vectors one after another on its own
+  thread, O(PEs × bytes).
 - **Cores are not assumed spare.** A node runs a PE on every core with the
   library's progress thread beside them, so oversubscription is the normal
   case: nothing spins, and a waiting PE sleeps on a futex.
@@ -294,7 +312,10 @@ for.
   message naming it. No wait gives up merely because time has passed; a job
   proved deadlocked ends, naming where each PE waits, and a job told to
   (`OSOE_NO_PROGRESS_TIMEOUT`) ends a wait on the library's own progress that
-  has stopped moving, and says what it waited for.
+  has stopped moving, and says what it waited for. Loud stops where the library
+  cannot see. The PEs of one node are not compared with each other on the
+  collectives they call, so a collective they call differently goes unnamed
+  (Limits, "Failures").
 - **Observable from outside**: `osoe-stat` reads a running or hung job's
   counters and state from its control segment, without its cooperation.
 - **A path to RDMA that no interface blocks.** The transport and collective
@@ -339,8 +360,9 @@ for.
 | put, get, atomic to a node-mate | memcpy or CPU atomic on the shared heap | no system call |
 | any of those across nodes | an active message on the node pair's one connection, applied by the target node's progress thread | connection state O(n) a node, not O(n × P) |
 | barrier, sync, small reductions, broadcast | the node's PEs meet in shared memory; the node leads meet in a k-ary tree (`OSOE_COLLECTIVE_FANOUT`, default 4) | ⌈log_k n⌉ steps between nodes |
-| larger data collectives | pieces pipelined through that tree, two in flight (`OSOE_COLLECTIVE_PIPELINE`) | |
+| larger data collectives | pieces pipelined through that tree, two in flight (`OSOE_COLLECTIVE_PIPELINE`) | O(P × bytes) for the lead's combine on a node, then the tree |
 | `fcollect` | Bruck's allgather among the node leads | ⌈log₂ n⌉ steps, each node's data crossing the network once |
+| `collect` | the PEs' lengths first, as one vector of 8 bytes a PE, summed through the node leads' tree, then the data as `fcollect`'s | the data as `fcollect`'s; the lengths O(N) bytes up the tree and down it, 1 MB at 128,000 PEs |
 | prefix scans | a tree over the team's ranks, its pieces pipelined as the other data collectives' are | O(log N) rounds |
 | `alltoall`, `alltoalls` | every block put directly, then a barrier | O(N) a PE - inherent: every PE has a block for every other |
 | a team | a number from a job-wide counter, and a record on each member node | O(1) a member after a one-time O(S log S) to build a split's node set |
@@ -353,8 +375,9 @@ node's whole vector up the tree and the result down, about twice the bytes of
 a ring or Rabenseifner's algorithm, until measurement picks the crossover;
 the tree's fan-out is one fixed default, where on the Pi cluster it proved a
 bandwidth choice at large sizes; every pair of nodes connects at start-up, so
-the job holds n(n - 1)/2 connections, n - 1 a node; and team numbers, never
-reused, make a two-dimensional split of a whole job cost 2√N of them (below).
+the job holds n(n - 1)/2 connections, n - 1 a node; one thread a node moves all
+of its internode messages (Limits, below); and team numbers, never reused, make
+a two-dimensional split of a whole job cost 2√N of them (below).
 
 ## Limits, and where osoe departs from the specification
 
@@ -371,12 +394,27 @@ specification or takes a choice the specification leaves open.
 - **`shmem_team_split_2d` spends a number on every row and every column**:
   2√N for a square grid of N PEs, so no grid of a whole job above about 930
   PEs by default, or 2.6 × 10⁵ at the ceiling.
+- **Every split claims job-wide numbers, so a split made on each node spends one
+  a node** (temporary: the team work now under way replaces this). A split takes
+  its numbers from one job-wide counter whatever its parent team, so one line of
+  a program - a split of `SHMEM_TEAM_SHARED` on every node, say, which is a
+  separate split on each - spends a number for every node. With the default
+  `OSOE_MAX_TEAMS` 61 nodes get their team; on a job of 62 nodes or more the
+  rest get `SHMEM_TEAM_INVALID` and a nonzero return - which nodes is a race -
+  and a program that ignores the return runs that team's collectives as no-ops
+  there and ends with status 0. Raising `OSOE_MAX_TEAMS` costs every PE about
+  200 KiB of address space a number, which the `/dev/shm` check counts.
 
 **Threads and contexts**
 
 - **`shmem_init` provides `SHMEM_THREAD_SERIALIZED`** (a choice the
   specification leaves to the implementation); ask `shmem_init_thread` for
   `SHMEM_THREAD_MULTIPLE` to get it.
+- **`shmem_init_thread` returns 0 or does not return.** A start-up that fails
+  ends the program, with a message and status 1, where §9.2.1 has the routine
+  return nonzero - a choice: the specification allows ending the program for an
+  invalid `SHMEM_SYMMETRIC_SIZE` (§8), and in a job of many processes a PE that
+  returned would leave the rest waiting for it.
 - **At most `OSOE_MAX_THREADS` live threads of a PE may have called the
   library**, the main thread included - 16 by default, 1,023 at most. A thread
   takes its place at its first call after `shmem_init` that does more than
@@ -387,6 +425,13 @@ specification or takes a choice the specification leaves open.
 - **At most `OSOE_MAX_CONTEXTS` contexts a PE at once**, the default context
   included - 64 by default, 4,096 at most; past it `shmem_ctx_create` returns
   nonzero.
+- **Any team can create contexts, whatever its `num_contexts`.** The
+  specification's default is a team that can create none (§9.4.3), and asks only
+  for a best effort for as many as a split names. osoe records the number a
+  split was given - `shmem_team_get_config` returns it - but
+  `shmem_team_create_ctx` never looks at it, and fails only when the PE's
+  `OSOE_MAX_CONTEXTS` are all taken or memory is short. Permissive: no program
+  that follows the specification can see it.
 - **Communication sessions are accepted and do nothing** - conforming: they
   may not change what a program computes.
 
@@ -394,7 +439,10 @@ specification or takes a choice the specification leaves open.
 
 - **One symmetric heap a PE, its size fixed at start-up** by
   `SHMEM_SYMMETRIC_SIZE` (256 MiB by default), the same on every PE -
-  checked, and a job that disagrees ends by name. At most 4 TiB a PE.
+  checked, and a job that disagrees ends by name. At most 4 TiB a PE. A size of
+  0, which the specification's grammar admits, ends the job at start-up, naming
+  the variable - a choice: no `shmem_malloc` could succeed, and a zero is
+  usually a script's arithmetic on an unset variable gone wrong.
 - **A node's heaps live in `/dev/shm`**, and start-up refuses a job whose
   heaps would not fit its free space (`OSOE_SHM_CAPACITY_CHECK=0` warns
   instead).
@@ -424,11 +472,28 @@ specification or takes a choice the specification leaves open.
   rendezvous's port range; and the program must be at the same path on every
   node.
 - **A host name that resolves only to IPv6 is refused.**
+- **Tested on aarch64.** osoe has been developed and tested on aarch64: the
+  Raspberry Pi 5 cluster and an aarch64 virtual machine. On x86-64 the tree
+  builds without warnings and passes the one-node tests that can run there -
+  more than 300 in release - under Rosetta, an x86-64 user space on an aarch64
+  kernel, with the futex2 calls Rosetta refuses stood in for by a shim. Rosetta
+  refuses io_uring, so no x86-64 process has sent a message to another node: the
+  network path, and the timing pins that were set on aarch64, are untested
+  there, and no x86-64 kernel has run any of it.
+- **Every node of a job must have the same architecture.** The rendezvous
+  compares the job's size, the heap's size, the handler table, and the
+  collectives' fan-out, team count and pipeline depth, and no architecture, so a
+  job that mixed x86-64 and aarch64 nodes would start. Its `long double` values
+  would then be wrong with no message - x86-64's 80-bit extended format read as
+  aarch64's 128-bit one, and the other way - in reductions
+  (`shmem/src/internode.h` says that nothing checks it) and in puts and gets of
+  them. Nobody has run such a job.
 - **Run with `--cpu-bind=none`, or two CPUs a task.** Slurm binds each task to
   one core by default where a node has as many tasks as cores, and the node's
   progress thread then waits behind its first PE's own thread on that PE's
   core: on the Pi cluster that costs a pipelined point-to-point pattern six
-  times its rate.
+  times its rate. It is a trade: unbound, small collectives cost 4 to 17% more
+  ("Running a program with `srun`").
 - **A login that ends on a node just before a job starts there can stall the
   job's start.** systemd-logind deletes a user's files in `/dev/shm` about ten
   seconds after the user's last login session on a machine ends (`RemoveIPC`,
@@ -443,6 +508,15 @@ specification or takes a choice the specification leaves open.
 
 - **A PE or a node that dies ends the whole job**, with a message naming it.
   There is no fault tolerance.
+- **A process that leaves without calling `shmem_finalize` ends the job.** The
+  specification has a program end its use of the library with `shmem_finalize`
+  or `shmem_global_exit`, and a PE that simply returned from `main` would leave
+  the others waiting for it at their next collective. So its exit ends the whole
+  job: it says which PE left without finalizing, and every PE ends with status
+  1, whatever status the process was returning. A program started with
+  `start_pes` is finalized at exit, as the specification says, and is not
+  affected. Older programs that never finalized, which some implementations let
+  pass, fail here.
 - **No wait gives up by default**: set `OSOE_NO_PROGRESS_TIMEOUT` for a wait
   on the library's own progress - acknowledgements, buffer space, a reply, the
   rendezvous - that stops moving to end the job naming what it waited for. A
@@ -460,12 +534,44 @@ specification or takes a choice the specification leaves open.
   blocked. A program woken only from outside the library - by a signal
   handler's store, or another program writing memory it shares with a PE -
   should turn detection off: `OSOE_DEADLOCK_SECONDS=0`.
+- **A collective that the PEs of one node call differently is not detected.**
+  The leads of the nodes compare a reduction's, a broadcast's or a collect's
+  epoch, kind and size - a reduction's operation and element, a broadcast's root
+  node - where they meet, and a disagreement between nodes ends the job naming
+  it ("PEs called different collectives, or the same one with different
+  arguments"). The PEs of one node are compared with nobody: one that
+  broadcasts where the others reduce, or passes another count, root or
+  `fcollect` size, gets or gives wrong data, and nothing says so - the job can
+  end with status 0. The specification leaves a collective that its PEs do not
+  call alike undefined.
 
 **Transport and API**
 
 - **TCP only**; no RDMA backend exists (below).
+- **One thread a node moves every message between nodes.** The progress thread
+  of a node's first PE seals, sends, receives and applies the traffic of all the
+  node's PEs, so a node's message rate and its bandwidth to other nodes are one
+  thread's, whatever its PE count, and each PE's share of the rate falls as the
+  PEs on a node rise. Design §3.12 sketches more such threads for 256 PEs a node,
+  sharded by peer node; they are not built. "Put streams run at line rate" is a
+  measurement at 1 Gbit/s - 111 to 112 MiB/s on the Pi cluster, the bare echo's
+  own rate - and says nothing above it. No faster link has been measured. Over
+  loopback between two nodes of an idle four-core virtual machine, where nothing
+  but the machine limits a stream, the library moved 2 to 3 GiB/s where a bare
+  io_uring echo moved 10 to 12.7 - about a fifth of it - and 0.5 to 1.6 where
+  the echo moved 5.2 to 8.4 with the test suite running beside it. The cost per
+  message of one thread serving 256 PEs has not been measured on any machine:
+  the Pi cluster's nodes run four PEs each, and its sixteen-PE mailbox, with
+  `--cpu-bind=none`, ran at 243,000 to 259,000 messages a second.
 - **`shmem_ptr` returns a pointer only for PEs on the same node**, NULL for the
-  rest - which the specification allows.
+  rest - which the specification allows. A wait is woken by the library's own
+  operations - atomics, puts, signals - and a plain store through that pointer
+  is none of them: the waiter finds the store only at its 100 ms sweep. Two
+  node-mates passing a flag by plain stores took about 115 ms a round trip; by
+  `shmem_atomic_set`, 14 to 28 µs. The specification has a waited-for word
+  updated by an atomic operation (§9.11.1), so this conforms; a program ported
+  from an implementation that polls the word should store with
+  `shmem_atomic_set`, `shmem_p` or a signal.
 - **Strided transfers move element by element, and block-strided ones block by
   block**, batched onto the connection: one message for the whole only when
   the blocks lie end to end.
@@ -476,8 +582,10 @@ specification or takes a choice the specification leaves open.
   `shmem_signal_add`, `shmem_signal_set` - are macros that choose by argument
   count, so a program that declares or defines one by name, a profiling
   wrapper, writes `(shmem_signal_add)` in parentheses.
-- **`shmemx.h` is empty**, and the deprecated cache routines do nothing, as
-  their deprecation allows.
+- **`shmemx.h` is empty.** The cache routines (`shmem_set_cache_inv` and five
+  more) were deprecated in 1.3 and left the specification after 1.4; osoe keeps
+  them as routines that do nothing, for programs that still call them, which is
+  right on a cache-coherent machine, as every one osoe runs on is.
 
 ## Toward RDMA: a RoCE backend
 
@@ -498,18 +606,33 @@ that one could be added without touching the OpenSHMEM layer.
   size classes, and gets as RDMA reads; atomics as the NIC's, which then serve
   node-mates too, since a NIC's atomics are not coherent with the CPU's; one
   registered memory region a node rather than a PE, its node's heaps laid out
-  contiguously, so the key table stays 16 bytes a node; XRC queue pairs, one
-  per context and target node, matching today's one connection a node pair;
+  contiguously, so the key table stays 16 bytes a node; reliable connections of
+  one of two kinds - XRC queue pairs, one per context and target node, matching
+  today's one connection a node pair, which that review recommended, with DC
+  behind a build-time switch, or DC (dynamically connected) transport alone,
+  which a later review of the seam recommended instead
+  (`docs/reviews/archive/phase1-step2-slice1-roce-seam.md`, F12);
   quiet as reaping completions, with a zero-length read where a write's
   completion does not promise visibility; and a per-node polling thread in
   place of the target-side counters RDMA lacks, to wake a PE waiting on a word.
-- **What it would give up**: collectives stay above the seam, so in-network
-  reduction (SHARP and its kind) is out of reach; `internode.h` is where a
-  backend that can do better does it.
+- **Collectives are not out of reach.** A collective's internode phase is
+  behind `internode.h`, a seam of its own below the OpenSHMEM layer, and a
+  backend runs it there as it can: a tree over RDMA writes and atomics, or a
+  NIC's collective engine or an in-network reduction where the fabric has one,
+  handing the rest to the generic implementation. Nothing above the header
+  changes, and the header says how each call would go. RoCE switches have no
+  in-network reduction; what a RoCE backend would gain is a tree on the fabric
+  in place of today's over TCP.
 - **What is not known**: the review's hardware facts are recalled, not
   measured - eight questions stay open, the first of them load-bearing (whether
   a remote initiator can target a lead-registered region through a shared
-  XRC domain). The one road to testing a verbs backend without hardware is
+  XRC domain). XRC against DC is not settled - the first review's V7, DC's
+  renegotiation cost, is among the eight questions - and the later review
+  counted about 2.1 million XRC queue pairs on one NIC for an all-to-all over
+  4,096 nodes of 256 PEs, against a device limit it recalled and did not
+  measure, and recommended DC at medium confidence. That is a recommendation
+  from recalled limits, not a decision; both lie below the seam, and neither is
+  built. The one road to testing a verbs backend without hardware is
   Soft-RoCE (`rdma_rxe`), for function, not performance: post-release work,
   if hardware is still far off then.
 
@@ -540,11 +663,13 @@ that one could be added without touching the OpenSHMEM layer.
   against both of its readers on the machine. In an optimized build it fails
   when the library's reader loads the name plainly again; a plain writer, or
   `osoe-stat`'s reader, tore nothing it could see on these machines.
-- **Sandia OpenSHMEM's test suite**: 159 of its programs pass on two maps of
-  logical nodes. The four that do not are SOS's own: two use an extension of
-  the type-generic interfaces, one overflows its own buffer (osoe stops it by
-  name), and one asks `shmem_align` for an alignment the specification leaves
-  undefined.
+- **Sandia OpenSHMEM's test suite**: 161 of its 165 programs pass, on two maps
+  of logical nodes in the development VM and at 4 × 2 on the Pi cluster, where
+  `bigget` is run with a smaller loop count, since its default is 16 GiB of gets
+  a PE over gigabit Ethernet. The four that do not are SOS's own: two use an
+  extension of the type-generic interfaces and do not build, one overflows its
+  own buffer (osoe stops it by name), and one asks `shmem_align` for an
+  alignment the specification leaves undefined.
 - **Applications**: ISx, NPB IS, the Parallel Research Kernels and the
   OpenSHMEM examples, built with `oshcc`.
 - **`shmem.floor`'s pins.** In each of seven pairs, in a job of two nodes on one
@@ -569,9 +694,10 @@ that one could be added without touching the OpenSHMEM layer.
   (`osoe-pacer-counted`, built where Python 3 is found) shows which of the
   library's 1,794 routines a run reaches.
 - **A Raspberry Pi 5 cluster** over gigabit Ethernet, where puts, gets and
-  atomics run within 8 to 13% of a bare io_uring TCP echo's round trip, streams
-  run at line rate, and a 16-PE barrier takes about 180 µs
-  (`docs/pi-cluster-results.md`).
+  atomics run within 8 to 13% of a bare io_uring TCP echo's round trip, put
+  streams run at line rate, and a 16-PE barrier takes 176 to 183 µs under
+  Slurm's default binding and 196 to 208 µs with the `--cpu-bind=none` that this
+  README recommends (`docs/pi-cluster-results.md`).
 
 ## Reference
 
@@ -591,7 +717,7 @@ both are set the `SHMEM_` one controls.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `SHMEM_SYMMETRIC_SIZE` | `256m` | Symmetric heap bytes a PE, with an optional `k`, `m`, `g` or `t` multiplier; at most 4 TiB. *Checked*. |
+| `SHMEM_SYMMETRIC_SIZE` | `256m` | Symmetric heap bytes a PE, with an optional `k`, `m`, `g` or `t` multiplier; at most 4 TiB. `0` is refused. *Checked*. |
 | `SHMEM_VERSION` | unset | Set: every PE prints osoe's version and the specification's at start-up, as `osoe 0.1.0, OpenSHMEM 1.6`. |
 | `SHMEM_INFO` | unset | Set: each node's first PE prints the variables osoe reads, with their defaults, under a first line naming osoe's version. |
 | `SHMEM_DEBUG` | unset | Set: every PE prints what the library set up for it - its rank and node, its heap's size and address, its control segment's name. |
@@ -600,7 +726,7 @@ both are set the `SHMEM_` one controls.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_MAX_TEAMS` | `64` | Team numbers a job uses in its life, the three predefined teams' included: `4` to `1024`. A destroyed team keeps its number, so this bounds the teams a job creates - 61 at the default - not only those alive at once. Each number costs every PE about 160 KiB of address space that only a team's leads touch. *Checked*. |
+| `OSOE_MAX_TEAMS` | `64` | Team numbers a job uses in its life, the three predefined teams' included: `4` to `1024`. A destroyed team keeps its number, so this bounds the teams a job creates - 61 at the default - not only those alive at once. Each number costs every PE about 200 KiB of address space: 160 KiB that only a team's leads touch and 40 KiB, for the scans, that every member of a team that scans does. *Checked*. |
 | `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
 | `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. *Checked* among a node's PEs. |
 | `OSOE_GET_LANDING_BYTES` | `262144` | Bytes of each PE's landing zone for the replies of its gets and fetching atomics, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. *Checked* among a node's PEs. |
@@ -630,7 +756,7 @@ moves every message of the node
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_AGENT_SLICE_US` | `100` | The scheduler slice each agent thread asks for, in microseconds: `100` to `100000`, or `0` for the kernel's own. A short slice lets it preempt sooner when it wakes on a core it shares - the same fair share, no priority over anyone. Linux 6.12 and later; an older kernel ignores it. |
+| `OSOE_AGENT_SLICE_US` | `100` | The scheduler slice each agent thread asks for, in microseconds: `100` to `100000`, or `0` for the kernel's own. A short slice lets it preempt sooner when it wakes on a core it shares - the same fair share, no priority over anyone. Linux 6.12 and later; an older kernel ignores it. It is a trade, measured on the Pi cluster against `0` with 16 PEs on four nodes. Under Slurm's default binding it gave a pipelined mailbox 1.3 to 1.7 times the messages a second, a 64 KiB reduce 24% less time and a 4 KiB alltoall 10% less, and cost the barrier 8% and an 8-byte reduce or broadcast 11 and 13%. Unbound (`--cpu-bind=none`) it left a 64 KiB reduce as it was, gave the mailbox 2% more and the alltoall 8% less time, and cost the barrier 2 to 4% and an 8-byte reduce or broadcast 10 to 12%. A job that fills its nodes gets Slurm's binding without asking, which is why `100` is the default. |
 | `OSOE_AGENT_CPUS` | `task` | Where each agent thread may run: `task`, on its own PE's CPUs; `node`, on any CPU any PE of its node was bound to - the job's own cores there, never another's. The PEs' threads keep their binding either way. `node` lifts a bound job's messages where the kernel ignores the slice (a fifth on the Pi's mailbox), but beside the slice it made the Pi's small collectives 7-18% slower. The thread is named `osoe-agent`, as `top -H` and `ps -L` show it. |
 
 **The transport's buffers**, which a program rarely needs to change
@@ -638,11 +764,11 @@ moves every message of the node
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_AM_CHUNK` | `65536` | The largest message on a connection: a power of two from `1024` to `1048576`; larger transfers are split. |
-| `OSOE_AM_BUFFER` | twice the chunk | Bytes of each connection's buffer: a power of two up to 1 GiB. |
+| `OSOE_AM_BUFFER` | twice the chunk | Bytes of each connection's buffer: a power of two from twice `OSOE_AM_CHUNK` - the default, and the least allowed: a smaller value is refused, not raised - up to 1 GiB. |
 | `OSOE_AM_BUFFER_BUDGET` | `268435456` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. The default buffer is the floor, so at the defaults 1,025 nodes fit and 1,026 are refused: raise the budget or lower the chunk. |
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: map the node's connection buffers with huge pages, falling back, with a warning, when there are none. |
-| `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into. |
+| `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by all of a node's connections: the node holds their product, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
 
 **For testing**
 
