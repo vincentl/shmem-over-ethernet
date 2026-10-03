@@ -1261,9 +1261,9 @@ int main(int argc, char **argv)
         pacer_size(heap_text, sizeof heap_text, heap);
         pacer_size(memory, sizeof memory, options.memory);
         used += (size_t)snprintf(line + used, size - used,
-                                 "osoe-pacer library=%s version=%d.%d thread=%s pes=%d nodes=%d "
-                                 "layout=", library, major, minor, thread_level(), npes,
-                                 layout.nodes);
+                                 "osoe-pacer " OSOE_VERSION_STRING " library=%s openshmem=%d.%d "
+                                 "thread=%s pes=%d nodes=%d layout=", library, major, minor,
+                                 thread_level(), npes, layout.nodes);
         for (int node = 0; node < layout.nodes && used < size; node++)
             used += (size_t)snprintf(line + used, size - used, node ? ",%d" : "%d",
                                      layout.count[node]);

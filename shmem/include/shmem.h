@@ -183,10 +183,13 @@ void shmem_ctx_putmem_signal_nbi(shmem_ctx_t ctx, void *dest, const void *source
  * shmem_ctx_ one. The spec's C11 synopsis (§9.8.5, §9.8.7) also gives the
  * routine itself a leading context, shmem_signal_add(ctx, sig_addr, signal,
  * pe); it shares the name, so C11 counts the arguments to tell them apart (with
- * the generics, below) and C++ overloads (at the end), as for shmem_sync. The
- * macros come after these declarations, so the function itself stays reachable
- * as (shmem_signal_add)(...), which is also how a definition of it - an
- * interposer's (§10) - is written. */
+ * the generics, below). The macros come after these declarations, so the
+ * function itself stays reachable as (shmem_signal_add)(...), which is also how
+ * a definition or a declaration of it - an interposer's (§10) - is written in
+ * C11. C++ has no such form in the specification (its C/C++ synopsis gives the
+ * context to shmem_ctx_signal_add alone), and an overload would break a
+ * program that takes the routine's address, so it has none (the adversarial
+ * read of 2026-10-02). */
 void shmem_signal_set(uint64_t *sig_addr, uint64_t signal, int pe);
 void shmem_signal_add(uint64_t *sig_addr, uint64_t signal, int pe);
 void shmem_ctx_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal, int pe);
@@ -1761,21 +1764,6 @@ void shmem_pcontrol(int level, ...);
 static inline int shmem_sync(shmem_team_t team)
 {
     return shmem_team_sync(team);
-}
-
-/* spec §9.8.7's and §9.8.5's shmem_signal_set(ctx, ...) and shmem_signal_add(ctx,
- * ...), which C11 dispatches by argument count (above): C++ overloads them
- * beside the ones with C linkage that take no context. */
-static inline void shmem_signal_set(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
-                                    int pe)
-{
-    shmem_ctx_signal_set(ctx, sig_addr, signal, pe);
-}
-
-static inline void shmem_signal_add(shmem_ctx_t ctx, uint64_t *sig_addr, uint64_t signal,
-                                    int pe)
-{
-    shmem_ctx_signal_add(ctx, sig_addr, signal, pe);
 }
 #endif
 

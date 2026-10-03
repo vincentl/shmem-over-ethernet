@@ -16,7 +16,8 @@
  * Only the frozen directory and the metric descriptor are shared, which is
  * exactly the contract segment.h states. It then runs osoe-stat itself against
  * the segment at the layouts either side of the range whose watch word the tool
- * decodes: the one encoding it knows, rather than finds by name.
+ * decodes: the one encoding it knows, rather than finds by name; and against a
+ * crafted dead job, for what --gc must refuse to remove.
  *
  * It also checks the refusals, because a reader that is willing to follow a
  * bad offset into a mapping is worse than one that cannot read at all: a
@@ -600,10 +601,226 @@ static void check_startup_objects(void)
         shm_unlink(planted[i]);
 }
 
+/*
+ * What --gc removes on a dead job's word, and what it refuses to (stat.c). A
+ * segment's heap and statics names are written by whoever can write the
+ * segment, and --gc may be run by someone else - root, clearing /dev/shm - so a
+ * name is removed only if it is the segment's own, "<segment>.heap.<n>" or
+ * "<segment>.statics.<n>", and its object is a regular one owned as the
+ * segment is (the adversarial read of 2026-10-02). This segment is a crafted
+ * one: both PEs joined and gone, at a pid no process can have, and its four
+ * names
+ *
+ *   - PE 0's heap: an object of the test's that is no child of the segment;
+ *   - PE 0's statics: the segment's own, which is removed;
+ *   - PE 1's heap: a look-alike, "<segment>9.heap.1", another segment's;
+ *   - PE 1's statics: the segment's own name, but a FIFO, on which an open that
+ *     blocked would wait for a writer forever.
+ *
+ * Another owner cannot be made without privilege; owned_by's st_uid is one test
+ * with its S_ISREG, which the FIFO exercises. A FIFO in place of the segment
+ * itself, and of a job table, must be refused at once as well.
+ */
+enum {
+    GC_PHASE   = 0,             /* u32, in a slot */
+    GC_PID     = 4,             /* i32 */
+    GC_HEAP    = 8,             /* char[56] */
+    GC_STATICS = 64,            /* char[56] */
+    GC_NAME_BYTES = 56,
+};
+
+/* A name into a slot's field, which the new object's zeros terminate. */
+static void put_name(unsigned char *field, const char *name)
+{
+    size_t n = strlen(name);
+    CHECK(n < GC_NAME_BYTES);
+    memcpy(field, name, n < GC_NAME_BYTES ? n : GC_NAME_BYTES - 1);
+}
+
+static void *build_collectable(const char *name, const char *names[LOCAL_COUNT][2],
+                               size_t *bytes)
+{
+    struct osoe_metric_descriptor table[] = {
+        desc("pe.phase", "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_PE, 4, GC_PHASE),
+        desc("pe.pid", "", OSOE_MTYPE_I32, OSOE_MKIND_STATE, OSOE_MSCOPE_PE, 4, GC_PID),
+        desc("pe.heap_name", "", OSOE_MTYPE_STRING, OSOE_MKIND_STATE, OSOE_MSCOPE_PE,
+             GC_NAME_BYTES, GC_HEAP),
+        desc("pe.statics_name", "", OSOE_MTYPE_STRING, OSOE_MKIND_STATE, OSOE_MSCOPE_PE,
+             GC_NAME_BYTES, GC_STATICS),
+    };
+    uint32_t n = (uint32_t)(sizeof table / sizeof table[0]);
+    uint64_t slots_off = HEADER_BYTES;
+    uint64_t metrics_off = slots_off + (uint64_t)LOCAL_COUNT * SLOT_BYTES;
+    uint64_t blocks_off = metrics_off + (uint64_t)n * sizeof table[0];
+    uint64_t total = blocks_off + (uint64_t)BLOCK_COUNT * BLOCK_BYTES;
+
+    int fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
+    if (fd < 0 || ftruncate(fd, (off_t)total) != 0) {
+        perror("shm_open");
+        if (fd >= 0)
+            close(fd);
+        return NULL;
+    }
+    unsigned char *p = mmap(NULL, total, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    if (p == MAP_FAILED) {
+        perror("mmap");
+        return NULL;
+    }
+
+    struct osoe_segment_directory d;
+    memset(&d, 0, sizeof d);
+    d.magic = OSOE_SEGMENT_MAGIC;
+    d.layout = OSOE_SEGMENT_NEWEST_LAYOUT;
+    d.directory_bytes = (uint32_t)sizeof d;
+    d.header_bytes = HEADER_BYTES;
+    d.segment_bytes = total;
+    d.slots_offset = slots_off;
+    d.slot_bytes = SLOT_BYTES;
+    d.local_count = LOCAL_COUNT;
+    d.metrics_offset = metrics_off;
+    d.metrics_bytes = (uint64_t)n * sizeof table[0];
+    d.metrics_count = n;
+    d.metric_descriptor_bytes = (uint32_t)sizeof table[0];
+    d.metrics_checksum = fnv1a(table, (size_t)d.metrics_bytes);
+    d.blocks_offset = blocks_off;
+    d.blocks_bytes = (uint64_t)BLOCK_COUNT * BLOCK_BYTES;
+    d.block_count = BLOCK_COUNT;
+    d.block_bytes = BLOCK_BYTES;
+    d.blocks_per_pe = BLOCKS_PER_PE;
+    memcpy(p, &d, sizeof d);
+    memcpy(p + metrics_off, table, (size_t)d.metrics_bytes);
+
+    for (uint32_t i = 0; i < LOCAL_COUNT; i++) {
+        unsigned char *slot = p + slots_off + (uint64_t)i * SLOT_BYTES;
+        *(uint32_t *)(slot + GC_PHASE) = 3;                 /* joined */
+        *(int32_t *)(slot + GC_PID) = INT32_MAX;            /* past any pid_max: gone */
+        put_name(slot + GC_HEAP, names[i][0]);
+        put_name(slot + GC_STATICS, names[i][1]);
+    }
+    *bytes = total;
+    return p;
+}
+
+/* Whether /dev/shm holds `name`, of whatever kind. */
+static bool named(const char *name)
+{
+    char path[128];
+    snprintf(path, sizeof path, "/dev/shm%s", name);
+    struct stat st;
+    return lstat(path, &st) == 0;
+}
+
+/* osoe-stat --gc `name`, its output (both streams) into `out`; its status. */
+static int run_gc(const char *tool, const char *name, char *out, size_t size)
+{
+    char cmd[512];
+    snprintf(cmd, sizeof cmd, "'%s' --gc '%s' 2>&1", tool, name);
+    out[0] = '\0';
+    FILE *f = popen(cmd, "r");
+    CHECK(f != NULL);
+    if (!f)
+        return -1;
+    size_t n = fread(out, 1, size - 1, f);
+    out[n] = '\0';
+    int status = pclose(f);
+    printf("--- osoe-stat --gc %s\n%s", name, out);
+    return status;
+}
+
+static void plant_object(const char *name)
+{
+    shm_unlink(name);
+    int fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
+    CHECK(fd >= 0 && ftruncate(fd, 4096) == 0);
+    if (fd >= 0)
+        close(fd);
+}
+
+static void plant_fifo(const char *name)
+{
+    char path[128];
+    snprintf(path, sizeof path, "/dev/shm%s", name);
+    unlink(path);
+    CHECK(mkfifo(path, 0600) == 0);
+}
+
+static void check_gc_refusals(void)
+{
+    const char *tool = getenv("OSOE_TEST_STAT");
+    if (!tool) {
+        fprintf(stderr, "OSOE_TEST_STAT is not set\n");
+        CHECK(0);
+        return;
+    }
+    int pid = (int)getpid();
+    char segment[64], foreign[64], own[96], look_alike[96], fifo[96];
+    snprintf(segment, sizeof segment, "/osoe-gc-test.%d", pid);
+    snprintf(foreign, sizeof foreign, "/osoe-gc-victim.%d", pid);
+    snprintf(own, sizeof own, "%s.statics.0", segment);
+    snprintf(look_alike, sizeof look_alike, "%s9.heap.1", segment);
+    snprintf(fifo, sizeof fifo, "%s.statics.1", segment);
+    plant_object(foreign);
+    plant_object(own);
+    plant_object(look_alike);
+    plant_fifo(fifo);
+
+    const char *names[LOCAL_COUNT][2] = { { foreign, own }, { look_alike, fifo } };
+    shm_unlink(segment);
+    size_t bytes = 0;
+    void *p = build_collectable(segment, names, &bytes);
+    CHECK(p != NULL);
+    if (p)
+        munmap(p, bytes);       /* a mapping of this process's would keep the segment */
+
+    char out[8192], want[256];
+    CHECK(run_gc(tool, segment, out, sizeof out) == 0);
+    snprintf(want, sizeof want, "%s names %s as a heap: not its own; not removed", segment,
+             foreign);
+    CHECK(strstr(out, want) != NULL);
+    snprintf(want, sizeof want, "%s names %s as a heap: not its own; not removed", segment,
+             look_alike);
+    CHECK(strstr(out, want) != NULL);
+    snprintf(want, sizeof want, "%s is not owned as %s is, or is no shared-memory object; "
+             "not removed", fifo, segment);
+    CHECK(strstr(out, want) != NULL);
+    snprintf(want, sizeof want, "%s: removed", own);
+    CHECK(strstr(out, want) != NULL);
+    snprintf(want, sizeof want, "%s: removed", segment);
+    CHECK(strstr(out, want) != NULL);
+    CHECK(named(foreign) && named(look_alike) && named(fifo));
+    CHECK(!named(own) && !named(segment));
+
+    /* A FIFO by a segment's name, and by a job table's: refused, not waited on.
+     * A wait would end at ctest's timeout instead. */
+    char pipe_segment[64], pipe_job[64];
+    snprintf(pipe_segment, sizeof pipe_segment, "/osoe-gc-test.%d.pipe", pid);
+    snprintf(pipe_job, sizeof pipe_job, "/osoe.%u.0.0.job.0",
+             UINT32_C(950000000) + (uint32_t)pid % 1000000);
+    plant_fifo(pipe_segment);
+    plant_fifo(pipe_job);
+    CHECK(run_gc(tool, pipe_segment, out, sizeof out) != 0);
+    snprintf(want, sizeof want, "/dev/shm%s is not a shared-memory object: no segment",
+             pipe_segment);
+    CHECK(strstr(out, want) != NULL);
+    CHECK(run_gc(tool, pipe_job, out, sizeof out) != 0);
+    snprintf(want, sizeof want, "/dev/shm%s is not a shared-memory object osoe made", pipe_job);
+    CHECK(strstr(out, want) != NULL);
+    CHECK(named(pipe_segment) && named(pipe_job));
+
+    const char *planted[] = { foreign, own, look_alike, fifo, segment, pipe_segment, pipe_job };
+    for (size_t i = 0; i < sizeof planted / sizeof planted[0]; i++) {
+        char path[128];
+        snprintf(path, sizeof path, "/dev/shm%s", planted[i]);
+        unlink(path);
+    }
+}
+
 int main(void)
 {
     check_details();
     check_startup_objects();
+    check_gc_refusals();
 
     char name[64], file[96];
     snprintf(name, sizeof name, "/osoe-segment-test.%d", (int)getpid());

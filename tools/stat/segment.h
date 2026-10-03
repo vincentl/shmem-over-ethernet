@@ -4,14 +4,19 @@
  *
  * This is the reader half of the self-describing segment, and it is written
  * **against the segment, not the library**: it includes nothing from
- * `shmem/src` and nothing from `base/`, only libc. That is the point. If the
+ * `shmem/src`, and from `base/` only `atomic-name.h` - how a name the library
+ * rewrites is loaded, as atomic words, which says nothing of where anything
+ * is - beside libc. That is the point. If the
  * reader could reach into the library's headers it would find fields by
  * `offsetof` like the library does, the metric table would describe nothing
  * anyone depends on, and the first structural change would break every tool
  * while the build still passed. Having no other way to find anything is what
  * keeps "self-describing" a mechanism rather than a claim.
  *
- * So exactly two things are known here by layout, and both are frozen:
+ * So exactly two things of the segment are known here by layout, and both are
+ * frozen (and, for --gc alone, the opening words of two other objects - below,
+ * the job tables and the connection area, which their own files assert at compile
+ * time):
  *
  *   - `struct osoe_segment_directory`, the segment's opening prefix. §3.14
  *     freezes it: fields are appended, never reordered, resized or removed,
@@ -35,6 +40,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 /* "osoenode", little-endian. */
 #define OSOE_SEGMENT_MAGIC UINT64_C(0x65646f6e656f736f)
@@ -199,6 +205,9 @@ struct osoe_segment {
      * on any segment written before it. */
     uint32_t team_count;
     uint32_t epoch_row_count;
+    /* Who owns the object, as the kernel says: --gc removes a name the
+     * segment holds only if it is owned the same (stat.c). */
+    uid_t owner;
 };
 
 /*

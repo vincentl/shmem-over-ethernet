@@ -15,7 +15,8 @@ osoe_version_test(stat.version $<TARGET_FILE:osoe-stat> osoe-stat)
 # version from the future (§3.14). This is the test of "a tool built from a
 # different commit reads a job correctly"; running the tool against a job from
 # the same tree tests none of it. It runs the tool too, for the watch word's
-# layout range, so it is told where the tool is the way shmem.stat is.
+# layout range and for what --gc refuses to remove, so it is told where the
+# tool is the way shmem.stat is.
 add_executable(osoe_segment_test test-segment.c segment.c)
 target_include_directories(osoe_segment_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(osoe_segment_test PRIVATE rt)

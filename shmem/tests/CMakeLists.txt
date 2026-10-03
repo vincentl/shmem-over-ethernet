@@ -1057,8 +1057,11 @@ foreach(sig KILL TERM)
     PASS_REGULAR_EXPRESSION "killed by signal"
     FAIL_REGULAR_EXPRESSION "left behind")
 endforeach()
+# --gc on this job's two segments alone - the job id is the launcher's pid -
+# rather than every dead object of the user on the machine (the adversarial
+# read of 2026-10-02).
 add_test(NAME shmem.kill-after-init.kept
-  COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 OSOE_TEST_SIGNAL=KILL \"$0\" -n 4 -m 0,0,1,1 -t 30 -k -- \"$1\"; \"$2\" --gc"
+  COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 OSOE_TEST_SIGNAL=KILL \"$0\" -n 4 -m 0,0,1,1 -t 30 -k -- \"$1\" & L=$!; wait $L; \"$2\" --gc /osoe.$L.0.0.0 /osoe.$L.0.1.0"
           $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_kill-after-init>
           $<TARGET_FILE:osoe-stat>)
 set_tests_properties(shmem.kill-after-init.kept PROPERTIES LABELS "tier2" TIMEOUT 60

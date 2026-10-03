@@ -21,6 +21,7 @@
 #define _GNU_SOURCE
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -28,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -953,6 +955,62 @@ static bool all_pes_gone(const struct osoe_segment *s, bool *any_joined)
     return true;
 }
 
+/* Whether `child` is "<segment>.<kind>.<n>", n a decimal number: a name the
+ * library makes for one of the segment's own heaps or statics (node.c). */
+static bool names_own_child(const char *segment, const char *kind, const char *child)
+{
+    size_t length = strlen(segment), kind_length = strlen(kind);
+    if (strncmp(child, segment, length) != 0 || child[length] != '.' ||
+        strncmp(child + length + 1, kind, kind_length) != 0 ||
+        child[length + 1 + kind_length] != '.')
+        return false;
+    const char *n = child + length + 1 + kind_length + 1;
+    if (!*n)
+        return false;
+    for (; *n; n++)
+        if (!isdigit((unsigned char)*n))
+            return false;
+    return true;
+}
+
+/* Whether the shared-memory object `name` exists, is a regular object, and is
+ * owned by `owner`. Opened without blocking, so that a FIFO cannot hold it. */
+static bool owned_by(const char *name, uid_t owner)
+{
+    int fd = shm_open(name, O_RDONLY | O_NONBLOCK, 0);
+    if (fd < 0)
+        return errno == ENOENT;         /* gone already: nothing is removed */
+    struct stat st;
+    bool ours = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_uid == owner;
+    close(fd);
+    return ours;
+}
+
+/*
+ * Every name a listing finds, however many: a fixed count left the rest
+ * unexamined run after run when the first were another user's or a live
+ * job's (the adversarial read of 2026-10-02). The count is -1 when memory runs
+ * out, with *out NULL.
+ */
+static int list_all(int (*list)(char (*)[OSOE_SEGMENT_NAME_MAX], int),
+                    char (**out)[OSOE_SEGMENT_NAME_MAX])
+{
+    int room = 64;
+    for (;;) {
+        char (*names)[OSOE_SEGMENT_NAME_MAX] = malloc((size_t)room * OSOE_SEGMENT_NAME_MAX);
+        *out = NULL;
+        if (!names)
+            return -1;
+        int found = list(names, room);
+        if (found <= room) {
+            *out = names;
+            return found;
+        }
+        free(names);
+        room = found + 64;              /* more than room: again, with room for them */
+    }
+}
+
 static int gc_one(const char *name)
 {
     struct osoe_segment s;
@@ -984,13 +1042,30 @@ static int gc_one(const char *name)
 
     /* Heaps and statics first: their names are in the segment, so removing
      * the segment first would strand them. A segment older than layout 17 has
-     * no statics names, and the read says so by failing. */
+     * no statics names, and the read says so by failing. A name is removed
+     * only if it is this segment's own - "<segment>.heap.<n>" or
+     * "<segment>.statics.<n>", as the library makes them - and its object is
+     * owned by whoever owns the segment: the names are the segment's word, and
+     * a segment anyone may write, so without both a crafted one could have a
+     * root --gc remove any object at all (the adversarial read of
+     * 2026-10-02). */
     static const char *const owned[] = { "pe.heap_name", "pe.statics_name" };
+    static const char *const kind[] = { "heap", "statics" };
     for (uint32_t i = 0; i < s.local_count; i++)
         for (size_t k = 0; k < sizeof owned / sizeof owned[0]; k++) {
             char object[128];
             if (!osoe_segment_read_str(&s, owned[k], i, object, sizeof object) || !object[0])
                 continue;
+            if (!names_own_child(s.name, kind[k], object)) {
+                fprintf(stderr, "osoe-stat: %s names %s as a %s: not its own; not removed\n",
+                        s.name, object, kind[k]);
+                continue;
+            }
+            if (!owned_by(object, s.owner)) {
+                fprintf(stderr, "osoe-stat: %s is not owned as %s is, or is no shared-memory "
+                        "object; not removed\n", object, s.name);
+                continue;
+            }
             if (shm_unlink(object) == 0)
                 printf("%s: removed\n", object);
             else if (errno != ENOENT)
@@ -1265,22 +1340,25 @@ int main(int argc, char **argv)
         }
         /* Only named segments: one without a name is held open by a live job,
          * and has nothing to collect (§3.14). */
-        char names[64][OSOE_SEGMENT_NAME_MAX];
-        int found = osoe_segment_list_named(names, 64);
-        for (int k = 0; k < found && k < 64; k++)
+        char (*names)[OSOE_SEGMENT_NAME_MAX];
+        int found = list_all(osoe_segment_list_named, &names);
+        for (int k = 0; k < found; k++)
             rc |= gc_one(names[k]);
         /* Then what a start leaves (segment.h): a node's job tables and
          * connection area, named only until the last of its PEs has opened
          * them. */
-        char objects[64][OSOE_SEGMENT_NAME_MAX];
-        int objects_found = osoe_startup_object_list_named(objects, 64);
-        for (int k = 0; k < objects_found && k < 64; k++)
+        char (*objects)[OSOE_SEGMENT_NAME_MAX];
+        int objects_found = list_all(osoe_startup_object_list_named, &objects);
+        for (int k = 0; k < objects_found; k++)
             rc |= gc_startup_object(objects[k]);
-        if (found == 0 && objects_found == 0)
+        if (found < 0 || objects_found < 0) {
+            fprintf(stderr, "osoe-stat: out of memory listing /dev/shm\n");
+            rc = 1;
+        } else if (found == 0 && objects_found == 0) {
             printf("no named osoe segments, job tables or connection areas in /dev/shm\n");
-        if (found > 64 || objects_found > 64)
-            printf("(%d more not looked at; run --gc again)\n",
-                   (found > 64 ? found - 64 : 0) + (objects_found > 64 ? objects_found - 64 : 0));
+        }
+        free(names);
+        free(objects);
         return rc;
     }
 

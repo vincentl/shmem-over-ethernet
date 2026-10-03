@@ -49,8 +49,13 @@ sleep 1
 named=$(ls /dev/shm | grep -c "^osoe\.$J\.0\.0\.")
 echo "objects of job $J's node 0 with a name while its start is stuck: $named"
 
+# --gc on this job's names alone: the listing's own form would take every dead
+# object of this user on the machine with it - another session's kept segment,
+# a test running beside this one (the adversarial read of 2026-10-02). Its
+# listing is stat.segment's to test.
+objects="/osoe.$J.0.0.job.0 /osoe.$J.0.0.conn.0"
 echo "--- osoe-stat --gc, every PE alive"
-stuck=$("$STAT" --gc 2>&1)
+stuck=$("$STAT" --gc $objects 2>&1)
 printf '%s\n' "$stuck"
 alone=$(printf '%s\n' "$stuck" | grep -c "^/osoe\.$J\.0\.0\.\(job\|conn\)\.0: .*left alone")
 echo "left alone while its start was stuck: $alone"
@@ -63,7 +68,7 @@ wait $LP
 echo "launcher exited $?"
 
 echo "--- osoe-stat --gc, every PE gone"
-gone=$("$STAT" --gc 2>&1)
+gone=$("$STAT" --gc $objects 2>&1)
 printf '%s\n' "$gone"
 removed=$(printf '%s\n' "$gone" | grep -c "^/osoe\.$J\.0\.0\.\(job\|conn\)\.0: removed")
 echo "removed: $removed"

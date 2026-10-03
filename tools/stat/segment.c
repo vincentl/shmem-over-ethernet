@@ -244,7 +244,7 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
     int fd;
     if (is_plain_path(name)) {
         snprintf(s->name, sizeof s->name, "%s", name);
-        fd = open(name, O_RDONLY);
+        fd = open(name, O_RDONLY | O_NONBLOCK);
         if (fd < 0)
             return fail(err, errlen, "cannot open %s: %s", name, strerror(errno));
     } else {
@@ -253,12 +253,15 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
          * one from a library that removed names only at finalize. Then the
          * route that works for a live job's unlinked segment: a process that
          * holds it open, through /proc (§3.14). */
-        fd = shm_open(s->name, O_RDONLY, 0);
+        /* Without blocking: a FIFO by a segment's name would hold an open for
+         * ever, and it is refused below as no segment (the adversarial read of
+         * 2026-10-02). */
+        fd = shm_open(s->name, O_RDONLY | O_NONBLOCK, 0);
         if (fd < 0 && errno == ENOENT) {
             struct find_one f = { .name = s->name };
             enum proc_search why = walk_proc(match_name, &f);
             if (f.found)
-                fd = open(f.path, O_RDONLY);
+                fd = open(f.path, O_RDONLY | O_NONBLOCK);
             else if (why == PROC_RESTRICTED)
                 return fail(err, errlen, "%s: not found, and /proc is restricted (hidepid), "
                             "so only this user's processes can be searched at all", s->name);
@@ -279,6 +282,12 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
         close(fd);
         return fail(err, errlen, "cannot stat /dev/shm%s: %s", s->name, strerror(errno));
     }
+    if (!S_ISREG(st.st_mode)) {
+        close(fd);
+        return fail(err, errlen, "/dev/shm%s is not a shared-memory object: no segment",
+                    s->name);
+    }
+    s->owner = st.st_uid;
     if ((uint64_t)st.st_size < sizeof(struct osoe_segment_directory)) {
         close(fd);
         return fail(err, errlen, "/dev/shm%s is %lld bytes: too small to hold a directory",
@@ -761,7 +770,9 @@ int osoe_startup_object_creator(const char *name, char *err, size_t errlen)
     const size_t offset = kind == OSOE_STARTUP_OBJECT_JOB ? JOB_CREATOR_OFFSET
                                                            : CONNECTION_AREA_CREATOR_OFFSET;
 
-    int fd = shm_open(normal, O_RDONLY, 0);
+    /* Without blocking, and only a regular object: a FIFO by this name would
+     * hold the open for ever (the adversarial read of 2026-10-02). */
+    int fd = shm_open(normal, O_RDONLY | O_NONBLOCK, 0);
     if (fd < 0) {
         if (errno == ENOENT)
             return OSOE_CREATOR_ABSENT;
@@ -770,6 +781,11 @@ int osoe_startup_object_creator(const char *name, char *err, size_t errlen)
         if (errno == EACCES)
             return OSOE_CREATOR_FORBIDDEN;
         return fail(err, errlen, "cannot open /dev/shm%s: %s", normal, strerror(errno));
+    }
+    struct stat st;
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        close(fd);
+        return fail(err, errlen, "/dev/shm%s is not a shared-memory object osoe made", normal);
     }
     /* The object appears before it is sized and before its header is written
      * (§6.2): a read that comes up short, or finds the magic still zero, is a

@@ -458,7 +458,11 @@ specification or takes a choice the specification leaves open.
   the blocks lie end to end.
 - **C only.** There are no Fortran bindings. A C++ program can include
   `shmem.h`, and calls the typed routines: the type-generic interfaces are
-  C11's `_Generic`, as the specification defines them.
+  C11's `_Generic`, as the specification defines them. In C11 the routines
+  whose C11 synopsis gives one name two argument lists - `shmem_sync`,
+  `shmem_signal_add`, `shmem_signal_set` - are macros that choose by argument
+  count, so a program that declares or defines one by name, a profiling
+  wrapper, writes `(shmem_signal_add)` in parentheses.
 - **`shmemx.h` is empty**, and the deprecated cache routines do nothing, as
   their deprecation allows.
 
@@ -520,7 +524,9 @@ that one could be added without touching the OpenSHMEM layer.
   be read torn on aarch64. That name was the one plain field the round-three
   review's audit found rewritten while another process reads it; it is now
   four atomic words, and `shmem.blocked-record` runs the record's own writer
-  against both of its readers on the machine.
+  against both of its readers on the machine. In an optimized build it fails
+  when the library's reader loads the name plainly again; a plain writer, or
+  `osoe-stat`'s reader, tore nothing it could see on these machines.
 - **Sandia OpenSHMEM's test suite**: 159 of its programs pass on two maps of
   logical nodes. The four that do not are SOS's own: two use an extension of
   the type-generic interfaces, one overflows its own buffer (osoe stops it by

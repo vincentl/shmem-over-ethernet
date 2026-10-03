@@ -25,8 +25,13 @@ void exercise(long *dst, long *src, int *word)
     shmem_int_atomic_inc(word, 0);
     shmem_signal_add(&signal_word, 1, 0);
     shmem_signal_set(&signal_word, 1, 0);
-    shmem_signal_add(SHMEM_CTX_DEFAULT, &signal_word, 1, 0);
-    shmem_signal_set(SHMEM_CTX_DEFAULT, &signal_word, 1, 0);
+    /* The specification's C++ has no context-first spelling (shmem.h), and a
+     * program may take the routine's address, which an overload would make
+     * ambiguous. */
+    void (*add)(uint64_t *, uint64_t, int) = &shmem_signal_add;
+    void (*set)(uint64_t *, uint64_t, int) = &shmem_signal_set;
+    add(&signal_word, 1, 0);
+    set(&signal_word, 1, 0);
     shmem_ctx_signal_add(SHMEM_CTX_DEFAULT, &signal_word, 1, 0);
     shmem_ctx_signal_set(SHMEM_CTX_DEFAULT, &signal_word, 1, 0);
 }

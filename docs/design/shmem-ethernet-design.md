@@ -1361,9 +1361,11 @@ is installed, because the thing it is for happens on a machine that has no build
 tree.
 
 It is written **against the segment, not the library**: it includes nothing from
-`shmem/src` and nothing from `base/`, only libc and the two frozen structures
-above - and, for `--gc` alone, what two other objects open with (below). That
-constraint is the mechanism. A reader with access to the library's
+`shmem/src`, and from `base/` only `atomic-name.h` - how a name the library
+rewrites is loaded, as the atomic words it is kept in, which says nothing of
+where anything is (the "blocked in" record, above) - beside libc and the two
+frozen structures above; and, for `--gc` alone, what two other objects open
+with (below). That constraint is the mechanism. A reader with access to the library's
 headers would find fields by `offsetof` like the library does, the table would
 describe nothing anyone depended on, and the first structural change would break
 every tool while the build still passed. Having no other way to find anything is
@@ -1564,7 +1566,11 @@ headers would pass whenever the library agreed with itself.
   escape above the opening bump, and a reader that does not re-read - under
   sequential consistency and x86-TSO, which keep loads in order and so could
   not show K1. `shmem.blocked-record` runs the code's writer against both
-  readers on the machine, and fails when the name's loads are made plain.
+  readers on the machine. It fails, in an optimized build, when the library
+  reader's loads of the name are made plain again; it cannot see a writer
+  whose stores are plain, on cores whose read-modify-writes are single
+  instructions, nor `osoe-stat`'s reader made plain, which looks its fields up
+  between its loads - the C11 argument in `blocked.c` is what holds those.
 
   **Published only when a wait is about to sleep**, never on entry. A wait whose
   predicate is already true touches no locked instruction and no clock — which
@@ -6229,7 +6235,13 @@ The C11 generic macros cover `put`/`get`/`p`/`g`/`iput`/`iget`/`put_nbi`/
 context, dispatched on arity first as the AMO generics are (§7.3).
 `signal_set` and `signal_add` (§9.8.7, §9.8.5) take a leading context in C11
 the same way, by arity alone, since their pointer is a plain `uint64_t *` and
-there is no type to select on; C++ overloads them, as it does `shmem_sync`. Every
+there is no type to select on; a C11 program that declares or defines either by
+name - a profiling wrapper - writes `(shmem_signal_add)`, as it does
+`(shmem_sync)`. C++ has no context-first form of them in the specification and
+gets none: an overload would make a program that takes the routine's address
+ambiguous (the adversarial read of 2026-10-02). osoe's C++ `shmem_sync(team)`
+is an extension of that kind - the C/C++ synopsis gives the team form only as
+`shmem_team_sync` - which predates the read and stays. Every
 routine reaches the transport through the body of `putmem` or `getmem` with its
 element width and its own name as parameters (`rma.h`), so a bad PE or a
 non-symmetric address is reported as `shmem_double_put`'s, not as the byte
