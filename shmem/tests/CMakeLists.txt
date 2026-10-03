@@ -2131,8 +2131,26 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   add_test(NAME shmem.global-exit.kills.held-stdout.0-0-1-1
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
             $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 held-stdout)
+  # One PE held, of the other node, a non-lead: with every PE held the leads'
+  # own graces lined the ends up, and a test passed with either lead's wait
+  # deleted (Part 2's second adversarial read). Here only the waits keep the
+  # order - its lead's before its end of stream, the caller's lead's for it.
+  add_test(NAME shmem.global-exit.kills.held-other-node.0-0-1-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 held-other-node)
+  # Three nodes, the held PE on one that may hear of the exit from the third
+  # first: a lead told so used to end its stream to the caller's node at once,
+  # which took it for its node's end, and the launcher killed its PEs - eight
+  # runs in forty (the same read). Ranks 1 and 2 are node 2, rank 3 node 1.
+  add_test(NAME shmem.global-exit.kills.held-other-node.0-2-2-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,2,2,1 7 7 0 held-other-node)
   set_tests_properties(shmem.global-exit.kills.held-stdout.0-0-1-1
+                       shmem.global-exit.kills.held-other-node.0-0-1-1
     PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
+               PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  set_tests_properties(shmem.global-exit.kills.held-other-node.0-2-2-1
+    PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes;OSOE_TEST_HELD_RANK=2"
                PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endif()
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")

@@ -896,7 +896,8 @@ static bool flush_aborting(struct osoe_progress *p, uint32_t slot,
                               p->abort_segment_bytes - c->abort_sent);
     c->abort_sent += (uint32_t)n;
     if (c->abort_sent == p->abort_segment_bytes) {
-        osoe_wire_shutdown(w);
+        if (!p->abort_keeps_stream)
+            osoe_wire_shutdown(w);      /* a global exit's ends with the process */
         c->abort_done = true;
         return true;
     }
@@ -1295,11 +1296,12 @@ void osoe_progress_close(struct osoe_progress *p)
 }
 
 void osoe_progress_abort(struct osoe_progress *p, uint32_t pe, int32_t status,
-                         uint32_t disposition)
+                         uint32_t disposition, bool keep_stream)
 {
     if (p->aborting)
         return;
     p->aborting = true;
+    p->abort_keeps_stream = keep_stream;
     /* One segment for every peer: a header, and one message whose fixed part is
      * the abort. Its seq and ack are the ones nothing checks at the end of a
      * stream; the goodbye flag is what the peer's end of stream is judged by. */

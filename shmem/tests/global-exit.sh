@@ -38,7 +38,7 @@ KEEP=-k
 # stream it cannot lock (abort.c).
 flushes=yes
 [ "$HOW" = fatal ] || [ "$MODE" = immediate ] && flushes=no
-case $MODE in held-stdout|caller-held-stdout) flushes=no ;; esac
+case $MODE in held-stdout|caller-held-stdout|held-other-node) flushes=no ;; esac
 if [ "$MAP" = - ]; then
     out=$(${WRAP:-} "$LAUNCHER" -n "$RANKS" -t 60 $KEEP -- "$PROGRAM" "$HOW" "$CALLER" "$MODE" 2>&1)
 else
@@ -114,7 +114,7 @@ fi
 # what ends the job, at it and not before: otherwise the grace's own status was
 # never what the statuses above saw.
 case $MODE in
-held-stdout|caller-held-stdout)
+held-stdout|caller-held-stdout|held-other-node)
     [ -n "$began" ] && awk -v t="$took" 'BEGIN { exit !(t >= 9) }' || exit 1 ;;
 *)
     [ -n "$began" ] && awk -v t="$took" 'BEGIN { exit !(t < 6) }' || exit 1 ;;

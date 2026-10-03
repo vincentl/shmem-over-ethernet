@@ -130,11 +130,12 @@ _Noreturn void osoe_abort_end(void)
     bool caller = atomic_load_explicit(&called, memory_order_acquire) != 0;
     bool carrier = how == OSOE_ABORT_GLOBAL_EXIT && pe == osoe.bootstrap.rank;
     grace_status = how == OSOE_ABORT_GLOBAL_EXIT && !carrier ? 0 : status;
-    /* The carrier's wait comes before its grace, which then bounds its own
-     * end - its handlers and its flush - as it bounds any caller's. A lead's
+    /* A caller's wait comes before its grace, which then bounds its own end -
+     * its handlers and its flush - as it bounds any caller's: the carrier's,
+     * and a lead's that called and lost (its handlers were cut by a grace that
+     * outran its wait: Part 2's second adversarial read). Any other lead's
      * comes after its grace starts and its flush: a lead whose flush is held
-     * still ends by its grace, with what it waits for ended first (grace),
-     * rather than a grace after a wait after another's grace. */
+     * still ends by its grace, with what it waits for ended first (grace). */
     if (carrier) {
         struct osoe_deadline until = osoe_deadline_in(UINT64_C(1000000000) *
                                                       OSOE_ABORT_CARRIER_WAIT_SECONDS);
@@ -146,7 +147,10 @@ _Noreturn void osoe_abort_end(void)
             if (osoe.bootstrap.gtids[i] == pe)
                 outlast_besides = i;
         outlast_until = osoe_deadline_in(UINT64_C(1000000000) * OSOE_ABORT_LEAD_WAIT_SECONDS);
-        outlasts = true;
+        if (caller)
+            osoe_liveness_outlast(outlast_besides, &outlast_until);
+        else
+            outlasts = true;
     }
     /* With no thread to spare, the bound is SIGALRM's default action instead:
      * the process still ends, though by a signal and not with its status -
@@ -164,11 +168,8 @@ _Noreturn void osoe_abort_end(void)
      * - and _exit takes no lock, where exit waits for good on a thread already
      * inside exit, since glibc 2.41 (BZ 31997). */
     if (how == OSOE_ABORT_GLOBAL_EXIT) {
-        if (caller) {
-            if (outlasts)
-                osoe_liveness_outlast(outlast_besides, &outlast_until);
+        if (caller)
             exit(carrier ? status : 0);
-        }
         fflush(NULL);
         if (outlasts)
             osoe_liveness_outlast(outlast_besides, &outlast_until);

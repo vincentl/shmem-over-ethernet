@@ -1974,9 +1974,17 @@ goodbye named another caller (`peer_abort_origin`), which carries that one -
 each waiting for the other would only run both to the bound. The waits are
 bounded, `OSOE_ABORT_LEAD_WAIT_SECONDS` (20) and
 `OSOE_ABORT_CARRIER_WAIT_SECONDS` (30), each above the grace of what it waits
-for: a PE whose end is held still ends first, by its own grace, and a lead's
-grace, started before its wait, itself waits for the lead's node before
-`_exit`, so graces never stack beneath one another (`abort_exit_model.py`'s
+for: a PE whose end is held still ends first, by its own grace. Within a node
+graces do not stack - a lead's starts before its wait for its node, and itself
+waits for that node before `_exit` - but a lead of the carrier's node starts
+its grace only after its goodbyes and its wait for the other nodes, so such a
+lead ends within five graces of the abort, any other lead within three, and the
+carrier within four; processes held at several places at once, or stopped
+outright, can run a bound out, and the order with it. On a global exit a
+lead's stream is not ended at its goodbye but by its process's end: with three
+nodes, a node told by a third sent the carrier's node a goodbye and ended its
+stream at once, which that node took for its PEs having ended (Part 2's second
+adversarial read; the model, of two nodes, relays no goodbye) (`abort_exit_model.py`'s
 NO_KILL and JOB_STATUS, with srun -K1 as a thread that kills; its variants
 `no_carrier_wait`, `no_lead_wait`, `no_remote_wait`, `wait_every_node`,
 `no_exclusion`, `called_carries`; `shmem.global-exit.kills.*` require no rank

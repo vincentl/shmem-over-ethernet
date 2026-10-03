@@ -122,33 +122,56 @@ static int open_watch(uint32_t i, pid_t pid)
     return PID;
 }
 
+/* What osoe_liveness_outlast waits on at once: a batch of pidfds opened
+ * together, so that a PE reaped while an earlier one is waited for is not
+ * looked for later by a pid the kernel may have given another process (Part
+ * 2's second adversarial read). On the stack: no allocation on this path. */
+enum { OUTLAST_BATCH = 64 };
+
 void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until)
 {
-    for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++) {
-        if (i == osoe.bootstrap.local_id || i == besides)
-            continue;
-        const struct osoe_pe_slot *s = &osoe.node.slots[i];
-        /* The pid is published before the release store of the phase. */
-        if (atomic_load_explicit(&s->phase, memory_order_acquire) == OSOE_PHASE_EMPTY ||
-            s->pid <= 0)
-            continue;
-        int fd = (int)syscall(SYS_pidfd_open, (pid_t)s->pid, 0);
-        if (fd < 0) {
-            if (errno == ESRCH)
-                continue;               /* ended already */
-            struct timespec millisecond = { 0, 1000 * 1000 };
-            while (!(kill((pid_t)s->pid, 0) != 0 && errno == ESRCH) &&
+    struct pollfd watch[OUTLAST_BATCH];
+    pid_t unwatched[OUTLAST_BATCH];         /* where no pidfd could be had */
+    uint32_t i = 0;
+    while (i < osoe.bootstrap.local_count) {
+        nfds_t n = 0;
+        uint32_t k = 0;
+        for (; i < osoe.bootstrap.local_count && n + k < OUTLAST_BATCH; i++) {
+            if (i == osoe.bootstrap.local_id || i == besides)
+                continue;
+            const struct osoe_pe_slot *s = &osoe.node.slots[i];
+            /* The pid is published before the release store of the phase. */
+            if (atomic_load_explicit(&s->phase, memory_order_acquire) == OSOE_PHASE_EMPTY ||
+                s->pid <= 0)
+                continue;
+            int fd = (int)syscall(SYS_pidfd_open, (pid_t)s->pid, 0);
+            if (fd >= 0)
+                watch[n++] = (struct pollfd){ .fd = fd, .events = POLLIN };
+            else if (errno != ESRCH)            /* ended already: nothing to wait for */
+                unwatched[k++] = (pid_t)s->pid;
+        }
+        /* Every pidfd of the batch, until each has said its process ended. */
+        nfds_t open_count = n;
+        while (open_count && !osoe_deadline_expired(until)) {
+            int r = poll(watch, n, 100);
+            if (r < 0 && errno != EINTR)
+                break;                          /* cannot wait: as for an expired bound */
+            for (nfds_t j = 0; r > 0 && j < n; j++)
+                if (watch[j].fd >= 0 && watch[j].revents) {
+                    close(watch[j].fd);
+                    watch[j].fd = -1;           /* poll skips it from here */
+                    open_count--;
+                }
+        }
+        for (nfds_t j = 0; j < n; j++)
+            if (watch[j].fd >= 0)
+                close(watch[j].fd);
+        /* And by kill(pid, 0) every millisecond those it had no pidfd for. */
+        struct timespec millisecond = { 0, 1000 * 1000 };
+        for (uint32_t j = 0; j < k; j++)
+            while (!(kill(unwatched[j], 0) != 0 && errno == ESRCH) &&
                    !osoe_deadline_expired(until))
                 nanosleep(&millisecond, NULL);
-        } else {
-            struct pollfd ended_watch = { .fd = fd, .events = POLLIN };
-            while (!osoe_deadline_expired(until)) {
-                int r = poll(&ended_watch, 1, 100);
-                if (r > 0 || (r < 0 && errno != EINTR))
-                    break;
-            }
-            close(fd);
-        }
         if (osoe_deadline_expired(until))
             return;
     }

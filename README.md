@@ -739,7 +739,9 @@ the highest of its tasks' - would then be. So the caller waits until every
 other PE has ended before its own end begins: its node's PEs, and its node's
 lead the other nodes, each of whose leads waits for its own node first. A PE
 whose own end is held - a flush waiting on a lock - ends by its grace, and the
-caller after it. `srun` then returns the caller's status, and `osoe-launch`
+caller after it; only processes held in several places at once, or stopped
+outright, can outlast the waits' bounds, the longest 50 s, and with them the
+order. `srun` then returns the caller's status, and `osoe-launch`
 does the same. When several PEs call it at once, the job's status is one of
 theirs, as §9.1.6 asks: on each node the first call carries it, and the other
 callers leave with 0 after their handlers.

@@ -49,11 +49,13 @@
  * it; any other that gets here waits for that to happen.
  *
  * The goodbyes take OSOE_ABORT_GRACE_SECONDS at most (progress-host.c) before
- * the grace starts, so a process ends within twice that of the abort - but on a
- * global exit, where the waits above add theirs (OSOE_ABORT_*_WAIT_SECONDS), up
- * to four times it for the carrier and its node's lead, for a PE stopped
- * outright; a PE whose own end is held ends by its grace, and the waits for it
- * with it.
+ * the grace starts, so on a fatal a process ends within twice that of the
+ * abort. A global exit's waits add theirs (OSOE_ABORT_*_WAIT_SECONDS): a lead of
+ * the carrier's node ends within five graces of it - its goodbyes, the other
+ * nodes, its own node beside its grace - any other lead within three, and the
+ * carrier within four. They keep the order of ends where a PE's end is held,
+ * which its grace ends; where processes are held at several places at once,
+ * or stopped outright, a bound can run out first, and the order with it.
  */
 #ifndef OSOE_ABORT_H
 #define OSOE_ABORT_H

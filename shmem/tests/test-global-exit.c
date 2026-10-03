@@ -52,6 +52,12 @@
  *              the caller holds stdout's lock as it ends the job, so exit's
  *              flush waits on it and the grace ends the caller - with the
  *              caller's status
+ *   held-other-node
+ *              compute, one PE alone holding stdout's lock - OSOE_TEST_HELD_RANK,
+ *              by default the last: its grace ends it after 10 s, and every PE
+ *              that must outlast it waits - its node's lead before its end of
+ *              stream, the caller's node's lead for that end, the caller for
+ *              its lead
  *   two-callers
  *              compute, and the PE after the caller calls shmem_global_exit
  *              too, with STATUS + 1, at the same moment: the declaration that
@@ -138,8 +144,11 @@ int main(int argc, char **argv)
     if (strcmp(mode, "slow-handler") == 0 && me == caller)
         atexit(slow_handler_ran);
     /* Held for good: nothing of this program unlocks it (see the modes). */
+    const char *held = getenv("OSOE_TEST_HELD_RANK");
+    int held_rank = held ? atoi(held) : npes - 1;
     if ((strcmp(mode, "held-stdout") == 0 && me != caller) ||
-        (strcmp(mode, "caller-held-stdout") == 0 && me == caller))
+        (strcmp(mode, "caller-held-stdout") == 0 && me == caller) ||
+        (strcmp(mode, "held-other-node") == 0 && me == held_rank))
         flockfile(stdout);
     printf("PE %d: computing\n", me);           /* buffered: flushed only by exit */
     if (me == caller && strcmp(mode, "immediate") == 0)

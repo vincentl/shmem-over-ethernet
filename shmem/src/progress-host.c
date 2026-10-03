@@ -596,7 +596,8 @@ void osoe_progress_host_abort(void)
     enum osoe_abort_disposition how = osoe_node_abort_read(&osoe.node, &pe, &status);
     if (!osoe_am.ring.enabled)
         osoe_ring_enable(&osoe_am.ring);
-    osoe_progress_abort(&osoe_am.progress, pe, status, (uint32_t)how);
+    osoe_progress_abort(&osoe_am.progress, pe, status, (uint32_t)how,
+                        how == OSOE_ABORT_GLOBAL_EXIT);
     struct osoe_deadline grace = osoe_deadline_in(UINT64_C(1000000000) * OSOE_ABORT_GRACE_SECONDS);
     while (!osoe_progress_aborted(&osoe_am.progress) && !osoe_deadline_expired(&grace))
         if (!osoe_progress_poll(&osoe_am.progress))

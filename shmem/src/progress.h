@@ -233,6 +233,7 @@ struct osoe_progress {
      * any more, and every connection ends with the abortive goodbye below - the
      * same bytes for every peer, built once. */
     bool aborting;
+    bool abort_keeps_stream;                    /* a global exit's (osoe_progress_abort) */
     unsigned char abort_segment[64];
     uint32_t abort_segment_bytes;
     struct osoe_progress_connection *connection;/* one per peer, by peer slot */
@@ -379,12 +380,18 @@ bool osoe_progress_closed(const struct osoe_progress *p);
  * wire, so the peer's stream stays whole, then sends its abortive goodbye - a
  * segment flagged OSOE_AM_SEGMENT_GOODBYE carrying one OSOE_AM_ABORT - and ends
  * its stream; unless it has nobody to tell: its normal goodbye already went, the
- * peer died, or the peer's own abort arrived. O(N) once, what a normal goodbye
+ * peer died, or the peer's own abort arrived. With `keep_stream` - a global exit
+ * (abort.h) - the stream is left to the process's end, which ends it: the node
+ * whose PE carries the status takes another node's end of stream for that
+ * node's PEs having ended, which its lead waits for before its own end, and a
+ * stream ended at the goodbye would say so too soon (Part 2's second
+ * adversarial read: with three nodes, a node told by a third ended its stream
+ * to the carrier's at once, and srun -K1 killed its PEs). O(N) once, what a normal goodbye
  * costs. A connection that fails from here is a peer that is ending too, and is
  * not a fatal; nor is a peer's end of stream without its goodbye.
  */
 void osoe_progress_abort(struct osoe_progress *p, uint32_t pe, int32_t status,
-                         uint32_t disposition);
+                         uint32_t disposition, bool keep_stream);
 
 /* Every connection has had its abortive goodbye acknowledged by the peer's
  * kernel, or has nobody to tell. O(N) calls to the kernel. */
