@@ -220,11 +220,29 @@
  * the region's fixed 128 bytes. Each team number has its own, so two teams
  * whose trees share a lead put into different places (§7.3).
  */
+/*
+ * The number of the team in block `team` of this node's pool - every `team`
+ * here being a block index since the team redesign's step D (internode.h) -
+ * which is what places the team's slots and counters in each PE's internal
+ * region, the same on every node, where a block index is the node's own. Read
+ * from the block's name, which the record's publication, acquired before any
+ * call here, orders (node.h).
+ */
+static uint32_t number_of(uint32_t team)
+{
+    const struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
+    uint32_t number = b ? atomic_load_explicit(&b->name.number, memory_order_relaxed) : team;
+    if (number >= osoe.bootstrap.max_teams)
+        osoe_fatal("block %u of the node's teams names number %u, past OSOE_MAX_TEAMS (%u)",
+                   team, number, osoe.bootstrap.max_teams);
+    return number;
+}
+
 static uint64_t child_slot(uint32_t team, uint32_t position, uint64_t piece)
 {
     uint32_t pipeline = osoe.bootstrap.collective_pipeline;
-    return (uint64_t)team * osoe_internal_team_slots_bytes(osoe.bootstrap.collective_fanout,
-                                                           pipeline) +
+    return (uint64_t)number_of(team) *
+               osoe_internal_team_slots_bytes(osoe.bootstrap.collective_fanout, pipeline) +
            ((uint64_t)position * pipeline + piece % pipeline) * OSOE_INTERNAL_SLOT_BYTES;
 }
 
@@ -238,7 +256,7 @@ static uint64_t arrival_counter(uint32_t team, uint32_t position)
     uint32_t fanout = osoe.bootstrap.collective_fanout;
     return osoe_internal_words_offset(fanout, osoe.bootstrap.collective_pipeline,
                                       osoe.bootstrap.max_teams) +
-           (uint64_t)team * osoe_internal_team_words_bytes(fanout) +
+           (uint64_t)number_of(team) * osoe_internal_team_words_bytes(fanout) +
            (uint64_t)position * OSOE_INTERNAL_LINE_BYTES;
 }
 
@@ -259,7 +277,7 @@ static uint64_t gather_word(uint32_t team, uint32_t line)
     return osoe_internal_gather_offset(osoe.bootstrap.collective_fanout,
                                        osoe.bootstrap.collective_pipeline,
                                        osoe.bootstrap.max_teams) +
-           (uint64_t)team * osoe_internal_team_gather_bytes(steps) +
+           (uint64_t)number_of(team) * osoe_internal_team_gather_bytes(steps) +
            (uint64_t)line * OSOE_INTERNAL_LINE_BYTES;
 }
 
@@ -311,8 +329,8 @@ struct interval_list {
  * position's arrival counter and the release counter stood when the team's
  * last collective ended, by this lead's own trees (the file's comment), since
  * the counters in the internal region are cumulative over the team's life and
- * never reset. One per team number (OSOE_MAX_TEAMS), allocated at init and
- * filled the first time a call names the team. And what its gathers keep:
+ * never reset. One per block of the node's pool (OSOE_TEAM_BLOCKS), allocated
+ * at init and filled the first time a call names the team. And what its gathers keep:
  * the gathers so far, which READY and DATA count; and, found at the first and
  * the same for every one after it, the steps, the team's size, the (node,
  * step) pairs the lists hold, and each step's intervals of members.
@@ -340,10 +358,10 @@ static uint32_t team_count;
 
 void osoe_internode_generic_init(void)
 {
-    team_count = osoe.bootstrap.max_teams;
+    team_count = osoe.bootstrap.team_blocks;
     teams = calloc(team_count, sizeof *teams);
     if (!teams)
-        osoe_fatal("out of memory for %u teams' internode phases", team_count);
+        osoe_fatal("out of memory for %u team blocks' internode phases", team_count);
 }
 
 void osoe_internode_generic_fini(void)
@@ -371,18 +389,19 @@ void osoe_internode_generic_fini(void)
 static struct generic_team *registered_team(uint32_t team, const char *routine)
 {
     if (team >= team_count)
-        osoe_fatal("%s: team %u is past the job's %u team numbers", routine, team, team_count);
+        osoe_fatal("%s: block %u is past the node's %u team blocks", routine, team, team_count);
     struct generic_team *g = &teams[team];
     if (!g->registered) {
         const struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
         if (!atomic_load_explicit(&b->record.published, memory_order_acquire) ||
             b->record.nodes < 2)
-            osoe_fatal("%s: team %u has no internode phase on this node", routine, team);
+            osoe_fatal("%s: block %u of the node's teams holds no team with an internode "
+                       "phase on this node", routine, team);
         const struct osoe_team_record *r = &b->record;
         if (r->children > osoe.bootstrap.collective_fanout || r->index >= r->nodes)
             osoe_fatal("%s: team %u's record on this node says %u children at position %u of "
-                       "%u nodes, at a fan-out of %u", routine, team, r->children, r->index,
-                       r->nodes, osoe.bootstrap.collective_fanout);
+                       "%u nodes, at a fan-out of %u", routine, number_of(team), r->children,
+                       r->index, r->nodes, osoe.bootstrap.collective_fanout);
         g->count = r->nodes;
         g->index = r->index;
         g->reduction_tree.parent = r->parent;
@@ -403,7 +422,7 @@ static uint32_t lead_of(uint32_t team, uint32_t index, const char *routine)
     uint32_t rank = osoe_internode_team_lead(team, index);
     if (rank == UINT32_MAX)
         osoe_fatal("%s: team %u has no lead for the node at position %u of its node set",
-                   routine, team, index);
+                   routine, number_of(team), index);
     return rank;
 }
 
@@ -814,7 +833,7 @@ static uint32_t position_of(const struct generic_team *team_phase, uint32_t team
     }
     if (low >= count)
         osoe_fatal("%s: team %u has a member on node %u, which is not in its node set", routine,
-                   team, node);
+                   number_of(team), node);
     return low;
 }
 
@@ -907,34 +926,34 @@ static void find_intervals(struct generic_team *team_phase, uint32_t team, const
     uint32_t listed = 0;
     if (!osoe_internode_team_local_ranks(team, &listed))
         osoe_fatal("%s: team %u has no members on this node that this process knows of",
-                   routine, team);
+                   routine, number_of(team));
     if (team_phase->count > job->node_count)
-        osoe_fatal("%s: team %u spans %u nodes of a job of %u", routine, team, team_phase->count,
+        osoe_fatal("%s: team %u spans %u nodes of a job of %u", routine, number_of(team), team_phase->count,
                    job->node_count);
     uint32_t here = position_of(team_phase, team, job->node, routine);
     if (here != team_phase->index)
         osoe_fatal("%s: team %u's record puts this node, node %u, at position %u of its node "
-                   "set, and its leads at %u", routine, team, job->node, team_phase->index, here);
+                   "set, and its leads at %u", routine, number_of(team), job->node, team_phase->index, here);
     team_phase->steps = osoe_internal_gather_steps(team_phase->count);
     team_phase->step_intervals = calloc(team_phase->steps, sizeof *team_phase->step_intervals);
     struct member_walk walk = { team_phase, team, 0,
                                 calloc(team_phase->count, sizeof *walk.steps_joined), routine };
     if (!team_phase->step_intervals || !walk.steps_joined)
-        osoe_fatal("%s: out of memory for team %u's gather", routine, team);
+        osoe_fatal("%s: out of memory for team %u's gather", routine, number_of(team));
 
     /* The team's members as world ranks, from its record on this node, which
      * this thread - the team's local lead here - wrote (node.h, decision E):
      * one progression, walked once. */
     const struct osoe_team_record *record = &osoe_node_team(&osoe.node, team)->record;
     if (!atomic_load_explicit(&record->published, memory_order_acquire))
-        osoe_fatal("%s: team %u's record here is not published", routine, team);
+        osoe_fatal("%s: team %u's record here is not published", routine, number_of(team));
     if (!record->strided)
         osoe_fatal("%s: team %u's record here is not a progression of world ranks", routine,
-                   team);
+                   number_of(team));
     uint32_t world = record->world_start, count = record->members;
     int32_t stride = record->world_stride;
     if (stride == 0 && count > 1)
-        osoe_fatal("%s: team %u's ranks are all world rank %u", routine, team, world);
+        osoe_fatal("%s: team %u's ranks are all world rank %u", routine, number_of(team), world);
     for (uint32_t k = 0; k < count;) {
         int64_t w = (int64_t)world + (int64_t)k * stride;
         const struct osoe_rank_run *run =
@@ -942,7 +961,7 @@ static void find_intervals(struct generic_team *team_phase, uint32_t team, const
                 ? osoe_rank_run_find(job->runs, job->run_count, (uint32_t)w) : NULL;
         if (!run)
             osoe_fatal("%s: team %u's rank %u is PE %lld, which the rank map places on no "
-                       "node", routine, team, k, (long long)w);
+                       "node", routine, number_of(team), k, (long long)w);
         /* The progression's ranks from k on that this run holds. */
         uint64_t along = (uint64_t)w - run->first_rank;
         uint64_t in_run = stride > 0 ? (run->count - 1 - along) / (uint64_t)stride + 1
@@ -964,7 +983,7 @@ static void find_intervals(struct generic_team *team_phase, uint32_t team, const
     team_phase->members = count;
     if (walk.here != listed)
         osoe_fatal("%s: the rank map puts %u of team %u's members on this node, and the team "
-                   "lists %u here", routine, walk.here, team, listed);
+                   "lists %u here", routine, walk.here, number_of(team), listed);
 }
 
 /*
@@ -1044,7 +1063,7 @@ static void layout_overwritten(const struct gather *gather, uint64_t rank, uint6
     osoe_fatal("%s: team %u's member %llu has its place at byte %llu of a result of %llu "
                "bytes, out of the places' order: the layout was overwritten after it was made "
                "- is dest shorter than the result, so that copying into it ran on past its "
-               "end?", gather->routine, gather->team, (unsigned long long)rank,
+               "end?", gather->routine, number_of(gather->team), (unsigned long long)rank,
                (unsigned long long)place, (unsigned long long)gather->bytes);
 }
 
@@ -1267,7 +1286,7 @@ static uint64_t scan_team_offset(uint32_t team)
     uint32_t pipeline = osoe.bootstrap.collective_pipeline;
     return osoe_internal_scan_offset(fanout, pipeline, osoe.bootstrap.max_teams,
                                      osoe.bootstrap.node_count) +
-           (uint64_t)team * osoe_internal_team_scan_bytes(fanout, pipeline);
+           (uint64_t)number_of(team) * osoe_internal_team_scan_bytes(fanout, pipeline);
 }
 
 /* Row `position`'s slot for piece `piece` of the team's scans: a child
@@ -1373,9 +1392,9 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
 {
     const struct osoe_team_record *record = &osoe_node_team(&osoe.node, team)->record;
     if (!atomic_load_explicit(&record->published, memory_order_acquire))
-        osoe_fatal("%s: team %u's record here is not published", routine, team);
+        osoe_fatal("%s: team %u's record here is not published", routine, number_of(team));
     if (!record->strided || rank >= record->members)
-        osoe_fatal("%s: team %u's record here is %s", routine, team,
+        osoe_fatal("%s: team %u's record here is %s", routine, number_of(team),
                    !record->strided ? "not a progression of world ranks"
                                     : "shorter than this PE's rank");
     osoe_combine_function add = osoe_combine_lookup(OSOE_REDUCTION_SUM, element);

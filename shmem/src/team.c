@@ -409,7 +409,7 @@ static void created_node_set(const struct osoe_team *t, struct node_set *set)
 static void write_record(const struct osoe_team *t, const char *name,
                          const struct node_set *set)
 {
-    struct osoe_team_record *r = &osoe_node_team(&osoe.node, t->number)->record;
+    struct osoe_team_record *r = &t->block->record;
     r->local_members = t->local_members;
     r->nodes = t->nodes;
     r->index = 0;
@@ -449,23 +449,73 @@ static void write_record(const struct osoe_team *t, const char *name,
     }
     /* release: the record, then the word its readers load first (§3.16). */
     atomic_store_explicit(&r->published, 1, memory_order_release);
-    /* Then the node's high-water mark of published numbers (node.h), raised
-     * past this one and never lowered: a record another process writes may
-     * have raised it further first. A compare-and-swap, seq_cst as every one
-     * is (§3.16), which releases the record with it. */
-    _Atomic uint32_t *high = &osoe.node.hdr->team_numbers_published;
-    uint32_t seen = atomic_load_explicit(high, memory_order_acquire);
-    while (seen < t->number + 1 &&
-           !atomic_compare_exchange_strong_explicit(high, &seen, t->number + 1,
+    /* Then, for a created team, the node's low-water mark of published blocks
+     * (node.h), lowered to this one and never raised: a record another process
+     * writes may have lowered it further first. A compare-and-swap, seq_cst as
+     * every one is (§3.16), which releases the record with it. The predefined
+     * teams' blocks, below every created one's, the scan takes always. */
+    if (t->block_index < OSOE_PREDEFINED_TEAMS)
+        return;
+    _Atomic uint32_t *low = &osoe.node.hdr->team_blocks_published_from;
+    uint32_t seen = atomic_load_explicit(low, memory_order_acquire);
+    while (seen > t->block_index &&
+           !atomic_compare_exchange_strong_explicit(low, &seen, t->block_index,
                                                     memory_order_seq_cst, memory_order_acquire))
         ;
 }
 
-/* Bind a descriptor to its number's block on this node and this PE's
- * published epoch for it, and make it findable by the number. */
+/*
+ * The block of a team this PE leads on this node (step D): claimed from the
+ * pool and named - its lead, its number, its local members as its holders,
+ * its generation raised - before the record is written into it, and mapped
+ * under the name once the record is published (build). Until the team work's
+ * second part no block is given back, so a pool runs dry only when a node holds
+ * OSOE_TEAM_BLOCKS teams; and the number has been claimed job-wide by then,
+ * so the split cannot fail alike on every parent PE - it ends the job,
+ * naming the setting (temporary: the second part makes it such a failure).
+ */
+static void claim_block(struct osoe_team *t)
+{
+    uint32_t index = osoe_node_team_claim(&osoe.node);
+    if (index == UINT32_MAX)
+        osoe_fatal("%s: node %u holds %u teams, every block of its pool (OSOE_TEAM_BLOCKS is "
+                   "%u): raise OSOE_TEAM_BLOCKS", t->name, osoe.job.node,
+                   osoe.node.team_count, osoe.node.team_count);
+    struct osoe_team_name *name = &osoe_node_team(&osoe.node, index)->name;
+    atomic_store_explicit(&name->lead, t->lead_local_id, memory_order_relaxed);
+    atomic_store_explicit(&name->number, t->number, memory_order_relaxed);
+    atomic_store_explicit(&name->holders, t->local_members, memory_order_relaxed);
+    atomic_store_explicit(&name->generation,
+                          atomic_load_explicit(&name->generation, memory_order_relaxed) + 1,
+                          memory_order_relaxed);
+    t->block_index = index;
+    t->block = osoe_node_team(&osoe.node, index);
+}
+
+/*
+ * Bind a descriptor to its block on this node and this PE's published epoch
+ * for it, and make it findable by the number. A predefined team's block is at
+ * the index of its number; a created team's is the one its local lead here
+ * mapped under the team's name before the split's sync, which this follows -
+ * the map entry's release and this acquire carry the block's name and record
+ * with them (node.h). A member finding none is a broken invariant, not a
+ * program's mistake.
+ */
 static void take_number(struct osoe_team *t)
 {
-    t->block = osoe_node_team(&osoe.node, t->number);
+    if (t->number < OSOE_PREDEFINED_TEAMS) {
+        t->block_index = t->number;
+    } else {
+        t->block_index = osoe_node_team_find(&osoe.node, t->lead_local_id, t->number);
+        if (t->block_index == UINT32_MAX)
+            osoe_fatal("%s: no block is mapped on node %u under its name (local lead %u, "
+                       "number %u) after the split's sync", t->name, osoe.job.node,
+                       t->lead_local_id, t->number);
+    }
+    t->block = osoe_node_team(&osoe.node, t->block_index);
+    if (!t->block)
+        osoe_fatal("%s: its block on node %u is %u, past the pool's %u", t->name, osoe.job.node,
+                   t->block_index, osoe.node.team_count);
     t->published = osoe_node_published_epoch(&osoe.node, osoe.bootstrap.local_id, t->number);
     atomic_store_explicit(&numbered[t->number], t, memory_order_release);
 }
@@ -648,19 +698,33 @@ uint32_t osoe_team_node_index(const struct osoe_team *t, uint32_t node)
 
 /* ---- what the internode backend asks of a team (internode.h) ------------ */
 
+/*
+ * The descriptor of the team whose block on this node is `block_index` - the
+ * seam's `team` since step D (internode.h) - by the number its name holds:
+ * until the team work's second part a number is job-wide, so one descriptor in
+ * this process has it.
+ */
+static const struct osoe_team *of_block(uint32_t block_index)
+{
+    const struct osoe_team_block *block = osoe_node_team(&osoe.node, block_index);
+    if (!block)
+        return NULL;
+    return osoe_team_numbered(atomic_load_explicit(&block->name.number, memory_order_relaxed));
+}
+
 uint32_t osoe_internode_team_lead(uint32_t team, uint32_t index)
 {
-    const struct osoe_team *t = osoe_team_numbered(team);
+    const struct osoe_team *t = of_block(team);
     if (!t || index >= t->nodes)
         return UINT32_MAX;
     if (t->node_leads)
         return t->node_leads[index];
-    return team < OSOE_PREDEFINED_TEAMS ? osoe_job_node_lead(&osoe.job, index) : UINT32_MAX;
+    return t->number < OSOE_PREDEFINED_TEAMS ? osoe_job_node_lead(&osoe.job, index) : UINT32_MAX;
 }
 
 const uint32_t *osoe_internode_team_local_ranks(uint32_t team, uint32_t *count)
 {
-    const struct osoe_team *t = osoe_team_numbered(team);
+    const struct osoe_team *t = of_block(team);
     *count = t ? t->local_members : 0;
     if (!t)
         return NULL;
@@ -668,7 +732,7 @@ const uint32_t *osoe_internode_team_local_ranks(uint32_t team, uint32_t *count)
      * hand-given order need not make ascending; every other team's list is
      * ascending already - a created team's in team-rank order, SHARED's its
      * local ids. */
-    if (team == OSOE_TEAM_WORLD || team == OSOE_TEAM_FINALIZE)
+    if (t->number == OSOE_TEAM_WORLD || t->number == OSOE_TEAM_FINALIZE)
         return ranks_ascending;
     return t->local_ranks;
 }
@@ -947,7 +1011,12 @@ static struct osoe_team *build(const struct osoe_team *parent, uint32_t number,
     t->nodes = set.count;
     char name[16];
     snprintf(name, sizeof name, "%u", number);
+    claim_block(t);
     write_record(t, name, &set);
+    /* The name to the block last, with release: what every member's acquire
+     * after the split's sync finds it by (take_number). */
+    atomic_store_explicit(osoe_node_team_map_entry(&osoe.node, t->lead_local_id, number),
+                          t->block_index + 1, memory_order_release);
     if (t->internode) {
         t->node_leads = set.leads;
         set.leads = NULL;

@@ -36,10 +36,16 @@ uint32_t osoe_am_table_checksum(void)
 {
     /*
      * FNV-1a over what a peer must agree about: the identifier, the size of the
-     * fixed part, and whether a payload follows. Not the name, which is a
-     * diagnostic and may be reworded without making two binaries incompatible.
+     * fixed part, and whether a payload follows - and, first, the revision of
+     * what the fields mean (OSOE_AM_WIRE_REVISION), which a message's shape
+     * cannot show. Not the name, which is a diagnostic and may be reworded
+     * without making two binaries incompatible.
      */
     uint32_t h = UINT32_C(2166136261);
+    for (uint32_t revision = OSOE_AM_WIRE_REVISION, b = 0; b < 4; b++, revision >>= 8) {
+        h ^= revision & 0xff;
+        h *= UINT32_C(16777619);
+    }
     for (uint32_t i = 0; i < OSOE_AM_HANDLER_COUNT; i++) {
         unsigned char shape[9];
         shape[0] = (unsigned char)i;

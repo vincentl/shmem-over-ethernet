@@ -217,15 +217,18 @@ static void collect(const struct team_case *t, unsigned char *dest, unsigned cha
 
 /*
  * The counts this node's lead published for its last gather on the team:
- * ceil(log2 N) steps, and N - 1 (node, step) pairs in its lists. Then a sync,
- * so that no lead starts another gather while a PE of its node has still to
- * read this one's.
+ * ceil(log2 N) steps, and N - 1 (node, step) pairs in its lists - in the team's
+ * block, found by the number its name holds, a block's index being the pool's
+ * since the team redesign's step D. Then a sync, so that no lead starts
+ * another gather while a PE of its node has still to read this one's.
  */
 static void check_counts(const struct team_case *t)
 {
     uint64_t steps = UINT64_MAX, shares = UINT64_MAX;
-    CHECK(osoe_test_scoped_metric("team.tree.gather_steps", OSOE_MSCOPE_TEAM, t->number, &steps));
-    CHECK(osoe_test_scoped_metric("team.tree.gather_shares", OSOE_MSCOPE_TEAM, t->number,
+    uint32_t block = osoe_test_team_block(t->number);
+    CHECK(block != UINT32_MAX);
+    CHECK(osoe_test_scoped_metric("team.tree.gather_steps", OSOE_MSCOPE_TEAM, block, &steps));
+    CHECK(osoe_test_scoped_metric("team.tree.gather_shares", OSOE_MSCOPE_TEAM, block,
                                   &shares));
     uint64_t want_steps = (uint64_t)steps_over(t->nodes), want_shares = (uint64_t)t->nodes - 1;
     if (steps != want_steps || shares != want_shares)

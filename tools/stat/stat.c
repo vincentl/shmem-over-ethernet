@@ -67,9 +67,21 @@ static void metric_name(const struct osoe_metric_descriptor *m, char *buf, size_
 }
 
 /*
- * Whether team number `team`'s block holds a published record (layout 18), and
- * if so the name its metrics go by - the record's own, world or finalize or a
- * number, found by name like everything else, or the number when the record
+ * The number of the team in block `team` of the node's pool: what its name
+ * says (layout 29, the team redesign's step D), or before it the block's own
+ * index, which was the number then.
+ */
+static uint32_t team_number(const struct osoe_segment *s, uint32_t team)
+{
+    uint64_t number = team;
+    osoe_segment_read_name(s, "team.name.number", team, &number);
+    return (uint32_t)number;
+}
+
+/*
+ * Whether block `team`'s team holds a published record (layout 18), and if so
+ * the name its metrics go by - the record's own, world or finalize or a number,
+ * found by name like everything else, or the team's number when the record
  * gives none. What every view that walks the teams asks first: a block whose
  * record is not published belongs to no team on this node.
  */
@@ -79,7 +91,7 @@ static bool team_label(const struct osoe_segment *s, uint32_t team, char *label,
     if (!osoe_segment_read_name(s, "team.record.published", team, &published) || !published)
         return false;
     if (!osoe_segment_read_str(s, "team.record.name", team, label, len) || !label[0])
-        snprintf(label, len, "%u", team);
+        snprintf(label, len, "%u", team_number(s, team));
     return true;
 }
 
@@ -740,12 +752,20 @@ static void dump_human(const struct osoe_segment *s)
             print_value(s, &s->metrics[i], 0);
 
     /* Every team with a record on this node (layout 18), under its name: its
-     * block's fields, then each local PE's published epoch for it. */
+     * block's fields, then each local PE's published epoch for its number -
+     * paired by the number the block's name holds, a block's index being the
+     * pool's since layout 29 (the team redesign's step D). */
     for (uint32_t t = 0; t < s->team_count; t++) {
         char label[24];
         if (!team_label(s, t, label, sizeof label))
             continue;
-        printf("\n  team %s (number %u)\n", label, t);
+        uint32_t number = team_number(s, t);
+        uint64_t generation = 0;
+        if (osoe_segment_read_name(s, "team.name.generation", t, &generation))
+            printf("\n  team %s (number %u) in block %u, generation %" PRIu64 "\n", label,
+                   number, t, generation);
+        else
+            printf("\n  team %s (number %u)\n", label, number);
         for (uint32_t i = 0; i < s->nmetrics; i++) {
             if (s->metrics[i].scope != OSOE_MSCOPE_TEAM || beyond_children(s, &s->metrics[i], t))
                 continue;
@@ -753,6 +773,13 @@ static void dump_human(const struct osoe_segment *s)
             team_metric_name(&s->metrics[i], label, shown, sizeof shown);
             print_value_as(s, &s->metrics[i], t, shown);
         }
+        printf("    %-32s", "pe.epoch, by local id");
+        for (uint32_t p = 0; p < s->local_count; p++) {
+            uint32_t epoch;
+            if (osoe_segment_epoch(s, p, number, &epoch))
+                printf(" %u:%u", p, epoch);
+        }
+        printf("\n");
     }
 
     uint64_t now = osoe_segment_now_ns();
@@ -911,9 +938,17 @@ static void dump_json(const struct osoe_segment *s)
         char label[24];
         if (!team_label(s, t, label, sizeof label))
             continue;
-        printf("%s{\"number\":%u,\"name\":", first_team ? "" : ",", t);
+        uint32_t number = team_number(s, t);
+        printf("%s{\"number\":%u,\"block\":%u,\"name\":", first_team ? "" : ",", number, t);
         first_team = false;
         json_str(stdout, label);
+        printf(",\"epochs\":[");
+        for (uint32_t p = 0; p < s->local_count; p++) {
+            uint32_t epoch = 0;
+            osoe_segment_epoch(s, p, number, &epoch);
+            printf("%s%u", p ? "," : "", epoch);
+        }
+        printf("]");
         for (uint32_t i = 0; i < s->nmetrics; i++) {
             const struct osoe_metric_descriptor *m = &s->metrics[i];
             uint64_t v;

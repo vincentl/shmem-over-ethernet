@@ -483,6 +483,13 @@ specification or takes a choice the specification leaves open.
 
 **Teams**
 
+- **A node holds at most `OSOE_TEAM_BLOCKS` teams in a session** (1,024 by
+  default), the three predefined and the destroyed among them (*temporary*: the
+  team work gives a destroyed team's block back, so that it bounds the teams a
+  node holds at once); the split that would make one more on a node ends the
+  job, naming the variable (*temporary*: the team work makes it a split that
+  fails alike on every PE of its parent).
+
 The three limits below are temporary: the team work, decided and to be built
 before the first release (`docs/design/team-resources-proposal.md`), gives each
 PE numbers of its own, given back when a team is destroyed.
@@ -876,6 +883,7 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_MAX_TEAMS` | `64` | Team numbers a job uses between `shmem_init` and `shmem_finalize`, the three predefined teams' included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team keeps its number, so this bounds the teams a job creates - 61 at the default - not only those alive at once (*temporary*: the team work makes it the teams one PE is in at once). Each number costs every PE about 200 KiB of address space at the default fan-out and pipeline depth: 160 KiB that only a team's leads touch and 40 KiB, for the scans, that every member of a team that scans does. *Checked*. |
+| `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold in a session, the three predefined teams' and the destroyed included (*temporary*: the team work gives a destroyed team's block back, so that it counts the teams a node holds at once): the node's pool of team blocks in its control segment, about a kilobyte each, from which a created team's local lead on each node takes one. `8` to `65536`. A node holding that many ends the job at the next split, naming the variable (*temporary*: the team work makes it a split that fails alike on every PE of its parent). Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
 | `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
 | `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. *Checked* among a node's PEs. |
 | `OSOE_GET_LANDING_BYTES` | `262144` | Bytes of each PE's landing zone for the replies of its gets from other nodes, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. *Checked* among a node's PEs. |

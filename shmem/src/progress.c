@@ -233,16 +233,19 @@ static void publish_team(struct osoe_progress *p, uint32_t team)
     atomic_store_explicit(&c->fanout, t->tree.fanout, memory_order_release);
 }
 
-/* Queue one collective message toward a node of the tree. A handler may
- * enqueue but never reserve (§3.7): the drain step writes it. */
-static void forward(struct osoe_progress *p, uint32_t team, uint32_t node, uint16_t kind,
-                    uint32_t epoch)
+/* Queue one collective message toward a node of the tree, naming the team as
+ * that node knows it: its number, and `lead`, the local id of the team's local
+ * lead there (am.h; the team redesign's step D). A handler may enqueue but
+ * never reserve (§3.7): the drain step writes it. */
+static void forward(struct osoe_progress *p, uint32_t team, uint32_t node, uint32_t lead,
+                    uint16_t kind, uint32_t epoch)
 {
     uint32_t slot = osoe_progress_slot(p, node);
     if (slot == OSOE_CONNECTION_NONE || !osoe_connection_to(p->area, node))
         osoe_fatal("node %u: no connection toward node %u, a neighbour in team %u's tree",
-                   p->node, node, team);
-    struct osoe_reply r = { .kind = kind, .origin_pe = team, .length = 0, .value = epoch };
+                   p->node, node, p->team[team].number);
+    struct osoe_reply r = { .kind = kind, .origin_pe = p->team[team].number,
+                            .target_pe = lead, .length = 0, .value = epoch };
     enqueue(p, slot, &p->connection[slot].queues.control, &r);
 }
 
@@ -255,7 +258,7 @@ static void release_down(struct osoe_progress *p, uint32_t team, uint32_t epoch)
 {
     struct osoe_progress_team *t = &p->team[team];
     for (uint32_t j = 0; j < t->tree.children; j++)
-        forward(p, team, t->tree.child[j], OSOE_REPLY_RELEASE, epoch);
+        forward(p, team, t->tree.child[j], t->child_lead[j], OSOE_REPLY_RELEASE, epoch);
     if (t->release_pending == 0)
         p->pending[p->pending_count++] = team;
     t->release_pending = epoch;
@@ -274,22 +277,22 @@ static void book_arrival(struct osoe_progress *p, uint32_t team, uint32_t epoch,
     struct osoe_progress_team *t = &p->team[team];
     if (epoch <= t->closed)
         osoe_fatal("node %u: team %u has an arrival for epoch %u, and has already closed "
-                   "epoch %u; collective epochs have diverged", p->node, team, epoch,
+                   "epoch %u; collective epochs have diverged", p->node, t->number, epoch,
                    t->closed);
     if (t->open != 0 && t->open != epoch)
         osoe_fatal("node %u: team %u has arrivals for epochs %u and %u at once; "
-                   "collective epochs have diverged", p->node, team, t->open, epoch);
+                   "collective epochs have diverged", p->node, t->number, t->open, epoch);
     t->open = epoch;
     if (child == OSOE_COLLECTIVE_TREE_NONE) {
         if (t->own)
             osoe_fatal("node %u: team %u's members arrived twice for epoch %u", p->node,
-                       team, epoch);
+                       t->number, epoch);
         t->own = true;
     } else {
         uint32_t bit = UINT32_C(1) << child;
         if (t->arrived & bit)
             osoe_fatal("node %u: team %u had two arrivals for epoch %u from node %u",
-                       p->node, team, epoch, t->tree.child[child]);
+                       p->node, t->number, epoch, t->tree.child[child]);
         t->arrived |= bit;
     }
     uint32_t all = t->tree.children == 32 ? UINT32_MAX
@@ -307,15 +310,15 @@ static void book_arrival(struct osoe_progress *p, uint32_t team, uint32_t epoch,
     if (t->tree.parent == OSOE_COLLECTIVE_TREE_NONE)
         release_down(p, team, epoch);
     else
-        forward(p, team, t->tree.parent, OSOE_REPLY_ARRIVE, epoch);
+        forward(p, team, t->tree.parent, t->parent_lead, OSOE_REPLY_ARRIVE, epoch);
 }
 
 /*
- * Team number `team`'s state, or NULL if it has no internode phase on this
- * node. Filled from the host's source the first time the engine meets the team
- * (progress.h), which is how a team created while this thread runs becomes
- * known to it: the host reads the team's record, which is published before
- * the team's first arrival anywhere. O(k) once per team.
+ * The state of the team in block `team`, or NULL if it has no internode phase
+ * on this node. Filled from the host's source the first time the engine meets
+ * the team (progress.h), which is how a team created while this thread runs
+ * becomes known to it: the host reads the team's record, which is published
+ * before the team's first arrival anywhere. O(k) once per team.
  */
 static struct osoe_progress_team *known_team(struct osoe_progress *p, uint32_t team)
 {
@@ -323,11 +326,10 @@ static struct osoe_progress_team *known_team(struct osoe_progress *p, uint32_t t
         return NULL;
     struct osoe_progress_team *t = &p->team[team];
     if (!t->registered && p->team_source) {
-        struct osoe_collective_tree tree;
-        struct osoe_collective_state *published = NULL;
-        if (p->team_source(p->host.context, team, &tree, &published)) {
-            *t = (struct osoe_progress_team){ .registered = true, .tree = tree,
-                                              .published = published };
+        struct osoe_progress_team learnt = { 0 };
+        if (p->team_source(p->host.context, team, &learnt)) {
+            learnt.registered = true;
+            *t = learnt;
             publish_team(p, team);
         }
     }
@@ -340,18 +342,29 @@ void osoe_progress_meet_teams(struct osoe_progress *p, uint32_t count)
         known_team(p, team);
 }
 
-/* The team a collective message names, checked (§3.4's trust boundary). */
+/*
+ * The team a collective message names, checked (§3.4's trust boundary), and
+ * its block here in `*block`. The message names the team as this node knows
+ * it - the local id of its local lead here, and its number (am.h) - which the
+ * node's map resolves (the team redesign's step D); a name with no block is
+ * never learnt from the message alone, but named. With no finder - the
+ * engine's own tests, whose teams are registered by hand - the number is the
+ * block and the lead local id 0.
+ */
 static struct osoe_progress_team *barrier_team(struct osoe_progress *p, uint32_t slot,
                                                const struct osoe_am_barrier *m,
-                                               const char *what)
+                                               const char *what, uint32_t *block)
 {
-    struct osoe_progress_team *t = known_team(p, m->team);
-    if (!t)
-        osoe_fatal("node %u: a barrier %s from node %u names team %u, which has no "
-                   "internode phase on this node", p->node, what, peer_of(p, slot), m->team);
     if (m->from_node != peer_of(p, slot))
         osoe_fatal("node %u: a barrier %s on node %u's connection says it is from node %u",
                    p->node, what, peer_of(p, slot), m->from_node);
+    *block = p->team_find ? p->team_find(p->host.context, m->lead, m->team)
+                          : m->lead == 0 ? m->team : UINT32_MAX;
+    struct osoe_progress_team *t = *block == UINT32_MAX ? NULL : known_team(p, *block);
+    if (!t)
+        osoe_fatal("node %u: a barrier %s from node %u names team %u, led here by local PE %u, "
+                   "under which no block with an internode phase is mapped on this node",
+                   p->node, what, peer_of(p, slot), m->team, m->lead);
     return t;
 }
 
@@ -472,7 +485,8 @@ static void complete(void *context, const struct osoe_message_header *header,
     case OSOE_AM_BARRIER_ARRIVE: {
         struct osoe_am_barrier m;
         memcpy(&m, fixed, sizeof m);
-        struct osoe_progress_team *t = barrier_team(p, a->slot, &m, "arrival");
+        uint32_t block;
+        struct osoe_progress_team *t = barrier_team(p, a->slot, &m, "arrival", &block);
         /* §3.4's trust boundary: only a child sends ARRIVE up to this node. A
          * node that disagrees about the tree - a different
          * OSOE_COLLECTIVE_FANOUT, or a different node set - is named rather
@@ -481,16 +495,17 @@ static void complete(void *context, const struct osoe_message_header *header,
         if (child == OSOE_COLLECTIVE_TREE_NONE)
             osoe_fatal("node %u: team %u's arrival for epoch %u came from node %u, which is "
                        "not a child of this node in its tree (fan-out %u over %u nodes); "
-                       "the nodes disagree about the tree", p->node, m.team, m.epoch,
+                       "the nodes disagree about the tree", p->node, t->number, m.epoch,
                        m.from_node, t->tree.fanout, t->tree.count);
-        book_arrival(p, m.team, m.epoch, child);
+        book_arrival(p, block, m.epoch, child);
         break;
     }
 
     case OSOE_AM_BARRIER_RELEASE: {
         struct osoe_am_barrier m;
         memcpy(&m, fixed, sizeof m);
-        struct osoe_progress_team *t = barrier_team(p, a->slot, &m, "release");
+        uint32_t block;
+        struct osoe_progress_team *t = barrier_team(p, a->slot, &m, "release", &block);
         if (m.from_node != t->tree.parent)
             osoe_fatal("node %u: team %u's release for epoch %u came from node %u; this "
                        "node's parent in the tree is node %u", p->node, m.team, m.epoch,
@@ -499,7 +514,7 @@ static void complete(void *context, const struct osoe_message_header *header,
             osoe_fatal("node %u: team %u's release for epoch %u arrived with epoch %u the "
                        "last closed here and %u open; collective epochs have diverged",
                        p->node, m.team, m.epoch, t->closed, t->open);
-        release_down(p, m.team, m.epoch);
+        release_down(p, block, m.epoch);
         break;
     }
 
@@ -707,7 +722,7 @@ static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_conne
             memcpy(at + sizeof h, &m, sizeof m);
         } else if (barrier) {
             struct osoe_am_barrier m = { .team = r->origin_pe, .epoch = (uint32_t)r->value,
-                                         .from_node = p->node };
+                                         .from_node = p->node, .lead = r->target_pe };
             memcpy(at + sizeof h, &m, sizeof m);
         } else {
             struct osoe_am_rmw_reply m = { .origin_pe = r->origin_pe, .token = r->token,
@@ -1076,7 +1091,8 @@ void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *ar
 
 void osoe_progress_attach_teams(struct osoe_progress *p, struct osoe_progress_team *teams,
                                 uint32_t *pending, uint32_t count,
-                                osoe_progress_team_source *source)
+                                osoe_progress_team_source *source,
+                                osoe_progress_team_finder *find)
 {
     memset(teams, 0, sizeof *teams * count);
     p->team = teams;
@@ -1084,6 +1100,7 @@ void osoe_progress_attach_teams(struct osoe_progress *p, struct osoe_progress_te
     p->team_count = count;
     p->pending_count = 0;
     p->team_source = source;
+    p->team_find = find;
 }
 
 void osoe_progress_attach(struct osoe_progress *p,
@@ -1275,7 +1292,8 @@ void osoe_progress_team(struct osoe_progress *p, uint32_t team,
     if (team >= p->team_count)
         osoe_fatal("team %u registered an internode phase; this engine has room for %u",
                    team, p->team_count);
-    p->team[team] = (struct osoe_progress_team){ .registered = true, .tree = *tree };
+    p->team[team] = (struct osoe_progress_team){ .registered = true, .tree = *tree,
+                                                 .number = team };
     publish_team(p, team);
 }
 

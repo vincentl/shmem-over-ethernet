@@ -67,7 +67,7 @@ static void sync_team(struct osoe_team *t, const char *routine)
              * designated PE here either, and in particular this is not
              * necessarily the lead. The call does not block (internode.h).
              */
-            osoe_internode_arrive(t->number, k + 1);
+            osoe_internode_arrive(t->block_index, k + 1);
         } else {
             if (!osoe_epoch_release_bump_eq(&b->released, k + 1))
                 osoe_fatal("%s epochs diverged at epoch %u: PEs called different numbers "
@@ -104,12 +104,14 @@ static void sync_team(struct osoe_team *t, const char *routine)
  * equality waits turn that into a hang rather than an error unless it is named
  * here.
  *
- * **The team is found by number in the node's block, never by a descriptor**
- * (node.h): this runs in the node lead's process, which need not belong to
- * the team - it will not, for a split team whose members are all elsewhere on
- * the node - and so may hold no descriptor for it. The block's record says
- * whether the team has an internode phase here, loaded with acquire (§3.16);
- * nothing here, and nothing in the backend, knows how many teams exist.
+ * **The team is found by its block in the node's pool, never by a
+ * descriptor** (node.h): this runs in the node lead's process, which need not
+ * belong to the team - it will not, for a split team whose members are all
+ * elsewhere on the node - and so may hold no descriptor for it. `team` is the
+ * block index (internode.h, since the team redesign's step D); the block's
+ * record says whether the team has an internode phase here, loaded with
+ * acquire (§3.16), and its name which team it is; nothing here, and nothing in
+ * the backend, knows how many teams exist.
  */
 void osoe_internode_released(uint32_t team, uint32_t epoch)
 {
@@ -117,12 +119,13 @@ void osoe_internode_released(uint32_t team, uint32_t epoch)
     char label[32];
     if (!b || !atomic_load_explicit(&b->record.published, memory_order_acquire) ||
         b->record.nodes < 2)
-        osoe_fatal("an internode release names team %u, which has no internode phase "
-                   "on this node", team);
+        osoe_fatal("an internode release names block %u of the node's teams, which holds no "
+                   "team with an internode phase on this node", team);
     if (!osoe_epoch_release_bump_eq(&b->released, epoch))
         osoe_fatal("the internode release for %s arrived for epoch %u out of order: "
                    "the PEs of this job called different numbers of collectives",
-                   osoe_team_label(team, label, sizeof label), epoch);
+                   osoe_team_label(atomic_load_explicit(&b->name.number, memory_order_relaxed),
+                                   label, sizeof label), epoch);
     osoe_epoch_release_wake(&b->released, epoch);
 }
 

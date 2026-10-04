@@ -209,30 +209,32 @@ static void notify(void *context, uint32_t pe, uint16_t region, uint64_t offset,
 }
 
 /*
- * A team the engine meets for the first time (progress.h): its record in this
- * node's block (node.h), loaded as it was published - `published` with acquire,
- * then the rest (§3.16) - and turned into the engine's terms, the node numbers
- * its messages go to rather than the neighbours' leads' ranks the record keeps.
+ * A team the engine meets for the first time (progress.h): its record in its
+ * block on this node (node.h), loaded as it was published - `published` with
+ * acquire, then the rest (§3.16) - and turned into the engine's terms: the
+ * node numbers its messages go to, and the team's name on each of those nodes,
+ * its number and the local id there of its local lead, rather than the
+ * neighbours' leads' ranks the record keeps (the team redesign's step D).
  * False for a team with no record here, or one spanning a single node: the
  * engine then ends the job naming it, as it did an unregistered team. The
  * record's counts are this library's own, but they are read from shared
  * memory, so a child count past the fan-out is refused rather than followed.
  */
-static bool team_of_record(void *context, uint32_t team, struct osoe_collective_tree *tree,
-                           struct osoe_collective_state **published)
+static bool team_of_record(void *context, uint32_t team, struct osoe_progress_team *learnt)
 {
     (void)context;
     struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
     if (!b || !atomic_load_explicit(&b->record.published, memory_order_acquire))
         return false;
     const struct osoe_team_record *r = &b->record;
+    uint32_t number = atomic_load_explicit(&b->name.number, memory_order_relaxed);
     if (r->nodes < 2)
         return false;
     uint32_t fanout = osoe.bootstrap.collective_fanout;
     if (r->children > fanout || r->index >= r->nodes)
         osoe_fatal("team %u's record on this node says %u children at index %u of %u nodes, "
-                   "at a fan-out of %u", team, r->children, r->index, r->nodes, fanout);
-    *tree = (struct osoe_collective_tree){
+                   "at a fan-out of %u", number, r->children, r->index, r->nodes, fanout);
+    learnt->tree = (struct osoe_collective_tree){
         .count = r->nodes,
         .index = r->index,
         .fanout = fanout,
@@ -240,10 +242,22 @@ static bool team_of_record(void *context, uint32_t team, struct osoe_collective_
                                           : osoe_node_of(&osoe.job, r->parent),
         .children = r->children,
     };
-    for (uint32_t j = 0; j < r->children; j++)
-        tree->child[j] = osoe_node_of(&osoe.job, r->child[j]);
-    *published = &b->tree;
+    learnt->number = number;
+    learnt->parent_lead = r->parent == UINT32_MAX ? 0
+                                                  : osoe_job_local_index(&osoe.job, r->parent);
+    for (uint32_t j = 0; j < r->children; j++) {
+        learnt->tree.child[j] = osoe_node_of(&osoe.job, r->child[j]);
+        learnt->child_lead[j] = osoe_job_local_index(&osoe.job, r->child[j]);
+    }
+    learnt->published = &b->tree;
     return true;
+}
+
+/* A team's block on this node by the name a message carries (progress.h). */
+static uint32_t team_by_name(void *context, uint32_t lead, uint32_t number)
+{
+    (void)context;
+    return osoe_node_team_find(&osoe.node, lead, number);
 }
 
 /*
@@ -412,7 +426,8 @@ void osoe_progress_host_start(uint32_t session)
      * degree and not one per connection: OSOE_MAX_TEAMS, the bound §5.7 gives
      * the control queue, since the splits create teams (phase 1 step 7 slice
      * 2; the first slice counted the predefined three). The per-team state
-     * below is sized by it too, since it is indexed by number.
+     * below is sized by the pool, OSOE_TEAM_BLOCKS, since it is indexed by
+     * block (the team redesign's step D).
      */
     /*
      * And one a peer for the deadlock detector's messages (§3.15), of which a
@@ -420,9 +435,15 @@ void osoe_progress_host_start(uint32_t session)
      * collection and a node answers once, each only after what came before
      * has been answered (deadlock.c).
      */
-    uint32_t teams = osoe.bootstrap.max_teams;
+    /* Collective forwards are bounded per team number, OSOE_MAX_TEAMS, while
+     * a number is job-wide and a node's blocks map one to one to numbers (the
+     * team redesign's step D, its first part; the second part, where a node may
+     * hold more teams than one PE's numbers, bounds it by the pool). The
+     * engine's per-team state is per block of the pool. */
+    uint32_t numbers = osoe.bootstrap.max_teams;
+    uint32_t teams = osoe.bootstrap.team_blocks;
     uint32_t descriptors = peers * (osoe_am.area.credits + OSOE_REPLY_SLACK + 1) +
-                           OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) * teams;
+                           OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) * numbers;
     osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
     osoe_am.busy = calloc((peers + 63) / 64, sizeof *osoe_am.busy);
@@ -462,7 +483,7 @@ void osoe_progress_host_start(uint32_t session)
                        osoe_am.descriptor, descriptors, osoe_am.scratch,
                        (uint32_t)osoe_am.area.chunk_bytes, &host);
     osoe_progress_attach_teams(&osoe_am.progress, osoe_am.team, osoe_am.pending, teams,
-                               team_of_record);
+                               team_of_record, team_by_name);
     /* Count into the control segment, where osoe-stat and the tests read it. */
     osoe_am.progress.metrics = &osoe.node.hdr->am;
     /* §3.14's connection scope, in the same segment: the engine writes it,
@@ -682,9 +703,7 @@ bool osoe_progress_host_poll(void)
      * whose records the node's lead wrote before this thread started. */
     if (!osoe_am.ring.enabled) {
         osoe_ring_enable(&osoe_am.ring);
-        osoe_progress_meet_teams(&osoe_am.progress,
-                                 atomic_load_explicit(&osoe.node.hdr->team_numbers_published,
-                                                      memory_order_acquire));
+        osoe_progress_meet_teams(&osoe_am.progress, OSOE_PREDEFINED_TEAMS);
     }
     struct osoe_connection_area *a = &osoe_am.area;
     if (flag_raised) {

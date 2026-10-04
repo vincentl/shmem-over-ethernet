@@ -118,6 +118,17 @@ struct osoe_segment_directory {
     uint64_t threads_bytes;
     uint32_t thread_record_bytes;
     uint32_t threads_per_pe;
+
+    /* Appended at layout 29 (the team redesign's step D): the team blocks
+     * above are a pool, found by a team's name through the map, and which are
+     * free is a bitmap. The team scope's index is a block index since; a
+     * block's name, `team.name.*`, says which team it holds. A reader built
+     * before them asks and finds them absent. */
+    uint64_t team_map_offset;
+    uint64_t team_map_bytes;
+    uint64_t team_free_offset;
+    uint32_t team_map_row;
+    uint32_t team_free_words;
 };
 
 /*
@@ -294,12 +305,17 @@ void osoe_segment_close(struct osoe_segment *s);
  *       which every agent of the node may run on
  *   28  the header's `launch`, which launch of the job's ids made the segment,
  *       and `creator_pid` as a metric
+ *   29  the team blocks a pool of OSOE_TEAM_BLOCKS, found by name through a
+ *       map, with a bitmap of the free ones, both appended; each block gains
+ *       its name (team.name.*), and the team scope's index is a block index;
+ *       node.team_numbers_published became node.team_blocks_published_from
+ *       (the team redesign's step D)
  *
- * None of 5 to 28 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 29 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, and 23 gave each thread a word of its own.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               28
+#define OSOE_SEGMENT_NEWEST_LAYOUT               29
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is
@@ -347,6 +363,13 @@ bool osoe_segment_read_str(const struct osoe_segment *s, const char *name, uint3
 
 /* Which PE owns counter block `block`. */
 uint32_t osoe_segment_block_pe(const struct osoe_segment *s, uint32_t block);
+
+/* Local PE `local_id`'s published epoch for team number `number` (layout 18),
+ * the word `number` of its row in the epochs scope - which a block is paired
+ * with by the number its name holds, its index being the pool's (layout 29).
+ * False past the row or the mapping. */
+bool osoe_segment_epoch(const struct osoe_segment *s, uint32_t local_id, uint32_t number,
+                        uint32_t *epoch);
 
 /*
  * The §3.14 "blocked in" record for local PE `pe`, read under the generation

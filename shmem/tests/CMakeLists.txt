@@ -2080,6 +2080,40 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "${osoe_team_split_full}")
 endif()
 
+# OSOE_TEAM_BLOCKS (§5.7; the team redesign's step D): a node's pool of team
+# blocks, which its lead lays out, so the PEs of a node must agree - refused as
+# OSOE_MAX_TEAMS is - while two nodes may hold pools of different sizes, since
+# the wire names a team by its name on the node it goes to and never by a block
+# index: the team split program, whose forty teams span both nodes of the
+# second map, passes with its second node's pool a tenth of its first's. A
+# pool too small for the teams a node holds ends the job naming the setting
+# (temporary: the team work's second part makes it a split that fails alike).
+osoe_refusal_test(shmem.team-blocks.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_TEAM_BLOCKS=64
+  PATTERNS "osoe: PE 1: OSOE_TEAM_BLOCKS differs between PEs: the local lead has 1024, this PE has 64"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
+foreach(value 7 65537 x)
+  add_test(NAME shmem.team-blocks.invalid.${value}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEAM_BLOCKS=${value}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.team-blocks.invalid.${value} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "OSOE_TEAM_BLOCKS='${value}' is not between 8 and 65536")
+endforeach()
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.job.disagree.team-blocks
+    COMMAND ${CMAKE_COMMAND} -E env ${osoe_team_split_environment}
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -e 2:OSOE_TEAM_BLOCKS=100
+            -e 3:OSOE_TEAM_BLOCKS=100 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
+  set_tests_properties(shmem.job.disagree.team-blocks PROPERTIES LABELS "tier2" TIMEOUT 90)
+endif()
+add_test(NAME shmem.team-blocks.dry
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEAM_BLOCKS=8 ${osoe_team_split_environment}
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
+set_tests_properties(shmem.team-blocks.dry PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "node 0 holds 8 teams, every block of its pool [(]OSOE_TEAM_BLOCKS is 8[)]: raise OSOE_TEAM_BLOCKS"
+  FAIL_REGULAR_EXPRESSION "CHECK[(]|killed by signal|timeout after")
+
 set(osoe_get_nbi_small OSOE_GET_LANDING_BYTES=4096
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
@@ -2829,6 +2863,14 @@ if(OSOE_TIER3)
     osoe_tier3_test(context.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_context
                     ENV ${osoe_tier3_wire} OSOE_GET_LANDING_BYTES=4096
                         OSOE_AM_CREDITS=2)
+    # Created teams spanning nodes over the shaped link (the team redesign's step
+    # D): the team split program's forty teams on the interleaved map, where the
+    # odd ranks' local lead on node 0 is local id 1 and on node 1 local id 0, so
+    # a message names its team by a lead that is not the sender's own, and every
+    # created team's block differs from its number - barriers, reductions and
+    # the rest on each, through the delay and the loss.
+    osoe_tier3_test(team-split.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_team-split
+                    ENV SHMEM_SYMMETRIC_SIZE=16m)
     # The leads' tree of the reductions and broadcast, over the shaped link.
     osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
     osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)

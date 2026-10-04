@@ -42,9 +42,9 @@
 
 /*
  * The epoch this agent has already taken out of each team's handoff word, one
- * per team number (OSOE_MAX_TEAMS), allocated at init. Private to the agent
- * thread: nothing else reads or writes it, which is the whole point of the
- * word it shadows.
+ * per block of the node's pool (OSOE_TEAM_BLOCKS), allocated at init. Private
+ * to the agent thread: nothing else reads or writes it, which is the whole
+ * point of the word it shadows.
  */
 static uint32_t *consumed;
 static uint32_t consumed_count;
@@ -61,10 +61,10 @@ uint32_t osoe_internode_fanout_default(void)
 
 void osoe_internode_init(void)
 {
-    consumed_count = osoe.bootstrap.max_teams;
+    consumed_count = osoe.bootstrap.team_blocks;
     consumed = calloc(consumed_count, sizeof *consumed);
     if (!consumed)
-        osoe_fatal("out of memory for %u teams' arrivals", consumed_count);
+        osoe_fatal("out of memory for %u team blocks' arrivals", consumed_count);
     osoe_internode_generic_init();
 }
 
@@ -90,8 +90,8 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
     struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
     if (!b || !atomic_load_explicit(&b->record.published, memory_order_acquire) ||
         b->record.nodes < 2)
-        osoe_fatal("team %u arrived at an internode phase it has no record of on this node",
-                   team);
+        osoe_fatal("a team arrived at an internode phase through block %u of the node's pool, "
+                   "which holds no record of one", team);
     struct osoe_arrival_handoff *h = &b->arrival;
     /*
      * A single-writer publication store (§3.16): only one member posts per
@@ -121,38 +121,48 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
  * docs/design/evidence/am-backend/arrival_model.py, where the whole job hangs
  * and every other node is the one that looks stuck.
  *
- * A word per team number, each on its own line of the node's own header -
- * never a connection - but only below `team_numbers_published`, one past the
- * highest number whose record on this node is published (node.h): numbers are
- * never reused, so a pass costs the numbers issued so far, up to the highest
- * published here, and not OSOE_MAX_TEAMS. A team is met here, and learnt from
- * its record, at its first post; a word that has not moved is skipped at once,
- * and a team that has no internode phase never posts.
+ * A word per team block, each on its own line of the node's own header -
+ * never a connection - but only the predefined teams' three and the blocks at
+ * and above `team_blocks_published_from`, the lowest block of a created team
+ * whose record on this node is published (node.h): blocks are claimed from the
+ * top of the pool down and, until the team work's second part, never given
+ * back, so a pass costs the blocks claimed so far and not OSOE_TEAM_BLOCKS.
+ * Until step D the words were per team number, below a high-water mark of
+ * numbers published; the walk is the same, over block indices. A team is met
+ * here, and learnt from its record, at its first post; a word that has not
+ * moved is skipped at once, and a team that has no internode phase never
+ * posts.
  *
  * The bound is loaded with acquire, once a pass, after the agent's load of its
  * wake word and before the handoff words, and it misses no post: a member posts
- * only once its team's record is published and the bound raised past it (the
+ * only once its team's record is published and the bound lowered past it (the
  * record's argument, node.h), and then bumps the lead's wake word. An agent
- * whose load of that word read the bump sees the raised bound; one whose load
+ * whose load of that word read the bump sees the lowered bound; one whose load
  * came before it finds the wait's compare fail and passes again - the rule
  * that makes the handoff sound already (§5.3).
  */
+static bool take_arrival(uint32_t block)
+{
+    uint32_t epoch = atomic_load_explicit(&osoe_node_team(&osoe.node, block)->arrival.epoch,
+                                          memory_order_acquire);
+    if (epoch == consumed[block])
+        return false;
+    consumed[block] = epoch;
+    osoe_progress_arrive(&osoe_am.progress, block, epoch);
+    return true;
+}
+
 bool osoe_internode_am_take_arrivals(void)
 {
     bool moved = false;
-    uint32_t count = atomic_load_explicit(&osoe.node.hdr->team_numbers_published,
-                                          memory_order_acquire);
-    if (count > consumed_count)
-        count = consumed_count;
-    for (uint32_t team = 0; team < count; team++) {
-        uint32_t epoch = atomic_load_explicit(&osoe_node_team(&osoe.node, team)->arrival.epoch,
-                                              memory_order_acquire);
-        if (epoch == consumed[team])
-            continue;
-        consumed[team] = epoch;
-        osoe_progress_arrive(&osoe_am.progress, team, epoch);
-        moved = true;
-    }
+    uint32_t from = atomic_load_explicit(&osoe.node.hdr->team_blocks_published_from,
+                                         memory_order_acquire);
+    if (from < OSOE_PREDEFINED_TEAMS)
+        from = OSOE_PREDEFINED_TEAMS;
+    for (uint32_t block = 0; block < OSOE_PREDEFINED_TEAMS && block < consumed_count; block++)
+        moved |= take_arrival(block);
+    for (uint32_t block = from; block < consumed_count; block++)
+        moved |= take_arrival(block);
     return moved;
 }
 

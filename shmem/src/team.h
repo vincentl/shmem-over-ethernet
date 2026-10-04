@@ -131,7 +131,13 @@ struct osoe_team {
     /* A created team's descriptor once destroyed (osoe_team_of): its number
      * stays, to say so. */
     bool destroyed;
-    struct osoe_team_block *block;  /* this node's block for `number` (node.h) */
+    /* This node's block for the team (node.h): since step D a block of the
+     * node's pool, found through the map by the team's name - its local lead's
+     * local id here and its number - after the split's sync; the predefined
+     * teams' at the block index of their number. `block_index` is what the
+     * internode seam and the progress engine know the team by (internode.h). */
+    struct osoe_team_block *block;
+    uint32_t block_index;
     uint32_t epoch;                 /* this PE's k for the team (§5.4) */
     uint32_t data_epoch;            /* and its d, data collectives completed */
     _Atomic uint32_t *published;    /* where k is published for osoe-stat */

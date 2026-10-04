@@ -197,10 +197,10 @@ static void data_collective_at(const char *routine, struct osoe_team *t, void *d
         }
         if (t->internode) {
             if (reduction)
-                osoe_internode_reduce(t->number, k + 1, accumulator, nelems,
+                osoe_internode_reduce(t->block_index, k + 1, accumulator, nelems,
                                       reduction->operation, reduction->element, routine);
             else
-                osoe_internode_broadcast(t->number, k + 1, root_index(t, root_rank, routine),
+                osoe_internode_broadcast(t->block_index, k + 1, root_index(t, root_rank, routine),
                                          accumulator, bytes, routine);
         }
 
@@ -368,7 +368,7 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
                        m == 0 ? source : member_copy(t->local_ids[m], source_at), length);
         }
         if (t->internode)
-            osoe_internode_collect(t->number, k + 1, result, total, block, places, routine);
+            osoe_internode_collect(t->block_index, k + 1, result, total, block, places, routine);
         if (lengths)
             prefix_sums(routine, dest, t->members);
         if (!osoe_epoch_release_bump_eq(&b->released, k + 1))
@@ -437,7 +437,7 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
             places[t->local_ranks[m]] =
                 *(const uint64_t *)member_copy(t->local_ids[m], length_at);
         if (t->internode)
-            osoe_internode_reduce(t->number, k + 1, places, members, OSOE_REDUCTION_SUM,
+            osoe_internode_reduce(t->block_index, k + 1, places, members, OSOE_REDUCTION_SUM,
                                   (struct osoe_element){ OSOE_ELEMENT_UNSIGNED_INTEGER,
                                                          sizeof(uint64_t) }, routine);
         prefix_sums(routine, places, members);
@@ -573,7 +573,7 @@ int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *so
     struct osoe_symmetric_location source_at = osoe_symmetric_locate(routine, source, bytes);
 
     if (t->internode) {
-        osoe_internode_scan(t->number, t->me, dest, source, nelems, element, inclusive, routine);
+        osoe_internode_scan(t->block_index, t->me, dest, source, nelems, element, inclusive, routine);
         return 0;
     }
 

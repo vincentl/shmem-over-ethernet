@@ -138,15 +138,30 @@ struct osoe_am_rmw_reply {
 };
 
 /*
+ * The revision of what the messages' fields mean, which the handler table's
+ * checksum covers (§3.13; osoe_am_table_checksum) beside each message's shape:
+ * raised when a field changes meaning and not size, so that two binaries that
+ * read one message two ways refuse to form a job rather than misread each
+ * other. 1 since the team redesign's step D, whose barrier message names its
+ * team on the receiving node (struct osoe_am_barrier's `lead`, until then
+ * reserved and 0); 0 before.
+ */
+#define OSOE_AM_WIRE_REVISION 1u
+
+/*
  * A team's internode arrival and release. Addressed to a *node*, not a PE:
  * §5.1's internode phase is between node leads, and the epoch counter it moves
  * is the node's, shared by every local member of the team.
  */
 struct osoe_am_barrier {
-    uint32_t team;              /* which team's counters (§5.4) */
+    uint32_t team;              /* the team's number (§5.4, §5.7) */
     uint32_t epoch;             /* the epoch being arrived at or released */
     uint32_t from_node;
-    uint32_t reserved;
+    /* The local id of the team's local lead on the node the message goes to:
+     * with `team`, the team's name there, which that node's map resolves to
+     * its own block (node.h; the team redesign's step D, until which this was
+     * reserved and 0). */
+    uint32_t lead;
 };
 
 /* The job is ending: who ended it, how, and the status every PE leaves with. */

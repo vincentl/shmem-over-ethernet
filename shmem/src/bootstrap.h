@@ -38,6 +38,8 @@ struct osoe_bootstrap {
     uint32_t max_teams;         /* OSOE_MAX_TEAMS: teams in existence job-wide at once (§5.7) */
     uint32_t max_contexts;      /* OSOE_MAX_CONTEXTS: contexts a PE may have at once, the
                                  * default one included (§4.11; phase 1 step 8) */
+    uint32_t team_blocks;       /* OSOE_TEAM_BLOCKS: the node's pool of team blocks, the
+                                 * three predefined teams' included (§5.7; step D) */
     uint32_t max_threads;       /* OSOE_MAX_THREADS: live threads of a PE that have called
                                  * the library, the main one included (§3.14) */
     uint32_t collective_pipeline;   /* OSOE_COLLECTIVE_PIPELINE: D, a data collective's
@@ -94,6 +96,18 @@ struct osoe_bootstrap {
 #define OSOE_MAX_CONTEXTS_DEFAULT 64u
 #define OSOE_MAX_CONTEXTS_LOWEST  1u
 #define OSOE_MAX_CONTEXTS_HIGHEST 4096u
+
+/*
+ * OSOE_TEAM_BLOCKS (§5.7; the team redesign's step D,
+ * docs/design/team-resources-proposal.md D3): how many teams a node can hold
+ * at once - its pool of team blocks in the control segment, the three
+ * predefined teams' blocks among them. Its default, and the range it must lie
+ * in: at 1,024 a pool is about a megabyte of a node's segment, and the
+ * ceiling, 65,536, what a block index of the map can name with room to spare.
+ */
+#define OSOE_TEAM_BLOCKS_DEFAULT 1024u
+#define OSOE_TEAM_BLOCKS_LOWEST  8u
+#define OSOE_TEAM_BLOCKS_HIGHEST 65536u
 
 /*
  * OSOE_COLLECTIVE_PIPELINE (§5.8, "Pipelined pieces"): D, how many pieces of a

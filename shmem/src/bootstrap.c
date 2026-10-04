@@ -293,6 +293,20 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         osoe_fatal("OSOE_MAX_CONTEXTS='%s' is not between %u and %u", getenv("OSOE_MAX_CONTEXTS"),
                    OSOE_MAX_CONTEXTS_LOWEST, OSOE_MAX_CONTEXTS_HIGHEST);
 
+    /*
+     * How many teams a node can hold in a session (§5.7; step D; at once since
+     * its second part gives a destroyed team's block back): it sizes the
+     * node's pool of team blocks, which the node's lead lays out, so a node's
+     * PEs must agree, and the node's own rendezvous checks that they do
+     * (node.c). Not between nodes: a block index is its node's own, and the
+     * wire names a team's block by its name (am.h).
+     */
+    b->team_blocks = OSOE_TEAM_BLOCKS_DEFAULT;
+    if (osoe_environment_u32("OSOE_TEAM_BLOCKS", &b->team_blocks) == OSOE_ENVIRONMENT_INVALID ||
+        b->team_blocks < OSOE_TEAM_BLOCKS_LOWEST || b->team_blocks > OSOE_TEAM_BLOCKS_HIGHEST)
+        osoe_fatal("OSOE_TEAM_BLOCKS='%s' is not between %u and %u", getenv("OSOE_TEAM_BLOCKS"),
+                   OSOE_TEAM_BLOCKS_LOWEST, OSOE_TEAM_BLOCKS_HIGHEST);
+
     /* OSOE_MAX_THREADS (bootstrap.h): here, by every PE, where until the
      * round-three review only the lead read it, as it laid out the segment - a
      * bad value given to every PE then ended the lead by name and left the

@@ -189,10 +189,20 @@ uint32_t osoe_internode_fanout_default(void);
 
 /*
  * There is no call. A team reaches the backend as its record in each member
- * node's block for its number (node.h), which the SHMEM layer writes and
- * publishes with a release store, and a backend reads with an acquire load
- * the first time it meets the team - its first arrival, a peer's message
- * naming it, or its first data collective. Phase 1 step 7 replaced a call
+ * node's block for it (node.h), which the SHMEM layer writes and publishes
+ * with a release store, and a backend reads with an acquire load the first
+ * time it meets the team - its first arrival, a peer's message naming it, or
+ * its first data collective.
+ *
+ * **Every `team` below is a block index** (the team redesign's step D,
+ * docs/design/team-resources-proposal.md D3): the team's block in this node's
+ * pool, node-local - another node holds the same team at an index of its own,
+ * so nothing that crosses the wire carries one. A message names a team by its
+ * name on the node it goes to, the local id of the team's local lead there and
+ * the team's number (am.h), which the receiving node's map resolves to its
+ * block. The block's name holds the number, which is what places a team's
+ * slots and counters in each PE's internal region (internal-region.h), the
+ * same on every node. Phase 1 step 7 replaced a call
  * made on every local PE at the team's creation: a team created while the
  * progress thread runs must be learnt by that thread, in a process that may
  * hold no descriptor for it, and a record in shared memory is what it can read

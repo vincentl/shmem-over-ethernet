@@ -137,6 +137,8 @@ _Static_assert(sizeof thread_metrics / sizeof thread_metrics[0] == OSOE_COUNTER_
     (offsetof(struct osoe_team_block, tree) + offsetof(struct osoe_collective_state, field))
 #define BLOCK_RECORD(field)                                                 \
     (offsetof(struct osoe_team_block, record) + offsetof(struct osoe_team_record, field))
+#define BLOCK_NAME(field)                                                   \
+    (offsetof(struct osoe_team_block, name) + offsetof(struct osoe_team_name, field))
 
 #define TEAM(name, where)                                                   \
     { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_TEAM, 4, (uint32_t)(where), 0 }
@@ -255,6 +257,15 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     RECORD_CHILD(28), RECORD_CHILD(29), RECORD_CHILD(30), RECORD_CHILD(31),
     { "team.record.name", "", OSOE_MTYPE_STRING, OSOE_MKIND_STATE, OSOE_MSCOPE_TEAM,
       (uint16_t)sizeof(((struct osoe_team_record *)0)->name), (uint32_t)BLOCK_RECORD(name), 0 },
+    /* The block's name in the pool (layout 29; the team redesign's step D):
+     * the local id of the team's local lead here and its number, which the map
+     * finds the block by; the local members holding it; and its generation,
+     * raised each time it is written for a team - what osoe-stat labels a block
+     * by. */
+    TEAM("team.name.lead", BLOCK_NAME(lead)),
+    TEAM("team.name.number", BLOCK_NAME(number)),
+    TEAM("team.name.holders", BLOCK_NAME(holders)),
+    TEAM("team.name.generation", BLOCK_NAME(generation)),
     /* The predefined teams' fields in the node scope, by the names they had
      * when the header held them, for readers that find them so. */
     NDTEAM("team.world.arrived", OSOE_TEAM_WORLD, BLOCK_EPOCH(arrived)),
@@ -331,9 +342,10 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("node.mapped", mapped, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.finalized", finalized, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.failed", failed, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
-    /* One past the highest team number whose record here is published: how far
-     * the lead's agent looks for arrivals (layout 18, node.h). */
-    ND("node.team_numbers_published", team_numbers_published, OSOE_MTYPE_U32,
+    /* The lowest block of a created team whose record here is published: where
+     * the lead's agent starts looking for arrivals above the predefined teams'
+     * three (layout 29, node.h; until then node.team_numbers_published). */
+    ND("node.team_blocks_published_from", team_blocks_published_from, OSOE_MTYPE_U32,
        OSOE_MKIND_STATE, ""),
     NDDIR("node.local_count", local_count, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
     NDDIR("node.blocks_per_pe", blocks_per_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE),

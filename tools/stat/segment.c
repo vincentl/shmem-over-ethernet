@@ -38,9 +38,9 @@
  * rather than the job.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 256,
+_Static_assert(sizeof(struct osoe_segment_directory) == 288,
                "frozen by §3.14: append only. 136 at layout 6; 160 at layout 12; 208 at "
-               "layout 18; 232 at layout 21; 256 at layout 23");
+               "layout 18; 232 at layout 21; 256 at layout 23; 288 at layout 29");
 
 uint64_t osoe_segment_now_ns(void)
 {
@@ -435,6 +435,19 @@ static const unsigned char *record(const struct osoe_segment *s, unsigned scope,
         return NULL;
     *len = n;
     return s->map + off;
+}
+
+bool osoe_segment_epoch(const struct osoe_segment *s, uint32_t local_id, uint32_t number,
+                        uint32_t *epoch)
+{
+    uint64_t len = 0;
+    const unsigned char *row = record(s, OSOE_MSCOPE_EPOCHS, local_id, &len);
+    if (!row || (uint64_t)number * sizeof *epoch + sizeof *epoch > len)
+        return false;
+    /* A word another process writes as this runs: copied, never torn on the
+     * machines osoe runs on, as every value read here is (osoe_segment_read). */
+    memcpy(epoch, row + (uint64_t)number * sizeof *epoch, sizeof *epoch);
+    return true;
 }
 
 bool osoe_segment_read(const struct osoe_segment *s, const struct osoe_metric_descriptor *m,

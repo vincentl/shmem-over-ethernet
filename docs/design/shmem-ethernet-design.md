@@ -1014,6 +1014,12 @@ of published team records, which each record's writer raises after publishing
 it and the lead's agent loads once a pass: team numbers are never reused
 (§5.7), so a pass costs the numbers issued so far, up to the highest published
 on the node, and not O(`OSOE_MAX_TEAMS`), 64 by default and 1,024 at most.
+*As built since the team redesign's step D (layout 29):* a word per block of
+the node's pool of teams, read for the predefined teams' three and for the
+blocks at and above `team_blocks_published_from`, the lowest block of a created
+team whose record is published - blocks being claimed from the top of the pool
+down and not yet given back - so a pass costs the blocks claimed, not
+O(`OSOE_TEAM_BLOCKS`).
 
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
@@ -1334,11 +1340,12 @@ that is stuck. Memory can be read without the job's cooperation.
   Sections, each starting on a cache line: the header, the PE slots, the
   metric table, the counter blocks, and since layouts 6, 12 and 18 the landing
   zones, the connection records and each PE's row of published epochs. Since
-  layout 18 the header ends with one block per team number, `OSOE_MAX_TEAMS` of
-  them (§5.7). A metric names its **scope** — node, PE, thread, connection, and
-  since layout 18 **team** (a team number's block, indexed by the number) and
-  **epochs** (a PE's row, a word per team number) — which says which record its
-  offset is into. The predefined teams' fields keep their node-scope names,
+  layout 18 the header ends with the team blocks, one per team number until
+  layout 29 and since a pool of `OSOE_TEAM_BLOCKS` (§5.7). A metric names its
+  **scope** — node, PE, thread, connection, and since layout 18 **team** (a
+  block of the pool, indexed by its place there, which was the team's number
+  until layout 29; the block's name says the number) and **epochs** (a PE's row,
+  a word per team number) — which says which record its offset is into. The predefined teams' fields keep their node-scope names,
   `team.world.*` and the like, since the blocks are the header's tail; a reader
   finds every team by walking the team scope, and `osoe-stat` shows each whose
   record is published as `team.<name>.*`.
@@ -5047,6 +5054,36 @@ in a per-process pool indexed by number, so a handle never issued or already
 destroyed is named without being read through. Destroy is a sync over the
 team's members, then the descriptor's arrays are freed; the number, its blocks
 and records stay.
+
+*As built (the team redesign's step D, part 1, layout 29;
+`docs/design/team-resources-proposal.md` D3, `docs/prompts/phase1-step7-slice3-prompt.md`).*
+A node's blocks for teams are a **pool**, `OSOE_TEAM_BLOCKS` of them (default
+1,024, 8 to 65,536, agreed among a node's PEs and free to differ between nodes),
+ending the node header as the per-number blocks did - the first three the
+predefined teams', at the index of their number, so the node scope still names
+their fields. A created team's block is found by its **name** on the node, the
+pair (local id of its local lead there, its number), through the **map**, a word
+per name - `OSOE_MAX_TEAMS` names for each local PE - holding the block's index
+plus one; which blocks are free is a bitmap. The team's local lead on each node
+claims a block by compare-and-swap on the bitmap, from the top of the pool
+down, so that a created team's block index is seldom its number - never at
+the defaults - and a mix-up of the two shows at once; names it - lead, number, its local members as its
+holders, its generation raised; writes the record; lowers the node's low-water
+mark of published blocks, which bounds the progress thread's scan of arrival
+handoffs above the predefined three; and stores the map entry with release,
+before the split's sync, after which every member acquires it (`node.h`'s
+argument for the record, unchanged). The internode seam and the progress
+engine know a team by its block index (`internode.h`), node-local; a barrier
+message names it by its name on the node it goes to, the number in `team` and
+the receiving node's lead local id in `lead` (`am.h`), which that node's map
+resolves, a name with no block being named rather than learnt; and the generic
+internode phase places a team's slots and counters in the internal region by
+the number its block's name holds, the same on every node. Numbers are still
+job-wide and never reused in this part, and no block is given back: a node
+whose pool runs dry ends the job at the next split, naming the setting, since
+the number is claimed by then and the split cannot fail alike - the second part
+makes it such a failure. The control queue's term stays per number (§3.8),
+which a node's blocks match one for one while numbers are job-wide.
 
 *Two readings of §9.4.6*, where the specification says two things. A triplet
 whose sequence would wrap around the parent - "considered invalid and the

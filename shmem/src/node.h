@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 28
+#define OSOE_NODE_LAYOUT 29
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -349,6 +349,22 @@ struct osoe_segment_directory {
     uint64_t threads_bytes;
     uint32_t thread_record_bytes;    /* one record */
     uint32_t threads_per_pe;         /* OSOE_MAX_THREADS */
+
+    /*
+     * Appended at layout 29 (§5.7; the team redesign's step D,
+     * docs/design/team-resources-proposal.md D3): since this layout the team
+     * blocks above, `team_count` of them, are a pool of OSOE_TEAM_BLOCKS, found
+     * by a team's *name* - the local id of its local lead, and its number -
+     * through the map: `team_map_row` (OSOE_MAX_TEAMS) words for each local
+     * PE, name to block index plus one, 0 for none. Which blocks are free is a
+     * bitmap of `team_free_words` 64-bit words, a bit set for a free block.
+     * After the threads' records, so that nothing before them moved.
+     */
+    uint64_t team_map_offset;
+    uint64_t team_map_bytes;
+    uint64_t team_free_offset;
+    uint32_t team_map_row;           /* OSOE_MAX_TEAMS */
+    uint32_t team_free_words;        /* ceil(OSOE_TEAM_BLOCKS / 64) */
 };
 
 /*
@@ -576,9 +592,10 @@ struct osoe_collective_state {
  * it by orders that exist already, the sync carrying it:
  *
  * - **The team's members on this node**, on the arrival path and in the data
- *   half. The local lead publishes the record, and raises
- *   `team_numbers_published`, before its own arrival at the parent's sync, a
- *   seq_cst add to the parent's `arrived`. The parent's epoch is released
+ *   half. The local lead publishes the record, lowers
+ *   `team_blocks_published_from` and stores the map entry (layout 29), before
+ *   its own arrival at the parent's sync, a seq_cst add to the parent's
+ *   `arrived`. The parent's epoch is released
  *   here only after the last local arrival, a later add to the same counter,
  *   and every add to it is a read-modify-write, so the last one reads a value
  *   in the release sequence of the local lead's: the last arriver's release
@@ -594,8 +611,8 @@ struct osoe_collective_state {
  *   everything the thread does after that follows the record. It meets the
  *   new team at one of two things. A local member's first post, which comes
  *   after that member's return from the split, and is followed by its bump of
- *   the lead's wake word, so the thread's load of `team_numbers_published`
- *   after its load of that word sees the mark raised (internode-am.c). Or a
+ *   the lead's wake word, so the thread's load of `team_blocks_published_from`
+ *   after its load of that word sees the mark lowered (internode-am.c). Or a
  *   message about the new team from another node, which can only have been
  *   sent once the parent's sync completed, which needed this node's arrival,
  *   which the thread sent after its acquire of the handoff: the message's
@@ -640,10 +657,35 @@ struct osoe_team_record {
 };
 
 /*
- * Everything a node keeps per team number (layout 18; §5.3, §5.4, §5.7): the
- * header ends with OSOE_MAX_TEAMS of these, indexed by the team's number
- * (osoe_node_team), so a team created later needs no storage of its own and
- * no team's state shares a cache line with another's.
+ * What the pool needs of a block (layout 29; the team redesign's step D,
+ * docs/design/team-resources-proposal.md D3 and D4): the team's *name* on this
+ * node - the local id of its local lead and its number, under which the map
+ * holds the block's index - the local members holding it, and its generation,
+ * raised each time the block is written for a team. Written by the team's
+ * local lead as it claims the block, before the map entry, whose release
+ * orders them before any member's acquire of it after the split's sync (the
+ * record's argument, below); read by members, by the progress engine as it
+ * learns the team, and by osoe-stat, which labels a block by it - relaxed, the
+ * map entry and the record's `published` being what orders them. Until the
+ * team work's second part gives blocks back, no block is written twice: holders
+ * stay the team's local members, and the generation is 1.
+ */
+struct osoe_team_name {
+    _Alignas(OSOE_CACHELINE)
+    _Atomic uint32_t lead;          /* local id of the team's local lead here */
+    _Atomic uint32_t number;        /* the team's number */
+    _Atomic uint32_t holders;       /* local members holding the block */
+    _Atomic uint32_t generation;    /* 0 for a block never written */
+};
+
+/*
+ * Everything a node keeps for a team (layout 18; §5.3, §5.4, §5.7): the header
+ * ends with a pool of these, OSOE_TEAM_BLOCKS since layout 29 (step D), found
+ * by the team's name through the map (osoe_node_team_find) and then by block
+ * index (osoe_node_team), so a team created later needs no storage of its own
+ * and no team's state shares a cache line with another's. The predefined teams'
+ * are the first three, at the block index of their number; a created team's is
+ * claimed from the free bitmap by its local lead here (osoe_node_team_claim).
  *
  * - **§5.4's three epoch counters**, each alone on its line. SHMEM_TEAM_SHARED
  *   has its own although on one node its membership is the world's: the spec
@@ -661,6 +703,7 @@ struct osoe_team_block {
     struct osoe_arrival_handoff arrival;
     struct osoe_collective_state tree;
     struct osoe_team_record record;
+    struct osoe_team_name name;
 };
 
 struct osoe_node_header {
@@ -739,25 +782,30 @@ struct osoe_node_header {
     uint32_t landing_arena_bytes;
 
     /*
-     * Layout 18: one past the highest team number whose record on this node is
-     * published, or 0 before the first. What bounds the node lead agent's scan
-     * of the arrival handoffs (internode-am.c), so that a pass costs the teams
-     * created and not OSOE_MAX_TEAMS: numbers are never reused (§5.7), and a
-     * node's are published in no particular order, so it is a high-water mark,
-     * raised by each record's writer after its `published` and never lowered -
-     * a compare-and-swap that only raises it, since the writers of created
-     * teams' records are their local leads, in any process of the node. Raised as
-     * part of writing the record, so the record's argument for who sees it
-     * covers it too. On its own line: every pass of the agent loads it.
+     * Layout 29 (step D): the lowest block index of a created team whose record
+     * on this node is published, or `dir.team_count` before the first - which,
+     * with the three predefined teams' blocks below it, bounds the node lead
+     * agent's scan of the arrival handoffs (internode-am.c), so that a pass
+     * costs the blocks claimed and not the pool. Blocks are claimed from the top
+     * of the pool down (osoe_node_team_claim), and until the team work's second
+     * part none is given back, so a low-water mark, lowered by each record's
+     * writer after its `published` and never raised - a compare-and-swap that
+     * only lowers it, since the writers are the teams' local leads, in any
+     * process of the node. Lowered as part of writing the record, so the
+     * record's argument for who sees it covers it too. On its own line: every
+     * pass of the agent loads it. Until layout 29, `team_numbers_published`,
+     * one past the highest team number published, the blocks then being the
+     * numbers'.
      */
-    _Alignas(OSOE_CACHELINE) _Atomic uint32_t team_numbers_published;
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t team_blocks_published_from;
 
     /*
-     * Layout 18: one block per team number, `dir.team_count` of them
-     * (OSOE_MAX_TEAMS), which end the header - `dir.header_bytes` counts them,
-     * so the node scope of the metric table reaches the predefined teams'
-     * fields by the names they had when the header held them (§3.14). Found
-     * with osoe_node_team.
+     * The pool of team blocks, `dir.team_count` of them (OSOE_TEAM_BLOCKS since
+     * layout 29; one per team number, OSOE_MAX_TEAMS, from layout 18), which
+     * end the header - `dir.header_bytes` counts them, so the node scope of the
+     * metric table reaches the predefined teams' fields, the first three
+     * blocks, by the names they had when the header held them (§3.14). Found
+     * with osoe_node_team; a created team's through the map first.
      */
     struct osoe_team_block team[];
 };
@@ -997,9 +1045,15 @@ struct osoe_node {
      * one node (§3.14's connection scope). */
     struct osoe_am_connection_metrics *connection_metrics;
     uint32_t connection_count;
-    /* The header's team blocks, one per team number (OSOE_MAX_TEAMS), and
-     * each local PE's row of published epochs, `epoch_row_words` long. */
+    /* The header's pool of team blocks (OSOE_TEAM_BLOCKS), the map from a
+     * team's name to its block, `team_map_row` (OSOE_MAX_TEAMS) words a local
+     * PE, the bitmap of free blocks, and each local PE's row of published
+     * epochs, `epoch_row_words` long, by number. */
     uint32_t team_count;
+    _Atomic uint32_t *team_map;
+    uint32_t team_map_row;
+    _Atomic uint64_t *team_free;
+    uint32_t team_free_words;
     _Atomic uint32_t *epochs;
     uint32_t epoch_row_words;
     /* Each local PE's pool of context blocks, `contexts_per_pe` each
@@ -1026,11 +1080,48 @@ static inline struct osoe_context_block *osoe_node_context(const struct osoe_nod
     return &n->contexts[(size_t)local_id * n->contexts_per_pe + index];
 }
 
-/* The node's block for team number `team`, or NULL past the last (§5.7). */
-static inline struct osoe_team_block *osoe_node_team(const struct osoe_node *n, uint32_t team)
+/* The node's team block at `block_index` in the pool, or NULL past the last
+ * (§5.7; step D). The predefined teams' are at the index of their number. */
+static inline struct osoe_team_block *osoe_node_team(const struct osoe_node *n,
+                                                     uint32_t block_index)
 {
-    return team < n->team_count ? &n->hdr->team[team] : NULL;
+    return block_index < n->team_count ? &n->hdr->team[block_index] : NULL;
 }
+
+/* The map's word for the name (`lead`, `number`): its block index plus one, or
+ * 0 for none (step D, D3). The team's local lead stores it with release once
+ * the block is written, before the split's sync; a member loads it with acquire
+ * after the sync (osoe_node_team_find). */
+static inline _Atomic uint32_t *osoe_node_team_map_entry(const struct osoe_node *n,
+                                                         uint32_t lead, uint32_t number)
+{
+    return &n->team_map[(size_t)lead * n->team_map_row + number];
+}
+
+/* The block index the name (`lead`, `number`) maps to on this node, or
+ * UINT32_MAX for a name with no block - or out of range, as a message's name
+ * from another node may be. */
+static inline uint32_t osoe_node_team_find(const struct osoe_node *n, uint32_t lead,
+                                           uint32_t number)
+{
+    if (lead >= n->local_count || number >= n->team_map_row)
+        return UINT32_MAX;
+    uint32_t v = atomic_load_explicit(osoe_node_team_map_entry(n, lead, number),
+                                      memory_order_acquire);
+    return v && v <= n->team_count ? v - 1 : UINT32_MAX;
+}
+
+/*
+ * Claim a free block of the pool for a team created here, or UINT32_MAX if
+ * none is free: a compare-and-swap on the free bitmap, as team numbers are
+ * claimed (team.c), so a failed claim takes nothing. From the top of the pool
+ * down, so that a created team's block index is seldom its number - never at
+ * the defaults, where the pool is sixteen times the numbers - and a mix-up of
+ * the two shows at once rather than on some node of some map; and the scan of
+ * arrivals stays bounded below by `team_blocks_published_from`. Until the team
+ * work's second part, a claimed block is never given back.
+ */
+uint32_t osoe_node_team_claim(struct osoe_node *n);
 
 /*
  * Where local PE `local_id` publishes its epoch count k for team `team` (§5.4),
