@@ -99,15 +99,15 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
                    "which holds no record of one", team);
     struct osoe_arrival_handoff *h = &b->arrival;
     /*
-     * The block's generation beside the epoch (node.h): a relaxed load, since
-     * this member holds the block and its generation moves only while nobody
-     * does. Then a single-writer publication store (§3.16): only one member
+     * The block's generation beside the epoch (node.h): an acquire load
+     * (§3.16), though this member holds the block and its generation moves
+     * only while nobody does. Then a single-writer publication store (§3.16): only one member
      * posts per epoch, and the release of the previous epoch orders it after
      * the last one. Then the wake word, a locked add, which on x86-TSO also
      * drains the store buffer so the agent cannot see the bump without the
      * epoch.
      */
-    uint32_t generation = atomic_load_explicit(&b->name.generation, memory_order_relaxed);
+    uint32_t generation = atomic_load_explicit(&b->name.generation, memory_order_acquire);
     atomic_store_explicit(&h->word, (uint64_t)generation << 32 | epoch, memory_order_release);
     /* The block's bit in the posted bitmap, then its word's bit in the summary
      * (node.h, team_posted_summary; posted_bitmap_model.py): after the word, so

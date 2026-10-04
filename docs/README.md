@@ -2,7 +2,8 @@
 
 Start with the decisions index, `docs/decisions/README.md`: what is decided and
 still holds, and who decided it. What waits on the author is at the end of the
-newest dated record beside it, and what a release needs is in
+newest record of the author's own decisions - the dated files named for a day
+alone, `docs/decisions/<date>.md` - and what a release needs is in
 `docs/release-checklist.md`. Then:
 
 | Question | Where |
@@ -19,6 +20,15 @@ newest dated record beside it, and what a release needs is in
 
 Finished briefs and past reviews are history: kept so a line of code or a
 decision can be traced to what produced it, not read to follow the project.
+
+The records name three development virtual machines. `osoe` is the one
+`dev/lima/` defines; `osoe-load` and `osoe-x86` were clones of it, made so that
+runs could go side by side, and are not defined here. `osoe-x86` runs an
+aarch64 kernel like the others, with Rosetta registered for x86-64 programs: a
+run "in `osoe-x86`" is an aarch64 run unless it says x86-64. Paths under
+`build/scratch/` name the scratch tree of the session that made a run, which
+git ignores: a record cites them to say where its outputs were, not to send a
+reader there.
 
 The evidence under `docs/design/evidence/` and `docs/reviews/evidence/`, the
 finished briefs and the review prompts were written on the author's machine and

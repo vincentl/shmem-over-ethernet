@@ -621,9 +621,8 @@ void osoe_team_start(void)
     if (!numbered || !created || !held || !pending)
         osoe_fatal("out of memory for %u teams", numbered_count);
     for (uint32_t number = 0; number < OSOE_PREDEFINED_TEAMS; number++)
-        atomic_store_explicit(&held[number / 64], atomic_load(&held[number / 64]) |
-                                                      UINT64_C(1) << (number % 64),
-                              memory_order_relaxed);
+        atomic_fetch_or_explicit(&held[number / 64], UINT64_C(1) << (number % 64),
+                                 memory_order_seq_cst);
     predefined_local_shape();
     world_team = every_pe("SHMEM_TEAM_WORLD", OSOE_TEAM_WORLD);
     shared_team = shared();
@@ -791,7 +790,7 @@ static const struct osoe_team *of_block(uint32_t block_index)
     if (!block)
         return NULL;
     const struct osoe_team *t =
-        osoe_team_numbered(atomic_load_explicit(&block->name.number, memory_order_relaxed));
+        osoe_team_numbered(atomic_load_explicit(&block->name.number, memory_order_acquire));
     return t && t->block_index == block_index ? t : NULL;
 }
 
@@ -1233,23 +1232,30 @@ enum split_mark {
  */
 static void pool_dry(const char *routine)
 {
-    fprintf(stderr, "osoe: PE %u: %s: node %u (%s) has no team block left for the new team "
-            "this PE would lead there: OSOE_TEAM_BLOCKS is %u, the teams a node may hold at "
-            "once (design §5.7); the split takes none and returns nonzero on every PE of its "
-            "parent team\n", osoe.bootstrap.rank, routine, osoe.job.node, osoe.node.hdr->hostname,
-            osoe.node.team_count);
+    /* One write a line (osoe_notice), as a fatal is: several would-be leads of
+     * a split_2d can find the pool dry at once, and unbuffered stderr would cut
+     * their lines into each other (the review of step D's merge point). */
+    osoe_notice("%s: node %u (%s) has no team block left for the new team this PE would "
+                "lead there: OSOE_TEAM_BLOCKS is %u, the teams a node may hold at once (design "
+                "§5.7); the split takes none and returns nonzero on every PE of its parent team",
+                routine, osoe.job.node, osoe.node.hdr->hostname, osoe.node.team_count);
 }
 
 /* No number is free on every PE of the new teams (step 4 of the file's
  * comment): said once, by the parent's rank 0. */
 static void numbers_used_up(const char *routine, uint32_t numbers)
 {
-    fprintf(stderr, "osoe: PE %u: %s: no %s free on every PE of the new team%s: "
-            "OSOE_MAX_TEAMS is %u, the teams one PE may be in at once, %u of them "
-            "predefined (design §5.7); the split takes none and returns nonzero on every PE "
-            "of its parent team\n", osoe.bootstrap.rank, routine,
-            numbers == 1 ? "team number is" : "two team numbers are", numbers == 1 ? "" : "s",
-            osoe.bootstrap.max_teams, OSOE_PREDEFINED_TEAMS);
+    /* What runs out is what the members hold between them, which each may
+     * hold less of (the review of step D's merge point, readiness Q5-1). */
+    osoe_notice("%s: no %s free on every PE of the new team%s - between them %s, though each "
+                "may hold fewer: OSOE_MAX_TEAMS is %u, the teams one PE may be in at once, %u "
+                "of them predefined, and a larger one leaves more to choose from (design "
+                "§5.7); the split takes none and returns nonzero on every PE of its parent team",
+                routine, numbers == 1 ? "team number is" : "two team numbers are",
+                numbers == 1 ? "" : "s",
+                numbers == 1 ? "they hold every one a program may use"
+                             : "they hold all but at most one of those a program may use",
+                osoe.bootstrap.max_teams, OSOE_PREDEFINED_TEAMS);
 }
 
 /*

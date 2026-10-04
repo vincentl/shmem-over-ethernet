@@ -946,16 +946,15 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
         osoe_epoch_init(&h->team[t].arrived);
         osoe_epoch_init(&h->team[t].released);
         osoe_epoch_init(&h->team[t].copied);
-        atomic_store_explicit(&h->team[t].name.lead, 0, memory_order_relaxed);
-        atomic_store_explicit(&h->team[t].name.number, t, memory_order_relaxed);
-        atomic_store_explicit(&h->team[t].name.holders, b->local_count, memory_order_relaxed);
-        atomic_store_explicit(&h->team[t].name.generation, 1, memory_order_relaxed);
-        atomic_store_explicit(osoe_node_team_map_entry(n, 0, t), t + 1, memory_order_relaxed);
+        atomic_store_explicit(&h->team[t].name.lead, 0, memory_order_release);
+        atomic_store_explicit(&h->team[t].name.number, t, memory_order_release);
+        atomic_store_explicit(&h->team[t].name.holders, b->local_count, memory_order_release);
+        atomic_store_explicit(&h->team[t].name.generation, 1, memory_order_release);
+        atomic_store_explicit(osoe_node_team_map_entry(n, 0, t), t + 1, memory_order_release);
     }
     for (uint32_t i = OSOE_PREDEFINED_TEAMS; i < b->team_blocks; i++) {
-        uint64_t word = atomic_load_explicit(&n->team_free[i / 64], memory_order_relaxed);
-        atomic_store_explicit(&n->team_free[i / 64], word | UINT64_C(1) << (i % 64),
-                              memory_order_relaxed);
+        atomic_fetch_or_explicit(&n->team_free[i / 64], UINT64_C(1) << (i % 64),
+                                 memory_order_seq_cst);
     }
 
     /*
@@ -968,7 +967,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * leftover that osoe-stat --gc removes. The lead knows L and the heap size;
      * every PE has parsed the same size, or check_agreement fails them all. A
      * heap object is the heap and then its internal region (internal-region.h),
-     * about 11 MiB at the default 64 teams, fan-out of 4 and two pieces in
+     * about 12.6 MiB at the default 64 teams, fan-out of 4 and two pieces in
      * flight (OSOE_COLLECTIVE_PIPELINE), which is counted here with the heap
      * it follows. Pages cost only once written, so the room above has taken
      * is only the segment's first and last pages, allocated so that they could
@@ -986,11 +985,13 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
             snprintf(statics, sizeof statics, " and as many copies of the program's %llu MiB "
                      "of statics", (unsigned long long)((n->statics_bytes + (1u << 20) - 1) >> 20));
         snprintf(msg, sizeof msg, "/dev/shm has %llu MiB free, but this node's control "
-                 "segment and %u heaps of %llu MiB%s need %llu MiB: lower "
-                 "SHMEM_SYMMETRIC_SIZE, run fewer PEs per node, or enlarge /dev/shm - or, "
-                 "since pages cost only once written, OSOE_SHM_CAPACITY_CHECK=0 reports "
-                 "this without refusing", (unsigned long long)(free_bytes >> 20),
-                 b->local_count, (unsigned long long)(n->heap_bytes >> 20), statics,
+                 "segment and %u heap%s of %llu MiB%s need %llu MiB: lower "
+                 "SHMEM_SYMMETRIC_SIZE, run fewer PEs per node, or enlarge /dev/shm (a "
+                 "container's --shm-size) - or, since pages cost only once written, "
+                 "OSOE_SHM_CAPACITY_CHECK=0 reports this without refusing",
+                 (unsigned long long)(free_bytes >> 20), b->local_count,
+                 b->local_count == 1 ? "" : "s", (unsigned long long)(n->heap_bytes >> 20),
+                 statics,
                  (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
         if (!b->shm_capacity_warning_only)
             fail_rendezvous(n, msg);
@@ -1271,7 +1272,7 @@ uint32_t osoe_node_team_claim(struct osoe_node *n)
                                                       memory_order_seq_cst,
                                                       memory_order_acquire)) {
                 atomic_store_explicit(&osoe_node_team(n, block_index)->name.members, 0,
-                                      memory_order_relaxed);
+                                      memory_order_release);
                 return block_index;
             }
         }
@@ -1294,17 +1295,17 @@ void osoe_node_team_return(struct osoe_node *n, uint32_t block_index)
  * until the engine learns the team's tree and publishes it. */
 static void collective_state_reset(struct osoe_collective_state *c)
 {
-    atomic_store_explicit(&c->epoch_open, 0, memory_order_relaxed);
-    atomic_store_explicit(&c->epoch_closed, 0, memory_order_relaxed);
-    atomic_store_explicit(&c->own_arrived, 0, memory_order_relaxed);
-    atomic_store_explicit(&c->children, 0, memory_order_relaxed);
-    atomic_store_explicit(&c->children_arrived, 0, memory_order_relaxed);
-    atomic_store_explicit(&c->lowest_missing, OSOE_COLLECTIVE_TREE_NONE, memory_order_relaxed);
-    atomic_store_explicit(&c->parent, OSOE_COLLECTIVE_TREE_NONE, memory_order_relaxed);
-    atomic_store_explicit(&c->fanout, 0, memory_order_relaxed);
-    atomic_store_explicit(&c->most_pieces_in_flight, 0, memory_order_relaxed);
-    atomic_store_explicit(&c->gather_steps, 0, memory_order_relaxed);
-    atomic_store_explicit(&c->gather_shares, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->epoch_open, 0, memory_order_release);
+    atomic_store_explicit(&c->epoch_closed, 0, memory_order_release);
+    atomic_store_explicit(&c->own_arrived, 0, memory_order_release);
+    atomic_store_explicit(&c->children, 0, memory_order_release);
+    atomic_store_explicit(&c->children_arrived, 0, memory_order_release);
+    atomic_store_explicit(&c->lowest_missing, OSOE_COLLECTIVE_TREE_NONE, memory_order_release);
+    atomic_store_explicit(&c->parent, OSOE_COLLECTIVE_TREE_NONE, memory_order_release);
+    atomic_store_explicit(&c->fanout, 0, memory_order_release);
+    atomic_store_explicit(&c->most_pieces_in_flight, 0, memory_order_release);
+    atomic_store_explicit(&c->gather_steps, 0, memory_order_release);
+    atomic_store_explicit(&c->gather_shares, 0, memory_order_release);
 }
 
 /*
@@ -1323,21 +1324,21 @@ uint32_t osoe_node_team_name(struct osoe_node *n, uint32_t block_index, uint32_t
     if (!b || block_index < OSOE_PREDEFINED_TEAMS)
         osoe_fatal("block %u of a pool of %u named for team %u", block_index, n->team_count,
                    number);
-    uint32_t generation = atomic_load_explicit(&b->name.generation, memory_order_relaxed) + 1;
+    uint32_t generation = atomic_load_explicit(&b->name.generation, memory_order_acquire) + 1;
     if (generation % 2 == 0)
         osoe_fatal("block %u, claimed for team %u, is at generation %u: a team holds it",
                    block_index, number, generation - 1);
-    atomic_store_explicit(&b->name.generation, generation, memory_order_relaxed);
+    atomic_store_explicit(&b->name.generation, generation, memory_order_release);
     osoe_epoch_init(&b->arrived);
     osoe_epoch_init(&b->released);
     osoe_epoch_init(&b->copied);
     collective_state_reset(&b->tree);
-    atomic_store_explicit(&b->name.lead, lead, memory_order_relaxed);
-    atomic_store_explicit(&b->name.number, number, memory_order_relaxed);
+    atomic_store_explicit(&b->name.lead, lead, memory_order_release);
+    atomic_store_explicit(&b->name.number, number, memory_order_release);
     /* The holders before the members, with release: osoe_node_team_returning
      * reads the members first, with acquire, and so never sees this team's
      * members beside the last team's holders. */
-    atomic_store_explicit(&b->name.holders, holders, memory_order_relaxed);
+    atomic_store_explicit(&b->name.holders, holders, memory_order_release);
     atomic_store_explicit(&b->name.members, holders, memory_order_release);
     return generation;
 }
@@ -1384,8 +1385,8 @@ bool osoe_node_team_leave(struct osoe_node *n, uint32_t block_index, bool lead)
                    block_index, n->team_count);
     if (lead)
         atomic_store_explicit(osoe_node_team_map_entry(
-                                  n, atomic_load_explicit(&b->name.lead, memory_order_relaxed),
-                                  atomic_load_explicit(&b->name.number, memory_order_relaxed)),
+                                  n, atomic_load_explicit(&b->name.lead, memory_order_acquire),
+                                  atomic_load_explicit(&b->name.number, memory_order_acquire)),
                               0, memory_order_release);
     uint32_t before = atomic_fetch_sub_explicit(&b->name.holders, 1, memory_order_seq_cst);
     if (before == 0)

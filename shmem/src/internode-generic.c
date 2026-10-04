@@ -231,7 +231,7 @@
 static uint32_t number_of(uint32_t team)
 {
     const struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
-    uint32_t number = b ? atomic_load_explicit(&b->name.number, memory_order_relaxed) : team;
+    uint32_t number = b ? atomic_load_explicit(&b->name.number, memory_order_acquire) : team;
     if (number >= osoe.bootstrap.max_teams)
         osoe_fatal("block %u of the node's teams names number %u, past OSOE_MAX_TEAMS (%u)",
                    team, number, osoe.bootstrap.max_teams);
@@ -407,8 +407,8 @@ void osoe_internode_generic_fini(void)
  */
 /* The process's state for the team in block `team`, emptied first if it was
  * kept for another team the block held (struct generic_team): the generation
- * read relaxed, since the caller is a member holding the block, whose
- * generation moves only while nobody does (node.h). */
+ * read with acquire (§3.16), though the caller is a member holding the block,
+ * whose generation moves only while nobody does (node.h). */
 static struct generic_team *team_state(uint32_t team, const char *routine)
 {
     if (team >= team_count)
@@ -416,7 +416,7 @@ static struct generic_team *team_state(uint32_t team, const char *routine)
     struct generic_team *g = &teams[team];
     uint32_t generation =
         atomic_load_explicit(&osoe_node_team(&osoe.node, team)->name.generation,
-                             memory_order_relaxed);
+                             memory_order_acquire);
     if (g->generation != generation) {
         for (uint32_t s = 0; g->step_intervals && s < g->steps; s++)
             free(g->step_intervals[s].intervals);
@@ -1573,11 +1573,11 @@ void osoe_internode_generic_number_taken(uint32_t number)
             atomic_store_explicit(
                 (_Atomic uint64_t *)internal(words[i] +
                                              (uint64_t)position * OSOE_INTERNAL_LINE_BYTES),
-                0, memory_order_relaxed);
+                0, memory_order_release);
     }
     for (uint32_t line = 0; line < 2 * steps; line++)
         atomic_store_explicit((_Atomic uint64_t *)internal(gather_of_number(number) +
                                                            (uint64_t)line *
                                                                OSOE_INTERNAL_LINE_BYTES),
-                              0, memory_order_relaxed);
+                              0, memory_order_release);
 }

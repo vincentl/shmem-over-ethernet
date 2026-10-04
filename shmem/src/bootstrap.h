@@ -75,11 +75,12 @@ struct osoe_bootstrap {
 #define OSOE_DEFAULT_PORT_HIGH 26999
 
 /*
- * OSOE_MAX_TEAMS (§5.7): its default, and the range it must lie in - room for
- * at least one team beyond the three predefined, and at most 1,024, where a
- * node's team blocks come to about a megabyte of its control segment and each
- * PE's internal region to about 200 MiB of address space at the default
- * fan-out and OSOE_COLLECTIVE_PIPELINE.
+ * OSOE_MAX_TEAMS (§5.7): its default, and the range it must lie in - the
+ * numbers one PE may hold at once, room for at least one team beyond the three
+ * predefined, and at most 1,024, where each PE's internal region comes to about
+ * 200 MiB of address space at the default fan-out and OSOE_COLLECTIVE_PIPELINE.
+ * A node's team blocks are OSOE_TEAM_BLOCKS's (below), since the team
+ * redesign's step D.
  */
 #define OSOE_MAX_TEAMS_DEFAULT 64u
 #define OSOE_MAX_TEAMS_LOWEST  4u
@@ -120,9 +121,9 @@ struct osoe_bootstrap {
  * before phase 1 step 5 slice 5; each step of D costs every team number's
  * slots in the internal region again (internal-region.h). A PE's region is
  * OSOE_MAX_TEAMS x (fan-out + 1) x D slots of 16 KiB, and a line per counter:
- * 10 MiB at the defaults (64 teams, fan-out 4, D = 2) - and the scans' 1.3 MiB after
- * it (internal-region.h) - and at the extremes the
- * ranges allow (1,024 teams, fan-out 32, D = 8) 4.1 GiB, which the shared-memory
+ * 10 MiB at the defaults (64 teams, fan-out 4, D = 2) - and the scans' 2.6 MiB
+ * after it (internal-region.h) - and at the extremes the ranges allow (1,024
+ * teams, fan-out 32, D = 8) 4.1 GiB, which the shared-memory
  * capacity check refuses at init on a machine without it (node.c).
  */
 #define OSOE_COLLECTIVE_PIPELINE_DEFAULT 2u

@@ -228,7 +228,7 @@ static bool team_of_record(void *context, uint32_t team, struct osoe_progress_te
     if (!b || !atomic_load_explicit(&b->record.published, memory_order_acquire))
         return false;
     const struct osoe_team_record *r = &b->record;
-    uint32_t number = atomic_load_explicit(&b->name.number, memory_order_relaxed);
+    uint32_t number = atomic_load_explicit(&b->name.number, memory_order_acquire);
     if (r->nodes < 2)
         return false;
     uint32_t fanout = osoe.bootstrap.collective_fanout;
@@ -251,13 +251,13 @@ static bool team_of_record(void *context, uint32_t team, struct osoe_progress_te
         learnt->child_lead[j] = osoe_job_local_index(&osoe.job, r->child[j]);
     }
     learnt->published = &b->tree;
-    learnt->generation = atomic_load_explicit(&b->name.generation, memory_order_relaxed);
+    learnt->generation = atomic_load_explicit(&b->name.generation, memory_order_acquire);
     return true;
 }
 
 /* A team's block on this node by the name a message carries, and the block's
- * generation (progress.h): relaxed, the map entry's acquire carrying the name
- * that was written before it (node.h). */
+ * generation (progress.h): read with acquire (§3.16), though the map entry's
+ * acquire already carries the name that was written before it (node.h). */
 static uint32_t team_by_name(void *context, uint32_t lead, uint32_t number,
                              uint32_t *generation)
 {
@@ -265,7 +265,7 @@ static uint32_t team_by_name(void *context, uint32_t lead, uint32_t number,
     uint32_t block = osoe_node_team_find(&osoe.node, lead, number);
     if (block != UINT32_MAX)
         *generation = atomic_load_explicit(&osoe_node_team(&osoe.node, block)->name.generation,
-                                           memory_order_relaxed);
+                                           memory_order_acquire);
     return block;
 }
 

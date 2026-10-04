@@ -327,7 +327,7 @@ struct osoe_segment_directory {
     uint64_t teams_offset;
     uint64_t teams_bytes;
     uint32_t team_bytes;             /* one block */
-    uint32_t team_count;             /* OSOE_MAX_TEAMS */
+    uint32_t team_count;             /* OSOE_TEAM_BLOCKS */
     uint64_t epochs_offset;
     uint64_t epochs_bytes;
     uint32_t epoch_row_bytes;        /* one PE's row */
@@ -713,13 +713,14 @@ struct osoe_team_record {
  * The generation is what the progress engine follows (D4): it keeps the one
  * it learnt a block's team at, and a handoff or a message showing another
  * makes it learn the block afresh (progress.c). It moves only while the block
- * has no holder, so a member reads its block's with a relaxed load.
+ * has no holder, so a member's acquire load of its block's needs nothing more.
  *
  * Written by the team's local lead as it names the block, before the map
  * entry, whose release orders them before any member's acquire of it after the
  * split's sync (the record's argument, below); read by members, by the progress
  * engine as it learns the team, and by osoe-stat, which labels a block by it -
- * relaxed, the map entry and the record's `published` being what orders them.
+ * with acquire (§3.16), though the map entry and the record's `published` are
+ * what order them.
  * `holders` moves by read-modify-writes, seq_cst as every one is (§3.16).
  */
 struct osoe_team_name {

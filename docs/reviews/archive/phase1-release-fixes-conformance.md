@@ -562,7 +562,7 @@ probes and logs: `/tmp/conformance-r4/probes/new/` in `osoe-load` (`signal-c11.c
 the SOS sweep in `/tmp/conformance-r4/sos/` (`sos-sweep.sh`, `sweep.txt`), and the
 corpus's `tests-sos` and `openshmem-examples`. The probe sources, the scripts and
 the sweep's results are mirrored on the host in the session scratchpad,
-`/private/tmp/claude-501/-Users-vincent-shmem-over-ethernet/44ed3de5-63ca-4642-accd-f6d4600ccb60/scratchpad/probes/`
+`<scratchpad>/probes/`, a scratch directory outside the repository
 (`new/`, `sos/`, and the previous round's under `prev-a/` and `prev-b/`). The
 build in `osoe-load` was removed when the review finished; a refutation run
 rebuilds the tree (26 s) and the probes with its `oshcc`.

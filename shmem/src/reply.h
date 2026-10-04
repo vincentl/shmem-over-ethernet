@@ -236,7 +236,7 @@ struct osoe_credit {
  * the tier-1 tests of the connection compile it on its own. */
 static inline void osoe_credit_init(struct osoe_credit *c, uint32_t credits)
 {
-    atomic_store_explicit(&c->wake, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->wake, 0, memory_order_release);
     atomic_store_explicit(&c->state, credits, memory_order_release);
 }
 

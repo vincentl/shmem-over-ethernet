@@ -5,13 +5,14 @@
  * shmem_ctx_get_team, and the resolution every routine taking a handle goes
  * through (context.h).
  *
- * The thread level stays at most SHMEM_THREAD_SERIALIZED, so every context is
- * serial (§4.11, "Context modes"): one call on it at a time, which the
- * application guarantees. The options are recorded and mean what §4.11 says
- * they will: SERIALIZED and PRIVATE choose the serial mode a context has
- * anyway below MULTIPLE, PRIVATE also records its creating thread, which
- * alone may destroy it (spec §9.5.3), and NOSTORE lets fence and quiet on the
- * context skip the fence that orders the calling thread's stores (§4.6).
+ * Below SHMEM_THREAD_MULTIPLE every context is serial (§4.11, "Context
+ * modes"): one call on it at a time, which the application guarantees. Under
+ * MULTIPLE a context made without SERIALIZED or PRIVATE is shareable, and its
+ * issue takes no lock (phase 1 step 8's third slice; transport-am.c). The
+ * options mean what §4.11 says: SERIALIZED and PRIVATE choose the serial mode,
+ * PRIVATE also records its creating thread, which alone may destroy it (spec
+ * §9.5.3), and NOSTORE lets fence and quiet on the context skip the fence that
+ * orders the calling thread's stores (§4.6).
  *
  * A created context is destroyed by the program, by the destroy of the team
  * it was created from (spec §9.4.8, for a shareable one), or by the last
@@ -58,7 +59,9 @@ static struct osoe_context *pool;
 static uint32_t pool_count;
 /* Held while an element is claimed or given back, so that two threads creating
  * contexts at once (spec §9.5: creation is not collective) take different
- * ones; never across an operation or a wait. */
+ * ones, and while a team's destroy or the last finalize reads the pool for the
+ * contexts to end, which it drops around each; never across an operation or a
+ * wait. */
 static pthread_mutex_t pool_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static const long known_options = SHMEM_CTX_SERIALIZED | SHMEM_CTX_PRIVATE | SHMEM_CTX_NOSTORE;
@@ -260,25 +263,45 @@ OSOE_API int pshmem_ctx_get_team(shmem_ctx_t ctx, shmem_team_t *team)
     return 0;
 }
 
+/*
+ * The pool is read under its mutex, since another thread may claim or give
+ * back an element meanwhile (spec §9.2, §9.5: a context's creation is not
+ * collective; the review of step D's merge point, conformance F1). An element
+ * of this team's is this call's alone - no other thread may use a team's
+ * context across its destroy - so the mutex is dropped while it is destroyed,
+ * which takes it again, and the context's implicit quiet runs without it.
+ */
 void osoe_context_team_destroyed(const struct osoe_team *team, const char *routine)
 {
+    pthread_mutex_lock(&pool_mutex);
     for (uint32_t i = 1; i < pool_count; i++) {
         struct osoe_context *c = &pool[i];
         if (!c->live || c->descriptor != team)
             continue;
-        if (c->options & SHMEM_CTX_PRIVATE)
+        bool is_private = (c->options & SHMEM_CTX_PRIVATE) != 0;
+        pthread_mutex_unlock(&pool_mutex);
+        if (is_private)
             osoe_fatal("%s: context %p, created from %s with SHMEM_CTX_PRIVATE, is still live; "
                        "spec §9.4.8 requires the program to destroy it first", routine,
                        (void *)c, team->name);
         destroy(c, routine);
+        pthread_mutex_lock(&pool_mutex);
     }
+    pthread_mutex_unlock(&pool_mutex);
 }
 
+/* The last shmem_finalize's, likewise read under the mutex. */
 void osoe_context_finalize(void)
 {
-    for (uint32_t i = 1; i < pool_count; i++)
-        if (pool[i].live)
-            destroy(&pool[i], "shmem_finalize");
+    pthread_mutex_lock(&pool_mutex);
+    for (uint32_t i = 1; i < pool_count; i++) {
+        if (!pool[i].live)
+            continue;
+        pthread_mutex_unlock(&pool_mutex);
+        destroy(&pool[i], "shmem_finalize");
+        pthread_mutex_lock(&pool_mutex);
+    }
+    pthread_mutex_unlock(&pool_mutex);
 }
 
 /* The weak `shmem_` aliases (export.h). */

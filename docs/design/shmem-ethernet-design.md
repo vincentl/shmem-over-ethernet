@@ -4379,7 +4379,8 @@ Computed once at team creation, stored in the private team descriptor:
   node with eight PEs of which three are in team T has arrival target three.
 - **Node participation** — the internode tree spans only nodes with at least one
   member. Topology is per team. *As built (phase 1 step 7):* each member node's
-  block for the team's number holds the team's **record** (`node.h`) - its local
+  block for the team - found by the team's name since the team redesign's step
+  D (§5.7) - holds the team's **record** (`node.h`) - its local
   member count, and the O(*k*) of the tree over its sorted node list that the
   node needs, each neighbour named by its lead's rank - published before the
   team's first arrival anywhere; the progress thread and the internode backend
@@ -5030,17 +5031,19 @@ so it cannot perform a world-collective allocation.
 allocator. Three constraints resolve against one number — one thing to document,
 one place to fail loudly. *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`,
 default 64 (32 until 2026-09-26), between 4 and 1,024, read at each session's first init and agreed at
-the job rendezvous (§6.2) and between a node's PEs; it sizes each node's team
-blocks, each PE's published epochs, the internal region's per-team blocks
-(§5.8) and the progress thread's per-team state, and from the split that
-creates teams the control queue's term (§3.8).
+the job rendezvous (§6.2) and between a node's PEs; it sizes each PE's
+published epochs, the internal region's per-number blocks (§5.8) and a PE's
+mask of free numbers. A node's team blocks, the progress thread's per-team
+state and the control queue's term count `OSOE_TEAM_BLOCKS`, a node's pool,
+since the team redesign's step D (below; §3.8).
 
-**It counts team numbers job-wide, including the predefined teams' — not teams per
-PE — and a number is never reused within a session (below), so it bounds the teams
-a session creates in its life, not only those alive at once: 61 at the default.**
-*Until the team redesign's step D (below): since its second part `OSOE_MAX_TEAMS`
-counts the numbers one PE holds at once, a destroyed team gives its number back,
-and the control queue's term counts a node's pool of team blocks.*
+**It counts the team numbers one PE holds at once, the predefined teams'
+included, and a destroyed team gives its number back (step D, below)**: it
+bounds the teams a PE is in at once, 61 of its own at the default, not the teams
+a session makes in its life - and a split takes a number free on every member of
+the new team, so a PE can meet it holding fewer, when its team-mates hold the
+rest. *Until step D it counted numbers job-wide, never reused within a session,
+and so bounded the teams a session made in its life, 61 at the default.*
 The control-queue bound is per connection: the number of
 distinct teams whose trees use that node pair. `shmem_team_split_2d` can put `L`
 different teams on one node pair while each PE belongs to only two, so a per-PE
@@ -5104,7 +5107,9 @@ down, so that a created team's block index is seldom its number - never at
 the defaults - and a mix-up of the two shows at once; names it - lead, number, its local members as its
 holders, its generation raised; writes the record; lowers the node's low-water
 mark of published blocks, which bounds the progress thread's scan of arrival
-handoffs above the predefined three; and stores the map entry with release,
+handoffs above the predefined three (in this part: the second part replaced the
+mark by the posted bitmap, a bit a block behind a summary word, §3.10); and
+stores the map entry with release,
 before the split's sync, after which every member acquires it (`node.h`'s
 argument for the record, unchanged). The internode seam and the progress
 engine know a team by its block index (`internode.h`), node-local; a barrier
@@ -5861,7 +5866,7 @@ small for the node's heaps, among them. Three rules close it:
   bootstrap and init, before its node joins - until the review the lead alone
   checked seven, as it laid out the segment, and the leads alone the wire's -
   and a node's PEs are compared on every one that lays out the segment
-  (`OSOE_MAX_TEAMS`, `OSOE_MAX_CONTEXTS`, `OSOE_MAX_THREADS`,
+  (`OSOE_MAX_TEAMS`, `OSOE_TEAM_BLOCKS`, `OSOE_MAX_CONTEXTS`, `OSOE_MAX_THREADS`,
   `OSOE_COLLECTIVE_FANOUT`, `OSOE_COLLECTIVE_PIPELINE`,
   `OSOE_GET_LANDING_BYTES`, `SHMEM_SYMMETRIC_SIZE`), through `failed`. The
   agent's and the detector's (`OSOE_AGENT_SLICE_US`, `OSOE_AGENT_CPUS`,
@@ -6522,7 +6527,11 @@ one appears. Every AMO, `putmem`, `getmem`, `putmem_signal`, the signal updates,
 `shmem_team_t` and `shmem_ctx_t` are pointers to incomplete types, so passing a
 team where a context is expected is a compile error, and the predefined handles
 are small integers cast to those types. A created team's handle is the address
-of the library's descriptor for it (§5.7). A library that exported
+of the library's descriptor for it plus the descriptor's generation - how many
+times the PE has taken the team's number - times the size of the process's pool
+of descriptors, so that a destroyed team's handle is told from a later team's
+under the same number by arithmetic alone (§5.7; the team redesign's step D,
+D6). A library that exported
 `SHMEM_TEAM_WORLD` as data would be exporting a symbol outside the `shmem_`
 namespace the export test enforces, for no gain.
 

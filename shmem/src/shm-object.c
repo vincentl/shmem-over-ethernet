@@ -60,9 +60,19 @@ int osoe_shm_create(const char *name, long owner_offset, char *err, size_t errle
             pid = 0;                    /* shorter than the header: never initialized */
         close(old);
         if (pid > 0 && !(kill((pid_t)pid, 0) != 0 && errno == ESRCH)) {
-            snprintf(err, errlen, "/dev/shm%s already exists, and its creator, pid %d, is "
-                     "still running: is another job using these job and step ids?", name,
-                     (int)pid);
+            /* A creator with this process's own pid is none of this start's:
+             * the name was left from another PID namespace, where pids repeat,
+             * and no pid can judge it (the review of step D's merge point,
+             * portability Q2). */
+            if (pid == (int32_t)getpid())
+                snprintf(err, errlen, "/dev/shm%s already exists, its creator's pid %d this "
+                         "process's own: another PID namespace left it (a node's PEs must "
+                         "share one); if no job of these ids runs, rm -f "
+                         "/dev/shm/osoe.<job id>.*", name, (int)pid);
+            else
+                snprintf(err, errlen, "/dev/shm%s already exists, and its creator, pid %d, is "
+                         "still running: is another job using these job and step ids?", name,
+                         (int)pid);
             return -1;
         }
         /* A leftover of a job that died during init: its creator is gone, or

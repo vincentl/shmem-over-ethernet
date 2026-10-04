@@ -95,6 +95,53 @@ static bool team_label(const struct osoe_segment *s, uint32_t team, char *label,
     return true;
 }
 
+/*
+ * A created team's world ranks, which its record carries (decision E of
+ * 2026-09-26-day): with its number they tell it from any other team, alike on
+ * every node, where since the team redesign's step D teams with no PE in common
+ * may share a number (the review of step D's merge point, readiness Q5-2).
+ * `first` gets the first member's world rank - for SHMEM_TEAM_SHARED's family,
+ * which never leaves a node and records no progression, its local lead's, the
+ * lowest team rank on the node - and `ranks` a phrase for the dump. False for
+ * the predefined three, which have names, or a segment too old to say.
+ */
+static bool team_ranks(const struct osoe_segment *s, uint32_t team, uint32_t *first,
+                       char *ranks, size_t len)
+{
+    /* The predefined three are named - world, shared, finalize - where a
+     * created team's record carries its number as its name (team.c). */
+    char name[24];
+    if (osoe_segment_read_str(s, "team.record.name", team, name, sizeof name) && name[0] &&
+        strspn(name, "0123456789") != strlen(name))
+        return false;
+    uint64_t strided = 0, start = 0, members = 0, stride = 0;
+    if (!osoe_segment_read_name(s, "team.record.strided", team, &strided) ||
+        !osoe_segment_read_name(s, "team.record.world_start", team, &start) ||
+        !osoe_segment_read_name(s, "team.record.members", team, &members) ||
+        !osoe_segment_read_name(s, "team.record.world_stride", team, &stride))
+        return false;
+    if (!strided) {
+        uint64_t lead = 0, rank = 0;
+        if (!osoe_segment_read_name(s, "team.name.lead", team, &lead) ||
+            !osoe_segment_read_name(s, "pe.rank", (uint32_t)lead, &rank))
+            return false;
+        *first = (uint32_t)rank;
+        snprintf(ranks, len, "this node's, its lead world rank %u", *first);
+        return true;
+    }
+    int64_t step = (int64_t)stride;
+    *first = (uint32_t)start;
+    if (members <= 1)
+        snprintf(ranks, len, "world rank %u", *first);
+    else if (step == 1)
+        snprintf(ranks, len, "world ranks %u to %" PRId64, *first,
+                 (int64_t)start + (int64_t)(members - 1) * step);
+    else
+        snprintf(ranks, len, "world ranks %u to %" PRId64 " by %" PRId64, *first,
+                 (int64_t)start + (int64_t)(members - 1) * step, step);
+    return true;
+}
+
 /* Whether a team-scope metric is one of the record's child ranks past the
  * children it has: they are named team.record.child.<i>, as many as the
  * largest fan-out allows, and a team shows the ones its record holds. */
@@ -487,7 +534,7 @@ static void tree_line(const struct osoe_segment *s, uint64_t node, const char *h
         snprintf(missing_s, sizeof missing_s, "%" PRIu64, t->missing);
     if (t->parent != UINT32_MAX)
         snprintf(parent_s, sizeof parent_s, "%" PRIu64, t->parent);
-    printf("node %-3" PRIu64 " %-16s %2" PRIu64 "/%-2u live  %-8s epoch %" PRIu64
+    printf("node %-3" PRIu64 " %-16s %2" PRIu64 "/%-2u live  %-10s epoch %" PRIu64
            "/%-3" PRIu64 " own %-3s children %" PRIu64 "/%-2" PRIu64
            " next %-4s parent %-4s  %s\n",
            node, host, live, s->local_count, team, t->open, t->closed, t->own ? "yes" : "no",
@@ -540,7 +587,11 @@ static void summary_line(const struct osoe_segment *s)
         osoe_segment_blocked_detail(&b, what, sizeof what);
         if (age)
             print_duration(d, sizeof d, age);
-        snprintf(where, sizeof where, "PE%u %s (%s) %s", i, b.routine, what, d);
+        /* By world rank, as the deadlock detector's report and the PE lines
+         * name a PE - its local id is this node's alone. */
+        uint64_t rank = i;
+        osoe_segment_read_name(s, "pe.rank", i, &rank);
+        snprintf(where, sizeof where, "rank %" PRIu64 " %s (%s) %s", rank, b.routine, what, d);
     }
 
     bool first = true;
@@ -554,7 +605,16 @@ static void summary_line(const struct osoe_segment *s)
         if (!first && (nodes < 2 || (state.open == 0 && state.closed == 0)))
             continue;
         first = false;
-        tree_line(s, node, host, live, label, &state, where);
+        /* A created team as its number and its first member's world rank,
+         * "4@r1": the same on every node, and two teams under one number told
+         * apart (team_ranks). */
+        char shown[40], ranks[64];
+        uint32_t first_rank;
+        if (team_ranks(s, t, &first_rank, ranks, sizeof ranks))
+            snprintf(shown, sizeof shown, "%s@r%u", label, first_rank);
+        else
+            snprintf(shown, sizeof shown, "%s", label);
+        tree_line(s, node, host, live, shown, &state, where);
     }
     if (!first)
         return;
@@ -763,11 +823,15 @@ static void dump_human(const struct osoe_segment *s)
             continue;
         uint32_t number = team_number(s, t);
         uint64_t generation = 0;
+        char ranks[64], of[80] = "";
+        uint32_t first_rank;
+        if (team_ranks(s, t, &first_rank, ranks, sizeof ranks))
+            snprintf(of, sizeof of, " of %s,", ranks);
         if (osoe_segment_read_name(s, "team.name.generation", t, &generation))
-            printf("\n  team %s (number %u) in block %u, generation %" PRIu64 "\n", label,
-                   number, t, generation);
+            printf("\n  team %s (number %u)%s in block %u, generation %" PRIu64 "\n", label,
+                   number, of, t, generation);
         else
-            printf("\n  team %s (number %u)\n", label, number);
+            printf("\n  team %s (number %u)%s\n", label, number, of);
         for (uint32_t i = 0; i < s->nmetrics; i++) {
             if (s->metrics[i].scope != OSOE_MSCOPE_TEAM || beyond_children(s, &s->metrics[i], t))
                 continue;

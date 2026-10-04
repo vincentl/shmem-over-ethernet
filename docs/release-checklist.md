@@ -79,8 +79,8 @@ done; an open one, what is left.
   the tree, and the history still carries what the tree no longer does. The
   author decided on 2026-10-04: the whole history, as it is, as the record of
   the AI-assisted development (`docs/decisions/2026-10-04.md` item 2, with the
-  scan behind it). Left before the first push: whether the commits keep the
-  author's personal address, which only a rewrite could change.
+  scan behind it). The commits keep the author's address, and the public
+  repository is named `shmem-over-ethernet` (the same record, item 4).
 
 ## After the release
 
@@ -110,6 +110,43 @@ blocks the tag.
   declared (M5).
 - **A test past 16 logical nodes** of the global exit and a proved deadlock
   (scale, minor 1).
+- **Six of round four's minors** that this list had dropped (the review of step
+  D's merge point, readiness): `OSOE_JOB_SECRET` not marked *checked* in the
+  README's table; `SHMEM_INFO`'s subset; `oshcc -O2 -show`, the wrapper taking
+  `-show` only as its first argument; `--static`; `osoe-launch` never printing
+  the job id; `transport.h:536-539`'s sentence.
+- **From the review of step D's merge point**
+  (`docs/reviews/archive/phase1-step7-slice3-review.md`), each rated after the
+  release or minor:
+  - the release hold of a team's local release (design §3.8) has no test and no
+    model: the correctness read's probe - a node stopped while 32 MiB streams
+    to it - shows it engaging, and its removal ending the job (G1);
+  - a PE's descriptor generation for a team number is 32 bits: taking one number
+    2^32 - 1 times ends the job at the next split - hours on one PE, days on
+    several (conformance F2, scale T2); 64 bits, or a generation that wraps;
+  - `osoe-stat`'s counters view keeps 64 PEs a node (readiness), and a split
+    waiting on another thread's pending number shows as `(+0xN)` there, wanting
+    a blocked-record kind of its own;
+  - a split called with other arguments on the PEs of one node is silent, and
+    across nodes a proved deadlock: two more words in its reduction, a hash of
+    the arguments and its complement, would fail it alike on every PE;
+  - a busy round runs again at once, spinning a one-node parent's PEs (scale
+    minor 4); 257 leads claiming at once start on one bitmap word; the
+    engine's team array is zeroed twice (`progress.c:1141`), more than half of
+    a block's 570 bytes on the lead;
+  - nothing asserts that the shared 64-bit atomics are lock-free, and step D's
+    four models run under sequential consistency only (portability Q4);
+  - `posted_bitmap_model.py`'s ORDER check is reached by no listed breakage,
+    and `take_arrival`'s comparison with the consumed word is redundant
+    (correctness G3);
+  - round two's C5, `iput` with a stride, dropped from the README and this list
+    (conformance M2);
+  - a start-up check that a node's PEs share one PID namespace (portability Q2,
+    the refutation's sketch): each PE's `/proc/self/ns/pid` device and inode in
+    its slot, compared by the lead at the join and refused by name - a layout
+    change - which would turn a missed death and a false one into a refusal;
+    and the deadlock detector reads node-mates' `/proc/<pid>/task`, which across
+    namespaces names another process.
 - **A team of one PE claims no pool block**, maps no name and publishes its
   epoch word without a block: a `split_2d` with `xrange` 1 makes one per PE, so
   on a node of 256 PEs four of them empty the default pool (step D's second

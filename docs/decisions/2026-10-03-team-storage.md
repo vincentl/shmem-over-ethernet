@@ -63,7 +63,7 @@ no protocol - a message means the same team before and after, so
    claimed and did not do. The JSON's `number` is the team's number, with `block`
    and `epochs` beside it.
 10. **The README** (the `OSOE_TEAM_BLOCKS` row; the limit of teams a node holds,
-    with its temporary end) and **the design** (§5.7's account of the pool; §3.12's
+    with its temporary end) and **the design** (§5.7's account of the pool; §3.10's
     of the arrival scan).
 
 ## The author's answers (the brief's "a test that must change in Part 1")

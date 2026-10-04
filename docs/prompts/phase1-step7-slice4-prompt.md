@@ -117,6 +117,41 @@ The author's goals, the axes to judge the work by:
   older records.
 - The host disk is near full; remove each part's worktree once it has merged.
 
+## From the review of D's merge point
+
+The review of the tree D left (`docs/reviews/archive/phase1-step7-slice3-review.md`)
+kept apart what its investigators saw of this step. Each point is this brief's
+to take:
+
+- **The grant's guard against an earlier team** (correctness): a grant's epoch
+  and identity cannot tell the last grant of a team destroyed under a number
+  from the first of the next team under it, since epochs start again at 1 and
+  the number is the same; zeroing the grant line when a PE takes the number
+  again is the only guard. So a mutation that leaves the line unzeroed must
+  fail a test - a team reuse that reaches it - beside Part 1's other mutations.
+- **The band where the grant's hop is not paid back** (scale): a reduction of
+  1 to 16 KiB is large at the default `OSOE_SMALL_COLLECTIVE_BYTES` and too few
+  pieces to hide a hop - by arithmetic a fifth to a third more time on the
+  Pi - and NPB IS sums 4,116 bytes every iteration. Part 2's measurements take
+  2, 4, 8 and 16 KiB besides the proposal's sizes: the scale read's probe,
+  `q3d-band.c` (its `/tmp/q3d/probe/` in the `osoe` VM; build it with `oshcc`
+  on D's tree and on E's, `srun -K1 -N4 --ntasks-per-node=4 ./q3d-band`,
+  alternately), holds E to its claim if the 8-byte and 32 KiB lines do not
+  move and the 2 to 16 KiB lines move by at most a hop, some 80 µs there. Its
+  baseline on D in the VM: 194 to 233 µs for 1 to 16 KiB at 4 x 1, 310 to 358
+  µs at 4 x 4.
+- **The class rule's premise** (conformance): every lead decides a collective's
+  class from its bytes alike, which rests on every PE passing the same
+  `nelems`; the specification states that outright only for `alltoall`,
+  `alltoalls` and `fcollect`, and implies it for the rest. A program that
+  breaks it is outside the specification either way; the README's Limits
+  should say what it meets.
+- **The numbers' reach at 256** (conformance, readiness): the README's sentence
+  on the 70-PE programs that keep a team a round says from what size they skip
+  rounds again - above 253 PEs - rather than "temporary"; and a split's number
+  being free on every member stays the rule at 256 - every pair of 129 PEs made
+  a team in a double loop fails at a pair holding 127 and 126.
+
 ## How to work
 
 - **A branch and a worktree a part** (`build/scratch/wt/<branch>`, `git
@@ -259,7 +294,10 @@ transport.
    through each member's lane, a member granting its tree children as it
    enters; a large scan's piece becomes the lane's 16 KiB where it is 4 KiB
    today. `osoe_internode_scan` is already every member's call at entry.
-3. **`OSOE_MAX_TEAMS` defaults to 256** (E10, D8): the README row as E10
+3. **`OSOE_MAX_TEAMS` defaults to 256** (E10, D8), and `OSOE_TEAM_BLOCKS` keeps
+   its 1,024 (the author, `docs/decisions/2026-10-04.md` item 3): the README's
+   sentence on a grid's cost in blocks gives the numbers' new reach beside the
+   pool's, thirty grids becoming 126. The README row as E10
    writes it, the *temporary* sentences D left replaced (the Limits bullet's
    200 KiB, the release note's line on the default), `SHMEM_INFO`'s text, the
    decisions index's settings lines, and the `/dev/shm` capacity check's sum,

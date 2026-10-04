@@ -150,7 +150,7 @@ replaced the first build's (below, "The adversarial read").
    smallest pool (`1 + 1 + 3 × 8`).
 11. **The records**: design §5.7 (the second part's account, the old "ranges
     leak" paragraph made history), §5.2 (the lead's name), §3.8 (the bound),
-    §3.12 (the scan and the handoff), §10 (the question on `split_2d`'s numbers
+    §3.10 (the scan and the handoff), §10 (the question on `split_2d`'s numbers
     closed); the README's team limits, its cost table and settings rows; the
     `SHMEM_INFO` text; the comments a sweep of every per-number state found
     saying the opposite.

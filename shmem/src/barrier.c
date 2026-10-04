@@ -124,7 +124,7 @@ void osoe_internode_released(uint32_t team, uint32_t epoch)
     if (!osoe_epoch_release_bump_eq(&b->released, epoch))
         osoe_fatal("the internode release for %s arrived for epoch %u out of order: "
                    "the PEs of this job called different numbers of collectives",
-                   osoe_team_label(atomic_load_explicit(&b->name.number, memory_order_relaxed),
+                   osoe_team_label(atomic_load_explicit(&b->name.number, memory_order_acquire),
                                    label, sizeof label), epoch);
     osoe_epoch_release_wake(&b->released, epoch);
 }

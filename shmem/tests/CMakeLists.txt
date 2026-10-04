@@ -45,6 +45,15 @@ add_test(NAME shmem.boundary
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckBoundary.cmake)
 set_tests_properties(shmem.boundary PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# Design §3.16's rule: every atomic access in the library names acquire,
+# release or seq_cst - no `relaxed`, no call without `_explicit`. Step D added
+# 37 relaxed accesses that all four presets passed; the review of its merge
+# point found them (CheckMemoryOrders.cmake).
+add_test(NAME shmem.memory-orders
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckMemoryOrders.cmake)
+set_tests_properties(shmem.memory-orders PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 # A static build is not one of the four presets (none sets BUILD_SHARED_LIBS),
 # so this proves it on its own: a nested configure and build of libosoe as a
 # static archive, then a link of a tiny consumer against that archive alone -
@@ -377,9 +386,10 @@ osoe_refusal_test(shmem.job.disagree.fanout 3 0
            "node 2: the rendezvous lost node 0, its parent in the rendezvous tree"
   PROGRAM $<TARGET_FILE:shmem_test_job>)
 
-# OSOE_MAX_TEAMS is agreed the same way (§5.7): team numbers are job-wide, and
-# a node counting to another number lays its team state out differently. Two
-# nodes, the second's lead given 128 teams to the first's default 64.
+# OSOE_MAX_TEAMS is agreed the same way (§5.7): a split reduces every parent
+# PE's mask of numbers, which must be one length, and it lays out each PE's
+# internal region, whose offsets every node must compute alike. Two nodes, the
+# second's lead given 128 numbers to the first's default 64.
 osoe_refusal_test(shmem.job.disagree.max-teams 2 0
   LAUNCH -n 2 -m 0,1 -e 1:OSOE_MAX_TEAMS=128
   PATTERNS "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=128; node 0 has 64"
@@ -2069,12 +2079,12 @@ function(osoe_team_split_mode mode label launch environment pass)
 endfunction()
 set(osoe_team_split_exhaust_environment OSOE_MAX_TEAMS=8 SHMEM_SYMMETRIC_SIZE=16m)
 set(osoe_team_split_exhausted
-  "PE 0: shmem_team_split_2d: no two team numbers are free on every PE of the new teams: OSOE_MAX_TEAMS is 8, the teams one PE may be in at once.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team: OSOE_MAX_TEAMS is 8.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team: OSOE_MAX_TEAMS is 8.*every check of this mode passed")
+  "PE 0: shmem_team_split_2d: no two team numbers are free on every PE of the new teams - between them they hold all but at most one of those a program may use, though each may hold fewer: OSOE_MAX_TEAMS is 8, the teams one PE may be in at once.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team - between them they hold every one a program may use, though each may hold fewer: OSOE_MAX_TEAMS is 8.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team - between them.*OSOE_MAX_TEAMS is 8.*every check of this mode passed")
 set(osoe_team_split_full "every check of this mode passed")
 osoe_team_split_mode(exhaust L4 "-n;4" "${osoe_team_split_exhaust_environment}"
   "${osoe_team_split_exhausted}")
 osoe_team_split_mode(too-many L4 "-n;4" "OSOE_MAX_TEAMS=4;SHMEM_SYMMETRIC_SIZE=16m"
-  "PE 0: shmem_team_split_2d: no two team numbers are free on every PE of the new teams: OSOE_MAX_TEAMS is 4.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team: OSOE_MAX_TEAMS is 4.*every check of this mode passed")
+  "PE 0: shmem_team_split_2d: no two team numbers are free on every PE of the new teams - between them.*OSOE_MAX_TEAMS is 4.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team - between them.*OSOE_MAX_TEAMS is 4.*every check of this mode passed")
 osoe_team_split_mode(dry L2 "-n;2" "OSOE_TEAM_BLOCKS=8;SHMEM_SYMMETRIC_SIZE=16m"
   "PE 0: shmem_team_split_strided: node 0 [(][^)]*[)] has no team block left for the new team this PE would lead there: OSOE_TEAM_BLOCKS is 8, the teams a node may hold at once.*PE 0: shmem_team_split_strided: node 0 [(][^)]*[)] has no team block left.*PE 0: shmem_team_split_2d: node 0 [(][^)]*[)] has no team block left.*every check of this mode passed")
 osoe_team_split_mode(full L4 "-n;4" "SHMEM_SYMMETRIC_SIZE=1m" "${osoe_team_split_full}")
@@ -2197,6 +2207,13 @@ osoe_tier2_map_test(team-threads 0,1,2)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(team-threads 0,0,1,1)
 endif()
+
+# A team's destroy on one thread while another creates and destroys contexts,
+# under SHMEM_THREAD_MULTIPLE (test-context-team-destroy.c): the destroy's scan
+# of the context pool now holds the pool's mutex, which the tsan preset shows
+# missing otherwise (the review of step D's merge point, conformance F1).
+osoe_tier2_test(context-team-destroy)
+target_link_libraries(shmem_test_context-team-destroy PRIVATE Threads::Threads)
 
 # Splits whose parent PEs ask for different thread levels (test-team-levels.c):
 # PE 0 SHMEM_THREAD_MULTIPLE, the rest shmem_init's SERIALIZED, every parent PE

@@ -506,15 +506,26 @@ static void mode_passed(void)
         fprintf(stderr, "PE 0: every check of this mode passed\n");
 }
 
-/* Whether a split's status says it made the team, alike on every PE. */
-static void check_made(int status, shmem_team_t team)
+/* Whether a split's status says it made the team, alike on every PE. A
+ * macro, so that the split returns before its handle is read: as arguments
+ * of one call the two are indeterminately sequenced (C11 6.5.2.2p10), and
+ * GCC for x86-64 reads the handle first. */
+#define check_made(split, team) do {                                           \
+        int split_status = (split);                                             \
+        check_made_status(split_status, (team));                                \
+    } while (0)
+static void check_made_status(int status, shmem_team_t team)
 {
     CHECK(status == 0 && team != SHMEM_TEAM_INVALID && statuses_agree(status));
 }
 
 /* Whether a split's status says it failed, alike on every PE, and left the
- * handles it was given SHMEM_TEAM_INVALID. */
-static void check_failed(int status, shmem_team_t x, shmem_team_t y)
+ * handles it was given SHMEM_TEAM_INVALID; a macro as check_made is. */
+#define check_failed(split, x, y) do {                                         \
+        int split_status = (split);                                             \
+        check_failed_status(split_status, (x), (y));                            \
+    } while (0)
+static void check_failed_status(int status, shmem_team_t x, shmem_team_t y)
 {
     CHECK(status != 0 && x == SHMEM_TEAM_INVALID && y == SHMEM_TEAM_INVALID &&
           statuses_agree(status));

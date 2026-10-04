@@ -269,6 +269,18 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     RECORD_CHILD(28), RECORD_CHILD(29), RECORD_CHILD(30), RECORD_CHILD(31),
     { "team.record.name", "", OSOE_MTYPE_STRING, OSOE_MKIND_STATE, OSOE_MSCOPE_TEAM,
       (uint16_t)sizeof(((struct osoe_team_record *)0)->name), (uint32_t)BLOCK_RECORD(name), 0 },
+    /* The team's world ranks (decision E of 2026-09-26-day): its members, the
+     * first one's rank and the stride between them when `strided` is 1, a
+     * progression; SHMEM_TEAM_SHARED's family, which never leaves a node,
+     * records 0. With its number they name a team alike on every node, which
+     * the number alone has not since the team redesign's step D gave numbers
+     * back (osoe-stat labels a team by both; the review of step D's merge
+     * point, readiness Q5-2). */
+    TEAM("team.record.members", BLOCK_RECORD(members)),
+    TEAM("team.record.world_start", BLOCK_RECORD(world_start)),
+    { "team.record.world_stride", "", OSOE_MTYPE_I32, OSOE_MKIND_STATE, OSOE_MSCOPE_TEAM, 4,
+      (uint32_t)BLOCK_RECORD(world_stride), 0 },
+    TEAM("team.record.strided", BLOCK_RECORD(strided)),
     /* The block's name in the pool (layout 29; the team redesign's step D):
      * the local id of the team's local lead here and its number, which the map
      * finds the block by; the local members holding it; and its generation,

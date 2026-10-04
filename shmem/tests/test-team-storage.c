@@ -505,6 +505,19 @@ static void check_stat(const uint32_t *node_of, uint32_t nodes, const uint32_t *
     CHECK(says(out, "team 3 (number 3)"));
     CHECK(says(out, "team.3.tree.epoch_open"));
     CHECK(says(out, "team 4 (number 4)"));
+    /* With the world ranks each record carries, which name a team alike on
+     * every node (osoe-stat's team_ranks; the review of step D's merge point,
+     * readiness Q5-2). */
+    char ranks[96];
+    if (npes > 1) {
+        snprintf(ranks, sizeof ranks, "team 3 (number 3) of world ranks 0 to %d,", npes - 1);
+        CHECK(says(out, ranks));
+        snprintf(ranks, sizeof ranks, "team 4 (number 4) of world ranks %d to 0 by -1,",
+                 npes - 1);
+        CHECK(says(out, ranks));
+    } else {
+        CHECK(says(out, "team 3 (number 3) of world rank 0,"));
+    }
     check_record(out, "3", local, nodes, lowest_of);
     check_record(out, "4", local, nodes, highest_of);
     char label[16];
@@ -513,10 +526,65 @@ static void check_stat(const uint32_t *node_of, uint32_t nodes, const uint32_t *
 
     CHECK(run_stat("--summary", out, sizeof out) == 0);
     CHECK(summary_has(out, osoe.job.node, "world"));
+    /* A created team that spans nodes and has run, as its number and its first
+     * member's world rank. */
+    if (nodes > 1) {
+        CHECK(summary_has(out, osoe.job.node, "3@r0"));
+        snprintf(ranks, sizeof ranks, "4@r%d", npes - 1);
+        CHECK(summary_has(out, osoe.job.node, ranks));
+    }
     /* The finalize team has run once, at the first finalize: on a job of
      * several nodes its tree has closed an epoch, and it has a line too. */
     if (nodes > 1)
         CHECK(summary_has(out, osoe.job.node, "finalize"));
+}
+
+/*
+ * Two teams with no PE in common may share a number (step D, D1), and
+ * osoe-stat must still tell them apart (the review of step D's merge point,
+ * readiness Q5-2): the even ranks and the odd ranks, each split from the world,
+ * agree the same lowest free number - every PE holds the same numbers here -
+ * and the summary labels each by that number and its first world rank, 0 and
+ * 1, on every node with a member of it. Run once every team above has run, on
+ * a job of several nodes and four PEs or more, so that both span nodes.
+ */
+static void check_shared_number(const uint32_t *node_of, uint32_t nodes)
+{
+    if (npes < 4 || nodes < 2 || osoe.job.force_remote)
+        return;
+    shmem_team_t even = SHMEM_TEAM_INVALID, odd = SHMEM_TEAM_INVALID;
+    CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 2, (npes + 1) / 2, NULL, 0,
+                                         &even) == 0);
+    CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_WORLD, 1, 2, npes / 2, NULL, 0, &odd) == 0);
+    shmem_team_t mine = me % 2 ? odd : even;
+    CHECK_FATAL(mine != SHMEM_TEAM_INVALID);
+    CHECK((me % 2 ? even : odd) == SHMEM_TEAM_INVALID);
+    int *number = shmem_malloc(3 * sizeof *number);
+    CHECK_FATAL(number != NULL);
+    number[0] = (int)osoe_team_of("test-team-storage", mine)->number;
+    CHECK(shmem_int_max_reduce(SHMEM_TEAM_WORLD, &number[1], &number[0], 1) == 0);
+    CHECK(shmem_int_min_reduce(SHMEM_TEAM_WORLD, &number[2], &number[0], 1) == 0);
+    CHECK(number[1] == number[2]);
+    shmem_team_sync(mine);
+    shmem_barrier_all();
+    if (osoe.bootstrap.local_id == 0) {
+        static char out[256 * 1024];
+        bool even_here = false, odd_here = false;
+        for (int r = 0; r < npes; r++)
+            if (node_of[r] == osoe.job.node)
+                *(r % 2 ? &odd_here : &even_here) = true;
+        CHECK(run_stat("--summary", out, sizeof out) == 0);
+        char label[32];
+        snprintf(label, sizeof label, "%d@r0", number[0]);
+        if (even_here)
+            CHECK(summary_has(out, osoe.job.node, label));
+        snprintf(label, sizeof label, "%d@r1", number[0]);
+        if (odd_here)
+            CHECK(summary_has(out, osoe.job.node, label));
+    }
+    shmem_barrier_all();
+    shmem_team_destroy(mine);
+    shmem_free(number);
 }
 
 int main(void)
@@ -562,6 +630,7 @@ int main(void)
     if (osoe.bootstrap.local_id == 0)
         check_stat(node_of, nodes, lead_of, lowest_of, highest_of);
     shmem_barrier_all();
+    check_shared_number(node_of, nodes);
 
     /* A destroyed team's record goes with its block (step D): team 4 is gone
      * from the dump once every member here has left it, and team 3 is not. */

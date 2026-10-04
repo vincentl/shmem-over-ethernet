@@ -116,9 +116,10 @@ checks of the build itself and jobs of a few processes. On four cores of an idle
 virtual machine it took about eight and a half minutes, one for the build and
 seven and a half for the tests. Both may run four at a time, as this project's
 own runs do (`cmake --build --preset release -j4`, `ctest --preset release
--j4`). The 24 tests of the model checker (`tools/modelcheck`, which needs Python
-3) took 29 minutes in the development VM, one at a time, and check the design,
-which does not vary with the machine. They have a label of their own, `model`,
+-j4`). The 28 tests of the model checker (`tools/modelcheck`, which needs Python
+3) took 15 minutes in the development VM four at a time, the longest of them,
+`model.abort`, 14 of those, and check the design, which does not vary with the
+machine. They have a label of their own, `model`,
 which the `release` preset leaves out and the `models` preset runs alone, in the
 same build:
 
@@ -150,8 +151,30 @@ is 2), and container runtimes' default seccomp profiles refuse it: Docker 25 and
 later and containerd 2.0 and later with `EPERM`, for which the message names
 the sysctl even though it reads 0 inside the container, and Podman with
 `ENOSYS`. There jobs on one node run, but the test suite's multi-node tests,
-about 300 of them, fail at `shmem_init` or at opening a ring. Set the sysctl to
+about 320 of them, fail at `shmem_init` or at opening a ring. Set the sysctl to
 0 as root, or run the container with a seccomp profile that allows io_uring.
+Container runtimes also give a container 64 MiB of `/dev/shm` unless asked for
+more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) - less than
+one PE needs at the default heap of 256 MiB - so at their defaults even a job of
+one PE is refused at start-up, naming the sizes, and about 540 of the suite's
+tests fail. Give the container a `/dev/shm` of its own, about 300 MiB for
+each PE of the node at the default heap, or lower `SHMEM_SYMMETRIC_SIZE`,
+rather than the host's (`--ipc=host`), which outlives the container.
+
+A node's PEs must share one PID namespace and one `/dev/shm`: they meet in
+`/dev/shm`, and osoe watches a node's PEs, and judges what a failed start left
+there, by process id. Run one container a node with all its PEs inside it, or
+containers that keep the host's PID namespace and `/dev/shm` - Apptainer's
+default, not its `--pid` or `--containall`. With a PID namespace for each PE, a
+PE killed by a signal - a crash, the OOM killer - goes unnoticed where the
+namespaces repeat its pid, as identical containers do, and the others wait until
+the launcher ends the step (`srun -K1`), or for ever; where the pids differ, a
+live PE is taken for dead and the job ends at once; with a
+`/dev/shm` for each, the start waits for ever. Where `/dev/shm` outlives a
+container (`--ipc=host`), a start killed with its container leaves names that
+`osoe-stat --gc` cannot judge, and that make a later start by the same ids fail
+- saying another PID namespace left them, where the pids repeat: remove them with
+`rm -f /dev/shm/osoe.<job id>.*`.
 
 ### Developing on macOS
 
@@ -334,6 +357,9 @@ osoe-stat --summary 1234  # each team's collective in progress, to walk a hang d
 
 A job that hangs shows, for every PE, the routine it is blocked in, the
 collective's epoch - how many collectives its team has begun - and for how long.
+The summary names a team you made by its number and its first member's world
+rank - `4@r1` - since teams with no PE in common may share a number, and a
+blocked PE by its world rank.
 A job that deadlocks - every PE waiting in the library, with nothing in flight
 between its nodes - ends by itself after `OSOE_DEADLOCK_SECONDS` and prints the
 same, node by node (below); a hang the library cannot prove, such as a PE
@@ -396,7 +422,8 @@ computing for ever, is what `osoe-stat` is for.
 - **Launched by Slurm's `srun`, with no PMI library**: nodes find each other
   over TCP from what the step's environment says.
 - **Loud, never hung.** A PE or a node that dies ends the whole job with a
-  message naming it. No wait gives up merely because time has passed; a job
+  message naming it, provided the node's PEs share a PID namespace, which
+  separate containers can break (Building). No wait gives up merely because time has passed; a job
   proved deadlocked ends, naming where each PE waits, and a job told to
   (`OSOE_NO_PROGRESS_TIMEOUT`) ends a wait on the library's own progress that
   has stopped moving, and says what it waited for. Loud stops where the library
@@ -456,7 +483,7 @@ computing for ever, is what `osoe-stat` is for.
 | `collect` | the PEs' lengths first, as one vector of 8 bytes a PE, summed through the node leads' tree, then the data as `fcollect`'s | the data as `fcollect`'s; the lengths O(N) bytes up the tree and down it, 1 MB at 128,000 PEs |
 | prefix scans | a tree over the team's ranks, its pieces pipelined as the other data collectives' are | O(log N) rounds |
 | `alltoall`, `alltoalls` | every block put directly, then a barrier | O(N) a PE - inherent: every PE has a block for every other |
-| a team | a number agreed by one reduction over the parent of every member's free numbers, the same on all of them, and a block from each member node's pool, given back at destroy | the reduction of `OSOE_MAX_TEAMS` / 64 words - about what one broadcast costs - and a second, of one word, when any PE of the parent has `SHMEM_THREAD_MULTIPLE`; O(P) a member, testing its node's PEs; on each node's lead, O(M) once to find the team's nodes from its members - O(M log M) when they are not met in node order - and the S leads kept |
+| a team | a number agreed by one reduction over the parent of every member's free numbers, the same on all of them, and a block from each member node's pool, given back at destroy | the reduction of `OSOE_MAX_TEAMS` / 64 words - about what one broadcast costs - and a second, of one word, when any PE of the parent has `SHMEM_THREAD_MULTIPLE`, then a sync of the parent: about a broadcast and a barrier, and a destroy a barrier of the team; O(P) a member, testing its node's PEs; on each node's lead, O(M) once to find the team's nodes from its members - O(M log M) when they are not met in node order - and the S leads kept |
 | waiting | a futex word per resource a connection has, shared by the node's PEs; one per thread for its replies and watches, per PE for its agent and its landing zone, per context for its counters | O(1) a waiter |
 | start-up | the node leads' rendezvous tree, then their mesh | ⌈log₈ n⌉ levels, then n - 1 connections a lead, made one after another |
 | `SHMEM_THREAD_MULTIPLE` | threads issue on a shared context without a lock; every wait that completes its operations - a quiet, `shmem_pe_quiet`, a strided get's end, and the quiet a barrier or `shmem_clear_lock` makes - takes the context's, and one shares a full quiet that began and ended while it waited for it | O(1) an operation |
@@ -483,12 +510,18 @@ specification or takes a choice the specification leaves open.
 
 - **A PE is in at most `OSOE_MAX_TEAMS` teams at once** (64 by default, 1,024
   at most), the three predefined among them - the world, the node's shared team,
-  and one the library keeps for `shmem_finalize` - so a program can hold 61
-  teams of its own on every PE. A destroyed team gives its number back to each
+  and one the library keeps for `shmem_finalize` - so no PE holds more than 61
+  teams of its own. A destroyed team gives its number back to each
   of its members. A split takes, on every member of each team it creates, one
   number free on all of them: `shmem_team_split_strided` one, and a whole-job
-  `shmem_team_split_2d` two, every row the one and every column the other. A
-  split of `SHMEM_TEAM_SHARED` on every node, which is a separate split on each,
+  `shmem_team_split_2d` two, every row the one and every column the other. So
+  it is what a new team's members hold between them that runs out, not what
+  each holds: teams made by splitting one another, or sharing no PE, line their
+  numbers up and reach 61 a PE, where teams that overlap otherwise can fail
+  sooner, as the order they are made in has it - making every pair of 33 PEs a
+  team in a double loop fails at a pair holding 31 and 30, where the same pairs
+  made a round of disjoint pairs at a time reach 61. A larger `OSOE_MAX_TEAMS`
+  moves the failure out. A split of `SHMEM_TEAM_SHARED` on every node, which is a separate split on each,
   takes one number on each PE, and any number of nodes get their team. With no
   number free on every member a split returns nonzero on every PE of its parent
   team, as the specification allows for a split that cannot be made, and the
@@ -498,8 +531,15 @@ specification or takes a choice the specification leaves open.
 - **A node holds at most `OSOE_TEAM_BLOCKS` teams at once** (1,024 by default),
   the three predefined among them, a team of members on several nodes counting
   once on each, and a team of one PE counting too. A split that would make one
-  more on a node returns nonzero on every PE of its parent team, a PE of that
-  node saying why, naming the variable and the node. A team destroyed before
+  more on a node returns nonzero on every PE of its parent team, each PE whose
+  claim of a block there failed saying why, naming the variable and the node. A
+  grid of the whole job takes the most: a `shmem_team_split_2d` whose rows are a
+  node long or longer gives each of a node's P PEs a column of its own, a block
+  each, and with its rows takes P + 1 of the node's blocks - three such grids
+  fill the default pool at 256 PEs a node, where the numbers would allow thirty
+  - and a team per local rank takes P a family. A block costs a kilobyte of
+  `/dev/shm`, allocated at start, and about 600 bytes of memory on the node's
+  first PE. A team destroyed before
   the split - on each node, by the PE that would lead the new team there, or by
   PEs of the split's parent that are all of the team's members there - has
   given its place back for it, although a destroy returns before every member
@@ -631,8 +671,9 @@ specification or takes a choice the specification leaves open.
 
 **Failures**
 
-- **A PE or a node that dies ends the whole job**, with a message naming it.
-  There is no fault tolerance.
+- **A PE or a node that dies ends the whole job**, with a message naming it,
+  provided the node's PEs share a PID namespace, which separate containers can
+  break (Building). There is no fault tolerance.
 - **A process that leaves without calling `shmem_finalize` ends the job.** The
   specification has a program end its use of the library with `shmem_finalize`
   or `shmem_global_exit`, and a PE that simply returned from `main` would leave
@@ -779,14 +820,16 @@ that one could be added without touching the OpenSHMEM layer.
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
   run before every merge, on the exact tree that merges: more than 650 tests in
-  release, and the model checker's 24 tests beside them, which run in that build
+  release, and the model checker's 28 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
 - **Model checking.** Every lock-free and futex protocol but one - waking the
   progress thread, waits, the barrier tree, pipelined collectives, Bruck's
   allgather, the scans, get completion under `SHMEM_THREAD_MULTIPLE`,
-  rendezvous, abort, and the proof a deadlock is found by - is checked
+  rendezvous, abort, the proof a deadlock is found by, and the teams' - a team
+  block's life, a split's pending numbers, a pool found empty, the posted
+  arrivals - is checked
   exhaustively in small configurations by an explicit-state model checker
   written for them (`tools/modelcheck`). Six of the models, those of the
   `SHMEM_THREAD_MULTIPLE` designs, run only in a build configured with
@@ -813,7 +856,8 @@ that one could be added without touching the OpenSHMEM layer.
   stops it by name), and one asks `shmem_align` for an alignment the
   specification leaves undefined. At 70 PEs, programs that make a team a round
   and keep them all, such as `reduce_active_set` and `repeated_barriers`, skip
-  their last nine rounds without saying so: their last PE would be in 70 teams,
+  their last nine rounds, the programs saying nothing and the library a line for
+  each, naming `OSOE_MAX_TEAMS`: their last PE would be in 70 teams,
   more than the 61 of its own a PE may hold at the default `OSOE_MAX_TEAMS`
   (Limits; temporary, until the default rises to 256).
 - **Applications**: ISx, NPB IS, the Parallel Research Kernels and the
@@ -887,7 +931,7 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_MAX_TEAMS` | `64` | Teams one PE may be in at once, the three predefined teams included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team gives its number back. Each number costs every PE about 200 KiB of address space at the default fan-out and pipeline depth: 160 KiB that only a team's leads touch and 40 KiB, for the scans, that every member of a team that scans does (*temporary*: the team work's second step makes it about 15 KiB, and the default 256). *Checked*. |
-| `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, about a kilobyte each, from which a created team's local lead on each node takes one, and to which the last of its members there gives it back. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
+| `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, a kilobyte each of `/dev/shm`, allocated at start, and about 600 bytes each of the memory of the node's first PE, from which a created team's local lead on each node takes one, and to which the last of its members there gives it back. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
 | `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
 | `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. *Checked* among a node's PEs. |
 | `OSOE_GET_LANDING_BYTES` | `262144` | Bytes of each PE's landing zone for the replies of its gets from other nodes, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. *Checked* among a node's PEs. |
@@ -928,7 +972,7 @@ moves every message of the node
 | `OSOE_AM_BUFFER` | twice the chunk | Bytes of each connection's buffer: a power of two from twice `OSOE_AM_CHUNK` - the default, and the least allowed: a smaller value is refused, not raised - up to 1 GiB. |
 | `OSOE_AM_BUFFER_BUDGET` | `268435456` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. The default buffer is the floor, so at the defaults 1,025 nodes fit and 1,026 are refused: raise the budget or lower the chunk. |
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
-| `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
+| `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by all of a node's connections: the node holds their product, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
 
 **For testing**
@@ -966,7 +1010,7 @@ launcher environment". There is no single-PE default.
 | `OSOE_JOB_ID` | A number unique among jobs running on this machine at once |
 | `OSOE_STEP_ID` | A number; `0` is fine |
 | `OSOE_STEP_NODELIST` | The nodes' host names, as Slurm writes a host list; needed only for more than one node |
-| `OSOE_LAUNCH` | Optional, `0` when unset: a number that tells this start from an earlier one by the same job and step ids, as `SLURM_RESTART_COUNT` does under Slurm; `osoe-launch` sets a random one. A start that may follow a failed one by the same ids must set a new one |
+| `OSOE_LAUNCH` | Optional, `0` when unset: a number that tells this start from an earlier one by the same job and step ids, as `SLURM_RESTART_COUNT` does under Slurm; `osoe-launch` sets a random one. A start that may follow a failed one by the same ids must set a new one, the same on every PE of the start: PEs given different numbers each wait for the other's launch to go |
 
 - The job id and step id name the job's shared memory
   (`/dev/shm/osoe.<job>.<step>.…`). Two starts with the same pair at once
@@ -1086,7 +1130,7 @@ secret, any host that can reach the ports can join.
 ### How a job ends
 
 A PE that dies, or a node that vanishes, ends the whole job with a failure
-(design §3.15). `shmem_global_exit(status)` ends every PE, and the job with
+(design §3.15), provided a node's PEs share a PID namespace (Building). `shmem_global_exit(status)` ends every PE, and the job with
 `status`. The calling PE leaves with `exit(status)`, so its `atexit` handlers
 run and its streams are flushed, as the specification asks. They run on the
 library's own thread, not the one that called, with signals blocked: a handler
