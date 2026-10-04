@@ -16,7 +16,8 @@ specification, or takes a choice it leaves open, is listed under
 [Limits](#limits-and-where-osoe-departs-from-the-specification). osoe has not
 made a release yet: there is no version tag, and it is built and tested from
 the repository as it stands. The tree is version 0.1.0; [Installing](#installing)
-says where the library and the tools show it.
+says where the library and the tools show it. It was written with Claude Code, under its
+author's direction ([How osoe was made](#how-osoe-was-made)).
 
 ## OpenSHMEM in two minutes
 
@@ -1179,6 +1180,48 @@ each node has printed where its PEs wait.
 - [Decisions in force](docs/decisions/README.md), each linked to the dated
   record that explains it
 - [Specification reference](docs/reference/README.md)
+
+## How osoe was made
+
+osoe was written with Claude Code, Anthropic's agentic coding tool, between 15
+September and 4 October 2026, under the direction of its author, Vincent
+Lucarelli. The models were the ones Anthropic offered over those three weeks:
+Claude Opus 5, and from 22 September Claude Opus 5.5, led each working session;
+Claude Sonnet 5 and 5.5 and Claude Fable 5.1 took parts of some sessions and of
+the tasks a session handed off. Every commit but the first and six merges
+names the model that wrote it beside the author, in a `Co-Authored-By` line,
+and the history is published whole, as the record of how the work was done.
+
+The work ran from goals down to code, and each level is in the repository:
+
+- **Goals**, the author's: OpenSHMEM 1.6 complete over ordinary Ethernet,
+  algorithms logarithmic in the node count, a path to RDMA that no interface
+  blocks, and the scale osoe is designed for (design notes §1;
+  `docs/decisions/README.md`, "Scope and goals").
+- **Planning**, between the author and Claude: sessions that turned the goals
+  into the design notes (`docs/design/shmem-ethernet-design.md`) and a plan of
+  phases, steps and slices (§7.1). Every decision is recorded with who took it -
+  the author, or Claude where a brief left it to Claude - why, and how to undo it:
+  the dated records in `docs/decisions/`, and its index of what holds.
+- **Briefs**: each slice went to a Claude Code session as a written brief - its
+  goal, what to read first, what to build, how to verify it, and the questions to
+  stop and put to the author (`docs/prompts/`, the finished ones in `done/`).
+  `CLAUDE.md` holds the working agreements every session followed.
+- **Building**: every lock-free protocol modelled before its code and checked
+  exhaustively, each model with broken variants that must fail
+  (`tools/modelcheck`); the tests in four build presets, sanitizers among them;
+  a speed claim simulated and timed before it merged; `main` moved only at green
+  checkpoints, the README true of the tree at every commit.
+- **Review**: a fresh Claude agent read each change adversarially before it
+  merged. At each merge point five more reviewed the whole tree - is it
+  OpenSHMEM 1.6, is it correct, does it scale as claimed, does it run elsewhere,
+  is it ready to be public - a refutation pass tried to knock down every finding
+  rated serious, and a synthesis said what had to change
+  (`docs/reviews/archive/`).
+
+The author set the goals, took the decisions the briefs reserved for the
+author, answered the questions they raised, and built and cabled the Raspberry
+Pi cluster osoe was measured on.
 
 ## License
 
