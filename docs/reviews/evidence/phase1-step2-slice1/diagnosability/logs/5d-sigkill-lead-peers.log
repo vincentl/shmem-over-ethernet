@@ -212,12 +212,12 @@ block  PE      pid      tid          cpu    invol.csw  kind
    16   2   651590   651593         0 ns            2  agent
    17   2   651590   651590     290.0 ms          676  application
 
--rw-------  1 vincent vincent 221184 Sep 20 13:49 osoe.651583.0.0.0
--rw-------  1 vincent vincent 263552 Sep 20 13:49 osoe.651583.0.0.conn.0
--rw-------  1 vincent vincent 221184 Sep 20 13:49 osoe.651583.0.1.0
--rw-------  1 vincent vincent 263552 Sep 20 13:49 osoe.651583.0.1.conn.0
--rw-------  1 vincent vincent    664 Sep 20 13:49 osoe.651583.0.job.0
--rw-------  1 vincent vincent  33920 Sep 20 13:49 osoe.651583.0.wire.0.1.0
+-rw-------  1 user user 221184 Sep 20 13:49 osoe.651583.0.0.0
+-rw-------  1 user user 263552 Sep 20 13:49 osoe.651583.0.0.conn.0
+-rw-------  1 user user 221184 Sep 20 13:49 osoe.651583.0.1.0
+-rw-------  1 user user 263552 Sep 20 13:49 osoe.651583.0.1.conn.0
+-rw-------  1 user user    664 Sep 20 13:49 osoe.651583.0.job.0
+-rw-------  1 user user  33920 Sep 20 13:49 osoe.651583.0.wire.0.1.0
 # hook2: sleep 8
 # launcher exit 1
 # left in /dev/shm afterwards:

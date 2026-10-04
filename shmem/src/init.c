@@ -302,13 +302,16 @@ static void session_start(void)
     osoe_node_refusal_arm(&osoe.node, &osoe.bootstrap, sessions);
 
     /*
-     * Every setting is checked by every PE before its node joins (the
-     * round-three review's R8): until then the AM layer's (OSOE_AM_*,
-     * OSOE_GET_LANDING_BYTES) were read by the lead alone as it laid out the
-     * segment, and the wire's by leads alone after the rendezvous, so a bad
-     * value ended one PE and left the rest waiting, or was never read. The
-     * backend checks its own (transport.h), values only; their users read them
-     * again where they use them.
+     * Every setting the node's layout and the wire depend on is checked by
+     * every PE before its node joins (the round-three review's R8): until then
+     * the AM layer's (OSOE_AM_*, OSOE_GET_LANDING_BYTES) were read by the lead
+     * alone as it laid out the segment, and the wire's by leads alone after the
+     * rendezvous, so a bad value ended one PE and left the rest waiting, or was
+     * never read. The backend checks its own (transport.h), values only; their
+     * users read them again where they use them. A few are read only after the
+     * join - the deadlock detector's, the agent's CPUs - and a bad one there
+     * ends the whole job, as any failure after the join does (the release
+     * fixes' review, Q5-6).
      */
     osoe_transport_settings_check(&osoe.bootstrap);
 
@@ -328,7 +331,7 @@ static void session_start(void)
      * reads. It comes after the node's own rendezvous because a lead publishes
      * its node's rank list, which it learns there.
      */
-    osoe_job_join(&osoe.job, &osoe.bootstrap, session);
+    osoe_job_join(&osoe.job, &osoe.bootstrap, session, osoe.node.hdr->creator_pid);
     /*
      * The backend, then the allocator, then the teams, then the thread that
      * runs the backend - each needs the one before it. osoe_transport_init

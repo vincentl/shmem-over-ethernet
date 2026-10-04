@@ -1380,6 +1380,49 @@ add_test(NAME shmem.leftovers.gc
           $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:osoe-stat>)
 set_tests_properties(shmem.leftovers.gc PROPERTIES LABELS "tier2" TIMEOUT 90
   PASS_REGULAR_EXPRESSION "START LEFTOVERS OK")
+# And a start by the same ids, with no --gc between, takes none of them: its
+# lead replaces both and its PEs take only what their lead made - before, a
+# non-lead took the leftovers and the start ended as a false deadlock, or hung
+# (the release fixes' review, correctness F1). See restart-leftovers.sh.
+# The program it starts again is test-internode.c, whose puts and quiets use the
+# connection area; under tsan, test-multinode.c's barriers, since tsan reads the
+# agent writing a heap a local thread holds as a race (shmem.internode.*, above).
+if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(osoe_restart_program shmem_test_multinode)
+else()
+  set(osoe_restart_program shmem_test_internode)
+endif()
+add_test(NAME shmem.leftovers.restart
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/restart-leftovers.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:${osoe_restart_program}>)
+set_tests_properties(shmem.leftovers.restart PROPERTIES LABELS "tier2" TIMEOUT 120
+  PASS_REGULAR_EXPRESSION "RESTART LEFTOVERS OK")
+# And with node 0's lead of the second start holding back making its
+# connection area until its node-mate has its job tables (slow-create.c): the
+# node-mate meets the leftover area, the fix's other half, which the plain case
+# does not reach - its lead nearly always replaces the area first. Not under
+# the sanitizers, as slow-message.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  add_library(slow-create SHARED slow-create.c)
+  target_link_libraries(slow-create PRIVATE ${CMAKE_DL_LIBS})
+  osoe_warnings(slow-create)
+  add_test(NAME shmem.leftovers.restart.slow-lead
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/restart-leftovers.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:shmem_test_internode>
+            $<TARGET_FILE:slow-create>)
+  set_tests_properties(shmem.leftovers.restart.slow-lead PROPERTIES LABELS "tier2"
+    TIMEOUT 120 PASS_REGULAR_EXPRESSION "RESTART LEFTOVERS OK")
+  # And the second start on three nodes, its area larger than the two-node
+  # leftover: the node-mate must not take the leftover's size for its lead's
+  # settings.
+  add_test(NAME shmem.leftovers.restart.other-size
+    COMMAND ${CMAKE_COMMAND} -E env SECOND_MAP=0,0,1,1,2,2
+            sh ${CMAKE_CURRENT_SOURCE_DIR}/restart-leftovers.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:shmem_test_internode>
+            $<TARGET_FILE:slow-create>)
+  set_tests_properties(shmem.leftovers.restart.other-size PROPERTIES LABELS "tier2"
+    TIMEOUT 120 PASS_REGULAR_EXPRESSION "RESTART LEFTOVERS OK")
+endif()
 
 # A job never outlives its launcher: SIGTERM and SIGINT are forwarded, and a
 # SIGKILLed launcher takes its PEs with it (launch.c; review round two,

@@ -4,15 +4,16 @@
 `done/`, under its own name, which this index still gives.
 
 **Open now:** one session's prompt, `task-first-release.md` (the arc, the
-order, how to spend the session), over two briefs written 2026-10-02 after the round-three review
-(`docs/reviews/archive/phase1-release-review.md`) and the plan that validated
-its findings (`phase1-release-fixes-plan.md`): `task-release-fixes.md`, every
-fix before the first release but the teams, and
-`phase1-step7-slice3-prompt.md`, step D of the team redesign
-(`docs/design/team-resources-proposal.md`); step E's brief follows D's merge
-point. The review lead's own brief, `phase1-release-fixes-prompt.md`, is
-answered by the plan and kept as given. The table below gives every finished
-brief, in the order the work was done, and these at its end.
+order, how to spend the session), over the brief of step D of the team
+redesign, `phase1-step7-slice3-prompt.md` (`docs/design/team-resources-proposal.md`);
+step E's brief follows D's merge point. The two briefs written 2026-10-02 after
+the round-three review (`docs/reviews/archive/phase1-release-review.md`) and
+the plan that validated its findings are done: `task-release-fixes.md`, every
+fix before the first release but the teams, merged with the fixes of the
+round-four review of its merge point (`docs/reviews/archive/phase1-release-fixes-review.md`),
+and with it the plan and the review lead's own brief. The table below gives
+every finished brief, in the order the work was done, and the open ones at its
+end.
 
 The brief each working session was given, kept so that a decision can be traced
 back to what was asked for as well as to what was done.
@@ -89,6 +90,6 @@ and `docs/reviews/` do track the current names.
 | `task-stress-phase4.md` | Add `mix` - teams running different exercises out of step, for hours, as a soak - the library's own counters in the checkpoint line, and the deprecated Annex F forms, closing the counted build's coverage gap | merged, `3d5bbe1`. 98 pacer tests, 18 new mutations each caught; four presets pass. The first soak hung on a stray `barrier_all`, fixed. On the Pi, three hours of `mix` ran 916 periods and 1.53 TB with `failures=0`; the counted build reached 1,792 of 1,794 declared routines. The author later took two recommendations from here: install `osoe-pacer`, and run an hour of `mix` before every release tag. See `docs/decisions/2026-09-27-evening.md` |
 | `phase1-release-fixes-prompt.md` | The review lead's brief after the round-three review (2026-09-28): the sixteen findings and its own fix sketches | answered by `phase1-release-fixes-plan.md` (2026-10-01/02): all sixteen hold; three of its fixes corrected (plan §1, points 3 to 5). Kept as given |
 | `phase1-release-fixes-plan.md` | The plan: each finding described, checked and given its options; nine decisions D1 to D9 for the author | D1 to D3 decided by the author on 2026-10-02 (only the caller carries a global exit's status; the start-up fixes' middle option; the team redesign, both steps before the tag), D4 to D9 as recommended (`docs/decisions/2026-10-02.md`) |
-| `task-release-fixes.md` | Every fix before the first release but the teams, for a fresh session: the record, the small code fixes, global exit, start-up, the README and records, the repository scrub, the whole-tree verification | in progress: Part 0 on `main` (9bbac4f, 2026-10-02); Parts 1 to 6 merged 2026-10-02 and 03 (`docs/decisions/2026-10-02-release-fixes.md`); the full adversarial review of this merge point next, then the three files move to `done/` |
+| `task-release-fixes.md` | Every fix before the first release but the teams, for a fresh session: the record, the small code fixes, global exit, start-up, the README and records, the repository scrub, the whole-tree verification | done: Part 0 on `main` (9bbac4f, 2026-10-02); Parts 1 to 6 merged 2026-10-02 and 03 (`docs/decisions/2026-10-02-release-fixes.md`); the round-four review of the merge point, at `08b3da0` (`docs/reviews/archive/phase1-release-fixes-review.md`: release after named changes), and its fixes merged 2026-10-04 (`docs/decisions/2026-10-04-review-fixes.md`) |
 | `phase1-step7-slice3-prompt.md` | §7.1 step 7, slice 3: step D of the team redesign - a team number held by each member PE and given back at destroy; the node blocks from a pool found by name; two parts and a merge point before step E | open |
 | `task-first-release.md` | The opening prompt of the session that takes the tree from the round-three review to the first tag: the arc, the order of the briefs, subagents and adversarial reads | open |

@@ -14,7 +14,7 @@ internode tree), and every lock-free protocol has a model. Phase 1 (design
 runbook, LGPL, `cmake --install`, the README. Three adversarial reviews have
 run; the third, on 2026-09-28 (`docs/reviews/archive/phase1-release-review.md`),
 says *release after named changes*. The plan that validated its sixteen
-findings is `docs/prompts/phase1-release-fixes-plan.md`; the author's
+findings is `docs/prompts/done/phase1-release-fixes-plan.md`; the author's
 decisions on it are `docs/decisions/2026-10-02.md`. What stands between the
 tree and the tag is three things: the release fixes, the team redesign, and
 the release point's conditions (design §1, "Release point").
@@ -25,7 +25,7 @@ Read first, in this order: `CLAUDE.md`; `docs/README.md`;
 
 ## The order of work
 
-1. **`docs/prompts/task-release-fixes.md`**, Parts 0 to 6. Part 0 first and at
+1. **`docs/prompts/done/task-release-fixes.md`**, Parts 0 to 6. Part 0 first and at
    once: it commits the review, the plan, the proposal, the briefs and the
    day's record, all untracked today. Then the small fixes, global exit,
    start-up, the README's own items, the scrub, the whole-tree verification.

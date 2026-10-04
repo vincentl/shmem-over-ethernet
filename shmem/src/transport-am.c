@@ -661,8 +661,11 @@ static uint64_t turnover(const struct osoe_connection *connection)
  * with work (§3.10) - and waits on the connection's turnover word, which the
  * agent bumps when it opens a buffer and anyone is registered
  * (base/wait-word.h, §3.11). Every waiter is woken: room is divisible, and each
- * has its own reservation to retry. It asks again before every sleep, since
- * the buffer that just opened may have filled before this writer got to it.
+ * has its own reservation to retry - for small messages; a reopened buffer at
+ * the default sizes holds one of OSOE_AM_CHUNK, so of writers that large one
+ * gets in and the rest sleep again (the release fixes' review, S1). It asks
+ * again before every sleep, since the buffer that just opened may have filled
+ * before this writer got to it.
  *
  * Step 2 slept 20 us and looked again instead, which on the ring held a stream
  * to 3% of the floor (§8.4). am.reserve_stalls counts every wait, so a buffer

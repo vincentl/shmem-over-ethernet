@@ -1,6 +1,6 @@
 # Decisions taken overnight, 2026-09-23 to 24
 
-Vincent authorized an overnight run at about 22:30 EDT on 2026-09-23, ahead of
+The author authorized an overnight run at about 22:30 EDT on 2026-09-23, ahead of
 the next day's first experiments on the Raspberry Pi cluster: merges to main,
 Slurm's daemons left running in the shared VM, and this record of every
 decision point passed. Each entry says what was decided, why, and how to undo

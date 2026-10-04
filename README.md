@@ -145,6 +145,14 @@ of more than one node is refused at `shmem_init`, naming the facility that is
 missing, for the io_uring facilities `shmem_init` checks (`env.probe` tests a
 few more).
 
+io_uring is off by default on RHEL 10 and its rebuilds (`kernel.io_uring_disabled`
+is 2), and container runtimes' default seccomp profiles refuse it: Docker 25 and
+later and containerd 2.0 and later with `EPERM`, for which the message names
+the sysctl even though it reads 0 inside the container, and Podman with
+`ENOSYS`. There jobs on one node run, but the test suite's multi-node tests,
+about 300 of them, fail at `shmem_init` or at opening a ring. Set the sysctl to
+0 as root, or run the container with a seccomp profile that allows io_uring.
+
 ### Developing on macOS
 
 io_uring is Linux-only, so development on a Mac happens in a Lima VM defined in
@@ -651,6 +659,10 @@ PE numbers of its own, given back when a team is destroyed.
   `fcollect` size, gets or gives wrong data, and nothing says so - the job can
   end with status 0. The specification leaves a collective that its PEs do not
   call alike undefined.
+- **Nor is a `shmem_malloc` that the PEs call with different sizes**, which the
+  specification leaves undefined too: the next object then starts at another
+  place on the PE that differed, puts to it land in the wrong place, and
+  nothing says so.
 
 **Transport and API**
 
@@ -671,7 +683,13 @@ PE numbers of its own, given back when a team is destroyed.
   one thread serving 256 PEs has not been measured on any machine: the Pi
   cluster's nodes run four PEs each, and the stress tester's sixteen-PE mailbox,
   a pipelined point-to-point pattern, with `--cpu-bind=none`, ran at 256,000
-  messages a second over a minute.
+  messages a second over a minute. And it grows with the PEs of a node waiting
+  to send to one other node at once: each reopening of that connection's
+  buffer, which at the defaults has room for one 64 KiB message, wakes all of
+  them, and when their messages are that large all but one sleep again. In the
+  virtual machine this cost the thread a few microseconds a reopening at 32
+  such PEs, and no run showed the node's rate fall; at 256 it has not been
+  measured.
 - **`shmem_ptr` returns a pointer only for PEs on the same node**, NULL for the
   rest - which the specification allows. A wait is woken by the library's own
   operations - atomics, puts, signals - and a plain store through that pointer
@@ -812,16 +830,21 @@ that one could be added without touching the OpenSHMEM layer.
   library's 1,794 routines a run reaches.
 - **A Raspberry Pi 5 cluster** over gigabit Ethernet, its four nodes running
   with TCP and generic segmentation offload off. Before, one node's spurious
-  retransmissions stalled collectives of some sizes for 0.5 to 52 s at a time
+  retransmissions stalled collectives of some sizes for up to 52 s at a time
   (F1); turning its offload off ended the stalls in the runs that followed,
   though every node had just rebooted, and F1 is not explained - three hours of
   `mix` with the offload off still counted 87 retransmission timeouts
   (`docs/pi-cluster-results.md`, "F1, investigated"). There an 8-byte put with
   quiet, a get or a fetch-add between two nodes took 172 to 176 µs a round trip
   against a bare io_uring TCP echo's 158 to 159, by the medians of seven pairs
-  in each of three runs: within 9 to 11% of the echo; put streams run at line
-  rate, and a 16-PE barrier takes 176 to 183 µs under Slurm's default binding
-  and 196 to 208 µs with the `--cpu-bind=none` that this README recommends
+  in each of three runs: within 9 to 11% of the echo. The ratio does not
+  travel: the library adds some 15 µs there, and about 27 over a virtual
+  machine's loopback, whose echo takes 27 to 28 µs, so that the same round
+  trips take about twice it
+  (`docs/design/evidence/release-fixes/floor-idle.txt`) - its cost is the
+  machine's more than the link's. Put streams run at line rate, and a 16-PE
+  barrier takes 176 to 183 µs under Slurm's default binding and 196 to 208 µs
+  with the `--cpu-bind=none` that this README recommends
   (`docs/pi-cluster-results.md`).
 
 ## Reference
@@ -893,7 +916,7 @@ moves every message of the node
 | `OSOE_AM_BUFFER` | twice the chunk | Bytes of each connection's buffer: a power of two from twice `OSOE_AM_CHUNK` - the default, and the least allowed: a smaller value is refused, not raised - up to 1 GiB. |
 | `OSOE_AM_BUFFER_BUDGET` | `268435456` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. The default buffer is the floor, so at the defaults 1,025 nodes fit and 1,026 are refused: raise the budget or lower the chunk. |
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
-| `OSOE_AM_HUGEPAGES` | `0` | `1`: map the node's connection buffers with huge pages, falling back, with a warning, when there are none. |
+| `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by all of a node's connections: the node holds their product, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
 
 **For testing**
@@ -931,7 +954,7 @@ launcher environment". There is no single-PE default.
 | `OSOE_JOB_ID` | A number unique among jobs running on this machine at once |
 | `OSOE_STEP_ID` | A number; `0` is fine |
 | `OSOE_STEP_NODELIST` | The nodes' host names, as Slurm writes a host list; needed only for more than one node |
-| `OSOE_LAUNCH` | Optional, `0` when unset: a number that tells this start from an earlier one by the same job and step ids, as `SLURM_RESTART_COUNT` does under Slurm; `osoe-launch` sets a random one |
+| `OSOE_LAUNCH` | Optional, `0` when unset: a number that tells this start from an earlier one by the same job and step ids, as `SLURM_RESTART_COUNT` does under Slurm; `osoe-launch` sets a random one. A start that may follow a failed one by the same ids must set a new one |
 
 - The job id and step id name the job's shared memory
   (`/dev/shm/osoe.<job>.<step>.…`). Two starts with the same pair at once
@@ -944,14 +967,18 @@ For example, two PEs from a shell:
 ```sh
 export OSOE_STEP_NUM_TASKS=2 OSOE_STEP_NUM_NODES=1 OSOE_NODEID=0 OSOE_GTIDS=0,1
 export OSOE_JOB_ID=$$ OSOE_STEP_ID=0
+export OSOE_LAUNCH=$(date +%s%N)     # anew before every start
 OSOE_PROCID=0 OSOE_LOCALID=0 ./my_program &
 OSOE_PROCID=1 OSOE_LOCALID=1 ./my_program
 wait
 ```
 
 A start that fails can leave `/dev/shm/osoe.<job>.*` behind
-([below](#names-a-failed-start-leaves)): a later start with the same ids takes
-over what a process now gone left there, and `osoe-stat --gc` removes it.
+([below](#names-a-failed-start-leaves)): a later start with the same ids and a
+new `OSOE_LAUNCH` takes over what a process now gone left there, and
+`osoe-stat --gc` removes it. With the same launch number, the later start's PEs
+cannot tell the leftover from their own lead's segment, and the start can fail
+or wait for ever: set it anew before every start, as above.
 
 ### Names a failed start leaves
 
@@ -977,7 +1004,10 @@ has not yet recorded itself: a start that died in that moment leaves one that
 `--gc` cannot tell from a start under way, which stays until a job with the
 same ids reclaims it or the epilog below removes it. `osoe-stat --gc` works on the
 machine it runs on and removes only what its user may, so a site runs it as
-root on each node. `osoe-launch` removes its own job's leftovers itself, and
+root on each node - from a timer, not from Slurm's epilog: it reads objects
+any user can write, and one written to fail its reading fails the run, which
+in an epilog drains the node. The epilog's safe line is the `rm` below.
+`osoe-launch` removes its own job's leftovers itself, and
 says which it found, except a control segment `OSOE_KEEP_CONTROL_SEGMENT`
 keeps, which it leaves for `--gc`.
 
@@ -1003,7 +1033,12 @@ loud, and how far it reaches depends on where it is:
   segment's name. A PE that refuses while its lead has made no segment waits up
   to 10 s for one to publish in; past that, its lead's notice names it
   instead. A kernel too old for osoe each PE refuses by itself, before
-  anything is made.
+  anything is made. A few settings are read only after the node has joined
+  the job - `OSOE_DEADLOCK_SECONDS` and `OSOE_AGENT_CPUS` among them - and a
+  bad one ends the whole job. Where one PE alone has the bad value, it names
+  the variable and every other PE says it ends on behalf of that one; where
+  every PE has it, as an exported value gives, some PEs name it and the
+  launcher ends the rest without a word.
 - **A node whose lead finds the job disagreeing** - another node launched for
   another count, a value the rows above mark *checked* between nodes - ends
   naming the variable and both nodes. The nodes already connected to it in the
@@ -1041,7 +1076,11 @@ secret, any host that can reach the ports can join.
 A PE that dies, or a node that vanishes, ends the whole job with a failure
 (design §3.15). `shmem_global_exit(status)` ends every PE, and the job with
 `status`. The calling PE leaves with `exit(status)`, so its `atexit` handlers
-run and its streams are flushed, as the specification asks - for at most 10 s, a
+run and its streams are flushed, as the specification asks. They run on the
+library's own thread, not the one that called, with signals blocked: a handler
+that reads the caller's thread-local storage - `errno` included - sees that
+thread's, and a C++ caller's `thread_local` objects are not destroyed. They run
+for at most 10 s, a
 constant of the library (`OSOE_ABORT_GRACE_SECONDS` in `shmem/src/abort.h`, not
 a variable a job can set), after which the library ends it, with its standard
 output flushed unless a thread holds its lock. Every other PE leaves with 0, its
@@ -1061,13 +1100,17 @@ outright, can outlast the waits' bounds, the longest 50 s, and with them the
 order. `srun` then returns the caller's status, and `osoe-launch`
 does the same. When several PEs call it at once, the job's status is one of
 theirs, as §9.1.6 asks: on each node the first call carries it, and the other
-callers leave with 0 after their handlers.
+callers leave with 0, usually after their handlers - a caller whose call loses
+the race with another node's end leaves as a PE that did not call.
 
 Two limits remain. A site that sets `WaitTime`, or `srun -W n`, ends the
 other tasks n seconds after the first one leaves, whatever its status. And
-under `-K1`, two PEs of two nodes that call `shmem_global_exit` at the same
-moment each carry their own node's end, and whichever leaves first can still
-have Slurm kill a PE of the other node: `srun` may then return 143.
+under `-K1`, when PEs of more than one node call `shmem_global_exit` - as they
+all do when each detects the same failure - each node's first caller carries
+that node's end, and the first to leave can have Slurm kill the other nodes'
+PEs still ending, callers among them, whose handlers and buffered output are
+then lost: `srun` may then return 143. To keep the status and the output, call
+it from one PE.
 A job proved deadlocked ends the same way as a failure, with status 1, after
 each node has printed where its PEs wait.
 

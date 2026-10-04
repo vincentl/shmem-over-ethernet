@@ -104,7 +104,7 @@ int main(void)
      * since this test is about the area and not about bootstrap.
      */
     struct osoe_connection_area area;
-    osoe_connection_area_open(&area, &b, NODES, 0);
+    osoe_connection_area_open(&area, &b, NODES, 0, OSOE_SHM_ANY_CREATOR);
 
     /* One connection per peer node, and none to itself. */
     CHECK(osoe_connection_to(&area, b.node) == NULL);

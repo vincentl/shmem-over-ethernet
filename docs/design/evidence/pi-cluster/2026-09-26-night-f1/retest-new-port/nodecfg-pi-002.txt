@@ -10,7 +10,7 @@ nvme.max_host_mem_size_mb=32
 numa=fake=8
 system_heap.max_order=0
 iommu_dma_numa_policy=interleave
-smsc95xx.macaddr=2C:CF:67:C6:7D:52
+smsc95xx.macaddr=xx:xx:xx:xx:xx:xx
 vc_mem.mem_base=0x3fc00000
 vc_mem.mem_size=0x40000000
 

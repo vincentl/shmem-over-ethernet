@@ -205,8 +205,9 @@ static void lead(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t se
 }
 
 /* Any other PE: wait for the lead's object, as §6.2's non-lead PEs wait for the
- * control segment - for the name, the length, then `ready`. */
-static void follow(struct osoe_job *j, const struct osoe_bootstrap *b)
+ * control segment - for the name, the length, then `ready` - and take it only
+ * if `lead_pid` made it (osoe_job_join). */
+static void follow(struct osoe_job *j, const struct osoe_bootstrap *b, int32_t lead_pid)
 {
 again:;
     /* Nothing moves until the lead has met every other lead, so the watch is
@@ -255,6 +256,35 @@ again:;
         if (osoe_futex_wait(&h->ready, 0, &d, OSOE_FUTEX_SHARED) == ETIMEDOUT)
             osoe_sweep_expired("shmem_init");
     }
+    /*
+     * A failed start by the same ids leaves its tables ready, and a PE that took
+     * them would join a job that is over: the release fixes' review found a
+     * requeued start ending as a false deadlock, or silent (correctness F1).
+     * Only the tables this node's lead made for this launch are this job's. The
+     * lead removes a leftover's name as it makes its own (shm-object.h): wait
+     * for that, as for `ready`, and start over - never counting this PE in the
+     * leftover's `opened`, which would remove its name with nothing made.
+     */
+    if (lead_pid != OSOE_SHM_ANY_CREATOR && h->creator_pid != lead_pid) {
+        struct timespec pause = { 0, 200000 };
+        while (!osoe_shm_orphaned(fd)) {
+            if (osoe_deadline_expired(&sweep)) {
+                sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+                osoe_sweep_expired("shmem_init");
+                if (osoe_stall_watch_stalled(&watch, 0))
+                    osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): this "
+                               "node's lead, pid %d, has not replaced %s, which pid %d left",
+                               (unsigned long long)osoe_stall_watch_seconds(&watch),
+                               (int)lead_pid, j->name, (int)h->creator_pid);
+            }
+            nanosleep(&pause, NULL);
+            if (pause.tv_nsec < 10000000)
+                pause.tv_nsec *= 2;
+        }
+        munmap(p, j->bytes);
+        close(fd);
+        goto again;
+    }
     close(fd);
     if (h->magic != OSOE_JOB_MAGIC || h->layout != OSOE_JOB_LAYOUT ||
         h->world_size != b->world_size || h->node_count != b->node_count ||
@@ -264,7 +294,8 @@ again:;
     j->map = p;
 }
 
-void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t session)
+void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t session,
+                   int32_t lead_pid)
 {
     *j = (struct osoe_job){ 0 };
     j->world_size = b->world_size;
@@ -319,7 +350,7 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
     if (b->local_id == 0)
         lead(j, b, session);
     else
-        follow(j, b);
+        follow(j, b, lead_pid);
     struct osoe_job_header *h = j->map;
     bind_tables(j, h);
 

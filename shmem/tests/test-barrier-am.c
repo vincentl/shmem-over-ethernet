@@ -89,7 +89,7 @@ int main(void)
     CHECK_FATAL(b.node_count >= 3 && b.node_count <= MAX_NODES);
 
     struct osoe_connection_area area;
-    osoe_connection_area_open(&area, &b, b.node_count, 0);
+    osoe_connection_area_open(&area, &b, b.node_count, 0, OSOE_SHM_ANY_CREATOR);
     arrivals_open();
 
     /* Only the node lead touches a wire or runs the loop (§3.12). The other

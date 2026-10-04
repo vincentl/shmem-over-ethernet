@@ -39,6 +39,7 @@
 
 #include "bootstrap.h"
 #include "connection.h"
+#include "shm-object.h"
 
 /*
  * Defaults (§3.2, §3.4).
@@ -152,12 +153,15 @@ struct osoe_connection_area {
 };
 
 /*
- * Create (local lead) or open (everyone else) this node's area. Fatal on
- * failure (§3.15). A job of one node maps nothing and leaves the handle empty,
- * so the caller need not special-case it.
+ * Create (local lead) or open (everyone else) this node's area - the area
+ * `lead_pid` made, the pid of the node's lead that created the control segment
+ * this PE has joined, and no leftover a failed start by the same ids left ready
+ * (shm-object.h, OSOE_SHM_ANY_CREATOR). Fatal on failure (§3.15). A job of one
+ * node maps nothing and leaves the handle empty, so the caller need not
+ * special-case it.
  */
 void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe_bootstrap *b,
-                        uint32_t nodes, uint32_t session);
+                        uint32_t nodes, uint32_t session, int32_t lead_pid);
 
 /* Unmap; the lead also removes the name. */
 void osoe_connection_area_close(struct osoe_connection_area *a);

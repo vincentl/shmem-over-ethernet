@@ -77,7 +77,7 @@ The author's goals, the axes to judge the work by:
 
 ## The state of the tree
 
-- This brief may start while `docs/prompts/task-release-fixes.md` is being
+- This brief may start while `docs/prompts/done/task-release-fixes.md` is being
   built. The two meet in `node.c`'s `create_control` and in `OSOE_NODE_LAYOUT`
   (its Part 3 reorders the segment's creation; this brief rebuilds the team
   section): whoever merges second rebases and takes the next layout number.

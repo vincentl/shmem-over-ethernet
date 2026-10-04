@@ -36,6 +36,16 @@
 int osoe_shm_create(const char *name, long owner_offset, char *err, size_t errlen);
 
 /*
+ * The creator a non-lead takes an object from (job.c, connection-area.c): the
+ * pid of its node's lead, the creator of the control segment it has joined -
+ * an object a failed start by the same ids left ready names another, and is
+ * waited past (the release fixes' review, correctness F1). OSOE_SHM_ANY_CREATOR
+ * is for a caller with no control segment to name the lead by, the transport's
+ * own tests: any ready object is taken.
+ */
+#define OSOE_SHM_ANY_CREATOR 0
+
+/*
  * shm_open(name, O_RDWR), refusing an object another user owns. Returns the
  * descriptor; -1 with errno ENOENT and an empty `err` when there is no such
  * object yet, which the rendezvous waits on; -1 with a reason in `err`

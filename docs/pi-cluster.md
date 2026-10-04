@@ -395,25 +395,27 @@ done | tee ~/examples.txt
 ```
 
 The same programs ran under `osoe-launch` in the development VM, four PEs on
-two logical nodes, on 2026-09-24. **What to expect** from that run:
+two logical nodes, on 2026-09-24, and the examples again on 2026-10-03, after
+the release fixes (`08b3da0`). **What to expect** from those runs:
 - PRK's three kernels validate.
-- Of the 72 examples, all but the following exit 0.
-  - `bar_pair` and `bcast4` pass an active set smaller than the job, which osoe
-    refuses by name (design §7.4). So, on more than four PEs, do `bcast3`,
-    `collect32`, `reduce-max` and `reduce-sum`, whose active set is PEs 0 to 3
-    written out - the whole job on the VM's four, half of it on the cluster's
-    4 × 2 (2026-09-24, and in the VM on 8); all but `collect32` also call with
-    PEs outside it, which the spec leaves undefined anyway.
+- Of the 72 examples, 68 exit 0 on 0,0,1,1. The other four:
   - `nullput` puts to a null pointer. `just-a-shmalloc` and `shmem_2dheat`
     exit without `shmem_finalize`, which only a `start_pes` program may do
-    (the latter calls `exit` on the line before its finalize). `addr-accessible`
-    reports its own stack check as a failure: its test is inverted. osoe
-    names each of the first three as such.
-  - `global_exit` exits 1 where the program asks for 99: `osoe-launch` reports
-    the job's failure, not the status (§7 above checks the status under
-    `srun`, and on the cluster it exits 99). It calls `shmem_global_exit`
-    straight after `shmem_init`, and can leave the job's names in `/dev/shm`
-    behind it - the window design §6.2 accepts, which `osoe-stat --gc` clears.
+    (the latter calls `exit` on the line before its finalize). osoe names
+    each as such, and each exits 1.
+  - `global_exit` exits 99, the status the program asks for, under
+    `osoe-launch` as under `srun` (§7 above checks the status under `srun`,
+    and on the cluster it exits 99). It calls `shmem_global_exit` straight
+    after `shmem_init`, and can leave the job's names in `/dev/shm` behind
+    it - the window design §6.2 accepts, which `osoe-stat --gc` clears.
+- An active set smaller than the job works (design §7.4): `bar_pair` and
+  `bcast4` use one, and exit 0 on four PEs. On more than four, a PE that calls
+  with a set it is not in, which the spec leaves undefined, ends the job by
+  name; so `bcast3`, `reduce-max` and `reduce-sum`, which every PE calls with
+  PEs 0 to 3 written out - the whole job on the VM's four, half of it on the
+  cluster's 4 × 2 - and `bcast4`, which every even PE calls with PEs 0 and 2,
+  end it there. `bar_pair` and `collect32`, which only members call, exit 0 on
+  any job of four PEs or more (read from the programs and `active-set.c`).
 - NPB IS verifies, classes S and A, on four PEs over two logical nodes and
   over four.
 - ISx, weak scaling on 0,0,1,1 and strong on 0,1,2,3, sorts and verifies,
@@ -531,13 +533,20 @@ two (`build/scratch/sos/sweep.sh`): 147 built and exited 0 on both on
 `fa59c93` that evening, after contexts and `SHMEM_THREAD_MULTIPLE` - the eight
 threaded programs (`mt_a2a`, `mt_contention`, `mt_lock_test`, `mt_membar`,
 `thread_wait`, `threading`, `web`, `spec-example/shmem_ctx`) and
-`spec-example/shmem_team_context` among them. **What to expect** of the rest:
+`spec-example/shmem_team_context` among them. Like the loop above, the sweep
+builds each program from its one source, so it leaves out the two that SOS's
+automake makes from other sources with extra flags: `rma_coverage_pshmem`
+(`-DTEST_PSHMEM`) and `query_thread_funneled` (`-DENABLE_THREADS`). Built by
+hand, both pass on both maps. That is why the README gives 159 for the VM, of
+163 programs, and 161 for the Pi, of 165, where they were built too
+(2026-09-28). **What to expect** of the rest:
 - `c11_shmem_test_all_any_some` and `c11_shmem_wait_until_all_any_some` do not
   build: they pass `short *` to the `_all`/`_any`/`_some` generics, which
   OpenSHMEM 1.5 defined over Table 6's AMO types alone - SOS's extension.
-- `shmem_team_b2b_collectives` collects 40 longs into a destination of 10 on
-  the VM's 0,0,1,1 map, and osoe stops it by name where the old gather
-  corrupted memory silently; whether 4 × 2 trips it is a finding either way.
+- `shmem_team_b2b_collectives` collects 10 longs a PE into a destination of
+  10, and osoe stops it by name where the old gather corrupted memory
+  silently: on every map of more than one PE, 40 longs on the VM's 0,0,1,1 and
+  80 on the cluster's 4 × 2 (2026-09-28).
 - `shmemalign` exits 1 with osoe naming the call: it asks `shmem_align` for an
   alignment of 2, which the spec leaves undefined below `sizeof(void *)`.
 - `bigget` exits 124 - the loop's 120 s `timeout` - on the cluster: it does

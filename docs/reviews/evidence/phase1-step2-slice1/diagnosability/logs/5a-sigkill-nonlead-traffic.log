@@ -229,16 +229,16 @@ block  PE      pid      tid          cpu    invol.csw  kind
     8   1   643090   643094         0 ns            4  agent
     9   1   643090   643090     720.0 ms        16628  application
 
--rw-------  1 vincent vincent 151552 Sep 20 13:45 osoe.643075.0.0.0
--rw-------  1 vincent vincent 526848 Sep 20 13:45 osoe.643075.0.0.conn.0
--rw-------  1 vincent vincent 151552 Sep 20 13:45 osoe.643075.0.1.0
--rw-------  1 vincent vincent 526848 Sep 20 13:45 osoe.643075.0.1.conn.0
--rw-------  1 vincent vincent 151552 Sep 20 13:45 osoe.643075.0.2.0
--rw-------  1 vincent vincent 526848 Sep 20 13:45 osoe.643075.0.2.conn.0
--rw-------  1 vincent vincent    664 Sep 20 13:45 osoe.643075.0.job.0
--rw-------  1 vincent vincent  33920 Sep 20 13:45 osoe.643075.0.wire.0.1.0
--rw-------  1 vincent vincent  33920 Sep 20 13:45 osoe.643075.0.wire.0.2.0
--rw-------  1 vincent vincent  33920 Sep 20 13:45 osoe.643075.0.wire.1.2.0
+-rw-------  1 user user 151552 Sep 20 13:45 osoe.643075.0.0.0
+-rw-------  1 user user 526848 Sep 20 13:45 osoe.643075.0.0.conn.0
+-rw-------  1 user user 151552 Sep 20 13:45 osoe.643075.0.1.0
+-rw-------  1 user user 526848 Sep 20 13:45 osoe.643075.0.1.conn.0
+-rw-------  1 user user 151552 Sep 20 13:45 osoe.643075.0.2.0
+-rw-------  1 user user 526848 Sep 20 13:45 osoe.643075.0.2.conn.0
+-rw-------  1 user user    664 Sep 20 13:45 osoe.643075.0.job.0
+-rw-------  1 user user  33920 Sep 20 13:45 osoe.643075.0.wire.0.1.0
+-rw-------  1 user user  33920 Sep 20 13:45 osoe.643075.0.wire.0.2.0
+-rw-------  1 user user  33920 Sep 20 13:45 osoe.643075.0.wire.1.2.0
 # hook2: sleep 5
 # launcher exit 1
 # left in /dev/shm afterwards:

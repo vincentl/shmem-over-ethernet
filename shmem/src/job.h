@@ -43,6 +43,7 @@
 
 #include "bootstrap.h"
 #include "rank-map.h"
+#include "shm-object.h"
 
 /*
  * A backend's per-node addressing blob (§6.2; second review, roce-seam F10).
@@ -82,10 +83,14 @@ struct osoe_job {
 
 /*
  * Meet the other nodes' leads and learn the map. Every PE calls it; only leads
- * take part, as §6.2 requires, and the others read what their own lead wrote.
- * Fatal on disagreement, and on no progress for OSOE_NO_PROGRESS_TIMEOUT (§3.15).
+ * take part, as §6.2 requires, and the others read what their own lead wrote -
+ * the tables `lead_pid` made, the pid of the node's lead that created the
+ * control segment this PE has joined, and no leftover a failed start by the
+ * same ids left ready (shm-object.h, OSOE_SHM_ANY_CREATOR). Fatal on
+ * disagreement, and on no progress for OSOE_NO_PROGRESS_TIMEOUT (§3.15).
  */
-void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t session);
+void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t session,
+                   int32_t lead_pid);
 
 /* Unmap; free what the join built. */
 void osoe_job_leave(struct osoe_job *j);

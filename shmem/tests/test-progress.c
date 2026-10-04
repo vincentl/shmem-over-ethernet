@@ -280,7 +280,7 @@ int main(void)
     };
 
     struct osoe_connection_area area;
-    osoe_connection_area_open(&area, &b, 2, 0);
+    osoe_connection_area_open(&area, &b, 2, 0, OSOE_SHM_ANY_CREATOR);
 
     struct osoe_connection *c = osoe_connection_to(&area, peer);
     CHECK_FATAL(c != NULL);  /* a non-lead PE dereferences it below via post() */

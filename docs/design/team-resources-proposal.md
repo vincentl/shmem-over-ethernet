@@ -2,7 +2,7 @@
 
 *Proposed by Claude on 2026-10-02, at the author's request, after the
 round-three review (`docs/reviews/archive/phase1-release-scale-and-performance.md`,
-P1) and the plan that followed it (`docs/prompts/phase1-release-fixes-plan.md`,
+P1) and the plan that followed it (`docs/prompts/done/phase1-release-fixes-plan.md`,
 §3.3). The author decided the same day that both steps here precede the first
 release's tag, and accepted a significant rewrite for the better design; the
 same evening he answered §8's six questions (pool with an index for the node

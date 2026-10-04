@@ -1,6 +1,6 @@
 # Decisions taken without the author, 2026-09-23
 
-Vincent was away for eight hours from about 09:45 EDT and left the work to run
+The author was away for eight hours from about 09:45 EDT and left the work to run
 on its own: merge to main, continue to later slices, review every test with
 subagents, keep a record of every decision point passed. This is that record.
 Each entry says what was decided, why, and how to undo it. The most
@@ -11,7 +11,7 @@ There is no git remote, so every merge here is local and nothing was pushed.
 
 ## Where things stand, and what needs you
 
-*Vincent reviewed every entry on their return the same evening; each question
+*The author reviewed every entry on their return the same evening; each question
 below carries their answer, and "The author's review" at the end records every
 entry's.*
 
@@ -152,8 +152,8 @@ once committed, with its newest layout raised to 14.
 
 **8a. The `osoe-stat` branch is merged although its own brief said to ask
 first.** The other session committed `b229f8e` on `stat-watch-word-layouts` and
-passed on that its brief (from Vincent, earlier) said "do not merge into main;
-ask before merging". Vincent's later instruction to this session was to keep
+passed on that its brief (from the author, earlier) said "do not merge into main;
+ask before merging". The author's later instruction to this session was to keep
 track of that work "and incorporate its work product as appropriate", with
 merges to main authorized. Read together, the later instruction governs, so it
 is merged, as a merge commit of its own after slice 2 so that one
@@ -478,7 +478,7 @@ proves `pidfd_open` polled on a ring beside a futex wait.
 
 ## The author's review, the same evening
 
-Vincent went through every entry on their return. Each is confirmed as built
+The author went through every entry on their return. Each is confirmed as built
 unless this section says otherwise.
 
 - **Confirmed as built:** 1–15, 16's pidfds from every agent's loop, 17, and

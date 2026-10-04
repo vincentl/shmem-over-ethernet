@@ -204,8 +204,28 @@ void osoe_am_config_read(struct osoe_am_config *c)
                    (unsigned)OSOE_LANDING_EXTENT_BYTES);
 }
 
+/*
+ * Whether this node's lead of this start made the object open at `fd`: its
+ * recorded creator is `lead_pid`. A size that differs from this PE's is the
+ * lead's settings only then - an area a failed start by the same ids left can
+ * be of another size, and its lead replaces it (the review fixes' adversarial
+ * read) - and an object whose creator has not yet recorded itself is waited
+ * for, as one not yet sized is. With OSOE_SHM_ANY_CREATOR every object is
+ * taken for the lead's.
+ */
+static bool made_by(int fd, int32_t lead_pid)
+{
+    if (lead_pid == OSOE_SHM_ANY_CREATOR)
+        return true;
+    int32_t pid = 0;
+    if (pread(fd, &pid, sizeof pid,
+              (off_t)offsetof(struct osoe_connection_area_header, creator_pid)) != (ssize_t)sizeof pid)
+        return false;
+    return pid == lead_pid;
+}
+
 void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe_bootstrap *b,
-                        uint32_t nodes, uint32_t session)
+                        uint32_t nodes, uint32_t session, int32_t lead_pid)
 {
     *a = (struct osoe_connection_area){ 0 };
     a->node = b->node;
@@ -291,38 +311,52 @@ again:;
         for (;;) {
             char err[256];
             fd = osoe_shm_open_ours(a->name, err, sizeof err);
-            bool exists = fd >= 0;
+            const char *state = "does not exist yet";
+            bool leftover = false;
             if (fd >= 0) {
                 struct stat st;
-                if (fstat(fd, &st) == 0 && (uint64_t)st.st_size >= a->bytes)
+                bool sized = fstat(fd, &st) == 0 && st.st_size > 0;
+                if (sized && (uint64_t)st.st_size >= a->bytes)
                     break;
                 /* The lead sizes the area in one step, from nothing to the
                  * whole of it, so a size that is neither is the lead's, and
                  * smaller than this PE's settings make it: they differ, and
                  * waiting for it to grow would be waiting for ever (the
                  * round-three review's settings sweep). A larger one is
-                 * refused below, by the header. */
-                if (fstat(fd, &st) == 0 && st.st_size > 0) {
+                 * refused below, by the header. Unless another start by these
+                 * ids made it: then it is a leftover, which the lead replaces,
+                 * as below (the review fixes' adversarial read). */
+                if (sized && made_by(fd, lead_pid)) {
                     close(fd);
                     osoe_fatal("connection area %s is %llu bytes, as the local lead's "
                                "OSOE_AM_* settings made it; this PE's make it %llu: every "
                                "PE of a job must set OSOE_AM_* the same", a->name,
                                (unsigned long long)st.st_size, (unsigned long long)a->bytes);
                 }
+                leftover = sized;
+                state = sized ? "an earlier start by these ids left, smaller than this "
+                                "PE's settings make it"
+                              : "exists but is not sized yet";
                 close(fd);
             } else if (errno != ENOENT) {
                 osoe_fatal("the connection area: %s", err);
             }
-            if (osoe_stall_watch_stalled(&watch, 0))
+            if (osoe_stall_watch_stalled(&watch, 0)) {
+                if (leftover)
+                    osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local "
+                               "lead, pid %d, has not replaced %s, which an earlier start by "
+                               "these ids left",
+                               (unsigned long long)osoe_stall_watch_seconds(&watch),
+                               (int)lead_pid, a->name);
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead has not created %s",
                            (unsigned long long)osoe_stall_watch_seconds(&watch), a->name);
+            }
             if (osoe_stall_watch_notice_due(&watch))
                 osoe_notice("shmem_init on node %u has waited %llu s for the local lead, "
-                            "rank %u, to create the node's connection area %s, which %s; "
+                            "rank %u, to %s the node's connection area %s, which %s; "
                             "still waiting", b->node,
                             (unsigned long long)osoe_stall_watch_waited_seconds(&watch),
-                            b->gtids[0], a->name,
-                            exists ? "exists but is not sized yet" : "does not exist yet");
+                            b->gtids[0], leftover ? "replace" : "create", a->name, state);
             /* §4.10: every wait sweeps - a local lead that died before sizing
              * the area would leave its siblings here for good. */
             if (osoe_deadline_expired(&sweep)) {
@@ -432,6 +466,40 @@ again:;
                             "has created; still waiting", b->node,
                             (unsigned long long)osoe_stall_watch_waited_seconds(&watch),
                             b->gtids[0], a->name);
+        }
+        /* A failed start by the same ids leaves its area ready too, and only the
+         * area this node's lead made for this launch is this job's (job.c's
+         * follow, the release fixes' review, correctness F1): wait for the lead
+         * to remove the leftover's name as it makes its own, and start over. */
+        if (lead_pid != OSOE_SHM_ANY_CREATOR && h->creator_pid != lead_pid) {
+            struct timespec pause = { 0, 200000 };
+            struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+            while (!osoe_shm_orphaned(fd)) {
+                if (osoe_deadline_expired(&sweep)) {
+                    osoe_sweep_expired("shmem_init");
+                    sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+                }
+                if (osoe_stall_watch_stalled(&watch, 0))
+                    osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local "
+                               "lead, pid %d, has not replaced %s, which pid %d left",
+                               (unsigned long long)osoe_stall_watch_seconds(&watch),
+                               (int)lead_pid, a->name, (int)h->creator_pid);
+                if (osoe_stall_watch_notice_due(&watch))
+                    osoe_notice("shmem_init on node %u has waited %llu s for the local lead, "
+                                "rank %u, to replace the node's connection area %s, which an "
+                                "earlier start by these ids left; still waiting", b->node,
+                                (unsigned long long)osoe_stall_watch_waited_seconds(&watch),
+                                b->gtids[0], a->name);
+                nanosleep(&pause, NULL);
+                if (pause.tv_nsec < 10000000)
+                    pause.tv_nsec *= 2;
+            }
+            munmap(p, a->bytes);
+            close(fd);
+            free(a->connection);
+            a->connection = NULL;
+            a->map = NULL;
+            goto again;
         }
         if (h->magic != OSOE_CONNECTION_AREA_MAGIC || h->layout != OSOE_CONNECTION_AREA_LAYOUT ||
             h->buffer_bytes != buffer || h->chunk_bytes != config.chunk ||

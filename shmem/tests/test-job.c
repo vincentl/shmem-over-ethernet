@@ -89,7 +89,7 @@ int main(void)
     osoe_bootstrap_read(&b);
 
     struct osoe_job job;
-    osoe_job_join(&job, &b, 0);
+    osoe_job_join(&job, &b, 0, OSOE_SHM_ANY_CREATOR);
 
     /* Every rank is on exactly one node, and this PE is on the node the
      * launcher said it was. */

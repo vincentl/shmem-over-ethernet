@@ -14,7 +14,7 @@ newest dated record beside it, and what a release needs is in
 | How do I run it on the Pi cluster? | `docs/pi-cluster.md`, the runbook |
 | What did the Pi cluster measure? | `docs/pi-cluster-results.md` |
 | How is a review run? | `docs/reviews/adversarial-review-prompt.md`; past reviews in `docs/reviews/archive/` |
-| What does the specification say? | `docs/reference/OpenSHMEM-1.6.pdf` |
+| What does the specification say? | The specification is not in the repository; `docs/reference/README.md` says where to get it |
 | How do I build and run a program? | `README.md` at the top of the repository |
 
 Finished briefs and past reviews are history: kept so a line of code or a
@@ -33,5 +33,12 @@ LGPL-3.0-or-later`: first in the file, or second where the first line is a
 shebang, and last in the three probes in that `conformance/` directory whose
 compiler errors `run.out` records by line number, so that those numbers stay
 true. The specification's examples are the specification's, and have none.
-Nothing else in those files was changed. A script that names `<repo>` records
-what ran; it is not one to run as written.
+On 2026-10-04 the Unix account's name, which `ls -l` had written as owner and
+group in ten logs under `docs/reviews/evidence/phase1-step2-slice1/diagnosability/logs/`
+and as owner in `docs/reviews/evidence/phase1-step2-slice1/portability/stale-segments.out`,
+was replaced there by `user`, and two Pi nodes' hardware addresses by
+`xx:xx:xx:xx:xx:xx` in four files under
+`docs/design/evidence/pi-cluster/2026-09-26-night-f1/retest-new-port/`, as the
+newer files of that tree already have them. Nothing else in those files was
+changed. A script that names `<repo>` records what ran; it is not one to run
+as written.

@@ -384,7 +384,8 @@ void osoe_progress_host_start(uint32_t session)
 
     /* Every local PE maps the area: its application threads reserve into these
      * buffers like any other writer (§3.5, §3.12). */
-    osoe_connection_area_open(&osoe_am.area, &osoe.bootstrap, osoe.job.node_count, session);
+    osoe_connection_area_open(&osoe_am.area, &osoe.bootstrap, osoe.job.node_count, session,
+                              osoe.node.hdr->creator_pid);
     if (!osoe_am.lead)
         return;
 
@@ -547,7 +548,10 @@ static void close_connections(void)
     osoe_stall_watch_begin(&watch, 0, osoe.bootstrap.no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     while (!osoe_progress_closed(&osoe_am.progress)) {
-        if (!osoe_progress_poll(&osoe_am.progress))
+        /* A poll can take a peer's end of stream and say it moved nothing, so
+         * the condition is asked again before the sleep, which would otherwise
+         * last the whole sweep (the release fixes' review, conformance F1). */
+        if (!osoe_progress_poll(&osoe_am.progress) && !osoe_progress_closed(&osoe_am.progress))
             osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
         if (!osoe_deadline_expired(&sweep))
             continue;
@@ -599,8 +603,12 @@ void osoe_progress_host_abort(void)
     osoe_progress_abort(&osoe_am.progress, pe, status, (uint32_t)how,
                         how == OSOE_ABORT_GLOBAL_EXIT);
     struct osoe_deadline grace = osoe_deadline_in(UINT64_C(1000000000) * OSOE_ABORT_GRACE_SECONDS);
+    /* Each wait asks its condition again after a poll that moved nothing, as
+     * close_connections does: an end of stream taken by the poll would
+     * otherwise be seen a sweep late, which under srun -K1 is the window in
+     * which the first node to end can have another node's PEs killed. */
     while (!osoe_progress_aborted(&osoe_am.progress) && !osoe_deadline_expired(&grace))
-        if (!osoe_progress_poll(&osoe_am.progress))
+        if (!osoe_progress_poll(&osoe_am.progress) && !osoe_progress_aborted(&osoe_am.progress))
             osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
     /*
      * A global exit called on this node: the PE carrying its status leaves
@@ -615,7 +623,8 @@ void osoe_progress_host_abort(void)
     struct osoe_deadline last = osoe_deadline_in(UINT64_C(1000000000) *
                                                  OSOE_ABORT_LEAD_WAIT_SECONDS);
     while (!osoe_progress_peers_ended(&osoe_am.progress, pe) && !osoe_deadline_expired(&last))
-        if (!osoe_progress_poll(&osoe_am.progress))
+        if (!osoe_progress_poll(&osoe_am.progress) &&
+            !osoe_progress_peers_ended(&osoe_am.progress, pe))
             osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
 }
 

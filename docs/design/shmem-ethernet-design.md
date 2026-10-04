@@ -149,9 +149,9 @@ following hold, and RoCE work waits until after it:
 
 1. OpenSHMEM 1.5 complete: contexts and `SHMEM_THREAD_MULTIPLE` (phase 1 step
    8, three slices).
-2. OpenSHMEM 1.6 complete but for the known non-conformance §7.4 records: the
-   scans (§9.10.10) built, beside the block-strided RMA and the sessions
-   already there.
+2. OpenSHMEM 1.6 complete: the scans (§9.10.10) built, beside the
+   block-strided RMA and the sessions already there, and with them the two
+   limits §7.4 once recorded (item 6).
 3. The SOS test suite passes every program except those using SOS's own
    extensions (§8.6, the runbook's §8 names them).
 4. The Pi runbook green end to end, with the floor ratios, `osoe-bench` and the
@@ -462,7 +462,7 @@ mistake as a second data socket, in a different place.
 | `OSOE_AM_CHUNK` | 64 KiB | §3.2's fragmentation size, and so the largest message on the wire |
 | `OSOE_AM_BUFFER` | `2 × chunk` | Bytes per connection buffer; a power of two, refused below the floor |
 | `OSOE_AM_BUFFER_BUDGET` | 256 MiB | Per-node ceiling on `2 × (nodes − 1) × buffer` |
-| `OSOE_AM_HUGEPAGES` | 0 | Opt in to huge pages for the area |
+| `OSOE_AM_HUGEPAGES` | 0 | Opt in to huge pages for the area - no effect as built: the area is a `/dev/shm` object, on which Linux refuses `MAP_HUGETLB` |
 
 **The floor is the default, because everything except aggregation pushes down.**
 §3.2 bounds head-of-line blocking at roughly two segments — about 2 ms on 1 GbE
@@ -492,7 +492,13 @@ tests set the sizes explicitly rather than inheriting the production default.
 Connection buffers are touched sparsely, because a halo exchange faults six
 peers' worth of the whole area; `hugetlbfs` pages are reserved up front, so
 opting in trades away exactly the demand paging that makes a large node count
-affordable.
+affordable. *As built, the opt-in has no effect*: it adds `MAP_HUGETLB` to the
+mapping of the area's `/dev/shm` object, and Linux refuses that flag for a file
+that is not on hugetlbfs, before it looks for a page - so every PE warns and
+maps ordinary pages, whatever huge pages are reserved (the step-2 review's F9,
+and the release fixes' review found it again). A `/dev/shm` mounted `huge=always`
+or `within_size` gives the area transparent huge pages regardless. A hugetlbfs
+area is designed and not built.
 
 **Known and not addressed: NUMA first touch.** On a multi-socket node the lead
 creates the area, so first touch places every buffer on the lead's NUMA node and
@@ -1052,6 +1058,16 @@ third class, reply credits, is indivisible, and has the handoff below.
 - Buffer becomes `OPEN` (divisible: 192 KB free, 30 waiters needing 200 B each)
   → **wake many.** Waking one creates a serial chain with a scheduling delay per
   link; at 30 deep on a Pi that is milliseconds of pointless latency.
+  *As built the room is divisible for small messages only*: a buffer reopened at
+  the default sizes, twice `OSOE_AM_CHUNK` less its header, has room for one
+  64 KiB message, so writers of messages that large - a node's PEs putting to
+  one node at once, an alltoall's step - wake together and all but one sleep
+  again (the release fixes' review, S1). Measured in the VM: the wakes as
+  counted, a few microseconds of the agent's a reopening at 32 writers, no fall
+  in the node's rate, and a bare wake-one 10-25% slower at 4 and 16 writers -
+  this paragraph's own chain. The fix is a hand-on wake - a writer that reserves
+  and leaves room wakes the next, and a woken writer that finds none passes the
+  wake on - after release, `wait_word_model.py` first.
 - Single descriptor frees (indivisible) → **wake one.** Waking more is a
   thundering herd; at 256 local PEs, 255 threads wake and immediately re-sleep.
 
@@ -5678,7 +5694,16 @@ small for the node's heaps, among them. Three rules close it:
   or failed segment of another launch for the leftover it is, waiting for this
   launch's lead to reclaim it, as `tell_the_lead` does (the adversarial read of
   2026-10-03: a refusal's leftover had made the next start with the same ids
-  fail, four times in ten).
+  fail, four times in ten). The job tables and the connection area, which a
+  node-mate also opens by name, carry no launch: it takes them only from the
+  lead whose segment it joined, by the creator's pid each header records, and
+  waits past one another start left - ready, or of another size - for that lead
+  to replace it (`job.c`, `connection-area.c`; the round-four review's
+  correctness F1, which found a requeued start binding both and ending as a
+  false deadlock). A new lead with the dead lead's pid would defeat the check,
+  which on one node and within a requeue is a coincidence of `pid_max` - though
+  a launch in its own pid namespace makes equal pids likely, if `/dev/shm`
+  outlives the launch.
 - *The lead makes the segment before anything that can refuse*: the `/dev/shm`
   check comes after it exists and refuses through `failed`; the pages the lead
   writes first are allocated, not only sized, so a `/dev/shm` too full even for
@@ -5744,7 +5769,7 @@ the ones it meets when it creates its own, a leftover whose creator is gone
 site's epilog may remove `/dev/shm/osoe.<job>.*` at the end of every job. Heaps
 are ordinary pages of `/dev/shm`, under the same names: no code asks for huge
 pages for them (`MAP_HUGETLB` is used only by the connection area, when
-`OSOE_AM_HUGEPAGES=1`, §3.4). Every process maps every node-mate's heap, so a
+`OSOE_AM_HUGEPAGES=1`, and Linux refuses it there, §3.4). Every process maps every node-mate's heap, so a
 PE's page tables grow with the bytes it touches in all of them; a hugetlbfs path
 was designed and is not built.
 

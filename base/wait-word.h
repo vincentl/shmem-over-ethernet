@@ -22,9 +22,12 @@
  * the check, the value published by a release store - each lose a wake.
  *
  * **Every waiter is woken** (§3.11: the wake count tracks divisibility). The
- * values this carries are divisible: each quiet waits for its own sequence, and
- * each writer has its own reservation to retry. A credit, which only one
- * waiter can take, is not one of them.
+ * values this carries are divisible, or nearly: each quiet waits for its own
+ * sequence, and each writer has its own reservation to retry - though a buffer
+ * reopened at the default sizes has room for one message of OSOE_AM_CHUNK,
+ * so writers of messages that large wake together and all but one sleep again
+ * (the release fixes' review, S1; a hand-on wake is the after-release fix). A
+ * credit, which only one waiter can take, is not one of them.
  *
  * The value is the caller's, and so are its stores and loads: this holds only
  * the word and the count, and says nothing about what the value is.

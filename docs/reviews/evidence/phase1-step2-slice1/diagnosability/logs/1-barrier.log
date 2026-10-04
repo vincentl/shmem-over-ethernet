@@ -188,15 +188,15 @@ osoe-stat: /dev/shm/osoe.628951.0.2.conn.0 is not an osoe control segment (magic
 $ <repo>/build/scratch/review-diagnosability/tree/build/debug/tools/stat/osoe-stat --threads /dev/shm/osoe.628951.0.2.conn.0
 osoe-stat: /dev/shm/osoe.628951.0.2.conn.0 is not an osoe control segment (magic 0x61657261656f736f)
 
--rw-------  1 vincent vincent 151552 Sep 20 13:42 osoe.628951.0.0.0
--rw-------  1 vincent vincent 526848 Sep 20 13:42 osoe.628951.0.0.conn.0
--rw-------  1 vincent vincent 151552 Sep 20 13:42 osoe.628951.0.1.0
--rw-------  1 vincent vincent 526848 Sep 20 13:42 osoe.628951.0.1.conn.0
--rw-------  1 vincent vincent 151552 Sep 20 13:42 osoe.628951.0.2.0
--rw-------  1 vincent vincent 526848 Sep 20 13:42 osoe.628951.0.2.conn.0
--rw-------  1 vincent vincent    664 Sep 20 13:42 osoe.628951.0.job.0
--rw-------  1 vincent vincent  33920 Sep 20 13:42 osoe.628951.0.wire.0.1.0
--rw-------  1 vincent vincent  33920 Sep 20 13:42 osoe.628951.0.wire.0.2.0
--rw-------  1 vincent vincent  33920 Sep 20 13:42 osoe.628951.0.wire.1.2.0
+-rw-------  1 user user 151552 Sep 20 13:42 osoe.628951.0.0.0
+-rw-------  1 user user 526848 Sep 20 13:42 osoe.628951.0.0.conn.0
+-rw-------  1 user user 151552 Sep 20 13:42 osoe.628951.0.1.0
+-rw-------  1 user user 526848 Sep 20 13:42 osoe.628951.0.1.conn.0
+-rw-------  1 user user 151552 Sep 20 13:42 osoe.628951.0.2.0
+-rw-------  1 user user 526848 Sep 20 13:42 osoe.628951.0.2.conn.0
+-rw-------  1 user user    664 Sep 20 13:42 osoe.628951.0.job.0
+-rw-------  1 user user  33920 Sep 20 13:42 osoe.628951.0.wire.0.1.0
+-rw-------  1 user user  33920 Sep 20 13:42 osoe.628951.0.wire.0.2.0
+-rw-------  1 user user  33920 Sep 20 13:42 osoe.628951.0.wire.1.2.0
 # launcher exit 1
 # left in /dev/shm afterwards:
