@@ -5090,7 +5090,7 @@ team's members, then the descriptor's arrays are freed; the number, its blocks
 and records stay.
 
 *As built (the team redesign's step D, part 1, layout 29;
-`docs/design/team-resources-proposal.md` D3, `docs/prompts/phase1-step7-slice3-prompt.md`).*
+`docs/design/team-resources-proposal.md` D3, `docs/prompts/done/phase1-step7-slice3-prompt.md`).*
 A node's blocks for teams are a **pool**, `OSOE_TEAM_BLOCKS` of them (default
 1,024, 8 to 65,536, agreed among a node's PEs and free to differ between nodes),
 ending the node header as the per-number blocks did - the first three the

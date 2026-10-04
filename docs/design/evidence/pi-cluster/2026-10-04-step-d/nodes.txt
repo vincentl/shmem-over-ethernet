@@ -1,0 +1,24 @@
+== pi-002
+== pi-001
+== pi-004
+rx-usecs:	49
+rx-usecs:	49
+rx-usecs:	49
+tcp-segmentation-offload: off
+generic-segmentation-offload: off
+tcp-segmentation-offload: off
+generic-segmentation-offload: off
+tcp-segmentation-offload: off
+generic-segmentation-offload: off
+6.18.50+rpt-rpi-2712
+6.18.50+rpt-rpi-2712
+6.18.50+rpt-rpi-2712
+2026-10-02 17:10:40
+== pi-003
+2026-10-02 17:10:40
+2026-10-02 17:10:42
+rx-usecs:	49
+tcp-segmentation-offload: off
+generic-segmentation-offload: off
+6.18.50+rpt-rpi-2712
+2026-10-02 17:10:41

@@ -590,3 +590,46 @@ the messages a second):
 | barrier | 180.9 / 167.4: 8% more time | 200.9 / 196.4: 2 to 4% more time |
 | 8-byte reduce | 211.1 / 190.6: 11% more time | 223.6 / 202.3: 11% more time |
 | 8-byte broadcast | 211.2 / 187.4: 13% more time | 220.2 / 197.5: 11% more time |
+
+## Step D's merge point (2026-10-04)
+
+Release builds at 4 × 4 under Slurm's default binding, `osoe-bench` three times
+each way, alternating, driven from `pi-login`; kernel 6.18.50, interrupt
+coalescing at 49 µs, TCP and generic segmentation offload off - as on
+2026-09-28 - the nodes up since 2026-10-02. The record is
+`docs/decisions/2026-10-04-step-d-merge-point.md`; the raw outputs are
+`docs/design/evidence/pi-cluster/2026-10-04-step-d/`.
+
+Step D changes no data path, and its brief asked that nothing move beyond
+noise. D and the tree before it ran as they were before their last changes -
+comments, diagnostics and tests, none on a data path. Medians in µs, the range
+of the three runs' medians:
+
+| | before D (`c51ba87`) | with D | the records' tree (`b0e0b53`) | with D, again |
+|---|---|---|---|---|
+| barrier | 175.6 to 182.6 | 175.6 to 175.7 | 175.7 to 177.1 | 175.4 to 175.7 |
+| reduce, 8 B | 198.3 to 207.9 | 197.6 to 197.8 | 198.6 to 198.8 | 197.6 to 197.9 |
+| broadcast, 8 B | 195.8 to 204.9 | 195.2 to 195.4 | 195.5 to 195.7 | 195.3 to 195.5 |
+| fcollect, 8 B a PE | 247.9 to 266.7 | 262.3 to 266.6 | 262.1 to 270.9 | 264.6 to 267.3 |
+| alltoall, 8 B a PE | 345.0 to 349.5 | 343.3 to 344.3 | 344.7 to 345.6 | 343.6 to 345.1 |
+| reduce, 64 KiB | 2,389 to 2,398 | 2,387 to 2,388 | 2,387 to 2,389 | 2,387 to 2,388 |
+| broadcast, 64 KiB | 1,875 to 1,882 | 1,873 to 1,876 | 1,874 to 1,888 | 1,872 to 1,879 |
+| fcollect, 4 KiB a PE | 684.8 to 686.3 | 685.3 to 686.0 | 685.5 to 688.5 | 684.7 to 687.0 |
+| alltoall, 4 KiB a PE | 2,563 to 2,601 | 2,542 to 2,644 | 2,542 to 2,630 | 2,562 to 2,589 |
+
+With D and without it, every line's median of medians is within 1% of the
+other's, but the 4 KiB alltoall's, 2%, inside its runs' spread; the first run
+before D was the slowest of its three in the small collectives. The point-to-
+point lines - put and quiet, get and fetch-add, 8 B to 1 MiB - are within 1%
+too (the raw files).
+
+Against the records of 2026-09-28 (above), the barrier is within its 176 to
+183, and the 8-byte reduce and broadcast are 6 and 7% faster than that
+morning's 211.1 and 211.2. So the tree measured then (`b0e0b53`,
+source-identical to `f561e2d`) ran again, alternating with D's: the same
+lines as D's, within 1% on every line. The code since the records moves
+nothing; the cluster runs these collectives faster than it did that morning,
+with the same kernel and NIC settings. The author put it down to the cluster's
+rebuild - how its nodes are plugged into the switch can move these lines - and
+accepted it: these runs are the baseline step E is measured against, run
+alternately on the day.

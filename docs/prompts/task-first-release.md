@@ -30,11 +30,12 @@ Read first, in this order: `CLAUDE.md`; `docs/README.md`;
    day's record, all untracked today. Then the small fixes, global exit,
    start-up, the README's own items, the scrub, the whole-tree verification.
    About a week.
-2. **`docs/prompts/phase1-step7-slice3-prompt.md`**: step D of the team
+2. **`docs/prompts/done/phase1-step7-slice3-prompt.md`**: step D of the team
    redesign (`docs/design/team-resources-proposal.md` §3), two parts and a
    merge point. About two weeks.
 3. **Step E** (the proposal §4): write its brief first, from the proposal and
-   D's record, in the form of D's brief - it is the proposal's build plan,
+   D's record, in the form of D's brief (written on 2026-10-04 as
+   `docs/prompts/phase1-step7-slice4-prompt.md`) - it is the proposal's build plan,
    not a new design, so build from it without waiting, and put any point
    where it departs from the proposal to the author before building that
    point. About two weeks.

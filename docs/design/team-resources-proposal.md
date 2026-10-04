@@ -500,8 +500,9 @@ leaves temporary marked so.
    and design notes for both steps.
 
 About two weeks a step. The briefs: `phase1-step7-slice3-prompt.md` for D
-(slices 1 and 2 above, its own two parts), written 2026-10-02; E's after D
-has merged, from D's record.
+(slices 1 and 2 above, its own two parts), written 2026-10-02, done at its
+merge point on 2026-10-04 (`docs/prompts/done/`); `phase1-step7-slice4-prompt.md`
+for E (slices 3 and 4), written that day from D's record.
 
 ## 6. Models, tests, measurements
 

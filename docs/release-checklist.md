@@ -20,7 +20,9 @@ done; an open one, what is left.
   rebuilt: `shmem_team_reuse_teams` and `shmem_team_max` at 70 PEs, and
   `reduce_active_set`, `broadcast_active_set`, `collect_active_set` and
   `repeated_barriers` at 70 PEs with no iteration skipped
-  (`docs/prompts/phase1-step7-slice3-prompt.md`, acceptance).
+  (`docs/prompts/done/phase1-step7-slice3-prompt.md`, acceptance; met on step
+  D's tree, `docs/decisions/2026-10-03-team-allocation.md`, "Acceptance", and to
+  be run again on the tree to be tagged).
 - [ ] **The Pi runbook green end to end** on the cluster as rebuilt on
   2026-09-28 - the tree copied and built per `docs/pi-cluster.md` §2 - with the
   floor ratios, `osoe-bench` and the collective sweeps recorded in
@@ -42,7 +44,8 @@ done; an open one, what is left.
   Round four, at the fixes' merge point (2026-10-03,
   `docs/reviews/archive/phase1-release-fixes-review.md`), said the same, its
   named changes merged on 2026-10-04 (`docs/decisions/2026-10-04-review-fixes.md`).
-  The full review runs again after the teams' step D and after step E
+  The full review runs again after the teams' step D - at its merge point,
+  `docs/reviews/archive/phase1-step7-slice3-review.md` - and after step E
   (`docs/prompts/task-first-release.md`).
 - [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
   tagged. Evidence so far: two hours on the round-three candidate, `b0e0b53`,
@@ -106,3 +109,8 @@ blocks the tag.
   declared (M5).
 - **A test past 16 logical nodes** of the global exit and a proved deadlock
   (scale, minor 1).
+- **A team of one PE claims no pool block**, maps no name and publishes its
+  epoch word without a block: a `split_2d` with `xrange` 1 makes one per PE, so
+  on a node of 256 PEs four of them empty the default pool (step D's second
+  part, its first adversarial read, item 5; documented in the README's
+  limits).

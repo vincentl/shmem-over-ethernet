@@ -4,9 +4,10 @@
 `done/`, under its own name, which this index still gives.
 
 **Open now:** one session's prompt, `task-first-release.md` (the arc, the
-order, how to spend the session), over the brief of step D of the team
-redesign, `phase1-step7-slice3-prompt.md` (`docs/design/team-resources-proposal.md`);
-step E's brief follows D's merge point. The two briefs written 2026-10-02 after
+order, how to spend the session), over the brief of step E of the team
+redesign, `phase1-step7-slice4-prompt.md` (`docs/design/team-resources-proposal.md`
+§4), written from step D's record at D's merge point; D's brief,
+`phase1-step7-slice3-prompt.md`, is done. The two briefs written 2026-10-02 after
 the round-three review (`docs/reviews/archive/phase1-release-review.md`) and
 the plan that validated its findings are done: `task-release-fixes.md`, every
 fix before the first release but the teams, merged with the fixes of the
@@ -91,5 +92,6 @@ and `docs/reviews/` do track the current names.
 | `phase1-release-fixes-prompt.md` | The review lead's brief after the round-three review (2026-09-28): the sixteen findings and its own fix sketches | answered by `phase1-release-fixes-plan.md` (2026-10-01/02): all sixteen hold; three of its fixes corrected (plan §1, points 3 to 5). Kept as given |
 | `phase1-release-fixes-plan.md` | The plan: each finding described, checked and given its options; nine decisions D1 to D9 for the author | D1 to D3 decided by the author on 2026-10-02 (only the caller carries a global exit's status; the start-up fixes' middle option; the team redesign, both steps before the tag), D4 to D9 as recommended (`docs/decisions/2026-10-02.md`) |
 | `task-release-fixes.md` | Every fix before the first release but the teams, for a fresh session: the record, the small code fixes, global exit, start-up, the README and records, the repository scrub, the whole-tree verification | done: Part 0 on `main` (9bbac4f, 2026-10-02); Parts 1 to 6 merged 2026-10-02 and 03 (`docs/decisions/2026-10-02-release-fixes.md`); the round-four review of the merge point, at `08b3da0` (`docs/reviews/archive/phase1-release-fixes-review.md`: release after named changes), and its fixes merged 2026-10-04 (`docs/decisions/2026-10-04-review-fixes.md`) |
-| `phase1-step7-slice3-prompt.md` | §7.1 step 7, slice 3: step D of the team redesign - a team number held by each member PE and given back at destroy; the node blocks from a pool found by name; two parts and a merge point before step E | in progress: Part 1 merged (the pool found by name, `OSOE_TEAM_BLOCKS`, the engine and the wire by block and name; `docs/decisions/2026-10-03-team-storage.md`); Part 2 merged (numbers per PE given back, blocks given back, handles by generation, `SHMEM_THREAD_MULTIPLE` splits by pending numbers; `docs/decisions/2026-10-03-team-allocation.md`); the merge point next |
+| `phase1-step7-slice3-prompt.md` | §7.1 step 7, slice 3: step D of the team redesign - a team number held by each member PE and given back at destroy; the node blocks from a pool found by name; two parts and a merge point before step E | done: Part 1 merged (the pool found by name, `OSOE_TEAM_BLOCKS`, the engine and the wire by block and name; `docs/decisions/2026-10-03-team-storage.md`); Part 2 merged (numbers per PE given back, blocks given back, handles by generation, `SHMEM_THREAD_MULTIPLE` splits by pending numbers; `docs/decisions/2026-10-03-team-allocation.md`); both on `main` at `d8a651d` on 2026-10-04 and the merge point passed that day (`docs/decisions/2026-10-04-step-d-merge-point.md`) |
+| `phase1-step7-slice4-prompt.md` | §7.1 step 7, slice 4: step E of the team redesign - a team number's counters and small slots, the large pieces through a lane per thread lent by a grant, `OSOE_SMALL_COLLECTIVE_BYTES`, the default of 256; two parts and a merge point | open |
 | `task-first-release.md` | The opening prompt of the session that takes the tree from the round-three review to the first tag: the arc, the order of the briefs, subagents and adversarial reads | open |
