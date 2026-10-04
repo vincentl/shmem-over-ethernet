@@ -390,6 +390,12 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "collectives round=2 timed collect world bytes=8: byte 0 of block 1 is [0-9a-f]+, not what PE 1 sent")
   pacer_plant(teams-exhaust "teams;--teams-exhaust"
     "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
+  # The renewal's and the exhaust's own check that the numbers come back: a
+  # status misread fires each, with nothing else changed.
+  pacer_plant(teams-renew teams
+    "teams round=[0-9]+ renew [a-z]+: a split returned 1: a number or a block was not given back")
+  pacer_plant(teams-back "teams;--teams-exhaust"
+    "teams exhaust: a split of the whole team after the [0-9]+ teams made were destroyed returned 1: their numbers did not come back")
   pacer_plant(print-hash print
     "print round=0 same: returned 2 lines, expected 1"
     ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
@@ -472,13 +478,15 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(tools.pacer.library.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
     PASS_REGULAR_EXPRESSION "library nodes=2 bytes_sent=[1-9][0-9]* .*osoe-pacer failures=0 "
     FAIL_REGULAR_EXPRESSION "${pacer_failed}")
-  # Splitting until the job's team numbers run out: the split must return
-  # nonzero on every PE, and the job go on (design §5.7).
+  # Splitting until a PE's team numbers run out: the split must return nonzero
+  # on every PE, and the job go on; then the teams made are destroyed, and a
+  # split of the whole team must succeed on every PE, since the numbers come
+  # back at destroy (design §5.7).
   add_test(NAME tools.pacer.teams-exhaust.0-0-1-1
     COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --teams-exhaust
             teams)
   set_tests_properties(tools.pacer.teams-exhaust.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
-    PASS_REGULAR_EXPRESSION "teams exhausted after [0-9]+ splits.*osoe-pacer failures=0 "
+    PASS_REGULAR_EXPRESSION "teams exhausted after [0-9]+ splits.*one more split of the whole team succeeded on every PE.*osoe-pacer failures=0 "
     FAIL_REGULAR_EXPRESSION "${pacer_failed}")
 
   # parallel_print checking its own lines, which pins the label format; on

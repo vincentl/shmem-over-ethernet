@@ -94,7 +94,12 @@ directory is `tools/pacer/`, the target `osoe-pacer`, and the briefs are
    them, and exhausts the limit only in a dedicated short mode that checks
    the split's nonzero return. This is worth the author's attention beyond
    the tool: an application that makes a sub-team per iteration runs out of
-   numbers after 61 iterations at the default.
+   numbers after 61 iterations at the default. *Since the team redesign's
+   step D (2026-10-03) a number is each PE's own and a destroyed team gives
+   it back: the exercise renews a strided team every third round, and the
+   exhaust mode splits once more after destroying what it made
+   (`tools/pacer/teams.c`); a program that keeps every team it makes still
+   meets the limit, at 61 teams a PE.*
 9. **Scale rules for the tool itself.** No structure larger than O(N) per PE
    (N the job size), the same bar the library is held to, so the tool still
    runs at the hundreds-of-nodes target and a 1M-PE run would cost 16 MB a
@@ -419,7 +424,11 @@ zero, `fcollect`, `alltoall`, `sum_inscan` and `sum_exscan`, `team_sync`.
 Every input is (PE, round)-determined, so every PE can compute every result.
 Destroy and re-split happen only within the budget; `--teams-exhaust`, a
 separate short mode, creates until the split returns nonzero, checks that
-it did on every PE and that the job goes on, and stops.
+it did on every PE and that the job goes on, and stops. *As built since the
+team redesign's step D: no budget - the exercise holds at most six numbers a
+PE, four strided teams and a whole-team grid's two - a strided team renewed
+every third round, destroyed and split anew, and `--teams-exhaust` destroying
+what it made and splitting once more, which must succeed on every PE.*
 
 Covers: `team_split_strided`, `team_split_2d`, `team_destroy`,
 `team_create_ctx`, `ctx_get_team`, `team_get_config`, `team_n_pes`,

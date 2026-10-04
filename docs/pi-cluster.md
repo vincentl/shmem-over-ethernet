@@ -285,9 +285,10 @@ srun -K1 -N4 --ntasks-per-node=4 build/release/tools/pacer/osoe-pacer-start-pes-
     --coverage coverage-start-pes.txt
 ```
 
-`--teams-exhaust teams`, alone, splits until the job's team numbers are gone
-and checks that the split refuses alike on every PE; it is a test's, not a
-measurement.
+`--teams-exhaust teams`, alone, splits until a PE's team numbers are gone,
+checks that the split refuses alike on every PE, and after destroying what it
+made splits once more, which must succeed on every PE - the numbers given back;
+it is a test's, not a measurement.
 
 Keep the outputs, under `docs/design/evidence/pi-cluster/<date>/pacer/`. The
 numbers for `docs/pi-cluster-results.md`: the sort's keys a second under each

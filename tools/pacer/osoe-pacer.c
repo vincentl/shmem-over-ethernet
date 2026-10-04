@@ -86,7 +86,7 @@ static const char *const plant_names[PACER_PLANTS] = {
     "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold", "print-route",
     "rma-signal", "waits-value", "waits-index", "waits-excluded", "deprecated-reduce",
     "deprecated-data", "deprecated-outside", "deprecated-barrier", "deprecated-amo",
-    "deprecated-wait", "deprecated-word", "waits-count"
+    "deprecated-wait", "deprecated-word", "waits-count", "teams-renew", "teams-back"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -96,7 +96,8 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "memory", "collectives", "collectives", "collectives", "collectives", "atomics", "atomics",
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
     "memory", "print", "print", "rma", "waits", "waits", "waits", "deprecated", "deprecated",
-    "deprecated", "deprecated", "deprecated", "deprecated", "deprecated", "waits"
+    "deprecated", "deprecated", "deprecated", "deprecated", "deprecated", "waits", "teams",
+    "teams"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -168,6 +169,8 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 writes one deprecated wait's word wrong",
     "PE 1 sends one deprecated atomic a wrong value",
     "PE 1 misreads one count a _some form returned",
+    "PE 1 misreads the status of one renewal's split",
+    "PE 1 misreads the status of the split that follows the exhaust's destroys",
 };
 
 static void usage(FILE *out)
@@ -182,7 +185,8 @@ static void usage(FILE *out)
 "  alltoall  every-to-every exchange eight ways, on the world and on `even'\n"
 "  mailbox   messages with signals, waited for by every wait and test form\n"
 "  teams     teams of every shape, their queries, collectives on rows and\n"
-"            columns at once\n"
+"            columns at once, a strided team destroyed and split anew every\n"
+"            few rounds\n"
 "  atomics   every atomic operation on every type, on three contexts\n"
 "  rma       a halo put and fenced to a flag, and every transfer of every\n"
 "            type and size, strided, blocked, nonblocking, and by shmem_ptr\n"
@@ -223,7 +227,8 @@ static void usage(FILE *out)
 "  --no-ptr            put to node-mates rather than store through shmem_ptr\n"
 "  --threads T         the threads exercise's workers a PE (default 4); T + 1\n"
 "                      at most OSOE_MAX_THREADS (the library's, default 16)\n"
-"  --teams-exhaust     the teams exercise splits until a split fails, and\n"
+"  --teams-exhaust     the teams exercise splits until a split fails, checks\n"
+"                      that destroying what it made gives the numbers back, and\n"
 "                      stops; teams must be the only exercise named\n"
 "  --mix-teams K       mix: the teams the world is split into, 1 to 6 (default\n"
 "                      4 from 8 PEs, 2 from 4, else 1)\n"
@@ -603,9 +608,10 @@ static int parse(int argc, char **argv)
         chosen[chosen_count++] = &pacer_memory;
         chosen[chosen_count++] = &pacer_collectives;
     }
-    /* Exhausting the job's team numbers leaves none for any exercise after. */
+    /* Exhausting a PE's team numbers is a mode of the teams exercise of its
+     * own, done at setup, with which that exercise ends. */
     if (options.teams_exhaust && (chosen_count != 1 || chosen[0] != &pacer_teams))
-        return refuse("--teams-exhaust uses up the job's team numbers: name teams alone");
+        return refuse("--teams-exhaust is the teams exercise's mode of its own: name teams alone");
     if (options.plant != PACER_PLANT_NONE) {
         int present = 0;
         for (int j = 0; j < chosen_count; j++)

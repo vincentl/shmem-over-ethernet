@@ -357,8 +357,9 @@ static void make_view(struct team_view *team, shmem_team_t handle, const char *n
 }
 
 /* The even PEs of a team, split once for each team the exercise runs on and
- * kept: a team's number is never reused (design §5.7), so a split a period
- * would spend the job's numbers. */
+ * kept until teardown: a split is a collective over the parent, and the
+ * exercise, rebound to a team every period under mix, need not pay one each
+ * time. */
 enum { PARENTS = 8 };
 static struct {
     shmem_team_t parent, even;

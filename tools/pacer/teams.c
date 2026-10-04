@@ -3,24 +3,31 @@
  * teams - teams of every shape, their queries, and collectives on many teams
  * at once (proposal §4.3; docs/prompts/task-stress-phase2.md).
  *
- * **Made once, from a budget.** A team's number is never reused (design §5.7):
- * a job creates OSOE_MAX_TEAMS - 3 teams in its life, 61 at the default, and a
- * split_2d spends one number a row and one a column. So this exercise makes
- * its teams at setup, from a budget of 16 numbers, and keeps them: a strided
- * team of random start, stride and size; one with a negative stride; a team
- * of one, by the stride 0 the spec allows it; a split of the first; and a grid
- * - split_2d - of the whole team when its rows and columns fit what is left,
- * else of a strided team of its first PEs. The header says what it spent.
- * `--teams-exhaust` is the other mode: it splits until a split returns
- * nonzero, checks that it did on every PE and that the job goes on, and stops.
+ * **Made at setup, and renewed as it runs.** A team's number is each PE's own,
+ * and a destroyed team gives it back (design §5.7), so what the exercise costs
+ * a PE is what it holds at once: STRIDED numbers for the strided teams - one
+ * of random start, stride and size; one with a negative stride; a team of one,
+ * by the stride 0 the spec allows it; a split of the first - and two for the
+ * grid, which is always of the whole team: split_2d takes two numbers of every
+ * PE, its row's and its column's, however large the grid. The header's
+ * `numbers=` is the most one PE holds. Every RENEW_EVERY rounds the exercise
+ * renews one strided team, rotating which: it destroys the context it made of
+ * the team, frees the team's buffers, destroys the team, and splits another of
+ * the same kind in its place - a fresh start, stride and size drawn from the
+ * stream setup draws from, alike on every PE - so that the library gives
+ * numbers and nodes' blocks back and takes them again while the other teams'
+ * collectives run. `--teams-exhaust` is the other mode: it splits until a
+ * split returns nonzero, checks that it did on every PE and that the job goes
+ * on, destroys what it made, checks that a split of the whole team then
+ * succeeds on every PE - the numbers are back - and stops.
  *
  * **Every team is a progression of world ranks** - a split of a progression
  * is one, and so is a grid's row or column - so every answer is arithmetic.
- * Checked at setup, for each team: SHMEM_TEAM_INVALID exactly outside it;
- * team_n_pes, team_my_pe; team_translate_pe to the world for every member and
- * from the world for every PE, and between a grid's row and column;
- * team_get_config; team_ptr non-NULL exactly for node-mates; a context of the
- * team whose ctx_get_team names it.
+ * Checked for each team as it is made, at setup or by a renewal:
+ * SHMEM_TEAM_INVALID exactly outside it; team_n_pes, team_my_pe;
+ * team_translate_pe to the world for every member and from the world for every
+ * PE, and between a grid's row and column; team_get_config; team_ptr non-NULL
+ * exactly for node-mates; a context of the team whose ctx_get_team names it.
  *
  * **Rounds of collectives on many teams at once.** Each round every grid
  * member does one collective on its row and one on its column - the even rows
@@ -35,7 +42,8 @@
  * or O(size) for fcollect. Every input is (world PE, round, element)-
  * determined, so every member computes every result. A team's buffers come in
  * two, by round parity, so that no member's next collective on it writes a
- * buffer another member is still checking.
+ * buffer another member is still checking; a renewal frees a team's and
+ * allocates its successor's, on every PE, members or not, as setup does.
  */
 #define _GNU_SOURCE
 #include <math.h>
@@ -49,7 +57,11 @@
 #include "exercise.h"
 #include "random.h"
 
-enum { BUDGET = 16, ELEMENTS = 4, STRIDED = 4, GRID_ROW = STRIDED, GRID_COLUMN, TEAMS };
+/* TEAMS - the strided teams, a row and a column - are the most a PE is in at
+ * once, and each holds one of its numbers. A strided team is renewed every
+ * RENEW_EVERY rounds, in turn: three, so that --quick's 15 rounds renew all
+ * four. */
+enum { ELEMENTS = 4, STRIDED = 4, GRID_ROW = STRIDED, GRID_COLUMN, TEAMS, RENEW_EVERY = 3 };
 enum kind {
     SUM, MAX, MIN, PRODUCT, AND, OR, XOR, DOUBLE_SUM, BROADCAST, COLLECT, FCOLLECT, ALLTOALL,
     INSCAN, EXSCAN, SYNC, KINDS
@@ -61,7 +73,7 @@ static const char *const kind_names[KINDS] = {
 };
 /* The strided teams' turns: each O(1) a member but fcollect's O(size). */
 static const enum kind strided_kinds[] = { SUM, MAX, XOR, BROADCAST, FCOLLECT, INSCAN, SYNC };
-static const char *const phase_names[] = { "grid", "strided", "check", NULL };
+static const char *const phase_names[] = { "grid", "strided", "check", "renew", NULL };
 
 struct team {
     const char *name;
@@ -81,17 +93,21 @@ static struct {
     uint64_t seed;
     int exhaust;
     int plant_query, plant_collective, plant_exhaust, plant_member, plant_ring;
+    int plant_renew, plant_back;
     int query_planted, collective_planted[KINDS];
-    int grid_size, columns, rows;   /* the grid's parent size, and its shape */
-    int grid_row_index;             /* this PE's row in the grid, or -1 */
-    int spent;                      /* team numbers */
+    int columns, rows;              /* the grid's shape: of the whole team */
+    int grid_row_index;             /* this PE's row in the grid */
     /* the teams */
-    shmem_team_t team, grid_parent;
+    shmem_team_t team;
     int n, me_world;
+    struct team world;              /* the exercise's team, as the strided teams' parent */
     struct team teams[TEAMS];
     long *ring;                     /* symmetric [TEAMS]: the contexts' round trip */
+    uint64_t state;                 /* the strided teams' draws: the same stream on every PE */
     long round;
-    double collectives, phase[3];
+    long renewals;                  /* strided teams renewed, the same on every PE */
+    int last;                       /* the step in hand is the last */
+    double collectives, phase[4];   /* seconds: grid, strided, check, renew */
 } teams;
 
 static int member_of(const struct team *t, int world, int *rank)
@@ -109,7 +125,8 @@ static int member_of(const struct team *t, int world, int *rank)
     return 1;
 }
 
-/* The grid of `size` PEs with the fewest numbers: columns near the square root. */
+/* The grid of `size` PEs: columns near the square root, so that rows and
+ * columns are about as long as each other. */
 static void grid_shape(int size, int *columns, int *rows)
 {
     int c = (int)ceil(sqrt((double)size));
@@ -127,36 +144,28 @@ static uint64_t teams_memory(int npes, const struct pacer_options *options, char
     teams.plant_exhaust = options->plant == PACER_PLANT_TEAMS_EXHAUST;
     teams.plant_member = options->plant == PACER_PLANT_TEAMS_MEMBER;
     teams.plant_ring = options->plant == PACER_PLANT_TEAMS_RING;
+    teams.plant_renew = options->plant == PACER_PLANT_TEAMS_RENEW;
+    teams.plant_back = options->plant == PACER_PLANT_TEAMS_BACK;
     if (teams.exhaust) {
         snprintf(fields, size, "mode=exhaust");
         return 0;
     }
-    /* The grid: the whole team's if its rows and columns fit what the four
-     * strided teams leave, else of its first PEs, one number more. */
-    int columns, rows, grid = npes;
-    grid_shape(grid, &columns, &rows);
-    if (STRIDED + columns + rows > BUDGET) {
-        while (STRIDED + 1 + columns + rows > BUDGET) {
-            grid--;
-            grid_shape(grid, &columns, &rows);
-        }
-    }
-    teams.grid_size = grid;
-    teams.columns = columns;
-    teams.rows = rows;
-    teams.spent = STRIDED + columns + rows + (grid < npes);
+    /* The grid is of the whole team: split_2d takes two numbers of every PE,
+     * whatever the grid's size. */
+    grid_shape(npes, &teams.columns, &teams.rows);
     uint64_t n = (uint64_t)npes, buffers = 0;
+    uint64_t side = (uint64_t)(teams.rows > teams.columns ? teams.rows : teams.columns);
     for (int k = 0; k < STRIDED; k++)
         buffers += 2 * (3 * ELEMENTS + n) * 8 * 3;
-    buffers += 2 * 2 * (3 * ELEMENTS + (uint64_t)(rows > columns ? rows : columns) * ELEMENTS) * 8 * 3;
+    buffers += 2 * 2 * (3 * ELEMENTS + side * ELEMENTS) * 8 * 3;
     uint64_t symmetric = buffers + TEAMS * 8;
     if (symmetric > options->memory) {
         snprintf(fields, size, "%d PEs' team buffers need %llu bytes", npes,
                  (unsigned long long)symmetric);
         return UINT64_MAX;
     }
-    snprintf(fields, size, "numbers=%d strided=%d grid=%dx%d%s kinds=%d", teams.spent, STRIDED,
-             rows, columns, grid < npes ? " grid_of_first" : "", KINDS);
+    snprintf(fields, size, "numbers=%d strided=%d grid=%dx%d renew_every=%d kinds=%d", TEAMS,
+             STRIDED, teams.rows, teams.columns, RENEW_EVERY, KINDS);
     return symmetric;
 }
 
@@ -180,6 +189,71 @@ static int allocate_buffers(struct team *t, size_t members)
             return -1;
     }
     return 0;
+}
+
+/* A team's buffers back, in the reverse of the order they came. shmem_free is
+ * collective, so every PE frees them alike, members of the team or not. */
+static void release_buffers(struct team *t)
+{
+    for (int p = 1; p >= 0; p--) {
+        shmem_free(t->doubles[p]);
+        shmem_free(t->words[p]);
+        shmem_free(t->longs[p]);
+        t->doubles[p] = NULL;
+        t->words[p] = NULL;
+        t->longs[p] = NULL;
+    }
+}
+
+/*
+ * Strided team k, made: its triplet in the whole team drawn from the stream -
+ * three words for the first and the negative, one for the team of one, none for
+ * the split, which takes every other member of the first from its second - its
+ * progression in world ranks, and the split. Setup draws the four in turn, and
+ * a renewal the one it renews, so that every PE, which draws and splits alike,
+ * is given the same teams. A member gets its handle, any other PE
+ * SHMEM_TEAM_INVALID. Nonzero when the split is.
+ */
+static int make_strided(int k)
+{
+    static const char *const names[STRIDED] = { "strided", "negative", "one", "split" };
+    struct team *t = &teams.teams[k];
+    const struct team *parent = &teams.world;
+    shmem_team_t parent_handle = teams.team;
+    uint64_t *state = &teams.state;
+    int n = teams.n, start, stride, size;
+    switch (k) {
+    case 0:                         /* random start, stride and size */
+        stride = 1 + (int)(random_next(state) % (uint64_t)(n > 3 ? n / 3 : 1));
+        size = 1 + (int)(random_next(state) % (uint64_t)((n - 1) / stride + 1));
+        start = (int)(random_next(state) % (uint64_t)(n - (size - 1) * stride));
+        break;
+    case 1: {                       /* a negative stride, from the top */
+        int down = 1 + (int)(random_next(state) % (uint64_t)(n > 2 ? n / 2 : 1));
+        size = 1 + (int)(random_next(state) % (uint64_t)((n - 1) / down + 1));
+        start = (size - 1) * down +
+                (int)(random_next(state) % (uint64_t)(n - (size - 1) * down));
+        stride = -down;
+        break;
+    }
+    case 2:                         /* a team of one, by stride 0 */
+        start = (int)(random_next(state) % (uint64_t)n);
+        stride = 0;
+        size = 1;
+        break;
+    default:                        /* a split of the first, every other member from its second */
+        parent = &teams.teams[0];
+        parent_handle = parent->handle;
+        start = parent->size > 1 ? 1 : 0;
+        stride = parent->size > 1 ? 2 : 1;
+        size = parent->size > 1 ? parent->size / 2 : 1;
+        break;
+    }
+    *t = (struct team){ .name = names[k], .handle = SHMEM_TEAM_INVALID };
+    progression(t, parent, start, stride, size);
+    if (parent_handle == SHMEM_TEAM_INVALID)    /* not a member of the parent: no split to join */
+        return 0;
+    return shmem_team_split_strided(parent_handle, start, stride, size, NULL, 0, &t->handle);
 }
 
 /* Every query against arithmetic. */
@@ -259,10 +333,12 @@ static void check_queries(struct team *t, const struct team *world_team)
 static int exhaust(void)
 {
     /* Splits of the whole team until one returns nonzero. Each PE's count of
-     * successes must be every PE's, and the job must go on. */
+     * successes must be every PE's, the job must go on, and the numbers the
+     * splits took must come back with the teams: a split of the whole team
+     * after they are destroyed succeeds on every PE. */
     enum { MOST = 1024 };
     shmem_team_t *made = calloc(MOST, sizeof *made);
-    long *counts = shmem_malloc(2 * sizeof *counts);
+    long *counts = shmem_malloc(4 * sizeof *counts);
     if (!made || !counts)
         return -1;
     int count = 0;
@@ -278,16 +354,84 @@ static int exhaust(void)
         pacer_failure("teams exhaust: this PE made %ld teams before a split failed, another %ld",
                       counts[0], most);
     shmem_team_sync(teams.team);    /* the job goes on */
-    if (shmem_team_my_pe(teams.team) == 0) {
-        printf("teams exhausted after %d splits of the whole team, then the split returned "
-               "nonzero on every PE\n", count);
-        fflush(stdout);
-    }
     for (int k = 0; k < count; k++)
         shmem_team_destroy(made[k]);
+    /* The numbers, and the nodes' blocks, are back. */
+    shmem_team_t again = SHMEM_TEAM_INVALID;
+    int status = shmem_team_split_strided(teams.team, 0, 1, teams.n, NULL, 0, &again);
+    if (teams.plant_back && teams.me_world == 1)
+        status = 1;                 /* the planted defect: the split's status misread */
+    int back = status == 0 && again != SHMEM_TEAM_INVALID;
+    if (!back)
+        pacer_failure("teams exhaust: a split of the whole team after the %d teams made were "
+                      "destroyed returned %d: their numbers did not come back", count, status);
+    shmem_team_destroy(again);
+    counts[2] = back;
+    shmem_long_sum_reduce(teams.team, counts + 3, counts + 2, 1);
+    if (shmem_team_my_pe(teams.team) == 0) {
+        char outcome[96] = "succeeded on every PE, and was destroyed";
+        if (counts[3] != teams.n)
+            snprintf(outcome, sizeof outcome, "failed on %ld of %d PEs", teams.n - counts[3],
+                     teams.n);
+        printf("teams exhausted after %d splits of the whole team, then the split returned "
+               "nonzero on every PE; the teams destroyed, one more split of the whole team %s\n",
+               count, outcome);
+        fflush(stdout);
+    }
     free(made);
     shmem_free(counts);
     return 0;
+}
+
+/*
+ * Renew a strided team: the one after the last renewed, in turn. The context
+ * the exercise made of the team goes first, then the team's buffers - every PE
+ * frees them, members or not, as it allocated them - then the team, a
+ * collective of its members. Its number goes back to each member, and its
+ * node's block to the pool when the last member there has left. Then another
+ * of the same kind takes its place, drawn from the stream, with buffers and
+ * queries as at setup. Every PE comes here between the same two rounds, having
+ * done every collective of the first, so that the renewal's own - the frees,
+ * the destroy, the split, the allocations - are called by every PE alike and
+ * in the same order.
+ */
+static void renew(long round)
+{
+    double started = pacer_now();
+    int k = (int)(teams.renewals % STRIDED);
+    struct team *t = &teams.teams[k];
+    if (t->has_ctx)
+        shmem_ctx_destroy(t->ctx);
+    release_buffers(t);
+    if (t->handle != SHMEM_TEAM_INVALID)
+        shmem_team_destroy(t->handle);
+    int status = make_strided(k), seen = status;
+    if (teams.plant_renew && teams.me_world == 1) {
+        seen = 1;                   /* the planted defect: the status misread, and only said */
+        teams.plant_renew = 0;
+    }
+    if (seen != 0)
+        pacer_failure("teams round=%ld renew %s: a split returned %d: a number or a block was "
+                      "not given back, or OSOE_MAX_TEAMS is too small", round, t->name, seen);
+    if (status != 0) {
+        /* A split of the kind just given up fails only if its number or its
+         * block did not come back, or OSOE_MAX_TEAMS is below what the
+         * exercise needs. The slot goes empty, on every PE alike. */
+        t->handle = SHMEM_TEAM_INVALID;
+        t->start = -1;
+        t->stride = 1;
+        t->size = 0;
+        t->rank = -1;
+    }
+    if (allocate_buffers(t, (size_t)teams.n) != 0) {
+        fprintf(stderr, "osoe-pacer: PE %d: teams could not allocate the buffers of the %s team "
+                "it renewed in round %ld\n", teams.me_world, t->name, round);
+        shmem_global_exit(2);
+    }
+    if (status == 0)
+        check_queries(t, &teams.world);
+    teams.renewals++;
+    teams.phase[3] += pacer_now() - started;
 }
 
 static int teams_setup(shmem_team_t team, const struct pacer_options *options)
@@ -297,80 +441,42 @@ static int teams_setup(shmem_team_t team, const struct pacer_options *options)
     teams.n = shmem_team_n_pes(team);
     teams.me_world = shmem_my_pe();
     teams.round = 0;
+    teams.renewals = 0;
+    teams.last = 0;
     teams.collectives = 0;
     memset(teams.phase, 0, sizeof teams.phase);
     if (teams.exhaust)
         return exhaust();
 
     int n = teams.n;
-    struct team world_team = { .name = "world", .handle = team, .start = 0, .stride = 1, .size = n };
-    world_team.start = shmem_team_translate_pe(team, 0, SHMEM_TEAM_WORLD);
-    uint64_t state = random_mix(teams.seed, random_name("teams"), 0, 0);
+    teams.world = (struct team){ .name = "world", .handle = team, .start = 0, .stride = 1,
+                                 .size = n };
+    teams.world.start = shmem_team_translate_pe(team, 0, SHMEM_TEAM_WORLD);
+    teams.state = random_mix(teams.seed, random_name("teams"), 0, 0);
     struct team *t = teams.teams;
 
-    /* A: random start, stride and size. */
-    int stride = 1 + (int)(random_next(&state) % (uint64_t)(n > 3 ? n / 3 : 1));
-    int span = (n - 1) / stride + 1;
-    int size = 1 + (int)(random_next(&state) % (uint64_t)span);
-    int start = (int)(random_next(&state) % (uint64_t)(n - (size - 1) * stride));
-    t[0] = (struct team){ .name = "strided" };
-    progression(&t[0], &world_team, start, stride, size);
-    /* B: a negative stride, from the top. */
-    int down = 1 + (int)(random_next(&state) % (uint64_t)(n > 2 ? n / 2 : 1));
-    int down_size = 1 + (int)(random_next(&state) % (uint64_t)((n - 1) / down + 1));
-    int down_start = (down_size - 1) * down +
-                     (int)(random_next(&state) % (uint64_t)(n - (down_size - 1) * down));
-    t[1] = (struct team){ .name = "negative" };
-    progression(&t[1], &world_team, down_start, -down, down_size);
-    /* C: a team of one, by stride 0. */
-    int one = (int)(random_next(&state) % (uint64_t)n);
-    t[2] = (struct team){ .name = "one" };
-    progression(&t[2], &world_team, one, 0, 1);
-    if (shmem_team_split_strided(team, t[0].start - world_team.start, stride, size, NULL, 0,
-                                 &t[0].handle) != 0 ||
-        shmem_team_split_strided(team, down_start, -down, down_size, NULL, 0, &t[1].handle) != 0 ||
-        shmem_team_split_strided(team, one, 0, 1, NULL, 0, &t[2].handle) != 0) {
-        fprintf(stderr, "osoe-pacer: teams: a split failed; OSOE_MAX_TEAMS may be too small "
-                "for the %d numbers teams spends\n", teams.spent);
-        return -1;
-    }
-    /* D: a split of A, every other member of it from its second. */
-    t[3] = (struct team){ .name = "split", .handle = SHMEM_TEAM_INVALID };
-    int inner_size = size > 1 ? size / 2 : 1;
-    progression(&t[3], &t[0], size > 1 ? 1 : 0, size > 1 ? 2 : 1, inner_size);
-    if (t[0].handle != SHMEM_TEAM_INVALID &&
-        shmem_team_split_strided(t[0].handle, size > 1 ? 1 : 0, size > 1 ? 2 : 1, inner_size,
-                                 NULL, 0, &t[3].handle) != 0)
-        return -1;
-    /* The grid, of the whole team or of its first PEs. */
-    struct team grid_parent = { .name = "grid" };
-    progression(&grid_parent, &world_team, 0, 1, teams.grid_size);
-    teams.grid_parent = team;
-    if (teams.grid_size < n &&
-        shmem_team_split_strided(team, 0, 1, teams.grid_size, NULL, 0, &teams.grid_parent) != 0)
-        return -1;
+    /* The strided teams, in turn: each drawn, then split. */
+    for (int k = 0; k < STRIDED; k++)
+        if (make_strided(k) != 0) {
+            fprintf(stderr, "osoe-pacer: teams: a split failed; OSOE_MAX_TEAMS may be too small: "
+                    "teams holds %d numbers a PE at once, beside the predefined teams' three, and "
+                    "a split needs a number free on every member of the new team\n", TEAMS);
+            return -1;
+        }
+    /* The grid, of the whole team: every PE is in a row and a column. */
     t[GRID_ROW] = (struct team){ .name = "row", .handle = SHMEM_TEAM_INVALID };
     t[GRID_COLUMN] = (struct team){ .name = "column", .handle = SHMEM_TEAM_INVALID };
-    if (teams.grid_parent != SHMEM_TEAM_INVALID &&
-        shmem_team_split_2d(teams.grid_parent, teams.columns, NULL, 0, &t[GRID_ROW].handle, NULL,
-                            0, &t[GRID_COLUMN].handle) != 0)
+    if (shmem_team_split_2d(team, teams.columns, NULL, 0, &t[GRID_ROW].handle, NULL, 0,
+                            &t[GRID_COLUMN].handle) != 0)
         return -1;
-    /* This PE's row and column, as progressions, if it is in the grid. */
-    int grid_rank = teams.me_world - grid_parent.start;
-    teams.grid_row_index = -1;
-    if (grid_rank >= 0 && grid_rank < teams.grid_size) {
-        int x = grid_rank % teams.columns, y = grid_rank / teams.columns;
-        teams.grid_row_index = y;
-        int row_size = teams.grid_size - y * teams.columns < teams.columns
-                       ? teams.grid_size - y * teams.columns : teams.columns;
-        progression(&t[GRID_ROW], &grid_parent, y * teams.columns, 1, row_size);
-        progression(&t[GRID_COLUMN], &grid_parent, x, teams.columns,
-                    (teams.grid_size - x + teams.columns - 1) / teams.columns);
-    } else {
-        t[GRID_ROW].size = t[GRID_COLUMN].size = 0;
-        t[GRID_ROW].start = t[GRID_COLUMN].start = -1;
-        t[GRID_ROW].stride = t[GRID_COLUMN].stride = 1;
-    }
+    /* This PE's row and column, as progressions. */
+    int grid_rank = teams.me_world - teams.world.start;
+    int x = grid_rank % teams.columns, y = grid_rank / teams.columns;
+    teams.grid_row_index = y;
+    int row_size = n - y * teams.columns < teams.columns ? n - y * teams.columns : teams.columns;
+    progression(&t[GRID_ROW], &teams.world, y * teams.columns, 1, row_size);
+    progression(&t[GRID_COLUMN], &teams.world, x, teams.columns,
+                (n - x + teams.columns - 1) / teams.columns);
 
     /* Buffers, collectively and alike on every PE: the strided teams sized for
      * the world, the grid's for its longer side. */
@@ -384,7 +490,7 @@ static int teams_setup(shmem_team_t team, const struct pacer_options *options)
     if (!teams.ring)
         return -1;
     for (int k = 0; k < TEAMS; k++)
-        check_queries(&t[k], &world_team);
+        check_queries(&t[k], &teams.world);
     /* Between the grid's row and column: the corner they share. */
     if (t[GRID_ROW].rank >= 0 && t[GRID_COLUMN].rank >= 0) {
         int through = shmem_team_translate_pe(t[GRID_ROW].handle, t[GRID_ROW].rank,
@@ -587,12 +693,14 @@ static void round_trip(struct team *t, int index, long round)
 
 static void teams_step(long units, int last)
 {
-    (void)last;
     if (teams.exhaust)
         return;
+    teams.last = last;
     struct team *t = teams.teams;
     for (long u = 0; u < units; u++, teams.round++) {
         long round = teams.round;
+        if (round > 0 && round % RENEW_EVERY == 0)      /* between rounds, on every PE */
+            renew(round);
         enum kind k = (enum kind)(round % KINDS);
         if (t[GRID_ROW].rank >= 0) {
             int first = teams.grid_row_index % 2 ? GRID_COLUMN : GRID_ROW;
@@ -612,8 +720,11 @@ static void teams_checkpoint(struct pacer_counters *counters)
 {
     counters->finished = teams.exhaust;     /* exhausting is done at setup */
     counters->work = teams.collectives;
-    for (int k = 0; k < 3; k++)
+    for (int k = 0; k < (int)(sizeof teams.phase / sizeof *teams.phase); k++)
         counters->phase_seconds[k] = teams.phase[k];
+    /* The renewals are the same on every PE: rank 0 says them, at the end. */
+    if (teams.last && shmem_team_my_pe(teams.team) == 0)
+        pacer_summary("summary teams renewals=%ld renew_every=%d", teams.renewals, RENEW_EVERY);
     teams.collectives = 0;
     memset(teams.phase, 0, sizeof teams.phase);
 }
@@ -630,15 +741,9 @@ static void teams_teardown(void)
         if (t[k].handle != SHMEM_TEAM_INVALID)
             shmem_team_destroy(t[k].handle);
     }
-    if (teams.grid_parent != teams.team && teams.grid_parent != SHMEM_TEAM_INVALID)
-        shmem_team_destroy(teams.grid_parent);
     shmem_free(teams.ring);
     for (int k = TEAMS - 1; k >= 0; k--)
-        for (int p = 1; p >= 0; p--) {
-            shmem_free(t[k].doubles[p]);
-            shmem_free(t[k].words[p]);
-            shmem_free(t[k].longs[p]);
-        }
+        release_buffers(&t[k]);
 }
 
 const struct pacer_exercise pacer_teams = {

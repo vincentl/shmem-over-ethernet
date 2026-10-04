@@ -114,6 +114,8 @@ enum pacer_plant {
     PACER_PLANT_DEPRECATED_WAIT,    /* PE 1 writes one deprecated wait's word wrong */
     PACER_PLANT_DEPRECATED_WORD,    /* PE 1 sends one deprecated atomic a wrong value */
     PACER_PLANT_WAITS_COUNT,        /* PE 1 misreads one count a _some form returned */
+    PACER_PLANT_TEAMS_RENEW,        /* PE 1 misreads the status of one renewal's split */
+    PACER_PLANT_TEAMS_BACK,         /* PE 1 misreads the status of the split after the exhaust */
     PACER_PLANTS
 };
 
