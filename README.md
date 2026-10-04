@@ -75,6 +75,43 @@ oshcc -O2 -o ring ring.c
 srun -K1 --cpu-bind=none -N2 --ntasks-per-node=4 ./ring
 ```
 
+## Quick start
+
+On Debian 13 or Raspberry Pi OS Trixie, from the root of this repository, with
+the ring above saved there as `ring.c`: install the packages, build osoe, build
+the ring with the wrapper that build made, and run it on this machine as four
+PEs, and then as four PEs on two logical nodes, which reach each other over TCP
+on the loopback as the nodes of a cluster would.
+
+```sh
+sudo apt install build-essential cmake pkg-config liburing-dev
+cmake --preset release
+cmake --build --preset release -j4
+build/release/tools/wrapper/oshcc -O2 -o ring ring.c
+build/release/tools/launch/osoe-launch -n 4 -- ./ring
+build/release/tools/launch/osoe-launch -n 4 -m 0,0,1,1 -- ./ring
+```
+
+The build does not run the tests; from a clean tree it took 20 to 21 seconds on
+four cores of the development virtual machine. Each run prints these four lines,
+in any order - each PE's box holds the number of the PE before it - and exits
+with status 0:
+
+```
+PE 0 of 4: my box holds 3
+PE 1 of 4: my box holds 0
+PE 2 of 4: my box holds 1
+PE 3 of 4: my box holds 2
+```
+
+The second run opens io_uring, so it needs what [Requirements](#requirements)
+says of the kernel; `build/release/tools/probe/probe` checks it, a line for each
+facility. On a Mac, [Developing on macOS](#developing-on-macos) makes a Linux
+virtual machine to run these commands in, with the packages already installed:
+`limactl shell osoe` in front of a command runs it there, from the repository
+root. [Getting started](#getting-started) has what this leaves out, among it the
+test suite, installing, and running over several machines with `srun`.
+
 ## Getting started
 
 ### Requirements
@@ -391,6 +428,56 @@ computing for ever, is what `osoe-stat` is for.
   cluster met as F1. Turning the segmentation offload off on the node that
   stalled - `ethtool -K <interface> tso off gso off` - ended the stalls it
   measured, though its cause is not settled ("How osoe is tested").
+
+## The repository
+
+What each tracked directory and file at the top of the tree holds. Two
+directories that may appear beside them are not in the repository, since
+`.gitignore` leaves them out: `build/`, where every preset builds, and
+`corpus/`, where `tools/corpus/fetch.sh` puts public OpenSHMEM programs to read.
+`base/`, `shmem/`, `tools/`, `dev/` and `docs/` each have a `README.md` of their
+own, which says what the directory holds, how it relates to the rest of the
+tree, and where to start reading in it; [`docs/README.md`](docs/README.md) says
+where to find what among the documents.
+
+| Path | Holds |
+|---|---|
+| `README.md` | this file |
+| `COPYING`, `COPYING.LESSER` | the license texts that [License](#license) names: the GNU General Public License and the Lesser General Public License that supplements it, both version 3 |
+| `CMakeLists.txt`, `CMakePresets.json` | the build: the project and its one version, 0.1.0, and the presets `debug`, `release`, `asan`, `tsan` and `tier3`, with the test presets and workflows over them ([Building](#building)) |
+| `.gitignore` | what git ignores: `build/`, `corpus/` and the specification's PDF, among others |
+| `CLAUDE.md` | the working agreements every Claude Code session on this repository follows - delegating to subagents, naming, renames, the names of review files ([How osoe was made](#how-osoe-was-made)) |
+| `base/` | the pieces the library is made from that need nothing from the OpenSHMEM layer above them, among them futex waits, deadlines, epoch counters, a stall watch, memory fences, and the parsers for settings, Slurm host lists and the node map. An object library folded into `libosoe` and never installed; its tests are in `base/tests/` |
+| `shmem/include/` | the public headers, `shmem.h`, `pshmem.h` and `shmemx.h`, and `mpp/`, the historical location, whose headers redirect to those; all installed |
+| `shmem/src/` | the library: the OpenSHMEM routines, the runtime under them, `transport.h` and `internode.h` - the boundary a backend implements (design §4.10) - and the one backend below it, active messages over TCP and io_uring; `cmake/CheckBoundary.cmake` says which file is which |
+| `shmem/tests/` | the library's tests: test programs, shell scripts that start a job and break it to see how it ends, and the Slurm environments the bootstrap is tested against (`slurm-fixtures/`); its `CMakeLists.txt` registers them |
+| `tools/` | the programs beside the library, in the next table |
+| `cmake/` | CMake modules, and scripts the tests run with `cmake -P` to check the tree itself: that no file above the transport boundary includes one below it, that the library exports only OpenSHMEM's names, that every C11 atomic call names one of the three memory orders the project uses, that the tree builds as strict C11 and as a static archive |
+| `dev/` | `lima/`, the definition of the Debian 13 virtual machine osoe is developed in on a Mac ([Developing on macOS](#developing-on-macos)) |
+| `docs/README.md` | where to find what in `docs/` |
+| `docs/pi-cluster.md`, `docs/pi-cluster-results.md` | the runbook for the four-node Raspberry Pi 5 cluster, and what its sessions measured |
+| `docs/release-checklist.md` | what a release needs, ticked where it is done |
+| `docs/design/` | the design notes, `shmem-ethernet-design.md`; two proposals and a note on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
+| `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |
+| `docs/prompts/` | the written briefs each working session was given; the finished ones are in `done/` |
+| `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds (`evidence/`) |
+| `docs/reference/` | where to get the OpenSHMEM 1.6 specification, which is not in the repository |
+
+`tools/` has a directory for each program, or group of tests, it builds. Of the
+programs, `cmake --install` puts `oshcc`, `osoe-stat` and `osoe-pacer` under the
+prefix ([Installing](#installing)); the rest stay in the build tree.
+
+| `tools/` | Builds | Installed |
+|---|---|---|
+| `wrapper/` | `oshcc`, the compiler wrapper, and `osoe-statics.ld`, the linker script it passes, which makes a program's global and static variables symmetric | yes, both |
+| `stat/` | `osoe-stat`, which reads a running or hung job's counters and state from outside | yes |
+| `pacer/` | `osoe-pacer`, the stress tester; `osoe-pacer-start-pes`, which its tests run to check Annex F's unprefixed routines; and, where Python 3 is found, `osoe-pacer-counted` and `osoe-pacer-start-pes-counted`, builds that count every call to the library | `osoe-pacer` only |
+| `launch/` | `osoe-launch`, which starts a job's processes on this machine; beside it `tier3.sh`, which gives each logical node a network namespace, and `capture-slurm-fixtures.sh`, which records Slurm's environment under `srun` | no |
+| `bench/` | `osoe-bench`, what the library costs on a cluster, one measurement a line | no |
+| `probe/` | `probe`, which checks that the kernel has every io_uring and futex facility osoe relies on (the `env.probe` test) | no |
+| `echo-uring/` | `echo-uring`, a bare io_uring TCP echo and stream that the library is timed against, and `netem-sweep.sh`, which runs it over emulated links | no |
+| `modelcheck/` | no program: the model checker, in Python 3, and the models of osoe's protocols, registered as tests in the `release` build where Python 3 is found (six only with `-DOSOE_MULTIPLE_MODELS=ON`) | nothing to install |
+| `corpus/` | not part of the build: `fetch.sh` fetches public OpenSHMEM programs, pinned in `manifest.tsv`, into `corpus/` for reading, and `check-traces.py` checks the traces in `docs/design/workloads/traces/` against them | nothing to install |
 
 ## Design goals
 
