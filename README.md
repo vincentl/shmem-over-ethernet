@@ -1293,7 +1293,8 @@ The work ran from goals down to code, and each level is in the repository:
 - **Briefs**: each slice went to a Claude Code session as a written brief - its
   goal, what to read first, what to build, how to verify it, and the questions to
   stop and put to the author (`docs/prompts/`, the finished ones in `done/`).
-  `CLAUDE.md` holds the working agreements every session followed.
+  `CLAUDE.md` holds the working agreements the sessions followed from 19
+  September on.
 - **Building**: every lock-free protocol modelled before its code and checked
   exhaustively, each model with broken variants that must fail
   (`tools/modelcheck`); the tests in four build presets, sanitizers among them;

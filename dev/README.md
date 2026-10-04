@@ -10,4 +10,4 @@ from the repository root starts in the same directory inside the VM. Nothing in
 the build or the library depends on it: a Linux machine with the packages of the
 root `README.md`'s Requirements needs none of this. Start with that README's
 "Developing on macOS", which gives the commands; `docs/README.md` explains the
-three virtual machines the records name.
+virtual machines the records name.

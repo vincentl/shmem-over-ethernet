@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The 2026-09-28 records' tree (b0e0b53) against main with D, on the Pi at
 # 4 x 4, three runs each alternating: did the code or the cluster change since
 # the records? Touches nothing on the Pi outside ~/osoe. From the Mac.

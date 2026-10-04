@@ -7,9 +7,9 @@
  *
  * This is that tool, and the case it is built for is a hung job: it maps the
  * control segment read-only, needs no cooperation from the job, and works as
- * well on a job that is wedged as on one that is running. It is installed,
- * unlike everything else under tools/, because the thing it is for happens on
- * someone else's machine at three in the morning.
+ * well on a job that is wedged as on one that is running. It is installed, as
+ * of everything else under tools/ only oshcc and osoe-pacer are, because the
+ * thing it is for happens on someone else's machine at three in the morning.
  *
  * It is written against the *segment*, not the library: segment.h explains why,
  * and enforces it by including nothing from shmem/src. Every value here is

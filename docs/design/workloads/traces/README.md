@@ -18,7 +18,7 @@ checkout (shared by all worktrees, ignored by git), each entry at exactly its
 pinned commit or tarball digest. The entries and pins come
 from the usage study, `docs/reviews/evidence/q2/q2-usage.md` §0.
 
-Corpus licenses vary, and this repository has none yet. Traces therefore carry
+Corpus licenses vary, and none of them is this repository's. Traces therefore carry
 citations, never code: a routine name, a size, a `file:line`. Short identifiers
 in comments (a variable name, a macro) are the most a trace quotes.
 
@@ -35,8 +35,9 @@ in comments (a variable name, a macro) are the most a trace quotes.
 | [`U8-bale-convey-local.trace`](U8-bale-convey-local.trace) | U8 intranode direct access | bale convey, local porter |
 
 There is no U6 trace. U6 is U1 and U3 on one context per thread and needs
-`SHMEM_THREAD_MULTIPLE`, which osoe does not provide yet (§4.6). Write it when
-that lands; OSB `GUPs_threaded/SHMEMRandomAccess.c:254-272` is the obvious source.
+`SHMEM_THREAD_MULTIPLE`, which osoe has provided since phase 1 step 8 (§4.11),
+though nobody has written the trace; OSB `GUPs_threaded/SHMEMRandomAccess.c:254-272`
+is the obvious source.
 
 ## Format
 

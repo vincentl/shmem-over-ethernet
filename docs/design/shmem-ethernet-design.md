@@ -1,9 +1,9 @@
 # OpenSHMEM over Ethernet: Design Notes
 
-**Status:** Phase 1 in progress. Step 1 (one node) and step 2 (the active-message
-layer, over a shared-memory stand-in for the wire) are implemented; sockets and
-io_uring (step 3) onward are design only. Decisions recorded with rationale so
-that they are not silently reversed.
+**Status:** Phase 1 (§7.1) is built, every step of it, and the team redesign
+(`team-resources-proposal.md`) is being finished before the first release;
+`docs/prompts/README.md` says where the work stands. Each section says what
+was decided and what was built, so that a decision is not silently reversed.
 
 **Project:** osoe (OpenSHMEM Over Ethernet) — installs `libosoe` and the spec's
 `shmem.h`.

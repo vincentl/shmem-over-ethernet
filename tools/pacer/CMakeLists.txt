@@ -38,8 +38,8 @@ osoe_warnings(osoe-pacer-start-pes)
 #
 # Python 3 writes the shim, and nothing else in the build needs it but the
 # models (tools/modelcheck/CMakeLists.txt). So it is optional, found or not as
-# for the models: where it is found these two programs and their test are
-# built, and where it is not they are left out, with a status message. A
+# for the models: where it is found these two programs, and the first's test,
+# are built, and where it is not they are left out, with a status message. A
 # machine without Python still builds, installs and tests everything else.
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)

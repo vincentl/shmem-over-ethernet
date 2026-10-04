@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Step D's merge point on the Pi cluster (the brief: the runbook's barrier and
 # 8-byte collective lines, D changing no data path): main with D in ~/osoe, as
 # the runbook has it, and main without D under ~/osoe/build/compare/before,

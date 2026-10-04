@@ -83,5 +83,8 @@ which `ls -l` had written as owner and group in ten logs under
 `docs/reviews/evidence/phase1-step2-slice1/portability/stale-segments.out`, was
 replaced there by `user`, and two Pi nodes' hardware addresses by
 `xx:xx:xx:xx:xx:xx` in four files under
-`docs/design/evidence/pi-cluster/2026-09-26-night-f1/retest-new-port/`. Nothing
-else in those files was changed.
+`docs/design/evidence/pi-cluster/2026-09-26-night-f1/retest-new-port/`; and the
+two scripts of step D's merge point on the Pi cluster
+(`docs/design/evidence/pi-cluster/2026-10-04-step-d/`), committed without it,
+were given the license line, second after the shebang. Nothing else in those
+files was changed.

@@ -1,6 +1,7 @@
 # The Pi cluster's results
 
-What each session on the Raspberry Pi cluster measured and found, newest last.
+What the sessions on the Raspberry Pi cluster measured and found, from the
+second session on, newest last.
 How to run a session is the runbook, `docs/pi-cluster.md`; the raw outputs are
 under `docs/design/evidence/pi-cluster/`, a directory a session.
 
