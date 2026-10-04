@@ -1,0 +1,355 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+"""A split that finds its node's pool empty: dry, or a block on its way back (step D).
+
+A team's local lead claims a block for it from the node's pool before the
+split's reduction (team_block_model.py has the block's life). A destroy gives
+the block back only once the last of the team's members on the node has left
+it, after the destroy's sync, so a split just after a destroy can find the
+pool empty for a block a moment from free. The split must not fail for that
+block when the program ordered the destroy before it - through the lead's own
+program order, the lead having been in the team, or through the split's
+reduction, the team's members on the node all in its parent - and must not run
+its rounds forever for a block that is not coming back. The design:
+
+  - a pool found empty in the split's first round makes the round busy: the
+    claim may have come before a parent PE's destroy, which gives its blocks
+    back before that PE arrives in the round's reduction, and so before the
+    next round's claim;
+  - from the second round on it makes the round busy while a block is on its
+    way back, and fails the split otherwise. A block keeps its last team's
+    member count after that team has left it, and a claim zeroes it: a
+    nonzero count with fewer holders says the team is leaving it, or has left
+    and the block is not yet in the bitmap, or is in it again; a zero count
+    says claimed, or never named, and then the bitmap's bit alone says free.
+    The namer writes the holders before the count and the reader reads the
+    count first, so that a block being named reads as claimed or as held; one
+    read between its claim and the claim's zeroing reads as on its way back,
+    which costs a busy round and nothing more (the model does not count
+    rounds).
+
+The adversarial read of 2026-10-03 found the first design's test - fewer
+holders than members, the members never zeroed - true for ever of a block
+given back and claimed again (`first`): a split_2d whose lead holds one claimed
+block and finds no second ran busy rounds for ever. The fix it suggested, the
+test made only of a held block (an odd generation), misses a block between its
+last holder's generation raise and its bit (`odd_only`).
+
+The guarantee stops there, and the read of the rebuilt part showed where: a
+team whose member on the node is outside the split's parent, past the destroy's
+sync and not yet gone, holds its block with every holder, and the split may
+fail for it (`remote`, which LEGIT allows). No test the node can make tells
+that member from one still waiting in the destroy's sync for a PE inside the
+split: a flag its members set before arriving in that sync (`departing`, the
+read's suggestion) makes the split wait for the first, and run its rounds for
+ever for the second (`split_first`), whose destroy waits for the split.
+
+Checked
+  LEGIT    a split fails dry only when every block it has not claimed was, when
+           the lead looked, a live team's, or one held by a member outside the
+           split's parent - none free, none of a team the guarantee covers.
+  and, by the engine: no stuck thread, and from every reachable state the run can
+  still finish (AG EF done) - no busy rounds for ever.
+
+Cases (one node; the reductions abstract)
+  member    a pool of one block, held by team T of leads A and member M. A
+            leaves T, then splits a parent of its own and leads the new team
+            here; M leaves T at any time; C, another lead of another split the
+            program does not order, claims a block whenever one is free and
+            names it for a live team.
+  parent    a pool of one block, held by T = {M1, M2}; both leave T and then
+            arrive in the split's reduction, which A, not in T, leads a team of.
+  remote    a pool of one block, held by T, whose one member here, M, is not
+            in the split's parent; X, T's member elsewhere and a parent PE,
+            arrives in the split's reduction once T's sync - M in it - has
+            completed; M leaves whenever it runs again.
+  split_first  T = {X, M} as in remote, but X splits first and destroys T after:
+            M waits in T's sync for X, who is in the split.
+  two       a pool of two: block 0 given back by an old team and free, its
+            flag still set, block 1 a live team's; A leads two teams of one
+            split, as split_2d's row and column can be, claims block 0 and
+            finds no second.
+
+Designs
+  design            as above.
+Breakages
+  first             the first design: fewer holders than members, and the members
+                    never zeroed - A's own claimed block reads as on its way
+                    back for ever (TRAPPED, in two).
+  odd_only          the test made only of a block with an odd generation: a block
+                    read between its last holder's raise and its bit is neither
+                    (LEGIT, in member).
+  zero_at_leave     the last holder zeroes the members as it leaves, the claim not:
+                    a block given back and not yet in the bitmap reads as claimed
+                    (LEGIT, in member).
+  first_round_final a pool found empty in the first round fails the split: A's
+                    claim came before M1 and M2 left (LEGIT, in parent).
+  departing         a flag each member sets before it arrives in the destroy's
+                    sync makes its block on its way back: the split waits for a
+                    team whose destroy waits for the split (TRAPPED, in
+                    split_first).
+
+Every step is a locked instruction or a single-writer store whose order the
+model states; runs are SC. The C11 orders of the library are node.c's, which
+the model's order is the argument for.
+
+Usage: pool_dry_model.py [substring ...]   runs the cases whose names match
+"""
+import sys
+
+from engine import DEL, assemble, explore, report, select
+
+FREE = ('free',)                          # bit b set: block b is free
+GEN = lambda b: ('gen', b)
+HOLDERS = lambda b: ('holders', b)
+MEMBERS = lambda b: ('members', b)
+DEPARTING = lambda b: ('departing', b)    # departing: set by its team's members before the destroy's sync
+OWNER = lambda b: ('$owner', b)           # whose the block is: one of OWNERS
+ARRIVED = ('$arrived',)                   # parent, remote: arrivals the reduction waits for
+T_SYNC = ('$t_sync',)                     # split_first: arrivals in T's destroy sync
+SPLIT_DONE = ('$split_done',)             # split_first: A's split has returned
+DONE = ('$done',)
+
+FREE_OWNER, T, A, C, L, T_OUTSIDE = 0, 1, 2, 3, 4, 5
+OWNERS = {FREE_OWNER: 'nobody (free)', T: 'T, destroyed before the split', A: 'A', C: 'C',
+          L: 'a live team', T_OUTSIDE: 'T, its member here outside the parent and not yet gone'}
+
+# Each case: the blocks, their state - generation, holders, members,
+# departing, free, owner - and the threads. Block 0 of `two` keeps the flag
+# its old team set as it left, which a claim must make irrelevant.
+CASES_STATE = {
+    'member': [(1, 2, 2, 0, False, T)],
+    'parent': [(1, 2, 2, 0, False, T)],
+    'remote': [(1, 1, 1, 0, False, T_OUTSIDE)],
+    'split_first': [(1, 1, 1, 0, False, L)],
+    'two': [(2, 0, 2, 1, True, FREE_OWNER), (1, 1, 1, 0, False, L)],
+}
+# The arrivals the split's reduction waits for after its first round.
+ARRIVALS = {'parent': 2, 'remote': 1, 'split_first': 1}
+
+
+def depart(design, b, p, then):
+    """`departing` only: a member about to arrive in its team's destroy sync
+    marks the block."""
+    if design != 'departing':
+        return [(p, ('br', lambda L: True, then, then))]
+    return [(p, ('store', lambda L: DEPARTING(b), lambda L: 1, True, then))]
+
+
+def leave(design, b, p, then):
+    """One member leaves block b: holders down by one, and the last holder
+    raises the generation and sets the bit."""
+    B = [(p, ('add', lambda L: HOLDERS(b), lambda L: -1, 'left', '@' + p + 'k')),
+         (p + 'k', ('br', lambda L: L['left'] == 0, '@' + p + 'z', then))]
+    if design == 'zero_at_leave':
+        B += [(p + 'z', ('store', lambda L: MEMBERS(b), lambda L: 0, True, '@' + p + 'g'))]
+    else:
+        B += [(p + 'z', ('br', lambda L: True, '@' + p + 'g', '@' + p + 'g'))]
+    B += [(p + 'g', ('add', lambda L: GEN(b), lambda L: 1, '_', '@' + p + 'f')),
+          (p + 'f', ('or', lambda L: FREE, lambda L: 1 << b, '_', '@' + p + 'o')),
+          (p + 'o', ('gpost', lambda M, L: ({OWNER(b): FREE_OWNER}, {'left': DEL}), then))]
+    return B
+
+
+def returning(design, blocks, p, yes, no):
+    """osoe_node_team_returning, block by block in the library's order. Each
+    load also notes, in local `o<b>`, whose block b was at that instant, so
+    that LEGIT judges what the lead saw rather than what a member did after."""
+    def seen(nxt):
+        return ('gpost', lambda M, L: ({}, {f"o{L['b']}": M[OWNER(L['b'])]}), nxt)
+    B = [(p, ('set', 'b', lambda L: 0, '@' + p + 'L'))]
+    nxt = '@' + p + 'N'
+    B += [(p + 'L', ('br', lambda L: L['b'] >= blocks, no, '@' + p + 'S'))]
+    if design == 'odd_only':
+        B += [(p + 'S', ('load', lambda L: GEN(L['b']), 'g', '@' + p + 'Sg')),
+              (p + 'Sg', seen('@' + p + 'G')),
+              (p + 'G', ('br', lambda L: L['g'] % 2 == 1, '@' + p + 'M', nxt)),
+              (p + 'M', ('load', lambda L: MEMBERS(L['b']), 'm', '@' + p + 'H')),
+              (p + 'H', ('load', lambda L: HOLDERS(L['b']), 'h', '@' + p + 'Hs')),
+              (p + 'Hs', seen('@' + p + 'C')),
+              (p + 'C', ('br', lambda L: L['h'] < L['m'], yes, nxt))]
+    elif design == 'first':
+        B += [(p + 'S', ('load', lambda L: MEMBERS(L['b']), 'm', '@' + p + 'H')),
+              (p + 'H', ('load', lambda L: HOLDERS(L['b']), 'h', '@' + p + 'Hs')),
+              (p + 'Hs', seen('@' + p + 'C')),
+              (p + 'C', ('br', lambda L: L['h'] < L['m'], yes, nxt))]
+    else:
+        B += [(p + 'S', ('load', lambda L: MEMBERS(L['b']), 'm', '@' + p + 'Z')),
+              (p + 'Z', ('br', lambda L: L['m'] != 0, '@' + p + 'H', '@' + p + 'F')),
+              (p + 'H', ('load', lambda L: HOLDERS(L['b']), 'h', '@' + p + 'Hs')),
+              (p + 'Hs', seen('@' + p + 'C')),
+              (p + 'C', ('br', lambda L: L['h'] < L['m'], yes,
+                         '@' + p + 'P' if design == 'departing' else nxt)),
+              (p + 'P', ('load', lambda L: DEPARTING(L['b']), 'd', '@' + p + 'Ps')),
+              (p + 'Ps', seen('@' + p + 'Q')),
+              (p + 'Q', ('br', lambda L: L['d'], yes, nxt)),
+              (p + 'F', ('load', lambda L: FREE, 'f', '@' + p + 'Fs')),
+              (p + 'Fs', seen('@' + p + 'B')),
+              (p + 'B', ('br', lambda L: (L['f'] >> L['b']) & 1, yes, nxt))]
+    B += [(p + 'N', ('set', 'b', lambda L: L['b'] + 1, '@' + p + 'L'))]
+    return B
+
+
+def claim(design, who, p, got, dry):
+    """osoe_node_team_claim: the highest free bit by compare-and-swap, then the
+    block's members zeroed (but in `first` and `zero_at_leave`)."""
+    B = [(p, ('load', lambda L: FREE, 'w', '@' + p + 'e')),
+         (p + 'e', ('br', lambda L: L['w'] == 0, dry, '@' + p + 'p')),
+         (p + 'p', ('set', 'c', lambda L: L['w'].bit_length() - 1, '@' + p + 'x')),
+         (p + 'x', ('cas', lambda L: FREE, lambda L: L['w'], lambda L: L['w'] & ~(1 << L['c']),
+                    'ok', '@' + p + 'o')),
+         (p + 'o', ('gpost', lambda M, L: ({OWNER(L['c']): who} if L['ok'] else {}, {}),
+                    '@' + p + 'k')),
+         (p + 'k', ('br', lambda L: L['ok'], '@' + p + 'z', '@' + p))]
+    if design in ('first', 'zero_at_leave'):
+        B += [(p + 'z', ('br', lambda L: True, got, got))]
+    else:
+        B += [(p + 'z', ('store', lambda L: MEMBERS(L['c']), lambda L: 0, True, got))]
+    return B
+
+
+def split(design, case, who, need, p, then):
+    """A split's rounds on a lead that needs `need` blocks: claims kept across
+    rounds; a pool found empty makes the round busy in the first round and
+    while a block is on its way back, and fails the split otherwise. A's
+    failure is checked LEGIT; C's needs no check, nothing ordering it."""
+    blocks = len(CASES_STATE[case])
+
+    def legit(M, L):
+        if who != A:
+            return None
+        for b in range(blocks):
+            seen = L[f'o{b}']
+            if seen not in (A, C, L_OWNER, T_OUTSIDE):
+                return f'A failed dry, having found block {b} {OWNERS[seen]}'
+        return None
+
+    B = [(p, ('set', 'round', lambda L: 0, '@' + p + 'R')),
+         (p + 'R', ('br', lambda L: (L['have'] or 0) >= need, '@' + p + 'Y', '@' + p + 'c'))]
+    B += claim(design, who, p + 'c', '@' + p + 'G', '@' + p + 'D')
+    B += [(p + 'G', ('set', 'have', lambda L: (L['have'] or 0) + 1, '@' + p + 'R')),
+          # Dry: busy in the first round, or while a block is on its way back.
+          (p + 'D', ('br', lambda L: L['round'] == 0 and design != 'first_round_final',
+                     '@' + p + 'B', '@' + p + 'q'))]
+    B += returning(design, blocks, p + 'q', '@' + p + 'B', '@' + p + 'F')
+    # Busy: the round's reduction - in parent, the one M1 and M2 arrive in
+    # after leaving T - and the round again.
+    if case in ARRIVALS:
+        wait = lambda M, L, n=ARRIVALS[case]: M[ARRIVED] == n
+    else:
+        wait = lambda M, L: True
+    B += [(p + 'B', ('await', wait, '@' + p + 'b')),
+          (p + 'b', ('gpost', lambda M, L: ({}, {'round': 1, 'w': DEL, 'c': DEL, 'ok': DEL,
+                                                 'b': DEL, 'm': DEL, 'h': DEL, 'f': DEL,
+                                                 'g': DEL, 'd': DEL, 'o0': DEL, 'o1': DEL}),
+                      '@' + p + 'R')),
+          (p + 'F', ('check', legit, '@' + p + 'X')),
+          (p + 'X', ('gpost', lambda M, L: ({SPLIT_DONE: 1} if who == A else {}, {}), then))]
+    if who == C:
+        # C names the block it claimed for a live team: holders, the flag
+        # cleared, then members.
+        B += [(p + 'Y', ('load', lambda L: GEN(L['c']), 'g', '@' + p + 'Yg')),
+              (p + 'Yg', ('store', lambda L: GEN(L['c']), lambda L: L['g'] + 1, True, '@' + p + 'Yh')),
+              (p + 'Yh', ('store', lambda L: HOLDERS(L['c']), lambda L: 1, True, '@' + p + 'Yd')),
+              (p + 'Yd', ('store', lambda L: DEPARTING(L['c']), lambda L: 0, True, '@' + p + 'Ym')),
+              (p + 'Ym', ('store', lambda L: MEMBERS(L['c']), lambda L: 1, True, then))]
+    else:
+        B += [(p + 'Y', ('br', lambda L: True, then, then))]
+    return B
+
+
+L_OWNER = L
+
+
+def finish(p):
+    return [(p, ('ghost', lambda M, L: ({DONE: M[DONE] + 1},
+                                       {k: DEL for k in ('round', 'have', 'w', 'c', 'ok', 'b', 'm',
+                                                         'h', 'f', 'g', 'd', 'o0', 'o1',
+                                                         'left')}), '@END')),
+            ('END', ('done',))]
+
+
+def case(design, which):
+    state = CASES_STATE[which]
+    mem = {FREE: 0, DONE: 0, ARRIVED: 0, T_SYNC: 0, SPLIT_DONE: 0}
+    for b, (gen, holders, members, departing, free, owner) in enumerate(state):
+        mem[GEN(b)], mem[HOLDERS(b)], mem[MEMBERS(b)] = gen, holders, members
+        mem[DEPARTING(b)] = departing
+        mem[OWNER(b)] = owner
+        if free:
+            mem[FREE] |= 1 << b
+    if which == 'member':
+        lead = assemble(depart(design, 0, 'd', '@l') + leave(design, 0, 'l', '@s')
+                        + split(design, which, A, 1, 's', '@E') + finish('E'))
+        member = assemble(depart(design, 0, 'd', '@l') + leave(design, 0, 'l', '@E')
+                          + finish('E'))
+        other = assemble(split(design, which, C, 1, 's', '@E') + finish('E'))
+        threads = [lead, member, other]
+    elif which == 'parent':
+        arrive = [('a', ('ghost', lambda M, L: ({ARRIVED: M[ARRIVED] + 1}, {}), '@E'))]
+        leaver = assemble(depart(design, 0, 'd', '@l') + leave(design, 0, 'l', '@a') + arrive
+                          + finish('E'))
+        lead = assemble(split(design, which, A, 1, 's', '@E') + finish('E'))
+        threads = [lead, leaver, leaver]
+    elif which == 'remote':
+        # M, T's one member here, not in the parent: it marks the block and
+        # arrives in T's sync, whose completion lets X - T's member and a
+        # parent PE elsewhere - return from its destroy and arrive in the
+        # split's reduction, which the ghost stands for; then M leaves,
+        # whenever it runs again.
+        sync = [('a', ('ghost', lambda M, L: ({ARRIVED: 1}, {}), '@l'))]
+        member = assemble(depart(design, 0, 'd', '@a') + sync + leave(design, 0, 'l', '@E')
+                          + finish('E'))
+        lead = assemble(split(design, which, A, 1, 's', '@E') + finish('E'))
+        threads = [lead, member]
+    elif which == 'split_first':
+        # T = {X, M}, M here and not in the parent, X a parent PE elsewhere
+        # that splits first and destroys T after: M arrives in T's sync and
+        # waits for X there; X is in the split's reduction (ARRIVED, at once)
+        # and arrives in T's sync once the split has returned; then M leaves.
+        member = assemble(depart(design, 0, 'd', '@a') + [
+            ('a', ('ghost', lambda M, L: ({T_SYNC: M[T_SYNC] + 1}, {}), '@w')),
+            ('w', ('await', lambda M, L: M[T_SYNC] == 2, '@n')),
+            ('n', ('gpost', lambda M, L: ({OWNER(0): T}, {}), '@l'))]
+            + leave(design, 0, 'l', '@E') + finish('E'))
+        other = assemble([
+            ('x', ('ghost', lambda M, L: ({ARRIVED: 1}, {}), '@y')),
+            ('y', ('await', lambda M, L: M[SPLIT_DONE] == 1, '@z')),
+            ('z', ('ghost', lambda M, L: ({T_SYNC: M[T_SYNC] + 1}, {}), '@E'))] + finish('E'))
+        lead = assemble(split(design, which, A, 1, 's', '@E') + finish('E'))
+        threads = [lead, member, other]
+    else:
+        threads = [assemble(split(design, which, A, 2, 's', '@E') + finish('E'))]
+    return f'pool_dry/{which}/{design}', threads, mem
+
+
+CASES = [
+    ('member', 'design', True),
+    ('parent', 'design', True),
+    ('remote', 'design', True),
+    ('split_first', 'design', True),
+    ('two', 'design', True),
+    ('two', 'first', False),
+    ('member', 'odd_only', False),
+    ('member', 'zero_at_leave', False),
+    ('parent', 'first_round_final', False),
+    ('split_first', 'departing', False),
+]
+
+
+def main():
+    want = select(sys.argv)
+    ok = True
+    for which, design, expect in CASES:
+        name, threads, mem = case(design, which)
+        if not want(name):
+            continue
+        res = explore(name, threads, mem, max_seconds=1800, liveness_max_states=6_000_000,
+                      done=lambda M, n=len(threads): M[DONE] == n,
+                      symmetric=[[1, 2]] if which == 'parent' else ())
+        ok &= report(res, expect_ok=expect)
+    return 0 if ok else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -438,15 +438,26 @@ static const unsigned char *record(const struct osoe_segment *s, unsigned scope,
 }
 
 bool osoe_segment_epoch(const struct osoe_segment *s, uint32_t local_id, uint32_t number,
-                        uint32_t *epoch)
+                        uint32_t *block, uint32_t *epoch)
 {
     uint64_t len = 0;
     const unsigned char *row = record(s, OSOE_MSCOPE_EPOCHS, local_id, &len);
-    if (!row || (uint64_t)number * sizeof *epoch + sizeof *epoch > len)
+    bool with_block = s->dir->layout >= OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT;
+    uint64_t width = with_block ? sizeof(uint64_t) : sizeof(uint32_t);
+    if (!row || (uint64_t)number * width + width > len)
         return false;
     /* A word another process writes as this runs: copied, never torn on the
      * machines osoe runs on, as every value read here is (osoe_segment_read). */
-    memcpy(epoch, row + (uint64_t)number * sizeof *epoch, sizeof *epoch);
+    *block = UINT32_MAX;
+    if (!with_block) {
+        memcpy(epoch, row + (uint64_t)number * width, sizeof *epoch);
+        return true;
+    }
+    uint64_t word;
+    memcpy(&word, row + (uint64_t)number * width, sizeof word);
+    *epoch = (uint32_t)word;
+    if (word >> 32)
+        *block = (uint32_t)(word >> 32) - 1;
     return true;
 }
 

@@ -753,8 +753,10 @@ static void dump_human(const struct osoe_segment *s)
 
     /* Every team with a record on this node (layout 18), under its name: its
      * block's fields, then each local PE's published epoch for its number -
-     * paired by the number the block's name holds, a block's index being the
-     * pool's since layout 29 (the team redesign's step D). */
+     * found by the number the block's name holds, a block's index being the
+     * pool's since layout 29 (the team redesign's step D), and since layout 30
+     * paired by the block the PE's word names, another PE of the node holding
+     * another team under the number perhaps. */
     for (uint32_t t = 0; t < s->team_count; t++) {
         char label[24];
         if (!team_label(s, t, label, sizeof label))
@@ -775,8 +777,10 @@ static void dump_human(const struct osoe_segment *s)
         }
         printf("    %-32s", "pe.epoch, by local id");
         for (uint32_t p = 0; p < s->local_count; p++) {
-            uint32_t epoch;
-            if (osoe_segment_epoch(s, p, number, &epoch))
+            uint32_t block, epoch;
+            if (osoe_segment_epoch(s, p, number, &block, &epoch) &&
+                (block == t || (block == UINT32_MAX &&
+                                s->dir->layout < OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT)))
                 printf(" %u:%u", p, epoch);
         }
         printf("\n");
@@ -942,11 +946,18 @@ static void dump_json(const struct osoe_segment *s)
         printf("%s{\"number\":%u,\"block\":%u,\"name\":", first_team ? "" : ",", number, t);
         first_team = false;
         json_str(stdout, label);
+        /* Each local PE's epoch for this block's team, or null for a PE in
+         * another team under the number, or in none (layout 30). */
         printf(",\"epochs\":[");
         for (uint32_t p = 0; p < s->local_count; p++) {
-            uint32_t epoch = 0;
-            osoe_segment_epoch(s, p, number, &epoch);
-            printf("%s%u", p ? "," : "", epoch);
+            uint32_t block = UINT32_MAX, epoch = 0;
+            bool mine = osoe_segment_epoch(s, p, number, &block, &epoch) &&
+                        (block == t || (block == UINT32_MAX &&
+                                        s->dir->layout < OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT));
+            if (mine)
+                printf("%s%u", p ? "," : "", epoch);
+            else
+                printf("%snull", p ? "," : "");
         }
         printf("]");
         for (uint32_t i = 0; i < s->nmetrics; i++) {

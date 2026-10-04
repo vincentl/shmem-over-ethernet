@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 29
+#define OSOE_NODE_LAYOUT 30
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -98,13 +98,15 @@ enum osoe_abort_disposition {
 /*
  * The predefined teams, numbered (§7.3, spec §9.4).
  *
- * A team's number indexes every piece of per-team state - its block in the
- * node header, its published epoch in each PE's row, its block of the internal
- * region, the progress thread's and the backends' bookkeeping - and is
- * job-wide, so every node means the same team by it. The predefined teams take
- * the first three; teams created by shmem_team_split_* (phase 1 step 7 slice
- * 2) take 3 to OSOE_MAX_TEAMS - 1, each claimed once and never reused within a
- * session, and every per-team array is sized by OSOE_MAX_TEAMS (§5.7).
+ * A team's number indexes a PE's state for the team - its published epoch in
+ * the PE's row, its block of the PE's internal region, its descriptor - and,
+ * with the local id of the team's local lead, names the team's block in the
+ * node's pool (struct osoe_team_name). Since the team redesign's step D a
+ * number is each PE's own: no PE is in two live teams under one number, and two
+ * teams with no PE in common may hold one. The predefined teams take the first
+ * three, everywhere; teams created by shmem_team_split_* take 3 to
+ * OSOE_MAX_TEAMS - 1, agreed by the split among the new team's members and
+ * given back at its destroy (§5.7, team.c).
  */
 enum osoe_team_number {
     OSOE_TEAM_WORLD = 0,
@@ -194,8 +196,8 @@ struct osoe_pe_slot {
 
     /* Liveness and progress, published by this PE (§3.14 question 1). Its
      * epoch count k for each team is published too - since layout 18 in a row
-     * of its own outside this slot, a word per team number
-     * (osoe_node_published_epoch). */
+     * of its own outside this slot, a word per team number, and since layout
+     * 30 with the team's block beside it (osoe_node_published_epoch). */
     _Atomic uint64_t sweeps;             /* safety-sweep expiries: a blocked PE still moves */
 
     /*
@@ -318,7 +320,9 @@ struct osoe_segment_directory {
      * OSOE_MAX_TEAMS of them - the node header's own tail, so `header_bytes`
      * covers them and a node-scope metric can name a predefined team's field -
      * and each local PE's published epochs, a row per PE of one 32-bit word
-     * per team number (OSOE_MSCOPE_EPOCHS), each row padded to a cache line.
+     * per team number (OSOE_MSCOPE_EPOCHS), each row padded to a cache line;
+     * since layout 30 a 64-bit word, the team's block beside the epoch
+     * (osoe_node_published_epoch).
      */
     uint64_t teams_offset;
     uint64_t teams_bytes;
@@ -368,8 +372,7 @@ struct osoe_segment_directory {
 };
 
 /*
- * The internode arrival handoff, one per team number, in its block (§5.3,
- * §3.12).
+ * The internode arrival handoff, one per team block (§5.3, §3.12).
  *
  * Whichever local member's increment reaches the team's arrival target leaves
  * the epoch here and bumps the local lead's `agent_wake`; that agent consumes
@@ -405,11 +408,21 @@ struct osoe_segment_directory {
  */
 struct osoe_arrival_handoff {
     /*
-     * The posted epoch, k+1, or 0 before the first. A single-writer publication
-     * store (§3.16): one member posts at a time, and the release of the
-     * previous epoch orders it after the last one.
+     * The posted epoch, k+1, in the low half, and in the high half the
+     * generation of the block the poster holds (osoe_team_name), or 0 before
+     * the first post. A single-writer publication store (§3.16): one member
+     * posts at a time, and the release of the previous epoch orders it after
+     * the last one. The generation since layout 30 (the team redesign's step
+     * D, D4): a block given back and claimed for another team starts its
+     * epochs again, and a word of the old team's could equal the new team's
+     * first post if it held the epoch alone; with the generation beside it no
+     * two teams' posts are one value, and the agent, comparing the whole word
+     * with the one it consumed last, learns the block's team afresh when the
+     * generation has moved (internode-am.c). Nothing resets it when the block
+     * is claimed: the word stays the old team's last post, already consumed,
+     * until the new team's first.
      */
-    _Alignas(OSOE_CACHELINE) _Atomic uint32_t epoch;
+    _Alignas(OSOE_CACHELINE) _Atomic uint64_t word;
 };
 
 _Static_assert(sizeof(struct osoe_arrival_handoff) == OSOE_CACHELINE,
@@ -463,6 +476,11 @@ struct osoe_am_node_metrics {
     _Atomic uint64_t receive_rearms;
     _Atomic uint64_t sends;
     _Atomic uint64_t short_sends;
+    /* Layout 30: the times a team's local release was held back because a
+     * RELEASE it forwarded was still in a child's control queue (§3.8,
+     * progress.c, release_local, which a pass runs twice). Zero but when a
+     * connection is full at the release. */
+    _Atomic uint64_t releases_held;
 };
 
 /*
@@ -562,15 +580,20 @@ struct osoe_collective_state {
  * internode phase puts to, and from which the progress thread finds the node
  * numbers its messages go to.
  *
- * Written once, fields first and then `published` with a release store; a
- * reader loads `published` with acquire and reads the rest only once it is 1
- * (§3.16's single-writer publication). Never rewritten: a team number is not
- * reused within a session (§5.7), so neither is its record, which outlives the
- * team's destruction. SHMEM_TEAM_SHARED under force-remote has none: it is a
- * different team of one on each PE of the node under the one number, and
- * touches nothing of the node's. A created team of one has one, its number
- * being its own. More than one cache line: the children's ranks alone are 128
- * bytes at the largest fan-out.
+ * Written once for a team, fields first and then `published` with a release
+ * store; a reader loads `published` with acquire and reads the rest only once
+ * it is 1 (§3.16's single-writer publication). Since layout 30 (the team
+ * redesign's step D, D4) a block is given back when the last of the team's
+ * members here leaves it, after the destroy's sync: that member retracts the
+ * record - `published` back to 0 - before anything else of the block's life
+ * moves (osoe_team_name), and the next team the block is claimed for writes
+ * its own. Until then nobody reads the old team's: the team's members have
+ * left it, and nothing of it is still to arrive (the proposal's "Why giving a
+ * number back is safe"). SHMEM_TEAM_SHARED under force-remote has none: it is
+ * a different team of one on each PE of the node under the one number, and
+ * touches nothing of the node's. A created team of one has one, its name being
+ * its own. More than one cache line: the children's ranks alone are 128 bytes
+ * at the largest fan-out.
  *
  * **Who sees it, and why** (§3.16). The predefined teams' records are written
  * by this node's lead in osoe_team_start (team.c), in every session, before
@@ -592,9 +615,8 @@ struct osoe_collective_state {
  * it by orders that exist already, the sync carrying it:
  *
  * - **The team's members on this node**, on the arrival path and in the data
- *   half. The local lead publishes the record, lowers
- *   `team_blocks_published_from` and stores the map entry (layout 29), before
- *   its own arrival at the parent's sync, a seq_cst add to the parent's
+ *   half. The local lead publishes the record and stores the map entry (layout
+ *   29), before its own arrival at the parent's sync, a seq_cst add to the parent's
  *   `arrived`. The parent's epoch is released
  *   here only after the last local arrival, a later add to the same counter,
  *   and every add to it is a read-modify-write, so the last one reads a value
@@ -610,9 +632,10 @@ struct osoe_collective_state {
  *   local arriver posted after its add, and so after the local lead's:
  *   everything the thread does after that follows the record. It meets the
  *   new team at one of two things. A local member's first post, which comes
- *   after that member's return from the split, and is followed by its bump of
- *   the lead's wake word, so the thread's load of `team_blocks_published_from`
- *   after its load of that word sees the mark lowered (internode-am.c). Or a
+ *   after that member's return from the split, and sets the block's posted
+ *   bits before its bump of the lead's wake word, so the thread's exchanges of
+ *   the summary and the bitmap after its load of that word find the block
+ *   (internode-am.c, `team_posted_summary`). Or a
  *   message about the new team from another node, which can only have been
  *   sent once the parent's sync completed, which needed this node's arrival,
  *   which the thread sent after its acquire of the handoff: the message's
@@ -660,22 +683,56 @@ struct osoe_team_record {
  * What the pool needs of a block (layout 29; the team redesign's step D,
  * docs/design/team-resources-proposal.md D3 and D4): the team's *name* on this
  * node - the local id of its local lead and its number, under which the map
- * holds the block's index - the local members holding it, and its generation,
- * raised each time the block is written for a team. Written by the team's
- * local lead as it claims the block, before the map entry, whose release
- * orders them before any member's acquire of it after the split's sync (the
- * record's argument, below); read by members, by the progress engine as it
- * learns the team, and by osoe-stat, which labels a block by it - relaxed, the
- * map entry and the record's `published` being what orders them. Until the
- * team work's second part gives blocks back, no block is written twice: holders
- * stay the team's local members, and the generation is 1.
+ * holds the block's index - the local members holding it, and its generation.
+ *
+ * **A block's life** (layout 30; tools/modelcheck/team_block_model.py). The
+ * local lead of a team a split creates claims a free block from the bitmap
+ * before the split's reduction (osoe_node_team_claim), and once the number is
+ * agreed names it (osoe_node_team_name): its generation raised, to an odd
+ * value, its counters and tree state zeroed, the name and the holders - the
+ * team's members on this node - written; then the record, and last the map
+ * entry, with release, before the split's sync (team.c). Members find the block
+ * through the map after the sync. At destroy, after the sync over the team,
+ * each member leaves it (osoe_node_team_leave): the team's local lead first
+ * clears the map entry under its name, which is its own, and which nothing
+ * resolves once any member here has left the team - no message for the team
+ * reaches the node after that (the proposal's "A late message") - and then
+ * every member brings holders down by one, and the member that brings them to
+ * zero retracts the record, raises the generation again and returns the block
+ * to the bitmap, in that order. The model's breakages show the order: the bit
+ * before the raise, and another team can claim and write the block in between,
+ * the raise landing on that team's generation; the map entry cleared by every
+ * member as it leaves, and a slow member clears the entry the lead has made
+ * again for its next team; the entry the last holder's to clear - the first
+ * design - and a lead whose members are slow to leave finds its own name
+ * taken, its number not free at its next split. A lead's free mask leaves a
+ * number out while a block is mapped under the lead's name (team.c); and a
+ * block is claimed only from the bitmap, so no block is written for a team
+ * while a member of another still holds it.
+ *
+ * The generation is what the progress engine follows (D4): it keeps the one
+ * it learnt a block's team at, and a handoff or a message showing another
+ * makes it learn the block afresh (progress.c). It moves only while the block
+ * has no holder, so a member reads its block's with a relaxed load.
+ *
+ * Written by the team's local lead as it names the block, before the map
+ * entry, whose release orders them before any member's acquire of it after the
+ * split's sync (the record's argument, below); read by members, by the progress
+ * engine as it learns the team, and by osoe-stat, which labels a block by it -
+ * relaxed, the map entry and the record's `published` being what orders them.
+ * `holders` moves by read-modify-writes, seq_cst as every one is (§3.16).
  */
 struct osoe_team_name {
     _Alignas(OSOE_CACHELINE)
     _Atomic uint32_t lead;          /* local id of the team's local lead here */
     _Atomic uint32_t number;        /* the team's number */
     _Atomic uint32_t holders;       /* local members holding the block */
-    _Atomic uint32_t generation;    /* 0 for a block never written */
+    _Atomic uint32_t generation;    /* odd while a team holds it; 0 never written */
+    /* Layout 30: the holders it was named with, the team's members here - so
+     * that fewer holders says its team is leaving it - kept once the last has
+     * left, and zeroed when the block is claimed again: a block given back and
+     * not yet in the bitmap is told by it (osoe_node_team_returning). */
+    _Atomic uint32_t members;
 };
 
 /*
@@ -685,7 +742,8 @@ struct osoe_team_name {
  * index (osoe_node_team), so a team created later needs no storage of its own
  * and no team's state shares a cache line with another's. The predefined teams'
  * are the first three, at the block index of their number; a created team's is
- * claimed from the free bitmap by its local lead here (osoe_node_team_claim).
+ * claimed from the free bitmap by its local lead here (osoe_node_team_claim),
+ * and given back when the last of its members here leaves it (osoe_team_name).
  *
  * - **§5.4's three epoch counters**, each alone on its line. SHMEM_TEAM_SHARED
  *   has its own although on one node its membership is the world's: the spec
@@ -782,22 +840,26 @@ struct osoe_node_header {
     uint32_t landing_arena_bytes;
 
     /*
-     * Layout 29 (step D): the lowest block index of a created team whose record
-     * on this node is published, or `dir.team_count` before the first - which,
-     * with the three predefined teams' blocks below it, bounds the node lead
-     * agent's scan of the arrival handoffs (internode-am.c), so that a pass
-     * costs the blocks claimed and not the pool. Blocks are claimed from the top
-     * of the pool down (osoe_node_team_claim), and until the team work's second
-     * part none is given back, so a low-water mark, lowered by each record's
-     * writer after its `published` and never raised - a compare-and-swap that
-     * only lowers it, since the writers are the teams' local leads, in any
-     * process of the node. Lowered as part of writing the record, so the
-     * record's argument for who sees it covers it too. On its own line: every
-     * pass of the agent loads it. Until layout 29, `team_numbers_published`,
-     * one past the highest team number published, the blocks then being the
-     * numbers'.
+     * Layout 30 (the team redesign's step D, D5;
+     * tools/modelcheck/posted_bitmap_model.py): which team blocks have an
+     * arrival posted. A bit a block in the posted bitmap (`team_posted`, after
+     * the free bitmap), and here a bit for each 64-block word of it, so that the
+     * node lead's agent finds the posts with one load when there are none,
+     * however many teams the node holds - 1,024 blocks need the first word
+     * alone, the 65,536 the setting allows all sixteen. A member that posts
+     * sets its block's bit, then its word's bit here, between its store of the
+     * handoff and its bump of the lead's wake word (osoe_internode_arrive); the
+     * agent, after loading its wake word, takes each nonzero word here by
+     * exchange, and each bitmap word it names by exchange, and reads those
+     * blocks' handoffs. The model's breakages each lose a post: the bit here
+     * before the block's, the wake before either, either before the handoff,
+     * the agent clearing this word after reading the bitmap. On its own line:
+     * every pass loads it, every post sets it. Until layout 30 the agent read
+     * every block at and above a low-water mark of published blocks,
+     * `team_blocks_published_from`, and until layout 29 every number below a
+     * high-water mark, `team_numbers_published`.
      */
-    _Alignas(OSOE_CACHELINE) _Atomic uint32_t team_blocks_published_from;
+    _Alignas(OSOE_CACHELINE) _Atomic uint64_t team_posted_summary[OSOE_TEAM_POSTED_SUMMARY_WORDS];
 
     /*
      * The pool of team blocks, `dir.team_count` of them (OSOE_TEAM_BLOCKS since
@@ -1054,7 +1116,8 @@ struct osoe_node {
     uint32_t team_map_row;
     _Atomic uint64_t *team_free;
     uint32_t team_free_words;
-    _Atomic uint32_t *epochs;
+    _Atomic uint64_t *team_posted;      /* team_free_words words: the posted blocks */
+    _Atomic uint64_t *epochs;
     uint32_t epoch_row_words;
     /* Each local PE's pool of context blocks, `contexts_per_pe` each
      * (OSOE_MAX_CONTEXTS), indexed by osoe_node_context. */
@@ -1113,27 +1176,86 @@ static inline uint32_t osoe_node_team_find(const struct osoe_node *n, uint32_t l
 
 /*
  * Claim a free block of the pool for a team created here, or UINT32_MAX if
- * none is free: a compare-and-swap on the free bitmap, as team numbers are
- * claimed (team.c), so a failed claim takes nothing. From the top of the pool
- * down, so that a created team's block index is seldom its number - never at
- * the defaults, where the pool is sixteen times the numbers - and a mix-up of
- * the two shows at once rather than on some node of some map; and the scan of
- * arrivals stays bounded below by `team_blocks_published_from`. Until the team
- * work's second part, a claimed block is never given back.
+ * none is free: a compare-and-swap on the free bitmap, so a failed claim takes
+ * nothing, and then the block's members zeroed (osoe_team_name). From the top
+ * of the pool down, so that a created team's block index is seldom its number
+ * - a mix-up of the two shows at once rather than on some node of some map. A
+ * block claimed and never named - its split failed - goes back with
+ * osoe_node_team_return.
  */
 uint32_t osoe_node_team_claim(struct osoe_node *n);
 
+/* Give back a block claimed and not named (osoe_node_team_claim): one atomic
+ * or of its bit into the free bitmap. */
+void osoe_node_team_return(struct osoe_node *n, uint32_t block_index);
+
 /*
- * Where local PE `local_id` publishes its epoch count k for team `team` (§5.4),
- * which osoe-stat compares against the team's counters to say which PE has not
- * reached a collective (§3.14). One word of that PE's row, which only it
- * writes; the rows are padded to a cache line, so no two PEs share one.
+ * Name the claimed block `block_index` for the team (`lead`, `number`) with
+ * `holders` members on this node (osoe_team_name, a block's life): the
+ * generation raised, the counters and the tree state zeroed, the name and the
+ * holders written. By the team's local lead, before it writes the record and
+ * the map entry. Returns the generation.
  */
-static inline _Atomic uint32_t *osoe_node_published_epoch(const struct osoe_node *n,
+uint32_t osoe_node_team_name(struct osoe_node *n, uint32_t block_index, uint32_t lead,
+                             uint32_t number, uint32_t holders);
+
+/*
+ * Whether a block of the pool is on its way back: its team has begun to leave
+ * it, or its last holder has given it back and it is not in the bitmap yet -
+ * fewer holders than the members it was named with, which only a claim zeroes;
+ * or it is in the bitmap, back since the caller found the pool empty. Each
+ * lasts only as long as a member past the destroy's sync takes to leave. What
+ * a lead that finds the pool empty asks, so that its split runs the round
+ * again rather than failing for a block about to be free (team.c;
+ * tools/modelcheck/pool_dry_model.py). A block claimed and not yet named is
+ * not on its way back: its split will name it, or fail. O(OSOE_TEAM_BLOCKS),
+ * on that path alone.
+ */
+bool osoe_node_team_returning(const struct osoe_node *n);
+
+/*
+ * One member of the team in block `block_index` leaves it, after the destroy's
+ * sync (osoe_team_name, a block's life): the team's local lead here - `lead` -
+ * first clearing the map entry under the block's name, its own; then holders
+ * down by one, and if that was the last, the record retracted, the generation
+ * raised and the block returned to the bitmap, in that order. True for the
+ * member that gave the block back.
+ */
+bool osoe_node_team_leave(struct osoe_node *n, uint32_t block_index, bool lead);
+
+/*
+ * Where local PE `local_id` publishes its epoch count k for the team it holds
+ * under number `team` (§5.4), which osoe-stat compares against the team's
+ * counters to say which PE has not reached a collective (§3.14). One word of
+ * that PE's row, which only it writes; the rows are padded to a cache line, so
+ * no two PEs share one. Since layout 30 (step D) the word is the team's block
+ * index plus one in the high half and k in the low (OSOE_EPOCH_WORD), so that
+ * a reader pairs it with a block and not with a number: two PEs of one node
+ * may hold different teams under one number (D1). 0 for none.
+ */
+static inline _Atomic uint64_t *osoe_node_published_epoch(const struct osoe_node *n,
                                                           uint32_t local_id, uint32_t team)
 {
     return &n->epochs[(size_t)local_id * n->epoch_row_words + team];
 }
+
+/* The word of the posted bitmap that holds block `block_index`'s bit, and the
+ * summary word that holds that word's (node.h, `team_posted_summary`). */
+static inline _Atomic uint64_t *osoe_node_team_posted(const struct osoe_node *n,
+                                                      uint32_t block_index)
+{
+    return &n->team_posted[block_index / 64];
+}
+
+static inline _Atomic uint64_t *osoe_node_team_posted_summary(const struct osoe_node *n,
+                                                              uint32_t block_index)
+{
+    return &n->hdr->team_posted_summary[block_index / 4096];
+}
+
+/* A published epoch word: block `block_index` and epoch count `epoch`. */
+#define OSOE_EPOCH_WORD(block_index, epoch)                                 \
+    ((uint64_t)((block_index) + 1) << 32 | (uint32_t)(epoch))
 
 /* A local PE's landing zone. Its size is set at run time, so zones are indexed
  * by bytes, never by array. */

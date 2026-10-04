@@ -456,7 +456,7 @@ computing for ever, is what `osoe-stat` is for.
 | `collect` | the PEs' lengths first, as one vector of 8 bytes a PE, summed through the node leads' tree, then the data as `fcollect`'s | the data as `fcollect`'s; the lengths O(N) bytes up the tree and down it, 1 MB at 128,000 PEs |
 | prefix scans | a tree over the team's ranks, its pieces pipelined as the other data collectives' are | O(log N) rounds |
 | `alltoall`, `alltoalls` | every block put directly, then a barrier | O(N) a PE - inherent: every PE has a block for every other |
-| a team | a number from a job-wide counter, and a record on each member node | O(P) a member, testing its node's PEs; on each node's lead, O(M) once to find the team's nodes from its members - O(M log M) when they are not met in node order - and the S leads kept (temporary: the team work replaces this) |
+| a team | a number agreed by one reduction over the parent of every member's free numbers, the same on all of them, and a block from each member node's pool, given back at destroy | the reduction of `OSOE_MAX_TEAMS` / 64 words - about what one broadcast costs - and a second, of one word, when any PE of the parent has `SHMEM_THREAD_MULTIPLE`; O(P) a member, testing its node's PEs; on each node's lead, O(M) once to find the team's nodes from its members - O(M log M) when they are not met in node order - and the S leads kept |
 | waiting | a futex word per resource a connection has, shared by the node's PEs; one per thread for its replies and watches, per PE for its agent and its landing zone, per context for its counters | O(1) a waiter |
 | start-up | the node leads' rendezvous tree, then their mesh | ⌈log₈ n⌉ levels, then n - 1 connections a lead, made one after another |
 | `SHMEM_THREAD_MULTIPLE` | threads issue on a shared context without a lock; every wait that completes its operations - a quiet, `shmem_pe_quiet`, a strided get's end, and the quiet a barrier or `shmem_clear_lock` makes - takes the context's, and one shares a full quiet that began and ended while it waited for it | O(1) an operation |
@@ -470,10 +470,8 @@ proved a bandwidth choice at large sizes - on its four nodes a fan-out of 2 with
 the pipeline 4 to 8 deep was 1.5 times faster at 1 MiB than the default, though
 at the default depth of 2 it sped a broadcast 1.2 times and slowed a reduction
 19%, and 4 was twice as fast up to 1 KiB; every pair of nodes connects at
-start-up, so the job holds n(n - 1)/2 connections, n - 1 a node; one thread a
-node moves all of its internode messages (Limits, below); and team numbers,
-never reused, make a two-dimensional split of a whole job cost 2√N of them
-(below; temporary).
+start-up, so the job holds n(n - 1)/2 connections, n - 1 a node; and one thread
+a node moves all of its internode messages (Limits, below).
 
 ## Limits, and where osoe departs from the specification
 
@@ -483,35 +481,40 @@ specification or takes a choice the specification leaves open.
 
 **Teams**
 
-- **A node holds at most `OSOE_TEAM_BLOCKS` teams in a session** (1,024 by
-  default), the three predefined and the destroyed among them (*temporary*: the
-  team work gives a destroyed team's block back, so that it bounds the teams a
-  node holds at once); the split that would make one more on a node ends the
-  job, naming the variable (*temporary*: the team work makes it a split that
-  fails alike on every PE of its parent).
-
-The three limits below are temporary: the team work, decided and to be built
-before the first release (`docs/design/team-resources-proposal.md`), gives each
-PE numbers of its own, given back when a team is destroyed.
-
-- **Team numbers are never reused.** A job can create `OSOE_MAX_TEAMS` - 3 teams
-  between `shmem_init` and `shmem_finalize` - 61 by default, 1,021 at most -
-  counting those already destroyed. Past that, a split returns nonzero on every
-  PE of its parent team, as the specification allows for a split that cannot be
-  made.
-- **`shmem_team_split_2d` spends a number on every row and every column**:
-  2√N for a square grid of N PEs, so no grid of a whole job above about 930
-  PEs by default, or 2.6 × 10⁵ at the ceiling.
-- **Every split claims job-wide numbers, so a split made on each node spends one
-  a node.** A split takes its numbers from one job-wide counter whatever its
-  parent team, so one line of a program - a split of `SHMEM_TEAM_SHARED` on
-  every node, say, which is a separate split on each - spends a number for every
-  node. With the default `OSOE_MAX_TEAMS` 61 nodes get their team; on a job of
-  62 nodes or more the rest get `SHMEM_TEAM_INVALID` and a nonzero return -
-  which nodes is a race - and a program that ignores the return runs that team's
-  collectives as no-ops there and ends with status 0. Raising `OSOE_MAX_TEAMS`
-  costs every PE about 200 KiB of address space a number, which the `/dev/shm`
-  check counts.
+- **A PE is in at most `OSOE_MAX_TEAMS` teams at once** (64 by default, 1,024
+  at most), the three predefined among them - the world, the node's shared team,
+  and one the library keeps for `shmem_finalize` - so a program can hold 61
+  teams of its own on every PE. A destroyed team gives its number back to each
+  of its members. A split takes, on every member of each team it creates, one
+  number free on all of them: `shmem_team_split_strided` one, and a whole-job
+  `shmem_team_split_2d` two, every row the one and every column the other. A
+  split of `SHMEM_TEAM_SHARED` on every node, which is a separate split on each,
+  takes one number on each PE, and any number of nodes get their team. With no
+  number free on every member a split returns nonzero on every PE of its parent
+  team, as the specification allows for a split that cannot be made, and the
+  parent's rank 0 says why, naming the variable. Each number costs every PE about
+  200 KiB of address space, which the `/dev/shm` check counts (*temporary*: the
+  team work's second step makes it about 15 KiB, and the default 256).
+- **A node holds at most `OSOE_TEAM_BLOCKS` teams at once** (1,024 by default),
+  the three predefined among them, a team of members on several nodes counting
+  once on each, and a team of one PE counting too. A split that would make one
+  more on a node returns nonzero on every PE of its parent team, a PE of that
+  node saying why, naming the variable and the node. A team destroyed before
+  the split - on each node, by the PE that would lead the new team there, or by
+  PEs of the split's parent that are all of the team's members there - has
+  given its place back for it, although a destroy returns before every member
+  on the node has let go: the split waits the moment that takes. A team whose
+  members on the node are all outside the split's parent, none of them yet
+  letting go, can still make the split fail, as a node with no place left
+  does.
+- **Two splits of different parents at once, on threads of one PE**, under
+  `SHMEM_THREAD_MULTIPLE`, can agree the same number. One keeps it and the other
+  runs its agreement again, on every PE of its parent; neither fails for it.
+  One of the two may wait a moment inside the library for the other's agreement
+  to finish on their PE, which waits on nothing outside the split. A split
+  takes two reductions over its parent when any PE of the parent has
+  `SHMEM_THREAD_MULTIPLE` - the PEs of a job may ask for different levels - and
+  one when none has.
 
 **Threads and contexts**
 
@@ -808,10 +811,11 @@ that one could be added without touching the OpenSHMEM layer.
   nodes. The four that do not are SOS's own: two use an extension of the
   type-generic interfaces and do not build, one overflows its own buffer (osoe
   stops it by name), and one asks `shmem_align` for an alignment the
-  specification leaves undefined. Past 61 PEs, `shmem_team_reuse_teams` fails,
-  and programs that make a team a PE, such as `reduce_active_set` and
-  `repeated_barriers`, skip their last rounds without saying so, on the team
-  limits under Limits (temporary, as they are).
+  specification leaves undefined. At 70 PEs, programs that make a team a round
+  and keep them all, such as `reduce_active_set` and `repeated_barriers`, skip
+  their last nine rounds without saying so: their last PE would be in 70 teams,
+  more than the 61 of its own a PE may hold at the default `OSOE_MAX_TEAMS`
+  (Limits; temporary, until the default rises to 256).
 - **Applications**: ISx, NPB IS, the Parallel Research Kernels and the
   OpenSHMEM examples, built with `oshcc`.
 - **`shmem.floor`'s pins.** In each of seven pairs, in a job of two nodes on one
@@ -882,8 +886,8 @@ both are set the `SHMEM_` one controls.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_MAX_TEAMS` | `64` | Team numbers a job uses between `shmem_init` and `shmem_finalize`, the three predefined teams' included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team keeps its number, so this bounds the teams a job creates - 61 at the default - not only those alive at once (*temporary*: the team work makes it the teams one PE is in at once). Each number costs every PE about 200 KiB of address space at the default fan-out and pipeline depth: 160 KiB that only a team's leads touch and 40 KiB, for the scans, that every member of a team that scans does. *Checked*. |
-| `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold in a session, the three predefined teams' and the destroyed included (*temporary*: the team work gives a destroyed team's block back, so that it counts the teams a node holds at once): the node's pool of team blocks in its control segment, about a kilobyte each, from which a created team's local lead on each node takes one. `8` to `65536`. A node holding that many ends the job at the next split, naming the variable (*temporary*: the team work makes it a split that fails alike on every PE of its parent). Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
+| `OSOE_MAX_TEAMS` | `64` | Teams one PE may be in at once, the three predefined teams included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team gives its number back. Each number costs every PE about 200 KiB of address space at the default fan-out and pipeline depth: 160 KiB that only a team's leads touch and 40 KiB, for the scans, that every member of a team that scans does (*temporary*: the team work's second step makes it about 15 KiB, and the default 256). *Checked*. |
+| `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, about a kilobyte each, from which a created team's local lead on each node takes one, and to which the last of its members there gives it back. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
 | `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
 | `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. *Checked* among a node's PEs. |
 | `OSOE_GET_LANDING_BYTES` | `262144` | Bytes of each PE's landing zone for the replies of its gets from other nodes, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. *Checked* among a node's PEs. |

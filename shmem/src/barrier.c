@@ -52,7 +52,7 @@ static void sync_team(struct osoe_team *t, const char *routine)
      */
     if (t->singleton) {
         t->epoch = k + 1;
-        atomic_store_explicit(t->published, k + 1, memory_order_release);
+        osoe_team_publish_epoch(t, k + 1);
         return;
     }
 
@@ -89,7 +89,7 @@ static void sync_team(struct osoe_team *t, const char *routine)
     /* Publish it: comparing each PE's k against the team's counters is how
      * osoe-stat says which PE has not reached a barrier, the most common real
      * hang (§3.14 question 1). */
-    atomic_store_explicit(t->published, k + 1, memory_order_release);
+    osoe_team_publish_epoch(t, k + 1);
 }
 
 /*

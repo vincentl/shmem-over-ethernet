@@ -22,10 +22,15 @@
 #include "internode.h"
 
 /* From the backend's osoe_internode_init: every team's state starts afresh,
- * as the internal region does with the session's heap, one entry per team
- * number (OSOE_MAX_TEAMS). And from its osoe_internode_fini: freed. */
+ * as the internal region does with the session's heap, one entry per block of
+ * the node's pool of teams (OSOE_TEAM_BLOCKS). And from its
+ * osoe_internode_fini: freed. */
 void osoe_internode_generic_init(void);
 void osoe_internode_generic_fini(void);
+
+/* osoe_internode_number_taken's, for the counters of this PE's internal region
+ * (internal-region.h). */
+void osoe_internode_generic_number_taken(uint32_t number);
 
 /* internode.h's osoe_internode_reduce, osoe_internode_broadcast and
  * osoe_internode_collect, whose contracts these meet. */

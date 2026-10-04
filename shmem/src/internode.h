@@ -221,6 +221,19 @@ uint32_t osoe_internode_fanout_default(void);
  */
 
 /*
+ * Down: this PE takes team number `number` for a team a split is creating (the
+ * team redesign's step D, docs/design/team-resources-proposal.md D1): what the
+ * backend keeps for the number in this PE's own memory starts again from
+ * nothing - for the generic data half, the number's counters in the internal
+ * region (internal-region.h). Called by every member of the new team, before
+ * the split's sync over the parent, after which alone anybody writes to it for
+ * the new team; and only once this PE has left every team it held under the
+ * number, the last of whose writes into it the PE waited for before it left
+ * (the proposal's "Why giving a number back is safe"). Does not block.
+ */
+void osoe_internode_number_taken(uint32_t number);
+
+/*
  * Up, and implemented above this header like osoe_internode_released: the
  * world rank of the lead of the node at position `index` of team `team`'s
  * sorted node set - the rank that node's part of the data half runs on - or

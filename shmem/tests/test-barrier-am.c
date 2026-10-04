@@ -149,7 +149,7 @@ int main(void)
      */
     arrivals_arrive((int)b.rank);
     arrivals_row()[b.node] = arrivals_now();
-    osoe_progress_arrive(&p, TEAM, EPOCH);
+    osoe_progress_arrive(&p, TEAM, 0, EPOCH);
 
     while (releases == 0) {
         if (!osoe_progress_poll(&p))

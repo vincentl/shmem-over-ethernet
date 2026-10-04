@@ -560,8 +560,9 @@ use; whether the sort's rates warrant a line in `docs/pi-cluster-results.md`.
 `--teams-exhaust`; the two test hooks on in the debug and asan smoke runs.
 An hour of `threads` in a debug build with the hooks on, on the VM and on
 the Pi. *Author decides after:* what to do about per-job team numbers if
-the exercise makes the cost vivid; whether the open oracle firing
-reproduced, and what it said.
+the exercise makes the cost vivid (*decided 2026-10-02: the team redesign,
+built as step D on 2026-10-03*); whether the open oracle firing reproduced,
+and what it said.
 
 **Phase 3 - the rest of the surface.** `atomics` over every type, `rma`,
 `locks`, `memory`, `collectives`; the generated interposition shim

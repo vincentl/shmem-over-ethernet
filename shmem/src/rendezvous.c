@@ -38,8 +38,9 @@ struct agreement {
     uint64_t symmetric_size;
     uint32_t handler_checksum;
     uint32_t collective_fanout;     /* §5.3: a node building another tree hangs the job */
-    /* §5.7: team numbers are job-wide, and a node with another count lays its
-     * team state and internal region out differently. */
+    /* §5.7: a node with another count of team numbers lays its internal
+     * region out differently, and a put of one team's piece would land in
+     * another's slot. */
     uint32_t max_teams;
     /* §5.8: D, the pieces in flight per lead, which fixes the internal
      * region's offsets as the fan-out and the team count do. The last word, so

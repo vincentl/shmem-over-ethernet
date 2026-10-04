@@ -214,7 +214,8 @@ static void notify(void *context, uint32_t pe, uint16_t region, uint64_t offset,
  * acquire, then the rest (§3.16) - and turned into the engine's terms: the
  * node numbers its messages go to, and the team's name on each of those nodes,
  * its number and the local id there of its local lead, rather than the
- * neighbours' leads' ranks the record keeps (the team redesign's step D).
+ * neighbours' leads' ranks the record keeps (the team redesign's step D); and
+ * the block's generation, which the engine learnt it at.
  * False for a team with no record here, or one spanning a single node: the
  * engine then ends the job naming it, as it did an unregistered team. The
  * record's counts are this library's own, but they are read from shared
@@ -250,14 +251,22 @@ static bool team_of_record(void *context, uint32_t team, struct osoe_progress_te
         learnt->child_lead[j] = osoe_job_local_index(&osoe.job, r->child[j]);
     }
     learnt->published = &b->tree;
+    learnt->generation = atomic_load_explicit(&b->name.generation, memory_order_relaxed);
     return true;
 }
 
-/* A team's block on this node by the name a message carries (progress.h). */
-static uint32_t team_by_name(void *context, uint32_t lead, uint32_t number)
+/* A team's block on this node by the name a message carries, and the block's
+ * generation (progress.h): relaxed, the map entry's acquire carrying the name
+ * that was written before it (node.h). */
+static uint32_t team_by_name(void *context, uint32_t lead, uint32_t number,
+                             uint32_t *generation)
 {
     (void)context;
-    return osoe_node_team_find(&osoe.node, lead, number);
+    uint32_t block = osoe_node_team_find(&osoe.node, lead, number);
+    if (block != UINT32_MAX)
+        *generation = atomic_load_explicit(&osoe_node_team(&osoe.node, block)->name.generation,
+                                           memory_order_relaxed);
+    return block;
 }
 
 /*
@@ -420,14 +429,19 @@ void osoe_progress_host_start(uint32_t session)
      * progress.c ends the job naming the peer if one does.
      */
     /*
-     * The forwards' term counts the teams that can exist at once, since a node
-     * pair carries the trees of as many teams as exist job-wide and never more
-     * (§5.7), and the pool is node-wide, so it costs a descriptor per team per
-     * degree and not one per connection: OSOE_MAX_TEAMS, the bound §5.7 gives
-     * the control queue, since the splits create teams (phase 1 step 7 slice
-     * 2; the first slice counted the predefined three). The per-team state
-     * below is sized by the pool, OSOE_TEAM_BLOCKS, since it is indexed by
-     * block (the team redesign's step D).
+     * The forwards' term counts the teams this node can hold at once, since
+     * its engine forwards for those and no others, and the pool is node-wide,
+     * so it costs a descriptor per team per degree and not one per connection:
+     * OSOE_TEAM_BLOCKS since the team redesign's step D (D5), its pool of team
+     * blocks - a team's members are released only once its RELEASEs have left
+     * the control queues (release_local, progress.c, holds the local release
+     * until then), so a block given back and claimed again finds none of the
+     * old team's still queued. Until step D's second part it
+     * was OSOE_MAX_TEAMS, the teams that could exist job-wide, which a node
+     * could not exceed while numbers were job-wide; a node may now hold more
+     * teams than any one PE's numbers. 5,120 descriptors at the defaults,
+     * about 240 KiB. The per-team state below is sized by the pool too, since
+     * it is indexed by block.
      */
     /*
      * And one a peer for the deadlock detector's messages (§3.15), of which a
@@ -435,15 +449,9 @@ void osoe_progress_host_start(uint32_t session)
      * collection and a node answers once, each only after what came before
      * has been answered (deadlock.c).
      */
-    /* Collective forwards are bounded per team number, OSOE_MAX_TEAMS, while
-     * a number is job-wide and a node's blocks map one to one to numbers (the
-     * team redesign's step D, its first part; the second part, where a node may
-     * hold more teams than one PE's numbers, bounds it by the pool). The
-     * engine's per-team state is per block of the pool. */
-    uint32_t numbers = osoe.bootstrap.max_teams;
     uint32_t teams = osoe.bootstrap.team_blocks;
     uint32_t descriptors = peers * (osoe_am.area.credits + OSOE_REPLY_SLACK + 1) +
-                           OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) * numbers;
+                           OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) * teams;
     osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
     osoe_am.busy = calloc((peers + 63) / 64, sizeof *osoe_am.busy);

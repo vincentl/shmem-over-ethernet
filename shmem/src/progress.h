@@ -108,14 +108,17 @@ struct osoe_progress_host {
  * How a host tells the engine a team it meets for the first time - its own
  * members' arrival, a child's, or a release (§5.3): the team's place in the
  * internode tree, in node numbers; where its state is published for osoe-stat
- * (§3.14); and its name on its neighbours' nodes, which its messages carry
- * (`number`, `parent_lead`, `child_lead`) - into `learnt`, or false if the
- * team has no internode phase on this node. `team` is the team's block on this
- * node (internode.h). A host in a job reads it from the team's record in that
- * block (node.h), published before the team's first arrival anywhere; the
- * engine never learns a team any other way there, since the process it runs
- * in may hold no descriptor for it. Called with the host's context, and given
- * with the per-team arrays it fills (osoe_progress_attach_teams).
+ * (§3.14); its name on its neighbours' nodes, which its messages carry
+ * (`number`, `parent_lead`, `child_lead`); and the generation of its block
+ * (`generation`) - into `learnt`, or false if the team has no internode phase
+ * on this node. `team` is the team's block on this node (internode.h). A host
+ * in a job reads it from the team's record in that block (node.h), published
+ * before the team's first arrival anywhere; the engine never learns a team any
+ * other way there, since the process it runs in may hold no descriptor for it.
+ * Asked again whenever the block shows a generation other than the one the
+ * engine learnt (the team redesign's step D, D4): the block holds another team.
+ * Called with the host's context, and given with the per-team arrays it fills
+ * (osoe_progress_attach_teams).
  */
 struct osoe_progress_team;
 typedef bool osoe_progress_team_source(void *context, uint32_t team,
@@ -124,10 +127,12 @@ typedef bool osoe_progress_team_source(void *context, uint32_t team,
 /*
  * How a host resolves the name a team's message carries (am.h) - the local id
  * of the team's local lead on this node, and its number - to the team's block
- * here, or UINT32_MAX if this node maps no block under the name (the team
- * redesign's step D). A host in a job reads the node's map (node.h).
+ * here, and that block's generation into `*generation`; or UINT32_MAX if this
+ * node maps no block under the name (the team redesign's step D). A host in a
+ * job reads the node's map and the block's name (node.h).
  */
-typedef uint32_t osoe_progress_team_finder(void *context, uint32_t lead, uint32_t number);
+typedef uint32_t osoe_progress_team_finder(void *context, uint32_t lead, uint32_t number,
+                                           uint32_t *generation);
 
 /*
  * One team's place in the internode tree, and the epoch it is in (§5.3).
@@ -151,6 +156,10 @@ struct osoe_progress_team {
     uint32_t number;
     uint32_t parent_lead;
     uint32_t child_lead[OSOE_COLLECTIVE_FANOUT_MAX];
+    /* The generation of the block this was learnt at (node.h, osoe_team_name):
+     * a handoff or a message showing another has the engine learn the block
+     * afresh. 0 for a team registered by hand. */
+    uint32_t generation;
     /* Where the state below is published for osoe-stat (§3.14): the team's
      * block in the node header, or NULL where there is none (the engine's own
      * tests), and then nothing is published. */
@@ -166,6 +175,15 @@ struct osoe_progress_team {
      * leaves for the next level before this level's local wake (§5.3).
      */
     uint32_t release_pending;
+    /*
+     * The RELEASEs of this team still in a child's control queue (§3.8,
+     * argument 2): the local release waits until none is (release_local), so
+     * that the team's members here leave its block only once its forwards
+     * have left the reply pool, and a block given back and claimed again finds
+     * none of the old team's there - which the pool's bound of a degree's worth
+     * a block counts on.
+     */
+    uint32_t releases_queued;
 };
 
 /* The progress thread's private bookkeeping for one connection. Writers see
@@ -466,8 +484,11 @@ void osoe_progress_team(struct osoe_progress *p, uint32_t team,
  *
  * Booked like a child's arrival. If it completes the epoch, the node forwards
  * ARRIVE to its parent - queued, for this same thread's drain - or, at the
- * root, starts the release.
+ * root, starts the release. `generation` is the one the handoff carried, the
+ * block's while its poster held it (node.h): the engine learns the block
+ * afresh if it is not the one it learnt.
  */
-void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch);
+void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t generation,
+                          uint32_t epoch);
 
 #endif /* OSOE_PROGRESS_H */

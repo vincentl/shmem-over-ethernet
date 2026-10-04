@@ -215,32 +215,30 @@ static inline int osoe_test_scoped_metric(const char *metric, unsigned scope, ui
 }
 
 /*
- * The block of this node's pool of teams that holds team number `number` with
- * a published record, or UINT32_MAX: the team scope is indexed by block since
- * layout 29 (the team redesign's step D), and a block's name says its team's
- * number. Until the team work's second part a number is job-wide, so one block
- * of a node holds it.
+ * The block of this node's pool of teams that holds this PE's team under number
+ * `number`, or UINT32_MAX: the team scope is indexed by block since layout 29
+ * (the team redesign's step D), and since layout 30 a number is each PE's own -
+ * two teams on one node may hold it - so the block is the one this PE's
+ * published epoch for the number names beside the epoch (node.h).
  */
 static inline uint32_t osoe_test_team_block(uint32_t number)
 {
     char name[OSOE_SEGMENT_NAME_MAX], err[256];
     osoe_test_segment_name(name, sizeof name, 0);
+    const char *local = osoe_test_launcher("LOCALID");
     struct osoe_segment s;
-    if (osoe_segment_open(&s, name, err, sizeof err) != 0) {
-        fprintf(stderr, "team %u's block: %s\n", number, err);
+    if (!local || osoe_segment_open(&s, name, err, sizeof err) != 0) {
+        fprintf(stderr, "team %u's block: %s\n", number, local ? err : "no local id");
         return UINT32_MAX;
     }
-    uint32_t found = UINT32_MAX;
-    for (uint32_t b = 0; s.table_usable && b < s.team_count && found == UINT32_MAX; b++) {
-        uint64_t n = 0, published = 0;
-        if (osoe_segment_read_name(&s, "team.record.published", b, &published) && published &&
-            osoe_segment_read_name(&s, "team.name.number", b, &n) && n == number)
-            found = b;
-    }
-    if (found == UINT32_MAX)
-        fprintf(stderr, "team %u: no block of %s holds it\n", number, s.name);
+    uint32_t block = UINT32_MAX, epoch = 0;
+    if (!osoe_segment_epoch(&s, (uint32_t)strtoul(local, NULL, 10), number, &block, &epoch) ||
+        block >= s.team_count)
+        block = UINT32_MAX;
+    if (block == UINT32_MAX)
+        fprintf(stderr, "team %u: this PE's epoch in %s names no block\n", number, s.name);
     osoe_segment_close(&s);
-    return found;
+    return block;
 }
 
 /* How many records this node's connection scope has (0 on a one-node job). */

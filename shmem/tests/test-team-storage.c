@@ -45,12 +45,14 @@
  * table of ranks where the node's interleave with another's. Each PE checks
  * its descriptors against the map and runs the collectives on each, and
  * osoe-stat names teams 3 and 4 by their numbers, with their records as the
- * map implies them - team 4's after it is destroyed, since a record outlives
- * its team - and the node's own. The two left alive at the end are the
- * session's end to free. And a fourth team, the world again, has node 0's
- * record published 300 ms late, by a wrapped function of the link, while
- * every member syncs on it the moment its split returns: the split's sync over
- * its parent is what makes that safe (check_parent_sync).
+ * map implies them, and the node's own. Then team 4 is destroyed, and its
+ * record is gone from the dump: since the team redesign's step D the last of
+ * a team's members on a node to leave its block retracts the record and gives
+ * the block back (node.h). The two left alive at the end are the session's
+ * end to free. And a fourth team, the world again, has node 0's record
+ * published 300 ms late, by a wrapped function of the link, while every member
+ * syncs on it the moment its split returns: the split's sync over its parent
+ * is what makes that safe (check_parent_sync).
  *
  * OSOE_TEST_MAP gives the map, and OSOE_TEST_LEADS each node's lead's rank
  * where a hand-given order makes it other than the node's lowest.
@@ -497,9 +499,9 @@ static void check_stat(const uint32_t *node_of, uint32_t nodes, const uint32_t *
     CHECK(says(out, "pe.world_epoch"));
     check_record(out, "world", local, nodes, lead_of);
 
-    /* The created teams, by number: the world again and reversed - the second
-     * destroyed by now - led on each node by its lowest and its highest rank,
-     * and this PE's node reversed, on this node alone. */
+    /* The created teams, by number: the world again and reversed, led on each
+     * node by its lowest and its highest rank, and this PE's node reversed, on
+     * this node alone. */
     CHECK(says(out, "team 3 (number 3)"));
     CHECK(says(out, "team.3.tree.epoch_open"));
     CHECK(says(out, "team 4 (number 4)"));
@@ -539,7 +541,6 @@ int main(void)
     check_shared(gtids, local_count);
     check_created_teams(node_of, nodes, gtids, local_count);
     check_parent_sync();
-    shmem_team_destroy(reverse_team);
 
     /* Each node's lowest and highest rank: the leads there of the world again
      * and of the world reversed. */
@@ -560,6 +561,19 @@ int main(void)
     shmem_barrier_all();
     if (osoe.bootstrap.local_id == 0)
         check_stat(node_of, nodes, lead_of, lowest_of, highest_of);
+    shmem_barrier_all();
+
+    /* A destroyed team's record goes with its block (step D): team 4 is gone
+     * from the dump once every member here has left it, and team 3 is not. */
+    shmem_team_destroy(reverse_team);
+    shmem_barrier_all();
+    if (osoe.bootstrap.local_id == 0) {
+        static char out[256 * 1024];
+        CHECK(run_stat("-d", out, sizeof out) == 0);
+        CHECK(says(out, "team 3 (number 3)"));
+        CHECK(!strstr(out, "team 4 (number 4)"));
+        CHECK(!strstr(out, "team.4.record"));
+    }
     shmem_barrier_all();
 
     shmem_finalize();

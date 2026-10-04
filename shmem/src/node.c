@@ -58,6 +58,16 @@ static const uint64_t heap_base_candidates[] = {
 };
 
 /* Sections of the control segment start on a cache line, so none shares one. */
+static uint64_t align_up(uint64_t n);
+
+/* Where the pool's posted bitmap is (layout 30; node.h): the line after the
+ * free bitmap, which is as long - found from the free bitmap's directory
+ * fields, so that the directory did not grow for it. */
+static uint64_t team_posted_offset_of(uint64_t free_offset, uint32_t free_words)
+{
+    return align_up(free_offset + (uint64_t)free_words * sizeof(uint64_t));
+}
+
 static uint64_t align_up(uint64_t n)
 {
     return (n + OSOE_CACHELINE - 1) / OSOE_CACHELINE * OSOE_CACHELINE;
@@ -753,9 +763,10 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * Each local PE's published epochs (layout 18, §5.4): a row per PE of one
      * word per team number, indexed [local id][team], each row padded to a
      * cache line so that a PE publishing its count after every collective
-     * shares no line with another. 128 bytes a PE at the default.
+     * shares no line with another. Since layout 30 a 64-bit word, the team's
+     * block beside its epoch (node.h): 512 bytes a PE at the default.
      */
-    uint64_t epoch_row_bytes = align_up((uint64_t)b->max_teams * sizeof(uint32_t));
+    uint64_t epoch_row_bytes = align_up((uint64_t)b->max_teams * sizeof(uint64_t));
     uint64_t epochs_offset = align_up(connections_offset + connections_bytes);
     uint64_t epochs_bytes = (uint64_t)b->local_count * epoch_row_bytes;
 
@@ -774,13 +785,15 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
                              sizeof(struct osoe_thread_record);
     /* The pool's map, a word per name - OSOE_MAX_TEAMS names for each local PE,
      * 256 bytes a PE at the default - and its bitmap of free blocks (layout 29;
-     * step D). Last, so that nothing before them moved. */
+     * step D); and its bitmap of posted blocks, as long, on a line of its own
+     * (layout 30; team_posted_offset). Last, so that nothing before them moved. */
     uint64_t team_map_offset = align_up(threads_offset + threads_bytes);
     uint64_t team_map_bytes = (uint64_t)b->local_count * b->max_teams * sizeof(uint32_t);
     uint32_t team_free_words = (b->team_blocks + 63) / 64;
     uint64_t team_free_offset = align_up(team_map_offset + team_map_bytes);
     uint64_t team_free_bytes = (uint64_t)team_free_words * sizeof(uint64_t);
-    n->control_bytes = page_round(team_free_offset + team_free_bytes);
+    uint64_t team_posted_offset = team_posted_offset_of(team_free_offset, team_free_words);
+    n->control_bytes = page_round(team_posted_offset + team_free_bytes);
 
     char err[256];
     int fd = osoe_shm_create(n->control_name,
@@ -903,8 +916,9 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     n->team_map_row = b->max_teams;
     n->team_free = (_Atomic uint64_t *)((char *)p + team_free_offset);
     n->team_free_words = team_free_words;
-    n->epochs = (_Atomic uint32_t *)((char *)p + epochs_offset);
-    n->epoch_row_words = (uint32_t)(epoch_row_bytes / sizeof(uint32_t));
+    n->team_posted = (_Atomic uint64_t *)((char *)p + team_posted_offset);
+    n->epochs = (_Atomic uint64_t *)((char *)p + epochs_offset);
+    n->epoch_row_words = (uint32_t)(epoch_row_bytes / sizeof(uint64_t));
     n->contexts = (struct osoe_context_block *)((char *)p + contexts_offset);
     n->contexts_per_pe = b->max_contexts;
     n->threads = (struct osoe_thread_record *)((char *)p + threads_offset);
@@ -921,12 +935,12 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     /*
      * The pool (layout 29; step D): the predefined teams' blocks, the first
      * three, each named (local id 0, its number) and mapped under that name,
-     * every local PE holding it; and every other block free. A block is zero
-     * until it is claimed, which is a fresh block's state - its counters at 0,
-     * its handoff and record unwritten - so nothing else is written now, and
-     * until the team work's second part no block is claimed twice. The rest of
-     * each predefined block, its handoff, tree state and record, is zero as it
-     * is; its record is written by the lead's osoe_team_start (team.c).
+     * every local PE holding it, at generation 1, never given back; and every
+     * other block free. A free block is zero until it is first claimed, and
+     * named then (osoe_node_team_name), which zeroes what a team counts on in
+     * it whatever another team left there. The rest of each predefined block,
+     * its handoff, tree state and record, is zero as it is; its record is
+     * written by the lead's osoe_team_start (team.c).
      */
     for (uint32_t t = 0; t < OSOE_PREDEFINED_TEAMS; t++) {
         osoe_epoch_init(&h->team[t].arrived);
@@ -943,7 +957,6 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
         atomic_store_explicit(&n->team_free[i / 64], word | UINT64_C(1) << (i % 64),
                               memory_order_relaxed);
     }
-    atomic_store_explicit(&h->team_blocks_published_from, b->team_blocks, memory_order_relaxed);
 
     /*
      * The node's whole request, checked once, now that the segment exists to
@@ -1174,7 +1187,7 @@ again:;
         h->dir.connections_offset + h->dir.connections_bytes > n->control_bytes ||
         h->dir.metrics_offset + h->dir.metrics_bytes > n->control_bytes ||
         header_bytes > n->control_bytes ||
-        h->dir.epoch_row_bytes < (uint64_t)h->dir.team_map_row * sizeof(uint32_t) ||
+        h->dir.epoch_row_bytes < (uint64_t)h->dir.team_map_row * sizeof(uint64_t) ||
         h->dir.epoch_row_count != h->dir.local_count ||
         h->dir.epochs_offset + (uint64_t)h->dir.epoch_row_count * h->dir.epoch_row_bytes >
             n->control_bytes ||
@@ -1182,7 +1195,8 @@ again:;
                                     sizeof(uint32_t) ||
         h->dir.team_map_offset + h->dir.team_map_bytes > n->control_bytes ||
         h->dir.team_free_words < (h->dir.team_count + 63) / 64 ||
-        h->dir.team_free_offset + (uint64_t)h->dir.team_free_words * sizeof(uint64_t) >
+        team_posted_offset_of(h->dir.team_free_offset, h->dir.team_free_words) +
+                (uint64_t)h->dir.team_free_words * sizeof(uint64_t) >
             n->control_bytes)
         osoe_fatal("control segment %s is too small for its own directory",
                    n->control_name);
@@ -1207,8 +1221,11 @@ again:;
     n->team_map_row = h->dir.team_map_row;
     n->team_free = (_Atomic uint64_t *)((char *)n->hdr + h->dir.team_free_offset);
     n->team_free_words = h->dir.team_free_words;
-    n->epochs = (_Atomic uint32_t *)((char *)n->hdr + h->dir.epochs_offset);
-    n->epoch_row_words = h->dir.epoch_row_bytes / (uint32_t)sizeof(uint32_t);
+    n->team_posted = (_Atomic uint64_t *)((char *)n->hdr +
+                                          team_posted_offset_of(h->dir.team_free_offset,
+                                                                h->dir.team_free_words));
+    n->epochs = (_Atomic uint64_t *)((char *)n->hdr + h->dir.epochs_offset);
+    n->epoch_row_words = h->dir.epoch_row_bytes / (uint32_t)sizeof(uint64_t);
     n->contexts = (struct osoe_context_block *)((char *)n->hdr + h->dir.contexts_offset);
     n->contexts_per_pe = h->dir.contexts_per_pe;
     n->threads = (struct osoe_thread_record *)((char *)n->hdr + h->dir.threads_offset);
@@ -1227,6 +1244,17 @@ again:;
                    osoe_metric_checksum(want, want_count));
 }
 
+/* The bitmap's word and bit for block `block_index`. */
+static _Atomic uint64_t *free_word(const struct osoe_node *n, uint32_t block_index)
+{
+    return &n->team_free[block_index / 64];
+}
+
+/*
+ * The members count goes to 0 as the block is claimed (node.h, osoe_team_name):
+ * until then it is its last team's, which osoe_node_team_returning reads as
+ * "on its way back" while the block is neither held nor in the bitmap.
+ */
 uint32_t osoe_node_team_claim(struct osoe_node *n)
 {
     for (uint32_t w = n->team_free_words; w-- > 0;) {
@@ -1234,17 +1262,143 @@ uint32_t osoe_node_team_claim(struct osoe_node *n)
         uint64_t bits = atomic_load_explicit(word, memory_order_acquire);
         while (bits) {
             uint32_t bit = 63 - (uint32_t)__builtin_clzll(bits);   /* the highest free */
-            if (w * 64 + bit >= n->team_count)
-                osoe_fatal("block %u of a pool of %u is marked free", w * 64 + bit,
+            uint32_t block_index = w * 64 + bit;
+            if (block_index >= n->team_count)
+                osoe_fatal("block %u of a pool of %u is marked free", block_index,
                            n->team_count);
             if (atomic_compare_exchange_weak_explicit(word, &bits,
                                                       bits & ~(UINT64_C(1) << bit),
                                                       memory_order_seq_cst,
-                                                      memory_order_acquire))
-                return w * 64 + bit;
+                                                      memory_order_acquire)) {
+                atomic_store_explicit(&osoe_node_team(n, block_index)->name.members, 0,
+                                      memory_order_relaxed);
+                return block_index;
+            }
         }
     }
     return UINT32_MAX;
+}
+
+void osoe_node_team_return(struct osoe_node *n, uint32_t block_index)
+{
+    if (block_index < OSOE_PREDEFINED_TEAMS || block_index >= n->team_count)
+        osoe_fatal("block %u given back to a pool of %u, whose first %u are never claimed",
+                   block_index, n->team_count, OSOE_PREDEFINED_TEAMS);
+    atomic_fetch_or_explicit(free_word(n, block_index), UINT64_C(1) << (block_index % 64),
+                             memory_order_seq_cst);
+}
+
+/* The tree state of a block, for the team it is named for (node.h): zero, as
+ * the progress thread leaves it between collectives, and no parent and no
+ * child missing - OSOE_COLLECTIVE_TREE_NONE, which osoe-stat reads as "none" -
+ * until the engine learns the team's tree and publishes it. */
+static void collective_state_reset(struct osoe_collective_state *c)
+{
+    atomic_store_explicit(&c->epoch_open, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->epoch_closed, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->own_arrived, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->children, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->children_arrived, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->lowest_missing, OSOE_COLLECTIVE_TREE_NONE, memory_order_relaxed);
+    atomic_store_explicit(&c->parent, OSOE_COLLECTIVE_TREE_NONE, memory_order_relaxed);
+    atomic_store_explicit(&c->fanout, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->most_pieces_in_flight, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->gather_steps, 0, memory_order_relaxed);
+    atomic_store_explicit(&c->gather_shares, 0, memory_order_relaxed);
+}
+
+/*
+ * A block's life (node.h, osoe_team_name; tools/modelcheck/team_block_model.py,
+ * write_block): by the team's local lead, on a block it has claimed and so the
+ * only writer of. Nobody of another team holds the block - a block is in the
+ * bitmap only once its last holder has left - and nobody of this one has found
+ * it yet: the map entry comes after. The handoff word is left as the last team
+ * posted it, consumed already, and its first post carries the new generation
+ * (osoe_arrival_handoff).
+ */
+uint32_t osoe_node_team_name(struct osoe_node *n, uint32_t block_index, uint32_t lead,
+                             uint32_t number, uint32_t holders)
+{
+    struct osoe_team_block *b = osoe_node_team(n, block_index);
+    if (!b || block_index < OSOE_PREDEFINED_TEAMS)
+        osoe_fatal("block %u of a pool of %u named for team %u", block_index, n->team_count,
+                   number);
+    uint32_t generation = atomic_load_explicit(&b->name.generation, memory_order_relaxed) + 1;
+    if (generation % 2 == 0)
+        osoe_fatal("block %u, claimed for team %u, is at generation %u: a team holds it",
+                   block_index, number, generation - 1);
+    atomic_store_explicit(&b->name.generation, generation, memory_order_relaxed);
+    osoe_epoch_init(&b->arrived);
+    osoe_epoch_init(&b->released);
+    osoe_epoch_init(&b->copied);
+    collective_state_reset(&b->tree);
+    atomic_store_explicit(&b->name.lead, lead, memory_order_relaxed);
+    atomic_store_explicit(&b->name.number, number, memory_order_relaxed);
+    /* The holders before the members, with release: osoe_node_team_returning
+     * reads the members first, with acquire, and so never sees this team's
+     * members beside the last team's holders. */
+    atomic_store_explicit(&b->name.holders, holders, memory_order_relaxed);
+    atomic_store_explicit(&b->name.members, holders, memory_order_release);
+    return generation;
+}
+
+/*
+ * tools/modelcheck/pool_dry_model.py. A block keeps its last team's members
+ * after that team has left it, and a claim zeroes them (osoe_node_team_claim):
+ * a nonzero count with fewer holders is a team leaving the block, or a block
+ * its last holder has given back and the bitmap does not show yet, or one it
+ * shows again - a lead asks only once its claim found the pool empty, so a free
+ * block is one back since; a zero count is a block claimed, or never named,
+ * which is back only if its bit is set. The members first, with acquire: the
+ * namer writes the holders before them, with release, so a block being named
+ * reads as claimed or as held. One read between a claim and its zeroing reads
+ * as on its way back, which costs the caller a round and nothing more.
+ */
+bool osoe_node_team_returning(const struct osoe_node *n)
+{
+    for (uint32_t i = OSOE_PREDEFINED_TEAMS; i < n->team_count; i++) {
+        const struct osoe_team_name *name = &osoe_node_team(n, i)->name;
+        uint32_t members = atomic_load_explicit(&name->members, memory_order_acquire);
+        if (members != 0 ? atomic_load_explicit(&name->holders, memory_order_seq_cst) < members
+                         : (atomic_load_explicit(free_word(n, i), memory_order_seq_cst) &
+                            UINT64_C(1) << (i % 64)) != 0)
+            return true;
+    }
+    return false;
+}
+
+/*
+ * The model's `leave`, each step in the model's order, each breakage of it
+ * failing there (node.h). The lead clears its name's entry before its own
+ * decrement, and so before the last holder's - the holders' count is a
+ * read-modify-write, whose order every decrement reads - and so before the
+ * bit. Exactly one member brings the count to zero, after every other
+ * member's decrement: every holder's last use of the block comes before its
+ * own decrement, and so before the give-back.
+ */
+bool osoe_node_team_leave(struct osoe_node *n, uint32_t block_index, bool lead)
+{
+    struct osoe_team_block *b = osoe_node_team(n, block_index);
+    if (!b || block_index < OSOE_PREDEFINED_TEAMS)
+        osoe_fatal("a member left block %u of a pool of %u, which no created team can hold",
+                   block_index, n->team_count);
+    if (lead)
+        atomic_store_explicit(osoe_node_team_map_entry(
+                                  n, atomic_load_explicit(&b->name.lead, memory_order_relaxed),
+                                  atomic_load_explicit(&b->name.number, memory_order_relaxed)),
+                              0, memory_order_release);
+    uint32_t before = atomic_fetch_sub_explicit(&b->name.holders, 1, memory_order_seq_cst);
+    if (before == 0)
+        osoe_fatal("a member left block %u, which no member held", block_index);
+    if (before > 1)
+        return false;
+    /* release, as everything the block's last team's members did in it comes
+     * before (§3.16); then the generation, then the bit. */
+    atomic_store_explicit(&b->record.published, 0, memory_order_release);
+    atomic_fetch_add_explicit(&b->name.generation, 1, memory_order_seq_cst);
+    atomic_fetch_or_explicit(free_word(n, block_index), UINT64_C(1) << (block_index % 64),
+                             memory_order_seq_cst);
+    return true;
 }
 
 /*

@@ -10,6 +10,7 @@
 #ifndef OSOE_TEAM_H
 #define OSOE_TEAM_H
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -17,6 +18,7 @@
 #include <shmem.h>
 
 #include "base/epoch.h"
+#include "node.h"
 
 /*
  * Build the predefined teams for this session, and write each one's record
@@ -35,11 +37,12 @@ void osoe_team_stop(void);
  * world's membership on counters of its own. */
 struct osoe_team *osoe_team_finalize(void);
 
-/* This process's descriptor for team number `number` (enum osoe_team_number),
- * or NULL if it has none: a number this PE is not a member of, one it has
- * destroyed, or none that exists. Nothing on the progress thread asks this -
- * it finds a team by number in the node's block (node.h), since in its
- * process there may be no descriptor at all. */
+/* This process's descriptor for the team it holds under number `number`
+ * (enum osoe_team_number), or NULL if it holds none: a number this PE is in no
+ * team under, or none that exists. Since the team redesign's step D a number
+ * is each PE's own (D1): another PE may hold another team under it. Nothing on
+ * the progress thread asks this - it finds a team by its block in the node's
+ * pool (node.h), since in its process there may be no descriptor at all. */
 struct osoe_team *osoe_team_numbered(uint32_t number);
 
 /* "SHMEM_TEAM_WORLD", "SHMEM_TEAM_SHARED", "the finalize team", or "team <n>",
@@ -50,7 +53,10 @@ struct osoe_team_block;
 
 struct osoe_team {
     const char *name;
-    uint32_t number;                /* enum osoe_team_number: indexes per-team state */
+    /* enum osoe_team_number: indexes this PE's per-team state. This PE's own
+     * since the team redesign's step D: no other team this PE is in has it
+     * while this one lives, and another PE may hold another team under it. */
+    uint32_t number;
     uint32_t members;               /* PEs in the team */
     /*
      * §5.2's local member count: team members *on this node*, which is not the
@@ -129,8 +135,14 @@ struct osoe_team {
     /* A created team's `name`: "team 3". */
     char label[16];
     /* A created team's descriptor once destroyed (osoe_team_of): its number
-     * stays, to say so. */
+     * stays, to say so, until this PE takes the number again. */
     bool destroyed;
+    /* How many times this PE has taken the descriptor's number for a team, the
+     * one it holds now counted: a created team's handle carries it (team.c,
+     * osoe_team_of), so that a handle of a destroyed team never names the
+     * team holding its number since. Not the block's generation (node.h),
+     * which is the node's and counts every team the block has held. */
+    uint32_t generation;
     /* This node's block for the team (node.h): since step D a block of the
      * node's pool, found through the map by the team's name - its local lead's
      * local id here and its number - after the split's sync; the predefined
@@ -140,16 +152,28 @@ struct osoe_team {
     uint32_t block_index;
     uint32_t epoch;                 /* this PE's k for the team (§5.4) */
     uint32_t data_epoch;            /* and its d, data collectives completed */
-    _Atomic uint32_t *published;    /* where k is published for osoe-stat */
+    /* Where k is published for osoe-stat, beside the block (node.h,
+     * osoe_node_published_epoch): osoe_team_publish_epoch writes it. */
+    _Atomic uint64_t *published;
 };
+
+/* Publish this PE's epoch count `epoch` for `t` (§3.14), with the team's block
+ * beside it, a single-writer store (§3.16). */
+static inline void osoe_team_publish_epoch(const struct osoe_team *t, uint32_t epoch)
+{
+    atomic_store_explicit(t->published, OSOE_EPOCH_WORD(t->block_index, epoch),
+                          memory_order_release);
+}
 
 /*
  * Resolve a team handle. Returns NULL for SHMEM_TEAM_INVALID, which several
  * routines answer with -1 rather than a failure. A created team's handle is
- * its descriptor's address, accepted while this PE's descriptor for its
- * number is that one; anything else - a handle the library never issued to
- * this PE, or one it has destroyed - is fatal, naming which: the spec makes it
- * undefined, and it is a program bug worth naming.
+ * its descriptor's address and the descriptor's generation (team.c), accepted
+ * while this PE's descriptor for its number is that one at that generation;
+ * anything else - a handle the library never issued to this PE, or one of a
+ * team it has destroyed, whose number may name another team since - is fatal,
+ * naming which: the spec makes it undefined, and it is a program bug worth
+ * naming.
  */
 struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team);
 

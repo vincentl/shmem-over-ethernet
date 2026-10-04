@@ -15,6 +15,10 @@ were run. Develop new models here.
 | `scan_model.py` | The prefix scans' tree over a team's ranks, with per-PE slots shared by every team and READY per team number (§5.8, phase 1 step 10); `scan_timing.py` times it against §5.8's runs |
 | `landing_extent_model.py`, `copy_out_claim_model.py` | §4.11's two open points the author decided on 2026-09-25: landing-zone extents claimed by CAS over a bitmap, and one copier per landed nonblocking get |
 | `pe_quiet_model.py` | §4.11 item 2's rule that a full quiet never piggybacks on a `pe_quiet`, which §10 had left unmodeled |
+| `team_block_model.py` | A team's block of a node's pool (the team redesign's step D, D3-D5): claimed, held by its members, its name's map entry cleared by its lead as it leaves, given back by the last holder - record, generation, then the bitmap - and the engine relearning a block whose generation moved |
+| `split_numbers_model.py` | Two splits at once on one PE under `SHMEM_THREAD_MULTIPLE` (step D, D7, as redesigned after the adversarial read of 2026-10-03): nothing held across a reduction; each member takes its agreed numbers pending, waiting only for a higher parent number, and a second reduction keeps them or runs the round again. Its `token` case is the first design, the mask token, deadlocking the read's program |
+| `pool_dry_model.py` | A split whose node's pool is empty (step D): busy in its first round and while a block is on its way back - a team leaving it, or its last holder's give-back not yet in the bitmap, told by the members count a claim zeroes - and dry only otherwise |
+| `posted_bitmap_model.py` | Which team blocks have an arrival posted (step D, D5): a bit a block behind a summary word, set after the handoff and before the wake, and taken by the agent by exchange, so that a pass with nothing posted is one load |
 | `selftest.py` | Checks that the reductions change no verdict; rerun it after changing the engine |
 
 **Where they run.** Every model is a ctest in the release preset only: a model

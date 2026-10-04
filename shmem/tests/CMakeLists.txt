@@ -1227,19 +1227,24 @@ else()
   target_link_libraries(shmem_test_reply-pool PRIVATE osoe rt)
   osoe_warnings(shmem_test_reply-pool)
 endif()
-# The target's pool is C per connection plus (k + 1) x OSOE_MAX_TEAMS for the
-# tree's forwards, node-wide (§3.8): with C = 1, k = 2 and the fewest teams the
-# variable allows, 4, that is 1 + 3 x 4 = 13, so fourteen origin PEs each with
-# a blocking get outstanding overflow it, and fifteen leave a margin. Slice 3
-# made the forward term node-wide - at the default k = 4 it was 16, and the
-# seven origin PEs this test had until then stopped reaching it - and phase 1
-# step 7's second slice made it count every team number, where it had counted
-# the three predefined teams and eleven origins overflowed it.
+# The target's pool is, per connection, C and one for the deadlock detector,
+# plus (k + 1) x OSOE_TEAM_BLOCKS for the tree's forwards, node-wide (§3.8):
+# with C = 1, k = 2 and the smallest pool of team blocks the variable allows, 8,
+# that is 1 + 1 + 3 x 8 = 26, so twenty-seven origin PEs each with a blocking
+# get outstanding overflow it, and thirty-one leave a margin. Slice 3 made the
+# forward term node-wide - at the default k = 4 it was 16, and the seven origin
+# PEs this test had until then stopped reaching it - phase 1 step 7's second
+# slice made it count every team number, where it had counted the three
+# predefined teams and eleven origins overflowed it, and the team redesign's
+# step D every block of the node's pool, a node holding more teams than one
+# PE's numbers, where fifteen origins overflowed 1 + 1 + 3 x 4.
 add_test(NAME shmem.reply-pool.overflow
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow SHMEM_SYMMETRIC_SIZE=16m
-          OSOE_COLLECTIVE_FANOUT=2 OSOE_MAX_TEAMS=4
-          $<TARGET_FILE:osoe-launch> -n 16 -m 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 -t 30
-          -e 15:OSOE_AM_CREDITS=1 -- $<TARGET_FILE:shmem_test_reply-pool>)
+          OSOE_COLLECTIVE_FANOUT=2
+          $<TARGET_FILE:osoe-launch> -n 32
+          -m 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 -t 30
+          -e 31:OSOE_AM_CREDITS=1 -e 31:OSOE_TEAM_BLOCKS=8
+          -- $<TARGET_FILE:shmem_test_reply-pool>)
 set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
 
@@ -2024,7 +2029,8 @@ endif()
 # On one node at 1, 2 and 4 PEs; on a block map, an interleaved one and four
 # nodes of one PE, where {0, 1} and {0, 2} meet at PE 0 from two other nodes;
 # and under force-remote, where each PE's SHARED is itself. The program makes
-# about forty teams, whose numbers are never reused, so it runs with 64.
+# about forty teams, destroying each as it goes, so that its numbers are given
+# back and taken again, and their blocks with them (the team redesign's step D).
 add_executable(shmem_test_team-split test-team-split.c
   ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 target_include_directories(shmem_test_team-split PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
@@ -2038,14 +2044,20 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
   set_tests_properties(shmem.team-split.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
 
-# The split's three ways to fail for want of what it needs, each a mode of the
-# program on four PEs (the program's comment), judged by what PE 0 says rather
-# than by the exit status - so every failure a run can show fails it by its
-# words: exhaust, under OSOE_MAX_TEAMS=8, where two split_2d calls fail at the
-# claim and take nothing - PE 0 saying 2 numbers had been claimed before each -
-# so that three splits after them still fit, and then the numbers run out, 5
-# claimed; too-many, under OSOE_MAX_TEAMS=4, a split_2d of five teams refused
-# before any claim and the one number then still there; and full, the heap
+# What a split needs and what a number is, each a mode of the program (the
+# program's comment), judged by what PE 0 says rather than by the exit status -
+# so every failure a run can show fails it by its words: exhaust, under
+# OSOE_MAX_TEAMS=8, where two teams with no PE in common hold one number and a
+# split_2d with one number free fails, then the world again with none free on
+# PE 0, twice, and takes the two teams' number once both are destroyed;
+# too-many, under OSOE_MAX_TEAMS=4, a split_2d, which needs two numbers,
+# failing; dry, under OSOE_TEAM_BLOCKS=8 on one node, two splits finding the
+# pool dry, PE 0 naming the setting and its node each time, a split_2d needing
+# three blocks where one is free failing too - not running its rounds for
+# ever, holding the one it claimed - and a destroyed team's block serving the
+# next; stale-handle, a destroyed team's handle used
+# once its number names another team, which ends the job by name; reuse, a
+# team taking a destroyed team's block under another name; and full, the heap
 # filled to its last block under SHMEM_SYMMETRIC_SIZE=1m.
 function(osoe_team_split_mode mode label launch environment pass)
   add_test(NAME shmem.team-split.${mode}.${label}
@@ -2057,13 +2069,24 @@ function(osoe_team_split_mode mode label launch environment pass)
 endfunction()
 set(osoe_team_split_exhaust_environment OSOE_MAX_TEAMS=8 SHMEM_SYMMETRIC_SIZE=16m)
 set(osoe_team_split_exhausted
-  "the 4 teams this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 2 have been claimed.*the 5 teams this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 2 have been claimed.*the 1 team this call creates: OSOE_MAX_TEAMS is 8, 3 of them predefined, and 5 have been claimed.*every check of this mode passed")
+  "PE 0: shmem_team_split_2d: no two team numbers are free on every PE of the new teams: OSOE_MAX_TEAMS is 8, the teams one PE may be in at once.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team: OSOE_MAX_TEAMS is 8.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team: OSOE_MAX_TEAMS is 8.*every check of this mode passed")
 set(osoe_team_split_full "every check of this mode passed")
 osoe_team_split_mode(exhaust L4 "-n;4" "${osoe_team_split_exhaust_environment}"
   "${osoe_team_split_exhausted}")
 osoe_team_split_mode(too-many L4 "-n;4" "OSOE_MAX_TEAMS=4;SHMEM_SYMMETRIC_SIZE=16m"
-  "this call creates 5 teams, more than a session can ever have: OSOE_MAX_TEAMS is 4.*the 1 team this call creates: OSOE_MAX_TEAMS is 4, 3 of them predefined, and 1 has been claimed.*every check of this mode passed")
+  "PE 0: shmem_team_split_2d: no two team numbers are free on every PE of the new teams: OSOE_MAX_TEAMS is 4.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team: OSOE_MAX_TEAMS is 4.*every check of this mode passed")
+osoe_team_split_mode(dry L2 "-n;2" "OSOE_TEAM_BLOCKS=8;SHMEM_SYMMETRIC_SIZE=16m"
+  "PE 0: shmem_team_split_strided: node 0 [(][^)]*[)] has no team block left for the new team this PE would lead there: OSOE_TEAM_BLOCKS is 8, the teams a node may hold at once.*PE 0: shmem_team_split_strided: node 0 [(][^)]*[)] has no team block left.*PE 0: shmem_team_split_2d: node 0 [(][^)]*[)] has no team block left.*every check of this mode passed")
 osoe_team_split_mode(full L4 "-n;4" "SHMEM_SYMMETRIC_SIZE=1m" "${osoe_team_split_full}")
+osoe_team_split_mode(reuse L4 "-n;4" "SHMEM_SYMMETRIC_SIZE=16m" "${osoe_team_split_full}")
+# The stale handle's pass is the job's end, named: its own registration, since
+# the failure expression above would take that end for a failure.
+add_test(NAME shmem.team-split.stale-handle.L2
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SPLIT=stale-handle SHMEM_SYMMETRIC_SIZE=16m
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
+set_tests_properties(shmem.team-split.stale-handle.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "every check before the stale handle passed.*shmem_team_my_pe: 0x[0-9a-f]+ is team 3, which this PE has destroyed; the number names another team since"
+  FAIL_REGULAR_EXPRESSION "CHECK[(]")
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(team-split 0,0,1,1 ${osoe_team_split_environment})
   osoe_tier2_map_test(team-split 0,1,2,0,1,0 ${osoe_team_split_environment})
@@ -2078,6 +2101,10 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     "${osoe_team_split_exhausted}")
   osoe_team_split_mode(full 0-0-1-1 "-n;4;-m;0,0,1,1" "SHMEM_SYMMETRIC_SIZE=1m"
     "${osoe_team_split_full}")
+  osoe_team_split_mode(reuse 0-0-1-1 "-n;4;-m;0,0,1,1" "SHMEM_SYMMETRIC_SIZE=16m"
+    "${osoe_team_split_full}")
+  osoe_team_split_mode(reuse 0-1-2-0-1-0 "-n;6;-m;0,1,2,0,1,0" "SHMEM_SYMMETRIC_SIZE=16m"
+    "${osoe_team_split_full}")
 endif()
 
 # OSOE_TEAM_BLOCKS (§5.7; the team redesign's step D): a node's pool of team
@@ -2086,8 +2113,8 @@ endif()
 # the wire names a team by its name on the node it goes to and never by a block
 # index: the team split program, whose forty teams span both nodes of the
 # second map, passes with its second node's pool a tenth of its first's. A
-# pool too small for the teams a node holds ends the job naming the setting
-# (temporary: the team work's second part makes it a split that fails alike).
+# pool too small for the teams a node holds makes the split fail alike, which
+# the split program's dry mode tests (above).
 osoe_refusal_test(shmem.team-blocks.local-disagree 2 0
   LAUNCH -n 2 -e 1:OSOE_TEAM_BLOCKS=64
   PATTERNS "osoe: PE 1: OSOE_TEAM_BLOCKS differs between PEs: the local lead has 1024, this PE has 64"
@@ -2107,12 +2134,6 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
             -e 3:OSOE_TEAM_BLOCKS=100 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
   set_tests_properties(shmem.job.disagree.team-blocks PROPERTIES LABELS "tier2" TIMEOUT 90)
 endif()
-add_test(NAME shmem.team-blocks.dry
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEAM_BLOCKS=8 ${osoe_team_split_environment}
-          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
-set_tests_properties(shmem.team-blocks.dry PROPERTIES LABELS "tier2" TIMEOUT 90
-  PASS_REGULAR_EXPRESSION "node 0 holds 8 teams, every block of its pool [(]OSOE_TEAM_BLOCKS is 8[)]: raise OSOE_TEAM_BLOCKS"
-  FAIL_REGULAR_EXPRESSION "CHECK[(]|killed by signal|timeout after")
 
 set(osoe_get_nbi_small OSOE_GET_LANDING_BYTES=4096
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
@@ -2160,6 +2181,34 @@ add_test(NAME shmem.multiple.exhaust
 set_tests_properties(shmem.multiple.exhaust PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "more live threads of this PE have called the library than OSOE_MAX_THREADS=2 allows")
 target_link_libraries(shmem_test_multiple PRIVATE Threads::Threads)
+
+# Two splits at once on one PE under SHMEM_THREAD_MULTIPLE (the team
+# redesign's step D, D7, as redesigned; test-team-threads.c): two threads of
+# every PE splitting together, both succeeding; and on three PEs or more the
+# adversarial read's program, which the first design's mask token deadlocked,
+# finishing, its split of {0, 2} losing a round to {0, 1}'s number - PE 0's
+# shmem.team_split.lost_rounds says so. On one node, and on 0,1 and 0,1,2,
+# which tsan sees whole, one PE a node - the second the read's program; and
+# 0,0,1,1.
+osoe_tier2_test(team-threads)
+target_link_libraries(shmem_test_team-threads PRIVATE Threads::Threads)
+osoe_tier2_map_test(team-threads 0,1)
+osoe_tier2_map_test(team-threads 0,1,2)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(team-threads 0,0,1,1)
+endif()
+
+# Splits whose parent PEs ask for different thread levels (test-team-levels.c):
+# PE 0 SHMEM_THREAD_MULTIPLE, the rest shmem_init's SERIALIZED, every parent PE
+# running the same rounds because the first reduction's marks say whether any
+# has the level - the adversarial read of the rebuilt step D part 2 found a
+# split that never finished when each PE decided by its own. On one node, and
+# on 0,1 and 0,0,1,1.
+osoe_tier2_test(team-levels)
+osoe_tier2_map_test(team-levels 0,1)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(team-levels 0,0,1,1)
+endif()
 # A landing zone that is not whole extents is refused by name, not rounded.
 add_test(NAME shmem.multiple.landing-unaligned
   COMMAND ${CMAKE_COMMAND} -E env OSOE_GET_LANDING_BYTES=1500
@@ -2866,11 +2915,18 @@ if(OSOE_TIER3)
     # Created teams spanning nodes over the shaped link (the team redesign's step
     # D): the team split program's forty teams on the interleaved map, where the
     # odd ranks' local lead on node 0 is local id 1 and on node 1 local id 0, so
-    # a message names its team by a lead that is not the sender's own, and every
-    # created team's block differs from its number - barriers, reductions and
-    # the rest on each, through the delay and the loss.
+    # a message names its team by a lead that is not the sender's own, and a
+    # created team's block seldom its number, each block given back as the
+    # program destroys its team and taken again at a new generation - barriers,
+    # reductions and the rest on each, through the delay and the loss. Its reuse
+    # mode makes two teams in sequence spanning the nodes, the second taking the
+    # first's block under another name, which the progress engine follows; and
+    # two threads of each PE split two parents at once, one a node.
     osoe_tier3_test(team-split.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_team-split
                     ENV SHMEM_SYMMETRIC_SIZE=16m)
+    osoe_tier3_test(team-split.reuse.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_team-split
+                    ENV OSOE_TEST_SPLIT=reuse SHMEM_SYMMETRIC_SIZE=16m)
+    osoe_tier3_test(team-threads.0-1 ${shape} 0,1 shmem_test_team-threads)
     # The leads' tree of the reductions and broadcast, over the shaped link.
     osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
     osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)

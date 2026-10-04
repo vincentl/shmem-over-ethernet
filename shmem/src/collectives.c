@@ -149,7 +149,7 @@ static void data_collective_at(const char *routine, struct osoe_team *t, void *d
             memmove(dest, source, bytes);
         t->epoch = k + 1;
         t->data_epoch = d + 1;
-        atomic_store_explicit(t->published, k + 1, memory_order_release);
+        osoe_team_publish_epoch(t, k + 1);
         return;
     }
 
@@ -221,7 +221,7 @@ static void data_collective_at(const char *routine, struct osoe_team *t, void *d
 
     t->epoch = k + 1;
     t->data_epoch = d + 1;
-    atomic_store_explicit(t->published, k + 1, memory_order_release);
+    osoe_team_publish_epoch(t, k + 1);
     osoe_blocked_leave();
 }
 
@@ -258,20 +258,46 @@ static struct osoe_symmetric_location team_word_at(const struct osoe_team *t,
     return at;
 }
 
-/*
- * A word from team rank 0 to every member of `t`, through the team number's
- * own word in the internal region: a broadcast that borrows nothing from the
- * heap, so that it stays symmetric when another thread allocates meanwhile
- * (phase 1 step 8 slice 2). The split's first number travels in it (team.c).
- */
-uint64_t osoe_team_broadcast_word(const char *routine, struct osoe_team *t, uint64_t value)
+/* A split over `t`'s words (internal-region.h): its number's split lines in
+ * local PE `local`'s internal region. */
+static struct osoe_symmetric_location split_words_at(const struct osoe_team *t)
 {
-    struct osoe_symmetric_location at = team_word_at(t, OSOE_INTERNAL_SPLIT_NUMBER);
-    uint64_t *word = (uint64_t *)member_copy(osoe.bootstrap.local_id, at);
-    if (t->me == 0)
-        *word = value;
-    data_collective_at(routine, t, word, at, word, at, 1, sizeof *word, NULL, 0, false);
-    return *word;
+    struct osoe_symmetric_location at = {
+        OSOE_REGION_INTERNAL,
+        osoe_internal_team_split_offset(osoe.bootstrap.collective_fanout,
+                                        osoe.bootstrap.collective_pipeline,
+                                        osoe.bootstrap.max_teams, t->number) };
+    return at;
+}
+
+_Static_assert((OSOE_MAX_TEAMS_HIGHEST + 63) / 64 + 1 <=
+                   OSOE_INTERNAL_SPLIT_LINES * OSOE_INTERNAL_LINE_BYTES / sizeof(uint64_t),
+               "a split's lines hold the largest free mask and its marks word");
+
+uint64_t *osoe_team_split_words(const struct osoe_team *t)
+{
+    return (uint64_t *)member_copy(osoe.bootstrap.local_id, split_words_at(t));
+}
+
+/*
+ * The AND of every member's split words, in place, through the team number's
+ * own lines of the internal region: a reduction that borrows nothing from the
+ * heap, so that it stays symmetric when another thread allocates meanwhile
+ * (phase 1 step 8 slice 2), and that a split over another parent on another
+ * thread never shares, its parent's number being another (team.c, D7). Until
+ * the team redesign's step D a broadcast of the split's first number took its
+ * place, from a spare word of the release counter's line.
+ */
+void osoe_team_split_and(const char *routine, struct osoe_team *t, uint32_t count)
+{
+    struct reduction r = { OSOE_REDUCTION_AND,
+                           { OSOE_ELEMENT_UNSIGNED_INTEGER, sizeof(uint64_t) }, NULL };
+    r.combine = osoe_combine_lookup(r.operation, r.element);
+    if (!r.combine)
+        osoe_fatal("%s: no AND over eight-byte unsigned words", routine);
+    struct osoe_symmetric_location at = split_words_at(t);
+    uint64_t *words = (uint64_t *)member_copy(osoe.bootstrap.local_id, at);
+    data_collective_at(routine, t, words, at, words, at, count, sizeof *words, &r, -1, false);
 }
 
 /*
@@ -345,7 +371,7 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
             prefix_sums(routine, dest, 1);
         t->epoch = k + 1;
         t->data_epoch = d + 1;
-        atomic_store_explicit(t->published, k + 1, memory_order_release);
+        osoe_team_publish_epoch(t, k + 1);
         return 0;
     }
 
@@ -390,7 +416,7 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
 
     t->epoch = k + 1;
     t->data_epoch = d + 1;
-    atomic_store_explicit(t->published, k + 1, memory_order_release);
+    osoe_team_publish_epoch(t, k + 1);
     osoe_blocked_leave();
     return 0;
 }
@@ -454,7 +480,7 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
         total = *(const uint64_t *)member_copy(lead_local_id, total_at);
     }
     t->epoch = k + 1;
-    atomic_store_explicit(t->published, k + 1, memory_order_release);
+    osoe_team_publish_epoch(t, k + 1);
     osoe_blocked_leave();
     int status = gather(routine, t, dest, source, block, places, total, false);
     free(places);
@@ -584,7 +610,7 @@ int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *so
         else if (source != dest)
             memmove(dest, source, bytes);
         t->epoch = k + 1;
-        atomic_store_explicit(t->published, k + 1, memory_order_release);
+        osoe_team_publish_epoch(t, k + 1);
         return 0;
     }
 
@@ -644,7 +670,7 @@ int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *so
         osoe_epoch_wait_eq(&b->released, k + 1, routine);
     }
     t->epoch = k + 1;
-    atomic_store_explicit(t->published, k + 1, memory_order_release);
+    osoe_team_publish_epoch(t, k + 1);
     osoe_blocked_leave();
     return 0;
 }

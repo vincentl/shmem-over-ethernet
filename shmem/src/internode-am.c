@@ -41,12 +41,12 @@
 #include "state.h"
 
 /*
- * The epoch this agent has already taken out of each team's handoff word, one
- * per block of the node's pool (OSOE_TEAM_BLOCKS), allocated at init. Private
- * to the agent thread: nothing else reads or writes it, which is the whole
- * point of the word it shadows.
+ * The handoff word this agent has already taken out of each team block - the
+ * block's generation and the epoch (node.h) - one per block of the node's pool
+ * (OSOE_TEAM_BLOCKS), allocated at init. Private to the agent thread: nothing
+ * else reads or writes it, which is the whole point of the word it shadows.
  */
-static uint32_t *consumed;
+static uint64_t *consumed;
 static uint32_t consumed_count;
 
 /*
@@ -76,6 +76,11 @@ void osoe_internode_fini(void)
     consumed_count = 0;
 }
 
+void osoe_internode_number_taken(uint32_t number)
+{
+    osoe_internode_generic_number_taken(number);
+}
+
 void osoe_internode_arrive(uint32_t team, uint32_t epoch)
 {
     /* Only a team whose record here says it spans nodes posts. The record is
@@ -94,12 +99,25 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
                    "which holds no record of one", team);
     struct osoe_arrival_handoff *h = &b->arrival;
     /*
-     * A single-writer publication store (§3.16): only one member posts per
-     * epoch, and the release of the previous epoch orders it after the last
-     * one. Then the wake word, a locked add, which on x86-TSO also drains the
-     * store buffer so the agent cannot see the bump without the epoch.
+     * The block's generation beside the epoch (node.h): a relaxed load, since
+     * this member holds the block and its generation moves only while nobody
+     * does. Then a single-writer publication store (§3.16): only one member
+     * posts per epoch, and the release of the previous epoch orders it after
+     * the last one. Then the wake word, a locked add, which on x86-TSO also
+     * drains the store buffer so the agent cannot see the bump without the
+     * epoch.
      */
-    atomic_store_explicit(&h->epoch, epoch, memory_order_release);
+    uint32_t generation = atomic_load_explicit(&b->name.generation, memory_order_relaxed);
+    atomic_store_explicit(&h->word, (uint64_t)generation << 32 | epoch, memory_order_release);
+    /* The block's bit in the posted bitmap, then its word's bit in the summary
+     * (node.h, team_posted_summary; posted_bitmap_model.py): after the word, so
+     * that the agent that takes a bit finds the epoch, and before the wake, so
+     * that an agent that missed them both is woken to look again. Locked ors,
+     * seq_cst as every read-modify-write is (§3.16). */
+    atomic_fetch_or_explicit(osoe_node_team_posted(&osoe.node, team), UINT64_C(1) << (team % 64),
+                             memory_order_seq_cst);
+    atomic_fetch_or_explicit(osoe_node_team_posted_summary(&osoe.node, team),
+                             UINT64_C(1) << (team / 64 % 64), memory_order_seq_cst);
 
     /* The lead is local id 0 (§6.2). It is the only agent that runs the
      * engine, so it is the only one worth waking for this. */
@@ -122,47 +140,68 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
  * and every other node is the one that looks stuck.
  *
  * A word per team block, each on its own line of the node's own header -
- * never a connection - but only the predefined teams' three and the blocks at
- * and above `team_blocks_published_from`, the lowest block of a created team
- * whose record on this node is published (node.h): blocks are claimed from the
- * top of the pool down and, until the team work's second part, never given
- * back, so a pass costs the blocks claimed so far and not OSOE_TEAM_BLOCKS.
- * Until step D the words were per team number, below a high-water mark of
- * numbers published; the walk is the same, over block indices. A team is met
- * here, and learnt from its record, at its first post; a word that has not
- * moved is skipped at once, and a team that has no internode phase never
- * posts.
+ * never a connection - read only where the posted bitmap says a post was made
+ * (node.h, team_posted_summary; tools/modelcheck/posted_bitmap_model.py): the
+ * summary's words taken by exchange, each nonzero one naming bitmap words
+ * taken the same way, each naming blocks; so a pass with nothing posted costs
+ * a load of the summary - one word at the default pool - however many teams
+ * the node holds. Until layout 30 a pass read every block at and above a
+ * low-water mark of published blocks, the most the node had held at once; until
+ * step D every team number below a high-water mark, every team the job had
+ * made. A team is met here, and learnt from its record, at its first post; a
+ * bit whose word has not moved is passed over, and a team that has no
+ * internode phase never posts.
  *
- * The bound is loaded with acquire, once a pass, after the agent's load of its
- * wake word and before the handoff words, and it misses no post: a member posts
- * only once its team's record is published and the bound lowered past it (the
- * record's argument, node.h), and then bumps the lead's wake word. An agent
- * whose load of that word read the bump sees the lowered bound; one whose load
- * came before it finds the wait's compare fail and passes again - the rule
- * that makes the handoff sound already (§5.3).
+ * **The whole word is compared, the generation with the epoch** (node.h, the
+ * handoff): a block given back and claimed for another team starts its epochs
+ * again, and the new team's first post can carry the epoch the old team's
+ * last one did; it never carries its generation. The engine learns the block
+ * afresh when the generation is not the one it learnt (progress.c).
+ *
+ * The bitmap misses no post: a member stores its word, then sets its bits,
+ * then bumps the lead's wake word, and the agent loads that word before it
+ * takes the bits. An agent whose load read the bump finds the bits, and through
+ * their exchange the word, which was stored before them; one whose load came
+ * before it finds the wait's compare fail and passes again - the rule that
+ * makes the handoff sound already (§5.3). A bit taken whose word was taken in
+ * an earlier pass is a word that has not moved, and costs nothing.
  */
 static bool take_arrival(uint32_t block)
 {
-    uint32_t epoch = atomic_load_explicit(&osoe_node_team(&osoe.node, block)->arrival.epoch,
-                                          memory_order_acquire);
-    if (epoch == consumed[block])
+    uint64_t word = atomic_load_explicit(&osoe_node_team(&osoe.node, block)->arrival.word,
+                                         memory_order_acquire);
+    if (word == consumed[block])
         return false;
-    consumed[block] = epoch;
-    osoe_progress_arrive(&osoe_am.progress, block, epoch);
+    consumed[block] = word;
+    osoe_progress_arrive(&osoe_am.progress, block, (uint32_t)(word >> 32), (uint32_t)word);
     return true;
 }
 
 bool osoe_internode_am_take_arrivals(void)
 {
     bool moved = false;
-    uint32_t from = atomic_load_explicit(&osoe.node.hdr->team_blocks_published_from,
-                                         memory_order_acquire);
-    if (from < OSOE_PREDEFINED_TEAMS)
-        from = OSOE_PREDEFINED_TEAMS;
-    for (uint32_t block = 0; block < OSOE_PREDEFINED_TEAMS && block < consumed_count; block++)
-        moved |= take_arrival(block);
-    for (uint32_t block = from; block < consumed_count; block++)
-        moved |= take_arrival(block);
+    uint32_t words = (consumed_count + 63) / 64;
+    for (uint32_t s = 0; s * 64 < words; s++) {
+        _Atomic uint64_t *summary = &osoe.node.hdr->team_posted_summary[s];
+        /* A load first: a pass with nothing posted takes no line for writing. */
+        if (atomic_load_explicit(summary, memory_order_acquire) == 0)
+            continue;
+        uint64_t marked = atomic_exchange_explicit(summary, 0, memory_order_seq_cst);
+        for (; marked != 0; marked &= marked - 1) {
+            uint32_t w = s * 64 + (uint32_t)__builtin_ctzll(marked);
+            if (w >= words)
+                osoe_fatal("the posted summary marks word %u of a bitmap of %u", w, words);
+            uint64_t posted = atomic_exchange_explicit(&osoe.node.team_posted[w], 0,
+                                                       memory_order_seq_cst);
+            for (; posted != 0; posted &= posted - 1) {
+                uint32_t block = w * 64 + (uint32_t)__builtin_ctzll(posted);
+                if (block >= consumed_count)
+                    osoe_fatal("the posted bitmap marks block %u of a pool of %u", block,
+                               consumed_count);
+                moved |= take_arrival(block);
+            }
+        }
+    }
     return moved;
 }
 

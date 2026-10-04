@@ -12,6 +12,17 @@ E10 and §5 below carry the answers. Nothing here is built; one model and one
 timing simulation exist, in `build/scratch/teams-design/`, and §6 says what
 each shows. The record is `docs/decisions/2026-10-02.md`.*
 
+*Step D is built (2026-10-03): `docs/decisions/2026-10-03-team-storage.md`
+and `docs/decisions/2026-10-03-team-allocation.md`, design §5.7. Three
+departures, each in the second record with its undo: the team's local lead
+clears its name's map entry as it leaves, not the last holder (D4); a pool
+found empty while a block may be about to come back - in the split's first
+round, or with a block on its way back - makes the split's round busy, not
+dry; and D7's mask token, which the adversarial read of the built step found
+deadlocks a valid program, is replaced: nothing is held across the first
+reduction, and each member takes its agreed numbers pending between the two
+reductions (`tools/modelcheck/split_numbers_model.py`).*
+
 The author's goals, the axes to judge it by:
 
 - **Internode algorithms logarithmic in node count**, in time and in memory.
@@ -256,7 +267,10 @@ contributes zeros and a busy mark in a second reduced word. A round that ends
 busy is retried by every parent PE; a round that ends without a free bit and
 not busy is the failure of D2.4. The split with the lowest parent number
 among those active never yields, so some split always completes. Checked by a
-model before it is written (§6).
+model before it is written (§6). *Replaced as built (2026-10-04): the token
+is held across the reduction, which waits for every parent PE, and a program
+whose other collectives wait in turn on the busy split deadlocks - the status
+note above, and design §5.7.*
 
 **D8. What `OSOE_MAX_TEAMS` means.** The numbers a PE may hold at once, the
 three predefined included; still 4 to 1,024, still agreed at the rendezvous

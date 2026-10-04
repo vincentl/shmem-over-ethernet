@@ -77,6 +77,13 @@ static const struct osoe_metric_descriptor thread_metrics[] = {
     T("shmem.signal.update.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.signal.fetch.calls", OSOE_MKIND_COUNTER, ""),
     T("shmem.signal.wait.calls", OSOE_MKIND_COUNTER, ""),
+    /* A split's calls; its rounds run again because a PE was busy (team.c;
+     * layout 30) - its node's pool empty in the first round's claim, or with a
+     * block on its way back; and, under SHMEM_THREAD_MULTIPLE, its rounds lost
+     * to a number another split of a member's PE held. */
+    T("shmem.team_split.calls", OSOE_MKIND_COUNTER, ""),
+    T("shmem.team_split.busy_rounds", OSOE_MKIND_COUNTER, ""),
+    T("shmem.team_split.lost_rounds", OSOE_MKIND_COUNTER, ""),
     T("agent.loops", OSOE_MKIND_COUNTER, ""),
     T("agent.wakeups", OSOE_MKIND_COUNTER, ""),
     T("agent.last_wake_ns", OSOE_MKIND_STATE, "ns"),
@@ -131,8 +138,12 @@ _Static_assert(sizeof thread_metrics / sizeof thread_metrics[0] == OSOE_COUNTER_
 #define BLOCK_EPOCH(field)                                                  \
     (offsetof(struct osoe_team_block, field) +                              \
      offsetof(struct osoe_epoch, count_compare_only_by_equality))
+/* The handoff's epoch, the low half of its word since layout 30 (node.h): the
+ * word's first four bytes, osoe running little-endian only. */
 #define BLOCK_ARRIVAL                                                       \
-    (offsetof(struct osoe_team_block, arrival) + offsetof(struct osoe_arrival_handoff, epoch))
+    (offsetof(struct osoe_team_block, arrival) + offsetof(struct osoe_arrival_handoff, word))
+_Static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__,
+               "a 32-bit metric reads the low half of a 64-bit word at its address");
 #define BLOCK_TREE(field)                                                   \
     (offsetof(struct osoe_team_block, tree) + offsetof(struct osoe_collective_state, field))
 #define BLOCK_RECORD(field)                                                 \
@@ -153,11 +164,11 @@ _Static_assert(OSOE_COLLECTIVE_FANOUT_MAX == 32,
       (uint32_t)(offsetof(struct osoe_node_header, team) +                  \
                  (number) * sizeof(struct osoe_team_block) + (where)), 0 }
 
-/* One local PE's published epoch count for a team (§5.4): the team's word of
- * the PE's row. */
+/* One local PE's published epoch count for a team (§5.4): the low half of the
+ * team's word of the PE's row, the block beside it since layout 30 (node.h). */
 #define EPOCH(name, number)                                                 \
     { name, "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_EPOCHS, 4,    \
-      (uint32_t)((number) * sizeof(uint32_t)), 0 }
+      (uint32_t)((number) * sizeof(uint64_t)), 0 }
 
 static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.rank", rank, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
@@ -201,9 +212,10 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.scan.most_pieces_in_flight", scan_most_in_flight, OSOE_MTYPE_U32, OSOE_MKIND_STATE,
        ""),
     /*
-     * Every team number's block (layout 18), one record per number. A reader
-     * that walks them all - osoe-stat does - shows those whose record is
-     * published, under the record's name: team.world.*, team.3.*.
+     * Every block of the node's pool of teams (layout 18; by block since
+     * layout 29), one record per block. A reader that walks them all -
+     * osoe-stat does - shows those whose record is published, under the
+     * record's name: team.world.*, team.3.*.
      *
      * §5.4's three counters; then §5.3's internode arrival handoff, the epoch a
      * local member posted for the lead's agent to forward. Against `released`
@@ -260,12 +272,14 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     /* The block's name in the pool (layout 29; the team redesign's step D):
      * the local id of the team's local lead here and its number, which the map
      * finds the block by; the local members holding it; and its generation,
-     * raised each time it is written for a team - what osoe-stat labels a block
-     * by. */
+     * raised when a team is written into it and again when the team gives it
+     * back, so odd while a team holds it (layout 30) - what osoe-stat labels a
+     * block by. */
     TEAM("team.name.lead", BLOCK_NAME(lead)),
     TEAM("team.name.number", BLOCK_NAME(number)),
     TEAM("team.name.holders", BLOCK_NAME(holders)),
     TEAM("team.name.generation", BLOCK_NAME(generation)),
+    TEAM("team.name.members", BLOCK_NAME(members)),
     /* The predefined teams' fields in the node scope, by the names they had
      * when the header held them, for readers that find them so. */
     NDTEAM("team.world.arrived", OSOE_TEAM_WORLD, BLOCK_EPOCH(arrived)),
@@ -342,11 +356,12 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("node.mapped", mapped, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.finalized", finalized, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.failed", failed, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
-    /* The lowest block of a created team whose record here is published: where
-     * the lead's agent starts looking for arrivals above the predefined teams'
-     * three (layout 29, node.h; until then node.team_numbers_published). */
-    ND("node.team_blocks_published_from", team_blocks_published_from, OSOE_MTYPE_U32,
-       OSOE_MKIND_STATE, ""),
+    /* The posted bitmap's first summary word (layout 30, node.h): a bit for
+     * each 64 team blocks of which one has an arrival posted that the lead's
+     * agent has not taken - at the default pool, the only word. Until layout
+     * 30, node.team_blocks_published_from, and until 29
+     * node.team_numbers_published. */
+    ND("node.team_posted_summary", team_posted_summary[0], OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     NDDIR("node.local_count", local_count, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
     NDDIR("node.blocks_per_pe", blocks_per_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
     /* The AM layer's node-wide counters (node.h, layout 8). */
@@ -377,6 +392,8 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("transport.am.receive_rearms", am.receive_rearms, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     ND("transport.am.sends", am.sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     ND("transport.am.short_sends", am.short_sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    /* Layout 30: a local release held for its forwards (node.h). */
+    ND("transport.am.releases_held", am.releases_held, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
 };
 
 enum {

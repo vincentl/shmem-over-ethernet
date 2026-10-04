@@ -246,6 +246,16 @@ static uint64_t child_slot(uint32_t team, uint32_t position, uint64_t piece)
            ((uint64_t)position * pipeline + piece % pipeline) * OSOE_INTERNAL_SLOT_BYTES;
 }
 
+/* Where team number `number`'s words start: its arrival counter for each
+ * child position, then its release counter, a line each. */
+static uint64_t words_of_number(uint32_t number)
+{
+    uint32_t fanout = osoe.bootstrap.collective_fanout;
+    return osoe_internal_words_offset(fanout, osoe.bootstrap.collective_pipeline,
+                                      osoe.bootstrap.max_teams) +
+           (uint64_t)number * osoe_internal_team_words_bytes(fanout);
+}
+
 static uint64_t release_slot(uint32_t team, uint64_t piece)
 {
     return child_slot(team, osoe.bootstrap.collective_fanout, piece);
@@ -253,11 +263,7 @@ static uint64_t release_slot(uint32_t team, uint64_t piece)
 
 static uint64_t arrival_counter(uint32_t team, uint32_t position)
 {
-    uint32_t fanout = osoe.bootstrap.collective_fanout;
-    return osoe_internal_words_offset(fanout, osoe.bootstrap.collective_pipeline,
-                                      osoe.bootstrap.max_teams) +
-           (uint64_t)number_of(team) * osoe_internal_team_words_bytes(fanout) +
-           (uint64_t)position * OSOE_INTERNAL_LINE_BYTES;
+    return words_of_number(number_of(team)) + (uint64_t)position * OSOE_INTERNAL_LINE_BYTES;
 }
 
 static uint64_t release_counter(uint32_t team)
@@ -266,19 +272,23 @@ static uint64_t release_counter(uint32_t team)
 }
 
 /*
- * The allgather's words (internal-region.h): per team number, past the line
- * that counts the team numbers claimed, READY for each step and then DATA for
- * each, each alone on its line, with room for as many steps as the job's
- * node count takes - the most any team's gather takes.
+ * The allgather's words (internal-region.h): per team number, past every
+ * number's words, READY for each step and then DATA for each, each alone on
+ * its line, with room for as many steps as the job's node count takes - the
+ * most any team's gather takes.
  */
-static uint64_t gather_word(uint32_t team, uint32_t line)
+static uint64_t gather_of_number(uint32_t number)
 {
     uint32_t steps = osoe_internal_gather_steps(osoe.bootstrap.node_count);
     return osoe_internal_gather_offset(osoe.bootstrap.collective_fanout,
                                        osoe.bootstrap.collective_pipeline,
                                        osoe.bootstrap.max_teams) +
-           (uint64_t)number_of(team) * osoe_internal_team_gather_bytes(steps) +
-           (uint64_t)line * OSOE_INTERNAL_LINE_BYTES;
+           (uint64_t)number * osoe_internal_team_gather_bytes(steps);
+}
+
+static uint64_t gather_word(uint32_t team, uint32_t line)
+{
+    return gather_of_number(number_of(team)) + (uint64_t)line * OSOE_INTERNAL_LINE_BYTES;
 }
 
 /* READY[step], at the lead that writes at `step`: the entries of the lead it
@@ -329,13 +339,22 @@ struct interval_list {
  * position's arrival counter and the release counter stood when the team's
  * last collective ended, by this lead's own trees (the file's comment), since
  * the counters in the internal region are cumulative over the team's life and
- * never reset. One per block of the node's pool (OSOE_TEAM_BLOCKS), allocated
- * at init and filled the first time a call names the team. And what its gathers keep:
- * the gathers so far, which READY and DATA count; and, found at the first and
- * the same for every one after it, the steps, the team's size, the (node,
- * step) pairs the lists hold, and each step's intervals of members.
+ * reset only when a PE takes the number for another team
+ * (osoe_internode_generic_number_taken). One per block of the node's pool
+ * (OSOE_TEAM_BLOCKS), allocated at init and filled the first time a call names
+ * the team. And what its gathers keep: the gathers so far, which READY and DATA
+ * count; and, found at the first and the same for every one after it, the
+ * steps, the team's size, the (node, step) pairs the lists hold, and each
+ * step's intervals of members.
+ *
+ * Kept for the block's team at `generation` (node.h, osoe_team_name): a block
+ * is given back when its team is destroyed and claimed for another, whose
+ * counters start again at 0 on every member, and the state of the old team is
+ * emptied when a call meets the block at another generation (team_state) -
+ * the bases with the counters they count from.
  */
 struct generic_team {
+    uint32_t generation;
     bool registered;
     uint32_t count;                     /* how many nodes it spans */
     uint32_t index;                     /* this node's position among them */
@@ -386,11 +405,30 @@ void osoe_internode_generic_fini(void)
  * creates, whose leads are wherever their lowest team ranks are - which the
  * record names, and osoe_internode_team_lead gives by position.
  */
-static struct generic_team *registered_team(uint32_t team, const char *routine)
+/* The process's state for the team in block `team`, emptied first if it was
+ * kept for another team the block held (struct generic_team): the generation
+ * read relaxed, since the caller is a member holding the block, whose
+ * generation moves only while nobody does (node.h). */
+static struct generic_team *team_state(uint32_t team, const char *routine)
 {
     if (team >= team_count)
         osoe_fatal("%s: block %u is past the node's %u team blocks", routine, team, team_count);
     struct generic_team *g = &teams[team];
+    uint32_t generation =
+        atomic_load_explicit(&osoe_node_team(&osoe.node, team)->name.generation,
+                             memory_order_relaxed);
+    if (g->generation != generation) {
+        for (uint32_t s = 0; g->step_intervals && s < g->steps; s++)
+            free(g->step_intervals[s].intervals);
+        free(g->step_intervals);
+        *g = (struct generic_team){ .generation = generation };
+    }
+    return g;
+}
+
+static struct generic_team *registered_team(uint32_t team, const char *routine)
+{
+    struct generic_team *g = team_state(team, routine);
     if (!g->registered) {
         const struct osoe_team_block *b = osoe_node_team(&osoe.node, team);
         if (!atomic_load_explicit(&b->record.published, memory_order_acquire) ||
@@ -1280,13 +1318,18 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
  * slot the most pieces it had in flight at once (node.h): min(D, p) at a
  * leaf, which fills its window before it looks for a down.
  */
-static uint64_t scan_team_offset(uint32_t team)
+static uint64_t scan_of_number(uint32_t number)
 {
     uint32_t fanout = osoe.bootstrap.collective_fanout;
     uint32_t pipeline = osoe.bootstrap.collective_pipeline;
     return osoe_internal_scan_offset(fanout, pipeline, osoe.bootstrap.max_teams,
                                      osoe.bootstrap.node_count) +
-           (uint64_t)number_of(team) * osoe_internal_team_scan_bytes(fanout, pipeline);
+           (uint64_t)number * osoe_internal_team_scan_bytes(fanout, pipeline);
+}
+
+static uint64_t scan_team_offset(uint32_t team)
+{
+    return scan_of_number(number_of(team));
 }
 
 /* Row `position`'s slot for piece `piece` of the team's scans: a child
@@ -1299,13 +1342,18 @@ static uint64_t scan_slot(uint32_t team, uint32_t position, uint64_t piece)
 }
 
 /* Row `position`'s counter, past every row's slots. */
-static uint64_t scan_counter(uint32_t team, uint32_t position)
+static uint64_t scan_counter_of_number(uint32_t number, uint32_t position)
 {
     uint32_t fanout = osoe.bootstrap.collective_fanout;
     uint32_t pipeline = osoe.bootstrap.collective_pipeline;
-    return scan_team_offset(team) +
+    return scan_of_number(number) +
            (uint64_t)(fanout + 1) * pipeline * OSOE_INTERNAL_SCAN_SLOT_BYTES +
            (uint64_t)position * OSOE_INTERNAL_LINE_BYTES;
+}
+
+static uint64_t scan_counter(uint32_t team, uint32_t position)
+{
+    return scan_counter_of_number(number_of(team), position);
 }
 
 /* The children of the place covering [a, b): how many, and child j's first
@@ -1428,7 +1476,7 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
     unsigned char *own = buffers, *totals = buffers + ring;
     unsigned char *sum = buffers + (size_t)(children + 1) * ring;
     struct osoe_transport_context *context = osoe_transport_context_default();
-    struct generic_team *g = &teams[team];
+    struct generic_team *g = team_state(team, routine);
     uint64_t base = g->scan_pieces, up = 0, down = 0, most = 0;
 
     while (down < pieces) {
@@ -1509,4 +1557,27 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
     atomic_store_explicit(&osoe.node.slots[osoe.bootstrap.local_id].scan_most_in_flight,
                           (uint32_t)most, memory_order_release);
     free(buffers);
+}
+
+/* Every counter of team number `number` in this PE's internal region
+ * (internal-region.h): its arrivals and its release, its gathers' READY and
+ * DATA, and its scans' rows. Atomic stores, as each word is written by the
+ * transport's adds; the split's sync that follows orders them before any. */
+void osoe_internode_generic_number_taken(uint32_t number)
+{
+    uint32_t fanout = osoe.bootstrap.collective_fanout;
+    uint32_t steps = osoe_internal_gather_steps(osoe.bootstrap.node_count);
+    for (uint32_t position = 0; position <= fanout; position++) {
+        uint64_t words[2] = { words_of_number(number), scan_counter_of_number(number, 0) };
+        for (uint32_t i = 0; i < 2; i++)
+            atomic_store_explicit(
+                (_Atomic uint64_t *)internal(words[i] +
+                                             (uint64_t)position * OSOE_INTERNAL_LINE_BYTES),
+                0, memory_order_relaxed);
+    }
+    for (uint32_t line = 0; line < 2 * steps; line++)
+        atomic_store_explicit((_Atomic uint64_t *)internal(gather_of_number(number) +
+                                                           (uint64_t)line *
+                                                               OSOE_INTERNAL_LINE_BYTES),
+                              0, memory_order_relaxed);
 }

@@ -38,8 +38,8 @@ struct osoe_am_state {
     uint64_t *busy;                              /* (nodes - 1 + 63) / 64 words */
     struct osoe_reply *descriptor;               /* the node-wide pool (§3.8) */
     unsigned char *scratch;                      /* receive staging, one AM chunk */
-    struct osoe_progress_team *team;             /* OSOE_MAX_TEAMS: the tree's per-team state */
-    uint32_t *pending;                           /* as many team numbers (progress.h) */
+    struct osoe_progress_team *team;             /* OSOE_TEAM_BLOCKS: per-block tree state */
+    uint32_t *pending;                           /* as many block indices (progress.h) */
     struct osoe_progress progress;
 };
 

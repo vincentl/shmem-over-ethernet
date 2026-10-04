@@ -11,55 +11,109 @@
  * stop agreeing. Implementing SHARED as an alias for WORLD would pass every
  * test that can be written today and be wrong on the first multi-node job.
  *
- * A team's state is found by its number (phase 1 step 7): its block of the
- * node header - §5.4's counters, the arrival handoff, and the record of the
- * team's place on this node that the progress thread reads - its published
- * epoch in each PE's row, and its block of the internal region. What the
- * descriptor holds is the team's shape: this node's members and which of them
- * leads, and its ranks as world ranks (team.h).
+ * A team's state is found by its number on each PE (phase 1 step 7; the team
+ * redesign's step D, docs/design/team-resources-proposal.md §3): its
+ * published epoch in the PE's row and its block of the PE's internal region;
+ * and on each node by its *name*, the local id of its local lead there and its
+ * number, which the node's map turns into the team's block of the node's pool
+ * - §5.4's counters, the arrival handoff, and the record of the team's place
+ * on this node that the progress thread reads (node.h). What the descriptor
+ * holds is the team's shape: this node's members and which of them leads, and
+ * its ranks as world ranks (team.h).
+ *
+ * **A number is each PE's own** (D1): no PE holds two live teams under one
+ * number, and two teams with no PE in common may hold the same one, on one
+ * node or on two. A PE takes a number when a split creates a team it is in,
+ * and gives it back when it destroys the team. OSOE_MAX_TEAMS is how many a
+ * PE may hold at once, the three predefined included (D8).
  *
  * **Teams are created by splitting a parent** (spec §9.4.6, §9.4.7; phase 1
- * step 7 slice 2, docs/prompts/done/phase1-step7-slice2-prompt.md), collectively
- * over the parent, in this order:
+ * step 7 slice 2, docs/prompts/done/phase1-step7-slice2-prompt.md; step D,
+ * D2), collectively over the parent, in this order:
  *
  *   1. every parent PE checks the arguments alike: the spec's failures return
  *      nonzero on every one of them, and what it leaves undefined ends the job
  *      by name;
- *   2. the parent's rank 0 claims a number for each team the call creates,
- *      with a compare-and-swap on a counter in world PE 0's internal region
- *      (internal-region.h), retried until it lands - numbers are job-wide and
- *      never reused within a session (§5.7), so no late message or straggling
- *      reader of a team's state ever meets another team under its number, and
- *      a claim that would pass OSOE_MAX_TEAMS takes none, so the numbers left
- *      stay for a call that fits;
- *   3. a broadcast over the parent carries the first number, or 0 for a claim
- *      that failed, in the allocator's smallest block - 16 bytes, for an
- *      eight-byte word - which every parent PE borrows from the symmetric heap
- *      for the call, as collect borrows its lengths' room;
- *   4. every member builds its descriptor: its node's members in O(L), and
- *      from them whether the team spans nodes, O(1); and each node's local
- *      lead of the team - the one PE per node that needs it - the team's node
- *      set, O(S) node lookups for a team of S members whose walk meets the
- *      nodes in order and O(S log S) otherwise, O(S) memory either way: the
- *      one step that is not logarithmic, taken at creation only;
- *   5. each node's local lead of the new team writes the team's record into
- *      its node's block for the number and publishes it (node.h, where the
- *      argument that every reader sees it is written);
+ *   2. every member builds its descriptor but for the number: its node's
+ *      members in O(L), and from them whether the team spans nodes, O(1); and
+ *      each node's local lead of the team - the one PE per node that needs it
+ *      - the team's node set, O(S) node lookups for a team of S members whose
+ *      walk meets the nodes in order and O(S log S) otherwise, O(S) memory
+ *      either way: the one step that is not logarithmic, taken at creation
+ *      only. The local lead claims its node's block for the team from the
+ *      pool (node.h) - none of which needs the number;
+ *   3. one AND reduction over the parent, in place, in the parent number's
+ *      split words of the internal region (internal-region.h): every member
+ *      contributes its *free mask* - bit t set when t is not predefined, this
+ *      PE holds no team under t, and no block is mapped under (this PE, t) on
+ *      its node, which a lead clears as it leaves its team there (node.h) -
+ *      and every other parent PE all ones; and a word of marks, written
+ *      inverted so that the one AND serves, a bit set saying "no complaint
+ *      here": a block claimed, and the pool not found empty while a block may
+ *      be about to come back - in the split's first round, or with a block on
+ *      its way back (split) - and this PE below SHMEM_THREAD_MULTIPLE;
+ *   4. every parent PE reads the same result: split_strided takes the lowest
+ *      bit set, split_2d the lowest for every row and the next for every
+ *      column - rows share no PE, nor columns, and each PE is in one of each.
+ *      A round some PE was busy in is run again by every parent PE; a round
+ *      with a dry pool, or with no bit left, fails the split alike on every
+ *      parent PE, said by the PEs whose node is dry - naming OSOE_TEAM_BLOCKS
+ *      and the node - or once by the parent's rank 0 - naming OSOE_MAX_TEAMS,
+ *      the teams one PE may be in at once; a block claimed for it is returned.
+ *      When any parent PE has SHMEM_THREAD_MULTIPLE, which the marks say, each
+ *      member then takes its numbers pending, and a second AND says whether
+ *      all did (below);
+ *   5. each member takes the number - its descriptor's slot, its counters in
+ *      the internal region zeroed (internode.h) - and each node's local lead
+ *      of the new team names its block, writes the team's record into it and
+ *      maps the block under the team's name (node.h, where the argument that
+ *      every reader sees them is written);
  *   6. a sync over the parent, so that no collective on the new team starts
- *      anywhere before every member node's record is published;
- *   7. members get the handle - the descriptor's address - and the others
- *      SHMEM_TEAM_INVALID, every parent PE the same status.
+ *      anywhere before every member node's record is published and every
+ *      member's counters are zero;
+ *   7. members get the handle and the others SHMEM_TEAM_INVALID, every parent
+ *      PE the same status.
+ *
+ * **SHMEM_THREAD_MULTIPLE** (D7; tools/modelcheck/split_numbers_model.py): two
+ * threads of one PE may be in two splits at once, of two parents, and a PE's
+ * free mask is one resource - two reductions reading it at once can agree the
+ * same number. Nothing is held across the first reduction, which waits for
+ * every parent PE and so, through other collectives, for anything else in the
+ * program: the first design, a mask token held across it, deadlocked a valid
+ * program that way (the adversarial read of 2026-10-03). Each member
+ * takes its agreed numbers *pending* on its PE (take_pending): a word per
+ * number, from 0 to the parent number plus one by compare-and-swap, and then
+ * the number found not held. A word another split holds is waited for when
+ * that split's parent number is higher and lost when it is lower; a second AND
+ * reduction over the parent says whether every member took its numbers, and
+ * then each marks them held and clears its words, or clears them and every
+ * parent PE runs the round again. A split holds words only between its two
+ * reductions, with every member past the first; it waits only for a higher
+ * parent number, whose own waits are for higher numbers still - a team's
+ * number being the same on all its members - so no waits close a cycle. The
+ * lowest parent number among the splits active loses a round only to a
+ * number another has made held. The pending take and the second reduction run
+ * when any parent PE has SHMEM_THREAD_MULTIPLE, which the first reduction's
+ * marks say alike on every parent PE - the levels of a job's PEs may differ,
+ * and a PE below it takes its numbers uncontended. When none has, one thread
+ * of each is in the library at a time, and a split takes its numbers after
+ * the one reduction.
  *
  * A created team's descriptor lives in this process's pool, one per number
- * (osoe_team_of): a handle is accepted while it is the live descriptor for its
- * number, and one never issued or already destroyed is named, never
- * dereferenced. Destroying a team is a sync over its members, then its
- * descriptor's arrays are freed and its number forgotten here; the number, and
- * its blocks and records on every node, stay, since nothing reuses them.
+ * (osoe_team_of), used again when the PE takes the number again. A handle is
+ * the descriptor's address plus its generation - how many times the PE has
+ * taken the number - times the pool's size: never dereferenced, recovered by
+ * division, and accepted while the descriptor is live at that generation, so
+ * that one never issued, or of a team destroyed, is named, even when its
+ * number names another team since (D6). Destroying a team is a sync over its
+ * members, then each member leaves the node's block - the last to leave gives
+ * it back to the pool (node.h) - its descriptor's arrays are freed and its
+ * number given back.
  *
  * Contexts are context.c's (phase 1 step 8): a team's destroy destroys the
  * shareable contexts created from it, before its sync (spec §9.4.8).
  */
+#include <limits.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -73,6 +127,10 @@
 
 #include "allocator.h"
 #include "barrier.h"
+#include "base/deadline.h"
+#include "base/futex.h"
+#include "base/sweep.h"
+#include "blocked.h"
 #include "collective-tree.h"
 #include "collectives.h"
 #include "context.h"
@@ -81,6 +139,7 @@
 #include "internal-region.h"
 #include "internode.h"
 #include "job.h"
+#include "metrics.h"
 #include "node.h"
 #include "state.h"
 #include "symmetric.h"
@@ -103,25 +162,47 @@ static uint32_t numbered_count;
 
 /*
  * The descriptors of the teams a split creates, one per number from
- * OSOE_PREDEFINED_TEAMS on, `created_count` of them. A created team's handle is
- * its descriptor's address here, which is what lets osoe_team_of tell a handle
- * it issued from one it did not, and a live one from a destroyed one, without
- * reading through either: a handle is a descriptor only if it points into this
- * array, and live only if `numbered` still holds it. A number is never reused,
- * so neither is its descriptor: destroying the team frees the descriptor's
- * arrays and leaves its number, to say which team the handle was. Untouched
+ * OSOE_PREDEFINED_TEAMS on, `created_count` of them, each used again when this
+ * PE takes its number again. A created team's handle is its descriptor's
+ * address here plus its generation times the array's size (handle_of), which
+ * is what lets osoe_team_of tell a handle it issued from one it did not, and a
+ * live one from a destroyed one, without reading through either: a handle is
+ * a descriptor's only if it falls on one, the array's size apart, and live
+ * only if `numbered` holds the descriptor and the descriptor's generation is
+ * the handle's. Destroying the team frees the descriptor's arrays and leaves
+ * its number and generation, to say which team the handle was. Untouched
  * entries cost address space, not memory.
  */
 static struct osoe_team *created;
 static uint32_t created_count;
 
 /*
- * How many team numbers this PE last saw claimed, job-wide: where its next
- * claim guesses the counter stands. A guess and no more - a stale one costs a
- * compare-and-swap that fails and says where the counter is - and this PE's
- * own, so a plain word; each session's counter, like its guess, starts at 0.
+ * The numbers this PE holds (D1): bit t set from the moment a split agrees t
+ * for a team this PE is in until its destroy has given the team up, after
+ * every use of the descriptor. Set by the split - while it holds the number
+ * pending, when any PE of the parent has SHMEM_THREAD_MULTIPLE - and cleared
+ * by the destroy, two threads may be in a split and a destroy at once, each
+ * with one atomic read-modify-write; `mask_words` words, OSOE_MAX_TEAMS bits.
  */
-static _Atomic uint64_t claimed_seen;   /* a guess: two threads' splits may race it */
+static _Atomic uint64_t *held;
+static uint32_t mask_words;
+
+/*
+ * The numbers pending on this PE (D7; tools/modelcheck/split_numbers_model.py):
+ * per number, 0, or one more than the parent number of the split that holds it
+ * pending - between a SHMEM_THREAD_MULTIPLE split's two reductions, and until
+ * it is held if the split keeps it. OSOE_MAX_TEAMS words, each a futex word a
+ * split waits on (take_pending). Process-local: a PE is a process, and only its
+ * own threads contend.
+ */
+static _Atomic uint32_t *pending;
+
+/* Whether two threads of this PE may be in splits at once - the program has
+ * SHMEM_THREAD_MULTIPLE (D7). A split takes its numbers pending when any PE of
+ * its parent has, which the first reduction's marks say alike on every parent
+ * PE: the levels of a job's PEs may differ (spec §9.2), and the parent PEs must
+ * run the same reductions. Set at start, before any split. */
+static bool concurrent;
 
 /* The predefined teams' local list, every local id in order - beyond what the
  * node and the bootstrap already hold, the one array their shapes need. */
@@ -449,47 +530,6 @@ static void write_record(const struct osoe_team *t, const char *name,
     }
     /* release: the record, then the word its readers load first (§3.16). */
     atomic_store_explicit(&r->published, 1, memory_order_release);
-    /* Then, for a created team, the node's low-water mark of published blocks
-     * (node.h), lowered to this one and never raised: a record another process
-     * writes may have lowered it further first. A compare-and-swap, seq_cst as
-     * every one is (§3.16), which releases the record with it. The predefined
-     * teams' blocks, below every created one's, the scan takes always. */
-    if (t->block_index < OSOE_PREDEFINED_TEAMS)
-        return;
-    _Atomic uint32_t *low = &osoe.node.hdr->team_blocks_published_from;
-    uint32_t seen = atomic_load_explicit(low, memory_order_acquire);
-    while (seen > t->block_index &&
-           !atomic_compare_exchange_strong_explicit(low, &seen, t->block_index,
-                                                    memory_order_seq_cst, memory_order_acquire))
-        ;
-}
-
-/*
- * The block of a team this PE leads on this node (step D): claimed from the
- * pool and named - its lead, its number, its local members as its holders,
- * its generation raised - before the record is written into it, and mapped
- * under the name once the record is published (build). Until the team work's
- * second part no block is given back, so a pool runs dry only when a node holds
- * OSOE_TEAM_BLOCKS teams; and the number has been claimed job-wide by then,
- * so the split cannot fail alike on every parent PE - it ends the job,
- * naming the setting (temporary: the second part makes it such a failure).
- */
-static void claim_block(struct osoe_team *t)
-{
-    uint32_t index = osoe_node_team_claim(&osoe.node);
-    if (index == UINT32_MAX)
-        osoe_fatal("%s: node %u holds %u teams, every block of its pool (OSOE_TEAM_BLOCKS is "
-                   "%u): raise OSOE_TEAM_BLOCKS", t->name, osoe.job.node,
-                   osoe.node.team_count, osoe.node.team_count);
-    struct osoe_team_name *name = &osoe_node_team(&osoe.node, index)->name;
-    atomic_store_explicit(&name->lead, t->lead_local_id, memory_order_relaxed);
-    atomic_store_explicit(&name->number, t->number, memory_order_relaxed);
-    atomic_store_explicit(&name->holders, t->local_members, memory_order_relaxed);
-    atomic_store_explicit(&name->generation,
-                          atomic_load_explicit(&name->generation, memory_order_relaxed) + 1,
-                          memory_order_relaxed);
-    t->block_index = index;
-    t->block = osoe_node_team(&osoe.node, index);
 }
 
 /*
@@ -517,44 +557,73 @@ static void take_number(struct osoe_team *t)
         osoe_fatal("%s: its block on node %u is %u, past the pool's %u", t->name, osoe.job.node,
                    t->block_index, osoe.node.team_count);
     t->published = osoe_node_published_epoch(&osoe.node, osoe.bootstrap.local_id, t->number);
+    osoe_team_publish_epoch(t, 0);
     atomic_store_explicit(&numbered[t->number], t, memory_order_release);
 }
 
-/* The number of the created team whose descriptor is at `team`, or UINT32_MAX
- * if it is not one of the pool's: a comparison of addresses, never a read. */
-static uint32_t created_number(shmem_team_t team)
+/*
+ * A created team's handle (D6): its descriptor's address plus the descriptor's
+ * generation times the array's size - an address past the array's end once
+ * the number has been taken twice, never dereferenced, and never 0, 1 or 2,
+ * the predefined handles, being at least the array's own. The arithmetic is on
+ * integers: osoe runs on 64-bit address spaces, where a generation's 32 bits
+ * times an array of at most 1,021 descriptors stays below 2^63 past any heap
+ * address.
+ */
+static shmem_team_t handle_of(const struct osoe_team *t)
+{
+    return (shmem_team_t)((uintptr_t)t +
+                          (uintptr_t)t->generation * created_count * sizeof *created);
+}
+_Static_assert(sizeof(uintptr_t) == 8, "a team handle is an address plus a generation's span");
+
+/* The number of the created team whose descriptor a handle names, and the
+ * generation it names it at, or UINT32_MAX if it names no descriptor of the
+ * pool: arithmetic on the value, never a read through it. */
+static uint32_t created_number(shmem_team_t team, uint64_t *generation)
 {
     uintptr_t at = (uintptr_t)team, base = (uintptr_t)created;
-    size_t size = sizeof *created;
-    if (!created || at < base || at - base >= (uintptr_t)created_count * size ||
-        (at - base) % size != 0)
+    uintptr_t size = sizeof *created, span = (uintptr_t)created_count * size;
+    if (!created || at < base || (at - base) % span % size != 0)
         return UINT32_MAX;
-    return OSOE_PREDEFINED_TEAMS + (uint32_t)((at - base) / size);
+    *generation = (at - base) / span;
+    return OSOE_PREDEFINED_TEAMS + (uint32_t)((at - base) % span / size);
 }
 
 /* A created team gone from this process: its number is forgotten, its arrays
- * freed, and the descriptor left saying which number it was (osoe_team_of). */
+ * freed, and the descriptor left saying which number and generation it was
+ * (osoe_team_of). The number stays held until the caller gives it back. */
 static void forget(struct osoe_team *t)
 {
-    uint32_t number = t->number;
+    uint32_t number = t->number, generation = t->generation;
     atomic_store_explicit(&numbered[number], NULL, memory_order_release);
     free((void *)t->local_ids);
     free((void *)t->local_ranks);
     free((void *)t->world_of_rank);
     free((void *)t->node_leads);
-    *t = (struct osoe_team){ .number = number, .destroyed = true };
+    *t = (struct osoe_team){ .number = number, .destroyed = true, .generation = generation };
 }
 
 void osoe_team_start(void)
 {
-    atomic_store_explicit(&claimed_seen, 0, memory_order_release);
     numbered_count = osoe.bootstrap.max_teams;
     created_count = numbered_count - OSOE_PREDEFINED_TEAMS;
-    /* calloc: a null pointer in every entry, before any reader exists. */
+    mask_words = osoe_internal_mask_words(numbered_count);
+    int level = SHMEM_THREAD_SINGLE;
+    pshmem_query_thread(&level);
+    concurrent = level == SHMEM_THREAD_MULTIPLE;
+    /* calloc: a null pointer in every entry, and no number held or pending,
+     * before any reader exists. */
     numbered = calloc(numbered_count, sizeof *numbered);
     created = calloc(created_count, sizeof *created);
-    if (!numbered || !created)
+    held = calloc(mask_words, sizeof *held);
+    pending = calloc(numbered_count, sizeof *pending);
+    if (!numbered || !created || !held || !pending)
         osoe_fatal("out of memory for %u teams", numbered_count);
+    for (uint32_t number = 0; number < OSOE_PREDEFINED_TEAMS; number++)
+        atomic_store_explicit(&held[number / 64], atomic_load(&held[number / 64]) |
+                                                      UINT64_C(1) << (number % 64),
+                              memory_order_relaxed);
     predefined_local_shape();
     world_team = every_pe("SHMEM_TEAM_WORLD", OSOE_TEAM_WORLD);
     shared_team = shared();
@@ -594,12 +663,17 @@ void osoe_team_stop(void)
     }
     free(created);
     free(numbered);
+    free((void *)held);
+    free((void *)pending);
     free(identity);
     free(ranks_ascending);
     created = NULL;
     created_count = 0;
     numbered = NULL;
     numbered_count = 0;
+    held = NULL;
+    pending = NULL;
+    mask_words = 0;
     identity = NULL;
     ranks_ascending = NULL;
 }
@@ -637,14 +711,20 @@ struct osoe_team *osoe_team_of(const char *routine, shmem_team_t team)
         return &world_team;
     if (team == SHMEM_TEAM_SHARED)
         return &shared_team;
-    uint32_t number = created_number(team);
+    uint64_t generation = 0;
+    uint32_t number = created_number(team, &generation);
     if (number == UINT32_MAX)
         osoe_fatal("%s: %p is not a team this library issued", routine, (void *)team);
     struct osoe_team *t = &created[number - OSOE_PREDEFINED_TEAMS];
-    if (atomic_load_explicit(&numbered[number], memory_order_acquire) != t)
-        osoe_fatal("%s: %p is team %u, which %s", routine, (void *)team, number,
-                   t->destroyed ? "this PE has destroyed" : "this PE was never given");
-    return t;
+    bool live = atomic_load_explicit(&numbered[number], memory_order_acquire) == t;
+    if (live && generation == t->generation)
+        return t;
+    if (generation > t->generation || (generation == t->generation && !t->destroyed))
+        osoe_fatal("%s: %p is not a team this library issued to this PE", routine,
+                   (void *)team);
+    osoe_fatal("%s: %p is team %u, which this PE has destroyed%s", routine, (void *)team, number,
+               live || generation < t->generation ? "; the number names another team since"
+                                                   : "");
 }
 
 int osoe_team_to_world(const struct osoe_team *t, int pe)
@@ -701,15 +781,18 @@ uint32_t osoe_team_node_index(const struct osoe_team *t, uint32_t node)
 /*
  * The descriptor of the team whose block on this node is `block_index` - the
  * seam's `team` since step D (internode.h) - by the number its name holds:
- * until the team work's second part a number is job-wide, so one descriptor in
- * this process has it.
+ * asked on the thread of a member holding the block, whose descriptor under
+ * that number is the block's team, a number naming one team of a PE's at a
+ * time (D1); anything else is none.
  */
 static const struct osoe_team *of_block(uint32_t block_index)
 {
     const struct osoe_team_block *block = osoe_node_team(&osoe.node, block_index);
     if (!block)
         return NULL;
-    return osoe_team_numbered(atomic_load_explicit(&block->name.number, memory_order_relaxed));
+    const struct osoe_team *t =
+        osoe_team_numbered(atomic_load_explicit(&block->name.number, memory_order_relaxed));
+    return t && t->block_index == block_index ? t : NULL;
 }
 
 uint32_t osoe_internode_team_lead(uint32_t team, uint32_t index)
@@ -799,13 +882,23 @@ struct progression {
     uint32_t size;
 };
 
-/* One team of those a split creates, as this PE sees it. */
+/*
+ * One team of those a split creates, as this PE sees it: which of the numbers
+ * the call agrees it takes - split_strided's one, split_2d's lowest for the
+ * rows and the next for the columns - and, for a team this PE is in, its
+ * descriptor as it is built before the number is known (step 2 of the file's
+ * comment) and, on the team's local lead here, its node set and the block
+ * claimed for it.
+ */
 struct membership {
-    uint32_t offset;                    /* its number, less the call's first */
+    uint32_t which;                     /* 0: the lowest number agreed; 1: the next */
     bool member;                        /* whether this PE is in it */
     struct progression ranks;
     int num_contexts;                   /* spec §9.4.3, as this PE was given it */
     shmem_team_t *handle;               /* where its handle goes */
+    struct osoe_team shape;             /* its descriptor but for the number */
+    struct node_set set;                /* on its local lead here: its node set */
+    uint32_t block;                     /* on its local lead here: its block, or UINT32_MAX */
 };
 
 static bool is_member(const struct progression *p, uint32_t parent_rank)
@@ -836,95 +929,24 @@ static int contexts_requested(const char *routine, const char *argument,
 }
 
 /*
- * No team numbers are left for a call creating `count` teams (§5.7), `before`
- * having been claimed: said once, by the parent's rank 0, which found the
- * counter so. The split takes none and fails on every PE of its parent, as spec
- * §9.4.6 says a team that cannot be created does.
+ * This PE's descriptor for a team its call creates, whose members are the
+ * parent ranks of `m` (step 2 of the file's comment), all but the number: its
+ * world mapping, composed from the parent's; its members on this node in
+ * team-rank order, by testing each local PE, O(L); from them whether it spans
+ * nodes, O(1); and, on its local lead here, its node set, O(S) or O(S log S).
  */
-static void numbers_used_up(const char *routine, uint32_t count, uint64_t before)
+static void shape(const struct osoe_team *parent, struct membership *m)
 {
-    fprintf(stderr, "osoe: PE %u: %s: no team numbers are left for the %u team%s this call "
-            "creates: OSOE_MAX_TEAMS is %u, %u of them predefined, and %llu %s been claimed, "
-            "which a destroyed team does not give back (design §5.7); the split takes none "
-            "and returns nonzero on every PE of its parent team\n", osoe.bootstrap.rank, routine,
-            count, count == 1 ? "" : "s", osoe.bootstrap.max_teams, OSOE_PREDEFINED_TEAMS,
-            (unsigned long long)before, before == 1 ? "has" : "have");
-}
-
-/* A call creating more teams than a session can ever have, refused on every
- * parent PE before anything is claimed: said once, by the parent's rank 0. */
-static void more_teams_than_numbers(const char *routine, uint32_t count)
-{
-    fprintf(stderr, "osoe: PE %u: %s: this call creates %u teams, more than a session can ever "
-            "have: OSOE_MAX_TEAMS is %u, %u of them predefined (design §5.7); the split returns "
-            "nonzero on every PE of its parent team\n", osoe.bootstrap.rank, routine, count,
-            osoe.bootstrap.max_teams, OSOE_PREDEFINED_TEAMS);
-}
-
-/*
- * The parent's rank 0 claims the numbers of the `count` teams its call creates
- * (step 2 of the file's comment), compare-and-swapping world PE 0's counter
- * (internal-region.h) from where it guesses the counter stands to `count`
- * past it, and again from the value each failed exchange returns, until one
- * lands. The first number is OSOE_PREDEFINED_TEAMS past the value exchanged.
- * A claim the numbers left cannot hold takes none - its exchange writes back
- * the value it found, which confirms the count it reports - and answers 0,
- * which no created team has, so a later call that fits still gets them. The
- * loop ends: the counter moves only by claims that land, and those stop at
- * OSOE_MAX_TEAMS. One round trip when this PE's guess is right, which it is
- * after its own last claim unless another parent has claimed since.
- */
-static uint64_t claim(const char *routine, uint32_t count)
-{
-    uint32_t max_teams = osoe.bootstrap.max_teams;
-    uint64_t counter = osoe_internal_team_counter_offset(osoe.bootstrap.collective_fanout,
-                                                         osoe.bootstrap.collective_pipeline,
-                                                         max_teams);
-    /* split has refused a count past this before calling. */
-    uint64_t room = max_teams - OSOE_PREDEFINED_TEAMS;
-    uint64_t expected = atomic_load_explicit(&claimed_seen, memory_order_acquire);
-    for (;;) {
-        bool fits = expected <= room - count;
-        uint64_t found = osoe_transport_rmw(osoe_transport_context_default(), 0,
-                                            OSOE_REGION_INTERNAL, counter, OSOE_RMW_CSWAP,
-                                            sizeof(uint64_t), fits ? expected + count : expected,
-                                            expected, OSOE_TRANSPORT_FETCH);
-        if (found != expected) {
-            expected = found;
-            continue;
-        }
-        if (fits) {
-            atomic_store_explicit(&claimed_seen, expected + count, memory_order_release);
-            return OSOE_PREDEFINED_TEAMS + expected;
-        }
-        atomic_store_explicit(&claimed_seen, expected, memory_order_release);
-        numbers_used_up(routine, count, expected);
-        return 0;
-    }
-}
-
-/*
- * This PE's descriptor for team `number`, which its call has just claimed and
- * whose members are the parent ranks `p` (steps 4 and 5 of the file's
- * comment): its world mapping, composed from the parent's; its members on this
- * node in team-rank order, by testing each local PE, O(L); from them whether
- * it spans nodes, O(1); and, on its local lead here, its node set, O(S) or
- * O(S log S), and the record, written and published, and the set's leads
- * kept.
- */
-static struct osoe_team *build(const struct osoe_team *parent, uint32_t number,
-                               const struct progression *p, int num_contexts)
-{
-    struct osoe_team *t = &created[number - OSOE_PREDEFINED_TEAMS];
+    const struct progression *p = &m->ranks;
+    struct osoe_team *t = &m->shape;
     *t = (struct osoe_team){
-        .number = number,
+        .name = "the new team",
         .members = p->size,
         .singleton = p->size == 1,
         .me = p->stride == 0 ? 0 : (uint32_t)(((int64_t)parent->me - p->start) / p->stride),
-        .num_contexts = num_contexts,
+        .num_contexts = m->num_contexts,
     };
-    snprintf(t->label, sizeof t->label, "team %u", number);
-    t->name = t->label;
+    m->block = UINT32_MAX;
 
     /* Team rank r is parent rank start + stride x r: a start and a stride in
      * world ranks when the parent's are, and a table - of at most the node's
@@ -999,70 +1021,358 @@ static struct osoe_team *build(const struct osoe_team *parent, uint32_t number,
     t->internode = t->local_members < t->members;
     t->nodes = t->internode ? 0 : 1;
     if (osoe.bootstrap.local_id != t->lead_local_id)
-        return t;
-    struct node_set set = { 0 };
+        return;
     if (!t->internode) {
-        node_set_allocate(&set, 1, t->name);
-        set.nodes[0] = osoe.job.node;
-        set.leads[0] = osoe.bootstrap.gtids[t->lead_local_id];
+        node_set_allocate(&m->set, 1, t->name);
+        m->set.nodes[0] = osoe.job.node;
+        m->set.leads[0] = osoe.bootstrap.gtids[t->lead_local_id];
     } else {
-        created_node_set(t, &set);
+        created_node_set(t, &m->set);
     }
-    t->nodes = set.count;
+    t->nodes = m->set.count;
+}
+
+/* Whether this PE leads `m`'s team on its node, and so claims its block. */
+static bool leads(const struct membership *m)
+{
+    return m->member && osoe.bootstrap.local_id == m->shape.lead_local_id;
+}
+
+/* What a split that failed built of `m`: its arrays, its node set, and the
+ * block it claimed, returned to the pool unnamed (node.h). */
+static void unshape(struct membership *m)
+{
+    if (!m->member)
+        return;
+    free((void *)m->shape.local_ids);
+    free((void *)m->shape.local_ranks);
+    free((void *)m->shape.world_of_rank);
+    node_set_free(&m->set);
+    if (m->block != UINT32_MAX)
+        osoe_node_team_return(&osoe.node, m->block);
+    m->block = UINT32_MAX;
+}
+
+/*
+ * Step 5 of the file's comment, for team `m` under `number`: the descriptor
+ * moved into this PE's pool, to the slot of the number, whose generation it
+ * raises (osoe_team_of); the number's counters in this PE's internal region
+ * zeroed (internode.h) - nothing of the team this PE last held under the
+ * number is still to arrive, every write of it having been waited for before
+ * the PE left it (the proposal's "Why giving a number back is safe"); and on
+ * the team's local lead here, its block named, the record written and
+ * published, and the block mapped under the team's name last, with release -
+ * what every member's acquire after the split's sync finds it by
+ * (take_number). The name is free: the number was in this lead's free mask, so
+ * no block was mapped under it.
+ */
+static struct osoe_team *finish(struct membership *m, uint32_t number)
+{
+    struct osoe_team *t = &created[number - OSOE_PREDEFINED_TEAMS];
+    uint32_t generation = t->generation;
+    if (generation == UINT32_MAX)
+        osoe_fatal("this PE has taken team number %u %u times, every generation a handle can "
+                   "name", number, generation);
+    *t = m->shape;
+    t->number = number;
+    t->generation = generation + 1;
+    snprintf(t->label, sizeof t->label, "team %u", number);
+    t->name = t->label;
+    m->shape = (struct osoe_team){ 0 };     /* its arrays are the descriptor's now */
+    /* Only a number this PE has held before in the session has counters to
+     * zero: a heap object is new each session, and only the teams this PE
+     * holds a number for write its counters for it - so a first take touches
+     * none of the pages a barrier-only team never uses. */
+    if (generation > 0)
+        osoe_internode_number_taken(number);
+    if (m->block == UINT32_MAX)
+        return t;
+    t->block_index = m->block;
+    t->block = osoe_node_team(&osoe.node, m->block);
+    osoe_node_team_name(&osoe.node, m->block, t->lead_local_id, number, t->local_members);
     char name[16];
     snprintf(name, sizeof name, "%u", number);
-    claim_block(t);
-    write_record(t, name, &set);
-    /* The name to the block last, with release: what every member's acquire
-     * after the split's sync finds it by (take_number). */
+    write_record(t, name, &m->set);
     atomic_store_explicit(osoe_node_team_map_entry(&osoe.node, t->lead_local_id, number),
-                          t->block_index + 1, memory_order_release);
+                          m->block + 1, memory_order_release);
+    m->block = UINT32_MAX;
     if (t->internode) {
-        t->node_leads = set.leads;
-        set.leads = NULL;
+        t->node_leads = m->set.leads;
+        m->set.leads = NULL;
     }
-    node_set_free(&set);
+    node_set_free(&m->set);
     return t;
 }
 
 /*
- * The protocol of the file's comment, from step 2, over parent `parent` - its
- * handle `parent_handle` - for a call creating `count` teams, of which this PE
- * sees `mine`: split_strided's one, split_2d's row and column.
+ * This PE's free mask (step 3 of the file's comment), `mask_words` words: bit
+ * t set when t is not predefined - the three are held from the start - this PE
+ * holds no team under t, and no block is mapped under (this PE, t) on its node.
+ * The last is one map read a number not held, and holds whenever the first
+ * two do: this PE, leading a team, clears its name's entry as it leaves the
+ * team and before it gives the number back (node.h) - a check that the name
+ * is free that costs nothing beside the reduction. Read without a lock: under
+ * SHMEM_THREAD_MULTIPLE another thread's split may agree one of these numbers
+ * meanwhile, which the pending take finds (D7, take_pending).
  */
-static int split(const char *routine, shmem_team_t parent_handle, struct osoe_team *parent,
-                 uint32_t count, const struct membership *mine, uint32_t mine_count)
+static void free_mask(uint64_t *mask)
 {
-    /* More teams than there are numbers fails before anything is claimed:
-     * every parent PE computes the count alike, as it checked the arguments. */
-    if (count > osoe.bootstrap.max_teams - OSOE_PREDEFINED_TEAMS) {
-        if (parent->me == 0)
-            more_teams_than_numbers(routine, count);
+    uint32_t me = osoe.bootstrap.local_id;
+    for (uint32_t w = 0; w < mask_words; w++) {
+        uint64_t bits = ~atomic_load_explicit(&held[w], memory_order_acquire);
+        if (w == mask_words - 1 && numbered_count % 64 != 0)
+            bits &= (UINT64_C(1) << (numbered_count % 64)) - 1;
+        for (uint64_t rest = bits; rest != 0; rest &= rest - 1) {
+            uint32_t number = w * 64 + (uint32_t)__builtin_ctzll(rest);
+            if (atomic_load_explicit(osoe_node_team_map_entry(&osoe.node, me, number),
+                                     memory_order_acquire) != 0)
+                bits &= ~(UINT64_C(1) << (number % 64));
+        }
+        mask[w] = bits;
+    }
+}
+
+/* Give up the pending words of `count` numbers (take_pending), waking any
+ * split of this PE that waits for one. */
+static void give_pending(const uint32_t *numbers, uint32_t count)
+{
+    for (uint32_t i = 0; i < count; i++) {
+        atomic_store_explicit(&pending[numbers[i]], 0, memory_order_seq_cst);
+        osoe_futex_wake(&pending[numbers[i]], INT_MAX, OSOE_FUTEX_PRIVATE);
+    }
+}
+
+/*
+ * Wait while number `number` is pending for the split whose parent number is
+ * `holder` - 1. Bounded: that split's parent number is higher, it holds the
+ * word only between its two reductions, with every member past the first, and
+ * its own waits are for higher numbers still (the file's comment). Fair it is
+ * not: the word cleared, the higher split can take it again in its next round
+ * before this one's compare-and-swap, which only a schedule that keeps doing so
+ * prolongs (split_numbers_model.py checks that a way out always exists). A wait
+ * like every other: it sweeps (§4.10), counts for the deadlock detector while
+ * it sleeps (base/sweep.h) - between its loads and its sleeps it does nothing
+ * anyone could see - and says where it is blocked, the number as its detail,
+ * for osoe-stat, once it is about to sleep (blocked.h).
+ */
+static void wait_pending(const char *routine, uint32_t number, uint32_t holder)
+{
+    _Atomic uint32_t *word = &pending[number];
+    if (atomic_load_explicit(word, memory_order_acquire) != holder)
+        return;
+    struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_NONE, number);
+    do {
+        osoe_wait_sleeps();
+        osoe_futex_wait(word, holder, &sweep, OSOE_FUTEX_PRIVATE);
+        if (osoe_deadline_expired(&sweep)) {
+            osoe_sweep_expired(routine);
+            sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        }
+    } while (atomic_load_explicit(word, memory_order_acquire) == holder);
+    osoe_wait_ends();
+    osoe_blocked_leave();
+}
+
+/*
+ * Step 4's pending take, when any PE of the parent has SHMEM_THREAD_MULTIPLE
+ * (D7; tools/modelcheck/split_numbers_model.py): this PE's `count` numbers of the
+ * split over parent number `parent`, in turn, each taken pending - its word
+ * from 0 to the parent number plus one, by compare-and-swap - and then found
+ * not held. A word another split of this PE holds is waited for when that
+ * split's parent number is higher, and lost when it is lower, so that a split
+ * waits only for higher numbers and the lowest loses a round only to a number
+ * made held. seq_cst, the swap and the held load as the held bit's or and the
+ * word's clear of the split that keeps the number: one of the two sees the
+ * other (the model's release_first). False, with the words this call took
+ * given up, if any is lost.
+ */
+static bool take_pending(const char *routine, uint32_t parent, const uint32_t *numbers,
+                         uint32_t count)
+{
+    uint32_t mine = parent + 1;
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t number = numbers[i], holder = 0;
+        while (!atomic_compare_exchange_strong_explicit(&pending[number], &holder, mine,
+                                                        memory_order_seq_cst,
+                                                        memory_order_seq_cst)) {
+            if (holder == mine)
+                osoe_fatal("%s: two threads of this PE split team %u at once; spec §9.4 "
+                           "requires a team's collectives to be called in one order", routine,
+                           parent);
+            if (holder < mine) {
+                give_pending(numbers, i);
+                return false;
+            }
+            wait_pending(routine, number, holder);
+            holder = 0;
+        }
+        if (atomic_load_explicit(&held[number / 64], memory_order_seq_cst) &
+            UINT64_C(1) << (number % 64)) {
+            give_pending(numbers, i + 1);
+            return false;
+        }
+    }
+    return true;
+}
+
+/* The marks word of a split's reduction (step 3 of the file's comment), a bit
+ * set for no complaint, so that one AND carries every PE's. */
+enum split_mark {
+    MARK_NOT_BUSY = 1,      /* this PE's pool was not found empty while a block of
+                             * it may be about to come back (split) */
+    MARK_NOT_DRY = 2,       /* this PE claimed every block it leads, or leads none */
+    MARK_NOT_CONCURRENT = 4,    /* no other thread of this PE can be in a split:
+                                 * its level is below SHMEM_THREAD_MULTIPLE */
+};
+
+/*
+ * The pool of this PE's node had no block for a team this PE would lead on it
+ * (step 4 of the file's comment): said by this PE, which alone knows which
+ * node it is, once a round that was not busy found it so.
+ */
+static void pool_dry(const char *routine)
+{
+    fprintf(stderr, "osoe: PE %u: %s: node %u (%s) has no team block left for the new team "
+            "this PE would lead there: OSOE_TEAM_BLOCKS is %u, the teams a node may hold at "
+            "once (design §5.7); the split takes none and returns nonzero on every PE of its "
+            "parent team\n", osoe.bootstrap.rank, routine, osoe.job.node, osoe.node.hdr->hostname,
+            osoe.node.team_count);
+}
+
+/* No number is free on every PE of the new teams (step 4 of the file's
+ * comment): said once, by the parent's rank 0. */
+static void numbers_used_up(const char *routine, uint32_t numbers)
+{
+    fprintf(stderr, "osoe: PE %u: %s: no %s free on every PE of the new team%s: "
+            "OSOE_MAX_TEAMS is %u, the teams one PE may be in at once, %u of them "
+            "predefined (design §5.7); the split takes none and returns nonzero on every PE "
+            "of its parent team\n", osoe.bootstrap.rank, routine,
+            numbers == 1 ? "team number is" : "two team numbers are", numbers == 1 ? "" : "s",
+            osoe.bootstrap.max_teams, OSOE_PREDEFINED_TEAMS);
+}
+
+/*
+ * The protocol of the file's comment, from step 2, over parent `parent` for a
+ * call agreeing `numbers` numbers - split_strided's one, split_2d's two - of
+ * whose teams this PE sees `mine`: split_strided's one, split_2d's row and
+ * column. A round is one reduction over the parent, and a second when any
+ * parent PE has SHMEM_THREAD_MULTIPLE, which the first's marks say; every
+ * parent PE reads their results alike, and so runs as many.
+ */
+static int split(const char *routine, struct osoe_team *parent, uint32_t numbers,
+                 struct membership *mine, uint32_t mine_count)
+{
+    osoe_count(OSOE_C_SHMEM_TEAM_SPLIT_CALLS, 1);
+    bool member = false;
+    for (uint32_t i = 0; i < mine_count; i++) {
+        mine[i].block = UINT32_MAX;
+        mine[i].set = (struct node_set){ 0 };
+        if (mine[i].member) {
+            shape(parent, &mine[i]);
+            member = true;
+        }
+    }
+
+    uint32_t agreed[2] = { UINT32_MAX, UINT32_MAX }, found = 0;
+    uint32_t taking[2] = { 0, 0 }, count = 0;
+    uint64_t marks;
+    bool dry;
+    for (uint32_t round = 0;; round++) {
+        /* A block for every team this PE leads here, before its mask; a claim
+         * a round found dry is tried again in the next. A pool found empty
+         * makes the round busy, not dry, while a block of it may be about to
+         * come back: in the first round, whose claim may have come before a
+         * parent PE's destroy just ahead of this call - which gives its blocks
+         * back before that PE arrives in the round's reduction, and so before
+         * the next round's claim; and while a block is on its way back - a
+         * team destroyed, whose members here are past the destroy's sync and
+         * still leaving it (node.h, osoe_node_team_returning). */
+        dry = false;
+        for (uint32_t i = 0; i < mine_count; i++)
+            if (leads(&mine[i]) && mine[i].block == UINT32_MAX) {
+                mine[i].block = osoe_node_team_claim(&osoe.node);
+                dry |= mine[i].block == UINT32_MAX;
+            }
+        uint64_t *words = osoe_team_split_words(parent);
+        if (member) {
+            free_mask(words);
+        } else {
+            for (uint32_t w = 0; w < mask_words; w++)
+                words[w] = UINT64_MAX;
+        }
+        marks = MARK_NOT_BUSY | MARK_NOT_DRY;
+        if (dry)
+            marks = round == 0 || osoe_node_team_returning(&osoe.node) ? MARK_NOT_DRY
+                                                                         : MARK_NOT_BUSY;
+        words[mask_words] = marks | (concurrent ? 0 : MARK_NOT_CONCURRENT);
+        osoe_team_split_and(routine, parent, mask_words + 1);
+        marks = words[mask_words];
+        if (!(marks & MARK_NOT_BUSY)) {
+            osoe_count(OSOE_C_SHMEM_TEAM_SPLIT_BUSY_ROUNDS, 1);
+            continue;
+        }
+        found = 0;
+        for (uint32_t w = 0; w < mask_words && found < numbers; w++)
+            for (uint64_t rest = words[w]; rest != 0 && found < numbers; rest &= rest - 1)
+                agreed[found++] = w * 64 + (uint32_t)__builtin_ctzll(rest);
+        if (!(marks & MARK_NOT_DRY) || found < numbers || (marks & MARK_NOT_CONCURRENT))
+            break;
+        /* Some parent PE has SHMEM_THREAD_MULTIPLE, and another thread of a
+         * member may be in a split of its own that agreed one of these numbers:
+         * each member takes its numbers pending - which a member below that
+         * level does uncontended - and a second AND says whether every member
+         * did (D7). A round lost is run again by every parent PE, with nothing
+         * pending. */
+        count = 0;
+        for (uint32_t i = 0; i < mine_count; i++)
+            if (mine[i].member)
+                taking[count++] = agreed[mine[i].which];
+        bool took = take_pending(routine, parent->number, taking, count);
+        words[0] = took;
+        osoe_team_split_and(routine, parent, 1);
+        if (words[0])
+            break;
+        if (took)
+            give_pending(taking, count);
+        osoe_count(OSOE_C_SHMEM_TEAM_SPLIT_LOST_ROUNDS, 1);
+    }
+
+    if (!(marks & MARK_NOT_DRY) || found < numbers) {
+        if (!(marks & MARK_NOT_DRY)) {
+            if (dry)
+                pool_dry(routine);
+        } else if (parent->me == 0) {
+            numbers_used_up(routine, numbers);
+        }
+        for (uint32_t i = 0; i < mine_count; i++)
+            unshape(&mine[i]);
         return 1;
     }
 
-    /* The first number travels in the parent team number's own word of the
-     * internal region, not in a borrow from the heap, which under
-     * THREAD_MULTIPLE could race an allocation on another thread, in a
-     * different order on each PE (phase 1 step 8 slice 2). */
-    (void)parent_handle;
-    uint64_t first = osoe_team_broadcast_word(routine, parent,
-                                              parent->me == 0 ? claim(routine, count) : 0);
-    if (first == 0)
-        return 1;
+    /* The numbers are this PE's from here (D1): held, and only then no longer
+     * pending, so that another split's take finds the one or the other. */
+    for (uint32_t i = 0; i < mine_count; i++)
+        if (mine[i].member) {
+            uint32_t number = agreed[mine[i].which];
+            atomic_fetch_or_explicit(&held[number / 64], UINT64_C(1) << (number % 64),
+                                     memory_order_seq_cst);
+        }
+    if (!(marks & MARK_NOT_CONCURRENT))
+        give_pending(taking, count);
 
     struct osoe_team *made[2] = { NULL, NULL };
     for (uint32_t i = 0; i < mine_count; i++)
         if (mine[i].member)
-            made[i] = build(parent, (uint32_t)first + mine[i].offset, &mine[i].ranks,
-                            mine[i].num_contexts);
-    /* Every member node's record is published before any member leaves this,
-     * and so before any collective on a new team starts (node.h). */
+            made[i] = finish(&mine[i], agreed[mine[i].which]);
+    /* Every member node's record is published, and every member's counters
+     * zeroed, before any member leaves this, and so before any collective on a
+     * new team starts (node.h). */
     osoe_team_sync(parent, routine);
     for (uint32_t i = 0; i < mine_count; i++)
         if (made[i]) {
             take_number(made[i]);
-            *mine[i].handle = (shmem_team_t)made[i];
+            *mine[i].handle = handle_of(made[i]);
         }
     return 0;
 }
@@ -1101,15 +1411,16 @@ OSOE_API int pshmem_team_split_strided(shmem_team_t parent_team, int start, int 
         .handle = new_team,
     };
     m.member = is_member(&m.ranks, parent->me);
-    return split(routine, parent_team, parent, 1, &m, 1);
+    return split(routine, parent, 1, &m, 1);
 }
 
 /*
  * spec §9.4.7. The parent's ranks laid out in rows of xrange - no more than the
  * parent has - and every row a team and every column a team, all of them
- * created by this one call: rows first, then columns, in the numbers it
- * claims. A PE is in one of each, its x-axis team its row and its y-axis team
- * its column. xrange not positive is undefined, and ends the job by name.
+ * created by this one call, under two numbers: every row the lowest the call
+ * agrees and every column the next, since rows share no PE, nor columns (D2).
+ * A PE is in one of each, its x-axis team its row and its y-axis team its
+ * column. xrange not positive is undefined, and ends the job by name.
  */
 OSOE_API int pshmem_team_split_2d(shmem_team_t parent_team, int xrange,
                                  const shmem_team_config_t *xaxis_config, long xaxis_mask,
@@ -1132,25 +1443,29 @@ OSOE_API int pshmem_team_split_2d(shmem_team_t parent_team, int xrange,
         osoe_fatal("%s: xrange %d; spec §9.4.7 requires a positive one", routine, xrange);
     uint32_t members = parent->members;
     uint32_t columns = (uint32_t)xrange < members ? (uint32_t)xrange : members;
-    uint32_t rows = (members + columns - 1) / columns;
     uint32_t x = parent->me % columns, y = parent->me / columns;
     uint32_t row_size = members - y * columns < columns ? members - y * columns : columns;
     struct membership m[2] = {
-        { .offset = y, .member = true,
+        { .which = 0, .member = true,
           .ranks = { (int64_t)y * columns, 1, row_size },
           .num_contexts = x_contexts, .handle = xaxis_team },
-        { .offset = rows + x, .member = true,
+        { .which = 1, .member = true,
           .ranks = { x, columns, (members - x + columns - 1) / columns },
           .num_contexts = y_contexts, .handle = yaxis_team },
     };
-    return split(routine, parent_team, parent, rows + columns, m, 2);
+    return split(routine, parent, 2, m, 2);
 }
 
 /*
  * spec §9.4.8: collective over the team's members (§5.7) - a sync over the
- * team, and then this PE's descriptor goes. The number stays taken, and the
- * team's blocks and records stay on every node: a late reader or a late
- * message meets the team it was for, never another. SHMEM_TEAM_INVALID does
+ * team, and then this PE leaves the node's block, its descriptor goes and its
+ * number is given back. The team's local lead on a node clears its name's
+ * entry in the map as it leaves, and the last of the team's members there to
+ * leave the block gives it back to the pool (node.h); the number is given back
+ * last of all, once nothing of this PE uses the descriptor any more, since a
+ * thread of this PE taking the number in a split of its own takes the
+ * descriptor's slot (D1). Nothing of the team is still to arrive here or anywhere (the
+ * proposal's "Why giving a number back is safe"). SHMEM_TEAM_INVALID does
  * nothing; a predefined team is undefined, which here means loud, and so is a
  * handle never issued or already destroyed (osoe_team_of).
  */
@@ -1167,7 +1482,16 @@ OSOE_API void pshmem_team_destroy(shmem_team_t team)
      * it orders everything else on the team (spec §9.4.8; context.c). */
     osoe_context_team_destroyed(t, "shmem_team_destroy");
     osoe_team_sync(t, "shmem_team_destroy");
+    /* This PE's published epoch for the number says nothing any more, rather
+     * than the team's last, which osoe-stat would pair with the block when it
+     * holds another team (node.h). */
+    uint32_t number = t->number;
+    atomic_store_explicit(t->published, 0, memory_order_release);
+    osoe_node_team_leave(&osoe.node, t->block_index,
+                         osoe.bootstrap.local_id == t->lead_local_id);
     forget(t);
+    atomic_fetch_and_explicit(&held[number / 64], ~(UINT64_C(1) << (number % 64)),
+                              memory_order_seq_cst);
 }
 
 /*

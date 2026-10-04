@@ -49,10 +49,16 @@ int osoe_collect(const char *routine, shmem_team_t team, void *dest, const void 
 int osoe_alltoall(const char *routine, shmem_team_t team, void *dest, const void *source,
                   ptrdiff_t dest_stride, ptrdiff_t source_stride, size_t nelems, size_t width);
 
-/* A word from team rank 0 to every member of `t`, borrowing nothing from the
- * heap (collectives.c): what a split broadcasts its first team number in. */
+/*
+ * A split over `t` (team.c; the team redesign's step D, D2): the words of t's
+ * number's split lines in this PE's internal region, which the caller fills
+ * with its contribution - its free mask and its marks - and then
+ * osoe_team_split_and, collective over `t`, replaces with the AND of every
+ * member's first `count` words, borrowing nothing from the heap.
+ */
 struct osoe_team;
-uint64_t osoe_team_broadcast_word(const char *routine, struct osoe_team *t, uint64_t value);
+uint64_t *osoe_team_split_words(const struct osoe_team *t);
+void osoe_team_split_and(const char *routine, struct osoe_team *t, uint32_t count);
 
 /*
  * A prefix sum of nelems elements of `element` over `team` (spec §9.10.10):

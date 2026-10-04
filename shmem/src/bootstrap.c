@@ -266,13 +266,14 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    getenv("OSOE_COLLECTIVE_FANOUT"), (unsigned)OSOE_COLLECTIVE_FANOUT_MAX);
 
     /*
-     * How many teams may exist job-wide at once, the predefined ones included
-     * (§5.7). It sizes each node's team blocks, each PE's published epochs and
-     * the internal region's per-team blocks, and a team's number is job-wide
-     * and below it - so every node must agree, and the job rendezvous checks
-     * that they do beside the fan-out (§6.2). A node with a different count
-     * would lay its internal region out differently, and a put of one team's
-     * piece would land in another's slot.
+     * How many teams one PE may be in at once, the predefined ones included
+     * (§5.7; the team redesign's step D, D8): a team's number is each PE's own
+     * and below it. It sizes each PE's published epochs, each local PE's row of
+     * the node's map of team names, and the internal region's per-number
+     * blocks - so every node must agree, and the job rendezvous checks that
+     * they do beside the fan-out (§6.2). A node with a different count would
+     * lay its internal region out differently, and a put of one team's piece
+     * would land in another's slot.
      */
     b->max_teams = OSOE_MAX_TEAMS_DEFAULT;
     if (osoe_environment_u32("OSOE_MAX_TEAMS", &b->max_teams) == OSOE_ENVIRONMENT_INVALID ||

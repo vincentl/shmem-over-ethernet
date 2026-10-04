@@ -849,7 +849,22 @@ first slice left this term at the three teams that could then exist, and its
 second, whose splits create teams, made it `OSOE_MAX_TEAMS`.
 `shmem.reply-pool.overflow` changed with it: at *C* = 1, *k* = 2 and the
 fewest teams the variable allows, four, the pool is 1 + 3 × 4 = 13, and fifteen
-origins overflow it where eleven overflowed three teams' 10. Slice 2 sized argument
+origins overflow it where eleven overflowed three teams' 10. *Since the team
+redesign's step D (part 2)* the term is `degree × OSOE_TEAM_BLOCKS`, the teams
+the node can hold at once (§5.7): a number is each PE's own, so a node may hold
+more teams than any one PE's numbers. The bound a block needs the old team's
+forwards gone before the block is claimed again, and a team's members leave
+its block only after its local release - which `release_local` applies only
+once the team's RELEASEs have left the children's control queues. It drains
+and flushes each child's connection first, as it always did, and that empties
+them unless a connection has no room; then the local release waits a pass, or
+as many as the room takes (`transport.am.releases_held` counts the times it is
+held back, twice a pass). The
+adversarial read of step D found the first build applied the release whatever
+the drain left, which made the bound hold only when the drain emptied the
+queues. 5,120 descriptors at the defaults,
+about 240 KiB; `shmem.reply-pool.overflow` overflows `1 + 1 + 3 × 8` with
+thirty-one origins and the smallest pool. Slice 2 sized argument
 2 per connection at one per team, which was the star's shape — its root released
 every peer at once — and cost N − 1 descriptors per team on every node for a need
 only the root had; the node-wide term is O(*k*·*T*). `slack` stays 0 — every
@@ -1017,9 +1032,20 @@ on the node, and not O(`OSOE_MAX_TEAMS`), 64 by default and 1,024 at most.
 *As built since the team redesign's step D (layout 29):* a word per block of
 the node's pool of teams, read for the predefined teams' three and for the
 blocks at and above `team_blocks_published_from`, the lowest block of a created
-team whose record is published - blocks being claimed from the top of the pool
-down and not yet given back - so a pass costs the blocks claimed, not
-O(`OSOE_TEAM_BLOCKS`).
+team whose record has been published - blocks being claimed from the top of the
+pool down, the highest free first - so a pass costs the most blocks the node has
+held at once, not O(`OSOE_TEAM_BLOCKS`). Since layout 30 the word carries the
+block's generation beside the epoch, and the agent compares the whole word with
+the one it took last: a block given back and claimed for another team starts its
+epochs again, never its generation (§5.7). And since layout 30 the agent no longer
+walks the blocks: a member that posts sets its block's bit in a **bitmap of posted
+blocks** and that bitmap word's bit in a **summary** (`team_posted_summary`,
+`node.h`), after its handoff and before the wake, and the agent takes the
+summary and the words it names by exchange (`tools/modelcheck/posted_bitmap_model.py`)
+- a pass with nothing posted is one load at the default pool, sixteen at the
+largest, however many teams the node holds. The walk it replaced cost the most
+blocks the node had held at once: in the VM, 500 teams held made a barrier of the
+world about 8 to 11 µs slower, some 10% (`docs/decisions/2026-10-03-team-allocation.md`).
 
 **Safety sweep:** pass a ~100 ms timeout (`io_uring_submit_and_wait_timeout`,
 which uses `IORING_ENTER_EXT_ARG`) and submit
@@ -4391,7 +4417,12 @@ Computed once at team creation, stored in the private team descriptor:
   internode phase and the job's table of leads address on every node; the two
   agree under every distribution Slurm and `osoe-launch` produce, and a local
   order given by hand, whose local id 0 is not the lowest rank, runs as it
-  always did.
+  always did. *Since the team redesign's step D* the local lead's local id is
+  half of the team's **name** on the node, the number the other half (§5.7):
+  the lead claims the node's block for the team, names it, maps it under the
+  name and, at destroy, clears that entry; the rule is unchanged, so a PE leads
+  no two live teams under one number on its node, and a name is one team's for
+  as long as the team lives there.
 
 ### 5.3 Intranode phase
 
@@ -5007,6 +5038,9 @@ creates teams the control queue's term (§3.8).
 **It counts team numbers job-wide, including the predefined teams' — not teams per
 PE — and a number is never reused within a session (below), so it bounds the teams
 a session creates in its life, not only those alive at once: 61 at the default.**
+*Until the team redesign's step D (below): since its second part `OSOE_MAX_TEAMS`
+counts the numbers one PE holds at once, a destroyed team gives its number back,
+and the control queue's term counts a node's pool of team blocks.*
 The control-queue bound is per connection: the number of
 distinct teams whose trees use that node pair. `shmem_team_split_2d` can put `L`
 different teams on one node pair while each PE belongs to only two, so a per-PE
@@ -5085,6 +5119,113 @@ the number is claimed by then and the split cannot fail alike - the second part
 makes it such a failure. The control queue's term stays per number (§3.8),
 which a node's blocks match one for one while numbers are job-wide.
 
+*As built (the team redesign's step D, part 2, layout 30;
+`docs/design/team-resources-proposal.md` D1, D2 and D4 to D8).* **A number is
+each PE's own**: no PE is in two live teams under one number, and two teams with
+no PE in common may hold one, on one node or on two. `OSOE_MAX_TEAMS` counts the
+numbers one PE holds at once, the three predefined included - still 4 to 1,024,
+default 64, agreed at the rendezvous, since it lays out every PE's internal
+region alike - and a destroyed team gives its number back. **A split agrees its
+numbers by one AND reduction over the parent** (`team.c`), in place of the claim
+on world PE 0 and the broadcast, in two lines of the parent number's words in
+the internal region (§5.8): every member of a team the call creates contributes
+its *free mask* - a bit for each number it holds no team under and under which
+no block is mapped in its own name on its node - and every other parent PE all
+ones, beside a word of marks written inverted so that the one AND carries them.
+Every parent PE reads the same result: `split_strided` takes the lowest bit,
+`split_2d` the lowest for every row and the next for every column, since rows
+share no PE, nor columns. Before contributing, the would-be local lead of each
+new team on each node claims the team's block from the pool, so that a dry pool
+fails the split alike - said by the PE that found it dry, naming
+`OSOE_TEAM_BLOCKS` and its node - and so does a mask with no bit left, said once
+by the parent's rank 0, naming `OSOE_MAX_TEAMS`; a block claimed for a split that
+fails goes back. Each member then takes the number: its descriptor's slot in its
+process's pool, and its counters for the number in its internal region zeroed
+(`internode.h`, `osoe_internode_number_taken`), before the split's sync, after
+which alone anybody writes them for the new team - and only for a number it has
+held before in the session, the heap object being new each session; and each
+node's local lead names its block and writes the record and the map entry, as
+in the first part.
+
+**A block's life** (`node.h`; `tools/modelcheck/team_block_model.py`): a block
+counts its holders, the team's members on the node. At destroy, after the sync
+over the team, the team's local lead on each node clears its name's map entry -
+its own, which nothing resolves once any member there has left the team, no
+message for the team reaching the node after that (the proposal's "Why giving a
+number back is safe") - and every member leaves the block; the last to leave
+retracts the record, raises the block's generation and returns it to the
+bitmap, in that order. The generation is odd while a team holds the block. The
+arrival handoff carries it beside the epoch, in one 64-bit word, and the
+progress engine (§3.12) and the generic internode phase (§5.8) learn a block
+afresh when they meet it at another generation than the one they learnt it at;
+an engine that finds a team it is relearning with an epoch open names the
+broken argument rather than overwriting it. **Two departures from the
+proposal**, both from runs of the tests: the proposal had the last holder clear
+the map entry, and then a lead whose members on its node were slow to leave
+found its own name still mapped, its number out of its free mask, so that a
+split right after a destroy failed with the numbers tight (the model's
+`last_clears` breakage, the first design, fails the property the change gives:
+the lead finds its name free as soon as it has left); and a would-be lead that
+finds its pool empty while a block may be about to come back marks the round
+busy, which every parent PE runs again, rather than failing the split as dry
+(`tools/modelcheck/pool_dry_model.py`): in the split's first round, whose claim
+may have come before a parent PE's destroy just ahead of the call - which gives
+its blocks back before that PE arrives in the round's reduction, and so before
+the next round's claim; and while a block is on its way back - a team
+destroyed, its members there past the sync and still leaving it, or the last
+of them past its give-back but the block not yet in the bitmap. What it cannot
+wait for is a team whose members on the node are outside the split's parent and
+none of whom has begun to leave: the node cannot tell one past its destroy's
+sync from one still waiting in it for a PE inside the split, whose destroy
+waits for the split, and waiting for that one would never end - the model's
+`remote` and `split_first`; the read of the rebuilt part, which found the
+README promising more. A block keeps
+its last team's member count after the team has left it and a claim zeroes it,
+so that a nonzero count with fewer holders says "on its way back" and a zero
+count says "claimed": the first test, fewer holders than members with the count
+never zeroed, held for ever of a block given back and claimed again, and a
+`split_2d` whose lead held one claimed block and found no second ran its rounds
+for ever (the adversarial read of 2026-10-03; the model's `first` breakage).
+
+**Handles** (D6): a created team's handle is its descriptor's address plus the
+descriptor's generation - how many times the PE has taken the number - times
+the size of the process's pool of descriptors, an integer never dereferenced,
+recovered by division, and accepted while the descriptor is live at that
+generation; a handle of a destroyed team is named as such, the more so when its
+number names another team since. **Under `SHMEM_THREAD_MULTIPLE`** (D7;
+`tools/modelcheck/split_numbers_model.py`) a PE's free mask is one resource,
+which two splits' reductions can read at once and agree the same number from.
+Nothing is held across the split's first reduction, which waits for every
+parent PE and so, through the program's other collectives, for anything: the
+proposal's mask token, held across it, deadlocked a valid program that way - PE 0's
+split of {0, 2} holding the token waiting for PE 2, which waited in a sync of
+{1, 2} for PE 1, which ran the busy rounds of {0, 1}'s split for ever, PE 0's
+other thread unable to take the token (the adversarial read of 2026-10-03; the
+model's `token` case). Each member instead takes its agreed numbers *pending*
+on its PE once the reduction has agreed them: a word per number, set from 0 to
+the parent number plus one by compare-and-swap, and then the number found not
+held. A word another split holds is waited for when that split's parent number
+is higher, and lost when it is lower; a second AND reduction over the parent
+says whether every member took its numbers, and then each marks them held and
+clears its words, or clears them and every parent PE runs the round again. A
+split holds words only between its two reductions, with every member past the
+first, and waits only for higher parent numbers - a team's number is one
+number on all its members - so no waits close a cycle, and the split of the
+lowest parent number among those active loses a round only to a number another
+has made held. The pending take and the second reduction run when any parent
+PE has `SHMEM_THREAD_MULTIPLE` - the levels of a job's PEs may differ (spec
+§9.2), so the first reduction's marks carry a bit for it, and every parent PE
+runs the same rounds; a PE below that level takes its numbers uncontended.
+When none has, one thread of each is in the library at a time, and a split
+takes its numbers after its one reduction (the adversarial read of the
+rebuilt part found the first rebuild deciding it on each PE's own level, which
+mixed levels turned into a split that never finished). Three counters say how often:
+`shmem.team_split.calls`, `shmem.team_split.busy_rounds` and
+`shmem.team_split.lost_rounds`. Each number costs every PE about 200 KiB of its
+internal region's address space, as before (*temporary*: step E, the per-team
+counters and the per-PE buffers of the proposal's §4, makes it about 15 KiB and
+the default 256).
+
 *Two readings of §9.4.6*, where the specification says two things. A triplet
 whose sequence would wrap around the parent - "considered invalid and the
 behavior is undefined" - is taken as the invalid triplet it also is, one with
@@ -5106,15 +5247,20 @@ would be simpler, but forcing a rebuild to raise a limit is exactly the friction
 every structure statically sized. Rejected because the ceiling reintroduces the
 rebuild, which is the whole objection.)*
 
-**Team ranges leak until `finalize`**, with a counter. §9.4.8 calls
-`shmem_team_destroy` "a collective operation that destroys the team referenced by
-the team handle argument team" without naming a scope in the routine text, but the rest of the spec fixes
-it: a parent-team PE that is not in a new team "will receive a value of
+**Team ranges leaked until `finalize`**, with a counter, until the team
+redesign's step D. §9.4.8 calls `shmem_team_destroy` "a collective operation
+that destroys the team referenced by the team handle argument team" without
+naming a scope in the routine text, but the rest of the spec fixes it: a
+parent-team PE that is not in a new team "will receive a value of
 SHMEM_TEAM_INVALID" (§9.4), and destroying `SHMEM_TEAM_INVALID` is a no-op. So
 destroy is collective over the team's members. An earlier draft called the scope
-ambiguous; it is not. The conclusion stands anyway: parent PEs outside the child
-cannot observe the destroy, so ranges cannot be reclaimed without divergence, and
-leaking costs nothing because teams are typically created once during setup.
+ambiguous; it is not. The first design concluded that parent PEs outside the
+child cannot observe the destroy, so job-wide numbers cannot be reclaimed
+without divergence, and that leaking cost nothing because teams are typically
+created once during setup - which SOS's `shmem_team_reuse_teams` and every
+program that splits in a loop disproved. Step D removes the premise: a number is
+each member's own, so a PE outside the team never needs to know it is free, and
+each member gives it back at destroy (above).
 
 Two related requirements from the same section: destroy also destroys every
 **shareable** context created from the team, while **`SHMEM_CTX_PRIVATE`**
@@ -7417,11 +7563,12 @@ Recorded rather than deleted, so they are not reopened from memory.
 | Which SOS configuration is the baseline? | **Withdrawn.** libfabric does not build usably on the target hardware, which is the project's premise, not an obstacle to measuring it. Replaced by the §1 floors |
 | `shmem_ptr` context-variant signature | **No such thing.** The variant is team-scoped: `shmem_team_ptr` (1.6 §9.1.10). §4.8 corrected |
 | `barrier_all` versus `sync` quiet semantics | **Confirmed** (§9.10.1 Notes): `barrier_all` ≡ `shmem_ctx_quiet` on the default context, then `shmem_team_sync` on world |
-| `shmem_team_destroy` scoping | **Collective over the team's members**: non-members hold `SHMEM_TEAM_INVALID`, on which destroy is a no-op. An earlier resolution called the scope ambiguous. Team ranges still leak until finalize (§5.7) |
+| `shmem_team_destroy` scoping | **Collective over the team's members**: non-members hold `SHMEM_TEAM_INVALID`, on which destroy is a no-op. An earlier resolution called the scope ambiguous. Team ranges leaked until finalize until the team redesign's step D, since which each member gives its number back (§5.7) |
 | Team-based allocation | **Does not exist through 1.6.** 1.6 change #10 states malloc and friends are world-team collective (§4.5) |
 | PMIx on the actual nodes | **Moot.** Nothing links against PMIx or PMI-2 on the default path (§6) |
-| `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7). *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`, read at each session's first init and agreed at the rendezvous, sizing everything indexed by team number, the control queue's term too since the split creates teams |
-| Team range allocator and split protocol | **Built** (approved 2026-09-25; §5.7, `docs/prompts/done/phase1-step7-slice1-prompt.md`, `docs/prompts/done/phase1-step7-slice2-prompt.md`): team numbers claimed from a counter on world PE 0 and never reused within a session, storage per number on every node, a record per member node that the progress thread learns a team from, the split collective over its parent and ending with a sync over it. Phase 1 step 7's first slice built the storage, its second creation: `shmem_team_split_strided`, `shmem_team_split_2d`, `shmem_team_destroy` |
+| `max_teams` runtime or build-time | **Runtime**, read at first init, bounding three structures (§5.7). *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`, read at each session's first init and agreed at the rendezvous, sizing everything indexed by team number, the control queue's term too since the split creates teams. *Since the team redesign's step D:* the numbers one PE holds at once; the control queue's term counts the node's pool of team blocks, `OSOE_TEAM_BLOCKS` |
+| Team range allocator and split protocol | **Built** (approved 2026-09-25; §5.7, `docs/prompts/done/phase1-step7-slice1-prompt.md`, `docs/prompts/done/phase1-step7-slice2-prompt.md`): team numbers claimed from a counter on world PE 0 and never reused within a session, storage per number on every node, a record per member node that the progress thread learns a team from, the split collective over its parent and ending with a sync over it. Phase 1 step 7's first slice built the storage, its second creation: `shmem_team_split_strided`, `shmem_team_split_2d`, `shmem_team_destroy`. *Replaced by the team redesign's step D* (next row) |
+| Team numbers for `split_2d`, and numbers never reused | **Closed by the team redesign's step D** (`docs/design/team-resources-proposal.md` §3; §5.7). The question (the review of phase 1 step 7 slice 2): a `split_2d` claimed a number for each of its rows and columns from a job-wide space never reused, so a square grid over *P* PEs took 2√*P* numbers, and at a default of 32 SOS's `shmem_team_split_2d` lost splits from six PEs; a number needs to be unique only among the teams a PE is in. Since step D a number is each PE's own, agreed by an AND reduction of free masks over the parent, given back at destroy, and a node's teams are a pool of blocks found by name: a whole-job `split_2d` takes two numbers, and the colouring the question proposed is not needed |
 | How a PE blocks in `wait_until` | **One watch slot per local PE with a 32-bit futex sequence word** (§4.9). Futexing on the `ivar` itself was withdrawn, since 64-bit futexes do not exist, and the hash table was replaced once waits were seen to be on the caller's own variable |
 | io_uring ring bound | **Two bounds, two rings.** CQ is sized from the provided-buffer ring (§3.3). Verified by `tools/probe` |
 | Reduction `dest` versus 1.6 change #17 | **Not a conflict** — same arrays means same symmetric offset. The surrounding text exposed three real bugs, fixed by a single-writer lead that leaves last (§5.5) |
@@ -7601,18 +7748,6 @@ which has two states per pair, so a third backend needs a selector of its own
 - **The value of the reply credit `C`** (§3.8, §4.6). Large enough to be
   irrelevant to real codes, small enough that `connections × C` descriptors stay
   cheap; pick it from measurement.
-- **Team numbers for `split_2d`** (§5.7; the review of phase 1 step 7 slice 2).
-  A `split_2d` claims a number for each of its row and column teams at once, from
-  the job-wide space numbers are never reused in: a square grid over *P* PEs
-  takes 2√*P*, so above about 2.6 × 10⁵ PEs no grid can be made even at
-  `OSOE_MAX_TEAMS`' ceiling of 1,024, and at the default of 32 SOS's
-  `shmem_team_split_2d` loses some of its splits from six PEs (it still exits 0).
-  A number needs to be unique only among the teams that share a node, and each
-  team one number on all its nodes: a colouring every PE could compute from the
-  grid and the rank map would give a grid O(PEs per node) numbers, on the path to
-  RoCE at ~10⁶ PEs. *Decided 2026-09-26: the default is 64 (applied the same
-  day, with the numbers of §5.7 and §5.8); the colouring waits for a RoCE
-  backend, which is post-release (§1).*
 - **`SHMEM_THREAD_MULTIPLE`: points §4.11 leaves open.** None blocks phase 1.
   - **A full thread table.** A PE's `OSOE_MAX_THREADS` blocks can all be taken by
     live threads. Aborting with a diagnostic naming the variable is loud and simple.

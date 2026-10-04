@@ -22,11 +22,13 @@
  *   PE          a field of a PE's slot: one per local PE, written by that PE
  *   THREAD      a counter in a thread's block: one per thread (§3.14 cost rules)
  *   CONNECTION  a field of one connection's record: one per peer node
- *   TEAM        a field of one team number's block: one per team number
- *               (layout 18), the index being the number - which is how a
- *               reader finds a team created after the table was written
+ *   TEAM        a field of one block of the node's pool of teams: one per
+ *               block (layout 18, by number until layout 29), the index being
+ *               the block's - which is how a reader finds a team created
+ *               after the table was written
  *   EPOCHS      a word of one local PE's row of published epochs, a word per
- *               team number (layout 18), the index being the local id
+ *               team number (layout 18), the index being the local id; since
+ *               layout 30 a 64-bit word, the team's block beside the epoch
  *
  * The predefined teams' fields are node-scope names too, `team.world.*` and
  * the like, as they were when the header held them by name: the team blocks
@@ -72,6 +74,14 @@ enum osoe_counter {
     OSOE_C_SHMEM_WAIT_UNTIL_CALLS, OSOE_C_SHMEM_TEST_CALLS,
     OSOE_C_SHMEM_SIGNAL_UPDATE_CALLS, OSOE_C_SHMEM_SIGNAL_FETCH_CALLS,
     OSOE_C_SHMEM_SIGNAL_WAIT_CALLS,
+    /* The splits (team.c; layout 30): calls; their rounds that some PE of the
+     * parent ended busy - its pool empty in the round's claim, the first round
+     * or with a block on its way back - and every parent PE ran again; and,
+     * under SHMEM_THREAD_MULTIPLE, their rounds lost because some member could
+     * not take a number another split of its PE held (the team redesign's
+     * step D, D7). */
+    OSOE_C_SHMEM_TEAM_SPLIT_CALLS, OSOE_C_SHMEM_TEAM_SPLIT_BUSY_ROUNDS,
+    OSOE_C_SHMEM_TEAM_SPLIT_LOST_ROUNDS,
 
     /* The agent thread's own block (§3.14's progress heartbeat). */
     OSOE_C_AGENT_LOOPS, OSOE_C_AGENT_WAKEUPS, OSOE_C_AGENT_LAST_WAKE_NS,

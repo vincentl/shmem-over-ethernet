@@ -30,12 +30,16 @@
  * scratch that means something only while a collective has it, rather than in
  * a count the next collective would wait on forever.
  *
- * Then one more line: **the count of team numbers claimed** (§5.7; phase 1
- * step 7 slice 2), an eight-byte word at the line's start. Every PE's region
- * has the line and only world PE 0's is used: a split's parent rank 0 claims
- * the numbers its call creates by compare-and-swap there (team.c), so numbers
- * are job-wide and never reused within a session. It is not a team number's
- * word, and no collective counts on it.
+ * Past each team number's counters, **two lines for its splits** (§5.7; the
+ * team redesign's step D, docs/design/team-resources-proposal.md D2): the words
+ * a split over the team as parent reduces in place, every parent PE's free mask
+ * of team numbers - a bit per number, OSOE_MAX_TEAMS bits - and then one word
+ * of marks (team.c). Seventeen words at the largest OSOE_MAX_TEAMS, 1,024: two
+ * lines hold them, and every team number has the two, whatever OSOE_MAX_TEAMS
+ * is, so that nothing else's place depends on it more than it did. Until step
+ * D a line past every team number's words held the count of team numbers
+ * claimed, on world PE 0, and the split's first number travelled in a spare
+ * word of the release counter's line; both are gone.
  *
  * Last, **the allgather's words** (§5.8, "An allgather for fcollect"; phase 1
  * step 5 slice 6): per team number, a READY counter for each of the gather's
@@ -46,8 +50,21 @@
  * shape of the gather that lead entered, 24 bytes, put before the add. A team over N nodes takes ceil(log2 N) steps, so
  * every team number has room for ceil(log2 N) steps of the job's N nodes,
  * which every node agrees on - the one part of the layout the node count
- * sizes, by its logarithm. They come after the counter's line so that nothing
- * before them moved when they were added.
+ * sizes, by its logarithm. They came after the counter's line, so that nothing
+ * before them moved when they were added, and come after the words since the
+ * line went.
+ *
+ * **What a team number owns here is the team's while one of this PE's teams
+ * holds the number** (step D): a PE gives a number back when it destroys its
+ * team, and takes it again for a later one, and as it takes it zeroes every
+ * counter of the number in its own region (osoe_internode_number_taken), before
+ * the split's sync, after which alone anybody writes them for the new team.
+ * Nothing of the old team is still to arrive by then: every write into a PE's
+ * slots and counters is one the PE waits for before it returns from the
+ * collective, and the destroy's sync follows every member's return from the
+ * team's last collective (the proposal's "Why giving a number back is safe").
+ * The slots are not zeroed: a slot is read only once a counter says it is
+ * written.
  *
  * Every PE's heap carries one, and a team touches only its own slots and its
  * words' lines, and only on the leads of its nodes - but for its scans, whose
@@ -92,11 +109,15 @@ static inline uint64_t osoe_internal_team_slots_bytes(uint32_t fanout, uint32_t 
     return (uint64_t)(fanout + 1) * pipeline * OSOE_INTERNAL_SLOT_BYTES;
 }
 
+/* The lines of a team number's words that hold its splits' masks and marks
+ * (the file's comment): room for 1,024 numbers' bits and the marks. */
+enum { OSOE_INTERNAL_SPLIT_LINES = 2 };
+
 /* One team number's words: an arrival counter per child position, then the
- * release counter, each alone on its line. */
+ * release counter, each alone on its line; then its splits' lines. */
 static inline uint64_t osoe_internal_team_words_bytes(uint32_t fanout)
 {
-    return (uint64_t)(fanout + 1) * OSOE_INTERNAL_LINE_BYTES;
+    return (uint64_t)(fanout + 1 + OSOE_INTERNAL_SPLIT_LINES) * OSOE_INTERNAL_LINE_BYTES;
 }
 
 /* Where the words start: past every team number's slots. */
@@ -118,7 +139,6 @@ static inline uint64_t osoe_internal_words_offset(uint32_t fanout, uint32_t pipe
  * collective that owns them, with plain stores, and read by node-mates.
  */
 enum osoe_internal_team_spare {
-    OSOE_INTERNAL_SPLIT_NUMBER,         /* a split's first team number, broadcast */
     OSOE_INTERNAL_COLLECT_LENGTH,       /* a member's collect length, for its lead */
     OSOE_INTERNAL_COLLECT_TOTAL,        /* the lead's total of them, for its members */
 };
@@ -132,13 +152,20 @@ static inline uint64_t osoe_internal_team_spare_word(uint32_t fanout, uint32_t p
            (uint64_t)fanout * OSOE_INTERNAL_LINE_BYTES + 64 + (uint64_t)which * 8;
 }
 
-/* Where the count of team numbers claimed is: the line past every team
- * number's words. */
-static inline uint64_t osoe_internal_team_counter_offset(uint32_t fanout, uint32_t pipeline,
-                                                         uint32_t max_teams)
+/* The words a split over team number `team` reduces (the file's comment):
+ * the mask's, then the marks word, in the number's split lines. */
+static inline uint64_t osoe_internal_team_split_offset(uint32_t fanout, uint32_t pipeline,
+                                                       uint32_t max_teams, uint32_t team)
 {
     return osoe_internal_words_offset(fanout, pipeline, max_teams) +
-           (uint64_t)max_teams * osoe_internal_team_words_bytes(fanout);
+           (uint64_t)team * osoe_internal_team_words_bytes(fanout) +
+           (uint64_t)(fanout + 1) * OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* How many words a free mask of `max_teams` numbers takes, a bit a number. */
+static inline uint32_t osoe_internal_mask_words(uint32_t max_teams)
+{
+    return (max_teams + 63) / 64;
 }
 
 /* The allgather's steps over `nodes` nodes: ceil(log2 nodes), 0 for one. */
@@ -157,12 +184,12 @@ static inline uint64_t osoe_internal_team_gather_bytes(uint32_t steps)
     return (uint64_t)2 * steps * OSOE_INTERNAL_LINE_BYTES;
 }
 
-/* Where the allgather's words start: past the counter's line. */
+/* Where the allgather's words start: past every team number's words. */
 static inline uint64_t osoe_internal_gather_offset(uint32_t fanout, uint32_t pipeline,
                                                    uint32_t max_teams)
 {
-    return osoe_internal_team_counter_offset(fanout, pipeline, max_teams) +
-           OSOE_INTERNAL_LINE_BYTES;
+    return osoe_internal_words_offset(fanout, pipeline, max_teams) +
+           (uint64_t)max_teams * osoe_internal_team_words_bytes(fanout);
 }
 
 /*
@@ -207,8 +234,8 @@ static inline uint64_t osoe_internal_scan_bytes(uint32_t fanout, uint32_t pipeli
 
 /* The region's size for `max_teams` team numbers, a tree of fan-out `fanout`,
  * `pipeline` pieces in flight and a job of `nodes` nodes, before page
- * rounding: the slots, the words, the counter's line, the allgather's words,
- * then the scans' area. */
+ * rounding: the slots, the words, the allgather's words, then the scans'
+ * area. */
 static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipeline,
                                                   uint32_t max_teams, uint32_t nodes)
 {

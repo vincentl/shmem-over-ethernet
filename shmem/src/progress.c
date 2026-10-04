@@ -245,8 +245,22 @@ static void forward(struct osoe_progress *p, uint32_t team, uint32_t node, uint3
         osoe_fatal("node %u: no connection toward node %u, a neighbour in team %u's tree",
                    p->node, node, p->team[team].number);
     struct osoe_reply r = { .kind = kind, .origin_pe = p->team[team].number,
-                            .target_pe = lead, .length = 0, .value = epoch };
+                            .target_pe = lead, .length = 0, .value = epoch, .token = team };
     enqueue(p, slot, &p->connection[slot].queues.control, &r);
+    if (kind == OSOE_REPLY_RELEASE)
+        p->team[team].releases_queued++;
+}
+
+/* A RELEASE has left a control queue for the wire: one fewer of its team's
+ * holds the team's local release (release_local). The descriptor carries the
+ * team as this engine indexes it, in `token`, which no collective message
+ * uses. */
+static void release_left_queue(struct osoe_progress *p, uint64_t team)
+{
+    if (team >= p->team_count || p->team[team].releases_queued == 0)
+        osoe_fatal("node %u: a RELEASE left a control queue for team %llu, which has none "
+                   "queued", p->node, (unsigned long long)team);
+    p->team[team].releases_queued--;
 }
 
 /*
@@ -314,42 +328,68 @@ static void book_arrival(struct osoe_progress *p, uint32_t team, uint32_t epoch,
 }
 
 /*
- * The state of the team in block `team`, or NULL if it has no internode phase
- * on this node. Filled from the host's source the first time the engine meets
- * the team (progress.h), which is how a team created while this thread runs
- * becomes known to it: the host reads the team's record, which is published
- * before the team's first arrival anywhere. O(k) once per team.
+ * The state of the team in block `team` at generation `generation`, or NULL if
+ * it has no internode phase on this node. Filled from the host's source the
+ * first time the engine meets the team (progress.h), which is how a team
+ * created while this thread runs becomes known to it: the host reads the
+ * team's record, which is published before the team's first arrival anywhere.
+ * O(k) once per team.
+ *
+ * And again whenever the block shows another generation than the one learnt
+ * (the team redesign's step D, D4; tools/modelcheck/team_block_model.py's
+ * engine, whose no_relearn breakage applies one team's message to another's
+ * state): the block has been given back and claimed for another team since.
+ * Nothing of the old team is pending then - its members left only once this
+ * node had applied its last release, which waits for its RELEASEs to leave the
+ * control queues (release_local), and nothing for it arrives afterwards (the
+ * proposal's "A late message") - and an old team caught with an epoch open, a
+ * release unapplied or a RELEASE queued is that argument broken, named rather
+ * than overwritten.
  */
-static struct osoe_progress_team *known_team(struct osoe_progress *p, uint32_t team)
+static struct osoe_progress_team *known_team(struct osoe_progress *p, uint32_t team,
+                                             uint32_t generation)
 {
     if (team >= p->team_count)
         return NULL;
     struct osoe_progress_team *t = &p->team[team];
-    if (!t->registered && p->team_source) {
+    if ((!t->registered || t->generation != generation) && p->team_source) {
+        if (t->registered && (t->open != 0 || t->release_pending != 0 ||
+                              t->releases_queued != 0))
+            osoe_fatal("node %u: team %u's block %u holds another team (generation %u, "
+                       "learnt at %u) while epoch %u is open, %u's release is unapplied or "
+                       "%u of its RELEASEs are queued: a message for the team arrived after "
+                       "its members left it, or they left before its forwards", p->node,
+                       t->number, team, generation, t->generation, t->open,
+                       t->release_pending, t->releases_queued);
         struct osoe_progress_team learnt = { 0 };
-        if (p->team_source(p->host.context, team, &learnt)) {
+        if (p->team_source(p->host.context, team, &learnt) && learnt.generation == generation) {
             learnt.registered = true;
             *t = learnt;
             publish_team(p, team);
+        } else {
+            t->registered = false;
         }
     }
-    return t->registered ? t : NULL;
+    return t->registered && t->generation == generation ? t : NULL;
 }
 
 void osoe_progress_meet_teams(struct osoe_progress *p, uint32_t count)
 {
-    for (uint32_t team = 0; team < count && team < p->team_count; team++)
-        known_team(p, team);
+    for (uint32_t team = 0; team < count && team < p->team_count; team++) {
+        struct osoe_progress_team learnt = { 0 };
+        if (p->team_source && p->team_source(p->host.context, team, &learnt))
+            known_team(p, team, learnt.generation);
+    }
 }
 
 /*
  * The team a collective message names, checked (§3.4's trust boundary), and
  * its block here in `*block`. The message names the team as this node knows
  * it - the local id of its local lead here, and its number (am.h) - which the
- * node's map resolves (the team redesign's step D); a name with no block is
- * never learnt from the message alone, but named. With no finder - the
- * engine's own tests, whose teams are registered by hand - the number is the
- * block and the lead local id 0.
+ * node's map resolves, with the block's generation (the team redesign's step
+ * D); a name with no block is never learnt from the message alone, but named.
+ * With no finder - the engine's own tests, whose teams are registered by hand -
+ * the number is the block, the lead local id 0 and the generation 0.
  */
 static struct osoe_progress_team *barrier_team(struct osoe_progress *p, uint32_t slot,
                                                const struct osoe_am_barrier *m,
@@ -358,9 +398,11 @@ static struct osoe_progress_team *barrier_team(struct osoe_progress *p, uint32_t
     if (m->from_node != peer_of(p, slot))
         osoe_fatal("node %u: a barrier %s on node %u's connection says it is from node %u",
                    p->node, what, peer_of(p, slot), m->from_node);
-    *block = p->team_find ? p->team_find(p->host.context, m->lead, m->team)
+    uint32_t generation = 0;
+    *block = p->team_find ? p->team_find(p->host.context, m->lead, m->team, &generation)
                           : m->lead == 0 ? m->team : UINT32_MAX;
-    struct osoe_progress_team *t = *block == UINT32_MAX ? NULL : known_team(p, *block);
+    struct osoe_progress_team *t =
+        *block == UINT32_MAX ? NULL : known_team(p, *block, generation);
     if (!t)
         osoe_fatal("node %u: a barrier %s from node %u names team %u, led here by local PE %u, "
                    "under which no block with an internode phase is mapped on this node",
@@ -730,6 +772,8 @@ static bool drain_into(struct osoe_progress *p, uint32_t slot, struct osoe_conne
             memcpy(at + sizeof h, &m, sizeof m);
         }
         osoe_connection_commit(connection, &resv);
+        if (r->kind == OSOE_REPLY_RELEASE)
+            release_left_queue(p, r->token);
         osoe_reply_give(&p->pool, osoe_reply_pop(&p->pool, &c->queues.control));
         moved = true;
     }
@@ -1158,10 +1202,16 @@ static void settle(struct osoe_progress *p, uint32_t slot)
  * Each child's connection is drained and flushed first, so the RELEASE is in
  * the wire - or in the open buffer behind a send already in flight - before the
  * local wake, which is O(L) futex work on this thread (§5.3). O(k) per release.
+ * A RELEASE the drain found no room for is still queued, and then the local
+ * release waits for a later pass (releases_queued): the members leave the
+ * team's block only once its forwards are out of the reply pool (§3.8). Not
+ * while the job aborts: the release is applied at once then, whatever is
+ * still queued, since an aborting engine sends nothing more but goodbyes.
  */
 static bool release_local(struct osoe_progress *p)
 {
     bool moved = false;
+    uint32_t kept = 0;
     /* The list, not every team number: O(k) per release this pass forwarded,
      * whatever OSOE_MAX_TEAMS is. A team is listed once however many passes
      * its release waits, and taken off as it is applied. */
@@ -1174,12 +1224,17 @@ static bool release_local(struct osoe_progress *p)
             flush(p, slot);
             settle(p, slot);
         }
+        if (t->releases_queued != 0 && !p->aborting) {
+            p->pending[kept++] = team;
+            osoe_counter_word_add(&p->metrics->releases_held, 1);
+            continue;
+        }
         uint32_t epoch = t->release_pending;
         t->release_pending = 0;
         p->host.release(p->host.context, team, epoch);
         moved = true;
     }
-    p->pending_count = 0;
+    p->pending_count = kept;
     return moved;
 }
 
@@ -1297,11 +1352,12 @@ void osoe_progress_team(struct osoe_progress *p, uint32_t team,
     publish_team(p, team);
 }
 
-void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t epoch)
+void osoe_progress_arrive(struct osoe_progress *p, uint32_t team, uint32_t generation,
+                          uint32_t epoch)
 {
-    if (!known_team(p, team))
-        osoe_fatal("node %u: team %u arrived at an internode phase it never registered",
-                   p->node, team);
+    if (!known_team(p, team, generation))
+        osoe_fatal("node %u: the team in block %u at generation %u arrived at an internode "
+                   "phase it never registered", p->node, team, generation);
     book_arrival(p, team, epoch, OSOE_COLLECTIVE_TREE_NONE);
 }
 

@@ -178,9 +178,10 @@ enum osoe_metric_scope {
     OSOE_MSCOPE_PE,
     OSOE_MSCOPE_THREAD,
     OSOE_MSCOPE_CONNECTION,
-    /* Layout 18: a team number's block, the index being the number; and a
-     * local PE's row of published epochs, a 32-bit word per team number, the
-     * index being the local id and the offset four times the team's number. */
+    /* Layout 18: a team's block, the index being its number until layout 29
+     * and its place in the node's pool since; and a local PE's row of
+     * published epochs, a word per team number, the index being the local id
+     * - 32 bits until layout 30, and since 64, the block beside the epoch. */
     OSOE_MSCOPE_TEAM,
     OSOE_MSCOPE_EPOCHS,
 };
@@ -310,12 +311,22 @@ void osoe_segment_close(struct osoe_segment *s);
  *       its name (team.name.*), and the team scope's index is a block index;
  *       node.team_numbers_published became node.team_blocks_published_from
  *       (the team redesign's step D)
+ *   30  a team number is each PE's own and a block is given back and claimed
+ *       again (step D's second part): each PE's published epochs are 64-bit
+ *       words, the team's block index plus one in the high half beside the
+ *       epoch, so that a reader pairs a PE's epoch with a block; the arrival
+ *       handoff a 64-bit word, the block's generation beside the epoch, which
+ *       team.arrival_posted still reads the low half of; and
+ *       node.team_blocks_published_from became node.team_posted_summary, the
+ *       first word of a bitmap of posted blocks' summary
  *
- * None of 5 to 29 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 30 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, and 23 gave each thread a word of its own.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               29
+#define OSOE_SEGMENT_NEWEST_LAYOUT               30
+/* The first layout whose published epochs carry their block (node.h). */
+#define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 
 /* What node.aborting holds since layout 15 (node.h, the segment's encoding): the
  * rank in its low 32 bits, the exit status's low eight bits, then how the job is
@@ -364,12 +375,15 @@ bool osoe_segment_read_str(const struct osoe_segment *s, const char *name, uint3
 /* Which PE owns counter block `block`. */
 uint32_t osoe_segment_block_pe(const struct osoe_segment *s, uint32_t block);
 
-/* Local PE `local_id`'s published epoch for team number `number` (layout 18),
- * the word `number` of its row in the epochs scope - which a block is paired
- * with by the number its name holds, its index being the pool's (layout 29).
- * False past the row or the mapping. */
+/* Local PE `local_id`'s published epoch for the team it holds under number
+ * `number` (layout 18), the word `number` of its row in the epochs scope, and
+ * since layout 30 the block of that team on the node into `*block` - which a
+ * block's team is paired with, two PEs of a node holding different teams
+ * under one number (the team redesign's step D) - or UINT32_MAX when the PE
+ * holds no team under it, or the layout's words do not say. False past the
+ * row or the mapping. */
 bool osoe_segment_epoch(const struct osoe_segment *s, uint32_t local_id, uint32_t number,
-                        uint32_t *epoch);
+                        uint32_t *block, uint32_t *epoch);
 
 /*
  * The §3.14 "blocked in" record for local PE `pe`, read under the generation

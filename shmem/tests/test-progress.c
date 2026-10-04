@@ -548,7 +548,7 @@ int main(void)
      */
     enum { EPOCH = 11 };
     CHECK(releases == 0);
-    osoe_progress_arrive(&p, 0, EPOCH);
+    osoe_progress_arrive(&p, 0, 0, EPOCH);
     /*
      * No assertion about *when* the release happens here. The root's own
      * arrival may legitimately be the last one - the peer's may already have

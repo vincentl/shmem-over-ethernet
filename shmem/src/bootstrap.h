@@ -35,7 +35,7 @@ struct osoe_bootstrap {
     bool keep_control_segment;  /* OSOE_KEEP_CONTROL_SEGMENT: name kept until finalize */
     bool shm_capacity_warning_only; /* OSOE_SHM_CAPACITY_CHECK=0: report, do not refuse */
     uint32_t collective_fanout; /* OSOE_COLLECTIVE_FANOUT: k of the internode tree (§5.3) */
-    uint32_t max_teams;         /* OSOE_MAX_TEAMS: teams in existence job-wide at once (§5.7) */
+    uint32_t max_teams;         /* OSOE_MAX_TEAMS: teams one PE may be in at once (§5.7) */
     uint32_t max_contexts;      /* OSOE_MAX_CONTEXTS: contexts a PE may have at once, the
                                  * default one included (§4.11; phase 1 step 8) */
     uint32_t team_blocks;       /* OSOE_TEAM_BLOCKS: the node's pool of team blocks, the
@@ -108,6 +108,9 @@ struct osoe_bootstrap {
 #define OSOE_TEAM_BLOCKS_DEFAULT 1024u
 #define OSOE_TEAM_BLOCKS_LOWEST  8u
 #define OSOE_TEAM_BLOCKS_HIGHEST 65536u
+/* The summary words of the pool's posted bitmap (node.h), a bit each for 64
+ * blocks: as many as the largest pool needs. */
+#define OSOE_TEAM_POSTED_SUMMARY_WORDS (OSOE_TEAM_BLOCKS_HIGHEST / 64 / 64)
 
 /*
  * OSOE_COLLECTIVE_PIPELINE (§5.8, "Pipelined pieces"): D, how many pieces of a
