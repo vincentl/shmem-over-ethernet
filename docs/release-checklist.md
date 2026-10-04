@@ -74,12 +74,13 @@ done; an open one, what is left.
 
 ## Added by the round-four review
 
-- [ ] **Which history to publish** (the review's readiness Q5-3): 512 of the
+- [x] **Which history to publish** (the review's readiness Q5-3): 512 of the
   526 commits at the review predate the scrub of host-specific material from
   the tree, and the history still carries what the tree no longer does. The
-  author decides before the first push - the history as it is, the history
-  rewritten to the scrub, or the tagged tree as one commit - and it cannot be
-  taken back after it.
+  author decided on 2026-10-04: the whole history, as it is, as the record of
+  the AI-assisted development (`docs/decisions/2026-10-04.md` item 2, with the
+  scan behind it). Left before the first push: whether the commits keep the
+  author's personal address, which only a rewrite could change.
 
 ## After the release
 
