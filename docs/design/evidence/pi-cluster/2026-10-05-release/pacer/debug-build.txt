@@ -1,0 +1,114 @@
+Preset CMake variables:
+
+  CMAKE_BUILD_TYPE="Debug"
+  CMAKE_EXPORT_COMPILE_COMMANDS="ON"
+
+-- The C compiler identification is GNU 14.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found PkgConfig: /usr/bin/pkg-config (found version "1.8.1")
+-- Checking for module 'liburing>=2.6'
+--   Found liburing, version 2.9
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Found Python3: /usr/bin/python3 (found version "3.13.5") found components: Interpreter
+-- Configuring done (0.7s)
+-- Generating done (0.3s)
+-- Build files have been written to: /home/pi/osoe/build/debug
+[  0%] Building C object base/CMakeFiles/osoe_base.dir/epoch.c.o
+[  0%] Building C object base/CMakeFiles/osoe_base.dir/node-map.c.o
+[  0%] Building C object base/CMakeFiles/osoe_base.dir/environment.c.o
+[  0%] Building C object base/CMakeFiles/osoe_base.dir/deadline.c.o
+[  7%] Building C object base/CMakeFiles/osoe_base.dir/futex.c.o
+[  7%] Building C object base/CMakeFiles/osoe_base.dir/ring-check.c.o
+[  7%] Building C object base/CMakeFiles/osoe_base.dir/hostlist.c.o
+[  7%] Building C object base/CMakeFiles/osoe_base.dir/order.c.o
+[  7%] Building C object base/CMakeFiles/osoe_base.dir/siphash.c.o
+[  7%] Building C object base/CMakeFiles/osoe_base.dir/size.c.o
+[  7%] Building C object base/CMakeFiles/osoe_base.dir/stall-watch.c.o
+[ 14%] Building C object base/CMakeFiles/osoe_base.dir/sweep.c.o
+[ 14%] Built target osoe_base
+[ 21%] Building C object shmem/CMakeFiles/osoe.dir/src/agent.c.o
+[ 21%] Building C object shmem/CMakeFiles/osoe.dir/src/accessible.c.o
+[ 21%] Building C object shmem/CMakeFiles/osoe.dir/src/allocator.c.o
+[ 21%] Building C object shmem/CMakeFiles/osoe.dir/src/abort.c.o
+[ 21%] Building C object shmem/CMakeFiles/osoe.dir/src/alltoall.c.o
+[ 21%] Building C object shmem/CMakeFiles/osoe.dir/src/amo.c.o
+[ 21%] Building C object shmem/CMakeFiles/osoe.dir/src/barrier.c.o
+[ 28%] Building C object shmem/CMakeFiles/osoe.dir/src/blocked.c.o
+[ 28%] Building C object shmem/CMakeFiles/osoe.dir/src/bootstrap.c.o
+[ 28%] Building C object shmem/CMakeFiles/osoe.dir/src/collective-tree.c.o
+[ 28%] Building C object shmem/CMakeFiles/osoe.dir/src/deadlock.c.o
+[ 28%] Building C object shmem/CMakeFiles/osoe.dir/src/deprecated.c.o
+[ 28%] Building C object shmem/CMakeFiles/osoe.dir/src/fatal.c.o
+[ 35%] Building C object shmem/CMakeFiles/osoe.dir/src/init.c.o
+[ 35%] Building C object shmem/CMakeFiles/osoe.dir/src/info.c.o
+[ 35%] Building C object shmem/CMakeFiles/osoe.dir/src/job.c.o
+[ 35%] Building C object shmem/CMakeFiles/osoe.dir/src/listener.c.o
+[ 35%] Building C object shmem/CMakeFiles/osoe.dir/src/liveness.c.o
+[ 35%] Building C object shmem/CMakeFiles/osoe.dir/src/lock.c.o
+[ 35%] Building C object shmem/CMakeFiles/osoe.dir/src/malloc.c.o
+[ 42%] Building C object shmem/CMakeFiles/osoe.dir/src/metrics.c.o
+[ 42%] Building C object shmem/CMakeFiles/osoe.dir/src/node.c.o
+[ 42%] Building C object shmem/CMakeFiles/osoe.dir/src/perturb.c.o
+[ 42%] Building C object shmem/CMakeFiles/osoe.dir/src/profile.c.o
+[ 42%] Building C object shmem/CMakeFiles/osoe.dir/src/quiet.c.o
+[ 42%] Building C object shmem/CMakeFiles/osoe.dir/src/rank-map.c.o
+[ 42%] Building C object shmem/CMakeFiles/osoe.dir/src/rendezvous.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/rma.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/rma-typed.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/scans.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/active-set.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/collectives.c.o
+[ 50%] Building C object shmem/CMakeFiles/osoe.dir/src/combine.c.o
+[ 57%] Building C object shmem/CMakeFiles/osoe.dir/src/context.c.o
+[ 57%] Building C object shmem/CMakeFiles/osoe.dir/src/reductions.c.o
+[ 57%] Building C object shmem/CMakeFiles/osoe.dir/src/broadcast.c.o
+[ 57%] Building C object shmem/CMakeFiles/osoe.dir/src/collect.c.o
+[ 57%] Building C object shmem/CMakeFiles/osoe.dir/src/session.c.o
+[ 57%] Building C object shmem/CMakeFiles/osoe.dir/src/shm-object.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/signal.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/symmetric.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/team.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/transport-local.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/region-wait.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/wait.c.o
+[ 64%] Building C object shmem/CMakeFiles/osoe.dir/src/watch.c.o
+[ 71%] Building C object shmem/CMakeFiles/osoe.dir/src/sweep.c.o
+[ 71%] Building C object shmem/CMakeFiles/osoe.dir/src/am.c.o
+[ 71%] Building C object shmem/CMakeFiles/osoe.dir/src/connection.c.o
+[ 71%] Building C object shmem/CMakeFiles/osoe.dir/src/connection-area.c.o
+[ 71%] Building C object shmem/CMakeFiles/osoe.dir/src/internode-am.c.o
+[ 71%] Building C object shmem/CMakeFiles/osoe.dir/src/internode-generic.c.o
+[ 78%] Building C object shmem/CMakeFiles/osoe.dir/src/progress.c.o
+[ 78%] Building C object shmem/CMakeFiles/osoe.dir/src/progress-host.c.o
+[ 78%] Building C object shmem/CMakeFiles/osoe.dir/src/reply.c.o
+[ 78%] Building C object shmem/CMakeFiles/osoe.dir/src/ring.c.o
+[ 78%] Building C object shmem/CMakeFiles/osoe.dir/src/transport-am.c.o
+[ 78%] Building C object shmem/CMakeFiles/osoe.dir/src/wire.c.o
+[ 78%] Linking C shared library libosoe.so
+[ 78%] Built target osoe
+[ 85%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/osoe-pacer.c.o
+[ 85%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/alltoall.c.o
+[ 85%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/parallel-print.c.o
+[ 85%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/sort.c.o
+[ 85%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/mailbox.c.o
+[ 85%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/teams.c.o
+[ 85%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/threads.c.o
+[ 85%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/print.c.o
+[ 92%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/atomics.c.o
+[ 92%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/rma.c.o
+[ 92%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/locks.c.o
+[ 92%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/memory.c.o
+[ 92%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/collectives.c.o
+[ 92%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/waits.c.o
+[ 92%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/deprecated.c.o
+[100%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/library-counters.c.o
+[100%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/__/__/base/size.c.o
+[100%] Building C object tools/pacer/CMakeFiles/osoe-pacer.dir/__/stat/segment.c.o
+[100%] Linking C executable osoe-pacer
+[100%] Built target osoe-pacer

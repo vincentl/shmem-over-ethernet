@@ -1,0 +1,10 @@
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+block exit 0
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+cyclic exit 0

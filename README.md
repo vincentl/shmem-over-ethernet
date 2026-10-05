@@ -13,10 +13,13 @@ cluster's 16 PEs, four on each node.
 **Status.** Every routine of OpenSHMEM 1.6's C interface is implemented, the
 deprecated ones of its Annex F included. What departs from the
 specification, or takes a choice it leaves open, is listed under
-[Limits](#limits-and-where-osoe-departs-from-the-specification). osoe has not
-made a release yet: there is no version tag, and it is built and tested from
-the repository as it stands. The tree is version 0.1.0; [Installing](#installing)
-says where the library and the tools show it. It was written with Claude Code, under its
+[Limits](#limits-and-where-osoe-departs-from-the-specification). This is 0.1.0,
+osoe's first release ([its note](docs/release-notes/0.1.0.md)); [Installing](#installing)
+says where the library and the tools show the version. It has been tested on
+aarch64 only: on x86-64 it builds and passes the tests an emulator can run, but
+its network path has never run on an x86-64 kernel - there the quick start's
+second run, `ctest --preset release` and `osoe-pacer --quick` across nodes are
+its first tests. It was written with Claude Code, under its
 author's direction ([How osoe was made](#how-osoe-was-made)).
 
 ## OpenSHMEM in two minutes
@@ -71,6 +74,7 @@ int main(void)
 ```
 
 ```sh
+# once osoe is installed (Installing); the flags: "Running a program with srun"
 oshcc -O2 -o ring ring.c
 srun -K1 --cpu-bind=none -N2 --ntasks-per-node=4 ./ring
 ```
@@ -104,7 +108,7 @@ PE 2 of 4: my box holds 1
 PE 3 of 4: my box holds 2
 ```
 
-Four PEs take about 1.05 GiB of `/dev/shm` at the default heap of 256 MiB,
+Four PEs take about 1,050 MiB of `/dev/shm` at the default heap of 256 MiB,
 written only as they are used; a machine with less - a Raspberry Pi 5 of 2 GB,
 say - refuses the first run by name, with the remedies, and `SHMEM_SYMMETRIC_SIZE=64m`
 in front of the command runs it. The second run opens io_uring, so it needs what
@@ -117,11 +121,27 @@ test suite, installing, and running over several machines with `srun`.
 
 ## Getting started
 
+On a Slurm cluster, in this order - each step below has its section:
+
+1. Build where every node sees the tree, such as a shared home directory
+   ([Building](#building)).
+2. Check every node: `srun -N<nodes> --ntasks-per-node=1 build/release/tools/probe/probe`
+   prints a line a facility, all "ok".
+3. Install to a prefix every node sees ([Installing](#installing)).
+4. Check the job path: `srun -K1 --cpu-bind=none -N<nodes> --ntasks-per-node=4 osoe-pacer --quick`
+   ends `failures=0`.
+5. Build a program with `oshcc` and run it with `srun`, or submit the batch
+   script ([Running a program with `srun`](#running-a-program-with-srun)).
+
+A problem is worth a report: the line `SHMEM_VERSION=1` prints, the probe's
+output on each node, the first error line, and for a hang `osoe-stat`'s.
+
 ### Requirements
 
 - Linux 6.7 or newer, and for a job of more than one node io_uring open to its
   user: the `kernel.io_uring_disabled` sysctl at 0, or at 1 with the user in the
-  group `kernel.io_uring_group` names (`env.probe`, below, checks)
+  group `kernel.io_uring_group` names (the probe, `build/<preset>/tools/probe/probe`,
+  which ctest runs as `env.probe`, checks)
 - liburing 2.6 or newer
 - CMake 3.25 or newer, pkg-config, and GCC or Clang: the code is C11 with GNU
   extensions, the symbol attributes and `__typeof__`
@@ -138,9 +158,10 @@ whole suite; no x86-64 kernel has run it: see Limits, "Launching".
 Debian 13 (Trixie) and Raspberry Pi OS Trixie provide all of these from their
 own repositories - `sudo apt install build-essential cmake pkg-config
 liburing-dev`, and `python3` for the models - and a node that only runs jobs
-needs only liburing's runtime package, `liburing2`. Older releases are not
+needs only liburing's runtime package, `liburing2`, 2.6 or newer. Older releases are not
 supported, even where the kernel is new enough, since osoe does not bundle a
-newer liburing (design notes, §1): Debian 12 has liburing 2.3 and Ubuntu 24.04
+newer liburing ([design notes](docs/design/shmem-ethernet-design.md) §1 - "design §N"
+here names them, and a bare § the OpenSHMEM 1.6 specification): Debian 12 has liburing 2.3 and Ubuntu 24.04
 2.5, and Rocky Linux 9 and its kin have Linux 5.14.
 
 ### Building
@@ -152,12 +173,12 @@ Builds use CMake presets and run on Linux only. Each preset builds under
 cmake --workflow --preset release    # configure, build, and test, without the models
 ```
 
-That builds one file at a time and runs the tests one at a time - more than 650,
+That builds one file at a time and runs the tests one at a time - about 720,
 checks of the build itself and jobs of a few processes. On four cores of an idle
 virtual machine it took about eight and a half minutes, one for the build and
 seven and a half for the tests. Both may run four at a time, as this project's
 own runs do (`cmake --build --preset release -j4`, `ctest --preset release
--j4`). The 29 tests of the model checker (`tools/modelcheck`, which needs Python
+-j4`). The 30 tests of the model checker (`tools/modelcheck`, which needs Python
 3) took 15 minutes in the development VM four at a time, the longest of them,
 `model.abort`, 14 of those, and check the design, which does not vary with the
 machine. They have a label of their own, `model`,
@@ -165,7 +186,7 @@ which the `release` preset leaves out and the `models` preset runs alone, in the
 same build:
 
 ```sh
-ctest --preset models                # the models, once the release build exists
+ctest --preset models -j4           # the models, once the release build exists
 cmake --workflow --preset models     # or from a clean tree: configure, build, then them
 ```
 
@@ -373,7 +394,8 @@ several nodes, over TCP between them as a cluster would - up to 1,024
 processes on 254 logical nodes. `-s` names the variables as `srun` does, so
 the job takes the bootstrap's Slurm path.
 
-It fails if any process fails, if the timeout (`-t SECONDS`, default 60)
+It fails if any process fails, if the timeout (`-t SECONDS`, 1 to 86400, default 60 -
+raise it for anything longer than a test)
 expires, or if the job leaves shared memory behind, and its exit status is
 `srun`'s: the highest exit code of any rank - so a job ended by
 `shmem_global_exit(7)` exits 7 - or 128 plus the signal for a rank killed by
@@ -394,6 +416,8 @@ job's nodes, naming the job by its id - Slurm's job id, or for a job of
 ```sh
 osoe-stat 1234            # job 1234 on this node: counters, and where each PE waits
 osoe-stat --summary 1234  # each team's barrier or sync in progress, to walk a hang down
+srun --jobid=1234 --overlap -N4 --ntasks-per-node=1 osoe-stat --summary 1234
+                          # the same on every node of a Slurm job, as its own user
 ```
 
 A job that hangs shows, for every PE, the routine it is blocked in, the
@@ -590,7 +614,7 @@ in all), computed from the code; the times are measured where a record says so.
 | larger reductions and broadcasts | pieces pipelined through that tree, two in flight (`OSOE_COLLECTIVE_PIPELINE`), through slots the thread leading each node's part lends to the collective - its *lane* - which a reduction's leads name to their children as they enter | O(P × bytes) for the lead's combine on a node, then the tree; a reduction's child waits for its parent's lane, once: up to a hop when the two enter together - nothing once the child's own node takes a hop - and up to a round trip, the grant down and the first piece back, when the parent enters after it |
 | `fcollect` | Bruck's allgather among the node leads | ⌈log₂ n⌉ steps, each node receiving every other node's data once |
 | `collect` | the PEs' lengths first, as one vector of 8 bytes a PE, summed through the node leads' tree, then the data as `fcollect`'s | the data as `fcollect`'s; the lengths O(N) bytes up the tree and down it, 1 MB at 128,000 PEs |
-| prefix scans | a tree over the team's ranks, every member a place in it; a scan of at most `OSOE_SMALL_COLLECTIVE_BYTES` in one piece through slots its team keeps, a larger one pipelined through lanes as the large reductions are, in pieces sized to the scan, at most 16 KiB | O(log N) rounds; a large scan's child waits for its parent's lane, once: about a hop more when they enter together, up to a round trip when the parent enters after it - on the Pi cluster, where such a hop is about 120 µs with its handling, a 2 KiB scan measured 120 to 160 µs slower than before step E, and 230 to 260 µs with its root or a member with children late |
+| prefix scans | a tree over the team's ranks, every member a place in it; a scan of at most `OSOE_SMALL_COLLECTIVE_BYTES` in one piece through slots its team keeps, a larger one pipelined through lanes as the large reductions are, in pieces sized to the scan, at most 16 KiB | O(log N) rounds; a large scan's child waits for its parent's lane, once: about a hop more when they enter together, up to a round trip when the parent enters after it - on the Pi cluster, where such a hop is about 120 µs with its handling, a 2 KiB scan measured 120 to 160 µs slower than through the per-team slots the lanes replaced, and 230 to 260 µs with its root or a member with children late |
 | `alltoall`, `alltoalls` | every block put directly, then a barrier | O(N) a PE - inherent: every PE has a block for every other - and so P(N - P) blocks into a node, all applied by its one progress thread, a message each up to a chunk (`OSOE_AM_CHUNK`) and, for an `alltoalls` with a stride, one an element: 32.7 million messages a call at 500 nodes of 256 |
 | a team | a number agreed by one reduction over the parent of every member's free numbers, the same on all of them, and a block from each member node's pool, given back at destroy | the reduction of `OSOE_MAX_TEAMS` / 64 + 1 words - about what one broadcast costs - and a second, of one word, when any PE of the parent has `SHMEM_THREAD_MULTIPLE`, then a sync of the parent: about a broadcast and a barrier, and a destroy a barrier of the team; O(P) a member, testing its node's PEs; on each node's lead, O(M log n) once to find the team's nodes from its members, a search of the rank map for each - O(M log M) more when they are not met in node order - and the S leads kept |
 | waiting | a futex word per resource a connection has, shared by the node's PEs; one per thread for its replies and watches, per PE for its agent and its landing zone, per context for its counters | O(1) a waiter - but room made in a connection's buffer wakes every writer waiting for it (Limits) |
@@ -841,7 +865,7 @@ specification or takes a choice the specification leaves open.
   Raspberry Pi 5 cluster and an aarch64 virtual machine. On x86-64 this tree
   built without warnings and passed every test that can run under Rosetta, an
   x86-64 user space on an aarch64 kernel, with the futex2 calls Rosetta refuses
-  stood in for by a shim: 369 of the suite's 716, the rest refused io_uring or
+  369 of the suite's 718, the rest refused io_uring or
   seccomp by the emulator. Rosetta refuses io_uring, so no x86-64 process has
   sent a message to another node: the network path, and the timing pins that
   were set on aarch64, are untested there, and no x86-64 kernel has run any of
@@ -849,8 +873,8 @@ specification or takes a choice the specification leaves open.
   checked instead on aarch64, built to order memory as x86-64 does - stores
   released, loads acquired, a store-buffering litmus test telling the two
   orders apart: the whole suite passed so, the lanes, scan and pipeline tests
-  25 times each, and 13 minutes of the stress tester (round six's portability
-  review).
+  25 times each, and 13 minutes of the stress tester
+  (`docs/reviews/archive/phase1-step7-slice4-portability.md`).
 - **Every node of a job must have the same architecture.** The rendezvous
   compares the job's size, the heap's size, the build's table of message
   handlers, and the collectives' fan-out, team count, pipeline depth and small
@@ -1041,8 +1065,8 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: more than 650 tests in
-  release, and the model checker's 29 tests beside them, which run in that build
+  run before every merge, on the exact tree that merges: about 720 tests in
+  release, and the model checker's 30 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
@@ -1065,7 +1089,8 @@ that one could be added without touching the OpenSHMEM layer.
   aarch64, the machines osoe is built for, does not: the "blocked in" record's
   model passed while its routine name, then plain characters, could be read torn
   on aarch64. That name, a plain field rewritten while another process reads it,
-  was the round-three review's finding K1; it is now four atomic words, and
+  was a finding of the review before the first release (`docs/reviews/archive/`);
+  it is now four atomic words, and
   `shmem.blocked-record` runs the record's own writer against both of its
   readers on the machine. In an optimized build it fails when the library's
   reader loads the name plainly again; a plain writer, or `osoe-stat`'s reader,
@@ -1426,7 +1451,7 @@ The work ran from goals down to code, and each level is in the repository:
   `docs/decisions/README.md`, "Scope and goals").
 - **Planning**, between the author and Claude: sessions that turned the goals
   into the design notes (`docs/design/shmem-ethernet-design.md`) and a plan of
-  phases, steps and slices (§7.1). Every decision is recorded with who took it -
+  phases, steps and slices (design §7.1). Every decision is recorded with who took it -
   the author, or Claude where a brief left it to Claude - why, and how to undo it:
   from 23 September the dated records in `docs/decisions/`, and its index of what
   holds; before that, the design notes and the commits.

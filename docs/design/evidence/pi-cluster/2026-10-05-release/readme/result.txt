@@ -1,0 +1,12 @@
+host: pi-login Debian GNU/Linux 13 (trixie) aarch64 6.18.50+rpt-rpi-2712
+ring.c: 20 lines
+quick start build: 0 in 72 s, 0 warnings
+ring built: 0
+ring, four PEs: 0 4 lines
+ring, two logical nodes: 0 4 lines
+probe: 0 13 ok
+install: 0 oshcc osoe-pacer osoe-stat 
+installed oshcc: 0
+ring under srun -N2 x 4: 0 8 lines
+batch script: 0 16 lines
+DONE

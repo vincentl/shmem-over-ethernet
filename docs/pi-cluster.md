@@ -197,8 +197,9 @@ srun -K1 -N4 --ntasks-per-node=4 $P --seconds 600 --exchange alltoall sort > pac
 srun -K1 -N4 --ntasks-per-node=4 $P --seconds 600 --no-ptr sort > pacer-no-ptr.txt
 ```
 
-The first runs the sort and then the alltoall, five minutes each; the other
-three change only the sort. The accumulating sort fills a gibibyte a PE with
+The first runs the default set, each exercise given the run's 300 seconds -
+ten exercises since the stress tester's later phases joined it, so about fifty
+minutes (3,014 s at the release); the other three change only the sort. The accumulating sort fills a gibibyte a PE with
 keys, sorts it in place and checks it, over and over: four PEs' heaps of
 1500m fit a node's 8 GB `/dev/shm`, touched only as the keys arrive. Every run
 must end `failures=0` and exit 0. A failure line names its exercise, its

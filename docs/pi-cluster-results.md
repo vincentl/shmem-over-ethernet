@@ -729,3 +729,53 @@ extra piece costs 0.5 to 4% at 4 × 4 (1,888 against 1,878 µs for a reduction
 of 32 KiB, 1,087 against 1,047 for a broadcast) and up to 11% at 4 × 1 (a 16
 KiB broadcast, 623 against 562), where the development VM measured up to 2.4
 times.
+
+## The release (2026-10-05)
+
+The runbook end to end on the tree to be tagged (`beae139`; parts A and B ran on
+`81ba75a`, its code), copied to `~/osoe` and built there per §2, Slurm's
+default binding unless a line says `--cpu-bind=none`; the record is
+`docs/decisions/2026-10-05-release-point.md`, the raw outputs
+`docs/design/evidence/pi-cluster/2026-10-05-release/`.
+
+- **§1-§2**: the release build with no warning; the probe, all ok on every node;
+  tier 1 on the head node 86 of 86, and tier 2 on a node, given all four cores,
+  626 of 626.
+- **§4**: the smoke test exits 0 on a block and a cyclic distribution.
+- **§5, the floor**: a get's, a put and quiet's and a fetch-and-add's fastest
+  round trips 1.098, 1.090 and 1.099 times an io_uring echo's between the same
+  two processes, their medians 1.10, 1.09 and 1.10; the stream 0.999 of the
+  floor's rate. Every pin holds with room: a fastest trip may be 3.0 times the
+  floor's.
+- **§6, `osoe-bench`** at 4 × 4: a put and quiet of 8 bytes 168.9 µs, a get
+  168.3; a stream at 112.1 MiB/s from 64 KiB, gigabit's rate; the barrier 175.7
+  µs, the 8-byte reduce 197.5 and broadcast 195.1, fcollect of 8 bytes a PE 264.3
+  and alltoall 342.7 - step D's merge point's lines, as they were; and the 64 KiB
+  reduce 2,374 µs and broadcast 1,834, 0.6 and 2% faster than D's, a piece now 16
+  KiB whole. Unbound, the barrier 196.6 µs and the reduce 210.4.
+- **§7, endings**: a global exit returns its status, 7, from every task; a dead
+  PE ends the job, naming rank 5 on every PE.
+- **§8, the corpus**: NPB IS verifies, classes A and B; PRK's three kernels
+  validate; ISx sorts and verifies, weak and strong; of the 72 examples, 64 exit
+  0 on 4 × 2 and the other eight as the runbook expects - `global_exit` 99,
+  `nullput`, `just-a-shmalloc` and `shmem_2dheat` named, `bcast3`, `bcast4`,
+  `reduce-max` and `reduce-sum` ended by name for their active sets; OSU's
+  nineteen programs run whole, the five collectives at 4 × 1 and 4 × 4; ssca1
+  finds its three alignments, scores 55 to 53, on both maps; the SOS suite at 4
+  × 2, 160 clean and `bigget` clean alone at `-l 100`, the runbook's 161 of 165.
+- **The README's commands**, on the head node - Raspberry Pi OS Trixie on a Pi
+  5 - from a fresh copy: the quick start as printed, built in 72 s with no
+  warning, the ring's four lines on one node and on two logical nodes, the probe;
+  `cmake --install`; the ring built by the installed `oshcc` under `srun -K1
+  --cpu-bind=none -N2 --ntasks-per-node=4`, its eight lines; the README's batch
+  script, its secret exported, its sixteen; and `osoe-stat --summary` on every
+  node of a running job through `srun --jobid=J --overlap -N4
+  --ntasks-per-node=1`, a line a node with every PE's routine.
+- **§6, `osoe-pacer`**, each run `failures=0`: the default set - its ten
+  exercises now, each given the run's 300 s, so 3,014 s in all; the accumulating
+  sort, the pull and the sort without `shmem_ptr`; mailbox, teams, atomics, rma,
+  locks, memory and collectives, ten minutes each; waits and deprecated, five;
+  `start_pes`; the teams' exhaustion; and the counted runs, whose coverage lists
+  are kept.
+- **An hour of `mix`**, `failures=0` in 3,607 s; **an hour of `threads`** in a debug build with
+  the test hooks and an overfilled landing zone, `failures=0` in 3,600 s and no `OSOE_CHECK_QUIET:` line.

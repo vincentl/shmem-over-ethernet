@@ -1,0 +1,43 @@
+ending the job at 1791175388.409559631
+PE 10: computing
+PE 5: computing
+PE 13: computing
+PE 6: computing
+PE 11: computing
+PE 14: computing
+PE 7: computing
+PE 15: computing
+PE 4: computing
+PE 2: computing
+PE 8: computing
+PE 3: computing
+PE 12: computing
+PE 9: computing
+PE 0: computing
+PE 1: computing
+srun: error: pi-001: task 1: Exited with exit code 7
+global-exit status 7
+osoe: PE 4: local PE 1 (rank 5, pid 10331) has ended without finalizing; ending the job (§3.15)
+osoe: PE 4: shmem_barrier_all: the job is aborting on behalf of PE 5; this PE cannot make progress
+osoe: PE 4: control segment /osoe.268.0.1.0 (osoe-stat /osoe.268.0.1.0, while any PE of this node is alive)
+osoe: PE 6: ending: the job is aborting on behalf of PE 5; this PE was waiting in shmem_barrier_all
+osoe: PE 7: ending: the job is aborting on behalf of PE 5; this PE was not waiting in the library
+osoe: PE 1: ending: the job is aborting on behalf of PE 5; this PE was not waiting in the library
+osoe: PE 2: ending: the job is aborting on behalf of PE 5; this PE was waiting in shmem_barrier_all
+osoe: PE 13: ending: the job is aborting on behalf of PE 5; this PE was not waiting in the library
+osoe: PE 14: ending: the job is aborting on behalf of PE 5; this PE was waiting in shmem_barrier_all
+osoe: PE 9: ending: the job is aborting on behalf of PE 5; this PE was not waiting in the library
+osoe: PE 3: ending: the job is aborting on behalf of PE 5; this PE was not waiting in the library
+osoe: PE 10: ending: the job is aborting on behalf of PE 5; this PE was waiting in shmem_barrier_all
+osoe: PE 15: ending: the job is aborting on behalf of PE 5; this PE was not waiting in the library
+osoe: PE 12: ending: the job is aborting on behalf of PE 5; this PE was waiting in shmem_barrier_all
+osoe: PE 11: ending: the job is aborting on behalf of PE 5; this PE was not waiting in the library
+osoe: PE 8: ending: the job is aborting on behalf of PE 5; this PE was waiting in shmem_barrier_all
+osoe: PE 0: ending: the job is aborting on behalf of PE 5; this PE was waiting in shmem_barrier_all
+srun: error: pi-002: tasks 4,6-7: Exited with exit code 1
+srun: error: pi-002: task 5: Killed
+srun: error: pi-003: tasks 8-11: Exited with exit code 1
+srun: error: pi-004: tasks 12-15: Exited with exit code 1
+srun: error: pi-001: tasks 0-3: Exited with exit code 1
+srun: Force Terminated StepId=268.0
+dead-pe status 137

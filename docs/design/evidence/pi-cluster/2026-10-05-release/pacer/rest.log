@@ -1,0 +1,25 @@
+start 01:16:49
+pacer-default: done, osoe-pacer failures=0 seconds=3014.1 01:52:20
+pacer-accumulate: 0 osoe-pacer failures=0 seconds=606.5 02:02:32
+pacer-pull: 0 osoe-pacer failures=0 seconds=602.1 02:12:45
+pacer-no-ptr: 0 osoe-pacer failures=0 seconds=600.6 02:22:56
+pacer-mailbox: 0 osoe-pacer failures=0 seconds=600.1 02:33:06
+pacer-teams: 0 osoe-pacer failures=0 seconds=600.0 02:43:12
+pacer-atomics: 0 osoe-pacer failures=0 seconds=600.0 02:53:17
+pacer-rma: 0 osoe-pacer failures=0 seconds=600.0 03:03:23
+pacer-locks: 0 osoe-pacer failures=0 seconds=600.0 03:13:33
+pacer-memory: 0 osoe-pacer failures=0 seconds=600.6 03:23:39
+pacer-collectives: 0 osoe-pacer failures=0 seconds=605.5 03:33:45
+pacer-waits: 0 osoe-pacer failures=0 seconds=300.0 03:38:51
+pacer-deprecated: 0 osoe-pacer failures=0 seconds=300.0 03:44:01
+pacer-start-pes: 0 start-pes failures=0 03:44:07
+pacer-teams-exhaust: 0 osoe-pacer failures=0 seconds=0.2 03:44:12
+coverage-run: 0 osoe-pacer failures=0 seconds=307.3 03:49:20
+coverage-mix-run: 0 osoe-pacer failures=0 seconds=122.4 03:51:27
+coverage-start-pes-run: 0 start-pes failures=0 03:51:33
+part C done 03:51:33
+pacer-mix: 0 osoe-pacer failures=0 seconds=3607.3 04:51:46
+debug-build: 0 [100%] Built target osoe-pacer 04:51:51
+pacer-threads-hour: 0 osoe-pacer failures=0 seconds=3600.0 05:51:51
+check_quiet lines in the threads hour: 0 05:51:51
+ALL DONE 05:51:51

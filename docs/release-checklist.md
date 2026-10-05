@@ -15,7 +15,7 @@ done; an open one, what is left.
 - [x] **OpenSHMEM 1.6 complete**: the scans (phase 1 step 10), the deprecated
   routines' profiling names (both spellings) and active sets smaller than the
   job (step 5 slice 7) are built, as design §7.4 and §7.5 record.
-- [ ] **The SOS test suite clean** but for its own extensions (design §8.6; the
+- [x] **The SOS test suite clean** but for its own extensions (design §8.6; the
   runbook's §8 names them) - now including runs past 61 PEs once the teams are
   rebuilt: `shmem_team_reuse_teams` and `shmem_team_max` at 70 PEs, and
   `reduce_active_set`, `broadcast_active_set` and `repeated_barriers` at 70
@@ -24,21 +24,25 @@ done; an open one, what is left.
   on step D's tree at 128 teams, `docs/decisions/2026-10-03-team-allocation.md`,
   "Acceptance", and at step E's merge point at the default of 256,
   `docs/decisions/2026-10-04-step-e-merge-point.md`; to be run again on the
-  tree to be tagged).
-- [ ] **The Pi runbook green end to end** on the cluster as rebuilt on
+  tree to be tagged). Met on the tagged tree, 2026-10-05: 161 of 165 at 4 × 2, the acceptance at 70 PEs and `collect_active_set` at 32 (`docs/decisions/2026-10-05-release-point.md`).
+- [x] **The Pi runbook green end to end** on the cluster as rebuilt on
   2026-09-28 - the tree copied and built per `docs/pi-cluster.md` §2 - with the
   floor ratios, `osoe-bench` and the collective sweeps recorded in
-  `docs/pi-cluster-results.md`.
+  `docs/pi-cluster-results.md`. Green end to end on the tagged tree, 2026-10-05: the floor, `osoe-bench`, the corpus and every pacer run in `docs/pi-cluster-results.md`, "The release (2026-10-05)" (`docs/decisions/2026-10-05-release-point.md`).
 - [x] **A license** (GNU LGPL, version 3 or any later version), **`cmake
   --install`**, and **a README enough for a stranger** to build and run a
-  program on a Slurm cluster like the author's - to be read once more as the
-  stranger on the tagged tree (the release fixes' Part 4).
+  program on a Slurm cluster like the author's - read once more as the
+  stranger on the tagged tree on 2026-10-05, by a fresh agent: enough, its
+  fixes made (`docs/decisions/2026-10-05-release-point.md`).
 - [ ] **A version tag and a release note** listing the known limits: whatever
   the last Pi session measured short of the floor, and the README's Limits.
   The version is 0.1.0 (`docs/decisions/2026-10-02.md` item 7, D8). The
-  author tags. **The commit the tag names says so**: the README's opening says
+  author tags. **The commit the tag names says so**: the README's opening said
   "osoe has not made a release yet: there is no version tag" (round six's
-  readiness Q5-5), and the README is true at every commit.
+  readiness Q5-5), and the README is true at every commit; on the release
+  commit it says this is 0.1.0, the first release. The release note is written,
+  `docs/release-notes/0.1.0.md`, on the release commit the tag is to name
+  (`docs/decisions/2026-10-05-release-point.md`); the tag is what is left.
 
 ## Before every release tag (the decisions index)
 
@@ -53,33 +57,33 @@ done; an open one, what is left.
   the release candidate: round six, `docs/reviews/archive/phase1-step7-slice4-review.md`,
   *release, after the named changes*, every one made
   (`docs/decisions/2026-10-05-step-e-review-fixes.md`).
-- [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
+- [x] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
   tagged. Evidence so far: two hours on the round-three candidate, `b0e0b53`,
-  `failures=0`.
+  `failures=0`. Done on the tagged tree, 2026-10-05: `failures=0` in 3,607 s, and an hour of `threads` in a debug build too (`docs/decisions/2026-10-05-release-point.md`).
 
 ## Added by the release fixes
 
-- [ ] **The four presets, `models`, `tier3` and the suite under load** on the
+- [x] **The four presets, `models`, `tier3` and the suite under load** on the
   tree to be tagged (`ctest --preset models` is about half an hour; the `release`
   preset leaves the models out), and the six `SHMEM_THREAD_MULTIPLE` models
   once, configured with `-DOSOE_MULTIPLE_MODELS=ON`: the library provides
-  `MULTIPLE`, and no preset runs them.
-- [ ] **The README's commands on the Pi cluster as written**: the ring with
+  `MULTIPLE`, and no preset runs them. Done for the tagged tree, 2026-10-05: the presets, tier 3 and the models on its code, the suite under eight busy loops 718 of 718, the six MULTIPLE models 6 of 6 (`docs/decisions/2026-10-05-release-point.md`).
+- [x] **The README's commands on the Pi cluster as written**: the ring with
   `srun -K1 --cpu-bind=none -N2 --ntasks-per-node=4`, the batch script with its
   secret, `env.probe` on every node, and `osoe-stat` on a running job's
-  nodes.
-- [ ] **The README's quick start on Raspberry Pi OS**, which it names and has
+  nodes. Done 2026-10-05: the ring, the batch script with its secret, the probe on every node, and `osoe-stat --summary` on every node of a running job through `srun --overlap`, which the README now prints (`docs/decisions/2026-10-05-release-point.md`).
+- [x] **The README's quick start on Raspberry Pi OS**, which it names and has
   run only on Debian (round six's readiness Q5-5): on one Pi node, an ssh
   session held open (`RemoveIPC`, the runbook), a fresh copy of the tagged
   tree, the quick start's commands as printed - both rings print the README's
-  four lines and exit 0, and the probe passes.
-- [ ] **`shmem_global_exit` under Slurm, by hand**, since no ctest runs under
+  four lines and exit 0, and the probe passes. Done 2026-10-05 on the cluster's head node, Raspberry Pi OS Trixie on a Pi 5: built in 72 s with no warning, both rings, the probe (`docs/decisions/2026-10-05-release-point.md`).
+- [x] **`shmem_global_exit` under Slurm, by hand**, since no ctest runs under
   Slurm: `srun -K1 --cpu-bind=none -N1 -n4` with the caller's `atexit` handler
   taking 0 ms, 200 ms, 1 s and 5 s, the caller at PE 0 and at PE 3, and a
-  status of 0 - every handler finishes and `srun` returns the caller's status.
-- [ ] **The floor test's pins** with `OSOE_TEST_FLOOR_PINS=1`
-  (`-DOSOE_TEST_PINS=ON`) on the machines they were set on.
-- [ ] **x86-64 on the tagged tree**: it builds and passes its one-node tests
+  status of 0 - every handler finishes and `srun` returns the caller's status. Done 2026-10-05 in the development VM's Slurm, all sixteen cases - the caller at PE 0 and PE 3, handlers of 0 ms to 5 s, statuses 0 and 7 (`docs/decisions/2026-10-05-release-point.md`).
+- [x] **The floor test's pins** with `OSOE_TEST_FLOOR_PINS=1`
+  (`-DOSOE_TEST_PINS=ON`) on the machines they were set on. Done 2026-10-05: the release preset with the pins on, on the development VM where they were set, as part of the tagged code's verification; on the Pi every ratio well inside them (`docs/decisions/2026-10-05-release-point.md`).
+- [x] **x86-64 on the tagged tree**: it builds and passes its one-node tests
   (the `osoe-x86` VM, kept until the tag for this, at the author's word of
   2026-10-02), so that the README's sentence on architectures is true of it -
   every test Rosetta can run, 369 of 716 at round six, the rest refused io_uring
@@ -88,7 +92,7 @@ done; an open one, what is left.
   (`docs/reviews/archive/phase1-step7-slice4-portability.md`, its appendix): its
   suite, the lanes tests repeated, and `mix` across logical nodes, about ten
   minutes - the one run that puts x86-64's memory order on step E (round six's
-  portability Q1).
+  portability Q1). Done 2026-10-05: 369 of 718 under Rosetta, every failure the emulator's; the x86-ordered aarch64 build 718 of 718, the lanes tests 1,250 times and `mix`, `failures=0` (`docs/decisions/2026-10-05-release-point.md`).
 
 ## Added by the round-four review
 
