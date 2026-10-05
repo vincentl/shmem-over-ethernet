@@ -3,7 +3,7 @@
 """Lanes: the pipeline's slots a thread's own, lent to one collective at a time (step E).
 
 docs/design/team-resources-proposal.md §4, E4, E5 and E9;
-docs/prompts/phase1-step7-slice4-prompt.md, Part 1's first model. It is
+docs/prompts/done/phase1-step7-slice4-prompt.md, Part 1's first model. It is
 pipeline_model.py with the slots moved:
 
   * a team number keeps its counters, and the 16 KiB slots are a **lane** of

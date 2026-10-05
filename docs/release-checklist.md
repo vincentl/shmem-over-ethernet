@@ -18,11 +18,13 @@ done; an open one, what is left.
 - [ ] **The SOS test suite clean** but for its own extensions (design §8.6; the
   runbook's §8 names them) - now including runs past 61 PEs once the teams are
   rebuilt: `shmem_team_reuse_teams` and `shmem_team_max` at 70 PEs, and
-  `reduce_active_set`, `broadcast_active_set`, `collect_active_set` and
-  `repeated_barriers` at 70 PEs with no iteration skipped
-  (`docs/prompts/done/phase1-step7-slice3-prompt.md`, acceptance; met on step
-  D's tree, `docs/decisions/2026-10-03-team-allocation.md`, "Acceptance", and to
-  be run again on the tree to be tagged).
+  `reduce_active_set`, `broadcast_active_set` and `repeated_barriers` at 70
+  PEs with no iteration skipped, and `collect_active_set` at 32, the most it
+  runs on (`docs/prompts/done/phase1-step7-slice3-prompt.md`, acceptance; met
+  on step D's tree at 128 teams, `docs/decisions/2026-10-03-team-allocation.md`,
+  "Acceptance", and at step E's merge point at the default of 256,
+  `docs/decisions/2026-10-04-step-e-merge-point.md`; to be run again on the
+  tree to be tagged).
 - [ ] **The Pi runbook green end to end** on the cluster as rebuilt on
   2026-09-28 - the tree copied and built per `docs/pi-cluster.md` §2 - with the
   floor ratios, `osoe-bench` and the collective sweeps recorded in

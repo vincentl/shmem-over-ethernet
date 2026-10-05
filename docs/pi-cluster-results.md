@@ -698,3 +698,17 @@ A collective's hop on the cluster, the message and its handling, is 115 to 135
 two, two and none, as `scan_grant_timing.py` has it. The band's +158 µs at 2
 KiB is the first case - the members enter as a barrier releases them, a member
 and its child on other nodes together.
+
+**Step E's merge point** (`merge/`): `main` with both parts against D,
+alternating, three runs a side, the same probe and `osoe-bench`. The session's
+own medians put the barrier 12% and the 8-byte reduce 15% above D's, on lines
+step E does not touch. Under `--cpu-bind=none` both are bimodal from job to
+job on both trees - a run lands near 182 µs or near 207 for the barrier, near
+202 or near 229 for the reduce, and within a mode the trees agree to a
+microsecond - and this session drew D's faster mode twice and E's once. Over
+all twelve runs a side of the four sessions: the barrier +1%, the 8-byte
+reduce +2%, broadcasts within 1%, the large reductions of 2 and 4 KiB +11 and
++19 µs, scans as above (2 and 4 KiB +138 and +88 µs; 64 KiB 0.79 and 1 MiB
+0.67 times D). `osoe-bench`, under Slurm's default binding, shows one mode in
+every run of every session, D and E alike: the barrier 175 to 177 µs, the
+8-byte reduce 197 to 198, the 8-byte broadcast 195.

@@ -35,7 +35,7 @@ Read first, in this order: `CLAUDE.md`; `docs/README.md`;
    merge point. About two weeks.
 3. **Step E** (the proposal §4): write its brief first, from the proposal and
    D's record, in the form of D's brief (written on 2026-10-04 as
-   `docs/prompts/phase1-step7-slice4-prompt.md`) - it is the proposal's build plan,
+   `docs/prompts/done/phase1-step7-slice4-prompt.md`) - it is the proposal's build plan,
    not a new design, so build from it without waiting, and put any point
    where it departs from the proposal to the author before building that
    point. About two weeks.

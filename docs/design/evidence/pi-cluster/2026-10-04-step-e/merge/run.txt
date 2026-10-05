@@ -1,0 +1,22 @@
+start 21:51:50
+before built: 0
+before probe: 0
+after built: 0
+after probe: 0
+ok   buffer ring exhaustion -> one terminal -ENOBUFS cqes=9 last=-105
+PROBE PASSED (0 failures)
+bench before 1: 0
+band before 1: 0
+bench after 1: 0
+band after 1: 0
+bench before 2: 0
+band before 2: 0
+bench after 2: 0
+band after 2: 0
+bench before 3: 0
+band before 3: 0
+bench after 3: 0
+band after 3: 0
+pacer before: 0 osoe-pacer failures=0 seconds=6.9
+pacer after: 0 osoe-pacer failures=0 seconds=6.9
+end 22:05:28
