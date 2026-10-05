@@ -44,6 +44,8 @@ struct osoe_bootstrap {
                                  * the library, the main one included (§3.14) */
     uint32_t collective_pipeline;   /* OSOE_COLLECTIVE_PIPELINE: D, a data collective's
                                      * pieces in flight per level of the tree (§5.8) */
+    uint32_t small_collective_bytes;    /* OSOE_SMALL_COLLECTIVE_BYTES: the largest data
+                                         * collective through a team's own slots (§5.8) */
     uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
     /* OSOE_KEEPALIVE (§3.15): TCP keepalive on every node-pair connection, as
      * seconds idle, seconds between probes, and probes. Zero means the default,
@@ -78,7 +80,9 @@ struct osoe_bootstrap {
  * OSOE_MAX_TEAMS (§5.7): its default, and the range it must lie in - the
  * numbers one PE may hold at once, room for at least one team beyond the three
  * predefined, and at most 1,024, where each PE's internal region comes to about
- * 200 MiB of address space at the default fan-out and OSOE_COLLECTIVE_PIPELINE.
+ * 50 MiB of address space at the other settings' defaults (internal-region.h;
+ * since the team redesign's step E a number holds counters and small slots,
+ * and the scans' slots until its second part).
  * A node's team blocks are OSOE_TEAM_BLOCKS's (below), since the team
  * redesign's step D.
  */
@@ -118,17 +122,32 @@ struct osoe_bootstrap {
  * data collective each lead of the internode tree keeps in flight between
  * sending them up and receiving their release. Its default, and the range it
  * must lie in: 1 is one piece at a time, each a whole pass up and down, as
- * before phase 1 step 5 slice 5; each step of D costs every team number's
- * slots in the internal region again (internal-region.h). A PE's region is
- * OSOE_MAX_TEAMS x (fan-out + 1) x D slots of 16 KiB, and a line per counter:
- * 10 MiB at the defaults (64 teams, fan-out 4, D = 2) - and the scans' 2.6 MiB
- * after it (internal-region.h) - and at the extremes the ranges allow (1,024
- * teams, fan-out 32, D = 8) 4.1 GiB, which the shared-memory
- * capacity check refuses at init on a machine without it (node.c).
+ * before phase 1 step 5 slice 5; each step of D costs every lane's slots in
+ * the internal region again (internal-region.h). A lane is (fan-out + 1) x D
+ * slots of 16 KiB, and a PE has one per thread record, OSOE_MAX_THREADS + 1 of
+ * them: 2.7 MiB at the defaults (fan-out 4, D = 2, 16 threads) - with the
+ * scans' area, still each team number's (temporary, until the team redesign's
+ * step E is whole), 2.6 MiB more at 64 teams - and at the extremes the ranges
+ * allow (1,024 teams, fan-out 32, D = 8, 1,023 threads, small collectives of
+ * 16 KiB) a PE's region is about 5.7 GiB, which the shared-memory capacity
+ * check refuses at init on a machine without it (node.c).
  */
 #define OSOE_COLLECTIVE_PIPELINE_DEFAULT 2u
 #define OSOE_COLLECTIVE_PIPELINE_LOWEST  1u
 #define OSOE_COLLECTIVE_PIPELINE_HIGHEST 8u
+
+/*
+ * OSOE_SMALL_COLLECTIVE_BYTES (§5.8; the team redesign's step E, E1 and E2):
+ * the largest data collective that moves through a team number's own small
+ * slots, in one piece with no grant and no lane (internal-region.h); a larger
+ * one goes through the lanes of the threads that lead it. Its default, and the
+ * range it must lie in: at 1 KiB a team number costs a PE about 15 KiB, at 128
+ * bytes about 6, and at 16 KiB - a lane's piece, past which nothing is small -
+ * its small rows hold as much as a lane's row of one slot.
+ */
+#define OSOE_SMALL_COLLECTIVE_BYTES_DEFAULT 1024u
+#define OSOE_SMALL_COLLECTIVE_BYTES_LOWEST  128u
+#define OSOE_SMALL_COLLECTIVE_BYTES_HIGHEST 16384u
 
 /*
  * OSOE_MAX_THREADS: the application threads a PE may have alive that have

@@ -457,6 +457,31 @@ osoe_refusal_test(shmem.collective-pipeline.local-disagree 2 0
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
+# OSOE_SMALL_COLLECTIVE_BYTES the same three ways (the team redesign's step E):
+# it sizes every team number's small rows, and every lead must decide alike
+# which data collectives are small - a lead that took one as large would wait
+# for a grant its parent never sends. Between nodes, the second's lead given
+# 2,048 to the first's default 1,024; outside 128 to 16,384, or not a number,
+# refused at init; and between the PEs of one node.
+osoe_refusal_test(shmem.job.disagree.small-collective-bytes 2 0
+  LAUNCH -n 2 -m 0,1 -e 1:OSOE_SMALL_COLLECTIVE_BYTES=2048
+  PATTERNS "node 1 [(]or a node below it[)] has OSOE_SMALL_COLLECTIVE_BYTES=2048; node 0 has 1024"
+           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+  PROGRAM $<TARGET_FILE:shmem_test_job>)
+foreach(value 127 16385 x)
+  add_test(NAME shmem.small-collective-bytes.invalid.${value}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_SMALL_COLLECTIVE_BYTES=${value}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.small-collective-bytes.invalid.${value} PROPERTIES LABELS "tier2"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "OSOE_SMALL_COLLECTIVE_BYTES='${value}' is not between 128 and 16384")
+endforeach()
+osoe_refusal_test(shmem.small-collective-bytes.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_SMALL_COLLECTIVE_BYTES=128
+  PATTERNS "osoe: PE 1: OSOE_SMALL_COLLECTIVE_BYTES differs between PEs: the local lead has 1024, this PE has 128"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
+
 # The node count is the value that shapes the waits: a lead expects children by
 # its own count, so one given too many waits for children that do not exist.
 # The hello carries the count and a lead calls its parent before it waits for
@@ -1827,6 +1852,12 @@ endforeach()
 osoe_statics_program(shmem_test_collect)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(collect 0,1,2,3 OSOE_COLLECTIVE_FANOUT=2)
+  # And twenty PEs on five nodes with OSOE_SMALL_COLLECTIVE_BYTES at its
+  # smallest, so that collect's lengths - eight bytes a member, 160 here - are
+  # a large reduction (the team redesign's step E), entered before the lead
+  # waits for its members, its children waiting for the lead's grant.
+  osoe_tier2_map_test(collect 0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4
+                      OSOE_SMALL_COLLECTIVE_BYTES=128)
 endif()
 add_test(NAME shmem.alltoall.stride
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_ALLTOALL_STRIDE=0
@@ -1897,10 +1928,12 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   endforeach()
   # Under the AM stress settings - 1 KiB chunks, two credits, the wire in short
   # reads split at random - where a piece is sixteen chunks and a lead's puts
-  # queue behind its credits. And with OSOE_MAX_TEAMS=4, where the counters
-  # begin right after four teams' slots: a slot computed from piece k rather
-  # than k mod D, which every other map lets write into unused teams' slots
-  # unseen, lands on a counter. At D = 2.
+  # queue behind its credits. And with OSOE_MAX_TEAMS=4 and OSOE_MAX_THREADS=1,
+  # the fewest team numbers and lanes - the main thread's and the agent's - so
+  # that the region is as small as it gets and its lanes end it: a slot
+  # computed from piece k rather than k mod D, which a larger region lets write
+  # into a lane nobody lent unseen, runs past the region's end, which the
+  # target refuses by name (progress-host.c). At D = 2.
   add_test(NAME shmem.pipeline.0-1-2-3-4.stress
     COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_COLLECTIVE_FANOUT=2
             OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
@@ -1910,9 +1943,77 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(shmem.pipeline.0-1-2-3-4.stress PROPERTIES LABELS "tier2" TIMEOUT 180)
   add_test(NAME shmem.pipeline.0-0-1-1.max-teams-4
     COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_MAX_TEAMS=4
+            OSOE_MAX_THREADS=1
             $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
             $<TARGET_FILE:shmem_test_pipeline>)
   set_tests_properties(shmem.pipeline.0-0-1-1.max-teams-4 PROPERTIES LABELS "tier2" TIMEOUT 90)
+endif()
+
+# Lanes and grants (design §5.8; the team redesign's step E; test-lanes.c): the
+# cases of tools/modelcheck/lane_model.py on the code, one PE a logical node.
+# Two teams whose leads coincide on node 1, the parent of both, with a child
+# outside the collective its parent is in (shared-lead), and under
+# SHMEM_THREAD_MULTIPLE their large reductions at once on two of node 1's
+# threads (two-threads); a team's large reductions led by its PEs' threads in
+# turn (turns); a broadcast's tree turned against the reduction's before it,
+# under OSOE_TEST_PERTURB (rotation); the class boundary a byte either side, at
+# the setting's smallest and at its default, and a large collective's pieces in
+# flight at D = 2 and 4 (boundary); a team number taken again (reuse); and two
+# leads in different reductions, which the grant names (mismatch). tsan is
+# left out of the maps for shmem.internode.*'s reason.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_executable(shmem_test_lanes test-lanes.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_lanes PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_lanes PRIVATE osoe rt Threads::Threads)
+  osoe_warnings(shmem_test_lanes)
+  foreach(case "shared-lead:0,1,2,3" "two-threads:0,1,2,3" "turns:0,1"
+               "rotation:0,1,2,3:OSOE_COLLECTIVE_FANOUT=2:OSOE_TEST_PERTURB=1"
+               "boundary:0,1,2" "boundary:0,1,2:OSOE_SMALL_COLLECTIVE_BYTES=128"
+               "boundary:0,1,2:OSOE_COLLECTIVE_PIPELINE=4" "reuse:0,1")
+    string(REPLACE ":" ";" environment "${case}")
+    list(POP_FRONT environment which map)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    set(label "${which}")
+    foreach(setting IN LISTS environment)
+      string(REGEX REPLACE "^OSOE_([A-Z_]+)=(.*)$" "\\1-\\2" suffix "${setting}")
+      string(TOLOWER "${suffix}" suffix)
+      string(REPLACE "_" "-" suffix "${suffix}")
+      if(NOT setting MATCHES "PERTURB|FANOUT")
+        set(label "${label}.${suffix}")
+      endif()
+    endforeach()
+    add_test(NAME shmem.lanes.${label}
+      COMMAND ${CMAKE_COMMAND} -E env ${environment}
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 90 --
+              $<TARGET_FILE:shmem_test_lanes> ${which})
+    set_tests_properties(shmem.lanes.${label} PROPERTIES LABELS "tier2" TIMEOUT 120)
+  endforeach()
+  add_test(NAME shmem.lanes.mismatch
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+            mismatch)
+  set_tests_properties(shmem.lanes.mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+    "the grant from node 0's lead [(]PE 0[)] is for epoch [0-9]+'s sum of 8-byte signed integers, 4096 bytes, and this node's lead [(]PE 1[)] is in epoch [0-9]+'s maximum of 8-byte signed integers")
+  add_test(NAME shmem.lanes.class-split-named
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+            class-split-named)
+  set_tests_properties(shmem.lanes.class-split-named PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+    "the lane word of node 1's lead [(]PE 1[)], this node's child at position 0, says epoch 0 and lane 0, and this node's lead [(]PE 0[)] is in epoch [0-9]+'s collective")
+  add_test(NAME shmem.lanes.class-split-broadcast
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+            class-split-broadcast)
+  set_tests_properties(shmem.lanes.class-split-broadcast PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+    "should be piece 0 [(]1500 bytes[)] of epoch [0-9]+'s broadcast from the node at index 0, and is nothing: no piece was put there")
+  add_test(NAME shmem.lanes.class-split-hang
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+            class-split-hang)
+  set_tests_properties(shmem.lanes.class-split-hang PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_long_sum_reduce"
+    FAIL_REGULAR_EXPRESSION "osoe-launch: timeout")
 endif()
 
 # The allgather among node leads that is fcollect's and collect's internode

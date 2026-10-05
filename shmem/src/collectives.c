@@ -177,6 +177,13 @@ static void data_collective_at(const char *routine, struct osoe_team *t, void *d
         osoe_epoch_wake_all(&b->arrived);
 
     if (lead) {
+        /* A reduction's internode phase is told of it before the lead waits
+         * for its members, so that what the nodes below need first - the
+         * generic implementation's grants, for a large one - leaves now
+         * (internode.h, osoe_internode_reduce_enter). */
+        if (reduction && t->internode)
+            osoe_internode_reduce_enter(t->block_index, k + 1, nelems, reduction->operation,
+                                        reduction->element, routine);
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * members, routine);
         unsigned char *accumulator = member_copy(lead_local_id, result_at);
         if (reduction) {
@@ -253,8 +260,9 @@ static struct osoe_symmetric_location team_word_at(const struct osoe_team *t,
     struct osoe_symmetric_location at = {
         OSOE_REGION_INTERNAL,
         osoe_internal_team_spare_word(osoe.bootstrap.collective_fanout,
-                                      osoe.bootstrap.collective_pipeline,
-                                      osoe.bootstrap.max_teams, t->number, which) };
+                                      osoe.bootstrap.max_teams,
+                                      osoe.bootstrap.small_collective_bytes, t->number,
+                                      which) };
     return at;
 }
 
@@ -265,8 +273,8 @@ static struct osoe_symmetric_location split_words_at(const struct osoe_team *t)
     struct osoe_symmetric_location at = {
         OSOE_REGION_INTERNAL,
         osoe_internal_team_split_offset(osoe.bootstrap.collective_fanout,
-                                        osoe.bootstrap.collective_pipeline,
-                                        osoe.bootstrap.max_teams, t->number) };
+                                        osoe.bootstrap.max_teams,
+                                        osoe.bootstrap.small_collective_bytes, t->number) };
     return at;
 }
 
@@ -453,7 +461,15 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
     if (osoe_epoch_release_bump_eq(&b->arrived, (k + 1) * local) && !lead)
         osoe_epoch_wake_all(&b->arrived);
     uint64_t *places = NULL, total;
+    struct osoe_element length = { OSOE_ELEMENT_UNSIGNED_INTEGER, sizeof(uint64_t) };
     if (lead) {
+        /* Entered before the members' wait, as every reduction is
+         * (data_collective_at): the lengths are eight bytes a member, so a
+         * team of more than OSOE_SMALL_COLLECTIVE_BYTES / 8 members sums them
+         * as a large reduction, whose children wait for its grant. */
+        if (t->internode)
+            osoe_internode_reduce_enter(t->block_index, k + 1, members, OSOE_REDUCTION_SUM,
+                                        length, routine);
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * local, routine);
         places = calloc(members + 1, sizeof *places);
         if (!places)
@@ -464,8 +480,7 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
                 *(const uint64_t *)member_copy(t->local_ids[m], length_at);
         if (t->internode)
             osoe_internode_reduce(t->block_index, k + 1, places, members, OSOE_REDUCTION_SUM,
-                                  (struct osoe_element){ OSOE_ELEMENT_UNSIGNED_INTEGER,
-                                                         sizeof(uint64_t) }, routine);
+                                  length, routine);
         prefix_sums(routine, places, members);
         total = places[members];
         *(uint64_t *)member_copy(lead_local_id, total_at) = total;

@@ -319,12 +319,16 @@ void osoe_segment_close(struct osoe_segment *s);
  *       team.arrival_posted still reads the low half of; and
  *       node.team_blocks_published_from became node.team_posted_summary, the
  *       first word of a bitmap of posted blocks' summary
+ *   31  team.tree.collective_class and team.tree.lane, in padding the tree
+ *       state's line had: the class of the lead's last data collective
+ *       through the tree and the lane of its last large one; and the
+ *       header's OSOE_SMALL_COLLECTIVE_BYTES (the team redesign's step E)
  *
- * None of 5 to 30 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 31 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, and 23 gave each thread a word of its own.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               30
+#define OSOE_SEGMENT_NEWEST_LAYOUT               31
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 

@@ -32,8 +32,12 @@ void osoe_internode_generic_fini(void);
  * (internal-region.h). */
 void osoe_internode_generic_number_taken(uint32_t number);
 
-/* internode.h's osoe_internode_reduce, osoe_internode_broadcast and
- * osoe_internode_collect, whose contracts these meet. */
+/* internode.h's osoe_internode_reduce_enter, osoe_internode_reduce,
+ * osoe_internode_broadcast and osoe_internode_collect, whose contracts these
+ * meet. */
+void osoe_internode_generic_reduce_enter(uint32_t team, uint32_t epoch, size_t count,
+                                         enum osoe_reduction_operation operation,
+                                         struct osoe_element element, const char *routine);
 void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t count,
                                    enum osoe_reduction_operation operation,
                                    struct osoe_element element, const char *routine);

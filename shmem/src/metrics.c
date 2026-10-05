@@ -251,6 +251,11 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * algorithm by. */
     TEAM("team.tree.gather_steps", BLOCK_TREE(gather_steps)),
     TEAM("team.tree.gather_shares", BLOCK_TREE(gather_shares)),
+    /* The class of the lead's last data collective through the tree, 0 small
+     * and 1 large, and the lane its thread lent to the last large one (the
+     * team redesign's step E; layout 31): which way it went, and whose slots. */
+    TEAM("team.tree.collective_class", BLOCK_TREE(collective_class)),
+    TEAM("team.tree.lane", BLOCK_TREE(lane)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),
     TEAM("team.record.local_members", BLOCK_RECORD(local_members)),

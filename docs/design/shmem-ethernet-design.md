@@ -4876,7 +4876,10 @@ chunking loop, no high-water allocation, no per-team data area. Their shared
 footprint there is **three counters on three cache lines**, regardless of
 reduction size. Between nodes a partial result has to land somewhere that is not
 `dest`, and the as-built paragraph below says where: fixed slots of §5.8's
-internal region, a vector larger than a slot going in pieces.
+internal region, a vector larger than a slot going in pieces - since the team
+redesign's step E, a team number's small slots for a collective of at most
+`OSOE_SMALL_COLLECTIVE_BYTES`, and for a larger one the lanes its leads'
+threads lend it (§5.8, "Small and large collectives").
 
 *(Fallback for cases where `dest` cannot serve: chunk through fixed scratch. The
 loop costs nothing on small reductions and adds pipelining on large ones. §5.8 turns
@@ -4927,7 +4930,10 @@ one collective to the next cannot disturb them: the root releases a piece only
 when every node has sent it up, and a node sends a piece up only after its own
 wait for its children's, so an early arrival for the next collective only ever
 counts toward that one (`internode-generic.c` walks it through,
-`pipeline_model.py` checks it). *(Until slice 5 each piece made a whole pass up
+`pipeline_model.py` checks it). *Since the team redesign's step E* the slots
+are a team number's small ones for a small collective, in one piece, and for a
+large one a lane of each lead's thread, lent by a grant (§5.8, "Small and large
+collectives"). *(Until slice 5 each piece made a whole pass up
 and down, and one arrival word per node was compared for equality, §5.4's
 rule.)* Every PE ends with the same bits, each element combined once along the
 tree (§5.8 rule 3). Integer sums and products wrap, through unsigned
@@ -5146,7 +5152,10 @@ fails the split alike - said by the PE that found it dry, naming
 by the parent's rank 0, naming `OSOE_MAX_TEAMS`; a block claimed for a split that
 fails goes back. Each member then takes the number: its descriptor's slot in its
 process's pool, and its counters for the number in its internal region zeroed
-(`internode.h`, `osoe_internode_number_taken`), before the split's sync, after
+- since step E its grant counter and the grant's words too, the one guard
+against a grant the team before it under the number left, since epochs start
+again at 1 (§5.8, "Small and large collectives") - (`internode.h`,
+`osoe_internode_number_taken`), before the split's sync, after
 which alone anybody writes them for the new team - and only for a number it has
 held before in the session, the heap object being new each session; and each
 node's local lead names its block and writes the record and the map entry, as
@@ -5226,10 +5235,12 @@ takes its numbers after its one reduction (the adversarial read of the
 rebuilt part found the first rebuild deciding it on each PE's own level, which
 mixed levels turned into a split that never finished). Three counters say how often:
 `shmem.team_split.calls`, `shmem.team_split.busy_rounds` and
-`shmem.team_split.lost_rounds`. Each number costs every PE about 200 KiB of its
-internal region's address space, as before (*temporary*: step E, the per-team
-counters and the per-PE buffers of the proposal's §4, makes it about 15 KiB and
-the default 256).
+`shmem.team_split.lost_rounds`. Each number costs every PE about 48 KiB of its
+internal region's address space since step E's first part - its counters and
+small slots about 7 KiB, its scans' slots 41 KiB (*temporary*: the second part
+moves the scans' large pieces to the lanes, making a number about 15 KiB, and
+the default 256) - where it cost 200 KiB before (§5.8, "Small and large
+collectives").
 
 *Two readings of §9.4.6*, where the specification says two things. A triplet
 whose sequence would wrap around the parent - "considered invalid and the
@@ -5327,6 +5338,8 @@ each position received, and the argument for early arrivals (§5.5 as built)
 carries over, since no node starts the next collective before holding this one's
 last release. D pieces cost D times the internal region's slots: at D = 2, 64
 teams and a fan-out of 4, 10 MiB a PE, touched only by a team's local leads.
+*(Since the team redesign's step E the slots are lanes, one per thread record,
+2.7 MiB a PE at the defaults: "Small and large collectives", below.)*
 
 *As built* (phase 1 step 5 slice 5; `internode-generic.c`, `internal-region.h`;
 `docs/prompts/done/phase1-step5-slice5-prompt.md`). D is `OSOE_COLLECTIVE_PIPELINE`,
@@ -5356,6 +5369,108 @@ five nodes a broadcast took 12.0 ms at D = 1, 4.4 and 4.2 ms at D = 2 and 4
 with the first build's loop, and 4.0 and 2.2 ms with this one; on eight nodes,
 three levels deep, a reduction took 18.8 ms at D = 1, 12.8 and 12.4 ms with
 the first loop, 10.7 and 6.3 ms with this one.
+
+**Small and large collectives, lanes and grants** *(the team redesign's step E,
+`docs/design/team-resources-proposal.md` §4, decided with the author on
+2026-10-02; checked by `lane_model.py`, timed by `grant_timing.py`; built in
+step E's first part, below).* Until step E every team number held the slots
+above, (fan-out + 1) × D of 16 KiB on every PE, so that a child could put a
+piece into its parent's row whatever other team's collective the parent was
+in: 200 KiB a number, which kept `OSOE_MAX_TEAMS` at 64. But a thread is in one
+collective at a time, so the slots a lead reads during a collective can be its
+own, used by one team after another, if a child knows when they are its
+team's:
+- **Two classes, by size.** A reduction or broadcast whose bytes are at most
+  `OSOE_SMALL_COLLECTIVE_BYTES` (default 1,024, from 128 to 16,384; the
+  author's answer to the proposal's E2) is *small*, and *large* otherwise.
+  Every lead decides alike from the call's bytes - a reduction's count times
+  its width, a broadcast's bytes - which rests on every PE passing the same
+  count, and on every node holding the same setting, agreed at the rendezvous
+  and between a node's PEs, since it lays out the internal region.
+- **A small collective** is one piece through its team number's own small
+  slots, one per child position and one for releases, and the fenced add: no
+  change in hops. The slot is safe for the reason one slot per position is
+  safe at D = 1 (`pipeline_model.py`'s D = 1 cases): a child reaches the
+  team's next collective only once it holds this one's release, which exists
+  only after every lead has read its children's slots.
+- **A large collective** goes through *lanes*: each PE's internal region holds
+  one per thread record (node.h), (fan-out + 1) × D slots of 16 KiB, which the
+  thread lends to the collective it leads from its entry to its return. One
+  per thread record and not a pool (the author's answer to E9): two threads of
+  a PE may lead two teams' collectives at once, and a thread waiting for a lane
+  could close a cycle across PEs with others waiting the same way.
+- **The grant.** Where a lane is depends on which thread leads, which may change
+  from one collective of a team to the next, so it travels. A lead entering a
+  large reduction sends each child of its tree a grant as it enters - before
+  it waits for its own node's members, through one more call at the seam
+  (`internode.h`, `osoe_internode_reduce_enter`) - the epoch, the collective's
+  identity, its bytes and the lane's index put into the child's grant line
+  for the team, then a fenced add to the child's grant counter. A child sends
+  its first piece up only once its grant counter shows this collective's
+  grant, counted cumulatively and as at least, and a grant naming another
+  collective ends the job naming both leads, a hop before a piece's header
+  would. A large broadcast needs no grant: its pieces go up empty.
+- **The lane word.** A child puts its own lane's index and the epoch into its
+  row's lane word at its parent before its first add of a large collective,
+  and the parent reads it as it takes that child's first piece, keeping it for
+  the collective's releases. The proposal had the parent read it when it first
+  sends that child a release; the model found that wrong (its
+  `release_lane_late`): with no more pieces than the window, a middle lead's
+  last piece goes up before its first release comes down, the collective can
+  end elsewhere, and in the team's next collective - a broadcast rooted
+  elsewhere, whose tree is turned - another node can be the lead's child at
+  that position and write the word first. Read with the first piece, the word
+  is ordered before anything of the next collective, since that cannot begin
+  before this lead's last piece has gone up.
+- **Why a lane can be handed on** (E5): every write into a lead's slots, lane
+  or small, is one that lead waits for before it returns - its children's
+  pieces, each of which it combines, and its parent's releases, each of which
+  it copies out - so at return nothing addressed to the lane is still to come,
+  and the next collective's children cannot write before the lead's next
+  grant, or for a release before their own next arrival. The grant counter is
+  zeroed as a PE takes a number again (§5.7): a grant's epoch and identity
+  cannot tell the last grant of a team destroyed under a number from the first
+  of the next, whose epochs start again at 1.
+
+What it costs (the proposal's "What it costs", `grant_timing.py`): once, on a
+large reduction, a child's wait for its parent's grant. When the leads enter
+together, a leaf has its node's partial result when its intranode phase ends,
+and waits for a grant that left its parent as the parent entered, so the cost
+is one hop less the leaf's intranode time, never below zero: +1.00 hop when
+that time is nothing, +0.70 at 0.3 of a hop, nothing at a hop or more, from 4
+nodes to 4,096 and from 1 piece to 64 - the proposal's case. When a lead with
+children enters after them, its grants leave only then, and their first pieces
+arrive a round trip after it enters - the grant down, the piece back - where a
+team number's own slots had them waiting: up to two hops less the late lead's
+own intranode time, +1.72 at 0.3 of a hop and +1.02 at a hop for the root or a
+middle lead late by two hops or more at 21 nodes, less where a deeper subtree
+hides the lateness (at 500 nodes +0.70 and nothing, as when the leads enter
+together). A late leaf costs nothing. The second case is the second part's
+adversarial read's, found for the scans. Barriers, small collectives,
+broadcasts and gathers pay nothing.
+
+*As built* (step E, first part; `internal-region.h`, `internode-generic.c`,
+`docs/decisions/2026-10-04-team-lanes.md`). The region's order puts scratch
+first, as before: every team number's small rows - a lane word and a small
+slot each, rounded to the line - then every number's words, its arrival
+counters, release counter and grant counter contiguous, so that one watch
+covers every word a lead waits on and no put writes inside it -
+the lane words and the grant's words, which are put, lie outside it, in the
+rows and past the grant counter - then the splits' lines, the allgather's
+words, the scans' area, and last the lanes, whose number places nothing else
+(`OSOE_MAX_THREADS` is agreed only between a node's PEs). A PE's region is
+5.6 MiB at the defaults, where it was 12.6: the lanes 2.7 MiB, each number
+about 48 KiB - its counters and small slots 7 KiB, its scans' slots, still each
+number's until the second part, 41 KiB. Each lead publishes its last data
+collective's class and, for a large one, its lane in the team's tree state
+(`team.tree.collective_class`, `team.tree.lane`, layout 31). `shmem.lanes.*`
+runs the model's cases on the code - two teams whose leads coincide with a
+child outside its parent's collective, two threads leading two teams at once,
+a team's collectives led by its PEs' threads in turn, a tree turned between a
+reduction and a broadcast under `OSOE_TEST_PERTURB`, the class boundary a byte
+either side, a number taken again, and two leads whose grant names their
+difference - and each of the model's breakages, as a mutation of the code,
+fails at least one of them.
 
 **An allgather for fcollect** *(decided 2026-09-25; checked by
 `allgather_model.py`; built at phase 1 step 5 slice 6, below).* The generic
@@ -5401,9 +5516,9 @@ reduction waits on other
 words than the reduction's, a hang whose blocked records name each PE's
 routine, as for collectives whose trees share no edge (§5.5). The words are
 each team number's own: a READY and a DATA for each of the ⌈log₂ *N*⌉ steps
-the job's *N* nodes allow, each alone on its line, after the line that counts
-the team numbers claimed, so that nothing before them moved (the internal
-region, below) - sized by the node count's logarithm and the team count, and
+the job's *N* nodes allow, each alone on its line, after every number's words
+(the internal region, below; the line that once counted the team numbers
+claimed went with the team redesign's step D) - sized by the node count's logarithm and the team count, and
 by nothing else; the shape takes 24 bytes of READY[0]'s line. A lead counts
 its gathers per team, and its gather *x* waits for *x* + 1.
 
@@ -5559,13 +5674,19 @@ words fan-out + 1, an arrival counter per child position and a release counter
 *since phase 1 step 10*, 1.3 MiB more of the scans' per-team slots at the
 region's end, on every member: "Prefix scans", below), a
 fan-out of 4 and D = 2, of which a team touches only its own slots and words,
-and only on its leads. And since the second slice of step 7 one line more,
-whose first word counts the team numbers claimed, on world PE 0 alone
-(§5.7). *Since phase 1 step 5 slice 6*, after that line, each team number's
-allgather words: a READY and a DATA counter for each of the ⌈log₂ *N*⌉ steps
-the job's *N* nodes allow a team, each alone on its line - the one part of the
-layout the node count sizes, 2.5 KiB a team number at a thousand nodes ("An
-allgather for fcollect", below).)*
+and only on its leads. And from the second slice of step 7 to the team
+redesign's step D one line more, whose first word counted the team numbers
+claimed, on world PE 0 alone (§5.7); step D gave each number two lines for its
+splits' words instead. *Since phase 1 step 5 slice 6*, after the words, each
+team number's allgather words: a READY and a DATA counter for each of the
+⌈log₂ *N*⌉ steps the job's *N* nodes allow a team, each alone on its line - the
+one part of the layout the node count sizes, 2.5 KiB a team number at a
+thousand nodes ("An allgather for fcollect", below). *Since the team
+redesign's step E* a number keeps counters and small slots, and the large
+slots are lanes, one per thread record, at the region's end: every number's
+small rows first, still scratch first; then every number's words, with a grant
+counter; then the allgather's words and the scans' area; then the lanes -
+5.6 MiB a PE at the defaults ("Small and large collectives", above).)*
 
 *(Built at phase 1 step 5 slice 2, once reductions had landed and shown what it
 must contain - not as a separate header but as `internode.h`'s data half, beside
@@ -5868,7 +5989,8 @@ small for the node's heaps, among them. Three rules close it:
   and a node's PEs are compared on every one that lays out the segment
   (`OSOE_MAX_TEAMS`, `OSOE_TEAM_BLOCKS`, `OSOE_MAX_CONTEXTS`, `OSOE_MAX_THREADS`,
   `OSOE_COLLECTIVE_FANOUT`, `OSOE_COLLECTIVE_PIPELINE`,
-  `OSOE_GET_LANDING_BYTES`, `SHMEM_SYMMETRIC_SIZE`), through `failed`. The
+  `OSOE_SMALL_COLLECTIVE_BYTES`, `OSOE_GET_LANDING_BYTES`,
+  `SHMEM_SYMMETRIC_SIZE`), through `failed`. The
   agent's and the detector's (`OSOE_AGENT_SLICE_US`, `OSOE_AGENT_CPUS`,
   `OSOE_DEADLOCK_SECONDS`, `OSOE_CHECK_QUIET`, `OSOE_FORCE_REMOTE`, and the test
   hook `OSOE_TEST_PERTURB`) every PE checks after the join, as it starts its
@@ -5979,7 +6101,10 @@ phase 1 step 3 as a tree rooted at that lead - "The rendezvous as built", below.
   step 7 `OSOE_MAX_TEAMS` (§5.7: a node counting to another number lays its
   team state and internal region out differently), and since phase 1 step 5
   slice 5 `OSOE_COLLECTIVE_PIPELINE` (§5.8: a node keeping another number of
-  pieces in flight places them in its internal region by it). The server checks
+  pieces in flight places them in its internal region by it), and since the
+  team redesign's step E `OSOE_SMALL_COLLECTIVE_BYTES` (§5.8: a node taking a
+  collective as large where its parent takes it as small waits for a grant
+  that never comes). The server checks
   agreement, then broadcasts the rank→node map and node addresses, and each
   node's fixed-size backend blob (§4.10; zeros on AM, an RDMA backend's queue-pair
   and key material).
@@ -6111,7 +6236,8 @@ waiting on its socket names it ("the rendezvous lost node 9, its child…").
 arithmetic progressions in local-id order (one under block, one under cyclic;
 `rank-map.h`) and its blob; and the values every node must agree on — the job's
 size, `SHMEM_SYMMETRIC_SIZE`, the handler checksum, `OSOE_COLLECTIVE_FANOUT`,
-`OSOE_MAX_TEAMS`, `OSOE_COLLECTIVE_PIPELINE` — which each parent checks against
+`OSOE_MAX_TEAMS`, `OSOE_COLLECTIVE_PIPELINE`, `OSOE_SMALL_COLLECTIVE_BYTES` —
+which each parent checks against
 its own, so a disagreement is refused by the
 lead that sees it, naming both nodes (`shmem.job.disagree.*`). *At the root* the
 map is built: the progressions are expanded once, into O(*P*) scratch on that one

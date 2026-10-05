@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 30
+#define OSOE_NODE_LAYOUT 31
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -563,6 +563,16 @@ struct osoe_collective_state {
      */
     _Atomic uint32_t gather_steps;
     _Atomic uint32_t gather_shares;
+    /*
+     * Layout 31 (the team redesign's step E), in the same padding: the class of
+     * this node's lead's last data collective on the team through the tree -
+     * OSOE_COLLECTIVE_SMALL or OSOE_COLLECTIVE_LARGE (internal-region.h) - and
+     * the lane its thread lent to the last large one, its thread record's
+     * index. Written with most_pieces_in_flight, so that a test pins which way
+     * a collective went, and which thread's lane it took.
+     */
+    _Atomic uint32_t collective_class;
+    _Atomic uint32_t lane;
 };
 
 /*
@@ -787,6 +797,11 @@ struct osoe_node_header {
      * other PE of the node to them, as it does to OSOE_MAX_TEAMS. */
     uint32_t collective_fanout;
     uint32_t collective_pipeline;
+    /* Layout 31 (the team redesign's step E): the lead's
+     * OSOE_SMALL_COLLECTIVE_BYTES, which sizes every team number's small rows
+     * in every PE's internal region and decides every data collective's class
+     * (internal-region.h), so open_control holds the node's PEs to it too. */
+    uint32_t small_collective_bytes;
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)

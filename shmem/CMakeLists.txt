@@ -49,6 +49,7 @@ add_library(osoe
   src/malloc.c
   src/metrics.c
   src/node.c
+  src/perturb.c
   src/profile.c
   src/quiet.c
   src/rank-map.c

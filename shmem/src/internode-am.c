@@ -207,6 +207,13 @@ bool osoe_internode_am_take_arrivals(void)
 
 /* ---- The data half: the generic implementation's ---------------------- */
 
+void osoe_internode_reduce_enter(uint32_t team, uint32_t epoch, size_t count,
+                                 enum osoe_reduction_operation operation,
+                                 struct osoe_element element, const char *routine)
+{
+    osoe_internode_generic_reduce_enter(team, epoch, count, operation, element, routine);
+}
+
 void osoe_internode_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t count,
                            enum osoe_reduction_operation operation,
                            struct osoe_element element, const char *routine)

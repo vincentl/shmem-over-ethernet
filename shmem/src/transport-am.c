@@ -51,6 +51,7 @@
 #include "job.h"
 #include "metrics.h"
 #include "node.h"
+#include "perturb.h"
 #include "progress.h"
 #include "progress-host.h"
 #include "state.h"
@@ -248,12 +249,12 @@ void osoe_transport_threads(bool concurrent)
  *   the landing zone - and ends the job naming the first it finds broken.
  * - OSOE_TEST_PERTURB=1: at the points between a protocol's steps, a thread
  *   sometimes yields or sleeps up to 200 us, so that the interleavings the
- *   models find happen in a run.
+ *   models find happen in a run (perturb.h, which the generic internode
+ *   phase's points share).
  *
  * Off, each is one load of a flag a point. Neither changes what is correct.
  */
 static bool check_quiet;
-static bool perturbing;
 static _Atomic uint64_t issue_clock;      /* nonblocking get calls returned */
 /*
  * Per extent, the stamp of the call whose get it holds: that piece's issue
@@ -277,24 +278,6 @@ static _Atomic uint64_t *issue_stamp;
 #define ISSUE_MASK ((UINT64_C(1) << (64 - STAMP_BITS)) - 1)
 static _Atomic uint64_t issue_count;      /* nonblocking get pieces issued */
 
-static void perturb(void)
-{
-    if (!perturbing)
-        return;
-    static _Thread_local uint64_t x;
-    if (!x)
-        x = (uint64_t)(uintptr_t)&x * UINT64_C(0x9E3779B97F4A7C15) | 1;
-    x ^= x << 13;
-    x ^= x >> 7;
-    x ^= x << 17;
-    if ((x & 7) == 0) {
-        struct timespec t = { 0, (long)((x >> 40) % 200000) };
-        nanosleep(&t, NULL);
-    } else if ((x & 1) == 0) {
-        sched_yield();
-    }
-}
-
 static bool environment_flag(const char *name)
 {
     uint32_t v = 0;
@@ -314,7 +297,7 @@ void osoe_transport_init(void)
 {
     osoe_am = (struct osoe_am_state){ 0 };
     check_quiet = environment_flag("OSOE_CHECK_QUIET");
-    perturbing = environment_flag("OSOE_TEST_PERTURB");
+    osoe_perturb_init();
     osoe_am.internode = osoe.job.node_count > 1;
     osoe_am.lead = osoe.bootstrap.local_id == 0;
 
@@ -506,14 +489,14 @@ static void mark(struct osoe_transport_context *c, uint32_t peer, uint64_t seq)
          * bit's fetch_or only when it is clear: once a segment a node, not
          * once an operation.
          */
-        perturb();
+        osoe_perturb();
         _Atomic uint64_t *high = &c->shared_highest_segment[slot];
         uint64_t seen = atomic_load_explicit(high, memory_order_seq_cst);
-        perturb();
+        osoe_perturb();
         while (seq > seen && !atomic_compare_exchange_weak_explicit(
                                  high, &seen, seq, memory_order_seq_cst, memory_order_seq_cst))
             ;
-        perturb();
+        osoe_perturb();
         _Atomic uint64_t *word = &c->dirty_bits[slot / 64];
         uint64_t bit = UINT64_C(1) << (slot % 64);
         if (!(atomic_load_explicit(word, memory_order_seq_cst) & bit))
@@ -1361,9 +1344,9 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
              */
             for (;;) {
                 uint64_t g = atomic_load_explicit(&block->generation, memory_order_seq_cst);
-                perturb();
+                osoe_perturb();
                 atomic_fetch_add_explicit(&block->bytes_issued[g & 1], n, memory_order_seq_cst);
-                perturb();
+                osoe_perturb();
                 if (atomic_load_explicit(&block->generation, memory_order_seq_cst) == g) {
                     pair = g & 1;
                     break;
@@ -1762,9 +1745,9 @@ static uint32_t wait_dirty_shared(struct osoe_transport_context *c, const bool *
             if (ask_acknowledgement(c, slot))
                 osoe_progress_host_wake_lead();
             wait_acknowledged(slot, through, routine);
-            perturb();
+            osoe_perturb();
             atomic_fetch_and_explicit(&c->dirty_bits[w], ~bit, memory_order_seq_cst);
-            perturb();
+            osoe_perturb();
             if (!acknowledged(c, slot))
                 atomic_fetch_or_explicit(&c->dirty_bits[w], bit, memory_order_seq_cst);
         }
@@ -1867,7 +1850,7 @@ static void wait_shared(struct osoe_transport_context *c, const int *pes, size_t
     osoe_serializing_fence();
     struct osoe_context_block *block = block_of(c);
     uint64_t e = atomic_load_explicit(&block->generation, memory_order_seq_cst);
-    perturb();
+    osoe_perturb();
     context_enter(c);
     uint64_t full = atomic_load_explicit(&block->full, memory_order_seq_cst);
     if (full > e) {

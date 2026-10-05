@@ -154,7 +154,7 @@ checks of the build itself and jobs of a few processes. On four cores of an idle
 virtual machine it took about eight and a half minutes, one for the build and
 seven and a half for the tests. Both may run four at a time, as this project's
 own runs do (`cmake --build --preset release -j4`, `ctest --preset release
--j4`). The 28 tests of the model checker (`tools/modelcheck`, which needs Python
+-j4`). The 29 tests of the model checker (`tools/modelcheck`, which needs Python
 3) took 15 minutes in the development VM four at a time, the longest of them,
 `model.abort`, 14 of those, and check the design, which does not vary with the
 machine. They have a label of their own, `model`,
@@ -565,8 +565,8 @@ prefix ([Installing](#installing)); the rest stay in the build tree.
 |---|---|---|
 | put, get, atomic to a node-mate | memcpy or CPU atomic on the shared heap | no system call, but a futex wake when the target waits on the word |
 | any of those across nodes | an active message on the node pair's one connection, applied by the target node's progress thread | the connections' state O(n) a node, not O(n × P); each PE's ordering state O(n) a context, 21 bytes a node |
-| barrier, sync, small reductions, broadcast | the node's PEs meet in shared memory; the node leads meet in a k-ary tree (`OSOE_COLLECTIVE_FANOUT`, default 4) | ⌈log_k n⌉ steps between nodes |
-| larger data collectives | pieces pipelined through that tree, two in flight (`OSOE_COLLECTIVE_PIPELINE`) | O(P × bytes) for the lead's combine on a node, then the tree |
+| barrier, sync, and reductions and broadcasts of at most `OSOE_SMALL_COLLECTIVE_BYTES` (1 KiB by default) | the node's PEs meet in shared memory; the node leads meet in a k-ary tree (`OSOE_COLLECTIVE_FANOUT`, default 4), a reduction or broadcast in one piece through slots its team keeps | ⌈log_k n⌉ steps between nodes |
+| larger reductions and broadcasts | pieces pipelined through that tree, two in flight (`OSOE_COLLECTIVE_PIPELINE`), through slots the thread leading each node's part lends to the collective - its *lane* - which a reduction's leads name to their children as they enter | O(P × bytes) for the lead's combine on a node, then the tree; a reduction's child waits for its parent's lane, once: up to a hop when the two enter together - nothing once the child's own node takes a hop - and up to a round trip, the grant down and the first piece back, when the parent enters after it |
 | `fcollect` | Bruck's allgather among the node leads | ⌈log₂ n⌉ steps, each node's data crossing the network once |
 | `collect` | the PEs' lengths first, as one vector of 8 bytes a PE, summed through the node leads' tree, then the data as `fcollect`'s | the data as `fcollect`'s; the lengths O(N) bytes up the tree and down it, 1 MB at 128,000 PEs |
 | prefix scans | a tree over the team's ranks, its pieces pipelined as the other data collectives' are | O(log N) rounds |
@@ -614,8 +614,11 @@ specification or takes a choice the specification leaves open.
   number free on every member a split returns nonzero on every PE of its parent
   team, as the specification allows for a split that cannot be made, and the
   parent's rank 0 says why, naming the variable. Each number costs every PE about
-  200 KiB of address space, which the `/dev/shm` check counts (*temporary*: the
-  team work's second step makes it about 15 KiB, and the default 256).
+  48 KiB of address space, which the `/dev/shm` check counts: its counters and
+  the slots of its small collectives, about 7 KiB, and its scans' slots, about
+  41 KiB (*temporary*: the team work's last part moves the scans' larger pieces
+  to the lanes the reductions' use, making a number about 15 KiB, and the
+  default 256).
 - **A node holds at most `OSOE_TEAM_BLOCKS` teams at once** (1,024 by default),
   the three predefined among them, a team of members on several nodes counting
   once on each, and a team of one PE counting too. A split that would make one
@@ -735,8 +738,8 @@ specification or takes a choice the specification leaves open.
   has run any of it.
 - **Every node of a job must have the same architecture.** The rendezvous
   compares the job's size, the heap's size, the build's table of message
-  handlers, and the collectives' fan-out, team count and pipeline depth, and no
-  architecture, so a job that mixed x86-64 and aarch64 nodes would start. Its
+  handlers, and the collectives' fan-out, team count, pipeline depth and small
+  collectives' size, and no architecture, so a job that mixed x86-64 and aarch64 nodes would start. Its
   `long double` values would then be wrong with no message - x86-64's 80-bit
   extended format read as aarch64's 128-bit one, and the other way - in
   reductions (`shmem/src/internode.h` says that nothing checks it) and in puts
@@ -797,7 +800,14 @@ specification or takes a choice the specification leaves open.
   broadcasts where the others reduce, or passes another count, root or
   `fcollect` size, gets or gives wrong data, and nothing says so - the job can
   end with status 0. The specification leaves a collective that its PEs do not
-  call alike undefined.
+  call alike undefined. Every node's lead decides from the count it is given
+  whether a reduction or broadcast is small - at most
+  `OSOE_SMALL_COLLECTIVE_BYTES` - or large, which rests on every PE passing the
+  same count, as the specification has them do (it says so outright only for
+  `alltoall`, `alltoalls` and `fcollect`): where nodes are given counts on
+  either side of the line, the job ends where the leads meet, naming both - or,
+  under a small reduction's parent, a child taking it as large waits for a
+  word its parent never sends, until the deadlock detector ends the job.
 - **Nor is a `shmem_malloc` that the PEs call with different sizes**, which the
   specification leaves undefined too: the next object then starts at another
   place on the PE that differed, puts to it land in the wrong place, and
@@ -908,13 +918,14 @@ that one could be added without touching the OpenSHMEM layer.
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
   run before every merge, on the exact tree that merges: more than 650 tests in
-  release, and the model checker's 28 tests beside them, which run in that build
+  release, and the model checker's 29 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
 - **Model checking.** Every lock-free and futex protocol but one - waking the
-  progress thread, waits, the barrier tree, pipelined collectives, Bruck's
-  allgather, the scans, get completion under `SHMEM_THREAD_MULTIPLE`,
+  progress thread, waits, the barrier tree, pipelined collectives and the lanes
+  their large pieces go through, Bruck's allgather, the scans, get completion
+  under `SHMEM_THREAD_MULTIPLE`,
   rendezvous, abort, the proof a deadlock is found by, and the teams' - a team
   block's life, a split's pending numbers, a pool found empty, the posted
   arrivals - is checked
@@ -1018,10 +1029,10 @@ both are set the `SHMEM_` one controls.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_MAX_TEAMS` | `64` | Teams one PE may be in at once, the three predefined teams included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team gives its number back. Each number costs every PE about 200 KiB of address space at the default fan-out and pipeline depth: 160 KiB that only a team's leads touch and 40 KiB, for the scans, that every member of a team that scans does (*temporary*: the team work's second step makes it about 15 KiB, and the default 256). *Checked*. |
+| `OSOE_MAX_TEAMS` | `64` | Teams one PE may be in at once, the three predefined teams included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team gives its number back. Each number costs every PE about 48 KiB of address space at the other variables' defaults: 7 KiB of counters and small slots that only a team's leads touch, and 41 KiB, for the scans, that every member of a team that scans does (*temporary*: the team work's last part makes it about 15 KiB, and the default 256). *Checked*. |
 | `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, a kilobyte each of `/dev/shm`, allocated at start, and about 600 bytes each of the memory of the node's first PE, from which a created team's local lead on each node takes one, and to which the last of its members there gives it back. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
 | `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
-| `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. *Checked* among a node's PEs. |
+| `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. Each place, and the agent's, has a lane for the large collectives its thread leads, 160 KiB of address space at the default fan-out and pipeline depth, which a thread that leads none never touches: 2.7 MiB a PE at the default. *Checked* among a node's PEs. |
 | `OSOE_GET_LANDING_BYTES` | `262144` | Bytes of each PE's landing zone for the replies of its gets from other nodes, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. *Checked* among a node's PEs. |
 
 **Collectives**
@@ -1029,7 +1040,8 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_COLLECTIVE_FANOUT` | `4` | k of the tree the node leads meet in: `2` to `32`. Over Ethernet it is a bandwidth choice at large sizes, since a node sends a copy to each of its children over its one link. *Checked*. |
-| `OSOE_COLLECTIVE_PIPELINE` | `2` | Pieces of a data collective each node keeps in flight up and down that tree: `1` to `8`. *Checked*. |
+| `OSOE_COLLECTIVE_PIPELINE` | `2` | Pieces of a large reduction or broadcast each node keeps in flight up and down that tree, each 16 KiB: `1` to `8`. *Checked*. |
+| `OSOE_SMALL_COLLECTIVE_BYTES` | `1024` | The largest reduction or broadcast that moves in one piece through slots its team keeps: `128` to `16384`. A larger one goes in pieces through lanes its leading threads lend it, and a reduction's child may wait for its parent's, once - up to a hop, or a round trip when the parent enters after it. Each team number keeps the slots, so the value costs every PE about five times itself a number: lower it for memory, raise it to keep a few kilobytes' reduction in one hop. *Checked*. |
 
 **Start-up, failures and inspection**
 

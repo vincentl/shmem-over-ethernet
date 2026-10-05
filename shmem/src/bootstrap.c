@@ -338,6 +338,24 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    OSOE_COLLECTIVE_PIPELINE_HIGHEST);
 
     /*
+     * The largest data collective that moves through a team number's own small
+     * slots, in one piece (the team redesign's step E, E1 and E2): a larger one
+     * goes through the lanes of the threads that lead it. It sizes every team
+     * number's small rows (internal-region.h) and decides every data
+     * collective's class, which every lead must decide alike, so every node
+     * must agree, and the job rendezvous checks that they do beside the
+     * pipeline's depth.
+     */
+    b->small_collective_bytes = OSOE_SMALL_COLLECTIVE_BYTES_DEFAULT;
+    if (osoe_environment_u32("OSOE_SMALL_COLLECTIVE_BYTES", &b->small_collective_bytes) ==
+            OSOE_ENVIRONMENT_INVALID ||
+        b->small_collective_bytes < OSOE_SMALL_COLLECTIVE_BYTES_LOWEST ||
+        b->small_collective_bytes > OSOE_SMALL_COLLECTIVE_BYTES_HIGHEST)
+        osoe_fatal("OSOE_SMALL_COLLECTIVE_BYTES='%s' is not between %u and %u",
+                   getenv("OSOE_SMALL_COLLECTIVE_BYTES"), OSOE_SMALL_COLLECTIVE_BYTES_LOWEST,
+                   OSOE_SMALL_COLLECTIVE_BYTES_HIGHEST);
+
+    /*
      * The ports a node lead may listen on (§6.2's "configurable range"). Each
      * lead binds the first free port of a candidate sequence hashed from (job,
      * step, node) inside it, and another lead finds it by trying the same

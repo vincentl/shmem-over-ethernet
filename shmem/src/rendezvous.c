@@ -24,9 +24,12 @@
  * word the second kept zero only so that nothing travelled as padding: the same
  * 48 bytes, so the size assert below cannot tell the two apart, and the magic
  * must. Read as the second shape, a third-shape report's D would be a word no
- * lead checks, and a node with another D would be let in.
+ * lead checks, and a node with another D would be let in. The fourth,
+ * "osoeup-4", carries OSOE_SMALL_COLLECTIVE_BYTES (the team redesign's step E)
+ * and a word kept zero after it, for the same reason the second kept one: 56
+ * bytes.
  */
-#define UP_MAGIC   UINT64_C(0x332d7075656f736f)  /* "osoeup-3", little-endian */
+#define UP_MAGIC   UINT64_C(0x342d7075656f736f)  /* "osoeup-4", little-endian */
 #define DOWN_MAGIC UINT64_C(0x6e776f64656f736f)  /* "osoedown" */
 
 /* What every node must agree on (§6.2): a node that differs is a mismatched
@@ -43,9 +46,15 @@ struct agreement {
      * another's slot. */
     uint32_t max_teams;
     /* §5.8: D, the pieces in flight per lead, which fixes the internal
-     * region's offsets as the fan-out and the team count do. The last word, so
-     * that what travels has no padding. */
+     * region's offsets as the fan-out and the team count do. */
     uint32_t collective_pipeline;
+    /* §5.8: the largest small collective, which sizes every team number's small
+     * rows and decides every data collective's class: a node that decided
+     * otherwise would wait for a grant its parent never sends, or put a piece
+     * into a lane nobody lent. Then a word kept zero, so that what travels has
+     * no padding. */
+    uint32_t small_collective_bytes;
+    uint32_t reserved;
 };
 
 struct up_header {
@@ -55,9 +64,9 @@ struct up_header {
     uint32_t progressions;          /* progressions that follow the records */
 };
 
-_Static_assert(sizeof(struct up_header) == 48 &&
+_Static_assert(sizeof(struct up_header) == 56 &&
                offsetof(struct up_header, agreement) +
-                       offsetof(struct agreement, collective_pipeline) == 36,
+                       offsetof(struct agreement, small_collective_bytes) == 40,
                "the up header's shape is UP_MAGIC's: a new shape takes a new magic");
 
 /* One node of a subtree, as it travels up. */
@@ -128,6 +137,12 @@ static void agree(const struct osoe_bootstrap *b, uint32_t child, const struct a
                    "%u: every node must keep as many pieces in flight, since it places them "
                    "in its internal region by that number (§5.8)", child,
                    theirs->collective_pipeline, b->node, mine->collective_pipeline);
+    if (theirs->small_collective_bytes != mine->small_collective_bytes)
+        osoe_fatal("node %u (or a node below it) has OSOE_SMALL_COLLECTIVE_BYTES=%u; node %u "
+                   "has %u: every node must decide alike which collectives are small, since "
+                   "a small one moves through a team's own slots and a large one through "
+                   "lanes its parent grants (§5.8)", child, theirs->small_collective_bytes,
+                   b->node, mine->small_collective_bytes);
 }
 
 static void lost(const struct osoe_bootstrap *b, uint32_t node, const char *role)
@@ -256,7 +271,7 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
     *out = (struct osoe_rendezvous_result){ 0 };
     struct agreement mine = { b->world_size, b->node_count, b->symmetric_size,
                               osoe_am_table_checksum(), b->collective_fanout, b->max_teams,
-                              b->collective_pipeline };
+                              b->collective_pipeline, b->small_collective_bytes, 0 };
 
     /* This node's record: its address, its ranks as progressions, its blob. */
     struct report r = { 0 };

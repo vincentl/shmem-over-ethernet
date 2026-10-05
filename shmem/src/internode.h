@@ -46,7 +46,11 @@
  * (team, epoch) on every participating node. The data half,
  * osoe_internode_reduce, osoe_internode_broadcast and osoe_internode_collect,
  * is called by the team's local lead on its own application thread, and
- * blocks; osoe_internode_scan by every member, on its own thread.
+ * blocks - a reduction entered first with osoe_internode_reduce_enter, on the
+ * same thread, which does not; osoe_internode_scan by every member, on its own
+ * thread. Which application thread leads a team's collective may change from
+ * one collective to the next, as the program's threads take turns on a team;
+ * two threads of one PE may lead two teams' collectives at once.
  *
  * Errors, and waiting. As transport.h: there is no error return, and a failure
  * ends the job (§3.15). The barrier's half never blocks, so it never sweeps;
@@ -137,6 +141,9 @@
  *   - Hardware offload (an in-network barrier, where a fabric has one - RoCE
  *     switches do not): arrive posts to the offload engine, and its completion
  *     calls released. Nothing above this header changes.
+ *   - osoe_internode_reduce_enter: the generic implementation's grant to each
+ *     child - its words put, then a fenced add, which become an RDMA write and
+ *     an atomic - or nothing, for a reduction it offloads.
  *   - osoe_internode_reduce: the generic implementation, whose puts and fenced
  *     adds become RDMA writes and atomics with no change to it; or, for the
  *     (operation, element) pairs a NIC's collective engine or an in-network
@@ -201,8 +208,8 @@ uint32_t osoe_internode_fanout_default(void);
  * name on the node it goes to, the local id of the team's local lead there and
  * the team's number (am.h), which the receiving node's map resolves to its
  * block. The block's name holds the number, which is what places a team's
- * slots and counters in each PE's internal region (internal-region.h), the
- * same on every node. Phase 1 step 7 replaced a call
+ * counters and small slots in each PE's internal region (internal-region.h),
+ * the same on every node. Phase 1 step 7 replaced a call
  * made on every local PE at the team's creation: a team created while the
  * progress thread runs must be learnt by that thread, in a process that may
  * hold no descriptor for it, and a record in shared memory is what it can read
@@ -225,7 +232,7 @@ uint32_t osoe_internode_fanout_default(void);
  * team redesign's step D, docs/design/team-resources-proposal.md D1): what the
  * backend keeps for the number in this PE's own memory starts again from
  * nothing - for the generic data half, the number's counters in the internal
- * region (internal-region.h). Called by every member of the new team, before
+ * region and its grant's words (internal-region.h). Called by every member of the new team, before
  * the split's sync over the parent, after which alone anybody writes to it for
  * the new team; and only once this PE has left every team it held under the
  * number, the last of whose writes into it the PE waited for before it left
@@ -316,18 +323,41 @@ struct osoe_element {
 };
 
 /*
+ * Down: the team's local lead has entered a reduction - the one it will hand
+ * over with osoe_internode_reduce, with the same team, epoch, count, operation
+ * and element - and has not yet waited for its node's members. Called once per
+ * node per reduction, on the thread that will call osoe_internode_reduce, before
+ * the intranode phase (collectives.c); never for a broadcast or a gather. It
+ * waits for nothing of the collective's peers: its puts may wait for room in a
+ * connection's buffer, as any put may.
+ *
+ * It is there so that a backend can tell the nodes below it, as early as it can,
+ * what they need before they send (the team redesign's step E, E8): the
+ * generic implementation's large reduction moves through a slot set the lead's
+ * thread lends to the collective - its lane - and a child sends its first piece
+ * only once its parent's grant names the lane (internode-generic.c), which this
+ * call sends, so that a child holding its node's partial result early does not
+ * wait for its parent's intranode phase as well as for the hop. A backend that
+ * offloads the reduction, or needs nothing told, ignores it.
+ */
+void osoe_internode_reduce_enter(uint32_t team, uint32_t epoch, size_t count,
+                                 enum osoe_reduction_operation operation,
+                                 struct osoe_element element, const char *routine);
+
+/*
  * The internode phase of a reduction: on entry `buffer` holds this node's
  * `count` elements, its members already combined; on return it holds the
  * operation applied across every participating node's, elementwise, the same
  * bits on every node (the contract above).
  *
  * Called by the team's local lead, once per node per collective, after its
- * intranode phase and before it releases its members; every participating
- * node's lead calls it with the same team, epoch, count, operation and element.
- * `epoch` is the team's §5.4 epoch of this collective, from the sequence the
- * barrier's arrivals use, so the two halves never disagree on which collective
- * is which. Blocks until the result is in `buffer`, sweeping as it waits;
- * `routine` names the caller in what the wait records and in a fatal.
+ * intranode phase and before it releases its members, on the thread that
+ * entered it (osoe_internode_reduce_enter); every participating node's lead
+ * calls it with the same team, epoch, count, operation and element. `epoch` is
+ * the team's §5.4 epoch of this collective, from the sequence the barrier's
+ * arrivals use, so the two halves never disagree on which collective is which.
+ * Blocks until the result is in `buffer`, sweeping as it waits; `routine` names
+ * the caller in what the wait records and in a fatal.
  */
 void osoe_internode_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t count,
                            enum osoe_reduction_operation operation,

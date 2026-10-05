@@ -39,6 +39,16 @@ two trees differ; each has its own slots and counters, as built (scan_model.py,
 per_team). A case's order is the scans every member makes, "AB" one on A then
 one on B.
 
+**Lanes** (the team redesign's step E, E6; docs/design/team-resources-proposal.md
+§4): a large scan's slots move from the team number to the member's *lane*,
+one a thread, shared by the teams it scans (the counters stay the team's), and
+a member entering a scan *grants* each of its tree children: it adds one to the
+child's grant counter for the team, and the child sends its first piece up only
+once that counter shows this scan's grant, counted as everything else is. A
+down needs no grant: the parent writes a child's down-slot only after the
+child's piece went up, inside this scan. lane_model.py has the lane's index
+travelling with the grant; here each member has one thread and one lane.
+
 Designs
   design              as above.
 Breakages
@@ -54,6 +64,12 @@ Breakages
                       totals are overwritten before it goes down (RESULT).
   summed              one up counter per member, summed over positions: a fast
                       child's next piece stands in for a slow child's (VALUE).
+  lanes               the slots a member's lane, with the grant: a design.
+  lanes_no_grant      the slots a member's lane, and a child that puts without
+                      the grant: into a parent still in another team's scan
+                      (SLOT or VALUE).
+  lanes_stale_grant   a child that takes any grant it ever had from the team
+                      for this scan's (SLOT or VALUE).
 
 Runs are SC; a put is fenced before the counter add that covers it
 (invariant 5), and waits are abstract (the region wait's wake is
@@ -69,13 +85,19 @@ UP = lambda p, t, j, s: ('up', p, t, j, s)   # at PE p, team t: child position j
 UPC = lambda p, t, j: ('upc', p, t, j)       # its counter, cumulative
 DOWN = lambda p, t, s: ('down', p, t, s)     # at PE p, team t: down-slot s
 DOWNC = lambda p, t: ('downc', p, t)
+GRANT = lambda p, t: ('grant', p, t)         # at PE p, team t: its tree parents' grants, cumulative
+LANE = 'lane'                                # the lanes designs' key, in place of the team's
 UNREAD = lambda key: ('$unread',) + key      # ghost: the slot holds a value not yet read
 TAG = lambda key: ('$tag',) + key            # ghost: (scan, piece) of the value in the slot
 OVERWRITE = ('$overwrite',)
 FIN = ('$fin',)
 
-TEAMS = {'A': lambda m: list(range(m)), 'B': lambda m: list(reversed(range(m)))}
-TEAM_NUMBER = {'A': 0, 'B': 1}
+TEAMS = {'A': lambda m: list(range(m)), 'B': lambda m: list(reversed(range(m))),
+         # Two teams of two that share PE 1, the root of both: PE 0 is P's child
+         # and PE m - 1 Q's, each at position 0 - a child outside the scan its
+         # parent is in, which is where the lanes' grant matters.
+         'P': lambda m: [1, 0], 'Q': lambda m: [1, m - 1]}
+TEAM_NUMBER = {'A': 0, 'B': 1, 'P': 2, 'Q': 3}
 
 
 def children(a, b, k):
@@ -121,29 +143,40 @@ def member(design, pe, members, k, depth, pieces, order):
     ring = depth - 1 if design == 'ring_short' else depth
     B = []
     moved = {}                  # team -> pieces its scans moved before this one
-    for x, team in enumerate(order):
+    granted = {}                # team -> grants this PE had for its scans before this one
+    mine = [(x, team) for x, team in enumerate(order) if pe in TEAMS[team](members)]
+    for at, (x, team) in enumerate(mine):
+        pes = TEAMS[team](members)
         base = moved.get(team, 0)
         moved[team] = base + pieces
-        after = f'@x{x + 1}_E' if x + 1 < len(order) else '@DONE'
+        grants = granted.get(team, 0)
+        if places(len(pes), k)[pes.index(pe)][0] is not None:
+            granted[team] = grants + 1
+        after = f'@x{mine[at + 1][0]}_E' if at + 1 < len(mine) else '@DONE'
         # Each scan's program in a call of its own, so that every function and
         # lambda below closes over this scan's names, not the last scan's.
-        B += one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base, after)
+        B += one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base, after,
+                      grants)
     B += [('DONE', ('gpost', lambda M, L: ({FIN: M[FIN] + 1}, {}), '@END')),
           ('END', ('done',))]
+    if not mine:
+        B = [('START', ('br', lambda L: True, '@DONE', '@DONE'))] + B
     return assemble(B)
 
 
-def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base, after):
+def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base, after, grants):
     """Scan x of PE `pe`'s program: its loop over the pieces, entered at
     x<x>_E and leaving to `after`."""
     B = []
     pes = TEAMS[team](members)
     t = TEAM_NUMBER[team]
     rank = pes.index(pe)
-    parent, position, kids = places(members, k)[rank]
+    parent, position, kids = places(len(pes), k)[rank]
     ppe = None if parent is None else pes[parent]
     kpes = [pes[c] for c in kids]
     p = f'x{x}_'
+    lanes = design.startswith('lanes')
+    s_t = LANE if lanes else t      # whose slots: the lane's, or the team number's
 
     def slot(q, base=base):
         return (base + q) % depth
@@ -165,14 +198,30 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
             entry.append(('set', f'c{j}_{q}', lambda L: 0))
     for i, (op, var, fn) in enumerate(entry):
         here = p + ('E' if i == 0 else f'E{i}')
-        nxt = '@' + p + (f'E{i + 1}' if i + 1 < len(entry) else 'LOOP')
+        nxt = '@' + p + (f'E{i + 1}' if i + 1 < len(entry) else 'G0')
         B.append((here, (op, var, fn, nxt)))
+    # Entering: under the lanes designs, a grant to each tree child.
+    G = []
+    for j, kpe in enumerate(kpes if lanes else []):
+        G.append((p + f'G{j}', ('add', lambda L, kpe=kpe, t=t: GRANT(kpe, t), lambda L: 1, '_',
+                                '@' + p + (f'G{j + 1}' if j + 1 < len(kpes) else 'LOOP'))))
+    if not G:
+        G.append((p + 'G0', ('br', lambda L: True, '@' + p + 'LOOP', '@' + p + 'LOOP')))
+    B += G
     B.append((p + 'LOOP', ('br', lambda L: L['down'] >= pieces and not L['pend'],
                            after, '@' + p + 'CH')))
 
+    def holds_grant(M, root=parent is None, t=t):
+        if root or not lanes or design == 'lanes_no_grant':
+            return True
+        if design == 'lanes_stale_grant':
+            return M[GRANT(pe, t)] >= 1
+        return M[GRANT(pe, t)] >= grants + 1
+
     def choose(M, L, base=base, root=parent is None, t=t):
         alts = []
-        if L['up'] < pieces and L['up'] < L['down'] + window and arrived(M, L['up']):
+        if L['up'] < pieces and L['up'] < L['down'] + window and arrived(M, L['up']) and \
+                holds_grant(M):
             alts.append(({}, {'go': 1}, f'PE {pe}: piece {L["up"]} up'))
         if L['pend']:
             alts.append(({}, {'go': 3}, f'PE {pe}: copy out the down it counted'))
@@ -188,18 +237,18 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
     # Up: each child's total for piece `up`, kept, then the subtree's up.
     up = []
     for j in range(len(kids)):
-        up.append((f'U{j}', ('check', lambda M, L, j=j, t=t:
+        up.append((f'U{j}', ('check', lambda M, L, j=j, t=s_t:
                              None if M[TAG(UP(pe, t, j, slot(L['up'])))] == tag(x, L['up']) else
                              f'PE {pe} read up-slot {j} with tag '
                              f'{M[TAG(UP(pe, t, j, slot(L["up"])))]}, waiting for piece '
                              f'{L["up"]} of scan {x} ({tag(x, L["up"])})')))
-        up.append((f'UT{j}', ('ghost', lambda M, L, j=j, t=t:
+        up.append((f'UT{j}', ('ghost', lambda M, L, j=j, t=s_t:
                               ({UNREAD(UP(pe, t, j, slot(L['up']))): 0},
                                {local(f'c{j}_', L['up']): M[UP(pe, t, j, slot(L['up']))]}))))
     up.append(('UO', ('ghost', lambda M, L, rank=rank:
                       ({}, {local('own', L['up']): source(x, L['up'], rank, members, pieces)}))))
     if ppe is not None:
-        def put_up(M, L, t=t, ppe=ppe, position=position, n=len(kids)):
+        def put_up(M, L, t=s_t, ppe=ppe, position=position, n=len(kids)):
             key = UP(ppe, t, position, slot(L['up']))
             if M[UNREAD(key)]:
                 return [({OVERWRITE: 1}, {}, 'overwrite')]
@@ -218,12 +267,12 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
     def down_steps(prefix, var):
         D = []
         if ppe is not None:
-            D += [(f'{prefix}V', ('check', lambda M, L, t=t:
+            D += [(f'{prefix}V', ('check', lambda M, L, t=s_t:
                                   None if M[TAG(DOWN(pe, t, slot(L[var])))] == tag(x, L[var]) else
                                   f'PE {pe} read its down-slot with tag '
                                   f'{M[TAG(DOWN(pe, t, slot(L[var])))]}, waiting for piece '
                                   f'{L[var]} of scan {x} ({tag(x, L[var])})')),
-                  (f'{prefix}T', ('ghost', lambda M, L, t=t:
+                  (f'{prefix}T', ('ghost', lambda M, L, t=s_t:
                                   ({UNREAD(DOWN(pe, t, slot(L[var]))): 0},
                                    {'before': M[DOWN(pe, t, slot(L[var]))]})))]
         else:
@@ -234,7 +283,7 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
                                  f'PE {pe}\'s exclusive result for piece {L[var]} of scan {x} '
                                  f'is {L["before"]:b}')))
         for j, kpe in enumerate(kpes):
-            def put_down(M, L, j=j, kpe=kpe, t=t):
+            def put_down(M, L, j=j, kpe=kpe, t=s_t):
                 key = DOWN(kpe, t, slot(L[var]))
                 if M[UNREAD(key)]:
                     return [({OVERWRITE: 1}, {}, 'overwrite')]
@@ -275,6 +324,8 @@ def case(design, members, k, depth, pieces, order):
     mem = {FIN: 0, OVERWRITE: 0}
     for p in range(members):
         for t in TEAM_NUMBER.values():
+            mem[GRANT(p, t)] = 0
+        for t in list(TEAM_NUMBER.values()) + [LANE]:
             mem[DOWNC(p, t)] = 0
             for s in range(depth):
                 mem[DOWN(p, t, s)] = mem[UNREAD(DOWN(p, t, s))] = mem[TAG(DOWN(p, t, s))] = 0
@@ -303,6 +354,22 @@ CASES = [
     ('root_early', 3, 2, 2, 3, 'A', False),
     ('ring_short', 3, 1, 2, 4, 'A', False),
     ('summed', 3, 2, 2, 3, 'A', False),
+    # Step E: the slots a member's lane, shared by its teams, and the grant.
+    ('lanes', 4, 2, 2, 2, 'AB', True),
+    ('lanes', 3, 1, 2, 3, 'ABA', True),
+    ('lanes', 4, 2, 2, 3, 'AA', True),
+    ('lanes', 3, 2, 2, 2, 'ABAB', True),
+    ('lanes', 3, 1, 2, 2, 'PQ', True),
+    ('lanes', 3, 1, 2, 2, 'PQP', True),
+    # With every member in both teams, a scan's last piece down proves every
+    # piece of it went up, so a member that has finished one scan writes into
+    # no slot of it: without the grant A then B is still safe, as consecutive
+    # scans on one team are...
+    ('lanes_no_grant', 3, 1, 2, 2, 'AB', True),
+    # ...and the grant matters where a child is outside the scan its parent is
+    # in: PE 2, in Q alone, puts into PE 1's lane while PE 1 is in P's scan.
+    ('lanes_no_grant', 3, 1, 2, 2, 'PQ', False),
+    ('lanes_stale_grant', 3, 1, 2, 2, 'QPQ', False),
 ]
 
 

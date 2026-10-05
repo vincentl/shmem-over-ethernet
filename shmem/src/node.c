@@ -660,7 +660,8 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
             fail_rendezvous(n, msg);
         }
         /* A backstop. Every setting that sizes the heap object - the symmetric
-         * size above, the fan-out, the pipeline's depth and the team count in
+         * size above, the fan-out, the pipeline's depth, the small
+         * collectives' bytes, the team count and the thread count in
          * open_control - is agreed by name; this fires only for one that a
          * later change forgets to agree, before the progress thread reads a
          * node-mate's internal region by this PE's size of it. */
@@ -852,6 +853,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->world_size = b->world_size;
     h->collective_fanout = b->collective_fanout;
     h->collective_pipeline = b->collective_pipeline;
+    h->small_collective_bytes = b->small_collective_bytes;
     h->dir.slot_bytes = sizeof(struct osoe_pe_slot);
     h->dir.slots_offset = slots_offset;
     h->dir.metrics_offset = metrics_offset;
@@ -967,9 +969,9 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * leftover that osoe-stat --gc removes. The lead knows L and the heap size;
      * every PE has parsed the same size, or check_agreement fails them all. A
      * heap object is the heap and then its internal region (internal-region.h),
-     * about 12.6 MiB at the default 64 teams, fan-out of 4 and two pieces in
-     * flight (OSOE_COLLECTIVE_PIPELINE), which is counted here with the heap
-     * it follows. Pages cost only once written, so the room above has taken
+     * about 5.6 MiB at the defaults - 64 team numbers, a fan-out of 4, two
+     * pieces in flight (OSOE_COLLECTIVE_PIPELINE) and a lane for each of 17
+     * thread records - which is counted here with the heap it follows. Pages cost only once written, so the room above has taken
      * is only the segment's first and last pages, allocated so that they could
      * be written (about 1.1 MiB at the defaults, the pool of team blocks most
      * of it, counted again in `wanted`: a check that errs by that much toward
@@ -1148,6 +1150,15 @@ again:;
                  b->collective_pipeline);
         fail_rendezvous(n, msg);
     }
+    /* And by its OSOE_SMALL_COLLECTIVE_BYTES, which sizes every team number's
+     * small rows and decides which way each data collective moves (layout 31). */
+    if (h->small_collective_bytes != b->small_collective_bytes) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_SMALL_COLLECTIVE_BYTES differs between PEs: the local "
+                 "lead has %u, this PE has %u (§5.8)", h->small_collective_bytes,
+                 b->small_collective_bytes);
+        fail_rendezvous(n, msg);
+    }
     /* And by its OSOE_MAX_CONTEXTS, which sizes every PE's pool of context
      * blocks (layout 21): this PE would claim blocks past its own pool's end. */
     if (h->dir.contexts_per_pe != b->max_contexts) {
@@ -1306,6 +1317,8 @@ static void collective_state_reset(struct osoe_collective_state *c)
     atomic_store_explicit(&c->most_pieces_in_flight, 0, memory_order_release);
     atomic_store_explicit(&c->gather_steps, 0, memory_order_release);
     atomic_store_explicit(&c->gather_shares, 0, memory_order_release);
+    atomic_store_explicit(&c->collective_class, 0, memory_order_release);
+    atomic_store_explicit(&c->lane, 0, memory_order_release);
 }
 
 /*
@@ -1468,9 +1481,14 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     /* The heap, then OSOE_REGION_INTERNAL, in one object (internal-region.h):
      * the allocator is given heap_size and never reaches the tail. */
     n->internal_offset = page_round(b->symmetric_size ? b->symmetric_size : 1);
+    /* A lane per thread record, the agent's included (bootstrap.h): the index
+     * a thread's lane follows (internode-generic.c). */
     n->internal_bytes = page_round(osoe_internal_region_bytes(b->collective_fanout,
                                                               b->collective_pipeline,
-                                                              b->max_teams, b->node_count));
+                                                              b->max_teams,
+                                                              b->small_collective_bytes,
+                                                              b->node_count,
+                                                              b->max_threads + 1));
     n->heap_bytes = n->internal_offset + n->internal_bytes;
     n->heap_of = calloc(b->local_count, sizeof *n->heap_of);
     if (!n->heap_of)

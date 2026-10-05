@@ -22,11 +22,14 @@
  * lead's to reuse at once, and §5.5's hazard of a forward that reads `dest` by
  * reference after the lead has left cannot arise.
  *
- * **A vector larger than a slot goes through the tree in slot-sized pieces,
- * and each lead keeps D of them in flight** (§5.8, "Pipelined pieces"; phase 1
+ * **A large collective goes through the tree in pieces of a 16 KiB slot, and
+ * each lead keeps D of them in flight** (§5.8, "Pipelined pieces"; phase 1
  * step 5 slice 5): D is OSOE_COLLECTIVE_PIPELINE, which every node agrees on,
- * and a parent keeps D slots per child position and every node D release
- * slots, piece k in slot k mod D (internal-region.h). The loop, in_pieces, is
+ * and a lead's lane keeps D slots per child position and D release slots,
+ * piece k in slot k mod D (internal-region.h; the lanes are below). A small
+ * one - at most OSOE_SMALL_COLLECTIVE_BYTES - is one piece through its team
+ * number's own small slots, and the loop is the same at one piece. The loop,
+ * in_pieces, is
  * tools/modelcheck/pipeline_model.py's node loop, and it keeps the model's
  * rules - the first, third and fourth each with a breakage the model shows
  * failing, the second pinned by the tests, where an equality wait hangs:
@@ -100,9 +103,58 @@
  * span every node, the job's table of each node's local id 0 (job.h); for a
  * team a split creates, the list of every node's lead - its member with the
  * lowest team rank - that each node's local lead of the team keeps (team.c;
- * phase 1 step 7 slice 2). Each team number has its own slots and words in
- * the internal region, so two teams whose leads coincide on a node never meet
+ * phase 1 step 7 slice 2). Each team number has its own counters and small
+ * slots in the internal region, and a large collective the lanes its leads
+ * lent it (below), so two teams whose leads coincide on a node never meet
  * there, whatever their trees share.
+ *
+ * **Small and large, lanes and grants** (the team redesign's step E,
+ * docs/design/team-resources-proposal.md §4; tools/modelcheck/lane_model.py).
+ * A data collective is *small* when its bytes are at most
+ * OSOE_SMALL_COLLECTIVE_BYTES and *large* otherwise, which every lead decides
+ * alike from the call's bytes (osoe_collective_class): a reduction's count
+ * times its width, a broadcast's bytes - the same on every PE, as the
+ * specification has every PE pass the same count, and as every node agrees on
+ * the setting. A small one moves as a one-piece collective always has, through
+ * the team number's small slot for each position and its small release slot:
+ * safe because a child reaches the team's next collective only once it holds
+ * this one's release, which exists only after every lead has read its
+ * children's slots. A large one's slots are a **lane**: one per thread record
+ * of the PE (node.h), which the thread lends to the collective it is in from
+ * its entry to its return, any team's - a thread is in one collective at a
+ * time, and two threads of a PE leading two teams' collectives at once have
+ * two lanes. Since where a lane is depends on which thread leads, which may
+ * change from one of a team's collectives to the next, it travels:
+ *   - a lead entering a large **reduction** sends each child of its tree a
+ *     **grant** as it enters, before it waits for its own node's members
+ *     (osoe_internode_reduce_enter): the grant's words - the epoch, the
+ *     collective's identity, its bytes and the lane's index - put into the
+ *     child's grant line for the team, then one more on the child's grant
+ *     counter, fenced after them. A child sends its first piece up only once
+ *     its grant counter shows this collective's grant, counted as every other
+ *     counter is, and puts into the lane the grant names; a grant naming
+ *     another collective ends the job, naming both leads, a hop before a
+ *     piece's header would. A **broadcast** needs none: its pieces go up
+ *     empty, writing nothing into the parent's lane;
+ *   - a child puts its own lane's index and the collective's epoch into its
+ *     row's lane word at its parent before its first add of a large
+ *     collective, and the parent reads it **as it takes that child's first
+ *     piece** - the arrival that shows it written - and keeps it for the
+ *     collective, for the releases it sends that child. Not later, as the
+ *     proposal had it, at the first release: with no more pieces than the
+ *     window a middle lead's last piece goes up before its first release comes
+ *     down, the collective can end elsewhere, and in the team's next
+ *     collective - a broadcast rooted elsewhere - another node can be this
+ *     lead's child at the position and write the word first (the model's
+ *     release_lane_late, which the code's epoch check names).
+ * **Every write into a lead's slots, its lane's or its small ones, is one that
+ * lead waits for before it returns** (the proposal's E5): its children's
+ * pieces, every one of which it combines, and its parent's releases, every one
+ * of which it copies out. So at return nothing addressed to the lane is still
+ * to come, and the next collective's children cannot write before the lead's
+ * next grant or, for a release, before their own next arrival - the rule the
+ * lane model checks, with the grant left out (no_grant), taken stale
+ * (stale_grant) or read early (lane_early, release_lane_early) failing.
  *
  * Costs, with N nodes, k the fan-out, n bytes and p = ceil(n / slot) pieces:
  * O(k n) combining and k puts per node per piece; and since each lead keeps D
@@ -112,7 +164,14 @@
  * rather than the links is the limit (a timing simulation of the loop gives D
  * times at depths 1 to 4, for D of 2, 4 and 8). A broadcast finds its rotated
  * tree's k + 1 neighbouring leads in O(k), and a reduction's tree is found once
- * per team. State: O(k) per team.
+ * per team. A large reduction's grant costs a lead a put and a fenced add to
+ * each child as it enters, and a child a wait for it, once: when the two enter
+ * together, a hop less the child's own intranode time - nothing once that is a
+ * hop - and when the parent enters after its children, up to a round trip, the
+ * grant down and the first piece back, less the parent's own intranode time,
+ * where a team number's own slots had that piece waiting for it
+ * (tools/modelcheck/grant_timing.py; the proposal's "What it costs" had only
+ * the first). State: O(k) per team.
  *
  * **A gather is Bruck's allgather among the team's node leads** (§5.8, "An
  * allgather for fcollect"; phase 1 step 5 slice 6), tools/modelcheck/
@@ -205,25 +264,30 @@
 #include "internal-region.h"
 #include "internode-generic.h"
 #include "job.h"
+#include "metrics.h"
 #include "node.h"
+#include "perturb.h"
 #include "region-wait.h"
 #include "state.h"
 #include "transport.h"
 
 /*
- * The internal region's layout (internal-region.h): a block of slots per team
- * number, then the words. A team's block of slots is a row of D per child
- * position - that child's pieces, piece k in the row's slot k mod D - and a
- * last row the parent's releases land in, likewise. Its words are an
- * eight-byte arrival counter per child position (that child's pieces in) and
- * then the release counter (the parent's pieces down), each alone on a line of
- * the region's fixed 128 bytes. Each team number has its own, so two teams
- * whose trees share a lead put into different places (§7.3).
+ * The internal region's layout (internal-region.h): per team number, a small
+ * row per child position and one for releases - a lane word, then the small
+ * slot - and its words: an eight-byte arrival counter per child position (that
+ * child's pieces in), the release counter (the parent's pieces down) and the
+ * grant counter, each alone on a line of the region's fixed 128 bytes, the
+ * grant's words past its counter; and, past every number's places, a lane per
+ * thread record, a row of D 16 KiB slots per child position and a release row,
+ * piece k in a row's slot k mod D. Each team number has its own counters and
+ * small slots, so two teams whose trees share a lead count on different words
+ * (§7.3); a large collective's pieces go through the lanes its leads' threads
+ * lend it (the file's comment).
  */
 /*
  * The number of the team in block `team` of this node's pool - every `team`
  * here being a block index since the team redesign's step D (internode.h) -
- * which is what places the team's slots and counters in each PE's internal
+ * which is what places the team's rows and counters in each PE's internal
  * region, the same on every node, where a block index is the node's own. Read
  * from the block's name, which the record's publication, acquired before any
  * call here, orders (node.h).
@@ -238,37 +302,72 @@ static uint32_t number_of(uint32_t team)
     return number;
 }
 
-static uint64_t child_slot(uint32_t team, uint32_t position, uint64_t piece)
+/* Team number `number`'s small row for `position`: a child position's below
+ * the fan-out, the release row at it. */
+static uint64_t small_row(uint32_t number, uint32_t position)
 {
+    uint32_t small = osoe.bootstrap.small_collective_bytes;
+    return (uint64_t)number *
+               osoe_internal_team_small_bytes(osoe.bootstrap.collective_fanout, small) +
+           (uint64_t)position * osoe_internal_small_row_bytes(small);
+}
+
+/* The row's lane word: where the child at `position` says which lane it lends
+ * to the large collective under way. */
+static uint64_t lane_word(uint32_t number, uint32_t position)
+{
+    return small_row(number, position);
+}
+
+/* The row's small slot: a small collective's one piece, behind its header. */
+static uint64_t small_slot(uint32_t number, uint32_t position)
+{
+    return small_row(number, position) + OSOE_INTERNAL_LANE_WORD_BYTES;
+}
+
+/* Lane `lane`'s slot for piece `piece` of `position`'s row - a child
+ * position's below the fan-out, the release row at it. */
+static uint64_t lane_slot(uint32_t lane, uint32_t position, uint64_t piece)
+{
+    uint32_t fanout = osoe.bootstrap.collective_fanout;
     uint32_t pipeline = osoe.bootstrap.collective_pipeline;
-    return (uint64_t)number_of(team) *
-               osoe_internal_team_slots_bytes(osoe.bootstrap.collective_fanout, pipeline) +
+    return osoe_internal_lanes_offset(fanout, pipeline, osoe.bootstrap.max_teams,
+                                      osoe.bootstrap.small_collective_bytes,
+                                      osoe.bootstrap.node_count) +
+           (uint64_t)lane * osoe_internal_lane_bytes(fanout, pipeline) +
            ((uint64_t)position * pipeline + piece % pipeline) * OSOE_INTERNAL_SLOT_BYTES;
 }
 
 /* Where team number `number`'s words start: its arrival counter for each
- * child position, then its release counter, a line each. */
+ * child position, then its release counter and its grant counter, a line
+ * each. */
 static uint64_t words_of_number(uint32_t number)
 {
     uint32_t fanout = osoe.bootstrap.collective_fanout;
-    return osoe_internal_words_offset(fanout, osoe.bootstrap.collective_pipeline,
-                                      osoe.bootstrap.max_teams) +
+    return osoe_internal_words_offset(fanout, osoe.bootstrap.max_teams,
+                                      osoe.bootstrap.small_collective_bytes) +
            (uint64_t)number * osoe_internal_team_words_bytes(fanout);
 }
 
-static uint64_t release_slot(uint32_t team, uint64_t piece)
+static uint64_t arrival_counter(uint32_t number, uint32_t position)
 {
-    return child_slot(team, osoe.bootstrap.collective_fanout, piece);
+    return words_of_number(number) + (uint64_t)position * OSOE_INTERNAL_LINE_BYTES;
 }
 
-static uint64_t arrival_counter(uint32_t team, uint32_t position)
+static uint64_t release_counter(uint32_t number)
 {
-    return words_of_number(number_of(team)) + (uint64_t)position * OSOE_INTERNAL_LINE_BYTES;
+    return arrival_counter(number, osoe.bootstrap.collective_fanout);
 }
 
-static uint64_t release_counter(uint32_t team)
+static uint64_t grant_counter(uint32_t number)
 {
-    return arrival_counter(team, osoe.bootstrap.collective_fanout);
+    return arrival_counter(number, osoe.bootstrap.collective_fanout + 1);
+}
+
+/* The grant's words, past its counter and so past every lead's watch. */
+static uint64_t grant_words(uint32_t number)
+{
+    return grant_counter(number) + 8;
 }
 
 /*
@@ -281,8 +380,8 @@ static uint64_t gather_of_number(uint32_t number)
 {
     uint32_t steps = osoe_internal_gather_steps(osoe.bootstrap.node_count);
     return osoe_internal_gather_offset(osoe.bootstrap.collective_fanout,
-                                       osoe.bootstrap.collective_pipeline,
-                                       osoe.bootstrap.max_teams) +
+                                       osoe.bootstrap.max_teams,
+                                       osoe.bootstrap.small_collective_bytes) +
            (uint64_t)number * osoe_internal_team_gather_bytes(steps);
 }
 
@@ -336,11 +435,12 @@ struct interval_list {
 /*
  * A team's internode phase as this node's lead keeps it: the reduction's tree,
  * from the team's record, and the bases its waits count from - where each child
- * position's arrival counter and the release counter stood when the team's
- * last collective ended, by this lead's own trees (the file's comment), since
- * the counters in the internal region are cumulative over the team's life and
- * reset only when a PE takes the number for another team
- * (osoe_internode_generic_number_taken). One per block of the node's pool
+ * position's arrival counter, the release counter and the grant counter stood
+ * when the team's last collective ended, by this lead's own trees (the file's
+ * comment), since the counters in the internal region are cumulative over the
+ * team's life and reset only when a PE takes the number for another team
+ * (osoe_internode_generic_number_taken); and the epoch of the large reduction
+ * it last entered, whose grants it sent (osoe_internode_generic_reduce_enter). One per block of the node's pool
  * (OSOE_TEAM_BLOCKS), allocated at init and filled the first time a call names
  * the team. And what its gathers keep: the gathers so far, which READY and DATA
  * count; and, found at the first and the same for every one after it, the
@@ -361,6 +461,8 @@ struct generic_team {
     struct lead_tree reduction_tree;
     uint64_t arrival_base[OSOE_COLLECTIVE_FANOUT_MAX];
     uint64_t release_base;
+    uint64_t grant_base;
+    uint32_t entered;                   /* the epoch of the large reduction entered */
     struct osoe_collective_state *published;    /* the team's tree state (node.h) */
     uint64_t gathers;
     uint32_t steps;
@@ -501,8 +603,35 @@ struct piece_header {
     uint32_t collective;                /* which: reduction_identity, or the root */
     uint32_t bytes;                     /* this piece's */
 };
-enum { HEADER_BYTES = 16 };
+enum { HEADER_BYTES = OSOE_INTERNAL_PIECE_HEADER_BYTES };
 _Static_assert(sizeof(struct piece_header) == HEADER_BYTES, "a piece's header is 16 bytes");
+
+/*
+ * What a grant carries past its counter (the file's comment): the epoch and the
+ * identity of the large reduction its parent entered, as a piece's header names
+ * them, the reduction's bytes, and the lane the parent lends to it.
+ */
+struct grant {
+    uint32_t epoch;
+    uint32_t collective;
+    uint64_t bytes;
+    uint32_t lane;
+    uint32_t reserved;
+};
+_Static_assert(sizeof(struct grant) == 24 && 8 + sizeof(struct grant) <= OSOE_INTERNAL_LINE_BYTES,
+               "a grant's words fit its line, past the counter");
+
+/* What a child puts into its row's lane word at its parent (the file's
+ * comment): the large collective's epoch, and the lane the child lends to it. */
+struct lane_word {
+    uint32_t epoch;
+    uint32_t lane;
+};
+_Static_assert(sizeof(struct lane_word) <= OSOE_INTERNAL_LANE_WORD_BYTES,
+               "a lane word fits the room its row keeps for it");
+
+/* No lane known yet. */
+#define NO_LANE UINT32_MAX
 
 /* A reduction's `collective`, its top bit set; a broadcast's is its root's index. */
 static uint32_t reduction_identity(enum osoe_reduction_operation operation,
@@ -567,17 +696,35 @@ static void check_piece(const unsigned char *slot, const struct piece_header *ex
                from, osoe_node_of(&osoe.job, sender), sender, want, found);
 }
 
+/* A collective as a reader wants it: "epoch 3's sum of 8-byte signed
+ * integers". */
+static void describe_collective(uint32_t epoch, uint32_t collective, char *out, size_t size)
+{
+    if (epoch == 0)
+        snprintf(out, size, "nothing: no grant was put there");
+    else if (collective >> 31)
+        snprintf(out, size, "epoch %u's %s of %u-byte %s", epoch,
+                 operation_name((collective >> 16) & 0x7fff), collective & 0xff,
+                 kind_name((collective >> 8) & 0xff));
+    else
+        snprintf(out, size, "epoch %u's broadcast from the node at index %u", epoch, collective);
+}
+
 /*
  * One collective's pieces, as every lead cuts them alike: its buffer, `bytes`
- * long, in pieces of `bytes_per_piece` - a whole number of elements that fits
- * a slot behind its header - the last of which may be shorter; and what each
- * piece's header says besides its number and bytes. `combine` is NULL for a
- * broadcast, whose pieces go up empty.
+ * long, in pieces of `bytes_per_piece` - the whole buffer for a small
+ * collective, and for a large one a whole number of elements that fits a
+ * lane's slot behind its header - the last of which may be shorter; its class,
+ * every lead's alike; its team's number, which places the team's rows and
+ * counters; and what each piece's header says besides its number and bytes.
+ * `combine` is NULL for a broadcast, whose pieces go up empty.
  */
 struct pieces {
     uint32_t team;
+    uint32_t number;
     uint32_t epoch;
     uint32_t collective;                /* the header's: reduction_identity, or the root */
+    enum osoe_collective_class class;
     unsigned char *buffer;
     size_t bytes;
     size_t bytes_per_piece;
@@ -586,10 +733,39 @@ struct pieces {
     const char *routine;
 };
 
-/* The most bytes of `width`-byte elements a slot holds behind its header. */
+/*
+ * A large collective's lanes as this lead learns them (the file's comment):
+ * its own, which its thread lends to the collective; its parent's, from the
+ * grant, where a reduction's pieces go up; and each child's, read as this lead
+ * takes the child's first piece, where the releases go down. A small
+ * collective has none.
+ */
+struct lanes {
+    uint32_t own;
+    uint32_t parent;
+    uint32_t child[OSOE_COLLECTIVE_FANOUT_MAX];
+};
+
+/* The lane of this thread: its thread record's index (node.h), which every
+ * application thread of the PE holds while it lives. */
+static uint32_t own_lane(void)
+{
+    return osoe_metrics_thread_index();
+}
+
+/* The most bytes of `width`-byte elements a lane's slot holds behind its
+ * header. */
 static size_t piece_bytes(size_t width)
 {
     return ((OSOE_INTERNAL_SLOT_BYTES - HEADER_BYTES) / width) * width;
+}
+
+/* How every lead cuts `bytes` of `width`-byte elements of a collective of
+ * `class`: in one piece when it is small - its small slot holds
+ * OSOE_SMALL_COLLECTIVE_BYTES - and in a lane's slots when it is large. */
+static size_t bytes_per_piece(enum osoe_collective_class class, size_t bytes, size_t width)
+{
+    return class == OSOE_COLLECTIVE_SMALL && bytes > 0 ? bytes : piece_bytes(width);
 }
 
 /* Piece `number`'s header. */
@@ -610,6 +786,16 @@ static unsigned char *piece_at(const struct pieces *pieces, uint64_t number)
     return pieces->buffer + (size_t)number * pieces->bytes_per_piece;
 }
 
+/* Where this lead finds piece `number` from child position `position` - the
+ * team number's small slot for the position, or its own lane's row - and, at
+ * the fan-out, its release of the piece. */
+static uint64_t own_slot(const struct pieces *pieces, const struct lanes *lanes,
+                         uint32_t position, uint64_t number)
+{
+    return pieces->class == OSOE_COLLECTIVE_SMALL ? small_slot(pieces->number, position)
+                                                  : lane_slot(lanes->own, position, number);
+}
+
 /*
  * Whether every child has sent piece `number` up: each child position's
  * arrival counter shows it, at least - a child may be up to D pieces ahead,
@@ -621,7 +807,7 @@ static bool children_sent(const struct generic_team *team_phase, const struct pi
                           const struct lead_tree *tree, uint64_t number)
 {
     for (uint32_t c = 0; c < tree->children; c++)
-        if (osoe_transport_load(OSOE_REGION_INTERNAL, arrival_counter(pieces->team, c), 8) <
+        if (osoe_transport_load(OSOE_REGION_INTERNAL, arrival_counter(pieces->number, c), 8) <
             team_phase->arrival_base[c] + number + 1)
             return false;
     return true;
@@ -632,8 +818,93 @@ static bool children_sent(const struct generic_team *team_phase, const struct pi
 static bool release_sent(const struct generic_team *team_phase, const struct pieces *pieces,
                          uint64_t number)
 {
-    return osoe_transport_load(OSOE_REGION_INTERNAL, release_counter(pieces->team), 8) >=
+    return osoe_transport_load(OSOE_REGION_INTERNAL, release_counter(pieces->number), 8) >=
            team_phase->release_base + number + 1;
+}
+
+/* Whether the parent's grant for this large reduction is in: the grant
+ * counter against its base, as at least, like every other counter here. */
+static bool grant_in(const struct generic_team *team_phase, const struct pieces *pieces)
+{
+    return osoe_transport_load(OSOE_REGION_INTERNAL, grant_counter(pieces->number), 8) >=
+           team_phase->grant_base + 1;
+}
+
+/*
+ * **A reader clears what it read**: a piece's header once its bytes are
+ * combined or copied out, a lane word or a grant's words once taken. Each is
+ * written again only after something its reader does next - its next arrival,
+ * or its return - which the clear precedes, so it races with nothing a valid
+ * program does. What it buys is the invalid one's: a slot or a word nobody
+ * wrote again since reads as nothing, and the check that reads it ends the job
+ * naming both leads. A lane is shared by every team its thread leads, and a
+ * header names no team, so without the clear a header another team's
+ * collective left - same epoch, same piece, same root and bytes, as two teams'
+ * first collectives can be - would pass for this one's where the nodes took a
+ * collective's class differently (the adversarial read of step E's first
+ * part: a broadcast of 1,000 bytes on the parent and 1,500 on the child
+ * returned another team's data with status 0, where step D's tree named it).
+ */
+static void cleared(unsigned char *read, size_t bytes)
+{
+    memset(read, 0, bytes);
+}
+
+/*
+ * The parent's grant, once grant_in says it is in: its words, put before the
+ * add the acquire load saw, name the parent's lane, and must name this
+ * collective - its epoch, its identity and its bytes - or the job ends naming
+ * both leads, a hop before a piece's header would.
+ */
+static void take_grant(const struct pieces *pieces, const struct lead_tree *tree,
+                       struct lanes *lanes)
+{
+    struct grant grant;
+    memcpy(&grant, internal(grant_words(pieces->number)), sizeof grant);
+    cleared(internal(grant_words(pieces->number)), sizeof grant);
+    if (grant.epoch != pieces->epoch || grant.collective != pieces->collective ||
+        grant.bytes != pieces->bytes) {
+        char theirs[160], mine[160];
+        describe_collective(grant.epoch, grant.collective, theirs, sizeof theirs);
+        describe_collective(pieces->epoch, pieces->collective, mine, sizeof mine);
+        osoe_fatal("%s: the grant from node %u's lead (PE %u) is for %s, %llu bytes, and this "
+                   "node's lead (PE %u) is in %s, %zu bytes: PEs called different collectives, "
+                   "or the same one with different arguments", pieces->routine,
+                   osoe_node_of(&osoe.job, tree->parent), tree->parent, theirs,
+                   (unsigned long long)grant.bytes, osoe.job.me, mine, pieces->bytes);
+    }
+    if (grant.lane >= OSOE_MAX_THREADS_HIGHEST)
+        osoe_fatal("%s: the grant from node %u's lead (PE %u) names lane %u, past any PE's %u",
+                   pieces->routine, osoe_node_of(&osoe.job, tree->parent), tree->parent,
+                   grant.lane, (unsigned)OSOE_MAX_THREADS_HIGHEST);
+    lanes->parent = grant.lane;
+}
+
+/*
+ * Each child's lane, read as this lead takes the child's first piece of a large
+ * collective - the arrival children_sent saw, which the child made after
+ * putting its lane word - and kept for the collective (the file's comment).
+ * Not later: once this lead's last piece has gone up the collective can end
+ * elsewhere, and a node that is this lead's child at the position in the
+ * team's next collective, in a tree rotated to another root, puts its own lane
+ * word there (tools/modelcheck/lane_model.py, release_lane_late). The word
+ * names the collective's epoch, or the job ends.
+ */
+static void take_child_lanes(const struct pieces *pieces, const struct lead_tree *tree,
+                             struct lanes *lanes)
+{
+    for (uint32_t c = 0; c < tree->children; c++) {
+        struct lane_word word;
+        memcpy(&word, internal(lane_word(pieces->number, c)), sizeof word);
+        cleared(internal(lane_word(pieces->number, c)), sizeof word);
+        if (word.epoch != pieces->epoch || word.lane >= OSOE_MAX_THREADS_HIGHEST)
+            osoe_fatal("%s: the lane word of node %u's lead (PE %u), this node's child at "
+                       "position %u, says epoch %u and lane %u, and this node's lead (PE %u) "
+                       "is in epoch %u's collective", pieces->routine,
+                       osoe_node_of(&osoe.job, tree->child[c]), tree->child[c], c, word.epoch,
+                       word.lane, osoe.job.me, pieces->epoch);
+        lanes->child[c] = word.lane;
+    }
 }
 
 /*
@@ -643,66 +914,86 @@ static bool release_sent(const struct generic_team *team_phase, const struct pie
  * (§5.8 rule 3). A broadcast's children put nothing: their arrival says only
  * that their release slot for this piece is free.
  */
-static void combine_children(const struct pieces *pieces, const struct lead_tree *tree,
-                             const struct piece_header *header, uint64_t number,
-                             unsigned char *at)
+static void combine_children(const struct pieces *pieces, const struct lanes *lanes,
+                             const struct lead_tree *tree, const struct piece_header *header,
+                             uint64_t number, unsigned char *at)
 {
     if (!pieces->combine)
         return;
     for (uint32_t c = 0; c < tree->children; c++) {
-        const unsigned char *slot = internal(child_slot(pieces->team, c, number));
+        unsigned char *slot = internal(own_slot(pieces, lanes, c, number));
         check_piece(slot, header, "a child's partial result", tree->child[c], pieces->routine);
         pieces->combine(at, slot + HEADER_BYTES, header->bytes / pieces->width);
+        cleared(slot, HEADER_BYTES);
     }
 }
 
 /* Piece `number`'s release, once release_sent says it is in: check the header
  * in the release slot for the piece, and copy what follows it out to `at`. */
-static void copy_release(const struct pieces *pieces, const struct lead_tree *tree,
-                         const struct piece_header *header, uint64_t number, unsigned char *at)
+static void copy_release(const struct pieces *pieces, const struct lanes *lanes,
+                         const struct lead_tree *tree, const struct piece_header *header,
+                         uint64_t number, unsigned char *at)
 {
-    const unsigned char *slot = internal(release_slot(pieces->team, number));
+    unsigned char *slot =
+        internal(own_slot(pieces, lanes, osoe.bootstrap.collective_fanout, number));
     check_piece(slot, header, "the result from the parent", tree->parent, pieces->routine);
     memcpy(at, slot + HEADER_BYTES, header->bytes);
+    cleared(slot, HEADER_BYTES);
 }
 
-/* Piece `number` up: the partial result in `at` into the parent's slot for
- * this node's position and the piece, behind its header - a broadcast's goes
- * up empty - then one more on the parent's arrival counter for the position,
- * fenced, so that the add lands after the bytes (invariant 5). */
-static void to_parent(const struct pieces *pieces, const struct lead_tree *tree,
-                      const struct piece_header *header, uint64_t number,
-                      const unsigned char *at)
+/*
+ * Piece `number` up: the partial result in `at` into the parent's slot for
+ * this node's position and the piece - the team number's small slot, or the
+ * parent's lane's row - behind its header; a broadcast's goes up empty. Before
+ * a large collective's first, this thread's lane into the position's lane
+ * word, for the releases. Then one more on the parent's arrival counter for
+ * the position, fenced, so that the add lands after the bytes (invariant 5).
+ */
+static void to_parent(const struct pieces *pieces, const struct lanes *lanes,
+                      const struct lead_tree *tree, const struct piece_header *header,
+                      uint64_t number, const unsigned char *at)
 {
     struct osoe_transport_context *context = osoe_transport_context_default();
+    bool small = pieces->class == OSOE_COLLECTIVE_SMALL;
+    if (!small && number == 0) {
+        struct lane_word word = { pieces->epoch, lanes->own };
+        osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL,
+                           lane_word(pieces->number, tree->position), &word, sizeof word,
+                           OSOE_TRANSPORT_MORE);
+    }
     if (pieces->combine) {
-        uint64_t slot = child_slot(pieces->team, tree->position, number);
+        uint64_t slot = small ? small_slot(pieces->number, tree->position)
+                              : lane_slot(lanes->parent, tree->position, number);
         osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL, slot, header,
                            HEADER_BYTES, OSOE_TRANSPORT_MORE);
         osoe_transport_put(context, (int)tree->parent, OSOE_REGION_INTERNAL, slot + HEADER_BYTES,
                            at, header->bytes, OSOE_TRANSPORT_MORE);
     }
     osoe_transport_rmw(context, (int)tree->parent, OSOE_REGION_INTERNAL,
-                       arrival_counter(pieces->team, tree->position), OSOE_RMW_ADD, 8, 1, 0,
+                       arrival_counter(pieces->number, tree->position), OSOE_RMW_ADD, 8, 1, 0,
                        OSOE_TRANSPORT_FENCED);
 }
 
 /* Piece `number`'s release down, from `at`: into each child's release slot for
- * the piece, behind its header, then one more on the child's release counter,
- * fenced after the bytes. */
-static void to_children(const struct pieces *pieces, const struct lead_tree *tree,
-                        const struct piece_header *header, uint64_t number,
-                        const unsigned char *at)
+ * the piece - the team number's small one, or the child's lane's release row -
+ * behind its header, then one more on the child's release counter, fenced
+ * after the bytes. */
+static void to_children(const struct pieces *pieces, const struct lanes *lanes,
+                        const struct lead_tree *tree, const struct piece_header *header,
+                        uint64_t number, const unsigned char *at)
 {
     struct osoe_transport_context *context = osoe_transport_context_default();
-    uint64_t slot = release_slot(pieces->team, number);
+    uint32_t fanout = osoe.bootstrap.collective_fanout;
     for (uint32_t c = 0; c < tree->children; c++) {
+        uint64_t slot = pieces->class == OSOE_COLLECTIVE_SMALL
+                            ? small_slot(pieces->number, fanout)
+                            : lane_slot(lanes->child[c], fanout, number);
         osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL, slot, header,
                            HEADER_BYTES, OSOE_TRANSPORT_MORE);
         osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL,
                            slot + HEADER_BYTES, at, header->bytes, OSOE_TRANSPORT_MORE);
         osoe_transport_rmw(context, (int)tree->child[c], OSOE_REGION_INTERNAL,
-                           release_counter(pieces->team), OSOE_RMW_ADD, 8, 1, 0,
+                           release_counter(pieces->number), OSOE_RMW_ADD, 8, 1, 0,
                            OSOE_TRANSPORT_FENCED |
                            (c + 1 < tree->children ? OSOE_TRANSPORT_MORE : 0));
     }
@@ -710,17 +1001,21 @@ static void to_children(const struct pieces *pieces, const struct lead_tree *tre
 
 /*
  * What a lead waits for when neither of its inputs is ready: its children's
- * copies of piece `up`, if the window lets it send that piece, or its next
- * piece down - piece `down`'s release from its parent, or at the root every
- * child's copy of piece `down`. The team's words are contiguous, an arrival
- * counter per child position and then the release counter, so one watch
- * covers them all.
+ * copies of piece `up`, if the window lets it send that piece - and, for a
+ * large reduction's first piece, its parent's grant - or its next piece down:
+ * piece `down`'s release from its parent, or at the root every child's copy
+ * of piece `down`. The team's counters are contiguous, an arrival counter per
+ * child position, the release counter and the grant counter, so one watch
+ * covers them all, and no put writes inside it - the release counter's line
+ * also holds collect's spare words, which a node-mate writes with plain stores
+ * that wake nobody (internal-region.h).
  */
 struct awaited {
     const struct generic_team *team_phase;
     const struct pieces *pieces;
     const struct lead_tree *tree;
     bool sending;                       /* the window lets piece `up` go up */
+    bool granting;                      /* and the grant it waits for is not yet taken */
     uint64_t up;
     uint64_t down;
 };
@@ -735,7 +1030,8 @@ static bool next_down_sent(const struct generic_team *team_phase, const struct p
 static bool awaited_holds(const void *context)
 {
     const struct awaited *a = context;
-    return (a->sending && children_sent(a->team_phase, a->pieces, a->tree, a->up)) ||
+    return (a->sending && children_sent(a->team_phase, a->pieces, a->tree, a->up) &&
+            (!a->granting || grant_in(a->team_phase, a->pieces))) ||
            next_down_sent(a->team_phase, a->pieces, a->tree, a->down);
 }
 
@@ -760,12 +1056,19 @@ static bool awaited_holds(const void *context)
  * depth h, about h / (h - 1) of one piece at a time's speed rather than D times
  * (design §5.8; the phase 1 step 5 slice 5 review).
  *
+ * A large collective (the file's comment) runs through lanes: this thread's,
+ * bound to it since its entry; a reduction's child sends its first piece up
+ * only once it holds its parent's grant, which names the parent's lane; every
+ * lead takes its children's lanes from their lane words as it takes their
+ * first piece, and a child puts its own lane's word before its first add. A
+ * small one is a single piece through the team number's own small slots.
+ *
  * At the end, the bases advance by what this tree says each counter received,
  * and the most pieces this lead had in flight at once goes into the team's
  * tree state (node.h): min(D, pieces) at a leaf, which has no children to wait
  * for and fills its window before it looks for a release; between 1 and that
  * at a middle lead, as the schedule has it; 0 at the root, which sends nothing
- * up.
+ * up. With it, the collective's class and, for a large one, the lane.
  */
 static void in_pieces(struct generic_team *team_phase, const struct pieces *pieces,
                       const struct lead_tree *tree)
@@ -773,14 +1076,25 @@ static void in_pieces(struct generic_team *team_phase, const struct pieces *piec
     uint64_t piece_count = (pieces->bytes + pieces->bytes_per_piece - 1) / pieces->bytes_per_piece;
     uint64_t window = osoe.bootstrap.collective_pipeline;
     bool root = tree->parent == UINT32_MAX;
+    bool large = pieces->class == OSOE_COLLECTIVE_LARGE;
+    /* A large reduction's child sends nothing up before its parent's grant;
+     * a broadcast's pieces go up empty, and need none (E4). */
+    bool needs_grant = large && pieces->combine && !root;
+    struct lanes lanes = { .own = large ? own_lane() : NO_LANE, .parent = NO_LANE };
     uint64_t up = 0, down = 0, most = 0;
     while (down < piece_count) {
         bool sending = !root && up < piece_count && up < down + window;
-        if (sending && children_sent(team_phase, pieces, tree, up)) {
+        if (sending && children_sent(team_phase, pieces, tree, up) &&
+            (!needs_grant || lanes.parent != NO_LANE || grant_in(team_phase, pieces))) {
+            if (needs_grant && lanes.parent == NO_LANE)
+                take_grant(pieces, tree, &lanes);
+            if (large && up == 0)
+                take_child_lanes(pieces, tree, &lanes);
             struct piece_header header = header_of(pieces, up);
             unsigned char *at = piece_at(pieces, up);
-            combine_children(pieces, tree, &header, up, at);
-            to_parent(pieces, tree, &header, up, at);
+            combine_children(pieces, &lanes, tree, &header, up, at);
+            to_parent(pieces, &lanes, tree, &header, up, at);
+            osoe_perturb();
             up++;
             if (up - down > most)
                 most = up - down;
@@ -789,18 +1103,23 @@ static void in_pieces(struct generic_team *team_phase, const struct pieces *piec
         if (next_down_sent(team_phase, pieces, tree, down)) {
             struct piece_header header = header_of(pieces, down);
             unsigned char *at = piece_at(pieces, down);
-            if (root)
-                combine_children(pieces, tree, &header, down, at);
-            else
-                copy_release(pieces, tree, &header, down, at);
-            to_children(pieces, tree, &header, down, at);
+            if (root) {
+                if (large && down == 0)
+                    take_child_lanes(pieces, tree, &lanes);
+                combine_children(pieces, &lanes, tree, &header, down, at);
+            } else {
+                copy_release(pieces, &lanes, tree, &header, down, at);
+            }
+            to_children(pieces, &lanes, tree, &header, down, at);
+            osoe_perturb();
             down++;
             continue;
         }
-        struct awaited awaited = { team_phase, pieces, tree, sending, up, down };
-        uint64_t first = arrival_counter(pieces->team, 0);
+        struct awaited awaited = { team_phase, pieces, tree, sending,
+                                   needs_grant && lanes.parent == NO_LANE, up, down };
+        uint64_t first = arrival_counter(pieces->number, 0);
         osoe_region_wait_condition(pieces->routine, OSOE_REGION_INTERNAL, first,
-                                   (size_t)(release_counter(pieces->team) + 8 - first),
+                                   (size_t)(grant_counter(pieces->number) + 8 - first),
                                    awaited_holds, &awaited, OSOE_BLOCKED_DETAIL_EPOCH,
                                    pieces->epoch);
     }
@@ -808,12 +1127,50 @@ static void in_pieces(struct generic_team *team_phase, const struct pieces *piec
         team_phase->arrival_base[c] += piece_count;
     if (!root)
         team_phase->release_base += piece_count;
+    if (needs_grant)
+        team_phase->grant_base++;
     /* Single-writer publication for osoe-stat and the tests (§3.16), and
      * before the lead bumps the team's `released`, which every member loads
      * with acquire before it returns: so once its call has returned, a member
-     * of this node reads this collective's count. */
+     * of this node reads this collective's counts. */
     atomic_store_explicit(&team_phase->published->most_pieces_in_flight, (uint32_t)most,
                           memory_order_release);
+    atomic_store_explicit(&team_phase->published->collective_class, (uint32_t)pieces->class,
+                          memory_order_release);
+    if (large)
+        atomic_store_explicit(&team_phase->published->lane, lanes.own, memory_order_release);
+}
+
+/*
+ * The grants of a large reduction (the file's comment), sent as its local lead
+ * enters it, before the intranode phase: this thread's lane is the
+ * reduction's from here to its return, and each child of the reduction's tree
+ * is told so - the grant's words put into its grant line for the team, then one
+ * more on its grant counter, fenced after them. A small reduction needs none.
+ * It waits for nothing of the collective's.
+ */
+void osoe_internode_generic_reduce_enter(uint32_t team, uint32_t epoch, size_t count,
+                                         enum osoe_reduction_operation operation,
+                                         struct osoe_element element, const char *routine)
+{
+    uint64_t bytes = (uint64_t)count * element.width;
+    if (osoe_collective_class(bytes, osoe.bootstrap.small_collective_bytes) ==
+        OSOE_COLLECTIVE_SMALL)
+        return;
+    struct generic_team *team_phase = registered_team(team, routine);
+    const struct lead_tree *tree = &team_phase->reduction_tree;
+    team_phase->entered = epoch;
+    uint32_t number = number_of(team);
+    struct grant grant = { epoch, reduction_identity(operation, element), bytes, own_lane(), 0 };
+    struct osoe_transport_context *context = osoe_transport_context_default();
+    for (uint32_t c = 0; c < tree->children; c++) {
+        osoe_transport_put(context, (int)tree->child[c], OSOE_REGION_INTERNAL,
+                           grant_words(number), &grant, sizeof grant, OSOE_TRANSPORT_MORE);
+        osoe_transport_rmw(context, (int)tree->child[c], OSOE_REGION_INTERNAL,
+                           grant_counter(number), OSOE_RMW_ADD, 8, 1, 0,
+                           OSOE_TRANSPORT_FENCED |
+                           (c + 1 < tree->children ? OSOE_TRANSPORT_MORE : 0));
+    }
 }
 
 void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, size_t count,
@@ -825,9 +1182,16 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
     if (!combine || element.width > OSOE_INTERNAL_SLOT_BYTES - HEADER_BYTES)
         osoe_fatal("%s: no reduction %d over elements of kind %d and width %u", routine,
                    (int)operation, (int)element.kind, element.width);
-    struct pieces pieces = { team, epoch, reduction_identity(operation, element), buffer,
-                             count * element.width, piece_bytes(element.width), element.width,
-                             combine, routine };
+    size_t bytes = count * element.width;
+    enum osoe_collective_class class =
+        osoe_collective_class(bytes, osoe.bootstrap.small_collective_bytes);
+    if (class == OSOE_COLLECTIVE_LARGE && team_phase->entered != epoch)
+        osoe_fatal("%s: team %u's large reduction at epoch %u was not entered first "
+                   "(osoe_internode_reduce_enter), so no grant left for its children",
+                   routine, number_of(team), epoch);
+    struct pieces pieces = { team, number_of(team), epoch, reduction_identity(operation, element),
+                             class, buffer, bytes, bytes_per_piece(class, bytes, element.width),
+                             element.width, combine, routine };
     in_pieces(team_phase, &pieces, &team_phase->reduction_tree);
 }
 
@@ -1249,8 +1613,10 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
                    root_index, team_phase->count);
     struct lead_tree tree;
     find_lead_tree(team_phase, team, root_index, &tree, routine);
-    struct pieces pieces = { team, epoch, root_index, buffer, bytes, piece_bytes(1), 1, NULL,
-                             routine };
+    enum osoe_collective_class class =
+        osoe_collective_class(bytes, osoe.bootstrap.small_collective_bytes);
+    struct pieces pieces = { team, number_of(team), epoch, root_index, class, buffer, bytes,
+                             bytes_per_piece(class, bytes, 1), 1, NULL, routine };
     in_pieces(team_phase, &pieces, &tree);
 }
 
@@ -1322,7 +1688,8 @@ static uint64_t scan_of_number(uint32_t number)
 {
     uint32_t fanout = osoe.bootstrap.collective_fanout;
     uint32_t pipeline = osoe.bootstrap.collective_pipeline;
-    return osoe_internal_scan_offset(fanout, pipeline, osoe.bootstrap.max_teams,
+    return osoe_internal_scan_offset(fanout, osoe.bootstrap.max_teams,
+                                     osoe.bootstrap.small_collective_bytes,
                                      osoe.bootstrap.node_count) +
            (uint64_t)number * osoe_internal_team_scan_bytes(fanout, pipeline);
 }
@@ -1560,21 +1927,25 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
 }
 
 /* Every counter of team number `number` in this PE's internal region
- * (internal-region.h): its arrivals and its release, its gathers' READY and
- * DATA, and its scans' rows. Atomic stores, as each word is written by the
- * transport's adds; the split's sync that follows orders them before any. */
+ * (internal-region.h): its arrivals, its release and its grant, the grant's
+ * words, its gathers' READY and DATA, and its scans' rows. Atomic stores, as
+ * each counter is written by the transport's adds; the split's sync that
+ * follows orders them before any. The grant counter is the one guard against
+ * the team that held the number before: a grant's epoch and identity cannot
+ * tell that team's last grant from the next team's first, since epochs start
+ * again at 1 under the same number. */
 void osoe_internode_generic_number_taken(uint32_t number)
 {
     uint32_t fanout = osoe.bootstrap.collective_fanout;
     uint32_t steps = osoe_internal_gather_steps(osoe.bootstrap.node_count);
-    for (uint32_t position = 0; position <= fanout; position++) {
-        uint64_t words[2] = { words_of_number(number), scan_counter_of_number(number, 0) };
-        for (uint32_t i = 0; i < 2; i++)
-            atomic_store_explicit(
-                (_Atomic uint64_t *)internal(words[i] +
-                                             (uint64_t)position * OSOE_INTERNAL_LINE_BYTES),
-                0, memory_order_release);
-    }
+    for (uint32_t line = 0; line < fanout + 2; line++)
+        atomic_store_explicit((_Atomic uint64_t *)internal(arrival_counter(number, line)), 0,
+                              memory_order_release);
+    memset(internal(grant_words(number)), 0, sizeof(struct grant));
+    for (uint32_t position = 0; position <= fanout; position++)
+        atomic_store_explicit(
+            (_Atomic uint64_t *)internal(scan_counter_of_number(number, position)), 0,
+            memory_order_release);
     for (uint32_t line = 0; line < 2 * steps; line++)
         atomic_store_explicit((_Atomic uint64_t *)internal(gather_of_number(number) +
                                                            (uint64_t)line *
