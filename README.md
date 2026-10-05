@@ -489,7 +489,7 @@ where to find what among the documents.
 | `docs/README.md` | where to find what in `docs/` |
 | `docs/pi-cluster.md`, `docs/pi-cluster-results.md` | the runbook for the four-node Raspberry Pi 5 cluster, and what its sessions measured |
 | `docs/release-checklist.md` | what a release needs, ticked where it is done |
-| `docs/design/` | the design notes, `shmem-ethernet-design.md`; two proposals and a note on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
+| `docs/design/` | the design notes, `shmem-ethernet-design.md`; three proposals and a note on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
 | `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |
 | `docs/prompts/` | the written briefs each working session was given; the finished ones are in `done/` |
 | `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds (`evidence/`) |
@@ -706,7 +706,16 @@ times these:
   the set's ranks, log₂ of its size deep, its edges across nodes wherever its
   PEs are.
 - **The mesh**: every pair of nodes connects at start-up, each lead's n - 1
-  connections made one after another.
+  connections made one after another. A lead calls no higher node until every
+  lower one has called it, so the start-up is a chain of node-to-node
+  connections, the last lead connected after about n connection times, and a
+  larger system may need it changed (`docs/design/mesh-schedule-proposal.md`
+  proposes a schedule). On one subnet each node also needs an entry in the
+  kernel's neighbour table, its record of a peer's Ethernet address, for each
+  of its n - 1 peers, and Linux allows 1,024 by default: for more than about a
+  thousand nodes on one subnet, an administrator raises
+  `net.ipv4.neigh.default.gc_thresh3` above the node count, and `gc_thresh1`
+  and `gc_thresh2` with it.
 - **`/dev/shm`**: each PE makes a heap object, which every PE of its node maps,
   so the capacity check asks for P × (`SHMEM_SYMMETRIC_SIZE` + the program's
   statics + 6.5 MiB) and the control segment - 65.7 GiB a node at 256 PEs and
@@ -1438,10 +1447,11 @@ testing on an Arm VM running on macOS and a Raspberry Pi 5 cluster running
 Raspberry Pi OS (Trixie). The work was carried out starting in September 2026.
 The models were the ones Anthropic offered during September/October 2026:
 Claude Opus 5, and from 22 September Claude Opus 5.5, led each working session;
-Claude Sonnet 5 and 5.5 and Claude Fable 5.1 took parts of some sessions and of
-the tasks a session handed off. Every commit but the first and six merges
-names the model that wrote it beside the author, in a `Co-Authored-By` line,
-and the history is published whole, as the record of how the work was done.
+Claude Sonnet 5 and 5.5 took parts of some sessions and of the tasks a session
+handed off, and Claude Fable 5.1 did periodic reviews and deep planning. Every
+commit but the first and six merges names the model that wrote it beside the
+author, in a `Co-Authored-By` line, and the history is published whole, as the
+record of how the work was done.
 
 The work ran from goals down to code, and each level is in the repository:
 

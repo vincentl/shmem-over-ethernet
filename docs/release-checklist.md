@@ -41,8 +41,10 @@ done; an open one, what is left.
   "osoe has not made a release yet: there is no version tag" (round six's
   readiness Q5-5), and the README is true at every commit; on the release
   commit it says this is 0.1.0, the first release. The release note is written,
-  `docs/release-notes/0.1.0.md`, on the release commit the tag is to name
-  (`docs/decisions/2026-10-05-release-point.md`); the tag is what is left.
+  `docs/release-notes/0.1.0.md`; the release point verified the tree
+  (`docs/decisions/2026-10-05-release-point.md`), and what the author asked for
+  the morning after went in before the tag, documents only
+  (`docs/decisions/2026-10-05-before-the-tag.md`); the tag is what is left.
 
 ## Before every release tag (the decisions index)
 
@@ -194,3 +196,7 @@ rated them (round six's readiness Q5-5).
   on a node of 256 PEs four of them empty the default pool (step D's second
   part, its first adversarial read, item 5; documented in the README's
   limits).
+- **The mesh's start-up schedule** (`docs/design/mesh-schedule-proposal.md`),
+  once a system large enough to measure it is at hand: the author postponed it
+  on 2026-10-05 (`docs/decisions/2026-10-05-before-the-tag.md` item 2), and the
+  README's limits say the start-up is a chain a larger system may need changed.

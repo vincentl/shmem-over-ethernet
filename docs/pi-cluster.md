@@ -22,6 +22,7 @@ srun -N4 --ntasks-per-node=1 uname -r
 srun -N4 --ntasks-per-node=1 getconf PAGESIZE                          # 16384 on a Pi 5's kernel
 srun -N4 --ntasks-per-node=1 cat /proc/sys/kernel/io_uring_disabled   # 0
 srun -N4 --ntasks-per-node=1 cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+srun -N4 --ntasks-per-node=1 cat /sys/class/net/eth0/speed /sys/class/net/eth0/duplex   # 1000, full
 srun -N4 --ntasks-per-node=1 sh -c 'echo "$(hostname): $(getent ahostsv4 $(hostname) | head -1)"'
 sinfo -V
 ```
@@ -39,8 +40,8 @@ Keep the output: it goes in the notes with the results.
   on each for its whole run (`ssh pi-00N sleep 7200 &`). The cure is
   `RemoveIPC=no` in `/etc/systemd/logind.conf`, or `loginctl enable-linger pi`,
   on each node - sudo, the author's.
-- The switch: compute node `pi-00X` is on port X and the head node on port 9; the switch is unmanaged as far as known, so it has no counters to read. What TCP saw of it is in `nstat -az TcpRetransSegs TcpExtTCPTimeouts` on each node.
-- The fifth line shows what each node's own name resolves to there. On this cluster the image's `/etc/hosts` maps each name to its 10.0.1.N address. A stock Raspberry Pi OS maps a host's own name to 127.0.1.1, which its peers cannot reach; osoe then listens at the node's address toward the others instead (design §6.1), and `SHMEM_DEBUG=1` says so per node.
+- The switch: compute node `pi-00X` is on port X and the head node on port 9; the switch is unmanaged as far as known, so it has no counters to read. The fifth line is the speed each node's link negotiated with its port: 1000 Mb/s, full duplex, on every node on 2026-10-05, and node-to-node streams run at 111.5 to 112.1 MiB/s, gigabit's rate for TCP's payload. A 100 Mb/s port would show 100 there and cap a stream near 11 MiB/s. What TCP saw of it is in `nstat -az TcpRetransSegs TcpExtTCPTimeouts` on each node.
+- The sixth line shows what each node's own name resolves to there. On this cluster the image's `/etc/hosts` maps each name to its 10.0.1.N address. A stock Raspberry Pi OS maps a host's own name to 127.0.1.1, which its peers cannot reach; osoe then listens at the node's address toward the others instead (design §6.1), and `SHMEM_DEBUG=1` says so per node.
 
 ## 2. Build once, in /home
 
