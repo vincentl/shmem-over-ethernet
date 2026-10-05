@@ -91,7 +91,7 @@
  * **What a team number owns here is the team's while one of this PE's teams
  * holds the number** (step D): a PE gives a number back when it destroys its
  * team, and takes it again for a later one, and as it takes it zeroes every
- * counter of the number in its own region and its grant's words
+ * counter of the number in its own region and its grants' words
  * (osoe_internode_number_taken), before the split's sync, after which alone
  * anybody writes them for the new team. Nothing of the old team is still to
  * arrive by then: every write into a PE's slots and counters is one the PE
@@ -106,7 +106,8 @@
  *
  * Every PE's heap carries one region. A team touches only its own number's
  * rows and words, on the leads of its nodes - but for its scans, on every
- * member (below) - and a large collective a lane of each lead's; the pages
+ * member (below) - and a large collective a lane of each lead's thread, or
+ * for a scan of each member's; the pages
  * nobody writes cost address space and the /dev/shm capacity check's share,
  * not memory. **Every node computes the same offsets**: the layout is fixed by
  * the fan-out, OSOE_MAX_TEAMS, D, OSOE_SMALL_COLLECTIVE_BYTES and the job's
@@ -133,10 +134,6 @@ enum {
      * Pi's Cortex-A72 and A76 and x86-64 have 64.
      */
     OSOE_INTERNAL_LINE_BYTES = 128,
-    /* One piece of a prefix scan: smaller than a data collective's, since a
-     * scan's slots are every member's and not only its node's lead's, and no
-     * program in the corpus scans much (the scans' area, below). */
-    OSOE_INTERNAL_SCAN_SLOT_BYTES = 4 << 10,
     /* What a piece carries ahead of its bytes (internode-generic.c), sixteen
      * bytes so that the bytes after it stay aligned for every element. */
     OSOE_INTERNAL_PIECE_HEADER_BYTES = 16,
@@ -265,24 +262,34 @@ static inline uint64_t osoe_internal_gather_offset(uint32_t fanout, uint32_t max
 
 /*
  * Then **the scans' area** (spec §9.10.10; phase 1 step 10 slice 1,
- * docs/prompts/done/phase1-step10-slice1-prompt.md): per team number, like
- * everything else here, and on every member's region rather than its node's
- * lead's alone, since every member of a scan holds a place of its own in the
- * scan's tree - a row of D up-slots per child position and a row of D
- * down-slots, D being the pieces a scan keeps in flight as the reductions do
- * (OSOE_COLLECTIVE_PIPELINE; the author's decision of 2026-09-27), piece g of
- * the team's scans in slot g mod D; then a counter for each row, alone on its
- * line. Not the reductions' rows: a node that finished a scan may start a
- * reduction and put into a row its tree parent, still in the scan, would be
- * reading - different collectives have different trees. Per team number and
- * not the PE's alone, shared by every team: under THREAD_MULTIPLE two threads
- * of a PE may scan two teams at once (spec §9.4), and with a team's own slots
- * consecutive scans on it are safe by the tree alone
- * (tools/modelcheck/scan_model.py, per_team; the review of the slice), and
- * with D in flight as well (scan_pipeline_model.py). 2.6 MiB at the defaults,
- * touched only by scans. *Temporary*: step E's second part moves the scans to
- * a team number's small rows and the lanes, as the reductions' are moved here.
+ * docs/prompts/done/phase1-step10-slice1-prompt.md; the team redesign's step
+ * E, E6): per team number, like everything else here, and on every member's
+ * region rather than its node's lead's alone, since every member of a scan
+ * holds a place of its own in the scan's tree. Shaped as the reductions' are:
+ * a small row per child position and one for the down - a lane word, then a
+ * small slot of OSOE_SMALL_COLLECTIVE_BYTES, with no piece header, as a scan's
+ * pieces carry none - rounded up to the line; then a counter for each row and
+ * the scans' grant counter, each alone on its line and contiguous, the
+ * grant's words past it. A small scan is one piece through the small slots; a
+ * large one goes through the members' lanes in pieces sized to the scan, at
+ * most a lane's 16 KiB slot, D of them in flight (OSOE_COLLECTIVE_PIPELINE; the author's decision of
+ * 2026-09-27), piece g of the team's scans in slot g mod D, each member
+ * granting its tree children as it enters. Not the reductions' rows and
+ * counters: a node that finished a scan may start a reduction and put into a
+ * row its tree parent, still in the scan, would be reading - different
+ * collectives have different trees. Per team number and not the PE's alone,
+ * so that two threads of a PE may scan two teams at once (spec §9.4), and
+ * consecutive scans on a team are safe by the tree alone
+ * (tools/modelcheck/scan_model.py, per_team; scan_pipeline_model.py, with D in
+ * flight, the lanes and the small scans).
  */
+static inline uint64_t osoe_internal_scan_row_bytes(uint32_t small_collective_bytes)
+{
+    uint64_t bytes = OSOE_INTERNAL_LANE_WORD_BYTES + (uint64_t)small_collective_bytes;
+    return (bytes + OSOE_INTERNAL_LINE_BYTES - 1) / OSOE_INTERNAL_LINE_BYTES *
+           OSOE_INTERNAL_LINE_BYTES;
+}
+
 static inline uint64_t osoe_internal_scan_offset(uint32_t fanout, uint32_t max_teams,
                                                  uint32_t small_collective_bytes,
                                                  uint32_t nodes)
@@ -292,17 +299,19 @@ static inline uint64_t osoe_internal_scan_offset(uint32_t fanout, uint32_t max_t
                osoe_internal_team_gather_bytes(osoe_internal_gather_steps(nodes));
 }
 
-/* One team number's scan rows, `pipeline` slots each, and their counters. */
-static inline uint64_t osoe_internal_team_scan_bytes(uint32_t fanout, uint32_t pipeline)
+/* One team number's scan rows, and then their counters and the scans' grant
+ * line. */
+static inline uint64_t osoe_internal_team_scan_bytes(uint32_t fanout,
+                                                     uint32_t small_collective_bytes)
 {
-    return (uint64_t)(fanout + 1) *
-           ((uint64_t)pipeline * OSOE_INTERNAL_SCAN_SLOT_BYTES + OSOE_INTERNAL_LINE_BYTES);
+    return (uint64_t)(fanout + 1) * osoe_internal_scan_row_bytes(small_collective_bytes) +
+           (uint64_t)(fanout + 2) * OSOE_INTERNAL_LINE_BYTES;
 }
 
-static inline uint64_t osoe_internal_scan_bytes(uint32_t fanout, uint32_t pipeline,
-                                                uint32_t max_teams)
+static inline uint64_t osoe_internal_scan_bytes(uint32_t fanout, uint32_t max_teams,
+                                                uint32_t small_collective_bytes)
 {
-    return (uint64_t)max_teams * osoe_internal_team_scan_bytes(fanout, pipeline);
+    return (uint64_t)max_teams * osoe_internal_team_scan_bytes(fanout, small_collective_bytes);
 }
 
 /* One lane: a row of `pipeline` slots per child position, then the release
@@ -313,13 +322,12 @@ static inline uint64_t osoe_internal_lane_bytes(uint32_t fanout, uint32_t pipeli
 }
 
 /* Where the lanes start: past the scans' area. */
-static inline uint64_t osoe_internal_lanes_offset(uint32_t fanout, uint32_t pipeline,
-                                                  uint32_t max_teams,
+static inline uint64_t osoe_internal_lanes_offset(uint32_t fanout, uint32_t max_teams,
                                                   uint32_t small_collective_bytes,
                                                   uint32_t nodes)
 {
     return osoe_internal_scan_offset(fanout, max_teams, small_collective_bytes, nodes) +
-           osoe_internal_scan_bytes(fanout, pipeline, max_teams);
+           osoe_internal_scan_bytes(fanout, max_teams, small_collective_bytes);
 }
 
 /* The region's size for `max_teams` team numbers and `lanes` lanes, a tree of
@@ -332,8 +340,7 @@ static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipe
                                                   uint32_t small_collective_bytes,
                                                   uint32_t nodes, uint32_t lanes)
 {
-    return osoe_internal_lanes_offset(fanout, pipeline, max_teams, small_collective_bytes,
-                                      nodes) +
+    return osoe_internal_lanes_offset(fanout, max_teams, small_collective_bytes, nodes) +
            (uint64_t)lanes * osoe_internal_lane_bytes(fanout, pipeline);
 }
 

@@ -43,6 +43,15 @@
  *                 next.
  *   mismatch      two leads of one team in different large reductions: the
  *                 child's grant names the difference, and the job ends by name.
+ *   scan-shared-parent, scan-turns, scan-reuse, scan-mismatch
+ *                 the same for the scans (E6), whose every member grants its
+ *                 tree children as it enters and lends its lane: two teams whose
+ *                 scan trees share their root, PE 1, with large and small scans
+ *                 and a child outside the scan its parent is in
+ *                 (scan_pipeline_model.py's PQ); a team's large scans led by
+ *                 its PEs' threads in turn; a number taken again; and an
+ *                 inclusive scan against an exclusive one, which the grant
+ *                 names.
  *   class-split   two leads of one team given counts on either side of
  *                 OSOE_SMALL_COLLECTIVE_BYTES, outside the specification, as
  *                 the README's Limits say: a large parent over a small child
@@ -153,6 +162,31 @@ static void broadcast_on(shmem_team_t team, int root, int root_pe, long *dst, lo
         }
 }
 
+/* An inclusive or exclusive sum scan of `n` longs on `team`, whose world ranks
+ * by team rank are `members`, every element checked. */
+static void scan_on(shmem_team_t team, const int *members, long *dst, long *src, size_t n,
+                    int round, bool inclusive, const char *what)
+{
+    int rank = shmem_team_my_pe(team);
+    for (size_t i = 0; i < n; i++) {
+        src[i] = value(me, i, round);
+        dst[i] = -1;
+    }
+    CHECK((inclusive ? shmem_long_sum_inscan(team, dst, src, n)
+                     : shmem_long_sum_exscan(team, dst, src, n)) == 0);
+    for (size_t i = 0; i < n; i++) {
+        long want = 0;
+        for (int r = 0; r < rank + (inclusive ? 1 : 0); r++)
+            want += value(members[r], i, round);
+        if (dst[i] != want) {
+            fprintf(stderr, "PE %d: %s, round %d: element %zu of %zu is %ld, not %ld\n", me,
+                    what, round, i, n, dst[i], want);
+            CHECK(dst[i] == want);
+            return;
+        }
+    }
+}
+
 /* ---- shared-lead ------------------------------------------------------- */
 
 enum { SHARED_ROUNDS = 24, LATE_US = 20000 };
@@ -184,6 +218,38 @@ static void shared_lead(void)
             else
                 reduce_on(u, u_members, 2, dest, source, n, round, "U's sum");
         }
+    }
+    shmem_barrier_all();
+    if (t != SHMEM_TEAM_INVALID)
+        shmem_team_destroy(t);
+    if (u != SHMEM_TEAM_INVALID)
+        shmem_team_destroy(u);
+}
+
+/* The scans' shared-lead: T's and U's scan trees both rooted at PE 1, their
+ * rank 0, with node 3 late to T's, so that PE 2, in U alone, enters U's scan
+ * while PE 1 is in T's, PE 2 at position 0 of U's tree as PE 3 is of T's. U
+ * has a third member, PE 3 at its position 1, because only a child before the
+ * last has a total any result depends on: a scan's down to child j carries the
+ * totals of children 0 .. j - 1, and a corrupt total from the last child shows
+ * nowhere. */
+static const int u3_members[] = { 1, 2, 3 };
+
+static void scan_shared_parent(void)
+{
+    CHECK_FATAL(npes == 4);
+    shmem_team_t t = split(1, 2, 2);    /* PEs 1 and 3 */
+    shmem_team_t u = split(1, 1, 3);    /* PEs 1, 2 and 3 */
+    static const size_t sizes[] = { ONE_PIECE, SEVERAL, SMALL };
+    for (int round = 0; round < SHARED_ROUNDS; round++) {
+        size_t n = sizes[round % 3];
+        bool inclusive = round % 2 == 0;
+        if (me == 3)
+            sleep_us(LATE_US);
+        if (t != SHMEM_TEAM_INVALID)
+            scan_on(t, t_members, dest, source, n, round, inclusive, "T's scan");
+        if (u != SHMEM_TEAM_INVALID)
+            scan_on(u, u3_members, dest, source, n, round, inclusive, "U's scan");
     }
     shmem_barrier_all();
     if (t != SHMEM_TEAM_INVALID)
@@ -277,10 +343,17 @@ static int turn_round = -1;             /* the round the helper is to run, or -1
 static bool turn_done, turn_stop;
 static const int both[] = { 0, 1 };
 
+static bool turn_scans;                 /* scan-turns: the turns scan, not reduce */
+
 static void turn_reduce(int round)
 {
-    reduce_on(SHMEM_TEAM_WORLD, both, 2, dest, source, round % 3 ? ONE_PIECE : SEVERAL, round,
-              "a sum led by its turn's thread");
+    size_t n = round % 3 ? ONE_PIECE : SEVERAL;
+    if (turn_scans)
+        scan_on(SHMEM_TEAM_WORLD, both, dest, source, n, round, round % 2 == 0,
+                "a scan made by its turn's thread");
+    else
+        reduce_on(SHMEM_TEAM_WORLD, both, 2, dest, source, n, round,
+                  "a sum led by its turn's thread");
 }
 
 static void *turn_helper(void *argument)
@@ -334,6 +407,39 @@ static void turns(void)
     pthread_mutex_unlock(&turn_lock);
     CHECK(pthread_join(helper, NULL) == 0);
     shmem_barrier_all();
+}
+
+/* ---- scan-reuse, scan-mismatch ----------------------------------------- */
+
+static void scan_reuse(void)
+{
+    CHECK_FATAL(npes == 2);
+    shmem_team_t x = split(0, 1, 2);
+    for (int round = 0; round < 3; round++)
+        scan_on(x, both, dest, source, ONE_PIECE, round, true, "the first team's scan");
+    shmem_team_destroy(x);
+    shmem_team_t y = split(0, 1, 2);
+    CHECK(osoe_test_team_block(PREDEFINED_TEAMS) != UINT32_MAX);
+    /* PE 0, rank 0, the scan tree's root, late: PE 1 must wait for its grant. */
+    if (me == 0)
+        sleep_us(200000);
+    scan_on(y, both, dest, source, ONE_PIECE, 100, true, "the second team's scan");
+    scan_on(y, both, dest, source, SEVERAL, 101, false, "the second team's scan");
+    shmem_barrier_all();
+    shmem_team_destroy(y);
+}
+
+static void scan_mismatch(void)
+{
+    CHECK_FATAL(npes == 2);
+    for (size_t i = 0; i < ONE_PIECE; i++)
+        source[i] = value(me, i, 0);
+    if (me == 0)
+        shmem_long_sum_inscan(SHMEM_TEAM_WORLD, dest, source, ONE_PIECE);
+    else
+        shmem_long_sum_exscan(SHMEM_TEAM_WORLD, dest, source, ONE_PIECE);
+    fprintf(stderr, "PE %d: a mismatched scan returned\n", me);
+    CHECK(false);
 }
 
 /* ---- rotation ---------------------------------------------------------- */
@@ -507,7 +613,8 @@ static void class_split_broadcast(void)
 int main(int argc, char **argv)
 {
     const char *which = argc > 1 ? argv[1] : "";
-    bool threaded = strcmp(which, "two-threads") == 0 || strcmp(which, "turns") == 0;
+    bool threaded = strcmp(which, "two-threads") == 0 || strcmp(which, "turns") == 0 ||
+                    strcmp(which, "scan-turns") == 0;
     int provided = -1;
     CHECK_FATAL(shmem_init_thread(threaded ? SHMEM_THREAD_MULTIPLE : SHMEM_THREAD_SINGLE,
                                   &provided) == 0);
@@ -524,6 +631,15 @@ int main(int argc, char **argv)
         two_threads();
     else if (strcmp(which, "turns") == 0)
         turns();
+    else if (strcmp(which, "scan-turns") == 0) {
+        turn_scans = true;
+        turns();
+    } else if (strcmp(which, "scan-shared-parent") == 0)
+        scan_shared_parent();
+    else if (strcmp(which, "scan-reuse") == 0)
+        scan_reuse();
+    else if (strcmp(which, "scan-mismatch") == 0)
+        scan_mismatch();
     else if (strcmp(which, "rotation") == 0)
         rotation();
     else if (strcmp(which, "boundary") == 0)
@@ -540,7 +656,8 @@ int main(int argc, char **argv)
         class_split_broadcast();
     else
         CHECK_FATAL(!"a case: shared-lead, two-threads, turns, rotation, boundary, reuse, "
-                     "mismatch, class-split-named, class-split-hang or class-split-broadcast");
+                     "mismatch, scan-shared-parent, scan-turns, scan-reuse, scan-mismatch, "
+                     "class-split-named, class-split-hang or class-split-broadcast");
 
     shmem_free(dest);
     shmem_free(source);

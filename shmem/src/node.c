@@ -765,7 +765,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * word per team number, indexed [local id][team], each row padded to a
      * cache line so that a PE publishing its count after every collective
      * shares no line with another. Since layout 30 a 64-bit word, the team's
-     * block beside its epoch (node.h): 512 bytes a PE at the default.
+     * block beside its epoch (node.h): 2,048 bytes a PE at the default 256 numbers.
      */
     uint64_t epoch_row_bytes = align_up((uint64_t)b->max_teams * sizeof(uint64_t));
     uint64_t epochs_offset = align_up(connections_offset + connections_bytes);
@@ -785,7 +785,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint64_t threads_bytes = (uint64_t)b->local_count * per_pe *
                              sizeof(struct osoe_thread_record);
     /* The pool's map, a word per name - OSOE_MAX_TEAMS names for each local PE,
-     * 256 bytes a PE at the default - and its bitmap of free blocks (layout 29;
+     * 1,024 bytes a PE at the default - and its bitmap of free blocks (layout 29;
      * step D); and its bitmap of posted blocks, as long, on a line of its own
      * (layout 30; team_posted_offset). Last, so that nothing before them moved. */
     uint64_t team_map_offset = align_up(threads_offset + threads_bytes);
@@ -969,9 +969,10 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * leftover that osoe-stat --gc removes. The lead knows L and the heap size;
      * every PE has parsed the same size, or check_agreement fails them all. A
      * heap object is the heap and then its internal region (internal-region.h),
-     * about 5.6 MiB at the defaults - 64 team numbers, a fan-out of 4, two
-     * pieces in flight (OSOE_COLLECTIVE_PIPELINE) and a lane for each of 17
-     * thread records - which is counted here with the heap it follows. Pages cost only once written, so the room above has taken
+     * about 6 MiB at the defaults - 256 team numbers of about 14 KiB each, a
+     * fan-out of 4, two pieces in flight (OSOE_COLLECTIVE_PIPELINE) and a lane
+     * of 160 KiB for each of 17 thread records - which is counted here with the
+     * heap it follows. Pages cost only once written, so the room above has taken
      * is only the segment's first and last pages, allocated so that they could
      * be written (about 1.1 MiB at the defaults, the pool of team blocks most
      * of it, counted again in `wanted`: a check that errs by that much toward

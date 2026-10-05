@@ -1,0 +1,8 @@
+scan-odd: 1024 longs (  8192 bytes): median    855.3 us (p10    803.7, p90    891.4)
+scan-odd: 2048 longs ( 16384 bytes): median   1428.8 us (p10   1374.9, p90   1507.2)
+scan-odd: 2049 longs ( 16392 bytes): median   1584.8 us (p10   1478.8, p90   1670.5)
+scan-odd: 3000 longs ( 24000 bytes): median   2003.3 us (p10   1914.4, p90   2105.1)
+scan-odd: 3001 longs ( 24008 bytes): median   1997.2 us (p10   1913.2, p90   2079.0)
+scan-odd: 4094 longs ( 32752 bytes): median   2590.2 us (p10   2503.8, p90   2685.0)
+scan-odd: 4095 longs ( 32760 bytes): median   2589.6 us (p10   2495.4, p90   2677.9)
+scan-odd: 4096 longs ( 32768 bytes): median   2584.4 us (p10   2494.1, p90   2683.9)

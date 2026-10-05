@@ -5,8 +5,9 @@
  * r's source element j is distinct per (r, j), so a result missing a rank's
  * contribution, or holding one it should not, shows.
  *
- * Inclusive and exclusive; in place and not; one element, a few, and more
- * than a scan slot of the internal region holds (a scan in pieces); long
+ * Inclusive and exclusive; in place and not; one element, a few - a small
+ * scan, through its team number's own slots - and more than a lane's slot of
+ * the internal region holds (a large scan, in pieces); long
  * through its typed name and the C11 generic, and one scan of each other type
  * SUM takes but the exact-width ones whose base type is tested - unsigned
  * char, unsigned int and uint64_t with sums that wrap; on the world, the
@@ -37,8 +38,12 @@
 #include "check.h"
 #include "invariants.h"
 
-enum { LARGE = 2048 + 3 };   /* past a 4 KiB scan slot of longs, four times over */
-enum { SLOT_LONGS = 4096 / sizeof(long), MANY = 20 * SLOT_LONGS + 7 };   /* 21 pieces */
+/* Since the team redesign's step E a large scan's pieces are sized to it - its
+ * count's share of D, but at least 8 KiB and at most a lane's 16 KiB slot - and
+ * a scan of at most OSOE_SMALL_COLLECTIVE_BYTES is small, one piece through its
+ * team number's own slots (internode-generic.c). */
+enum { LARGE = 8192 + 3 };   /* past a 16 KiB lane slot of longs, four times over */
+enum { SLOT_LONGS = 16384 / sizeof(long), MANY = 20 * SLOT_LONGS + 7 };   /* 21 pieces */
 enum { BUFFER_BYTES = MANY * sizeof(long) > LARGE * 16 ? MANY * sizeof(long) : LARGE * 16 };
 
 static int me, npes;

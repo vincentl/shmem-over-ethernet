@@ -331,7 +331,7 @@ static uint64_t lane_slot(uint32_t lane, uint32_t position, uint64_t piece)
 {
     uint32_t fanout = osoe.bootstrap.collective_fanout;
     uint32_t pipeline = osoe.bootstrap.collective_pipeline;
-    return osoe_internal_lanes_offset(fanout, pipeline, osoe.bootstrap.max_teams,
+    return osoe_internal_lanes_offset(fanout, osoe.bootstrap.max_teams,
                                       osoe.bootstrap.small_collective_bytes,
                                       osoe.bootstrap.node_count) +
            (uint64_t)lane * osoe_internal_lane_bytes(fanout, pipeline) +
@@ -470,8 +470,12 @@ struct generic_team {
     uint32_t shares;
     struct interval_list *step_intervals;
     /* The pieces its scans have moved (osoe_internode_generic_scan): what each
-     * scan slot a member uses has received, since the team's tree is one. */
+     * scan slot a member uses has received, since the team's tree is one; its
+     * scans, every member's count alike; and the base of the scans' grant
+     * counter, as the reductions' grant base is. */
     uint64_t scan_pieces;
+    uint32_t scans;
+    uint64_t scan_grant_base;
 };
 
 static struct generic_team *teams;
@@ -1638,11 +1642,24 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
  * exclusive result, plus its source its inclusive one, and child j is sent
  * that plus its source plus the totals of children 0 .. j - 1.
  *
- * **A scan larger than a slot goes in pieces, D of them in flight** (the
- * author's decision of 2026-09-27; D is OSOE_COLLECTIVE_PIPELINE, the
- * reductions' window): each member keeps a row of D up-slots per child
- * position and a row of D down-slots, piece g of the team's scans in slot
- * g mod D (internal-region.h), and a counter per row, cumulative over the
+ * **A small scan is one piece and a large one goes in pieces, D of them in
+ * flight** (the author's decision of 2026-09-27; D is OSOE_COLLECTIVE_PIPELINE,
+ * the reductions' window; the team redesign's step E, E6): a small scan - its
+ * bytes at most OSOE_SMALL_COLLECTIVE_BYTES - goes through the team number's
+ * own small slots, one per child position and one for the down; a large one
+ * through the members' lanes, as a large reduction does, in pieces sized to
+ * the scan - its count's share of D, but at least 8 KiB and at most a lane's
+ * 16 KiB slot (the author's decision of 2026-10-04, the rule the Pi measured
+ * best of three) - each member's lane a row of D up-slots per child position
+ * and a row of D down-slots, piece g of the team's scans in slot g mod D
+ * (internal-region.h) - and every member grants its tree children as it
+ * enters, as a reduction's lead does: its lane's index, the scan's number
+ * among the team's and its identity into the child's scans' grant line, then a
+ * fenced add to the child's scans' grant counter. A child sends its first
+ * piece up only once that counter shows this scan's grant, and puts its own
+ * lane's word into its parent's row before its first add, which the parent
+ * reads as it takes the child's first total (the reductions' rule, and the
+ * same reason: lane_model.py). Each row has a counter, cumulative over the
  * team's life and compared as at least. Every member of a team moves the same
  * pieces, so each expects, in every row it uses, one more piece than the
  * team's scans have moved so far (`scan_pieces`, counted per team as the
@@ -1678,49 +1695,61 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
  * Costs, with M members, k the fan-out, D pieces in flight and p pieces:
  * 2 ceil(log_k M) steps a piece, each a put and a fenced add, taking about
  * p / D round trips of the tree where one piece at a time took p, for as long
- * as the round trip rather than the links is the limit; O(k D) slots and O(k)
- * counters a team number a PE; O(k D) pieces of private memory a scan;
+ * as the round trip rather than the links is the limit, and a large scan's
+ * child at most a hop more, once, for its parent's grant; O(k) small slots and
+ * counters a team number a PE, the large slots the lanes'; O(k D) pieces of
+ * private memory a scan;
  * O(k log_k M) arithmetic to find a place. Each member publishes in its PE
  * slot the most pieces it had in flight at once (node.h): min(D, p) at a
  * leaf, which fills its window before it looks for a down.
  */
+/* Team number `number`'s scans' area (internal-region.h). */
 static uint64_t scan_of_number(uint32_t number)
 {
     uint32_t fanout = osoe.bootstrap.collective_fanout;
-    uint32_t pipeline = osoe.bootstrap.collective_pipeline;
-    return osoe_internal_scan_offset(fanout, osoe.bootstrap.max_teams,
-                                     osoe.bootstrap.small_collective_bytes,
+    uint32_t small = osoe.bootstrap.small_collective_bytes;
+    return osoe_internal_scan_offset(fanout, osoe.bootstrap.max_teams, small,
                                      osoe.bootstrap.node_count) +
-           (uint64_t)number * osoe_internal_team_scan_bytes(fanout, pipeline);
+           (uint64_t)number * osoe_internal_team_scan_bytes(fanout, small);
 }
 
-static uint64_t scan_team_offset(uint32_t team)
+/* Its small row for `position`: a child position's below the fan-out, the
+ * down row at it - a lane word, then the small slot. */
+static uint64_t scan_small_row(uint32_t number, uint32_t position)
 {
-    return scan_of_number(number_of(team));
+    return scan_of_number(number) +
+           (uint64_t)position * osoe_internal_scan_row_bytes(osoe.bootstrap.small_collective_bytes);
 }
 
-/* Row `position`'s slot for piece `piece` of the team's scans: a child
- * position's row below the fan-out, the down row at it. */
-static uint64_t scan_slot(uint32_t team, uint32_t position, uint64_t piece)
+static uint64_t scan_lane_word(uint32_t number, uint32_t position)
 {
-    uint32_t pipeline = osoe.bootstrap.collective_pipeline;
-    return scan_team_offset(team) +
-           ((uint64_t)position * pipeline + piece % pipeline) * OSOE_INTERNAL_SCAN_SLOT_BYTES;
+    return scan_small_row(number, position);
 }
 
-/* Row `position`'s counter, past every row's slots. */
+static uint64_t scan_small_slot(uint32_t number, uint32_t position)
+{
+    return scan_small_row(number, position) + OSOE_INTERNAL_LANE_WORD_BYTES;
+}
+
+/* Row `position`'s counter, past every row - and at the fan-out + 1 the
+ * scans' grant counter, whose words lie past it. */
 static uint64_t scan_counter_of_number(uint32_t number, uint32_t position)
 {
     uint32_t fanout = osoe.bootstrap.collective_fanout;
-    uint32_t pipeline = osoe.bootstrap.collective_pipeline;
     return scan_of_number(number) +
-           (uint64_t)(fanout + 1) * pipeline * OSOE_INTERNAL_SCAN_SLOT_BYTES +
+           (uint64_t)(fanout + 1) *
+               osoe_internal_scan_row_bytes(osoe.bootstrap.small_collective_bytes) +
            (uint64_t)position * OSOE_INTERNAL_LINE_BYTES;
 }
 
-static uint64_t scan_counter(uint32_t team, uint32_t position)
+static uint64_t scan_grant_counter(uint32_t number)
 {
-    return scan_counter_of_number(number_of(team), position);
+    return scan_counter_of_number(number, osoe.bootstrap.collective_fanout + 1);
+}
+
+static uint64_t scan_grant_words(uint32_t number)
+{
+    return scan_grant_counter(number) + 8;
 }
 
 /* The children of the place covering [a, b): how many, and child j's first
@@ -1763,32 +1792,132 @@ static void scan_place(uint32_t members, uint32_t k, uint32_t rank, uint32_t *a,
     }
 }
 
+/*
+ * One scan as a member moves it: its team's number, the scan's number among
+ * the team's - every member's alike, since every member makes every scan of
+ * its team - and its identity, which a grant and a lane word name; its class;
+ * and its lanes, as a large reduction's (struct lanes): its own, its parent's
+ * from the grant, its children's from their lane words.
+ */
+struct scan_flight {
+    uint32_t number;
+    uint32_t sequence;
+    uint32_t identity;
+    enum osoe_collective_class class;
+    uint64_t bytes;
+    uint64_t base;                      /* the team's scan pieces before this scan's */
+    struct lanes lanes;
+};
+
+/* A large scan's pieces (osoe_internode_generic_scan): its count's share of D,
+ * but at least 8 KiB and at most a lane's 16 KiB slot. */
+enum { SCAN_LEAST_PIECE_BYTES = 8 << 10 };
+
+/* A scan's identity: inclusive or not, and its element. */
+static uint32_t scan_identity(bool inclusive, struct osoe_element element)
+{
+    return (inclusive ? UINT32_C(1) << 24 : 0) | (uint32_t)element.kind << 8 |
+           (element.width & 0xff);
+}
+
+/* A scan as a reader wants it: "scan 3 of the team, an inclusive one of
+ * 8-byte signed integers". */
+static void describe_scan(uint32_t sequence, uint32_t identity, char *out, size_t size)
+{
+    if (sequence == 0)
+        snprintf(out, size, "nothing: no grant was put there");
+    else
+        snprintf(out, size, "scan %u of the team, an %s one of %u-byte %s", sequence,
+                 identity >> 24 ? "inclusive" : "exclusive", identity & 0xff,
+                 kind_name((identity >> 8) & 0xff));
+}
+
+/* Where this member finds row `position`'s piece `piece` of the team's scans:
+ * the team number's small slot for the row, or its lane's. */
+static uint64_t scan_own_slot(const struct scan_flight *f, uint32_t position, uint64_t piece)
+{
+    return f->class == OSOE_COLLECTIVE_SMALL ? scan_small_slot(f->number, position)
+                                             : lane_slot(f->lanes.own, position, piece);
+}
+
 /* Whether row `position`'s counter shows piece `piece` of the team's scans,
  * numbered from 0 over the team's life. The load is acquire (transport.h), so
  * the bytes put before the fenced add are there to read. */
-static bool scan_arrived(uint32_t team, uint32_t position, uint64_t piece)
+static bool scan_arrived(uint32_t number, uint32_t position, uint64_t piece)
 {
-    return osoe_transport_load(OSOE_REGION_INTERNAL, scan_counter(team, position), 8) >=
+    return osoe_transport_load(OSOE_REGION_INTERNAL, scan_counter_of_number(number, position), 8) >=
            piece + 1;
 }
 
-static bool scan_children_arrived(uint32_t team, uint32_t children, uint64_t piece)
+static bool scan_children_arrived(uint32_t number, uint32_t children, uint64_t piece)
 {
     for (uint32_t j = 0; j < children; j++)
-        if (!scan_arrived(team, j, piece))
+        if (!scan_arrived(number, j, piece))
             return false;
     return true;
 }
 
+/* Whether this scan's grant is in: the scans' grant counter against its base,
+ * as at least. */
+static bool scan_grant_in(const struct generic_team *g, uint32_t number)
+{
+    return osoe_transport_load(OSOE_REGION_INTERNAL, scan_grant_counter(number), 8) >=
+           g->scan_grant_base + 1;
+}
+
+/* The parent's grant, once scan_grant_in says it is in: it names this scan, or
+ * the job ends naming both PEs. */
+static void scan_take_grant(struct scan_flight *f, int parent_pe, const char *routine)
+{
+    struct grant grant;
+    memcpy(&grant, internal(scan_grant_words(f->number)), sizeof grant);
+    cleared(internal(scan_grant_words(f->number)), sizeof grant);
+    if (grant.epoch != f->sequence || grant.collective != f->identity || grant.bytes != f->bytes) {
+        char theirs[160], mine[160];
+        describe_scan(grant.epoch, grant.collective, theirs, sizeof theirs);
+        describe_scan(f->sequence, f->identity, mine, sizeof mine);
+        osoe_fatal("%s: the scan grant from PE %d is for %s, %llu bytes, and PE %u is in %s, "
+                   "%llu bytes: PEs called different scans, or the same one with different "
+                   "arguments", routine, parent_pe, theirs, (unsigned long long)grant.bytes,
+                   osoe.job.me, mine, (unsigned long long)f->bytes);
+    }
+    if (grant.lane >= OSOE_MAX_THREADS_HIGHEST)
+        osoe_fatal("%s: the scan grant from PE %d names lane %u, past any PE's %u", routine,
+                   parent_pe, grant.lane, (unsigned)OSOE_MAX_THREADS_HIGHEST);
+    f->lanes.parent = grant.lane;
+}
+
+/* Each child's lane, read as this member takes the child's first total - the
+ * arrival that shows the word written - and kept for the scan (the reductions'
+ * rule, take_child_lanes). */
+static void scan_take_child_lanes(struct scan_flight *f, uint32_t children, const int *child_pe,
+                                  const char *routine)
+{
+    for (uint32_t j = 0; j < children; j++) {
+        struct lane_word word;
+        memcpy(&word, internal(scan_lane_word(f->number, j)), sizeof word);
+        cleared(internal(scan_lane_word(f->number, j)), sizeof word);
+        if (word.epoch != f->sequence || word.lane >= OSOE_MAX_THREADS_HIGHEST)
+            osoe_fatal("%s: the lane word of PE %d, this PE's child at position %u in the "
+                       "team's scan tree, says scan %u and lane %u, and PE %u is in scan %u",
+                       routine, child_pe[j], j, word.epoch, word.lane, osoe.job.me,
+                       f->sequence);
+        f->lanes.child[j] = word.lane;
+    }
+}
+
 /* What a member waits for when neither input is ready: every child's total
- * for piece `up`, if the window lets it take that piece up, or piece `down`'s
- * down, if it has taken that piece up and is not the root. The rows' counters
- * are contiguous, a line each, so one watch covers them all. */
+ * for piece `up`, if the window lets it take that piece up - and for a large
+ * scan's first, its parent's grant - or piece `down`'s down, if it has taken
+ * that piece up and is not the root. The rows' counters and the scans' grant
+ * counter are contiguous, a line each, so one watch covers them all. */
 struct scan_awaited {
-    uint32_t team;
+    const struct generic_team *team_phase;
+    uint32_t number;
     uint32_t children;
     uint32_t down_row;
     bool sending;
+    bool granting;
     bool descending;
     uint64_t up;                        /* the team's piece numbers */
     uint64_t down;
@@ -1797,8 +1926,9 @@ struct scan_awaited {
 static bool scan_awaited_holds(const void *context)
 {
     const struct scan_awaited *a = context;
-    return (a->sending && scan_children_arrived(a->team, a->children, a->up)) ||
-           (a->descending && scan_arrived(a->team, a->down_row, a->down));
+    return (a->sending && scan_children_arrived(a->number, a->children, a->up) &&
+            (!a->granting || scan_grant_in(a->team_phase, a->number))) ||
+           (a->descending && scan_arrived(a->number, a->down_row, a->down));
 }
 
 void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const void *source,
@@ -1830,8 +1960,59 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
     int parent_pe = root ? -1
         : (int)((int64_t)record->world_start + (int64_t)parent * record->world_stride);
 
+    struct generic_team *g = team_state(team, routine);
+    size_t width = element.width;
+    struct scan_flight flight = {
+        .number = number_of(team),
+        .sequence = g->scans + 1,
+        .identity = scan_identity(inclusive, element),
+        .class = osoe_collective_class((uint64_t)count * width,
+                                       osoe.bootstrap.small_collective_bytes),
+        .bytes = (uint64_t)count * width,
+        .base = g->scan_pieces,
+        .lanes = { .own = NO_LANE, .parent = NO_LANE },
+    };
+    bool large = flight.class == OSOE_COLLECTIVE_LARGE;
+    bool needs_grant = large && !root;
+    struct osoe_transport_context *context = osoe_transport_context_default();
+    if (large) {
+        /* Entering: this thread's lane is the scan's from here to its return,
+         * and each tree child is told so before anything else (E6). */
+        flight.lanes.own = own_lane();
+        struct grant grant = { flight.sequence, flight.identity, flight.bytes, flight.lanes.own, 0 };
+        for (uint32_t j = 0; j < children; j++) {
+            osoe_transport_put(context, child_pe[j], OSOE_REGION_INTERNAL,
+                               scan_grant_words(flight.number), &grant, sizeof grant,
+                               OSOE_TRANSPORT_MORE);
+            osoe_transport_rmw(context, child_pe[j], OSOE_REGION_INTERNAL,
+                               scan_grant_counter(flight.number), OSOE_RMW_ADD, 8, 1, 0,
+                               OSOE_TRANSPORT_FENCED |
+                               (j + 1 < children ? OSOE_TRANSPORT_MORE : 0));
+        }
+    }
+
     uint64_t window = osoe.bootstrap.collective_pipeline;
-    size_t width = element.width, per_piece = OSOE_INTERNAL_SCAN_SLOT_BYTES / width;
+    /* A small scan's one piece is the whole of it. A large one's pieces are
+     * sized to the scan (the author's decision of 2026-10-04), every member
+     * alike from its count, its element and D: the count's share of D, rounded
+     * up, but at least 8 KiB of elements, since each piece costs a message the
+     * progress thread handles, and at most a lane's slot of them - one piece to
+     * 8 KiB, 8 KiB ones to D x 8 KiB, D to D x 16 KiB and slots past that.
+     * Counted in elements, so that D pieces are D and not D + 1 with a
+     * remainder: the second part's adversarial read found sizing in bytes cut
+     * 2,049 longs 1,024 + 1,024 + 1, a third piece waiting a round trip of the
+     * tree. On the Pi, of three rules - a lane's 16 KiB at every size (1.17
+     * times slower than step D at 16 KiB, one piece where D's 4 KiB pieces had
+     * kept two in flight), 4 KiB below 64 KiB (slower at 8 and 32 KiB, where
+     * fewer messages won) and this one - this was the fastest at every scan
+     * size, and step D's equal or better from 8 KiB up
+     * (docs/decisions/2026-10-04-team-scans.md). */
+    size_t least_per_piece = (SCAN_LEAST_PIECE_BYTES + width - 1) / width;
+    size_t most_per_piece = OSOE_INTERNAL_SLOT_BYTES / width;
+    size_t share = (count + window - 1) / window;
+    size_t per_piece = !large ? (count ? count : 1)
+                     : share < least_per_piece ? least_per_piece
+                     : share > most_per_piece ? most_per_piece : share;
     size_t piece_bytes = (count < per_piece ? count : per_piece) * width;
     uint64_t pieces = (count + per_piece - 1) / per_piece;
     /* Kept for the pieces in flight, D of each: this PE's source, then each
@@ -1842,13 +2023,17 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
         osoe_fatal("%s: out of memory for a scan's pieces", routine);
     unsigned char *own = buffers, *totals = buffers + ring;
     unsigned char *sum = buffers + (size_t)(children + 1) * ring;
-    struct osoe_transport_context *context = osoe_transport_context_default();
-    struct generic_team *g = team_state(team, routine);
-    uint64_t base = g->scan_pieces, up = 0, down = 0, most = 0;
+    uint64_t base = flight.base, up = 0, down = 0, most = 0;
 
     while (down < pieces) {
         bool sending = up < pieces && up < down + window;
-        if (sending && scan_children_arrived(team, children, base + up)) {
+        if (sending && scan_children_arrived(flight.number, children, base + up) &&
+            (!needs_grant || flight.lanes.parent != NO_LANE ||
+             scan_grant_in(g, flight.number))) {
+            if (needs_grant && flight.lanes.parent == NO_LANE)
+                scan_take_grant(&flight, parent_pe, routine);
+            if (large && up == 0)
+                scan_take_child_lanes(&flight, children, child_pe, routine);
             size_t first = (size_t)up * per_piece;
             size_t n = count - first < per_piece ? count - first : per_piece;
             size_t bytes = n * width, at = (size_t)(up % window) * piece_bytes;
@@ -1858,23 +2043,38 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
             memcpy(sum, own + at, bytes);
             for (uint32_t j = 0; j < children; j++) {
                 unsigned char *total = totals + (size_t)j * ring + at;
-                memcpy(total, internal(scan_slot(team, j, base + up)), bytes);
+                unsigned char *slot = internal(scan_own_slot(&flight, j, base + up));
+                memcpy(total, slot, bytes);
+                /* A scan's piece has no header, but a lane's slot is read by
+                 * the other collectives' header checks too: cleared where a
+                 * header would be, so that a slot a scan left reads as nothing
+                 * to them (a reader clears what it read). */
+                if (large)
+                    cleared(slot, HEADER_BYTES);
                 add(sum, total, n);
             }
             if (!root) {
-                osoe_transport_put(context, parent_pe, OSOE_REGION_INTERNAL,
-                                   scan_slot(team, position, base + up), sum, bytes,
+                if (large && up == 0) {
+                    struct lane_word word = { flight.sequence, flight.lanes.own };
+                    osoe_transport_put(context, parent_pe, OSOE_REGION_INTERNAL,
+                                       scan_lane_word(flight.number, position), &word,
+                                       sizeof word, OSOE_TRANSPORT_MORE);
+                }
+                uint64_t slot = large ? lane_slot(flight.lanes.parent, position, base + up)
+                                      : scan_small_slot(flight.number, position);
+                osoe_transport_put(context, parent_pe, OSOE_REGION_INTERNAL, slot, sum, bytes,
                                    OSOE_TRANSPORT_MORE);
                 osoe_transport_rmw(context, parent_pe, OSOE_REGION_INTERNAL,
-                                   scan_counter(team, position), OSOE_RMW_ADD, 8, 1, 0,
-                                   OSOE_TRANSPORT_FENCED);
+                                   scan_counter_of_number(flight.number, position), OSOE_RMW_ADD,
+                                   8, 1, 0, OSOE_TRANSPORT_FENCED);
             }
+            osoe_perturb();
             up++;
             if (up - down > most)
                 most = up - down;
             continue;
         }
-        if (down < up && (root || scan_arrived(team, k, base + down))) {
+        if (down < up && (root || scan_arrived(flight.number, k, base + down))) {
             size_t first = (size_t)down * per_piece;
             size_t n = count - first < per_piece ? count - first : per_piece;
             size_t bytes = n * width, at = (size_t)(down % window) * piece_bytes;
@@ -1882,43 +2082,53 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
              * copied out before anything lets the parent write the slot again. */
             if (root)
                 memset(sum, 0, bytes);
-            else
-                memcpy(sum, internal(scan_slot(team, k, base + down)), bytes);
+            else {
+                unsigned char *slot = internal(scan_own_slot(&flight, k, base + down));
+                memcpy(sum, slot, bytes);
+                if (large)
+                    cleared(slot, HEADER_BYTES);
+            }
             unsigned char *out = (unsigned char *)dest + first * width;
             memcpy(out, sum, bytes);
             if (inclusive)
                 add(out, own + at, n);
             add(sum, own + at, n);
             for (uint32_t j = 0; j < children; j++) {
-                osoe_transport_put(context, child_pe[j], OSOE_REGION_INTERNAL,
-                                   scan_slot(team, k, base + down), sum, bytes,
+                uint64_t slot = large ? lane_slot(flight.lanes.child[j], k, base + down)
+                                      : scan_small_slot(flight.number, k);
+                osoe_transport_put(context, child_pe[j], OSOE_REGION_INTERNAL, slot, sum, bytes,
                                    OSOE_TRANSPORT_MORE);
                 osoe_transport_rmw(context, child_pe[j], OSOE_REGION_INTERNAL,
-                                   scan_counter(team, k), OSOE_RMW_ADD, 8, 1, 0,
-                                   OSOE_TRANSPORT_FENCED);
+                                   scan_counter_of_number(flight.number, k), OSOE_RMW_ADD, 8, 1,
+                                   0, OSOE_TRANSPORT_FENCED);
                 add(sum, totals + (size_t)j * ring + at, n);
             }
+            osoe_perturb();
             down++;
             continue;
         }
         /* Neither: wait for either, naming the PE it waits on - a child whose
-         * total is missing, else the parent whose down is. */
+         * total is missing, else the parent, whose grant or down is. */
         int from = parent_pe;
         if (sending)
             for (uint32_t j = 0; j < children; j++)
-                if (!scan_arrived(team, j, base + up)) {
+                if (!scan_arrived(flight.number, j, base + up)) {
                     from = child_pe[j];
                     break;
                 }
-        struct scan_awaited awaited = { team, children, k, sending, !root && down < up,
-                                        base + up, base + down };
-        uint64_t watched = scan_counter(team, 0);
+        struct scan_awaited awaited = { g, flight.number, children, k, sending,
+                                        needs_grant && flight.lanes.parent == NO_LANE,
+                                        !root && down < up, base + up, base + down };
+        uint64_t watched = scan_counter_of_number(flight.number, 0);
         osoe_region_wait_condition(routine, OSOE_REGION_INTERNAL, watched,
-                                   (size_t)(scan_counter(team, k) + 8 - watched),
+                                   (size_t)(scan_grant_counter(flight.number) + 8 - watched),
                                    scan_awaited_holds, &awaited, OSOE_BLOCKED_DETAIL_PE,
                                    (uint64_t)(from < 0 ? 0 : from));
     }
     g->scan_pieces = base + pieces;
+    g->scans = flight.sequence;
+    if (needs_grant)
+        g->scan_grant_base++;
     /* Single-writer publication for osoe-stat and the tests (§3.16), before
      * the scan returns. */
     atomic_store_explicit(&osoe.node.slots[osoe.bootstrap.local_id].scan_most_in_flight,
@@ -1928,7 +2138,7 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
 
 /* Every counter of team number `number` in this PE's internal region
  * (internal-region.h): its arrivals, its release and its grant, the grant's
- * words, its gathers' READY and DATA, and its scans' rows. Atomic stores, as
+ * words, its gathers' READY and DATA, and its scans' rows and their grant. Atomic stores, as
  * each counter is written by the transport's adds; the split's sync that
  * follows orders them before any. The grant counter is the one guard against
  * the team that held the number before: a grant's epoch and identity cannot
@@ -1942,10 +2152,11 @@ void osoe_internode_generic_number_taken(uint32_t number)
         atomic_store_explicit((_Atomic uint64_t *)internal(arrival_counter(number, line)), 0,
                               memory_order_release);
     memset(internal(grant_words(number)), 0, sizeof(struct grant));
-    for (uint32_t position = 0; position <= fanout; position++)
+    for (uint32_t position = 0; position < fanout + 2; position++)
         atomic_store_explicit(
             (_Atomic uint64_t *)internal(scan_counter_of_number(number, position)), 0,
             memory_order_release);
+    memset(internal(scan_grant_words(number)), 0, sizeof(struct grant));
     for (uint32_t line = 0; line < 2 * steps; line++)
         atomic_store_explicit((_Atomic uint64_t *)internal(gather_of_number(number) +
                                                            (uint64_t)line *

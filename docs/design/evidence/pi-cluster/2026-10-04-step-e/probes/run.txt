@@ -1,0 +1,19 @@
+start 21:44:52
+after built: 0
+before scan-odd: 0
+after scan-odd: 0
+before scan-skew: 0
+after scan-skew: 0
+odd before 1: 0
+skew before 1: 0
+odd after 1: 0
+skew after 1: 0
+odd before 2: 0
+skew before 2: 0
+odd after 2: 0
+skew after 2: 0
+odd before 3: 0
+skew before 3: 0
+odd after 3: 0
+skew after 3: 0
+end 21:46:29

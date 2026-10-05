@@ -13,6 +13,7 @@ were run. Develop new models here.
 | `pipeline_model.py` | Pieces of a data collective pipelined through the internode tree, the author's decision of 2026-09-25 (§5.8) |
 | `allgather_model.py` | Bruck's allgather among node leads for fcollect's internode phase, the same decision (§5.8) |
 | `scan_model.py` | The prefix scans' tree over a team's ranks, with per-PE slots shared by every team and READY per team number (§5.8, phase 1 step 10); `scan_timing.py` times it against §5.8's runs |
+| `scan_pipeline_model.py` | A large scan's pieces, D in flight (§5.8), and since the team redesign's step E its large pieces through the members' lanes, granted as each enters, its small ones through each team number's own slots; `scan_grant_timing.py` times the grant's cost, once a scan: a hop when the members enter together, up to a round trip when a member with children enters after them |
 | `landing_extent_model.py`, `copy_out_claim_model.py` | §4.11's two open points the author decided on 2026-09-25: landing-zone extents claimed by CAS over a bitmap, and one copier per landed nonblocking get |
 | `pe_quiet_model.py` | §4.11 item 2's rule that a full quiet never piggybacks on a `pe_quiet`, which §10 had left unmodeled |
 | `team_block_model.py` | A team's block of a node's pool (the team redesign's step D, D3-D5): claimed, held by its members, its name's map entry cleared by its lead as it leaves, given back by the last holder - record, generation, then the bitmap - and the engine relearning a block whose generation moved |

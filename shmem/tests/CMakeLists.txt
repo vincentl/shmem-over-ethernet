@@ -389,10 +389,10 @@ osoe_refusal_test(shmem.job.disagree.fanout 3 0
 # OSOE_MAX_TEAMS is agreed the same way (§5.7): a split reduces every parent
 # PE's mask of numbers, which must be one length, and it lays out each PE's
 # internal region, whose offsets every node must compute alike. Two nodes, the
-# second's lead given 128 numbers to the first's default 64.
+# second's lead given 128 numbers to the first's default 256.
 osoe_refusal_test(shmem.job.disagree.max-teams 2 0
   LAUNCH -n 2 -m 0,1 -e 1:OSOE_MAX_TEAMS=128
-  PATTERNS "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=128; node 0 has 64"
+  PATTERNS "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=128; node 0 has 256"
            "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
   PROGRAM $<TARGET_FILE:shmem_test_job>)
 
@@ -404,14 +404,14 @@ osoe_refusal_test(shmem.job.disagree.max-teams 2 0
 # through, ends with "another local PE failed".
 osoe_refusal_test(shmem.max-teams.local-disagree 2 0
   LAUNCH -n 2 -e 1:OSOE_MAX_TEAMS=128
-  PATTERNS "osoe: PE 1: OSOE_MAX_TEAMS differs between PEs: the local lead has 64, this PE has 128"
+  PATTERNS "osoe: PE 1: OSOE_MAX_TEAMS differs between PEs: the local lead has 256, this PE has 128"
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 # And the lead's count the larger, whose segment then has room for more than
 # the member counts on: refused the same way.
 osoe_refusal_test(shmem.max-teams.local-disagree.lead 2 0
   LAUNCH -n 2 -e 0:OSOE_MAX_TEAMS=128
-  PATTERNS "osoe: PE 1: OSOE_MAX_TEAMS differs between PEs: the local lead has 128, this PE has 64"
+  PATTERNS "osoe: PE 1: OSOE_MAX_TEAMS differs between PEs: the local lead has 128, this PE has 256"
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
@@ -1969,7 +1969,8 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   foreach(case "shared-lead:0,1,2,3" "two-threads:0,1,2,3" "turns:0,1"
                "rotation:0,1,2,3:OSOE_COLLECTIVE_FANOUT=2:OSOE_TEST_PERTURB=1"
                "boundary:0,1,2" "boundary:0,1,2:OSOE_SMALL_COLLECTIVE_BYTES=128"
-               "boundary:0,1,2:OSOE_COLLECTIVE_PIPELINE=4" "reuse:0,1")
+               "boundary:0,1,2:OSOE_COLLECTIVE_PIPELINE=4" "reuse:0,1"
+               "scan-shared-parent:0,1,2,3" "scan-turns:0,1" "scan-reuse:0,1")
     string(REPLACE ":" ";" environment "${case}")
     list(POP_FRONT environment which map)
     string(REPLACE "," ";" ranks "${map}")
@@ -1995,6 +1996,12 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(shmem.lanes.mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION
     "the grant from node 0's lead [(]PE 0[)] is for epoch [0-9]+'s sum of 8-byte signed integers, 4096 bytes, and this node's lead [(]PE 1[)] is in epoch [0-9]+'s maximum of 8-byte signed integers")
+  add_test(NAME shmem.lanes.scan-mismatch
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+            scan-mismatch)
+  set_tests_properties(shmem.lanes.scan-mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+    "the scan grant from PE 0 is for scan [0-9]+ of the team, an inclusive one of 8-byte signed integers, 4096 bytes, and PE 1 is in scan [0-9]+ of the team, an exclusive one of 8-byte signed integers")
   add_test(NAME shmem.lanes.class-split-named
     COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
             class-split-named)

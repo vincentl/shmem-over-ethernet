@@ -1,0 +1,4 @@
+scan-skew: 2048 bytes, PE -1 late by 0 us: median 610.3 us past its entry (p10 547.4, p90 675.2)
+scan-skew: 2048 bytes, PE 5 late by 1000 us: median 667.8 us past its entry (p10 634.2, p90 694.2)
+scan-skew: 2048 bytes, PE 0 late by 1000 us: median 455.4 us past its entry (p10 439.0, p90 485.1)
+scan-skew: 2048 bytes, PE 15 late by 1000 us: median 463.5 us past its entry (p10 446.7, p90 497.8)

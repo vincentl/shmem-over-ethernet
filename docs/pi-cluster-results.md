@@ -634,3 +634,67 @@ with the same kernel and NIC settings. The author put it down to the cluster's
 rebuild - how its nodes are plugged into the switch can move these lines - and
 accepted it: these runs are the baseline step E is measured against, run
 alternately on the day.
+
+## Step E (2026-10-04, evening)
+
+Release builds at 4 × 4, `srun -K1 --cpu-bind=none -N4 --ntasks-per-node=4`,
+driven from `pi-login`, the nodes and settings as at step D's merge point:
+step E's tree in `~/osoe` against step D (`main` at `158c13e`) under
+`~/osoe/build/compare/before`, three runs a side in each of three sessions,
+alternating. The probe, `e-band.c`, times on the world a barrier, a long sum
+reduction, a broadcast and an inclusive sum scan from 8 bytes to 1 MiB - each
+PE's median over 200 calls (50 from 64 KiB), each between two barriers, the
+slowest PE's printed. The record is `docs/decisions/2026-10-04-team-scans.md`;
+the raw outputs are `docs/design/evidence/pi-cluster/2026-10-04-step-e/`. The
+sessions ran three rules for a large scan's pieces: a lane's 16 KiB at every
+size, 4 KiB below 64 KiB, and the one kept - the scan's share of D, at least
+8 KiB and at most 16 KiB. D is the median of its nine runs, E of the third
+session's three; µs, the slowest PE's median:
+
+| | D | E | |
+|---|---|---|---|
+| barrier | 204 | 208 | +2% |
+| reduce, 8 B / 4 KiB / 16 KiB / 1 MiB | 227 / 394 / 1,050 / 29,342 | 230 / 410 / 1,064 / 29,310 | +1.5% / +4% / +1% / 0% |
+| broadcast, 8 B / 4 KiB / 16 KiB / 1 MiB | 209 / 303 / 628 / 27,872 | 209 / 306 / 610 / 27,866 | none |
+| scan, 8 B / 1 KiB (small) | 370 / 497 | 374 / 507 | +1% / +2% |
+| scan, 2 KiB / 4 KiB | 479 / 614 | 636 / 722 | +158 / +108 µs |
+| scan, 8 / 16 / 32 KiB | 859 / 1,408 / 2,551 | 849 / 1,405 / 2,388 | 0.99 / 1.00 / 0.94 |
+| scan, 64 KiB / 1 MiB | 4,897 / 73,349 | 3,929 / 48,596 | 0.80 / 0.66 |
+
+The reductions and broadcasts did not move beyond 4%: at four PEs a node a
+lead's intranode phase takes about a hop, which hides the grant
+(`grant_timing.py`). The scans of 2 and 4 KiB pay it - one piece, which nothing
+hides - and the author accepted that with his choice to size the pieces; from
+8 KiB they are step D's or faster, and from 64 KiB much faster, a lane's 16
+KiB pieces moving a quarter of the messages D's 4 KiB did. The first rule was
+1.17 times D at 16 KiB, one piece where D kept two of 4 KiB in flight; the
+second 1.10 times D at 8 KiB and 1.05 at 32, where fewer messages won.
+`osoe-bench`, three runs a side each session: no line moved beyond its
+run-to-run spread. `osoe-pacer --quick`, once a side each session: `failures=0`
+on both trees, 6.8 to 7.0 s.
+
+**An hour of `mix`** on E's third tree, 16 PEs at 4 × 4 under `--cpu-bind=none`:
+`failures=0` in 3,609 s (`mix-hour-summary.txt`, its summary lines).
+
+**The adversarial read's two probes** (`probes/`), on E as merged - its pieces
+sized in elements - against D, three runs a side alternating, medians in µs.
+`scan-odd`, an inclusive sum scan of longs either side of a multiple of D:
+2,049, 3,001 and 4,095 longs take what 2,048, 3,000 and 4,094 do (1,409, 1,915
+and 2,445 against 1,408, 1,889 and 2,456), where E's earlier sizing in bytes
+cut a third piece from them; D pays its own fifth 4 KiB piece at 2,049 (1,560
+against 1,427). `scan-skew`, a 2 KiB scan - one piece on both trees, so that
+only the grant differs - timed past the entry of the member made late by a
+millisecond:
+
+| late | D | E | E - D |
+|---|---|---|---|
+| nobody | 501 | 620 | +119 |
+| world rank 5, a member with children | 407 | 666 | +259 |
+| the root | 227 | 455 | +228 |
+| world rank 15, a leaf | 456 | 450 | -6 |
+
+A collective's hop on the cluster, the message and its handling, is 115 to 135
+µs (D's 227 µs for the root's two hops down, 407 for rank 5's three): one hop,
+two, two and none, as `scan_grant_timing.py` has it. The band's +158 µs at 2
+KiB is the first case - the members enter as a barrier releases them, a member
+and its child on other nodes together.

@@ -151,7 +151,10 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     if (entries > b->world_size)
         osoe_fatal("%sGTIDS='%s' names %zu ranks in a job of %u", prefix, gtids, entries,
                    b->world_size);
-    /* §6.2's per-rank local index in the job map is 16 bits (job.h). */
+    /* The bound §6.2 set when the job map held each rank's local index in 16
+     * bits. The map has been runs of 32-bit fields since (rank-map.h), and the
+     * bound stays - far above any node, and what the README states - rather
+     * than let a node meet a size nothing has run at. */
     if (entries > UINT16_MAX)
         osoe_fatal("%sGTIDS names %zu ranks on one node; osoe supports at most %u", prefix,
                    entries, (unsigned)UINT16_MAX);

@@ -1028,7 +1028,8 @@ step 7):* only those below `team_numbers_published`, the node's high-water mark
 of published team records, which each record's writer raises after publishing
 it and the lead's agent loads once a pass: team numbers are never reused
 (§5.7), so a pass costs the numbers issued so far, up to the highest published
-on the node, and not O(`OSOE_MAX_TEAMS`), 64 by default and 1,024 at most.
+on the node, and not O(`OSOE_MAX_TEAMS`), 256 by default (64 until the team
+redesign's step E) and 1,024 at most.
 *As built since the team redesign's step D (layout 29):* a word per block of
 the node's pool of teams, read for the predefined teams' three and for the
 blocks at and above `team_blocks_published_from`, the lowest block of a created
@@ -5036,7 +5037,7 @@ so it cannot perform a world-collective allocation.
 **the same parameter bounds the control queue (§3.8)** and the team range
 allocator. Three constraints resolve against one number — one thing to document,
 one place to fail loudly. *As built (phase 1 step 7):* `OSOE_MAX_TEAMS`,
-default 64 (32 until 2026-09-26), between 4 and 1,024, read at each session's first init and agreed at
+default 256 since the team redesign's step E (64 until then, 32 until 2026-09-26), between 4 and 1,024, read at each session's first init and agreed at
 the job rendezvous (§6.2) and between a node's PEs; it sizes each PE's
 published epochs, the internal region's per-number blocks (§5.8) and a PE's
 mask of free numbers. A node's team blocks, the progress thread's per-team
@@ -5045,7 +5046,7 @@ since the team redesign's step D (below; §3.8).
 
 **It counts the team numbers one PE holds at once, the predefined teams'
 included, and a destroyed team gives its number back (step D, below)**: it
-bounds the teams a PE is in at once, 61 of its own at the default, not the teams
+bounds the teams a PE is in at once, 253 of its own at the default, not the teams
 a session makes in its life - and a split takes a number free on every member of
 the new team, so a PE can meet it holding fewer, when its team-mates hold the
 rest. *Until step D it counted numbers job-wide, never reused within a session,
@@ -5135,7 +5136,7 @@ which a node's blocks match one for one while numbers are job-wide.
 each PE's own**: no PE is in two live teams under one number, and two teams with
 no PE in common may hold one, on one node or on two. `OSOE_MAX_TEAMS` counts the
 numbers one PE holds at once, the three predefined included - still 4 to 1,024,
-default 64, agreed at the rendezvous, since it lays out every PE's internal
+default 64 through step D and 256 since step E, agreed at the rendezvous, since it lays out every PE's internal
 region alike - and a destroyed team gives its number back. **A split agrees its
 numbers by one AND reduction over the parent** (`team.c`), in place of the claim
 on world PE 0 and the broadcast, in two lines of the parent number's words in
@@ -5235,12 +5236,11 @@ takes its numbers after its one reduction (the adversarial read of the
 rebuilt part found the first rebuild deciding it on each PE's own level, which
 mixed levels turned into a split that never finished). Three counters say how often:
 `shmem.team_split.calls`, `shmem.team_split.busy_rounds` and
-`shmem.team_split.lost_rounds`. Each number costs every PE about 48 KiB of its
-internal region's address space since step E's first part - its counters and
-small slots about 7 KiB, its scans' slots 41 KiB (*temporary*: the second part
-moves the scans' large pieces to the lanes, making a number about 15 KiB, and
-the default 256) - where it cost 200 KiB before (§5.8, "Small and large
-collectives").
+`shmem.team_split.lost_rounds`. Each number costs every PE about 14 KiB of its
+internal region's address space since step E - its counters and small slots,
+its scans' the same, and its allgather's words, 16 KiB at a thousand nodes -
+where it cost 200 KiB before (§5.8, "Small and large collectives"), and the
+default is 256.
 
 *Two readings of §9.4.6*, where the specification says two things. A triplet
 whose sequence would wrap around the parent - "considered invalid and the
@@ -5458,10 +5458,13 @@ covers every word a lead waits on and no put writes inside it -
 the lane words and the grant's words, which are put, lie outside it, in the
 rows and past the grant counter - then the splits' lines, the allgather's
 words, the scans' area, and last the lanes, whose number places nothing else
-(`OSOE_MAX_THREADS` is agreed only between a node's PEs). A PE's region is
-5.6 MiB at the defaults, where it was 12.6: the lanes 2.7 MiB, each number
-about 48 KiB - its counters and small slots 7 KiB, its scans' slots, still each
-number's until the second part, 41 KiB. Each lead publishes its last data
+(`OSOE_MAX_THREADS` is agreed only between a node's PEs). A PE's region was
+5.6 MiB at the first part's defaults, where it had been 12.6: the lanes 2.7
+MiB, each of 64 numbers about 48 KiB - its counters and small slots 7 KiB, its
+scans' slots, still each number's then, 41 KiB. Since the second part
+(`docs/decisions/2026-10-04-team-scans.md`), whose scans go through the same
+small rows and lanes, a number is about 14 KiB, and the region 6 MiB at the
+default of 256 numbers. Each lead publishes its last data
 collective's class and, for a large one, its lane in the team's tree state
 (`team.tree.collective_class`, `team.tree.lane`, layout 31). `shmem.lanes.*`
 runs the model's cases on the code - two teams whose leads coincide with a
@@ -5686,7 +5689,8 @@ redesign's step E* a number keeps counters and small slots, and the large
 slots are lanes, one per thread record, at the region's end: every number's
 small rows first, still scratch first; then every number's words, with a grant
 counter; then the allgather's words and the scans' area; then the lanes -
-5.6 MiB a PE at the defaults ("Small and large collectives", above).)*
+6 MiB a PE at the defaults, 256 numbers of about 14 KiB and 17 lanes of 160
+KiB ("Small and large collectives", above).)*
 
 *(Built at phase 1 step 5 slice 2, once reductions had landed and shown what it
 must contain - not as a separate header but as `internode.h`'s data half, beside
@@ -5826,6 +5830,49 @@ in flight. The scans' area doubles at the default D of 2, to 2.6 MiB of
 address space a PE, touched only by scans. Each member publishes the most
 pieces it had in flight in its PE slot (layout 25), min(D, pieces) at a leaf,
 which the tests pin.
+
+*Since the team redesign's step E* (`docs/decisions/2026-10-04-team-scans.md`;
+E6) the scans move as the reductions do: a scan of at most
+`OSOE_SMALL_COLLECTIVE_BYTES` is one piece through its team number's own small
+rows - a lane word and a small slot per child position and for the down - and
+a larger one goes through the members' lanes, D pieces in flight - pieces sized
+to the scan in elements, its count's share of D rounded up but at least 8 KiB
+of elements and at most a lane's 16 KiB slot of them - one piece to 8 KiB, 8
+KiB ones to D × 8 KiB, D to D × 16 KiB and 16 KiB ones past that (sized in
+bytes, 2,049 longs
+were cut 1,024 + 1,024 + 1, a third piece that waited a round trip of the tree;
+the second part's adversarial read): of three rules the Pi measured against
+step D, the proposal's 16 KiB at every size (1.17 times slower at 16 KiB,
+where four pieces in flight had beaten one), 4 KiB below 64 KiB (slower at 8
+and 32 KiB, where fewer messages won) and this, this was the fastest at every
+scan size and step D's equal or better from 8 KiB up, 1.5 times faster at 1 MiB
+(the author's decision of 2026-10-04 to size them, the rule the measurement's)
+- every member granting its tree children as
+it enters (the call is already every member's at entry, so the seam needs
+nothing new) and each child putting its own lane's word before its first total
+up, which its parent reads as it takes that total. A grant names the scan by its
+number among the team's - every member's alike, since every member makes every
+scan of its team - its identity (inclusive or not, its element) and its bytes,
+and a difference ends the job naming both PEs. The scan's tree never turns, a
+position's child the same rank in every scan of the team, so the reductions'
+reason to read a lane word with the first piece cannot arise here; the rule is
+kept for uniformity. A small scan's piece carries no header, and so compares
+nothing: members given other counts below the line get wrong results (the
+README's limits). A reader clears what it read, as the reductions' do, and a
+large scan's lane slot where a header would be, so that a slot a scan left
+reads as nothing to the other collectives' header checks. What the grant costs
+(`scan_grant_timing.py`, every member its own node): +1.00 hop when the members
+enter together, at 16 members to 256 and 1 piece to 16; up to a round trip,
++1.96 to +2.02, when the root or a member with children enters after its
+children by enough to be on the scan's longest path - a hop at 16 members,
+three at 256 - where its slots had their first totals waiting; nothing when a
+leaf is late. On the Pi, a 2 KiB scan against step D's (the second part's
+adversarial read's probe): +119 µs with nobody late, +259 with a member with
+children a millisecond late, +228 with the root late, -6 with a leaf late, a
+collective's hop there - the message and its handling - being 115 to 135 µs. A number's scans' area falls from 40 KiB to 6.4 KiB at the
+defaults, and the 2.6 MiB of 64 numbers to 1.6 MiB of 256 (`scan_pipeline_model.py`
+with lanes, grants and small scans; `shmem.lanes.scan-*`; the scan's breakages,
+each a mutation of the code, failing).
 
 ---
 
@@ -6148,7 +6195,8 @@ below the library that make a mesh without a rendezvous.
 **What the map holds, and what it costs** (phase 1 step 2 slice 3; second review,
 D7). Per rank: its node (4 bytes) and its **local index on that node** (2 bytes;
 16 bits suffice at 256 PEs per node, and `OSOE_GTIDS` longer than 65,535 is
-refused). The local index is the one fact about a *remote* PE that an RDMA
+refused; *since the map became runs (`rank-map.h`) its fields are 32 bits, and
+the bound on `OSOE_GTIDS` stays, far above any node*). The local index is the one fact about a *remote* PE that an RDMA
 backend cannot do without — it forms a remote heap address as the node's
 registered base plus index × the heap mapping's size plus offset (the mapping
 being the heap and, past it, §5.8's internal region at `internal_offset`), and

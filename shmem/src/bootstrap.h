@@ -80,13 +80,15 @@ struct osoe_bootstrap {
  * OSOE_MAX_TEAMS (§5.7): its default, and the range it must lie in - the
  * numbers one PE may hold at once, room for at least one team beyond the three
  * predefined, and at most 1,024, where each PE's internal region comes to about
- * 50 MiB of address space at the other settings' defaults (internal-region.h;
+ * 18 MiB of address space at the other settings' defaults (internal-region.h:
  * since the team redesign's step E a number holds counters and small slots,
- * and the scans' slots until its second part).
+ * about 15 KiB, and the large slots are each thread's lane). 256 by default
+ * since step E made a number that cheap (the author, 2026-10-02: "256 max teams
+ * is more than sufficient"); 64 before it.
  * A node's team blocks are OSOE_TEAM_BLOCKS's (below), since the team
  * redesign's step D.
  */
-#define OSOE_MAX_TEAMS_DEFAULT 64u
+#define OSOE_MAX_TEAMS_DEFAULT 256u
 #define OSOE_MAX_TEAMS_LOWEST  4u
 #define OSOE_MAX_TEAMS_HIGHEST 1024u
 
@@ -125,12 +127,11 @@ struct osoe_bootstrap {
  * before phase 1 step 5 slice 5; each step of D costs every lane's slots in
  * the internal region again (internal-region.h). A lane is (fan-out + 1) x D
  * slots of 16 KiB, and a PE has one per thread record, OSOE_MAX_THREADS + 1 of
- * them: 2.7 MiB at the defaults (fan-out 4, D = 2, 16 threads) - with the
- * scans' area, still each team number's (temporary, until the team redesign's
- * step E is whole), 2.6 MiB more at 64 teams - and at the extremes the ranges
- * allow (1,024 teams, fan-out 32, D = 8, 1,023 threads, small collectives of
- * 16 KiB) a PE's region is about 5.7 GiB, which the shared-memory capacity
- * check refuses at init on a machine without it (node.c).
+ * them: 2.7 MiB at the defaults (fan-out 4, D = 2, 16 threads) - and at the
+ * extremes the ranges allow (1,024 teams, fan-out 32, D = 8, 1,023 threads,
+ * small collectives of 16 KiB) a PE's region is about 5.2 GiB, which the
+ * shared-memory capacity check refuses at init on a machine without it
+ * (node.c).
  */
 #define OSOE_COLLECTIVE_PIPELINE_DEFAULT 2u
 #define OSOE_COLLECTIVE_PIPELINE_LOWEST  1u
