@@ -1,7 +1,7 @@
 # Release checklist
 
-**Draft, written 2026-10-02 - the author has not read it yet.** Moved into the
-tree from the author's status page at the author's word ("yes, move checklist";
+**Written 2026-10-02, and accepted by the author on 2026-10-04** ("Skimmed it.
+Accepted."). Moved into the tree from the author's status page at the author's word ("yes, move checklist";
 `docs/decisions/2026-10-02.md` item 5), by the release-fixes brief
 (`docs/prompts/done/task-release-fixes.md`, Part 5 item 3). Its items are the
 page's own eight, design §1's release point, the decisions index's lines on a

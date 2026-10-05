@@ -1270,9 +1270,12 @@ each node has printed where its PEs wait.
 
 ## How osoe was made
 
-osoe was written with Claude Code, Anthropic's agentic coding tool, between 15
-September and 4 October 2026, under the direction of its author, Vincent
-Lucarelli. The models were the ones Anthropic offered over those three weeks:
+The scope and goals of osoe were first defined by the author and then Claude
+Code, Anthropic's agentic coding tool, was used to consider the goals and the
+OpenSHMEM specification to generate plans, carry out implementation, and perform
+testing on an Arm VM running on macOS and a Raspberry Pi 5 cluster running
+Raspberry Pi OS (Trixie). The work was carried out starting in September 2026.
+The models were the ones Anthropic offered during September/October 2026:
 Claude Opus 5, and from 22 September Claude Opus 5.5, led each working session;
 Claude Sonnet 5 and 5.5 and Claude Fable 5.1 took parts of some sessions and of
 the tasks a session handed off. Every commit but the first and six merges
