@@ -1,0 +1,16 @@
+== 4x4 k=4 L=-1
+reduce-skew: 4096 bytes, PE -1 late by 0 us: median 390.7 us past its entry (p10 373.4, p90 401.2)
+== 4x4 k=4 L=0
+reduce-skew: 4096 bytes, PE 0 late by 1000 us: median 417.7 us past its entry (p10 408.6, p90 433.4)
+== 4x4 k=4 L=1
+reduce-skew: 4096 bytes, PE 1 late by 1000 us: median 140.1 us past its entry (p10 125.1, p90 179.5)
+== 4x4 k=4 L=12
+reduce-skew: 4096 bytes, PE 12 late by 1000 us: median 368.1 us past its entry (p10 360.8, p90 377.9)
+== 4x4 k=2 L=4
+reduce-skew: 4096 bytes, PE 4 late by 1000 us: median 523.9 us past its entry (p10 513.2, p90 534.1)
+== 4x1 k=4 L=-1
+reduce-skew: 4096 bytes, PE -1 late by 0 us: median 411.4 us past its entry (p10 391.3, p90 425.4)
+== 4x1 k=4 L=0
+reduce-skew: 4096 bytes, PE 0 late by 1000 us: median 322.1 us past its entry (p10 291.3, p90 450.4)
+== 4x1 k=4 L=3
+reduce-skew: 4096 bytes, PE 3 late by 1000 us: median 317.3 us past its entry (p10 311.5, p90 327.9)

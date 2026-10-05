@@ -661,9 +661,10 @@ session's three; µs, the slowest PE's median:
 | scan, 8 / 16 / 32 KiB | 859 / 1,408 / 2,551 | 849 / 1,405 / 2,388 | 0.99 / 1.00 / 0.94 |
 | scan, 64 KiB / 1 MiB | 4,897 / 73,349 | 3,929 / 48,596 | 0.80 / 0.66 |
 
-The reductions and broadcasts did not move beyond 4%: at four PEs a node a
-lead's intranode phase takes about a hop, which hides the grant
-(`grant_timing.py`). The scans of 2 and 4 KiB pay it - one piece, which nothing
+The reductions and broadcasts did not move beyond 4%: the probe calls each
+just after a barrier, which releases the tree's root node a hop before its
+children - the way a grant travels - so a child finds its grant waiting (round
+six's runs, below, measured the grant's cost when a lead is late). The scans of 2 and 4 KiB pay it - one piece, which nothing
 hides - and the author accepted that with his choice to size the pieces; from
 8 KiB they are step D's or faster, and from 64 KiB much faster, a lane's 16
 KiB pieces moving a quarter of the messages D's 4 KiB did. The first rule was
@@ -712,3 +713,19 @@ reduce +2%, broadcasts within 1%, the large reductions of 2 and 4 KiB +11 and
 0.67 times D). `osoe-bench`, under Slurm's default binding, shows one mode in
 every run of every session, D and E alike: the barrier 175 to 177 µs, the
 8-byte reduce 197 to 198, the 8-byte broadcast 195.
+
+**Round six's runs** (`review/`, for its scale-and-performance review), three
+runs a side alternating, medians. `reduce-skew`, `scan-skew` with a 4 KiB
+reduction - one large piece - timed past the late member's entry, E less D:
+nobody late -8 µs at 4 × 4 and +23 at 4 × 1, where no intranode phase hides
+anything, so that it is the barrier's order that hides the grant; the root
+node's lead a millisecond late +278 µs at 4 × 4 and +43 at 4 × 1; a middle
+lead at a fan-out of 2 +216; a PE of the root's node that does not lead it +2;
+a leaf node's lead +18, and at 4 × 1 -10. The grant's round trip when a parent
+enters late, then, and nothing much otherwise. `piece-edge`, E alone: a
+reduction's or broadcast's piece holds 16,368 bytes, a lane's slot less its
+header, so 32,768 bytes are three pieces where 32,736 are two; on gigabit the
+extra piece costs 0.5 to 4% at 4 × 4 (1,888 against 1,878 µs for a reduction
+of 32 KiB, 1,087 against 1,047 for a broadcast) and up to 11% at 4 × 1 (a 16
+KiB broadcast, 623 against 562), where the development VM measured up to 2.4
+times.

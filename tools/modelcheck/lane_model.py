@@ -85,6 +85,10 @@ Breakages
   node_small    a node's small slots shared by its teams, not a team number's
                 own (UP): a child of one team puts its small piece while the
                 parent reads another team's.
+  node_small_down  only the small release slot shared by a node's teams (DOWN):
+                holds with one thread a node, fails with two leading two teams
+                at once - the one breakage that reaches the small path's DOWN
+                check (round six's H3).
 
 Runs are SC, as pipeline_model.py's: every add is fenced after its data.
 
@@ -126,7 +130,7 @@ def tree(members, root, fanout):
 # The designs whose parent reads a child's lane as it takes the child's first
 # piece; release_lane_early reads it at entry, release_lane_late at the first
 # release, no_grant computes it.
-READS_AT_ARRIVAL = ('design', 'stale_grant', 'lane_early', 'one_lane', 'node_small')
+READS_AT_ARRIVAL = ('design', 'stale_grant', 'lane_early', 'one_lane', 'node_small', 'node_small_down')
 
 
 def lane_of(design, h):
@@ -169,6 +173,7 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
     for at, (x, team, parent, position, kids, kid_pos, arr, rel, grant, turn,
              tagbase, kind, pieces) in enumerate(plan):
         small_team = '*' if design == 'node_small' else team
+        small_down_team = '*' if design in ('node_small', 'node_small_down') else team
         p = f'n{n}h{h}c{x}_'
         after = f'@n{n}h{h}c{plan[at + 1][0]}_T' if at + 1 < len(plan) else '@DONE'
         me = x + 1
@@ -267,7 +272,7 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
                 for i, k in enumerate(kids):
                     here = label if i == 0 else f'{label}{i}'
                     nxt = f'@{label}{i + 1}' if i + 1 < len(kids) else then
-                    F += [(here, ('store', lambda L, k=k, st=small_team: SMALL_DOWN(st, k),
+                    F += [(here, ('store', lambda L, k=k, st=small_down_team: SMALL_DOWN(st, k),
                                   lambda L: tagbase, True, f'@{here}A')),
                           (f'{here}A', ('add', lambda L, k=k: REL(team, k), lambda L: 1, '_', nxt))]
                 return F
@@ -375,7 +380,7 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
                   (p + 'SEND2', ('set', 'up', lambda L: L['up'] + 1, '@' + p + 'LOOP')),
                   (p + 'RW', ('await', lambda M, L, rel=rel, team=team:
                               M[REL(team, n)] >= rel + L['down'] + 1, '@' + p + 'RX')),
-                  (p + 'RX', ('check', lambda M, L, tb=tagbase, st=small_team:
+                  (p + 'RX', ('check', lambda M, L, tb=tagbase, st=small_down_team:
                               None if M[SMALL_DOWN(st, n)] == tb else
                               f'DOWN: node {n} read small release {M[SMALL_DOWN(st, n)]}, '
                               f'waiting for {tb}', '@' + p + 'FW')
@@ -494,6 +499,19 @@ CASES = [
     ('design', 3, 2, 2, 2, T01_U12,
      [('T', 1, {1: 0}, 's'), ('U', 0, {1: 1}), ('T', 1, {1: 0}), ('U', 0, {1: 1}, 's')], 2, True),
     ('node_small', 3, 1, 2, 2, T01_U12, [('T', 1, {}, 's'), ('U', 0, {}, 's')], 2, False),
+    # The small path's release slot shared by a node's teams (node_small_down,
+    # round six's H3): the only breakage that reaches the small path's DOWN
+    # check, which every large-path breakage meets LANE before. Two teams that
+    # share node 0 as a parent: with one thread a node their small reductions
+    # take turns and the sharing holds; with two threads leading them at once
+    # node 0 reads one team's release in the other's slot. The design holds
+    # the last case.
+    ('node_small_down', 3, 1, 2, 2, {'T': [0, 1], 'U': [0, 2]},
+     [('T', 1, {}, 's'), ('U', 1, {}, 's'), ('T', 1, {}, 's')], 2, True),
+    ('node_small_down', 3, 2, 2, 2, {'T': [0, 1], 'U': [0, 2]},
+     [('T', 1, {0: 0}, 's'), ('U', 1, {0: 1}, 's')], 2, False),
+    ('design', 3, 2, 2, 2, {'T': [0, 1], 'U': [0, 2]},
+     [('T', 1, {0: 0}, 's'), ('U', 1, {0: 1}, 's')], 2, True),
     # One team over four nodes whose tree turns between collectives, as a
     # broadcast's does: rooted at node 0, node 1's child at position 0 is node
     # 3; rooted at node 1 it is node 2, which leads the second on its thread 1.

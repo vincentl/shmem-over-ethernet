@@ -1,0 +1,12 @@
+e-band pes=4 reduce bytes=16368 slowest_pe_median_us=1062.3
+e-band pes=4 reduce bytes=16384 slowest_pe_median_us=1059.0
+e-band pes=4 reduce bytes=32736 slowest_pe_median_us=1797.4
+e-band pes=4 reduce bytes=32768 slowest_pe_median_us=1804.8
+e-band pes=4 reduce bytes=65472 slowest_pe_median_us=2915.4
+e-band pes=4 reduce bytes=65536 slowest_pe_median_us=2936.4
+e-band pes=4 broadcast bytes=16368 slowest_pe_median_us=564.8
+e-band pes=4 broadcast bytes=16384 slowest_pe_median_us=561.4
+e-band pes=4 broadcast bytes=32736 slowest_pe_median_us=1055.9
+e-band pes=4 broadcast bytes=32768 slowest_pe_median_us=1059.0
+e-band pes=4 broadcast bytes=65472 slowest_pe_median_us=1990.9
+e-band pes=4 broadcast bytes=65536 slowest_pe_median_us=1823.6

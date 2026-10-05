@@ -38,9 +38,11 @@
  *   reuse         a team destroyed after three large reductions and its number
  *                 taken again by the next, whose first large reduction's parent
  *                 comes late: the grant counter zeroed as the number is taken
- *                 is the one guard (the review of step D's merge point), since
- *                 a grant's epoch cannot tell one team under a number from the
- *                 next.
+ *                 keeps the count exact (the review of step D's merge point),
+ *                 since a grant's epoch cannot tell one team under a number
+ *                 from the next, and the grant's words, cleared by their
+ *                 reader, end the job by name on a stale count (round six's
+ *                 H4).
  *   mismatch      two leads of one team in different large reductions: the
  *                 child's grant names the difference, and the job ends by name.
  *   scan-shared-parent, scan-turns, scan-reuse, scan-mismatch
@@ -85,12 +87,13 @@
 #include "invariants.h"
 
 /*
- * A lane's slot holds 16 KiB less a piece's 16-byte header: 2,046 longs. So
- * ONE_PIECE is one large piece, SEVERAL four - more than the default window of
- * two - and SMALL fits the default small slot of 1 KiB.
+ * A large piece carries 16 KiB, its 16-byte header in the lane's slot beside
+ * it: 2,048 longs. So ONE_PIECE is one large piece, SEVERAL four - more than
+ * the default window of two - and SMALL fits the default small slot of 1 KiB.
  */
 enum {
-    PIECE_LONGS = ((16 << 10) - 16) / sizeof(long),
+    PIECE_BYTES = 16 << 10,
+    PIECE_LONGS = PIECE_BYTES / sizeof(long),
     ONE_PIECE = 512,                    /* 4 KiB: large, one piece */
     SEVERAL = 3 * PIECE_LONGS + 5,      /* four pieces */
     SMALL = 16,                         /* 128 bytes: small at every setting */
@@ -502,7 +505,7 @@ static void boundary(void)
     uint32_t small = setting("OSOE_SMALL_COLLECTIVE_BYTES", 1024);
     uint32_t window = setting("OSOE_COLLECTIVE_PIPELINE", 2);
     unsigned char *bytes_dst = (unsigned char *)dest, *bytes_src = (unsigned char *)source;
-    size_t sizes[] = { small, (size_t)small + 1, 3 * (((16 << 10) - 16)) + 1 };
+    size_t sizes[] = { small, (size_t)small + 1, 3 * (size_t)PIECE_BYTES + 1 };
     for (size_t s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {
         size_t n = sizes[s];
         CHECK_FATAL(n <= MOST * sizeof(long));
@@ -517,7 +520,7 @@ static void boundary(void)
                 CHECK(false);
                 break;
             }
-        check_published(n, (16 << 10) - 16, small, window, "a byte broadcast");
+        check_published(n, PIECE_BYTES, small, window, "a byte broadcast");
 
         for (size_t i = 0; i < n; i++) {
             bytes_src[i] = (unsigned char)(me * 37 + i * 11 + s);
@@ -535,7 +538,7 @@ static void boundary(void)
                 break;
             }
         }
-        check_published(n, (16 << 10) - 16, small, window, "a byte sum");
+        check_published(n, PIECE_BYTES, small, window, "a byte sum");
     }
 }
 

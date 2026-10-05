@@ -1588,7 +1588,11 @@ headers would pass whenever the library agreed with itself.
   last field turns "which node has not arrived" from a visit to every node into a
   walk down from the root, O(log N) visits, and `node.hostname` — also layout 12 —
   says which machine to ask next. `osoe-stat --summary` prints one line per node
-  and team for exactly this walk. *Measured* (`shmem.hang-walk`, and the
+  and team for exactly this walk - of a barrier or a sync, whose epochs the
+  progress thread keeps: the data collectives' generic phase runs on the
+  calling thread and publishes none, so a team hung in one reads "nothing
+  open" there, and the PE lines say where its PEs wait (round six's Q5-1; its
+  own walk is after the release). *Measured* (`shmem.hang-walk`, and the
   transcript in the commit): one PE of eight logical nodes never calls the second
   barrier, and three visits find it — node 0 names child 2, node 2 names child 6,
   node 6 has no epoch open and its own members not arrived, so its PE lines say
@@ -2818,7 +2822,10 @@ are an artifact of implementing collectives as RMA on symmetric scratch. Here
 collectives are AMs: a barrier sends an arrival AM and waits for a release AM.
 State is a private counter and a private flag. Nothing is the target of remote
 RMA, so nothing must be symmetric. A team is a private descriptor: member list,
-tree topology, counters. *Verify against each collective during the spec read.*
+tree topology, counters. *Verified against each collective by the conformance
+reviews of rounds three to six, the spec read the author closed on 2026-10-04;
+the deprecated routines never touch their `pSync` or `pWrk` (phase 1 step 5
+slice 3).*
 
 **Contexts** are purely local (`shmem_ctx_create` is not collective) and must
 require no symmetric memory. A context is a sequence-number space. Confirm this
@@ -5153,9 +5160,11 @@ fails the split alike - said by the PE that found it dry, naming
 by the parent's rank 0, naming `OSOE_MAX_TEAMS`; a block claimed for a split that
 fails goes back. Each member then takes the number: its descriptor's slot in its
 process's pool, and its counters for the number in its internal region zeroed
-- since step E its grant counter and the grant's words too, the one guard
+- since step E its grant counter and the grant's words too, guarding twice
 against a grant the team before it under the number left, since epochs start
-again at 1 (§5.8, "Small and large collectives") - (`internode.h`,
+again at 1: the counter zeroed keeps the count exact, and the words, which a
+reader also clears as it takes them, make a count with no grant behind it end
+the job by name (§5.8, "Small and large collectives") - (`internode.h`,
 `osoe_internode_number_taken`), before the split's sync, after
 which alone anybody writes them for the new team - and only for a number it has
 held before in the session, the heap object being new each session; and each
@@ -5394,8 +5403,9 @@ team's:
   team's next collective only once it holds this one's release, which exists
   only after every lead has read its children's slots.
 - **A large collective** goes through *lanes*: each PE's internal region holds
-  one per thread record (node.h), (fan-out + 1) × D slots of 16 KiB, which the
-  thread lends to the collective it leads from its entry to its return. One
+  one per thread record (node.h), (fan-out + 1) × D slots, each a piece's
+  16-byte header and its 16 KiB (round six's U1: with the header inside 16
+  KiB, a power-of-two size went in one piece more), which the thread lends to the collective it leads from its entry to its return. One
   per thread record and not a pool (the author's answer to E9): two threads of
   a PE may lead two teams' collectives at once, and a thread waiting for a lane
   could close a cycle across PEs with others waiting the same way.
@@ -5430,7 +5440,10 @@ team's:
   grant, or for a release before their own next arrival. The grant counter is
   zeroed as a PE takes a number again (§5.7): a grant's epoch and identity
   cannot tell the last grant of a team destroyed under a number from the first
-  of the next, whose epochs start again at 1.
+  of the next, whose epochs start again at 1. That keeps the count exact; the
+  grant's words, which their reader clears as it takes them, are the second
+  guard - a stale count meets words that say "nothing" and ends the job by
+  name.
 
 What it costs (the proposal's "What it costs", `grant_timing.py`): once, on a
 large reduction, a child's wait for its parent's grant. When the leads enter
@@ -7779,11 +7792,15 @@ Recorded rather than deleted, so they are not reopened from memory.
 
 ### Still open — blocking
 
-- **Thorough 1.6 spec read.** The review's omissions pass covered the phase-1
-  routines and the general sections, and closed "does any team query return
-  remotely accessible memory" (none does). Still unchecked: the exact semantics of
-  the 1.6 session routines if they are ever more than no-ops, and the routines
-  beyond phase 1.
+None. The last, a thorough read of the 1.6 specification, was closed by the
+author on 2026-10-04 (`docs/decisions/2026-10-04.md` item 11): the review's
+omissions pass covered the phase-1 routines and the general sections and closed
+"does any team query return remotely accessible memory" (none does), and four
+rounds' conformance reviews then read the C interface against the
+specification - round six checking 514,710 collective calls against values the
+specification alone gives. What it had left, the 1.6 session routines'
+semantics should they ever be more than no-ops, is on the release checklist's
+after-release list.
 
 ### Still open — measurement, once hardware exists
 

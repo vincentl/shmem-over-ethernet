@@ -81,7 +81,8 @@
  * one part of the layout the node count sizes, by its logarithm.
  *
  * Then **the scans' area** (below), and last **the lanes**: one per thread
- * record of the PE (node.h), each `fanout + 1` rows of D slots of 16 KiB - a
+ * record of the PE (node.h), each `fanout + 1` rows of D slots, a piece's
+ * header and its 16 KiB each (OSOE_INTERNAL_SLOT_BYTES) - a
  * row for each child position's pieces and one for what the parent sends
  * down, piece k in the row's slot k mod D - a lane's place its index times its
  * size. Last, so that no other place depends on how many there are: a lane is
@@ -125,7 +126,7 @@
 #include <stdint.h>
 
 enum {
-    OSOE_INTERNAL_SLOT_BYTES = 16 << 10,        /* one piece of a large data collective */
+    OSOE_INTERNAL_PIECE_BYTES = 16 << 10,       /* the most a large collective's piece carries */
     /*
      * The line each control word sits alone on: 128 bytes whatever the
      * compiler's cache line (base/cacheline.h), since the offsets must be
@@ -140,6 +141,12 @@ enum {
     /* A small row's lane word, and the room it takes ahead of the small slot:
      * sixteen bytes, so that the slot's header and data stay aligned. */
     OSOE_INTERNAL_LANE_WORD_BYTES = 16,
+    /* A lane's slot: a piece's header, then the piece's 16 KiB, so that a
+     * power-of-two size from 16 KiB goes in whole pieces - with the header
+     * inside 16 KiB a piece held 16,368 bytes, and 32 KiB went in three pieces
+     * against a window of two (round six's U1; the author, 2026-10-04 item 10).
+     * A multiple of sixteen, so that every slot's bytes stay aligned. */
+    OSOE_INTERNAL_SLOT_BYTES = OSOE_INTERNAL_PIECE_HEADER_BYTES + OSOE_INTERNAL_PIECE_BYTES,
 };
 
 /* Which way a data collective moves (the file's comment). */

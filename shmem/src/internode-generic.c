@@ -22,7 +22,7 @@
  * lead's to reuse at once, and §5.5's hazard of a forward that reads `dest` by
  * reference after the lead has left cannot arise.
  *
- * **A large collective goes through the tree in pieces of a 16 KiB slot, and
+ * **A large collective goes through the tree in pieces of 16 KiB, and
  * each lead keeps D of them in flight** (§5.8, "Pipelined pieces"; phase 1
  * step 5 slice 5): D is OSOE_COLLECTIVE_PIPELINE, which every node agrees on,
  * and a lead's lane keeps D slots per child position and D release slots,
@@ -278,7 +278,8 @@
  * child's pieces in), the release counter (the parent's pieces down) and the
  * grant counter, each alone on a line of the region's fixed 128 bytes, the
  * grant's words past its counter; and, past every number's places, a lane per
- * thread record, a row of D 16 KiB slots per child position and a release row,
+ * thread record, a row of D slots of a header and 16 KiB per child position
+ * and a release row,
  * piece k in a row's slot k mod D. Each team number has its own counters and
  * small slots, so two teams whose trees share a lead count on different words
  * (§7.3); a large collective's pieces go through the lanes its leads' threads
@@ -757,11 +758,11 @@ static uint32_t own_lane(void)
     return osoe_metrics_thread_index();
 }
 
-/* The most bytes of `width`-byte elements a lane's slot holds behind its
- * header. */
+/* The most bytes of `width`-byte elements a piece carries, behind its header
+ * in a lane's slot: 16 KiB for every element the specification names. */
 static size_t piece_bytes(size_t width)
 {
-    return ((OSOE_INTERNAL_SLOT_BYTES - HEADER_BYTES) / width) * width;
+    return (OSOE_INTERNAL_PIECE_BYTES / width) * width;
 }
 
 /* How every lead cuts `bytes` of `width`-byte elements of a collective of
@@ -904,9 +905,13 @@ static void take_child_lanes(const struct pieces *pieces, const struct lead_tree
         if (word.epoch != pieces->epoch || word.lane >= OSOE_MAX_THREADS_HIGHEST)
             osoe_fatal("%s: the lane word of node %u's lead (PE %u), this node's child at "
                        "position %u, says epoch %u and lane %u, and this node's lead (PE %u) "
-                       "is in epoch %u's collective", pieces->routine,
+                       "is in epoch %u's collective: %s", pieces->routine,
                        osoe_node_of(&osoe.job, tree->child[c]), tree->child[c], c, word.epoch,
-                       word.lane, osoe.job.me, pieces->epoch);
+                       word.lane, osoe.job.me, pieces->epoch,
+                       word.epoch == 0 ? "no word was put, so the child took this collective "
+                                         "as small - PEs called it with counts on either side "
+                                         "of OSOE_SMALL_COLLECTIVE_BYTES - or is in another"
+                                       : "PEs called different collectives");
         lanes->child[c] = word.lane;
     }
 }
@@ -1183,7 +1188,7 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
 {
     struct generic_team *team_phase = registered_team(team, routine);
     osoe_combine_function combine = osoe_combine_lookup(operation, element);
-    if (!combine || element.width > OSOE_INTERNAL_SLOT_BYTES - HEADER_BYTES)
+    if (!combine || element.width > OSOE_INTERNAL_PIECE_BYTES)
         osoe_fatal("%s: no reduction %d over elements of kind %d and width %u", routine,
                    (int)operation, (int)element.kind, element.width);
     size_t bytes = count * element.width;
@@ -1688,9 +1693,12 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
  * up - of this scan or the team's next - only after its down for piece q - D
  * arrived, which its parent sent after reading piece q - D's total; and a
  * parent puts piece q down only after the child's total for q arrived, which
- * the child sent after copying out its down for q - D. Different teams use
- * different memory, so two threads may scan two teams at once (spec §9.4),
- * which slots shared by every team would not allow (the review of the slice).
+ * the child sent after copying out its down for q - D. Two threads may scan
+ * two teams at once (spec §9.4): each team's counters and small rows are its
+ * number's own, and a large scan's pieces go through the calling thread's
+ * lane, which no other thread of the PE lends while the scan runs - slots
+ * shared by every team, as the first build had, would not allow it (the
+ * review of the slice; round six's H6).
  *
  * Costs, with M members, k the fan-out, D pieces in flight and p pieces:
  * 2 ceil(log_k M) steps a piece, each a put and a fenced add, taking about
@@ -2008,7 +2016,7 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
      * size, and step D's equal or better from 8 KiB up
      * (docs/decisions/2026-10-04-team-scans.md). */
     size_t least_per_piece = (SCAN_LEAST_PIECE_BYTES + width - 1) / width;
-    size_t most_per_piece = OSOE_INTERNAL_SLOT_BYTES / width;
+    size_t most_per_piece = OSOE_INTERNAL_PIECE_BYTES / width;
     size_t share = (count + window - 1) / window;
     size_t per_piece = !large ? (count ? count : 1)
                      : share < least_per_piece ? least_per_piece
@@ -2140,10 +2148,13 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
  * (internal-region.h): its arrivals, its release and its grant, the grant's
  * words, its gathers' READY and DATA, and its scans' rows and their grant. Atomic stores, as
  * each counter is written by the transport's adds; the split's sync that
- * follows orders them before any. The grant counter is the one guard against
- * the team that held the number before: a grant's epoch and identity cannot
- * tell that team's last grant from the next team's first, since epochs start
- * again at 1 under the same number. */
+ * follows orders them before any. Zeroing the grant counter keeps the count
+ * exact against the team that held the number before - a grant's epoch and
+ * identity cannot tell that team's last grant from the next team's first,
+ * since epochs start again at 1 under the same number - and the grant's words,
+ * which take_grant and scan_take_grant also clear as they read them, are the
+ * second guard: a stale count meets words that say "nothing", and the job ends
+ * by name. */
 void osoe_internode_generic_number_taken(uint32_t number)
 {
     uint32_t fanout = osoe.bootstrap.collective_fanout;

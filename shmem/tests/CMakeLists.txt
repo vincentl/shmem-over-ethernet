@@ -1959,61 +1959,71 @@ endif()
 # under OSOE_TEST_PERTURB (rotation); the class boundary a byte either side, at
 # the setting's smallest and at its default, and a large collective's pieces in
 # flight at D = 2 and 4 (boundary); a team number taken again (reuse); and two
-# leads in different reductions, which the grant names (mismatch). tsan is
-# left out of the maps for shmem.internode.*'s reason.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_executable(shmem_test_lanes test-lanes.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
-  target_include_directories(shmem_test_lanes PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
-  target_link_libraries(shmem_test_lanes PRIVATE osoe rt Threads::Threads)
-  osoe_warnings(shmem_test_lanes)
-  foreach(case "shared-lead:0,1,2,3" "two-threads:0,1,2,3" "turns:0,1"
-               "rotation:0,1,2,3:OSOE_COLLECTIVE_FANOUT=2:OSOE_TEST_PERTURB=1"
-               "boundary:0,1,2" "boundary:0,1,2:OSOE_SMALL_COLLECTIVE_BYTES=128"
-               "boundary:0,1,2:OSOE_COLLECTIVE_PIPELINE=4" "reuse:0,1"
-               "scan-shared-parent:0,1,2,3" "scan-turns:0,1" "scan-reuse:0,1")
-    string(REPLACE ":" ";" environment "${case}")
-    list(POP_FRONT environment which map)
-    string(REPLACE "," ";" ranks "${map}")
-    list(LENGTH ranks count)
-    set(label "${which}")
-    foreach(setting IN LISTS environment)
-      string(REGEX REPLACE "^OSOE_([A-Z_]+)=(.*)$" "\\1-\\2" suffix "${setting}")
-      string(TOLOWER "${suffix}" suffix)
-      string(REPLACE "_" "-" suffix "${suffix}")
-      if(NOT setting MATCHES "PERTURB|FANOUT")
-        set(label "${label}.${suffix}")
-      endif()
-    endforeach()
-    add_test(NAME shmem.lanes.${label}
-      COMMAND ${CMAKE_COMMAND} -E env ${environment}
-              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 90 --
-              $<TARGET_FILE:shmem_test_lanes> ${which})
-    set_tests_properties(shmem.lanes.${label} PROPERTIES LABELS "tier2" TIMEOUT 120)
+# leads in different reductions, which the grant names (mismatch). They run
+# under tsan too, which shmem.internode.*'s maps are kept from: that reason
+# needs a node-mate, a PE whose heap the node's lead's agent writes from
+# another process, and every case here is one PE a logical node. The agent that
+# applies a PE's incoming puts is a thread of that PE's own process, and what
+# separates its write into a lane from the owner's last touch of it - the
+# owner's own send through the agent, and the counters - is all inside the one
+# process tsan sees (round six's H5 ran the nine positive cases under it clean,
+# and a lane shared by threads is a data race it reports). All but
+# class-split-hang, which ends by the deadlock detector: under tsan no job is
+# judged deadlocked, its own thread in every process being one the detector
+# cannot see (shmem.deadlock.* below).
+add_executable(shmem_test_lanes test-lanes.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+target_include_directories(shmem_test_lanes PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+target_link_libraries(shmem_test_lanes PRIVATE osoe rt Threads::Threads)
+osoe_warnings(shmem_test_lanes)
+foreach(case "shared-lead:0,1,2,3" "two-threads:0,1,2,3" "turns:0,1"
+             "rotation:0,1,2,3:OSOE_COLLECTIVE_FANOUT=2:OSOE_TEST_PERTURB=1"
+             "boundary:0,1,2" "boundary:0,1,2:OSOE_SMALL_COLLECTIVE_BYTES=128"
+             "boundary:0,1,2:OSOE_COLLECTIVE_PIPELINE=4" "reuse:0,1"
+             "scan-shared-parent:0,1,2,3" "scan-turns:0,1" "scan-reuse:0,1")
+  string(REPLACE ":" ";" environment "${case}")
+  list(POP_FRONT environment which map)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  set(label "${which}")
+  foreach(setting IN LISTS environment)
+    string(REGEX REPLACE "^OSOE_([A-Z_]+)=(.*)$" "\\1-\\2" suffix "${setting}")
+    string(TOLOWER "${suffix}" suffix)
+    string(REPLACE "_" "-" suffix "${suffix}")
+    if(NOT setting MATCHES "PERTURB|FANOUT")
+      set(label "${label}.${suffix}")
+    endif()
   endforeach()
-  add_test(NAME shmem.lanes.mismatch
-    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
-            mismatch)
-  set_tests_properties(shmem.lanes.mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
-    PASS_REGULAR_EXPRESSION
-    "the grant from node 0's lead [(]PE 0[)] is for epoch [0-9]+'s sum of 8-byte signed integers, 4096 bytes, and this node's lead [(]PE 1[)] is in epoch [0-9]+'s maximum of 8-byte signed integers")
-  add_test(NAME shmem.lanes.scan-mismatch
-    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
-            scan-mismatch)
-  set_tests_properties(shmem.lanes.scan-mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
-    PASS_REGULAR_EXPRESSION
-    "the scan grant from PE 0 is for scan [0-9]+ of the team, an inclusive one of 8-byte signed integers, 4096 bytes, and PE 1 is in scan [0-9]+ of the team, an exclusive one of 8-byte signed integers")
-  add_test(NAME shmem.lanes.class-split-named
-    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
-            class-split-named)
-  set_tests_properties(shmem.lanes.class-split-named PROPERTIES LABELS "tier2" TIMEOUT 90
-    PASS_REGULAR_EXPRESSION
-    "the lane word of node 1's lead [(]PE 1[)], this node's child at position 0, says epoch 0 and lane 0, and this node's lead [(]PE 0[)] is in epoch [0-9]+'s collective")
-  add_test(NAME shmem.lanes.class-split-broadcast
-    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
-            class-split-broadcast)
-  set_tests_properties(shmem.lanes.class-split-broadcast PROPERTIES LABELS "tier2" TIMEOUT 90
-    PASS_REGULAR_EXPRESSION
-    "should be piece 0 [(]1500 bytes[)] of epoch [0-9]+'s broadcast from the node at index 0, and is nothing: no piece was put there")
+  add_test(NAME shmem.lanes.${label}
+    COMMAND ${CMAKE_COMMAND} -E env ${environment}
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 90 --
+            $<TARGET_FILE:shmem_test_lanes> ${which})
+  set_tests_properties(shmem.lanes.${label} PROPERTIES LABELS "tier2" TIMEOUT 120)
+endforeach()
+add_test(NAME shmem.lanes.mismatch
+  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+          mismatch)
+set_tests_properties(shmem.lanes.mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION
+  "the grant from node 0's lead [(]PE 0[)] is for epoch [0-9]+'s sum of 8-byte signed integers, 4096 bytes, and this node's lead [(]PE 1[)] is in epoch [0-9]+'s maximum of 8-byte signed integers")
+add_test(NAME shmem.lanes.scan-mismatch
+  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+          scan-mismatch)
+set_tests_properties(shmem.lanes.scan-mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION
+  "the scan grant from PE 0 is for scan [0-9]+ of the team, an inclusive one of 8-byte signed integers, 4096 bytes, and PE 1 is in scan [0-9]+ of the team, an exclusive one of 8-byte signed integers")
+add_test(NAME shmem.lanes.class-split-named
+  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+          class-split-named)
+set_tests_properties(shmem.lanes.class-split-named PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION
+  "the lane word of node 1's lead [(]PE 1[)], this node's child at position 0, says epoch 0 and lane 0, and this node's lead [(]PE 0[)] is in epoch [0-9]+'s collective")
+add_test(NAME shmem.lanes.class-split-broadcast
+  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+          class-split-broadcast)
+set_tests_properties(shmem.lanes.class-split-broadcast PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION
+  "should be piece 0 [(]1500 bytes[)] of epoch [0-9]+'s broadcast from the node at index 0, and is nothing: no piece was put there")
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   add_test(NAME shmem.lanes.class-split-hang
     COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
             $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
@@ -2021,6 +2031,31 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(shmem.lanes.class-split-hang PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_long_sum_reduce"
     FAIL_REGULAR_EXPRESSION "osoe-launch: timeout")
+endif()
+
+# A lane for each thread, for every kind of collective (test-lanes-threads.c;
+# round six's H1, the correctness investigator's stress): four threads a PE,
+# each with its own copy of the world split every round into a team of its own
+# shape, then sums, broadcasts and both scans of 8 to 5,000 longs on either side
+# of the class line, 300 rounds, every result checked. What the cases above do
+# not see: a regression that sends every large scan of a PE through one lane
+# returns wrong prefix sums with status 0, and passes shmem.lanes.* and
+# shmem.scan.* whole. On one PE a logical node, which tsan sees whole; and on two
+# a node, which it does not: a lead's agent writes its node-mate's heap from
+# another process (shmem.internode.*'s reason, above), so that map is not run
+# under it.
+add_executable(shmem_test_lanes_threads test-lanes-threads.c)
+target_link_libraries(shmem_test_lanes_threads PRIVATE osoe Threads::Threads)
+osoe_warnings(shmem_test_lanes_threads)
+add_test(NAME shmem.lanes.threads
+  COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 120 --
+          $<TARGET_FILE:shmem_test_lanes_threads> 300 4)
+set_tests_properties(shmem.lanes.threads PROPERTIES LABELS "tier2" TIMEOUT 150)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.lanes.threads.two-a-node
+    COMMAND $<TARGET_FILE:osoe-launch> -n 6 -m 0,0,1,1,2,2 -t 120 --
+            $<TARGET_FILE:shmem_test_lanes_threads> 300 4)
+  set_tests_properties(shmem.lanes.threads.two-a-node PROPERTIES LABELS "tier2" TIMEOUT 150)
 endif()
 
 # The allgather among node leads that is fcollect's and collect's internode

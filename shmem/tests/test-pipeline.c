@@ -39,16 +39,17 @@
 #include "launcher.h"
 
 /*
- * A piece carries 16 KiB less its 16-byte header (internode-generic.c): 2,046
- * longs of a reduction or a gather, or 16,368 bytes of a broadcast, which goes
- * as bytes - the same bytes either way. So 1 MiB is 64 whole pieces and one
- * of 1 KiB; the odd sizes end on a short piece too.
+ * A piece carries 16 KiB, its 16-byte header in the lane's slot beside it
+ * (internal-region.h): 2,048 longs of a reduction or a gather, or 16,384 bytes
+ * of a broadcast, which goes as bytes - the same bytes either way. So 1 MiB is
+ * 64 whole pieces, and the odd sizes end on a short piece. (A piece held 16 KiB
+ * less its header until round six's U1, when 1 MiB was 64 pieces and one.)
  */
 enum {
-    PIECE_BYTES = (16 << 10) - 16,
-    MEBIBYTE_LONGS = (1 << 20) / sizeof(long),      /* 65 pieces */
-    ODD_LONGS = 100003,                             /* 49, the last 14,360 bytes */
-    ODD_BYTES = (1 << 20) + 13,                     /* 65, the last 1,037 bytes */
+    PIECE_BYTES = 16 << 10,
+    MEBIBYTE_LONGS = (1 << 20) / sizeof(long),      /* 64 pieces */
+    ODD_LONGS = 100003,                             /* 49, the last 13,592 bytes */
+    ODD_BYTES = (1 << 20) + 13,                     /* 65, the last 13 bytes */
     ODD_BLOCK_LONGS = 16411,                        /* an fcollect's, from each PE */
 };
 
@@ -245,7 +246,7 @@ int main(void)
      * reduction after each, at 1, 3 and 49 pieces in turn, so that the next
      * collective's tree, and its piece count, differ from this one's.
      */
-    static const size_t sizes[] = { 5, 3 * 2046 - 7, ODD_LONGS };
+    static const size_t sizes[] = { 5, 3 * 2048 - 7, ODD_LONGS };
     for (int round = 0; round < 2 * npes; round++) {
         size_t n = sizes[round % 3];
         broadcast_longs(dst, src, n, round % npes, 10 + round);

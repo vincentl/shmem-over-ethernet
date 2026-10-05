@@ -38,7 +38,7 @@ was directed, written and reviewed; this part is where each level of it is kept.
 | `CLAUDE.md` | the working agreements a session works under: when to delegate to subagents, how names are spelled, how a rename is audited, how review files are named |
 | `docs/reviews/` | the adversarial reviews: `adversarial-review-prompt.md` is how one is run, `archive/` holds the finished ones, and `evidence/` the raw material of the first two rounds; its `README.md` is the guide |
 
-**The evidence.** 908 files sit under `docs/design/evidence/` and
+**The evidence.** About a thousand files sit under `docs/design/evidence/` and
 `docs/reviews/evidence/` - `git ls-files | grep -c '/evidence/'` counts them:
 model runs, litmus tests, probe programs, logs, patches, and the raw output of
 each session on the Pi cluster, which

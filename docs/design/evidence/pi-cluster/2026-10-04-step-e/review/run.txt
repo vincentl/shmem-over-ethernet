@@ -1,0 +1,17 @@
+start 22:34:19
+before reduce-skew: 0
+after reduce-skew: 0
+piece-edge: 0
+rskew before 1: done
+rskew after 1: done
+edge 4x4 1: 0
+edge 4x1 1: 0
+rskew before 2: done
+rskew after 2: done
+edge 4x4 2: 0
+edge 4x1 2: 0
+rskew before 3: done
+rskew after 3: done
+edge 4x4 3: 0
+edge 4x1 3: 0
+end 22:35:34

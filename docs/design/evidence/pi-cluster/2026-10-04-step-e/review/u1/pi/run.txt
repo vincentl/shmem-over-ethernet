@@ -1,0 +1,17 @@
+start 23:28:51
+u1 built: 0
+before probe: 0
+after probe: 0
+before 4x4 1: 0
+before 4x1 1: 0
+after 4x4 1: 0
+after 4x1 1: 0
+before 4x4 2: 0
+before 4x1 2: 0
+after 4x4 2: 0
+after 4x1 2: 0
+before 4x4 3: 0
+before 4x1 3: 0
+after 4x4 3: 0
+after 4x1 3: 0
+end 23:31:11

@@ -36,19 +36,23 @@ done; an open one, what is left.
 - [ ] **A version tag and a release note** listing the known limits: whatever
   the last Pi session measured short of the floor, and the README's Limits.
   The version is 0.1.0 (`docs/decisions/2026-10-02.md` item 7, D8). The
-  author tags.
+  author tags. **The commit the tag names says so**: the README's opening says
+  "osoe has not made a release yet: there is no version tag" (round six's
+  readiness Q5-5), and the README is true at every commit.
 
 ## Before every release tag (the decisions index)
 
-- [ ] **An adversarial review of the release candidate, its findings settled.**
+- [x] **An adversarial review of the release candidate, its findings settled.**
   Round three (2026-09-28, `docs/reviews/archive/phase1-release-review.md`)
   said *release after named changes*: the release fixes and the team redesign.
   Round four, at the fixes' merge point (2026-10-03,
   `docs/reviews/archive/phase1-release-fixes-review.md`), said the same, its
   named changes merged on 2026-10-04 (`docs/decisions/2026-10-04-review-fixes.md`).
-  The full review runs again after the teams' step D - at its merge point,
-  `docs/reviews/archive/phase1-step7-slice3-review.md` - and after step E
-  (`docs/prompts/task-first-release.md`).
+  The full review ran again after the teams' step D - at its merge point,
+  `docs/reviews/archive/phase1-step7-slice3-review.md` - and after step E, on
+  the release candidate: round six, `docs/reviews/archive/phase1-step7-slice4-review.md`,
+  *release, after the named changes*, every one made
+  (`docs/decisions/2026-10-05-step-e-review-fixes.md`).
 - [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
   tagged. Evidence so far: two hours on the round-three candidate, `b0e0b53`,
   `failures=0`.
@@ -64,6 +68,11 @@ done; an open one, what is left.
   `srun -K1 --cpu-bind=none -N2 --ntasks-per-node=4`, the batch script with its
   secret, `env.probe` on every node, and `osoe-stat` on a running job's
   nodes.
+- [ ] **The README's quick start on Raspberry Pi OS**, which it names and has
+  run only on Debian (round six's readiness Q5-5): on one Pi node, an ssh
+  session held open (`RemoveIPC`, the runbook), a fresh copy of the tagged
+  tree, the quick start's commands as printed - both rings print the README's
+  four lines and exit 0, and the probe passes.
 - [ ] **`shmem_global_exit` under Slurm, by hand**, since no ctest runs under
   Slurm: `srun -K1 --cpu-bind=none -N1 -n4` with the caller's `atexit` handler
   taking 0 ms, 200 ms, 1 s and 5 s, the caller at PE 0 and at PE 3, and a
@@ -72,7 +81,14 @@ done; an open one, what is left.
   (`-DOSOE_TEST_PINS=ON`) on the machines they were set on.
 - [ ] **x86-64 on the tagged tree**: it builds and passes its one-node tests
   (the `osoe-x86` VM, kept until the tag for this, at the author's word of
-  2026-10-02), so that the README's sentence on architectures is true of it.
+  2026-10-02), so that the README's sentence on architectures is true of it -
+  every test Rosetta can run, 369 of 716 at round six, the rest refused io_uring
+  or seccomp by the emulator. And, since no lanes test runs on one node, the
+  aarch64 build made to order memory as x86-64 does
+  (`docs/reviews/archive/phase1-step7-slice4-portability.md`, its appendix): its
+  suite, the lanes tests repeated, and `mix` across logical nodes, about ten
+  minutes - the one run that puts x86-64's memory order on step E (round six's
+  portability Q1).
 
 ## Added by the round-four review
 
@@ -87,8 +103,28 @@ done; an open one, what is left.
 ## After the release
 
 What the reviews rated *after release*, kept here so that none is lost; none
-blocks the tag.
+blocks the tag. Round three's own after-release list is
+`docs/reviews/archive/phase1-release-review.md`'s, with its readiness report's
+three diagnosis items (`phase1-release-readiness.md`, Q5's list): of those, what
+round six's readiness review found still as it was - "on behalf of PE N"
+naming the PE that noticed rather than the cause, and `osoe-stat` showing a
+stopped node as a waiting one - and the rest of that list stand as round three
+rated them (round six's readiness Q5-5).
 
+- **From round six** (`docs/reviews/archive/phase1-step7-slice4-review.md`):
+  - `osoe-stat --summary`'s walk of a data collective: the generic phase
+    publishing its state as it waits, as the progress thread does a barrier's
+    (readiness Q5-1; the README says what the view walks today);
+  - an `osoe-pacer` exercise of collectives on per-thread teams under
+    `SHMEM_THREAD_MULTIPLE`, so that the stress tester can see a lane shared by
+    threads (correctness H1; `shmem.lanes.threads` sees it today);
+  - step E's two models under the checker's weaker orders, not sequential
+    consistency only; the PID-namespace message when pids are shifted rather
+    than repeated; an x86-64 tsan build's heap placement (portability Q5);
+  - a real x86-64 kernel (portability's third step for the x86-64 item).
+- **The 1.6 session routines' semantics, should they ever be more than
+  no-ops** - what design §10's "thorough 1.6 spec read" had left when the author
+  closed it (`docs/decisions/2026-10-04.md` item 11).
 - **The global exit's single job-wide carrier**, modelled first, which closes
   what the README's second limit leaves open (round four, conformance F1).
 - **A hand-on wake for a reopened connection buffer** - a writer that reserves

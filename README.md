@@ -104,8 +104,11 @@ PE 2 of 4: my box holds 1
 PE 3 of 4: my box holds 2
 ```
 
-The second run opens io_uring, so it needs what [Requirements](#requirements)
-says of the kernel; `build/release/tools/probe/probe` checks it, a line for each
+Four PEs take about 1.05 GiB of `/dev/shm` at the default heap of 256 MiB,
+written only as they are used; a machine with less - a Raspberry Pi 5 of 2 GB,
+say - refuses the first run by name, with the remedies, and `SHMEM_SYMMETRIC_SIZE=64m`
+in front of the command runs it. The second run opens io_uring, so it needs what
+[Requirements](#requirements) says of the kernel; `build/release/tools/probe/probe` checks it, a line for each
 facility. On a Mac, [Developing on macOS](#developing-on-macos) makes a Linux
 virtual machine to run these commands in, with the packages already installed:
 `limactl shell osoe` in front of a command runs it there, from the repository
@@ -127,10 +130,10 @@ test suite, installing, and running over several machines with `srun`.
   leaves those out; nothing else needs it.
 
 osoe has run on aarch64 only, on the Raspberry Pi cluster and in an aarch64
-virtual machine. An x86-64 build of an earlier tree passed most of the one-node
-tests an emulator on an aarch64 kernel can run, with a shim standing in for the
-futex2 calls the emulator refuses, and no x86-64 kernel has run it: see Limits,
-"Launching".
+virtual machine. An x86-64 build of this tree passed every test an emulator on an
+aarch64 kernel can run, with a shim standing in for the futex2 calls the emulator
+refuses, and an aarch64 build made to order memory as x86-64 does passed the
+whole suite; no x86-64 kernel has run it: see Limits, "Launching".
 
 Debian 13 (Trixie) and Raspberry Pi OS Trixie provide all of these from their
 own repositories - `sudo apt install build-essential cmake pkg-config
@@ -189,12 +192,12 @@ is 2), and container runtimes' default seccomp profiles refuse it: Docker 25 and
 later and containerd 2.0 and later with `EPERM`, for which the message names
 the sysctl even though it reads 0 inside the container, and Podman with
 `ENOSYS`. There jobs on one node run, but the test suite's multi-node tests,
-about 320 of them, fail at `shmem_init` or at opening a ring. Set the sysctl to
+about 340 of them, fail at `shmem_init` or at opening a ring. Set the sysctl to
 0 as root, or run the container with a seccomp profile that allows io_uring.
 Container runtimes also give a container 64 MiB of `/dev/shm` unless asked for
 more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) - less than
 one PE needs at the default heap of 256 MiB - so at their defaults even a job of
-one PE is refused at start-up, naming the sizes, and about 540 of the suite's
+one PE is refused at start-up, naming the sizes, and about 560 of the suite's
 tests fail. Give the container a `/dev/shm` of its own, about 300 MiB for
 each PE of the node at the default heap, or lower `SHMEM_SYMMETRIC_SIZE`,
 rather than the host's (`--ipc=host`), which outlives the container.
@@ -390,11 +393,14 @@ job's nodes, naming the job by its id - Slurm's job id, or for a job of
 
 ```sh
 osoe-stat 1234            # job 1234 on this node: counters, and where each PE waits
-osoe-stat --summary 1234  # each team's collective in progress, to walk a hang down
+osoe-stat --summary 1234  # each team's barrier or sync in progress, to walk a hang down
 ```
 
 A job that hangs shows, for every PE, the routine it is blocked in, the
 collective's epoch - how many collectives its team has begun - and for how long.
+The summary's walk follows a team's barriers and syncs, whose epochs each
+node's progress thread keeps; a team hung in a reduction, broadcast, gather or
+scan shows there as nothing open, and its PE lines are where to look.
 The summary names a team you made by its number and its first member's world
 rank - `4@r1` - since teams with no PE in common may share a number, and a
 blocked PE by its world rank.
@@ -408,7 +414,9 @@ computing for ever, is what `osoe-stat` is for.
 - **The exit status says who ended it.** Every PE the library ends leaves with
   1 - a PE or a node that died, a start refused, a deadlock proved, a wait that
   `OSOE_NO_PROGRESS_TIMEOUT` ended. The PE that saw the cause writes a line on
-  standard error saying why; each of the others, one naming that PE. A status
+  standard error saying why, and it comes first; each of the others writes a
+  line naming the PE of its node that saw the job end, or the node it lost -
+  "ended its connection without its goodbye" of a node whose lead ended. A status
   given to `shmem_global_exit` comes through as it is. Under `srun -K1` a task
   Slurm killed, once another had ended badly, counts 143 (128 plus SIGTERM):
   look for the first message, not the highest status.
@@ -627,7 +635,7 @@ The `/dev/shm` capacity check counts the objects whole all the same.
 | The connection area | in `/dev/shm`, one a node | 256 KiB of buffers and 1.25 KiB of state a peer node | 0.75 MiB | 15.8 MiB | 125 MiB, 0.6 written at start |
 | The node lead's own | its private memory | about 0.6 MiB and 3.5 KB a peer node, most of it the reply pool, and 1 MiB of receive buffers as traffic comes | 1.6 MiB | 1.8 MiB | 3.3 MiB |
 | Every PE's own, for the other nodes | its private memory | 24 bytes a peer node, and 21 a peer node for each context in use | 135 bytes | 2.8 KB | 22.5 KB |
-| The job object: the rank map and each node's address | in `/dev/shm`, one a node | 136 bytes a node, and 24 a run of the rank map - n of them under a block distribution, P under a cyclic one | 1.1 KiB | 10.4 KiB | 79 KiB |
+| The job object: the rank map and each node's address | in `/dev/shm`, one a node | 136 bytes a node, and 24 a run of the rank map - n of them under a block distribution, P under a cyclic one, and under a plane or an arbitrary one as many as the ranks fall in, up to one a rank: 32,000, 768 KB a node, at 500 nodes of 256 under `plane=4` | 1.1 KiB | 10.4 KiB | 79 KiB |
 | Sockets | the lead's | n - 1 a node, n(n - 1)/2 in the job | 3, 6 | 63, 2,016 | 499, 124,750 |
 
 A team number is 13.5 KiB a PE at 4 nodes and 15.3 at 500: its counters and
@@ -830,14 +838,19 @@ specification or takes a choice the specification leaves open.
   C library's own state would then be gathered with the program's symmetric
   statics.
 - **Tested on aarch64.** osoe has been developed and tested on aarch64: the
-  Raspberry Pi 5 cluster and an aarch64 virtual machine. On x86-64 the tree of
-  28 September, before this one's release fixes, built without warnings and
-  passed the one-node tests that can run there - more than 300 in release -
-  under Rosetta, an x86-64 user space on an aarch64 kernel, with the futex2
-  calls Rosetta refuses stood in for by a shim. Rosetta refuses io_uring, so no
-  x86-64 process has sent a message to another node: the network path, and the
-  timing pins that were set on aarch64, are untested there, and no x86-64 kernel
-  has run any of it.
+  Raspberry Pi 5 cluster and an aarch64 virtual machine. On x86-64 this tree
+  built without warnings and passed every test that can run under Rosetta, an
+  x86-64 user space on an aarch64 kernel, with the futex2 calls Rosetta refuses
+  stood in for by a shim: 369 of the suite's 716, the rest refused io_uring or
+  seccomp by the emulator. Rosetta refuses io_uring, so no x86-64 process has
+  sent a message to another node: the network path, and the timing pins that
+  were set on aarch64, are untested there, and no x86-64 kernel has run any of
+  it. What x86-64's memory order would do to the protocols across nodes was
+  checked instead on aarch64, built to order memory as x86-64 does - stores
+  released, loads acquired, a store-buffering litmus test telling the two
+  orders apart: the whole suite passed so, the lanes, scan and pipeline tests
+  25 times each, and 13 minutes of the stress tester (round six's portability
+  review).
 - **Every node of a job must have the same architecture.** The rendezvous
   compares the job's size, the heap's size, the build's table of message
   handlers, and the collectives' fan-out, team count, pipeline depth and small
@@ -910,12 +923,13 @@ specification or takes a choice the specification leaves open.
   either side of the line, the job ends where the leads meet, naming both - or,
   under a small reduction's parent, a child taking it as large waits for a
   word its parent never sends, until the deadlock detector ends the job. A
-  scan's members are compared with their tree parent when the scan is large -
-  its number among the team's scans, inclusive or exclusive, its element and
-  its bytes, the PEs of one node too - and not at all when it is small, where
-  PEs given other counts get wrong results with nothing said; given counts on
-  either side of the line, they end the job by name or wait until the deadlock
-  detector ends it.
+  scan's members are compared with their tree parent when the scan is large
+  and its team spans nodes - its number among the team's scans, inclusive or
+  exclusive, its element and its bytes, the PEs of one node too - and not at
+  all when it is small or its team lies on one node, where PEs given other
+  counts get wrong results with nothing said; given counts on either side of
+  the line, they end the job by name or wait until the deadlock detector ends
+  it.
 - **Nor is a `shmem_malloc` that the PEs call with different sizes**, which the
   specification leaves undefined too: the next object then starts at another
   place on the PE that differed, puts to it land in the wrong place, and
@@ -954,8 +968,10 @@ specification or takes a choice the specification leaves open.
   node-mates passing a flag by plain stores took about 115 ms a round trip; by
   `shmem_atomic_set`, 28 µs. The specification has a waited-for word updated by
   an atomic operation (§9.11.1), so this conforms; a program ported from an
-  implementation that polls the word should store with `shmem_atomic_set`,
-  `shmem_p` or a signal.
+  implementation that polls the word should store with `shmem_atomic_set` or a
+  signal. A put such as `shmem_p` wakes the waiter too, but on a best effort
+  (design §4.9): on x86-64 that wake can be missed, and the 100 ms sweep then
+  finds the store.
 - **Strided transfers move element by element, and block-strided ones block by
   block**, batched onto the connection: one message for the whole only when
   the blocks lie end to end.
@@ -1148,7 +1164,7 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_COLLECTIVE_FANOUT` | `4` | k of the tree the node leads meet in: `2` to `32`. Over Ethernet it is a bandwidth choice at large sizes, since a node sends a copy to each of its children over its one link. *Checked*. |
-| `OSOE_COLLECTIVE_PIPELINE` | `2` | Pieces of a large reduction, broadcast or scan each node or member keeps in flight up and down its tree - a reduction's and a broadcast's 16 KiB each, a scan's sized to it, at most 16 KiB: `1` to `8`. *Checked*. |
+| `OSOE_COLLECTIVE_PIPELINE` | `2` | Pieces of a large reduction, broadcast or scan each node or member keeps in flight up and down its tree: `1` to `8`. A reduction's or a broadcast's piece carries 16 KiB, its header in the lane's slot beside it; a scan's is sized to it, at most 16 KiB. *Checked*. |
 | `OSOE_SMALL_COLLECTIVE_BYTES` | `1024` | The largest reduction, broadcast or scan that moves in one piece through slots its team keeps: `128` to `16384`. A larger one goes in pieces through lanes the threads that lead it lend it - every member's thread, for a scan - and a reduction's or scan's child may wait for its parent's, once - up to a hop, or a round trip when the parent enters after it. Each team number keeps the slots - one for each child position of the tree and one for the release, for its reductions and broadcasts and again for its scans - so each byte of the value costs every PE ten bytes a number at the default fan-out: lower it for memory, raise it to keep a few kilobytes' reduction or scan in one hop. *Checked*. |
 
 **Start-up, failures and inspection**
@@ -1412,7 +1428,8 @@ The work ran from goals down to code, and each level is in the repository:
   into the design notes (`docs/design/shmem-ethernet-design.md`) and a plan of
   phases, steps and slices (§7.1). Every decision is recorded with who took it -
   the author, or Claude where a brief left it to Claude - why, and how to undo it:
-  the dated records in `docs/decisions/`, and its index of what holds.
+  from 23 September the dated records in `docs/decisions/`, and its index of what
+  holds; before that, the design notes and the commits.
 - **Briefs**: each slice went to a Claude Code session as a written brief - its
   goal, what to read first, what to build, how to verify it, and the questions to
   stop and put to the author (`docs/prompts/`, the finished ones in `done/`).
@@ -1423,12 +1440,14 @@ The work ran from goals down to code, and each level is in the repository:
   (`tools/modelcheck`); the tests in four build presets, sanitizers among them;
   a speed claim simulated and timed before it merged; `main` moved only at green
   checkpoints, the README true of the tree at every commit.
-- **Review**: a fresh Claude agent read each change adversarially before it
-  merged. At each merge point five more reviewed the whole tree - is it
-  OpenSHMEM 1.6, is it correct, does it scale as claimed, does it run elsewhere,
-  is it ready to be public - a refutation pass tried to knock down every finding
-  rated serious, and a synthesis said what had to change
-  (`docs/reviews/archive/`).
+- **Review**: a fresh Claude agent read changes adversarially before they
+  merged - every part of the release fixes and the team redesign among them. At
+  five points - the round-two review onward,
+  round one having read the design alone - five more reviewed the whole tree:
+  is it OpenSHMEM 1.6, is it correct, does it scale as claimed, does it run
+  elsewhere, is it ready to be public; from round three a refutation pass tried
+  to knock down every finding rated serious, and a synthesis said what had to
+  change (`docs/reviews/archive/`).
 
 The author set the goals, took the decisions the briefs reserved for the
 author, answered the questions they raised, and built and cabled the Raspberry

@@ -982,19 +982,21 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
                       (uint64_t)b->local_count * (n->heap_bytes + n->statics_bytes);
     uint64_t free_bytes;
     if (!osoe_shm_room(wanted, &free_bytes)) {
-        char msg[512];
+        char msg[768];
         char statics[96] = "";
         if (n->statics_bytes)
             snprintf(statics, sizeof statics, " and as many copies of the program's %llu MiB "
                      "of statics", (unsigned long long)((n->statics_bytes + (1u << 20) - 1) >> 20));
         snprintf(msg, sizeof msg, "/dev/shm has %llu MiB free, but this node's control "
-                 "segment and %u heap%s of %llu MiB%s need %llu MiB: lower "
-                 "SHMEM_SYMMETRIC_SIZE, run fewer PEs per node, or enlarge /dev/shm (a "
-                 "container's --shm-size) - or, since pages cost only once written, "
+                 "segment and %u heap%s of %llu MiB - each the symmetric heap and %llu MiB "
+                 "of the library's own region, which OSOE_MAX_TEAMS and "
+                 "OSOE_SMALL_COLLECTIVE_BYTES size -%s need %llu MiB: lower "
+                 "SHMEM_SYMMETRIC_SIZE or those, run fewer PEs per node, or enlarge /dev/shm "
+                 "(a container's --shm-size) - or, since pages cost only once written, "
                  "OSOE_SHM_CAPACITY_CHECK=0 reports this without refusing",
                  (unsigned long long)(free_bytes >> 20), b->local_count,
                  b->local_count == 1 ? "" : "s", (unsigned long long)(n->heap_bytes >> 20),
-                 statics,
+                 (unsigned long long)((n->internal_bytes + (1u << 20) - 1) >> 20), statics,
                  (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
         if (!b->shm_capacity_warning_only)
             fail_rendezvous(n, msg);

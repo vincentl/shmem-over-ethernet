@@ -98,6 +98,15 @@ KiB here, the gather's words included).
 
 ## Choices made without the author
 
+- **The scans' piece rule built is not the one put to the author.** Item 8 of
+  `2026-10-04.md` records "4 KiB below 64 KiB and 16 KiB from 64 KiB"; the Pi
+  measured that rule 1.10 times step D at 8 KiB and 1.05 at 32 KiB, where fewer
+  messages won, and a third - the count's share of D, at least 8 KiB and at most
+  a lane's 16 KiB slot - the fastest at every size, step D's or better from 8 KiB
+  (the measurements, below). Built, within the author's decision to size the
+  pieces to the scan. *Undo*: the constants in `osoe_internode_generic_scan`,
+  `SCAN_LEAST_PIECE_BYTES` and the clamp, for 4 KiB below 64 KiB (round six's
+  readiness review, Q5-6, found it unlisted here).
 - **The scan's grant names the scan by its number among the team's**, which
   every member counts alike, since a scan has no epoch at the seam
   (`osoe_internode_scan` takes none).

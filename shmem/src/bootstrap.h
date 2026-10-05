@@ -126,12 +126,12 @@ struct osoe_bootstrap {
  * must lie in: 1 is one piece at a time, each a whole pass up and down, as
  * before phase 1 step 5 slice 5; each step of D costs every lane's slots in
  * the internal region again (internal-region.h). A lane is (fan-out + 1) x D
- * slots of 16 KiB, and a PE has one per thread record, OSOE_MAX_THREADS + 1 of
- * them: 2.7 MiB at the defaults (fan-out 4, D = 2, 16 threads) - and at the
- * extremes the ranges allow (1,024 teams, fan-out 32, D = 8, 1,023 threads,
- * small collectives of 16 KiB) a PE's region is about 5.2 GiB, which the
- * shared-memory capacity check refuses at init on a machine without it
- * (node.c).
+ * slots of a header and 16 KiB, and a PE has one per thread record,
+ * OSOE_MAX_THREADS + 1 of them: 2.7 MiB at the defaults (fan-out 4, D = 2, 16
+ * threads) - and at the extremes the ranges allow (1,024 teams, fan-out 32,
+ * D = 8, 1,023 threads, small collectives of 16 KiB) a PE's region is about
+ * 5.2 GiB, which the shared-memory capacity check refuses at init on a machine
+ * without it (node.c).
  */
 #define OSOE_COLLECTIVE_PIPELINE_DEFAULT 2u
 #define OSOE_COLLECTIVE_PIPELINE_LOWEST  1u
