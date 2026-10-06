@@ -268,7 +268,10 @@ int main(void)
 
     /* ---- CREDIT ---- */
     struct osoe_credit credit;
-    uint32_t ticket, first, second;
+    /* Zero, so that a take that wrongly succeeds - and leaves its ticket
+     * unwritten - fails the checks below rather than reading garbage (Clang's
+     * -Wsometimes-uninitialized, once shmem.strict-c11 compiled with it). */
+    uint32_t ticket = 0, first = 0, second = 0;
     osoe_credit_init(&credit, 3);
     CHECK(osoe_credit_available(&credit) == 3);
     CHECK(osoe_credit_take(&credit, &ticket) && osoe_credit_take(&credit, &ticket) &&
