@@ -67,6 +67,7 @@ add_test(NAME shmem.static-link
           -DPROBE_SRC=${CMAKE_CURRENT_SOURCE_DIR}/static-link-probe.c
           -DC_COMPILER=${CMAKE_C_COMPILER}
           "-DURING_LIBRARIES=${LIBURING_LINK_LIBRARIES}"
+          -DSINGLE_NODE=${OSOE_SINGLE_NODE}
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStaticLink.cmake)
 set_tests_properties(shmem.static-link PROPERTIES LABELS "tier1" TIMEOUT 180)
 
@@ -79,6 +80,7 @@ add_test(NAME shmem.strict-c11
   COMMAND ${CMAKE_COMMAND}
           -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
           -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/strict-c11-check
+          -DSINGLE_NODE=${OSOE_SINGLE_NODE}
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStrictC11.cmake)
 set_tests_properties(shmem.strict-c11 PROPERTIES LABELS "tier1" TIMEOUT 600)
 
@@ -105,59 +107,67 @@ osoe_warnings(shmem_test_watch_range)
 add_test(NAME shmem.watch-range COMMAND shmem_test_watch_range)
 set_tests_properties(shmem.watch-range PROPERTIES LABELS "tier1" TIMEOUT 60)
 
-# AM framing and the stream parser (tier 1): the same bytes in every split.
-add_executable(shmem_test_am test-am.c ../src/am.c)
-target_include_directories(shmem_test_am PRIVATE ../src)
-target_link_libraries(shmem_test_am PRIVATE osoe_base)
-osoe_warnings(shmem_test_am)
-add_test(NAME shmem.am COMMAND shmem_test_am)
-set_tests_properties(shmem.am PROPERTIES LABELS "tier1" TIMEOUT 120)
+# internode: these programs compile the internode backend's own files
+if(OSOE_INTERNODE)
+  # AM framing and the stream parser (tier 1): the same bytes in every split.
+  add_executable(shmem_test_am test-am.c ../src/am.c)
+  target_include_directories(shmem_test_am PRIVATE ../src)
+  target_link_libraries(shmem_test_am PRIVATE osoe_base)
+  osoe_warnings(shmem_test_am)
+  add_test(NAME shmem.am COMMAND shmem_test_am)
+  set_tests_properties(shmem.am PROPERTIES LABELS "tier1" TIMEOUT 120)
+  osoe_internode_label(shmem.am)
 
-# A framing error must be a loud, immediate abort naming the field that
-# disagreed (§3.4, §3.15) - not a garbage dispatch later. These assert the
-# message, so a check that stopped firing fails here rather than going quiet.
-foreach(case_expect
-    "count|carried 4 messages, its header says 5"
-    "length|runs past the end of segment 1 from an unnamed peer"
-    "short-segment|less than its own header"
-    "kind|this build knows"
-    "short-message|less than its fixed part"
-    "long-message|runs past the end of segment"
-    "empty-count|messages in no room")
-  string(REPLACE "|" ";" parts "${case_expect}")
-  list(GET parts 0 case)
-  list(GET parts 1 expect)
-  add_test(NAME shmem.am.malformed.${case} COMMAND shmem_test_am ${case})
-  set_tests_properties(shmem.am.malformed.${case} PROPERTIES
-    LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
-endforeach()
+  # A framing error must be a loud, immediate abort naming the field that
+  # disagreed (§3.4, §3.15) - not a garbage dispatch later. These assert the
+  # message, so a check that stopped firing fails here rather than going quiet.
+  foreach(case_expect
+      "count|carried 4 messages, its header says 5"
+      "length|runs past the end of segment 1 from an unnamed peer"
+      "short-segment|less than its own header"
+      "kind|this build knows"
+      "short-message|less than its fixed part"
+      "long-message|runs past the end of segment"
+      "empty-count|messages in no room")
+    string(REPLACE "|" ";" parts "${case_expect}")
+    list(GET parts 0 case)
+    list(GET parts 1 expect)
+    add_test(NAME shmem.am.malformed.${case} COMMAND shmem_test_am ${case})
+    set_tests_properties(shmem.am.malformed.${case} PROPERTIES
+      LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
+    osoe_internode_label(shmem.am.malformed.${case})
+  endforeach()
 
-# Deferred reply queues and the credit (tier 1): pure logic and one atomic.
-add_executable(shmem_test_reply test-reply.c ../src/reply.c)
-target_include_directories(shmem_test_reply PRIVATE ../src)
-target_link_libraries(shmem_test_reply PRIVATE osoe_base Threads::Threads)
-osoe_warnings(shmem_test_reply)
-add_test(NAME shmem.reply COMMAND shmem_test_reply)
-set_tests_properties(shmem.reply PROPERTIES LABELS "tier1" TIMEOUT 60)
+  # Deferred reply queues and the credit (tier 1): pure logic and one atomic.
+  add_executable(shmem_test_reply test-reply.c ../src/reply.c)
+  target_include_directories(shmem_test_reply PRIVATE ../src)
+  target_link_libraries(shmem_test_reply PRIVATE osoe_base Threads::Threads)
+  osoe_warnings(shmem_test_reply)
+  add_test(NAME shmem.reply COMMAND shmem_test_reply)
+  set_tests_properties(shmem.reply PROPERTIES LABELS "tier1" TIMEOUT 60)
+  osoe_internode_label(shmem.reply)
 
-# The AM sizing policy (tier 1): pure arithmetic, compiled in.
-add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/am-configuration.c ../src/connection.c
-  ../src/shm-object.c)
-target_include_directories(shmem_test_am_size PRIVATE ../src)
-target_link_libraries(shmem_test_am_size PRIVATE osoe_base rt)
-osoe_warnings(shmem_test_am_size)
-add_test(NAME shmem.am-size COMMAND shmem_test_am_size)
-set_tests_properties(shmem.am-size PROPERTIES LABELS "tier1" TIMEOUT 60)
+  # The AM sizing policy (tier 1): pure arithmetic, compiled in.
+  add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/am-configuration.c ../src/connection.c
+    ../src/shm-object.c)
+  target_include_directories(shmem_test_am_size PRIVATE ../src)
+  target_link_libraries(shmem_test_am_size PRIVATE osoe_base rt)
+  osoe_warnings(shmem_test_am_size)
+  add_test(NAME shmem.am-size COMMAND shmem_test_am_size)
+  set_tests_properties(shmem.am-size PROPERTIES LABELS "tier1" TIMEOUT 60)
+  osoe_internode_label(shmem.am-size)
 
-# The reservation protocol (tier 1): the real code under real threads, checking
-# the properties the models check. Writers are threads because that is what the
-# tsan preset can instrument; §8.2 says what that does and does not buy.
-add_executable(shmem_test_connection test-connection.c ../src/connection.c)
-target_include_directories(shmem_test_connection PRIVATE ../src)
-target_link_libraries(shmem_test_connection PRIVATE osoe_base Threads::Threads)
-osoe_warnings(shmem_test_connection)
-add_test(NAME shmem.connection COMMAND shmem_test_connection)
-set_tests_properties(shmem.connection PROPERTIES LABELS "tier1" TIMEOUT 120)
+  # The reservation protocol (tier 1): the real code under real threads, checking
+  # the properties the models check. Writers are threads because that is what the
+  # tsan preset can instrument; §8.2 says what that does and does not buy.
+  add_executable(shmem_test_connection test-connection.c ../src/connection.c)
+  target_include_directories(shmem_test_connection PRIVATE ../src)
+  target_link_libraries(shmem_test_connection PRIVATE osoe_base Threads::Threads)
+  osoe_warnings(shmem_test_connection)
+  add_test(NAME shmem.connection COMMAND shmem_test_connection)
+  set_tests_properties(shmem.connection PROPERTIES LABELS "tier1" TIMEOUT 120)
+  osoe_internode_label(shmem.connection)
+endif()
 
 # The compressed rank map on its own (tier 1): progressions, runs, lookups against
 # the uncompressed map, the refusals, and the sizes at 4,096 x 256 (§6.2).
@@ -167,61 +177,69 @@ osoe_warnings(shmem_test_rank-map)
 add_test(NAME shmem.rank-map COMMAND shmem_test_rank-map)
 set_tests_properties(shmem.rank-map PROPERTIES LABELS "tier1" TIMEOUT 60)
 
-# The node-pair wire on its own (tier 1): both ends in one process, so no
-# launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
-# its own osoe_fatal so a failure inside it fails the test.
-add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c
-  ../src/shm-object.c)
-target_include_directories(shmem_test_wire PRIVATE ../src)
-target_link_libraries(shmem_test_wire PRIVATE osoe_base rt PkgConfig::LIBURING)
-osoe_warnings(shmem_test_wire)
-add_test(NAME shmem.wire COMMAND shmem_test_wire)
-set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 120)
+# internode: these compile wire.c, ring.c and listener.c, and link liburing
+if(OSOE_INTERNODE)
+  # The node-pair wire on its own (tier 1): both ends in one process, so no
+  # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
+  # its own osoe_fatal so a failure inside it fails the test.
+  add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c
+    ../src/shm-object.c)
+  target_include_directories(shmem_test_wire PRIVATE ../src)
+  target_link_libraries(shmem_test_wire PRIVATE osoe_base rt PkgConfig::LIBURING)
+  osoe_warnings(shmem_test_wire)
+  add_test(NAME shmem.wire COMMAND shmem_test_wire)
+  set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 120)
+  osoe_internode_label(shmem.wire)
 
-# The wire between two processes (tier 2). Two logical nodes, one PE each, so
-# each process is a node lead - the only role that touches a wire (§3.12). It
-# does not call shmem_init: it tests the wire on its own, below the library,
-# and takes its identity straight from the launcher environment.
-# The seed is fixed: §3.14 wants an injected fault reproducible, and without it
-# the pattern would follow the launcher's pid and differ every run.
-add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/wire-settings.c ../src/ring.c
-  ../src/listener.c ../src/shm-object.c)
-target_include_directories(shmem_test_wire_pair PRIVATE ../src)
-target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt PkgConfig::LIBURING)
-osoe_warnings(shmem_test_wire_pair)
-add_test(NAME shmem.wire-pair
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000
-          OSOE_WIRE_SEED=20260919
-          $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
-          $<TARGET_FILE:shmem_test_wire_pair>)
-set_tests_properties(shmem.wire-pair PROPERTIES LABELS "tier2" TIMEOUT 90)
+  # The wire between two processes (tier 2). Two logical nodes, one PE each, so
+  # each process is a node lead - the only role that touches a wire (§3.12). It
+  # does not call shmem_init: it tests the wire on its own, below the library,
+  # and takes its identity straight from the launcher environment.
+  # The seed is fixed: §3.14 wants an injected fault reproducible, and without it
+  # the pattern would follow the launcher's pid and differ every run.
+  add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/wire-settings.c ../src/ring.c
+    ../src/listener.c ../src/shm-object.c)
+  target_include_directories(shmem_test_wire_pair PRIVATE ../src)
+  target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt PkgConfig::LIBURING)
+  osoe_warnings(shmem_test_wire_pair)
+  add_test(NAME shmem.wire-pair
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000
+            OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+            $<TARGET_FILE:shmem_test_wire_pair>)
+  set_tests_properties(shmem.wire-pair PROPERTIES LABELS "tier2" TIMEOUT 90)
+  osoe_internode_label(shmem.wire-pair)
+endif()
 
 # Multi-process tests (tier 2): each program runs under osoe-launch at every
 # listed local PE count, as shmem.<name>.L<count>.
 set(OSOE_LAUNCH_COUNTS 1 2 4)
 
-# The internode phase of a barrier (tier 2). Three nodes at least: with two,
-# the root's own arrival and the single message it receives are the first and
-# the last, so releasing on any arrival is indistinguishable from releasing on
-# all of them - and that mutation passed a two-node test.
-add_executable(shmem_test_barrier_am test-barrier-am.c
-  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
-  ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
-  ../src/shm-object.c)
-target_include_directories(shmem_test_barrier_am PRIVATE ../src)
-target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt PkgConfig::LIBURING)
-osoe_warnings(shmem_test_barrier_am)
-foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
-  string(REPLACE "," ";" ranks "${map}")
-  list(LENGTH ranks count)
-  string(REPLACE "," "-" label "${map}")
-  add_test(NAME shmem.barrier-am.${label}
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
-            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
-            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
-            $<TARGET_FILE:shmem_test_barrier_am>)
-  set_tests_properties(shmem.barrier-am.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
-endforeach()
+if(OSOE_INTERNODE)
+  # The internode phase of a barrier (tier 2). Three nodes at least: with two,
+  # the root's own arrival and the single message it receives are the first and
+  # the last, so releasing on any arrival is indistinguishable from releasing on
+  # all of them - and that mutation passed a two-node test.
+  add_executable(shmem_test_barrier_am test-barrier-am.c
+    ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
+    ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
+    ../src/shm-object.c)
+  target_include_directories(shmem_test_barrier_am PRIVATE ../src)
+  target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt PkgConfig::LIBURING)
+  osoe_warnings(shmem_test_barrier_am)
+  foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.barrier-am.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+              $<TARGET_FILE:shmem_test_barrier_am>)
+    set_tests_properties(shmem.barrier-am.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+    osoe_internode_label(shmem.barrier-am.${label})
+  endforeach()
+endif()
 
 # The job-wide rendezvous and the locality function (tier 2), over §8.1's four
 # poles: one node, one PE per node, uneven sizes, and ranks not contiguous per
@@ -277,57 +295,63 @@ foreach(fixture IN LISTS osoe_slurm_fixtures)
     PASS_REGULAR_EXPRESSION "FIXTURE OK")
 endforeach()
 
-add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c ../src/shm-object.c
-  ../src/am.c ../src/rendezvous.c ../src/rank-map.c ../src/listener.c)
-target_include_directories(shmem_test_job PRIVATE ../src)
-target_link_libraries(shmem_test_job PRIVATE osoe_base rt)
-osoe_warnings(shmem_test_job)
-foreach(map 0 0,0,0,0 0,1,2,3 0,0,0,1,2,2 0,1,2,0,1,0)
-  string(REPLACE "," ";" ranks "${map}")
-  list(LENGTH ranks count)
-  string(REPLACE "," "-" label "${map}")
-  add_test(NAME shmem.job.${label}
-    COMMAND osoe-launch -n ${count} -m ${map} -t 60 -- $<TARGET_FILE:shmem_test_job>)
-  set_tests_properties(shmem.job.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
-endforeach()
-# Two node leads claiming one rank: node 1's lead is told its node holds ranks 1
-# and 0, and node 0's lead holds 0. The rendezvous's root checks every node's
-# ranks once, as it builds the map (rank-map.c), and the job is refused naming
-# the rank and both nodes. (Step 2 had each lead claim its ranks by CAS in a
-# job-wide array; a plain test-and-store before slice 2 let two leads both pass.)
-add_test(NAME shmem.job.duplicate-rank
-  COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1,0 --
-          $<TARGET_FILE:shmem_test_job>)
-set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
-
-# A rank no lead claims: node 1's lead is told its node holds rank 1 alone,
-# though rank 2 is there too. The root checks the map once as it builds it
-# (it was every PE's O(P) scan before slice 3), and the job is refused naming
-# the rank.
-add_test(NAME shmem.job.unclaimed-rank
-  COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1 --
-          $<TARGET_FILE:shmem_test_job>)
-set_tests_properties(shmem.job.unclaimed-rank PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "rank 2 was not claimed by any node")
-
-# The same refusal with its message's write held back a second (slow-message.c):
-# the reason must be on stderr before the job is told to fail, or the launcher's
-# SIGTERM can take it. Before the reason was written first, it was lost in 1 of
-# 30 runs of the test above under load, and in every run of this one. Not under
-# the sanitizers, whose runtimes must come first in the link order LD_PRELOAD
-# would change.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
-  add_library(slow-message SHARED slow-message.c)
-  target_link_libraries(slow-message PRIVATE ${CMAKE_DL_LIBS})
-  osoe_warnings(slow-message)
-  add_test(NAME shmem.job.duplicate-rank.slow-message
-    COMMAND ${CMAKE_COMMAND} -E env "OSOE_TEST_SLOW_TEXT=is claimed by node"
-            LD_PRELOAD=$<TARGET_FILE:slow-message>
-            $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1,0 --
+# internode: shmem_test_job compiles am.c, rendezvous.c and listener.c, on one-node maps too
+if(OSOE_INTERNODE)
+  add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c ../src/shm-object.c
+    ../src/am.c ../src/rendezvous.c ../src/rank-map.c ../src/listener.c)
+  target_include_directories(shmem_test_job PRIVATE ../src)
+  target_link_libraries(shmem_test_job PRIVATE osoe_base rt)
+  osoe_warnings(shmem_test_job)
+  foreach(map 0 0,0,0,0 0,1,2,3 0,0,0,1,2,2 0,1,2,0,1,0)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.job.${label}
+      COMMAND osoe-launch -n ${count} -m ${map} -t 60 -- $<TARGET_FILE:shmem_test_job>)
+    set_tests_properties(shmem.job.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+    osoe_internode_label(shmem.job.${label})
+  endforeach()
+  # Two node leads claiming one rank: node 1's lead is told its node holds ranks 1
+  # and 0, and node 0's lead holds 0. The rendezvous's root checks every node's
+  # ranks once, as it builds the map (rank-map.c), and the job is refused naming
+  # the rank and both nodes. (Step 2 had each lead claim its ranks by CAS in a
+  # job-wide array; a plain test-and-store before slice 2 let two leads both pass.)
+  add_test(NAME shmem.job.duplicate-rank
+    COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1,0 --
             $<TARGET_FILE:shmem_test_job>)
-  set_tests_properties(shmem.job.duplicate-rank.slow-message PROPERTIES LABELS "tier2"
-    TIMEOUT 60 PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
+  set_tests_properties(shmem.job.duplicate-rank PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
+
+  # A rank no lead claims: node 1's lead is told its node holds rank 1 alone,
+  # though rank 2 is there too. The root checks the map once as it builds it
+  # (it was every PE's O(P) scan before slice 3), and the job is refused naming
+  # the rank.
+  add_test(NAME shmem.job.unclaimed-rank
+    COMMAND osoe-launch -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1 --
+            $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.job.unclaimed-rank PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "rank 2 was not claimed by any node")
+  osoe_internode_label(shmem.job.duplicate-rank shmem.job.unclaimed-rank)
+
+  # The same refusal with its message's write held back a second (slow-message.c):
+  # the reason must be on stderr before the job is told to fail, or the launcher's
+  # SIGTERM can take it. Before the reason was written first, it was lost in 1 of
+  # 30 runs of the test above under load, and in every run of this one. Not under
+  # the sanitizers, whose runtimes must come first in the link order LD_PRELOAD
+  # would change.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+    add_library(slow-message SHARED slow-message.c)
+    target_link_libraries(slow-message PRIVATE ${CMAKE_DL_LIBS})
+    osoe_warnings(slow-message)
+    add_test(NAME shmem.job.duplicate-rank.slow-message
+      COMMAND ${CMAKE_COMMAND} -E env "OSOE_TEST_SLOW_TEXT=is claimed by node"
+              LD_PRELOAD=$<TARGET_FILE:slow-message>
+              $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,1 -t 30 -e 1:OSOE_GTIDS=1,0 --
+              $<TARGET_FILE:shmem_test_job>)
+    set_tests_properties(shmem.job.duplicate-rank.slow-message PROPERTIES LABELS "tier2"
+      TIMEOUT 60 PASS_REGULAR_EXPRESSION "rank 0 is claimed by node [01] and by node [01]")
+    osoe_internode_label(shmem.job.duplicate-rank.slow-message)
+  endif()
 endif()
 
 # A refusal must end the job, or say why it cannot: the round-three review's R8
@@ -368,33 +392,37 @@ endfunction()
 set(osoe_dial_error
     "(Connection refused|no answer to the hello on a candidate port|its candidate ports answered for another node or job)")
 
-# The values every node must agree on are checked up the rendezvous tree, each
-# by the parent that sees the disagreement, naming both nodes (§6.2). Node 2's
-# parent is node 0 at the tree's fan-out of 8. The root that refuses ends, and
-# its callers see their connection close: each of them ends, naming the lead it
-# lost.
-osoe_refusal_test(shmem.job.disagree.symmetric-size 3 0
-  LAUNCH -n 3 -m 0,1,2 -e 2:SHMEM_SYMMETRIC_SIZE=64M
-  PATTERNS "node 2 [(]or a node below it[)] has SHMEM_SYMMETRIC_SIZE [0-9]+; node 0 has"
-           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
-           "node 2: the rendezvous lost node 0, its parent in the rendezvous tree"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
-osoe_refusal_test(shmem.job.disagree.fanout 3 0
-  LAUNCH -n 3 -m 0,1,2 -e 2:OSOE_COLLECTIVE_FANOUT=2
-  PATTERNS "node 2 [(]or a node below it[)] has OSOE_COLLECTIVE_FANOUT=2; node 0 has 4"
-           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
-           "node 2: the rendezvous lost node 0, its parent in the rendezvous tree"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
+if(OSOE_INTERNODE)
+  # The values every node must agree on are checked up the rendezvous tree, each
+  # by the parent that sees the disagreement, naming both nodes (§6.2). Node 2's
+  # parent is node 0 at the tree's fan-out of 8. The root that refuses ends, and
+  # its callers see their connection close: each of them ends, naming the lead it
+  # lost.
+  osoe_refusal_test(shmem.job.disagree.symmetric-size 3 0
+    LAUNCH -n 3 -m 0,1,2 -e 2:SHMEM_SYMMETRIC_SIZE=64M
+    PATTERNS "node 2 [(]or a node below it[)] has SHMEM_SYMMETRIC_SIZE [0-9]+; node 0 has"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+             "node 2: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_refusal_test(shmem.job.disagree.fanout 3 0
+    LAUNCH -n 3 -m 0,1,2 -e 2:OSOE_COLLECTIVE_FANOUT=2
+    PATTERNS "node 2 [(]or a node below it[)] has OSOE_COLLECTIVE_FANOUT=2; node 0 has 4"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+             "node 2: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
 
-# OSOE_MAX_TEAMS is agreed the same way (§5.7): a split reduces every parent
-# PE's mask of numbers, which must be one length, and it lays out each PE's
-# internal region, whose offsets every node must compute alike. Two nodes, the
-# second's lead given 128 numbers to the first's default 256.
-osoe_refusal_test(shmem.job.disagree.max-teams 2 0
-  LAUNCH -n 2 -m 0,1 -e 1:OSOE_MAX_TEAMS=128
-  PATTERNS "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=128; node 0 has 256"
-           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
+  # OSOE_MAX_TEAMS is agreed the same way (§5.7): a split reduces every parent
+  # PE's mask of numbers, which must be one length, and it lays out each PE's
+  # internal region, whose offsets every node must compute alike. Two nodes, the
+  # second's lead given 128 numbers to the first's default 256.
+  osoe_refusal_test(shmem.job.disagree.max-teams 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_MAX_TEAMS=128
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=128; node 0 has 256"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_internode_label(shmem.job.disagree.symmetric-size shmem.job.disagree.fanout
+    shmem.job.disagree.max-teams)
+endif()
 
 # Between the PEs of one node too: the lead sizes the team blocks, the rows of
 # published epochs and the internal regions by its count, and a PE with
@@ -416,28 +444,31 @@ osoe_refusal_test(shmem.max-teams.local-disagree.lead 2 0
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
 # And outside its range, or not a number, it is refused by name at init: at
-# least one team beyond the three predefined, and at most 1,024.
+# least one team beyond the three predefined, and at most 1,024 - by
+# shmem_init in either build (bootstrap.c).
 foreach(value 3 1025 x)
   add_test(NAME shmem.max-teams.invalid.${value}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_TEAMS=${value}
-            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.max-teams.invalid.${value} PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "OSOE_MAX_TEAMS='${value}' is not between 4 and 1024")
 endforeach()
-
-# OSOE_COLLECTIVE_PIPELINE too (§5.8): the pieces each lead keeps in flight
-# place them in the internal region, so a node with another number puts a piece
-# where its parent keeps another. Two nodes, the second's lead given 4 to the
-# first's default 2; and outside 1 to 8, or not a number, refused at init.
-osoe_refusal_test(shmem.job.disagree.pipeline 2 0
-  LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_PIPELINE=4
-  PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=4; node 0 has 2"
-           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
+if(OSOE_INTERNODE)
+  # OSOE_COLLECTIVE_PIPELINE too (§5.8): the pieces each lead keeps in flight
+  # place them in the internal region, so a node with another number puts a piece
+  # where its parent keeps another. Two nodes, the second's lead given 4 to the
+  # first's default 2; and outside 1 to 8, or not a number, refused at init.
+  osoe_refusal_test(shmem.job.disagree.pipeline 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_PIPELINE=4
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=4; node 0 has 2"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_internode_label(shmem.job.disagree.pipeline)
+endif()
 foreach(value 0 9 x)
   add_test(NAME shmem.collective-pipeline.invalid.${value}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${value}
-            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.collective-pipeline.invalid.${value} PROPERTIES LABELS "tier2"
     TIMEOUT 60 PASS_REGULAR_EXPRESSION "OSOE_COLLECTIVE_PIPELINE='${value}' is not between 1 and 8")
 endforeach()
@@ -463,15 +494,18 @@ osoe_refusal_test(shmem.collective-pipeline.local-disagree 2 0
 # for a grant its parent never sends. Between nodes, the second's lead given
 # 2,048 to the first's default 1,024; outside 128 to 16,384, or not a number,
 # refused at init; and between the PEs of one node.
-osoe_refusal_test(shmem.job.disagree.small-collective-bytes 2 0
-  LAUNCH -n 2 -m 0,1 -e 1:OSOE_SMALL_COLLECTIVE_BYTES=2048
-  PATTERNS "node 1 [(]or a node below it[)] has OSOE_SMALL_COLLECTIVE_BYTES=2048; node 0 has 1024"
-           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
+if(OSOE_INTERNODE)
+  osoe_refusal_test(shmem.job.disagree.small-collective-bytes 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_SMALL_COLLECTIVE_BYTES=2048
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_SMALL_COLLECTIVE_BYTES=2048; node 0 has 1024"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_internode_label(shmem.job.disagree.small-collective-bytes)
+endif()
 foreach(value 127 16385 x)
   add_test(NAME shmem.small-collective-bytes.invalid.${value}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_SMALL_COLLECTIVE_BYTES=${value}
-            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.small-collective-bytes.invalid.${value} PROPERTIES LABELS "tier2"
     TIMEOUT 60
     PASS_REGULAR_EXPRESSION "OSOE_SMALL_COLLECTIVE_BYTES='${value}' is not between 128 and 16384")
@@ -482,102 +516,110 @@ osoe_refusal_test(shmem.small-collective-bytes.local-disagree 2 0
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
-# The node count is the value that shapes the waits: a lead expects children by
-# its own count, so one given too many waits for children that do not exist.
-# The hello carries the count and a lead calls its parent before it waits for
-# its children, so the first edge that disagrees refuses the job, rather than
-# every lead waiting with no message (tools/modelcheck/rendezvous_model.py).
-# Node 1 given 10 nodes expects a child 9; node 0 given 9 expects 1 to 8.
-#
-# Without a secret nothing a caller says can be proved, so a lead judges a hello
-# as it arrives and ends at the first whose counts differ, before it has answered
-# it. Its caller is left with a closed connection and then with a port nobody
-# holds, and retries; its notice says what it sees - the node it calls, the host
-# list's entry for it, the address dialled, "Connection refused" (the round-three
-# review's N1: nothing was said at all). With a secret the lead answers first, and
-# the callers it answered end: see below. Node 2's hello is a good one, and node 2
-# ends if the lead answered it before it read node 1's, or else is one more node
-# retrying against a closed port. Which comes first is not the test's to choose,
-# so it requires either of node 2, and node 1 to wait.
-osoe_refusal_test(shmem.job.disagree.node-count 3 1-2
-  LAUNCH -n 3 -m 0,1,2 -e 1:OSOE_STEP_NUM_NODES=10 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-10]"
-  PATTERNS "node 0, launched for 3 tasks on 3 nodes, was called by node 1, launched for 3 tasks on 10 nodes"
-           "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
-           "node 2: the rendezvous lost node 0, its parent in the rendezvous tree|osoe_notice: shmem_init on node 2 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
-# The same with one caller: node 1 is a leaf in either view, and has nothing to
-# wait for but the lead it called, which ended on its hello and left it
-# the refused connection to retry.
-osoe_refusal_test(shmem.job.disagree.leaf-node-count 2 1
-  LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NUM_NODES=3 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-3]"
-  PATTERNS "node 0, launched for 2 tasks on 2 nodes, was called by node 1, launched for 2 tasks on 3 nodes"
-           "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
-osoe_refusal_test(shmem.job.disagree.root-node-count 3 2
-  LAUNCH -n 3 -m 0,1,2 -e 0:OSOE_STEP_NUM_NODES=9 -e "0:OSOE_STEP_NODELIST=127.0.0.[1-9]"
-  PATTERNS "node 0, launched for 3 tasks on 9 nodes, was called by node [12], launched for 3 tasks on 3 nodes"
-           "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
-           "osoe_notice: shmem_init on node 2 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
+if(OSOE_INTERNODE)
+  # The node count is the value that shapes the waits: a lead expects children by
+  # its own count, so one given too many waits for children that do not exist.
+  # The hello carries the count and a lead calls its parent before it waits for
+  # its children, so the first edge that disagrees refuses the job, rather than
+  # every lead waiting with no message (tools/modelcheck/rendezvous_model.py).
+  # Node 1 given 10 nodes expects a child 9; node 0 given 9 expects 1 to 8.
+  #
+  # Without a secret nothing a caller says can be proved, so a lead judges a hello
+  # as it arrives and ends at the first whose counts differ, before it has answered
+  # it. Its caller is left with a closed connection and then with a port nobody
+  # holds, and retries; its notice says what it sees - the node it calls, the host
+  # list's entry for it, the address dialled, "Connection refused" (the round-three
+  # review's N1: nothing was said at all). With a secret the lead answers first, and
+  # the callers it answered end: see below. Node 2's hello is a good one, and node 2
+  # ends if the lead answered it before it read node 1's, or else is one more node
+  # retrying against a closed port. Which comes first is not the test's to choose,
+  # so it requires either of node 2, and node 1 to wait.
+  osoe_refusal_test(shmem.job.disagree.node-count 3 1-2
+    LAUNCH -n 3 -m 0,1,2 -e 1:OSOE_STEP_NUM_NODES=10 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-10]"
+    PATTERNS "node 0, launched for 3 tasks on 3 nodes, was called by node 1, launched for 3 tasks on 10 nodes"
+             "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+             "node 2: the rendezvous lost node 0, its parent in the rendezvous tree|osoe_notice: shmem_init on node 2 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  # The same with one caller: node 1 is a leaf in either view, and has nothing to
+  # wait for but the lead it called, which ended on its hello and left it
+  # the refused connection to retry.
+  osoe_refusal_test(shmem.job.disagree.leaf-node-count 2 1
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NUM_NODES=3 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-3]"
+    PATTERNS "node 0, launched for 2 tasks on 2 nodes, was called by node 1, launched for 2 tasks on 3 nodes"
+             "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_refusal_test(shmem.job.disagree.root-node-count 3 2
+    LAUNCH -n 3 -m 0,1,2 -e 0:OSOE_STEP_NUM_NODES=9 -e "0:OSOE_STEP_NODELIST=127.0.0.[1-9]"
+    PATTERNS "node 0, launched for 3 tasks on 9 nodes, was called by node [12], launched for 3 tasks on 3 nodes"
+             "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+             "osoe_notice: shmem_init on node 2 has waited [0-9]+ s for node 0 [(]127[.]0[.]0[.]1, at 127[.]0[.]0[.]1[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: ${osoe_dial_error}"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_internode_label(shmem.job.disagree.node-count shmem.job.disagree.leaf-node-count
+    shmem.job.disagree.root-node-count)
 
-# OSOE_JOB_SECRET (§6.2, §10): leads that share it meet; a lead that has none,
-# or a different one, is refused by name - by the proof in the hello, which a
-# lead that does not know the secret cannot make.
-set(osoe_secret 0123456789abcdef0123456789abcdef)
-add_test(NAME shmem.job.secret
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
-          $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 30 -- $<TARGET_FILE:shmem_test_job>)
-set_tests_properties(shmem.job.secret PROPERTIES LABELS "tier2" TIMEOUT 60)
-# A caller that finds the lead's answer is not one it can accept - a secret on
-# one side only, or two - ends by itself naming it, before it confirms. The lead
-# it called has not counted it and waits for it still: its notice names the node
-# and the port it waits on.
-osoe_refusal_test(shmem.job.secret.missing 2 1
-  ENV OSOE_JOB_SECRET=${osoe_secret}
-  LAUNCH -n 2 -m 0,1 -e 1:OSOE_JOB_SECRET=
-  PATTERNS "node 0 has an OSOE_JOB_SECRET and node 1 has none"
-           "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
-osoe_refusal_test(shmem.job.secret.different 2 1
-  ENV OSOE_JOB_SECRET=${osoe_secret}
-  LAUNCH -n 2 -m 0,1 -e 1:OSOE_JOB_SECRET=fedcba9876543210fedcba9876543210
-  PATTERNS "a proof of a different OSOE_JOB_SECRET"
-           "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
+  # OSOE_JOB_SECRET (§6.2, §10): leads that share it meet; a lead that has none,
+  # or a different one, is refused by name - by the proof in the hello, which a
+  # lead that does not know the secret cannot make.
+  set(osoe_secret 0123456789abcdef0123456789abcdef)
+  add_test(NAME shmem.job.secret
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_JOB_SECRET=${osoe_secret}
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+  set_tests_properties(shmem.job.secret PROPERTIES LABELS "tier2" TIMEOUT 60)
+  osoe_internode_label(shmem.job.secret)
+  # A caller that finds the lead's answer is not one it can accept - a secret on
+  # one side only, or two - ends by itself naming it, before it confirms. The lead
+  # it called has not counted it and waits for it still: its notice names the node
+  # and the port it waits on.
+  osoe_refusal_test(shmem.job.secret.missing 2 1
+    ENV OSOE_JOB_SECRET=${osoe_secret}
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_JOB_SECRET=
+    PATTERNS "node 0 has an OSOE_JOB_SECRET and node 1 has none"
+             "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_refusal_test(shmem.job.secret.different 2 1
+    ENV OSOE_JOB_SECRET=${osoe_secret}
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_JOB_SECRET=fedcba9876543210fedcba9876543210
+    PATTERNS "a proof of a different OSOE_JOB_SECRET"
+             "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_internode_label(shmem.job.secret.missing shmem.job.secret.different)
 
-# A genuine mislaunch with a secret. The lead judges a hello's counts and claims
-# only once its caller has proved the secret (listener.h), so that a host that
-# does not know it cannot end a node's start-up with one hello (the round-three
-# review's N2); it answers, then, and refuses its caller by name afterwards. A
-# caller that sees its connection close ends, naming the lead it lost, where
-# without a secret it retried a refused connection for ever
-# (shmem.job.disagree.leaf-node-count). Two nodes, so that one caller is in
-# question and the order of two is not: node 0 given 3 nodes, and in the next
-# test node 1, a leaf in either view, given 3. In both the lead names both counts
-# and node 1 ends.
-osoe_refusal_test(shmem.job.secret.disagree.root-node-count 2 0
-  ENV OSOE_JOB_SECRET=${osoe_secret}
-  LAUNCH -n 2 -m 0,1 -e 0:OSOE_STEP_NUM_NODES=3 -e "0:OSOE_STEP_NODELIST=127.0.0.[1-3]"
-  PATTERNS "node 0, launched for 2 tasks on 3 nodes, was called by node 1, launched for 2 tasks on 2 nodes"
-           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
-osoe_refusal_test(shmem.job.secret.disagree.leaf-node-count 2 0
-  ENV OSOE_JOB_SECRET=${osoe_secret}
-  LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NUM_NODES=3 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-3]"
-  PATTERNS "node 0, launched for 2 tasks on 2 nodes, was called by node 1, launched for 2 tasks on 3 nodes"
-           "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
-# Node 1 given 10 nodes is a lead of children in its own view, and waits for the
-# first of them, node 9, before it reads anything from the lead it called. The
-# lead ends naming both counts, and node 1 is left waiting for a node that its
-# real job does not have, which its notice names: as ever, a lead given too large
-# a count waits for children that do not exist (rendezvous.c).
-osoe_refusal_test(shmem.job.secret.disagree.node-count 2 1
-  ENV OSOE_JOB_SECRET=${osoe_secret}
-  LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NUM_NODES=10 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-10]"
-  PATTERNS "node 0, launched for 2 tasks on 2 nodes, was called by node 1, launched for 2 tasks on 10 nodes"
-           "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 9, its child in the rendezvous tree, to call it on port [0-9]+"
-  PROGRAM $<TARGET_FILE:shmem_test_job>)
+  # A genuine mislaunch with a secret. The lead judges a hello's counts and claims
+  # only once its caller has proved the secret (listener.h), so that a host that
+  # does not know it cannot end a node's start-up with one hello (the round-three
+  # review's N2); it answers, then, and refuses its caller by name afterwards. A
+  # caller that sees its connection close ends, naming the lead it lost, where
+  # without a secret it retried a refused connection for ever
+  # (shmem.job.disagree.leaf-node-count). Two nodes, so that one caller is in
+  # question and the order of two is not: node 0 given 3 nodes, and in the next
+  # test node 1, a leaf in either view, given 3. In both the lead names both counts
+  # and node 1 ends.
+  osoe_refusal_test(shmem.job.secret.disagree.root-node-count 2 0
+    ENV OSOE_JOB_SECRET=${osoe_secret}
+    LAUNCH -n 2 -m 0,1 -e 0:OSOE_STEP_NUM_NODES=3 -e "0:OSOE_STEP_NODELIST=127.0.0.[1-3]"
+    PATTERNS "node 0, launched for 2 tasks on 3 nodes, was called by node 1, launched for 2 tasks on 2 nodes"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_refusal_test(shmem.job.secret.disagree.leaf-node-count 2 0
+    ENV OSOE_JOB_SECRET=${osoe_secret}
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NUM_NODES=3 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-3]"
+    PATTERNS "node 0, launched for 2 tasks on 2 nodes, was called by node 1, launched for 2 tasks on 3 nodes"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  # Node 1 given 10 nodes is a lead of children in its own view, and waits for the
+  # first of them, node 9, before it reads anything from the lead it called. The
+  # lead ends naming both counts, and node 1 is left waiting for a node that its
+  # real job does not have, which its notice names: as ever, a lead given too large
+  # a count waits for children that do not exist (rendezvous.c).
+  osoe_refusal_test(shmem.job.secret.disagree.node-count 2 1
+    ENV OSOE_JOB_SECRET=${osoe_secret}
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NUM_NODES=10 -e "1:OSOE_STEP_NODELIST=127.0.0.[1-10]"
+    PATTERNS "node 0, launched for 2 tasks on 2 nodes, was called by node 1, launched for 2 tasks on 10 nodes"
+             "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 9, its child in the rendezvous tree, to call it on port [0-9]+"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_internode_label(shmem.job.secret.disagree.root-node-count
+    shmem.job.secret.disagree.leaf-node-count shmem.job.secret.disagree.node-count)
+endif()
 
 # A start-up that goes wrong before the node has joined (the round-three
 # review's R8; §6.2). Every PE checks every setting before its node joins, so a
@@ -641,20 +683,23 @@ foreach(case_expect
     PROGRAM $<TARGET_FILE:shmem_test_init>)
 endforeach()
 
-# A non-lead whose OSOE_AM_BUFFER made a larger connection area than its lead's
-# once waited for ever for the object to grow, which the lead sizes in one step.
-# It refuses at once, by name, and the job ends: the other PE of its node by the
-# node's abort, and the PEs of the other node as the lead they wait for ends.
-osoe_refusal_test(shmem.start-up.am-buffer.differs 4 0
-  LAUNCH -n 4 -m 0,0,1,1 -e 1:OSOE_AM_BUFFER=262144
-  PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 is [0-9]+ bytes, as the local lead's OSOE_AM_[*] settings made it; this PE's make it [0-9]+: every PE of a job must set OSOE_AM_[*] the same"
-  PROGRAM $<TARGET_FILE:shmem_test_init>)
-# And the lead's the larger: the object is whole before the PE looks, and its
-# header says what it was made with.
-osoe_refusal_test(shmem.start-up.am-buffer.lead-larger 4 0
-  LAUNCH -n 4 -m 0,0,1,1 -e 0:OSOE_AM_BUFFER=262144
-  PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 was created with different AM sizing [(]buffer 262144 chunk [0-9]+ nodes 2, not [0-9]+/[0-9]+/2[)]: every PE of a job must set OSOE_AM_[*] the same"
-  PROGRAM $<TARGET_FILE:shmem_test_init>)
+if(OSOE_INTERNODE)
+  # A non-lead whose OSOE_AM_BUFFER made a larger connection area than its lead's
+  # once waited for ever for the object to grow, which the lead sizes in one step.
+  # It refuses at once, by name, and the job ends: the other PE of its node by the
+  # node's abort, and the PEs of the other node as the lead they wait for ends.
+  osoe_refusal_test(shmem.start-up.am-buffer.differs 4 0
+    LAUNCH -n 4 -m 0,0,1,1 -e 1:OSOE_AM_BUFFER=262144
+    PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 is [0-9]+ bytes, as the local lead's OSOE_AM_[*] settings made it; this PE's make it [0-9]+: every PE of a job must set OSOE_AM_[*] the same"
+    PROGRAM $<TARGET_FILE:shmem_test_init>)
+  # And the lead's the larger: the object is whole before the PE looks, and its
+  # header says what it was made with.
+  osoe_refusal_test(shmem.start-up.am-buffer.lead-larger 4 0
+    LAUNCH -n 4 -m 0,0,1,1 -e 0:OSOE_AM_BUFFER=262144
+    PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 was created with different AM sizing [(]buffer 262144 chunk [0-9]+ nodes 2, not [0-9]+/[0-9]+/2[)]: every PE of a job must set OSOE_AM_[*] the same"
+    PROGRAM $<TARGET_FILE:shmem_test_init>)
+  osoe_internode_label(shmem.start-up.am-buffer.differs shmem.start-up.am-buffer.lead-larger)
+endif()
 
 # A PE whose own environment is bad refuses it before its node has joined, and
 # its node-mates end with "another local PE failed" instead of waiting for it:
@@ -746,24 +791,28 @@ osoe_refusal_test(shmem.start-up.never-calls-init.lead 3 2
            "!osoe: PE 2: shmem_init on node"
   PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/exit-before-init.sh 0 $<TARGET_FILE:shmem_test_init>)
 
-# A node that refuses leaves the other nodes waiting for it (a refusing node
-# telling its neighbours is not done), and the lead of each says for whom: here
-# the PEs of node 1 end naming the difference between them, or the lead's own
-# environment, and node 0's lead names node 1, the port it waits on and that
-# nothing has called it. Node 0's other PE waits for its lead, which says nothing
-# for the node twice. Both PEs of node 1 compare their sizes, and the one that
-# is told the other has failed first ends with that instead.
-osoe_refusal_test(shmem.start-up.node-refuses.size-mismatch 4 2
-  LAUNCH -n 4 -m 0,0,1,1 -e 3:SHMEM_SYMMETRIC_SIZE=64M
-  PATTERNS "osoe: PE [23]: SHMEM_SYMMETRIC_SIZE differs between PEs"
-           "osoe: PE 0: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
-  PROGRAM $<TARGET_FILE:shmem_test_init>)
-osoe_refusal_test(shmem.start-up.node-refuses.own-environment-lead 4 2
-  LAUNCH -n 4 -m 0,0,1,1 -e 2:SHMEM_SYMMETRIC_SIZE=abc
-  PATTERNS "osoe: PE 2: SHMEM_SYMMETRIC_SIZE='abc' is invalid"
-           "osoe: PE 3: another local PE failed during rendezvous"
-           "osoe: PE 0: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
-  PROGRAM $<TARGET_FILE:shmem_test_init>)
+if(OSOE_INTERNODE)
+  # A node that refuses leaves the other nodes waiting for it (a refusing node
+  # telling its neighbours is not done), and the lead of each says for whom: here
+  # the PEs of node 1 end naming the difference between them, or the lead's own
+  # environment, and node 0's lead names node 1, the port it waits on and that
+  # nothing has called it. Node 0's other PE waits for its lead, which says nothing
+  # for the node twice. Both PEs of node 1 compare their sizes, and the one that
+  # is told the other has failed first ends with that instead.
+  osoe_refusal_test(shmem.start-up.node-refuses.size-mismatch 4 2
+    LAUNCH -n 4 -m 0,0,1,1 -e 3:SHMEM_SYMMETRIC_SIZE=64M
+    PATTERNS "osoe: PE [23]: SHMEM_SYMMETRIC_SIZE differs between PEs"
+             "osoe: PE 0: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+    PROGRAM $<TARGET_FILE:shmem_test_init>)
+  osoe_refusal_test(shmem.start-up.node-refuses.own-environment-lead 4 2
+    LAUNCH -n 4 -m 0,0,1,1 -e 2:SHMEM_SYMMETRIC_SIZE=abc
+    PATTERNS "osoe: PE 2: SHMEM_SYMMETRIC_SIZE='abc' is invalid"
+             "osoe: PE 3: another local PE failed during rendezvous"
+             "osoe: PE 0: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+    PROGRAM $<TARGET_FILE:shmem_test_init>)
+  osoe_internode_label(shmem.start-up.node-refuses.size-mismatch
+    shmem.start-up.node-refuses.own-environment-lead)
+endif()
 
 # The library against its floor (§1, §8.4): in each of seven pairs, 8-byte
 # io_uring round trips on a raw connection between the job's two processes
@@ -777,86 +826,95 @@ osoe_refusal_test(shmem.start-up.node-refuses.own-environment-lead 4 2
 # reason below: the lead's agent applies PE 0's puts to a heap whose owner last
 # touched it before a barrier that runs through another process.
 option(OSOE_TEST_PINS "check shmem.floor's performance pins, tier 3's included (in an optimized build): the project's regression guard, set on its own machines" OFF)
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_executable(shmem_test_floor test-floor.c ${PROJECT_SOURCE_DIR}/base/hostlist.c
-    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
-  target_include_directories(shmem_test_floor PRIVATE ${PROJECT_SOURCE_DIR}
-    ${PROJECT_SOURCE_DIR}/tools/stat)
-  target_link_libraries(shmem_test_floor PRIVATE osoe rt PkgConfig::LIBURING)
-  osoe_warnings(shmem_test_floor)
-  add_test(NAME shmem.floor
-    COMMAND osoe-launch -n 2 -m 0,1 -t 150 -- $<TARGET_FILE:shmem_test_floor>)
-  set_tests_properties(shmem.floor PROPERTIES LABELS "tier2" TIMEOUT 180)
-  if(OSOE_TEST_PINS)
-    set_tests_properties(shmem.floor PROPERTIES ENVIRONMENT "OSOE_TEST_FLOOR_PINS=1")
+if(OSOE_INTERNODE)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_executable(shmem_test_floor test-floor.c ${PROJECT_SOURCE_DIR}/base/hostlist.c
+      ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+    target_include_directories(shmem_test_floor PRIVATE ${PROJECT_SOURCE_DIR}
+      ${PROJECT_SOURCE_DIR}/tools/stat)
+    target_link_libraries(shmem_test_floor PRIVATE osoe rt PkgConfig::LIBURING)
+    osoe_warnings(shmem_test_floor)
+    add_test(NAME shmem.floor
+      COMMAND osoe-launch -n 2 -m 0,1 -t 150 -- $<TARGET_FILE:shmem_test_floor>)
+    set_tests_properties(shmem.floor PROPERTIES LABELS "tier2" TIMEOUT 180)
+    osoe_internode_label(shmem.floor)
+    if(OSOE_TEST_PINS)
+      set_tests_properties(shmem.floor PROPERTIES ENVIRONMENT "OSOE_TEST_FLOOR_PINS=1")
+    endif()
   endif()
+
+  # The lead's half of the secret (tier 1): a caller whose hello is right in every
+  # field but who cannot prove the secret - replaying the answer's own proof - is
+  # refused and not counted, and the lead goes on listening. Only a caller that
+  # lies reaches this check, so test-listener.c is one, and includes listener.c
+  # for the hello's layout.
+  add_executable(shmem_test_listener test-listener.c)
+  target_include_directories(shmem_test_listener PRIVATE ../src)
+  target_link_libraries(shmem_test_listener PRIVATE osoe_base Threads::Threads)
+  osoe_warnings(shmem_test_listener)
+  add_test(NAME shmem.listener.secret COMMAND shmem_test_listener)
+  set_tests_properties(shmem.listener.secret PROPERTIES LABELS "tier1" TIMEOUT 60)
+  # internode: shmem_test_listener includes listener.c
+  osoe_internode_label(shmem.listener.secret)
+
+  # The progress loop between two logical nodes (tier 2): every layer at once.
+  # The wire is far smaller than a segment and its split injection is on, so the
+  # stream really arrives in pieces (§8.2). Sizes are pinned rather than
+  # inherited, so the production defaults cannot make the suite slow or the test
+  # vacuous.
+  add_executable(shmem_test_progress test-progress.c
+    ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
+    ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/shm-object.c)
+  target_include_directories(shmem_test_progress PRIVATE ../src)
+  target_link_libraries(shmem_test_progress PRIVATE osoe_base rt PkgConfig::LIBURING)
+  osoe_warnings(shmem_test_progress)
+  add_test(NAME shmem.progress
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+            $<TARGET_FILE:shmem_test_progress>)
+  set_tests_properties(shmem.progress PROPERTIES LABELS "tier2" TIMEOUT 90)
+  # Review round two, D4: a get reply nobody asked for, pointing past the landing
+  # zone, must be refused by name on the node that receives it. Before slice 2 it
+  # was written, 64 bytes past the zone, and the test passed.
+  add_test(NAME shmem.progress.forged-get-reply
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+            OSOE_TEST_FORGE=get-reply
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
+            $<TARGET_FILE:shmem_test_progress>)
+  set_tests_properties(shmem.progress.forged-get-reply PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "osoe_fatal: a get reply from node 0"
+    FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
+  add_test(NAME shmem.progress.forged-get-reply-bounds
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+            OSOE_TEST_FORGE=get-reply-bounds
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
+            $<TARGET_FILE:shmem_test_progress>)
+  set_tests_properties(shmem.progress.forged-get-reply-bounds PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "osoe_fatal: a get reply from node 0 for PE 2 puts 64 bytes at offset"
+    FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
+  osoe_internode_label(shmem.progress shmem.progress.forged-get-reply
+    shmem.progress.forged-get-reply-bounds)
+
+  # The connection area across the PEs of a node (tier 2). The local lead creates
+  # it and the others open it, which is §3.12's arrangement. Not an
+  # osoe_tier2_test: it does not call shmem_init, testing the area on its own
+  # below the library, and it takes its identity from the launcher environment.
+  add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/am-configuration.c ../src/connection.c
+    ../src/shm-object.c)
+  target_include_directories(shmem_test_connection_area PRIVATE ../src)
+  target_link_libraries(shmem_test_connection_area PRIVATE osoe_base rt)
+  osoe_warnings(shmem_test_connection_area)
+  foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
+    add_test(NAME shmem.connection-area.L${count}
+      COMMAND osoe-launch -n ${count} -t 60 -- $<TARGET_FILE:shmem_test_connection_area>)
+    set_tests_properties(shmem.connection-area.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
+    # internode: compiles connection-area.c and connection.c
+    osoe_internode_label(shmem.connection-area.L${count})
+  endforeach()
 endif()
-
-# The lead's half of the secret (tier 1): a caller whose hello is right in every
-# field but who cannot prove the secret - replaying the answer's own proof - is
-# refused and not counted, and the lead goes on listening. Only a caller that
-# lies reaches this check, so test-listener.c is one, and includes listener.c
-# for the hello's layout.
-add_executable(shmem_test_listener test-listener.c)
-target_include_directories(shmem_test_listener PRIVATE ../src)
-target_link_libraries(shmem_test_listener PRIVATE osoe_base Threads::Threads)
-osoe_warnings(shmem_test_listener)
-add_test(NAME shmem.listener.secret COMMAND shmem_test_listener)
-set_tests_properties(shmem.listener.secret PROPERTIES LABELS "tier1" TIMEOUT 60)
-
-# The progress loop between two logical nodes (tier 2): every layer at once.
-# The wire is far smaller than a segment and its split injection is on, so the
-# stream really arrives in pieces (§8.2). Sizes are pinned rather than
-# inherited, so the production defaults cannot make the suite slow or the test
-# vacuous.
-add_executable(shmem_test_progress test-progress.c
-  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
-  ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/shm-object.c)
-target_include_directories(shmem_test_progress PRIVATE ../src)
-target_link_libraries(shmem_test_progress PRIVATE osoe_base rt PkgConfig::LIBURING)
-osoe_warnings(shmem_test_progress)
-add_test(NAME shmem.progress
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
-          OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
-          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
-          $<TARGET_FILE:shmem_test_progress>)
-set_tests_properties(shmem.progress PROPERTIES LABELS "tier2" TIMEOUT 90)
-# Review round two, D4: a get reply nobody asked for, pointing past the landing
-# zone, must be refused by name on the node that receives it. Before slice 2 it
-# was written, 64 bytes past the zone, and the test passed.
-add_test(NAME shmem.progress.forged-get-reply
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
-          OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
-          OSOE_TEST_FORGE=get-reply
-          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
-          $<TARGET_FILE:shmem_test_progress>)
-set_tests_properties(shmem.progress.forged-get-reply PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "osoe_fatal: a get reply from node 0"
-  FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
-add_test(NAME shmem.progress.forged-get-reply-bounds
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
-          OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
-          OSOE_TEST_FORGE=get-reply-bounds
-          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
-          $<TARGET_FILE:shmem_test_progress>)
-set_tests_properties(shmem.progress.forged-get-reply-bounds PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "osoe_fatal: a get reply from node 0 for PE 2 puts 64 bytes at offset"
-  FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
-
-# The connection area across the PEs of a node (tier 2). The local lead creates
-# it and the others open it, which is §3.12's arrangement. Not an
-# osoe_tier2_test: it does not call shmem_init, testing the area on its own
-# below the library, and it takes its identity from the launcher environment.
-add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/am-configuration.c ../src/connection.c
-  ../src/shm-object.c)
-target_include_directories(shmem_test_connection_area PRIVATE ../src)
-target_link_libraries(shmem_test_connection_area PRIVATE osoe_base rt)
-osoe_warnings(shmem_test_connection_area)
-foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
-  add_test(NAME shmem.connection-area.L${count}
-    COMMAND osoe-launch -n ${count} -t 60 -- $<TARGET_FILE:shmem_test_connection_area>)
-  set_tests_properties(shmem.connection-area.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90)
-endforeach()
 
 # A job spanning logical nodes, end to end through the public API (tier 2).
 #
@@ -881,85 +939,97 @@ foreach(map 0,0,0,0 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
   string(REPLACE "," ";" ranks "${map}")
   list(LENGTH ranks count)
   string(REPLACE "," "-" label "${map}")
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
   add_test(NAME shmem.multinode.${label}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
             OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
             $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
             $<TARGET_FILE:shmem_test_multinode>)
   set_tests_properties(shmem.multinode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.multinode.${label})
+  endif()
 endforeach()
 
-# The internode tree (§5.3), over node counts where its shape matters: 7 and
-# 13 nodes leave the last level partly filled, and 8 at k = 2 is depth 3. One
-# PE per node, where the tree is all there is, and uneven maps with several
-# PEs on some nodes, where the intranode phase and the handoff run under it.
-# The same program as shmem.multinode.*: its arrival table (arrivals.h) is what
-# says no PE left before the last arrived, and it ends by requiring every
-# invariant counter, missed_wake among them, to be zero.
-set(osoe_tree_maps
-  0,1,2,3,4,5,6
-  0,1,2,3,4,5,6,7
-  0,1,2,3,4,5,6,7,8,9,10,11,12
-  0,0,0,1,2,2,3,4,5,6
-  0,0,1,2,2,3,4,5,6,7,7
-  0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12)
-foreach(fanout 2 4)
-  foreach(map IN LISTS osoe_tree_maps)
+if(OSOE_INTERNODE)
+  # The internode tree (§5.3), over node counts where its shape matters: 7 and
+  # 13 nodes leave the last level partly filled, and 8 at k = 2 is depth 3. One
+  # PE per node, where the tree is all there is, and uneven maps with several
+  # PEs on some nodes, where the intranode phase and the handoff run under it.
+  # The same program as shmem.multinode.*: its arrival table (arrivals.h) is what
+  # says no PE left before the last arrived, and it ends by requiring every
+  # invariant counter, missed_wake among them, to be zero.
+  set(osoe_tree_maps
+    0,1,2,3,4,5,6
+    0,1,2,3,4,5,6,7
+    0,1,2,3,4,5,6,7,8,9,10,11,12
+    0,0,0,1,2,2,3,4,5,6
+    0,0,1,2,2,3,4,5,6,7,7
+    0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12)
+  foreach(fanout 2 4)
+    foreach(map IN LISTS osoe_tree_maps)
+      string(REPLACE "," ";" ranks "${map}")
+      list(LENGTH ranks count)
+      list(REMOVE_DUPLICATES ranks)
+      list(LENGTH ranks nodes)
+      add_test(NAME shmem.tree.k${fanout}.n${nodes}.p${count}
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=${fanout}
+                OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+                OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+                SHMEM_SYMMETRIC_SIZE=16M
+                $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 150 --
+                $<TARGET_FILE:shmem_test_multinode>)
+      set_tests_properties(shmem.tree.k${fanout}.n${nodes}.p${count}
+        PROPERTIES LABELS "tier2" TIMEOUT 180)
+      osoe_internode_label(shmem.tree.k${fanout}.n${nodes}.p${count})
+    endforeach()
+  endforeach()
+
+  # Work discovery on the send side (§3.10; slice 3 part C): 16 logical nodes,
+  # traffic on one connection, and a pass must drain and flush O(1) of them.
+  add_executable(shmem_test_work_discovery test-work-discovery.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_work_discovery PRIVATE
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_work_discovery PRIVATE osoe rt)
+  osoe_warnings(shmem_test_work_discovery)
+  add_test(NAME shmem.work-discovery
+    COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=16M
+            $<TARGET_FILE:osoe-launch> -n 16 -m 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -t 120
+            -- $<TARGET_FILE:shmem_test_work_discovery>)
+  set_tests_properties(shmem.work-discovery PROPERTIES LABELS "tier2" TIMEOUT 150)
+  osoe_internode_label(shmem.work-discovery)
+
+  # The same program with §8.1's force-remote flag on, which is what makes
+  # osoe_transport_direct's call to the one locality function testable at all:
+  # without it a PE on another node already has no mapped heap here, so the
+  # answer is NULL whether the function is consulted or not, and the line that
+  # matters is the one that returns NULL for a PE which *is* on this node.
+  #
+  # The data path does not route yet, so this is the shmem_ptr half of the
+  # differential test rather than the whole of it. Multi-node maps only: with one
+  # logical node there is no peer to route to, and what force-remote should mean
+  # there is an open question (§8.1). All four multi-node poles, as its siblings
+  # run: SHARED must collapse to {self} on the uneven and the non-contiguous maps
+  # too.
+  foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
     string(REPLACE "," ";" ranks "${map}")
     list(LENGTH ranks count)
-    list(REMOVE_DUPLICATES ranks)
-    list(LENGTH ranks nodes)
-    add_test(NAME shmem.tree.k${fanout}.n${nodes}.p${count}
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=${fanout}
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.multinode.force-remote.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
               OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
               OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
-              SHMEM_SYMMETRIC_SIZE=16M
-              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 150 --
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
               $<TARGET_FILE:shmem_test_multinode>)
-    set_tests_properties(shmem.tree.k${fanout}.n${nodes}.p${count}
-      PROPERTIES LABELS "tier2" TIMEOUT 180)
+    set_tests_properties(shmem.multinode.force-remote.${label}
+      PROPERTIES LABELS "tier2" TIMEOUT 90)
+    osoe_internode_label(shmem.multinode.force-remote.${label})
   endforeach()
-endforeach()
-
-# Work discovery on the send side (§3.10; slice 3 part C): 16 logical nodes,
-# traffic on one connection, and a pass must drain and flush O(1) of them.
-add_executable(shmem_test_work_discovery test-work-discovery.c
-  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
-target_include_directories(shmem_test_work_discovery PRIVATE
-  ${PROJECT_SOURCE_DIR}/tools/stat)
-target_link_libraries(shmem_test_work_discovery PRIVATE osoe rt)
-osoe_warnings(shmem_test_work_discovery)
-add_test(NAME shmem.work-discovery
-  COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=16M
-          $<TARGET_FILE:osoe-launch> -n 16 -m 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -t 120
-          -- $<TARGET_FILE:shmem_test_work_discovery>)
-set_tests_properties(shmem.work-discovery PROPERTIES LABELS "tier2" TIMEOUT 150)
-
-# The same program with §8.1's force-remote flag on, which is what makes
-# osoe_transport_direct's call to the one locality function testable at all:
-# without it a PE on another node already has no mapped heap here, so the
-# answer is NULL whether the function is consulted or not, and the line that
-# matters is the one that returns NULL for a PE which *is* on this node.
-#
-# The data path does not route yet, so this is the shmem_ptr half of the
-# differential test rather than the whole of it. Multi-node maps only: with one
-# logical node there is no peer to route to, and what force-remote should mean
-# there is an open question (§8.1). All four multi-node poles, as its siblings
-# run: SHARED must collapse to {self} on the uneven and the non-contiguous maps
-# too.
-foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
-  string(REPLACE "," ";" ranks "${map}")
-  list(LENGTH ranks count)
-  string(REPLACE "," "-" label "${map}")
-  add_test(NAME shmem.multinode.force-remote.${label}
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
-            OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
-            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
-            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
-            $<TARGET_FILE:shmem_test_multinode>)
-  set_tests_properties(shmem.multinode.force-remote.${label}
-    PROPERTIES LABELS "tier2" TIMEOUT 90)
-endforeach()
+endif()
 
 # The data path across a node boundary (tier 2): the same program over the
 # intranode path and the force-remote path, which must agree byte for byte.
@@ -995,6 +1065,10 @@ foreach(map IN LISTS osoe_internode_maps)
   string(REPLACE "," ";" ranks "${map}")
   list(LENGTH ranks count)
   string(REPLACE "," "-" label "${map}")
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
   add_test(NAME shmem.internode.${label}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
             OSOE_AM_CREDITS=2
@@ -1002,6 +1076,9 @@ foreach(map IN LISTS osoe_internode_maps)
             $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
             $<TARGET_FILE:shmem_test_internode>)
   set_tests_properties(shmem.internode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.internode.${label})
+  endif()
 endforeach()
 # The same through the bootstrap's Slurm path (§6.1): osoe-launch -s names the
 # launcher's variables as srun does, SLURM_ in place of OSOE_. One node, one PE
@@ -1017,6 +1094,10 @@ foreach(map IN LISTS osoe_slurm_maps)
   string(REPLACE "," ";" ranks "${map}")
   list(LENGTH ranks count)
   string(REPLACE "," "-" label "${map}")
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
   add_test(NAME shmem.slurm.internode.${label}
     COMMAND ${CMAKE_COMMAND} -E env --unset=OSOE_PROCID OSOE_AM_CHUNK=1024
             OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
@@ -1024,34 +1105,40 @@ foreach(map IN LISTS osoe_slurm_maps)
             $<TARGET_FILE:osoe-launch> -s -n ${count} -m ${map} -t 60 --
             $<TARGET_FILE:shmem_test_internode>)
   set_tests_properties(shmem.slurm.internode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.slurm.internode.${label})
+  endif()
 endforeach()
-# The same program under §8.1's force-remote flag (slice 3). It is registered
-# now because the flag no longer touches the route: a put to a node-mate is
-# still applied in the calling thread, and only the *pointer* is denied
-# (job.h's two predicates). Until that split, this configuration aborted with
-# "no connection toward node N" - 4 runs in 4 - which is what the test would
-# have said had it been registered, and what three comments claimed could not
-# happen. Multi-node maps only: the flag needs somewhere to be remote from, and
-# is refused at init on one logical node - which is also why these do not run
-# under ThreadSanitizer at all, where the multi-node maps of shmem.internode.*
-# are already excluded for the reason given above (the ordering that makes a
-# put safe runs through another process, and tsan reports a race it cannot
-# disprove). With the single-node map unavailable to this flag, there is
-# nothing left to run there.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
-  string(REPLACE "," ";" ranks "${map}")
-  list(LENGTH ranks count)
-  string(REPLACE "," "-" label "${map}")
-  add_test(NAME shmem.internode.force-remote.${label}
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
-            OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
-            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
-            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
-            $<TARGET_FILE:shmem_test_internode>)
-  set_tests_properties(shmem.internode.force-remote.${label} PROPERTIES LABELS "tier2"
-    TIMEOUT 90)
-endforeach()
+if(OSOE_INTERNODE)
+  # The same program under §8.1's force-remote flag (slice 3). It is registered
+  # now because the flag no longer touches the route: a put to a node-mate is
+  # still applied in the calling thread, and only the *pointer* is denied
+  # (job.h's two predicates). Until that split, this configuration aborted with
+  # "no connection toward node N" - 4 runs in 4 - which is what the test would
+  # have said had it been registered, and what three comments claimed could not
+  # happen. Multi-node maps only: the flag needs somewhere to be remote from, and
+  # is refused at init on one logical node - which is also why these do not run
+  # under ThreadSanitizer at all, where the multi-node maps of shmem.internode.*
+  # are already excluded for the reason given above (the ordering that makes a
+  # put safe runs through another process, and tsan reports a race it cannot
+  # disprove). With the single-node map unavailable to this flag, there is
+  # nothing left to run there.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.internode.force-remote.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+              OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+              $<TARGET_FILE:shmem_test_internode>)
+    set_tests_properties(shmem.internode.force-remote.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 90)
+    osoe_internode_label(shmem.internode.force-remote.${label})
+  endforeach()
+  endif()
 endif()
 
 # §8.2's heap-base shift (invariant 7): every PE maps its own heap at
@@ -1069,20 +1156,23 @@ foreach(name rma amo amo-types amo-nbi wait wait-many signal team malloc barrier
             $<TARGET_FILE:osoe-launch> -n 4 -t 60 -- $<TARGET_FILE:shmem_test_${name}>)
   set_tests_properties(shmem.heap-shift.${name}.L4 PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  foreach(map 0,0,1,1,2,2 0,1,2,0,1,0)
-    string(REPLACE "," ";" ranks "${map}")
-    list(LENGTH ranks count)
-    string(REPLACE "," "-" label "${map}")
-    add_test(NAME shmem.heap-shift.internode.${label}
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_SHIFT=2m
-              OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
-              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
-              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
-              $<TARGET_FILE:shmem_test_internode>)
-    set_tests_properties(shmem.heap-shift.internode.${label} PROPERTIES LABELS "tier2"
-      TIMEOUT 90)
-  endforeach()
+if(OSOE_INTERNODE)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    foreach(map 0,0,1,1,2,2 0,1,2,0,1,0)
+      string(REPLACE "," ";" ranks "${map}")
+      list(LENGTH ranks count)
+      string(REPLACE "," "-" label "${map}")
+      add_test(NAME shmem.heap-shift.internode.${label}
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_SHIFT=2m
+                OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+                OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+                $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+                $<TARGET_FILE:shmem_test_internode>)
+      set_tests_properties(shmem.heap-shift.internode.${label} PROPERTIES LABELS "tier2"
+        TIMEOUT 90)
+      osoe_internode_label(shmem.heap-shift.internode.${label})
+    endforeach()
+  endif()
 endif()
 # OSOE_HEAP_SHIFT is a whole number of pages, and anything else is refused by name.
 add_test(NAME shmem.heap-shift.invalid
@@ -1099,38 +1189,41 @@ add_test(NAME shmem.refuse.heap_base_unaligned
 set_tests_properties(shmem.refuse.heap_base_unaligned PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "OSOE_HEAP_BASE='0x100000000800' is not a multiple of the")
 
-# The differential test (§8.1): one program, §8.1's four poles of the logical
-# node map at one world size, and the transcripts must match. On the first map
-# every operation is applied in the calling thread; on the second every one
-# crosses the AM layer; the middle two mix them, which is where a path right at
-# both extremes and wrong in between shows up.
-#
-# It compares outputs rather than checking assertions, which is why it is worth
-# having beside shmem.internode: a CHECK catches what it was told to look for,
-# a diff catches anything that differs.
-#
-# Not registered under ThreadSanitizer, for the reason given above: the
-# happens-before that makes an applied put safe runs through another process,
-# and tsan sees one. Reducing it to the single-node map, as shmem.internode is
-# reduced, would leave nothing to compare it against - a differential test of
-# one configuration is not one - so it is left out there entirely and the other
-# three presets carry it.
-add_executable(shmem_test_differential test-differential.c
-  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
-target_include_directories(shmem_test_differential PRIVATE
-  ${PROJECT_SOURCE_DIR}/tools/stat)
-target_link_libraries(shmem_test_differential PRIVATE osoe rt)
-osoe_warnings(shmem_test_differential)
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-add_test(NAME shmem.differential
-  COMMAND ${CMAKE_COMMAND}
-          -DLAUNCH=$<TARGET_FILE:osoe-launch>
-          -DEXE=$<TARGET_FILE:shmem_test_differential>
-          -DNRANKS=6
-          "-DMAPS=0,0,0,0,0,0;0,1,2,3,4,5;0,0,0,1,2,2;0,1,2,0,1,0"
-          "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919;SHMEM_SYMMETRIC_SIZE=16m"
-          -P ${PROJECT_SOURCE_DIR}/cmake/Differential.cmake)
-set_tests_properties(shmem.differential PROPERTIES LABELS "tier2" TIMEOUT 300)
+if(OSOE_INTERNODE)
+  # The differential test (§8.1): one program, §8.1's four poles of the logical
+  # node map at one world size, and the transcripts must match. On the first map
+  # every operation is applied in the calling thread; on the second every one
+  # crosses the AM layer; the middle two mix them, which is where a path right at
+  # both extremes and wrong in between shows up.
+  #
+  # It compares outputs rather than checking assertions, which is why it is worth
+  # having beside shmem.internode: a CHECK catches what it was told to look for,
+  # a diff catches anything that differs.
+  #
+  # Not registered under ThreadSanitizer, for the reason given above: the
+  # happens-before that makes an applied put safe runs through another process,
+  # and tsan sees one. Reducing it to the single-node map, as shmem.internode is
+  # reduced, would leave nothing to compare it against - a differential test of
+  # one configuration is not one - so it is left out there entirely and the other
+  # three presets carry it.
+  add_executable(shmem_test_differential test-differential.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_differential PRIVATE
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_differential PRIVATE osoe rt)
+  osoe_warnings(shmem_test_differential)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.differential
+    COMMAND ${CMAKE_COMMAND}
+            -DLAUNCH=$<TARGET_FILE:osoe-launch>
+            -DEXE=$<TARGET_FILE:shmem_test_differential>
+            -DNRANKS=6
+            "-DMAPS=0,0,0,0,0,0;0,1,2,3,4,5;0,0,0,1,2,2;0,1,2,0,1,0"
+            "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919;SHMEM_SYMMETRIC_SIZE=16m"
+            -P ${PROJECT_SOURCE_DIR}/cmake/Differential.cmake)
+  set_tests_properties(shmem.differential PROPERTIES LABELS "tier2" TIMEOUT 300)
+  osoe_internode_label(shmem.differential)
+  endif()
 endif()
 
 # Every tier-2 test asserts §8.2's rule that invariant counters are zero at
@@ -1154,8 +1247,14 @@ endfunction()
 
 # A tier-2 test over a logical node map (§8.1) rather than a PE count: for
 # what only exists between nodes. Built like osoe_tier2_test, with the segment
-# reader, so it can read the control segment's metrics by name.
+# reader, so it can read the control segment's metrics by name. A map of more
+# than one node is the internode label's, and the single-node build registers
+# none (cmake/OsoeInternode.cmake); a map of one node runs in both builds.
 function(osoe_tier2_map_test name map)
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    return()
+  endif()
   if(NOT TARGET shmem_test_${name})
     add_executable(shmem_test_${name} test-${name}.c
       ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
@@ -1172,6 +1271,9 @@ function(osoe_tier2_map_test name map)
             $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
             $<TARGET_FILE:shmem_test_${name}>)
   set_tests_properties(shmem.${name}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.${name}.${label})
+  endif()
 endfunction()
 
 # Link a test program as oshcc links one (design §4.3): -fno-pie, -no-pie and
@@ -1209,131 +1311,137 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     SHMEM_SYMMETRIC_SIZE=16m)
 endif()
 
-# An internode quiet sweeps (§4.10; review round two, D2): node 1 is stopped,
-# PE 0 quiets toward it, PE 1 sees it blocked in osoe-stat with its sweep count
-# rising, and dies, and PE 0 must end naming shmem_quiet. -k leaves the
-# survivors to the library. Before slice 2 the quiet never swept: osoe-stat
-# showed nothing for PE 0, and the job ran to the launcher's 15 s timeout.
-add_executable(shmem_test_unswept-wait test-unswept-wait.c
-  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
-target_include_directories(shmem_test_unswept-wait PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
-target_link_libraries(shmem_test_unswept-wait PRIVATE osoe rt)
-osoe_warnings(shmem_test_unswept-wait)
-add_test(NAME shmem.unswept-wait
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
-          $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 15 -k --
-          $<TARGET_FILE:shmem_test_unswept-wait>)
-set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "shmem_quiet: the job is aborting on behalf of PE 1|waiting in shmem_quiet"
-  FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED|QUIET DID NOT SWEEP")
-
-# Diagnosability experiment 1 (§3.14, §5.3): one PE never reaches a barrier,
-# and the node it is on is found by walking down the tree rather than by
-# visiting every node. Eight logical nodes at k = 2, so the walk is three
-# visits. PE 0 leaves without finalizing once it has the answer, which its node
-# declares and the launcher finishes; the test is judged on what it printed.
-add_executable(shmem_test_hang-walk test-hang-walk.c
-  ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
-target_include_directories(shmem_test_hang-walk PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
-target_link_libraries(shmem_test_hang-walk PRIVATE osoe rt)
-osoe_warnings(shmem_test_hang-walk)
-add_test(NAME shmem.hang-walk
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=2 SHMEM_SYMMETRIC_SIZE=16M
-          $<TARGET_FILE:osoe-launch> -n 8 -m 0,1,2,3,4,5,6,7 -t 12 -k --
-          $<TARGET_FILE:shmem_test_hang-walk>)
-set_tests_properties(shmem.hang-walk PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "hang walk found node 6 in [0-9]+ visits"
-  FAIL_REGULAR_EXPRESSION "CHECK[(]")
-
-# The reply descriptor pool (§3.8; review round two, D1). The review's scenario
-# at C = 2 must complete; with the target given a smaller credit than the
-# origin, the pool overflows and the target must say so by name. Before slice 2
-# sized the pool by §3.8's formula, both dropped a get request without a word
-# and timed out ("no get reply after 60 s"). The completing half is not run
-# under ThreadSanitizer (see shmem.reply-starvation); the overflow half is,
-# since its pass is the named fatal and not a clean exit.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  osoe_tier2_map_test(reply-pool 0,0,0,1 OSOE_AM_CREDITS=2 SHMEM_SYMMETRIC_SIZE=16m)
-else()
-  add_executable(shmem_test_reply-pool test-reply-pool.c
+if(OSOE_INTERNODE)
+  # An internode quiet sweeps (§4.10; review round two, D2): node 1 is stopped,
+  # PE 0 quiets toward it, PE 1 sees it blocked in osoe-stat with its sweep count
+  # rising, and dies, and PE 0 must end naming shmem_quiet. -k leaves the
+  # survivors to the library. Before slice 2 the quiet never swept: osoe-stat
+  # showed nothing for PE 0, and the job ran to the launcher's 15 s timeout.
+  add_executable(shmem_test_unswept-wait test-unswept-wait.c
     ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
-  target_include_directories(shmem_test_reply-pool PRIVATE
-    ${PROJECT_SOURCE_DIR}/tools/stat)
-  target_link_libraries(shmem_test_reply-pool PRIVATE osoe rt)
-  osoe_warnings(shmem_test_reply-pool)
+  target_include_directories(shmem_test_unswept-wait PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_unswept-wait PRIVATE osoe rt)
+  osoe_warnings(shmem_test_unswept-wait)
+  add_test(NAME shmem.unswept-wait
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 15 -k --
+            $<TARGET_FILE:shmem_test_unswept-wait>)
+  set_tests_properties(shmem.unswept-wait PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "shmem_quiet: the job is aborting on behalf of PE 1|waiting in shmem_quiet"
+    FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED|QUIET DID NOT SWEEP")
+  osoe_internode_label(shmem.unswept-wait)
+
+  # Diagnosability experiment 1 (§3.14, §5.3): one PE never reaches a barrier,
+  # and the node it is on is found by walking down the tree rather than by
+  # visiting every node. Eight logical nodes at k = 2, so the walk is three
+  # visits. PE 0 leaves without finalizing once it has the answer, which its node
+  # declares and the launcher finishes; the test is judged on what it printed.
+  add_executable(shmem_test_hang-walk test-hang-walk.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_hang-walk PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_hang-walk PRIVATE osoe rt)
+  osoe_warnings(shmem_test_hang-walk)
+  add_test(NAME shmem.hang-walk
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=2 SHMEM_SYMMETRIC_SIZE=16M
+            $<TARGET_FILE:osoe-launch> -n 8 -m 0,1,2,3,4,5,6,7 -t 12 -k --
+            $<TARGET_FILE:shmem_test_hang-walk>)
+  set_tests_properties(shmem.hang-walk PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "hang walk found node 6 in [0-9]+ visits"
+    FAIL_REGULAR_EXPRESSION "CHECK[(]")
+  osoe_internode_label(shmem.hang-walk)
+
+  # The reply descriptor pool (§3.8; review round two, D1). The review's scenario
+  # at C = 2 must complete; with the target given a smaller credit than the
+  # origin, the pool overflows and the target must say so by name. Before slice 2
+  # sized the pool by §3.8's formula, both dropped a get request without a word
+  # and timed out ("no get reply after 60 s"). The completing half is not run
+  # under ThreadSanitizer (see shmem.reply-starvation); the overflow half is,
+  # since its pass is the named fatal and not a clean exit.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    osoe_tier2_map_test(reply-pool 0,0,0,1 OSOE_AM_CREDITS=2 SHMEM_SYMMETRIC_SIZE=16m)
+  else()
+    add_executable(shmem_test_reply-pool test-reply-pool.c
+      ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+    target_include_directories(shmem_test_reply-pool PRIVATE
+      ${PROJECT_SOURCE_DIR}/tools/stat)
+    target_link_libraries(shmem_test_reply-pool PRIVATE osoe rt)
+    osoe_warnings(shmem_test_reply-pool)
+  endif()
+  # The target's pool is, per connection, C and one for the deadlock detector,
+  # plus (k + 1) x OSOE_TEAM_BLOCKS for the tree's forwards, node-wide (§3.8):
+  # with C = 1, k = 2 and the smallest pool of team blocks the variable allows, 8,
+  # that is 1 + 1 + 3 x 8 = 26, so twenty-seven origin PEs each with a blocking
+  # get outstanding overflow it, and thirty-one leave a margin. Slice 3 made the
+  # forward term node-wide - at the default k = 4 it was 16, and the seven origin
+  # PEs this test had until then stopped reaching it - phase 1 step 7's second
+  # slice made it count every team number, where it had counted the three
+  # predefined teams and eleven origins overflowed it, and the team redesign's
+  # step D every block of the node's pool, a node holding more teams than one
+  # PE's numbers, where fifteen origins overflowed 1 + 1 + 3 x 4.
+  add_test(NAME shmem.reply-pool.overflow
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow SHMEM_SYMMETRIC_SIZE=16m
+            OSOE_COLLECTIVE_FANOUT=2
+            $<TARGET_FILE:osoe-launch> -n 32
+            -m 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 -t 30
+            -e 31:OSOE_AM_CREDITS=1 -e 31:OSOE_TEAM_BLOCKS=8
+            -- $<TARGET_FILE:shmem_test_reply-pool>)
+  set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
+  osoe_internode_label(shmem.reply-pool.overflow)
+
+  # A quiet waits as long as its peer does (§3.15; review round two, D3): node 1
+  # stopped for 3 s, then continued, and the quiet completes with the no-progress
+  # limit unset; with it at 5 s and node 1 stopped for 9, the quiet ends the job
+  # naming the connection. The slice-2 commit records a run stopped for 65 s, past
+  # the old 60 s bound. The limit was 1 s until a Pi took longer than that to
+  # connect a second logical node under ctest -j4, and the limit fired at start-up
+  # instead (docs/pi-cluster.md, 2026-09-24).
+  osoe_tier2_map_test(stopped-node 0,0,1 OSOE_TEST_STOP_MS=3000)
+  set_tests_properties(shmem.stopped-node.0-0-1 PROPERTIES
+    PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
+  add_test(NAME shmem.stopped-node.no-progress
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=9000 OSOE_NO_PROGRESS_TIMEOUT=5
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
+            $<TARGET_FILE:shmem_test_stopped-node>)
+  set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "shmem_quiet: no progress toward node 1 for [0-9]+ s"
+    FAIL_REGULAR_EXPRESSION "quiet completed")
+  # Keepalive asks whether a peer's kernel is there, and a stopped node's is
+  # (§3.15, wire.c): at its tightest - a probe after 1 s idle, then three 1 s
+  # apart - node 1 stopped for 6 s is still waited for, and the quiet completes.
+  # tier3.*.vanished-node is the other half: a node whose link is cut is found.
+  add_test(NAME shmem.stopped-node.keepalive
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=6000 OSOE_KEEPALIVE=1,1,3
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
+            $<TARGET_FILE:shmem_test_stopped-node>)
+  set_tests_properties(shmem.stopped-node.keepalive PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
+  osoe_internode_label(shmem.stopped-node.no-progress shmem.stopped-node.keepalive)
+  # A stopped node whose receive buffer is full (phase 1 release review, K5): the state
+  # the test above never reaches, and the one the silent-peer check's condition
+  # exists for - the kernel is asked how long its peer has acknowledged nothing
+  # only while something sent is unacknowledged (wire.c, osoe_wire_silent_ms). 64 MiB
+  # put toward node 1 while it is stopped shuts its window, which is probed with
+  # nothing outstanding. Without the condition the job ends at about 12 s, naming a
+  # node that was never gone, and every other stopped-node test still passes. The
+  # stop is 15 s: 12 s let the removal through and 13 s did not, so that leaves
+  # 2.8 s over the time the removal takes (the test's header has the arithmetic).
+  # In every preset, as the stopped-node tests are.
+  osoe_tier2_map_test(stopped-bulk 0,0,1 OSOE_TEST_STOP_MS=15000 OSOE_KEEPALIVE=1,1,3
+    SHMEM_SYMMETRIC_SIZE=128m)
+  set_tests_properties(shmem.stopped-bulk.0-0-1 PROPERTIES
+    PASS_REGULAR_EXPRESSION "STOPPED BULK OK"
+    FAIL_REGULAR_EXPRESSION "stopped answering|CHECK[(]|osoe-launch: (rank|timeout)")
+
+  # The other half of D-6 (diagnosability review): a blocking get waits for one
+  # PE's reply, not a whole node's queue, so its no-progress fatal must name that
+  # PE and not only the node. Before this fix it named neither. Five seconds, like
+  # shmem.stopped-node.no-progress's, because the limit covers start-up too.
+  osoe_tier2_map_test(get-no-progress 0,1 OSOE_NO_PROGRESS_TIMEOUT=5)
+  set_tests_properties(shmem.get-no-progress.0-1 PROPERTIES
+    PASS_REGULAR_EXPRESSION "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s"
+    FAIL_REGULAR_EXPRESSION "GET RETURNED")
 endif()
-# The target's pool is, per connection, C and one for the deadlock detector,
-# plus (k + 1) x OSOE_TEAM_BLOCKS for the tree's forwards, node-wide (§3.8):
-# with C = 1, k = 2 and the smallest pool of team blocks the variable allows, 8,
-# that is 1 + 1 + 3 x 8 = 26, so twenty-seven origin PEs each with a blocking
-# get outstanding overflow it, and thirty-one leave a margin. Slice 3 made the
-# forward term node-wide - at the default k = 4 it was 16, and the seven origin
-# PEs this test had until then stopped reaching it - phase 1 step 7's second
-# slice made it count every team number, where it had counted the three
-# predefined teams and eleven origins overflowed it, and the team redesign's
-# step D every block of the node's pool, a node holding more teams than one
-# PE's numbers, where fifteen origins overflowed 1 + 1 + 3 x 4.
-add_test(NAME shmem.reply-pool.overflow
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_POOL=overflow SHMEM_SYMMETRIC_SIZE=16m
-          OSOE_COLLECTIVE_FANOUT=2
-          $<TARGET_FILE:osoe-launch> -n 32
-          -m 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 -t 30
-          -e 31:OSOE_AM_CREDITS=1 -e 31:OSOE_TEAM_BLOCKS=8
-          -- $<TARGET_FILE:shmem_test_reply-pool>)
-set_tests_properties(shmem.reply-pool.overflow PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "reply descriptor pool is empty.*request from node 0")
-
-# A quiet waits as long as its peer does (§3.15; review round two, D3): node 1
-# stopped for 3 s, then continued, and the quiet completes with the no-progress
-# limit unset; with it at 5 s and node 1 stopped for 9, the quiet ends the job
-# naming the connection. The slice-2 commit records a run stopped for 65 s, past
-# the old 60 s bound. The limit was 1 s until a Pi took longer than that to
-# connect a second logical node under ctest -j4, and the limit fired at start-up
-# instead (docs/pi-cluster.md, 2026-09-24).
-osoe_tier2_map_test(stopped-node 0,0,1 OSOE_TEST_STOP_MS=3000)
-set_tests_properties(shmem.stopped-node.0-0-1 PROPERTIES
-  PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
-add_test(NAME shmem.stopped-node.no-progress
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=9000 OSOE_NO_PROGRESS_TIMEOUT=5
-          $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
-          $<TARGET_FILE:shmem_test_stopped-node>)
-set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "shmem_quiet: no progress toward node 1 for [0-9]+ s"
-  FAIL_REGULAR_EXPRESSION "quiet completed")
-# Keepalive asks whether a peer's kernel is there, and a stopped node's is
-# (§3.15, wire.c): at its tightest - a probe after 1 s idle, then three 1 s
-# apart - node 1 stopped for 6 s is still waited for, and the quiet completes.
-# tier3.*.vanished-node is the other half: a node whose link is cut is found.
-add_test(NAME shmem.stopped-node.keepalive
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=6000 OSOE_KEEPALIVE=1,1,3
-          $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
-          $<TARGET_FILE:shmem_test_stopped-node>)
-set_tests_properties(shmem.stopped-node.keepalive PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
-# A stopped node whose receive buffer is full (phase 1 release review, K5): the state
-# the test above never reaches, and the one the silent-peer check's condition
-# exists for - the kernel is asked how long its peer has acknowledged nothing
-# only while something sent is unacknowledged (wire.c, osoe_wire_silent_ms). 64 MiB
-# put toward node 1 while it is stopped shuts its window, which is probed with
-# nothing outstanding. Without the condition the job ends at about 12 s, naming a
-# node that was never gone, and every other stopped-node test still passes. The
-# stop is 15 s: 12 s let the removal through and 13 s did not, so that leaves
-# 2.8 s over the time the removal takes (the test's header has the arithmetic).
-# In every preset, as the stopped-node tests are.
-osoe_tier2_map_test(stopped-bulk 0,0,1 OSOE_TEST_STOP_MS=15000 OSOE_KEEPALIVE=1,1,3
-  SHMEM_SYMMETRIC_SIZE=128m)
-set_tests_properties(shmem.stopped-bulk.0-0-1 PROPERTIES
-  PASS_REGULAR_EXPRESSION "STOPPED BULK OK"
-  FAIL_REGULAR_EXPRESSION "stopped answering|CHECK[(]|osoe-launch: (rank|timeout)")
-
-# The other half of D-6 (diagnosability review): a blocking get waits for one
-# PE's reply, not a whole node's queue, so its no-progress fatal must name that
-# PE and not only the node. Before this fix it named neither. Five seconds, like
-# shmem.stopped-node.no-progress's, because the limit covers start-up too.
-osoe_tier2_map_test(get-no-progress 0,1 OSOE_NO_PROGRESS_TIMEOUT=5)
-set_tests_properties(shmem.get-no-progress.0-1 PROPERTIES
-  PASS_REGULAR_EXPRESSION "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s"
-  FAIL_REGULAR_EXPRESSION "GET RETURNED")
 
 # A loud failure ends the job without joining a collective (§3.15; review round
 # two, conformance F1): osoe_fatal leaves through _exit, so start_pes's atexit
@@ -1367,122 +1475,133 @@ set_tests_properties(shmem.exit-without-finalize.start_pes PROPERTIES LABELS "ti
   PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 4 s"
   FAIL_REGULAR_EXPRESSION "BARRIER RETURNED")
 
-# No death of any process strands a named object (§3.14; review round two,
-# D13): every PE dies of SIGKILL or SIGTERM after init, on two nodes, and the
-# launcher must find nothing left behind. The kept variant leaves the control
-# segments on purpose, and osoe-stat --gc must then remove them.
-add_executable(shmem_test_kill-after-init test-kill-after-init.c)
-target_link_libraries(shmem_test_kill-after-init PRIVATE osoe)
-osoe_warnings(shmem_test_kill-after-init)
-foreach(sig KILL TERM)
-  add_test(NAME shmem.kill-after-init.${sig}
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SIGNAL=${sig}
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 -k --
-            $<TARGET_FILE:shmem_test_kill-after-init>)
-  set_tests_properties(shmem.kill-after-init.${sig} PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "killed by signal"
+# internode: each of these launches a job of several nodes, here or in its script
+if(OSOE_INTERNODE)
+  # No death of any process strands a named object (§3.14; review round two,
+  # D13): every PE dies of SIGKILL or SIGTERM after init, on two nodes, and the
+  # launcher must find nothing left behind. The kept variant leaves the control
+  # segments on purpose, and osoe-stat --gc must then remove them.
+  add_executable(shmem_test_kill-after-init test-kill-after-init.c)
+  target_link_libraries(shmem_test_kill-after-init PRIVATE osoe)
+  osoe_warnings(shmem_test_kill-after-init)
+  foreach(sig KILL TERM)
+    add_test(NAME shmem.kill-after-init.${sig}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SIGNAL=${sig}
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 -k --
+              $<TARGET_FILE:shmem_test_kill-after-init>)
+    set_tests_properties(shmem.kill-after-init.${sig} PROPERTIES LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "killed by signal"
+      FAIL_REGULAR_EXPRESSION "left behind")
+    osoe_internode_label(shmem.kill-after-init.${sig})
+  endforeach()
+  # --gc on this job's two segments alone - the job id is the launcher's pid -
+  # rather than every dead object of the user on the machine (the adversarial
+  # read of 2026-10-02).
+  add_test(NAME shmem.kill-after-init.kept
+    COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 OSOE_TEST_SIGNAL=KILL \"$0\" -n 4 -m 0,0,1,1 -t 30 -k -- \"$1\" & L=$!; wait $L; \"$2\" --gc /osoe.$L.0.0.0 /osoe.$L.0.1.0"
+            $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_kill-after-init>
+            $<TARGET_FILE:osoe-stat>)
+  set_tests_properties(shmem.kill-after-init.kept PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "kept for post-mortem reading.*removed"
     FAIL_REGULAR_EXPRESSION "left behind")
-endforeach()
-# --gc on this job's two segments alone - the job id is the launcher's pid -
-# rather than every dead object of the user on the machine (the adversarial
-# read of 2026-10-02).
-add_test(NAME shmem.kill-after-init.kept
-  COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 OSOE_TEST_SIGNAL=KILL \"$0\" -n 4 -m 0,0,1,1 -t 30 -k -- \"$1\" & L=$!; wait $L; \"$2\" --gc /osoe.$L.0.0.0 /osoe.$L.0.1.0"
-          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_kill-after-init>
-          $<TARGET_FILE:osoe-stat>)
-set_tests_properties(shmem.kill-after-init.kept PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "kept for post-mortem reading.*removed"
-  FAIL_REGULAR_EXPRESSION "left behind")
+  osoe_internode_label(shmem.kill-after-init.kept)
 
-# Init reclaims leftovers of a job killed during init, and refuses an object
-# whose creator is alive (§6.2; review round two, D11, D15). See leftovers.sh.
-add_test(NAME shmem.leftovers.reclaim
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_init> reclaim)
-set_tests_properties(shmem.leftovers.reclaim PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "reclaimed /dev/shm.*job exited 0.*with a name afterwards: 0")
-add_test(NAME shmem.leftovers.live
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_init> live)
-set_tests_properties(shmem.leftovers.live PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "the refusal names the owner: yes")
+  # Init reclaims leftovers of a job killed during init, and refuses an object
+  # whose creator is alive (§6.2; review round two, D11, D15). See leftovers.sh.
+  add_test(NAME shmem.leftovers.reclaim
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_init> reclaim)
+  set_tests_properties(shmem.leftovers.reclaim PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "reclaimed /dev/shm.*job exited 0.*with a name afterwards: 0")
+  add_test(NAME shmem.leftovers.live
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_init> live)
+  set_tests_properties(shmem.leftovers.live PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "the refusal names the owner: yes")
+  osoe_internode_label(shmem.leftovers.reclaim shmem.leftovers.live)
 
-# A start that never finishes leaves its node's job tables and connection area
-# in /dev/shm - under srun nothing else removes them (the round-three review's
-# R5a) - and osoe-stat --gc removes them once nothing uses them, and not before.
-# One PE stops inside init after its node has joined, the start is cancelled,
-# and the job's names are counted before and after. See start-leftovers.sh.
-add_executable(shmem_test_stalled-start test-stalled-start.c)
-target_link_libraries(shmem_test_stalled-start PRIVATE osoe)
-osoe_warnings(shmem_test_stalled-start)
-add_test(NAME shmem.leftovers.gc
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/start-leftovers.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:osoe-stat>)
-set_tests_properties(shmem.leftovers.gc PROPERTIES LABELS "tier2" TIMEOUT 90
-  PASS_REGULAR_EXPRESSION "START LEFTOVERS OK")
-# And a start by the same ids, with no --gc between, takes none of them: its
-# lead replaces both and its PEs take only what their lead made - before, a
-# non-lead took the leftovers and the start ended as a false deadlock, or hung
-# (the release fixes' review, correctness F1). See restart-leftovers.sh.
-# The program it starts again is test-internode.c, whose puts and quiets use the
-# connection area; under tsan, test-multinode.c's barriers, since tsan reads the
-# agent writing a heap a local thread holds as a race (shmem.internode.*, above).
-if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  set(osoe_restart_program shmem_test_multinode)
-else()
-  set(osoe_restart_program shmem_test_internode)
-endif()
-add_test(NAME shmem.leftovers.restart
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/restart-leftovers.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:${osoe_restart_program}>)
-set_tests_properties(shmem.leftovers.restart PROPERTIES LABELS "tier2" TIMEOUT 120
-  PASS_REGULAR_EXPRESSION "RESTART LEFTOVERS OK")
-# And with node 0's lead of the second start holding back making its
-# connection area until its node-mate has its job tables (slow-create.c): the
-# node-mate meets the leftover area, the fix's other half, which the plain case
-# does not reach - its lead nearly always replaces the area first. Not under
-# the sanitizers, as slow-message.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
-  add_library(slow-create SHARED slow-create.c)
-  target_link_libraries(slow-create PRIVATE ${CMAKE_DL_LIBS})
-  osoe_warnings(slow-create)
-  add_test(NAME shmem.leftovers.restart.slow-lead
+  # A start that never finishes leaves its node's job tables and connection area
+  # in /dev/shm - under srun nothing else removes them (the round-three review's
+  # R5a) - and osoe-stat --gc removes them once nothing uses them, and not before.
+  # One PE stops inside init after its node has joined, the start is cancelled,
+  # and the job's names are counted before and after. See start-leftovers.sh.
+  add_executable(shmem_test_stalled-start test-stalled-start.c)
+  target_link_libraries(shmem_test_stalled-start PRIVATE osoe)
+  osoe_warnings(shmem_test_stalled-start)
+  add_test(NAME shmem.leftovers.gc
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/start-leftovers.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:osoe-stat>)
+  set_tests_properties(shmem.leftovers.gc PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "START LEFTOVERS OK")
+  osoe_internode_label(shmem.leftovers.gc)
+  # And a start by the same ids, with no --gc between, takes none of them: its
+  # lead replaces both and its PEs take only what their lead made - before, a
+  # non-lead took the leftovers and the start ended as a false deadlock, or hung
+  # (the release fixes' review, correctness F1). See restart-leftovers.sh.
+  # The program it starts again is test-internode.c, whose puts and quiets use the
+  # connection area; under tsan, test-multinode.c's barriers, since tsan reads the
+  # agent writing a heap a local thread holds as a race (shmem.internode.*, above).
+  if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    set(osoe_restart_program shmem_test_multinode)
+  else()
+    set(osoe_restart_program shmem_test_internode)
+  endif()
+  add_test(NAME shmem.leftovers.restart
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/restart-leftovers.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:shmem_test_internode>
-            $<TARGET_FILE:slow-create>)
-  set_tests_properties(shmem.leftovers.restart.slow-lead PROPERTIES LABELS "tier2"
-    TIMEOUT 120 PASS_REGULAR_EXPRESSION "RESTART LEFTOVERS OK")
-  # And the second start on three nodes, its area larger than the two-node
-  # leftover: the node-mate must not take the leftover's size for its lead's
-  # settings.
-  add_test(NAME shmem.leftovers.restart.other-size
-    COMMAND ${CMAKE_COMMAND} -E env SECOND_MAP=0,0,1,1,2,2
-            sh ${CMAKE_CURRENT_SOURCE_DIR}/restart-leftovers.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:shmem_test_internode>
-            $<TARGET_FILE:slow-create>)
-  set_tests_properties(shmem.leftovers.restart.other-size PROPERTIES LABELS "tier2"
-    TIMEOUT 120 PASS_REGULAR_EXPRESSION "RESTART LEFTOVERS OK")
-endif()
+            $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:${osoe_restart_program}>)
+  set_tests_properties(shmem.leftovers.restart PROPERTIES LABELS "tier2" TIMEOUT 120
+    PASS_REGULAR_EXPRESSION "RESTART LEFTOVERS OK")
+  osoe_internode_label(shmem.leftovers.restart)
+  # And with node 0's lead of the second start holding back making its
+  # connection area until its node-mate has its job tables (slow-create.c): the
+  # node-mate meets the leftover area, the fix's other half, which the plain case
+  # does not reach - its lead nearly always replaces the area first. Not under
+  # the sanitizers, as slow-message.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+    add_library(slow-create SHARED slow-create.c)
+    target_link_libraries(slow-create PRIVATE ${CMAKE_DL_LIBS})
+    osoe_warnings(slow-create)
+    add_test(NAME shmem.leftovers.restart.slow-lead
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/restart-leftovers.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:shmem_test_internode>
+              $<TARGET_FILE:slow-create>)
+    set_tests_properties(shmem.leftovers.restart.slow-lead PROPERTIES LABELS "tier2"
+      TIMEOUT 120 PASS_REGULAR_EXPRESSION "RESTART LEFTOVERS OK")
+    # And the second start on three nodes, its area larger than the two-node
+    # leftover: the node-mate must not take the leftover's size for its lead's
+    # settings.
+    add_test(NAME shmem.leftovers.restart.other-size
+      COMMAND ${CMAKE_COMMAND} -E env SECOND_MAP=0,0,1,1,2,2
+              sh ${CMAKE_CURRENT_SOURCE_DIR}/restart-leftovers.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_stalled-start> $<TARGET_FILE:shmem_test_internode>
+              $<TARGET_FILE:slow-create>)
+    set_tests_properties(shmem.leftovers.restart.other-size PROPERTIES LABELS "tier2"
+      TIMEOUT 120 PASS_REGULAR_EXPRESSION "RESTART LEFTOVERS OK")
+    osoe_internode_label(shmem.leftovers.restart.slow-lead shmem.leftovers.restart.other-size)
+  endif()
 
-# A job never outlives its launcher: SIGTERM and SIGINT are forwarded, and a
-# SIGKILLed launcher takes its PEs with it (launch.c; review round two,
-# omissions 6). See launcher-signals.sh.
-add_executable(shmem_test_sleeper sleeper.c)
-target_link_libraries(shmem_test_sleeper PRIVATE osoe)
-osoe_warnings(shmem_test_sleeper)
-foreach(mode term int kill)
-  add_test(NAME shmem.launcher-signals.${mode}
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/launcher-signals.sh
-            $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_sleeper> ${mode})
-  set_tests_properties(shmem.launcher-signals.${mode} PROPERTIES LABELS "tier2"
-    TIMEOUT 60)
-endforeach()
-set_tests_properties(shmem.launcher-signals.term PROPERTIES PASS_REGULAR_EXPRESSION
-  "launcher exited 143.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
-set_tests_properties(shmem.launcher-signals.int PROPERTIES PASS_REGULAR_EXPRESSION
-  "launcher exited 130.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
-set_tests_properties(shmem.launcher-signals.kill PROPERTIES PASS_REGULAR_EXPRESSION
-  "PEs still running: 0.*with a name: 0")
+  # A job never outlives its launcher: SIGTERM and SIGINT are forwarded, and a
+  # SIGKILLed launcher takes its PEs with it (launch.c; review round two,
+  # omissions 6). See launcher-signals.sh.
+  add_executable(shmem_test_sleeper sleeper.c)
+  target_link_libraries(shmem_test_sleeper PRIVATE osoe)
+  osoe_warnings(shmem_test_sleeper)
+  foreach(mode term int kill)
+    add_test(NAME shmem.launcher-signals.${mode}
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/launcher-signals.sh
+              $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_sleeper> ${mode})
+    set_tests_properties(shmem.launcher-signals.${mode} PROPERTIES LABELS "tier2"
+      TIMEOUT 60)
+  endforeach()
+  set_tests_properties(shmem.launcher-signals.term PROPERTIES PASS_REGULAR_EXPRESSION
+    "launcher exited 143.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
+  set_tests_properties(shmem.launcher-signals.int PROPERTIES PASS_REGULAR_EXPRESSION
+    "launcher exited 130.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
+  set_tests_properties(shmem.launcher-signals.kill PROPERTIES PASS_REGULAR_EXPRESSION
+    "PEs still running: 0.*with a name: 0")
+  osoe_internode_label(shmem.launcher-signals.term shmem.launcher-signals.int
+    shmem.launcher-signals.kill)
+endif()
 
 # What a core holds: this PE's heap, not its siblings' or the connection area
 # (review round two, omissions 4).
@@ -1493,9 +1612,12 @@ osoe_tier2_map_test(core-exclusion 0,0,1,1)
 add_test(NAME shmem.dev-shm-capacity.heaps
   COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
           $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> heaps)
-add_test(NAME shmem.dev-shm-capacity.connections
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
-          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> connections)
+# internode: dev-shm-capacity.sh's connections mode launches a job of several nodes
+if(OSOE_INTERNODE)
+  add_test(NAME shmem.dev-shm-capacity.connections
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
+            $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> connections)
+endif()
 # And OSOE_SHM_CAPACITY_CHECK=0, for testing on a small /dev/shm: the same
 # request is reported and the job runs.
 add_test(NAME shmem.dev-shm-capacity.warned
@@ -1511,78 +1633,121 @@ add_test(NAME shmem.dev-shm-capacity.node-ends
           $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> node-ends)
 set_tests_properties(shmem.dev-shm-capacity.node-ends PROPERTIES
   LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "REFUSAL OK")
-set_tests_properties(shmem.dev-shm-capacity.heaps shmem.dev-shm-capacity.connections
-  shmem.dev-shm-capacity.warned PROPERTIES LABELS "tier2" TIMEOUT 60)
+set_tests_properties(shmem.dev-shm-capacity.heaps shmem.dev-shm-capacity.warned
+  PROPERTIES LABELS "tier2" TIMEOUT 60)
 set_tests_properties(shmem.dev-shm-capacity.warned PROPERTIES PASS_REGULAR_EXPRESSION
   "and 2 heaps.*continuing, since OSOE_SHM_CAPACITY_CHECK=0.*launcher exited 0")
 set_tests_properties(shmem.dev-shm-capacity.heaps PROPERTIES PASS_REGULAR_EXPRESSION
   "/dev/shm has [0-9]+ MiB free, but this node's control segment and 2 heaps.*launcher exited 1")
-set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES PASS_REGULAR_EXPRESSION
-  "/dev/shm has [0-9]+ MiB free, but this node's connection area.*launcher exited 1"
-  SKIP_RETURN_CODE 77)
+if(OSOE_INTERNODE)
+  set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES LABELS "tier2" TIMEOUT 60)
+  set_tests_properties(shmem.dev-shm-capacity.connections PROPERTIES PASS_REGULAR_EXPRESSION
+    "/dev/shm has [0-9]+ MiB free, but this node's connection area.*launcher exited 1"
+    SKIP_RETURN_CODE 77)
+  osoe_internode_label(shmem.dev-shm-capacity.connections)
+endif()
 
-# The notice that the connection buffers were shrunk to fit the budget is one
-# line a node, from its lead, not one a PE (the round-three review's P3: 128,000
-# lines at 500 nodes of 256 PEs): three nodes of three PEs, and a buffer the
-# budget cannot hold. See shrink-notice.sh.
-add_test(NAME shmem.am-size.notice
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/shrink-notice.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_barrier>)
-set_tests_properties(shmem.am-size.notice PROPERTIES LABELS "tier2" TIMEOUT 90
-  PASS_REGULAR_EXPRESSION "SHRINK NOTICE OK")
+if(OSOE_INTERNODE)
+  # The notice that the connection buffers were shrunk to fit the budget is one
+  # line a node, from its lead, not one a PE (the round-three review's P3: 128,000
+  # lines at 500 nodes of 256 PEs): three nodes of three PEs, and a buffer the
+  # budget cannot hold. See shrink-notice.sh.
+  add_test(NAME shmem.am-size.notice
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/shrink-notice.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_barrier>)
+  set_tests_properties(shmem.am-size.notice PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "SHRINK NOTICE OK")
+  # internode: shrink-notice.sh launches a job of three nodes
+  osoe_internode_label(shmem.am-size.notice)
 
-# A kernel without futex2 (Linux < 6.7) is refused at init by name, before any
-# object exists (§1; review round two, portability F3). deny-futex2 makes the
-# three calls fail with ENOSYS, as such a kernel does. Before, both PEs died of
-# SIGABRT in the rendezvous and left their heaps and control segment behind.
-# And the probe, under the same filter, fails its named-object futex checks.
-add_executable(deny-futex2 deny-futex2.c)
-osoe_warnings(deny-futex2)
-add_test(NAME shmem.refuse.old-kernel
-  COMMAND deny-futex2 $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
-          $<TARGET_FILE:shmem_test_init>)
-set_tests_properties(shmem.refuse.old-kernel PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "needs Linux 6.7 or later, for the futex2 calls .*this kernel is"
-  FAIL_REGULAR_EXPRESSION "left behind|futex_wake failed|futex_wait failed")
-add_test(NAME env.probe.old-kernel COMMAND deny-futex2 $<TARGET_FILE:probe>)
-set_tests_properties(env.probe.old-kernel PROPERTIES LABELS "env" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "FAIL futex_wait, named shm, woken by other process")
+  # A kernel without futex2 (Linux < 6.7) is refused at init by name, before any
+  # object exists (§1; review round two, portability F3). deny-futex2 makes the
+  # three calls fail with ENOSYS, as such a kernel does. Before, both PEs died of
+  # SIGABRT in the rendezvous and left their heaps and control segment behind.
+  # And the probe, under the same filter, fails its named-object futex checks.
+  add_executable(deny-futex2 deny-futex2.c)
+  osoe_warnings(deny-futex2)
+  add_test(NAME shmem.refuse.old-kernel
+    COMMAND deny-futex2 $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
+            $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.refuse.old-kernel PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "needs Linux 6.7 or later, for the futex2 calls .*this kernel is"
+    FAIL_REGULAR_EXPRESSION "left behind|futex_wake failed|futex_wait failed")
+  add_test(NAME env.probe.old-kernel COMMAND deny-futex2 $<TARGET_FILE:probe>)
+  set_tests_properties(env.probe.old-kernel PROPERTIES LABELS "env" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "FAIL futex_wait, named shm, woken by other process")
+  # Labelled internode because the single-node build has no futex2 to deny (it waits
+  # with the classic futex), so the refusal these two check cannot happen there.
+  osoe_internode_label(shmem.refuse.old-kernel env.probe.old-kernel)
+
+endif()
 
 # io_uring refused in each place shmem_init's check enters it (deny-io-uring.c):
 # the probe fails its check of shmem_init's, naming the place; a job of two
 # nodes is refused by name before anything is made, the sysctl named only where
-# it can be the cause; and a job of one node, which opens no ring, runs. Before
-# Part 6's adversarial reads the check missed `enable` and `enter`, and a job
-# ended after its PEs had left shmem_init.
+# it can be the cause; and a job of one node, which opens no ring, runs - in
+# both builds, the single-node build having none to open. Before Part 6's
+# adversarial reads the check missed `enable` and `enter`, and a job ended after
+# its PEs had left shmem_init.
 add_executable(deny-io-uring deny-io-uring.c)
 osoe_warnings(deny-io-uring)
-set(osoe_io_uring_refused_setup "an io_uring created SINGLE_ISSUER, R_DISABLED and CQSIZE")
-set(osoe_io_uring_refused_enable "an io_uring enabled after it was created R_DISABLED")
-set(osoe_io_uring_refused_enter "an io_uring that can be entered to wait for completions")
-foreach(where setup enable enter)
-  add_test(NAME env.probe.no-io-uring-${where}
-    COMMAND deny-io-uring ${where} $<TARGET_FILE:probe>)
-  set_tests_properties(env.probe.no-io-uring-${where} PROPERTIES LABELS "env" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "FAIL shmem_init's io_uring check +${osoe_io_uring_refused_${where}}")
-  add_test(NAME shmem.refuse.no-io-uring-${where}
-    COMMAND deny-io-uring ${where} $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 --
-            $<TARGET_FILE:shmem_test_init>)
-  if(where STREQUAL "setup")
-    set(osoe_hint " .*which usually means the kernel.io_uring_disabled sysctl is set")
-    set(osoe_not "left behind")
-  else()
-    set(osoe_hint "")
-    set(osoe_not "left behind|io_uring_disabled|submission failed|cannot enable")
-  endif()
-  set_tests_properties(shmem.refuse.no-io-uring-${where} PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION
-      "osoe needs io_uring with ${osoe_io_uring_refused_${where}} for a job of 2 nodes${osoe_hint}"
-    FAIL_REGULAR_EXPRESSION "${osoe_not}")
-endforeach()
 add_test(NAME shmem.no-io-uring.one-node
   COMMAND deny-io-uring setup $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
           $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.no-io-uring.one-node PROPERTIES LABELS "tier2" TIMEOUT 60)
+if(OSOE_INTERNODE)
+  set(osoe_io_uring_refused_setup "an io_uring created SINGLE_ISSUER, R_DISABLED and CQSIZE")
+  set(osoe_io_uring_refused_enable "an io_uring enabled after it was created R_DISABLED")
+  set(osoe_io_uring_refused_enter "an io_uring that can be entered to wait for completions")
+  foreach(where setup enable enter)
+    add_test(NAME env.probe.no-io-uring-${where}
+      COMMAND deny-io-uring ${where} $<TARGET_FILE:probe>)
+    set_tests_properties(env.probe.no-io-uring-${where} PROPERTIES LABELS "env" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "FAIL shmem_init's io_uring check +${osoe_io_uring_refused_${where}}")
+    add_test(NAME shmem.refuse.no-io-uring-${where}
+      COMMAND deny-io-uring ${where} $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 --
+              $<TARGET_FILE:shmem_test_init>)
+    if(where STREQUAL "setup")
+      set(osoe_hint " .*which usually means the kernel.io_uring_disabled sysctl is set")
+      set(osoe_not "left behind")
+    else()
+      set(osoe_hint "")
+      set(osoe_not "left behind|io_uring_disabled|submission failed|cannot enable")
+    endif()
+    set_tests_properties(shmem.refuse.no-io-uring-${where} PROPERTIES LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION
+        "osoe needs io_uring with ${osoe_io_uring_refused_${where}} for a job of 2 nodes${osoe_hint}"
+      FAIL_REGULAR_EXPRESSION "${osoe_not}")
+    # internode: the single-node build has no io_uring to deny
+    osoe_internode_label(env.probe.no-io-uring-${where} shmem.refuse.no-io-uring-${where})
+  endforeach()
+endif()
+
+# The single-node build's own tests (v0.2 step 1), registered there alone: a
+# job of more than one node refused at shmem_init by name - every PE alike,
+# each ending by itself with a failure status, nothing left in /dev/shm, which
+# the launcher would report - and the classic futex refused by a sandbox,
+# refused by name as the full build refuses a kernel without futex2 (above),
+# by shmem_init and by the probe.
+if(OSOE_SINGLE_NODE)
+  osoe_refusal_test(shmem.single-node.refuse-nodes 2 0
+    LAUNCH -n 2 -m 0,1
+    PATTERNS "this is osoe's single-node build \\(OSOE_SINGLE_NODE\\), which runs a job of one node, and this job spans 2 nodes: the full build runs it"
+             "!left behind"
+    PROGRAM $<TARGET_FILE:shmem_test_init>)
+  add_executable(deny-futex deny-futex.c)
+  osoe_warnings(deny-futex)
+  add_test(NAME shmem.refuse.no-futex
+    COMMAND deny-futex $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
+            $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.refuse.no-futex PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION
+      "needs the futex calls FUTEX_WAIT_BITSET and FUTEX_WAKE_BITSET, which a sandbox \\(seccomp\\) must allow .*this kernel is"
+    FAIL_REGULAR_EXPRESSION "left behind|futex wake failed|futex wait failed")
+  add_test(NAME env.probe.no-futex COMMAND deny-futex $<TARGET_FILE:probe>)
+  set_tests_properties(env.probe.no-futex PROPERTIES LABELS "env" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "FAIL futex U32 wait \\(value mismatch\\)")
+endif()
 
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
@@ -1642,18 +1807,21 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(typed-rma 0,0,1,1)
   osoe_tier2_map_test(typed-rma 0,1,2,0,1,0)
 endif()
-# Under §8.1's force-remote flag: a same-node PE is denied the intranode
-# pointer too, so every block of an ibput/ibget's loop (as every element of an
-# iput/iget's) takes the AM path regardless of the map, as the collectives'
-# own force-remote test does. Multi-node maps only, and left out under tsan for
-# shmem.internode.*'s reason (above).
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_test(NAME shmem.typed-rma.force-remote.0-0-1-1
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
-            $<TARGET_FILE:shmem_test_typed-rma>)
-  set_tests_properties(shmem.typed-rma.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
-    TIMEOUT 90)
+if(OSOE_INTERNODE)
+  # Under §8.1's force-remote flag: a same-node PE is denied the intranode
+  # pointer too, so every block of an ibput/ibget's loop (as every element of an
+  # iput/iget's) takes the AM path regardless of the map, as the collectives'
+  # own force-remote test does. Multi-node maps only, and left out under tsan for
+  # shmem.internode.*'s reason (above).
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.typed-rma.force-remote.0-0-1-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+              $<TARGET_FILE:shmem_test_typed-rma>)
+    set_tests_properties(shmem.typed-rma.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
+      TIMEOUT 90)
+    osoe_internode_label(shmem.typed-rma.force-remote.0-0-1-1)
+  endif()
 endif()
 # shmem_ibput's dst/sst below bsize is undefined (spec §9.6.1.4's Arguments)
 # and ends the job by name (strided_block_put, rma-typed.c), as the other
@@ -1687,17 +1855,20 @@ foreach(collective reduce broadcast)
     osoe_tier2_map_test(${collective} 0,1,2,3,4 OSOE_COLLECTIVE_FANOUT=2)
   endif()
 endforeach()
-# Under OSOE_FORCE_REMOTE, SHMEM_TEAM_SHARED collapses to the PE itself: the
-# data collectives' team of one (collectives.c), which no other map reaches.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  foreach(collective reduce broadcast)
-    add_test(NAME shmem.${collective}.force-remote.0-0-1-1
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
-              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
-              $<TARGET_FILE:shmem_test_${collective}>)
-    set_tests_properties(shmem.${collective}.force-remote.0-0-1-1 PROPERTIES
-      LABELS "tier2" TIMEOUT 90)
-  endforeach()
+if(OSOE_INTERNODE)
+  # Under OSOE_FORCE_REMOTE, SHMEM_TEAM_SHARED collapses to the PE itself: the
+  # data collectives' team of one (collectives.c), which no other map reaches.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    foreach(collective reduce broadcast)
+      add_test(NAME shmem.${collective}.force-remote.0-0-1-1
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+                $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+                $<TARGET_FILE:shmem_test_${collective}>)
+      set_tests_properties(shmem.${collective}.force-remote.0-0-1-1 PROPERTIES
+        LABELS "tier2" TIMEOUT 90)
+      osoe_internode_label(shmem.${collective}.force-remote.0-0-1-1)
+    endforeach()
+  endif()
 endif()
 
 # The public headers compiled under each standard they promise, every warning
@@ -1800,10 +1971,13 @@ osoe_warnings(shmem_test_statics-pie)
 add_test(NAME shmem.statics.pie.L2
   COMMAND osoe-launch -n 2 -t 60 -- $<TARGET_FILE:shmem_test_statics-pie>)
 set_tests_properties(shmem.statics.pie.L2 PROPERTIES LABELS "tier2" TIMEOUT 90)
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_test(NAME shmem.statics.pie.0-0-1-1
-    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_statics-pie>)
-  set_tests_properties(shmem.statics.pie.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
+if(OSOE_INTERNODE)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.statics.pie.0-0-1-1
+      COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_statics-pie>)
+    set_tests_properties(shmem.statics.pie.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
+    osoe_internode_label(shmem.statics.pie.0-0-1-1)
+  endif()
 endif()
 add_test(NAME shmem.statics.misuse
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STATICS_MISUSE=stack
@@ -1871,218 +2045,234 @@ set_tests_properties(shmem.collect.partial PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION
   "shmem_fcollect64: PE 1 called it, and is not in its active set \\(PE_start 0, logPE_stride 0, PE_size 1\\)")
 
-# PEs that call different collectives end the job by name, from the piece
-# headers of the generic internode phase (internode-generic.c): node 1's PE
-# broadcasts where the others reduce, and node 0's lead finds node 1's slot
-# holding no partial result. Three nodes, so that node 0 also has a child that
-# did call the reduction.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_executable(shmem_test_collective-divergence test-collective-divergence.c)
-  target_link_libraries(shmem_test_collective-divergence PRIVATE osoe)
-  osoe_warnings(shmem_test_collective-divergence)
-  add_test(NAME shmem.collective-divergence
-    COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
-            $<TARGET_FILE:shmem_test_collective-divergence>)
-  set_tests_properties(shmem.collective-divergence PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "PEs called different collectives")
-  # A gather's size differing between two nodes: the one PE fcollects two longs
-  # where the other fcollects one, and a lead finds the shape the other said it
-  # entered is not its own before a byte lands (phase 1 step 5 slice 6).
-  add_test(NAME shmem.collective-divergence.gather-size
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_DIVERGE_KIND=gather
-            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
-            $<TARGET_FILE:shmem_test_collective-divergence>)
-  set_tests_properties(shmem.collective-divergence.gather-size PROPERTIES LABELS "tier2"
-    TIMEOUT 60 PASS_REGULAR_EXPRESSION "PEs called different collectives")
-endif()
+if(OSOE_INTERNODE)
+  # PEs that call different collectives end the job by name, from the piece
+  # headers of the generic internode phase (internode-generic.c): node 1's PE
+  # broadcasts where the others reduce, and node 0's lead finds node 1's slot
+  # holding no partial result. Three nodes, so that node 0 also has a child that
+  # did call the reduction.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_executable(shmem_test_collective-divergence test-collective-divergence.c)
+    target_link_libraries(shmem_test_collective-divergence PRIVATE osoe)
+    osoe_warnings(shmem_test_collective-divergence)
+    add_test(NAME shmem.collective-divergence
+      COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+              $<TARGET_FILE:shmem_test_collective-divergence>)
+    set_tests_properties(shmem.collective-divergence PROPERTIES LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "PEs called different collectives")
+    # A gather's size differing between two nodes: the one PE fcollects two longs
+    # where the other fcollects one, and a lead finds the shape the other said it
+    # entered is not its own before a byte lands (phase 1 step 5 slice 6).
+    add_test(NAME shmem.collective-divergence.gather-size
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_DIVERGE_KIND=gather
+              $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+              $<TARGET_FILE:shmem_test_collective-divergence>)
+    set_tests_properties(shmem.collective-divergence.gather-size PROPERTIES LABELS "tier2"
+      TIMEOUT 60 PASS_REGULAR_EXPRESSION "PEs called different collectives")
+    osoe_internode_label(shmem.collective-divergence shmem.collective-divergence.gather-size)
+  endif()
 
-# Pipelined pieces through the internode tree (design §5.8; phase 1 step 5
-# slice 5; test-pipeline.c): a reduction, a broadcast from a root off PE 0's
-# node and an fcollect, each of 1 MiB and of an odd size, every element
-# checked; collectives back to back from every root, their trees rotating; and
-# the count each lead publishes of the most pieces it had in flight, by its
-# place in the tree. On a block map, an interleaved one, five nodes at a
-# fan-out of 2, where a lead is both a parent and a child, and eight, a tree
-# three deep, at D = 1, 2 and 4 - D = 1 being one piece at a time. tsan is left
-# out of the maps for shmem.internode.*'s reason.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_executable(shmem_test_pipeline test-pipeline.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
-  target_include_directories(shmem_test_pipeline PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
-  target_link_libraries(shmem_test_pipeline PRIVATE osoe rt)
-  osoe_warnings(shmem_test_pipeline)
-  foreach(case "0,0,1,1" "0,1,2,0,1,0" "0,1,2,3,4:OSOE_COLLECTIVE_FANOUT=2"
-               "0,1,2,3,4,5,6,7:OSOE_COLLECTIVE_FANOUT=2")
+  # Pipelined pieces through the internode tree (design §5.8; phase 1 step 5
+  # slice 5; test-pipeline.c): a reduction, a broadcast from a root off PE 0's
+  # node and an fcollect, each of 1 MiB and of an odd size, every element
+  # checked; collectives back to back from every root, their trees rotating; and
+  # the count each lead publishes of the most pieces it had in flight, by its
+  # place in the tree. On a block map, an interleaved one, five nodes at a
+  # fan-out of 2, where a lead is both a parent and a child, and eight, a tree
+  # three deep, at D = 1, 2 and 4 - D = 1 being one piece at a time. tsan is left
+  # out of the maps for shmem.internode.*'s reason.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_executable(shmem_test_pipeline test-pipeline.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+    target_include_directories(shmem_test_pipeline PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+    target_link_libraries(shmem_test_pipeline PRIVATE osoe rt)
+    osoe_warnings(shmem_test_pipeline)
+    foreach(case "0,0,1,1" "0,1,2,0,1,0" "0,1,2,3,4:OSOE_COLLECTIVE_FANOUT=2"
+                 "0,1,2,3,4,5,6,7:OSOE_COLLECTIVE_FANOUT=2")
+      string(REPLACE ":" ";" environment "${case}")
+      list(POP_FRONT environment map)
+      string(REPLACE "," ";" ranks "${map}")
+      list(LENGTH ranks count)
+      string(REPLACE "," "-" label "${map}")
+      foreach(in_flight 1 2 4)
+        add_test(NAME shmem.pipeline.${label}.in-flight-${in_flight}
+          COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${in_flight} ${environment}
+                  $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+                  $<TARGET_FILE:shmem_test_pipeline>)
+        set_tests_properties(shmem.pipeline.${label}.in-flight-${in_flight} PROPERTIES
+          LABELS "tier2" TIMEOUT 90)
+        osoe_internode_label(shmem.pipeline.${label}.in-flight-${in_flight})
+      endforeach()
+    endforeach()
+    # Under the AM stress settings - 1 KiB chunks, two credits, the wire in short
+    # reads split at random - where a piece is sixteen chunks and a lead's puts
+    # queue behind its credits. And with OSOE_MAX_TEAMS=4 and OSOE_MAX_THREADS=1,
+    # the fewest team numbers and lanes - the main thread's and the agent's - so
+    # that the region is as small as it gets and its lanes end it: a slot
+    # computed from piece k rather than k mod D, which a larger region lets write
+    # into a lane nobody lent unseen, runs past the region's end, which the
+    # target refuses by name (progress-host.c). At D = 2.
+    add_test(NAME shmem.pipeline.0-1-2-3-4.stress
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_COLLECTIVE_FANOUT=2
+              OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+              $<TARGET_FILE:osoe-launch> -n 5 -m 0,1,2,3,4 -t 150 --
+              $<TARGET_FILE:shmem_test_pipeline>)
+    set_tests_properties(shmem.pipeline.0-1-2-3-4.stress PROPERTIES LABELS "tier2" TIMEOUT 180)
+    add_test(NAME shmem.pipeline.0-0-1-1.max-teams-4
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_MAX_TEAMS=4
+              OSOE_MAX_THREADS=1
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+              $<TARGET_FILE:shmem_test_pipeline>)
+    set_tests_properties(shmem.pipeline.0-0-1-1.max-teams-4 PROPERTIES LABELS "tier2" TIMEOUT 90)
+    osoe_internode_label(shmem.pipeline.0-1-2-3-4.stress shmem.pipeline.0-0-1-1.max-teams-4)
+  endif()
+
+  # Lanes and grants (design §5.8; the team redesign's step E; test-lanes.c): the
+  # cases of tools/modelcheck/lane_model.py on the code, one PE a logical node.
+  # Two teams whose leads coincide on node 1, the parent of both, with a child
+  # outside the collective its parent is in (shared-lead), and under
+  # SHMEM_THREAD_MULTIPLE their large reductions at once on two of node 1's
+  # threads (two-threads); a team's large reductions led by its PEs' threads in
+  # turn (turns); a broadcast's tree turned against the reduction's before it,
+  # under OSOE_TEST_PERTURB (rotation); the class boundary a byte either side, at
+  # the setting's smallest and at its default, and a large collective's pieces in
+  # flight at D = 2 and 4 (boundary); a team number taken again (reuse); and two
+  # leads in different reductions, which the grant names (mismatch). They run
+  # under tsan too, which shmem.internode.*'s maps are kept from: that reason
+  # needs a node-mate, a PE whose heap the node's lead's agent writes from
+  # another process, and every case here is one PE a logical node. The agent that
+  # applies a PE's incoming puts is a thread of that PE's own process, and what
+  # separates its write into a lane from the owner's last touch of it - the
+  # owner's own send through the agent, and the counters - is all inside the one
+  # process tsan sees (round six's H5 ran the nine positive cases under it clean,
+  # and a lane shared by threads is a data race it reports). All but
+  # class-split-hang, which ends by the deadlock detector: under tsan no job is
+  # judged deadlocked, its own thread in every process being one the detector
+  # cannot see (shmem.deadlock.* below).
+  add_executable(shmem_test_lanes test-lanes.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_lanes PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_lanes PRIVATE osoe rt Threads::Threads)
+  osoe_warnings(shmem_test_lanes)
+  foreach(case "shared-lead:0,1,2,3" "two-threads:0,1,2,3" "turns:0,1"
+               "rotation:0,1,2,3:OSOE_COLLECTIVE_FANOUT=2:OSOE_TEST_PERTURB=1"
+               "boundary:0,1,2" "boundary:0,1,2:OSOE_SMALL_COLLECTIVE_BYTES=128"
+               "boundary:0,1,2:OSOE_COLLECTIVE_PIPELINE=4" "reuse:0,1"
+               "scan-shared-parent:0,1,2,3" "scan-turns:0,1" "scan-reuse:0,1")
     string(REPLACE ":" ";" environment "${case}")
-    list(POP_FRONT environment map)
+    list(POP_FRONT environment which map)
     string(REPLACE "," ";" ranks "${map}")
     list(LENGTH ranks count)
-    string(REPLACE "," "-" label "${map}")
-    foreach(in_flight 1 2 4)
-      add_test(NAME shmem.pipeline.${label}.in-flight-${in_flight}
-        COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${in_flight} ${environment}
-                $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
-                $<TARGET_FILE:shmem_test_pipeline>)
-      set_tests_properties(shmem.pipeline.${label}.in-flight-${in_flight} PROPERTIES
-        LABELS "tier2" TIMEOUT 90)
+    set(label "${which}")
+    foreach(setting IN LISTS environment)
+      string(REGEX REPLACE "^OSOE_([A-Z_]+)=(.*)$" "\\1-\\2" suffix "${setting}")
+      string(TOLOWER "${suffix}" suffix)
+      string(REPLACE "_" "-" suffix "${suffix}")
+      if(NOT setting MATCHES "PERTURB|FANOUT")
+        set(label "${label}.${suffix}")
+      endif()
     endforeach()
+    add_test(NAME shmem.lanes.${label}
+      COMMAND ${CMAKE_COMMAND} -E env ${environment}
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 90 --
+              $<TARGET_FILE:shmem_test_lanes> ${which})
+    set_tests_properties(shmem.lanes.${label} PROPERTIES LABELS "tier2" TIMEOUT 120)
+    osoe_internode_label(shmem.lanes.${label})
   endforeach()
-  # Under the AM stress settings - 1 KiB chunks, two credits, the wire in short
-  # reads split at random - where a piece is sixteen chunks and a lead's puts
-  # queue behind its credits. And with OSOE_MAX_TEAMS=4 and OSOE_MAX_THREADS=1,
-  # the fewest team numbers and lanes - the main thread's and the agent's - so
-  # that the region is as small as it gets and its lanes end it: a slot
-  # computed from piece k rather than k mod D, which a larger region lets write
-  # into a lane nobody lent unseen, runs past the region's end, which the
-  # target refuses by name (progress-host.c). At D = 2.
-  add_test(NAME shmem.pipeline.0-1-2-3-4.stress
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_COLLECTIVE_FANOUT=2
-            OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
-            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
-            $<TARGET_FILE:osoe-launch> -n 5 -m 0,1,2,3,4 -t 150 --
-            $<TARGET_FILE:shmem_test_pipeline>)
-  set_tests_properties(shmem.pipeline.0-1-2-3-4.stress PROPERTIES LABELS "tier2" TIMEOUT 180)
-  add_test(NAME shmem.pipeline.0-0-1-1.max-teams-4
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_MAX_TEAMS=4
-            OSOE_MAX_THREADS=1
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
-            $<TARGET_FILE:shmem_test_pipeline>)
-  set_tests_properties(shmem.pipeline.0-0-1-1.max-teams-4 PROPERTIES LABELS "tier2" TIMEOUT 90)
-endif()
+  add_test(NAME shmem.lanes.mismatch
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+            mismatch)
+  set_tests_properties(shmem.lanes.mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+    "the grant from node 0's lead [(]PE 0[)] is for epoch [0-9]+'s sum of 8-byte signed integers, 4096 bytes, and this node's lead [(]PE 1[)] is in epoch [0-9]+'s maximum of 8-byte signed integers")
+  add_test(NAME shmem.lanes.scan-mismatch
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+            scan-mismatch)
+  set_tests_properties(shmem.lanes.scan-mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+    "the scan grant from PE 0 is for scan [0-9]+ of the team, an inclusive one of 8-byte signed integers, 4096 bytes, and PE 1 is in scan [0-9]+ of the team, an exclusive one of 8-byte signed integers")
+  add_test(NAME shmem.lanes.class-split-named
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+            class-split-named)
+  set_tests_properties(shmem.lanes.class-split-named PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+    "the lane word of node 1's lead [(]PE 1[)], this node's child at position 0, says epoch 0 and lane 0, and this node's lead [(]PE 0[)] is in epoch [0-9]+'s collective")
+  add_test(NAME shmem.lanes.class-split-broadcast
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+            class-split-broadcast)
+  set_tests_properties(shmem.lanes.class-split-broadcast PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+    "should be piece 0 [(]1500 bytes[)] of epoch [0-9]+'s broadcast from the node at index 0, and is nothing: no piece was put there")
+  osoe_internode_label(shmem.lanes.mismatch shmem.lanes.scan-mismatch
+    shmem.lanes.class-split-named shmem.lanes.class-split-broadcast)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.lanes.class-split-hang
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
+              $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+              class-split-hang)
+    set_tests_properties(shmem.lanes.class-split-hang PROPERTIES LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_long_sum_reduce"
+      FAIL_REGULAR_EXPRESSION "osoe-launch: timeout")
+    osoe_internode_label(shmem.lanes.class-split-hang)
+  endif()
 
-# Lanes and grants (design §5.8; the team redesign's step E; test-lanes.c): the
-# cases of tools/modelcheck/lane_model.py on the code, one PE a logical node.
-# Two teams whose leads coincide on node 1, the parent of both, with a child
-# outside the collective its parent is in (shared-lead), and under
-# SHMEM_THREAD_MULTIPLE their large reductions at once on two of node 1's
-# threads (two-threads); a team's large reductions led by its PEs' threads in
-# turn (turns); a broadcast's tree turned against the reduction's before it,
-# under OSOE_TEST_PERTURB (rotation); the class boundary a byte either side, at
-# the setting's smallest and at its default, and a large collective's pieces in
-# flight at D = 2 and 4 (boundary); a team number taken again (reuse); and two
-# leads in different reductions, which the grant names (mismatch). They run
-# under tsan too, which shmem.internode.*'s maps are kept from: that reason
-# needs a node-mate, a PE whose heap the node's lead's agent writes from
-# another process, and every case here is one PE a logical node. The agent that
-# applies a PE's incoming puts is a thread of that PE's own process, and what
-# separates its write into a lane from the owner's last touch of it - the
-# owner's own send through the agent, and the counters - is all inside the one
-# process tsan sees (round six's H5 ran the nine positive cases under it clean,
-# and a lane shared by threads is a data race it reports). All but
-# class-split-hang, which ends by the deadlock detector: under tsan no job is
-# judged deadlocked, its own thread in every process being one the detector
-# cannot see (shmem.deadlock.* below).
-add_executable(shmem_test_lanes test-lanes.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
-target_include_directories(shmem_test_lanes PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
-target_link_libraries(shmem_test_lanes PRIVATE osoe rt Threads::Threads)
-osoe_warnings(shmem_test_lanes)
-foreach(case "shared-lead:0,1,2,3" "two-threads:0,1,2,3" "turns:0,1"
-             "rotation:0,1,2,3:OSOE_COLLECTIVE_FANOUT=2:OSOE_TEST_PERTURB=1"
-             "boundary:0,1,2" "boundary:0,1,2:OSOE_SMALL_COLLECTIVE_BYTES=128"
-             "boundary:0,1,2:OSOE_COLLECTIVE_PIPELINE=4" "reuse:0,1"
-             "scan-shared-parent:0,1,2,3" "scan-turns:0,1" "scan-reuse:0,1")
-  string(REPLACE ":" ";" environment "${case}")
-  list(POP_FRONT environment which map)
-  string(REPLACE "," ";" ranks "${map}")
-  list(LENGTH ranks count)
-  set(label "${which}")
-  foreach(setting IN LISTS environment)
-    string(REGEX REPLACE "^OSOE_([A-Z_]+)=(.*)$" "\\1-\\2" suffix "${setting}")
-    string(TOLOWER "${suffix}" suffix)
-    string(REPLACE "_" "-" suffix "${suffix}")
-    if(NOT setting MATCHES "PERTURB|FANOUT")
-      set(label "${label}.${suffix}")
-    endif()
-  endforeach()
-  add_test(NAME shmem.lanes.${label}
-    COMMAND ${CMAKE_COMMAND} -E env ${environment}
-            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 90 --
-            $<TARGET_FILE:shmem_test_lanes> ${which})
-  set_tests_properties(shmem.lanes.${label} PROPERTIES LABELS "tier2" TIMEOUT 120)
-endforeach()
-add_test(NAME shmem.lanes.mismatch
-  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
-          mismatch)
-set_tests_properties(shmem.lanes.mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
-  PASS_REGULAR_EXPRESSION
-  "the grant from node 0's lead [(]PE 0[)] is for epoch [0-9]+'s sum of 8-byte signed integers, 4096 bytes, and this node's lead [(]PE 1[)] is in epoch [0-9]+'s maximum of 8-byte signed integers")
-add_test(NAME shmem.lanes.scan-mismatch
-  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
-          scan-mismatch)
-set_tests_properties(shmem.lanes.scan-mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
-  PASS_REGULAR_EXPRESSION
-  "the scan grant from PE 0 is for scan [0-9]+ of the team, an inclusive one of 8-byte signed integers, 4096 bytes, and PE 1 is in scan [0-9]+ of the team, an exclusive one of 8-byte signed integers")
-add_test(NAME shmem.lanes.class-split-named
-  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
-          class-split-named)
-set_tests_properties(shmem.lanes.class-split-named PROPERTIES LABELS "tier2" TIMEOUT 90
-  PASS_REGULAR_EXPRESSION
-  "the lane word of node 1's lead [(]PE 1[)], this node's child at position 0, says epoch 0 and lane 0, and this node's lead [(]PE 0[)] is in epoch [0-9]+'s collective")
-add_test(NAME shmem.lanes.class-split-broadcast
-  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
-          class-split-broadcast)
-set_tests_properties(shmem.lanes.class-split-broadcast PROPERTIES LABELS "tier2" TIMEOUT 90
-  PASS_REGULAR_EXPRESSION
-  "should be piece 0 [(]1500 bytes[)] of epoch [0-9]+'s broadcast from the node at index 0, and is nothing: no piece was put there")
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_test(NAME shmem.lanes.class-split-hang
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
-            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
-            class-split-hang)
-  set_tests_properties(shmem.lanes.class-split-hang PROPERTIES LABELS "tier2" TIMEOUT 90
-    PASS_REGULAR_EXPRESSION "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_long_sum_reduce"
-    FAIL_REGULAR_EXPRESSION "osoe-launch: timeout")
-endif()
-
-# A lane for each thread, for every kind of collective (test-lanes-threads.c;
-# round six's H1, the correctness investigator's stress): four threads a PE,
-# each with its own copy of the world split every round into a team of its own
-# shape, then sums, broadcasts and both scans of 8 to 5,000 longs on either side
-# of the class line, 300 rounds, every result checked. What the cases above do
-# not see: a regression that sends every large scan of a PE through one lane
-# returns wrong prefix sums with status 0, and passes shmem.lanes.* and
-# shmem.scan.* whole. On one PE a logical node, which tsan sees whole; and on two
-# a node, which it does not: a lead's agent writes its node-mate's heap from
-# another process (shmem.internode.*'s reason, above), so that map is not run
-# under it.
-add_executable(shmem_test_lanes_threads test-lanes-threads.c)
-target_link_libraries(shmem_test_lanes_threads PRIVATE osoe Threads::Threads)
-osoe_warnings(shmem_test_lanes_threads)
-add_test(NAME shmem.lanes.threads
-  COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 120 --
-          $<TARGET_FILE:shmem_test_lanes_threads> 300 4)
-set_tests_properties(shmem.lanes.threads PROPERTIES LABELS "tier2" TIMEOUT 150)
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_test(NAME shmem.lanes.threads.two-a-node
-    COMMAND $<TARGET_FILE:osoe-launch> -n 6 -m 0,0,1,1,2,2 -t 120 --
+  # A lane for each thread, for every kind of collective (test-lanes-threads.c;
+  # round six's H1, the correctness investigator's stress): four threads a PE,
+  # each with its own copy of the world split every round into a team of its own
+  # shape, then sums, broadcasts and both scans of 8 to 5,000 longs on either side
+  # of the class line, 300 rounds, every result checked. What the cases above do
+  # not see: a regression that sends every large scan of a PE through one lane
+  # returns wrong prefix sums with status 0, and passes shmem.lanes.* and
+  # shmem.scan.* whole. On one PE a logical node, which tsan sees whole; and on two
+  # a node, which it does not: a lead's agent writes its node-mate's heap from
+  # another process (shmem.internode.*'s reason, above), so that map is not run
+  # under it.
+  add_executable(shmem_test_lanes_threads test-lanes-threads.c)
+  target_link_libraries(shmem_test_lanes_threads PRIVATE osoe Threads::Threads)
+  osoe_warnings(shmem_test_lanes_threads)
+  add_test(NAME shmem.lanes.threads
+    COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 120 --
             $<TARGET_FILE:shmem_test_lanes_threads> 300 4)
-  set_tests_properties(shmem.lanes.threads.two-a-node PROPERTIES LABELS "tier2" TIMEOUT 150)
+  set_tests_properties(shmem.lanes.threads PROPERTIES LABELS "tier2" TIMEOUT 150)
+  osoe_internode_label(shmem.lanes.threads)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.lanes.threads.two-a-node
+      COMMAND $<TARGET_FILE:osoe-launch> -n 6 -m 0,0,1,1,2,2 -t 120 --
+              $<TARGET_FILE:shmem_test_lanes_threads> 300 4)
+    set_tests_properties(shmem.lanes.threads.two-a-node PROPERTIES LABELS "tier2" TIMEOUT 150)
+    osoe_internode_label(shmem.lanes.threads.two-a-node)
+  endif()
+
+  # The allgather among node leads that is fcollect's and collect's internode
+  # phase (design §5.8, "An allgather for fcollect"; phase 1 step 5 slice 6;
+  # test-allgather.c): blocks of 1 byte, 8 bytes and 64 KiB and a collect's
+  # differing ones, into the heap and into both statics ranges, byte by byte;
+  # fcollects back to back into one dest with the team's rank 0 reading each
+  # result late; and the steps and shares each lead publishes. On the world, its
+  # even ranks and the world reversed, over two to five logical nodes - so that
+  # the node count is and is not a power of two - on a block map and a cyclic
+  # one of two PEs a node, and on an interleaved map of uneven nodes; and on
+  # five, a team spanning three nodes: on the block map ranks 3 to 7, nodes 1 to
+  # 3 unevenly, and on the cyclic one ranks 2, 5 and 8, nodes 2, 0 and 3 in that
+  # order of team rank. Linked as oshcc links (§4.3), for its statics. tsan is
+  # left out of the maps for shmem.internode.*'s reason.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    foreach(case "0,0,1,1" "0,1,0,1" "0,0,1,1,2,2" "0,1,2,0,1,2" "0,0,1,1,2,2,3,3"
+                 "0,1,2,3,0,1,2,3" "0,0,1,1,2,2,3,3,4,4:OSOE_TEST_THREE_OF_FIVE=3,1,5"
+                 "0,1,2,3,4,0,1,2,3,4:OSOE_TEST_THREE_OF_FIVE=2,3,3" "0,1,2,0,1,0")
+      string(REPLACE ":" ";" environment "${case}")
+      list(POP_FRONT environment map)
+      osoe_tier2_map_test(allgather ${map} OSOE_TEST_MAP=${map} SHMEM_SYMMETRIC_SIZE=16m
+        ${environment})
+    endforeach()
+    osoe_statics_program(shmem_test_allgather)
+  endif()
 endif()
 
-# The allgather among node leads that is fcollect's and collect's internode
-# phase (design §5.8, "An allgather for fcollect"; phase 1 step 5 slice 6;
-# test-allgather.c): blocks of 1 byte, 8 bytes and 64 KiB and a collect's
-# differing ones, into the heap and into both statics ranges, byte by byte;
-# fcollects back to back into one dest with the team's rank 0 reading each
-# result late; and the steps and shares each lead publishes. On the world, its
-# even ranks and the world reversed, over two to five logical nodes - so that
-# the node count is and is not a power of two - on a block map and a cyclic
-# one of two PEs a node, and on an interleaved map of uneven nodes; and on
-# five, a team spanning three nodes: on the block map ranks 3 to 7, nodes 1 to
-# 3 unevenly, and on the cyclic one ranks 2, 5 and 8, nodes 2, 0 and 3 in that
-# order of team rank. Linked as oshcc links (§4.3), for its statics. tsan is
-# left out of the maps for shmem.internode.*'s reason.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  foreach(case "0,0,1,1" "0,1,0,1" "0,0,1,1,2,2" "0,1,2,0,1,2" "0,0,1,1,2,2,3,3"
-               "0,1,2,3,0,1,2,3" "0,0,1,1,2,2,3,3,4,4:OSOE_TEST_THREE_OF_FIVE=3,1,5"
-               "0,1,2,3,4,0,1,2,3,4:OSOE_TEST_THREE_OF_FIVE=2,3,3" "0,1,2,0,1,0")
-    string(REPLACE ":" ";" environment "${case}")
-    list(POP_FRONT environment map)
-    osoe_tier2_map_test(allgather ${map} OSOE_TEST_MAP=${map} SHMEM_SYMMETRIC_SIZE=16m
-      ${environment})
-  endforeach()
-  osoe_statics_program(shmem_test_allgather)
-endif()
-
+# The white-box programs below take the library's own sources from its target,
+# so each build's, and link liburing only where the build has it
+# (OSOE_LIBURING_LINK, cmake/OsoeInternode.cmake): their one-node tests run in
+# both builds, their tests across nodes in the full build alone.
+#
 # OSOE_REGION_INTERNAL itself (test-internal-region.c): between node-mates, a
 # path no collective takes, across nodes, and both. White-box: it calls the
 # transport, so the library's own sources are compiled into it.
@@ -2091,7 +2281,7 @@ list(TRANSFORM osoe_library_sources PREPEND ${PROJECT_SOURCE_DIR}/shmem/)
 add_executable(shmem_test_internal-region test-internal-region.c ${osoe_library_sources})
 target_include_directories(shmem_test_internal-region PRIVATE ../src ../include)
 target_link_libraries(shmem_test_internal-region PRIVATE osoe_base rt Threads::Threads
-  PkgConfig::LIBURING)
+  ${OSOE_LIBURING_LINK})
 osoe_warnings(shmem_test_internal-region)
 add_test(NAME shmem.internal-region.L2
   COMMAND osoe-launch -n 2 -t 60 -- $<TARGET_FILE:shmem_test_internal-region>)
@@ -2119,7 +2309,7 @@ target_include_directories(shmem_test_team-storage PRIVATE ../src ../include)
 # to the tree function goes through the test's wrapper (check_parent_sync).
 target_link_options(shmem_test_team-storage PRIVATE "LINKER:--wrap=osoe_collective_tree")
 target_link_libraries(shmem_test_team-storage PRIVATE osoe_base rt Threads::Threads
-  PkgConfig::LIBURING)
+  ${OSOE_LIBURING_LINK})
 osoe_warnings(shmem_test_team-storage)
 set(osoe_hand_order -e 0:OSOE_LOCALID=1 -e 1:OSOE_LOCALID=0 -e 0:OSOE_GTIDS=1,0
     -e 1:OSOE_GTIDS=1,0)
@@ -2133,46 +2323,53 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>)
   osoe_tier2_map_test(team-storage 0,0,1,1 OSOE_TEST_MAP=0,0,1,1
     OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>)
-  add_test(NAME shmem.team-storage.force-remote.0-0-1-1
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 OSOE_TEST_MAP=0,0,1,1
-            OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
-            $<TARGET_FILE:shmem_test_team-storage>)
-  set_tests_properties(shmem.team-storage.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
-    TIMEOUT 90)
-  add_test(NAME shmem.team-storage.local-order.internode
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MAP=0,0,1 OSOE_TEST_LEADS=1,2
-            OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
-            $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 60 ${osoe_hand_order} --
-            $<TARGET_FILE:shmem_test_team-storage>)
-  set_tests_properties(shmem.team-storage.local-order.internode PROPERTIES LABELS "tier2"
-    TIMEOUT 90)
+  if(OSOE_INTERNODE)
+    add_test(NAME shmem.team-storage.force-remote.0-0-1-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 OSOE_TEST_MAP=0,0,1,1
+              OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+              $<TARGET_FILE:shmem_test_team-storage>)
+    set_tests_properties(shmem.team-storage.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
+      TIMEOUT 90)
+    add_test(NAME shmem.team-storage.local-order.internode
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MAP=0,0,1 OSOE_TEST_LEADS=1,2
+              OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+              $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 60 ${osoe_hand_order} --
+              $<TARGET_FILE:shmem_test_team-storage>)
+    set_tests_properties(shmem.team-storage.local-order.internode PROPERTIES LABELS "tier2"
+      TIMEOUT 90)
+    osoe_internode_label(shmem.team-storage.force-remote.0-0-1-1
+      shmem.team-storage.local-order.internode)
+  endif()
 endif()
 
-# The generic gather's own checks, each ending the job by name before a byte
-# of the gather lands (test-gather-misuse.c; phase 1 step 5 slice 6): a collect
-# into a dest shorter than its result, SOS's shmem_team_b2b_collectives'
-# mistake, whose lead's own copy of its members' blocks overwrites the room
-# holding the places; and a lead's descriptor counting one member more on its
-# node than the rank map does. White-box, for the second, like team-storage's.
-add_executable(shmem_test_gather-misuse test-gather-misuse.c ${osoe_library_sources})
-target_include_directories(shmem_test_gather-misuse PRIVATE ../src ../include)
-target_link_libraries(shmem_test_gather-misuse PRIVATE osoe_base rt Threads::Threads
-  PkgConfig::LIBURING)
-osoe_warnings(shmem_test_gather-misuse)
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_test(NAME shmem.gather-misuse.short-dest
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MISUSE=short-dest
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
-            $<TARGET_FILE:shmem_test_gather-misuse>)
-  set_tests_properties(shmem.gather-misuse.short-dest PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "shmem_long_collect: dest has room for [0-9]+ bytes to the end of its allocation, and the result is 320 bytes")
-  add_test(NAME shmem.gather-misuse.local-count
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MISUSE=local-count
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
-            $<TARGET_FILE:shmem_test_gather-misuse>)
-  set_tests_properties(shmem.gather-misuse.local-count PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "test-gather-misuse: the rank map puts 2 of team 0's members on this node, and the team lists 3 here")
+if(OSOE_INTERNODE)
+  # The generic gather's own checks, each ending the job by name before a byte
+  # of the gather lands (test-gather-misuse.c; phase 1 step 5 slice 6): a collect
+  # into a dest shorter than its result, SOS's shmem_team_b2b_collectives'
+  # mistake, whose lead's own copy of its members' blocks overwrites the room
+  # holding the places; and a lead's descriptor counting one member more on its
+  # node than the rank map does. White-box, for the second, like team-storage's.
+  add_executable(shmem_test_gather-misuse test-gather-misuse.c ${osoe_library_sources})
+  target_include_directories(shmem_test_gather-misuse PRIVATE ../src ../include)
+  target_link_libraries(shmem_test_gather-misuse PRIVATE osoe_base rt Threads::Threads
+    PkgConfig::LIBURING)
+  osoe_warnings(shmem_test_gather-misuse)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.gather-misuse.short-dest
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MISUSE=short-dest
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
+              $<TARGET_FILE:shmem_test_gather-misuse>)
+    set_tests_properties(shmem.gather-misuse.short-dest PROPERTIES LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "shmem_long_collect: dest has room for [0-9]+ bytes to the end of its allocation, and the result is 320 bytes")
+    add_test(NAME shmem.gather-misuse.local-count
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MISUSE=local-count
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
+              $<TARGET_FILE:shmem_test_gather-misuse>)
+    set_tests_properties(shmem.gather-misuse.local-count PROPERTIES LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "test-gather-misuse: the rank map puts 2 of team 0's members on this node, and the team lists 3 here")
+    osoe_internode_label(shmem.gather-misuse.short-dest shmem.gather-misuse.local-count)
+  endif()
 endif()
 # Team creation (phase 1 step 7 slice 2; test-team-split.c): halves, evens and
 # odds, one PE, the world reversed, grids of the world and of a split, SHARED
@@ -2240,24 +2437,29 @@ add_test(NAME shmem.team-split.stale-handle.L2
 set_tests_properties(shmem.team-split.stale-handle.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
   PASS_REGULAR_EXPRESSION "every check before the stale handle passed.*shmem_team_my_pe: 0x[0-9a-f]+ is team 3, which this PE has destroyed; the number names another team since"
   FAIL_REGULAR_EXPRESSION "CHECK[(]")
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  osoe_tier2_map_test(team-split 0,0,1,1 ${osoe_team_split_environment})
-  osoe_tier2_map_test(team-split 0,1,2,0,1,0 ${osoe_team_split_environment})
-  osoe_tier2_map_test(team-split 0,1,2,3 ${osoe_team_split_environment})
-  add_test(NAME shmem.team-split.force-remote.0-0-1-1
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 ${osoe_team_split_environment}
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
-            $<TARGET_FILE:shmem_test_team-split>)
-  set_tests_properties(shmem.team-split.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
-    TIMEOUT 90)
-  osoe_team_split_mode(exhaust 0-0-1-1 "-n;4;-m;0,0,1,1" "${osoe_team_split_exhaust_environment}"
-    "${osoe_team_split_exhausted}")
-  osoe_team_split_mode(full 0-0-1-1 "-n;4;-m;0,0,1,1" "SHMEM_SYMMETRIC_SIZE=1m"
-    "${osoe_team_split_full}")
-  osoe_team_split_mode(reuse 0-0-1-1 "-n;4;-m;0,0,1,1" "SHMEM_SYMMETRIC_SIZE=16m"
-    "${osoe_team_split_full}")
-  osoe_team_split_mode(reuse 0-1-2-0-1-0 "-n;6;-m;0,1,2,0,1,0" "SHMEM_SYMMETRIC_SIZE=16m"
-    "${osoe_team_split_full}")
+if(OSOE_INTERNODE)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    osoe_tier2_map_test(team-split 0,0,1,1 ${osoe_team_split_environment})
+    osoe_tier2_map_test(team-split 0,1,2,0,1,0 ${osoe_team_split_environment})
+    osoe_tier2_map_test(team-split 0,1,2,3 ${osoe_team_split_environment})
+    add_test(NAME shmem.team-split.force-remote.0-0-1-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 ${osoe_team_split_environment}
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
+              $<TARGET_FILE:shmem_test_team-split>)
+    set_tests_properties(shmem.team-split.force-remote.0-0-1-1 PROPERTIES LABELS "tier2"
+      TIMEOUT 90)
+    osoe_team_split_mode(exhaust 0-0-1-1 "-n;4;-m;0,0,1,1" "${osoe_team_split_exhaust_environment}"
+      "${osoe_team_split_exhausted}")
+    osoe_team_split_mode(full 0-0-1-1 "-n;4;-m;0,0,1,1" "SHMEM_SYMMETRIC_SIZE=1m"
+      "${osoe_team_split_full}")
+    osoe_team_split_mode(reuse 0-0-1-1 "-n;4;-m;0,0,1,1" "SHMEM_SYMMETRIC_SIZE=16m"
+      "${osoe_team_split_full}")
+    osoe_team_split_mode(reuse 0-1-2-0-1-0 "-n;6;-m;0,1,2,0,1,0" "SHMEM_SYMMETRIC_SIZE=16m"
+      "${osoe_team_split_full}")
+    osoe_internode_label(shmem.team-split.force-remote.0-0-1-1 shmem.team-split.exhaust.0-0-1-1
+      shmem.team-split.full.0-0-1-1 shmem.team-split.reuse.0-0-1-1
+      shmem.team-split.reuse.0-1-2-0-1-0)
+  endif()
 endif()
 
 # OSOE_TEAM_BLOCKS (§5.7; the team redesign's step D): a node's pool of team
@@ -2276,16 +2478,19 @@ osoe_refusal_test(shmem.team-blocks.local-disagree 2 0
 foreach(value 7 65537 x)
   add_test(NAME shmem.team-blocks.invalid.${value}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_TEAM_BLOCKS=${value}
-            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.team-blocks.invalid.${value} PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "OSOE_TEAM_BLOCKS='${value}' is not between 8 and 65536")
 endforeach()
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_test(NAME shmem.job.disagree.team-blocks
-    COMMAND ${CMAKE_COMMAND} -E env ${osoe_team_split_environment}
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -e 2:OSOE_TEAM_BLOCKS=100
-            -e 3:OSOE_TEAM_BLOCKS=100 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
-  set_tests_properties(shmem.job.disagree.team-blocks PROPERTIES LABELS "tier2" TIMEOUT 90)
+if(OSOE_INTERNODE)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.job.disagree.team-blocks
+      COMMAND ${CMAKE_COMMAND} -E env ${osoe_team_split_environment}
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -e 2:OSOE_TEAM_BLOCKS=100
+              -e 3:OSOE_TEAM_BLOCKS=100 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
+    set_tests_properties(shmem.job.disagree.team-blocks PROPERTIES LABELS "tier2" TIMEOUT 90)
+    osoe_internode_label(shmem.job.disagree.team-blocks)
+  endif()
 endif()
 
 set(osoe_get_nbi_small OSOE_GET_LANDING_BYTES=4096
@@ -2307,23 +2512,26 @@ endif()
 # unprovable cross-process kind the internode tests are kept from.
 osoe_tier2_test(multiple)
 osoe_tier2_map_test(multiple 0,1 OSOE_GET_LANDING_BYTES=8192)
-# With the library checking every shared wait's promise at its return and
-# perturbing the steps of its protocols (OSOE_CHECK_QUIET, OSOE_TEST_PERTURB;
-# transport-internode.c), so that a race the models find happens and shows.
-foreach(map IN ITEMS 0,1 0,1,2,0,1,0)
-  string(REPLACE "," ";" ranks "${map}")
-  list(LENGTH ranks count)
-  string(REPLACE "," "-" label "${map}")
-  if(map STREQUAL "0,1" OR NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-    add_test(NAME shmem.multiple.checked.${label}
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1
-              OSOE_GET_LANDING_BYTES=8192
-              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 120 --
-              $<TARGET_FILE:shmem_test_multiple>)
-    set_tests_properties(shmem.multiple.checked.${label} PROPERTIES LABELS "tier2" TIMEOUT 180
-      FAIL_REGULAR_EXPRESSION "OSOE_CHECK_QUIET:")
-  endif()
-endforeach()
+if(OSOE_INTERNODE)
+  # With the library checking every shared wait's promise at its return and
+  # perturbing the steps of its protocols (OSOE_CHECK_QUIET, OSOE_TEST_PERTURB;
+  # transport-internode.c), so that a race the models find happens and shows.
+  foreach(map IN ITEMS 0,1 0,1,2,0,1,0)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    string(REPLACE "," "-" label "${map}")
+    if(map STREQUAL "0,1" OR NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+      add_test(NAME shmem.multiple.checked.${label}
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_QUIET=1 OSOE_TEST_PERTURB=1
+                OSOE_GET_LANDING_BYTES=8192
+                $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 120 --
+                $<TARGET_FILE:shmem_test_multiple>)
+      set_tests_properties(shmem.multiple.checked.${label} PROPERTIES LABELS "tier2" TIMEOUT 180
+        FAIL_REGULAR_EXPRESSION "OSOE_CHECK_QUIET:")
+      osoe_internode_label(shmem.multiple.checked.${label})
+    endif()
+  endforeach()
+endif()
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(multiple 0,0,1,1 OSOE_GET_LANDING_BYTES=8192)
   osoe_tier2_map_test(multiple 0,1,2,0,1,0 OSOE_GET_LANDING_BYTES=8192)
@@ -2421,17 +2629,24 @@ set_tests_properties(shmem.agent-slice.refused.L2 PROPERTIES LABELS "tier2" TIME
 add_executable(shmem_test_agent-cpus test-agent-cpus.c)
 target_link_libraries(shmem_test_agent-cpus PRIVATE osoe)
 osoe_warnings(shmem_test_agent-cpus)
-add_test(NAME shmem.agent-cpus.task.0-0-1-1
-  COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
-add_test(NAME shmem.agent-cpus.node.0-0-1-1
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_CPUS=node
-          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
+if(OSOE_INTERNODE)
+  add_test(NAME shmem.agent-cpus.task.0-0-1-1
+    COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
+  add_test(NAME shmem.agent-cpus.node.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_CPUS=node
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
+endif()
 add_test(NAME shmem.agent-cpus.node.L3
   COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_CPUS=node
           $<TARGET_FILE:osoe-launch> -n 3 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
-set_tests_properties(shmem.agent-cpus.task.0-0-1-1 shmem.agent-cpus.node.0-0-1-1
-  shmem.agent-cpus.node.L3 PROPERTIES LABELS "tier2" TIMEOUT 90
+set_tests_properties(shmem.agent-cpus.node.L3 PROPERTIES LABELS "tier2" TIMEOUT 90
   PASS_REGULAR_EXPRESSION "AGENT CPUS OK" FAIL_REGULAR_EXPRESSION "CHECK[(]")
+if(OSOE_INTERNODE)
+  set_tests_properties(shmem.agent-cpus.task.0-0-1-1 shmem.agent-cpus.node.0-0-1-1
+    PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "AGENT CPUS OK" FAIL_REGULAR_EXPRESSION "CHECK[(]")
+  osoe_internode_label(shmem.agent-cpus.task.0-0-1-1 shmem.agent-cpus.node.0-0-1-1)
+endif()
 add_test(NAME shmem.agent-cpus.refused.L2
   COMMAND ${CMAKE_COMMAND} -E env OSOE_AGENT_CPUS=all
           $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_agent-cpus>)
@@ -2469,6 +2684,10 @@ foreach(case IN LISTS deadlock_cases)
   list(GET parts 1 map)
   list(GET parts 2 where)
   string(REPLACE "," "-" label "${map}")
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
   add_test(NAME shmem.deadlock.${mode}.${label}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
             $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 30 --
@@ -2476,6 +2695,9 @@ foreach(case IN LISTS deadlock_cases)
   set_tests_properties(shmem.deadlock.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "every PE of the job waits in the library.*: PE [0-9, ]+ ${where}"
     FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.deadlock.${mode}.${label})
+  endif()
 endforeach()
 foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,1,1" "helper|0,0,0,0"
              "helper|0,0,1,1" "busy|0,0,0,0" "busy|0,0,1,1")
@@ -2485,6 +2707,10 @@ foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,1,1" "helper|
   string(REPLACE "," "-" label "${map}")
   string(REPLACE "," ";" ranks "${map}")
   list(LENGTH ranks count)
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
   add_test(NAME shmem.deadlock.${mode}.${label}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
             $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
@@ -2492,14 +2718,20 @@ foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,1,1" "helper|
   set_tests_properties(shmem.deadlock.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION "DEADLOCK TEST OK: ${mode}"
     FAIL_REGULAR_EXPRESSION "osoe: deadlock|CHECK[(]")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.deadlock.${mode}.${label})
+  endif()
 endforeach()
-add_test(NAME shmem.deadlock.off.0-0-1-1
-  COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=0
-          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 6 --
-          $<TARGET_FILE:shmem_test_deadlock> waits)
-set_tests_properties(shmem.deadlock.off.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 6 s"
-  FAIL_REGULAR_EXPRESSION "osoe: deadlock|DEADLOCK TEST REACHED")
+if(OSOE_INTERNODE)
+  add_test(NAME shmem.deadlock.off.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=0
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 6 --
+            $<TARGET_FILE:shmem_test_deadlock> waits)
+  set_tests_properties(shmem.deadlock.off.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 6 s"
+    FAIL_REGULAR_EXPRESSION "osoe: deadlock|DEADLOCK TEST REACHED")
+  osoe_internode_label(shmem.deadlock.off.0-0-1-1)
+endif()
 add_test(NAME shmem.deadlock.refused.L2
   COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=soon
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_deadlock> computing)
@@ -2513,39 +2745,44 @@ set_tests_properties(shmem.deadlock.refused.L2 PROPERTIES LABELS "tier2" TIMEOUT
 # that tree over ten members is three levels deep, with the AM layer's small
 # settings, which split a scan's pieces on the wire.
 osoe_tier2_test(scan)
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  osoe_tier2_map_test(scan 0,1,2,3)
-  osoe_tier2_map_test(scan 0,0,1,1)
-  osoe_tier2_map_test(scan 0,1,2,0,1,0)
-  osoe_tier2_map_test(scan 0,0,0,1,2,2)
-  add_test(NAME shmem.scan.force-remote.0-0-1-1
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_scan>)
-  set_tests_properties(shmem.scan.force-remote.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
-  add_test(NAME shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=2 OSOE_AM_CHUNK=1024
-            OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
-            $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
-            $<TARGET_FILE:shmem_test_scan>)
-  set_tests_properties(shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4 PROPERTIES LABELS "tier2"
-    TIMEOUT 120)
-  # Pieces in flight (2026-09-27): one at a time, as first built, and four on
-  # the three-level tree, the leaves' counts pinned by the test; the most the
-  # agreement allows, eight, on four nodes.
-  add_test(NAME shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=1 OSOE_COLLECTIVE_FANOUT=2
-            $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
-            $<TARGET_FILE:shmem_test_scan>)
-  add_test(NAME shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=4 OSOE_COLLECTIVE_FANOUT=2
-            $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
-            $<TARGET_FILE:shmem_test_scan>)
-  add_test(NAME shmem.scan.pipeline-8.0-1-2-3
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=8
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 60 -- $<TARGET_FILE:shmem_test_scan>)
-  set_tests_properties(shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
-    shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4 PROPERTIES LABELS "tier2" TIMEOUT 120)
-  set_tests_properties(shmem.scan.pipeline-8.0-1-2-3 PROPERTIES LABELS "tier2" TIMEOUT 90)
+if(OSOE_INTERNODE)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    osoe_tier2_map_test(scan 0,1,2,3)
+    osoe_tier2_map_test(scan 0,0,1,1)
+    osoe_tier2_map_test(scan 0,1,2,0,1,0)
+    osoe_tier2_map_test(scan 0,0,0,1,2,2)
+    add_test(NAME shmem.scan.force-remote.0-0-1-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_scan>)
+    set_tests_properties(shmem.scan.force-remote.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
+    add_test(NAME shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=2 OSOE_AM_CHUNK=1024
+              OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
+              $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
+              $<TARGET_FILE:shmem_test_scan>)
+    set_tests_properties(shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4 PROPERTIES LABELS "tier2"
+      TIMEOUT 120)
+    # Pieces in flight (2026-09-27): one at a time, as first built, and four on
+    # the three-level tree, the leaves' counts pinned by the test; the most the
+    # agreement allows, eight, on four nodes.
+    add_test(NAME shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=1 OSOE_COLLECTIVE_FANOUT=2
+              $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
+              $<TARGET_FILE:shmem_test_scan>)
+    add_test(NAME shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=4 OSOE_COLLECTIVE_FANOUT=2
+              $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
+              $<TARGET_FILE:shmem_test_scan>)
+    add_test(NAME shmem.scan.pipeline-8.0-1-2-3
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=8
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 60 -- $<TARGET_FILE:shmem_test_scan>)
+    set_tests_properties(shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
+      shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4 PROPERTIES LABELS "tier2" TIMEOUT 120)
+    set_tests_properties(shmem.scan.pipeline-8.0-1-2-3 PROPERTIES LABELS "tier2" TIMEOUT 90)
+    osoe_internode_label(shmem.scan.force-remote.0-0-1-1 shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4
+      shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
+      shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4 shmem.scan.pipeline-8.0-1-2-3)
+  endif()
 endif()
 
 # Contexts (spec §9.5; design §4.6, §4.11; phase 1 step 8 slice 1;
@@ -2555,13 +2792,16 @@ endif()
 # Then each misuse ending the job by name, and OSOE_MAX_CONTEXTS disagreeing
 # between a node's PEs, or outside its range, refused.
 osoe_tier2_test(context)
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  osoe_tier2_map_test(context 0,0,1,1 ${osoe_get_nbi_small})
-  osoe_tier2_map_test(context 0,1,2,0,1,0 ${osoe_get_nbi_small})
-  add_test(NAME shmem.context.force-remote.0-0-1-1
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 ${osoe_get_nbi_small}
-            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_context>)
-  set_tests_properties(shmem.context.force-remote.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
+if(OSOE_INTERNODE)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    osoe_tier2_map_test(context 0,0,1,1 ${osoe_get_nbi_small})
+    osoe_tier2_map_test(context 0,1,2,0,1,0 ${osoe_get_nbi_small})
+    add_test(NAME shmem.context.force-remote.0-0-1-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_FORCE_REMOTE=1 ${osoe_get_nbi_small}
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 -- $<TARGET_FILE:shmem_test_context>)
+    set_tests_properties(shmem.context.force-remote.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90)
+    osoe_internode_label(shmem.context.force-remote.0-0-1-1)
+  endif()
 endif()
 foreach(pair
     "destroyed:shmem_ctx_long_put: context 0x[0-9a-f]+ has been destroyed"
@@ -2588,7 +2828,7 @@ osoe_refusal_test(shmem.max-contexts.local-disagree 2 0
 foreach(value 0 4097 x)
   add_test(NAME shmem.max-contexts.invalid.${value}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_CONTEXTS=${value}
-            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_job>)
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.max-contexts.invalid.${value} PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "OSOE_MAX_CONTEXTS='${value}' is not between 1 and 4096")
 endforeach()
@@ -2653,73 +2893,79 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
   set_tests_properties(shmem.global-exit.L${count} shmem.global-exit.fatal.L${count}
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endforeach()
-foreach(map 0,1 0,0,1,1 0,1,2,0,1,0)
-  string(REPLACE "," ";" ranks "${map}")
-  list(LENGTH ranks count)
-  string(REPLACE "," "-" label "${map}")
-  add_test(NAME shmem.global-exit.${label}
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
-  add_test(NAME shmem.global-exit.fatal.${label}
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} fatal 1)
-  set_tests_properties(shmem.global-exit.${label} shmem.global-exit.fatal.${label}
-    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-endforeach()
-# The same ended by a non-lead, which only its lead's agent can speak for: a
-# global exit, a fatal - whose abortive goodbye then carries a fatal - and a
-# global exit straight after shmem_init, which init must not return before the
-# lead's agent runs to carry. Two ended while every other PE's main thread is
-# inside exit, holding exit's lock: in start_pes's finalize, and in a handler
-# of the program's before the library's, which a non-caller's _exit must not
-# wait on. One with a handler on every PE, which only the caller's exit may
-# run. And one ended mid-stream: the goodbye queued
-# behind a stream, with one arriving, must survive the caller's end, which is
-# a reset while input is unread, until the peer's kernel has acknowledged it.
-foreach(case "nonlead;7;7;1;compute" "fatal.nonlead;fatal;1;1;compute"
-             "immediate;7;7;1;immediate" "start-pes;7;7;0;start-pes"
-             "returned;7;7;0;returned" "handlers;7;7;1;handlers")
-  list(GET case 0 label)
-  list(GET case 1 how)
-  list(GET case 2 status)
-  list(GET case 3 caller)
-  list(GET case 4 mode)
-  add_test(NAME shmem.global-exit.${label}.0-0-1-1
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 ${how} ${status} ${caller} ${mode})
-  set_tests_properties(shmem.global-exit.${label}.0-0-1-1
-    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-endforeach()
-# The grace's own status (abort.c), which nothing else reaches: every other PE
-# holding stdout's lock, so its flush cannot end it and the grace does, with 0;
-# and the caller holding it, so exit's flush waits and the grace ends the caller
-# with its status. About 10 s each (OSOE_ABORT_GRACE_SECONDS). Not under tsan,
-# whose _exit takes stdout's lock itself: a program reduced to a thread holding
-# the lock and another calling _exit ends in 1 s without it and not at all with
-# it (docs/decisions/2026-10-02-release-fixes.md, Part 2) - the grace cannot
-# end what tsan holds open.
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  foreach(mode held-stdout caller-held-stdout)
-    add_test(NAME shmem.global-exit.${mode}.0-0-1-1
+if(OSOE_INTERNODE)
+  foreach(map 0,1 0,0,1,1 0,1,2,0,1,0)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.global-exit.${label}
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-              $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 ${mode})
-    set_tests_properties(shmem.global-exit.${mode}.0-0-1-1
+              $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
+    add_test(NAME shmem.global-exit.fatal.${label}
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} fatal 1)
+    set_tests_properties(shmem.global-exit.${label} shmem.global-exit.fatal.${label}
       PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    osoe_internode_label(shmem.global-exit.${label} shmem.global-exit.fatal.${label})
   endforeach()
+  # The same ended by a non-lead, which only its lead's agent can speak for: a
+  # global exit, a fatal - whose abortive goodbye then carries a fatal - and a
+  # global exit straight after shmem_init, which init must not return before the
+  # lead's agent runs to carry. Two ended while every other PE's main thread is
+  # inside exit, holding exit's lock: in start_pes's finalize, and in a handler
+  # of the program's before the library's, which a non-caller's _exit must not
+  # wait on. One with a handler on every PE, which only the caller's exit may
+  # run. And one ended mid-stream: the goodbye queued
+  # behind a stream, with one arriving, must survive the caller's end, which is
+  # a reset while input is unread, until the peer's kernel has acknowledged it.
+  foreach(case "nonlead;7;7;1;compute" "fatal.nonlead;fatal;1;1;compute"
+               "immediate;7;7;1;immediate" "start-pes;7;7;0;start-pes"
+               "returned;7;7;0;returned" "handlers;7;7;1;handlers")
+    list(GET case 0 label)
+    list(GET case 1 how)
+    list(GET case 2 status)
+    list(GET case 3 caller)
+    list(GET case 4 mode)
+    add_test(NAME shmem.global-exit.${label}.0-0-1-1
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 ${how} ${status} ${caller} ${mode})
+    set_tests_properties(shmem.global-exit.${label}.0-0-1-1
+      PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    osoe_internode_label(shmem.global-exit.${label}.0-0-1-1)
+  endforeach()
+  # The grace's own status (abort.c), which nothing else reaches: every other PE
+  # holding stdout's lock, so its flush cannot end it and the grace does, with 0;
+  # and the caller holding it, so exit's flush waits and the grace ends the caller
+  # with its status. About 10 s each (OSOE_ABORT_GRACE_SECONDS). Not under tsan,
+  # whose _exit takes stdout's lock itself: a program reduced to a thread holding
+  # the lock and another calling _exit ends in 1 s without it and not at all with
+  # it (docs/decisions/2026-10-02-release-fixes.md, Part 2) - the grace cannot
+  # end what tsan holds open.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    foreach(mode held-stdout caller-held-stdout)
+      add_test(NAME shmem.global-exit.${mode}.0-0-1-1
+        COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+                $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 ${mode})
+      set_tests_properties(shmem.global-exit.${mode}.0-0-1-1
+        PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+      osoe_internode_label(shmem.global-exit.${mode}.0-0-1-1)
+    endforeach()
+  endif()
+  # A global exit with status 0: no rank leaves nonzero, and the launcher exits 0.
+  add_test(NAME shmem.global-exit.zero.0-0-1-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 0 0 1 compute)
+  set_tests_properties(shmem.global-exit.zero.0-0-1-1
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  # Two callers at once on one node: the declaration that wins carries its status
+  # and leaves last; the other caller leaves with 0 (abort.c).
+  add_test(NAME shmem.global-exit.two-callers.0-0-1-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 two-callers)
+  set_tests_properties(shmem.global-exit.two-callers.0-0-1-1
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  osoe_internode_label(shmem.global-exit.zero.0-0-1-1 shmem.global-exit.two-callers.0-0-1-1)
 endif()
-# A global exit with status 0: no rank leaves nonzero, and the launcher exits 0.
-add_test(NAME shmem.global-exit.zero.0-0-1-1
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 0 0 1 compute)
-set_tests_properties(shmem.global-exit.zero.0-0-1-1
-  PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-# Two callers at once on one node: the declaration that wins carries its status
-# and leaves last; the other caller leaves with 0 (abort.c).
-add_test(NAME shmem.global-exit.two-callers.0-0-1-1
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 two-callers)
-set_tests_properties(shmem.global-exit.two-callers.0-0-1-1
-  PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 # Under a launcher that ends the job at the first bad exit, as srun -K1 does
 # (KILLS=yes: no -k): the PE carrying the status leaves last (abort.c), so its
 # exit, the one bad one, finds no rank to kill, and it finishes. The round-three
@@ -2739,55 +2985,69 @@ foreach(case "L4;4;-;0;compute" "slow-handler.0-0-1-1;4;0,0,1,1;1;slow-handler"
   list(GET case 2 map)
   list(GET case 3 caller)
   list(GET case 4 mode)
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
   add_test(NAME shmem.global-exit.kills.${label}
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
             $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7 ${caller} ${mode})
   set_tests_properties(shmem.global-exit.kills.${label}
     PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
                PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.global-exit.kills.${label})
+  endif()
 endforeach()
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_test(NAME shmem.global-exit.kills.held-stdout.0-0-1-1
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 held-stdout)
-  # One PE held, of the other node, a non-lead: with every PE held the leads'
-  # own graces lined the ends up, and a test passed with either lead's wait
-  # deleted (Part 2's second adversarial read). Here only the waits keep the
-  # order - its lead's before its end of stream, the caller's lead's for it.
-  add_test(NAME shmem.global-exit.kills.held-other-node.0-0-1-1
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 held-other-node)
-  # Three nodes, the held PE on one that may hear of the exit from the third
-  # first: a lead told so used to end its stream to the caller's node at once,
-  # which took it for its node's end, and the launcher killed its PEs - eight
-  # runs in forty (the same read). Ranks 1 and 2 are node 2, rank 3 node 1.
-  add_test(NAME shmem.global-exit.kills.held-other-node.0-2-2-1
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_global-exit> 4 0,2,2,1 7 7 0 held-other-node)
-  set_tests_properties(shmem.global-exit.kills.held-stdout.0-0-1-1
-                       shmem.global-exit.kills.held-other-node.0-0-1-1
-    PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
-               PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-  set_tests_properties(shmem.global-exit.kills.held-other-node.0-2-2-1
-    PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes;OSOE_TEST_HELD_RANK=2"
-               PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-endif()
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  add_test(NAME shmem.global-exit.stream.0-0-1-1
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
-  set_tests_properties(shmem.global-exit.stream.0-0-1-1
-    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-  # The same with two wire buffers, so that a node's ring has often none free
-  # when the goodbye arrives: the goodbye then waits in its kernel while the
-  # node's own stream meets the caller's reset as a failed send, which must
-  # stop the sends and nothing else (wire.h: send_error).
-  add_test(NAME shmem.global-exit.stream.two-buffers.0-0-1-1
-    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
-  set_tests_properties(shmem.global-exit.stream.two-buffers.0-0-1-1
-    PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "OSOE_WIRE_BUFFERS=2"
-               PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+if(OSOE_INTERNODE)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.global-exit.kills.held-stdout.0-0-1-1
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 held-stdout)
+    # One PE held, of the other node, a non-lead: with every PE held the leads'
+    # own graces lined the ends up, and a test passed with either lead's wait
+    # deleted (Part 2's second adversarial read). Here only the waits keep the
+    # order - its lead's before its end of stream, the caller's lead's for it.
+    add_test(NAME shmem.global-exit.kills.held-other-node.0-0-1-1
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 held-other-node)
+    # Three nodes, the held PE on one that may hear of the exit from the third
+    # first: a lead told so used to end its stream to the caller's node at once,
+    # which took it for its node's end, and the launcher killed its PEs - eight
+    # runs in forty (the same read). Ranks 1 and 2 are node 2, rank 3 node 1.
+    add_test(NAME shmem.global-exit.kills.held-other-node.0-2-2-1
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 4 0,2,2,1 7 7 0 held-other-node)
+    set_tests_properties(shmem.global-exit.kills.held-stdout.0-0-1-1
+                         shmem.global-exit.kills.held-other-node.0-0-1-1
+      PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
+                 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    set_tests_properties(shmem.global-exit.kills.held-other-node.0-2-2-1
+      PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes;OSOE_TEST_HELD_RANK=2"
+                 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    osoe_internode_label(shmem.global-exit.kills.held-stdout.0-0-1-1
+      shmem.global-exit.kills.held-other-node.0-0-1-1
+      shmem.global-exit.kills.held-other-node.0-2-2-1)
+  endif()
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.global-exit.stream.0-0-1-1
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
+    set_tests_properties(shmem.global-exit.stream.0-0-1-1
+      PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    # The same with two wire buffers, so that a node's ring has often none free
+    # when the goodbye arrives: the goodbye then waits in its kernel while the
+    # node's own stream meets the caller's reset as a failed send, which must
+    # stop the sends and nothing else (wire.h: send_error).
+    add_test(NAME shmem.global-exit.stream.two-buffers.0-0-1-1
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
+    set_tests_properties(shmem.global-exit.stream.two-buffers.0-0-1-1
+      PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "OSOE_WIRE_BUFFERS=2"
+                 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    osoe_internode_label(shmem.global-exit.stream.0-0-1-1
+      shmem.global-exit.stream.two-buffers.0-0-1-1)
+  endif()
 endif()
 
 # OSOE_KEEPALIVE is three counts or 0, and anything else is refused by name.
@@ -2812,19 +3072,30 @@ foreach(case "sibling.L2;0,0;1" "lead.L2;0,0;0" "sibling.L4;0,0,0,0;3" "lead.L4;
   list(GET case 2 dies)
   string(REPLACE "," ";" ranks "${map}")
   list(LENGTH ranks count)
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
   add_test(NAME shmem.dead-pe.${label}
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe.sh $<TARGET_FILE:osoe-launch>
             $<TARGET_FILE:shmem_test_dead-pe> ${count} ${map} ${dies})
   set_tests_properties(shmem.dead-pe.${label}
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "DEAD PE OK")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.dead-pe.${label})
+  endif()
 endforeach()
-# A lead that dies inside shmem_init, before any agent runs: its non-lead must
-# find it from init's own sweeps. See dead-pe-init.sh.
-add_test(NAME shmem.dead-pe.lead-in-init
-  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe-init.sh $<TARGET_FILE:osoe-launch>
-          $<TARGET_FILE:shmem_test_dead-pe>)
-set_tests_properties(shmem.dead-pe.lead-in-init
-  PROPERTIES LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "DEAD LEAD IN INIT OK")
+# internode: dead-pe-init.sh launches a job of two nodes
+if(OSOE_INTERNODE)
+  # A lead that dies inside shmem_init, before any agent runs: its non-lead must
+  # find it from init's own sweeps. See dead-pe-init.sh.
+  add_test(NAME shmem.dead-pe.lead-in-init
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe-init.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_dead-pe>)
+  set_tests_properties(shmem.dead-pe.lead-in-init
+    PROPERTIES LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "DEAD LEAD IN INIT OK")
+  osoe_internode_label(shmem.dead-pe.lead-in-init)
+endif()
 
 # A PE that dies while its siblings wait in the library ends the job, in every
 # build, naming where each survivor was (§3.15): its lead's agent finds the
@@ -2843,11 +3114,18 @@ foreach(layout "L2;2;-" "L4;4;-" "0-0-1-1;4;0,0,1,1")
     list(GET layout 2 map)
     list(GET case 0 where)
     list(GET case 1 routine)
+    osoe_map_nodes("${map}" nodes)
+    if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+      continue()
+    endif()
     add_test(NAME shmem.death-in-wait.${where}.${label}
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/death-in-wait.sh $<TARGET_FILE:osoe-launch>
               $<TARGET_FILE:shmem_test_death-in-wait> ${count} ${map} ${where} ${routine})
     set_tests_properties(shmem.death-in-wait.${where}.${label} PROPERTIES
       LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "DEATH IN WAIT OK")
+    if(nodes GREATER 1)
+      osoe_internode_label(shmem.death-in-wait.${where}.${label})
+    endif()
   endforeach()
 endforeach()
 
@@ -2935,12 +3213,19 @@ foreach(case_expect
   list(GET parts 1 count)
   list(GET parts 2 map)
   list(GET parts 3 expect)
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
   add_test(NAME shmem.refuse.team.${case}
     COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_BAD_TEAM=${case}
             $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
             $<TARGET_FILE:shmem_test_bad_team>)
   set_tests_properties(shmem.refuse.team.${case} PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION "${expect}")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.refuse.team.${case})
+  endif()
 endforeach()
 
 add_executable(shmem_test_bad_put test-bad-put.c)
@@ -3024,214 +3309,233 @@ endforeach()
 # the tests that never reach a socket, and those whose subject is a PE that
 # dies or stops rather than the link.
 option(OSOE_TIER3 "register the tier-3 tests, which need passwordless sudo" OFF)
+# Every tier-3 test is a job of several logical nodes, each in a network
+# namespace of its own: the single-node build, which refuses such a job, has
+# none to register, and says so rather than register nothing in silence.
+if(OSOE_TIER3 AND OSOE_SINGLE_NODE)
+  message(FATAL_ERROR "OSOE_TIER3=ON registers jobs of several nodes, which the single-node "
+                      "build (OSOE_SINGLE_NODE=ON) refuses: tier 3 is the full build's")
+endif()
 if(OSOE_TIER3 AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
   message(FATAL_ERROR "OSOE_TIER3: the multi-node data-path tests do not run under "
                       "ThreadSanitizer (shmem.internode's reason); use the tier3 preset")
 endif()
-if(OSOE_TIER3)
-  add_executable(shmem_test_vanished-node test-vanished-node.c)
-  target_link_libraries(shmem_test_vanished-node PRIVATE osoe)
-  osoe_warnings(shmem_test_vanished-node)
-  set(osoe_tier3 sudo -n ${PROJECT_SOURCE_DIR}/tools/launch/tier3.sh)
-  set(osoe_tier3_wire OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
-      OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919)
-  # tier3.<shape>.<name>: PROGRAM [ARGS...] launched on MAP, with ENV's NAME=VALUE
-  # pairs in the job's environment.
-  function(osoe_tier3_test name shape map program)
-    cmake_parse_arguments(PARSE_ARGV 4 tier3 "" "" "ENV;ARGS")
-    string(REPLACE "," ";" ranks "${map}")
-    list(LENGTH ranks count)
-    list(REMOVE_DUPLICATES ranks)
-    list(LENGTH ranks nodes)
-    add_test(NAME tier3.${shape}.${name}
-      COMMAND ${osoe_tier3} ${shape} ${nodes} ${tier3_ENV}
-              -- $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 300 --
-              $<TARGET_FILE:${program}> ${tier3_ARGS})
-    set_tests_properties(tier3.${shape}.${name} PROPERTIES LABELS "tier3" TIMEOUT 400)
-  endfunction()
-  foreach(shape pi lossy small)
-    osoe_tier3_test(wire-pair ${shape} 0,1 shmem_test_wire_pair
-                    ENV OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919)
-    osoe_tier3_test(progress ${shape} 0,0,1,1 shmem_test_progress
-                    ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
-                        OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919)
-    foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
-      string(REPLACE "," "-" label "${map}")
-      osoe_tier3_test(internode.${label} ${shape} ${map} shmem_test_internode
-                      ENV ${osoe_tier3_wire} OSOE_AM_CREDITS=2)
-    endforeach()
-    osoe_tier3_test(barrier-am.0-1-2 ${shape} 0,1,2 shmem_test_barrier_am
-                    ENV ${osoe_tier3_wire})
-    osoe_tier3_test(get-nbi.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_get-nbi
-                    ENV ${osoe_tier3_wire} OSOE_GET_LANDING_BYTES=4096
-                        OSOE_AM_CREDITS=2)
-    # Contexts' gets sharing the landing zone, and a team context's traffic,
-    # over the shaped link (phase 1 step 8 slice 1).
-    osoe_tier3_test(scan.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_scan
-                    ENV ${osoe_tier3_wire})
-    osoe_tier3_test(context.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_context
-                    ENV ${osoe_tier3_wire} OSOE_GET_LANDING_BYTES=4096
-                        OSOE_AM_CREDITS=2)
-    # Created teams spanning nodes over the shaped link (the team redesign's step
-    # D): the team split program's forty teams on the interleaved map, where the
-    # odd ranks' local lead on node 0 is local id 1 and on node 1 local id 0, so
-    # a message names its team by a lead that is not the sender's own, and a
-    # created team's block seldom its number, each block given back as the
-    # program destroys its team and taken again at a new generation - barriers,
-    # reductions and the rest on each, through the delay and the loss. Its reuse
-    # mode makes two teams in sequence spanning the nodes, the second taking the
-    # first's block under another name, which the progress engine follows; and
-    # two threads of each PE split two parents at once, one a node.
-    osoe_tier3_test(team-split.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_team-split
-                    ENV SHMEM_SYMMETRIC_SIZE=16m)
-    osoe_tier3_test(team-split.reuse.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_team-split
-                    ENV OSOE_TEST_SPLIT=reuse SHMEM_SYMMETRIC_SIZE=16m)
-    osoe_tier3_test(team-threads.0-1 ${shape} 0,1 shmem_test_team-threads)
-    # The leads' tree of the reductions and broadcast, over the shaped link.
-    osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
-    osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)
-    osoe_tier3_test(active-set.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_active-set)
-    osoe_tier3_test(collect.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_collect)
-    osoe_tier3_test(alltoall.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_alltoall)
-    osoe_tier3_test(statics.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_statics)
-    osoe_tier3_test(lock.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_lock)
-    # The deadlock detector over the shaped link (§3.15): a deadlock across
-    # three nodes found through the delay and the loss, and a PE computing
-    # while the rest wait - which must not be taken for one - through the same.
-    osoe_tier3_test(deadlock.mismatch.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_deadlock
-                    ENV OSOE_DEADLOCK_SECONDS=1 ARGS mismatch)
-    set_tests_properties(tier3.${shape}.deadlock.mismatch.0-1-2-0-1-0 PROPERTIES
-      PASS_REGULAR_EXPRESSION "every PE of the job waits in the library"
-      FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|timeout after")
-    osoe_tier3_test(deadlock.computing.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_deadlock
-                    ENV OSOE_DEADLOCK_SECONDS=1 ARGS computing)
-    set_tests_properties(tier3.${shape}.deadlock.computing.0-1-2-0-1-0 PROPERTIES
-      PASS_REGULAR_EXPRESSION "DEADLOCK TEST OK: computing"
-      FAIL_REGULAR_EXPRESSION "osoe: deadlock|CHECK[(]")
-    if(shape STREQUAL "pi")
-      osoe_tier3_test(reduce.0-1-2-3-4.k2 pi 0,1,2,3,4 shmem_test_reduce
-                      ENV OSOE_COLLECTIVE_FANOUT=2)
-    endif()
-    osoe_tier3_test(reply-starvation.0-1-1-1-1-1-1 ${shape} 0,1,1,1,1,1,1
-                    shmem_test_reply-starvation
-                    ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096
-                        OSOE_TEST_PUT_BYTES=984 SHMEM_SYMMETRIC_SIZE=16m)
-    osoe_tier3_test(tree.k2.n8.p8 ${shape} 0,1,2,3,4,5,6,7 shmem_test_multinode
-                    ENV OSOE_COLLECTIVE_FANOUT=2 ${osoe_tier3_wire} SHMEM_SYMMETRIC_SIZE=16M)
-    osoe_tier3_test(tree.k4.n13.p16 ${shape} 0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12
-                    shmem_test_multinode
-                    ENV OSOE_COLLECTIVE_FANOUT=4 ${osoe_tier3_wire} SHMEM_SYMMETRIC_SIZE=16M)
-    osoe_tier3_test(job.0-1-2-3 ${shape} 0,1,2,3 shmem_test_job)
-    # A 64 MiB stream: at 1 Gbit/s the default gigabyte takes nine seconds a trial.
-    # The pins are checked only when asked (shmem.floor's comment above), and sudo
-    # does not pass on ctest's environment, so the job's is given them here.
-    set(osoe_tier3_floor_environment)
-    if(OSOE_TEST_PINS)
-      set(osoe_tier3_floor_environment ENV OSOE_TEST_FLOOR_PINS=1)
-    endif()
-    osoe_tier3_test(floor ${shape} 0,1 shmem_test_floor ${osoe_tier3_floor_environment}
-                    ARGS 64)
-    foreach(map 0,1 0,1,2,0,1,0)
+# internode: every tier-3 test runs each node in a network namespace of its own
+if(OSOE_INTERNODE)
+  if(OSOE_TIER3)
+    add_executable(shmem_test_vanished-node test-vanished-node.c)
+    target_link_libraries(shmem_test_vanished-node PRIVATE osoe)
+    osoe_warnings(shmem_test_vanished-node)
+    set(osoe_tier3 sudo -n ${PROJECT_SOURCE_DIR}/tools/launch/tier3.sh)
+    set(osoe_tier3_wire OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
+        OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919)
+    # tier3.<shape>.<name>: PROGRAM [ARGS...] launched on MAP, with ENV's NAME=VALUE
+    # pairs in the job's environment.
+    function(osoe_tier3_test name shape map program)
+      cmake_parse_arguments(PARSE_ARGV 4 tier3 "" "" "ENV;ARGS")
       string(REPLACE "," ";" ranks "${map}")
       list(LENGTH ranks count)
       list(REMOVE_DUPLICATES ranks)
       list(LENGTH ranks nodes)
-      string(REPLACE "," "-" label "${map}")
-      string(REPLACE ";" " " wrap "${osoe_tier3};${shape};${nodes};--")
-      add_test(NAME tier3.${shape}.global-exit.${label}
+      add_test(NAME tier3.${shape}.${name}
+        COMMAND ${osoe_tier3} ${shape} ${nodes} ${tier3_ENV}
+                -- $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 300 --
+                $<TARGET_FILE:${program}> ${tier3_ARGS})
+      set_tests_properties(tier3.${shape}.${name} PROPERTIES LABELS "tier3" TIMEOUT 400)
+      osoe_internode_label(tier3.${shape}.${name})
+    endfunction()
+    foreach(shape pi lossy small)
+      osoe_tier3_test(wire-pair ${shape} 0,1 shmem_test_wire_pair
+                      ENV OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919)
+      osoe_tier3_test(progress ${shape} 0,0,1,1 shmem_test_progress
+                      ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
+                          OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919)
+      foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+        string(REPLACE "," "-" label "${map}")
+        osoe_tier3_test(internode.${label} ${shape} ${map} shmem_test_internode
+                        ENV ${osoe_tier3_wire} OSOE_AM_CREDITS=2)
+      endforeach()
+      osoe_tier3_test(barrier-am.0-1-2 ${shape} 0,1,2 shmem_test_barrier_am
+                      ENV ${osoe_tier3_wire})
+      osoe_tier3_test(get-nbi.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_get-nbi
+                      ENV ${osoe_tier3_wire} OSOE_GET_LANDING_BYTES=4096
+                          OSOE_AM_CREDITS=2)
+      # Contexts' gets sharing the landing zone, and a team context's traffic,
+      # over the shaped link (phase 1 step 8 slice 1).
+      osoe_tier3_test(scan.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_scan
+                      ENV ${osoe_tier3_wire})
+      osoe_tier3_test(context.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_context
+                      ENV ${osoe_tier3_wire} OSOE_GET_LANDING_BYTES=4096
+                          OSOE_AM_CREDITS=2)
+      # Created teams spanning nodes over the shaped link (the team redesign's step
+      # D): the team split program's forty teams on the interleaved map, where the
+      # odd ranks' local lead on node 0 is local id 1 and on node 1 local id 0, so
+      # a message names its team by a lead that is not the sender's own, and a
+      # created team's block seldom its number, each block given back as the
+      # program destroys its team and taken again at a new generation - barriers,
+      # reductions and the rest on each, through the delay and the loss. Its reuse
+      # mode makes two teams in sequence spanning the nodes, the second taking the
+      # first's block under another name, which the progress engine follows; and
+      # two threads of each PE split two parents at once, one a node.
+      osoe_tier3_test(team-split.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_team-split
+                      ENV SHMEM_SYMMETRIC_SIZE=16m)
+      osoe_tier3_test(team-split.reuse.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_team-split
+                      ENV OSOE_TEST_SPLIT=reuse SHMEM_SYMMETRIC_SIZE=16m)
+      osoe_tier3_test(team-threads.0-1 ${shape} 0,1 shmem_test_team-threads)
+      # The leads' tree of the reductions and broadcast, over the shaped link.
+      osoe_tier3_test(reduce.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_reduce)
+      osoe_tier3_test(broadcast.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_broadcast)
+      osoe_tier3_test(active-set.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_active-set)
+      osoe_tier3_test(collect.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_collect)
+      osoe_tier3_test(alltoall.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_alltoall)
+      osoe_tier3_test(statics.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_statics)
+      osoe_tier3_test(lock.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_lock)
+      # The deadlock detector over the shaped link (§3.15): a deadlock across
+      # three nodes found through the delay and the loss, and a PE computing
+      # while the rest wait - which must not be taken for one - through the same.
+      osoe_tier3_test(deadlock.mismatch.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_deadlock
+                      ENV OSOE_DEADLOCK_SECONDS=1 ARGS mismatch)
+      set_tests_properties(tier3.${shape}.deadlock.mismatch.0-1-2-0-1-0 PROPERTIES
+        PASS_REGULAR_EXPRESSION "every PE of the job waits in the library"
+        FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|timeout after")
+      osoe_tier3_test(deadlock.computing.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_deadlock
+                      ENV OSOE_DEADLOCK_SECONDS=1 ARGS computing)
+      set_tests_properties(tier3.${shape}.deadlock.computing.0-1-2-0-1-0 PROPERTIES
+        PASS_REGULAR_EXPRESSION "DEADLOCK TEST OK: computing"
+        FAIL_REGULAR_EXPRESSION "osoe: deadlock|CHECK[(]")
+      if(shape STREQUAL "pi")
+        osoe_tier3_test(reduce.0-1-2-3-4.k2 pi 0,1,2,3,4 shmem_test_reduce
+                        ENV OSOE_COLLECTIVE_FANOUT=2)
+      endif()
+      osoe_tier3_test(reply-starvation.0-1-1-1-1-1-1 ${shape} 0,1,1,1,1,1,1
+                      shmem_test_reply-starvation
+                      ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096
+                          OSOE_TEST_PUT_BYTES=984 SHMEM_SYMMETRIC_SIZE=16m)
+      osoe_tier3_test(tree.k2.n8.p8 ${shape} 0,1,2,3,4,5,6,7 shmem_test_multinode
+                      ENV OSOE_COLLECTIVE_FANOUT=2 ${osoe_tier3_wire} SHMEM_SYMMETRIC_SIZE=16M)
+      osoe_tier3_test(tree.k4.n13.p16 ${shape} 0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12
+                      shmem_test_multinode
+                      ENV OSOE_COLLECTIVE_FANOUT=4 ${osoe_tier3_wire} SHMEM_SYMMETRIC_SIZE=16M)
+      osoe_tier3_test(job.0-1-2-3 ${shape} 0,1,2,3 shmem_test_job)
+      # A 64 MiB stream: at 1 Gbit/s the default gigabyte takes nine seconds a trial.
+      # The pins are checked only when asked (shmem.floor's comment above), and sudo
+      # does not pass on ctest's environment, so the job's is given them here.
+      set(osoe_tier3_floor_environment)
+      if(OSOE_TEST_PINS)
+        set(osoe_tier3_floor_environment ENV OSOE_TEST_FLOOR_PINS=1)
+      endif()
+      osoe_tier3_test(floor ${shape} 0,1 shmem_test_floor ${osoe_tier3_floor_environment}
+                      ARGS 64)
+      foreach(map 0,1 0,1,2,0,1,0)
+        string(REPLACE "," ";" ranks "${map}")
+        list(LENGTH ranks count)
+        list(REMOVE_DUPLICATES ranks)
+        list(LENGTH ranks nodes)
+        string(REPLACE "," "-" label "${map}")
+        string(REPLACE ";" " " wrap "${osoe_tier3};${shape};${nodes};--")
+        add_test(NAME tier3.${shape}.global-exit.${label}
+          COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+                  sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+                  $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
+        set_tests_properties(tier3.${shape}.global-exit.${label}
+          PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+        osoe_internode_label(tier3.${shape}.global-exit.${label})
+      endforeach()
+      # A global exit straight after init, and one mid-stream, where the link's
+      # delay and loss are what the two orderings are for; the first again across
+      # eight nodes, whose lead's mesh takes longest to connect.
+      string(REPLACE ";" " " wrap "${osoe_tier3};${shape};8;--")
+      add_test(NAME tier3.${shape}.global-exit.immediate.0-0-1-2-3-4-5-6-7
         COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
                 sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-                $<TARGET_FILE:shmem_test_global-exit> ${count} ${map} 7 7)
-      set_tests_properties(tier3.${shape}.global-exit.${label}
+                $<TARGET_FILE:shmem_test_global-exit> 9 0,0,1,2,3,4,5,6,7 7 7 1 immediate)
+      set_tests_properties(tier3.${shape}.global-exit.immediate.0-0-1-2-3-4-5-6-7
         PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-    endforeach()
-    # A global exit straight after init, and one mid-stream, where the link's
-    # delay and loss are what the two orderings are for; the first again across
-    # eight nodes, whose lead's mesh takes longest to connect.
-    string(REPLACE ";" " " wrap "${osoe_tier3};${shape};8;--")
-    add_test(NAME tier3.${shape}.global-exit.immediate.0-0-1-2-3-4-5-6-7
-      COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
-              sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-              $<TARGET_FILE:shmem_test_global-exit> 9 0,0,1,2,3,4,5,6,7 7 7 1 immediate)
-    set_tests_properties(tier3.${shape}.global-exit.immediate.0-0-1-2-3-4-5-6-7
-      PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-    string(REPLACE ";" " " wrap "${osoe_tier3};${shape};2;--")
-    foreach(case "immediate;1;immediate" "stream;0;stream")
-      list(GET case 0 label)
-      list(GET case 1 caller)
-      list(GET case 2 mode)
-      add_test(NAME tier3.${shape}.global-exit.${label}.0-0-1-1
+      osoe_internode_label(tier3.${shape}.global-exit.immediate.0-0-1-2-3-4-5-6-7)
+      string(REPLACE ";" " " wrap "${osoe_tier3};${shape};2;--")
+      foreach(case "immediate;1;immediate" "stream;0;stream")
+        list(GET case 0 label)
+        list(GET case 1 caller)
+        list(GET case 2 mode)
+        add_test(NAME tier3.${shape}.global-exit.${label}.0-0-1-1
+          COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+                  sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+                  $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 ${caller} ${mode})
+        set_tests_properties(tier3.${shape}.global-exit.${label}.0-0-1-1
+          PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+        osoe_internode_label(tier3.${shape}.global-exit.${label}.0-0-1-1)
+      endforeach()
+      string(REPLACE ";" " " wrap "${osoe_tier3};${shape};2;OSOE_WIRE_BUFFERS=2;--")
+      add_test(NAME tier3.${shape}.global-exit.stream.two-buffers.0-0-1-1
         COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
                 sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-                $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 ${caller} ${mode})
-      set_tests_properties(tier3.${shape}.global-exit.${label}.0-0-1-1
+                $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
+      set_tests_properties(tier3.${shape}.global-exit.stream.two-buffers.0-0-1-1
         PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-    endforeach()
-    string(REPLACE ";" " " wrap "${osoe_tier3};${shape};2;OSOE_WIRE_BUFFERS=2;--")
-    add_test(NAME tier3.${shape}.global-exit.stream.two-buffers.0-0-1-1
-      COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
-              sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
-              $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 stream)
-    set_tests_properties(tier3.${shape}.global-exit.stream.two-buffers.0-0-1-1
-      PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-    # A node that vanishes - its link cut once the job is ready - is found by TCP
-    # keepalive at its tightest (§3.15, wire.c). See vanished-node.sh.
-    foreach(map 0,1 0,0,1,1)
-      string(REPLACE "," ";" ranks "${map}")
-      list(LENGTH ranks count)
-      string(REPLACE "," "-" label "${map}")
+      osoe_internode_label(tier3.${shape}.global-exit.stream.two-buffers.0-0-1-1)
+      # A node that vanishes - its link cut once the job is ready - is found by TCP
+      # keepalive at its tightest (§3.15, wire.c). See vanished-node.sh.
+      foreach(map 0,1 0,0,1,1)
+        string(REPLACE "," ";" ranks "${map}")
+        list(LENGTH ranks count)
+        string(REPLACE "," "-" label "${map}")
+        string(REPLACE ";" " " wrap
+               "${osoe_tier3};${shape};2;TIER3_CUT=1;OSOE_KEEPALIVE=1,1,3;--")
+        add_test(NAME tier3.${shape}.vanished-node.${label}
+          COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+                  sh ${CMAKE_CURRENT_SOURCE_DIR}/vanished-node.sh $<TARGET_FILE:osoe-launch>
+                  $<TARGET_FILE:shmem_test_vanished-node> ${count} ${map})
+        set_tests_properties(tier3.${shape}.vanished-node.${label}
+          PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "VANISHED NODE OK")
+        osoe_internode_label(tier3.${shape}.vanished-node.${label})
+      endforeach()
+      # The same with data in flight toward the node when it vanishes, which
+      # keepalive does not probe: found by the kernel's silence instead, within
+      # keepalive's budget (progress.c, osoe_progress_check_silent).
       string(REPLACE ";" " " wrap
-             "${osoe_tier3};${shape};2;TIER3_CUT=1;OSOE_KEEPALIVE=1,1,3;--")
-      add_test(NAME tier3.${shape}.vanished-node.${label}
+             "${osoe_tier3};${shape};2;TIER3_CUT=1;OSOE_KEEPALIVE=1,1,3;OSOE_TEST_MODE=inflight;--")
+      add_test(NAME tier3.${shape}.vanished-node-inflight.0-1
         COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
                 sh ${CMAKE_CURRENT_SOURCE_DIR}/vanished-node.sh $<TARGET_FILE:osoe-launch>
-                $<TARGET_FILE:shmem_test_vanished-node> ${count} ${map})
-      set_tests_properties(tier3.${shape}.vanished-node.${label}
+                $<TARGET_FILE:shmem_test_vanished-node> 2 0,1)
+      set_tests_properties(tier3.${shape}.vanished-node-inflight.0-1
         PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "VANISHED NODE OK")
+      osoe_internode_label(tier3.${shape}.vanished-node-inflight.0-1)
+      add_test(NAME tier3.${shape}.differential
+        COMMAND ${CMAKE_COMMAND}
+                "-DWRAP=${osoe_tier3};${shape}"
+                -DLAUNCH=$<TARGET_FILE:osoe-launch>
+                -DEXE=$<TARGET_FILE:shmem_test_differential>
+                -DNRANKS=6 -DTIMEOUT=300
+                "-DMAPS=0,0,0,0,0,0;0,1,2,3,4,5;0,0,0,1,2,2;0,1,2,0,1,0"
+                "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919;SHMEM_SYMMETRIC_SIZE=16m"
+                -P ${PROJECT_SOURCE_DIR}/cmake/Differential.cmake)
+      set_tests_properties(tier3.${shape}.differential PROPERTIES LABELS "tier3" TIMEOUT 1300)
+      osoe_internode_label(tier3.${shape}.differential)
     endforeach()
-    # The same with data in flight toward the node when it vanishes, which
-    # keepalive does not probe: found by the kernel's silence instead, within
-    # keepalive's budget (progress.c, osoe_progress_check_silent).
-    string(REPLACE ";" " " wrap
-           "${osoe_tier3};${shape};2;TIER3_CUT=1;OSOE_KEEPALIVE=1,1,3;OSOE_TEST_MODE=inflight;--")
-    add_test(NAME tier3.${shape}.vanished-node-inflight.0-1
-      COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
-              sh ${CMAKE_CURRENT_SOURCE_DIR}/vanished-node.sh $<TARGET_FILE:osoe-launch>
-              $<TARGET_FILE:shmem_test_vanished-node> 2 0,1)
-    set_tests_properties(tier3.${shape}.vanished-node-inflight.0-1
-      PROPERTIES LABELS "tier3" TIMEOUT 120 PASS_REGULAR_EXPRESSION "VANISHED NODE OK")
-    add_test(NAME tier3.${shape}.differential
-      COMMAND ${CMAKE_COMMAND}
-              "-DWRAP=${osoe_tier3};${shape}"
-              -DLAUNCH=$<TARGET_FILE:osoe-launch>
-              -DEXE=$<TARGET_FILE:shmem_test_differential>
-              -DNRANKS=6 -DTIMEOUT=300
-              "-DMAPS=0,0,0,0,0,0;0,1,2,3,4,5;0,0,0,1,2,2;0,1,2,0,1,0"
-              "-DENVS=OSOE_AM_CHUNK=1024;OSOE_AM_BUFFER=2048;OSOE_AM_CREDITS=2;OSOE_WIRE_BYTES=256;OSOE_WIRE_SPLIT=2000;OSOE_WIRE_SEED=20260919;SHMEM_SYMMETRIC_SIZE=16m"
-              -P ${PROJECT_SOURCE_DIR}/cmake/Differential.cmake)
-    set_tests_properties(tier3.${shape}.differential PROPERTIES LABELS "tier3" TIMEOUT 1300)
-  endforeach()
 
-  # N1 (the round-three review): a lead that cannot reach a peer says so, where it
-  # once retried in silence. Node 1's host list puts node 0 at an address no
-  # namespace has, as a typo in a host list would: its connects find no route, each
-  # after ARP has given up, and it retries - nothing gives up (§3.15) - and its
-  # notice names node 0, the host list's entry, the address dialled and the error;
-  # that is the dial's, kept, where it was thrown away. It comes at the first
-  # dial to end past the 2 s the test hook asks, since the loop sweeps between
-  # dials; when it swept only between rounds of node 0's 32 candidate ports, it
-  # came some 25 s of ARP's later, which the launcher's 20 s does not allow.
-  # Node 0, which nobody calls,
-  # names node 1 and the port it waits on. Both are left to the launcher's
-  # timeout. See refusal.sh and tools/launch/tier3.sh.
-  string(REPLACE ";" " " wrap "${osoe_tier3};pi;2;OSOE_TEST_NOTICE_SECONDS=2;--")
-  add_test(NAME tier3.pi.start-up.wrong-address
-    COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
-            sh ${CMAKE_CURRENT_SOURCE_DIR}/refusal.sh $<TARGET_FILE:osoe-launch> 2 2
-            "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]10[.]99[.]0[.]77, at 10[.]99[.]0[.]77[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: (No route to host|Host is down|Network is unreachable|the connection timed out)"
-            "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
-            -- -n 2 -m 0,1 -t 20 -e 1:OSOE_STEP_NODELIST=10.99.0.77,10.99.0.2
-            -- $<TARGET_FILE:shmem_test_job>)
-  set_tests_properties(tier3.pi.start-up.wrong-address PROPERTIES LABELS "tier3" TIMEOUT 120
-    PASS_REGULAR_EXPRESSION "REFUSAL OK")
+    # N1 (the round-three review): a lead that cannot reach a peer says so, where it
+    # once retried in silence. Node 1's host list puts node 0 at an address no
+    # namespace has, as a typo in a host list would: its connects find no route, each
+    # after ARP has given up, and it retries - nothing gives up (§3.15) - and its
+    # notice names node 0, the host list's entry, the address dialled and the error;
+    # that is the dial's, kept, where it was thrown away. It comes at the first
+    # dial to end past the 2 s the test hook asks, since the loop sweeps between
+    # dials; when it swept only between rounds of node 0's 32 candidate ports, it
+    # came some 25 s of ARP's later, which the launcher's 20 s does not allow.
+    # Node 0, which nobody calls,
+    # names node 1 and the port it waits on. Both are left to the launcher's
+    # timeout. See refusal.sh and tools/launch/tier3.sh.
+    string(REPLACE ";" " " wrap "${osoe_tier3};pi;2;OSOE_TEST_NOTICE_SECONDS=2;--")
+    add_test(NAME tier3.pi.start-up.wrong-address
+      COMMAND ${CMAKE_COMMAND} -E env "WRAP=${wrap}"
+              sh ${CMAKE_CURRENT_SOURCE_DIR}/refusal.sh $<TARGET_FILE:osoe-launch> 2 2
+              "osoe_notice: shmem_init on node 1 has waited [0-9]+ s for node 0 [(]10[.]99[.]0[.]77, at 10[.]99[.]0[.]77[)] to answer on its candidate ports in OSOE_PORT_RANGE=[0-9]+-[0-9]+: (No route to host|Host is down|Network is unreachable|the connection timed out)"
+              "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+              -- -n 2 -m 0,1 -t 20 -e 1:OSOE_STEP_NODELIST=10.99.0.77,10.99.0.2
+              -- $<TARGET_FILE:shmem_test_job>)
+    set_tests_properties(tier3.pi.start-up.wrong-address PROPERTIES LABELS "tier3" TIMEOUT 120
+      PASS_REGULAR_EXPRESSION "REFUSAL OK")
+    osoe_internode_label(tier3.pi.start-up.wrong-address)
+  endif()
 endif()

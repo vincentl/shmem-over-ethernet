@@ -12,15 +12,27 @@
 # takes the value from its template instead (tools/wrapper/oshcc.in), and the
 # shared library's VERSION and SOVERSION come from PROJECT_VERSION
 # (shmem/CMakeLists.txt).
-add_compile_definitions(OSOE_VERSION_STRING="${PROJECT_VERSION}")
+#
+# The single-node build says so after the version, wherever the version is
+# printed - "0.1.0 (single-node build)" - so that a user can tell from any
+# tool's --version, SHMEM_INFO or the start-up line which build is installed
+# (OSOE_SINGLE_NODE, the top-level CMakeLists.txt). OSOE_VERSION_TEXT is that
+# text; the library's file name and soname keep the bare version.
+set(OSOE_VERSION_TEXT "${PROJECT_VERSION}")
+if(OSOE_SINGLE_NODE)
+  string(APPEND OSOE_VERSION_TEXT " (single-node build)")
+endif()
+add_compile_definitions(OSOE_VERSION_STRING="${OSOE_VERSION_TEXT}")
 
-# The same value as a regular expression, for a test that compares what a
-# program prints with what CMake knows: a dot in it matches only a dot.
-string(REPLACE "." "[.]" OSOE_VERSION_PATTERN "${PROJECT_VERSION}")
+# The same text as a regular expression, for a test that compares what a
+# program prints with what CMake knows: a dot or a parenthesis in it matches
+# only itself.
+string(REGEX REPLACE "([.()])" "[\\1]" OSOE_VERSION_PATTERN "${OSOE_VERSION_TEXT}")
 
 # osoe_version_test(<test> <program> <tool> [<arguments>...]): a test that the
 # program, run with the arguments (--version without them), prints exactly
-# "<tool> (osoe) <version>" - the form every tool's --version takes - and exits 0.
+# "<tool> (osoe) <version>" - the form every tool's --version takes, the
+# version as OSOE_VERSION_TEXT has it - and exits 0.
 function(osoe_version_test test program tool)
   set(arguments --version)
   if(ARGN)
@@ -28,7 +40,7 @@ function(osoe_version_test test program tool)
   endif()
   add_test(NAME ${test}
     COMMAND ${CMAKE_COMMAND} "-DPROGRAM=${program}" "-DARGUMENTS=${arguments}"
-            "-DEXPECTED=${tool} (osoe) ${PROJECT_VERSION}"
+            "-DEXPECTED=${tool} (osoe) ${OSOE_VERSION_TEXT}"
             -P ${PROJECT_SOURCE_DIR}/cmake/CheckVersion.cmake)
   set_tests_properties(${test} PROPERTIES LABELS "tier1" TIMEOUT 30)
 endfunction()

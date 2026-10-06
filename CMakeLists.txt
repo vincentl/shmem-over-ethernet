@@ -13,9 +13,22 @@ project(osoe
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR
-    "osoe requires Linux (io_uring and futex2). On macOS, build inside the "
-    "development VM: see dev/lima/create.sh and docs/design, section 8.5.")
+    "osoe requires Linux (futex, and io_uring in the full build). On macOS, build "
+    "inside the development VM: see dev/lima/create.sh and docs/design, section 8.5.")
 endif()
+
+# The single-node build (docs/decisions/2026-10-05-v0.2.md, items 2 to 4): an
+# opt-in for one machine - a desktop, for developing at small PE counts - whose
+# library serves jobs of one node only and refuses any other by name at
+# shmem_init. It needs no liburing and no io_uring, and waits with the classic
+# futex(2) in place of Linux 6.7's futex2 calls, so it runs on Red Hat 9's
+# kernel and its rebuilds' and any distribution's since. Off, the full build is
+# what it was: Linux 6.7 and liburing 2.6. The two differ by files, chosen
+# here - base/futex-classic.c for base/futex-futex2.c, and
+# shmem/src/transport-single-node.c, the refusing backend, for the internode
+# backend's files (shmem/src/internode-backend.h) - never by a branch at run
+# time.
+option(OSOE_SINGLE_NODE "Build for jobs of one node only: no liburing, no io_uring, the classic futex" OFF)
 
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   message(FATAL_ERROR
@@ -44,16 +57,26 @@ include(GNUInstallDirs)
 include(CTest)
 include(OsoeWarnings)
 include(OsoeVersion)
+include(OsoeInternode)
 
 # liburing comes from the distribution; older releases are unsupported rather
-# than accommodated with a bundled copy (design notes, section 1).
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBURING IMPORTED_TARGET "liburing>=2.6")
-if(NOT LIBURING_FOUND)
-  message(FATAL_ERROR
-    "liburing 2.6 or newer is required (io_uring futex operations). "
-    "On Debian 13 or Raspberry Pi OS Trixie: apt install liburing-dev. "
-    "Older OS releases are not supported.")
+# than accommodated with a bundled copy (design notes, section 1). The
+# single-node build asks for neither it nor pkg-config.
+if(OSOE_SINGLE_NODE)
+  message(STATUS "osoe ${PROJECT_VERSION}: the single-node build (OSOE_SINGLE_NODE=ON) - "
+                 "jobs of one node only, no liburing, no io_uring, the classic futex")
+else()
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(LIBURING IMPORTED_TARGET "liburing>=2.6")
+  if(NOT LIBURING_FOUND)
+    message(FATAL_ERROR
+      "liburing 2.6 or newer is required (io_uring futex operations). "
+      "On Debian 13 or Raspberry Pi OS Trixie: apt install liburing-dev. "
+      "Older OS releases are not supported by the full build; a machine that runs "
+      "jobs of one node only can configure the single-node build, -DOSOE_SINGLE_NODE=ON, "
+      "which needs no liburing.")
+  endif()
+  message(STATUS "osoe ${PROJECT_VERSION}: the full build - liburing ${LIBURING_VERSION}")
 endif()
 
 add_subdirectory(base)

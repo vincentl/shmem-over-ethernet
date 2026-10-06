@@ -50,6 +50,16 @@
 
 #include "transport.h"
 
+/*
+ * The fan-out a job's collectives are laid out for when OSOE_COLLECTIVE_FANOUT
+ * sets none (internode.h's osoe_internode_fanout_default): AM's, 4 over
+ * Ethernet (internode-am.c says why). Every internode backend returns it, so
+ * that a job of one node - whose collectives have no internode tree, but
+ * whose internal region and team blocks the fan-out sizes - is laid out alike
+ * whichever is built.
+ */
+enum { OSOE_INTERNODE_FANOUT_DEFAULT = 4 };
+
 struct osoe_bootstrap;
 struct osoe_deadlock_message;
 struct osoe_rank_run;

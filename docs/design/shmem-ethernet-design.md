@@ -93,6 +93,28 @@ Part 6, whose adversarial reads found a job ending after its PEs had left
 through the same function. A one-node job on a machine whose
 `kernel.io_uring_disabled` sysctl forbids io_uring still runs.
 
+*As built, v0.2 step 1 (`docs/decisions/2026-10-06-single-node-build.md`): the
+single-node build.* The floor above is the full build's, and it is unchanged.
+Beside it is an opt-in, `-DOSOE_SINGLE_NODE=ON`, for a machine that runs jobs
+of one node only - a desktop, to develop programs at small PE counts, which
+the audience of the first release's talk asked for above all: its library
+links no liburing, configures with no pkg-config, opens no ring and makes no
+socket, and waits with the classic `futex(2)` - `FUTEX_WAIT_BITSET` and
+`FUTEX_WAKE_BITSET`, with the private flag and an absolute monotonic deadline,
+every futex2 feature the library uses on one node - in place of Linux 6.7's
+futex2 calls, so it runs on Red Hat 9's 5.14 kernel and any distribution's
+since `MAP_FIXED_NOREPLACE` (4.17). One wait path a build, chosen when
+configuring, never at run time; the full build keeps futex2 alone, since its
+ring's `IORING_OP_FUTEX_WAIT` needs 6.7 anyway. A job of more than one node is
+refused at `shmem_init` by name, before anything is made in `/dev/shm`, by a
+backend that stands in for the internode one (§4.10). The author's reason for
+an opt-in rather than an opt-out: "we want the builder to opt in to this, not
+out of the full build" (`docs/decisions/2026-10-05-v0.2.md`, items 2 to 4).
+Its build-time budget is a C11 compiler and CMake 3.25; its link-time budget
+libc alone. Init's futex check names what each build needs
+(`osoe_futex_requirement`), and its io_uring check is the transport's since the
+same step (§4.10, as built).
+
 **CMake is a build tool, not a dependency chain.** What this project exists to
 avoid is a dependency tree that does not build on the target hardware, not the
 need for a build tool. CMake 3.25 is in Debian 12 and 13 and in Raspberry Pi OS,
@@ -3404,8 +3426,9 @@ so the next reader does not have to rediscover that the channel exists, since
 one of them is an argument we already pass:
 
 - **The futex bitmask.** `futex_wait` and `futex_wake` each take a 32-bit mask
-  and the kernel wakes a waiter only when the two intersect; `base/futex.c`
-  passes `FUTEX_BITSET_MATCH_ANY` today. A waiter could set the bits of its
+  and the kernel wakes a waiter only when the two intersect; `base/futex-futex2.c`
+  (and the single-node build's `base/futex-classic.c`, whose classic calls take
+  the same mask) passes `FUTEX_BITSET_MATCH_ANY` today. A waiter could set the bits of its
   unmasked elements and a writer the bit of what it wrote, and the kernel would
   drop the rest. It degrades safely in both directions, since `MATCH_ANY`
   intersects every narrow mask, so scalar and range waiters mix without either
@@ -3787,6 +3810,16 @@ of the kernel for a job of this many nodes - on AM io_uring's checks, which
 AM layer's sizes and the wire's settings, which every PE checks as values,
 have files of their own on the boundary (`am-configuration.c`,
 `wire-settings.c`).
+
+*And the second internode backend* (`docs/decisions/2026-10-06-single-node-build.md`):
+the single-node build compiles none of the internode backend's files and
+`transport-single-node.c` in their place - every entry point of
+`internode-backend.h` and of `internode.h`, of which only the start-up check
+and the four `internode.h` calls a job of one node makes are reachable; the
+check refuses a job of more than one node by name, and every other entry point
+ends the job naming itself as a defect of the part every job uses. It is the
+seam's first exercise by a second backend, the RoCE constraint's kind of test,
+and it changed nothing above `transport.h`.
 
 ### 4.11 `SHMEM_THREAD_MULTIPLE`
 

@@ -34,6 +34,7 @@
 #include "base/futex.h"
 #include "fatal.h"
 #include "internode.h"
+#include "internode-backend.h"
 #include "internode-generic.h"
 #include "node.h"
 #include "progress.h"
@@ -56,7 +57,7 @@ static uint32_t consumed_count;
  */
 uint32_t osoe_internode_fanout_default(void)
 {
-    return 4;
+    return OSOE_INTERNODE_FANOUT_DEFAULT;
 }
 
 void osoe_internode_init(void)

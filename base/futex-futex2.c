@@ -11,6 +11,11 @@
 
 #include "base/futex.h"
 
+/*
+ * futex.h over the futex2 calls, futex_wait and futex_wake (Linux 6.7): the
+ * full build's. The single-node build's is futex-classic.c.
+ */
+
 /* futex2 system calls, Linux 6.7. Older headers lack the numbers; they are
  * the same on every architecture using the generic syscall table. */
 #ifndef __NR_futex_wake
@@ -89,4 +94,9 @@ int osoe_futex_check(void)
 uint64_t osoe_futex_timeouts(void)
 {
     return atomic_load_explicit(&timeouts, memory_order_acquire);
+}
+
+const char *osoe_futex_requirement(void)
+{
+    return "Linux 6.7 or later, for the futex2 calls";
 }

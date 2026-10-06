@@ -2,6 +2,9 @@
 add_executable(osoe-launch launch.c)
 target_link_libraries(osoe-launch PRIVATE osoe_base)
 osoe_warnings(osoe-launch)
+# Installed beside oshcc: how a job runs on one machine - a desktop with the
+# single-node build above all (v0.2 step 1) - as srun runs one on a cluster.
+install(TARGETS osoe-launch)
 
 # Its --version, which says the version CMake knows (cmake/OsoeVersion.cmake).
 osoe_version_test(launch.version $<TARGET_FILE:osoe-launch> osoe-launch)

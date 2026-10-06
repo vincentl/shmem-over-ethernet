@@ -17,14 +17,21 @@ cmake_minimum_required(VERSION 3.25)
 # macros in eight test files, not only in shmem/src and base/. Running the
 # resulting binaries would add a great deal of time for no more signal.
 #
+# SINGLE_NODE is the caller's OSOE_SINGLE_NODE, so that the nested build is
+# the same kind as the one that runs the check: the single-node build's on a
+# machine with no liburing, where the full build would not configure.
+#
 #   cmake -DSOURCE_DIR=<repo root> -DSCRATCH_DIR=<scratch build dir>
-#         -P CheckStrictC11.cmake
+#         [-DSINGLE_NODE=ON|OFF] -P CheckStrictC11.cmake
 
 foreach(var SOURCE_DIR SCRATCH_DIR)
   if(NOT DEFINED ${var})
     message(FATAL_ERROR "${var} is required")
   endif()
 endforeach()
+if(NOT DEFINED SINGLE_NODE)
+  set(SINGLE_NODE OFF)
+endif()
 
 file(REMOVE_RECURSE "${SCRATCH_DIR}")
 file(MAKE_DIRECTORY "${SCRATCH_DIR}")
@@ -32,6 +39,7 @@ file(MAKE_DIRECTORY "${SCRATCH_DIR}")
 execute_process(
   COMMAND "${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${SCRATCH_DIR}"
           -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_EXTENSIONS=OFF -DBUILD_TESTING=ON
+          -DOSOE_SINGLE_NODE=${SINGLE_NODE}
   OUTPUT_VARIABLE configure_out ERROR_VARIABLE configure_err RESULT_VARIABLE rc)
 if(NOT rc EQUAL 0)
   message(FATAL_ERROR "Configuring with CMAKE_C_EXTENSIONS=OFF failed:\n${configure_out}\n${configure_err}")

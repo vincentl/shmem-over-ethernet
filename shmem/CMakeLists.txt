@@ -33,6 +33,12 @@ if(OSOE_BACKEND STREQUAL "am")
     src/ring.c
     src/transport-internode.c
     src/wire.c)
+  # The single-node build compiles none of them: the refusing backend stands
+  # in their place, refusing a job of more than one node at shmem_init by name
+  # (OSOE_SINGLE_NODE, the top-level CMakeLists.txt).
+  if(OSOE_SINGLE_NODE)
+    set(osoe_internode_sources src/transport-single-node.c)
+  endif()
 else()
   message(FATAL_ERROR "OSOE_BACKEND=${OSOE_BACKEND}: the only backend is am")
 endif()
@@ -94,8 +100,12 @@ target_include_directories(osoe
   PRIVATE
     src)
 # liburing is the one library §1's budget allows beside libc (invariant 15);
-# the AM backend's ring is its first user (phase 1 step 3).
-target_link_libraries(osoe PRIVATE osoe_base Threads::Threads PkgConfig::LIBURING)
+# the AM backend's ring is its first user (phase 1 step 3), and the
+# single-node build has none.
+target_link_libraries(osoe PRIVATE osoe_base Threads::Threads)
+if(NOT OSOE_SINGLE_NODE)
+  target_link_libraries(osoe PRIVATE PkgConfig::LIBURING)
+endif()
 
 # The shared library's file is libosoe.so.<version> and its soname
 # libosoe.so.<major>, from the project's one version (cmake/OsoeVersion.cmake);

@@ -286,15 +286,15 @@ static void session_start(void)
      * Told to nobody: the kernel is every local PE's, so each refuses it by
      * itself, and a refusal's last word (node.h) would leave the node a
      * tombstone in /dev/shm for nothing - and wake its waiters with the very
-     * futex2 call that fails here.
+     * futex call that fails here.
      */
     osoe_node_refusal_disarm();
     int futex_error = osoe_futex_check();
     if (futex_error) {
         struct utsname u;
         const char *release = uname(&u) == 0 ? u.release : "unknown";
-        osoe_fatal("osoe needs Linux 6.7 or later, for the futex2 calls (they fail with "
-                   "\"%s\"); this kernel is %s", strerror(futex_error), release);
+        osoe_fatal("osoe needs %s (they fail with \"%s\"); this kernel is %s",
+                   osoe_futex_requirement(), strerror(futex_error), release);
     }
     osoe_node_refusal_arm(&osoe.node, &osoe.bootstrap, sessions);
 

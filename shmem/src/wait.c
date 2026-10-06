@@ -364,10 +364,16 @@ size_t osoe_test_some(const struct osoe_wait_many *w, size_t *indices)
 
 /* ---- the API surface, generated from the type lists -------------------- */
 
+/* Whether T is signed: -1 is below 1 only if T has negative values. Not
+ * (T)-1 < (T)0, which says the same but which GCC 11's -Wtype-limits, in
+ * -Wextra, reads as an unsigned value compared below 0 for every unsigned T
+ * (the first build on Rocky Linux 9, v0.2 step 1). */
+#define OSOE_SIGNED(T) ((T)-1 < (T)1)
+
 #define OSOE_WAIT_SET(T, NAME, IVARS, NELEMS, STATUS, CMP, VALUE, VALUES, ROUTINE)     \
     (struct osoe_wait_many){                                                            \
         .routine = ROUTINE, .ivars = (IVARS), .nelems = (NELEMS),                      \
-        .width = (unsigned)sizeof(T), .sgn = ((T)-1 < (T)0),                           \
+        .width = (unsigned)sizeof(T), .sgn = OSOE_SIGNED(T),                           \
         .status = (STATUS), .cmp = (CMP), .value = (VALUE), .values = (VALUES) }
 
 /* wait_until and test, for every type in Table 6 and for the deprecated
@@ -376,12 +382,12 @@ size_t osoe_test_some(const struct osoe_wait_many *w, size_t *indices)
     OSOE_API void pshmem_##NAME##_wait_until(T *ivar, int cmp, T cmp_value)              \
     {                                                                                   \
         osoe_wait_until("shmem_" #NAME "_wait_until", ivar, (unsigned)sizeof(T),        \
-                        (T)-1 < (T)0, cmp, (uint64_t)cmp_value);                        \
+                        OSOE_SIGNED(T), cmp, (uint64_t)cmp_value);                         \
     }                                                                                   \
     OSOE_API int pshmem_##NAME##_test(T *ivar, int cmp, T cmp_value)                     \
     {                                                                                   \
         return osoe_test("shmem_" #NAME "_test", ivar, (unsigned)sizeof(T),             \
-                         (T)-1 < (T)0, cmp, (uint64_t)cmp_value);                       \
+                         OSOE_SIGNED(T), cmp, (uint64_t)cmp_value);                        \
     }
 
 /* The multiple-element forms, Table 6 only. */
@@ -497,7 +503,7 @@ size_t osoe_test_some(const struct osoe_wait_many *w, size_t *indices)
     OSOE_API void pshmem_##NAME##_wait(T *ivar, T cmp_value)                             \
     {                                                                                   \
         osoe_wait_until("shmem_" #NAME "_wait", ivar, (unsigned)sizeof(T),              \
-                        (T)-1 < (T)0, SHMEM_CMP_NE, (uint64_t)cmp_value);               \
+                        OSOE_SIGNED(T), SHMEM_CMP_NE, (uint64_t)cmp_value);                \
     }
 
 /* The weak `shmem_` aliases (export.h), over the same lists. */

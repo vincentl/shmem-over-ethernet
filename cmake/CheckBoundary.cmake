@@ -72,7 +72,7 @@ set(OSOE_BELOW_BOUNDARY
   am.c am.h am-state.h connection.c connection.h connection-area.c
   connection-area.h internode-am.c progress.c progress.h progress-host.c
   progress-host.h reply.c reply.h ring.c ring.h transport-am.c transport-context.h
-  transport-internode.c transport-local.h wire.c wire.h)
+  transport-internode.c transport-local.h transport-single-node.c wire.c wire.h)
 
 # The generic implementation of internode.h's data half is for backends to
 # call or to replace (internode-generic.h); above the boundary it would be a
@@ -118,7 +118,9 @@ set(OSOE_ON_BOUNDARY_READING_AM rendezvous.c transport-local.c)
 # the connection area, the replies and the messages, the rendezvous of the node
 # leads, and internode.h over AM. A second internode backend replaces them
 # whole, so no other file may reach a header of theirs (the third check); the
-# lists above say where in the layers each sits.
+# lists above say where in the layers each sits. The single-node build's
+# internode backend, transport-single-node.c, is not among them: it stands in
+# for them where none is compiled, so it is held to the third check too.
 set(OSOE_INTERNODE_BACKEND
   am.c am.h am-state.h connection.c connection.h connection-area.c connection-area.h
   internode-am.c listener.c listener.h progress.c progress.h progress-host.c

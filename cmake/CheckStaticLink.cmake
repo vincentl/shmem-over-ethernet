@@ -13,16 +13,21 @@ cmake_minimum_required(VERSION 3.25)
 # Since phase 1 step 3 libosoe uses liburing, which a consumer of the static
 # archive links itself, exactly as it would for any static library with a
 # dependency; the distribution's liburing is the one §1 allows (invariant 15).
+# The single-node build has none, and URING_LIBRARIES is then empty: SINGLE_NODE
+# is the caller's OSOE_SINGLE_NODE, so that the nested build is the same kind.
 #
 #   cmake -DSOURCE_DIR=<repo root> -DSCRATCH_DIR=<scratch build dir>
 #         -DPROBE_SRC=<probe.c> -DC_COMPILER=<cc> -DURING_LIBRARIES=<liburing>
-#         -P CheckStaticLink.cmake
+#         [-DSINGLE_NODE=ON|OFF] -P CheckStaticLink.cmake
 
 foreach(var SOURCE_DIR SCRATCH_DIR PROBE_SRC C_COMPILER URING_LIBRARIES)
   if(NOT DEFINED ${var})
     message(FATAL_ERROR "${var} is required")
   endif()
 endforeach()
+if(NOT DEFINED SINGLE_NODE)
+  set(SINGLE_NODE OFF)
+endif()
 
 file(REMOVE_RECURSE "${SCRATCH_DIR}")
 file(MAKE_DIRECTORY "${SCRATCH_DIR}")
@@ -30,6 +35,7 @@ file(MAKE_DIRECTORY "${SCRATCH_DIR}")
 execute_process(
   COMMAND "${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${SCRATCH_DIR}"
           -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF
+          -DOSOE_SINGLE_NODE=${SINGLE_NODE}
   OUTPUT_VARIABLE configure_out ERROR_VARIABLE configure_err RESULT_VARIABLE rc)
 if(NOT rc EQUAL 0)
   message(FATAL_ERROR "Configuring a static build failed:\n${configure_out}\n${configure_err}")
@@ -82,5 +88,10 @@ if(NOT rc EQUAL 0)
   message(FATAL_ERROR "The program linked against libosoe.a alone exited ${rc}")
 endif()
 
-message(STATUS "libosoe.a alone (no separate osoe_base archive), with the distribution's "
-               "liburing, links and runs a consumer")
+if(SINGLE_NODE)
+  message(STATUS "libosoe.a alone (no separate osoe_base archive), the single-node build's, "
+                 "links and runs a consumer with no liburing")
+else()
+  message(STATUS "libosoe.a alone (no separate osoe_base archive), with the distribution's "
+                 "liburing, links and runs a consumer")
+endif()

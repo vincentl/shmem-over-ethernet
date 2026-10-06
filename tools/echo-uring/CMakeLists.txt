@@ -32,3 +32,6 @@ osoe_warnings(echo-uring)
 add_test(NAME env.echo-uring
   COMMAND echo-uring --rounds 3000 --mebibytes 1024 --check 1.5 0.5)
 set_tests_properties(env.echo-uring PROPERTIES LABELS "env" TIMEOUT 120)
+# io_uring's, so the internode label's: the single-node build does not build it
+# (tools/CMakeLists.txt, cmake/OsoeInternode.cmake).
+osoe_internode_label(env.echo-uring)

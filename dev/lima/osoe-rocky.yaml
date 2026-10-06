@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# osoe's single-node build VM: Rocky Linux 9 on Apple Silicon (v0.2 step 1).
+#
+# The single-node build's goal is Red Hat 9 and its rebuilds: a 5.14 kernel,
+# glibc 2.34, GCC 11, and no liburing - which is why none is installed here.
+# Create it with `dev/lima/create.sh osoe-rocky`, which mounts this repository
+# writable at the same path, as it does for the osoe VM (osoe.yaml). Small, as
+# the host's disk asks: the build trees go under /tmp or the repository.
+
+base: template:rocky-9
+
+vmType: vz
+cpus: 4
+memory: 4GiB
+disk: 16GiB
+
+mountType: virtiofs
+
+provision:
+- mode: system
+  script: |
+    #!/bin/sh
+    set -eux
+    # CMake from the distribution: 3.26 from Rocky 9.3 on, which the presets'
+    # version 6 needs (3.25). The sanitizer runtimes are GCC's own packages.
+    dnf install -y gcc make cmake python3 procps-ng util-linux libasan libubsan libtsan

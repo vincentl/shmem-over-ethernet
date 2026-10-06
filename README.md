@@ -4,7 +4,9 @@
 specification for clusters connected by ordinary Ethernet. It needs no RDMA
 hardware and no fabric library. It builds from a Linux distribution's own
 packages - a C compiler, CMake, pkg-config and liburing - and carries every
-operation between nodes over TCP, driven by io_uring. It was developed in an
+operation between nodes over TCP, driven by io_uring; a build for one machine
+alone, to develop programs on a desktop, needs only the compiler and CMake
+([On a desktop](#on-a-desktop-the-single-node-build)). It was developed in an
 aarch64 virtual machine and on a cluster of four Raspberry Pi 5 boards, and is
 designed to stay usable at hundreds of nodes with 256 processes each - a scale
 it has not run at: the largest job across separate machines so far is the Pi
@@ -13,9 +15,11 @@ cluster's 16 PEs, four on each node.
 **Status.** Every routine of OpenSHMEM 1.6's C interface is implemented, the
 deprecated ones of its Annex F included. What departs from the
 specification, or takes a choice it leaves open, is listed under
-[Limits](#limits-and-where-osoe-departs-from-the-specification). This is 0.1.0,
-osoe's first release ([its note](docs/release-notes/0.1.0.md)); [Installing](#installing)
-says where the library and the tools show the version. It has been tested on
+[Limits](#limits-and-where-osoe-departs-from-the-specification). 0.1.0, tagged
+`v0.1.0`, is osoe's first release ([its note](docs/release-notes/0.1.0.md)); this
+tree has v0.2's work on it since ([the plan](docs/prompts/task-v0.2.md)) and calls
+itself 0.1.0 until v0.2 is released. [Installing](#installing) says where the
+library and the tools show the version. It has been tested on
 aarch64 only: on x86-64 it builds and passes the tests an emulator can run, but
 its network path has never run on an x86-64 kernel - there the quick start's
 second run, `ctest --preset release` and `osoe-pacer --quick` across nodes are
@@ -119,9 +123,44 @@ virtual machine to run these commands in, with the packages already installed:
 root. [Getting started](#getting-started) has what this leaves out, among it the
 test suite, installing, and running over several machines with `srun`.
 
+## On a desktop: the single-node build
+
+A machine that runs jobs of one node only - a desktop with many cores, to
+develop and test programs at small PE counts - can build osoe with no liburing
+and no io_uring, on any distribution: Red Hat 9 and its rebuilds, Debian 12 and
+Ubuntu among them ([Requirements](#requirements)). Configure with the option,
+install, then build with the installed wrapper and run with the installed
+launcher - here as eight PEs, which a machine of four cores runs too:
+
+```sh
+cmake --preset release -DOSOE_SINGLE_NODE=ON
+cmake --build --preset release -j4
+cmake --install build/release --prefix ~/osoe
+~/osoe/bin/oshcc -O2 -o ring ring.c
+~/osoe/bin/osoe-launch -n 8 -- ./ring
+```
+
+A job of one node behaves the same in both builds; only the system call its
+waits sleep in differs - the classic futex there, Linux 6.7's futex2 calls in the
+full build - and
+every tool's `--version`, `SHMEM_INFO` and the start-up line say
+`(single-node build)` after the version. A job of more than one node - under
+`srun -N2`, or `osoe-launch -m` with two logical nodes - is refused at
+`shmem_init` by name, before anything is made in `/dev/shm`: the full build is
+what runs it. `/dev/shm` must hold about 300 MiB a PE at the default heap of 256
+MiB, and `SHMEM_SYMMETRIC_SIZE=64m` shrinks that (a container's 64 MiB is too
+little: [Building](#building) says what to give one). With more PEs than cores,
+each PE's progress thread competes with the program for a core;
+`OSOE_AGENT_SLICE_US` and `OSOE_AGENT_CPUS` say how it is scheduled
+([Environment variables](#environment-variables)). The test suite runs as it
+does in the full build, `ctest --preset release -j4`, without the 383 tests that
+need more than one node or test the internode backend's own files: 341 of the
+full build's 721, and the same 30 of the model checker.
+
 ## Getting started
 
-On a Slurm cluster, in this order - each step below has its section:
+On a Slurm cluster, in this order - each step below has its section; on one
+machine alone, [On a desktop](#on-a-desktop-the-single-node-build) is shorter:
 
 1. Build where every node sees the tree, such as a shared home directory
    ([Building](#building)).
@@ -138,6 +177,11 @@ output on each node, the first error line, and for a hang `osoe-stat`'s.
 
 ### Requirements
 
+osoe builds two ways from one tree. The **full build**, the default, runs jobs
+of any number of nodes; the **single-node build**, `-DOSOE_SINGLE_NODE=ON`
+([On a desktop](#on-a-desktop-the-single-node-build)), runs jobs of one node
+only, and needs less. The full build:
+
 - Linux 6.7 or newer, and for a job of more than one node io_uring open to its
   user: the `kernel.io_uring_disabled` sysctl at 0, or at 1 with the user in the
   group `kernel.io_uring_group` names (the probe, `build/<preset>/tools/probe/probe`,
@@ -149,6 +193,14 @@ output on each node, the first error line, and for a hang `osoe-stat`'s.
   build use it. Where CMake does not find it, it says so while configuring and
   leaves those out; nothing else needs it.
 
+The single-node build:
+
+- Linux 4.17 or newer, for `MAP_FIXED_NOREPLACE` - every distribution's kernel
+  in practice - and the futex calls `FUTEX_WAIT_BITSET` and `FUTEX_WAKE_BITSET`,
+  which every Linux since 2.6.25 has and a sandbox (seccomp) must allow
+- CMake 3.25 or newer, and GCC or Clang, as above; no liburing and no pkg-config
+- Python 3, optionally, as above
+
 osoe has run on aarch64 only, on the Raspberry Pi cluster and in an aarch64
 virtual machine. An x86-64 build of this tree passed every test an emulator on an
 aarch64 kernel can run, with a shim standing in for the futex2 calls the emulator
@@ -158,11 +210,16 @@ whole suite; no x86-64 kernel has run it: see Limits, "Launching".
 Debian 13 (Trixie) and Raspberry Pi OS Trixie provide all of these from their
 own repositories - `sudo apt install build-essential cmake pkg-config
 liburing-dev`, and `python3` for the models - and a node that only runs jobs
-needs only liburing's runtime package, `liburing2`, 2.6 or newer. Older releases are not
-supported, even where the kernel is new enough, since osoe does not bundle a
-newer liburing ([design notes](docs/design/shmem-ethernet-design.md) §1 - "design §N"
+needs only liburing's runtime package, `liburing2`, 2.6 or newer. The full build
+does not support older releases, even where the kernel is new enough, since osoe
+does not bundle a newer liburing ([design notes](docs/design/shmem-ethernet-design.md) §1 - "design §N"
 here names them, and a bare § the OpenSHMEM 1.6 specification): Debian 12 has liburing 2.3 and Ubuntu 24.04
-2.5, and Rocky Linux 9 and its kin have Linux 5.14.
+2.5, and Rocky Linux 9 and its kin have Linux 5.14. Those run the single-node
+build: on Rocky Linux 9 `sudo dnf install gcc make cmake` - its CMake is 3.31 at
+9.8, and 3.26 from 9.3; on 9.0 to 9.2, `pip install cmake` gives a newer one -
+and on Debian 12 or Ubuntu `sudo apt install build-essential cmake`. The full
+build needs a distribution with both a 6.7 kernel and liburing 2.6: Debian 13,
+Raspberry Pi OS Trixie, or another, such as current Fedora or Arch.
 
 ### Building
 
@@ -196,13 +253,16 @@ and `tier3`, the release build with tests over network namespaces whose links
 `netem` shapes, which needs `sudo` without a password, and `ip`, `tc` and
 `ethtool`.
 
-The `env.probe` test checks that the running kernel provides every io_uring and
-futex facility osoe relies on, `shmem_init`'s own checks among them. A job meets
+The `env.probe` test checks that the running kernel provides every facility
+osoe relies on, `shmem_init`'s own checks among them: in the full build every
+io_uring and futex2 facility, in the single-node build the classic futex calls,
+with the shared-memory facilities in both. A job meets
 the compute nodes' kernels, so run it there too, from a build tree every node
 sees - it is not installed - as the Pi cluster's runbook does: `srun -N4
 --ntasks-per-node=1 build/release/tools/probe/probe`. If a futex check fails, no
-job will run there: osoe needs the futex2 calls of Linux 6.7 for a job of any
-size. If only io_uring checks fail - the kernel's `kernel.io_uring_disabled`
+job will run there: the full build needs the futex2 calls of Linux 6.7 for a job
+of any size, and the single-node build the classic futex calls, which only a
+sandbox denies. If only io_uring checks fail - the kernel's `kernel.io_uring_disabled`
 sysctl is set, say - a job on one node still runs, since it opens no ring; a job
 of more than one node is refused at `shmem_init`, naming the facility that is
 missing, for the io_uring facilities `shmem_init` checks (`env.probe` tests a
@@ -212,8 +272,10 @@ io_uring is off by default on RHEL 10 and its rebuilds (`kernel.io_uring_disable
 is 2), and container runtimes' default seccomp profiles refuse it: Docker 25 and
 later and containerd 2.0 and later with `EPERM`, for which the message names
 the sysctl even though it reads 0 inside the container, and Podman with
-`ENOSYS`. There jobs on one node run, but the test suite's multi-node tests,
-about 340 of them, fail at `shmem_init` or at opening a ring. Set the sysctl to
+`ENOSYS`. There jobs on one node run, but 343 of the test suite's 721 tests fail
+at `shmem_init` or at opening a ring - every one of them labelled `internode`, the
+383 that need more than one node or test the internode backend's own files
+(`ctest -L internode`); the single-node build has neither them nor io_uring. Set the sysctl to
 0 as root, or run the container with a seccomp profile that allows io_uring.
 Container runtimes also give a container 64 MiB of `/dev/shm` unless asked for
 more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) - less than
@@ -261,13 +323,13 @@ cmake --install build/release --prefix /opt/osoe
 
 installs the library, its headers - `shmem.h`, `pshmem.h`, `shmemx.h`, and the
 `mpp/` forms older programs include - `oshcc` and the linker script it passes,
-`osoe-stat` and `osoe-pacer`: all that a node running jobs needs, and a check
-that osoe works there. The installed programs find the rest from where they are,
+`osoe-stat`, `osoe-pacer` and `osoe-launch`: all that a node running jobs needs,
+a check that osoe works there, and the launcher that runs a job on one machine. The installed programs find the rest from where they are,
 so the prefix may be chosen at install time. A program built by `oshcc` loads
 the library from the prefix's absolute path, so install under a path that every
 node sees the same - a shared file system, or the same install on each - and
-give every node liburing's runtime package. `osoe-launch` and `osoe-bench` stay
-in the build tree: they are for development, tests and measurement. Then put the
+give every node liburing's runtime package (the single-node build needs none).
+`osoe-bench` stays in the build tree: it is for measurement. Then put the
 prefix's `bin` on your `PATH`.
 
 Once installed, run the stress tester's smoke test under the cluster's launcher:
@@ -285,7 +347,8 @@ and everything that names a version says it: `SHMEM_VERSION=1` makes every PE
 print a line ending `osoe 0.1.0, OpenSHMEM 1.6` at start-up, and `SHMEM_INFO=1`
 heads its text with `osoe 0.1.0 environment variables`; `osoe-stat`,
 `osoe-pacer`, `osoe-launch` and `osoe-bench` answer `--version` with one line,
-such as `osoe-stat (osoe) 0.1.0`; the shared library is `libosoe.so.0.1.0`, with
+such as `osoe-stat (osoe) 0.1.0`, and the single-node build adds
+`(single-node build)` after the version wherever it is printed; the shared library is `libosoe.so.0.1.0`, with
 the soname `libosoe.so.0`. `oshcc` answers `--showme:version` instead: its
 `--version` is still the C compiler's, which build systems run to learn what
 `CC` is. (`shmem_info_get_name` still returns `osoe`, a name, and
@@ -380,8 +443,9 @@ since it is no task of a step.
 
 ### Running a program on one machine, with `osoe-launch`
 
-`build/<preset>/tools/launch/osoe-launch` starts the processes of a job on this
-machine and sets every bootstrap variable for them:
+`osoe-launch` - `build/<preset>/tools/launch/osoe-launch`, and installed beside
+`oshcc` - starts the processes of a job on this machine and sets every bootstrap
+variable for them:
 
 ```sh
 build/release/tools/launch/osoe-launch -n 4 -- ./my_program
@@ -391,7 +455,8 @@ build/release/tools/launch/osoe-launch -n 6 -m 0,0,1,1,2,2 -- ./my_program
 `-m` is a logical node map (design §8.1): one node id per rank, each node's
 lead listening on its own loopback address, so one machine runs a job of
 several nodes, over TCP between them as a cluster would - up to 1,024
-processes on 254 logical nodes. `-s` names the variables as `srun` does, so
+processes on 254 logical nodes; the single-node build refuses such a job by
+name, since it has no TCP. `-s` names the variables as `srun` does, so
 the job takes the bootstrap's Slurm path.
 
 It fails if any process fails, if the timeout (`-t SECONDS`, 1 to 86400, default 60 -
@@ -476,16 +541,16 @@ where to find what among the documents.
 |---|---|
 | `README.md` | this file |
 | `COPYING`, `COPYING.LESSER` | the license texts that [License](#license) names: the GNU General Public License and the Lesser General Public License that supplements it, both version 3 |
-| `CMakeLists.txt`, `CMakePresets.json` | the build: the project and its one version, 0.1.0, and the presets `debug`, `release`, `asan`, `tsan` and `tier3`, with the test presets and workflows over them ([Building](#building)) |
+| `CMakeLists.txt`, `CMakePresets.json` | the build: the project and its one version, 0.1.0, the option `OSOE_SINGLE_NODE` that makes the single-node build ([On a desktop](#on-a-desktop-the-single-node-build)), and the presets `debug`, `release`, `asan`, `tsan` and `tier3`, with the test presets and workflows over them ([Building](#building)) |
 | `.gitignore` | what git ignores: `build/`, `corpus/` and the specification's PDF, among others |
 | `CLAUDE.md` | the working agreements every Claude Code session on this repository follows - delegating to subagents, naming, renames, the names of review files ([How osoe was made](#how-osoe-was-made)) |
-| `base/` | the pieces the library is made from that need nothing from the OpenSHMEM layer above them, among them futex waits, deadlines, epoch counters, a stall watch, memory fences, and the parsers for settings, Slurm host lists and the node map. An object library folded into `libosoe` and never installed; its tests are in `base/tests/` |
+| `base/` | the pieces the library is made from that need nothing from the OpenSHMEM layer above them, among them futex waits - over futex2 in the full build (`futex-futex2.c`), over the classic futex in the single-node build (`futex-classic.c`) - deadlines, epoch counters, a stall watch, memory fences, and the parsers for settings, Slurm host lists and the node map. An object library folded into `libosoe` and never installed; its tests are in `base/tests/` |
 | `shmem/include/` | the public headers, `shmem.h`, `pshmem.h` and `shmemx.h`, and `mpp/`, the historical location, whose headers redirect to those; all installed |
-| `shmem/src/` | the library: the OpenSHMEM routines, the runtime under them, `transport.h` and `internode.h` - the boundary a backend implements (design §4.10) - and the one backend below it, active messages over TCP and io_uring; `cmake/CheckBoundary.cmake` says which file is which |
+| `shmem/src/` | the library: the OpenSHMEM routines, the runtime under them, `transport.h` and `internode.h` - the boundary a backend implements (design §4.10) - and the one backend below it, in two parts: what every job uses (`transport-am.c`), and the internode backend behind `internode-backend.h`, active messages over TCP and io_uring, which the single-node build replaces with a backend that refuses a job of more than one node (`transport-single-node.c`); `cmake/CheckBoundary.cmake` says which file is which |
 | `shmem/tests/` | the library's tests: test programs, shell scripts that start a job and break it to see how it ends, and the Slurm environments the bootstrap is tested against (`slurm-fixtures/`); its `CMakeLists.txt` registers them |
 | `tools/` | the programs beside the library, in the next table |
 | `cmake/` | CMake modules, and scripts the tests run with `cmake -P` to check the tree itself: that no file above the transport boundary includes one below it, that the library exports only OpenSHMEM's names, that every C11 atomic call names one of the three memory orders the project uses, that the tree builds as strict C11 and as a static archive |
-| `dev/` | `lima/`, the definition of the Debian 13 virtual machine osoe is developed in on a Mac ([Developing on macOS](#developing-on-macos)) |
+| `dev/` | `lima/`, the definitions of the Debian 13 virtual machine osoe is developed in on a Mac ([Developing on macOS](#developing-on-macos)) and of the Rocky Linux 9 one the single-node build is tested in |
 | `docs/README.md` | where to find what in `docs/` |
 | `docs/pi-cluster.md`, `docs/pi-cluster-results.md` | the runbook for the four-node Raspberry Pi 5 cluster, and what its sessions measured |
 | `docs/release-checklist.md` | what a release needs, ticked where it is done |
@@ -496,18 +561,19 @@ where to find what among the documents.
 | `docs/reference/` | where to get the OpenSHMEM 1.6 specification, which is not in the repository |
 
 `tools/` has a directory for each program, or group of tests, it builds. Of the
-programs, `cmake --install` puts `oshcc`, `osoe-stat` and `osoe-pacer` under the
-prefix ([Installing](#installing)); the rest stay in the build tree.
+programs, `cmake --install` puts `oshcc`, `osoe-stat`, `osoe-pacer` and
+`osoe-launch` under the prefix ([Installing](#installing)); the rest stay in the
+build tree.
 
 | `tools/` | Builds | Installed |
 |---|---|---|
 | `wrapper/` | `oshcc`, the compiler wrapper, and `osoe-statics.ld`, the linker script it passes, which makes a program's global and static variables symmetric | yes, both |
 | `stat/` | `osoe-stat`, which reads a running or hung job's counters and state from outside | yes |
 | `pacer/` | `osoe-pacer`, the stress tester; `osoe-pacer-start-pes`, which its tests run to check Annex F's unprefixed routines; and, where Python 3 is found, `osoe-pacer-counted` and `osoe-pacer-start-pes-counted`, builds that count every call to the library | `osoe-pacer` only |
-| `launch/` | `osoe-launch`, which starts a job's processes on this machine; beside it `tier3.sh`, which gives each logical node a network namespace, and `capture-slurm-fixtures.sh`, which records Slurm's environment under `srun` | no |
+| `launch/` | `osoe-launch`, which starts a job's processes on this machine; beside it `tier3.sh`, which gives each logical node a network namespace, and `capture-slurm-fixtures.sh`, which records Slurm's environment under `srun` | `osoe-launch` only |
 | `bench/` | `osoe-bench`, what the library costs on a cluster, one measurement a line | no |
-| `probe/` | `probe`, which checks that the kernel has every io_uring and futex facility osoe relies on (the `env.probe` test) | no |
-| `echo-uring/` | `echo-uring`, a bare io_uring TCP echo and stream that the library is timed against, and `netem-sweep.sh`, which runs it over emulated links | no |
+| `probe/` | `probe`, which checks that the kernel has every facility the build relies on - io_uring and futex2 in the full build, the classic futex in the single-node build (the `env.probe` test) | no |
+| `echo-uring/` | `echo-uring`, a bare io_uring TCP echo and stream that the library is timed against, and `netem-sweep.sh`, which runs it over emulated links; the full build only | no |
 | `modelcheck/` | no program: the model checker, in Python 3, and the models of osoe's protocols, registered as tests in the `release` build where Python 3 is found (six only with `-DOSOE_MULTIPLE_MODELS=ON`) | nothing to install |
 | `corpus/` | not part of the build: `fetch.sh` fetches public OpenSHMEM programs, pinned in `manifest.tsv`, into `corpus/` for reading, and `check-traces.py` checks the traces in `docs/design/workloads/traces/` against them | nothing to install |
 
@@ -842,7 +908,14 @@ specification or takes a choice the specification leaves open.
 - **Global and static variables are symmetric only in a program linked by
   `oshcc`**, which links it without position independence and with osoe's
   linker script. Passing a static where a symmetric address is required in
-  any other program ends the job by name.
+  any other program ends the job by name. `process_vm_readv` and
+  `process_vm_writev`, which reach another process's memory in any program,
+  copy between address spaces and map nothing: a put or a get would be a system
+  call, an atomic cannot be made of copies, a wait on such a variable would
+  never be woken, and Yama's `ptrace_scope` of 1 refuses them between a job's
+  sibling processes. Gathering the statics by a linker script and mapping them
+  as shared memory at init, as osoe does, is the only way Linux offers to *map*
+  another process's private memory (design §4.3).
 - **A PE's gets from other nodes land in its landing zone**
   (`OSOE_GET_LANDING_BYTES`, 256 KiB by default, in extents of 1 KiB): a get
   takes whole extents, at least one, so 256 small gets in flight fill it as 256
@@ -856,9 +929,10 @@ specification or takes a choice the specification leaves open.
 
 **Launching**
 
-- **Linux 6.7 or newer, and the distribution's liburing 2.6 or newer.** Other
-  systems are not supported; on a Mac, develop in the Lima VM this repository
-  defines.
+- **Linux 6.7 or newer, and the distribution's liburing 2.6 or newer**, for the
+  full build; the single-node build needs neither, and runs a job of one node
+  only ([Requirements](#requirements)). Other systems are not supported; on a
+  Mac, develop in the Lima VM this repository defines.
 - **Started by `srun` or by osoe's own launcher**, with no PMI library; every
   node must reach every other over TCP, the whole mesh, not only the
   rendezvous's port range. A heterogeneous Slurm job is refused at start-up.
@@ -883,7 +957,10 @@ specification or takes a choice the specification leaves open.
   released, loads acquired, a store-buffering litmus test telling the two
   orders apart: the whole suite passed so, the lanes, scan and pipeline tests
   25 times each, and 13 minutes of the stress tester
-  (`docs/reviews/archive/phase1-step7-slice4-portability.md`).
+  (`docs/reviews/archive/phase1-step7-slice4-portability.md`). The single-node
+  build has run on Rocky Linux 9.8 - kernel 5.14, glibc 2.34, GCC 11 - in an
+  aarch64 virtual machine, and in the Debian 13 one with liburing hidden from
+  it; nowhere else yet, and on no x86-64 machine.
 - **Every node of a job must have the same architecture.** The rendezvous
   compares the job's size, the heap's size, the build's table of message
   handlers, and the collectives' fan-out, team count, pipeline depth and small
@@ -1079,6 +1156,11 @@ that one could be added without touching the OpenSHMEM layer.
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
+- **Two builds.** The single-node build runs the same suite less the
+  383 tests labelled `internode` - those of a job of more than one node,
+  and of the internode backend's own files - in the same four presets, on Rocky
+  Linux 9 and in the development VM with liburing hidden; `ctest -L internode`
+  on the full build runs exactly the tests it lacks.
 - **Model checking.** Every lock-free and futex protocol but one - waking the
   progress thread, waits, the barrier tree, pipelined collectives and the lanes
   their large pieces go through, Bruck's allgather, the scans, get completion
@@ -1171,7 +1253,10 @@ is compared between nodes as well, where the node that sees a difference ends
 naming the variable and both nodes, the nodes already connected to it end with
 it, and a node not yet connected says what it waits for until the launcher ends
 it ("How a job starts"); one marked *checked among a node's PEs* is compared
-only there. `SHMEM_INFO` prints most of this list from the library itself.
+only there. `SHMEM_INFO` prints most of this list from the library itself. In
+the single-node build the settings only a job of more than one node uses - the
+connections', the wire's, keepalive's - are still checked as values, as the full
+build checks them in a job of one node, and change nothing.
 
 **The specification's** (§8). Each also has a deprecated `SMA_` spelling; when
 both are set the `SHMEM_` one controls.
