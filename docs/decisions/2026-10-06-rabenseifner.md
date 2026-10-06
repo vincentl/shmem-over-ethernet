@@ -5,11 +5,12 @@ The first part of v0.2's third step, on `docs/prompts/v0.2-step3-rabenseifner-pr
 shape - waits on step 2's chooser; the author's prompt for the night said that
 Part 1 depends on nothing in step 2, and items 1 and 2 do not.
 
-**Where it stands.** Built on the branch `rabenseifner`, itself on step 2's
-`tree-shape`, not merged: items 1 and 2 - the arithmetic, in the model and in C
-(`c7a7e14`), and the protocol the second question below proposes, modelled
-(`eaf4607`). Waiting: your word on that design and on the first question, and
-item 3, the chooser's term, which needs step 2's chooser on `main`.
+**Where it stands.** Part 1 built on the branch `rabenseifner`, itself on step
+2's `tree-shape`, not merged: the arithmetic, in the model and in C (`5beed12`);
+the protocol the second question below proposes, modelled (`5399266`); and the
+chooser's new shape, Rabenseifner's cost beside the trees' (`d5f6447`). Waiting:
+your word on the two questions, then Part 2, the data path - and the branch
+merges after step 2's.
 
 ## The arithmetic
 
@@ -78,6 +79,39 @@ What the model does not cover: the progress thread's delivery (puts and adds
 land in order on one connection, as the AM layer's models check); the combine's
 arithmetic (the first half's); and a team whose collectives move between a
 node's threads, which `lane_model.py` checks for the lanes they share.
+
+## The chooser's new shape
+
+`shape_timing.py` gains Rabenseifner's cost in closed form - its steps one
+after another, each a hop, a message cost, then its pieces at the pace of the
+link or of its flow (an exchange's lag of half the window, a one-way step's
+credits of the window), each step's half from the steps' shape - and a
+simulation of the steps on the same links as the trees (one `Network` class
+now serves both). Against the simulation the closed form errs by a median of 1%
+and at most 11% on the fitted links, 25% on the other link model. The chooser
+takes the reduce-scatter for a reduction where it costs less than the best
+tree, ties to the tree, with a window of 2 or more (half of a window of one is
+no lag). `collective-shape.c` mirrors it (`osoe_shape_rabenseifner_cost`, and
+`osoe_shape_choose`'s `reduce_scatter`); the grid holds the C to the model on
+all 3,024 inputs, 512 of which now choose the reduce-scatter, and
+`shmem.shape.choice` pins it.
+
+**What it chooses on the Pi's four nodes**: the star to 4 KiB, the
+reduce-scatter from 8 KiB - at 64 KiB 1.2 ms against the k = 2 tree's 1.9, at
+1 MiB 13.9 ms against 18.9. The brief pinned "64 KiB the tree", but its own
+arithmetic - 1.5n over B and four hops against 2n over B and two - crosses near
+40 KB, below 64 KiB; the model, which also counts each step's message cost and
+the pieces' pace, crosses lower still. Pinned instead: 2 KiB keeps the tree,
+1 MiB takes the reduce-scatter. The Pi's measurement in Part 3 is what says
+where the crossover is.
+
+**What it cannot settle**: where a tree has leads with both a parent and
+children - seven nodes and more - the two link models part by up to 40% on the
+tree's time, and the choice between the tree and the reduce-scatter on 7 to 13
+nodes at 1 MiB with them: choosing by the closed forms costs up to 38% against
+the 'sender' links' best and 25% against the 'connection' links'. On four nodes
+both agree. Only a cluster of more nodes can say which links the hardware has;
+the record of step 2 has the same caveat for the trees alone.
 
 ## Questions for the author
 
