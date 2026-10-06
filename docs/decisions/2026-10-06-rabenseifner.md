@@ -6,11 +6,10 @@ shape - waits on step 2's chooser; the author's prompt for the night said that
 Part 1 depends on nothing in step 2, and items 1 and 2 do not.
 
 **Where it stands.** Built on the branch `rabenseifner`, itself on step 2's
-`tree-shape`, not merged: the arithmetic, in the model and in C - item 2 and the
-arithmetic half of item 1 (`e2055e0`). Waiting: the protocol half of item 1 -
-the steps through lanes, grants and rows, which the second question below
-proposes a design for - and item 3, the chooser's term, which needs step 2's
-chooser on `main`.
+`tree-shape`, not merged: items 1 and 2 - the arithmetic, in the model and in C
+(`e2055e0`), and the protocol the second question below proposes, modelled
+(`feb2efe`). Waiting: your word on that design and on the first question, and
+item 3, the chooser's term, which needs step 2's chooser on `main`.
 
 ## The arithmetic
 
@@ -36,6 +35,49 @@ to the model's digests (`shmem/tests/rabenseifner-digest.txt`, 612 node counts
 and lengths; `model.rabenseifner.digest` holds the file to the model). With the
 fold's even lead sending the wrong half, 563 of them differ and the test fails.
 Nothing calls the arithmetic yet.
+
+## The protocol, modelled
+
+The design the second question proposes, in `rabenseifner_model.py`'s second
+half (`model.rabenseifner`), under the engine's SC interleavings. Each lead's
+lane has R rows of W slots; step i moves its pieces into row i mod R of the
+receiver's lane, piece j into slot j mod W, each a put and then an add on the
+receiver's arrival counter for the row, counted over the team's life and
+compared as at least. A sender puts its first piece of step i only once it
+holds its partner's grant for step i and this collective; a receiver grants
+step i at entry when i < R, and otherwise once it has combined every piece of
+step i - R, the row's last use. Within an exchange step a lead puts its piece q
+only after combining its partner's piece q - d, d = W / 2; within a one-way step
+the receiver adds a credit at the sender for every piece it takes, and the
+sender puts piece q only once it holds q - W + 1 of them. Every lead runs two
+reductions in a row, a piece an element. Checked: every piece a lead takes is
+the one it waits for - this collective's, this step's, this index - and an
+unfold's comes from a lead that has finished the allgather (UP); every put lands
+in a lane lent at that moment to the collective that puts (LANE); no lead is
+stuck, and from every state the run can end.
+
+| case | leads | elements | W | R | states | verdict |
+|---|---|---|---|---|---|---|
+| two leads, three pieces a half | 2 | 6 | 2 | 2 | 999 | holds, and can always finish |
+| three leads, the fold | 3 | 6 | 2 | 2 | 16,463 | holds, and can always finish |
+| four leads, a power of two | 4 | 4 | 2 | 2 | 390,789 | holds, and can always finish |
+| four leads, three rows | 4 | 4 | 2 | 3 | 427,527 | holds, and can always finish |
+| five leads, the fold and two halvings | 5 | 4 | 2 | 2 | 6,949,370 | holds; past the liveness check's bound |
+
+The breakages, each of which must fail and does, with the case it fails in
+first: a step's grant sent as the step before its row's
+next use starts rather than ends (`row_early`, three leads: a piece of the
+later step taken in place of the earlier's); no grant (two leads: a put into a
+lane not yet lent); a stale grant, any grant the step ever had (two leads: a put
+into the partner's lane while it is still in the first collective); the unfold
+before the allgather's last step (three leads); an exchange without the lag
+(two leads: a slot overwritten before its piece was combined); and a one-way
+step without its credits (three leads, the fold back).
+
+What the model does not cover: the progress thread's delivery (puts and adds
+land in order on one connection, as the AM layer's models check); the combine's
+arithmetic (the first half's); and a team whose collectives move between a
+node's threads, which `lane_model.py` checks for the lanes they share.
 
 ## Questions for the author
 
@@ -111,7 +153,7 @@ gives Rabenseifner's steps nothing.
   d ≥ 1 + h/t: on the Pi, at 16 KiB pieces, d = 2, so W = 4, the capacity step 2
   proposes. The model counts the cost of d; `shape_timing.py`'s term takes it.
 
-**Recommendation:** this design, checked by the model with the breakages "a
-piece put before the partner combined its slot's last" and "a one-way piece put
-without its credit", beside the brief's five. **Built meanwhile:** nothing on
-the data path; Part 2 waits for the model and your word on the design.
+**Recommendation:** this design. **Checked meanwhile:** the model above holds it
+on two to five leads, and each of its rules dropped - the lag, the credits - fails,
+beside the brief's own breakages. Nothing is on the data path; Part 2 waits for
+your word on the design.
