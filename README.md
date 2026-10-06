@@ -158,9 +158,9 @@ fine: nothing in the library spins - a waiting PE sleeps on a futex - and in a
 job of one node each PE's progress thread has nothing to move and sleeps too, so
 the two settings that schedule it in a job of many nodes, `OSOE_AGENT_SLICE_US`
 and `OSOE_AGENT_CPUS`, are not needed here. The test suite runs as it does in the
-full build, `ctest --preset release -j4`: 338 of the full build's 721 tests - all
-but the 383 labelled `internode`, which need more than one node or test the
-internode backend's own files, io_uring or futex2 - and three of its own; and
+full build, `ctest --preset release -j4`: 345 of the full build's 729 tests - all
+but the 384 labelled `internode`, which need more than one node or test the
+internode backend's own files, io_uring or futex2 - and four of its own; and
 `ctest --preset models` runs the same 30 tests of the model checker.
 
 ## Getting started
@@ -281,8 +281,8 @@ io_uring is off by default on RHEL 10 and its rebuilds (`kernel.io_uring_disable
 is 2), and container runtimes' default seccomp profiles refuse it: Docker 25 and
 later and containerd 2.0 and later with `EPERM`, for which the message names
 the sysctl even though it reads 0 inside the container, and Podman with
-`ENOSYS`. There jobs on one node run, but 343 of the test suite's 721 tests fail
-at `shmem_init` or at opening a ring - every one but `env.probe` among the 383
+`ENOSYS`. There jobs on one node run, but about 340 of the test suite's 729 tests
+fail at `shmem_init` or at opening a ring - every one but `env.probe` among the 384
 labelled `internode`, which need more than one node or test the internode
 backend's own files, io_uring or futex2 (`ctest -L internode`); the single-node
 build has neither them nor io_uring. Set the sysctl to
@@ -1162,15 +1162,15 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 720 tests in
+  run before every merge, on the exact tree that merges: about 730 tests in
   release, and the model checker's 30 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
 - **Two builds.** The single-node build runs the same suite less the
-  383 tests labelled `internode` - those of a job of more than one node, of
+  384 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and with
-  three of its own, in the same four presets, on Rocky Linux 9 and in the
+  four of its own, in the same four presets, on Rocky Linux 9 and in the
   development VM with liburing hidden; `ctest -L internode` on the full build
   runs exactly the tests it lacks.
 - **Model checking.** Every lock-free and futex protocol but one - waking the

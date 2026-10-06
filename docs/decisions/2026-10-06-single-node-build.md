@@ -78,7 +78,10 @@ one-node test the full build passes; the full build is unchanged.
    (`kernel.io_uring_disabled=2`) failed 343 of its 718 tests, every one of them
    labelled - `env.probe` aside, which both builds register, each with its own
    probe. The single-node build's suite has no test that fails for want of the
-   backend (item 9 and below). The README's "about 340" was right: 343.
+   backend (item 9 and below). The README's "about 340" was right: 343. After
+   the adversarial read's tests (below) the full build has 729 tests, 384 of
+   them `internode`, and the single-node build 349: the other 345 and four of
+   its own.
 6. **The probe** checks what its build's library uses (`tools/probe/`): the
    checks both builds make in `probe.c`, the full build's futex2 and io_uring
    checks in `probe-full-build.c`, the single-node build's classic futex in
@@ -191,7 +194,51 @@ Each is Claude's, under the standing mandate; the undo follows.
 
 ## Verification
 
-@@VERIFICATION@@
+On the tree that merges, `d70f256` (the documents' last commit after it changes
+no file a build reads), unless a line says otherwise.
+
+**The full build** in `osoe` (Debian 13, kernel 6.12, GCC 14), the floor pins
+on: debug 729 of 729, release 729 of 729, AddressSanitizer 726 of 726,
+ThreadSanitizer 500 of 500; `tier3` 113 of 113; `osoe-pacer`'s collectives at
+three values of `OSOE_SMALL_COLLECTIVE_BYTES` (128, 1024 and 16384), its teams
+and threads, and ten minutes of `mix` on four logical nodes of two PEs: no
+failure in any, in 60, 66, 64, 121 and 609 seconds. The models, 30 of 30, on
+`84e46fc`, whose whole verification - the four presets (721, 721, 718, 492),
+`tier3` (113), the same pacer runs and the models - passed too: no model or
+model-checker file changed since.
+
+**The single-node build**, the four presets each, its pacer smoke tests among
+them, then `cmake --install` into a prefix, `oshcc` from it compiling the
+statics test program and two examples of `corpus/openshmem-examples` (`hello`,
+`bcast1`), each run with the installed `osoe-launch` at 8 and 32 PEs on the
+VM's four cores, and a job of two logical nodes refused:
+
+| | Debian 13, liburing hidden (`osoe-load`) | Rocky Linux 9.8 (`osoe-rocky`) |
+|---|---|---|
+| debug | 349 of 349 | 347 of 347 |
+| release | 349 of 349 | 347 of 347 |
+| AddressSanitizer | 346 of 346 | 344 of 344 |
+| ThreadSanitizer | 346 of 346 | 344 of 344 |
+| installed: version text | `0.1.0 (single-node build)` | the same |
+| installed: 3 programs at 8 and 32 PEs | all exit 0 | all exit 0 |
+| two logical nodes | refused by name on both PEs, exit 1, nothing in `/dev/shm` | the same |
+| `internode` tests registered | 0 | 0 |
+| an ELF file linking liburing | none | none |
+
+AddressSanitizer runs three fewer: the futex filter's tests (item 9). Rocky's
+suites are two fewer than Debian's, the headers' C++ test needing a C++
+compiler the VM has not. No build of either printed a warning. The model
+checker's 30 tests in a single-node configure on Rocky's Python 3.9: 29 passed
+at `-j4`, and `model.abort` was killed by the kernel for memory - 1.4 GiB in a
+VM of 4 beside three other models; alone it passed, in 22 minutes.
+
+What these runs found on the way, all fixed before the tree above: GCC 11's
+ThreadSanitizer's heap base and GCC 14's AddressSanitizer's futex locks (item 9
+of what was built); `stat.segment`'s timeout under GCC 11's AddressSanitizer,
+whose leak check costs every process half a second at exit (an empty program
+takes 0.57 s to exit with it and 0.003 without), and the test runs `osoe-stat`
+thirteen times; and the signal test's count under ThreadSanitizer, which holds
+a signal for a handler until its own next intercepted call.
 
 ## The adversarial read
 
