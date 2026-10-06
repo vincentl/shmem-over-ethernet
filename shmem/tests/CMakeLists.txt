@@ -3243,7 +3243,24 @@ add_test(NAME shmem.version.info
   COMMAND osoe-launch -n 1 -t 60 -e 0:SHMEM_INFO=1 -- $<TARGET_FILE:shmem_test_init>)
 set_tests_properties(shmem.version.info PROPERTIES
   PASS_REGULAR_EXPRESSION "(^|\n)osoe ${OSOE_VERSION_PATTERN} environment variables\n")
-set_tests_properties(shmem.version.start-up shmem.version.info PROPERTIES
+# The deprecated SMA_ spellings of the two, and SHMEM_DEBUG under both of its
+# names, which no test ran (the v0.2 step 1 review, C4).
+add_test(NAME shmem.version.start-up.sma
+  COMMAND osoe-launch -n 1 -t 60 -e 0:SMA_VERSION=1 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.version.start-up.sma PROPERTIES
+  PASS_REGULAR_EXPRESSION "(^|\n)osoe: PE 0: osoe ${OSOE_VERSION_PATTERN}, OpenSHMEM 1[.]6\n")
+add_test(NAME shmem.version.info.sma
+  COMMAND osoe-launch -n 1 -t 60 -e 0:SMA_INFO=1 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.version.info.sma PROPERTIES
+  PASS_REGULAR_EXPRESSION "(^|\n)osoe ${OSOE_VERSION_PATTERN} environment variables\n")
+foreach(variable SHMEM_DEBUG SMA_DEBUG)
+  add_test(NAME shmem.debug.${variable}
+    COMMAND osoe-launch -n 1 -t 60 -e 0:${variable}=1 -- $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.debug.${variable} PROPERTIES
+    PASS_REGULAR_EXPRESSION "osoe: PE 0 of 1 [(]local 0 of 1[)]: segment /dev/shm/osoe[.]")
+endforeach()
+set_tests_properties(shmem.version.start-up shmem.version.info shmem.version.start-up.sma
+  shmem.version.info.sma shmem.debug.SHMEM_DEBUG shmem.debug.SMA_DEBUG PROPERTIES
   LABELS "tier2" TIMEOUT 90
   FAIL_REGULAR_EXPRESSION "exited with status [1-9]|killed by signal|timeout after|left behind")
 
