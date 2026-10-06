@@ -138,7 +138,7 @@ static unsigned char *landing_request(void *context, uint32_t pe, uint64_t token
  * A nonblocking get's reply has landed whole (landing_request has checked it).
  * Its record goes to LANDED first, with release, so that a second reply naming
  * it is refused and any of the PE's threads may now claim it for copying out
- * (transport-am.c); then the context block the token names counts its bytes -
+ * (transport-internode.c); then the context block the token names counts its bytes -
  * the value half of base/wait-word.h's two-sided wait, a seq_cst add, woken
  * only if a thread waits there - and the zone's `freed` word is bumped too,
  * since a thread waiting for room may copy this reply out and make some. The
@@ -402,12 +402,9 @@ void osoe_progress_host_advertise(void *blob)
 
 void osoe_progress_host_start(uint32_t session)
 {
-    /* osoe_am.internode and osoe_am.lead are set at the start of
-     * osoe_transport_init, before anything that reads them - including the
-     * dirty set, which is sized from the first (transport-am.c). */
-    if (!osoe_am.internode)
-        return;
-
+    /* Only in a job of more than one node, from the internode backend's start
+     * (transport-internode.c), which has set osoe_am.internode and
+     * osoe_am.lead before anything reads them. */
     /* Every local PE maps the area: its application threads reserve into these
      * buffers like any other writer (§3.5, §3.12). */
     osoe_connection_area_open(&osoe_am.area, &osoe.bootstrap, osoe.job.node_count, session,
@@ -625,7 +622,7 @@ static bool local_rank(uint32_t rank)
 
 void osoe_progress_host_abort(void)
 {
-    if (!osoe_am.internode || !osoe_am.lead)
+    if (!osoe_am.lead)
         return;
     uint32_t pe = 0;
     int status = EXIT_FAILURE;
@@ -662,7 +659,7 @@ void osoe_progress_host_abort(void)
 
 void osoe_progress_host_exit(void)
 {
-    if (!osoe_am.internode || !osoe_am.lead)
+    if (!osoe_am.lead)
         return;
     if (!osoe_am.ring.enabled)          /* an agent stopped before its first pass */
         osoe_ring_enable(&osoe_am.ring);
@@ -672,8 +669,6 @@ void osoe_progress_host_exit(void)
 
 void osoe_progress_host_stop(void)
 {
-    if (!osoe_am.internode)
-        return;
     if (osoe_am.lead) {
         free(osoe_am.wire);
         free(osoe_am.connection);
@@ -707,7 +702,7 @@ void osoe_progress_host_stop(void)
  */
 bool osoe_progress_host_poll(void)
 {
-    if (!osoe_am.internode || !osoe_am.lead)
+    if (!osoe_am.lead)
         return false;
     /* The first pass is on the agent thread, which enabling makes the ring's only
      * submitter (ring.h). It is also where the engine first meets the teams
@@ -741,7 +736,7 @@ bool osoe_progress_host_poll(void)
 
 bool osoe_progress_host_idle(uint64_t *applied)
 {
-    if (!osoe_am.internode || !osoe_am.lead) {
+    if (!osoe_am.lead) {
         *applied = 0;
         return true;
     }
@@ -751,7 +746,7 @@ bool osoe_progress_host_idle(uint64_t *applied)
 
 bool osoe_progress_host_quiet(uint64_t *applied)
 {
-    if (!osoe_am.internode || !osoe_am.lead) {
+    if (!osoe_am.lead) {
         *applied = 0;
         return true;
     }
@@ -760,18 +755,18 @@ bool osoe_progress_host_quiet(uint64_t *applied)
 
 void osoe_progress_host_deadlock_send(uint32_t node, const struct osoe_deadlock_message *m)
 {
-    if (!osoe_am.internode || !osoe_am.lead)
-        osoe_fatal("a deadlock detector message toward node %u from a node with no network",
+    if (!osoe_am.lead)
+        osoe_fatal("a deadlock detector message toward node %u from a PE that runs no engine",
                    node);
     osoe_progress_deadlock_send(&osoe_am.progress, node, m);
 }
 
 bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen)
 {
-    /* The lead of a multi-node job waits in its ring, on its sockets and the
-     * word at once (§3.10); every other agent has only the word. Either way
-     * the wait ends by a sweep interval at the latest (§4.10). */
-    if (osoe_am.internode && osoe_am.lead)
+    /* The lead waits in its ring, on its sockets and the word at once
+     * (§3.10); every other agent of the job has only the word. Either way the
+     * wait ends by a sweep interval at the latest (§4.10). */
+    if (osoe_am.lead)
         return osoe_ring_wait_wake(&osoe_am.ring, wake, seen, OSOE_SWEEP_NS);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     return osoe_futex_wait(wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0;

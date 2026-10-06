@@ -10,6 +10,7 @@
 
 #include "am.h"
 #include "fatal.h"
+#include "internode-backend.h"
 #include "job.h"
 #include "listener.h"
 #include "rendezvous.h"
@@ -358,4 +359,18 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
         send_down(b, child_fd[i], first_child + i, out);
         close(child_fd[i]);
     }
+}
+
+/*
+ * internode-backend.h's rendezvous, on AM: this lead's address - its own
+ * host-list entry's, or the one it would use to reach a peer where its name
+ * resolves to loopback (listener.h) - and the blob, to every other lead and
+ * back, by the tree above.
+ */
+void osoe_internode_backend_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
+                                       const void *blob, struct osoe_rendezvous_result *result)
+{
+    struct sockaddr_in address;
+    osoe_listener_own_address(b, &address);
+    osoe_rendezvous(b, session, &address, blob, result);
 }

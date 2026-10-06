@@ -37,54 +37,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "am-configuration.h"
 #include "bootstrap.h"
 #include "connection.h"
 #include "shm-object.h"
 
-/*
- * Defaults (§3.2, §3.4).
- *
- * The chunk is §3.2's application-level fragmentation size, and so the largest
- * message the wire ever carries. The buffer default is §3.4's floor of twice
- * that, and the floor is the right default because everything else pushes
- * *down*: §3.2 bounds head-of-line blocking at roughly two segments, which on
- * 1 GbE is about 2 ms at this size and doubles with the buffer, while §3.9's
- * self-clocking already grows the batch under load without needing headroom -
- * the buffer only has to hold what accumulates during one in-flight send.
- * Going above the floor is an opt-in for links fast enough that a millisecond
- * of wire time stops mattering.
- *
- * The budget is a guard rail, not a routine mechanism: at these defaults it is
- * not reached until about a thousand nodes, well past the "hundreds of nodes"
- * §1 targets, so inside the supported range the behaviour is simply "128 KiB
- * buffers, always" with no heuristic to reason about.
- */
-#define OSOE_AM_DEFAULT_CHUNK   (UINT64_C(64) << 10)
-#define OSOE_AM_MIN_CHUNK       (UINT64_C(1) << 10)
-#define OSOE_AM_MAX_CHUNK       (UINT64_C(1) << 20)
-#define OSOE_AM_DEFAULT_BUDGET  (UINT64_C(256) << 20)
-
-/*
- * §3.8's per-connection reply credit C. It bounds the target's deferred reply
- * queues, so a node's descriptor pool is `connections x C` - which scales with
- * node count as §1 requires, and is why the bound is per connection rather
- * than per PE.
- */
-#define OSOE_AM_DEFAULT_CREDITS 64u
-#define OSOE_AM_MIN_CREDITS     1u
-#define OSOE_AM_MAX_CREDITS     65536u
-
-/*
- * The bytes of a PE's landing zone, which every reply to its gets shares
- * (§4.6, §4.11 item 7; node.h): 256 KiB by default, in the control segment,
- * 256 extents of 1 KiB. Past it a PE completes what it has in flight before it
- * asks for more.
- */
-#define OSOE_DEFAULT_GET_LANDING_BYTES  (UINT64_C(256) << 10)
-/* Since layout 23 the zone is 1 KiB extents (node.h), at least one and at most
- * as many as a token's 16 bits name, less the one that means none. */
-#define OSOE_MIN_GET_LANDING_BYTES      UINT64_C(1024)
-#define OSOE_MAX_GET_LANDING_BYTES      (UINT64_C(65535) * 1024)
 
 enum osoe_am_size_status {
     OSOE_AM_SIZE_OK,
@@ -113,18 +70,6 @@ enum osoe_am_size_status osoe_am_choose_buffer(uint64_t chunk, uint64_t requeste
 /* Bytes the area occupies for `nodes` nodes at this buffer size. */
 uint64_t osoe_am_area_bytes(uint32_t nodes, uint64_t buffer);
 
-/* What the environment asks for, before the budget is applied. Fatal on a
- * malformed or out-of-range value, never a silent default (base/environment.h). */
-struct osoe_am_config {
-    uint64_t chunk;         /* OSOE_AM_CHUNK */
-    uint64_t buffer;        /* OSOE_AM_BUFFER */
-    uint64_t budget;        /* OSOE_AM_BUFFER_BUDGET */
-    uint32_t credits;       /* OSOE_AM_CREDITS: §3.8's C, per connection */
-    bool hugepages;         /* OSOE_AM_HUGEPAGES */
-    uint64_t get_landing_bytes;     /* OSOE_GET_LANDING_BYTES, per PE */
-};
-
-void osoe_am_config_read(struct osoe_am_config *c);
 
 /* Process-private handle on the area. */
 struct osoe_connection_area {

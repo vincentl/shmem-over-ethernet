@@ -141,7 +141,7 @@ add_test(NAME shmem.reply COMMAND shmem_test_reply)
 set_tests_properties(shmem.reply PROPERTIES LABELS "tier1" TIMEOUT 60)
 
 # The AM sizing policy (tier 1): pure arithmetic, compiled in.
-add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/connection.c
+add_executable(shmem_test_am_size test-am-size.c ../src/connection-area.c ../src/am-configuration.c ../src/connection.c
   ../src/shm-object.c)
 target_include_directories(shmem_test_am_size PRIVATE ../src)
 target_link_libraries(shmem_test_am_size PRIVATE osoe_base rt)
@@ -170,7 +170,7 @@ set_tests_properties(shmem.rank-map PROPERTIES LABELS "tier1" TIMEOUT 60)
 # The node-pair wire on its own (tier 1): both ends in one process, so no
 # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
 # its own osoe_fatal so a failure inside it fails the test.
-add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/ring.c ../src/listener.c
+add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c
   ../src/shm-object.c)
 target_include_directories(shmem_test_wire PRIVATE ../src)
 target_link_libraries(shmem_test_wire PRIVATE osoe_base rt PkgConfig::LIBURING)
@@ -184,7 +184,7 @@ set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 120)
 # and takes its identity straight from the launcher environment.
 # The seed is fixed: §3.14 wants an injected fault reproducible, and without it
 # the pattern would follow the launcher's pid and differ every run.
-add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/ring.c
+add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/wire-settings.c ../src/ring.c
   ../src/listener.c ../src/shm-object.c)
 target_include_directories(shmem_test_wire_pair PRIVATE ../src)
 target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt PkgConfig::LIBURING)
@@ -205,8 +205,8 @@ set(OSOE_LAUNCH_COUNTS 1 2 4)
 # the last, so releasing on any arrival is indistinguishable from releasing on
 # all of them - and that mutation passed a two-node test.
 add_executable(shmem_test_barrier_am test-barrier-am.c
-  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
+  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
+  ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
   ../src/shm-object.c)
 target_include_directories(shmem_test_barrier_am PRIVATE ../src)
 target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt PkgConfig::LIBURING)
@@ -810,8 +810,8 @@ set_tests_properties(shmem.listener.secret PROPERTIES LABELS "tier1" TIMEOUT 60)
 # inherited, so the production defaults cannot make the suite slow or the test
 # vacuous.
 add_executable(shmem_test_progress test-progress.c
-  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c
-  ../src/reply.c ../src/wire.c ../src/ring.c ../src/listener.c ../src/shm-object.c)
+  ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
+  ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/shm-object.c)
 target_include_directories(shmem_test_progress PRIVATE ../src)
 target_link_libraries(shmem_test_progress PRIVATE osoe_base rt PkgConfig::LIBURING)
 osoe_warnings(shmem_test_progress)
@@ -847,7 +847,7 @@ set_tests_properties(shmem.progress.forged-get-reply-bounds PROPERTIES LABELS "t
 # it and the others open it, which is §3.12's arrangement. Not an
 # osoe_tier2_test: it does not call shmem_init, testing the area on its own
 # below the library, and it takes its identity from the launcher environment.
-add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/connection.c
+add_executable(shmem_test_connection_area test-connection-area.c ../src/connection-area.c ../src/am-configuration.c ../src/connection.c
   ../src/shm-object.c)
 target_include_directories(shmem_test_connection_area PRIVATE ../src)
 target_link_libraries(shmem_test_connection_area PRIVATE osoe_base rt)
@@ -2309,7 +2309,7 @@ osoe_tier2_test(multiple)
 osoe_tier2_map_test(multiple 0,1 OSOE_GET_LANDING_BYTES=8192)
 # With the library checking every shared wait's promise at its return and
 # perturbing the steps of its protocols (OSOE_CHECK_QUIET, OSOE_TEST_PERTURB;
-# transport-am.c), so that a race the models find happens and shows.
+# transport-internode.c), so that a race the models find happens and shows.
 foreach(map IN ITEMS 0,1 0,1,2,0,1,0)
   string(REPLACE "," ";" ranks "${map}")
   list(LENGTH ranks count)

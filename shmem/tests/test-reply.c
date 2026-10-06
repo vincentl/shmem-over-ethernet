@@ -99,7 +99,7 @@ static _Atomic uint32_t over_limit;
  * A take that finds none free joins the queue, and the credit is this
  * thread's once its ticket is served. It watches for that with plain loads
  * for a while, then sleeps on the credit's word as the library does
- * (transport-am.c's take_credit): the word first, then the ticket, then a
+ * (transport-internode.c's take_credit): the word first, then the ticket, then a
  * sleep on the ticket's bit, swept like every wait. The watch is what keeps
  * the race open - a waiter that slept at once kept the queue standing, the
  * free credit was seldom contended, and a test-then-decrement take passed 9

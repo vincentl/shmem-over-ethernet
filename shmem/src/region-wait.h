@@ -52,7 +52,7 @@ enum osoe_counter osoe_region_wait_late_wake_counter(unsigned width);
  * later: an updater descheduled between its store and its bump, or a bump
  * landing as the timer fires, looks the same for an instant, which under load
  * meets a sweep a few runs in twenty (base/epoch.c measured it). The same
- * judgement as epoch.c's and transport-am.c's. Counted by width, as
+ * judgement as epoch.c's and transport-internode.c's. Counted by width, as
  * osoe_region_wait_late_wake_counter says.
  */
 void osoe_region_wait_count_if_lost(struct osoe_transport_watch *w, uint32_t slept_on,

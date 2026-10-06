@@ -183,7 +183,7 @@ static bool completed(void *context, uint32_t pe, uint64_t token, uint32_t lengt
     return true;
 }
 
-/* Arm the slot and the piece's record for `token`, as transport-am.c does
+/* Arm the slot and the piece's record for `token`, as transport-internode.c does
  * before a request goes out. */
 static void arm_piece(uint64_t token, uint32_t length)
 {
@@ -403,7 +403,7 @@ int main(void)
 
     /* A get larger than one AM chunk, so its reply is drained over several
      * passes and the descriptor survives partial draining (§3.8). */
-    /* Armed before the request, as transport-am.c's arm() does: the lead
+    /* Armed before the request, as transport-internode.c's arm() does: the lead
      * refuses a reply for any other token (§3.4's trust boundary). */
     if (!bounds)
         arm_piece(1, GET_BYTES);

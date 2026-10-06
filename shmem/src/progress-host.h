@@ -9,9 +9,10 @@
  * release goes up through internode.h's upcall. §5.3's arrival handoff is
  * internode-am.c's, the AM implementation of internode.h.
  *
- * Everything here is below the transport boundary: transport-am.c and
- * internode-am.c call it, and nothing in the SHMEM layer does
- * (cmake/CheckBoundary.cmake).
+ * Everything here is below the transport boundary, and the internode
+ * backend's (internode-backend.h): transport-internode.c and internode-am.c
+ * call it, and nothing in the SHMEM layer or the part of the transport every
+ * job uses does (cmake/CheckBoundary.cmake).
  *
  * **Only the local lead's agent runs the engine** (§3.12). Every other PE of
  * the node maps the connection area - its application threads reserve into the

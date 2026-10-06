@@ -148,7 +148,7 @@ def writer(variant, x, messages):
 
         def reserve(M, L, x=x):
             # Blocked while no buffer is open, exactly as reserve_waiting is
-            # (transport-am.c:175-193). Reserve and commit are one step: §3.5's
+            # (transport-internode.c). Reserve and commit are one step: §3.5's
             # protocol is what makes them atomic against the lead's seal.
             s = M[OPEN(x)]
             if s == 0:

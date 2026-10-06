@@ -17,22 +17,7 @@
 #include "fatal.h"
 #include "listener.h"
 #include "wire.h"
-
-/*
- * §3.14's fault injection, stateless and hash-derived, so the same seed gives
- * the same decision for the same transfer however the threads interleave. A
- * shared generator would make the split each site sees depend on arrival order
- * and destroy reproducibility, which is the whole value.
- */
-static uint64_t hash64(uint64_t x)
-{
-    x ^= x >> 33;
-    x *= UINT64_C(0xff51afd7ed558ccd);
-    x ^= x >> 33;
-    x *= UINT64_C(0xc4ceb9fe1a85ec53);
-    x ^= x >> 33;
-    return x;
-}
+#include "wire-settings.h"
 
 /*
  * How much of `n` this transfer moves: all of it, or - OSOE_WIRE_SPLIT times in
@@ -45,86 +30,31 @@ static size_t truncate_to(const struct osoe_wire *w, uint64_t site, uint64_t n)
 {
     if (w->split == 0 || n <= 1)
         return (size_t)n;
-    uint64_t h = hash64(w->seed ^ site ^ (n * UINT64_C(0x9E3779B97F4A7C15)));
+    uint64_t h = osoe_wire_hash(w->seed ^ site ^ (n * UINT64_C(0x9E3779B97F4A7C15)));
     if (h % 10000 >= w->split)
         return (size_t)n;
     return (size_t)((h >> 20) % n + 1);
 }
 
-struct wire_settings {
-    uint32_t buffer_bytes, buffer_count, split;
-    uint64_t seed;
-};
-
-static void read_settings(struct wire_settings *s, const struct osoe_bootstrap *b,
-                          bool announce)
-{
-    s->buffer_bytes = OSOE_WIRE_DEFAULT_BYTES;
-    if (osoe_environment_u32("OSOE_WIRE_BYTES", &s->buffer_bytes) == OSOE_ENVIRONMENT_INVALID ||
-        s->buffer_bytes < OSOE_WIRE_MIN_BYTES || s->buffer_bytes > OSOE_WIRE_MAX_BYTES)
-        osoe_fatal("OSOE_WIRE_BYTES='%s' is not a byte count between %u and %u",
-                   getenv("OSOE_WIRE_BYTES"), OSOE_WIRE_MIN_BYTES, OSOE_WIRE_MAX_BYTES);
-    s->buffer_count = OSOE_WIRE_DEFAULT_BUFFERS;
-    if (osoe_environment_u32("OSOE_WIRE_BUFFERS", &s->buffer_count) ==
-            OSOE_ENVIRONMENT_INVALID || s->buffer_count < 2 ||
-        s->buffer_count > OSOE_WIRE_MAX_BUFFERS ||
-        (s->buffer_count & (s->buffer_count - 1)) != 0)
-        osoe_fatal("OSOE_WIRE_BUFFERS='%s' is not a power of two between 2 and %u",
-                   getenv("OSOE_WIRE_BUFFERS"), OSOE_WIRE_MAX_BUFFERS);
-    s->split = 0;
-    if (osoe_environment_u32("OSOE_WIRE_SPLIT", &s->split) == OSOE_ENVIRONMENT_INVALID ||
-        s->split > 10000)
-        osoe_fatal("OSOE_WIRE_SPLIT='%s' is not a rate per myriad (0 to 10000)",
-                   getenv("OSOE_WIRE_SPLIT"));
-    /*
-     * §3.14: the seed must be overridable by environment, with a failing one
-     * committed as a permanent regression case. Without the override it comes
-     * from the job id, which is the launcher's pid, so every run would inject a
-     * different pattern and a case that failed could not be run again.
-     */
-    s->seed = hash64(b->job ^ ((uint64_t)b->step << 32));
-    uint64_t seed;
-    switch (osoe_environment_u64("OSOE_WIRE_SEED", &seed)) {
-    case OSOE_ENVIRONMENT_OK:
-        s->seed = seed;
-        break;
-    case OSOE_ENVIRONMENT_UNSET:
-        break;
-    default:
-        osoe_fatal("OSOE_WIRE_SEED='%s' is not a decimal number", getenv("OSOE_WIRE_SEED"));
-    }
-    /* Said whenever injection is on, so a failure names what to reproduce it
-     * with; off by default, so a normal run says nothing. */
-    if (announce && s->split != 0)
-        fprintf(stderr, "osoe: wire split %u per myriad, OSOE_WIRE_SEED=%llu\n", s->split,
-                (unsigned long long)s->seed);
-}
-
-void osoe_wire_settings_check(const struct osoe_bootstrap *b)
-{
-    struct wire_settings s;
-    read_settings(&s, b, false);
-}
-
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
                          const struct osoe_bootstrap *b)
 {
-    struct wire_settings s;
-    read_settings(&s, b, true);
+    struct osoe_wire_settings s;
+    osoe_wire_settings_read(&s, b, true);
     osoe_ring_open(r, wires, count, s.buffer_count, s.buffer_bytes);
 }
 
 void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,
                       uint32_t peer, const struct osoe_bootstrap *b)
 {
-    struct wire_settings settings;
-    read_settings(&settings, b, false);
-    const struct wire_settings *s = &settings;
+    struct osoe_wire_settings settings;
+    osoe_wire_settings_read(&settings, b, false);
+    const struct osoe_wire_settings *s = &settings;
     /* The seed differs per peer, so the two directions of a pair - and two
      * wires in one test process - split differently. */
     *w = (struct osoe_wire){ .fd = fd, .peer = peer, .slot = slot, .ring = r,
                              .first = OSOE_RING_NONE, .last = OSOE_RING_NONE, .sent = -1,
-                             .seed = hash64(s->seed ^ ((uint64_t)b->node << 32) ^ peer),
+                             .seed = osoe_wire_hash(s->seed ^ ((uint64_t)b->node << 32) ^ peer),
                              .split = s->split };
     /*
      * The application layer owns coalescing (§3.3, invariant 14). §3.9 is

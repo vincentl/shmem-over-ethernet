@@ -22,7 +22,6 @@
 #include "agent.h"
 #include "base/deadline.h"
 #include "base/futex.h"
-#include "base/ring-check.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "barrier.h"
@@ -280,8 +279,9 @@ static void session_start(void)
      * §1's start-up check of the running kernel, before anything is created:
      * an old kernel is refused by name, rather than aborting mid-rendezvous
      * with the control segment and heaps already in /dev/shm (review round two,
-     * portability F3). futex2 is all the library uses today; io_uring's checks
-     * join it at step 3, when the library first opens a ring.
+     * portability F3). The futex calls are what every job uses; what a job of
+     * more than one node also needs - io_uring, on AM - the transport checks
+     * with its settings below, in the same way (internode-backend.h).
      *
      * Told to nobody: the kernel is every local PE's, so each refuses it by
      * itself, and a refusal's last word (node.h) would leave the node a
@@ -296,20 +296,6 @@ static void session_start(void)
         osoe_fatal("osoe needs Linux 6.7 or later, for the futex2 calls (they fail with "
                    "\"%s\"); this kernel is %s", strerror(futex_error), release);
     }
-    /* io_uring's checks join it for a job that spans nodes, the one kind that
-     * opens a ring (§1: init checks what the library uses). */
-    const char *facility;
-    int ring_error = osoe.bootstrap.node_count > 1 ? osoe_ring_check(&facility) : 0;
-    if (ring_error) {
-        struct utsname u;
-        const char *release = uname(&u) == 0 ? u.release : "unknown";
-        osoe_fatal("osoe needs io_uring with %s for a job of %u nodes (it fails with "
-                   "\"%s\"%s); this kernel is %s", facility, osoe.bootstrap.node_count,
-                   strerror(ring_error),
-                   ring_error == EPERM && facility == osoe_ring_check_creating
-                       ? ", which usually means the kernel.io_uring_disabled sysctl is set"
-                       : "", release);
-    }
     osoe_node_refusal_arm(&osoe.node, &osoe.bootstrap, sessions);
 
     /*
@@ -318,8 +304,10 @@ static void session_start(void)
      * the AM layer's (OSOE_AM_*, OSOE_GET_LANDING_BYTES) were read by the lead
      * alone as it laid out the segment, and the wire's by leads alone after the
      * rendezvous, so a bad value ended one PE and left the rest waiting, or was
-     * never read. The backend checks its own (transport.h), values only; their
-     * users read them again where they use them. A few are read only after the
+     * never read. The backend checks its own (transport.h), values only, after
+     * what it needs of the kernel for a job of this many nodes, which it
+     * refuses telling no one, as the futex check above; their users read the
+     * settings again where they use them. A few are read only after the
      * join - the deadlock detector's, the agent's CPUs - and a bad one there
      * ends the whole job, as any failure after the join does (the release
      * fixes' review, Q5-6).

@@ -937,7 +937,7 @@ struct osoe_thread_record {
  * (docs/prompts/done/phase1-step8-slice1-prompt.md, decision 2).
  *
  * The rest of a context - its dirty set, O(nodes) virtual - is process
- * memory of the PE that owns it (transport-am.c).
+ * memory of the PE that owns it (transport-internode.c).
  */
 struct osoe_context_block {
     _Alignas(OSOE_CACHELINE)

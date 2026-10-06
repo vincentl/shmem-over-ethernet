@@ -3761,6 +3761,28 @@ instead of pushing every on-node rmw through NIC loopback.
   wait is spec §9.5.3's quiet. A context's PE is a world rank at the boundary,
   as every PE is: the SHMEM layer translates a team context's (`context.c`).
 
+*As built, v0.2 step 1 (`docs/decisions/2026-10-06-single-node-seam.md`): the
+internode backend behind one file boundary.* Below the boundary the transport
+is in two parts. The part every job uses is `transport-am.c`: the dispatch on
+locality, the intranode path it hands node-mates to, the pool of contexts and
+their modes, and the fence and wait of a job of one node, which are the calling
+thread's fences alone, since every operation there is applied before its call
+returns. Everything only a job of more than one node uses is the *internode
+backend*, reached through `internode-backend.h` alone - each of its entry
+points one of the calls above, or its share of one, for such a job - and on AM
+it is the far half (`transport-internode.c`, where the landing zone, the dirty
+set, the credits and the waits that the as-built notes of §3, §4.6 and §4.11
+place in `transport-am.c` now are), the engine, the wires and the ring, the
+connection area, the replies and the messages, the rendezvous of the node
+leads, and `internode.h` over AM. `shmem.boundary` holds every other file to
+reaching it through that header (`cmake/CheckBoundary.cmake`, its third
+check). The transport's settings check now also refuses what the backend needs
+of the kernel for a job of this many nodes - on AM io_uring's checks, which
+`init.c` made itself before - telling no one, as the futex check does; and the
+AM layer's sizes and the wire's settings, which every PE checks as values,
+have files of their own on the boundary (`am-configuration.c`,
+`wire-settings.c`).
+
 ### 4.11 `SHMEM_THREAD_MULTIPLE`
 
 > **Designed and model-checked; being built in three slices** (phase 1 step 8,

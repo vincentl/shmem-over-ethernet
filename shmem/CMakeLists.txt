@@ -8,19 +8,30 @@ find_package(Threads REQUIRED)
 set(OSOE_BACKEND "am" CACHE STRING "The transport and internode backend (am)")
 set_property(CACHE OSOE_BACKEND PROPERTY STRINGS am)
 if(OSOE_BACKEND STREQUAL "am")
+  # The part of the backend every job uses: the dispatch on locality, the
+  # contexts, and a one-node job's fence and wait (transport-am.c); and the
+  # generic internode phase, which AM hands the data collectives to and whose
+  # team-number calls every job makes - any backend may compile it (it is on
+  # the boundary, cmake/CheckBoundary.cmake).
   set(osoe_backend_sources
+    src/internode-generic.c
+    src/transport-am.c)
+  # The internode backend (internode-backend.h): every file only a job of more
+  # than one node uses - the far half, the engine, the wires and the ring, the
+  # connection area, the replies and the messages, the rendezvous of the node
+  # leads, and internode.h over AM.
+  set(osoe_internode_sources
     src/am.c
     src/connection.c
     src/connection-area.c
     src/internode-am.c
-    # The generic internode phase, which AM hands the data collectives to; any
-    # backend may compile it (it is on the boundary, cmake/CheckBoundary.cmake).
-    src/internode-generic.c
+    src/listener.c
     src/progress.c
     src/progress-host.c
+    src/rendezvous.c
     src/reply.c
     src/ring.c
-    src/transport-am.c
+    src/transport-internode.c
     src/wire.c)
 else()
   message(FATAL_ERROR "OSOE_BACKEND=${OSOE_BACKEND}: the only backend is am")
@@ -32,6 +43,7 @@ add_library(osoe
   src/agent.c
   src/allocator.c
   src/alltoall.c
+  src/am-configuration.c
   src/amo.c
   src/barrier.c
   src/blocked.c
@@ -43,7 +55,6 @@ add_library(osoe
   src/info.c
   src/init.c
   src/job.c
-  src/listener.c
   src/liveness.c
   src/lock.c
   src/malloc.c
@@ -53,7 +64,6 @@ add_library(osoe
   src/profile.c
   src/quiet.c
   src/rank-map.c
-  src/rendezvous.c
   src/rma.c
   src/rma-typed.c
   src/scans.c
@@ -74,7 +84,9 @@ add_library(osoe
   src/wait.c
   src/watch.c
   src/sweep.c
-  ${osoe_backend_sources})
+  src/wire-settings.c
+  ${osoe_backend_sources}
+  ${osoe_internode_sources})
 target_include_directories(osoe
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

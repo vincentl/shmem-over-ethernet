@@ -3,15 +3,15 @@
  * The intranode path of the transport boundary (§4.10, §4.1).
  *
  * Not a backend of its own any more. transport-am.c owns §4.10's entry points
- * and sends each operation here or over the AM layer, on the answer the one
- * locality function gives (§8.1); these are what it calls for a PE that
+ * and sends each operation here or to the internode backend, on the answer the
+ * one locality function gives (§8.1); these are what it calls for a PE that
  * osoe_transport_direct accepts.
  *
  * Each is a memory operation on a mapping this process already holds, applied
  * in the calling thread before it returns, so nothing taking this path is ever
  * outstanding and none of them takes a context: there is no ordering state to
  * carry when every operation is already complete. The dirty set belongs to the
- * far half.
+ * far half (transport-internode.c).
  *
  * `pe` here has already been resolved as routing in this process. Passing one
  * that has not is a null dereference rather than a slow path, which is

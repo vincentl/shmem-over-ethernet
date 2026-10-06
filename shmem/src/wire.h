@@ -46,19 +46,7 @@
 #include "bootstrap.h"
 #include "listener.h"
 #include "ring.h"
-
-/*
- * Provided buffers: OSOE_WIRE_BUFFERS of OSOE_WIRE_BYTES each, shared by every
- * wire of the ring, so the memory a node holds for receiving does not grow with
- * its peers. The count is what bounds the completion queue (§3.3); the size
- * only how finely a segment is split. A small size is how the tests make the
- * kernel split what a sender wrote whole.
- */
-#define OSOE_WIRE_DEFAULT_BYTES    (UINT32_C(16) << 10)
-#define OSOE_WIRE_MIN_BYTES        UINT32_C(64)
-#define OSOE_WIRE_MAX_BYTES        (UINT32_C(1) << 20)
-#define OSOE_WIRE_DEFAULT_BUFFERS  UINT32_C(64)
-#define OSOE_WIRE_MAX_BUFFERS      UINT32_C(32768)
+#include "wire-settings.h"
 
 struct osoe_wire {
     int fd;
@@ -121,10 +109,6 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
  * disabled until enabled; and a connected socket made wire `slot` of it, toward
  * node `peer`.
  */
-/* Read and check OSOE_WIRE_BYTES, _BUFFERS, _SPLIT and _SEED, fatal on a bad
- * one: every PE at init (init.c), where only a lead read them, and only on a
- * job of several nodes, until the round-three review's settings sweep. */
-void osoe_wire_settings_check(const struct osoe_bootstrap *b);
 
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
                          const struct osoe_bootstrap *b);

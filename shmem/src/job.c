@@ -3,7 +3,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <netinet/in.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +20,7 @@
 #include "base/sweep.h"
 #include "fatal.h"
 #include "job.h"
-#include "listener.h"
+#include "internode-backend.h"
 #include "rendezvous.h"
 #include "shm-object.h"
 #include "transport.h"
@@ -154,15 +153,15 @@ static void bind_tables(struct osoe_job *j, const struct osoe_job_header *h)
 /* The lead: meet the other leads, and write what it learned for its node. */
 static void lead(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t session)
 {
-    struct sockaddr_in address;
-    osoe_listener_own_address(b, &address);
     /* The backend readies what peers need to reach this node - on AM, its
-     * node-pair listener - and describes it in the blob (transport.h). */
+     * node-pair listener - and describes it in the blob (transport.h); the
+     * internode backend carries it to every other node's lead, and theirs
+     * back (internode-backend.h). */
     unsigned char blob[OSOE_JOB_BACKEND_BLOB_BYTES];
     memset(blob, 0, sizeof blob);
     osoe_transport_advertise(blob);
     struct osoe_rendezvous_result r;
-    osoe_rendezvous(b, session, &address, blob, &r);
+    osoe_internode_backend_rendezvous(b, session, blob, &r);
 
     j->bytes = object_bytes(r.run_count, b->node_count);
     char err[256];

@@ -22,7 +22,7 @@ accounting alone:
   SEQ      the sequence number a writer recorded after its CAS is the number of
            the segment its message left in (what quiet's dirty set stores)
   QUIET    when `acked` reaches the number a writer recorded, that writer's
-           messages have been applied (transport-am.c: acknowledged())
+           messages have been applied (transport-internode.c: acknowledged())
   SEGSEQ   segments leave in sequence order, without gaps
   liveness no writer and no progress thread is left blocked (STUCK)
 
@@ -171,7 +171,7 @@ def writer(w, msgs, cap, quiet):
         nxt = f'@w{m + 1}_S0' if m + 1 < msgs else '@Q0'
         B += reserve_blocks(p, ident, cap, None, nxt)
     if quiet:
-        # transport-am.c: wait for acked >= high_segment.
+        # transport-internode.c: wait for acked >= high_segment.
         B += [('Q0', ('set', 'q', lambda L: DEL, '@Q1')),
               ('Q1', ('await', lambda M, L: M[ACKED] >= L['s'], '@Q2')),
               ('Q2', ('check', lambda M, L, w=w, n=msgs: None if all(

@@ -65,7 +65,7 @@
  * hang and a clean abort. A blocking call also publishes the "blocked in"
  * record (§3.14) naming what it waits on, and gives up only by §3.15's
  * no-progress rule - never because time has passed. The AM backend's four
- * waits do all three (transport-am.c, struct am_wait), and shmem.unswept-wait
+ * waits do all three (transport-internode.c, struct am_wait), and shmem.unswept-wait
  * and shmem.stopped-node.* are the tests that would see one stop.
  */
 #ifndef OSOE_TRANSPORT_H
@@ -120,11 +120,16 @@ void osoe_transport_fini(void);
 struct osoe_bootstrap;
 
 /*
- * Every setting the backend reads, checked as values only by every PE before
- * its node joins, so that a bad one ends the job at once and by name rather
- * than one PE alone, or none (the round-three review's R8): the AM backend's,
- * OSOE_AM_* and OSOE_GET_LANDING_BYTES, and its wires'. Ends the PE with a
- * fatal on a bad value; their users read them again where they use them.
+ * What the backend needs before this PE's node joins, checked by every PE
+ * (init.c). First what it needs of the kernel to run a job of b->node_count
+ * nodes - on AM, io_uring's checks, for a job of more than one node - which
+ * every local PE refuses alike and so tells no one, as init's futex check
+ * does: a lead's last word would leave its node a tombstone in /dev/shm for
+ * nothing (node.h). Then every setting the backend reads, checked as values
+ * only, so that a bad one ends the job at once and by name rather than one PE
+ * alone, or none (the round-three review's R8): the AM backend's, OSOE_AM_*
+ * and OSOE_GET_LANDING_BYTES, and its wires'. Ends the PE with a fatal naming
+ * what failed; the settings' users read them again where they use them.
  */
 void osoe_transport_settings_check(const struct osoe_bootstrap *b);
 
@@ -159,7 +164,7 @@ void osoe_transport_threads(bool concurrent);
 /*
  * Create a context (§4.11's modes; phase 1 step 8): the backend's state for
  * an independent ordering and completion environment - on AM its own dirty
- * set and get counters (transport-am.c). A backend may bound how many a PE
+ * set and get counters (transport-am.c, transport-internode.c). A backend may bound how many a PE
  * has at once, as OSOE_MAX_CONTEXTS bounds AM's. Returns NULL when it cannot
  * make one now, which spec §9.5.1 lets shmem_ctx_create report as a failure
  * that is not an error.

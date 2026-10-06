@@ -11,6 +11,10 @@ cmake_minimum_required(VERSION 3.25)
 #      step 5 slice 2): the runtime, the files on the boundary and the backend
 #      include nothing of the OpenSHMEM layer's, so the includes run one way,
 #      from the API down.
+#   3. Nothing outside the internode backend includes, however indirectly, a
+#      header of the internode backend's (v0.2 step 1): the part of the
+#      transport every job uses reaches it through internode-backend.h alone,
+#      so a second internode backend replaces those files and nothing else.
 #
 #   cmake -DSOURCE_DIR=<repository root> -P CheckBoundary.cmake
 #
@@ -67,13 +71,16 @@ set(OSOE_RUNTIME
 set(OSOE_BELOW_BOUNDARY
   am.c am.h am-state.h connection.c connection.h connection-area.c
   connection-area.h internode-am.c progress.c progress.h progress-host.c
-  progress-host.h reply.c reply.h ring.c ring.h transport-am.c transport-local.h wire.c
-  wire.h)
+  progress-host.h reply.c reply.h ring.c ring.h transport-am.c transport-context.h
+  transport-internode.c transport-local.h wire.c wire.h)
 
 # The generic implementation of internode.h's data half is for backends to
 # call or to replace (internode-generic.h); above the boundary it would be a
-# way around the seam, so it is refused there as a backend's header is.
-set(OSOE_BACKEND_FACING internode-generic.h)
+# way around the seam, so it is refused there as a backend's header is. And
+# the internode backend's entry points (internode-backend.h), which the part
+# of the transport every job uses calls, and job.c for the rendezvous of the
+# node leads: a backend's, refused above the boundary in the same way.
+set(OSOE_BACKEND_FACING internode-backend.h internode-generic.h)
 
 # On the boundary: its own implementation that every backend keeps, and the
 # shared infrastructure both sides build on - the seam's two headers, the
@@ -82,18 +89,39 @@ set(OSOE_BACKEND_FACING internode-generic.h)
 # backend may call, and the rendezvous. The rendezvous's sockets (listener.c)
 # and the rank map (rank-map.c) are every build's: bootstrap is out of band
 # (§6.2).
+#
+# Two more every build keeps: the AM layer's sizes (am-configuration.c), which
+# lay out every PE's landing zone in the node segment whatever the job's shape,
+# and the wire's settings (wire-settings.c), which every PE checks as values
+# before its node joins - each read on one node as on many, so that a bad
+# value is refused the same way.
 set(OSOE_ON_BOUNDARY
-  collective-tree.c combine.c internode-generic.c job.c listener.c node.c rank-map.c
-  rendezvous.c shm-object.c transport-local.c watch.c
-  collective-tree.h combine.h internal-region.h internode.h job.h listener.h node.h
-  rank-map.h rendezvous.h rmw.h shm-object.h transport.h watch-range.h)
+  am-configuration.c collective-tree.c combine.c internode-generic.c job.c listener.c
+  node.c rank-map.c rendezvous.c shm-object.c transport-local.c watch.c wire-settings.c
+  am-configuration.h collective-tree.h combine.h internal-region.h internode.h job.h
+  listener.h node.h rank-map.h rendezvous.h rmw.h shm-object.h transport.h watch-range.h
+  wire-settings.h)
 
-# The three files on the boundary that reach an AM header, each known (roce-seam
-# §3.2): node.c sizes the landing zones from the AM chunk (L5); rendezvous.c
-# checks the AM handler table's checksum (L6); transport-local.c, the intranode
-# backend every build keeps, includes the header the AM backend shares with it.
-# Every other file on the boundary is held to the first check.
-set(OSOE_ON_BOUNDARY_READING_AM node.c rendezvous.c transport-local.c)
+# The two files on the boundary that reach an AM header, each known (roce-seam
+# §3.2): rendezvous.c checks the AM handler table's checksum (L6);
+# transport-local.c, the intranode backend every build keeps, includes the
+# header the AM backend shares with it. A third, node.c, sized the landing
+# zones from the AM chunk (L5) until v0.2's step 1 gave the AM layer's sizes a
+# file of their own on the boundary. Every other file on the boundary is held
+# to the first check.
+set(OSOE_ON_BOUNDARY_READING_AM rendezvous.c transport-local.c)
+
+# The internode backend (internode-backend.h): every file only a job of more
+# than one node uses, on AM - the far half, the engine, the wires and the ring,
+# the connection area, the replies and the messages, the rendezvous of the node
+# leads, and internode.h over AM. A second internode backend replaces them
+# whole, so no other file may reach a header of theirs (the third check); the
+# lists above say where in the layers each sits.
+set(OSOE_INTERNODE_BACKEND
+  am.c am.h am-state.h connection.c connection.h connection-area.c connection-area.h
+  internode-am.c listener.c listener.h progress.c progress.h progress-host.c
+  progress-host.h rendezvous.c reply.c reply.h ring.c ring.h transport-internode.c wire.c
+  wire.h)
 
 if(NOT SOURCE_DIR)
   message(FATAL_ERROR "usage: cmake -DSOURCE_DIR=<repository root> -P CheckBoundary.cmake")
@@ -243,5 +271,35 @@ if(violations)
                       "cmake/CheckBoundary.cmake):\n  ${report}")
 endif()
 
+# 3. Outside the internode backend, nothing of the internode backend's.
+set(internode_headers "")
+foreach(name IN LISTS OSOE_INTERNODE_BACKEND)
+  if(name MATCHES "\\.h$")
+    list(APPEND internode_headers "${name}")
+  endif()
+endforeach()
+paths_of(internode_headers internode)
+set(violations "")
+set(common 0)
+foreach(list IN ITEMS OSOE_API OSOE_RUNTIME OSOE_BELOW_BOUNDARY OSOE_BACKEND_FACING
+                      OSOE_ON_BOUNDARY)
+  foreach(top IN LISTS ${list})
+    if(top IN_LIST OSOE_INTERNODE_BACKEND)
+      continue()
+    endif()
+    walk("${top}" internode FALSE found)
+    list(APPEND violations ${found})
+    math(EXPR common "${common} + 1")
+  endforeach()
+endforeach()
+if(violations)
+  list(REMOVE_DUPLICATES violations)
+  list(JOIN violations "\n  " report)
+  message(FATAL_ERROR "files outside the internode backend include its headers (the part "
+                      "of the transport every job uses reaches it through "
+                      "internode-backend.h alone; cmake/CheckBoundary.cmake):\n  ${report}")
+endif()
+
 message(STATUS "${checked} files above or on the boundary, none reaching a header below it; "
-               "${outside} outside the API, none including one of its headers")
+               "${outside} outside the API, none including one of its headers; "
+               "${common} outside the internode backend, none including one of its headers")

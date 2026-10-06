@@ -12,7 +12,8 @@
  *
  * In step 1 this was the whole backend. It is now the near half of one:
  * transport-am.c owns §4.10's entry points and sends each operation here or
- * over the AM layer, on the answer the one locality function gives (§8.1).
+ * to the internode backend, on the answer the one locality function gives
+ * (§8.1).
  * Splitting them keeps this file what it was - the reference implementation
  * simple enough to trust, which is what the differential test of §8.1 diffs
  * against.

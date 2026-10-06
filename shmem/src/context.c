@@ -8,7 +8,7 @@
  * Below SHMEM_THREAD_MULTIPLE every context is serial (§4.11, "Context
  * modes"): one call on it at a time, which the application guarantees. Under
  * MULTIPLE a context made without SERIALIZED or PRIVATE is shareable, and its
- * issue takes no lock (phase 1 step 8's third slice; transport-am.c). The
+ * issue takes no lock (phase 1 step 8's third slice; transport-internode.c). The
  * options mean what §4.11 says: SERIALIZED and PRIVATE choose the serial mode,
  * PRIVATE also records its creating thread, which alone may destroy it (spec
  * §9.5.3), and NOSTORE lets fence and quiet on the context skip the fence that

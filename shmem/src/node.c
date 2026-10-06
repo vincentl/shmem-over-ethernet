@@ -22,7 +22,7 @@
 #include "abort.h"
 #include "fatal.h"
 #include "shm-object.h"
-#include "connection-area.h"
+#include "am-configuration.h"
 
 #include "metrics.h"
 #include "internal-region.h"
@@ -728,12 +728,12 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * the wire's maximum message undeliverable, which is a hang rather than a
      * short read.
      */
-    struct osoe_am_config am;
-    osoe_am_config_read(&am);
+    struct osoe_am_configuration am;
+    osoe_am_configuration_read(&am);
     /* Since layout 23 a zone is extents (node.h): its header and bitmap, a
      * record an extent, then the extents. A piece of a get is at most a run of
      * 64 extents in one word of the bitmap, and at most a chunk, which the
-     * wire's largest message holds. Whole extents, which osoe_am_config_read
+     * wire's largest message holds. Whole extents, which osoe_am_configuration_read
      * holds every PE to. */
     uint64_t extents = am.get_landing_bytes / OSOE_LANDING_EXTENT_BYTES;
     uint64_t landing_requests_offset =
@@ -1181,8 +1181,8 @@ again:;
     }
     /* And by its OSOE_GET_LANDING_BYTES, which sizes every PE's landing zone:
      * this PE's gets would be counted against a zone of another size. */
-    struct osoe_am_config am;
-    osoe_am_config_read(&am);
+    struct osoe_am_configuration am;
+    osoe_am_configuration_read(&am);
     if (h->landing_arena_bytes != am.get_landing_bytes) {
         char msg[256];
         snprintf(msg, sizeof msg, "OSOE_GET_LANDING_BYTES differs between PEs: the local lead "
