@@ -534,6 +534,57 @@ osoe_refusal_test(shmem.small-collective-bytes.local-disagree 2 0
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
+# The collective shape's setting and the link set by hand (v0.2 step 2): every
+# node must choose a collective's shape from the same numbers, or two would
+# build different trees for one call. Refused by name outside their values, the
+# link's three alone or not at all; held alike between the PEs of a node and,
+# below, between nodes.
+# Each refusal: a name, the variables set (separated by ^), the pattern.
+set(osoe_link_refusals
+  "shape-bogus|OSOE_COLLECTIVE_SHAPE=bogus|OSOE_COLLECTIVE_SHAPE='bogus' is neither link nor fixed"
+  "hop-0|OSOE_LINK_HOP_NS=0^OSOE_LINK_MESSAGE_NS=7000^OSOE_LINK_BYTES_PER_SECOND=116000000|OSOE_LINK_HOP_NS='0' is not between 1 and 10000000000"
+  "bandwidth-x|OSOE_LINK_HOP_NS=86000^OSOE_LINK_MESSAGE_NS=7000^OSOE_LINK_BYTES_PER_SECOND=x|OSOE_LINK_BYTES_PER_SECOND='x' is not between 1 and 10000000000000"
+  "message-too-large|OSOE_LINK_HOP_NS=86000^OSOE_LINK_MESSAGE_NS=1000000001^OSOE_LINK_BYTES_PER_SECOND=116000000|OSOE_LINK_MESSAGE_NS='1000000001' is not between 0 and 1000000000"
+  "hop-alone|OSOE_LINK_HOP_NS=86000|set together or not at all: OSOE_LINK_HOP_NS is set and OSOE_LINK_MESSAGE_NS is not"
+  "bandwidth-alone|OSOE_LINK_BYTES_PER_SECOND=116000000|set together or not at all: OSOE_LINK_BYTES_PER_SECOND is set and OSOE_LINK_HOP_NS is not")
+foreach(refusal IN LISTS osoe_link_refusals)
+  string(REPLACE "|" ";" parts "${refusal}")
+  list(GET parts 0 what)
+  list(GET parts 1 variables)
+  list(GET parts 2 pattern)
+  string(REPLACE "^" ";" env "${variables}")
+  add_test(NAME shmem.collective-shape.invalid.${what}
+    COMMAND ${CMAKE_COMMAND} -E env ${env}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.collective-shape.invalid.${what} PROPERTIES LABELS "tier2"
+    TIMEOUT 60 PASS_REGULAR_EXPRESSION "${pattern}")
+endforeach()
+osoe_refusal_test(shmem.collective-shape.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_SHAPE=fixed
+  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_SHAPE differs between PEs: the local lead has link, this PE has fixed"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
+osoe_refusal_test(shmem.link.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_LINK_HOP_NS=86000 -e 1:OSOE_LINK_MESSAGE_NS=7000
+         -e 1:OSOE_LINK_BYTES_PER_SECOND=116000000
+  PATTERNS "osoe: PE 1: OSOE_LINK_[*] differ between PEs: the local lead has a hop of 0 ns, a message cost of 0 ns and 0 bytes a second, this PE 86000, 7000 and 116000000"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
+if(OSOE_INTERNODE)
+  osoe_refusal_test(shmem.job.disagree.collective-shape 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_SHAPE=fixed
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_SHAPE=fixed; node 0 has link"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_refusal_test(shmem.job.disagree.link 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_LINK_HOP_NS=86000 -e 1:OSOE_LINK_MESSAGE_NS=7000
+           -e 1:OSOE_LINK_BYTES_PER_SECOND=116000000
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_LINK_[*] of a hop of 86000 ns, a message cost of 7000 ns and 116000000 bytes a second; node 0 has 0, 0 and 0"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_internode_label(shmem.job.disagree.collective-shape shmem.job.disagree.link)
+endif()
+
 if(OSOE_INTERNODE)
   # The node count is the value that shapes the waits: a lead expects children by
   # its own count, so one given too many waits for children that do not exist.
@@ -3000,6 +3051,12 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
   set_tests_properties(shmem.stat.L${count} PROPERTIES
     ENVIRONMENT "OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>")
 endforeach()
+# And with the link set by hand (v0.2 step 2): osoe-stat shows it.
+add_test(NAME shmem.stat.link
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+          OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000 OSOE_LINK_BYTES_PER_SECOND=116000000
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_stat>)
+set_tests_properties(shmem.stat.link PROPERTIES LABELS "tier2" TIMEOUT 90)
 
 # A job that dies, dies everywhere (§3.15; phase 1 step 4): PE 0 calls
 # shmem_global_exit, or ends the job with a fatal, while every other PE computes

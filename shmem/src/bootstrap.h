@@ -46,6 +46,12 @@ struct osoe_bootstrap {
                                      * pieces in flight per level of the tree (§5.8) */
     uint32_t small_collective_bytes;    /* OSOE_SMALL_COLLECTIVE_BYTES: the largest data
                                          * collective through a team's own slots (§5.8) */
+    uint32_t collective_shape;  /* OSOE_COLLECTIVE_SHAPE: OSOE_COLLECTIVE_SHAPE_LINK or
+                                 * _FIXED (v0.2 step 2, collective-shape.h) */
+    /* OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS, OSOE_LINK_BYTES_PER_SECOND (v0.2
+     * step 2): the link a large collective's shape is chosen from, set rather
+     * than measured - all three or none; 0 when none is set. */
+    uint64_t link_hop_ns, link_message_ns, link_bytes_per_second;
     uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
     /* OSOE_KEEPALIVE (§3.15): TCP keepalive on every node-pair connection, as
      * seconds idle, seconds between probes, and probes. Zero means the default,
@@ -149,6 +155,27 @@ struct osoe_bootstrap {
 #define OSOE_SMALL_COLLECTIVE_BYTES_DEFAULT 1024u
 #define OSOE_SMALL_COLLECTIVE_BYTES_LOWEST  128u
 #define OSOE_SMALL_COLLECTIVE_BYTES_HIGHEST 16384u
+
+/*
+ * OSOE_COLLECTIVE_SHAPE (v0.2 step 2): `link`, the default, chooses each large
+ * reduction's and broadcast's fan-out and window from the link
+ * (collective-shape.h); `fixed` runs every one at the fan-out and the pipeline
+ * as set, the 0.1.0 tag's shape. Until the chooser is on the data path - the
+ * step's second part - every collective runs as `fixed` does.
+ */
+#define OSOE_COLLECTIVE_SHAPE_LINK  0u
+#define OSOE_COLLECTIVE_SHAPE_FIXED 1u
+
+/*
+ * OSOE_LINK_* (v0.2 step 2): the link's three numbers set by hand, for tests
+ * and for a user who knows their fabric, in place of the measurement. The
+ * ranges keep the chooser's integer arithmetic inside 64 bits: a hop of up to
+ * ten seconds, a message cost of up to one, from one byte a second to ten
+ * terabytes.
+ */
+#define OSOE_LINK_HOP_NS_HIGHEST           UINT64_C(10000000000)
+#define OSOE_LINK_MESSAGE_NS_HIGHEST       UINT64_C(1000000000)
+#define OSOE_LINK_BYTES_PER_SECOND_HIGHEST UINT64_C(10000000000000)
 
 /*
  * OSOE_MAX_THREADS: the application threads a PE may have alive that have

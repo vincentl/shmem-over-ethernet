@@ -506,7 +506,8 @@ job's nodes, naming the job by its id - Slurm's job id, or for a job of
 
 ```sh
 osoe-stat 1234            # job 1234 on this node: counters, and where each PE waits
-osoe-stat --summary 1234  # each team's barrier or sync between nodes, to walk a hang down
+osoe-stat --summary 1234  # the node's collective shape and link, then each team's
+                          # barrier or sync between nodes, to walk a hang down
 srun --jobid=1234 --overlap -N4 --ntasks-per-node=1 osoe-stat --summary 1234
                           # the same on every node of a Slurm job, as its own user
 ```
@@ -1326,6 +1327,8 @@ both are set the `SHMEM_` one controls.
 | `OSOE_COLLECTIVE_FANOUT` | `4` | k of the tree the node leads meet in: `2` to `32`. Over Ethernet it is a bandwidth choice at large sizes, since a node sends a copy to each of its children over its one link. *Checked*. |
 | `OSOE_COLLECTIVE_PIPELINE` | `2` | Pieces of a large reduction, broadcast or scan each node or member keeps in flight up and down its tree: `1` to `8`. A reduction's or a broadcast's piece carries 16 KiB, its header in the lane's slot beside it; a scan's is sized to it, at most 16 KiB. *Checked*. |
 | `OSOE_SMALL_COLLECTIVE_BYTES` | `1024` | The largest reduction, broadcast or scan that moves in one piece through slots its team keeps: `128` to `16384`. A larger one goes in pieces through lanes the threads that lead it lend it - every member's thread, for a scan - and a reduction's or scan's child may wait for its parent's, once - up to a hop, or a round trip when the parent enters after it. Each team number keeps the slots - one for each child position of the tree and one for the release, for its reductions and broadcasts and again for its scans - so each byte of the value costs every PE ten bytes a number at the default fan-out: lower it for memory, raise it to keep a few kilobytes' reduction or scan in one hop. *Checked*. |
+| `OSOE_COLLECTIVE_SHAPE` | `link` | `link` or `fixed`: whether a large reduction's or broadcast's tree is to take the fan-out and window its size makes cheapest on the link, chosen alike on every node from the link's three numbers, or keep `OSOE_COLLECTIVE_FANOUT` and `OSOE_COLLECTIVE_PIPELINE` for every call, as osoe 0.1.0 did. Today both run as `fixed`: the choice reaches the collectives with the step that measures the link (`docs/prompts/v0.2-step2-tree-shape-prompt.md`). *Checked*. |
+| `OSOE_LINK_HOP_NS`, `OSOE_LINK_MESSAGE_NS`, `OSOE_LINK_BYTES_PER_SECOND` | not set | The link the shape is chosen from, set by hand in place of its measurement - for tests, and for a fabric known in advance: the one-way time of a small message between two nodes' leads, through both progress threads (`1` to `10000000000` nanoseconds); what a lead's loop spends on each message it sends (`0` to `1000000000` nanoseconds); and the bytes a second a node's link carries each way (`1` to `10000000000000`). All three or none: one alone is refused by name. `osoe-stat` shows them. *Checked*. |
 
 **Start-up, failures and inspection**
 

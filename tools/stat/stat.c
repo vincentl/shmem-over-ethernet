@@ -356,6 +356,25 @@ static uint64_t pe_thread_value(const struct osoe_segment *s, const struct osoe_
 
 /* ---- headers ---------------------------------------------------------- */
 
+/* The shape of a large collective's tree and the link it is chosen from
+ * (layout 32, v0.2 step 2), as one phrase; empty before layout 32. */
+static void shape_text(const struct osoe_segment *s, char *buf, size_t len)
+{
+    buf[0] = '\0';
+    uint64_t shape = 0, hop = 0, message = 0, bandwidth = 0;
+    if (s->dir->layout < 32 || !osoe_segment_read_name(s, "node.collective_shape", 0, &shape))
+        return;
+    osoe_segment_read_name(s, "node.link.hop_ns", 0, &hop);
+    osoe_segment_read_name(s, "node.link.message_ns", 0, &message);
+    osoe_segment_read_name(s, "node.link.bytes_per_second", 0, &bandwidth);
+    if (bandwidth)
+        snprintf(buf, len, "collective shape %s; link set: a hop of %" PRIu64 " ns, a message "
+                 "cost of %" PRIu64 " ns, %" PRIu64 " bytes a second", shape ? "fixed" : "link",
+                 hop, message, bandwidth);
+    else
+        snprintf(buf, len, "collective shape %s; link not set", shape ? "fixed" : "link");
+}
+
 static void print_identity(const struct osoe_segment *s)
 {
     uint64_t job = 0, step = 0, node = 0, session = 0, world = 0;
@@ -372,6 +391,10 @@ static void print_identity(const struct osoe_segment *s)
     printf("  %" PRIu64 " bytes, %u metrics (checksum %#010x), %u blocks of %u bytes\n",
            s->dir->segment_bytes, s->dir->metrics_count, s->dir->metrics_checksum,
            s->dir->block_count, s->dir->block_bytes);
+    char shape[192];
+    shape_text(s, shape, sizeof shape);
+    if (shape[0])
+        printf("  %s\n", shape);
 
     uint64_t aborting = 0, abort_pe = 0, failed = 0;
     osoe_segment_read_name(s, "node.aborting", 0, &aborting);
@@ -593,6 +616,12 @@ static void summary_line(const struct osoe_segment *s)
         osoe_segment_read_name(s, "pe.rank", i, &rank);
         snprintf(where, sizeof where, "rank %" PRIu64 " %s (%s) %s", rank, b.routine, what, d);
     }
+
+    /* The node's shape and link first: one line, before its teams'. */
+    char shape[192];
+    shape_text(s, shape, sizeof shape);
+    if (shape[0])
+        printf("node %-3" PRIu64 " %-16s %s\n", node, host, shape);
 
     bool first = true;
     for (uint32_t t = 0; t < s->team_count; t++) {
@@ -1453,7 +1482,8 @@ static void usage(FILE *f)
 "  -c, --counters    per-PE counter totals and where each PE is blocked (default)\n"
 "  -d, --dump        every field of every record: node, PE slots, counter blocks\n"
 "  -T, --threads     one line per counter block, with its kernel CPU time\n"
-"      --summary     one line per node and team: the barrier or sync epoch in\n"
+"      --summary     a line per node - its collective shape and link - then one\n"
+"                    per node and team: the barrier or sync epoch in\n"
 "                    progress, whether this node's own members arrived, and the\n"
 "                    lowest child that has not - walk a hung barrier or sync\n"
 "                    down from the root by it (§5.3); a reduction, broadcast,\n"

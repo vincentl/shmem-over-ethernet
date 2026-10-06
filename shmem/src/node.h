@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 31
+#define OSOE_NODE_LAYOUT 32
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -802,6 +802,14 @@ struct osoe_node_header {
      * in every PE's internal region and decides every data collective's class
      * (internal-region.h), so open_control holds the node's PEs to it too. */
     uint32_t small_collective_bytes;
+    /* Layout 32 (v0.2 step 2): the lead's OSOE_COLLECTIVE_SHAPE and the link
+     * its large collectives' shapes are chosen from - OSOE_LINK_*'s, or 0
+     * where they are not set - which open_control holds the node's PEs to,
+     * and osoe-stat shows (node.link.*). */
+    uint32_t collective_shape;
+    uint64_t link_hop_ns;
+    uint64_t link_message_ns;
+    uint64_t link_bytes_per_second;
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)
