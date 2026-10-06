@@ -7,8 +7,8 @@ Part 1 depends on nothing in step 2, and items 1 and 2 do not.
 
 **Where it stands.** Built on the branch `rabenseifner`, itself on step 2's
 `tree-shape`, not merged: items 1 and 2 - the arithmetic, in the model and in C
-(`e2055e0`), and the protocol the second question below proposes, modelled
-(`feb2efe`). Waiting: your word on that design and on the first question, and
+(`c7a7e14`), and the protocol the second question below proposes, modelled
+(`eaf4607`). Waiting: your word on that design and on the first question, and
 item 3, the chooser's term, which needs step 2's chooser on `main`.
 
 ## The arithmetic
