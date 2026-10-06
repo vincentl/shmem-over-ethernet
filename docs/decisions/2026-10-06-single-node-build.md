@@ -211,7 +211,9 @@ model-checker file changed since.
 them, then `cmake --install` into a prefix, `oshcc` from it compiling the
 statics test program and two examples of `corpus/openshmem-examples` (`hello`,
 `bcast1`), each run with the installed `osoe-launch` at 8 and 32 PEs on the
-VM's four cores, and a job of two logical nodes refused:
+VM's four cores - at `SHMEM_SYMMETRIC_SIZE=16m`, since 32 PEs at the default
+heap ask 8.2 GiB of `/dev/shm` and 8 ask 2.1, more than the VMs' half of their
+memory (the step's review, scale Q3-2) - and a job of two logical nodes refused:
 
 | | Debian 13, liburing hidden (`osoe-load`) | Rocky Linux 9.8 (`osoe-rocky`) |
 |---|---|---|
