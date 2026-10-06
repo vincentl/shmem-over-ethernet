@@ -13,6 +13,12 @@ without the author, under a standing mandate, and the record carries the undo.
 
 - **Release point first.** 1.5 complete through step 8, 1.6 less its known gaps, the SOS suite clean of its own extensions, a green Pi runbook, a license, `cmake --install`, a README, a version tag. Author, [2026-09-26-day](2026-09-26-day.md) item 2.
 - **RoCE is a constraint, not work.** The seams stay RDMA-capable; no RoCE backend before the release; Soft-RoCE at most after it. Author, [2026-09-26-day](2026-09-26-day.md) item 1.
+- **v0.2 is four steps in order**: the single-node build, the tree's shape from the link, Rabenseifner's reduction, progress helpers (`docs/prompts/task-v0.2.md`); x86-64 work is gated on hardware, not in the order; development stays aarch64-first. Author, [2026-10-05-v0.2](2026-10-05-v0.2.md) items 1 and 5.
+- **The single-node build is an opt-in**, `OSOE_SINGLE_NODE` default off: no liburing, no io_uring, the classic futex in that build alone, a job of more than one node refused by name; Rocky Linux 9 is its goal; the full build keeps Linux 6.7 and liburing 2.6. Author, [2026-10-05-v0.2](2026-10-05-v0.2.md) items 2 to 4.
+- **Rabenseifner's algorithm, not a ring**, for large reductions. Author, [2026-10-05-v0.2](2026-10-05-v0.2.md) item 6.
+- **Decisions in v0.2 go by performance and elegance**, not by the code or the tests they cost. Author, [2026-10-05-v0.2](2026-10-05-v0.2.md) item 7.
+- **Progress helpers are a control plane on the lead's agent and data planes on helper threads**, built last, correctness on oversubscribed logical nodes, performance when a fast link exists; the design is `docs/design/progress-helpers-proposal.md`, its §8 the author's to answer. Author (the premise and the order), Claude (the design), [2026-10-05-v0.2](2026-10-05-v0.2.md) item 8.
+- **`process_vm_readv`/`writev` are not a route to symmetric statics**; the README's statics limits will say why. Claude, not struck by the author, [2026-10-05-v0.2](2026-10-05-v0.2.md) item 9.
 - **Step 8 in three slices.** Contexts serial; then threads behind an interim per-context mutex; then a lock-free shared mode. Author, [2026-09-26-day](2026-09-26-day.md) item 3.
 - **Scans modeled before built, right after step 8 slice 1.** Author, [2026-09-26-day](2026-09-26-day.md) item 6.
 - **Scan design A.** Every member scans at its team rank's place in a pre-order k-ary tree, on its own thread. Author, [2026-09-26-evening](2026-09-26-evening.md) item 4.

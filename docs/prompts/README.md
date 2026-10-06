@@ -3,19 +3,20 @@
 **Where the files are.** The open brief sits here; every finished one is in
 `done/`, under its own name, which this index still gives.
 
-**Open now:** one session's prompt, `task-first-release.md` (the arc, the
-order, how to spend the session), whose last stretch is the release point:
-the briefs of the team redesign's steps D and E, `phase1-step7-slice3-prompt.md`
-and `phase1-step7-slice4-prompt.md` (`docs/design/team-resources-proposal.md`),
-are done, E's merge point passed on 2026-10-04 and its review, round six, under
-way. The two briefs written 2026-10-02 after
-the round-three review (`docs/reviews/archive/phase1-release-review.md`) and
-the plan that validated its findings are done: `task-release-fixes.md`, every
-fix before the first release but the teams, merged with the fixes of the
-round-four review of its merge point (`docs/reviews/archive/phase1-release-fixes-review.md`),
-and with it the plan and the review lead's own brief. The table below gives
-every finished brief, in the order the work was done, and the open ones at its
-end.
+**Open now:** v0.2. Its arc is `task-v0.2.md` - four steps in order, each
+with a brief of its own for a session that starts cold, and a list of items
+gated on hardware - written on 2026-10-05 from the author's decisions of that
+evening (`docs/decisions/2026-10-05-v0.2.md`): `v0.2-step1-single-node-prompt.md`
+(the opt-in single-node build, for Rocky Linux 9 and any desktop),
+`v0.2-step2-tree-shape-prompt.md` (the internode tree's fan-out and window
+chosen per collective from the link measured at start-up),
+`v0.2-step3-rabenseifner-prompt.md` (reduce-scatter and allgather over the
+node leads for large reductions) and `v0.2-step4-progress-helpers-prompt.md`
+(the control plane on the lead's agent, data planes on helper threads, from
+`docs/design/progress-helpers-proposal.md`, whose §8 the author answers
+first). The session that took the tree to the first tag, `task-first-release.md`,
+is done: 0.1.0 is `53b8f0f`. The table below gives every finished brief, in
+the order the work was done, and the open ones at its end.
 
 The brief each working session was given, kept so that a decision can be traced
 back to what was asked for as well as to what was done.
@@ -41,6 +42,11 @@ A fourth numbering shares the word and is unrelated: **§4.3's** phases 1, 1.5 a
 `task-*.md` files are one-off jobs — a merge, a review — rather than a slice of a
 step; the stress tester's phases, which belong to no §7.1 step, are
 `task-stress-phaseN.md`.
+
+**After the first tag** the unit of work is a version's step: `task-v0.2.md`
+is v0.2's arc and `v0.2-stepN-<name>-prompt.md` its steps, named for what they
+build rather than for a design-notes section, since §7.1 enumerates phase 1
+only.
 
 **RoCE in the briefs.** Several briefs give "a path to RoCE at ~10⁶ PEs that no
 interface blocks" as an axis to judge the work by. That axis stands: it is a
@@ -95,4 +101,9 @@ and `docs/reviews/` do track the current names.
 | `task-release-fixes.md` | Every fix before the first release but the teams, for a fresh session: the record, the small code fixes, global exit, start-up, the README and records, the repository scrub, the whole-tree verification | done: Part 0 on `main` (9bbac4f, 2026-10-02); Parts 1 to 6 merged 2026-10-02 and 03 (`docs/decisions/2026-10-02-release-fixes.md`); the round-four review of the merge point, at `08b3da0` (`docs/reviews/archive/phase1-release-fixes-review.md`: release after named changes), and its fixes merged 2026-10-04 (`docs/decisions/2026-10-04-review-fixes.md`) |
 | `phase1-step7-slice3-prompt.md` | §7.1 step 7, slice 3: step D of the team redesign - a team number held by each member PE and given back at destroy; the node blocks from a pool found by name; two parts and a merge point before step E | done: Part 1 merged (the pool found by name, `OSOE_TEAM_BLOCKS`, the engine and the wire by block and name; `docs/decisions/2026-10-03-team-storage.md`); Part 2 merged (numbers per PE given back, blocks given back, handles by generation, `SHMEM_THREAD_MULTIPLE` splits by pending numbers; `docs/decisions/2026-10-03-team-allocation.md`); both on `main` at `d8a651d` on 2026-10-04 and the merge point passed that day (`docs/decisions/2026-10-04-step-d-merge-point.md`); its review, round five (`docs/reviews/archive/phase1-step7-slice3-review.md`: release once step E is built, after named changes), and the changes merged the same day (`docs/decisions/2026-10-04-step-d-review-fixes.md`) |
 | `phase1-step7-slice4-prompt.md` | §7.1 step 7, slice 4: step E of the team redesign - a team number's counters and small slots, the large pieces through a lane per thread lent by a grant, `OSOE_SMALL_COLLECTIVE_BYTES`, the default of 256; two parts and a merge point | done: Part 1 merged on 2026-10-04 - a team number's counters and small slots, a lane per thread record lent by a grant, `OSOE_SMALL_COLLECTIVE_BYTES` agreed three ways, the entry call, and the parent reading a child's lane at its first piece rather than at its first release, the model's finding, which the author accepted (`docs/decisions/2026-10-04-team-lanes.md`); Part 2 merged the same day - the scans through the lanes, their pieces sized to the scan, `OSOE_MAX_TEAMS` 256, the README's section on scaling (`docs/decisions/2026-10-04-team-scans.md`); both on `main` at `375973a`, and the merge point passed that day (`docs/decisions/2026-10-04-step-e-merge-point.md`); its review, round six, at `375973a` |
-| `task-first-release.md` | The opening prompt of the session that takes the tree from the round-three review to the first tag: the arc, the order of the briefs, subagents and adversarial reads | open |
+| `task-first-release.md` | The opening prompt of the session that takes the tree from the round-three review to the first tag: the arc, the order of the briefs, subagents and adversarial reads | done: the release fixes, steps D and E, the round-four, -five and -six reviews and their fixes, the release point's conditions (`docs/decisions/2026-10-05-release-point.md`), and the documents of the morning after (`2026-10-05-before-the-tag.md`); 0.1.0 is `53b8f0f` |
+| `task-v0.2.md` | The arc of v0.2: four steps in order - the single-node build, the tree's shape from the link, Rabenseifner's reduction, progress helpers - and the items gated on x86-64 hardware; how to spend each session | open |
+| `v0.2-step1-single-node-prompt.md` | v0.2 step 1: `OSOE_SINGLE_NODE`, an opt-in build with no liburing, no io_uring and the classic futex, refusing a job of more than one node by name, for Rocky Linux 9 and any desktop; the internode backend behind one file boundary first; a Rocky 9 aarch64 VM; the README's two requirement lists. The arc's first review point | open |
+| `v0.2-step2-tree-shape-prompt.md` | v0.2 step 2: the root measures its link at start-up (hop, message cost, bandwidth) and every node computes the fan-out and window of each large reduction or broadcast from the same numbers; `OSOE_COLLECTIVE_FANOUT` becomes the ceiling; the cost model fitted to the Pi's table of 2026-09-26 first | open |
+| `v0.2-step3-rabenseifner-prompt.md` | v0.2 step 3: recursive-halving reduce-scatter and recursive-doubling allgather over the node leads through the lanes and grants, with the fold for node counts that are not powers of two; one more shape in step 2's chooser | open |
+| `v0.2-step4-progress-helpers-prompt.md` | v0.2 step 4: from `docs/design/progress-helpers-proposal.md` - the lead's agent keeps the control plane on a control wire of its own to every peer, helper threads own rings and the data wires; zero helpers is today's thread; Part 0 is the profile and the one-thread io_uring ladder. The arc's second review point | open, after the proposal's §8 is answered |
