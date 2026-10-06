@@ -40,7 +40,12 @@ enum osoe_futex_scope {
  * re-check their predicate in either case - and ETIMEDOUT when the deadline
  * passed. A signal does not end the wait: it is made again to the same
  * deadline, so that a program's handlers cannot hold a caller's sweep off.
- * Any other kernel error aborts: it is a bug.
+ * Any other kernel error aborts: it is a bug. A deadline is a lower bound: the
+ * classic call's timer takes the thread's timer slack (PR_SET_TIMERSLACK, 50
+ * us unless a session raises it), futex2's none - so only in the single-node
+ * build does a raised slack stretch every sweep by it (the v0.2 step 1 review,
+ * correctness K4); no deadline of the library's needs more precision than its
+ * 100 ms sweep.
  */
 int osoe_futex_wait(_Atomic uint32_t *word, uint32_t expected,
                     const struct osoe_deadline *deadline, enum osoe_futex_scope scope);

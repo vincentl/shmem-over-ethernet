@@ -288,10 +288,14 @@ README, against the tree. Their findings, and what became of each:
    Still two nodes only, and so absent from the single-node build: init's
    reclaiming of a dead start's objects (`shmem.leftovers.*`, whose script
    plants the job tables and connection area a job of one node never opens),
-   `shmem.dead-pe.lead-in-init`, `shmem.job.0*`, and the pacer's planted
-   defects, whose `PacerPlant.cmake` launches `0,0,1,1`. Each would need its
-   script or its expectations changed for one node, which this step leaves to
-   a later one; the single-node build still runs the pacer's own one-node test.
+   `shmem.dead-pe.lead-in-init`, and the pacer's planted defects, whose
+   `PacerPlant.cmake` launches `0,0,1,1`. Each would need its script or its
+   expectations changed for one node, which this step leaves to a later one;
+   the single-node build still runs the pacer's own one-node test.
+   (`shmem.job.0*`, listed here at first, are one-node maps, labelled for
+   choice 8's reason: their program compiles internode files - the step's
+   review, correctness K6. The same review found more lost this way, which its
+   fixes register on one node: `docs/decisions/2026-10-06-single-node-review-fixes.md`.)
 5. **Documents** (fixed): `launch.c` and `tools/CMakeLists.txt` called
    `osoe-launch` a test tool not installed; `docs/README.md` called `osoe` the
    one VM `dev/lima/` defines; `osoe-rocky.yaml` said no liburing is installed
@@ -317,7 +321,8 @@ README, against the tree. Their findings, and what became of each:
 What the adversarial read found sound, with the evidence: every function of
 `transport-single-node.c` but its check is unreachable on one node, each guard
 named; the full build's `-LE internode` tests are the single-node build's less
-its own three in every preset; the single-node build compiles none of the
+its own three in every preset (four once `shmem.refuse.no-shared-futex` came,
+the step's review, correctness K6); the single-node build compiles none of the
 internode files, and no ELF file of it links liburing (111 do in the full
 build), `libosoe.so` needing libc alone and importing no socket or io_uring
 call; the exported symbols are the same; a live four-PE job's control segment

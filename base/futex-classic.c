@@ -57,6 +57,12 @@ int osoe_futex_wait_bitset(_Atomic uint32_t *word, uint32_t expected, uint32_t b
      * every wait early, and a caller that makes a fresh sweep deadline each pass
      * never swept: a blocked PE's sweeps stood still, which osoe-stat reads as a
      * dead one (the adversarial read of v0.2 step 1, parts 2 and 3).
+     *
+     * The kernel arms this timer with the thread's timer slack, where futex2's
+     * wait takes none: a session that raises the slack for power - a prctl, a
+     * service's TimerSlackNSec= - makes these waits that much later than
+     * futex2's, 41 ms on average at a slack of 50 ms (the v0.2 step 1 review,
+     * correctness K4). futex.h says why it does not matter.
      */
     long r;
     do

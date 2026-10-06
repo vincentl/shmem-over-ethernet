@@ -556,11 +556,13 @@ endif()
 # test runs (shmem/tests/CMakeLists.txt): OSOE_CHECK_QUIET checks every shared
 # wait's promise at its return, and OSOE_TEST_PERTURB widens the windows between
 # a protocol's steps. On the four maps and on 0,1,2,0,1,0, where the hook's own
-# race showed (docs/decisions/2026-09-27.md item 10); under tsan on 0,1, one PE a
-# node, where every writer of a PE's memory is a thread of the process tsan sees.
+# race showed (docs/decisions/2026-09-27.md item 10); under tsan on 0,1 and on
+# 0, one PE a node, where every writer of a PE's memory is a thread of the
+# process tsan sees - 0 so that the single-node build runs it there too (the
+# v0.2 step 1 review, correctness K1).
 set(pacer_threads_maps 0,0,0,0 0,1,2,3 0,0,0,1,1,2 0,1,0,1 0,1,2,0,1,0)
 if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  set(pacer_threads_maps 0,1)
+  set(pacer_threads_maps 0,1 0)
 endif()
 foreach(map IN LISTS pacer_threads_maps)
   string(REPLACE "," ";" ranks "${map}")

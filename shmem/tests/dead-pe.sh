@@ -8,8 +8,10 @@
 # its timeout, none still computing or out of a barrier the dead PE never
 # reached. Pidfd liveness (liveness.h) is what finds the death. -k leaves the
 # survivors to the library.
+# WRAP, when set, is a program the launcher runs under - deny-pidfd, so that
+# liveness watches by pid as on a kernel before Linux 5.3.
 LAUNCHER=$1 PROGRAM=$2 RANKS=$3 MAP=$4 DIES=$5
-out=$("$LAUNCHER" -n "$RANKS" -m "$MAP" -t 60 -k -- "$PROGRAM" "$DIES" 2>&1)
+out=$(${WRAP:-} "$LAUNCHER" -n "$RANKS" -m "$MAP" -t 60 -k -- "$PROGRAM" "$DIES" 2>&1)
 echo "$out"
 failed=$(printf '%s\n' "$out" | grep -c "exited with status 1\$")
 killed=$(printf '%s\n' "$out" | grep -c "killed by signal")

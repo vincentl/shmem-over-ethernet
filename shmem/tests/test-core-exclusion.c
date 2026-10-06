@@ -11,7 +11,9 @@
  * core_pattern.
  *
  * Run on two nodes of two PEs, so that there is a sibling heap and a
- * connection area to look at.
+ * connection area to look at; and on one node of two, where there is a
+ * sibling heap and no connection area, so that the single-node build runs it
+ * (the v0.2 step 1 review, correctness K1).
  */
 #include <stdbool.h>
 #include <stdio.h>
@@ -76,11 +78,16 @@ int main(void)
         path[0] = '\0';
     }
     fclose(f);
-    /* Something to have looked at: an empty result would pass everything. */
+    /* Something to have looked at: an empty result would pass everything. A
+     * sibling is each other PE of the node, SHMEM_TEAM_SHARED's; a connection
+     * area exists only in a job of more than one node. */
+    unsigned node_pes = (unsigned)shmem_team_n_pes(SHMEM_TEAM_SHARED);
+    unsigned expect_areas = node_pes < (unsigned)shmem_n_pes() ? 1 : 0;
+    CHECK(node_pes >= 2);
     CHECK(own == 1);
-    CHECK(siblings == 1);
-    CHECK(areas == 1);
-    if (own != 1 || siblings != 1 || areas != 1)
+    CHECK(siblings == node_pes - 1);
+    CHECK(areas == expect_areas);
+    if (own != 1 || siblings != node_pes - 1 || areas != expect_areas)
         fprintf(stderr, "mappings seen: own heap %u, sibling heaps %u, connection areas %u\n",
                 own, siblings, areas);
 

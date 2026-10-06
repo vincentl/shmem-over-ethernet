@@ -128,9 +128,9 @@ test suite, installing, and running over several machines with `srun`.
 A machine that runs jobs of one node only - a desktop with many cores, to
 develop and test programs at small PE counts - can build osoe with no liburing
 and no io_uring, on a distribution with Linux 4.17 and CMake 3.25: Red Hat 9 and
-its rebuilds above all, and Debian 12 or Ubuntu 22.04 and 24.04
-([Requirements](#requirements); it has run on Rocky Linux 9 and Debian 13, and
-in containers on the userlands of Debian 12 and Ubuntu 22.04 to 26.04).
+its rebuilds above all, Debian 12 or Ubuntu 24.04, and Ubuntu 22.04 with a newer
+CMake ([Requirements](#requirements); it has run on Rocky Linux 9 and Debian 13,
+and in containers on the userlands of Debian 12 and Ubuntu 22.04 to 26.04).
 Configure with the option, install, then build the ring above with the installed
 wrapper and run it with the installed launcher, from the repository's root -
 here as eight PEs, which a machine of four cores runs too, and which need about
@@ -296,7 +296,7 @@ io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, for which the message names the sysctl even though it reads 0 inside
 the container, and Podman with `ENOSYS`. There jobs on one node run, but about
-340 of the test suite's 742 tests fail at `shmem_init` or at opening a ring -
+340 of the test suite's 760 tests fail at `shmem_init` or at opening a ring -
 every one but `env.probe` among the 384 labelled `internode`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
 (`ctest -L internode`); the single-node build has neither them nor io_uring. Set
@@ -1187,7 +1187,7 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 740 tests in
+  run before every merge, on the exact tree that merges: about 760 tests in
   release, and the model checker's 30 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
@@ -1196,7 +1196,7 @@ that one could be added without touching the OpenSHMEM layer.
   384 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 358 of the full build's 742 tests in
+  development VM with liburing hidden: 376 of the full build's 760 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs exactly
   the tests it lacks.

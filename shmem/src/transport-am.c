@@ -401,6 +401,14 @@ void osoe_transport_fence(struct osoe_transport_context *context)
  * than being omitted, because in a job of more than one node the same name
  * means something quite different.
  *
+ * Nothing on the project's machines fails without the fence: the counters
+ * around it are each an acquire load and a release store - ldar and stlr at
+ * GCC's default -march - which keep a store before a later load in aarch64's
+ * hardware. Built with -march=armv8.3-a, whose acquire loads are ldapr, a
+ * store-buffering litmus through shmem_quiet finds the forbidden outcome
+ * without it, and on x86-64 its mfence is all that orders the two (the v0.2
+ * step 1 review, correctness K2; a test is on the release checklist).
+ *
  * `pes == NULL` means every PE; a non-NULL list with npes == 0 has already
  * returned in quiet.c, where the spec says it (§9.12.3).
  */

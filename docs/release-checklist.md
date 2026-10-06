@@ -219,6 +219,15 @@ rated them (round six's readiness Q5-5).
     RDMA backend does not keep - and which of the runtime's functions a backend
     may call: the AM backend calls 38 of the rest of `libosoe` and 21 of
     `base/`;
+  - a test that fails without the one-node quiet's fence (correctness K2) -
+    all of quiet in the single-node build, and on x86-64 the only thing that
+    orders a store before a later load there: on aarch64 the counters' `ldar`
+    and `stlr` hide its absence, and the investigator's store-buffering litmus
+    through `shmem_quiet` found the forbidden outcome 109 times in 500,000
+    rounds without it only with the library built `-march=armv8.3-a`, whose
+    acquire loads are `ldapr`. The litmus as a tier-2 test of two PEs on one
+    node, built so where `ldapr` is emitted and the CPU has it, and on x86-64
+    when a machine exists;
   - for whoever runs the x86-64 items next: the futex2 shim copied into the
     VM's own file system - read from the host's mount, Rosetta's translation
     daemon stalled the full x86-64 suite after 244 of its tests (portability

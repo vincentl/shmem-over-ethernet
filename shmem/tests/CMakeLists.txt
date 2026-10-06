@@ -1639,6 +1639,7 @@ endif()
 # What a core holds: this PE's heap, not its siblings' or the connection area
 # (review round two, omissions 4).
 osoe_tier2_map_test(core-exclusion 0,0,1,1)
+osoe_tier2_map_test(core-exclusion 0,0)
 
 # A request larger than /dev/shm is refused at init, by name (§6.2; review round
 # two, omissions 5). See dev-shm-capacity.sh.
@@ -2765,10 +2766,15 @@ set_tests_properties(shmem.agent-cpus.refused.L2 PROPERTIES LABELS "tier2" TIMEO
 add_executable(shmem_test_deadlock test-deadlock.c)
 target_link_libraries(shmem_test_deadlock PRIVATE osoe)
 osoe_warnings(shmem_test_deadlock)
+# On one node as well as across two, each but the interleaved map's mismatch:
+# the one-node detector's half, which a desktop job takes, ran on two nodes
+# alone (the v0.2 step 1 review, correctness K1).
 set(deadlock_cases
     "waits|0,0,0,0|in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
     "waits|0,0,1,1|in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    "reinit|0,0,0,0|in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
     "reinit|0,0,1,1|in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    "mismatch|0,0,0,0|in shmem_barrier_all [(]epoch [0-9]+[)], for [0-9]+ s"
     "mismatch|0,0,1,1|in shmem_barrier_all [(]epoch [0-9]+[)], for [0-9]+ s"
     "mismatch|0,1,0,1|in shmem_barrier_all [(]epoch [0-9]+[)], for [0-9]+ s")
 if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
@@ -2795,7 +2801,8 @@ foreach(case IN LISTS deadlock_cases)
     osoe_internode_label(shmem.deadlock.${mode}.${label})
   endif()
 endforeach()
-foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,1,1" "helper|0,0,0,0"
+foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,0,0" "sleeping|0,0,1,1"
+             "helper|0,0,0,0"
              "helper|0,0,1,1" "busy|0,0,0,0" "busy|0,0,1,1")
   string(REPLACE "|" ";" parts "${case}")
   list(GET parts 0 mode)
@@ -2818,6 +2825,13 @@ foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,1,1" "helper|
     osoe_internode_label(shmem.deadlock.${mode}.${label})
   endif()
 endforeach()
+add_test(NAME shmem.deadlock.off.0-0-0-0
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=0
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 6 --
+          $<TARGET_FILE:shmem_test_deadlock> waits)
+set_tests_properties(shmem.deadlock.off.0-0-0-0 PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 6 s"
+  FAIL_REGULAR_EXPRESSION "osoe: deadlock|DEADLOCK TEST REACHED")
 if(OSOE_INTERNODE)
   add_test(NAME shmem.deadlock.off.0-0-1-1
     COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=0
@@ -2945,6 +2959,16 @@ endforeach()
 # shmem_ as a weak alias.
 osoe_tier2_test(surface)
 
+# The one-node agent's wake: the fastest of five finalizes well under the
+# agent's 100 ms sweep, which a lost wake makes every finalize wait out (the
+# v0.2 step 1 review, correctness K3; test-agent-wake.c).
+add_executable(shmem_test_agent-wake test-agent-wake.c)
+target_link_libraries(shmem_test_agent-wake PRIVATE osoe)
+osoe_warnings(shmem_test_agent-wake)
+add_test(NAME shmem.agent-wake.L4
+  COMMAND osoe-launch -n 4 -t 60 -- $<TARGET_FILE:shmem_test_agent-wake>)
+set_tests_properties(shmem.agent-wake.L4 PROPERTIES LABELS "tier2" TIMEOUT 90)
+
 # start_pes leaves no shmem_finalize behind on purpose: what proves the implicit
 # one ran is that osoe-launch reports no leaked shared memory (Annex F.2.3).
 osoe_tier2_test(start-pes)
@@ -2991,11 +3015,13 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
 endforeach()
 # §9.1.6's details on one node, in both builds - a non-lead caller, a fatal, an
 # exit straight after init, start_pes's finalize, a program that returned, the
-# caller's handlers - which ran over two nodes alone, so that the single-node
-# build ran none of them (the v0.2 step 1 review, C4). The cases below.
+# caller's handlers, a status of 0, two callers at once - which ran over two
+# nodes alone, so that the single-node build ran none of them (the v0.2 step 1
+# review, conformance C4 and correctness K1). The cases below.
 foreach(case "nonlead;7;7;1;compute" "fatal.nonlead;fatal;1;1;compute"
              "immediate;7;7;1;immediate" "start-pes;7;7;0;start-pes"
-             "returned;7;7;0;returned" "handlers;7;7;1;handlers")
+             "returned;7;7;0;returned" "handlers;7;7;1;handlers"
+             "zero;0;0;1;compute" "two-callers;7;7;0;two-callers")
   list(GET case 0 label)
   list(GET case 1 how)
   list(GET case 2 status)
@@ -3007,6 +3033,21 @@ foreach(case "nonlead;7;7;1;compute" "fatal.nonlead;fatal;1;1;compute"
   set_tests_properties(shmem.global-exit.${label}.one-node
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endforeach()
+# And on one node the grace's own status and an end while PEs stream to a
+# node-mate - not under tsan, for the reasons the two-node cases below give.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  foreach(case "held-stdout;1;held-stdout" "caller-held-stdout;1;caller-held-stdout"
+               "stream;0;stream")
+    list(GET case 0 label)
+    list(GET case 1 caller)
+    list(GET case 2 mode)
+    add_test(NAME shmem.global-exit.${label}.one-node
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 4 - 7 7 ${caller} ${mode})
+    set_tests_properties(shmem.global-exit.${label}.one-node
+      PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  endforeach()
+endif()
 if(OSOE_INTERNODE)
   foreach(map 0,1 0,0,1,1 0,1,2,0,1,0)
     string(REPLACE "," ";" ranks "${map}")
@@ -3091,6 +3132,8 @@ endif()
 # handlers; and PEs whose end waits on stdout's lock, which their grace ends
 # after 10 s - not under tsan, whose _exit waits on the lock for good (below).
 foreach(case "L4;4;-;0;compute" "slow-handler.0-0-1-1;4;0,0,1,1;1;slow-handler"
+             "slow-handler.one-node;4;-;1;slow-handler" "nonlead.one-node;4;-;1;compute"
+             "two-callers.one-node;4;-;0;two-callers"
              "nonlead.0-0-1-1;4;0,0,1,1;1;compute"
              "nonlead-other-node.0-0-1-1;4;0,0,1,1;3;compute"
              "two-callers.0-0-1-1;4;0,0,1,1;0;two-callers")
@@ -3113,6 +3156,14 @@ foreach(case "L4;4;-;0;compute" "slow-handler.0-0-1-1;4;0,0,1,1;1;slow-handler"
     osoe_internode_label(shmem.global-exit.kills.${label})
   endif()
 endforeach()
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.global-exit.kills.held-stdout.one-node
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 - 7 7 1 held-stdout)
+  set_tests_properties(shmem.global-exit.kills.held-stdout.one-node
+    PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
+               PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endif()
 if(OSOE_INTERNODE)
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     add_test(NAME shmem.global-exit.kills.held-stdout.0-0-1-1
@@ -3198,6 +3249,22 @@ foreach(case "sibling.L2;0,0;1" "lead.L2;0,0;0" "sibling.L4;0,0,0,0;3" "lead.L4;
   if(nodes GREATER 1)
     osoe_internode_label(shmem.dead-pe.${label})
   endif()
+endforeach()
+# And on a kernel without pidfd_open - before Linux 5.3, which the single-node
+# build's floor of 4.17 admits - where liveness watches by pid: the death
+# found all the same, and the lead saying once that it watches so (the v0.2
+# step 1 review, correctness K5; deny-pidfd.c).
+add_executable(deny-pidfd deny-pidfd.c)
+osoe_warnings(deny-pidfd)
+foreach(case "sibling;3" "lead;0")
+  list(GET case 0 who)
+  list(GET case 1 dies)
+  add_test(NAME shmem.dead-pe.no-pidfd.${who}.L4
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_dead-pe> 4 0,0,0,0 ${dies})
+  set_tests_properties(shmem.dead-pe.no-pidfd.${who}.L4 PROPERTIES LABELS "tier2" TIMEOUT 90
+    ENVIRONMENT "WRAP=$<TARGET_FILE:deny-pidfd>"
+    PASS_REGULAR_EXPRESSION "watching local PEs by pid instead.*DEAD PE OK")
 endforeach()
 # internode: dead-pe-init.sh launches a job of two nodes
 if(OSOE_INTERNODE)
@@ -3358,6 +3425,13 @@ foreach(case_expect
     osoe_internode_label(shmem.refuse.team.${case})
   endif()
 endforeach()
+# And the destroyed handle on one node, which the single-node build runs (the
+# v0.2 step 1 review, correctness K1).
+add_test(NAME shmem.refuse.team.destroyed.one-node
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_BAD_TEAM=destroyed
+          $<TARGET_FILE:osoe-launch> -n 2 -m 0,0 -t 60 -- $<TARGET_FILE:shmem_test_bad_team>)
+set_tests_properties(shmem.refuse.team.destroyed.one-node PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "shmem_team_n_pes: 0x[0-9a-f]+ is team 3, which this PE has destroyed")
 
 add_executable(shmem_test_bad_put test-bad-put.c)
 target_link_libraries(shmem_test_bad_put PRIVATE osoe)
