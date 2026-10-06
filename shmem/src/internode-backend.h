@@ -23,18 +23,24 @@
  * and nothing else** - shmem.boundary holds the files every build compiles to
  * that (cmake/CheckBoundary.cmake) - and only in a job of more than one node,
  * but for the check every PE of every job makes before its node joins. So a
- * second internode backend replaces those files without touching the first
- * part. The SHMEM layer reaches the internode backend through internode.h, and
- * a job of one node makes four of its calls: the default fan-out, read while
- * bootstrapping; init and fini; and a team number taken again - the last three
- * the generic phase's, in both builds.
+ * second internode backend of AM's shape - one that keeps the first part's path
+ * to node-mates, as the refusing one does - replaces those files without
+ * touching the first part. A backend on RDMA does not keep it: its NIC may
+ * serve node-mates' atomics, which design §4.10 dispatches per PE and operation
+ * class, where the first part dispatches per PE, and it has its own
+ * osoe_transport_set_range, which lives in transport-am.c; it replaces
+ * transport-am.c as well and implements transport.h and internode.h whole (the
+ * v0.2 step 1 review, readiness Q5-8). The SHMEM layer reaches the internode
+ * backend through internode.h, and a job of one node makes four of its calls:
+ * the default fan-out, read while bootstrapping; init and fini; and a team
+ * number taken again - the last three the generic phase's, in both builds.
  *
  * Every entry point below is one of §4.10's calls, or its share of one, for a
- * job of more than one node - a backend on RDMA provides each of them, as the
- * comment beside it says - and the internode backend also implements
- * internode.h whole, the collectives' seam. Its metrics are the control
- * segment's - the `am.*` counters and the connection scope (node.h, metrics.c)
- * - which every build lays out and only this backend writes.
+ * job of more than one node - which a backend on RDMA provides too, as the
+ * comment beside it says, in its own transport-am.c - and the internode backend
+ * also implements internode.h whole, the collectives' seam. Its metrics are the
+ * control segment's - the `am.*` counters and the connection scope (node.h,
+ * metrics.c) - which every build lays out and only this backend writes.
  *
  * Contexts are the AM backend's (transport-context.h): this header passes them
  * by pointer, and the internode backend keeps its own state for each behind

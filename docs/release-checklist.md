@@ -204,6 +204,21 @@ rated them (round six's readiness Q5-5).
   on a node of 256 PEs four of them empty the default pool (step D's second
   part, its first adversarial read, item 5; documented in the README's
   limits).
+- **From the review of v0.2 step 1's merge point**
+  (`docs/reviews/archive/v0.2-step1-review.md`), each rated after the release:
+  - a test that nothing in the library spins (scale Q3-1), best before v0.2
+    step 4, whose helpers rewrite the progress threads' waits: more PEs than
+    the machine has cores, PE 0 asleep outside the library for a second or
+    two, and the job failing when the others and their agents used more than a
+    few percent of the machine - in both builds, not labelled `internode`. A
+    wait that spins 200 µs before it sleeps passes both suites today, the floor
+    pins among them, and makes a 32-PE barrier on four cores 24 to 35 times
+    slower;
+  - the seam for a backend not of AM's shape (readiness Q5-8): design §4.10's
+    note to say what `internode-backend.h` is - AM's own division, which an
+    RDMA backend does not keep - and which of the runtime's functions a backend
+    may call: the AM backend calls 38 of the rest of `libosoe` and 21 of
+    `base/`.
 - **The mesh's start-up schedule** (`docs/design/mesh-schedule-proposal.md`),
   once a system large enough to measure it is at hand: the author postponed it
   on 2026-10-05 (`docs/decisions/2026-10-05-before-the-tag.md` item 2), and the
