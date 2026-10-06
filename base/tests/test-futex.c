@@ -93,10 +93,17 @@ static void wait_under_signals(int flags)
     int r = osoe_futex_wait(&quiet, 0, &d, OSOE_FUTEX_PRIVATE);
     double e = elapsed_since(&t0);
     CHECK(setitimer(ITIMER_REAL, &off, NULL) == 0);
+    /* ThreadSanitizer holds a signal for the program's handler until its own
+     * next intercepted call, and hands over what it holds as one: a sleep with
+     * the handler still installed lets it, before the default comes back. */
+    struct timespec flush = { 0, 20 * 1000 * 1000 };
+    nanosleep(&flush, NULL);
     CHECK(sigaction(SIGALRM, &before, NULL) == 0);
     CHECK(r == ETIMEDOUT);
     CHECK(e >= 0.295);
-    CHECK(ticks >= 5);          /* the signals did come */
+    /* The signals did come: about thirty, or under ThreadSanitizer at least
+     * one, since it delivers what it held at once. */
+    CHECK(ticks >= 1);
 }
 
 /* A waiter for the wake of none: one wait, and when it returned and with
