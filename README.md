@@ -321,8 +321,8 @@ the launcher ends the step (`srun -K1`), or for ever; where the pids differ, a
 live PE is taken for dead and the job ends at once; with a
 `/dev/shm` for each, the start waits for ever. Where `/dev/shm` outlives a
 container (`--ipc=host`), a start killed with its container leaves names that
-`osoe-stat --gc` cannot judge, and that make a later start by the same ids fail
-- saying another PID namespace left them, where the pids repeat: remove them with
+`osoe-stat --gc` cannot judge, and that make a later start by the same ids fail -
+saying another PID namespace left them, where the pids repeat: remove them with
 `rm -f /dev/shm/osoe.<job id>.*`.
 
 ### Developing on macOS
