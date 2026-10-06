@@ -34,7 +34,7 @@ done; an open one, what is left.
   program on a Slurm cluster like the author's - read once more as the
   stranger on the tagged tree on 2026-10-05, by a fresh agent: enough, its
   fixes made (`docs/decisions/2026-10-05-release-point.md`).
-- [ ] **A version tag and a release note** listing the known limits: whatever
+- [x] **A version tag and a release note** listing the known limits: whatever
   the last Pi session measured short of the floor, and the README's Limits.
   The version is 0.1.0 (`docs/decisions/2026-10-02.md` item 7, D8). The
   author tags. **The commit the tag names says so**: the README's opening said
@@ -44,7 +44,8 @@ done; an open one, what is left.
   `docs/release-notes/0.1.0.md`; the release point verified the tree
   (`docs/decisions/2026-10-05-release-point.md`), and what the author asked for
   the morning after went in before the tag, documents only
-  (`docs/decisions/2026-10-05-before-the-tag.md`); the tag is what is left.
+  (`docs/decisions/2026-10-05-before-the-tag.md`). Done 2026-10-05: the author
+  tagged `53b8f0f` as `v0.1.0`, an annotated tag, "osoe 0.1.0".
 
 ## Before every release tag (the decisions index)
 
