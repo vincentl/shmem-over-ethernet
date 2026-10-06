@@ -1815,6 +1815,23 @@ if(OSOE_SINGLE_NODE)
   endif()
 endif()
 
+# The heap holds what SHMEM_SYMMETRIC_SIZE says, its specification's own example
+# among the values (§8; the v0.2 step 1 review, C1): 3.1M is 3,250,586 bytes,
+# not a multiple of 16, and 1000 is not either.
+add_executable(shmem_test_heap-size test-heap-size.c)
+target_link_libraries(shmem_test_heap-size PRIVATE osoe)
+osoe_warnings(shmem_test_heap-size)
+foreach(case "3.1M|3250586" "1000|1000")
+  string(REPLACE "|" ";" parts "${case}")
+  list(GET parts 0 size)
+  list(GET parts 1 bytes)
+  add_test(NAME shmem.heap-size.${size}
+    COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=${size} OSOE_TEST_HEAP_BYTES=${bytes}
+            $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_heap-size>)
+  set_tests_properties(shmem.heap-size.${size} PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "holds ${bytes} bytes: yes")
+endforeach()
+
 osoe_tier2_test(init)
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
@@ -2957,6 +2974,24 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
             $<TARGET_FILE:shmem_test_global-exit> ${count} - fatal 1)
   set_tests_properties(shmem.global-exit.L${count} shmem.global-exit.fatal.L${count}
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+endforeach()
+# §9.1.6's details on one node, in both builds - a non-lead caller, a fatal, an
+# exit straight after init, start_pes's finalize, a program that returned, the
+# caller's handlers - which ran over two nodes alone, so that the single-node
+# build ran none of them (the v0.2 step 1 review, C4). The cases below.
+foreach(case "nonlead;7;7;1;compute" "fatal.nonlead;fatal;1;1;compute"
+             "immediate;7;7;1;immediate" "start-pes;7;7;0;start-pes"
+             "returned;7;7;0;returned" "handlers;7;7;1;handlers")
+  list(GET case 0 label)
+  list(GET case 1 how)
+  list(GET case 2 status)
+  list(GET case 3 caller)
+  list(GET case 4 mode)
+  add_test(NAME shmem.global-exit.${label}.one-node
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 - ${how} ${status} ${caller} ${mode})
+  set_tests_properties(shmem.global-exit.${label}.one-node
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
 endforeach()
 if(OSOE_INTERNODE)

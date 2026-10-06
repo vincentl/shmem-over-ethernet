@@ -1483,7 +1483,12 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     n->keep_name = b->keep_control_segment;
 
     control_name(n->control_name, sizeof n->control_name, b, session);
-    n->heap_size = b->symmetric_size;
+    /* SHMEM_SYMMETRIC_SIZE rounded up to the allocator's 16 bytes: §8 asks for
+     * a heap at least as large as the value - its own example, 3.1M, is
+     * 3,250,586 bytes - where rounding down held 10 fewer (the v0.2 step 1
+     * review, C1). Inside the page the internal region begins at, whatever the
+     * value. */
+    n->heap_size = (b->symmetric_size + 15) / 16 * 16;
     /* The heap, then OSOE_REGION_INTERNAL, in one object (internal-region.h):
      * the allocator is given heap_size and never reaches the tail. */
     n->internal_offset = page_round(b->symmetric_size ? b->symmetric_size : 1);

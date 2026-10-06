@@ -89,11 +89,16 @@ static _Atomic int thread_level = OSOE_INIT_LEVEL;
  * OSOE_ ones a user of this implementation would otherwise have to read the
  * source to find. Written to stderr, because stdout belongs to the program.
  */
+#ifndef OSOE_BUILD_NOTE
+#error "OSOE_BUILD_NOTE comes from CMake: see cmake/OsoeVersion.cmake"
+#endif
+
 static void print_info(void)
 {
     fprintf(stderr,
 OSOE_NAME_AND_VERSION " environment variables\n"
 "\n"
+OSOE_BUILD_NOTE
 "  From the OpenSHMEM specification (§8). Each also has a deprecated SMA_\n"
 "  spelling; when both are set the SHMEM_ one controls.\n"
 "    SHMEM_SYMMETRIC_SIZE   symmetric heap bytes per PE, with an optional\n"

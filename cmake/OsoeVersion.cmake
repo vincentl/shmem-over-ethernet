@@ -19,10 +19,16 @@
 # (OSOE_SINGLE_NODE, the top-level CMakeLists.txt). OSOE_VERSION_TEXT is that
 # text; the library's file name and soname keep the bare version.
 set(OSOE_VERSION_TEXT "${PROJECT_VERSION}")
+# And what SHMEM_INFO adds in that build: which of the settings it lists do
+# nothing there (the v0.2 step 1 review, C3). A string, as the version is, so
+# that the two builds differ by a value and not by a branch.
+set(OSOE_BUILD_NOTE "")
 if(OSOE_SINGLE_NODE)
   string(APPEND OSOE_VERSION_TEXT " (single-node build)")
+  set(OSOE_BUILD_NOTE "  This is the single-node build: it runs a job of one node, and checks\\n  OSOE_PORT_RANGE, OSOE_JOB_SECRET and OSOE_KEEPALIVE as values only - each is\\n  a setting of the connections between nodes, which it never makes.\\n\\n")
 endif()
-add_compile_definitions(OSOE_VERSION_STRING="${OSOE_VERSION_TEXT}")
+add_compile_definitions(OSOE_VERSION_STRING="${OSOE_VERSION_TEXT}"
+                        OSOE_BUILD_NOTE="${OSOE_BUILD_NOTE}")
 
 # The same text as a regular expression, for a test that compares what a
 # program prints with what CMake knows: a dot or a parenthesis in it matches

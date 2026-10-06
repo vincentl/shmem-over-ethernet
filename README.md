@@ -1208,11 +1208,13 @@ that one could be added without touching the OpenSHMEM layer.
   readers on the machine. In an optimized build it fails when the library's
   reader loads the name plainly again; a plain writer, or `osoe-stat`'s reader,
   tore nothing it could see on these machines.
-- **Sandia OpenSHMEM's test suite**, on the tree of 28 September: 161 of its 165
+- **Sandia OpenSHMEM's test suite**, on the tree tagged 0.1.0: 161 of its 165
   programs passed at 4 × 2 on the Pi cluster, 8 PEs, where `bigget` is run with
   a smaller loop count, since its default is 16 GiB of gets a PE over gigabit
-  Ethernet; in the development VM, 159 passed on both of two maps of logical
-  nodes. The four that do not are SOS's own: two use an extension of the
+  Ethernet (2026-10-05); in the development VM, 159 passed on both of two maps
+  of logical nodes, on the tree of 28 September. The single-node build, at v0.2
+  step 1's review, on one node: 161 of 165 in the development VM, and every C
+  program but the same four on Rocky Linux 9. The four that do not are SOS's own: two use an extension of the
   type-generic interfaces and do not build, one overflows its own buffer (osoe
   stops it by name), and one asks `shmem_align` for an alignment the
   specification leaves undefined. At 70 PEs, programs that make a team a round
