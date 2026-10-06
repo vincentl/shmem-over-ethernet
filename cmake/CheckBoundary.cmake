@@ -98,9 +98,11 @@ set(OSOE_BACKEND_FACING internode-backend.h internode-generic.h)
 # before its node joins - each read on one node as on many, so that a bad
 # value is refused the same way.
 set(OSOE_ON_BOUNDARY
-  am-configuration.c collective-tree.c combine.c internode-generic.c job.c listener.c
-  node.c rank-map.c rendezvous.c shm-object.c transport-local.c watch.c wire-settings.c
-  am-configuration.h collective-tree.h combine.h internal-region.h internode.h job.h
+  am-configuration.c collective-shape.c collective-tree.c combine.c internode-generic.c job.c
+  listener.c node.c rank-map.c rendezvous.c shm-object.c transport-local.c watch.c
+  wire-settings.c
+  am-configuration.h collective-shape.h collective-tree.h combine.h internal-region.h
+  internode.h job.h
   listener.h node.h rank-map.h rendezvous.h rmw.h shm-object.h transport.h watch-range.h
   wire-settings.h)
 

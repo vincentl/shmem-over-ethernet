@@ -104,6 +104,19 @@ osoe_warnings(shmem_test_collective_tree)
 add_test(NAME shmem.collective-tree COMMAND shmem_test_collective_tree)
 set_tests_properties(shmem.collective-tree PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# The chooser of a large collective's shape on its own (tier 1; v0.2 step 2):
+# what the Pi's link and a loopback's choose on four nodes, and the C against
+# tools/modelcheck/shape_timing.py on a grid of inputs the model wrote
+# (shape-grid.txt; model.shape_timing.grid checks the model still writes it).
+add_executable(shmem_test_collective_shape test-collective-shape.c ../src/collective-shape.c
+  ../src/collective-tree.c)
+target_include_directories(shmem_test_collective_shape PRIVATE ../src)
+osoe_warnings(shmem_test_collective_shape)
+add_test(NAME shmem.shape.choice COMMAND shmem_test_collective_shape choice)
+add_test(NAME shmem.shape.grid
+  COMMAND shmem_test_collective_shape grid ${CMAKE_CURRENT_SOURCE_DIR}/shape-grid.txt)
+set_tests_properties(shmem.shape.choice shmem.shape.grid PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The §4.9 watched-range encoding on its own (tier 1): pure logic, and the
 # property it must have is one a brute-force check can state directly.
 add_executable(shmem_test_watch_range test-watch-range.c)
