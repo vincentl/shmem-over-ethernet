@@ -14,7 +14,9 @@ nowhere; `osoe-launch` links it, and `osoe-stat`, `probe` and `osoe-pacer` take
 a header or a file of it. It includes nothing from `shmem/`: where it needs what
 only the layer above knows, `sweep.h` declares hooks that `shmem/src/` replaces,
 and `sweep.c` here defines them to do nothing. Start with `futex.h`, the one
-place the library makes the futex2 system calls, then `wait-word.h` and
+interface to the futex calls - futex2's in the full build (`futex-futex2.c`),
+the classic `FUTEX_WAIT_BITSET` and `FUTEX_WAKE_BITSET` in the single-node build
+(`futex-classic.c`) - then `wait-word.h` and
 `epoch.h`, which use it; every header opens with a comment saying what its piece
 is for and which section of the design notes it follows. `tests/` holds a test
 program for nine of the pieces.

@@ -98,12 +98,27 @@ static void usage(FILE *out, int status)
                  "[-e RANK:NAME=VALUE]... [-N NAMESPACE_PREFIX] [-H HOST_LIST] "
                  "-- PROGRAM [ARGS]...\n"
                  "       osoe-launch --version\n");
-    if (out == stdout)
+    if (out == stdout) {
+        fprintf(out, "\n"
+                     "  -n L            L processes, ranks 0 to L - 1, one job\n"
+                     "  -m NODE_MAP     a logical node for each rank, as 0,0,1,1: a job of\n"
+                     "                  several nodes on this one machine (OSOE_NODE_MAP sets it\n"
+                     "                  too); without it, one node. The single-node build refuses\n"
+                     "                  a job of more than one\n"
+                     "  -t SECONDS      end the job after this long, 1 to 86400; default 60\n"
+                     "  -k              after a rank fails, leave the others to the library\n"
+                     "                  rather than ending them\n"
+                     "  -s              name the variables as srun does, SLURM_ for OSOE_\n"
+                     "  -e RANK:NAME=VALUE  set or override one variable for one rank\n"
+                     "  -N PREFIX       start logical node i's ranks in network namespace\n"
+                     "                  PREFIX<i> (tier 3, as root; tools/launch/tier3.sh)\n"
+                     "  -H HOST_LIST    the host list those namespaces' addresses make\n");
         fprintf(out, "\nExit status, as srun's: the highest exit code of any rank; 128 plus "
                      "the signal for a\nrank killed by a signal the launcher did not send "
                      "itself; 1 for a timeout or\nshared memory left behind when no rank "
                      "reported more; 128 plus the signal when the\nlauncher itself is "
                      "interrupted; 2 for a bad argument.\n");
+    }
     exit(status);
 }
 
@@ -516,7 +531,8 @@ int main(int argc, char **argv)
         if (!timed_out && t >= deadline) {
             timed_out = true;
             failed = true;
-            fprintf(stderr, "osoe-launch: timeout after %ld s; killing %ld process(es)\n",
+            fprintf(stderr, "osoe-launch: timeout after %ld s; killing %ld process(es); -t "
+                    "sets the timeout\n",
                     timeout, remaining);
             for (long j = 0; j < n; j++)
                 if (!done[j]) {

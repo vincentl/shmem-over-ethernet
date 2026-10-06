@@ -15,7 +15,10 @@ them (`bootstrap.c`, the agent thread, failure and abort); the boundary -
 `transport.h` for operations between PEs, `internode.h` for a collective's
 internode phase, and what both sides share, such as the node's control segment
 (`node.h`) and the path between PEs of one node (`transport-local.c`) - and the
-one backend below it, active messages over TCP and io_uring (`connection.c`,
-`progress.c`, `wire.c`). Start with `src/rma.c`, which takes a put from the
+one backend below it, in two parts: what every job uses (`transport-am.c`), and
+the internode backend behind `internode-backend.h`, active messages over TCP and
+io_uring (`transport-internode.c`, `connection.c`, `progress.c`, `wire.c`), which
+the single-node build replaces with a backend that refuses a job of more than
+one node (`transport-single-node.c`). Start with `src/rma.c`, which takes a put from the
 routine to its call through `transport.h`, whose opening comment says what each
 side may call; design §2 and §4.10 are the map.

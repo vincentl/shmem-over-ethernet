@@ -9,9 +9,11 @@ checks a kernel (`probe/`); `echo-uring`, the bare io_uring echo the library is
 judged against (`echo-uring/`); and the model checker with the models of osoe's
 protocols (`modelcheck/`, which has a README of its own). `corpus/` is not
 built: it holds the scripts that fetch public OpenSHMEM programs to read. Of
-these, `cmake --install` installs `oshcc`, `osoe-stat` and `osoe-pacer`; the
-table of the repository in the root `README.md` says what each directory builds
-and which of its programs are installed.
+these, `cmake --install` installs `oshcc`, `osoe-stat`, `osoe-pacer` and
+`osoe-launch`; `echo-uring` is the full build's alone, the single-node build
+having no io_uring to measure. The table of the repository in the root
+`README.md` says what each directory builds and which of its programs are
+installed.
 
 `osoe-bench` and `osoe-pacer` are OpenSHMEM programs, linked against `libosoe`.
 `osoe-stat` includes nothing from `shmem/src`, so that a copy built from one

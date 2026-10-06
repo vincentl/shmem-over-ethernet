@@ -992,8 +992,8 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
                      "of statics", (unsigned long long)((n->statics_bytes + (1u << 20) - 1) >> 20));
         snprintf(msg, sizeof msg, "/dev/shm has %llu MiB free, but this node's control "
                  "segment and %u heap%s of %llu MiB - each the symmetric heap and %llu MiB "
-                 "of the library's own region, which OSOE_MAX_TEAMS and "
-                 "OSOE_SMALL_COLLECTIVE_BYTES size -%s need %llu MiB: lower "
+                 "of the library's own region, which OSOE_MAX_TEAMS, "
+                 "OSOE_SMALL_COLLECTIVE_BYTES and OSOE_MAX_THREADS size -%s need %llu MiB: lower "
                  "SHMEM_SYMMETRIC_SIZE or those, run fewer PEs per node, or enlarge /dev/shm "
                  "(a container's --shm-size) - or, since pages cost only once written, "
                  "OSOE_SHM_CAPACITY_CHECK=0 reports this without refusing",

@@ -113,12 +113,15 @@ static void probe_shared_futex(void)
     int status;
     waitpid(pid, &status, 0);
     int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-    CHECK(what, woke == 1 && code == 0,
-          "woke=%ld child_exit=%d (2: never woken, 3: open by name, 4: wait error)",
-          woke, code);
+    /* The name goes before the line is printed: a reader that closes the
+     * probe's output early ends it there, and a name left would be one
+     * nothing removes (the v0.2 step 1 review, Q5-11). */
     munmap((void *)w, 4096);
     close(fd);
     shm_unlink(name);
+    CHECK(what, woke == 1 && code == 0,
+          "woke=%ld child_exit=%d (2: never woken, 3: open by name, 4: wait error)",
+          woke, code);
 }
 
 /*

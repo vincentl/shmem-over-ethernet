@@ -122,6 +122,12 @@ static void check_live_output(const char *segment, int n)
     CHECK(run_stat("-T", segment, out, sizeof out) == 0);
     CHECK(strstr(out, "application") != NULL);
     CHECK(strstr(out, "agent") != NULL);
+
+    /* A job of one node has no tree between nodes: the summary says so,
+     * rather than print epochs nothing keeps (the v0.2 step 1 review, Q5-1). */
+    CHECK(run_stat("--summary", segment, out, sizeof out) == 0);
+    CHECK(strstr(out, "one node: no tree to walk") != NULL);
+    CHECK(strstr(out, "epoch 0/0") == NULL);
 }
 
 /*

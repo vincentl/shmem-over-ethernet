@@ -604,6 +604,16 @@ static void summary_line(const struct osoe_segment *s)
         osoe_segment_read_name(s, "team.record.nodes", t, &nodes);
         if (!first && (nodes < 2 || (state.open == 0 && state.closed == 0)))
             continue;
+        if (first && nodes < 2) {
+            /* A job of one node - every job of the single-node build - has no
+             * tree, and no engine to keep one's epochs: say so, rather than
+             * print epochs nothing writes, and point at the PE lines, which
+             * name the PE that is not waiting (the v0.2 step 1 review, Q5-1). */
+            printf("node %-3" PRIu64 " %-16s %2" PRIu64 "/%-2u live  %-10s one node: no tree "
+                   "to walk; the PE lines (osoe-stat JOB) say where each PE waits  %s\n", node,
+                   host, live, s->local_count, label, where);
+            return;
+        }
         first = false;
         /* A created team as its number and its first member's world rank,
          * "4@r1": the same on every node, and two teams under one number told
@@ -1447,7 +1457,9 @@ static void usage(FILE *f)
 "                    progress, whether this node's own members arrived, and the\n"
 "                    lowest child that has not - walk a hung barrier or sync\n"
 "                    down from the root by it (§5.3); a reduction, broadcast,\n"
-"                    gather or scan that hangs shows in the PE lines instead\n"
+"                    gather or scan that hangs shows in the PE lines instead,\n"
+"                    and so does every hang of a job of one node, which has no\n"
+"                    tree between nodes to walk\n"
 "  -l, --list        list the control segments in /dev/shm\n"
 "      --gc          remove what a job left named in /dev/shm that nothing uses:\n"
 "                    control segments (kept by OSOE_KEEP_CONTROL_SEGMENT, or left\n"

@@ -5,7 +5,7 @@ specification for clusters connected by ordinary Ethernet. It needs no RDMA
 hardware and no fabric library. It builds from a Linux distribution's own
 packages - a C compiler, CMake, pkg-config and liburing - and carries every
 operation between nodes over TCP, driven by io_uring; a build for one machine
-alone, to develop programs on a desktop, needs only the compiler and CMake
+alone, to develop programs on a desktop, needs only the compiler, CMake and make
 ([On a desktop](#on-a-desktop-the-single-node-build)). It was developed in an
 aarch64 virtual machine and on a cluster of four Raspberry Pi 5 boards, and is
 designed to stay usable at hundreds of nodes with 256 processes each - a scale
@@ -130,8 +130,11 @@ develop and test programs at small PE counts - can build osoe with no liburing
 and no io_uring, on a distribution with Linux 4.17 and CMake 3.25: Red Hat 9 and
 its rebuilds above all, and Debian 12 or Ubuntu 24.04 ([Requirements](#requirements);
 it has run on Rocky Linux 9 and Debian 13). Configure with the option,
-install, then build with the installed wrapper and run with the installed
-launcher - here as eight PEs, which a machine of four cores runs too:
+install, then build the ring above with the installed wrapper and run it with
+the installed launcher, from the repository's root - here as eight PEs, which a
+machine of four cores runs too, and which need about 2.1 GiB of `/dev/shm`,
+half the memory of a machine of 4.5 GiB; `SHMEM_SYMMETRIC_SIZE=64m` in front of
+the launcher runs them on less:
 
 ```sh
 cmake --preset release -DOSOE_SINGLE_NODE=ON
@@ -158,10 +161,11 @@ fine: nothing in the library spins - a waiting PE sleeps on a futex - and in a
 job of one node each PE's progress thread has nothing to move and sleeps too, so
 the two settings that schedule it in a job of many nodes, `OSOE_AGENT_SLICE_US`
 and `OSOE_AGENT_CPUS`, are not needed here. The test suite runs as it does in the
-full build, `ctest --preset release -j4`: 345 of the full build's 729 tests - all
-but the 384 labelled `internode`, which need more than one node or test the
-internode backend's own files, io_uring or futex2 - and four of its own; and
-`ctest --preset models` runs the same 30 tests of the model checker.
+full build, `ctest --preset release -j4`: every test of the full build but those
+labelled `internode`, which need more than one node or test the internode
+backend's own files, io_uring or futex2, and four of its own ("How osoe is
+tested" has the numbers); and `ctest --preset models` runs the same tests of the
+model checker, at `-j2` on a machine of 4 GiB, since the largest wants 1.5 GiB.
 
 ## Getting started
 
@@ -251,7 +255,7 @@ which the `release` preset leaves out and the `models` preset runs alone, in the
 same build:
 
 ```sh
-ctest --preset models -j4           # the models, once the release build exists
+ctest --preset models -j4           # the models, once the release build exists (-j2 on 4 GiB)
 cmake --workflow --preset models     # or from a clean tree: configure, build, then them
 ```
 
@@ -319,6 +323,7 @@ this repository. The presets are disabled on macOS and refuse to run there.
 brew install lima
 dev/lima/create.sh                                 # Debian 13 VM named osoe
 limactl shell osoe cmake --workflow --preset debug # run from the repository root
+dev/lima/create.sh osoe-rocky                      # Rocky Linux 9, for the single-node build
 ```
 
 The VM mounts the repository at the same path it has on the Mac, so commands run
@@ -490,16 +495,19 @@ job's nodes, naming the job by its id - Slurm's job id, or for a job of
 
 ```sh
 osoe-stat 1234            # job 1234 on this node: counters, and where each PE waits
-osoe-stat --summary 1234  # each team's barrier or sync in progress, to walk a hang down
+osoe-stat --summary 1234  # each team's barrier or sync between nodes, to walk a hang down
 srun --jobid=1234 --overlap -N4 --ntasks-per-node=1 osoe-stat --summary 1234
                           # the same on every node of a Slurm job, as its own user
 ```
 
 A job that hangs shows, for every PE, the routine it is blocked in, the
 collective's epoch - how many collectives its team has begun - and for how long.
-The summary's walk follows a team's barriers and syncs, whose epochs each
-node's progress thread keeps; a team hung in a reduction, broadcast, gather or
-scan shows there as nothing open, and its PE lines are where to look.
+The summary's walk follows a team's barriers and syncs between nodes, whose
+epochs each node's progress thread keeps; a team hung in a reduction,
+broadcast, gather or scan shows there as nothing open, and its PE lines are
+where to look. A job of one node - every job of the single-node build - has no
+tree between nodes to walk: its summary says so, and the PE lines of
+`osoe-stat JOB` name the PE that is not waiting.
 The summary names a team you made by its number and its first member's world
 rank - `4@r1` - since teams with no PE in common may share a number, and a
 blocked PE by its world rank.
@@ -523,8 +531,8 @@ computing for ever, is what `osoe-stat` is for.
   starts", below). A task that died before `shmem_init` is waited for until the
   launcher ends the step, or `OSOE_NO_PROGRESS_TIMEOUT`, if it is set, ends the
   wait.
-- **A job that hangs**: `osoe-stat JOB` and `osoe-stat --summary JOB` on each of
-  its nodes, above. A deadlock the library can prove ends the job by itself
+- **A job that hangs**: `osoe-stat JOB` on each of its nodes, and for a job of
+  more than one node `osoe-stat --summary JOB` too, above. A deadlock the library can prove ends the job by itself
   after `OSOE_DEADLOCK_SECONDS` (Limits, "Failures").
 - **Names a failed start left in `/dev/shm`**, and what removes them: "Names a
   failed start leaves", below.
@@ -1171,8 +1179,10 @@ that one could be added without touching the OpenSHMEM layer.
   384 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and with
   four of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden; `ctest -L internode` on the full build
-  runs exactly the tests it lacks.
+  development VM with liburing hidden: 345 of the full build's 729 tests in
+  the debug preset and its four, two fewer without a C++ compiler, which the
+  headers' C++ test needs. `ctest -L internode` on the full build runs exactly
+  the tests it lacks.
 - **Model checking.** Every lock-free and futex protocol but one - waking the
   progress thread, waits, the barrier tree, pipelined collectives and the lanes
   their large pieces go through, Bruck's allgather, the scans, get completion

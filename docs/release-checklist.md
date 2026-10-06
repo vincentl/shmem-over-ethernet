@@ -145,8 +145,15 @@ rated them (round six's readiness Q5-5).
   a sandbox's refusal of futex2 named as one (Q6); the 33rd start within a
   minute (Q7); the `EPERM` hint naming the sysctl only when it is set (Q1).
 - **`osoe-stat` past 64 segments on one machine** (readiness Q5-5); unknown
-  `OSOE_` names, silent today (Q5-6); the messages that could say more (Q5-6);
-  the check above the seam that belongs below it (Q5-7).
+  `OSOE_` names, silent today (Q5-6); the messages that could say more (Q5-6).
+  The check above the seam that belonged below it (Q5-7) is done: v0.2 step 1's
+  Part 1 moved it into the transport's settings check.
+- **What v0.2 step 1 left to a later step** (its record's adversarial read,
+  item 4): one-node variants of `shmem.leftovers.*`, `shmem.dead-pe.lead-in-init`
+  and `shmem.job.0*`, and of the pacer's planted defects, whose
+  `PacerPlant.cmake` launches `0,0,1,1` - so the single-node build runs none of
+  the 77, and nothing in it shows the stress tester's oracles can fail (the
+  step's review, readiness Q5-7).
 - **A lead that dies between making its segment and finishing it** (correctness
   F2); the relayed-goodbye test's sensitivity (F3); `env.probe`'s reopen check
   racing its child (F4); F5's small items.

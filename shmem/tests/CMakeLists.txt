@@ -1775,7 +1775,14 @@ if(OSOE_SINGLE_NODE)
     LAUNCH -n 2 -m 0,1
     PATTERNS "this is osoe's single-node build \\(OSOE_SINGLE_NODE\\), which runs a job of one node, and this job spans 2 nodes: the full build runs it"
              "!left behind"
+             "!control segment"
     PROGRAM $<TARGET_FILE:shmem_test_init>)
+  # The version names the build, written here as a literal: every version test
+  # compares a tool with OSOE_VERSION_TEXT, which the suffix is part of, so a
+  # build that dropped it would pass them all (the v0.2 step 1 review, Q5-5).
+  add_test(NAME shmem.single-node.version-says-so COMMAND $<TARGET_FILE:osoe-launch> --version)
+  set_tests_properties(shmem.single-node.version-says-so PROPERTIES LABELS "tier1" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "osoe-launch [(]osoe[)] [0-9.]+ [(]single-node build[)]")
   add_executable(deny-futex deny-futex.c)
   osoe_warnings(deny-futex)
   # Not under AddressSanitizer: GCC 14's runtime takes futex locks of its own as
