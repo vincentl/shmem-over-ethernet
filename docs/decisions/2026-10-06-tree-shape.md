@@ -9,7 +9,8 @@ runs on the shape it ran on at the 0.1.0 tag.
 **Where it stands.** Built on the branch `tree-shape`, not merged: the model and
 the chooser (`8553de7`), and the settings - `OSOE_COLLECTIVE_SHAPE` and the link
 set by hand, agreed three ways and shown by `osoe-stat` - with the README's rows
-(`72f27a6`, `f275b45`). Not built: the link's measurement and its way to every
+(`72f27a6`, `f275b45`), and a fix to the simulation, whose landing far into a
+long run could fall below the clock's resolution and never come (`591ecf4`). Not built: the link's measurement and its way to every
 node, which wait on the second question below. Three of the brief's stop-and-ask
 items were met, each below with its evidence, the options and a recommendation.
 The branch merges only after step 1's merge point - its full review and its
