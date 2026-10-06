@@ -145,13 +145,17 @@ def simulate(op, nodes, k, W, n, s, h, o, B, measure='osu', links='sender', coun
         generation[0] += 1
         if flight:
             r = rates()
-            soonest = min(x[0] / r[q] for q, x in flight.items())
-            at(now + max(0.0, soonest), landed, generation[0])
+            due, q = min((x[0] / r[q], q) for q, x in flight.items())
+            at(now + max(0.0, due), landed, generation[0], q)
 
-    def landed(g, now):
+    def landed(g, due, now):
         if g != generation[0]:
             return
         advance(now)
+        # The transfer this event was planned for lands whatever is left of it:
+        # far into a run, what is left can be a fraction of a byte too small
+        # for the clock to tell from now, and planned again would never land.
+        flight[due][0] = 0.0
         for q in [q for q, x in flight.items() if x[0] <= 1e-9]:
             _, u, v, (f, a) = flight.pop(q)
             at(now + h, f, *a)
