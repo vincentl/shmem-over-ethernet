@@ -1737,16 +1737,23 @@ if(OSOE_SINGLE_NODE)
     PROGRAM $<TARGET_FILE:shmem_test_init>)
   add_executable(deny-futex deny-futex.c)
   osoe_warnings(deny-futex)
-  add_test(NAME shmem.refuse.no-futex
-    COMMAND deny-futex $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
-            $<TARGET_FILE:shmem_test_init>)
-  set_tests_properties(shmem.refuse.no-futex PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION
-      "needs the futex calls FUTEX_WAIT_BITSET and FUTEX_WAKE_BITSET, which a sandbox \\(seccomp\\) must allow .*this kernel is"
-    FAIL_REGULAR_EXPRESSION "left behind|futex wake failed|futex wait failed")
-  add_test(NAME env.probe.no-futex COMMAND deny-futex $<TARGET_FILE:probe>)
-  set_tests_properties(env.probe.no-futex PROPERTIES LABELS "env" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "FAIL futex U32 wait \\(value mismatch\\)")
+  # Not under AddressSanitizer: GCC 14's runtime takes futex locks of its own as
+  # a process starts, and glibc ends a process whose futex call fails as it
+  # never should ("The futex facility returned an unexpected error code"), so
+  # under the filter every program ends before shmem_init's check could run.
+  # GCC 11's runtime and ThreadSanitizer's run them.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=address")
+    add_test(NAME shmem.refuse.no-futex
+      COMMAND deny-futex $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
+              $<TARGET_FILE:shmem_test_init>)
+    set_tests_properties(shmem.refuse.no-futex PROPERTIES LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION
+        "needs the futex calls FUTEX_WAIT_BITSET and FUTEX_WAKE_BITSET, which a sandbox \\(seccomp\\) must allow .*this kernel is"
+      FAIL_REGULAR_EXPRESSION "left behind|futex wake failed|futex wait failed")
+    add_test(NAME env.probe.no-futex COMMAND deny-futex $<TARGET_FILE:probe>)
+    set_tests_properties(env.probe.no-futex PROPERTIES LABELS "env" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "FAIL futex U32 wait \\(value mismatch\\)")
+  endif()
 endif()
 
 osoe_tier2_test(init)

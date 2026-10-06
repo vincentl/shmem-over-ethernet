@@ -48,13 +48,16 @@ _Static_assert(sizeof(struct osoe_segment_directory) == 288,
  * heap maps becomes B for the node (§4.1). No single address is free under
  * every build in the development VM (aarch64, 48-bit): AddressSanitizer and
  * ThreadSanitizer reserve disjoint ranges. The list covers a plain build, ASan,
- * TSan, and 39-bit address spaces, in that order. OSOE_HEAP_BASE replaces it.
+ * TSan, 39-bit address spaces, and the older ThreadSanitizer of GCC 11 (Rocky
+ * Linux 9), whose application memory is the low 8 GiB, a 20 GiB band at
+ * 0xaaaa00000000 and the top 4 GiB, in that order. OSOE_HEAP_BASE replaces it.
  */
 static const uint64_t heap_base_candidates[] = {
     UINT64_C(0x100000000000),
     UINT64_C(0x300000000000),
     UINT64_C(0x010000000000),
     UINT64_C(0x001000000000),
+    UINT64_C(0x000100000000),
 };
 
 /* Sections of the control segment start on a cache line, so none shares one. */

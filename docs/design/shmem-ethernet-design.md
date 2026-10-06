@@ -2508,11 +2508,15 @@ upward in a plain build. AddressSanitizer allows only
 `[0x2010_0000_0000, 0x5000_0000_0000)` and above `0x5410_0000_0000`.
 ThreadSanitizer allows only below `0x0a00_0000_0000`, a small band near
 `0xaab0_0000_0000`, and above `0xfc00_0000_0000`. Above `0xfc00_0000_0000` is common
-to all three, but it does not exist in a 39-bit or x86-64 address space. So:
+to all three, but it does not exist in a 39-bit or x86-64 address space. GCC
+11's ThreadSanitizer (Rocky Linux 9; v0.2 step 1) has an older layout of its own,
+which allows only below `0x2_0000_0000`, the band
+`[0xaaaa_0000_0000, 0xaaaf_0000_0000)` and above `0xffff_0000_0000`. So:
 - **The lead chooses `B`** by mapping its own heap at the first of a short
   candidate list that succeeds: `0x1000_0000_0000`, `0x3000_0000_0000`,
-  `0x100_0000_0000`, `0x10_0000_0000`. That is a plain build, ASan, TSan, and a
-  39-bit address space, in order.
+  `0x100_0000_0000`, `0x10_0000_0000`, `0x1_0000_0000`. That is a plain build,
+  ASan, TSan, a 39-bit address space and GCC 11's TSan, in order; the last
+  holds a heap of up to 4 GiB.
 - **It publishes `B` in the control segment** before any sibling reads it.
 - **Every other PE maps its own heap at the published `B`**, and fails loudly if it
   cannot. All local PEs run the same binary, so the lead's choice suits them.
@@ -2756,7 +2760,7 @@ local lead and again at the root.
   only the entry one.
 - **`shmem_align` aligns an address, but the allocator works in offsets.** The
   two agree only while the heap's base `B` is itself a multiple of the requested
-  alignment, which every candidate base in §4.1 is up to a terabyte. Above that,
+  alignment, which every candidate base in §4.1 is up to 4 GiB. Above that,
   `shmem_align` reports a failed allocation rather than returning an address
   that is not what was asked for: a null return is a value the spec defines, and
   every PE reaches it identically because `B` is the same number on all of them.

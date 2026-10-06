@@ -155,7 +155,7 @@ OSOE_API void *pshmem_align(size_t alignment, size_t size)
      * The allocator aligns heap *offsets*, and the caller was promised an
      * aligned *address*. The two agree only while this PE's heap base is itself
      * a multiple of the alignment: the node's B, which every candidate base is
-     * for anything up to 64 GiB (§4.1), plus - under §8.2's heap-base shift -
+     * for anything up to 4 GiB (§4.1), plus - under §8.2's heap-base shift -
      * this PE's rank times OSOE_HEAP_SHIFT. Beyond that, say the allocation
      * failed rather than return an address that is not what was asked for; a
      * failure is a return value the spec defines. It is decided from B and the
