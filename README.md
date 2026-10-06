@@ -127,8 +127,9 @@ test suite, installing, and running over several machines with `srun`.
 
 A machine that runs jobs of one node only - a desktop with many cores, to
 develop and test programs at small PE counts - can build osoe with no liburing
-and no io_uring, on any distribution: Red Hat 9 and its rebuilds, Debian 12 and
-Ubuntu among them ([Requirements](#requirements)). Configure with the option,
+and no io_uring, on a distribution with Linux 4.17 and CMake 3.25: Red Hat 9 and
+its rebuilds above all, and Debian 12 or Ubuntu 24.04 ([Requirements](#requirements);
+it has run on Rocky Linux 9 and Debian 13). Configure with the option,
 install, then build with the installed wrapper and run with the installed
 launcher - here as eight PEs, which a machine of four cores runs too:
 
@@ -147,15 +148,17 @@ every tool's `--version`, `SHMEM_INFO` and the start-up line say
 `(single-node build)` after the version. A job of more than one node - under
 `srun -N2`, or `osoe-launch -m` with two logical nodes - is refused at
 `shmem_init` by name, before anything is made in `/dev/shm`: the full build is
-what runs it. `/dev/shm` must hold about 300 MiB a PE at the default heap of 256
+what runs it. `/dev/shm` must hold about 263 MiB a PE at the default heap of 256
 MiB, and `SHMEM_SYMMETRIC_SIZE=64m` shrinks that (a container's 64 MiB is too
-little: [Building](#building) says what to give one). With more PEs than cores,
-each PE's progress thread competes with the program for a core;
-`OSOE_AGENT_SLICE_US` and `OSOE_AGENT_CPUS` say how it is scheduled
-([Environment variables](#environment-variables)). The test suite runs as it
-does in the full build, `ctest --preset release -j4`, without the 383 tests that
-need more than one node or test the internode backend's own files: 341 of the
-full build's 721, and the same 30 of the model checker.
+little: [Building](#building) says what to give one). More PEs than cores is
+fine: nothing in the library spins - a waiting PE sleeps on a futex - and in a
+job of one node each PE's progress thread has nothing to move and sleeps too, so
+the two settings that schedule it in a job of many nodes, `OSOE_AGENT_SLICE_US`
+and `OSOE_AGENT_CPUS`, are not needed here. The test suite runs as it does in the
+full build, `ctest --preset release -j4`: 338 of the full build's 721 tests - all
+but the 383 labelled `internode`, which need more than one node or test the
+internode backend's own files, io_uring or futex2 - and three of its own; and
+`ctest --preset models` runs the same 30 tests of the model checker.
 
 ## Getting started
 
@@ -178,7 +181,7 @@ output on each node, the first error line, and for a hang `osoe-stat`'s.
 ### Requirements
 
 osoe builds two ways from one tree. The **full build**, the default, runs jobs
-of any number of nodes; the **single-node build**, `-DOSOE_SINGLE_NODE=ON`
+of one node or of many; the **single-node build**, `-DOSOE_SINGLE_NODE=ON`
 ([On a desktop](#on-a-desktop-the-single-node-build)), runs jobs of one node
 only, and needs less. The full build:
 
@@ -214,12 +217,14 @@ needs only liburing's runtime package, `liburing2`, 2.6 or newer. The full build
 does not support older releases, even where the kernel is new enough, since osoe
 does not bundle a newer liburing ([design notes](docs/design/shmem-ethernet-design.md) §1 - "design §N"
 here names them, and a bare § the OpenSHMEM 1.6 specification): Debian 12 has liburing 2.3 and Ubuntu 24.04
-2.5, and Rocky Linux 9 and its kin have Linux 5.14. Those run the single-node
-build: on Rocky Linux 9 `sudo dnf install gcc make cmake` - its CMake is 3.31 at
-9.8, and 3.26 from 9.3; on 9.0 to 9.2, `pip install cmake` gives a newer one -
-and on Debian 12 or Ubuntu `sudo apt install build-essential cmake`. The full
-build needs a distribution with both a 6.7 kernel and liburing 2.6: Debian 13,
-Raspberry Pi OS Trixie, or another, such as current Fedora or Arch.
+2.5, and Rocky Linux 9 and its kin have Linux 5.14. Those are what the
+single-node build is for. On Rocky Linux 9, where it has run, `sudo dnf install
+gcc make cmake` - CMake 3.31 at 9.8; 9.0 to 9.2 shipped 3.20, where `pip install
+cmake` gives a newer one - and on Debian 12 or Ubuntu 24.04 `sudo apt install
+build-essential cmake`; Ubuntu 22.04's CMake, 3.22, is older than the floor. The
+full build needs a distribution with both a 6.7 kernel and liburing 2.6: Debian
+13, Raspberry Pi OS Trixie, or another, such as current Fedora or Arch, or
+Ubuntu 24.10 and later.
 
 ### Building
 
@@ -251,7 +256,8 @@ Presets: `debug`, `release` (optimized, with debug info), `asan`
 (AddressSanitizer and UndefinedBehaviorSanitizer), and `tsan` (ThreadSanitizer);
 and `tier3`, the release build with tests over network namespaces whose links
 `netem` shapes, which needs `sudo` without a password, and `ip`, `tc` and
-`ethtool`.
+`ethtool` - the full build's only: with the single-node build it is a configure
+error.
 
 The `env.probe` test checks that the running kernel provides every facility
 osoe relies on, `shmem_init`'s own checks among them: in the full build every
@@ -273,9 +279,10 @@ is 2), and container runtimes' default seccomp profiles refuse it: Docker 25 and
 later and containerd 2.0 and later with `EPERM`, for which the message names
 the sysctl even though it reads 0 inside the container, and Podman with
 `ENOSYS`. There jobs on one node run, but 343 of the test suite's 721 tests fail
-at `shmem_init` or at opening a ring - every one of them labelled `internode`, the
-383 that need more than one node or test the internode backend's own files
-(`ctest -L internode`); the single-node build has neither them nor io_uring. Set the sysctl to
+at `shmem_init` or at opening a ring - every one but `env.probe` among the 383
+labelled `internode`, which need more than one node or test the internode
+backend's own files, io_uring or futex2 (`ctest -L internode`); the single-node
+build has neither them nor io_uring. Set the sysctl to
 0 as root, or run the container with a seccomp profile that allows io_uring.
 Container runtimes also give a container 64 MiB of `/dev/shm` unless asked for
 more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) - less than
@@ -569,7 +576,7 @@ build tree.
 |---|---|---|
 | `wrapper/` | `oshcc`, the compiler wrapper, and `osoe-statics.ld`, the linker script it passes, which makes a program's global and static variables symmetric | yes, both |
 | `stat/` | `osoe-stat`, which reads a running or hung job's counters and state from outside | yes |
-| `pacer/` | `osoe-pacer`, the stress tester; `osoe-pacer-start-pes`, which its tests run to check Annex F's unprefixed routines; and, where Python 3 is found, `osoe-pacer-counted` and `osoe-pacer-start-pes-counted`, builds that count every call to the library | `osoe-pacer` only |
+| `pacer/` | `osoe-pacer`, the stress tester; in the full build `osoe-pacer-start-pes`, which its tests run to check Annex F's unprefixed routines; and, where Python 3 is found, `osoe-pacer-start-pes-counted` and, in the full build, `osoe-pacer-counted`, builds that count every call to the library | `osoe-pacer` only |
 | `launch/` | `osoe-launch`, which starts a job's processes on this machine; beside it `tier3.sh`, which gives each logical node a network namespace, and `capture-slurm-fixtures.sh`, which records Slurm's environment under `srun` | `osoe-launch` only |
 | `bench/` | `osoe-bench`, what the library costs on a cluster, one measurement a line | no |
 | `probe/` | `probe`, which checks that the kernel has every facility the build relies on - io_uring and futex2 in the full build, the classic futex in the single-node build (the `env.probe` test) | no |
@@ -584,8 +591,8 @@ build tree.
   a local floor - a bare io_uring TCP echo, a stream, a memcpy - rather than
   against another library's numbers.
 - **Built entirely from the distribution's own packages**, the primary goal
-  rather than a preference: link-time dependencies are libc and liburing, and
-  nothing is bundled.
+  rather than a preference: link-time dependencies are libc and liburing -
+  libc alone in the single-node build - and nothing is bundled.
 - **Correctness first, reasonable performance second.**
 - **Scale with nodes, not with PEs.** The collectives have two levels: the PEs
   of a node meet in shared memory, and then the *nodes* meet. Nothing may scale
@@ -655,7 +662,8 @@ build tree.
   collective's phase within a node reads and writes its node-mates' heaps
   directly. A test, `shmem.boundary`, fails if any file above the boundary
   includes one below it that it may not. The one backend today is TCP and
-  io_uring with an in-node shared-memory path.
+  io_uring with an in-node shared-memory path, which the single-node build
+  keeps alone.
 
 ## Scaling with nodes, not PEs
 
@@ -911,11 +919,11 @@ specification or takes a choice the specification leaves open.
   any other program ends the job by name. `process_vm_readv` and
   `process_vm_writev`, which reach another process's memory in any program,
   copy between address spaces and map nothing: a put or a get would be a system
-  call, an atomic cannot be made of copies, a wait on such a variable would
-  never be woken, and Yama's `ptrace_scope` of 1 refuses them between a job's
-  sibling processes. Gathering the statics by a linker script and mapping them
-  as shared memory at init, as osoe does, is the only way Linux offers to *map*
-  another process's private memory (design §4.3).
+  call, an atomic cannot be made of copies, and Yama's `ptrace_scope` of 1
+  refuses them between a job's sibling processes. Linux has no call that maps
+  memory a process keeps private; gathering the statics by a linker script and
+  remapping them as shared memory at init, as osoe does, makes them memory its
+  node-mates can map (design §4.3).
 - **A PE's gets from other nodes land in its landing zone**
   (`OSOE_GET_LANDING_BYTES`, 256 KiB by default, in extents of 1 KiB): a get
   takes whole extents, at least one, so 256 small gets in flight fill it as 256
@@ -1157,10 +1165,11 @@ that one could be added without touching the OpenSHMEM layer.
   through another process, and so leaves most tests across nodes to the other
   three.
 - **Two builds.** The single-node build runs the same suite less the
-  383 tests labelled `internode` - those of a job of more than one node,
-  and of the internode backend's own files - in the same four presets, on Rocky
-  Linux 9 and in the development VM with liburing hidden; `ctest -L internode`
-  on the full build runs exactly the tests it lacks.
+  383 tests labelled `internode` - those of a job of more than one node, of
+  the internode backend's own files, and of io_uring and futex2 - and with
+  three of its own, in the same four presets, on Rocky Linux 9 and in the
+  development VM with liburing hidden; `ctest -L internode` on the full build
+  runs exactly the tests it lacks.
 - **Model checking.** Every lock-free and futex protocol but one - waking the
   progress thread, waits, the barrier tree, pipelined collectives and the lanes
   their large pieces go through, Bruck's allgather, the scans, get completion
@@ -1220,7 +1229,7 @@ that one could be added without touching the OpenSHMEM layer.
   every atomic, transfer and collective, and all of them at once on teams out
   of step - every result checked against an oracle, and every oracle checked
   by a planted defect it must catch. A build of it that counts every call
-  (`osoe-pacer-counted`, built where Python 3 is found) shows which of the
+  (`osoe-pacer-counted`, built by the full build where Python 3 is found) shows which of the
   library's 1,794 routines a run reaches.
 - **A Raspberry Pi 5 cluster** over gigabit Ethernet, its four nodes running
   with TCP and generic segmentation offload off. Before, one node's spurious

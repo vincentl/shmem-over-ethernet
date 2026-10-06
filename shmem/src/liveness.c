@@ -20,6 +20,14 @@
 #include "liveness.h"
 #include "state.h"
 
+/* pidfd_open, Linux 5.3. Older headers lack the number: 434 on x86-64, as on
+ * every architecture using the generic syscall table. A kernel without the call
+ * refuses it, and open_watch watches by pid instead - the single-node build
+ * runs on Linux 4.17. */
+#ifndef SYS_pidfd_open
+#define SYS_pidfd_open 434
+#endif
+
 /*
  * What this PE watches: the lead every other local PE, every other PE its
  * lead. Each has an open pidfd, or is watched by its pid (PID) when no pidfd

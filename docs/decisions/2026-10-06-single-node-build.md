@@ -90,7 +90,8 @@ one-node test the full build passes; the full build is unchanged.
    under `deny-futex`, a seccomp filter denying `futex(2)` with `EPERM`:
    `shmem_init` refuses by name with the classic futex's requirement, nothing
    left behind; and `env.probe.no-futex`, the probe failing its classic check
-   under the same filter. New in both builds, the install tests' one-node
+   under the same filter - these two not under AddressSanitizer (item 9). New
+   in both builds, the install tests' one-node
    counterparts, the single-node build's only way to them:
    `wrapper.statics.one-node`, `wrapper.installed.one-node` - the installed
    `oshcc` and the installed `osoe-launch` - and `tools.pacer.installed.one-node`.
@@ -105,6 +106,24 @@ one-node test the full build passes; the full build is unchanged.
    first run, 339 of 339 (its two C++ header tests need a C++ compiler, which
    the VM has not). The audit's other expectations held, but one: Rocky 9.8
    ships CMake 3.31, where the audit expected 3.26 from 9.3.
+
+   **And what the first sanitizer runs found**, two things no audit could:
+   - **GCC 11's ThreadSanitizer lays memory out in an older way** than GCC
+     14's: application memory only the low 8 GiB, a 20 GiB band at
+     `0xaaaa_0000_0000` and the top 4 GiB (read from a TSan program's
+     `/proc/self/maps` on the VM), so none of §4.1's four heap base candidates
+     was free, and 223 of the 336 tests failed at start-up with "no candidate
+     heap base is free". A fifth candidate, `0x1_0000_0000`, in the low 8 GiB,
+     is tried last (`node.c`, design §4.1); `shmem_align`'s promise from `B`'s
+     alignment is now up to 4 GiB, which `malloc.c` checks against the real
+     `B` in any case. The full build has the same list: under GCC 14 its first
+     candidate maps as before.
+   - **Under AddressSanitizer with GCC 14** (Debian 13) the futex filter's two
+     tests ended before `shmem_init`: the sanitizer's runtime takes futex
+     locks of its own as a process starts, and glibc ends a process whose
+     futex call fails as no futex call should ("The futex facility returned an
+     unexpected error code"). They are not registered under AddressSanitizer;
+     GCC 11's runtime ran them, and so does ThreadSanitizer's.
 
 ## The Rocky Linux 9 VM
 
@@ -144,11 +163,31 @@ Each is Claude's, under the standing mandate; the undo follows.
    `shmem_init` reaches, and the single-node build must refuse those values
    too. *Undo:* back to `shmem_test_job`, labelled `internode`.
 7. **Tier 3 with the single-node build is a configure error**, rather than a
-   preset that registers nothing. *Undo:* let it register nothing.
+   preset that registers nothing; the README's preset list says so. *Undo:*
+   let it register nothing.
 8. **Tests of the internode backend's own files are `internode`** - `am.c`'s,
    the connections', the rendezvous's - since the single-node build does not
    contain the code they test. *Undo:* compile those files into their tests in
    both builds.
+9. **The desktop section says what is true of a job of one node where the
+   brief's item 2 said otherwise.** `/dev/shm` must hold about 263 MiB a PE,
+   the capacity check's figure (four PEs about 1,050 MiB, as the quick start
+   says), where the brief had "about 300", which is the container advice
+   Building keeps. And the brief's "`OSOE_AGENT_CPUS` and the slice matter
+   when PEs outnumber cores" holds of a job of many nodes, where the pacer's
+   `--cpu-bind=none` numbers were measured: in a job of one node the progress
+   thread has nothing to move and sleeps on its wake word, a sweep at the
+   longest (`transport-am.c`), and the slice is ignored before Linux 6.12
+   anyway. The README says nothing in the library spins and that the two
+   settings are not needed there. *Undo:* the brief's two sentences.
+10. **The statics sentences of the decisions of 2026-10-05 (item 9) are
+    corrected**, two of Claude's own claims there being wrong: "a wait on such
+    a variable would never be woken" - osoe's waits look again at every sweep,
+    and a copy could be followed by a wake through the control segment as a
+    put's is - is gone, the three other reasons standing; and osoe does not
+    "map another process's private memory" but makes a PE's statics memory
+    its node-mates can map, Linux having no call that maps memory a process
+    keeps private. *Undo:* item 9's wording.
 
 ## Verification
 
