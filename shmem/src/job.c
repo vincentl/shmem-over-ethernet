@@ -21,7 +21,6 @@
 #include "fatal.h"
 #include "job.h"
 #include "internode-backend.h"
-#include "rendezvous.h"
 #include "shm-object.h"
 #include "transport.h"
 

@@ -3528,10 +3528,15 @@ are five lists in that one script - the API, the runtime, the files on the
 boundary, the backend, and the one header only a backend includes - and every
 library source file and header must be in exactly one of them. An include is
 judged by the file it resolves to, quoted or angled, so no spelling of a
-forbidden header gets past. Three files on the boundary reach an AM header, each
-known: `node.c` sizes the landing zones from AM's chunk, `rendezvous.c` checks
-AM's handler checksum, and `transport-local.c` shares a header with AM; every
-other file on the boundary is held to the same rule as the files above it.
+forbidden header gets past. Three files on the boundary reached an AM header,
+each known: `node.c` sized the landing zones from AM's chunk, `rendezvous.c`
+checks AM's handler checksum, and `transport-local.c` shares a header with AM;
+every other file on the boundary is held to the same rule as the files above
+it. *(Since v0.2 step 1 `node.c` reads the AM layer's sizes from a file of their
+own on the boundary, so two remain; the backend-facing headers are two,
+`internode-generic.h` and `internode-backend.h`; and a third check holds every
+file outside the internode backend to reaching it through `internode-backend.h`
+alone: below, "As built, v0.2 step 1".)*
 *(Since phase 1 step 5 slice 2 a second walk checks that nothing outside the API
 includes an API header or a public one: the includes run from the OpenSHMEM
 layer down to the runtime and never back - the backend's one call up is the

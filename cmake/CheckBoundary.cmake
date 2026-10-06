@@ -86,9 +86,11 @@ set(OSOE_BACKEND_FACING internode-backend.h internode-generic.h)
 # shared infrastructure both sides build on - the seam's two headers, the
 # internode tree's topology, which an RDMA backend computes the same way, the
 # reductions' combine functions, the generic internode implementation a
-# backend may call, and the rendezvous. The rendezvous's sockets (listener.c)
-# and the rank map (rank-map.c) are every build's: bootstrap is out of band
-# (§6.2).
+# backend may call, and the rendezvous. The rank map (rank-map.c) is every
+# build's; the rendezvous (rendezvous.c) and its sockets (listener.c), which
+# bootstrap a job of more than one node out of band (§6.2), sit on the boundary
+# as an RDMA backend would keep them, and are the internode backend's files
+# below (the third check).
 #
 # Two more every build keeps: the AM layer's sizes (am-configuration.c), which
 # lay out every PE's landing zone in the node segment whatever the job's shape,
@@ -120,8 +122,8 @@ set(OSOE_ON_BOUNDARY_READING_AM rendezvous.c transport-local.c)
 set(OSOE_INTERNODE_BACKEND
   am.c am.h am-state.h connection.c connection.h connection-area.c connection-area.h
   internode-am.c listener.c listener.h progress.c progress.h progress-host.c
-  progress-host.h rendezvous.c reply.c reply.h ring.c ring.h transport-internode.c wire.c
-  wire.h)
+  progress-host.h rendezvous.c rendezvous.h reply.c reply.h ring.c ring.h
+  transport-internode.c wire.c wire.h)
 
 if(NOT SOURCE_DIR)
   message(FATAL_ERROR "usage: cmake -DSOURCE_DIR=<repository root> -P CheckBoundary.cmake")
@@ -279,6 +281,10 @@ foreach(name IN LISTS OSOE_INTERNODE_BACKEND)
   endif()
 endforeach()
 paths_of(internode_headers internode)
+# And base's io_uring check, which only the internode backend may call: a
+# file every build compiles that reached it would not compile without liburing.
+file(REAL_PATH "${SOURCE_DIR}/base/ring-check.h" ring_check)
+list(APPEND internode "${ring_check}")
 set(violations "")
 set(common 0)
 foreach(list IN ITEMS OSOE_API OSOE_RUNTIME OSOE_BELOW_BOUNDARY OSOE_BACKEND_FACING

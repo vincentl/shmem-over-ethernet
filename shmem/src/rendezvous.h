@@ -45,17 +45,13 @@
 #include <stdint.h>
 
 #include "bootstrap.h"
+#include "internode-backend.h"
 #include "rank-map.h"
 
 enum { OSOE_RENDEZVOUS_FANOUT = 8 };
 
-/* What every lead learns: malloc'd, the caller frees. */
-struct osoe_rendezvous_result {
-    struct osoe_rank_run *runs;
-    uint32_t run_count;
-    uint32_t *ipv4;                 /* node_count addresses, network order */
-    unsigned char *blobs;           /* node_count x OSOE_JOB_BACKEND_BLOB_BYTES */
-};
+/* What every lead learns is internode-backend.h's struct
+ * osoe_rendezvous_result, which job.c reads. */
 
 /*
  * This lead's part (b->local_id == 0, b->node_count > 1). `blob` is this node's

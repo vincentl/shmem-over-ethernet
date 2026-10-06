@@ -27,6 +27,7 @@
 #include <pthread.h>
 #include <sched.h>
 #include <stdatomic.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -55,7 +56,6 @@
 #include "state.h"
 #include "transport.h"
 #include "transport-context.h"
-#include "wire-settings.h"
 
 /* The peer slot for a node, as the connection area and the progress loop both
  * index it: node order with this node left out (§3.4). */
@@ -226,30 +226,27 @@ static void context_leave(struct osoe_transport_context *c)
 }
 
 /*
- * internode-backend.h's share of the settings check. The ring first: a job of
- * more than one node is the one kind that opens one, and its checks are the
- * kernel's (§1: the library checks what it uses, before anything is created),
- * every local PE's alike - so each refuses by itself, telling no one, as init's
- * futex check does: a lead's last word would leave its node a tombstone in
- * /dev/shm for nothing (node.h), and wake its waiters with the very calls that
- * fail here. Then the wire's settings, as values.
+ * internode-backend.h's check: the ring, which a job of more than one node is
+ * the one kind to open, and whose checks are the kernel's (§1: the library
+ * checks what it uses, before anything is created) - every local PE's alike,
+ * so the part every job uses refuses with what this says, telling no one.
  */
-void osoe_internode_backend_settings_check(const struct osoe_bootstrap *b)
+const char *osoe_internode_backend_check(const struct osoe_bootstrap *b, char *why,
+                                         size_t len)
 {
     const char *facility;
     int ring_error = b->node_count > 1 ? osoe_ring_check(&facility) : 0;
-    if (ring_error) {
-        struct utsname u;
-        const char *release = uname(&u) == 0 ? u.release : "unknown";
-        osoe_node_refusal_disarm();
-        osoe_fatal("osoe needs io_uring with %s for a job of %u nodes (it fails with "
-                   "\"%s\"%s); this kernel is %s", facility, b->node_count,
-                   strerror(ring_error),
-                   ring_error == EPERM && facility == osoe_ring_check_creating
-                       ? ", which usually means the kernel.io_uring_disabled sysctl is set"
-                       : "", release);
-    }
-    osoe_wire_settings_check(b);
+    if (!ring_error)
+        return NULL;
+    struct utsname u;
+    const char *release = uname(&u) == 0 ? u.release : "unknown";
+    snprintf(why, len,
+             "osoe needs io_uring with %s for a job of %u nodes (it fails with \"%s\"%s); "
+             "this kernel is %s", facility, b->node_count, strerror(ring_error),
+             ring_error == EPERM && facility == osoe_ring_check_creating
+                 ? ", which usually means the kernel.io_uring_disabled sysctl is set"
+                 : "", release);
+    return why;
 }
 
 /* internode-backend.h's start: the AM state afresh, the two facts about the job

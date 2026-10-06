@@ -14,25 +14,27 @@
  * runs (progress-host.c, progress.c, wire.c, ring.c); the connection area, the
  * connections, the reply pool and the messages (connection-area.c,
  * connection.c, reply.c, am.c); the rendezvous of the node leads (rendezvous.c,
- * listener.c); and internode.h over AM (internode-am.c, and the generic phase
- * it hands the data collectives to, internode-generic.c).
+ * listener.c); and internode.h over AM (internode-am.c). The generic phase AM
+ * hands the data collectives to (internode-generic.c) is on the boundary and
+ * built in every build, since internode.h's team-number calls reach it in any
+ * job.
  *
  * **The part every job uses reaches the internode backend through this header
  * and nothing else** - shmem.boundary holds the files every build compiles to
  * that (cmake/CheckBoundary.cmake) - and only in a job of more than one node,
- * except for the settings check, which every PE of every job makes. So a
+ * but for the check every PE of every job makes before its node joins. So a
  * second internode backend replaces those files without touching the first
- * part, and a one-node job runs the same code in both, the internode backend
- * never entered.
+ * part. The SHMEM layer reaches the internode backend through internode.h, and
+ * a job of one node makes four of its calls: the default fan-out, read while
+ * bootstrapping; init and fini; and a team number taken again - the last three
+ * the generic phase's, in both builds.
  *
  * Every entry point below is one of §4.10's calls, or its share of one, for a
  * job of more than one node - a backend on RDMA provides each of them, as the
  * comment beside it says - and the internode backend also implements
- * internode.h whole, the collectives' seam, whose calls a job of one node
- * makes only at init and fini and as a team number is taken again
- * (internode-am.c). Its metrics are the control segment's - the `am.*`
- * counters and the connection scope (node.h, metrics.c) - which every build
- * lays out and only this backend writes.
+ * internode.h whole, the collectives' seam. Its metrics are the control
+ * segment's - the `am.*` counters and the connection scope (node.h, metrics.c)
+ * - which every build lays out and only this backend writes.
  *
  * Contexts are the AM backend's (transport-context.h): this header passes them
  * by pointer, and the internode backend keeps its own state for each behind
@@ -50,21 +52,34 @@
 
 struct osoe_bootstrap;
 struct osoe_deadlock_message;
-struct osoe_rendezvous_result;
+struct osoe_rank_run;
 struct osoe_transport_context;
+
+/* What a lead learns from the job rendezvous (osoe_internode_backend_rendezvous,
+ * below): malloc'd, the caller frees. */
+struct osoe_rendezvous_result {
+    struct osoe_rank_run *runs;
+    uint32_t run_count;
+    uint32_t *ipv4;                 /* node_count addresses, network order */
+    unsigned char *blobs;           /* node_count x OSOE_JOB_BACKEND_BLOB_BYTES */
+};
 
 /* ---- Start-up and the end -------------------------------------------- */
 
 /*
- * osoe_transport_settings_check's share, made by every PE of every job before
- * its node joins (init.c): first what this backend needs of the kernel to run
- * a job of b->node_count nodes - on AM, io_uring's checks, for a job of more
- * than one node - refused by every PE alike and so telling no one, since a
- * lead's last word there would leave its node a tombstone in /dev/shm for
- * nothing (node.h); then its own settings, as values - on AM, the wire's. Ends
- * the PE with a fatal naming what failed.
+ * osoe_transport_settings_check's first step, made by every PE of every job
+ * before its node joins (init.c): can this backend run a job of
+ * b->node_count nodes here? NULL if it can; if not, `why`, a sentence naming
+ * what is missing, written into `len` bytes - on AM, the io_uring facility its
+ * ring needs, for a job of more than one node. The kernel and the job's node
+ * count are every local PE's alike, so the part every job uses refuses with
+ * it telling no one, as init's futex check does (transport-am.c): a lead's
+ * last word would leave its node a tombstone in /dev/shm for nothing
+ * (node.h). A backend's settings are checked as values beside it, in every
+ * build (am-configuration.h, wire-settings.h).
  */
-void osoe_internode_backend_settings_check(const struct osoe_bootstrap *b);
+const char *osoe_internode_backend_check(const struct osoe_bootstrap *b, char *why,
+                                         size_t len);
 
 /* osoe_transport_advertise (transport.h): ready what other nodes' leads need
  * to reach this node and describe it in `blob` - on AM, the node-pair

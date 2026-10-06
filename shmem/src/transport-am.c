@@ -15,9 +15,10 @@
  * both properties: the branch below is on where a PE *is*, which is a fact
  * about the job rather than a configuration, and it is the same branch
  * osoe_transport_direct already answers for shmem_ptr. A job of one logical
- * node never takes the far path at all, and never enters the internode
- * backend but for the settings check every PE makes: what it runs is this
- * file and the intranode path.
+ * node never takes the far path at all, and enters the internode backend only
+ * for the check every PE makes before its node joins and through internode.h's
+ * four calls every job makes (internode-backend.h): what its operations run is
+ * this file and the intranode path.
  *
  * What is here: the contexts - their pool in the node segment, their modes,
  * and the mutex a shared one's waits take (§4.11) - and the fence and wait of
@@ -44,6 +45,7 @@
 #include "transport.h"
 #include "transport-context.h"
 #include "transport-local.h"
+#include "wire-settings.h"
 
 /*
  * Whether the job spans more than one logical node: settled at the very start
@@ -99,16 +101,27 @@ static bool environment_flag(const char *name)
 }
 
 /*
- * transport.h: what the backend needs before the node joins. The AM layer's
- * sizes, which lay out every PE's landing zone in the node segment in any job
- * (node.c), and then the internode backend's share - what it needs of the
- * kernel for a job of this many nodes, and its own settings.
+ * transport.h: what the backend needs before the node joins. First whether
+ * the internode backend can run a job of this many nodes here - on AM, the
+ * io_uring a job of more than one node opens - which every local PE answers
+ * alike, so a refusal tells no one: the refusal's last word is disarmed before
+ * the fatal, as init's futex check is, since a lead's would leave its node a
+ * tombstone in /dev/shm for nothing (node.h). The transport, not a backend,
+ * keeps that rule. Then the settings, as values, in every build and whatever
+ * the job's shape, so that a bad one is refused the same way on one node and
+ * on many: the AM layer's sizes, which lay out every PE's landing zone in the
+ * node segment in any job (node.c), and the wire's.
  */
 void osoe_transport_settings_check(const struct osoe_bootstrap *b)
 {
+    char why[512];
+    if (osoe_internode_backend_check(b, why, sizeof why)) {
+        osoe_node_refusal_disarm();
+        osoe_fatal("%s", why);
+    }
     struct osoe_am_configuration am;
     osoe_am_configuration_read(&am);
-    osoe_internode_backend_settings_check(b);
+    osoe_wire_settings_check(b);
 }
 
 /*
