@@ -28,7 +28,9 @@
  * (default 60 s) expires, or if the job left shared-memory objects named
  * /osoe.<job>.* behind after every process exited successfully: heap names are
  * removed once mapped and the control segment at the last finalize (§6.2), so
- * a clean job leaves none. Leftovers are removed in every case. Its status is
+ * a clean job leaves none. Leftovers are removed in every case, a launcher
+ * whose output's reader has gone among them: it ignores SIGPIPE, and its
+ * children start with SIGPIPE as it found it. Its status is
  * srun's (design §3.15): the highest exit code of any rank, 128 plus the signal
  * for a rank killed by a signal this launcher did not send itself, and 1 for
  * the launcher's own findings - a timeout, leftovers - when no rank reported
@@ -453,6 +455,18 @@ int main(int argc, char **argv)
     sigaddset(&chld, SIGINT);
     sigprocmask(SIG_BLOCK, &chld, NULL);
     launcher_pid = getpid();
+    /*
+     * SIGPIPE ignored from here on, and given back to each child as this
+     * launcher found it: a launcher whose output's reader has gone -
+     * `osoe-launch ... | head`, or grep -m1 - then loses its own lines rather
+     * than dying at the first, and still ends the job and removes its
+     * leftovers. Killed by it, the launcher left a refused start's control
+     * segment in /dev/shm (the v0.2 step 1 review, scale's note for
+     * readiness).
+     */
+    struct sigaction ignore = { .sa_handler = SIG_IGN }, pipe_as_found;
+    sigemptyset(&ignore.sa_mask);
+    sigaction(SIGPIPE, &ignore, &pipe_as_found);
 
     pid_t pids[MAX_PROCS];
     bool done[MAX_PROCS] = { false };
@@ -467,6 +481,7 @@ int main(int argc, char **argv)
         if (pids[i] == 0) {
             signal(SIGTERM, SIG_DFL);
             signal(SIGINT, SIG_DFL);
+            sigaction(SIGPIPE, &pipe_as_found, NULL);
             sigprocmask(SIG_UNBLOCK, &chld, NULL);
             exec_rank(i, n, job, &place[i], ov, nov, prog);
         }

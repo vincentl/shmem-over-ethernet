@@ -1661,6 +1661,14 @@ add_test(NAME shmem.dev-shm-capacity.node-ends
           $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> node-ends)
 set_tests_properties(shmem.dev-shm-capacity.node-ends PROPERTIES
   LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "REFUSAL OK")
+# And with the launcher's output in a pipe whose reader has gone: the launcher
+# still removes what the refused start left, and exits 1, not 141 (the v0.2
+# step 1 review).
+add_test(NAME shmem.dev-shm-capacity.broken-pipe
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dev-shm-capacity.sh
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> broken-pipe)
+set_tests_properties(shmem.dev-shm-capacity.broken-pipe PROPERTIES
+  LABELS "tier2" TIMEOUT 60 PASS_REGULAR_EXPRESSION "BROKEN PIPE OK")
 set_tests_properties(shmem.dev-shm-capacity.heaps shmem.dev-shm-capacity.warned
   PROPERTIES LABELS "tier2" TIMEOUT 60)
 set_tests_properties(shmem.dev-shm-capacity.warned PROPERTIES PASS_REGULAR_EXPRESSION

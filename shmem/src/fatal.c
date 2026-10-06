@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
+#include <pthread.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -59,6 +61,16 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
         n = snprintf(out, sizeof out, "osoe: PE %u: %s\n", osoe.bootstrap.rank, msg);
     else
         n = snprintf(out, sizeof out, "osoe: %s\n", msg);
+
+    /* SIGPIPE held back in this thread, as abort.c holds it on the way out of
+     * an abort: a stderr whose reader has gone - a job piped into head - fails
+     * the write below with EPIPE, and the PE still tells its node and leaves
+     * with the fatal's status, not by the signal before either (the v0.2 step
+     * 1 review). The PE ends below, so the mask is never given back. */
+    sigset_t broken_pipe;
+    sigemptyset(&broken_pipe);
+    sigaddset(&broken_pipe, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &broken_pipe, NULL);
 
     /* The reason reaches stderr before anything that lets another process end
      * the job (fatal.h). */
