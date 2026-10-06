@@ -7,12 +7,13 @@ and its settings. Part 1 chooses nothing on the data path: every collective
 runs on the shape it ran on at the 0.1.0 tag.
 
 **Where it stands.** Built on the branch `tree-shape`, not merged: the model and
-the chooser (`8553de7`). Not built: the link's settings, their agreement, the
-measurement and `osoe-stat`'s display of it (item 3 of the brief's Part 1) and
-the README's rows (item 4). Three of the brief's stop-and-ask items were met,
-each below with its evidence, the options and a recommendation; the measurement
-waits on the second. And the branch merges only after step 1's merge point -
-its full review and its fixes - as the night's instructions have it.
+the chooser (`8553de7`), and the settings - `OSOE_COLLECTIVE_SHAPE` and the link
+set by hand, agreed three ways and shown by `osoe-stat` - with the README's rows
+(`72f27a6`, `f275b45`). Not built: the link's measurement and its way to every
+node, which wait on the second question below. Three of the brief's stop-and-ask
+items were met, each below with its evidence, the options and a recommendation.
+The branch merges only after step 1's merge point - its full review and its
+fixes - and with the measurement, which completes Part 1.
 
 ## What was built
 
@@ -70,6 +71,29 @@ its full review and its fixes - as the night's instructions have it.
    nodes, three ceilings and capacities, 8 bytes to 1 GiB); with beta's
    interior term broken in the C, 30 lines differ. `model.shape_timing.grid`
    holds the file to the model.
+3. **The settings** (the brief's item 3 but the measurement, and item 4):
+   `OSOE_COLLECTIVE_SHAPE` - `link`, the default, or `fixed`, the 0.1.0 tag's
+   shape - and `OSOE_LINK_HOP_NS`, `OSOE_LINK_MESSAGE_NS` and
+   `OSOE_LINK_BYTES_PER_SECOND`, all three or none, each in a range that keeps the
+   chooser's arithmetic inside 64 bits (a hop to ten seconds, a message cost to
+   one, one byte a second to ten terabytes). Read and checked by every PE,
+   refused by name otherwise, one link number alone among them; held alike among
+   a node's PEs by `open_control`, the header's new fields making layout 32; and
+   between nodes at the rendezvous, in the up header's fifth shape (`osoeup-5`,
+   80 bytes). Published as `node.collective_shape` and `node.link.*`, which
+   `osoe-stat` shows in its header and as the summary's first line for each
+   node: "collective shape link; link set: a hop of 86000 ns, a message cost of
+   7000 ns, 116000000 bytes a second", or "link not set". `SHMEM_INFO`'s list,
+   the README's two rows and the decisions index's line say that until the link
+   is measured and the chooser reaches the data path, every collective runs as
+   `fixed` does. Tests, in both builds: six refusals by name
+   (`shmem.collective-shape.invalid.*`), the shape and the link disagreeing
+   between a node's PEs (`shmem.collective-shape.local-disagree`,
+   `shmem.link.local-disagree`), and `shmem.stat.link` beside `shmem.stat`'s new
+   check of the default; in the full build, the two disagreeing between nodes
+   (`shmem.job.disagree.collective-shape`, `.link`). Each was run against the
+   mutation it was written for: the node's check of the link and of the shape
+   removed, the up header carrying no link, one number alone let through.
 
 ### What the model shows beyond the brief
 
@@ -266,5 +290,7 @@ file among them, and `shmem.shape.choice` and `shmem.shape.grid`; and
 configure. The C test also built and passed with the host's clang. Each new test
 was run against the mutation it was written for: the C's beta without an
 interior lead's parent (30 grid lines differ), and the model's two broken
-variants. Not yet: the other presets, the single-node build and `tier3`, which
-Part 1's merge verification runs once its last items are built.
+variants. The settings (`72f27a6`), in `osoe-load` with liburing hidden for the
+single-node build: the full build's debug preset 742 of 742, the single-node
+build's 360 of 360. Not yet: the other presets and `tier3`, which Part 1's merge
+verification runs once the measurement is built.
