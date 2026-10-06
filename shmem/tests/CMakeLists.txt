@@ -1475,15 +1475,54 @@ set_tests_properties(shmem.exit-without-finalize.start_pes PROPERTIES LABELS "ti
   PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 4 s"
   FAIL_REGULAR_EXPRESSION "BARRIER RETURNED")
 
+# No death of any process strands a named object (§3.14; review round two,
+# D13): every PE dies of SIGKILL or SIGTERM after init, and the launcher must
+# find nothing left behind. The kept variant leaves the control segments on
+# purpose, and osoe-stat --gc must then remove them. On one node in both builds
+# (v0.2 step 1's adversarial read: the single-node build had no test of it),
+# and on two below.
+add_executable(shmem_test_kill-after-init test-kill-after-init.c)
+target_link_libraries(shmem_test_kill-after-init PRIVATE osoe)
+osoe_warnings(shmem_test_kill-after-init)
+foreach(sig KILL TERM)
+  add_test(NAME shmem.kill-after-init.${sig}.one-node
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SIGNAL=${sig}
+            $<TARGET_FILE:osoe-launch> -n 4 -t 30 -k --
+            $<TARGET_FILE:shmem_test_kill-after-init>)
+  set_tests_properties(shmem.kill-after-init.${sig}.one-node PROPERTIES LABELS "tier2"
+    TIMEOUT 60 PASS_REGULAR_EXPRESSION "killed by signal"
+    FAIL_REGULAR_EXPRESSION "left behind")
+endforeach()
+add_test(NAME shmem.kill-after-init.kept.one-node
+  COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 OSOE_TEST_SIGNAL=KILL \"$0\" -n 4 -t 30 -k -- \"$1\" & L=$!; wait $L; \"$2\" --gc /osoe.$L.0.0.0"
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_kill-after-init>
+          $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.kill-after-init.kept.one-node PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "kept for post-mortem reading.*removed"
+  FAIL_REGULAR_EXPRESSION "left behind")
+
+# A job never outlives its launcher: SIGTERM and SIGINT are forwarded, and a
+# SIGKILLed launcher takes its PEs with it (launch.c; review round two,
+# omissions 6). See launcher-signals.sh. On one node in both builds - the
+# launcher is installed, the desktop's way to run a job - and on two below.
+add_executable(shmem_test_sleeper sleeper.c)
+target_link_libraries(shmem_test_sleeper PRIVATE osoe)
+osoe_warnings(shmem_test_sleeper)
+set(osoe_launcher_signals_term
+  "launcher exited 143.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
+set(osoe_launcher_signals_int
+  "launcher exited 130.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
+set(osoe_launcher_signals_kill "PEs still running: 0.*with a name: 0")
+foreach(mode term int kill)
+  add_test(NAME shmem.launcher-signals.${mode}.one-node
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/launcher-signals.sh
+            $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_sleeper> ${mode} one-node)
+  set_tests_properties(shmem.launcher-signals.${mode}.one-node PROPERTIES LABELS "tier2"
+    TIMEOUT 60 PASS_REGULAR_EXPRESSION "${osoe_launcher_signals_${mode}}")
+endforeach()
+
 # internode: each of these launches a job of several nodes, here or in its script
 if(OSOE_INTERNODE)
-  # No death of any process strands a named object (§3.14; review round two,
-  # D13): every PE dies of SIGKILL or SIGTERM after init, on two nodes, and the
-  # launcher must find nothing left behind. The kept variant leaves the control
-  # segments on purpose, and osoe-stat --gc must then remove them.
-  add_executable(shmem_test_kill-after-init test-kill-after-init.c)
-  target_link_libraries(shmem_test_kill-after-init PRIVATE osoe)
-  osoe_warnings(shmem_test_kill-after-init)
   foreach(sig KILL TERM)
     add_test(NAME shmem.kill-after-init.${sig}
       COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SIGNAL=${sig}
@@ -1580,25 +1619,14 @@ if(OSOE_INTERNODE)
     osoe_internode_label(shmem.leftovers.restart.slow-lead shmem.leftovers.restart.other-size)
   endif()
 
-  # A job never outlives its launcher: SIGTERM and SIGINT are forwarded, and a
-  # SIGKILLed launcher takes its PEs with it (launch.c; review round two,
-  # omissions 6). See launcher-signals.sh.
-  add_executable(shmem_test_sleeper sleeper.c)
-  target_link_libraries(shmem_test_sleeper PRIVATE osoe)
-  osoe_warnings(shmem_test_sleeper)
+  # The launcher's signals, on two nodes (above: on one).
   foreach(mode term int kill)
     add_test(NAME shmem.launcher-signals.${mode}
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/launcher-signals.sh
               $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_sleeper> ${mode})
     set_tests_properties(shmem.launcher-signals.${mode} PROPERTIES LABELS "tier2"
-      TIMEOUT 60)
+      TIMEOUT 60 PASS_REGULAR_EXPRESSION "${osoe_launcher_signals_${mode}}")
   endforeach()
-  set_tests_properties(shmem.launcher-signals.term PROPERTIES PASS_REGULAR_EXPRESSION
-    "launcher exited 143.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
-  set_tests_properties(shmem.launcher-signals.int PROPERTIES PASS_REGULAR_EXPRESSION
-    "launcher exited 130.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0")
-  set_tests_properties(shmem.launcher-signals.kill PROPERTIES PASS_REGULAR_EXPRESSION
-    "PEs still running: 0.*with a name: 0")
   osoe_internode_label(shmem.launcher-signals.term shmem.launcher-signals.int
     shmem.launcher-signals.kill)
 endif()
@@ -1676,9 +1704,22 @@ if(OSOE_INTERNODE)
   add_test(NAME env.probe.old-kernel COMMAND deny-futex2 $<TARGET_FILE:probe>)
   set_tests_properties(env.probe.old-kernel PROPERTIES LABELS "env" TIMEOUT 60
     PASS_REGULAR_EXPRESSION "FAIL futex_wait, named shm, woken by other process")
+  # A sandbox that lets the private futex2 calls through and refuses the shared
+  # ones, which every wait between a node's PEs makes: refused by name at
+  # shmem_init too, since the check tries both scopes - before the adversarial
+  # read of v0.2 step 1's parts 2 and 3 it tried the private one alone, and a job
+  # died of SIGABRT at its first shared wait, its objects already made.
+  add_test(NAME shmem.refuse.no-shared-futex2
+    COMMAND deny-futex2 --shared $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
+            $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.refuse.no-shared-futex2 PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION
+      "needs Linux 6.7 or later, for the futex2 calls \\(they fail with \"Operation not permitted\"\\)"
+    FAIL_REGULAR_EXPRESSION "left behind|futex_wake failed|futex_wait failed")
   # Labelled internode because the single-node build has no futex2 to deny (it waits
-  # with the classic futex), so the refusal these two check cannot happen there.
-  osoe_internode_label(shmem.refuse.old-kernel env.probe.old-kernel)
+  # with the classic futex), so the refusals these three check cannot happen there.
+  osoe_internode_label(shmem.refuse.old-kernel env.probe.old-kernel
+                       shmem.refuse.no-shared-futex2)
 
 endif()
 
@@ -1753,6 +1794,17 @@ if(OSOE_SINGLE_NODE)
     add_test(NAME env.probe.no-futex COMMAND deny-futex $<TARGET_FILE:probe>)
     set_tests_properties(env.probe.no-futex PROPERTIES LABELS "env" TIMEOUT 60
       PASS_REGULAR_EXPRESSION "FAIL futex U32 wait \\(value mismatch\\)")
+    # A sandbox that allows the private calls alone, which glibc's own locks
+    # make, and refuses the shared ones every wait between a node's PEs makes:
+    # refused by name at shmem_init too, nothing made, since the check tries
+    # both scopes (shmem.refuse.no-shared-futex2 is the full build's).
+    add_test(NAME shmem.refuse.no-shared-futex
+      COMMAND deny-futex --shared $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
+              $<TARGET_FILE:shmem_test_init>)
+    set_tests_properties(shmem.refuse.no-shared-futex PROPERTIES LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION
+        "needs the futex calls FUTEX_WAIT_BITSET and FUTEX_WAKE_BITSET, which a sandbox \\(seccomp\\) must allow \\(they fail with \"Operation not permitted\"\\)"
+      FAIL_REGULAR_EXPRESSION "left behind|futex wake failed|futex wait failed")
   endif()
 endif()
 

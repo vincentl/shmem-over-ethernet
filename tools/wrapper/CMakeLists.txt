@@ -83,16 +83,19 @@ if(OSOE_INTERNODE)
     COMMAND sh -c "rm -rf ${prefix} && ${CMAKE_COMMAND} --install ${PROJECT_BINARY_DIR} --prefix ${prefix} > /dev/null && p=$(cd ${prefix} && pwd -P) && ${prefix}/bin/oshcc -show -o x x.c | grep -q -- \"-I$p/${CMAKE_INSTALL_INCLUDEDIR} .*-Xlinker $p/${CMAKE_INSTALL_LIBDIR}/osoe/osoe-statics.ld .*-L$p/${CMAKE_INSTALL_LIBDIR} \" && ${prefix}/bin/oshcc -o ${work}/installed ${CMAKE_CURRENT_SOURCE_DIR}/statics.c && $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 -- ${work}/installed")
 endif()
 # The same on one node, in both builds - the single-node build's only way to
-# them: a static total built with the wrapper alone; and the installed wrapper
-# and launcher, under a prefix chosen at install time, the launcher found
-# beside the wrapper, as a desktop's user runs a job (v0.2 step 1).
+# them: a compile-only call followed by a link, as make builds a program; a
+# static total built with the wrapper alone; and the installed wrapper and
+# launcher, under a prefix chosen at install time, the launcher found beside
+# the wrapper, as a desktop's user runs a job (v0.2 step 1).
+add_test(NAME wrapper.compile-then-link.one-node
+  COMMAND sh -c "mkdir -p ${work} && ${oshcc} -c -o ${work}/hello-one.o ${CMAKE_CURRENT_SOURCE_DIR}/hello.c && ${oshcc} -o ${work}/hello-one-linked ${work}/hello-one.o && $<TARGET_FILE:osoe-launch> -n 4 -t 30 -- ${work}/hello-one-linked")
 set(prefix_one ${work}/prefix-one-node)
 add_test(NAME wrapper.statics.one-node
   COMMAND sh -c "mkdir -p ${work} && ${oshcc} -o ${work}/statics-one ${CMAKE_CURRENT_SOURCE_DIR}/statics.c && $<TARGET_FILE:osoe-launch> -n 4 -t 30 -- ${work}/statics-one")
 add_test(NAME wrapper.installed.one-node
   COMMAND sh -c "rm -rf ${prefix_one} && ${CMAKE_COMMAND} --install ${PROJECT_BINARY_DIR} --prefix ${prefix_one} > /dev/null && ${prefix_one}/bin/oshcc -o ${work}/installed-one ${CMAKE_CURRENT_SOURCE_DIR}/statics.c && ${prefix_one}/bin/osoe-launch -n 4 -t 30 -- ${work}/installed-one")
-set_tests_properties(wrapper.hello wrapper.show wrapper.statics.one-node
-  wrapper.installed.one-node PROPERTIES LABELS "tier1" TIMEOUT 60)
+set_tests_properties(wrapper.hello wrapper.show wrapper.compile-then-link.one-node
+  wrapper.statics.one-node wrapper.installed.one-node PROPERTIES LABELS "tier1" TIMEOUT 60)
 set_tests_properties(wrapper.installed.one-node PROPERTIES RESOURCE_LOCK osoe-install)
 if(OSOE_INTERNODE)
   set_tests_properties(wrapper.compile-then-link wrapper.statics wrapper.installed

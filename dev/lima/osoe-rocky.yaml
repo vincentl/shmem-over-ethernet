@@ -2,7 +2,9 @@
 # osoe's single-node build VM: Rocky Linux 9 on Apple Silicon (v0.2 step 1).
 #
 # The single-node build's goal is Red Hat 9 and its rebuilds: a 5.14 kernel,
-# glibc 2.34, GCC 11, and no liburing - which is why none is installed here.
+# glibc 2.34, GCC 11, and no liburing - which is why its headers are not
+# installed here. Its runtime package comes in with qemu-guest-agent's, and
+# nothing of osoe's links it.
 # Create it with `dev/lima/create.sh osoe-rocky`, which mounts this repository
 # writable at the same path, as it does for the osoe VM (osoe.yaml). Small, as
 # the host's disk asks: the build trees go under /tmp or the repository.

@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * osoe-launch - start L processes of one job on this machine, the way a Slurm
- * step would, for tests. Not installed.
+ * step would: for tests, and for running a job where there is no Slurm, as on a
+ * desktop with the single-node build. Installed, in both builds (v0.2 step 1).
  *
  *   osoe-launch -n L [-m MAP] [-t SECONDS] [-k] [-s] [-e RANK:NAME=VALUE]...
  *               [-N NAMESPACE_PREFIX] [-H HOST_LIST] -- PROGRAM [ARGS]...

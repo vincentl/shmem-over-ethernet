@@ -7,15 +7,19 @@
  * scheduler's slack; a wait on a word that already differs returning at once;
  * a private wait woken from another thread; a shared one woken from another
  * process, on a shared mapping; a bitset wait woken only by a wake that shares
- * a bit with it; and the start-up check passing.
+ * a bit with it; a wait under a program's timer signals ending at its deadline,
+ * with SA_RESTART and without; a wake of none waking no one; and the start-up
+ * check passing.
  */
 #define _GNU_SOURCE
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -57,6 +61,56 @@ static void *bit_waiter(void *arg)
     struct osoe_deadline d = osoe_deadline_in(3 * 1000 * 1000 * 1000ull);
     bit_result = osoe_futex_wait_bitset(&bit_word, 0, 2, &d, OSOE_FUTEX_PRIVATE);
     atomic_store_explicit(&bit_returned, 1, memory_order_release);
+    return NULL;
+}
+
+/* A program's own timer, as a profiler's SIGPROF or an alarm is: counted. */
+static volatile sig_atomic_t ticks;
+
+static void on_tick(int signal_number)
+{
+    (void)signal_number;
+    ticks++;
+}
+
+/* A wait of 300 ms on a word nobody changes, under a 10 ms timer whose handler
+ * has `flags`: it must end at its deadline, not at the first signal. */
+static void wait_under_signals(int flags)
+{
+    struct sigaction action, before;
+    memset(&action, 0, sizeof action);
+    action.sa_handler = on_tick;
+    action.sa_flags = flags;
+    sigemptyset(&action.sa_mask);
+    CHECK(sigaction(SIGALRM, &action, &before) == 0);
+    struct itimerval every = { { 0, 10000 }, { 0, 10000 } }, off = { { 0, 0 }, { 0, 0 } };
+    ticks = 0;
+    CHECK(setitimer(ITIMER_REAL, &every, NULL) == 0);
+    _Atomic uint32_t quiet = 0;
+    struct timespec t0;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    struct osoe_deadline d = osoe_deadline_in(300 * 1000 * 1000);
+    int r = osoe_futex_wait(&quiet, 0, &d, OSOE_FUTEX_PRIVATE);
+    double e = elapsed_since(&t0);
+    CHECK(setitimer(ITIMER_REAL, &off, NULL) == 0);
+    CHECK(sigaction(SIGALRM, &before, NULL) == 0);
+    CHECK(r == ETIMEDOUT);
+    CHECK(e >= 0.295);
+    CHECK(ticks >= 5);          /* the signals did come */
+}
+
+/* A waiter for the wake of none: one wait, and when it returned and with
+ * what - one call, not a loop, so that a wake it should not have had shows. */
+static _Atomic uint32_t none_word;
+static _Atomic int none_returned;
+static int none_result;
+
+static void *none_waiter(void *arg)
+{
+    (void)arg;
+    struct osoe_deadline d = osoe_deadline_in(3 * 1000 * 1000 * 1000ull);
+    none_result = osoe_futex_wait(&none_word, 0, &d, OSOE_FUTEX_PRIVATE);
+    atomic_store_explicit(&none_returned, 1, memory_order_release);
     return NULL;
 }
 
@@ -144,6 +198,29 @@ int main(void)
     osoe_futex_wake_bitset(&bit_word, INT_MAX, 2, OSOE_FUTEX_PRIVATE);
     pthread_join(t, NULL);
     CHECK(bit_result == 0);
+    CHECK(elapsed_since(&t0) < 1.0);
+
+    /* A signal does not end a wait, whatever its handler's SA_RESTART: the
+     * classic timed wait comes back with EINTR from every handler, and a
+     * profiler's timer ended every wait early, so a waiter that makes a fresh
+     * sweep deadline each pass never swept (the adversarial read of v0.2 step
+     * 1, parts 2 and 3). */
+    wait_under_signals(SA_RESTART);
+    wait_under_signals(0);
+
+    /* A wake of none wakes no one - the classic call woke one - and a wake of
+     * one then does. The word stays 0, so only a wake ends the wait before its
+     * deadline. */
+    atomic_store_explicit(&none_word, 0, memory_order_release);
+    CHECK(pthread_create(&t, NULL, none_waiter, NULL) == 0);
+    pause_ms(100);
+    osoe_futex_wake(&none_word, 0, OSOE_FUTEX_PRIVATE);
+    pause_ms(200);
+    CHECK(atomic_load_explicit(&none_returned, memory_order_acquire) == 0);
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    osoe_futex_wake(&none_word, 1, OSOE_FUTEX_PRIVATE);
+    pthread_join(t, NULL);
+    CHECK(none_result == 0);
     CHECK(elapsed_since(&t0) < 1.0);
 
     /* Deadline arithmetic carries nanoseconds into seconds. */

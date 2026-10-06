@@ -121,7 +121,10 @@ static int open_watch(uint32_t i, pid_t pid)
         ended(i);
         return SETTLED;
     }
-    if (!said_no_pidfd) {
+    /* Said once a PE, and where the kernel has no pidfd_open (before Linux 5.3,
+     * which the single-node build runs on) by the node's lead alone: the same
+     * on every PE of the node, it is one line a start, not one a PE. */
+    if (!said_no_pidfd && (errno != ENOSYS || osoe.bootstrap.local_id == 0)) {
         said_no_pidfd = true;
         fprintf(stderr, "osoe: PE %u: cannot open a pidfd for local PE %u (pid %d): %s; "
                 "watching local PEs by pid instead (§3.15)\n", osoe.bootstrap.rank, i,

@@ -42,14 +42,19 @@ int osoe_futex_wait_bitset(_Atomic uint32_t *word, uint32_t expected, uint32_t b
                            const struct osoe_deadline *deadline,
                            enum osoe_futex_scope scope)
 {
-    long r = syscall(__NR_futex_wait, (void *)word, (unsigned long)expected,
-                     (unsigned long)bitset, flags_for(scope),
-                     &deadline->at, CLOCK_MONOTONIC);
+    /* A signal whose handler lacks SA_RESTART ends the wait with EINTR: it is
+     * made again to the same absolute deadline, as futex-classic.c does for
+     * every signal, so that a program's handlers cannot hold a caller's sweep
+     * off (that file's wait says why). */
+    long r;
+    do
+        r = syscall(__NR_futex_wait, (void *)word, (unsigned long)expected,
+                    (unsigned long)bitset, flags_for(scope), &deadline->at, CLOCK_MONOTONIC);
+    while (r < 0 && errno == EINTR);
     if (r == 0)
         return 0;
     switch (errno) {
     case EAGAIN:
-    case EINTR:
         return 0;
     case ETIMEDOUT:
         atomic_fetch_add_explicit(&timeouts, 1, memory_order_seq_cst);
@@ -68,6 +73,8 @@ void osoe_futex_wake(_Atomic uint32_t *word, int n, enum osoe_futex_scope scope)
 void osoe_futex_wake_bitset(_Atomic uint32_t *word, int n, uint32_t bitset,
                             enum osoe_futex_scope scope)
 {
+    if (n <= 0)
+        return;                 /* none, as in futex-classic.c */
     long r = syscall(__NR_futex_wake, (void *)word, (unsigned long)bitset,
                      n, flags_for(scope));
     if (r < 0) {
@@ -78,16 +85,21 @@ void osoe_futex_wake_bitset(_Atomic uint32_t *word, int n, uint32_t bitset,
 
 int osoe_futex_check(void)
 {
-    _Atomic uint32_t word = 0;
-    if (syscall(__NR_futex_wake, (void *)&word, (unsigned long)FUTEX_BITSET_MATCH_ANY, 1,
-                flags_for(OSOE_FUTEX_PRIVATE)) < 0)
-        return errno;
-    /* Expecting 1 where the word holds 0: the kernel compares and refuses. */
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    if (syscall(__NR_futex_wait, (void *)&word, 1UL, (unsigned long)FUTEX_BITSET_MATCH_ANY,
-                flags_for(OSOE_FUTEX_PRIVATE), &now, CLOCK_MONOTONIC) == 0 || errno != EAGAIN)
-        return errno ? errno : EINVAL;
+    /* Both scopes, as in futex-classic.c: a sandbox may allow the private
+     * calls alone. */
+    for (int shared = 0; shared <= 1; shared++) {
+        enum osoe_futex_scope scope = shared ? OSOE_FUTEX_SHARED : OSOE_FUTEX_PRIVATE;
+        _Atomic uint32_t word = 0;
+        if (syscall(__NR_futex_wake, (void *)&word, (unsigned long)FUTEX_BITSET_MATCH_ANY, 1,
+                    flags_for(scope)) < 0)
+            return errno;
+        /* Expecting 1 where the word holds 0: the kernel compares and refuses. */
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        if (syscall(__NR_futex_wait, (void *)&word, 1UL, (unsigned long)FUTEX_BITSET_MATCH_ANY,
+                    flags_for(scope), &now, CLOCK_MONOTONIC) == 0 || errno != EAGAIN)
+            return errno ? errno : EINVAL;
+    }
     return 0;
 }
 

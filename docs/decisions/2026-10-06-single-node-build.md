@@ -195,4 +195,94 @@ Each is Claude's, under the standing mandate; the undo follows.
 
 ## The adversarial read
 
-@@ADVERSARIAL@@
+Two reads before the merge, each by a fresh agent: one adversarial, of the
+commit `84e46fc` against the brief and the rule the step is held to - one tree,
+two builds, no drift - which built both builds in `osoe-x86`, its x86-64 build
+under Rosetta among them; and one of every sentence Parts 2 and 3 changed in the
+README, against the tree. Their findings, and what became of each:
+
+1. **A signal ended the single-node build's timed waits early** (fixed). A
+   timed `FUTEX_WAIT_BITSET` comes back with `EINTR` from every handler,
+   `SA_RESTART` or not - the kernel restarts it through a restart block, which a
+   handler turns into `EINTR` - where futex2's wait restarts under
+   `SA_RESTART`; `futex-classic.c` returned 0, as for a wake. Its callers make
+   a fresh sweep deadline each pass, so under a profiler's timer (`SIGPROF`
+   every 10 ms) a blocked PE never swept: in a one-node job of 2.5 s, PE 1's
+   sweeps stood at 0 against the full build's 24, and `transport.watch.wakes`
+   and `.spurious` at 234 against 0 - and `osoe-stat` reads a PE asleep with
+   its sweeps standing still as a dead one. Not a hang: the agent, which blocks
+   signals, still ended the PE. Now both futex files make the wait again to the
+   same absolute deadline, which is what the kernel's own restart does - the
+   full build's too, which starved the same way under a handler without
+   `SA_RESTART` - and `futex.h` says a signal does not end a wait.
+   `test-futex.c` pins it: a wait of 300 ms under a 10 ms timer ends at its
+   deadline, with `SA_RESTART` and without.
+2. **A wake of none woke one in the classic file** (fixed): `FUTEX_WAKE_BITSET`
+   with 0 wakes one, futex2 none. No caller passes 0; both files now return at
+   once for n of 0 or less, `futex.h` says so, and `test-futex.c` pins it with
+   a waiter that one call, not a loop, would show woken.
+3. **The start-up check tried the private scope alone** (fixed), in both files,
+   where every wait between a node's PEs is shared: under a sandbox that allows
+   private futex calls only, as glibc's own locks need, the check passed and the
+   job died of `SIGABRT` at its first shared wait, its objects made. It now
+   makes a wake and a wait in each scope, and `deny-futex --shared` and
+   `deny-futex2 --shared` - a filter refusing the calls without the private
+   flag - give each build a test that the job is refused by name with nothing
+   made: `shmem.refuse.no-shared-futex`, and the full build's
+   `shmem.refuse.no-shared-futex2`.
+4. **Tests labelled `internode` only for the map they launch** (partly fixed):
+   one-node variants now run in both builds of the installed launcher's signal
+   forwarding (`shmem.launcher-signals.{term,int,kill}.one-node`,
+   `launcher-signals.sh` taking `one-node`), of a death after init stranding no
+   named object (`shmem.kill-after-init.{KILL,TERM,kept}.one-node`), and of a
+   compile-only call followed by a link (`wrapper.compile-then-link.one-node`).
+   Still two nodes only, and so absent from the single-node build: init's
+   reclaiming of a dead start's objects (`shmem.leftovers.*`, whose script
+   plants the job tables and connection area a job of one node never opens),
+   `shmem.dead-pe.lead-in-init`, `shmem.job.0*`, and the pacer's planted
+   defects, whose `PacerPlant.cmake` launches `0,0,1,1`. Each would need its
+   script or its expectations changed for one node, which this step leaves to
+   a later one; the single-node build still runs the pacer's own one-node test.
+5. **Documents** (fixed): `launch.c` and `tools/CMakeLists.txt` called
+   `osoe-launch` a test tool not installed; `docs/README.md` called `osoe` the
+   one VM `dev/lima/` defines; `osoe-rocky.yaml` said no liburing is installed
+   (its runtime is, with `qemu-guest-agent`); the desktop section ran the
+   installed launcher without saying it ends a job after 60 s, which it now
+   says with `-t`; and below Linux 5.3, which has no `pidfd_open`, every PE of a
+   job printed that it watches by pid - now the node's lead alone, once.
+   `liveness.c` also gained `pidfd_open`'s number for headers older than 5.3,
+   as the futex2 file has its calls'.
+6. **What the brief's "Off, nothing changes" no longer says** (recorded): the
+   full build changed in three ways a reader of that sentence would not expect
+   - `osoe-launch` is installed (choice 3), the `.invalid.*` tests run
+   `shmem_test_init` (choice 6), and tests were added to it, the install tests'
+   one-node counterparts and the one-node variants above among them. Nothing
+   of its library changed but the futex fixes above, which both builds take.
+7. **Which refusal a job of more than one node meets first** (an observation,
+   left): the bootstrap's own refusals - a bad `OSOE_PORT_RANGE`, say - come
+   before the single-node build's, and are told to the node, which leaves its
+   tombstones, as in the full build. "Before anything is made in `/dev/shm`"
+   holds for a job whose settings are otherwise valid, which is what the README
+   says it of.
+
+What the adversarial read found sound, with the evidence: every function of
+`transport-single-node.c` but its check is unreachable on one node, each guard
+named; the full build's `-LE internode` tests are the single-node build's less
+its own three in every preset; the single-node build compiles none of the
+internode files, and no ELF file of it links liburing (111 do in the full
+build), `libosoe.so` needing libc alone and importing no socket or io_uring
+call; the exported symbols are the same; a live four-PE job's control segment
+is byte-for-byte the same layout, 221 metrics, in both builds; the refusal
+holds under `-m 0,1`, `-s`, `0,0,1,2` and `OSOE_FORCE_REMOTE=1`, nothing left
+in `/dev/shm`; no internode file reads the environment, and every setting is
+refused alike on one node in both builds; and the two futex files agree on the
+private flag, the deadline's clock and time namespace, the bitset and the
+errors, but for findings 1 and 2 and the classic call's timer slack.
+
+The README read found nine sentences wrong or loose, and the session checked
+each against the tree before fixing it (`362bb89`): `/dev/shm`'s figure, the
+agent's settings (choice 9), the suite's counts (338 of 721 and three of its
+own), the distributions run against those that should run, Ubuntu 22.04's
+CMake, the tests that fail without io_uring (`env.probe` aside), the pacer's
+programs by build, the link-time dependencies, and the statics sentences
+(choice 10).

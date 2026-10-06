@@ -141,6 +141,9 @@ cmake --install build/release --prefix ~/osoe
 ~/osoe/bin/osoe-launch -n 8 -- ./ring
 ```
 
+`osoe-launch` ends a job that runs past 60 seconds, as a test needs; `-t`
+gives a longer one up to a day (`-t 3600`, an hour).
+
 A job of one node behaves the same in both builds; only the system call its
 waits sleep in differs - the classic futex there, Linux 6.7's futex2 calls in the
 full build - and

@@ -53,9 +53,10 @@ history of git is the rest of the record: almost every commit names the model
 that wrote it beside the author, and the records cite commits by hash.
 
 **The development machines.** The records name the virtual machines their runs
-were made in. `osoe` is the one `dev/lima/` defines, and the earliest briefs
-call it `shmem`; `osoe-load` and `osoe-x86` were made for the round-three review
-and are not defined here. `osoe-x86` runs an aarch64 kernel like the others,
+were made in. `osoe` is defined in `dev/lima/`, and the earliest briefs call it
+`shmem`; so is `osoe-rocky`, Rocky Linux 9 for the single-node build (v0.2 step
+1). `osoe-load` and `osoe-x86` were made for the round-three review and are not
+defined here. `osoe-x86` runs an aarch64 kernel like the others,
 with Rosetta registered for x86-64 programs: a run "in `osoe-x86`" is an aarch64
 run unless it says x86-64. A fourth, `osoe-16k`, was a throwaway for the second
 round's check of a kernel with 16 KiB pages, and

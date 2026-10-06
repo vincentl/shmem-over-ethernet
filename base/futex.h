@@ -36,14 +36,16 @@ enum osoe_futex_scope {
 
 /*
  * Sleep while *word == expected, until woken or the deadline passes.
- * Returns 0 when woken, when the word no longer held expected, or on a
- * signal - callers re-check their predicate in every case - and ETIMEDOUT
- * when the deadline passed. Any other kernel error aborts: it is a bug.
+ * Returns 0 when woken or when the word no longer held expected - callers
+ * re-check their predicate in either case - and ETIMEDOUT when the deadline
+ * passed. A signal does not end the wait: it is made again to the same
+ * deadline, so that a program's handlers cannot hold a caller's sweep off.
+ * Any other kernel error aborts: it is a bug.
  */
 int osoe_futex_wait(_Atomic uint32_t *word, uint32_t expected,
                     const struct osoe_deadline *deadline, enum osoe_futex_scope scope);
 
-/* Wake up to n waiters on word; INT_MAX wakes all. */
+/* Wake up to n waiters on word; INT_MAX wakes all, and n of 0 or less none. */
 void osoe_futex_wake(_Atomic uint32_t *word, int n, enum osoe_futex_scope scope);
 
 /*
@@ -63,9 +65,9 @@ void osoe_futex_wake_bitset(_Atomic uint32_t *word, int n, uint32_t bitset,
  * Does this kernel have the futex calls this build uses? Returns 0, or the
  * errno of the call that failed: in the full build ENOSYS on a kernel before
  * Linux 6.7, which has no futex2; in either, EPERM or ENOSYS where a sandbox
- * (seccomp) denies them. Makes one wake and one wait that cannot sleep, on a
- * private word, so it is cheap enough for init (§1: the kernel is checked at
- * start-up, before anything is created).
+ * (seccomp) denies them. Makes one wake and one wait that cannot sleep in each
+ * scope, private and shared, so it is cheap enough for init (§1: the kernel is
+ * checked at start-up, before anything is created).
  */
 int osoe_futex_check(void);
 
