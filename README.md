@@ -128,13 +128,14 @@ test suite, installing, and running over several machines with `srun`.
 A machine that runs jobs of one node only - a desktop with many cores, to
 develop and test programs at small PE counts - can build osoe with no liburing
 and no io_uring, on a distribution with Linux 4.17 and CMake 3.25: Red Hat 9 and
-its rebuilds above all, and Debian 12 or Ubuntu 24.04 ([Requirements](#requirements);
-it has run on Rocky Linux 9 and Debian 13). Configure with the option,
-install, then build the ring above with the installed wrapper and run it with
-the installed launcher, from the repository's root - here as eight PEs, which a
-machine of four cores runs too, and which need about 2.1 GiB of `/dev/shm`,
-half the memory of a machine of 4.5 GiB; `SHMEM_SYMMETRIC_SIZE=64m` in front of
-the launcher runs them on less:
+its rebuilds above all, and Debian 12 or Ubuntu 22.04 and 24.04
+([Requirements](#requirements); it has run on Rocky Linux 9 and Debian 13, and
+in containers on the userlands of Debian 12 and Ubuntu 22.04 to 26.04).
+Configure with the option, install, then build the ring above with the installed
+wrapper and run it with the installed launcher, from the repository's root -
+here as eight PEs, which a machine of four cores runs too, and which need about
+2.1 GiB of `/dev/shm`, half the memory of a machine of 4.5 GiB;
+`SHMEM_SYMMETRIC_SIZE=64m` in front of the launcher runs them on less:
 
 ```sh
 cmake --preset release -DOSOE_SINGLE_NODE=ON
@@ -163,7 +164,7 @@ the two settings that schedule it in a job of many nodes, `OSOE_AGENT_SLICE_US`
 and `OSOE_AGENT_CPUS`, are not needed here. The test suite runs as it does in the
 full build, `ctest --preset release -j4`: every test of the full build but those
 labelled `internode`, which need more than one node or test the internode
-backend's own files, io_uring or futex2, and four of its own ("How osoe is
+backend's own files, io_uring or futex2, and five of its own ("How osoe is
 tested" has the numbers); and `ctest --preset models` runs the same tests of the
 model checker, at `-j2` on a machine of 4 GiB, since the largest wants 1.5 GiB.
 
@@ -192,6 +193,7 @@ of one node or of many; the **single-node build**, `-DOSOE_SINGLE_NODE=ON`
 ([On a desktop](#on-a-desktop-the-single-node-build)), runs jobs of one node
 only, and needs less. The full build:
 
+- A 64-bit system: a 32-bit build is refused when it compiles
 - Linux 6.7 or newer, and for a job of more than one node io_uring open to its
   user: the `kernel.io_uring_disabled` sysctl at 0, or at 1 with the user in the
   group `kernel.io_uring_group` names (the probe, `build/<preset>/tools/probe/probe`,
@@ -205,17 +207,21 @@ only, and needs less. The full build:
 
 The single-node build:
 
+- A 64-bit system, as above
 - Linux 4.17 or newer, for `MAP_FIXED_NOREPLACE` - every distribution's kernel
   in practice - and the futex calls `FUTEX_WAIT_BITSET` and `FUTEX_WAKE_BITSET`,
-  which every Linux since 2.6.25 has and a sandbox (seccomp) must allow
+  which every Linux since 2.6.25 has and a sandbox (seccomp) must allow. Before
+  5.3, which added `pidfd_open`, and under an emulator without it, each job's
+  lead says that it watches its PEs by pid instead
 - CMake 3.25 or newer, and GCC or Clang, as above; no liburing and no pkg-config
 - Python 3, optionally, as above
 
 osoe has run on aarch64 only, on the Raspberry Pi cluster and in an aarch64
-virtual machine. An x86-64 build of this tree passed every test an emulator on an
-aarch64 kernel can run, with a shim standing in for the futex2 calls the emulator
-refuses, and an aarch64 build made to order memory as x86-64 does passed the
-whole suite; no x86-64 kernel has run it: see Limits, "Launching".
+virtual machine. An x86-64 build passed every test an emulator on an aarch64
+kernel can run - the full build with a shim standing in for the futex2 calls the
+emulator refuses, the single-node build with none, since the emulator passes the
+classic futex through - and an aarch64 build made to order memory as x86-64 does
+passed the whole suite; no x86-64 kernel has run it: see Limits, "Launching".
 
 Debian 13 (Trixie) and Raspberry Pi OS Trixie provide all of these from their
 own repositories - `sudo apt install build-essential cmake pkg-config
@@ -224,11 +230,15 @@ needs only liburing's runtime package, `liburing2`, 2.6 or newer. The full build
 does not support older releases, even where the kernel is new enough, since osoe
 does not bundle a newer liburing ([design notes](docs/design/shmem-ethernet-design.md) §1 - "design §N"
 here names them, and a bare § the OpenSHMEM 1.6 specification): Debian 12 has liburing 2.3 and Ubuntu 24.04
-2.5, and Rocky Linux 9 and its kin have Linux 5.14. Those are what the
-single-node build is for. On Rocky Linux 9, where it has run, `sudo dnf install
-gcc make cmake` - CMake 3.31 at 9.8; 9.0 to 9.2 shipped 3.20, where `pip install
-cmake` gives a newer one - and on Debian 12 or Ubuntu 24.04 `sudo apt install
-build-essential cmake`; Ubuntu 22.04's CMake, 3.22, is older than the floor. The
+2.5, and Rocky Linux 9.8 turns io_uring off by default and offers no liburing
+headers in its enabled repositories, though its 5.14 kernel carries the futex2
+calls, backported. Those are what the single-node build is for. On Rocky Linux 9,
+where it has run, `sudo dnf install gcc make cmake` - CMake 3.31 at 9.8; 9.0 to
+9.2 shipped 3.20, where `pip install cmake` gives a newer one - and on Debian 12,
+Ubuntu 22.04 or Ubuntu 24.04 `sudo apt install build-essential cmake`. Ubuntu
+22.04's CMake, 3.22, is older than the floor - it answers the preset with
+`Unrecognized "version" field` - and `pip install cmake` gives a newer one there
+too, with which the single-node build's suite passed whole. The
 full build needs a distribution with both a 6.7 kernel and liburing 2.6: Debian
 13, Raspberry Pi OS Trixie, or another, such as current Fedora or Arch, or
 Ubuntu 24.10 and later.
@@ -281,23 +291,24 @@ of more than one node is refused at `shmem_init`, naming the facility that is
 missing, for the io_uring facilities `shmem_init` checks (`env.probe` tests a
 few more).
 
-io_uring is off by default on RHEL 10 and its rebuilds (`kernel.io_uring_disabled`
-is 2), and container runtimes' default seccomp profiles refuse it: Docker 25 and
-later and containerd 2.0 and later with `EPERM`, for which the message names
-the sysctl even though it reads 0 inside the container, and Podman with
-`ENOSYS`. There jobs on one node run, but about 340 of the test suite's 729 tests
-fail at `shmem_init` or at opening a ring - every one but `env.probe` among the 384
-labelled `internode`, which need more than one node or test the internode
-backend's own files, io_uring or futex2 (`ctest -L internode`); the single-node
-build has neither them nor io_uring. Set the sysctl to
-0 as root, or run the container with a seccomp profile that allows io_uring.
-Container runtimes also give a container 64 MiB of `/dev/shm` unless asked for
-more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) - less than
-one PE needs at the default heap of 256 MiB - so at their defaults even a job of
-one PE is refused at start-up, naming the sizes, and about 560 of the suite's
-tests fail. Give the container a `/dev/shm` of its own, about 300 MiB for
-each PE of the node at the default heap, or lower `SHMEM_SYMMETRIC_SIZE`,
-rather than the host's (`--ipc=host`), which outlives the container.
+io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
+(`kernel.io_uring_disabled` is 2), and container runtimes' default seccomp
+profiles refuse it: Docker 25 and later and containerd 2.0 and later with
+`EPERM`, for which the message names the sysctl even though it reads 0 inside
+the container, and Podman with `ENOSYS`. There jobs on one node run, but about
+340 of the test suite's 742 tests fail at `shmem_init` or at opening a ring -
+every one but `env.probe` among the 384 labelled `internode`, which need more
+than one node or test the internode backend's own files, io_uring or futex2
+(`ctest -L internode`); the single-node build has neither them nor io_uring. Set
+the sysctl to 0 as root, or run the container with a seccomp profile that allows
+io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
+asked for more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) -
+less than one PE needs at the default heap of 256 MiB - so at their defaults
+even a job of one PE is refused at start-up, naming the sizes, and about 560 of
+the suite's tests fail. Give the container a `/dev/shm` of its own, about 300
+MiB for each PE of the node at the default heap, or lower
+`SHMEM_SYMMETRIC_SIZE`, rather than the host's (`--ipc=host`), which outlives
+the container.
 
 A node's PEs must share one PID namespace and one `/dev/shm`: they meet in
 `/dev/shm`, and osoe watches a node's PEs, and judges what a failed start left
@@ -964,12 +975,14 @@ specification or takes a choice the specification leaves open.
   C library's own state would then be gathered with the program's symmetric
   statics.
 - **Tested on aarch64.** osoe has been developed and tested on aarch64: the
-  Raspberry Pi 5 cluster and an aarch64 virtual machine. On x86-64 this tree
-  built without warnings and passed every test that can run under Rosetta, an
-  x86-64 user space on an aarch64 kernel, with the futex2 calls Rosetta refuses
-  369 of the suite's 718, the rest refused io_uring or
-  seccomp by the emulator. Rosetta refuses io_uring, so no x86-64 process has
-  sent a message to another node: the network path, and the timing pins that
+  Raspberry Pi 5 cluster and an aarch64 virtual machine. On x86-64 the tagged
+  tree built without warnings and passed every test that can run under Rosetta,
+  an x86-64 user space on an aarch64 kernel - 369 of its 718, with a shim
+  standing in for the futex2 calls Rosetta refuses; the emulator refused the
+  rest io_uring or seccomp - and v0.2 step 1's full build passed its one-node
+  tests but four, each failure the emulator's or the cross build's. Rosetta
+  refuses io_uring, so no x86-64 process has sent a message to another node: the
+  network path, and the timing pins that
   were set on aarch64, are untested there, and no x86-64 kernel has run any of
   it. What x86-64's memory order would do to the protocols across nodes was
   checked instead on aarch64, built to order memory as x86-64 does - stores
@@ -979,7 +992,11 @@ specification or takes a choice the specification leaves open.
   (`docs/reviews/archive/phase1-step7-slice4-portability.md`). The single-node
   build has run on Rocky Linux 9.8 - kernel 5.14, glibc 2.34, GCC 11 - in an
   aarch64 virtual machine, and in the Debian 13 one with liburing hidden from
-  it; nowhere else yet, and on no x86-64 machine.
+  it; on the userlands of Debian 12, Ubuntu 22.04 to 26.04 and Fedora 44, in
+  containers on Rocky's kernel; and as an x86-64 build under Rosetta with no
+  shim, since Rosetta passes the classic futex through: 343 of its 349 tests,
+  each failure the emulator's or the cross build's. No x86-64 kernel has run
+  it.
 - **Every node of a job must have the same architecture.** The rendezvous
   compares the job's size, the heap's size, the build's table of message
   handlers, and the collectives' fan-out, team count, pipeline depth and small
@@ -1170,7 +1187,7 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 730 tests in
+  run before every merge, on the exact tree that merges: about 740 tests in
   release, and the model checker's 30 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
@@ -1178,9 +1195,9 @@ that one could be added without touching the OpenSHMEM layer.
 - **Two builds.** The single-node build runs the same suite less the
   384 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and with
-  four of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 345 of the full build's 729 tests in
-  the debug preset and its four, two fewer without a C++ compiler, which the
+  five of its own, in the same four presets, on Rocky Linux 9 and in the
+  development VM with liburing hidden: 358 of the full build's 742 tests in
+  the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs exactly
   the tests it lacks.
 - **Model checking.** Every lock-free and futex protocol but one - waking the

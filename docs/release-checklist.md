@@ -218,7 +218,11 @@ rated them (round six's readiness Q5-5).
     note to say what `internode-backend.h` is - AM's own division, which an
     RDMA backend does not keep - and which of the runtime's functions a backend
     may call: the AM backend calls 38 of the rest of `libosoe` and 21 of
-    `base/`.
+    `base/`;
+  - for whoever runs the x86-64 items next: the futex2 shim copied into the
+    VM's own file system - read from the host's mount, Rosetta's translation
+    daemon stalled the full x86-64 suite after 244 of its tests (portability
+    Q9).
 - **The mesh's start-up schedule** (`docs/design/mesh-schedule-proposal.md`),
   once a system large enough to measure it is at hand: the author postponed it
   on 2026-10-05 (`docs/decisions/2026-10-05-before-the-tag.md` item 2), and the

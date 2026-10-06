@@ -66,6 +66,8 @@ add_test(NAME shmem.static-link
           -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/static-link-check
           -DPROBE_SRC=${CMAKE_CURRENT_SOURCE_DIR}/static-link-probe.c
           -DC_COMPILER=${CMAKE_C_COMPILER}
+          "-DC_COMPILER_TARGET=${CMAKE_C_COMPILER_TARGET}"
+          "-DTOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
           "-DURING_LIBRARIES=${LIBURING_LINK_LIBRARIES}"
           -DSINGLE_NODE=${OSOE_SINGLE_NODE}
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStaticLink.cmake)
@@ -80,6 +82,9 @@ add_test(NAME shmem.strict-c11
   COMMAND ${CMAKE_COMMAND}
           -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
           -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/strict-c11-check
+          -DC_COMPILER=${CMAKE_C_COMPILER}
+          "-DC_COMPILER_TARGET=${CMAKE_C_COMPILER_TARGET}"
+          "-DTOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
           -DSINGLE_NODE=${OSOE_SINGLE_NODE}
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStrictC11.cmake)
 set_tests_properties(shmem.strict-c11 PROPERTIES LABELS "tier1" TIMEOUT 600)

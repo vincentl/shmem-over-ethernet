@@ -66,12 +66,22 @@ if(OSOE_SINGLE_NODE)
   message(STATUS "osoe ${PROJECT_VERSION}: the single-node build (OSOE_SINGLE_NODE=ON) - "
                  "jobs of one node only, no liburing, no io_uring, the classic futex")
 else()
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(LIBURING IMPORTED_TARGET "liburing>=2.6")
+  # pkg-config not REQUIRED: without it, the message below - which names the
+  # single-node build - is still the first a user meets (the v0.2 step 1
+  # review, portability Q5).
+  find_package(PkgConfig)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(LIBURING IMPORTED_TARGET "liburing>=2.6")
+  endif()
   if(NOT LIBURING_FOUND)
+    set(osoe_without_pkg_config "")
+    if(NOT PKG_CONFIG_FOUND)
+      set(osoe_without_pkg_config "pkg-config, which finds it, is not installed either. ")
+    endif()
     message(FATAL_ERROR
       "liburing 2.6 or newer is required (io_uring futex operations). "
-      "On Debian 13 or Raspberry Pi OS Trixie: apt install liburing-dev. "
+      "${osoe_without_pkg_config}"
+      "On Debian 13 or Raspberry Pi OS Trixie: apt install liburing-dev pkg-config. "
       "Older OS releases are not supported by the full build; a machine that runs "
       "jobs of one node only can configure the single-node build, -DOSOE_SINGLE_NODE=ON, "
       "which needs no liburing.")

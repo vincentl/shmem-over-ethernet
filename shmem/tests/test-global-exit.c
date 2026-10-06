@@ -196,6 +196,7 @@ int main(int argc, char **argv)
         volatile unsigned long spins = 0;
         while (seconds() < start + COMPUTE_SECONDS)
             spins++;
+        (void)spins;                    /* read once: GCC 16 warns of a counter never read */
     }
     fprintf(stderr, "PE %d: NOT TERMINATED after %d s of computing\n", me, COMPUTE_SECONDS);
     return 3;

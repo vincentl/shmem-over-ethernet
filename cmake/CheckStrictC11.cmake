@@ -21,8 +21,15 @@ cmake_minimum_required(VERSION 3.25)
 # the same kind as the one that runs the check: the single-node build's on a
 # machine with no liburing, where the full build would not configure.
 #
+# C_COMPILER, C_COMPILER_TARGET and TOOLCHAIN_FILE are the caller's, so that
+# the nested build compiles with the compiler the build that runs the check
+# was configured with, not the default cc (the v0.2 step 1 review,
+# portability Q2). Its C flags are not passed: the presets' carry the
+# sanitizers, which this check does not want.
+#
 #   cmake -DSOURCE_DIR=<repo root> -DSCRATCH_DIR=<scratch build dir>
-#         [-DSINGLE_NODE=ON|OFF] -P CheckStrictC11.cmake
+#         [-DC_COMPILER=<cc>] [-DC_COMPILER_TARGET=<target>]
+#         [-DTOOLCHAIN_FILE=<file>] [-DSINGLE_NODE=ON|OFF] -P CheckStrictC11.cmake
 
 foreach(var SOURCE_DIR SCRATCH_DIR)
   if(NOT DEFINED ${var})
@@ -33,13 +40,24 @@ if(NOT DEFINED SINGLE_NODE)
   set(SINGLE_NODE OFF)
 endif()
 
+set(compiler_options)
+if(C_COMPILER)
+  list(APPEND compiler_options "-DCMAKE_C_COMPILER=${C_COMPILER}")
+endif()
+if(C_COMPILER_TARGET)
+  list(APPEND compiler_options "-DCMAKE_C_COMPILER_TARGET=${C_COMPILER_TARGET}")
+endif()
+if(TOOLCHAIN_FILE)
+  list(APPEND compiler_options "-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}")
+endif()
+
 file(REMOVE_RECURSE "${SCRATCH_DIR}")
 file(MAKE_DIRECTORY "${SCRATCH_DIR}")
 
 execute_process(
   COMMAND "${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${SCRATCH_DIR}"
           -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_EXTENSIONS=OFF -DBUILD_TESTING=ON
-          -DOSOE_SINGLE_NODE=${SINGLE_NODE}
+          -DOSOE_SINGLE_NODE=${SINGLE_NODE} ${compiler_options}
   OUTPUT_VARIABLE configure_out ERROR_VARIABLE configure_err RESULT_VARIABLE rc)
 if(NOT rc EQUAL 0)
   message(FATAL_ERROR "Configuring with CMAKE_C_EXTENSIONS=OFF failed:\n${configure_out}\n${configure_err}")
