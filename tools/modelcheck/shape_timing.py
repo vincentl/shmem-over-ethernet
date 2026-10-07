@@ -57,11 +57,15 @@ EVIDENCE = os.path.join(HERE, '..', '..', 'docs', 'design', 'evidence', 'pi-clus
 
 # The record's constants: the fit of simulate() to the Pi's table of
 # 2026-09-26, in microseconds and bytes a microsecond, and what that fit
-# lands within the noise. The piece then carried 16,368 bytes, 16 KiB less its
-# header; today's carries 16 KiB (internal-region.h, OSOE_INTERNAL_PIECE_BYTES).
+# lands within the noise of that table and of step 2's sweep of 1 to 16 KiB
+# (2026-10-06; 253 and 73 lines) - refitted to both, the best is h 89, o 4,
+# B 116, six lines more of 558 and the same choice on 854 of the grid's 858
+# large calls (Part 2's record), so the fit stays. The piece then carried
+# 16,368 bytes, 16 KiB less its header; today's carries 16 KiB
+# (internal-region.h, OSOE_INTERNAL_PIECE_BYTES).
 PI_HOP, PI_MESSAGE, PI_BANDWIDTH = 86.0, 7.0, 116.0
 PI_PIECE = 16368
-PI_WITHIN = 253
+PI_WITHIN = 326
 PIECE = 16384
 
 
@@ -397,13 +401,17 @@ LOOPBACK_LINK = (20000, 2000, 4000000000)
 # ---- The Pi's table --------------------------------------------------------
 
 def pi_table():
-    """2026-09-26's OSU lines: (op, k, D, bytes, microseconds, file)."""
+    """2026-09-26's OSU lines, and step 2's sweep of 1 to 16 KiB at k 2, 3 and
+    4 and D 2 and 4 (2026-10-06): (op, k, D, bytes, microseconds, file)."""
     rows = []
     day = os.path.join(EVIDENCE, '2026-09-26')
     late = os.path.join(EVIDENCE, '2026-09-26-late')
+    sweep = os.path.join(EVIDENCE, '2026-10-06-v0.2-step2', 'comparison')
     files = [(os.path.join(day, f), f) for f in sorted(os.listdir(day))
              if f.startswith(('osu-reduce-k', 'osu-broadcast-k'))]
     files += [(os.path.join(late, f), f) for f in sorted(os.listdir(late)) if f.startswith('f2-')]
+    files += [(os.path.join(sweep, f), f) for f in sorted(os.listdir(sweep))
+              if f.startswith('sweep-')]
     for path, name in files:
         stem = name[:-4].split('-')
         op = 'reduce' if 'reduce' in stem else 'broadcast'
@@ -430,20 +438,27 @@ def within_noise(rows, h, o, B):
 
 
 def table_regret(rows, h, o, B):
-    """For every call the table measured under several shapes: the measured
-    time of the shape the model picks, the window at the table's largest (8),
-    against the fastest measured. Repeated lines pooled by their mean."""
+    """For every call a session measured under several shapes: the measured
+    time of the shape the model picks, the window at the largest the session
+    measured that call at - 8 in 2026-09-26's lines, 4 in the sweep's -
+    against the fastest that session measured. Repeated lines pooled by their
+    mean within a session, never across two: the sweep ran ten days of code
+    later, and its star at 16 KiB took 369 us where the table's took 454."""
     measured = {}
     for op, k, D, n, us, name in rows:
-        measured.setdefault((op, n, k, D), []).append(us)
+        session = 'sweep' if name.startswith('sweep-') else 'table'
+        measured.setdefault((session, op, n, k, D), []).append(us)
     measured = {key: statistics.mean(v) for key, v in measured.items()}
     out = []
-    for op, n in sorted({(a, b) for a, b, c, d in measured}):
-        shapes = [(k, D, us) for (o2, n2, k, D), us in measured.items() if o2 == op and n2 == n]
-        at_capacity = [x for x in shapes if x[1] == 8]
+    for session, op, n in sorted({(s, a, b) for s, a, b, c, d in measured}):
+        shapes = [(k, D, us) for (s2, o2, n2, k, D), us in measured.items()
+                  if s2 == session and o2 == op and n2 == n]
+        widest = max(x[1] for x in shapes)
+        at_capacity = [x for x in shapes if x[1] == widest]
         if len(at_capacity) < 2:
             continue
-        pick = min(at_capacity, key=lambda x: (simulate(op, 4, x[0], 8, n, PI_PIECE, h, o, B), x[0]))
+        pick = min(at_capacity,
+                   key=lambda x: (simulate(op, 4, x[0], widest, n, PI_PIECE, h, o, B), x[0]))
         best = min(shapes, key=lambda x: x[2])
         out.append(pick[2] / best[2] - 1)
     return out

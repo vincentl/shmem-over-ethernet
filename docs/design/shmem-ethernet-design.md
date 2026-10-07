@@ -7947,6 +7947,18 @@ after-release list.
   and a latency decision for small ones, where each level costs a hop. The
   refinement is a fan-out chosen per message size, k = 2 above a threshold the
   small-message sweep at k = 2 has yet to set (the sweep ran from 64 KiB up).
+  *Measured and built (v0.2 step 2, §5.3 as built;
+  `docs/decisions/2026-10-06-tree-shape.md` and
+  `docs/decisions/2026-10-07-shape-data-path.md`):* the link's hop, message cost
+  and bandwidth are measured at the end of `shmem_init`, and each large
+  reduction and broadcast takes the fan-out a closed-form cost model gives its
+  size on them, under a ceiling of 8 and a capacity of 4. On the Pi's four
+  nodes, against 0.1.0's fixed tree, alternating three times: a 1 MiB
+  broadcast 1.43 to 1.47 times faster, a 1 MiB reduction 1.20 to 1.26, every
+  size from 64 KiB up faster, and none slower beyond the noise; the sweep of 1
+  to 16 KiB the item asked for found the star fastest at every size on four
+  nodes, which the chooser takes. Open: the scans' own shape per call (§5.8),
+  and a fabric whose links differ, which one link's numbers still shape.
 
 ### Still open — the RoCE exercise of 2026-09-17
 

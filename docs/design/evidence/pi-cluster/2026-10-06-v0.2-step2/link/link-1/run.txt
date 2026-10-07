@@ -1,0 +1,19 @@
+start 23:06:12
+built: 0
+0
+4x1 run 1: 4 lines; a hop of 88610 ns, a message cost of 0 ns, 118733349 bytes a second (24956 us of this start)
+4x1 run 2: 4 lines; a hop of 88925 ns, a message cost of 0 ns, 117476099 bytes a second (24981 us of this start)
+4x1 run 3: 4 lines; a hop of 93231 ns, a message cost of 0 ns, 118619269 bytes a second (25140 us of this start)
+4x1 run 4: 4 lines; a hop of 89147 ns, a message cost of 0 ns, 116842562 bytes a second (25113 us of this start)
+4x1 run 5: 4 lines; a hop of 88592 ns, a message cost of 0 ns, 117935410 bytes a second (25201 us of this start)
+4x1 run 6: 4 lines; a hop of 90147 ns, a message cost of 20777 ns, 116800809 bytes a second (25281 us of this start)
+4x1 run 7: 4 lines; a hop of 88342 ns, a message cost of 20388 ns, 117835922 bytes a second (25052 us of this start)
+4x1 run 8: 4 lines; a hop of 89397 ns, a message cost of 15148 ns, 118014023 bytes a second (25206 us of this start)
+4x1 run 9: 4 lines; a hop of 89351 ns, a message cost of 20343 ns, 119000833 bytes a second (25106 us of this start)
+4x1 run 10: 4 lines; a hop of 87490 ns, a message cost of 19250 ns, 117795398 bytes a second (24875 us of this start)
+4x4 run 1: 16 lines; a hop of 88110 ns, a message cost of 5926 ns, 117554101 bytes a second (25058 us of this start)
+4x4 run 2: 16 lines; a hop of 91777 ns, a message cost of 20990 ns, 117330662 bytes a second (25152 us of this start)
+4x4 run 3: 16 lines; a hop of 90675 ns, a message cost of 19490 ns, 117509205 bytes a second (25074 us of this start)
+4x4 run 4: 16 lines; a hop of 89508 ns, a message cost of 19324 ns, 118502088 bytes a second (24991 us of this start)
+4x4 run 5: 16 lines; a hop of 88508 ns, a message cost of 0 ns, 117752962 bytes a second (24843 us of this start)
+end 23:07:55
