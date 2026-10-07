@@ -51,8 +51,8 @@ Read first, in this order: `CLAUDE.md`; `docs/README.md`;
    that are not powers of two; one more shape in step 2's chooser, taken when
    the link says so. About a week, with Pi measurements.
 4. **`v0.2-step4-progress-helpers-prompt.md`: progress helpers**, built from
-   `docs/design/progress-helpers-proposal.md` once the author has answered
-   its §8. The lead's agent keeps the control plane on a control wire of its
+   `docs/design/progress-helpers-proposal.md`, whose §8 the author answered on
+   2026-10-07. The lead's agent keeps the control plane on a control wire of its
    own to every peer; helper threads own rings and disjoint sets of the data
    wires and move the bytes; nothing between threads is a queue; zero helpers
    is today's thread. Part 0 - the profile and the one-thread io_uring ladder
@@ -84,7 +84,8 @@ promoted into the order the day its machine exists:
   measurement.
 - **Step 4's Part 4**: the put stream and the mailbox rate at 0 to 4 helpers
   on a pair with a fast link, against `echo-uring`'s bare stream; the
-  ladder's rungs there; `SEND_ZC` if the author includes it.
+  ladder's rungs there; the default of the zero-copy send, which step 4
+  builds behind a setting off by default (`2026-10-07.md` item 7).
 - **Many PEs a node**: 16 to 64 PEs a node on an x86-64 pair, where the
   cost per message of one thread serving many PEs - never measured - shows.
 

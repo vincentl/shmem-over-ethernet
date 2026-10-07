@@ -5,8 +5,11 @@
 `docs/prompts/v0.2-step4-progress-helpers-prompt.md`). The author's premise
 is settled: one thread is not enough to drive an HPC link - "full stop". What
 this document proposes is *which* threads, owning *what*, talking *how*, so
-that the count can grow without a lock. §8 lists what it asks the author to
-decide; the brief is built once §8 is answered.**
+that the count can grow without a lock. §8 lists what it asked the author to
+decide; the author answered it on 2026-10-07 (`docs/decisions/2026-10-07.md`,
+items 4 to 7): the control wire, two wires a pair always, no helpers by
+default and a count only from the environment, and the zero-copy send built
+behind a setting that is off by default.**
 
 ## 0. What is wrong today
 
@@ -345,6 +348,13 @@ helper exists:
    what the clock governs, and §3.5's protocol already tolerates a later
    reopen. Measure the send-side CPU saved against the later reopen on a
    fast link; on loopback zero copy saves nothing.
+   *Corrected on 2026-10-07:* over TCP the notification comes once the
+   peer has acknowledged the bytes, since the kernel keeps them to
+   retransmit, not when the NIC is done; the next segment can go after the
+   send CQE, so a connection's two buffers cap one peer's stream at about
+   256 KiB a round trip, some 50 Gb/s at 40 µs. Over loopback the kernel
+   copies anyway and adds the notification. The author's answer (§8 item 4)
+   builds it behind a setting, off by default.
 6. The library's own: the parse per message, the apply's memcpy alignment,
    the dirty-word exchange per pass.
 
@@ -386,3 +396,12 @@ Only then helpers, with the same measurements.
 4. **The ladder's `SEND_ZC` rung**: a protocol change to the aggregation's
    clock, worth measuring only on a fast link; include it in the brief as a
    rung, or leave it for the hardware-gated items.
+
+*The author's answers, 2026-10-07* (`docs/decisions/2026-10-07.md`, items 4
+to 7): (1) the control wire - "absolutely - mixing control with data can lead
+to deadlocks"; (2) always - "it simplifies validation and we want dedicated
+control"; (3) no helpers by default, a count set from the environment alone;
+(4) built in step 4, behind a setting off by default, for segments above a
+threshold, its correctness tested in the VM and its default decided on a fast
+link - "will we lose any performance? if no, we should just do it to debug and
+get it working", and off by default it loses none.

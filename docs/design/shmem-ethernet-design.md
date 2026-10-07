@@ -354,6 +354,12 @@ peer's delayed ACK it can sit on a segment for tens of milliseconds.
 
 **Not used:** `IORING_OP_SEND_ZC`. Two CQEs, buffer stability requirement, and
 only pays above ~10–16 KB. Revisit only on a fast NIC.
+*The author, 2026-10-07: built in v0.2 step 4 behind a setting, off by
+default, for large segments, so that it is debugged before a fast NIC exists
+and its default decided on one (`docs/decisions/2026-10-07.md` item 7). Over
+TCP the buffer is released by the notification once the peer has acknowledged
+its bytes, so with it on a connection's two buffers cap one peer's stream at
+about 256 KiB a round trip.*
 
 *As built* (phase 1 step 3 slice 1; `ring.[ch]`, `wire.[ch]`, `listener.[ch]`).
 One ring per progress thread, created `IORING_SETUP_SINGLE_ISSUER |

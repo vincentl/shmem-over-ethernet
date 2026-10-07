@@ -13,7 +13,8 @@ step's merge point, `512e913`. One stop-and-ask, the credits (question 1,
 below): the design as written credits every piece, and so leaves the last
 credits of each round a write into a lead's words that the lead never waits
 for - the brief's first stop-and-ask. Built meanwhile with the recommendation,
-which the model holds and checks; the author's answer is owed.
+which the model holds and checks; the author accepted it that evening
+(`2026-10-07.md`, item 8).
 
 ## What was built
 
@@ -109,6 +110,8 @@ Each is Claude's; the undo follows.
 ## Questions for the author
 
 ### 1. The credits: for every piece, or for the pieces a sender waits on
+
+*Answered: (a), as built - the author: "accept" (`2026-10-07.md`, item 8).*
 
 **What the design says** (Part 1's record, which the author accepted, and the
 brief's amendment): "the receiver adds a credit at the sender for each piece it
