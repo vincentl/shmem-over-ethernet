@@ -218,4 +218,7 @@ its grid; `test-circulant.c` and `test-collective-shape.c` built with
 `-Wall -Wextra -Wconversion -Wshadow`, no warning, each against the mutation
 above; `circulant_model.py` whole again after the allgather's lanes moved to the
 reduce-scatter's first pieces (eight minutes, every case holding and the seven
-breakages failing). In the VM: *(the presets, when the branch is verified)*.
+breakages failing). In `osoe-load`, the branch at `14ad0c5` - the C as it stands, before the
+model's last change, which touched the model alone: the four presets with the floor pins, debug
+785 of 785, release 785, asan 782, tsan 546, and `tier3` 113 - step 2's suite and
+`shmem.circulant.arithmetic`.
