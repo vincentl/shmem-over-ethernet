@@ -1,4 +1,4 @@
-start 07:38:57
+start 08:11:17
 built: 0
 e-band: 0
 osu: 0
@@ -34,4 +34,4 @@ osu-reduce-4x4-tree-3: 0
 bench-4x4-tree-3: 0
 osu-reduce-big-4x1-link: 0
 osu-reduce-big-4x1-tree: 0
-end 07:56:06
+end 08:27:39

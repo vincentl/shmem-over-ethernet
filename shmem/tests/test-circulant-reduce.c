@@ -524,9 +524,11 @@ int main(int argc, char **argv)
         in_place(dest[1], large + 3);
         staggered(dest[2], source[2], large);
         back_to_back(copy, dest, source, large);
-        reuse(dest[3], source[3], large);
+        /* The copy gives its number back first, which the reuse takes, so
+         * that it runs at OSOE_MAX_TEAMS=4 too. */
         shmem_barrier_all();
         shmem_team_destroy(copy);
+        reuse(dest[3], source[3], large);
     }
 
     int *mine = shmem_malloc(2 * sizeof *mine), *all = shmem_malloc(2 * sizeof *all);

@@ -89,7 +89,8 @@ Each is Claude's; the undo follows.
    in flight.** The design had round k in row k at the capacity's window, four
    pieces; but a lane has the ceiling's nine rows and a reduction over N nodes
    uses ⌈log₂ N⌉, two on four nodes. Built so, Träff's was 1.14 to 1.19 times
-   faster than step 2's trees at 1 MiB on the Pi, where the model said 1.34; a
+   faster than step 2's trees at 1 MiB on the Pi, where the model said 1.34
+   (`comparison-window-4/`, three rotations); a
    window of eight (`OSOE_COLLECTIVE_PIPELINE=8`) took 9.4% off it, and taking
    an arrived piece before sending the next took nothing (the Pi's evidence,
    `experiment-1/`). So the chooser gives Träff's a window of the capacity
@@ -194,6 +195,34 @@ stress settings and both back-to-back maps:
 
 Each is caught by the library's own checks - a header, a grant's words, a lane
 field - which end the job naming both leads, not by a wrong result.
+
+## The Pi's measurements (Part 3)
+
+`docs/pi-cluster-results.md`, "v0.2 step 3", has them whole; the raw files are
+`docs/design/evidence/pi-cluster/2026-10-07-v0.2-step3/`. `link` - Träff's
+where the model takes it - against `tree`, step 2's trees, the setting the
+brief asked for, on one build, alternating three times: the e-band probe at
+4 × 4 and 4 × 1, OSU's reduce, `osoe-bench`.
+
+- **The brief's claim holds as merged**: a 1 MiB reduction 1.32 to 1.41 times
+  faster than step 2's trees (the brief: about 1.3), 2 and 4 MiB 1.43 and 1.46;
+  no size slower beyond the noise; every size to 8 KiB the trees', unchanged.
+  From 16 KiB, the smallest measured size Träff's takes, every size faster -
+  1.04 to 1.58 times by OSU and the probe.
+- **As Part 2 first built it**, a round in one row at the capacity's window,
+  1.14 to 1.19 at 1 MiB: the window held it back, which choice 6 answers
+  (`experiment-1/`, `experiment-2/`).
+- **`osoe-bench`'s back-to-back loop**: at 4 × 4 its 64 KiB reduction's median
+  is the trees' (2.26 against 2.24 ms, within the noise) and its fastest call
+  1.17 times faster - reductions called with no barrier between them, which
+  neither OSU nor the probe does. Not a size slower; worth a look when the
+  progress helpers (step 4) change what a lead's node can carry both ways.
+- **The model** against these: the chooser's closed forms put the 1 MiB ratio
+  at 1.34 on four nodes, and OSU measured 1.36 at 4 × 1; both closed forms run
+  16 to 18% under the measured times at that size. The event simulation's
+  Träff's is 11 to 22% optimistic from 256 KiB - it takes a lead's link both
+  ways at once at the full rate - so on seven nodes the README cites the
+  closed form's 1.7, not the simulation's 2.7, and names it the model's.
 
 ## Verification
 

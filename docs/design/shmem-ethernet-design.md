@@ -5886,8 +5886,10 @@ alone, so that nothing lands in a lead's words once it has returned. Each lead
 publishes the algorithm its last such call took and the rounds Träff's made in
 the team's tree state (`team.tree.algorithm`, `circulant_rounds`; layout 33),
 which `shmem.shape.chosen.*` and `shmem.circulant.*` hold call by call. Its
-crossover is the cost model's on the measured link; the Pi's check of it is the
-step's third part.
+crossover is the cost model's on the measured link: on the Pi's four nodes
+between 8 and 16 KiB, and it was faster than the trees at every size it took - 1.32 to 1.41
+times at 1 MiB - and the trees below it unchanged (`docs/pi-cluster-results.md`,
+v0.2 step 3).
 
 #### Prefix scans
 
@@ -8136,7 +8138,13 @@ which has two states per pair, so a third backend needs a selector of its own
 - **Reduction algorithm crossovers** (§5.8). The element counts at which a ring or
   Rabenseifner replaces the accumulator's internode tree are chosen from measurement
   on the §8.4 harness, not fixed in advance. The
-  lead's-`dest` accumulator does not cover them.
+  lead's-`dest` accumulator does not cover them. *Closed (v0.2 steps 2 and 3):*
+  each call chooses between the trees and Träff's circulant reduce-scatter and
+  allgather - Rabenseifner's halving with a fold modelled and set aside - by the
+  cost model's closed forms (`collective-shape.c`) on the link measured at the
+  end of `shmem_init`; on the Pi's four nodes Träff's from between 8 and 16 KiB, faster than
+  the trees at every size it takes, 1.32 to 1.41 times at 1 MiB, and the trees
+  below (`docs/pi-cluster-results.md`, v0.2 step 3).
 
 ### Review of 2026-09-16
 

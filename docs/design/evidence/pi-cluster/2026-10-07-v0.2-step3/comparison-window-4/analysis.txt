@@ -1,0 +1,131 @@
+what                                                   link       tree  tree/link  noise
+band 4x4  ('barrier', 0)                              209.1      208.5      0.997  0.015
+band 4x4  ('broadcast', 1024)                         246.2      239.9      0.974  0.110
+band 4x4  ('broadcast', 1048576)                    19006.7    19027.6      1.001  0.004
+band 4x4  ('broadcast', 16384)                        629.5      602.2      0.957  0.028 SLOWER-UNDER-LINK
+band 4x4  ('broadcast', 2048)                         269.5      268.8      0.997  0.058
+band 4x4  ('broadcast', 32768)                        985.9      994.9      1.009  0.010
+band 4x4  ('broadcast', 4096)                         306.6      308.1      1.005  0.021
+band 4x4  ('broadcast', 65536)                       1550.4     1555.9      1.004  0.181
+band 4x4  ('broadcast', 8)                            208.2      206.9      0.994  0.045
+band 4x4  ('broadcast', 8192)                         395.2      397.8      1.007  0.042
+band 4x4  ('reduce', 1024)                            285.5      295.1      1.034  0.049
+band 4x4  ('reduce', 1048576)                       20234.3    23175.7      1.145  0.018
+band 4x4  ('reduce', 16384)                           825.2     1061.2      1.286  0.025
+band 4x4  ('reduce', 2048)                            334.7      340.6      1.018  0.024
+band 4x4  ('reduce', 32768)                          1049.7     1597.1      1.521  0.017
+band 4x4  ('reduce', 4096)                            411.1      410.5      0.999  0.046
+band 4x4  ('reduce', 65536)                          1502.0     2360.0      1.571  0.013
+band 4x4  ('reduce', 8)                               232.9      237.2      1.018  0.021
+band 4x4  ('reduce', 8192)                            586.2      595.6      1.016  0.014
+band 4x4  ('scan', 1024)                              500.6      504.4      1.008  0.042
+band 4x4  ('scan', 1048576)                         49963.0    49715.1      0.995  0.017
+band 4x4  ('scan', 16384)                            1350.7     1391.4      1.030  0.053
+band 4x4  ('scan', 2048)                              648.7      650.1      1.002  0.044
+band 4x4  ('scan', 32768)                            2505.4     2453.7      0.979  0.068
+band 4x4  ('scan', 4096)                              715.4      715.1      1.000  0.027
+band 4x4  ('scan', 65536)                            4004.9     3990.8      0.996  0.022
+band 4x4  ('scan', 8)                                 361.6      359.6      0.994  0.044
+band 4x4  ('scan', 8192)                              863.0      862.6      1.000  0.038
+osu 4x4 reduce 1024                                   227.2      220.0      0.969  0.005 SLOWER-UNDER-LINK
+osu 4x4 reduce 1048576                              21103.0    24217.5      1.148  0.005
+osu 4x4 reduce 128                                    189.1      191.9      1.015  0.018
+osu 4x4 reduce 131072                                3044.2     3720.4      1.222  0.037
+osu 4x4 reduce 16                                     183.4      188.4      1.027  0.004
+osu 4x4 reduce 16384                                  818.8      849.2      1.037  0.003
+osu 4x4 reduce 2048                                   279.9      278.7      0.996  0.019
+osu 4x4 reduce 256                                    194.2      197.5      1.017  0.042
+osu 4x4 reduce 262144                                5555.9     6682.8      1.203  0.060
+osu 4x4 reduce 32                                     184.5      189.1      1.025  0.007
+osu 4x4 reduce 32768                                 1115.4     1133.8      1.017  0.037
+osu 4x4 reduce 4                                      185.7      188.4      1.015  0.020
+osu 4x4 reduce 4096                                   340.8      340.6      1.000  0.008
+osu 4x4 reduce 512                                    197.8      212.9      1.076  0.005
+osu 4x4 reduce 524288                               10849.2    12430.0      1.146  0.010
+osu 4x4 reduce 64                                     185.2      190.3      1.027  0.003
+osu 4x4 reduce 65536                                 1932.1     1989.9      1.030  0.117
+osu 4x4 reduce 8                                      183.6      188.1      1.025  0.008
+osu 4x4 reduce 8192                                   510.4      508.9      0.997  0.005
+band 4x1  ('barrier', 0)                              180.1      179.8      0.998  0.023
+band 4x1  ('broadcast', 1024)                         221.2      227.1      1.027  0.009
+band 4x1  ('broadcast', 1048576)                    18475.0    18548.8      1.004  0.013
+band 4x1  ('broadcast', 16384)                        548.2      563.9      1.029  0.002
+band 4x1  ('broadcast', 2048)                         241.1      242.1      1.004  0.097
+band 4x1  ('broadcast', 32768)                        870.4      850.8      0.977  0.016 SLOWER-UNDER-LINK
+band 4x1  ('broadcast', 4096)                         293.2      280.7      0.957  0.025 SLOWER-UNDER-LINK
+band 4x1  ('broadcast', 65536)                       1505.2     1534.2      1.019  0.028
+band 4x1  ('broadcast', 8)                            188.6      192.5      1.021  0.007
+band 4x1  ('broadcast', 8192)                         362.0      369.7      1.021  0.059
+band 4x1  ('reduce', 1024)                            252.0      253.9      1.008  0.058
+band 4x1  ('reduce', 1048576)                       19843.1    22588.1      1.138  0.024
+band 4x1  ('reduce', 16384)                           824.9     1009.0      1.223  0.021
+band 4x1  ('reduce', 2048)                            308.1      307.5      0.998  0.031
+band 4x1  ('reduce', 32768)                          1033.2     1361.8      1.318  0.025
+band 4x1  ('reduce', 4096)                            388.0      387.3      0.998  0.035
+band 4x1  ('reduce', 65536)                          1534.8     2194.3      1.430  0.108
+band 4x1  ('reduce', 8)                               201.2      200.9      0.999  0.055
+band 4x1  ('reduce', 8192)                            560.8      587.0      1.047  0.152
+band 4x1  ('scan', 1024)                              236.1      244.1      1.034  0.032
+band 4x1  ('scan', 1048576)                         28233.4    28214.3      0.999  0.002
+band 4x1  ('scan', 16384)                             989.9      964.1      0.974  0.062
+band 4x1  ('scan', 2048)                              290.5      294.4      1.013  0.014
+band 4x1  ('scan', 32768)                            1874.5     1743.6      0.930  0.038 SLOWER-UNDER-LINK
+band 4x1  ('scan', 4096)                              367.2      388.7      1.059  0.062
+band 4x1  ('scan', 65536)                            2777.6     2770.8      0.998  0.027
+band 4x1  ('scan', 8)                                 188.1      192.0      1.021  0.011
+band 4x1  ('scan', 8192)                              583.6      593.5      1.017  0.020
+osu 4x1 reduce 1024                                   232.8      233.3      1.002  0.004
+osu 4x1 reduce 1048576                              19111.8    22736.7      1.190  0.008
+osu 4x1 reduce 128                                    192.7      192.9      1.001  0.018
+osu 4x1 reduce 131072                                2425.4     3446.0      1.421  0.032
+osu 4x1 reduce 16                                     187.9      187.8      1.000  0.003
+osu 4x1 reduce 16384                                  760.1      801.4      1.054  0.016
+osu 4x1 reduce 2048                                   268.1      266.5      0.994  0.014
+osu 4x1 reduce 256                                    200.9      204.9      1.020  0.030
+osu 4x1 reduce 262144                                4800.1     6153.2      1.282  0.025
+osu 4x1 reduce 32                                     188.5      188.7      1.001  0.002
+osu 4x1 reduce 32768                                  948.3     1170.1      1.234  0.034
+osu 4x1 reduce 4                                      188.8      188.9      1.001  0.002
+osu 4x1 reduce 4096                                   321.5      321.4      1.000  0.003
+osu 4x1 reduce 512                                    215.2      215.9      1.003  0.013
+osu 4x1 reduce 524288                                9781.9    11783.8      1.205  0.014
+osu 4x1 reduce 64                                     190.2      190.0      0.999  0.002
+osu 4x1 reduce 65536                                 1409.9     1898.1      1.346  0.079
+osu 4x1 reduce 8                                      187.5      187.7      1.001  0.003
+osu 4x1 reduce 8192                                   472.5      472.7      1.000  0.003
+bench 4x4  alltoall pes=16 block=4096                2580.9     2606.9      1.010  0.018
+bench 4x4  alltoall pes=16 block=8                    346.7      347.1      1.001  0.002
+bench 4x4  atomic fetch-add target=4 where=remot      163.4      163.3      0.999  0.001
+bench 4x4  barrier pes=16                             176.7      177.0      1.002  0.002
+bench 4x4  broadcast pes=16 bytes=65536              1518.0     1597.5      1.052  0.052
+bench 4x4  broadcast pes=16 bytes=8                   195.9      195.6      0.998  0.001
+bench 4x4  fcollect pes=16 block=4096                 687.0      688.1      1.002  0.005
+bench 4x4  fcollect pes=16 block=8                    263.7      265.7      1.008  0.046
+bench 4x4  latency get target=4 where=remote byt    11623.0    11637.3      1.001  0.004
+bench 4x4  latency get target=4 where=remote byt     3017.9     3017.0      1.000  0.001
+bench 4x4  latency get target=4 where=remote byt      411.8      411.7      1.000  0.002
+bench 4x4  latency get target=4 where=remote byt      172.6      166.0      0.962  0.042
+bench 4x4  latency get target=4 where=remote byt      178.4      168.3      0.943  0.060
+bench 4x4  latency get target=4 where=remote byt      170.2      160.2      0.941  0.061 SLOWER-UNDER-LINK
+bench 4x4  latency get target=4 where=remote byt      168.7      159.0      0.943  0.062
+bench 4x4  latency put+quiet target=4 where=remo     9060.3     9059.1      1.000  0.000
+bench 4x4  latency put+quiet target=4 where=remo     2375.4     2374.8      1.000  0.001
+bench 4x4  latency put+quiet target=4 where=remo      424.7      410.6      0.967  0.034
+bench 4x4  latency put+quiet target=4 where=remo      194.6      180.4      0.927  0.079
+bench 4x4  latency put+quiet target=4 where=remo      178.0      168.2      0.945  0.057 SLOWER-UNDER-LINK
+bench 4x4  latency put+quiet target=4 where=remo      169.7      160.1      0.943  0.059 SLOWER-UNDER-LINK
+bench 4x4  latency put+quiet target=4 where=remo      168.7      159.3      0.944  0.060
+bench 4x4  reduce pes=16 bytes=65536                 2259.1     2255.9      0.999  0.028
+bench 4x4  reduce pes=16 bytes=8                      198.1      198.0      0.999  0.001
+
+lines slower under link than tree by more than the noise: 8
+   ("band 4x4  ('broadcast', 16384)", 1.0453337761541015, 0.02827309236947806)
+   ('osu 4x4 reduce 1024', 1.0324955687860746, 0.005201904426027193)
+   ("band 4x1  ('broadcast', 32768)", 1.0230371415138693, 0.015762851429243607)
+   ("band 4x1  ('broadcast', 4096)", 1.044531528322052, 0.024722321748477105)
+   ("band 4x1  ('scan', 32768)", 1.0750745583849508, 0.03831544178364976)
+   ('bench 4x4  latency get target=4 where=remote byt', 1.0624219725343322, 0.06117353308364559)
+   ('bench 4x4  latency put+quiet target=4 where=remo', 1.0582639714625446, 0.05707491082045202)
+   ('bench 4x4  latency put+quiet target=4 where=remo', 1.0599625234228607, 0.059337913803872544)
+big link: {4: 193.62, 8: 192.35, 16: 193.16, 32: 194.04, 64: 195.41, 128: 197.8, 256: 204.84, 512: 215.38, 1024: 232.91, 2048: 266.57, 4096: 323.94, 8192: 472.57, 16384: 770.41, 32768: 942.08, 65536: 1469.1, 131072: 2446.18, 262144: 4782.09, 524288: 9646.21, 1048576: 19091.94, 2097152: 37054.22, 4194304: 72981.44}
+big tree: {4: 177.86, 8: 175.74, 16: 176.91, 32: 186.5, 64: 189.94, 128: 192.62, 256: 198.21, 512: 215.82, 1024: 232.67, 2048: 269.5, 4096: 321.04, 8192: 471.66, 16384: 802.1, 32768: 1189.18, 65536: 1934.39, 131072: 3493.07, 262144: 6022.35, 524288: 11703.9, 1048576: 22624.22, 2097152: 44425.86, 4194304: 88308.45}
