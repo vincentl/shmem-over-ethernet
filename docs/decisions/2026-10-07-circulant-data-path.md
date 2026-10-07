@@ -229,6 +229,18 @@ brief asked for, on one build, alternating three times: the e-band probe at
   Träff's is 11 to 22% optimistic from 256 KiB - it takes a lead's link both
   ways at once at the full rate - so on seven nodes the README cites the
   closed form's 1.7, not the simulation's 2.7, and names it the model's.
+- **Seven nodes in the VM, the brief's check of the simulation**
+  (`vm-seven-nodes/`, with the caveat that loopback's link is not a link: the
+  VM's four cores carry seven leads and their progress threads, and the link it
+  measured ran from a 16 to a 44 µs hop and 2.1 to 7.5 GB/s from start to
+  start). On the link it measured, the chooser takes the trees at every size
+  of the probe, so `link` against `tree` there compares trees with trees
+  (`measured-link/`). With the shapes fixed by the Pi's link set
+  (`pi-link/`): Träff's, a window of 12, against trees of fan-out 2, three
+  rotations - 0.53 to 0.61 times as fast from 8 to 64 KiB, where hops rule on a
+  link this fast, and 1.68 times as fast at 1 MiB. The simulation of those
+  shapes at the loopback's median link: 0.43 to 0.53, and 1.37 at 1 MiB (1.37 to
+  2.43 across the three links measured) - within the brief's factor of two.
 
 ## The adversarial read
 

@@ -1,0 +1,21 @@
+== link 1 08:51:20
+exit 0
+== tree 1 08:51:24
+exit 0
+== link 2 08:51:28
+exit 0
+== tree 2 08:51:32
+exit 0
+== link 3 08:51:35
+exit 0
+== tree 3 08:51:39
+exit 0
+== shapes at 16 and 64 08:51:43
+1/6 Test #504: shmem.shape.chosen.pi.16 .........   Passed    0.33 sec
+2/6 Test #505: shmem.shape.chosen.loopback.16 ...   Passed    0.34 sec
+3/6 Test #506: shmem.shape.chosen.pi.64 .........   Passed    3.05 sec
+4/6 Test #507: shmem.shape.chosen.loopback.64 ...   Passed    4.34 sec
+5/6 Test #519: shmem.circulant.16 ...............   Passed    4.07 sec
+6/6 Test #522: shmem.circulant.64 ...............   Passed   37.10 sec
+100% tests passed, 0 tests failed out of 6
+DONE 08:52:33

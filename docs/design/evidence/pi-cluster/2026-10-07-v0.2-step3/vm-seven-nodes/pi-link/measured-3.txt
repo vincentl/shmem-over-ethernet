@@ -1,0 +1,35 @@
+osoe: PE 0 of 7 (local 0 of 1): segment /dev/shm/osoe.4067812.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 7; link measured: a hop of 22417 ns, a message cost of 7930 ns, 3037402091 bytes a second (5878 us of this start)
+osoe: PE 1 of 7 (local 0 of 1): segment /dev/shm/osoe.4067812.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 7; link measured: a hop of 22417 ns, a message cost of 7930 ns, 3037402091 bytes a second (6067 us of this start)
+osoe: PE 4 of 7 (local 0 of 1): segment /dev/shm/osoe.4067812.0.4.0, heap 268435456 bytes at 0x100000000000, node 4 of 7; link measured: a hop of 22417 ns, a message cost of 7930 ns, 3037402091 bytes a second (5639 us of this start)
+osoe: PE 5 of 7 (local 0 of 1): segment /dev/shm/osoe.4067812.0.5.0, heap 268435456 bytes at 0x100000000000, node 5 of 7; link measured: a hop of 22417 ns, a message cost of 7930 ns, 3037402091 bytes a second (5572 us of this start)
+osoe: PE 2 of 7 (local 0 of 1): segment /dev/shm/osoe.4067812.0.2.0, heap 268435456 bytes at 0x100000000000, node 2 of 7; link measured: a hop of 22417 ns, a message cost of 7930 ns, 3037402091 bytes a second (6170 us of this start)
+osoe: PE 6 of 7 (local 0 of 1): segment /dev/shm/osoe.4067812.0.6.0, heap 268435456 bytes at 0x100000000000, node 6 of 7; link measured: a hop of 22417 ns, a message cost of 7930 ns, 3037402091 bytes a second (5524 us of this start)
+osoe: PE 3 of 7 (local 0 of 1): segment /dev/shm/osoe.4067812.0.3.0, heap 268435456 bytes at 0x100000000000, node 3 of 7; link measured: a hop of 22417 ns, a message cost of 7930 ns, 3037402091 bytes a second (5853 us of this start)
+e-band pes=7 barrier bytes=0 slowest_pe_median_us=148.7
+e-band pes=7 reduce bytes=8 slowest_pe_median_us=199.5
+e-band pes=7 reduce bytes=1024 slowest_pe_median_us=203.3
+e-band pes=7 reduce bytes=2048 slowest_pe_median_us=249.0
+e-band pes=7 reduce bytes=4096 slowest_pe_median_us=247.1
+e-band pes=7 reduce bytes=8192 slowest_pe_median_us=262.2
+e-band pes=7 reduce bytes=16384 slowest_pe_median_us=275.3
+e-band pes=7 reduce bytes=32768 slowest_pe_median_us=292.1
+e-band pes=7 reduce bytes=65536 slowest_pe_median_us=393.6
+e-band pes=7 reduce bytes=1048576 slowest_pe_median_us=4815.0
+e-band pes=7 broadcast bytes=8 slowest_pe_median_us=192.5
+e-band pes=7 broadcast bytes=1024 slowest_pe_median_us=199.5
+e-band pes=7 broadcast bytes=2048 slowest_pe_median_us=191.0
+e-band pes=7 broadcast bytes=4096 slowest_pe_median_us=197.9
+e-band pes=7 broadcast bytes=8192 slowest_pe_median_us=199.1
+e-band pes=7 broadcast bytes=16384 slowest_pe_median_us=201.0
+e-band pes=7 broadcast bytes=32768 slowest_pe_median_us=234.2
+e-band pes=7 broadcast bytes=65536 slowest_pe_median_us=363.9
+e-band pes=7 broadcast bytes=1048576 slowest_pe_median_us=5311.4
+e-band pes=7 scan bytes=8 slowest_pe_median_us=284.8
+e-band pes=7 scan bytes=1024 slowest_pe_median_us=286.1
+e-band pes=7 scan bytes=2048 slowest_pe_median_us=351.8
+e-band pes=7 scan bytes=4096 slowest_pe_median_us=370.4
+e-band pes=7 scan bytes=8192 slowest_pe_median_us=387.5
+e-band pes=7 scan bytes=16384 slowest_pe_median_us=413.5
+e-band pes=7 scan bytes=32768 slowest_pe_median_us=440.4
+e-band pes=7 scan bytes=65536 slowest_pe_median_us=802.4
+e-band pes=7 scan bytes=1048576 slowest_pe_median_us=10627.3
