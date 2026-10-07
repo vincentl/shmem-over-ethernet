@@ -15,7 +15,12 @@ C, held to the model; its cost beside the trees', in the chooser where the
 caller allows it, which the data path does not yet. The data path waits on
 question 1: the protocol the model holds needs words of its own in the
 internal region, and grants of another form than the brief's - both on the
-brief's stop-and-ask list.
+brief's stop-and-ask list. *Since:* question 1 answered (below), and the data
+path built, measured on the Pi and read adversarially - the step's Parts 2 and
+3 and its merge point, `2026-10-07-circulant-data-path.md`, which also changed
+two things this record describes: credits only for the pieces a sender's
+window waits on (its question 1), and a round's window as many of a lane's
+rows as the rounds leave it (its choice 6).
 
 ## Why Träff's, and for every node count
 
