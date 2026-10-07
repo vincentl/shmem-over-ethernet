@@ -117,6 +117,18 @@ add_test(NAME shmem.shape.grid
   COMMAND shmem_test_collective_shape grid ${CMAKE_CURRENT_SOURCE_DIR}/shape-grid.txt)
 set_tests_properties(shmem.shape.choice shmem.shape.grid PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# Träff's circulant rounds on their own (tier 1; v0.2 step 3): every element of
+# every lead's result combined from every node exactly once, for every node
+# count from 2 to 70, and the C's whole table against what
+# tools/modelcheck/circulant_model.py digested (circulant-digest.txt;
+# model.circulant.digest checks the model still writes it).
+add_executable(shmem_test_circulant test-circulant.c ../src/collective-circulant.c)
+target_include_directories(shmem_test_circulant PRIVATE ../src)
+osoe_warnings(shmem_test_circulant)
+add_test(NAME shmem.circulant.arithmetic
+  COMMAND shmem_test_circulant ${CMAKE_CURRENT_SOURCE_DIR}/circulant-digest.txt)
+set_tests_properties(shmem.circulant.arithmetic PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The §4.9 watched-range encoding on its own (tier 1): pure logic, and the
 # property it must have is one a brute-force check can state directly.
 add_executable(shmem_test_watch_range test-watch-range.c)
