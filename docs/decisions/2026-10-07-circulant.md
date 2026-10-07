@@ -8,7 +8,7 @@ throughout if the reduce-scatter is the circulant one, which has no swaps".
 Part 1 - the fold the brief described, modelled and costed - is
 `2026-10-06-rabenseifner.md`.
 
-**Where it stands.** On the branch `circulant`, on step 2's tip, not merged:
+**Where it stands.** On the branch `circulant`, on `main`, not merged:
 Träff's algorithm modelled - its arithmetic for every node count from 2 to 70,
 its protocol on two to five leads - and the model holds it; its arithmetic in
 C, held to the model; its cost beside the trees', in the chooser where the
@@ -208,6 +208,8 @@ numbers (the region is 15.5 MiB at the defaults).
 
 **Recommendation: (a).** *Built meanwhile:* the model, the arithmetic and the
 chooser's shape; the data path waits for your word on the words and the grants.
+**Answered** (the author, 2026-10-07, `2026-10-07.md` item 2): "accept
+recommendation" - (a). The data path is the step's next part.
 
 ## Verification
 
