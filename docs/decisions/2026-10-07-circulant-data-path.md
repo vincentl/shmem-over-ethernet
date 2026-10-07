@@ -296,4 +296,36 @@ found, and what was done:
 
 ## Verification
 
-<!-- filled in -->
+- **The model**, on the host: `circulant_model.py` whole at `0635df0` - the
+  arithmetic's 612 cases and both broken arithmetic variants, the six protocol
+  cases holding (five leads 14.4 million states, past the liveness bound), the
+  eight breakages failing - in 5 min 22 s; again by the adversarial read at
+  `4b9767e`, with its own cases at windows of 2 and 3. `shape_timing.py`'s
+  check and its grid at `5cbd47e`, the grid regenerated for the rounds' windows.
+- **`4b9767e`**, as first built, in `osoe`: the four presets with the floor pins
+  - debug 809 of 809, release 809, asan 798 of 800 and tsan 562 of 563 (the
+  out-of-memory kills and `shmem.lanes.boundary`, both answered in `5cbd47e`) -
+  tier 3 113, the pacer's collectives at three values of
+  `OSOE_SMALL_COLLECTIVE_BYTES` and on five nodes with the Pi's link set (its
+  sizes from 32 KiB taking Träff's), its teams and threads, and ten minutes of
+  `mix`: no failure. The C mutants of the table above.
+- **`5cbd47e`**, the rounds' windows: each preset failing only
+  `shmem.circulant.4.max-teams-4` (finding 1, fixed in `9bc596b`); tier 3 113;
+  every pacer run without a failure. The read's twenty mutations.
+- **The tip's code and tests** (`95da3d3`; later commits change documents and
+  comments only), in `osoe`: the four presets with the floor pins - debug 816 of
+  816, release 816, asan 800, tsan 564; tier 3 113; the pacer's collectives at
+  the three values and on five nodes with the Pi's link set, its teams and
+  threads, and ten minutes of `mix` (602 s) - no failure. The lane mutations
+  against `shmem.circulant.{5,7}.lanes` at `8ce8a20`: each fails both, three
+  runs of three; `number_taken_keeps` fails every reuse-bearing case. And
+  `shmem.circulant.*` but its 33, 64 and 70 nodes five times over on a release
+  build, 135 of 135.
+- **The merge point's load** (`osoe-load`, the same tree): the models preset
+  whole, 34 of 34 (38 minutes); the SOS suite at 4 × 2, 161 programs built and
+  passing on every map, the two that do not build and the two that fail the
+  same as at step 2's merge (C11 waits on `short`, which osoe does not take;
+  `shmem_team_b2b_collectives`'s collect into a dest too short and
+  `shmemalign`'s alignment of 2, both refused by name); the acceptance past 61
+  PEs - 70 on one node and on ten nodes of seven, `collect_active_set` at 32,
+  the per-node split at 61, 62 and 64 nodes - every run status 0, as at step 2.
