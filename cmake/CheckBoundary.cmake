@@ -51,9 +51,10 @@ cmake_minimum_required(VERSION 3.25)
 # include its headers.
 set(OSOE_API
   accessible.c active-set.c alltoall.c amo.c barrier.c broadcast.c collect.c collectives.c context.c
-  deprecated.c info.c init.c lock.c malloc.c profile.c quiet.c reductions.c rma-typed.c
-  rma.c scans.c session.c signal.c symmetric.c team.c wait.c
-  barrier.h collectives.h context.h export.h lock.h rma.h symmetric.h team.h wait.h)
+  deprecated.c info.c init.c link-measure.c lock.c malloc.c profile.c quiet.c reductions.c
+  rma-typed.c rma.c scans.c session.c signal.c symmetric.c team.c wait.c
+  barrier.h collectives.h context.h export.h link-measure.h lock.h rma.h symmetric.h team.h
+  wait.h)
 
 # The runtime: initialization's machinery and the agent (§6, §3.12), and the
 # library's own services - fatal, abort, liveness, the sweep, the deadlock
@@ -98,9 +99,11 @@ set(OSOE_BACKEND_FACING internode-backend.h internode-generic.h)
 # before its node joins - each read on one node as on many, so that a bad
 # value is refused the same way.
 set(OSOE_ON_BOUNDARY
-  am-configuration.c collective-tree.c combine.c internode-generic.c job.c listener.c
-  node.c rank-map.c rendezvous.c shm-object.c transport-local.c watch.c wire-settings.c
-  am-configuration.h collective-tree.h combine.h internal-region.h internode.h job.h
+  am-configuration.c collective-shape.c collective-tree.c combine.c internode-generic.c job.c
+  listener.c node.c rank-map.c rendezvous.c shm-object.c transport-local.c watch.c
+  wire-settings.c
+  am-configuration.h collective-shape.h collective-tree.h combine.h internal-region.h
+  internode.h job.h
   listener.h node.h rank-map.h rendezvous.h rmw.h shm-object.h transport.h watch-range.h
   wire-settings.h)
 

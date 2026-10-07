@@ -1,0 +1,4 @@
+osoe: PE 0 of 4 (local 0 of 1): segment /dev/shm/osoe.720.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 4; link measured: a hop of 86796 ns, a message cost of 19690 ns, 117437084 bytes a second (27169 us of this start)
+osoe: PE 1 of 4 (local 0 of 1): segment /dev/shm/osoe.720.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 4; link measured: a hop of 86796 ns, a message cost of 19690 ns, 117437084 bytes a second (27376 us of this start)
+osoe: PE 2 of 4 (local 0 of 1): segment /dev/shm/osoe.720.0.2.0, heap 268435456 bytes at 0x100000000000, node 2 of 4; link measured: a hop of 86796 ns, a message cost of 19690 ns, 117437084 bytes a second (27369 us of this start)
+osoe: PE 3 of 4 (local 0 of 1): segment /dev/shm/osoe.720.0.3.0, heap 268435456 bytes at 0x100000000000, node 3 of 4; link measured: a hop of 86796 ns, a message cost of 19690 ns, 117437084 bytes a second (27293 us of this start)

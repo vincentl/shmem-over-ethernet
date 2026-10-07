@@ -46,6 +46,12 @@ struct osoe_bootstrap {
                                      * pieces in flight per level of the tree (§5.8) */
     uint32_t small_collective_bytes;    /* OSOE_SMALL_COLLECTIVE_BYTES: the largest data
                                          * collective through a team's own slots (§5.8) */
+    uint32_t collective_shape;  /* OSOE_COLLECTIVE_SHAPE: OSOE_COLLECTIVE_SHAPE_LINK or
+                                 * _FIXED (v0.2 step 2, collective-shape.h) */
+    /* OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS, OSOE_LINK_BYTES_PER_SECOND (v0.2
+     * step 2): the link a large collective's shape is chosen from, set rather
+     * than measured - all three or none; 0 when none is set. */
+    uint64_t link_hop_ns, link_message_ns, link_bytes_per_second;
     uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
     /* OSOE_KEEPALIVE (§3.15): TCP keepalive on every node-pair connection, as
      * seconds idle, seconds between probes, and probes. Zero means the default,
@@ -80,9 +86,9 @@ struct osoe_bootstrap {
  * OSOE_MAX_TEAMS (§5.7): its default, and the range it must lie in - the
  * numbers one PE may hold at once, room for at least one team beyond the three
  * predefined, and at most 1,024, where each PE's internal region comes to about
- * 18 MiB of address space at the other settings' defaults (internal-region.h:
+ * 35 MiB of address space at the other settings' defaults (internal-region.h:
  * since the team redesign's step E a number holds counters and small slots,
- * about 15 KiB, and the large slots are each thread's lane). 256 by default
+ * about 25 KiB, and the large slots are each thread's lane). 256 by default
  * since step E made a number that cheap (the author, 2026-10-02: "256 max teams
  * is more than sufficient"); 64 before it.
  * A node's team blocks are OSOE_TEAM_BLOCKS's (below), since the team
@@ -127,13 +133,16 @@ struct osoe_bootstrap {
  * before phase 1 step 5 slice 5; each step of D costs every lane's slots in
  * the internal region again (internal-region.h). A lane is (fan-out + 1) x D
  * slots of a header and 16 KiB, and a PE has one per thread record,
- * OSOE_MAX_THREADS + 1 of them: 2.7 MiB at the defaults (fan-out 4, D = 2, 16
+ * OSOE_MAX_THREADS + 1 of them: 9.6 MiB at the defaults (fan-out 8, D = 4, 16
  * threads) - and at the extremes the ranges allow (1,024 teams, fan-out 32,
  * D = 8, 1,023 threads, small collectives of 16 KiB) a PE's region is about
  * 5.2 GiB, which the shared-memory capacity check refuses at init on a machine
- * without it (node.c).
+ * without it (node.c). Since v0.2 step 2 it is the window's capacity: each
+ * large collective's window is chosen up to it (collective-shape.h). Its
+ * default 4 is the author's (docs/decisions/2026-10-06.md item 5): the Pi's
+ * 1 MiB reduction at k = 2 took 33.5 ms at D = 2 and 23.0 at D = 4.
  */
-#define OSOE_COLLECTIVE_PIPELINE_DEFAULT 2u
+#define OSOE_COLLECTIVE_PIPELINE_DEFAULT 4u
 #define OSOE_COLLECTIVE_PIPELINE_LOWEST  1u
 #define OSOE_COLLECTIVE_PIPELINE_HIGHEST 8u
 
@@ -142,13 +151,34 @@ struct osoe_bootstrap {
  * the largest data collective that moves through a team number's own small
  * slots, in one piece with no grant and no lane (internal-region.h); a larger
  * one goes through the lanes of the threads that lead it. Its default, and the
- * range it must lie in: at 1 KiB a team number costs a PE about 15 KiB, at 128
- * bytes about 6, and at 16 KiB - a lane's piece, past which nothing is small -
+ * range it must lie in: at 1 KiB a team number costs a PE about 25 KiB, at 128
+ * bytes about 9.5, and at 16 KiB - a lane's piece, past which nothing is small -
  * its small rows hold as much as a lane's row of one slot.
  */
 #define OSOE_SMALL_COLLECTIVE_BYTES_DEFAULT 1024u
 #define OSOE_SMALL_COLLECTIVE_BYTES_LOWEST  128u
 #define OSOE_SMALL_COLLECTIVE_BYTES_HIGHEST 16384u
+
+/*
+ * OSOE_COLLECTIVE_SHAPE (v0.2 step 2): `link`, the default, chooses each large
+ * reduction's and broadcast's fan-out and window from the link
+ * (collective-shape.h); `fixed` runs every one at the fan-out and the pipeline
+ * as set, the 0.1.0 tag's shape. Until the chooser is on the data path - the
+ * step's second part - every collective runs as `fixed` does.
+ */
+#define OSOE_COLLECTIVE_SHAPE_LINK  0u
+#define OSOE_COLLECTIVE_SHAPE_FIXED 1u
+
+/*
+ * OSOE_LINK_* (v0.2 step 2): the link's three numbers set by hand, for tests
+ * and for a user who knows their fabric, in place of the measurement. The
+ * ranges keep the chooser's integer arithmetic inside 64 bits: a hop of up to
+ * ten seconds, a message cost of up to one, from one byte a second to ten
+ * terabytes.
+ */
+#define OSOE_LINK_HOP_NS_HIGHEST           UINT64_C(10000000000)
+#define OSOE_LINK_MESSAGE_NS_HIGHEST       UINT64_C(1000000000)
+#define OSOE_LINK_BYTES_PER_SECOND_HIGHEST UINT64_C(10000000000000)
 
 /*
  * OSOE_MAX_THREADS: the application threads a PE may have alive that have

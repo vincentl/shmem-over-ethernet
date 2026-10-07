@@ -359,6 +359,55 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    OSOE_SMALL_COLLECTIVE_BYTES_HIGHEST);
 
     /*
+     * The shape of a large collective's tree (v0.2 step 2, collective-shape.h),
+     * and the link it is chosen from when set by hand. Every node must agree,
+     * as on the fan-out, and the job rendezvous checks that they do: two nodes
+     * choosing from different numbers would build different trees for one
+     * call. The link's three numbers go together: one alone is refused, since
+     * the other two would be the measurement's and the three would not
+     * describe one link.
+     */
+    const char *shape = getenv("OSOE_COLLECTIVE_SHAPE");
+    if (!shape || strcmp(shape, "link") == 0)
+        b->collective_shape = OSOE_COLLECTIVE_SHAPE_LINK;
+    else if (strcmp(shape, "fixed") == 0)
+        b->collective_shape = OSOE_COLLECTIVE_SHAPE_FIXED;
+    else
+        osoe_fatal("OSOE_COLLECTIVE_SHAPE='%s' is neither link nor fixed", shape);
+    static const char *const link_names[3] = { "OSOE_LINK_HOP_NS", "OSOE_LINK_MESSAGE_NS",
+                                               "OSOE_LINK_BYTES_PER_SECOND" };
+    uint64_t *const link_values[3] = { &b->link_hop_ns, &b->link_message_ns,
+                                       &b->link_bytes_per_second };
+    const uint64_t link_lowest[3] = { 1, 0, 1 };
+    const uint64_t link_highest[3] = { OSOE_LINK_HOP_NS_HIGHEST, OSOE_LINK_MESSAGE_NS_HIGHEST,
+                                       OSOE_LINK_BYTES_PER_SECOND_HIGHEST };
+    unsigned link_set = 0;
+    for (unsigned i = 0; i < 3; i++) {
+        *link_values[i] = 0;
+        enum osoe_environment_status status = osoe_environment_u64(link_names[i],
+                                                                  link_values[i]);
+        if (status == OSOE_ENVIRONMENT_INVALID ||
+            (status == OSOE_ENVIRONMENT_OK &&
+             (*link_values[i] < link_lowest[i] || *link_values[i] > link_highest[i])))
+            osoe_fatal("%s='%s' is not between %llu and %llu", link_names[i],
+                       getenv(link_names[i]), (unsigned long long)link_lowest[i],
+                       (unsigned long long)link_highest[i]);
+        if (status == OSOE_ENVIRONMENT_OK)
+            link_set |= 1u << i;
+    }
+    if (link_set != 0 && link_set != 7) {
+        unsigned unset = 0;
+        while (link_set & (1u << unset))
+            unset++;
+        unsigned set = 0;
+        while (!(link_set & (1u << set)))
+            set++;
+        osoe_fatal("OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS and OSOE_LINK_BYTES_PER_SECOND are "
+                   "set together or not at all: %s is set and %s is not", link_names[set],
+                   link_names[unset]);
+    }
+
+    /*
      * The ports a node lead may listen on (§6.2's "configurable range"). Each
      * lead binds the first free port of a candidate sequence hashed from (job,
      * step, node) inside it, and another lead finds it by trying the same

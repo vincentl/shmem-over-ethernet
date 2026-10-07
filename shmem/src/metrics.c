@@ -255,6 +255,9 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * and 1 large, and the lane its thread lent to the last large one (the
      * team redesign's step E; layout 31): which way it went, and whose slots. */
     TEAM("team.tree.collective_class", BLOCK_TREE(collective_class)),
+    TEAM("team.tree.shape_fanout", BLOCK_TREE(shape_fanout)),
+    TEAM("team.tree.shape_window", BLOCK_TREE(shape_window)),
+    TEAM("team.tree.shape_children", BLOCK_TREE(shape_children)),
     TEAM("team.tree.lane", BLOCK_TREE(lane)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),
@@ -361,6 +364,20 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("node.id", node, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.session", session, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.heap_base", heap_base, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    /* The shape's setting and the link it is chosen from (layout 32, v0.2 step
+     * 2): 0 for link and 1 for fixed; the link as OSOE_LINK_* set it, 0 where
+     * they are not set. Durations, not instants, so no "ns" unit, which marks a
+     * state as an instant on CLOCK_MONOTONIC (osoe-stat): the names say it. */
+    ND("node.collective_shape", collective_shape, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    ND("node.link.hop_ns", link_hop_ns, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    ND("node.link.message_ns", link_message_ns, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    ND("node.link.bytes_per_second", link_bytes_per_second, OSOE_MTYPE_U64, OSOE_MKIND_STATE,
+       ""),
+    ND("node.link.measured_hop_ns", measured_link_hop_ns, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    ND("node.link.measured_message_ns", measured_link_message_ns, OSOE_MTYPE_U64,
+       OSOE_MKIND_STATE, ""),
+    ND("node.link.measured_bytes_per_second", measured_link_bytes_per_second, OSOE_MTYPE_U64,
+       OSOE_MKIND_STATE, ""),
     /* The lead that made the segment: while no PE has joined, the segment is a
      * start under way as long as it lives, and a failed start's once it is
      * gone, which osoe-stat --gc removes (§3.14). */

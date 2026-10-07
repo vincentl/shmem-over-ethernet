@@ -54,6 +54,7 @@ add_library(osoe
   src/barrier.c
   src/blocked.c
   src/bootstrap.c
+  src/collective-shape.c
   src/collective-tree.c
   src/deadlock.c
   src/deprecated.c
@@ -61,6 +62,7 @@ add_library(osoe
   src/info.c
   src/init.c
   src/job.c
+  src/link-measure.c
   src/liveness.c
   src/lock.c
   src/malloc.c

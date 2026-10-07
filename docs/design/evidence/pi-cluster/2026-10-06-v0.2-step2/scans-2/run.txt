@@ -1,0 +1,17 @@
+start 00:18:15
+built: 0
+e-band: 0
+scan-band-4x4-link-1: 0
+scan-band-4x1-link-1: 0
+scan-band-4x4-fixed-1: 0
+scan-band-4x1-fixed-1: 0
+scan-band-4x4-link-2: 0
+scan-band-4x1-link-2: 0
+scan-band-4x4-fixed-2: 0
+scan-band-4x1-fixed-2: 0
+scan-band-4x4-link-3: 0
+scan-band-4x1-link-3: 0
+scan-band-4x4-fixed-3: 0
+scan-band-4x1-fixed-3: 0
+fetched
+end 00:20:37

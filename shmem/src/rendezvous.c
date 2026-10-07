@@ -28,9 +28,10 @@
  * lead checks, and a node with another D would be let in. The fourth,
  * "osoeup-4", carries OSOE_SMALL_COLLECTIVE_BYTES (the team redesign's step E)
  * and a word kept zero after it, for the same reason the second kept one: 56
- * bytes.
+ * bytes. The fifth, "osoeup-5", carries OSOE_COLLECTIVE_SHAPE in that word and
+ * the link's three numbers after it (v0.2 step 2): 80 bytes.
  */
-#define UP_MAGIC   UINT64_C(0x342d7075656f736f)  /* "osoeup-4", little-endian */
+#define UP_MAGIC   UINT64_C(0x352d7075656f736f)  /* "osoeup-5", little-endian */
 #define DOWN_MAGIC UINT64_C(0x6e776f64656f736f)  /* "osoedown" */
 
 /* What every node must agree on (§6.2): a node that differs is a mismatched
@@ -52,10 +53,15 @@ struct agreement {
     /* §5.8: the largest small collective, which sizes every team number's small
      * rows and decides every data collective's class: a node that decided
      * otherwise would wait for a grant its parent never sends, or put a piece
-     * into a lane nobody lent. Then a word kept zero, so that what travels has
-     * no padding. */
+     * into a lane nobody lent. */
     uint32_t small_collective_bytes;
-    uint32_t reserved;
+    /* v0.2 step 2: the collective shape's setting and the link set by hand
+     * (0 where not set): a node choosing a shape from other numbers would
+     * build another tree for the same call. */
+    uint32_t collective_shape;
+    uint64_t link_hop_ns;
+    uint64_t link_message_ns;
+    uint64_t link_bytes_per_second;
 };
 
 struct up_header {
@@ -65,9 +71,9 @@ struct up_header {
     uint32_t progressions;          /* progressions that follow the records */
 };
 
-_Static_assert(sizeof(struct up_header) == 56 &&
+_Static_assert(sizeof(struct up_header) == 80 &&
                offsetof(struct up_header, agreement) +
-                       offsetof(struct agreement, small_collective_bytes) == 40,
+                       offsetof(struct agreement, link_bytes_per_second) == 64,
                "the up header's shape is UP_MAGIC's: a new shape takes a new magic");
 
 /* One node of a subtree, as it travels up. */
@@ -144,6 +150,23 @@ static void agree(const struct osoe_bootstrap *b, uint32_t child, const struct a
                    "a small one moves through a team's own slots and a large one through "
                    "lanes its parent grants (§5.8)", child, theirs->small_collective_bytes,
                    b->node, mine->small_collective_bytes);
+    if (theirs->collective_shape != mine->collective_shape)
+        osoe_fatal("node %u (or a node below it) has OSOE_COLLECTIVE_SHAPE=%s; node %u has %s: "
+                   "every node must shape a collective's tree alike", child,
+                   theirs->collective_shape ? "fixed" : "link", b->node,
+                   mine->collective_shape ? "fixed" : "link");
+    if (theirs->link_hop_ns != mine->link_hop_ns ||
+        theirs->link_message_ns != mine->link_message_ns ||
+        theirs->link_bytes_per_second != mine->link_bytes_per_second)
+        osoe_fatal("node %u (or a node below it) has OSOE_LINK_* of a hop of %llu ns, a "
+                   "message cost of %llu ns and %llu bytes a second; node %u has %llu, %llu and "
+                   "%llu (0: not set): every node must choose a collective's shape from the "
+                   "same link", child, (unsigned long long)theirs->link_hop_ns,
+                   (unsigned long long)theirs->link_message_ns,
+                   (unsigned long long)theirs->link_bytes_per_second, b->node,
+                   (unsigned long long)mine->link_hop_ns,
+                   (unsigned long long)mine->link_message_ns,
+                   (unsigned long long)mine->link_bytes_per_second);
 }
 
 static void lost(const struct osoe_bootstrap *b, uint32_t node, const char *role)
@@ -272,7 +295,9 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
     *out = (struct osoe_rendezvous_result){ 0 };
     struct agreement mine = { b->world_size, b->node_count, b->symmetric_size,
                               osoe_am_table_checksum(), b->collective_fanout, b->max_teams,
-                              b->collective_pipeline, b->small_collective_bytes, 0 };
+                              b->collective_pipeline, b->small_collective_bytes,
+                              b->collective_shape, b->link_hop_ns, b->link_message_ns,
+                              b->link_bytes_per_second };
 
     /* This node's record: its address, its ranks as progressions, its blob. */
     struct report r = { 0 };

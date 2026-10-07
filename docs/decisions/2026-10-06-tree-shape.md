@@ -6,15 +6,18 @@ items 1 and 7): the cost model fitted to the Pi's table, the chooser, the link
 and its settings. Part 1 chooses nothing on the data path: every collective
 runs on the shape it ran on at the 0.1.0 tag.
 
-**Where it stands.** Built on the branch `tree-shape`, not merged: the model and
-the chooser (`8553de7`), and the settings - `OSOE_COLLECTIVE_SHAPE` and the link
-set by hand, agreed three ways and shown by `osoe-stat` - with the README's rows
-(`72f27a6`, `f275b45`), and a fix to the simulation, whose landing far into a
-long run could fall below the clock's resolution and never come (`591ecf4`). Not built: the link's measurement and its way to every
-node, which wait on the second question below. Three of the brief's stop-and-ask
-items were met, each below with its evidence, the options and a recommendation.
-The branch merges only after step 1's merge point - its full review and its
-fixes - and with the measurement, which completes Part 1.
+**Where it stands.** Built on the branch `tree-shape`: the model and the chooser,
+the settings - `OSOE_COLLECTIVE_SHAPE` and the link set by hand, agreed three
+ways and shown by `osoe-stat` - with the README's rows, a fix to the
+simulation, whose landing far into a long run could fall below the clock's
+resolution and never come, and, after the author's answers of 2026-10-06, the
+link's measurement and its way to every PE (below, "The link's measurement").
+Three of the brief's stop-and-ask items were met before the answers, each below
+with its evidence, the options and the recommendation; the author took all
+three (`docs/decisions/2026-10-06.md` items 3 to 5). The measurement met a
+fourth, the message cost's spread between starts, put to the author below with
+a recommendation and not waited on. The branch is rebased onto step 1's merge
+point and its fixes.
 
 ## What was built
 
@@ -118,6 +121,104 @@ more pieces in flight, and the closed form's window term is its least exact:
 chosen by cost, W came out too small (a regret of 20% at p90 on a grid). So
 the window is the capacity (choice 2).
 
+## The link's measurement
+
+Built as the author answered the second question (item 4): at the end of
+`shmem_init`, through the data path (`shmem/src/link-measure.c`, called from
+`init.c`'s session start once the node's lead speaks).
+
+- **Who measures what.** The root of every team's tree over the job's nodes is
+  node 0, its first children nodes 1 to k (level order, `collective-tree.c`).
+  The root's lead takes, against node 1's lead, the hop from fifteen round
+  trips of an 8-byte put and its completion - halved, the median - and the
+  bandwidth from the slope of a 512 KiB stream of 16 KiB puts over a 128 KiB
+  one, three of each, medians; and the message cost from one put to each of
+  its first `min(N - 1, ceiling)` children against one put alone, fifteen
+  paired tries, the trimmed mean of the differences over the extra children.
+  A burst to one child would not do: a connection carries consecutive small
+  messages together, and on loopback the burst read 0 to 0.15 µs a message
+  against the fan's 3 to 13. A job of two nodes has one child and no choice the
+  message cost could move - every fan-out is the same tree there - and takes
+  it as 0. Every number is an integer, clamped to the settings' ranges.
+- **How every PE gets the root's numbers.** An AND of three words over the
+  finalize team's split words (`osoe_team_split_and`), every PE but the root
+  contributing all ones, so that each PE ends holding the root's: a reduction
+  that borrows nothing from the heap, on counters no application collective
+  touches, so the world team's epochs - which `osoe-stat` shows a user - stay
+  the application's own.
+- **Where it lives.** `osoe.job.link` and `osoe.job.link_source` (none, set,
+  measured), on the boundary's side so that Part 2's chooser in
+  `internode-generic.c` reads it; the measured numbers in the control segment
+  (`node.link.measured_*`, layout 32 grown), which `osoe-stat --summary` shows
+  as "link measured: ...", and `SHMEM_DEBUG`'s start-up line, which also says
+  what establishing it cost the PE's start - one `write` a line now, since
+  every PE says it at once and separate writes interleaved inside each other's
+  lines.
+- **When nothing is measured.** A job of one node, the shape `fixed`, or
+  `OSOE_LINK_*` set: each is the same on every PE, so every PE takes the same
+  path, and no message is sent for it.
+
+**On the Pi** (4 × 1 and 4 × 4, fifteen starts, `build/scratch/shape/pi/link-2`
+in the session's scratch tree; the first estimator's run in `link-1`):
+
+| | 4 × 1, ten starts | 4 × 4, five starts |
+|---|---|---|
+| hop | 86.8 - 91.3 µs | 88.6 - 94.0 µs |
+| bandwidth | 116.7 - 120.1 MB/s | 116.5 - 118.0 MB/s |
+| message cost | 0 - 21.0 µs | 6.2 - 16.4 µs |
+| a start's cost | 27.2 - 27.5 ms | 27.1 - 27.6 ms |
+
+The hop agrees with the fit's 86 µs and the bandwidth with its 116 bytes a
+µs, both within 8% start to start, and a start pays 27 ms, under the brief's
+50. In the VM's loopback, five logical nodes: a hop of 24 to 44 µs, 4 to 40 GB/s
+- one machine's four cores running five PEs and their agents is no link, as
+the brief says - and 4 to 5 ms of the root's start; twenty jobs of 2 × 2 took
+3,516 ms measured against 3,486 with the link set.
+
+**The tests**: `shmem.link.{measured,set,fixed,none}.*` (`link.sh`, every PE's
+`SHMEM_DEBUG` line: the same numbers on every PE, within the settings'
+ranges, when measured; the given ones when set; none when fixed or on one
+node) and the hang-walk's check that every node's segment shows the same
+measured link. Mutated, each fails where it should: without the AND, the
+measured tests and the hang-walk; with a root that contributes all ones, the
+measured tests; with the segment unwritten, the hang-walk.
+
+### A fourth stop-and-ask: the message cost between starts
+
+**What the brief asks.** "The start-up measurement ... varying run to run by
+more than a factor of two in any of the three numbers": put it to the author.
+
+**What was found.** The message cost varies from 0 to 21 µs between starts on
+the Pi, while the hop and the bandwidth agree within 8%. Within a start the
+fan's extra cost comes as some tries about 20 µs late among others that cost
+nothing more - the first estimator, a median, read 0 or 20 by turns (`link-1`);
+the trimmed mean of paired tries (`link-2`) narrows it, and a start still
+sometimes reads 0. Which mode a start is in persists through its tries, so
+more tries do not settle it.
+
+**What it moves** (`shape_timing.py`'s chooser at the Pi's hop and bandwidth,
+the ceiling 8 and capacity 4 the author chose, 2 KiB to 1 MiB): nothing on
+four, seven or sixteen nodes - every message cost from 0 to 21 µs chooses the
+same fan-out at every size, reductions and broadcasts; on 64 and 500 nodes a
+few sizes move between neighbouring fan-outs (8 against 4 at 2 KiB, 3 against
+4 or 5 at 16 to 64 KiB), where the two cost about the same by being neighbours
+at a crossover.
+
+**Options.**
+- (a) Keep the measurement as built: the trimmed mean, honest about its spread,
+  which moves no choice the Pi can make.
+- (b) Take the message cost as 0 unless set: the chooser then never charges a
+  parent for its children; deterministic, and the model's fitted 7 µs - the
+  average a tree pays - ignored.
+- (c) Measure longer: more tries do not help where the mode persists through a
+  start, and each fan costs about two round trips.
+
+**Recommendation: (a)**, and the question again on a cluster large enough for
+the message cost to move a choice. **Built meanwhile:** (a). **Merged with
+(a)** at step 2's merge point, the answer not yet given: no choice the Pi can
+make depends on it, and (b) is one line of `link-measure.c` (the read's finding
+3; the night's record of 2026-10-07).
+
 ## Choices made without the author
 
 Each is Claude's; the undo follows.
@@ -208,6 +309,11 @@ misses move no choice beyond the noise, the brief's Part 2 claim - no line
 slower than `fixed` by more than the noise - is the bar that protects a program,
 and a term found later changes one function in Python and one in C.
 
+**Answered** (the author, 2026-10-06, `docs/decisions/2026-10-06.md` item 3):
+(a), "accept". `model.shape_timing` already holds the bar - no choice more than
+10% from the fastest measured shape - beside the fit's line count as a guard;
+Part 2's Pi session adds the 1 to 16 KiB sweep.
+
 ### 2. Where the link is measured: the brief's place comes before the mesh exists
 
 **What the brief asked.** "At start-up, once the leads' mesh is built and before
@@ -238,9 +344,8 @@ two leads is the rendezvous's own blocking socket.
 - (c) Measure lazily, at the first large collective: every node would have to
   agree on the moment, and the first call would pay for it.
 
-**Recommendation: (a).** **Waiting on the answer:** the measurement and its
-broadcast. The settings, their agreement and `osoe-stat`'s display of the link
-do not depend on it and are Part 1's next commits.
+**Recommendation: (a).** **Answered** (item 4): (a), "yes"; built as "The
+link's measurement" above says.
 
 ### 3. The defaults the brief names cost a PE 2.6 times the tag's internal region
 
@@ -280,18 +385,74 @@ trees at hundreds of nodes kept too); 6 and 4 (twice exactly).
 **Recommendation: the brief's 8 and 4**: what grows is address space and the
 capacity check's count, by 3.6% of a PE's figure, and both numbers buy
 something measured or computed. Part 1 keeps the tag's 4 and 2, which nothing
-in it needs changed; Part 2 sets what you choose.
+in it needs changed; Part 2 sets what you choose. **Answered** (item 5): 8 and 4,
+"accept"; Part 2 sets them.
+
+## The adversarial read
+
+A fresh agent read the branch at `eefb36f` (now `b073e7a`), asked to find a PE
+ending `shmem_init` with another shape or other numbers than its peers, or a
+chooser past the ceiling or the capacity: the report is
+`docs/reviews/archive/v0.2-step2-part1-adversarial-read.md`. The rule holds - the
+same path and the same numbers on every PE, measured up to 34 nodes and under
+perturbation, and the chooser held to the model on 80,000 random inputs under the
+sanitizers - and it found one defect and nine smaller things. In `cd5872d`:
+
+- **Finding 1, the defect**: the streams were sized from the root's own
+  `OSOE_MAX_THREADS`, which nodes need not agree on, and ran past the region of a
+  node with fewer threads, ending the job at start under a message naming the
+  wrong settings. They now stay within the fewest lanes any node can have - two,
+  at `OSOE_MAX_THREADS=1` - and within 64 KiB, a lane's row at the capacity, the
+  longer streams wrapping as a collective's pieces wrap in a row. That also
+  bounds what a start touches of node 1's lanes to 64 KiB (finding 6, now in the
+  README's `OSOE_MAX_THREADS` row). `shmem.link.few-lanes.0-1` - node 1 at one
+  thread and the smallest lanes the settings make - passes, and fails with the
+  old sizing.
+- **Finding 8**: a long stream no slower than the short gave the highest
+  bandwidth a setting may, which Part 2's chooser would read as bytes for free.
+  Now a slope more than four times the long stream's own rate is taken for noise,
+  and that rate - which counts the hop, so is a bound below the link's, within a
+  few percent of the slope where the bytes outweigh the hop - stands in for it.
+- **Finding 4**: osoe-stat reads the measured bandwidth first, the last of the
+  lead's three release stores, so it never shows one start's hop beside
+  another's bandwidth.
+- **Findings 5 and 7**, in the README: the measurement's puts count in the root's
+  lead's transport counters, and its 1.9 MiB of streams cost a slower link more -
+  about 170 ms at 100 Mbit/s - which set numbers or the shape `fixed` skip. The
+  streams are not shortened: on the Pi the long one's 4.5 ms against the short's
+  1.1 is what makes the slope steady.
+- **Finding 10**: the stale comments, the decisions index's line, and the README's
+  promise of a report at 30 s, which the start's last step - a collective's wait,
+  shown in osoe-stat as one, its routine `shmem_init` - does not make; the cost of
+  a shape no setting reaches is the most there is, not a division by 0.
+- **Finding 9**: the scans keep the ceiling's tree (Part 2's record), so a message
+  cost of 0 on two nodes moves none; nothing in the agent reads `osoe.job.link`.
+- **Finding 3**, the fourth stop-and-ask, is the author's (below).
 
 ## Verification
 
-The branch at `8553de7`, in `osoe-load` (Debian 13, GCC 14): the debug preset
-whole, 731 of 731, no warning - `shmem.boundary` and `shmem.exports` with the new
-file among them, and `shmem.shape.choice` and `shmem.shape.grid`; and
-`model.shape_timing` (40 seconds) and `model.shape_timing.grid` in the release
-configure. The C test also built and passed with the host's clang. Each new test
-was run against the mutation it was written for: the C's beta without an
-interior lead's parent (30 grid lines differ), and the model's two broken
-variants. The settings (`72f27a6`), in `osoe-load` with liburing hidden for the
+`977418f` (the cost model and the chooser), in `osoe-load` (Debian 13, GCC 14):
+the debug preset whole, 731 of 731, no warning - `shmem.boundary` and
+`shmem.exports` with the new file among them, and `shmem.shape.choice` and
+`shmem.shape.grid`; `model.shape_timing` (40 seconds) and
+`model.shape_timing.grid` in the release configure; the C test also with the
+host's clang. Each new test against the mutation it was written for: the C's beta
+without an interior lead's parent (30 grid lines differ), and the model's two
+broken variants. `4b30e34` (the settings), with liburing hidden for the
 single-node build: the full build's debug preset 742 of 742, the single-node
-build's 360 of 360. Not yet: the other presets and `tier3`, which Part 1's merge
-verification runs once the measurement is built.
+build's 360 of 360.
+
+`b41e729` (the measurement), the merge verification: the four presets with the
+floor pins and `tier3`, failing only `shmem.memory-orders` (a relaxed store in
+the measurement) and `test-internode`'s deferred-wakes check, which the init's
+AND made count, with the three restart tests that run it - both fixed in
+`b073e7a`; `osoe-pacer collectives` at three values of
+`OSOE_SMALL_COLLECTIVE_BYTES`, its teams and threads, and ten minutes of `mix`,
+no failure; the single-node build on Debian and Rocky, its four presets and an
+install, failing only `shmem.memory-orders`; the models; the SOS sweep at 0,1 and
+0,0,1,1, 159 programs clean on both, the known failures the runbook lists
+(`shmem_team_b2b_collectives`, `shmemalign`, two C11 programs that do not build).
+`b073e7a` in `osoe`: debug 778 of 778, release 778, asan 775, tsan 544, `tier3`
+113, with the pins. `cd5872d` (the read's findings): the link, job, shape and
+internode tests, 45 of 45, and the mutation above. The merge verification of the
+whole step - both parts - runs on Part 2's tip.

@@ -4632,6 +4632,26 @@ AM; below). Every node lead must agree on it — the job rendezvous
 checks it beside `SHMEM_SYMMETRIC_SIZE` (§6.2), because a node that disagrees
 waits for children that send elsewhere and the job hangs without a message.
 
+*As built (v0.2 step 2; `collective-shape.c`, `link-measure.c`,
+`internode-generic.c`; `docs/decisions/2026-10-06-tree-shape.md` and its Part 2
+record):* for the large reductions and broadcasts of §5.8, *k* is the call's,
+not the setting's. `OSOE_COLLECTIVE_FANOUT` is the **ceiling** - default 8 on
+both backends, still agreed at the rendezvous, since it sizes the internal
+region's rows - and each call takes the *k* from 2 to the ceiling that
+`osoe_shape_choose` gives for its bytes and node count on the job's link: three
+integers - a hop *h*, a message cost *o* and a bandwidth *B* - measured at the
+end of `shmem_init` by the root's lead against its first children's, through the
+data path with every progress thread running, and handed to every PE by an AND
+over the finalize team's split words, so that the world team's epochs stay the
+application's; or set by hand (`OSOE_LINK_HOP_NS`, `_MESSAGE_NS`,
+`_BYTES_PER_SECOND`). The chooser is integer arithmetic over those numbers and
+the call's alone, so every node builds the same tree for the same call; its
+closed form is `tools/modelcheck/shape_timing.py`'s, which a grid of 3,024
+inputs holds the C to. The barrier, the small class and the gathers keep the
+ceiling's tree, and the scans 0.1.0's shape (§5.8, "Pipelined pieces", as built
+at v0.2); `OSOE_COLLECTIVE_SHAPE=fixed` keeps the ceiling's for every call -
+with `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2`, 0.1.0's trees exactly.
+
 Per team per node the progress thread keeps the tree (O(*k*)) and the epoch in
 progress (O(1)): which epoch is open, whether the node's own members are in, and
 a bit per child that has arrived. A node **opens** an epoch at its first
@@ -5442,6 +5462,29 @@ five nodes a broadcast took 12.0 ms at D = 1, 4.4 and 4.2 ms at D = 2 and 4
 with the first build's loop, and 4.0 and 2.2 ms with this one; on eight nodes,
 three levels deep, a reduction took 18.8 ms at D = 1, 12.8 and 12.4 ms with
 the first loop, 10.7 and 6.3 ms with this one.
+
+*As built at v0.2 (step 2; the fan-out's note in §5.3):* D is the call's
+window, the shape's, at most `OSOE_COLLECTIVE_PIPELINE`, which is now the
+**capacity** - default 4, the slots of a lane's row - and the chooser gives every
+large call the capacity, since more pieces in flight never cost a large
+collective time in either of `shape_timing.py`'s simulations of the loop. With
+the call's fan-out its tree differs from the last call's, which the counters
+already allow: each child position keeps its own base, advanced by what this
+call's tree says the position received, so a position unused in one call
+neither advances nor stands in for another - the argument a broadcast's rotated
+tree needed, unchanged (§5.5 as built). The trees are built per call, in O(*k*)
+as a broadcast's always were, not cached. **The scans keep one shape for every
+call**: their rows share one base, the pieces the team's scans have moved, which
+a row unused in one call would leave behind, so a scan whose fan-out varied
+would wait forever on its next call. Under `link` it is 0.1.0's, a fan-out of 4
+and two pieces in flight (or the ceiling and the capacity where those are
+less), not the ceiling's: on the Pi a scan over 16 PEs on four nodes at the
+defaults' fan-out of 8 took 1.5 to 2.0 times as long from 8 KiB up, its root's
+node sending six copies over its link where 4 sends three, and at 4 with four
+pieces in flight it was 1.30 times faster at 1 MiB and 6.6% slower at 64 KiB. Each lead publishes the shape of its last
+reduction or broadcast in the team's tree state (`team.tree.shape_fanout`,
+`shape_window`), which `shmem.shape.chosen.*` holds to the chooser call by
+call.
 
 **Small and large collectives, lanes and grants** *(the team redesign's step E,
 `docs/design/team-resources-proposal.md` §4, decided with the author on
@@ -7904,6 +7947,18 @@ after-release list.
   and a latency decision for small ones, where each level costs a hop. The
   refinement is a fan-out chosen per message size, k = 2 above a threshold the
   small-message sweep at k = 2 has yet to set (the sweep ran from 64 KiB up).
+  *Measured and built (v0.2 step 2, §5.3 as built;
+  `docs/decisions/2026-10-06-tree-shape.md` and
+  `docs/decisions/2026-10-07-shape-data-path.md`):* the link's hop, message cost
+  and bandwidth are measured at the end of `shmem_init`, and each large
+  reduction and broadcast takes the fan-out a closed-form cost model gives its
+  size on them, under a ceiling of 8 and a capacity of 4. On the Pi's four
+  nodes, against 0.1.0's fixed tree, alternating three times: a 1 MiB
+  broadcast 1.43 to 1.47 times faster, a 1 MiB reduction 1.20 to 1.26, every
+  size from 64 KiB up faster, and none slower beyond the noise; the sweep of 1
+  to 16 KiB the item asked for found the star fastest at every size on four
+  nodes, which the chooser takes. Open: the scans' own shape per call (§5.8),
+  and a fabric whose links differ, which one link's numbers still shape.
 
 ### Still open — the RoCE exercise of 2026-09-17
 

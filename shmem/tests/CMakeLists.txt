@@ -104,6 +104,19 @@ osoe_warnings(shmem_test_collective_tree)
 add_test(NAME shmem.collective-tree COMMAND shmem_test_collective_tree)
 set_tests_properties(shmem.collective-tree PROPERTIES LABELS "tier1" TIMEOUT 60)
 
+# The chooser of a large collective's shape on its own (tier 1; v0.2 step 2):
+# what the Pi's link and a loopback's choose on four nodes, and the C against
+# tools/modelcheck/shape_timing.py on a grid of inputs the model wrote
+# (shape-grid.txt; model.shape_timing.grid checks the model still writes it).
+add_executable(shmem_test_collective_shape test-collective-shape.c ../src/collective-shape.c
+  ../src/collective-tree.c)
+target_include_directories(shmem_test_collective_shape PRIVATE ../src)
+osoe_warnings(shmem_test_collective_shape)
+add_test(NAME shmem.shape.choice COMMAND shmem_test_collective_shape choice)
+add_test(NAME shmem.shape.grid
+  COMMAND shmem_test_collective_shape grid ${CMAKE_CURRENT_SOURCE_DIR}/shape-grid.txt)
+set_tests_properties(shmem.shape.choice shmem.shape.grid PROPERTIES LABELS "tier1" TIMEOUT 60)
+
 # The §4.9 watched-range encoding on its own (tier 1): pure logic, and the
 # property it must have is one a brute-force check can state directly.
 add_executable(shmem_test_watch_range test-watch-range.c)
@@ -464,8 +477,8 @@ if(OSOE_INTERNODE)
   # where its parent keeps another. Two nodes, the second's lead given 4 to the
   # first's default 2; and outside 1 to 8, or not a number, refused at init.
   osoe_refusal_test(shmem.job.disagree.pipeline 2 0
-    LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_PIPELINE=4
-    PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=4; node 0 has 2"
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_PIPELINE=2
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=2; node 0 has 4"
              "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
     PROGRAM $<TARGET_FILE:shmem_test_job>)
   osoe_internode_label(shmem.job.disagree.pipeline)
@@ -484,12 +497,12 @@ endforeach()
 # (node.c, open_control).
 osoe_refusal_test(shmem.collective-fanout.local-disagree 2 0
   LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_FANOUT=2
-  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_FANOUT differs between PEs: the local lead has 4, this PE has 2"
+  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_FANOUT differs between PEs: the local lead has 8, this PE has 2"
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 osoe_refusal_test(shmem.collective-pipeline.local-disagree 2 0
-  LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_PIPELINE=4
-  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 2, this PE has 4"
+  LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_PIPELINE=2
+  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 4, this PE has 2"
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
@@ -520,6 +533,82 @@ osoe_refusal_test(shmem.small-collective-bytes.local-disagree 2 0
   PATTERNS "osoe: PE 1: OSOE_SMALL_COLLECTIVE_BYTES differs between PEs: the local lead has 1024, this PE has 128"
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
+
+# The collective shape's setting and the link set by hand (v0.2 step 2): every
+# node must choose a collective's shape from the same numbers, or two would
+# build different trees for one call. Refused by name outside their values, the
+# link's three alone or not at all; held alike between the PEs of a node and,
+# below, between nodes.
+# Each refusal: a name, the variables set (separated by ^), the pattern.
+set(osoe_link_refusals
+  "shape-bogus|OSOE_COLLECTIVE_SHAPE=bogus|OSOE_COLLECTIVE_SHAPE='bogus' is neither link nor fixed"
+  "hop-0|OSOE_LINK_HOP_NS=0^OSOE_LINK_MESSAGE_NS=7000^OSOE_LINK_BYTES_PER_SECOND=116000000|OSOE_LINK_HOP_NS='0' is not between 1 and 10000000000"
+  "bandwidth-x|OSOE_LINK_HOP_NS=86000^OSOE_LINK_MESSAGE_NS=7000^OSOE_LINK_BYTES_PER_SECOND=x|OSOE_LINK_BYTES_PER_SECOND='x' is not between 1 and 10000000000000"
+  "message-too-large|OSOE_LINK_HOP_NS=86000^OSOE_LINK_MESSAGE_NS=1000000001^OSOE_LINK_BYTES_PER_SECOND=116000000|OSOE_LINK_MESSAGE_NS='1000000001' is not between 0 and 1000000000"
+  "hop-alone|OSOE_LINK_HOP_NS=86000|set together or not at all: OSOE_LINK_HOP_NS is set and OSOE_LINK_MESSAGE_NS is not"
+  "bandwidth-alone|OSOE_LINK_BYTES_PER_SECOND=116000000|set together or not at all: OSOE_LINK_BYTES_PER_SECOND is set and OSOE_LINK_HOP_NS is not")
+foreach(refusal IN LISTS osoe_link_refusals)
+  string(REPLACE "|" ";" parts "${refusal}")
+  list(GET parts 0 what)
+  list(GET parts 1 variables)
+  list(GET parts 2 pattern)
+  string(REPLACE "^" ";" env "${variables}")
+  add_test(NAME shmem.collective-shape.invalid.${what}
+    COMMAND ${CMAKE_COMMAND} -E env ${env}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.collective-shape.invalid.${what} PROPERTIES LABELS "tier2"
+    TIMEOUT 60 PASS_REGULAR_EXPRESSION "${pattern}")
+endforeach()
+osoe_refusal_test(shmem.collective-shape.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_SHAPE=fixed
+  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_SHAPE differs between PEs: the local lead has link, this PE has fixed"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
+osoe_refusal_test(shmem.link.local-disagree 2 0
+  LAUNCH -n 2 -e 1:OSOE_LINK_HOP_NS=86000 -e 1:OSOE_LINK_MESSAGE_NS=7000
+         -e 1:OSOE_LINK_BYTES_PER_SECOND=116000000
+  PATTERNS "osoe: PE 1: OSOE_LINK_[*] differ between PEs: the local lead has a hop of 0 ns, a message cost of 0 ns and 0 bytes a second, this PE 86000, 7000 and 116000000"
+           "osoe: PE 0: another local PE failed during rendezvous"
+  PROGRAM $<TARGET_FILE:shmem_test_rma>)
+if(OSOE_INTERNODE)
+  osoe_refusal_test(shmem.job.disagree.collective-shape 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_SHAPE=fixed
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_SHAPE=fixed; node 0 has link"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_refusal_test(shmem.job.disagree.link 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_LINK_HOP_NS=86000 -e 1:OSOE_LINK_MESSAGE_NS=7000
+           -e 1:OSOE_LINK_BYTES_PER_SECOND=116000000
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_LINK_[*] of a hop of 86000 ns, a message cost of 7000 ns and 116000000 bytes a second; node 0 has 0, 0 and 0"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
+  osoe_internode_label(shmem.job.disagree.collective-shape shmem.job.disagree.link)
+endif()
+
+# The link the shapes are chosen from, as every PE's start-up line shows it
+# under SHMEM_DEBUG (link.sh; link-measure.h): measured by the root's lead and
+# the same on every PE, on two nodes and on three, where the root has two
+# children, and with node 1 holding the fewest and smallest lanes the settings
+# allow; as set by OSOE_LINK_*; and none at all where the shape is fixed or
+# the job is one node.
+foreach(case "measured;0,0,1,1" "measured;0,1,2" "few-lanes;0,1" "set;0,0,1,1" "fixed;0,1"
+             "none;0,0")
+  list(GET case 0 mode)
+  list(GET case 1 map)
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.link.${mode}.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/link.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_barrier> ${map} ${mode})
+  set_tests_properties(shmem.link.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "LINK OK")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.link.${mode}.${label})
+  endif()
+endforeach()
 
 if(OSOE_INTERNODE)
   # The node count is the value that shapes the waits: a lead expects children by
@@ -2848,6 +2937,68 @@ add_test(NAME shmem.deadlock.refused.L2
 set_tests_properties(shmem.deadlock.refused.L2 PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "OSOE_DEADLOCK_SECONDS=soon: 0 to turn deadlock detection off")
 
+# The shape each large reduction and broadcast takes on the data path (v0.2
+# step 2, Part 2; test-shapes-chosen.c): with the link set to the Pi's and to a
+# loopback's, on 4, 16 and 64 logical nodes - 4 and 16 under a sanitizer - every
+# call's fan-out and window the chooser's, held to shape-grid.txt, the model's,
+# and its result right.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_executable(shmem_test_shapes-chosen test-shapes-chosen.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_shapes-chosen PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_shapes-chosen PRIVATE osoe rt)
+  osoe_warnings(shmem_test_shapes-chosen)
+  foreach(case "pi;4;86000;7000;116000000" "pi;16;86000;7000;116000000"
+               "loopback;16;20000;2000;4000000000" "pi;64;86000;7000;116000000"
+               "loopback;64;20000;2000;4000000000")
+    list(GET case 0 link)
+    list(GET case 1 nodes)
+    list(GET case 2 hop)
+    list(GET case 3 message)
+    list(GET case 4 bandwidth)
+    # Sixty-four PEs under a sanitizer outgrow the VM's 8 GiB - the kernel
+    # killed one under asan (Part 2's record) - so the sanitizers run 4 and 16.
+    if(nodes GREATER 16 AND CMAKE_C_FLAGS MATCHES "sanitize=")
+      continue()
+    endif()
+    set(map "0")
+    math(EXPR last "${nodes} - 1")
+    foreach(node RANGE 1 ${last})
+      string(APPEND map ",${node}")
+    endforeach()
+    add_test(NAME shmem.shape.chosen.${link}.${nodes}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=${hop} OSOE_LINK_MESSAGE_NS=${message}
+              OSOE_LINK_BYTES_PER_SECOND=${bandwidth} SHMEM_SYMMETRIC_SIZE=4m
+              $<TARGET_FILE:osoe-launch> -n ${nodes} -m ${map} -t 240 --
+              $<TARGET_FILE:shmem_test_shapes-chosen> ${CMAKE_CURRENT_SOURCE_DIR}/shape-grid.txt)
+    set_tests_properties(shmem.shape.chosen.${link}.${nodes} PROPERTIES LABELS "tier2"
+      TIMEOUT 300 PASS_REGULAR_EXPRESSION "SHAPES CHOSEN: 12 calls checked"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]")
+    osoe_internode_label(shmem.shape.chosen.${link}.${nodes})
+  endforeach()
+
+  # And back to back, no barrier between calls whose fan-outs differ, on the
+  # world and two strided teams sharing its leads (test-shapes-back-to-back.c;
+  # the step's adversarial read, finding 2): a large reduction's grants go to
+  # this call's children. Sixteen nodes of one PE each, and eight of two, where
+  # the odds' lead is local id 1.
+  add_executable(shmem_test_shapes-back-to-back test-shapes-back-to-back.c)
+  target_link_libraries(shmem_test_shapes-back-to-back PRIVATE osoe)
+  osoe_warnings(shmem_test_shapes-back-to-back)
+  foreach(map "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15" "0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7")
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.shape.back-to-back.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
+              OSOE_LINK_BYTES_PER_SECOND=116000000 SHMEM_SYMMETRIC_SIZE=16m
+              $<TARGET_FILE:osoe-launch> -n 16 -m ${map} -t 240 --
+              $<TARGET_FILE:shmem_test_shapes-back-to-back> 40)
+    set_tests_properties(shmem.shape.back-to-back.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 300 PASS_REGULAR_EXPRESSION "SHAPES BACK TO BACK: 40 rounds on 16 PEs"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]")
+    osoe_internode_label(shmem.shape.back-to-back.${label})
+  endforeach()
+endif()
+
 # The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on
 # one node, where the team's local lead scans; across nodes on a block, an
 # interleaved and an uneven map, and under force-remote, where every member
@@ -2874,17 +3025,21 @@ if(OSOE_INTERNODE)
       TIMEOUT 120)
     # Pieces in flight (2026-09-27): one at a time, as first built, and four on
     # the three-level tree, the leaves' counts pinned by the test; the most the
-    # agreement allows, eight, on four nodes.
+    # agreement allows, eight, on four nodes. Four and eight under
+    # OSOE_COLLECTIVE_SHAPE=fixed, where a scan keeps the capacity in flight -
+    # under link it keeps 0.1.0's two (v0.2 step 2) - and the scan's fixed path
+    # with them, which nothing else runs (the step's adversarial read).
     add_test(NAME shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
       COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=1 OSOE_COLLECTIVE_FANOUT=2
               $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
               $<TARGET_FILE:shmem_test_scan>)
     add_test(NAME shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=4 OSOE_COLLECTIVE_FANOUT=2
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_PIPELINE=4
+              OSOE_COLLECTIVE_FANOUT=2
               $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
               $<TARGET_FILE:shmem_test_scan>)
     add_test(NAME shmem.scan.pipeline-8.0-1-2-3
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=8
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_PIPELINE=8
               $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 60 -- $<TARGET_FILE:shmem_test_scan>)
     set_tests_properties(shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
       shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4 PROPERTIES LABELS "tier2" TIMEOUT 120)
@@ -2987,6 +3142,12 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
   set_tests_properties(shmem.stat.L${count} PROPERTIES
     ENVIRONMENT "OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>")
 endforeach()
+# And with the link set by hand (v0.2 step 2): osoe-stat shows it.
+add_test(NAME shmem.stat.link
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+          OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000 OSOE_LINK_BYTES_PER_SECOND=116000000
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_stat>)
+set_tests_properties(shmem.stat.link PROPERTIES LABELS "tier2" TIMEOUT 90)
 
 # A job that dies, dies everywhere (§3.15; phase 1 step 4): PE 0 calls
 # shmem_global_exit, or ends the job with a fatal, while every other PE computes

@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 31
+#define OSOE_NODE_LAYOUT 32
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -573,7 +573,18 @@ struct osoe_collective_state {
      */
     _Atomic uint32_t collective_class;
     _Atomic uint32_t lane;
+    /* Layout 32 (v0.2 step 2), in the same padding: the shape of that last
+     * data collective through the tree, its fan-out and its window, as the
+     * chooser gave it (internode-generic.c, shape_of), and the children this
+     * node had in the tree the call built - so that a test and osoe-stat read
+     * which shape a call took, and a test that the data path built it. */
+    _Atomic uint32_t shape_fanout;
+    _Atomic uint32_t shape_window;
+    _Atomic uint32_t shape_children;
 };
+_Static_assert(sizeof(struct osoe_collective_state) == OSOE_CACHELINE,
+               "the tree state is one line, its padding now spent: a field more grows "
+               "every team block");
 
 /*
  * A team's record on this node (layout 18; phase 1 step 7): what this node's
@@ -760,7 +771,8 @@ struct osoe_team_name {
  *   has its own although on one node its membership is the world's: the spec
  *   makes them distinct predefined teams forming separate atomicity domains,
  *   and sharing the counters would make a sync on one team release a wait on
- *   the other. The finalize team never uses `copied`: it has no copy phase.
+ *   the other. The finalize team uses `copied` only in the link's AND at the
+ *   end of shmem_init (link-measure.c), a reduction like any other.
  * - **The arrival handoff** (§5.3), to the node lead's agent.
  * - **The tree's published state** (§3.14), which that agent writes.
  * - **The record** above.
@@ -802,6 +814,20 @@ struct osoe_node_header {
      * in every PE's internal region and decides every data collective's class
      * (internal-region.h), so open_control holds the node's PEs to it too. */
     uint32_t small_collective_bytes;
+    /* Layout 32 (v0.2 step 2): the lead's OSOE_COLLECTIVE_SHAPE and the link
+     * its large collectives' shapes are chosen from - OSOE_LINK_*'s, or 0
+     * where they are not set - which open_control holds the node's PEs to,
+     * and osoe-stat shows (node.link.*). Then the link as the root's lead
+     * measured it at the end of shmem_init, which the node's lead writes once
+     * it holds it (link-measure.h), 0 until then and where nothing is
+     * measured: osoe-stat's to show, read by nothing in the library. */
+    uint32_t collective_shape;
+    uint64_t link_hop_ns;
+    uint64_t link_message_ns;
+    uint64_t link_bytes_per_second;
+    _Atomic uint64_t measured_link_hop_ns;
+    _Atomic uint64_t measured_link_message_ns;
+    _Atomic uint64_t measured_link_bytes_per_second;
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)

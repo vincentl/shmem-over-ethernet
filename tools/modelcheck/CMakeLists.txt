@@ -57,6 +57,17 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_test(NAME model.selftest
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/selftest.py)
   set_tests_properties(model.selftest PROPERTIES LABELS "tier1;model" TIMEOUT 600)
+  # The cost of a collective's shape (v0.2 step 2): its fit to the Pi's table,
+  # the closed form against its walk and against the simulation, the choices'
+  # pins, and its two broken variants; and the grid collective-shape.c's test
+  # reads, as the model writes it now.
+  add_test(NAME model.shape_timing
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/shape_timing.py check)
+  add_test(NAME model.shape_timing.grid
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/shape_timing.py grid-compare
+            ${PROJECT_SOURCE_DIR}/shmem/tests/shape-grid.txt)
+  set_tests_properties(model.shape_timing model.shape_timing.grid PROPERTIES
+                       LABELS "tier1;model" TIMEOUT 600)
 elseif(NOT Python3_Interpreter_FOUND)
   message(STATUS "python3 not found: the concurrency models will not run as tests")
 endif()

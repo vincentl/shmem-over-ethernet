@@ -42,6 +42,7 @@
 #include <stdint.h>
 
 #include "bootstrap.h"
+#include "collective-shape.h"
 #include "rank-map.h"
 #include "shm-object.h"
 
@@ -79,6 +80,12 @@ struct osoe_job {
     struct osoe_rank_set here;      /* this node's ranks: the locality question */
     struct osoe_rank_run *owned_runs;   /* the map of a job of one node, freed at leave */
     bool force_remote;              /* §8.1: deny the pointer to a node-mate */
+    /* The link the large collectives' shapes are chosen from, the same on
+     * every PE, and where it came from (v0.2 step 2; link-measure.h): set at
+     * the end of each session's start, all zero where its source is none. */
+    struct osoe_link link;
+    enum osoe_link_source link_source;
+    uint64_t link_ns;               /* what establishing it cost this PE's start */
 };
 
 /*

@@ -58,13 +58,14 @@
 
 /*
  * The fan-out a job's collectives are laid out for when OSOE_COLLECTIVE_FANOUT
- * sets none (internode.h's osoe_internode_fanout_default): AM's, 4 over
- * Ethernet (internode-am.c says why). Every internode backend returns it, so
- * that a job of one node - whose collectives have no internode tree, but
- * whose internal region and team blocks the fan-out sizes - is laid out alike
- * whichever is built.
+ * sets none (internode.h's osoe_internode_fanout_default): AM's, 8 over
+ * Ethernet since v0.2 step 2 - the ceiling under which each large collective's
+ * shape is chosen from the link (internode-am.c says why). Every internode
+ * backend returns it, so that a job of one node - whose collectives have no
+ * internode tree, but whose internal region and team blocks the fan-out sizes
+ * - is laid out alike whichever is built.
  */
-enum { OSOE_INTERNODE_FANOUT_DEFAULT = 4 };
+enum { OSOE_INTERNODE_FANOUT_DEFAULT = 8 };
 
 struct osoe_bootstrap;
 struct osoe_deadlock_message;

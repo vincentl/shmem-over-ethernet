@@ -101,6 +101,16 @@ static void check_live_output(const char *segment, int n)
     CHECK(run_stat("-c", segment, out, sizeof out) == 0);
     CHECK(strstr(out, segment) != NULL);
     CHECK(strstr(out, "invariant.missed_wake") != NULL);
+    /* The node's collective shape and link (layout 32, v0.2 step 2), in the
+     * header and as the summary's line for the node: as OSOE_LINK_* set it
+     * (shmem.stat.link), or not set. */
+    const char *hop = getenv("OSOE_LINK_HOP_NS");
+    char link[96];
+    if (hop)
+        snprintf(link, sizeof link, "link set: a hop of %s ns", hop);
+    else
+        snprintf(link, sizeof link, "link not set");
+    CHECK(strstr(out, link) != NULL);
     /* One row per local PE, and the counters really were incremented by the
      * work this test has already done. */
     for (int i = 0; i < n; i++) {
@@ -124,10 +134,12 @@ static void check_live_output(const char *segment, int n)
     CHECK(strstr(out, "agent") != NULL);
 
     /* A job of one node has no tree between nodes: the summary says so,
-     * rather than print epochs nothing keeps (the v0.2 step 1 review, Q5-1). */
+     * rather than print epochs nothing keeps (the v0.2 step 1 review, Q5-1);
+     * the node's shape and link come first, as on any node. */
     CHECK(run_stat("--summary", segment, out, sizeof out) == 0);
     CHECK(strstr(out, "one node: no tree to walk") != NULL);
     CHECK(strstr(out, "epoch 0/0") == NULL);
+    CHECK(strstr(out, link) != NULL);
 }
 
 /*

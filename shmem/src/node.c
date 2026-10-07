@@ -857,6 +857,10 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->collective_fanout = b->collective_fanout;
     h->collective_pipeline = b->collective_pipeline;
     h->small_collective_bytes = b->small_collective_bytes;
+    h->collective_shape = b->collective_shape;
+    h->link_hop_ns = b->link_hop_ns;
+    h->link_message_ns = b->link_message_ns;
+    h->link_bytes_per_second = b->link_bytes_per_second;
     h->dir.slot_bytes = sizeof(struct osoe_pe_slot);
     h->dir.slots_offset = slots_offset;
     h->dir.metrics_offset = metrics_offset;
@@ -972,9 +976,9 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * leftover that osoe-stat --gc removes. The lead knows L and the heap size;
      * every PE has parsed the same size, or check_agreement fails them all. A
      * heap object is the heap and then its internal region (internal-region.h),
-     * about 6 MiB at the defaults - 256 team numbers of about 14 KiB each, a
-     * fan-out of 4, two pieces in flight (OSOE_COLLECTIVE_PIPELINE) and a lane
-     * of 160 KiB for each of 17 thread records - which is counted here with the
+     * about 15.5 MiB at the defaults - 256 team numbers of about 24 KiB each, a
+     * fan-out of 8, four pieces in flight (OSOE_COLLECTIVE_PIPELINE) and a lane
+     * of 577 KiB for each of 17 thread records - which is counted here with the
      * heap it follows. Pages cost only once written, so the room above has taken
      * is only the segment's first and last pages, allocated so that they could
      * be written (about 1.1 MiB at the defaults, the pool of team blocks most
@@ -1163,6 +1167,27 @@ again:;
         snprintf(msg, sizeof msg, "OSOE_SMALL_COLLECTIVE_BYTES differs between PEs: the local "
                  "lead has %u, this PE has %u (§5.8)", h->small_collective_bytes,
                  b->small_collective_bytes);
+        fail_rendezvous(n, msg);
+    }
+    /* And by its collective shape and link (layout 32), which any PE of the
+     * node may choose a team's shape from as the team's local lead. */
+    if (h->collective_shape != b->collective_shape) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_COLLECTIVE_SHAPE differs between PEs: the local lead "
+                 "has %s, this PE has %s", h->collective_shape ? "fixed" : "link",
+                 b->collective_shape ? "fixed" : "link");
+        fail_rendezvous(n, msg);
+    }
+    if (h->link_hop_ns != b->link_hop_ns || h->link_message_ns != b->link_message_ns ||
+        h->link_bytes_per_second != b->link_bytes_per_second) {
+        char msg[320];
+        snprintf(msg, sizeof msg, "OSOE_LINK_* differ between PEs: the local lead has a hop of "
+                 "%llu ns, a message cost of %llu ns and %llu bytes a second, this PE %llu, "
+                 "%llu and %llu (0: not set)", (unsigned long long)h->link_hop_ns,
+                 (unsigned long long)h->link_message_ns,
+                 (unsigned long long)h->link_bytes_per_second,
+                 (unsigned long long)b->link_hop_ns, (unsigned long long)b->link_message_ns,
+                 (unsigned long long)b->link_bytes_per_second);
         fail_rendezvous(n, msg);
     }
     /* And by its OSOE_MAX_CONTEXTS, which sizes every PE's pool of context

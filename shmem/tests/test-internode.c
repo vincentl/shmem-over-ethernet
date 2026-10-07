@@ -111,6 +111,8 @@ int main(void)
     me = shmem_my_pe();
     npes = shmem_n_pes();
     local_id = atoi(osoe_test_launcher("LOCALID") ? osoe_test_launcher("LOCALID") : "0");
+    /* This PE's own, from here: counter() reads the blocks of `local_id`. */
+    uint64_t deferred_at_init = counter("am.wakes_deferred");
     read_local_ranks();
 
     /* One inbox per origin, so every PE may write concurrently without two
@@ -344,10 +346,14 @@ int main(void)
      * exactly those maps - a check that was measuring the map rather than the
      * flag.
      */
+    /* Counted from the end of shmem_init: the link's measurement there is a
+     * reduction over the finalize team (v0.2 step 2, link-measure.h), whose
+     * pieces defer wakes on every lead of a job of more than one node. */
+    uint64_t deferred = counter("am.wakes_deferred") - deferred_at_init;
     if (nodes > 1 && !is_local(partner))
-        CHECK(counter("am.wakes_deferred") > 0);
+        CHECK(deferred > 0);
     else
-        CHECK(counter("am.wakes_deferred") == 0);
+        CHECK(deferred == 0);
 
     shmem_free(signal);
     shmem_free(counter_cell);

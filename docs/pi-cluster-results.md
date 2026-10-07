@@ -779,3 +779,45 @@ default binding unless a line says `--cpu-bind=none`; the record is
   are kept.
 - **An hour of `mix`**, `failures=0` in 3,607 s; **an hour of `threads`** in a debug build with
   the test hooks and an overfilled landing zone, `failures=0` in 3,600 s and no `OSOE_CHECK_QUIET:` line.
+
+## v0.2 step 2: the tree's shape from the link (2026-10-06 and 07)
+
+The trees of v0.2's second step, copied to `~/osoe` and built there as release
+with no warning; the records are `docs/decisions/2026-10-06-tree-shape.md`
+(Part 1) and `docs/decisions/2026-10-07-shape-data-path.md` (Part 2), the raw
+outputs `docs/design/evidence/pi-cluster/2026-10-06-v0.2-step2/`.
+
+- **The link, measured at the end of `shmem_init`** (`link/`, Part 1's
+  measurement as built): ten starts at 4 × 1 and five at 4 × 4, read from
+  `SHMEM_DEBUG`'s start-up lines. A hop of 86.8 to 94.0 µs, a bandwidth of 116.5
+  to 120.1 MB/s, the same on every PE of a start; the message cost 0 to 21.0 µs
+  from start to start; 27.1 to 27.6 ms of each start.
+- **The chooser on the data path against 0.1.0's one tree** (`comparison/`,
+  Part 2 before its scans' change): `link`, the chooser, against `fixed` at
+  0.1.0's defaults (a fan-out of 4, two pieces in flight) on the same build, and
+  the tag's own build, alternating three times: the e-band probe (a barrier,
+  reductions, broadcasts and scans from 8 bytes to 1 MiB) at 4 × 4 and 4 × 1,
+  OSU's reduce, broadcast and fcollect to 1 MiB at both, `osoe-bench` at 4 × 4;
+  `analysis.txt` each line's median of three, its spread, and the ratios. A
+  1 MiB broadcast 1.43 to 1.47 times faster than `fixed` (OSU 19.1 against
+  27.4 ms at 4 × 4), a 1 MiB reduction 1.20 to 1.26 (24.3 against 29.3 ms),
+  every size from 64 KiB up faster - 128 to 512 KiB 1.08 to 1.44 - and below
+  that within 7% either way, the larger differences not repeating in the scans'
+  runs below; `fixed` against the tag, the build against 0.1.0 at 0.1.0's shape,
+  within the noise or 2% on 167 of 170 lines, the other three 2.3 to 4.4% slower
+  (a 1 KiB broadcast and two small fcollects at 4 × 4); fcollect, which takes no
+  shape, unchanged by it. **The scans
+  at 4 × 4 1.5 to 2.0 times slower from 8 KiB up**: a scan kept the ceiling's
+  tree, whose default had gone from 4 to 8.
+- **The 1 to 16 KiB sweep** (`comparison/sweep-*`): OSU's reduce and broadcast
+  at 4 × 1 at fixed shapes, fan-outs 2, 3 and 4 and windows 2 and 4. On four
+  nodes the star - every fan-out of 3 or more - is the fastest at every size from
+  4 bytes to 16 KiB, the tree of 2's second level costing about 185 µs at the
+  smallest and still 160 µs at 16 KiB, and the window moving nothing below
+  16 KiB; the chooser takes the star at all of them.
+- **The scans' change** (`scans-1/`, `scans-2/`): at 0.1.0's fan-out with the
+  capacity's four pieces in flight a scan at 4 × 4 was as fast as `fixed` from
+  1 to 32 KiB, 1.30 times faster at 1 MiB and 6.6% slower at 64 KiB; with
+  0.1.0's whole shape, as merged, every line of the probe - barrier,
+  reductions, broadcasts and scans, both layouts - within the noise of `fixed`
+  or faster, the large reductions and broadcasts as above.

@@ -31,6 +31,7 @@
 #include "fatal.h"
 #include "internode.h"
 #include "job.h"
+#include "link-measure.h"
 #include "liveness.h"
 #include "lock.h"
 #include "metrics.h"
@@ -142,13 +143,16 @@ OSOE_BUILD_NOTE
 "                           osoe-stat --gc; by default no name survives init\n"
 "                           (§3.14)\n"
 "    OSOE_COLLECTIVE_FANOUT\n"
-"                           k of the internode tree collectives run over,\n"
-"                           2 to 32, the same on every node; the default is\n"
-"                           the backend's, 4 on AM (§5.3)\n"
+"                           the ceiling of the internode tree collectives run\n"
+"                           over, 2 to 32, the same on every node, default 8:\n"
+"                           a barrier's and a small collective's tree take it,\n"
+"                           a large reduction's or broadcast's the fan-out up\n"
+"                           to it its size makes cheapest on the link (§5.3)\n"
 "    OSOE_COLLECTIVE_PIPELINE\n"
-"                           pieces of a large data collective each node keeps\n"
-"                           in flight up and down that tree, 1 to 8, the same\n"
-"                           on every node; default 2 (§5.8)\n"
+"                           the capacity: the most pieces of a large data\n"
+"                           collective each node keeps in flight up and down\n"
+"                           its tree, 1 to 8, the same on every node, default\n"
+"                           4; a scan keeps 2 under link (§5.8)\n"
 "    OSOE_SMALL_COLLECTIVE_BYTES\n"
 "                           the largest reduction, broadcast or scan that\n"
 "                           moves through a team's own slots in one piece, 128\n"
@@ -156,6 +160,16 @@ OSOE_BUILD_NOTE
 "                           through the lanes of the threads that make it;\n"
 "                           default 1024\n"
 "                           (§5.8)\n"
+"    OSOE_COLLECTIVE_SHAPE  link, the default, or fixed, the same on every\n"
+"                           node: link chooses a large reduction's or\n"
+"                           broadcast's fan-out and window from the link,\n"
+"                           measured at start or set below, and a scan keeps\n"
+"                           0.1.0's 4 and 2; fixed keeps the two above for\n"
+"                           every call\n"
+"    OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS, OSOE_LINK_BYTES_PER_SECOND\n"
+"                           the link's hop and message cost in nanoseconds\n"
+"                           and its bandwidth, all three or none, the same on\n"
+"                           every node: for tests and fabrics known in advance\n"
 "    OSOE_SHM_CAPACITY_CHECK\n"
 "                           0: report a request larger than /dev/shm's free\n"
 "                           space and continue, for testing on a small\n"
@@ -406,6 +420,13 @@ static void session_start(void)
             sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         }
     }
+    /*
+     * The link the large collectives' shapes are chosen from (v0.2 step 2):
+     * measured now, through the data path with every agent running - the hop
+     * a collective pays - and handed to every PE before any collective can
+     * choose; or as set, or none (link-measure.h).
+     */
+    osoe_link_establish();
     init_pid = getpid();
     static bool exit_handler;
     if (!exit_handler) {
@@ -419,15 +440,37 @@ static void session_start(void)
      * (§3.14), and the heap base every PE agreed on (§4.1). This is the same
      * name §3.15 prints on an abort, said once at start-up instead.
      */
-    if (osoe.bootstrap.debug)
-        fprintf(stderr, "osoe: PE %u of %u (local %u of %u): segment /dev/shm%s, "
-                "heap %llu bytes at %#llx, node %u of %u%s\n",
-                osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
-                osoe.bootstrap.local_count, osoe.node.control_name,
-                (unsigned long long)osoe.node.heap_size,
-                (unsigned long long)(uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id],
-                osoe.job.node, osoe.job.node_count,
-                osoe.job.force_remote ? ", force-remote" : "");
+    if (osoe.bootstrap.debug) {
+        /* And the link, as the shapes will see it. One buffer, one write, as
+         * fatal.c's: every PE says this at once, and separate writes would
+         * interleave inside each other's lines. */
+        char link[192] = "", line[544];
+        const struct osoe_link *l = &osoe.job.link;
+        if (osoe.job.link_source != OSOE_LINK_NONE) {
+            int used = snprintf(link, sizeof link, "; link %s: a hop of %llu ns, a message cost "
+                                "of %llu ns, %llu bytes a second",
+                                osoe.job.link_source == OSOE_LINK_MEASURED ? "measured" : "set",
+                                (unsigned long long)l->hop_ns, (unsigned long long)l->message_ns,
+                                (unsigned long long)l->bytes_per_second);
+            if (osoe.job.link_source == OSOE_LINK_MEASURED && used > 0 &&
+                (size_t)used < sizeof link)
+                snprintf(link + used, sizeof link - (size_t)used, " (%llu us of this start)",
+                         (unsigned long long)(osoe.job.link_ns / 1000));
+        }
+        int n = snprintf(line, sizeof line, "osoe: PE %u of %u (local %u of %u): segment "
+                         "/dev/shm%s, heap %llu bytes at %#llx, node %u of %u%s%s\n",
+                         osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
+                         osoe.bootstrap.local_count, osoe.node.control_name,
+                         (unsigned long long)osoe.node.heap_size,
+                         (unsigned long long)(uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id],
+                         osoe.job.node, osoe.job.node_count,
+                         osoe.job.force_remote ? ", force-remote" : "", link);
+        if (n > 0) {
+            size_t len = (size_t)n < sizeof line ? (size_t)n : sizeof line - 1;
+            ssize_t ignored = write(STDERR_FILENO, line, len);
+            (void)ignored;
+        }
+    }
 }
 
 static void session_end(void)
