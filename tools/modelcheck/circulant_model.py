@@ -35,15 +35,17 @@ power of two and less at every other N.
 
 And the protocol, under the engine's SC interleavings (below, "The
 protocol"): each round through a row of the receiver's lane, credited piece by
-piece; the reduce-scatter's grants, a lane each, all taken at its start; the
-allgather's, a row's as its reduce-scatter round ends, all taken before the
-allgather, its lanes carried by the reduce-scatter's first pieces; every
-counter the reduce-scatter's own. On two to five leads, two reductions in a
-row, and a small tree reduction before and after one: every piece taken is the
-one waited for, every lane read is the one put for it, every put lands in a
-lane lent to its collective, nothing is stuck, and from every state the run can
-end - five leads past the liveness check's bound. Seven breakages, each
-failing.
+piece for the pieces its sender's window waits on; the reduce-scatter's grants,
+a lane each, all taken at its start; the allgather's, a row's as its
+reduce-scatter round ends, all taken before the allgather, its lanes carried by
+the reduce-scatter's first pieces; every counter the reduce-scatter's own. On
+two to five leads, two reductions in a row, and a small tree reduction before
+and after one: every piece taken is the one waited for, every lane read is the
+one put for it, every put lands in a lane lent to its collective, nothing
+written into a lead's words moves once every lead has returned from its last
+collective (QUIET, v0.2 step 3's Part 2), nothing is stuck, and from every
+state the run can end - five leads past the liveness check's bound. Eight
+breakages, each failing.
 
 Usage:
   circulant_model.py [check] [substring ...]  the arithmetic, then the
@@ -281,6 +283,19 @@ def volume_table():
 # the receiver adds a credit at the sender for each piece it takes, and the
 # sender puts piece j only once it holds j - W + 1 of the round's credits.
 #
+# **Only for the pieces the sender waits on**: piece j's credit is what lets
+# piece j + W go, so a round of P pieces credits its first P - W and no more.
+# A credit for one of the last W would be a write into the sender's words that
+# the sender never waits for - it may have returned, and left the team, by the
+# time it lands - and a team number is zeroed for its next team on the word
+# that nothing of the last is still to arrive (internal-region.h; the team
+# redesign's "Why giving a number back is safe"). With them left out, the
+# sender's last put of a round waits for every credit of the round, so none
+# outlives it. The observer checks it (QUIET): once every lead has returned
+# from its last collective, no counter or field of any lead's words has moved
+# since that lead returned. The breakage credit_every_piece, the design as
+# first written, fails it.
+#
 # Grants. Lead r's reduce-scatter receivers r + s_k are as many leads as there
 # are rounds, and each lends its own lane, so each grant carries a lane of its
 # own - into field k of r's grant line - and r cannot tell from one counter
@@ -370,7 +385,7 @@ def lead_program(design, rank, n, count, W, kinds):
             for phase, k, to, frm, sends, receives in plan:
                 base[(c, phase, k)] = (arrived[k], credits)
                 arrived[k] += receives
-                credits += sends
+                credits += sends if design == 'credit_every_piece' else max(0, sends - W)
         else:
             if rank == 0:
                 base[(c, 'tree')] = list(arrived) if shared else list(tree_arrived)
@@ -386,7 +401,7 @@ def lead_program(design, rank, n, count, W, kinds):
     for c, kind in enumerate(kinds):
         me = c + 1
         pre = f'c{c}'
-        nxt_collective = f'@c{c + 1}E' if c + 1 < len(kinds) else '@DONE'
+        nxt_collective = f'@c{c + 1}E' if c + 1 < len(kinds) else '@RET'
         if kind == 'tree':
             B.append((pre + 'E', ('ghost', lambda M, L, me=me: ({BIND(rank): me}, {}),
                                   f'@{pre}T')))
@@ -514,7 +529,12 @@ def lead_program(design, rank, n, count, W, kinds):
                                  f'round {k}, waiting for {piece_tag(c, phase, k, L["qc"] or 0)}',
                                  '@' + q_ + 'TAKEN')),
                   (q_ + 'TAKEN', ('set', 'qc', lambda L: (L['qc'] or 0) + 1,
-                                  '@' + q_ + ('TAKEF' if phase == REDUCE else 'CRED'))),
+                                  '@' + q_ + ('TAKEF' if phase == REDUCE else 'CREDQ'))),
+                  # a credit only for a piece the sender waits on: the taken
+                  # piece's index, qc - 1, below P - W (or, broken, for every one)
+                  (q_ + 'CREDQ', ('br', lambda L, P_recv=P_recv:
+                                  design == 'credit_every_piece' or (L['qc'] or 0) <= P_recv - W,
+                                  '@' + q_ + 'CRED', '@' + q_ + 'L')),
                   (q_ + 'CRED', ('add', lambda L, frm=frm: CRED(frm), lambda L: 1, '_',
                                  '@' + q_ + 'L'))]
             if phase == REDUCE:
@@ -529,13 +549,13 @@ def lead_program(design, rank, n, count, W, kinds):
                                       lambda L, c=c, k=k: grant_tag(c, k, rank), True,
                                       '@' + q_ + after_field)),
                       (q_ + 'TAKEF', ('br', lambda L: (L['qc'] or 0) == 1, '@' + q_ + 'TAKEF1',
-                                      '@' + q_ + 'CRED')),
+                                      '@' + q_ + 'CREDQ')),
                       (q_ + 'TAKEF1', ('check', lambda M, L, c=c, k=k, frm=frm:
                                        None if M[SENDER_FIELD(rank, k)] == grant_tag(c, k, frm)
                                        else f'SENDER: lead {rank} reads '
                                        f'{M[SENDER_FIELD(rank, k)]} in its senders\' lane field '
                                        f'{k} with the first piece of round {k}, waiting for lead '
-                                       f'{frm}\'s of collective {c}', '@' + q_ + 'CRED'))]
+                                       f'{frm}\'s of collective {c}', '@' + q_ + 'CREDQ'))]
             end = [(q_ + 'END', ('set', 'go', lambda L: DEL, '@' + q_ + 'END1')),
                    (q_ + 'END1', ('set', 'qs', lambda L: DEL, '@' + q_ + 'END2')),
                    (q_ + 'END2', ('set', 'qc', lambda L: DEL, '@' + q_ + 'END3'))]
@@ -549,8 +569,40 @@ def lead_program(design, rank, n, count, W, kinds):
                 end.append((q_ + 'END3', ('br', lambda L: True, nxt, nxt)))
             B += end
         B.append((pre + 'X', ('ghost', lambda M, L: ({BIND(rank): 0}, {}), nxt_collective)))
+    # Returned from its last collective: what its words hold now, for the
+    # observer to compare once every lead has returned (QUIET).
+    B.append(('RET', ('ghost', lambda M, L: ({('$ret', rank): 1, **{('$q', rank, i): M[key]
+                                              for i, key in enumerate(own_words(rank, n, q))}},
+                                             {}), '@DONE')))
     B.append(('DONE', ('done',)))
     return B
+
+
+def own_words(rank, n, q):
+    """Every counter and field of lead `rank`'s words that another lead writes."""
+    return ([CRED(rank), RS_GRANT(rank), AG_GRANT(rank), TREE_REL(rank)] +
+            [ARR(rank, k) for k in range(max(q, n))] +
+            [TREE_ARR(rank, p) for p in range(n)] +
+            [RS_FIELD(rank, k) for k in range(q)] + [SENDER_FIELD(rank, k) for k in range(q)])
+
+
+def observer(n):
+    """Once every lead has returned from its last collective, nothing written
+    into any lead's words has moved since that lead returned: every write into
+    them is one their owner waited for (QUIET) - the word a team number given
+    back is zeroed on for its next team."""
+    q = len(skips(n))
+
+    def quiet(M, L):
+        for r in range(n):
+            for i, key in enumerate(own_words(r, n, q)):
+                if M[key] != M[('$q', r, i)]:
+                    return (f'QUIET: lead {r}\'s {key} moved from {M[("$q", r, i)]} to {M[key]} '
+                            f'after lead {r} returned from its last collective')
+        return None
+    return [('W', ('await', lambda M, L: all(M[('$ret', r)] for r in range(n)), '@C')),
+            ('C', ('check', quiet, '@D')),
+            ('D', ('done',))]
 
 
 PROTOCOL_CASES = [
@@ -563,7 +615,8 @@ PROTOCOL_CASES = [
     ('five leads, a reduction twice', 5, 5, 1, ('circulant', 'circulant')),
 ]
 BREAKAGES = ['no_credit', 'no_rs_grant', 'stale_rs_grant', 'early_ag_grant',
-             'one_ag_grant_at_a_time', 'shared_counters', 'sender_field_late']
+             'one_ag_grant_at_a_time', 'shared_counters', 'sender_field_late',
+             'credit_every_piece']
 
 
 def protocol(want):
@@ -574,6 +627,7 @@ def protocol(want):
 
     def run(design, name, n, count, W, kinds, expect):
         threads = [assemble(lead_program(design, r, n, count, W, kinds)) for r in range(n)]
+        threads.append(assemble(observer(n)))
         res = explore(f'{design}: {name}', threads, {}, max_seconds=1800,
                       liveness_max_states=3_000_000, progress=60)
         report(res, expect_ok=expect)
