@@ -19,10 +19,12 @@
 #include "transport.h"
 
 /*
- * How much the root measures. Each number is a median of its tries, which a
- * delayed try - a wake late, a page touched first - cannot move as it moves a
- * mean. On the Pi's gigabit 25 ms in all, most of it the streams (measured,
- * 2026-10-06: 24.8 to 25.3 ms a start); on one machine's loopback a few.
+ * How much the root measures. The hop and each stream's time are medians of
+ * their tries, which a delayed try - a wake late, a page touched first -
+ * cannot move as it moves a mean; the message cost a trimmed mean (below). On
+ * the Pi's gigabit about 27 ms in all, most of it the streams' 1.9 MiB
+ * (measured, 2026-10-06: 27.1 to 27.6 ms a start), so about 170 ms on a link
+ * of 100 Mbit/s; on one machine's loopback a few.
  */
 enum {
     HOP_TRIPS = 15,             /* round trips of one small put for h */
@@ -63,26 +65,33 @@ static int64_t trimmed_mean(int64_t *values, size_t count)
 }
 
 /*
- * The child's scratch for the measurement: its lanes, which only a large
- * collective's grant lends, and none has begun - every PE is still in
+ * The child's scratch for the measurement: the start of its lanes, which only
+ * a large collective's grant lends, and none has begun - every PE is still in
  * shmem_init - so nothing reads them before the first grant rewrites the
  * slots it lends (internal-region.h). `window` is the bytes a stream may
- * cover from `at`, in whole pieces; a longer stream wraps.
+ * cover from `at`, in whole pieces; a longer stream wraps, as a collective's
+ * pieces wrap in a lane's row. At most STREAM_WINDOW, so that a start touches
+ * no more of a child's pages than a row of a lane, and never more than the
+ * fewest lanes any node can have: two, its one thread's and its agent's at
+ * OSOE_MAX_THREADS=1 - a setting nodes need not agree on, so this node's own
+ * says nothing of the child's (the adversarial read of Part 1, finding 1).
+ * The lane's own size every node agrees on.
  */
 struct scratch {
     uint64_t at, window;
 };
 
+static const uint64_t STREAM_WINDOW = UINT64_C(64) * 1024;
+
 static struct scratch child_scratch(void)
 {
     const struct osoe_bootstrap *b = &osoe.bootstrap;
-    uint64_t lanes = (uint64_t)(b->max_threads + 1) *
-                     osoe_internal_lane_bytes(b->collective_fanout, b->collective_pipeline);
+    uint64_t lanes = 2 * osoe_internal_lane_bytes(b->collective_fanout, b->collective_pipeline);
     uint64_t window = lanes / OSOE_INTERNAL_PIECE_BYTES * OSOE_INTERNAL_PIECE_BYTES;
     return (struct scratch){
         .at = osoe_internal_lanes_offset(b->collective_fanout, b->max_teams,
                                          b->small_collective_bytes, b->node_count),
-        .window = window < STREAM_LONG ? window : STREAM_LONG,
+        .window = window < STREAM_WINDOW ? window : STREAM_WINDOW,
     };
 }
 
@@ -183,13 +192,24 @@ static struct osoe_link measure(const int *children, uint32_t fan)
     link.message_ns = extra > 0 ? (uint64_t)extra / (fan - 1) : 0;
     if (link.message_ns > OSOE_LINK_MESSAGE_NS_HIGHEST)
         link.message_ns = OSOE_LINK_MESSAGE_NS_HIGHEST;
-    /* The stream's slope; a long stream no slower than the short one - a
-     * link faster than the clock can tell apart - is the highest a setting
-     * may give. */
+    /*
+     * The streams' slope, so that the hop cancels. Its denominator is a
+     * difference of two times, and a noisy one - a long stream no slower than
+     * the short, on a loaded machine - would make it any size up to infinite,
+     * which the chooser would read as bytes costing nothing (the adversarial
+     * read of Part 1, finding 8: 34 logical nodes in the VM all took the
+     * highest a setting may give). So the long stream's own rate bounds it:
+     * that rate counts the hop too, so it is a bound below the link's, within
+     * a few percent of the slope where the bytes take longer than the hop -
+     * the Pi's 114 MB/s against 117 - and a slope more than four times it is
+     * noise, for which the long stream's rate stands in.
+     */
     uint64_t longer = STREAM_LONG - STREAM_SHORT;
-    link.bytes_per_second = long_time > short_time
-                                ? longer * UINT64_C(1000000000) / (long_time - short_time)
-                                : OSOE_LINK_BYTES_PER_SECOND_HIGHEST;
+    uint64_t rate = STREAM_LONG * UINT64_C(1000000000) / (long_time ? long_time : 1);
+    uint64_t slope = long_time > short_time
+                         ? longer * UINT64_C(1000000000) / (long_time - short_time)
+                         : UINT64_MAX;
+    link.bytes_per_second = slope <= 4 * rate ? slope : rate;
     if (link.bytes_per_second == 0)
         link.bytes_per_second = 1;
     if (link.bytes_per_second > OSOE_LINK_BYTES_PER_SECOND_HIGHEST)
@@ -216,8 +236,10 @@ void osoe_link_establish(void)
     }
 
     /*
-     * The root of every team's tree over the job's nodes is node 0, its first
-     * child node 1 (collective-tree.c, level order). The root's lead measures;
+     * The root of every reduction's tree over the job's nodes is node 0, its
+     * first child node 1 (collective-tree.c, level order); a broadcast's is
+     * its root's node, whose links the job's numbers stand for too (the
+     * README's limits: one link's numbers shape the job). The root's lead measures;
      * every PE then takes part in an AND over the finalize team's split words
      * (collectives.h) - the root's numbers against every other PE's all ones,
      * so that each PE ends holding the root's. The finalize team's counters,

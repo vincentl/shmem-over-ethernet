@@ -760,7 +760,8 @@ struct osoe_team_name {
  *   has its own although on one node its membership is the world's: the spec
  *   makes them distinct predefined teams forming separate atomicity domains,
  *   and sharing the counters would make a sync on one team release a wait on
- *   the other. The finalize team never uses `copied`: it has no copy phase.
+ *   the other. The finalize team uses `copied` only in the link's AND at the
+ *   end of shmem_init (link-measure.c), a reduction like any other.
  * - **The arrival handoff** (§5.3), to the node lead's agent.
  * - **The tree's published state** (§3.14), which that agent writes.
  * - **The record** above.
@@ -807,7 +808,7 @@ struct osoe_node_header {
      * where they are not set - which open_control holds the node's PEs to,
      * and osoe-stat shows (node.link.*). Then the link as the root's lead
      * measured it at the end of shmem_init, which the node's lead writes once
-     * every PE holds it (link-measure.h), 0 until then and where nothing is
+     * it holds it (link-measure.h), 0 until then and where nothing is
      * measured: osoe-stat's to show, read by nothing in the library. */
     uint32_t collective_shape;
     uint64_t link_hop_ns;

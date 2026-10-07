@@ -361,6 +361,8 @@ def cost(op, nodes, k, W, n, s, h_ns, o_ns, bytes_per_second, interior=1):
     osoe_shape_cost, line for line, saturating at 2**64 - 1 as the C does."""
     if nodes <= 1 or n == 0:
         return 0
+    if k < 2 or W == 0 or s == 0 or bytes_per_second == 0:
+        return SATURATED
     first, loops, beta = tree_terms(op, nodes, k, interior)
     pieces = (n + s - 1) // s
     t = (min(n, s) * 1000000000 + bytes_per_second - 1) // bytes_per_second

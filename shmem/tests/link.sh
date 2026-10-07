@@ -3,12 +3,19 @@
 # The link the large collectives' shapes are chosen from (v0.2 step 2;
 # link-measure.h), as every PE's SHMEM_DEBUG line at start-up shows it.
 #
-#   link.sh LAUNCHER PROGRAM MAP measured|set|fixed|none
+#   link.sh LAUNCHER PROGRAM MAP measured|few-lanes|set|fixed|none
 #
 #   measured  the root's lead measures it at the end of shmem_init and every
 #             PE holds the root's numbers: one line a PE, every one naming
 #             the same hop, message cost and bandwidth, the hop and the
 #             bandwidth above zero.
+#   few-lanes measured, with the second PE - node 1's first, on a map that
+#             starts 0,1 - at OSOE_MAX_THREADS=1 and every lane as small as
+#             the settings make it: the measurement's streams stay within
+#             the fewest lanes a node can have, whatever the root's own
+#             OSOE_MAX_THREADS, which nodes need not agree on (the
+#             adversarial read of Part 1, finding 1: they ran past node 1's
+#             region, and the job ended at start naming the wrong settings).
 #   set       OSOE_LINK_* give it by hand: every PE names exactly those
 #             numbers, and nothing is measured.
 #   fixed     OSOE_COLLECTIVE_SHAPE=fixed: nothing chooses, so no PE names a
@@ -27,6 +34,9 @@ set)
 fixed)
     out=$(SHMEM_DEBUG=1 OSOE_COLLECTIVE_SHAPE=fixed \
         "$LAUNCHER" -n "$ranks" -m "$MAP" -t 60 -- "$PROGRAM" 2>&1) ;;
+few-lanes)
+    out=$(SHMEM_DEBUG=1 OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=1 \
+        "$LAUNCHER" -n "$ranks" -m "$MAP" -t 60 -e 1:OSOE_MAX_THREADS=1 -- "$PROGRAM" 2>&1) ;;
 *)
     out=$(SHMEM_DEBUG=1 "$LAUNCHER" -n "$ranks" -m "$MAP" -t 60 -- "$PROGRAM" 2>&1) ;;
 esac
@@ -44,7 +54,7 @@ named=$(printf '%s\n' "$links" | grep -c .)
 distinct=$(printf '%s\n' "$links" | grep . | sort -u | wc -l | tr -d ' ')
 echo "PEs naming a link: $named of $ranks; distinct: $distinct"
 case $MODE in
-measured)
+measured|few-lanes)
     [ "$named" -eq "$ranks" ] && [ "$distinct" -eq 1 ] || exit 1
     one=$(printf '%s\n' "$links" | head -1)
     hop=$(printf '%s\n' "$one" | sed -n 's/^measured: a hop of \([0-9]*\) ns, .*/\1/p')

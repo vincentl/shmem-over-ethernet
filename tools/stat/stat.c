@@ -368,9 +368,13 @@ static void shape_text(const struct osoe_segment *s, char *buf, size_t len)
      * by OSOE_LINK_*; else none - a job of one node, a fixed shape, or a
      * start not yet past the measurement. */
     const char *how = "measured";
+    /* The bandwidth first: the node's lead stores it last, each store a
+     * release and each read here an acquire, so a bandwidth not 0 shows the
+     * hop and the message cost stored before it - read after it, never a
+     * hop of one start beside the bandwidth of none. */
+    osoe_segment_read_name(s, "node.link.measured_bytes_per_second", 0, &bandwidth);
     osoe_segment_read_name(s, "node.link.measured_hop_ns", 0, &hop);
     osoe_segment_read_name(s, "node.link.measured_message_ns", 0, &message);
-    osoe_segment_read_name(s, "node.link.measured_bytes_per_second", 0, &bandwidth);
     if (!bandwidth) {
         how = "set";
         osoe_segment_read_name(s, "node.link.hop_ns", 0, &hop);

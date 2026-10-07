@@ -126,6 +126,12 @@ uint64_t osoe_shape_cost(enum osoe_shape_operation operation, uint32_t nodes, ui
 {
     if (nodes <= 1 || bytes == 0)
         return 0;
+    /* No setting reaches these - the fan-out is 2 at least, the window 1, the
+     * piece and the bandwidth not 0 - but a cost is no reason to divide by 0
+     * (the adversarial read of Part 1): a shape that cannot run costs the
+     * most there is. */
+    if (fanout < 2 || window == 0 || piece_bytes == 0 || link->bytes_per_second == 0)
+        return UINT64_MAX;
     struct terms t;
     terms_of(operation, nodes, fanout, &t);
     uint64_t pieces = bytes / piece_bytes + (bytes % piece_bytes != 0);
