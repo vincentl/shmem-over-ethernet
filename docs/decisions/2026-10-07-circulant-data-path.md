@@ -170,8 +170,10 @@ a copy of the world made, given two Träff's reductions and destroyed, three
 times, each copy taking the number its last gave back, whose words every lead
 must have zeroed. With two threads it also takes one team's reductions in turn
 from each thread, so that the lane a lead lends changes from call to call. On
-two nodes the chooser takes Träff's only where a piece's rounding favours it -
-16,385 bytes of the ladder - and the test holds every call to it either way.
+two nodes the chooser takes Träff's where a piece's rounding favours it - 16,385
+and 1,048,589 bytes of the ladder, and 68% of all sizes on the Pi's link, never
+a multiple of 16 KiB (the adversarial read's finding 2) - and the test holds
+every call to it either way.
 **`shmem.shape.chosen.*`** now holds every
 reduction's algorithm to the grid's line with Träff's allowed, and
 **`shmem.shape.back-to-back.*`** counts the world calls that took Träff's and
@@ -194,7 +196,11 @@ stress settings and both back-to-back maps:
 | every piece credited | 0 of 11 | no test can see it: its harm needs a credit still in flight as a team is destroyed and its number taken again; the model's QUIET is its evidence |
 
 Each is caught by the library's own checks - a header, a grant's words, a lane
-field - which end the job naming both leads, not by a wrong result.
+field - which end the job naming the lead that put it, or for a grant's words
+the lead that holds them, not by a wrong result. The table was measured at
+`4b9767e`, a round's window the capacity's four; the adversarial read ran
+twenty mutations of its own at `5cbd47e`'s wider windows
+(`docs/reviews/archive/v0.2-step3-adversarial-read.md`, "Mutations").
 
 ## The Pi's measurements (Part 3)
 

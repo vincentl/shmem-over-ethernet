@@ -3039,8 +3039,13 @@ endif()
 # once on 4 and 16; under the AM stress settings, as shmem.pipeline.*.stress
 # runs the trees; at the fewest team numbers and lanes, OSOE_MAX_TEAMS=4 and
 # OSOE_MAX_THREADS=1, where the lanes end the region and a slot past a lane's
-# rows runs off its end; and under OSOE_COLLECTIVE_SHAPE=tree, where no call may
-# take Träff's. The sanitizers run the cases of up to 9 PEs - 12 and 16 under
+# rows runs off its end; under OSOE_COLLECTIVE_SHAPE=tree, where no call may
+# take Träff's; with every node's lead lending a lane of its own (lanes); at a
+# ceiling of 2, where five nodes' three rounds take every row of a lane, the
+# release row's too; at a capacity of 1; at a window of 128 (a ceiling of 32
+# and a capacity of 8 on three nodes); and on a link so slow that a few hundred
+# bytes take Träff's, with fewer elements than nodes (tiny): empty blocks. And a
+# divergent call, which must end by name (diverge). The sanitizers run the cases of up to 9 PEs - 12 and 16 under
 # asan, beside the suite's other tests, were killed by the VM's OOM killer
 # (asan's own memory, about 55 MB a PE; the Part 2 record) - and tsan one PE a
 # node alone, as shmem.lanes.* does.
@@ -3053,7 +3058,8 @@ if(OSOE_INTERNODE)
   target_link_libraries(shmem_test_circulant-reduce PRIVATE osoe rt Threads::Threads)
   osoe_warnings(shmem_test_circulant-reduce)
   foreach(case 2 3 4 5 6 7 8 9 12 16 17 33 64 70 8x2 5.perturb 16.perturb 4.threads
-               16.threads 5.stress 4.max-teams-4 16.tree)
+               16.threads 5.stress 4.max-teams-4 16.tree 7.lanes 5.lanes 5.ceiling-2
+               5.capacity-1 3.window-128 16.tiny)
     string(REGEX MATCH "^[0-9]+" nodes "${case}")
     set(per_node 1)
     if(case MATCHES "x2$")
@@ -3061,6 +3067,8 @@ if(OSOE_INTERNODE)
     endif()
     set(extra "")
     set(arguments "")
+    set(link OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
+             OSOE_LINK_BYTES_PER_SECOND=116000000)
     if(case MATCHES "perturb")
       set(extra OSOE_TEST_PERTURB=1)
     elseif(case MATCHES "threads")
@@ -3072,6 +3080,17 @@ if(OSOE_INTERNODE)
       set(extra OSOE_MAX_TEAMS=4 OSOE_MAX_THREADS=1)
     elseif(case MATCHES "tree")
       set(extra OSOE_COLLECTIVE_SHAPE=tree)
+    elseif(case MATCHES "lanes")
+      set(arguments lanes)
+    elseif(case MATCHES "ceiling-2")
+      set(extra OSOE_COLLECTIVE_FANOUT=2)
+    elseif(case MATCHES "capacity-1")
+      set(extra OSOE_COLLECTIVE_PIPELINE=1)
+    elseif(case MATCHES "window-128")
+      set(extra OSOE_COLLECTIVE_FANOUT=32 OSOE_COLLECTIVE_PIPELINE=8)
+    elseif(case MATCHES "tiny")
+      set(link OSOE_LINK_HOP_NS=1000 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=1000)
+      set(extra OSOE_SMALL_COLLECTIVE_BYTES=128)
     endif()
     math(EXPR pes "${nodes} * ${per_node}")
     if(pes GREATER 9 AND CMAKE_C_FLAGS MATCHES "sanitize=")
@@ -3097,8 +3116,7 @@ if(OSOE_INTERNODE)
     endif()
     math(EXPR launch_timeout "${timeout} - 60")
     add_test(NAME shmem.circulant.${case}
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
-              OSOE_LINK_BYTES_PER_SECOND=116000000 SHMEM_SYMMETRIC_SIZE=12m ${extra}
+      COMMAND ${CMAKE_COMMAND} -E env ${link} SHMEM_SYMMETRIC_SIZE=12m ${extra}
               $<TARGET_FILE:osoe-launch> -n ${pes} -m ${map} -t ${launch_timeout} --
               $<TARGET_FILE:shmem_test_circulant-reduce> ${arguments})
     set_tests_properties(shmem.circulant.${case} PROPERTIES LABELS "tier2"
@@ -3106,6 +3124,17 @@ if(OSOE_INTERNODE)
       FAIL_REGULAR_EXPRESSION "CHECK[(]")
     osoe_internode_label(shmem.circulant.${case})
   endforeach()
+  # Two nodes' leads in Träff's reductions of different bytes: the grants say
+  # so, and the job ends naming the difference.
+  add_test(NAME shmem.circulant.4.diverge
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
+            OSOE_LINK_BYTES_PER_SECOND=116000000
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 60 --
+            $<TARGET_FILE:shmem_test_circulant-reduce> diverge)
+  set_tests_properties(shmem.circulant.4.diverge PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "PEs called different collectives, or the same one with different arguments"
+    FAIL_REGULAR_EXPRESSION "a divergent reduction returned")
+  osoe_internode_label(shmem.circulant.4.diverge)
 endif()
 
 # The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on

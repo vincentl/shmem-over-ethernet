@@ -720,9 +720,10 @@ in all), computed from the code; the times are measured where a record says so.
 
 Where the design admits a limit of its own: a large broadcast, and a reduction
 too small for Träff's rounds to pay - under 4 to 16 KiB by the node count on
-the Pi cluster's link, by the cost model, and on two nodes at most sizes, where
-the two cost about the same - go through a tree, whose busiest lead sends
-k + 1 vectors where Träff's sends under two; Träff's
+the Pi cluster's link, by the cost model - go through a tree, whose busiest
+lead sends k + 1 vectors where Träff's sends under two; on two nodes, where the
+two send the same bytes, the cost model takes the tree for a size of whole
+16 KiB pieces and Träff's for most others, not measured either way; Träff's
 takes 2⌈log₂ n⌉ rounds where a tree takes 2⌈log_k n⌉ levels, and a team of more
 than 65,536 nodes takes the tree at every size; a call's shape is chosen from
 one link's numbers, the root's lead's to its first children's, so a job whose

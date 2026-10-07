@@ -3,7 +3,7 @@
  * Träff's circulant reduce-scatter and allgather on the data path (tier 2;
  * v0.2 step 3, Part 2; internode-generic.c's in_rounds).
  *
- *   test-circulant-reduce [threads]
+ *   test-circulant-reduce [threads | lanes | diverge]
  *
  * Run over logical nodes, the link set by OSOE_LINK_* so that the choice is
  * known: the test asks the chooser itself (collective-shape.c, compiled in)
@@ -32,12 +32,24 @@
  *      has left adds to at once;
  *   6. reuse: a copy of the world made, given two Träff's reductions and
  *      destroyed, three times over, each new copy taking the number its last
- *      gave back - whose words every lead must have zeroed for it.
+ *      gave back - whose words every lead must have zeroed for it;
+ *   7. few: long double sums of fewer elements than nodes, where some blocks
+ *      are empty and some rounds send or take nothing - Träff's only where the
+ *      link makes a few hundred bytes worth it, as shmem.circulant.16.tiny's
+ *      does.
  * With `threads`, under SHMEM_THREAD_MULTIPLE: two threads a PE, each with a
  * copy of the world of its own, making Träff's reductions on it at once - two
  * teams' reduce-scatters through two lanes of each lead; then both on one copy
  * in turn, each round's reduction led by the other thread, so that the lane a
- * lead lends changes from call to call. Under
+ * lead lends changes from call to call; at 1 MiB, so that every round credits.
+ * With `lanes`, under SHMEM_THREAD_MULTIPLE and one PE a node: on node i, i
+ * helper threads claim thread records first and hold them, and then a new
+ * thread makes the reductions of phase 1, so that every node's lead lends a
+ * lane of its own - which the single-threaded phases cannot arrange, every lead
+ * lending its main thread's - and a sender that put into another round's lane,
+ * or its own index, would land in slots nobody lent it; the leads' lanes are
+ * checked to differ. With `diverge`, PE 1 reduces a byte more than the others:
+ * the job must end naming the difference. Under
  * OSOE_COLLECTIVE_SHAPE=tree every call must take a tree: the setting turns
  * Träff's off by name.
  *
@@ -265,6 +277,30 @@ static void reuse(uint8_t *dest, uint8_t *source, size_t large)
     }
 }
 
+/* Long double sums of `n` elements, fewer than the nodes: each element the sum
+ * of small integers, exact in any order. */
+static void few(long double *dest, long double *source, uint64_t n)
+{
+    for (uint64_t i = 0; i < n; i++) {
+        source[i] = (long double)(me * 3 + (int)i);
+        dest[i] = 0;
+    }
+    shmem_barrier_all();
+    CHECK(shmem_longdouble_sum_reduce(SHMEM_TEAM_WORLD, dest, source, (size_t)n) == 0);
+    for (uint64_t i = 0; i < n; i++) {
+        long double want = 0;
+        for (int p = 0; p < npes; p++)
+            want += (long double)(p * 3 + (int)i);
+        if (dest[i] != want) {
+            fprintf(stderr, "PE %d: a long double sum of %llu elements: element %llu is "
+                    "wrong\n", me, (unsigned long long)n, (unsigned long long)i);
+            failures++;
+            break;
+        }
+    }
+    published(n * sizeof(long double), "a long double sum of fewer elements than nodes");
+}
+
 /* ---- 2: every typed reduction ----------------------------------------------- */
 
 /* Values a reduction of every type takes exactly, whatever order the nodes'
@@ -453,6 +489,87 @@ static void *thread_main(void *argument)
     return NULL;
 }
 
+/* The lanes mode: helpers that claim a thread record each and hold it until
+ * released, and the thread that then reduces. */
+static pthread_barrier_t claimed, released;
+
+static void *helper_main(void *argument)
+{
+    (void)argument;
+    shmem_quiet();                      /* a counted call: claims this thread's record */
+    pthread_barrier_wait(&claimed);
+    pthread_barrier_wait(&released);
+    return NULL;
+}
+
+static uint64_t reducer_lane = UINT64_MAX;
+
+static void *reducer_main(void *argument)
+{
+    uint8_t **buffers = argument;
+    sizes(buffers[0], buffers[1]);
+    CHECK(osoe_test_scoped_metric("team.tree.lane", OSOE_MSCOPE_TEAM, 0, &reducer_lane));
+    return NULL;
+}
+
+static void lanes(void)
+{
+    int provided = 0;
+    CHECK_FATAL(shmem_init_thread(SHMEM_THREAD_MULTIPLE, &provided) == 0);
+    CHECK_FATAL(provided == SHMEM_THREAD_MULTIPLE);
+    me = shmem_my_pe();
+    npes = shmem_n_pes();
+    CHECK_FATAL((uint64_t)npes == nodes);           /* one PE a node: its node is its rank */
+    size_t most = SIZES[SIZE_COUNT - 1];
+    uint8_t *buffers[2] = { shmem_malloc(most), shmem_malloc(most) };
+    CHECK_FATAL(buffers[0] && buffers[1]);
+    pthread_t helper[64], reducer;
+    CHECK_FATAL(me < 64);
+    CHECK_FATAL(pthread_barrier_init(&claimed, NULL, (unsigned)me + 1) == 0);
+    CHECK_FATAL(pthread_barrier_init(&released, NULL, (unsigned)me + 1) == 0);
+    for (int h = 0; h < me; h++)
+        CHECK_FATAL(pthread_create(&helper[h], NULL, helper_main, NULL) == 0);
+    pthread_barrier_wait(&claimed);
+    shmem_barrier_all();
+    CHECK_FATAL(pthread_create(&reducer, NULL, reducer_main, buffers) == 0);
+    CHECK(pthread_join(reducer, NULL) == 0);
+    pthread_barrier_wait(&released);
+    for (int h = 0; h < me; h++)
+        CHECK(pthread_join(helper[h], NULL) == 0);
+    /* Every node's lead lent a lane of its own, or the test proved nothing. */
+    uint64_t *seen = shmem_calloc((size_t)npes, sizeof *seen);
+    CHECK_FATAL(seen != NULL);
+    for (int p = 0; p < npes; p++)
+        shmem_uint64_p(&seen[me], reducer_lane, p);
+    shmem_barrier_all();
+    for (int p = 0; p < npes; p++)
+        for (int q = p + 1; q < npes; q++)
+            if (seen[p] == seen[q]) {
+                fprintf(stderr, "PE %d: the leads of nodes %d and %d lent the same lane, %llu\n",
+                        me, p, q, (unsigned long long)seen[p]);
+                failures++;
+            }
+    shmem_barrier_all();
+    shmem_free(seen);
+}
+
+/* The diverge mode: PE 1 reduces a byte more than the others, at a size every
+ * node takes Träff's for. */
+static void diverge(uint64_t smallest)
+{
+    shmem_init();
+    me = shmem_my_pe();
+    npes = shmem_n_pes();
+    CHECK_FATAL(smallest != 0);
+    size_t n = (size_t)smallest * 4 + (me == 1);
+    uint8_t *source = shmem_malloc(n + 1), *dest = shmem_malloc(n + 1);
+    CHECK_FATAL(source && dest);
+    memset(source, 1, n);
+    shmem_uint8_sum_reduce(SHMEM_TEAM_WORLD, dest, source, n);
+    fprintf(stderr, "PE %d: a divergent reduction returned\n", me);
+    CHECK(0);
+}
+
 static int threads(size_t bytes)
 {
     int provided = 0;
@@ -502,8 +619,14 @@ int main(int argc, char **argv)
     uint64_t smallest = smallest_circulant();
     size_t large = smallest ? (size_t)smallest : (size_t)1 << 20;
 
-    if (threaded) {
-        threads(large);
+    if (argc > 1 && strcmp(argv[1], "diverge") == 0) {
+        diverge(smallest);
+    } else if (argc > 1 && strcmp(argv[1], "lanes") == 0) {
+        lanes();
+    } else if (threaded) {
+        /* At 1 MiB every round has more pieces than its window, so credits
+         * flow. */
+        threads((size_t)1 << 20);
     } else {
         shmem_init();
         me = shmem_my_pe();
@@ -529,6 +652,12 @@ int main(int argc, char **argv)
         shmem_barrier_all();
         shmem_team_destroy(copy);
         reuse(dest[3], source[3], large);
+        long double *ld_source = (long double *)(void *)source[0];
+        long double *ld_dest = (long double *)(void *)dest[0];
+        if (nodes > 2) {
+            few(ld_dest, ld_source, nodes - 1);
+            few(ld_dest, ld_source, nodes / 2 + 1);
+        }
     }
 
     int *mine = shmem_malloc(2 * sizeof *mine), *all = shmem_malloc(2 * sizeof *all);
@@ -539,9 +668,10 @@ int main(int argc, char **argv)
     CHECK(all[0] == 0);
     /* Träff's must have run wherever the chooser takes it at some size. */
     CHECK(threaded || smallest == 0 || all[1] > 0);
+    const char *mode = threaded ? "two threads" : argc > 1 ? "lanes of their own" : "every phase";
     if (me == 0 && all[0] == 0)
         printf("CIRCULANT REDUCE: %s on %llu nodes, %d PEs, Träff's from %llu bytes, %d calls "
-               "checked as Träff's\n", threaded ? "two threads" : "every phase",
+               "checked as Träff's\n", mode,
                (unsigned long long)nodes, npes, (unsigned long long)smallest, all[1]);
     shmem_finalize();
     return CHECK_DONE();
