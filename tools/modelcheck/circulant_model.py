@@ -37,11 +37,13 @@ And the protocol, under the engine's SC interleavings (below, "The
 protocol"): each round through a row of the receiver's lane, credited piece by
 piece; the reduce-scatter's grants, a lane each, all taken at its start; the
 allgather's, a row's as its reduce-scatter round ends, all taken before the
-allgather; every counter the reduce-scatter's own. On two to five leads, two
-reductions in a row, and a small tree reduction before and after one: every
-piece taken is the one waited for, every put lands in a lane lent to its
-collective, nothing is stuck, and from every state the run can end - five
-leads past the liveness check's bound. Six breakages, each failing.
+allgather, its lanes carried by the reduce-scatter's first pieces; every
+counter the reduce-scatter's own. On two to five leads, two reductions in a
+row, and a small tree reduction before and after one: every piece taken is the
+one waited for, every lane read is the one put for it, every put lands in a
+lane lent to its collective, nothing is stuck, and from every state the run can
+end - five leads past the liveness check's bound. Seven breakages, each
+failing.
 
 Usage:
   circulant_model.py [check] [substring ...]  the arithmetic, then the
@@ -285,8 +287,15 @@ def volume_table():
 # which of them has come: it waits for all of them, at the reduce-scatter's
 # start, every receiver granting as it enters. The allgather's round k comes
 # from r + s_k into r's row k, which r's reduce-scatter round k used, so r
-# grants that sender as its own round k ends, and a sender waits for all of
-# its allgather grants before its first allgather round.
+# grants that sender as its own round k ends - a count, nothing more - and a
+# sender waits for all of its allgather grants before its first allgather
+# round. Where the allgather's pieces go, the sender learned in the
+# reduce-scatter: its allgather round k sends to r - s_k, its reduce-scatter
+# round k's sender, which put its own lane into the field for row k of its
+# senders' lanes line before its first piece's add, and which the sender read
+# as it took that piece - the row's counter says which field is written. Every
+# put lands outside the counters a lead watches: the grant line's lanes past
+# its counter, the senders' lanes on a line of their own.
 #
 # Counters of their own. The allgather ends with no step that every lead
 # waits for: a lead whose last pieces have come leaves, and can start the
@@ -295,14 +304,15 @@ def volume_table():
 # pieces. So every counter the reduce-scatter waits on is one no other
 # collective adds to: the row counters, the credits and the two grant
 # counters are the reduce-scatter's alone. The breakage shared_counters gives
-# the tree's arrival counters to the rows and fails.
+# the tree's arrival counters to the rows and fails; sender_field_late puts a
+# sender's lane after its first piece's add, and fails.
 
 ARR = lambda n, k: ('arr', n, k)            # lead n's arrival counter for row k
 CRED = lambda n: ('cred', n)                # credits lead n holds for its pieces
 RS_GRANT = lambda n: ('rsg', n)             # reduce-scatter grants lead n has had
 RS_FIELD = lambda n, k: ('rsf', n, k)       # field k of lead n's reduce-scatter grant line
 AG_GRANT = lambda n: ('agg', n)             # allgather grants lead n has had
-AG_FIELD = lambda n, k: ('agf', n, k)       # field k of lead n's allgather grant line
+SENDER_FIELD = lambda n, k: ('snd', n, k)   # field k of lead n's senders' lanes line
 SLOT = lambda n, k, j: ('slot', n, k, j)    # lead n's lane: row k, slot j
 TREE_ARR = lambda n, p: ('tarr', n, p)      # a tree's arrival counter at lead n, position p
 TREE_REL = lambda n: ('trel', n)            # a tree's release counter at lead n
@@ -448,24 +458,12 @@ def lead_program(design, rank, n, count, W, kinds):
                     B.append((q_ + 'A', ('br', lambda L: True, '@' + q_ + 'L', '@' + q_ + 'L')))
                 else:
                     B.append((q_ + 'A', ('await', lambda M, L, ab=ab: M[AG_GRANT(rank)] >= ab + q,
-                                         '@' + q_ + 'AC')))
-
-                    def ag_fields(M, L, c=c):
-                        for ph, kk, t2, f2, s2, r2 in plan:
-                            if ph == GATHER and M[AG_FIELD(rank, kk)] != grant_tag(c, kk, t2):
-                                return (f'GRANT: lead {rank} reads {M[AG_FIELD(rank, kk)]} in '
-                                        f'its allgather grant field {kk}, waiting for lead '
-                                        f'{t2}\'s grant of collective {c}')
-                        return None
-                    B.append((q_ + 'AC', ('check', ag_fields, '@' + q_ + 'L')))
+                                         '@' + q_ + 'L')))
             elif design == 'early_ag_grant' and phase == REDUCE:
                 # the breakage: row k's allgather grant as the round starts,
                 # before its pieces are taken, not as it ends
-                B += [(q_ + 'A', ('store', lambda L, to=to, k=k: AG_FIELD(to, k),
-                                  lambda L, c=c, k=k: grant_tag(c, k, rank), True,
-                                  '@' + q_ + 'AE')),
-                      (q_ + 'AE', ('add', lambda L, to=to: AG_GRANT(to), lambda L: 1, '_',
-                                   '@' + q_ + 'L'))]
+                B.append((q_ + 'A', ('add', lambda L, to=to: AG_GRANT(to), lambda L: 1, '_',
+                                     '@' + q_ + 'L')))
             else:
                 B.append((q_ + 'A', ('br', lambda L: True, '@' + q_ + 'L', '@' + q_ + 'L')))
             # one allgather grant at a time, as a count: round k's wait is for
@@ -500,9 +498,12 @@ def lead_program(design, rank, n, count, W, kinds):
                                 f'{me}', '@' + q_ + 'PUTS')),
                   (q_ + 'PUTS', ('store', lambda L, to=to, k=k: SLOT(to, k, (L['qs'] or 0) % W),
                                  lambda L, c=c, phase=phase, k=k:
-                                 piece_tag(c, phase, k, L['qs'] or 0), True, '@' + q_ + 'PUTA')),
+                                 piece_tag(c, phase, k, L['qs'] or 0), True,
+                                 '@' + q_ + ('PUTF' if phase == REDUCE and
+                                             design != 'sender_field_late' else 'PUTA'))),
                   (q_ + 'PUTA', ('add', lambda L, to=to, k=k: ARR(to, k), lambda L: 1, '_',
-                                 '@' + q_ + 'PUTN')),
+                                 '@' + q_ + ('PUTF' if phase == REDUCE and
+                                             design == 'sender_field_late' else 'PUTN'))),
                   (q_ + 'PUTN', ('set', 'qs', lambda L: (L['qs'] or 0) + 1, '@' + q_ + 'L')),
                   (q_ + 'TAKE', ('check', lambda M, L, c=c, phase=phase, k=k:
                                  None if M[SLOT(rank, k, (L['qc'] or 0) % W)] ==
@@ -512,9 +513,29 @@ def lead_program(design, rank, n, count, W, kinds):
                                  f'{L["qc"] or 0} of {"reduce-scatter" if phase == REDUCE else "allgather"} '
                                  f'round {k}, waiting for {piece_tag(c, phase, k, L["qc"] or 0)}',
                                  '@' + q_ + 'TAKEN')),
-                  (q_ + 'TAKEN', ('set', 'qc', lambda L: (L['qc'] or 0) + 1, '@' + q_ + 'CRED')),
+                  (q_ + 'TAKEN', ('set', 'qc', lambda L: (L['qc'] or 0) + 1,
+                                  '@' + q_ + ('TAKEF' if phase == REDUCE else 'CRED'))),
                   (q_ + 'CRED', ('add', lambda L, frm=frm: CRED(frm), lambda L: 1, '_',
                                  '@' + q_ + 'L'))]
+            if phase == REDUCE:
+                # The first piece of the round carries the sender's lane: its
+                # field at the receiver, put before the first add (or, broken,
+                # after it), which the receiver reads as it takes that piece
+                # and uses for the allgather's round k back to the sender.
+                after_field = 'PUTA' if design != 'sender_field_late' else 'PUTN'
+                B += [(q_ + 'PUTF', ('br', lambda L: (L['qs'] or 0) == 0, '@' + q_ + 'PUTF1',
+                                     '@' + q_ + after_field)),
+                      (q_ + 'PUTF1', ('store', lambda L, to=to, k=k: SENDER_FIELD(to, k),
+                                      lambda L, c=c, k=k: grant_tag(c, k, rank), True,
+                                      '@' + q_ + after_field)),
+                      (q_ + 'TAKEF', ('br', lambda L: (L['qc'] or 0) == 1, '@' + q_ + 'TAKEF1',
+                                      '@' + q_ + 'CRED')),
+                      (q_ + 'TAKEF1', ('check', lambda M, L, c=c, k=k, frm=frm:
+                                       None if M[SENDER_FIELD(rank, k)] == grant_tag(c, k, frm)
+                                       else f'SENDER: lead {rank} reads '
+                                       f'{M[SENDER_FIELD(rank, k)]} in its senders\' lane field '
+                                       f'{k} with the first piece of round {k}, waiting for lead '
+                                       f'{frm}\'s of collective {c}', '@' + q_ + 'CRED'))]
             end = [(q_ + 'END', ('set', 'go', lambda L: DEL, '@' + q_ + 'END1')),
                    (q_ + 'END1', ('set', 'qs', lambda L: DEL, '@' + q_ + 'END2')),
                    (q_ + 'END2', ('set', 'qc', lambda L: DEL, '@' + q_ + 'END3'))]
@@ -522,11 +543,8 @@ def lead_program(design, rank, n, count, W, kinds):
                 # Row k is free: grant the lead that fills it in the allgather,
                 # lead + s_k - this round's receiver.
                 sender = to
-                end += [(q_ + 'END3', ('store', lambda L, sender=sender, k=k: AG_FIELD(sender, k),
-                                       lambda L, c=c, k=k: grant_tag(c, k, rank), True,
-                                       '@' + q_ + 'END4')),
-                        (q_ + 'END4', ('add', lambda L, sender=sender: AG_GRANT(sender),
-                                       lambda L: 1, '_', nxt))]
+                end.append((q_ + 'END3', ('add', lambda L, sender=sender: AG_GRANT(sender),
+                                          lambda L: 1, '_', nxt)))
             else:
                 end.append((q_ + 'END3', ('br', lambda L: True, nxt, nxt)))
             B += end
@@ -545,7 +563,7 @@ PROTOCOL_CASES = [
     ('five leads, a reduction twice', 5, 5, 1, ('circulant', 'circulant')),
 ]
 BREAKAGES = ['no_credit', 'no_rs_grant', 'stale_rs_grant', 'early_ag_grant',
-             'one_ag_grant_at_a_time', 'shared_counters']
+             'one_ag_grant_at_a_time', 'shared_counters', 'sender_field_late']
 
 
 def protocol(want):

@@ -89,8 +89,16 @@ The model's second half, under the engine's SC interleavings:
   of its own.
 - **The allgather's grants.** The allgather's round k comes from r + s_k into
   r's row k, which r's reduce-scatter round k filled; r grants that sender as
-  its own round k ends, and a sender starts its allgather once it holds all of
-  its allgather grants - again because one counter cannot say which.
+  its own round k ends - a count, nothing more - and a sender starts its
+  allgather once it holds all of its allgather grants, again because one
+  counter cannot say which.
+- **The allgather's lanes travel with the reduce-scatter.** Lead r's allgather
+  round k sends to r - s_k, the lead that sent to r in reduce-scatter round k;
+  that sender put its own lane into the field for row k of r's senders' lanes
+  line before its first piece's add, and r read it as it took that piece - the
+  row's counter is what says the field is written. Every put lands outside the
+  counters a lead watches: the grant line's lanes past its counter, the
+  senders' lanes on a line of their own.
 - **Counters of their own.** The allgather ends with no step every lead waits
   for: a lead whose last pieces have come leaves while another still waits for
   its own, and can start the team's next collective - a small reduction, whose
@@ -102,18 +110,20 @@ The model's second half, under the engine's SC interleavings:
   leaves before every lead has finished it.
 
 **Checked**: every piece a lead takes is the one it waits for - this
-collective's, this half's, this round's, this index (UP); every put lands in a
-lane lent, at that moment, to the collective that puts (LANE); no lead is
-stuck; from every state the run can end.
+collective's, this half's, this round's, this index (UP); every lane a lead
+reads in its senders' lanes line is the one its sender put there for this
+collective and round (SENDER); every put lands in a lane lent, at that moment,
+to the collective that puts (LANE); no lead is stuck; from every state the run
+can end.
 
 | case | leads | elements | W | states | verdict |
 |---|---|---|---|---|---|
-| a reduction twice | 2 | 4 | 1 | 1,323 | holds, and can always finish |
-| a reduction twice | 3 | 6 | 1 | 52,259 | holds, and can always finish |
-| a reduction, then a small tree reduction | 3 | 6 | 1 | 25,991 | holds, and can always finish |
-| a small tree reduction, then a reduction | 3 | 6 | 1 | 25,287 | holds, and can always finish |
-| a reduction twice | 4 | 4 | 1 | 699,773 | holds, and can always finish |
-| a reduction twice | 5 | 5 | 1 | 15,531,381 | holds; past the liveness check's bound |
+| a reduction twice | 2 | 4 | 1 | 1,367 | holds, and can always finish |
+| a reduction twice | 3 | 6 | 1 | 55,939 | holds, and can always finish |
+| a reduction, then a small tree reduction | 3 | 6 | 1 | 27,831 | holds, and can always finish |
+| a small tree reduction, then a reduction | 3 | 6 | 1 | 27,127 | holds, and can always finish |
+| a reduction twice | 4 | 4 | 1 | 790,023 | holds, and can always finish |
+| a reduction twice | 5 | 5 | 1 | 18,292,440 | holds; past the liveness check's bound |
 
 **The breakages**, each failing in the case named: no credit (two leads: a slot
 overwritten before it was taken); no reduce-scatter grant (two leads: a put
@@ -122,8 +132,10 @@ into a lane not yet lent); a stale grant, any grant ever taken for this one
 leads: an allgather piece where a reduce-scatter piece was waited for); the
 allgather's grants waited for one a round by count (three leads: a later
 round's grant counted for an earlier one, and a piece into a row still in
-use); and the counters shared with the tree's (three leads, a small reduction
-after the reduction: a child's early add counted as a piece).
+use); the counters shared with the tree's (three leads, a small reduction
+after the reduction: a child's early add counted as a piece); and a sender's
+lane put after its first piece's add (two leads: the receiver takes the first
+piece and finds no lane in the field).
 
 **What it found about the fold's design** (Part 1): the brief's one grant line
 a team number cannot hold the grants of several partners at once - the
@@ -176,17 +188,19 @@ differ from round to round, Träff's or the fold:
 
 **The design the model holds** (above), which leaves the lane's layout and the
 tree's grant as they are and adds, per team number, the reduce-scatter's own
-words, sized like the gather's by the job's node count: an arrival counter per
-row, ceil(log2 N) of them; a credit counter; a grant line whose counter the
-reduce-scatter's receivers add to, past which each puts its lane into the
-field for its round, with the collective's epoch, identity and bytes; and the
-same for the allgather's grants - ceil(log2 N) + 3 lines of 128 bytes, 10
-lines at the 70 nodes the VM runs, 1.25 KiB a team number, 320 KiB a PE at 256
+words, sized like the gather's by the job's node count, in this order so that
+every put lands outside the counters a lead watches: an arrival counter per
+row, ceil(log2 N) of them; a credit counter; the allgather's grant counter; the
+reduce-scatter's grant line, past whose counter each receiver puts its lane
+into the field for its round, with the collective's epoch, identity and bytes;
+and a line of the senders' lanes - ceil(log2 N) + 4 lines of 128 bytes, 11 at
+the 70 nodes the VM runs, about 1.4 KiB a team number, 352 KiB a PE at 256
 numbers (the region is 15.5 MiB at the defaults).
 
 **Options.**
-- (a) This design: its own words, grants a lane a round, each counter waited
-  for whole.
+- (a) This design: its own words, the reduce-scatter's grants a lane a round
+  and the allgather's a count, each waited for whole, the allgather's lanes
+  carried by the reduce-scatter's first pieces.
 - (b) The tree's counters, with a step at the reduction's end that every lead
   waits for, so that nobody leaves early: about a hop a call, and the grants'
   lanes still need fields of their own.
@@ -198,8 +212,10 @@ chooser's shape; the data path waits for your word on the words and the grants.
 ## Verification
 
 The branch at its third commit, on the host: `circulant_model.py` whole - the
-arithmetic, the six protocol cases and the six breakages (about six minutes,
+arithmetic, the six protocol cases and the seven breakages (about six minutes,
 the five-lead case most of it) - and the digests; `shape_timing.py`'s check and
 its grid; `test-circulant.c` and `test-collective-shape.c` built with
 `-Wall -Wextra -Wconversion -Wshadow`, no warning, each against the mutation
-above. In the VM: *(the presets, when the branch is verified)*.
+above; `circulant_model.py` whole again after the allgather's lanes moved to the
+reduce-scatter's first pieces (eight minutes, every case holding and the seven
+breakages failing). In the VM: *(the presets, when the branch is verified)*.
