@@ -503,7 +503,7 @@ static void boundary(void)
 {
     CHECK_FATAL(npes >= 2);
     uint32_t small = setting("OSOE_SMALL_COLLECTIVE_BYTES", 1024);
-    uint32_t window = setting("OSOE_COLLECTIVE_PIPELINE", 2);
+    uint32_t window = setting("OSOE_COLLECTIVE_PIPELINE", 4);
     unsigned char *bytes_dst = (unsigned char *)dest, *bytes_src = (unsigned char *)source;
     size_t sizes[] = { small, (size_t)small + 1, 3 * (size_t)PIECE_BYTES + 1 };
     for (size_t s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {

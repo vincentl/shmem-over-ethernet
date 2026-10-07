@@ -252,9 +252,9 @@ int main(void)
     check_long(SHMEM_TEAM_WORLD, "the world, in many pieces", MANY, true, false, false);
     check_long(SHMEM_TEAM_WORLD, "the world, in many pieces", MANY, false, true, false);
     if (shmem_team_n_pes(SHMEM_TEAM_SHARED) < npes &&
-        scan_leaf((uint32_t)npes, (uint32_t)setting("OSOE_COLLECTIVE_FANOUT", 4), (uint32_t)me)) {
+        scan_leaf((uint32_t)npes, (uint32_t)setting("OSOE_COLLECTIVE_FANOUT", 8), (uint32_t)me)) {
         uint64_t pieces = (MANY + SLOT_LONGS - 1) / SLOT_LONGS;
-        uint64_t window = setting("OSOE_COLLECTIVE_PIPELINE", 2);
+        uint64_t window = setting("OSOE_COLLECTIVE_PIPELINE", 4);
         uint64_t want = pieces < window ? pieces : window, most = most_in_flight();
         if (most != want)
             fprintf(stderr, "PE %d: a leaf of the scan's tree had %llu pieces in flight at "

@@ -164,14 +164,14 @@ static int root_off_first_node(void)
 static uint64_t pipeline(void)
 {
     const char *d = getenv("OSOE_COLLECTIVE_PIPELINE");
-    return d ? strtoull(d, NULL, 10) : 2;
+    return d ? strtoull(d, NULL, 10) : 4;   /* the default, bootstrap.h */
 }
 
-/* The fan-out, likewise: the library's default is 4 (internode-am.c). */
+/* The fan-out, likewise: the library's default is 8 (internode-backend.h). */
 static uint64_t fanout(void)
 {
     const char *k = getenv("OSOE_COLLECTIVE_FANOUT");
-    return k ? strtoull(k, NULL, 10) : 4;
+    return k ? strtoull(k, NULL, 10) : 8;
 }
 
 /* Where a node is in the tree over `nodes` nodes rooted at node `root_node`:

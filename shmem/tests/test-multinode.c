@@ -205,7 +205,7 @@ int main(void)
      */
     if (nodes > 1) {
         const char *k_env = getenv("OSOE_COLLECTIVE_FANOUT");
-        uint32_t k = k_env ? (uint32_t)atoi(k_env) : 4;
+        uint32_t k = k_env ? (uint32_t)atoi(k_env) : 8;   /* internode-backend.h's default */
         uint32_t me_node = (uint32_t)atoi(osoe_test_launcher("NODEID"));
         uint64_t parent = 0, children = 0, missing = 0, own = 0, fanout = 0;
         CHECK(osoe_test_node_metric("team.world.tree.parent", &parent));

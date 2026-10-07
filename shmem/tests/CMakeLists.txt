@@ -477,8 +477,8 @@ if(OSOE_INTERNODE)
   # where its parent keeps another. Two nodes, the second's lead given 4 to the
   # first's default 2; and outside 1 to 8, or not a number, refused at init.
   osoe_refusal_test(shmem.job.disagree.pipeline 2 0
-    LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_PIPELINE=4
-    PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=4; node 0 has 2"
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_PIPELINE=2
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=2; node 0 has 4"
              "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
     PROGRAM $<TARGET_FILE:shmem_test_job>)
   osoe_internode_label(shmem.job.disagree.pipeline)
@@ -497,12 +497,12 @@ endforeach()
 # (node.c, open_control).
 osoe_refusal_test(shmem.collective-fanout.local-disagree 2 0
   LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_FANOUT=2
-  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_FANOUT differs between PEs: the local lead has 4, this PE has 2"
+  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_FANOUT differs between PEs: the local lead has 8, this PE has 2"
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 osoe_refusal_test(shmem.collective-pipeline.local-disagree 2 0
-  LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_PIPELINE=4
-  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 2, this PE has 4"
+  LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_PIPELINE=2
+  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 4, this PE has 2"
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
@@ -2936,6 +2936,41 @@ add_test(NAME shmem.deadlock.refused.L2
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_deadlock> computing)
 set_tests_properties(shmem.deadlock.refused.L2 PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "OSOE_DEADLOCK_SECONDS=soon: 0 to turn deadlock detection off")
+
+# The shape each large reduction and broadcast takes on the data path (v0.2
+# step 2, Part 2; test-shapes-chosen.c): with the link set to the Pi's and to a
+# loopback's, on 4, 16 and 64 logical nodes, every call's fan-out and window the
+# chooser's - held to shape-grid.txt, the model's - and its result right.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_executable(shmem_test_shapes-chosen test-shapes-chosen.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_shapes-chosen PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_shapes-chosen PRIVATE osoe rt)
+  osoe_warnings(shmem_test_shapes-chosen)
+  foreach(case "pi;4;86000;7000;116000000" "pi;16;86000;7000;116000000"
+               "loopback;16;20000;2000;4000000000" "pi;64;86000;7000;116000000"
+               "loopback;64;20000;2000;4000000000")
+    list(GET case 0 link)
+    list(GET case 1 nodes)
+    list(GET case 2 hop)
+    list(GET case 3 message)
+    list(GET case 4 bandwidth)
+    set(map "0")
+    math(EXPR last "${nodes} - 1")
+    foreach(node RANGE 1 ${last})
+      string(APPEND map ",${node}")
+    endforeach()
+    add_test(NAME shmem.shape.chosen.${link}.${nodes}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=${hop} OSOE_LINK_MESSAGE_NS=${message}
+              OSOE_LINK_BYTES_PER_SECOND=${bandwidth} SHMEM_SYMMETRIC_SIZE=16m
+              $<TARGET_FILE:osoe-launch> -n ${nodes} -m ${map} -t 240 --
+              $<TARGET_FILE:shmem_test_shapes-chosen> ${CMAKE_CURRENT_SOURCE_DIR}/shape-grid.txt)
+    set_tests_properties(shmem.shape.chosen.${link}.${nodes} PROPERTIES LABELS "tier2"
+      TIMEOUT 300 PASS_REGULAR_EXPRESSION "SHAPES CHOSEN: 12 calls checked"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]")
+    osoe_internode_label(shmem.shape.chosen.${link}.${nodes})
+  endforeach()
+endif()
 
 # The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on
 # one node, where the team's local lead scans; across nodes on a block, an
