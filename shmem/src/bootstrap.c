@@ -372,8 +372,10 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         b->collective_shape = OSOE_COLLECTIVE_SHAPE_LINK;
     else if (strcmp(shape, "fixed") == 0)
         b->collective_shape = OSOE_COLLECTIVE_SHAPE_FIXED;
+    else if (strcmp(shape, "tree") == 0)
+        b->collective_shape = OSOE_COLLECTIVE_SHAPE_TREE;
     else
-        osoe_fatal("OSOE_COLLECTIVE_SHAPE='%s' is neither link nor fixed", shape);
+        osoe_fatal("OSOE_COLLECTIVE_SHAPE='%s' is not link, tree or fixed", shape);
     static const char *const link_names[3] = { "OSOE_LINK_HOP_NS", "OSOE_LINK_MESSAGE_NS",
                                                "OSOE_LINK_BYTES_PER_SECOND" };
     uint64_t *const link_values[3] = { &b->link_hop_ns, &b->link_message_ns,

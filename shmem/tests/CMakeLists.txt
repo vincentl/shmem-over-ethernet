@@ -553,7 +553,7 @@ osoe_refusal_test(shmem.small-collective-bytes.local-disagree 2 0
 # below, between nodes.
 # Each refusal: a name, the variables set (separated by ^), the pattern.
 set(osoe_link_refusals
-  "shape-bogus|OSOE_COLLECTIVE_SHAPE=bogus|OSOE_COLLECTIVE_SHAPE='bogus' is neither link nor fixed"
+  "shape-bogus|OSOE_COLLECTIVE_SHAPE=bogus|OSOE_COLLECTIVE_SHAPE='bogus' is not link, tree or fixed"
   "hop-0|OSOE_LINK_HOP_NS=0^OSOE_LINK_MESSAGE_NS=7000^OSOE_LINK_BYTES_PER_SECOND=116000000|OSOE_LINK_HOP_NS='0' is not between 1 and 10000000000"
   "bandwidth-x|OSOE_LINK_HOP_NS=86000^OSOE_LINK_MESSAGE_NS=7000^OSOE_LINK_BYTES_PER_SECOND=x|OSOE_LINK_BYTES_PER_SECOND='x' is not between 1 and 10000000000000"
   "message-too-large|OSOE_LINK_HOP_NS=86000^OSOE_LINK_MESSAGE_NS=1000000001^OSOE_LINK_BYTES_PER_SECOND=116000000|OSOE_LINK_MESSAGE_NS='1000000001' is not between 0 and 1000000000"
@@ -2278,7 +2278,9 @@ if(OSOE_INTERNODE)
   # place in the tree. On a block map, an interleaved one, five nodes at a
   # fan-out of 2, where a lead is both a parent and a child, and eight, a tree
   # three deep, at D = 1, 2 and 4 - D = 1 being one piece at a time. tsan is left
-  # out of the maps for shmem.internode.*'s reason.
+  # out of the maps for shmem.internode.*'s reason. Under OSOE_COLLECTIVE_SHAPE=tree
+  # since v0.2 step 3, so that a 1 MiB reduction keeps to the tree whose counts
+  # these pin, where the link might choose Träff's (shmem.circulant.* below).
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     add_executable(shmem_test_pipeline test-pipeline.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
     target_include_directories(shmem_test_pipeline PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
@@ -2293,7 +2295,8 @@ if(OSOE_INTERNODE)
       string(REPLACE "," "-" label "${map}")
       foreach(in_flight 1 2 4)
         add_test(NAME shmem.pipeline.${label}.in-flight-${in_flight}
-          COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=${in_flight} ${environment}
+          COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=tree
+                  OSOE_COLLECTIVE_PIPELINE=${in_flight} ${environment}
                   $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
                   $<TARGET_FILE:shmem_test_pipeline>)
         set_tests_properties(shmem.pipeline.${label}.in-flight-${in_flight} PROPERTIES
@@ -2310,14 +2313,16 @@ if(OSOE_INTERNODE)
     # into a lane nobody lent unseen, runs past the region's end, which the
     # target refuses by name (progress-host.c). At D = 2.
     add_test(NAME shmem.pipeline.0-1-2-3-4.stress
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_COLLECTIVE_FANOUT=2
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=tree OSOE_COLLECTIVE_PIPELINE=2
+              OSOE_COLLECTIVE_FANOUT=2
               OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2
               OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
               $<TARGET_FILE:osoe-launch> -n 5 -m 0,1,2,3,4 -t 150 --
               $<TARGET_FILE:shmem_test_pipeline>)
     set_tests_properties(shmem.pipeline.0-1-2-3-4.stress PROPERTIES LABELS "tier2" TIMEOUT 180)
     add_test(NAME shmem.pipeline.0-0-1-1.max-teams-4
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=2 OSOE_MAX_TEAMS=4
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=tree OSOE_COLLECTIVE_PIPELINE=2
+              OSOE_MAX_TEAMS=4
               OSOE_MAX_THREADS=1
               $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 60 --
               $<TARGET_FILE:shmem_test_pipeline>)
@@ -2993,9 +2998,13 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   # world and two strided teams sharing its leads (test-shapes-back-to-back.c;
   # the step's adversarial read, finding 2): a large reduction's grants go to
   # this call's children. Sixteen nodes of one PE each, and eight of two, where
-  # the odds' lead is local id 1.
-  add_executable(shmem_test_shapes-back-to-back test-shapes-back-to-back.c)
-  target_link_libraries(shmem_test_shapes-back-to-back PRIVATE osoe)
+  # the odds' lead is local id 1. Since v0.2 step 3 Träff's reductions among
+  # them, which the test counts and requires.
+  add_executable(shmem_test_shapes-back-to-back test-shapes-back-to-back.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_shapes-back-to-back PRIVATE
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_shapes-back-to-back PRIVATE osoe rt)
   osoe_warnings(shmem_test_shapes-back-to-back)
   foreach(map "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15" "0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7")
     string(REPLACE "," "-" label "${map}")
@@ -3008,6 +3017,84 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
       TIMEOUT 300 PASS_REGULAR_EXPRESSION "SHAPES BACK TO BACK: 40 rounds on 16 PEs"
       FAIL_REGULAR_EXPRESSION "CHECK[(]")
     osoe_internode_label(shmem.shape.back-to-back.${label})
+  endforeach()
+endif()
+
+# Träff's circulant reduce-scatter and allgather on the data path (v0.2 step 3,
+# Part 2; test-circulant-reduce.c): the link set to the Pi's, so that the test
+# knows what the chooser takes, over 2 to 70 logical nodes - the counts that
+# are not powers of two among them by name - one PE a node, and over eight
+# nodes of two: sizes across the chooser's crossover, every typed reduction at a
+# size Träff's takes, in place, staggered entries, and calls back to back with
+# small collectives and trees, each call's result and algorithm checked. Under
+# OSOE_TEST_PERTURB on 5 and 16 nodes; two threads a PE reducing two teams at
+# once on 4 and 16; under the AM stress settings, as shmem.pipeline.*.stress
+# runs the trees; at the fewest team numbers and lanes, OSOE_MAX_TEAMS=4 and
+# OSOE_MAX_THREADS=1, where the lanes end the region and a slot past a lane's
+# rows runs off its end; and under OSOE_COLLECTIVE_SHAPE=tree, where no call may
+# take Träff's. The sanitizers run up to 16 nodes - sixty-four PEs under asan
+# outgrow the VM - and tsan one PE a node alone, as shmem.lanes.* does.
+if(OSOE_INTERNODE)
+  add_executable(shmem_test_circulant-reduce test-circulant-reduce.c
+    ../src/collective-shape.c ../src/collective-circulant.c ../src/collective-tree.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_circulant-reduce PRIVATE ../src
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_circulant-reduce PRIVATE osoe rt Threads::Threads)
+  osoe_warnings(shmem_test_circulant-reduce)
+  foreach(case 2 3 4 5 6 7 8 9 12 16 17 33 64 70 8x2 5.perturb 16.perturb 4.threads
+               16.threads 5.stress 4.max-teams-4 16.tree)
+    string(REGEX MATCH "^[0-9]+" nodes "${case}")
+    set(per_node 1)
+    if(case MATCHES "x2$")
+      set(per_node 2)
+    endif()
+    set(extra "")
+    set(arguments "")
+    if(case MATCHES "perturb")
+      set(extra OSOE_TEST_PERTURB=1)
+    elseif(case MATCHES "threads")
+      set(arguments threads)
+    elseif(case MATCHES "stress")
+      set(extra OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2 OSOE_WIRE_BYTES=256
+                OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20261007)
+    elseif(case MATCHES "max-teams-4")
+      set(extra OSOE_MAX_TEAMS=4 OSOE_MAX_THREADS=1)
+    elseif(case MATCHES "tree")
+      set(extra OSOE_COLLECTIVE_SHAPE=tree)
+    endif()
+    if(nodes GREATER 16 AND CMAKE_C_FLAGS MATCHES "sanitize=")
+      continue()
+    endif()
+    if(per_node GREATER 1 AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
+      continue()
+    endif()
+    set(map "")
+    math(EXPR last "${nodes} - 1")
+    foreach(node RANGE 0 ${last})
+      foreach(copy RANGE 1 ${per_node})
+        if(map STREQUAL "")
+          set(map "${node}")
+        else()
+          string(APPEND map ",${node}")
+        endif()
+      endforeach()
+    endforeach()
+    math(EXPR pes "${nodes} * ${per_node}")
+    set(timeout 300)
+    if(nodes GREATER 16)
+      set(timeout 900)
+    endif()
+    math(EXPR launch_timeout "${timeout} - 60")
+    add_test(NAME shmem.circulant.${case}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
+              OSOE_LINK_BYTES_PER_SECOND=116000000 SHMEM_SYMMETRIC_SIZE=12m ${extra}
+              $<TARGET_FILE:osoe-launch> -n ${pes} -m ${map} -t ${launch_timeout} --
+              $<TARGET_FILE:shmem_test_circulant-reduce> ${arguments})
+    set_tests_properties(shmem.circulant.${case} PROPERTIES LABELS "tier2"
+      TIMEOUT ${timeout} PASS_REGULAR_EXPRESSION "CIRCULANT REDUCE: .* on ${nodes} nodes"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]")
+    osoe_internode_label(shmem.circulant.${case})
   endforeach()
 endif()
 

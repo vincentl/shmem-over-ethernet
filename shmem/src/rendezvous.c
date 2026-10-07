@@ -153,8 +153,8 @@ static void agree(const struct osoe_bootstrap *b, uint32_t child, const struct a
     if (theirs->collective_shape != mine->collective_shape)
         osoe_fatal("node %u (or a node below it) has OSOE_COLLECTIVE_SHAPE=%s; node %u has %s: "
                    "every node must shape a collective's tree alike", child,
-                   theirs->collective_shape ? "fixed" : "link", b->node,
-                   mine->collective_shape ? "fixed" : "link");
+                   osoe_collective_shape_name(theirs->collective_shape), b->node,
+                   osoe_collective_shape_name(mine->collective_shape));
     if (theirs->link_hop_ns != mine->link_hop_ns ||
         theirs->link_message_ns != mine->link_message_ns ||
         theirs->link_bytes_per_second != mine->link_bytes_per_second)

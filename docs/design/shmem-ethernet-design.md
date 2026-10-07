@@ -5862,18 +5862,30 @@ The intranode phase is unchanged: the lead combines local members' sources into
 its `dest` after they arrive (§5.5). The internode algorithm then runs between
 leads, and release and copy-out follow the §5.4 counters as before.
 
-*Modelled, not yet on the data path (v0.2 step 3; `2026-10-07-circulant.md`):*
-Träff's circulant reduce-scatter and allgather (arXiv 2410.14234) in place of
-the brief's recursive halving with a fold, for every node count: ceil(log2 N)
-rounds a half, every lead sending N - 1 blocks a half, where the fold put up to
-3.5 vectors on a fold lead's link. Rule 1 holds through the lanes' rows, rule 2
-on the lead's thread, rule 3 since each block is combined once, at its owner,
-and copied. Its arithmetic is `collective-circulant.c`, its cost the chooser's
-(`osoe_shape_circulant_cost`), which the data path does not yet ask for. The
-protocol the model holds needs counters of its own - its allgather ends with no
-step every lead waits for, so a finished lead's next collective could add to
-the tree's while another lead still waits on them - and grants that carry a
-lane a round; the record's question 1 puts both to the author.
+*As built (v0.2 step 3; `2026-10-07-circulant.md`, `2026-10-07-circulant-data-path.md`):*
+a large reduction takes Träff's circulant reduce-scatter and allgather (arXiv
+2410.14234) where the chooser says it costs less than the best tree (`shape_of`
+in `internode-generic.c`, under `OSOE_COLLECTIVE_SHAPE=link`; `tree` turns it
+off by name): ceil(log2 N) rounds a half for every node count, every lead
+sending N - 1 blocks a half - under two vectors on every lead's link, where a
+tree's interior lead sends k + 1 and the fold the step's brief first described
+put up to 3.5 on a fold lead's. Rule 1 holds through the lanes' rows, round k
+of either half into row k of the receiver's lane; rule 2 on the lead's thread,
+which combines or copies every piece; rule 3 since each block is combined once,
+at its owner, in an order the schedule fixes, and copied to every lead. Its
+arithmetic is `collective-circulant.c`, its cost `osoe_shape_circulant_cost`,
+its protocol `tools/modelcheck/circulant_model.py`'s: words of its own per team
+number - an arrival counter a row, a credit counter, the allgather's grant
+count, the reduce-scatter's grant line with a lane a round, and the senders'
+lanes - because its allgather ends with no step every lead waits for, so a
+finished lead's next collective could add to a tree's counters while another
+lead still waits on them; and credits for the pieces a sender's window waits on
+alone, so that nothing lands in a lead's words once it has returned. Each lead
+publishes the algorithm its last such call took and the rounds Träff's made in
+the team's tree state (`team.tree.algorithm`, `circulant_rounds`; layout 33),
+which `shmem.shape.chosen.*` and `shmem.circulant.*` hold call by call. Its
+crossover is the cost model's on the measured link; the Pi's check of it is the
+step's third part.
 
 #### Prefix scans
 

@@ -356,6 +356,13 @@ static uint64_t pe_thread_value(const struct osoe_segment *s, const struct osoe_
 
 /* ---- headers ---------------------------------------------------------- */
 
+/* OSOE_COLLECTIVE_SHAPE's value as the setting spells it (bootstrap.h): link
+ * 0, fixed 1, and since v0.2 step 3 tree 2. */
+static const char *shape_name(uint64_t shape)
+{
+    return shape == 1 ? "fixed" : shape == 2 ? "tree" : "link";
+}
+
 /* The shape of a large collective's tree and the link it is chosen from
  * (layout 32, v0.2 step 2), as one phrase; empty before layout 32. */
 static void shape_text(const struct osoe_segment *s, char *buf, size_t len)
@@ -383,10 +390,10 @@ static void shape_text(const struct osoe_segment *s, char *buf, size_t len)
     }
     if (bandwidth)
         snprintf(buf, len, "collective shape %s; link %s: a hop of %" PRIu64 " ns, a message "
-                 "cost of %" PRIu64 " ns, %" PRIu64 " bytes a second", shape ? "fixed" : "link",
+                 "cost of %" PRIu64 " ns, %" PRIu64 " bytes a second", shape_name(shape),
                  how, hop, message, bandwidth);
     else
-        snprintf(buf, len, "collective shape %s; link not set", shape ? "fixed" : "link");
+        snprintf(buf, len, "collective shape %s; link not set", shape_name(shape));
 }
 
 static void print_identity(const struct osoe_segment *s)

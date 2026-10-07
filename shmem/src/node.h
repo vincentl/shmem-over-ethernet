@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 32
+#define OSOE_NODE_LAYOUT 33
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -581,10 +581,24 @@ struct osoe_collective_state {
     _Atomic uint32_t shape_fanout;
     _Atomic uint32_t shape_window;
     _Atomic uint32_t shape_children;
+    /*
+     * Layout 33 (v0.2 step 3), past the line the fields above fill on x86-64:
+     * the algorithm that last data collective took past the intranode phase,
+     * OSOE_SHAPE_TREE or OSOE_SHAPE_CIRCULANT (collective-shape.h), and the
+     * rounds the lead's last Träff's reduction made, counted as they ran -
+     * 2 ceil(log2 N) over N nodes - so that a test pins which algorithm a call
+     * took, and that it ran every round, by counts. For Träff's the fields
+     * above say its class, its lane, the chooser's shape, no tree children,
+     * and in most_pieces_in_flight the most pieces the lead had put in a round
+     * and not yet held the credit for - at most the window.
+     */
+    _Atomic uint32_t algorithm;
+    _Atomic uint32_t circulant_rounds;
 };
-_Static_assert(sizeof(struct osoe_collective_state) == OSOE_CACHELINE,
-               "the tree state is one line, its padding now spent: a field more grows "
-               "every team block");
+_Static_assert(sizeof(struct osoe_collective_state) == 128,
+               "the tree state is 128 bytes since layout 33 - two lines on x86-64 and one on "
+               "aarch64, whose line is 128 - with room for fourteen fields more before it "
+               "grows every team block again");
 
 /*
  * A team's record on this node (layout 18; phase 1 step 7): what this node's

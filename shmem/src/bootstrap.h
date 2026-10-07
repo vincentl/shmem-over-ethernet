@@ -160,14 +160,25 @@ struct osoe_bootstrap {
 #define OSOE_SMALL_COLLECTIVE_BYTES_HIGHEST 16384u
 
 /*
- * OSOE_COLLECTIVE_SHAPE (v0.2 step 2): `link`, the default, chooses each large
- * reduction's and broadcast's fan-out and window from the link
- * (collective-shape.h); `fixed` runs every one at the fan-out and the pipeline
- * as set, the 0.1.0 tag's shape. Until the chooser is on the data path - the
- * step's second part - every collective runs as `fixed` does.
+ * OSOE_COLLECTIVE_SHAPE (v0.2 step 2; `tree` since step 3): `link`, the
+ * default, chooses each large reduction's and broadcast's shape from the link
+ * (collective-shape.h) - a tree's fan-out and window, or for a reduction
+ * Träff's circulant reduce-scatter and allgather where it costs less; `tree`
+ * chooses the same way among the trees alone, Träff's turned off by name;
+ * `fixed` runs every one at the fan-out and the pipeline as set, the 0.1.0
+ * tag's shape.
  */
 #define OSOE_COLLECTIVE_SHAPE_LINK  0u
 #define OSOE_COLLECTIVE_SHAPE_FIXED 1u
+#define OSOE_COLLECTIVE_SHAPE_TREE  2u
+
+/* A collective shape as the setting spells it. */
+static inline const char *osoe_collective_shape_name(uint32_t shape)
+{
+    return shape == OSOE_COLLECTIVE_SHAPE_FIXED  ? "fixed"
+           : shape == OSOE_COLLECTIVE_SHAPE_TREE ? "tree"
+                                                 : "link";
+}
 
 /*
  * OSOE_LINK_* (v0.2 step 2): the link's three numbers set by hand, for tests
