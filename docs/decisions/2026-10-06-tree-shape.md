@@ -214,7 +214,10 @@ at a crossover.
   start, and each fan costs about two round trips.
 
 **Recommendation: (a)**, and the question again on a cluster large enough for
-the message cost to move a choice. **Built meanwhile:** (a).
+the message cost to move a choice. **Built meanwhile:** (a). **Merged with
+(a)** at step 2's merge point, the answer not yet given: no choice the Pi can
+make depends on it, and (b) is one line of `link-measure.c` (the read's finding
+3; the night's record of 2026-10-07).
 
 ## Choices made without the author
 
@@ -385,16 +388,71 @@ something measured or computed. Part 1 keeps the tag's 4 and 2, which nothing
 in it needs changed; Part 2 sets what you choose. **Answered** (item 5): 8 and 4,
 "accept"; Part 2 sets them.
 
+## The adversarial read
+
+A fresh agent read the branch at `eefb36f` (now `b073e7a`), asked to find a PE
+ending `shmem_init` with another shape or other numbers than its peers, or a
+chooser past the ceiling or the capacity: the report is
+`docs/reviews/archive/v0.2-step2-part1-adversarial-read.md`. The rule holds - the
+same path and the same numbers on every PE, measured up to 34 nodes and under
+perturbation, and the chooser held to the model on 80,000 random inputs under the
+sanitizers - and it found one defect and nine smaller things. In `cd5872d`:
+
+- **Finding 1, the defect**: the streams were sized from the root's own
+  `OSOE_MAX_THREADS`, which nodes need not agree on, and ran past the region of a
+  node with fewer threads, ending the job at start under a message naming the
+  wrong settings. They now stay within the fewest lanes any node can have - two,
+  at `OSOE_MAX_THREADS=1` - and within 64 KiB, a lane's row at the capacity, the
+  longer streams wrapping as a collective's pieces wrap in a row. That also
+  bounds what a start touches of node 1's lanes to 64 KiB (finding 6, now in the
+  README's `OSOE_MAX_THREADS` row). `shmem.link.few-lanes.0-1` - node 1 at one
+  thread and the smallest lanes the settings make - passes, and fails with the
+  old sizing.
+- **Finding 8**: a long stream no slower than the short gave the highest
+  bandwidth a setting may, which Part 2's chooser would read as bytes for free.
+  Now a slope more than four times the long stream's own rate is taken for noise,
+  and that rate - which counts the hop, so is a bound below the link's, within a
+  few percent of the slope where the bytes outweigh the hop - stands in for it.
+- **Finding 4**: osoe-stat reads the measured bandwidth first, the last of the
+  lead's three release stores, so it never shows one start's hop beside
+  another's bandwidth.
+- **Findings 5 and 7**, in the README: the measurement's puts count in the root's
+  lead's transport counters, and its 1.9 MiB of streams cost a slower link more -
+  about 170 ms at 100 Mbit/s - which set numbers or the shape `fixed` skip. The
+  streams are not shortened: on the Pi the long one's 4.5 ms against the short's
+  1.1 is what makes the slope steady.
+- **Finding 10**: the stale comments, the decisions index's line, and the README's
+  promise of a report at 30 s, which the start's last step - a collective's wait,
+  shown in osoe-stat as one, its routine `shmem_init` - does not make; the cost of
+  a shape no setting reaches is the most there is, not a division by 0.
+- **Finding 9**: the scans keep the ceiling's tree (Part 2's record), so a message
+  cost of 0 on two nodes moves none; nothing in the agent reads `osoe.job.link`.
+- **Finding 3**, the fourth stop-and-ask, is the author's (below).
+
 ## Verification
 
-The branch at `8553de7`, in `osoe-load` (Debian 13, GCC 14): the debug preset
-whole, 731 of 731, no warning - `shmem.boundary` and `shmem.exports` with the new
-file among them, and `shmem.shape.choice` and `shmem.shape.grid`; and
-`model.shape_timing` (40 seconds) and `model.shape_timing.grid` in the release
-configure. The C test also built and passed with the host's clang. Each new test
-was run against the mutation it was written for: the C's beta without an
-interior lead's parent (30 grid lines differ), and the model's two broken
-variants. The settings (`72f27a6`), in `osoe-load` with liburing hidden for the
+`977418f` (the cost model and the chooser), in `osoe-load` (Debian 13, GCC 14):
+the debug preset whole, 731 of 731, no warning - `shmem.boundary` and
+`shmem.exports` with the new file among them, and `shmem.shape.choice` and
+`shmem.shape.grid`; `model.shape_timing` (40 seconds) and
+`model.shape_timing.grid` in the release configure; the C test also with the
+host's clang. Each new test against the mutation it was written for: the C's beta
+without an interior lead's parent (30 grid lines differ), and the model's two
+broken variants. `4b30e34` (the settings), with liburing hidden for the
 single-node build: the full build's debug preset 742 of 742, the single-node
-build's 360 of 360. Not yet: the other presets and `tier3`, which Part 1's merge
-verification runs once the measurement is built.
+build's 360 of 360.
+
+`b41e729` (the measurement), the merge verification: the four presets with the
+floor pins and `tier3`, failing only `shmem.memory-orders` (a relaxed store in
+the measurement) and `test-internode`'s deferred-wakes check, which the init's
+AND made count, with the three restart tests that run it - both fixed in
+`b073e7a`; `osoe-pacer collectives` at three values of
+`OSOE_SMALL_COLLECTIVE_BYTES`, its teams and threads, and ten minutes of `mix`,
+no failure; the single-node build on Debian and Rocky, its four presets and an
+install, failing only `shmem.memory-orders`; the models; the SOS sweep at 0,1 and
+0,0,1,1, 159 programs clean on both, the known failures the runbook lists
+(`shmem_team_b2b_collectives`, `shmemalign`, two C11 programs that do not build).
+`b073e7a` in `osoe`: debug 778 of 778, release 778, asan 775, tsan 544, `tier3`
+113, with the pins. `cd5872d` (the read's findings): the link, job, shape and
+internode tests, 45 of 45, and the mutation above. The merge verification of the
+whole step - both parts - runs on Part 2's tip.
