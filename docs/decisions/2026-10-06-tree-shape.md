@@ -214,7 +214,8 @@ at a crossover.
   start, and each fan costs about two round trips.
 
 **Recommendation: (a)**, and the question again on a cluster large enough for
-the message cost to move a choice. **Built meanwhile:** (a). **Merged with
+the message cost to move a choice. **Answered** (the author, 2026-10-07,
+`2026-10-07.md` item 3): "accept" - (a). **Built meanwhile:** (a). **Merged with
 (a)** at step 2's merge point, the answer not yet given: no choice the Pi can
 make depends on it, and (b) is one line of `link-measure.c` (the read's finding
 3; the night's record of 2026-10-07).

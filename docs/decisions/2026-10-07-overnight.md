@@ -71,6 +71,9 @@ show.
 
 ## What the author is asked, in one place
 
+*Answered on the morning of 2026-10-07* (`2026-10-07.md`): 1 keep, 2 accept the
+recommendation, 3 accept.
+
 1. Step 2, Part 2's question 1: the scans' shape - per call as the brief has it
    (its own model and per-row bases first), 0.1.0's fan-out with the
    capacity's window (1.30 times faster at 1 MiB, 6.6% slower at 64 KiB), or

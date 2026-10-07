@@ -159,6 +159,8 @@ final run found no line of any collective slower beyond the noise.
 - (c) 0.1.0's whole shape under `link`, the ceiling and the capacity where those
   are less, and the ceiling and the capacity under `fixed`.
 
+**Answered** (the author, 2026-10-07, `2026-10-07.md` item 1): "keep" - (c).
+
 **Recommendation: (c) now, as built and merged** - the shape no measured size is
 slower in - **and (a) as a step of its own**, its model first, which would take
 (b)'s gain where the model says it wins. *Undo:* `scan_fanout` and
