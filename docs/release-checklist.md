@@ -154,6 +154,13 @@ rated them (round six's readiness Q5-5).
   `PacerPlant.cmake` launches `0,0,1,1` - so the single-node build runs none of
   the 77, and nothing in it shows the stress tester's oracles can fail (the
   step's review, readiness Q5-7).
+- **What v0.2 step 2 left to after its merge** (its adversarial read, findings
+  10 to 12, `docs/reviews/archive/v0.2-step2-adversarial-read.md`): multi-node
+  tests on the measured link take shapes that vary from start to start, so pin
+  `OSOE_LINK_*` in them or print the link on failure; a divergence across a
+  crossover ends by the deadlock detector where one tree let a header name it -
+  the call's fan-out could travel in the grant or the lane word; the link is
+  measured on two and three nodes, where no fan-out differs.
 - **A lead that dies between making its segment and finishing it** (correctness
   F2); the relayed-goodbye test's sensitivity (F3); `env.probe`'s reopen check
   racing its child (F4); F5's small items.
