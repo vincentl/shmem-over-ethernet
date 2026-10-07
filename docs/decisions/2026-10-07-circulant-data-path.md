@@ -7,11 +7,13 @@ it (`2026-10-07-circulant.md`) and the author accepted it on 2026-10-07
 (`2026-10-07.md`, item 2), built into the data path. The model,
 `tools/modelcheck/circulant_model.py`, is the specification.
 
-**Where it stands.** Built on the branch `circulant`, with Part 1. One
-stop-and-ask, the credits (question 1, below): the design as written credits
-every piece, and so leaves the last credits of each round a write into a lead's
-words that the lead never waits for - the brief's first stop-and-ask. Built
-meanwhile with the recommendation, which the model holds and checks.
+**Where it stands.** Built on the branch `circulant` with Part 1, measured on
+the Pi (Part 3, below), read adversarially, and merged into `main` at the
+step's merge point, `512e913`. One stop-and-ask, the credits (question 1,
+below): the design as written credits every piece, and so leaves the last
+credits of each round a write into a lead's words that the lead never waits
+for - the brief's first stop-and-ask. Built meanwhile with the recommendation,
+which the model holds and checks; the author's answer is owed.
 
 ## What was built
 
