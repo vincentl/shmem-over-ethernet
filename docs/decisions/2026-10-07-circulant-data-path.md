@@ -230,6 +230,58 @@ brief asked for, on one build, alternating three times: the e-band probe at
   ways at once at the full rate - so on seven nodes the README cites the
   closed form's 1.7, not the simulation's 2.7, and names it the model's.
 
+## The adversarial read
+
+A fresh agent read the whole step, Part 2 the focus, at `4b9767e` and then at
+`5cbd47e` (`docs/reviews/archive/v0.2-step3-adversarial-read.md`), asked for a
+piece taken from a slot its receiver did not wait for, a row reused early, a
+write into a lead's words or lane after it returns, a counter another collective
+adds to, and the C against the model. **Its verdict: the protocol holds** at
+both - the C is the model's lead program, the model holds whole and at windows
+of 2 and 3, which its own cases never use, and nothing the reviewer ran broke
+it: leads lending different lanes, a number reused 30 times, fewer elements than
+nodes, windows from 1 to 128, a block holding a lane's release row, perturbation,
+divergent counts. Its twenty mutations at `5cbd47e` are its table. What it
+found, and what was done:
+
+- **Finding 1**, `shmem.circulant.4.max-teams-4` red at `5cbd47e`: the reuse
+  phase split a fifth team while the copy held the fourth number. Fixed in
+  `9bc596b`: the copy gives its number back first, and the reuse takes it.
+- **Finding 2**, the README's two-node sentence false: on two nodes, where both
+  send the same bytes, the cost model takes Träff's at 68% of sizes on the Pi's
+  link and the tree at every multiple of 16 KiB, since a tree's cost charges a
+  partial last piece whole. The README says so now (`8ce8a20`); the choice
+  itself is left to after the merge (`docs/release-checklist.md`).
+- **Finding 3**, this record: the verification below; the mutation table
+  dated to `4b9767e` and the read's own named; the "naming both leads" line
+  corrected - a grant's words name the lead that holds them.
+- **Finding 4**, the lanes the grants carry reached only through threads'
+  start-up order and timing - every single-threaded lead lends one index, so
+  three of the read's mutations (`to_lane_own`, `granted_reversed`,
+  `grant_receivers`) passed every single-threaded test. Built now rather than
+  after: **`shmem.circulant.{5,7}.lanes`**, where on node i, i helper threads
+  hold thread records so that every lead lends a lane of its own, the test
+  checking they differ and holding every call to the chooser. All three
+  mutations fail both, 3 runs of 3; `number_taken_keeps` fails every
+  reuse-bearing case. And the threads mode runs at 1 MiB, where every round has
+  more pieces than its window and credits flow.
+- **Finding 5**, the reduce-scatter grant's head is the last receiver's to
+  land, so a divergence among a lead's receivers can pass it, to be named a
+  round later or by the deadlock detector - named every time the reviewer tried.
+  Left to after the merge (the checklist): a field per receiver with its epoch
+  would name it at once, which the grant line has room for.
+- **Finding 6**, fixed before the read ended: no test reused a number (the
+  reuse phase), two presets red (the lanes tests under `tree`, the sanitizers'
+  cap), the memory figures.
+- **Finding 7**, configurations only probes ran - registered now: a ceiling of
+  2 on five nodes, whose three rounds take every row of a lane, the release
+  row's too (`5.ceiling-2`); a capacity of 1 (`5.capacity-1`); a window of 128
+  (`3.window-128`); fewer elements than nodes on a link slow enough that 144 and
+  240 bytes take Träff's, one and seven blocks empty (`16.tiny`); and a divergent
+  call, which must end by name (`4.diverge`). What no test can see:
+  `no_round_in_header`, a header without its round, which only a protocol fault
+  would put in the wrong slot.
+
 ## Verification
 
 <!-- filled in -->

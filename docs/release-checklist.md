@@ -161,6 +161,19 @@ rated them (round six's readiness Q5-5).
   crossover ends by the deadlock detector where one tree let a header name it -
   the call's fan-out could travel in the grant or the lane word; the link is
   measured on two and three nodes, where no fan-out differs.
+- **What v0.2 step 3 left to after its merge** (its adversarial read, findings
+  2, 5 and 7, `docs/reviews/archive/v0.2-step3-adversarial-read.md`, and its
+  record, `docs/decisions/2026-10-07-circulant-data-path.md`): on two nodes the
+  cost model's choice between the tree and Träff's follows how a size divides
+  into 16 KiB pieces, a tree's cost charging a partial last piece whole - take
+  the tree on two nodes, or charge its last piece by its bytes (step 2's fit);
+  a reduce-scatter grant's head is the last receiver's to land, so a divergence
+  among a lead's receivers can pass it - a field per receiver with its epoch;
+  Träff's at the default ceiling's last row (257 to 512 nodes) only through a
+  lower ceiling's tests; the cost model's Träff's optimistic against the Pi from
+  256 KiB, and `osoe-bench`'s back-to-back 64 KiB reduction no faster for it -
+  both worth a look when the progress helpers change what a node carries both
+  ways at once.
 - **A lead that dies between making its segment and finishing it** (correctness
   F2); the relayed-goodbye test's sensitivity (F3); `env.probe`'s reopen check
   racing its child (F4); F5's small items.
