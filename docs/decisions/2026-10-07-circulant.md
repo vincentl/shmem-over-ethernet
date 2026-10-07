@@ -221,4 +221,6 @@ reduce-scatter's first pieces (eight minutes, every case holding and the seven
 breakages failing). In `osoe-load`, the branch at `14ad0c5` - the C as it stands, before the
 model's last change, which touched the model alone: the four presets with the floor pins, debug
 785 of 785, release 785, asan 782, tsan 546, and `tier3` 113 - step 2's suite and
-`shmem.circulant.arithmetic`.
+`shmem.circulant.arithmetic`. And rebased onto `main` at step 2's merge
+(`2489481`), in `osoe`: debug 787, release 787, asan 782, tsan 546, `tier3` 113,
+with the model's check, its grid and the two C tests again on the host.
