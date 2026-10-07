@@ -255,6 +255,8 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * and 1 large, and the lane its thread lent to the last large one (the
      * team redesign's step E; layout 31): which way it went, and whose slots. */
     TEAM("team.tree.collective_class", BLOCK_TREE(collective_class)),
+    TEAM("team.tree.shape_fanout", BLOCK_TREE(shape_fanout)),
+    TEAM("team.tree.shape_window", BLOCK_TREE(shape_window)),
     TEAM("team.tree.lane", BLOCK_TREE(lane)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),

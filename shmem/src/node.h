@@ -573,6 +573,12 @@ struct osoe_collective_state {
      */
     _Atomic uint32_t collective_class;
     _Atomic uint32_t lane;
+    /* Layout 32 (v0.2 step 2), in the same padding: the shape of that last
+     * data collective through the tree, its fan-out and its window, as the
+     * chooser gave it (internode-generic.c, shape_of) - so that a test and
+     * osoe-stat read which shape a call took. */
+    _Atomic uint32_t shape_fanout;
+    _Atomic uint32_t shape_window;
 };
 
 /*

@@ -51,9 +51,13 @@ static uint64_t *consumed;
 static uint32_t consumed_count;
 
 /*
- * 4 for AM over Ethernet: h/o is about 4 on a server's TCP (h ~ 20 us one way,
- * o ~ 5 us per message) and about 8 on a Pi's 1 GbE, and the cost model's
- * optimum for those is k = 4 to 6 (§5.3). An RDMA backend would choose 8-16.
+ * 8 for AM over Ethernet, as a ceiling (v0.2 step 2; the author,
+ * docs/decisions/2026-10-06.md item 5): each large reduction's and broadcast's
+ * fan-out is chosen from the link under it (collective-shape.h), so the
+ * ceiling is the most a call may take - on hundreds of nodes a star of 8 is
+ * three levels where 4 is five - and the barrier's and the small class's trees
+ * take it whole. It sizes the layout: 2.56 times the tag's internal region at
+ * a capacity of 4 (internal-region.h). An RDMA backend would choose 8-16.
  */
 uint32_t osoe_internode_fanout_default(void)
 {

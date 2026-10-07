@@ -133,13 +133,16 @@ struct osoe_bootstrap {
  * before phase 1 step 5 slice 5; each step of D costs every lane's slots in
  * the internal region again (internal-region.h). A lane is (fan-out + 1) x D
  * slots of a header and 16 KiB, and a PE has one per thread record,
- * OSOE_MAX_THREADS + 1 of them: 2.7 MiB at the defaults (fan-out 4, D = 2, 16
+ * OSOE_MAX_THREADS + 1 of them: 9.6 MiB at the defaults (fan-out 8, D = 4, 16
  * threads) - and at the extremes the ranges allow (1,024 teams, fan-out 32,
  * D = 8, 1,023 threads, small collectives of 16 KiB) a PE's region is about
  * 5.2 GiB, which the shared-memory capacity check refuses at init on a machine
- * without it (node.c).
+ * without it (node.c). Since v0.2 step 2 it is the window's capacity: each
+ * large collective's window is chosen up to it (collective-shape.h). Its
+ * default 4 is the author's (docs/decisions/2026-10-06.md item 5): the Pi's
+ * 1 MiB reduction at k = 2 took 33.5 ms at D = 2 and 23.0 at D = 4.
  */
-#define OSOE_COLLECTIVE_PIPELINE_DEFAULT 2u
+#define OSOE_COLLECTIVE_PIPELINE_DEFAULT 4u
 #define OSOE_COLLECTIVE_PIPELINE_LOWEST  1u
 #define OSOE_COLLECTIVE_PIPELINE_HIGHEST 8u
 

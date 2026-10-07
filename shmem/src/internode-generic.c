@@ -258,6 +258,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "collective-shape.h"
 #include "collective-tree.h"
 #include "combine.h"
 #include "fatal.h"
@@ -434,8 +435,11 @@ struct interval_list {
 };
 
 /*
- * A team's internode phase as this node's lead keeps it: the reduction's tree,
- * from the team's record, and the bases its waits count from - where each child
+ * A team's internode phase as this node's lead keeps it: the team's node count
+ * and this node's place among them, from the team's record, which every call's
+ * tree is built from (find_lead_tree, at the call's fan-out since v0.2 step 2:
+ * a data collective's tree is the call's, the record's the barrier's); and the
+ * bases its waits count from - where each child
  * position's arrival counter, the release counter and the grant counter stood
  * when the team's last collective ended, by this lead's own trees (the file's
  * comment), since the counters in the internal region are cumulative over the
@@ -459,7 +463,6 @@ struct generic_team {
     bool registered;
     uint32_t count;                     /* how many nodes it spans */
     uint32_t index;                     /* this node's position among them */
-    struct lead_tree reduction_tree;
     uint64_t arrival_base[OSOE_COLLECTIVE_FANOUT_MAX];
     uint64_t release_base;
     uint64_t grant_base;
@@ -549,11 +552,6 @@ static struct generic_team *registered_team(uint32_t team, const char *routine)
                        r->index, r->nodes, osoe.bootstrap.collective_fanout);
         g->count = r->nodes;
         g->index = r->index;
-        g->reduction_tree.parent = r->parent;
-        g->reduction_tree.position = r->position;
-        g->reduction_tree.children = r->children;
-        for (uint32_t c = 0; c < r->children; c++)
-            g->reduction_tree.child[c] = r->child[c];
         g->published = &osoe_node_team(&osoe.node, team)->tree;
         g->registered = true;
     }
@@ -576,12 +574,14 @@ static uint32_t lead_of(uint32_t team, uint32_t index, const char *routine)
  * so that `root` is position 0: position i's parent is (i - 1) / k and its
  * children k i + 1 ... k i + k. The reduction's tree when the root is position
  * 0; a broadcast roots it at its root's node, so the data travels depth levels
- * and not up to position 0 first.
+ * and not up to position 0 first. `k` is the call's fan-out (shape_of), at
+ * most the ceiling the layout is sized for, so every child position it gives
+ * has its rows and its counter.
  */
 static void find_lead_tree(const struct generic_team *g, uint32_t team, uint32_t root,
-                           struct lead_tree *out, const char *routine)
+                           uint32_t k, struct lead_tree *out, const char *routine)
 {
-    uint32_t n = g->count, k = osoe.bootstrap.collective_fanout;
+    uint32_t n = g->count;
     uint32_t index = (g->index + n - root) % n;
     out->parent = UINT32_MAX;
     out->position = 0;
@@ -596,6 +596,31 @@ static void find_lead_tree(const struct generic_team *g, uint32_t team, uint32_t
             break;
         out->child[out->children++] = lead_of(team, (uint32_t)((child + root) % n), routine);
     }
+}
+
+/*
+ * The shape of one call (v0.2 step 2; collective-shape.h): its fan-out and its
+ * window, chosen from the job's link - which every PE holds alike since the
+ * end of shmem_init (link-measure.h) - and from the call's arguments, which
+ * every member passes alike (§9.10), by integer arithmetic alone: so every
+ * node of the team computes the same shape for the same call, and no message
+ * carries it (the brief's rule). The ceiling and the capacity, 0.1.0's shape,
+ * where the shape is `fixed` or there is no link to choose from. Both bound
+ * what the chooser returns, and the layout is sized for them, so every shape
+ * fits: its child positions within the ceiling's rows and counters, its
+ * window within the capacity's slots.
+ */
+static struct osoe_collective_shape shape_of(enum osoe_shape_operation operation,
+                                             const struct generic_team *g, uint64_t bytes)
+{
+    const struct osoe_bootstrap *b = &osoe.bootstrap;
+    if (b->collective_shape == OSOE_COLLECTIVE_SHAPE_FIXED ||
+        osoe.job.link_source == OSOE_LINK_NONE)
+        return (struct osoe_collective_shape){ OSOE_SHAPE_TREE, b->collective_fanout,
+                                               b->collective_pipeline };
+    return osoe_shape_choose(operation, g->count, bytes, &osoe.job.link, b->collective_fanout,
+                             b->collective_pipeline, b->small_collective_bytes,
+                             OSOE_INTERNAL_PIECE_BYTES);
 }
 
 /*
@@ -1080,10 +1105,10 @@ static bool awaited_holds(const void *context)
  * up. With it, the collective's class and, for a large one, the lane.
  */
 static void in_pieces(struct generic_team *team_phase, const struct pieces *pieces,
-                      const struct lead_tree *tree)
+                      const struct lead_tree *tree, struct osoe_collective_shape shape)
 {
     uint64_t piece_count = (pieces->bytes + pieces->bytes_per_piece - 1) / pieces->bytes_per_piece;
-    uint64_t window = osoe.bootstrap.collective_pipeline;
+    uint64_t window = shape.window;
     bool root = tree->parent == UINT32_MAX;
     bool large = pieces->class == OSOE_COLLECTIVE_LARGE;
     /* A large reduction's child sends nothing up before its parent's grant;
@@ -1146,6 +1171,10 @@ static void in_pieces(struct generic_team *team_phase, const struct pieces *piec
                           memory_order_release);
     atomic_store_explicit(&team_phase->published->collective_class, (uint32_t)pieces->class,
                           memory_order_release);
+    atomic_store_explicit(&team_phase->published->shape_fanout, shape.fanout,
+                          memory_order_release);
+    atomic_store_explicit(&team_phase->published->shape_window, shape.window,
+                          memory_order_release);
     if (large)
         atomic_store_explicit(&team_phase->published->lane, lanes.own, memory_order_release);
 }
@@ -1167,7 +1196,12 @@ void osoe_internode_generic_reduce_enter(uint32_t team, uint32_t epoch, size_t c
         OSOE_COLLECTIVE_SMALL)
         return;
     struct generic_team *team_phase = registered_team(team, routine);
-    const struct lead_tree *tree = &team_phase->reduction_tree;
+    /* The call's tree, which osoe_internode_generic_reduce builds again from
+     * the same arguments: the children granted here are the ones it waits for. */
+    struct lead_tree call_tree;
+    find_lead_tree(team_phase, team, 0, shape_of(OSOE_SHAPE_REDUCE, team_phase, bytes).fanout,
+                   &call_tree, routine);
+    const struct lead_tree *tree = &call_tree;
     team_phase->entered = epoch;
     uint32_t number = number_of(team);
     struct grant grant = { epoch, reduction_identity(operation, element), bytes, own_lane(), 0 };
@@ -1201,7 +1235,10 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
     struct pieces pieces = { team, number_of(team), epoch, reduction_identity(operation, element),
                              class, buffer, bytes, bytes_per_piece(class, bytes, element.width),
                              element.width, combine, routine };
-    in_pieces(team_phase, &pieces, &team_phase->reduction_tree);
+    struct osoe_collective_shape shape = shape_of(OSOE_SHAPE_REDUCE, team_phase, bytes);
+    struct lead_tree tree;
+    find_lead_tree(team_phase, team, 0, shape.fanout, &tree, routine);
+    in_pieces(team_phase, &pieces, &tree, shape);
 }
 
 /* Member r's place in a gather's result (internode.h). */
@@ -1620,13 +1657,14 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
     if (root_index >= team_phase->count)
         osoe_fatal("%s: the root's node is index %u of a team spanning %u nodes", routine,
                    root_index, team_phase->count);
+    struct osoe_collective_shape shape = shape_of(OSOE_SHAPE_BROADCAST, team_phase, bytes);
     struct lead_tree tree;
-    find_lead_tree(team_phase, team, root_index, &tree, routine);
+    find_lead_tree(team_phase, team, root_index, shape.fanout, &tree, routine);
     enum osoe_collective_class class =
         osoe_collective_class(bytes, osoe.bootstrap.small_collective_bytes);
     struct pieces pieces = { team, number_of(team), epoch, root_index, class, buffer, bytes,
                              bytes_per_piece(class, bytes, 1), 1, NULL, routine };
-    in_pieces(team_phase, &pieces, &tree);
+    in_pieces(team_phase, &pieces, &tree, shape);
 }
 
 /* ---- The scans (spec §9.10.10; phase 1 step 10 slice 1) ------------------ */
