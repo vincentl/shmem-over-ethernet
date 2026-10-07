@@ -1800,6 +1800,40 @@ static uint64_t scan_grant_words(uint32_t number)
 
 /* The children of the place covering [a, b): how many, and child j's first
  * rank and end. */
+/*
+ * A scan's fan-out and window. Its tree is over the team's members, not its
+ * nodes, and its rows share one base - the pieces the team's scans have moved -
+ * so it cannot take a shape per call as the reductions and broadcasts do: a row
+ * one call left unused would fall behind the base, and the next call to use it
+ * would wait forever. Under `link` it keeps 0.1.0's shape, a fan-out of 4 and
+ * two pieces in flight, or the ceiling and the capacity where those are less;
+ * under `fixed` the ceiling and the capacity, as every tree. On the Pi (v0.2
+ * step 2, Part 2's record), a scan over 16 PEs on four nodes at the defaults'
+ * fan-out of 8 took 1.5 to 2.0 times as long from 8 KiB up - its root's node
+ * sending six copies over its link where 4 sends three - and at 4 with the
+ * capacity's four pieces in flight it was 1.30 times faster at 1 MiB but 6.6%
+ * slower at 64 KiB: 0.1.0's shape is the one no size of it is slower in.
+ */
+enum { SCAN_FANOUT_UNDER_LINK = 4, SCAN_WINDOW_UNDER_LINK = 2 };
+
+static uint32_t scan_fanout(void)
+{
+    uint32_t ceiling = osoe.bootstrap.collective_fanout;
+    if (osoe.bootstrap.collective_shape == OSOE_COLLECTIVE_SHAPE_FIXED ||
+        ceiling < SCAN_FANOUT_UNDER_LINK)
+        return ceiling;
+    return SCAN_FANOUT_UNDER_LINK;
+}
+
+static uint32_t scan_window(void)
+{
+    uint32_t capacity = osoe.bootstrap.collective_pipeline;
+    if (osoe.bootstrap.collective_shape == OSOE_COLLECTIVE_SHAPE_FIXED ||
+        capacity < SCAN_WINDOW_UNDER_LINK)
+        return capacity;
+    return SCAN_WINDOW_UNDER_LINK;
+}
+
 static uint32_t scan_children(uint32_t a, uint32_t b, uint32_t k)
 {
     uint32_t rest = b - a - 1;
@@ -1992,7 +2026,7 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
     if (!add)
         osoe_fatal("%s: no sum over elements of kind %d and width %u", routine,
                    (int)element.kind, element.width);
-    uint32_t k = osoe.bootstrap.collective_fanout, members = record->members;
+    uint32_t k = scan_fanout(), members = record->members;
     uint32_t a, b, parent, position;
     scan_place(members, k, rank, &a, &b, &parent, &position);
     uint32_t children = scan_children(a, b, k);
@@ -2037,7 +2071,7 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
         }
     }
 
-    uint64_t window = osoe.bootstrap.collective_pipeline;
+    uint64_t window = scan_window();
     /* A small scan's one piece is the whole of it. A large one's pieces are
      * sized to the scan (the author's decision of 2026-10-04), every member
      * alike from its count, its element and D: the count's share of D, rounded

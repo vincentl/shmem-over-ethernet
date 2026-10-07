@@ -4647,10 +4647,10 @@ application's; or set by hand (`OSOE_LINK_HOP_NS`, `_MESSAGE_NS`,
 `_BYTES_PER_SECOND`). The chooser is integer arithmetic over those numbers and
 the call's alone, so every node builds the same tree for the same call; its
 closed form is `tools/modelcheck/shape_timing.py`'s, which a grid of 3,024
-inputs holds the C to. The barrier, the small class, the gathers and the scans
-keep the ceiling's tree (§5.8, "Pipelined pieces", as built at v0.2), and
-`OSOE_COLLECTIVE_SHAPE=fixed` keeps it for every call - with
-`OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2`, 0.1.0's trees exactly.
+inputs holds the C to. The barrier, the small class and the gathers keep the
+ceiling's tree, and the scans 0.1.0's shape (§5.8, "Pipelined pieces", as built
+at v0.2); `OSOE_COLLECTIVE_SHAPE=fixed` keeps the ceiling's for every call -
+with `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2`, 0.1.0's trees exactly.
 
 Per team per node the progress thread keeps the tree (O(*k*)) and the epoch in
 progress (O(1)): which epoch is open, whether the node's own members are in, and
@@ -5473,10 +5473,15 @@ already allow: each child position keeps its own base, advanced by what this
 call's tree says the position received, so a position unused in one call
 neither advances nor stands in for another - the argument a broadcast's rotated
 tree needed, unchanged (§5.5 as built). The trees are built per call, in O(*k*)
-as a broadcast's always were, not cached. **The scans keep the ceiling's tree**:
-their rows share one base, the pieces the team's scans have moved, which a row
-unused in one call would leave behind, so a scan whose fan-out varied would
-wait forever on its next call. Each lead publishes the shape of its last
+as a broadcast's always were, not cached. **The scans keep one shape for every
+call**: their rows share one base, the pieces the team's scans have moved, which
+a row unused in one call would leave behind, so a scan whose fan-out varied
+would wait forever on its next call. Under `link` it is 0.1.0's, a fan-out of 4
+and two pieces in flight (or the ceiling and the capacity where those are
+less), not the ceiling's: on the Pi a scan over 16 PEs on four nodes at the
+defaults' fan-out of 8 took 1.5 to 2.0 times as long from 8 KiB up, its root's
+node sending six copies over its link where 4 sends three, and at 4 with four
+pieces in flight it was 1.30 times faster at 1 MiB and 6.6% slower at 64 KiB. Each lead publishes the shape of its last
 reduction or broadcast in the team's tree state (`team.tree.shape_fanout`,
 `shape_window`), which `shmem.shape.chosen.*` holds to the chooser call by
 call.

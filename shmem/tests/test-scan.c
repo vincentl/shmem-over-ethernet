@@ -144,11 +144,29 @@ static void check_team(shmem_team_t team, const char *label)
     check_complexf(team, label, 7, true, false, false);
 }
 
-/* D and the fan-out as the library reads them: 2 and 4 by default. */
+/* D and the fan-out as the library reads them: 4 and 8 by default. */
 static uint64_t setting(const char *name, uint64_t fallback)
 {
     const char *value = getenv(name);
     return value ? strtoull(value, NULL, 10) : fallback;
+}
+
+/* The scan's fan-out and window as internode-generic.c's scan_fanout and
+ * scan_window take them: the ceiling and the capacity under
+ * OSOE_COLLECTIVE_SHAPE=fixed, else 4 and 2, or the ceiling and the capacity
+ * where those are less. */
+static uint32_t scan_shape_setting(const char *name, uint64_t fallback, uint32_t under_link)
+{
+    uint32_t value = (uint32_t)setting(name, fallback);
+    const char *shape = getenv("OSOE_COLLECTIVE_SHAPE");
+    if ((shape && strcmp(shape, "fixed") == 0) || value < under_link)
+        return value;
+    return under_link;
+}
+
+static uint32_t scan_fanout_setting(void)
+{
+    return scan_shape_setting("OSOE_COLLECTIVE_FANOUT", 8, 4);
 }
 
 /* Whether team rank `rank` of `members` is a leaf of the scan's tree: a place
@@ -252,9 +270,9 @@ int main(void)
     check_long(SHMEM_TEAM_WORLD, "the world, in many pieces", MANY, true, false, false);
     check_long(SHMEM_TEAM_WORLD, "the world, in many pieces", MANY, false, true, false);
     if (shmem_team_n_pes(SHMEM_TEAM_SHARED) < npes &&
-        scan_leaf((uint32_t)npes, (uint32_t)setting("OSOE_COLLECTIVE_FANOUT", 8), (uint32_t)me)) {
+        scan_leaf((uint32_t)npes, scan_fanout_setting(), (uint32_t)me)) {
         uint64_t pieces = (MANY + SLOT_LONGS - 1) / SLOT_LONGS;
-        uint64_t window = setting("OSOE_COLLECTIVE_PIPELINE", 4);
+        uint64_t window = scan_shape_setting("OSOE_COLLECTIVE_PIPELINE", 4, 2);
         uint64_t want = pieces < window ? pieces : window, most = most_in_flight();
         if (most != want)
             fprintf(stderr, "PE %d: a leaf of the scan's tree had %llu pieces in flight at "
