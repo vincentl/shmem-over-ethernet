@@ -720,16 +720,14 @@ in all), computed from the code; the times are measured where a record says so.
 
 Where the design admits a limit of its own: large reductions still send each
 node's whole vector up the tree and the result down, so the busiest lead sends
-k + 1 vectors where a ring or Rabenseifner's algorithm sends about two - 4.5
-times as many bytes at the default fan-out of 8 - until measurement picks the
-crossover; the tree's fan-out is one fixed default, where on the Pi cluster it
-proved a bandwidth choice at large sizes - on its four nodes a fan-out of 2 with
-the pipeline 4 to 8 deep was 1.5 times faster than the default for a 1 MiB
-broadcast and 1.2 to 1.45 times for a reduction, though at the default depth of
-2 it sped a broadcast 1.2 times and slowed a reduction 19%, and 4 was twice as
-fast up to 1 KiB; every pair of nodes connects at
-start-up, so the job holds n(n - 1)/2 connections, n - 1 a node; and one thread
-a node moves all of its internode messages (Limits, below).
+k + 1 vectors where a reduce-scatter and allgather would send about two - 1.5
+times as many bytes at the fan-out of 2 the Pi cluster's link gives a
+megabyte's reduction on up to 16 nodes, 3 times at the 5 it gives at 500; a
+call's tree is shaped by one link's numbers, the root's lead's to its first
+children's, so a job whose links differ is shaped for that one; every pair of
+nodes connects at start-up, so the job holds n(n - 1)/2 connections, n - 1 a
+node; and one thread a node moves all of its internode messages (Limits,
+below).
 
 Within a node, each collective's phase is O(P): its PEs arrive on one cache
 line, the release of a reduction or broadcast is one futex wake of every PE
