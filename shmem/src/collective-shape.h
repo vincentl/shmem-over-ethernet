@@ -13,10 +13,11 @@
  * the pipelined loop it stands for, and the fit of that simulation to the Pi
  * cluster's measurements; shmem.shape.grid holds the two to the same answers.
  *
- * A shape is a tree of fan-out k with a window of W pieces today. Step 3 adds
- * Rabenseifner's reduce-scatter and allgather as another algorithm with a cost
- * of its own under the same three numbers, which the chooser weighs against
- * the trees by the same rule: hence the algorithm in the shape.
+ * A shape is a tree of fan-out k with a window of W pieces, or - since v0.2
+ * step 3, for a reduction - Träff's circulant reduce-scatter and allgather
+ * (collective-circulant.h), with a cost of its own under the same three numbers,
+ * which the chooser weighs against the trees by the same rule: hence the
+ * algorithm in the shape.
  */
 #ifndef OSOE_COLLECTIVE_SHAPE_H
 #define OSOE_COLLECTIVE_SHAPE_H
