@@ -2939,8 +2939,9 @@ set_tests_properties(shmem.deadlock.refused.L2 PROPERTIES LABELS "tier2" TIMEOUT
 
 # The shape each large reduction and broadcast takes on the data path (v0.2
 # step 2, Part 2; test-shapes-chosen.c): with the link set to the Pi's and to a
-# loopback's, on 4, 16 and 64 logical nodes, every call's fan-out and window the
-# chooser's - held to shape-grid.txt, the model's - and its result right.
+# loopback's, on 4, 16 and 64 logical nodes - 4 and 16 under a sanitizer - every
+# call's fan-out and window the chooser's, held to shape-grid.txt, the model's,
+# and its result right.
 if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   add_executable(shmem_test_shapes-chosen test-shapes-chosen.c
     ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
@@ -2955,6 +2956,11 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     list(GET case 2 hop)
     list(GET case 3 message)
     list(GET case 4 bandwidth)
+    # Sixty-four PEs under a sanitizer outgrow the VM's 8 GiB - the kernel
+    # killed one under asan (Part 2's record) - so the sanitizers run 4 and 16.
+    if(nodes GREATER 16 AND CMAKE_C_FLAGS MATCHES "sanitize=")
+      continue()
+    endif()
     set(map "0")
     math(EXPR last "${nodes} - 1")
     foreach(node RANGE 1 ${last})
@@ -2962,7 +2968,7 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     endforeach()
     add_test(NAME shmem.shape.chosen.${link}.${nodes}
       COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=${hop} OSOE_LINK_MESSAGE_NS=${message}
-              OSOE_LINK_BYTES_PER_SECOND=${bandwidth} SHMEM_SYMMETRIC_SIZE=16m
+              OSOE_LINK_BYTES_PER_SECOND=${bandwidth} SHMEM_SYMMETRIC_SIZE=4m
               $<TARGET_FILE:osoe-launch> -n ${nodes} -m ${map} -t 240 --
               $<TARGET_FILE:shmem_test_shapes-chosen> ${CMAKE_CURRENT_SOURCE_DIR}/shape-grid.txt)
     set_tests_properties(shmem.shape.chosen.${link}.${nodes} PROPERTIES LABELS "tier2"
