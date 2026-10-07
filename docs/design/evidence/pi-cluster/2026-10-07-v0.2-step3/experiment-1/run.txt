@@ -1,0 +1,16 @@
+start 07:56:27
+vtake built: 0
+vtake e-band: 0
+exp-link4-1: 0
+exp-link8-1: 0
+exp-vtake-1: 0
+exp-tree8-1: 0
+exp-link4-2: 0
+exp-link8-2: 0
+exp-vtake-2: 0
+exp-tree8-2: 0
+exp-link4-3: 0
+exp-link8-3: 0
+exp-vtake-3: 0
+exp-tree8-3: 0
+end 07:59:41

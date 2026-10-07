@@ -91,11 +91,12 @@ static int choice(void)
     }
 
     /* Träff's, where the caller allows it: a 1 MiB reduction on four nodes of
-     * the Pi, and nothing else. */
+     * the Pi, and nothing else - its window four of a lane's nine rows of four
+     * slots, the rows its two rounds leave it. */
     struct osoe_collective_shape s;
     s = osoe_shape_choose(OSOE_SHAPE_REDUCE, 4, 1 << 20, &pi_link, 8, 4, 1024,
                           OSOE_INTERNAL_PIECE_BYTES, true);
-    CHECK(s.algorithm == OSOE_SHAPE_CIRCULANT && s.window == 4);
+    CHECK(s.algorithm == OSOE_SHAPE_CIRCULANT && s.window == 16);
     s = osoe_shape_choose(OSOE_SHAPE_REDUCE, 4, 2048, &pi_link, 8, 4, 1024,
                           OSOE_INTERNAL_PIECE_BYTES, true);
     CHECK(s.algorithm == OSOE_SHAPE_TREE);

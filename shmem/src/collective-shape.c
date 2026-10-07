@@ -228,8 +228,14 @@ struct osoe_collective_shape osoe_shape_choose(enum osoe_shape_operation operati
         }
     }
     shape.window = capacity;
-    if (circulant && operation == OSOE_SHAPE_REDUCE && osoe_circulant_rows(nodes) <= ceiling + 1 &&
-        osoe_shape_circulant_cost(nodes, capacity, bytes, piece_bytes, link) < least)
-        shape.algorithm = OSOE_SHAPE_CIRCULANT, shape.fanout = ceiling;
+    uint32_t rows = osoe_circulant_rows(nodes);
+    if (circulant && operation == OSOE_SHAPE_REDUCE && rows <= ceiling + 1) {
+        /* Träff's round takes as many of a lane's ceiling + 1 rows as its
+         * rounds leave it, the capacity's slots each, and keeps them all in
+         * flight. */
+        uint32_t window = capacity * ((ceiling + 1) / rows);
+        if (osoe_shape_circulant_cost(nodes, window, bytes, piece_bytes, link) < least)
+            shape = (struct osoe_collective_shape){ OSOE_SHAPE_CIRCULANT, ceiling, window };
+    }
     return shape;
 }

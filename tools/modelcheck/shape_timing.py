@@ -412,13 +412,15 @@ def choose_shape(op, nodes, n, link, ceiling, capacity, small_bytes, s=PIECE, ci
     choose() gives; and, where `circulant` allows it - the data path's word that
     it runs Träff's reduce-scatter - for a reduction past the small class whose
     rounds' rows, ceil(log2 nodes), fit a lane's ceiling + 1 rows, Träff's,
-    where its closed form costs less than that tree's, ties to the tree, at the
-    capacity's window."""
+    where its closed form costs less than that tree's, ties to the tree. Its
+    window is a round's slots: (ceiling + 1) // rows of the lane's rows, the
+    capacity each."""
     k, W = choose(op, nodes, n, link, ceiling, capacity, small_bytes, s)
-    if (circulant and op == 'reduce' and nodes > 1 and n > small_bytes and
-            len(circulant_skips(nodes)) <= ceiling + 1 and
-            circulant_cost(nodes, n, s, capacity, *link) < cost(op, nodes, k, W, n, s, *link)):
-        return 'circulant', ceiling, capacity
+    rows = len(circulant_skips(nodes))
+    if circulant and op == 'reduce' and nodes > 1 and n > small_bytes and rows <= ceiling + 1:
+        window = capacity * ((ceiling + 1) // rows)
+        if circulant_cost(nodes, n, s, window, *link) < cost(op, nodes, k, W, n, s, *link):
+            return 'circulant', ceiling, window
     return 'tree', k, W
 
 
@@ -777,8 +779,9 @@ def check_circulant(failures):
     for links, error_bound, regret_bound in (('sender', 0.12, 0.08), ('connection', 0.18, 0.08)):
         errors, regrets = [], []
         for N, n in grid:
-            sim_c = simulate_circulant(N, n, PIECE, 4, 86, 7, 116, links=links)
-            errors.append(abs(circulant_cost(N, n, PIECE, 4, *PI_LINK) / 1000 / sim_c - 1))
+            window = 4 * (9 // len(circulant_skips(N)))     # the chooser's, at (8, 4)
+            sim_c = simulate_circulant(N, n, PIECE, window, 86, 7, 116, links=links)
+            errors.append(abs(circulant_cost(N, n, PIECE, window, *PI_LINK) / 1000 / sim_c - 1))
             trees = {k: simulate('reduce', N, k, 4, n, PIECE, 86, 7, 116, measure='completion',
                                  links=links) for k in range(2, 9)}
             algorithm, k, W = choose_shape('reduce', N, n, PI_LINK, 8, 4, 1024, circulant=True)

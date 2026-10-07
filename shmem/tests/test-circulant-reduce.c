@@ -29,10 +29,15 @@
  *      by small reductions, broadcasts and the trees' large reductions, on the
  *      world and on a copy of it whose leads are the world's - the
  *      reduce-scatter's counters its own, which a small reduction's child that
- *      has left adds to at once.
+ *      has left adds to at once;
+ *   6. reuse: a copy of the world made, given two Träff's reductions and
+ *      destroyed, three times over, each new copy taking the number its last
+ *      gave back - whose words every lead must have zeroed for it.
  * With `threads`, under SHMEM_THREAD_MULTIPLE: two threads a PE, each with a
  * copy of the world of its own, making Träff's reductions on it at once - two
- * teams' reduce-scatters through two lanes of each lead. Under
+ * teams' reduce-scatters through two lanes of each lead; then both on one copy
+ * in turn, each round's reduction led by the other thread, so that the lane a
+ * lead lends changes from call to call. Under
  * OSOE_COLLECTIVE_SHAPE=tree every call must take a tree: the setting turns
  * Träff's off by name.
  *
@@ -245,6 +250,21 @@ static void back_to_back(shmem_team_t copy, uint8_t *dest[4], uint8_t *source[4]
     }
 }
 
+static void reuse(uint8_t *dest, uint8_t *source, size_t large)
+{
+    for (int round = 0; round < 3; round++) {
+        shmem_team_t team = SHMEM_TEAM_INVALID;
+        shmem_barrier_all();
+        CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &team) ==
+                    0);
+        byte_sum(team, dest, source, large, 1100 + 2 * round, false,
+                 "Träff's on a number taken again");
+        byte_sum(team, dest, source, large, 1101 + 2 * round, false,
+                 "Träff's again on a number taken again");
+        shmem_team_destroy(team);
+    }
+}
+
 /* ---- 2: every typed reduction ----------------------------------------------- */
 
 /* Values a reduction of every type takes exactly, whatever order the nodes'
@@ -388,33 +408,47 @@ enum { THREADS = 2, THREAD_ROUNDS = 6 };
 
 struct thread_work {
     shmem_team_t team;
+    shmem_team_t shared;                /* the copy the threads take in turn */
+    pthread_barrier_t *turns;
     uint8_t *dest, *source;
     size_t bytes;
     int index;
     int failed;
 };
 
+/* One byte sum on `team` from a thread, checked; tagged by `tag`. */
+static void thread_sum(struct thread_work *w, shmem_team_t team, int tag, int round)
+{
+    for (size_t i = 0; i < w->bytes; i++) {
+        w->source[i] = byte_value(me, i, tag);
+        w->dest[i] = 0;
+    }
+    if (shmem_uint8_sum_reduce(team, w->dest, w->source, w->bytes) != 0)
+        w->failed = 1;
+    for (size_t i = 0; i < w->bytes && !w->failed; i++) {
+        uint8_t want = 0;
+        for (int p = 0; p < npes; p++)
+            want = (uint8_t)(want + byte_value(p, i, tag));
+        if (w->dest[i] != want) {
+            fprintf(stderr, "PE %d, thread %d, round %d: byte %zu of %zu is %u, not %u\n", me,
+                    w->index, round, i, w->bytes, w->dest[i], want);
+            w->failed = 1;
+        }
+    }
+}
+
 static void *thread_main(void *argument)
 {
     struct thread_work *w = argument;
-    for (int round = 0; round < THREAD_ROUNDS && !w->failed; round++) {
-        int tag = 1000 + 10 * w->index + round;
-        for (size_t i = 0; i < w->bytes; i++) {
-            w->source[i] = byte_value(me, i, tag);
-            w->dest[i] = 0;
-        }
-        if (shmem_uint8_sum_reduce(w->team, w->dest, w->source, w->bytes) != 0)
-            w->failed = 1;
-        for (size_t i = 0; i < w->bytes && !w->failed; i++) {
-            uint8_t want = 0;
-            for (int p = 0; p < npes; p++)
-                want = (uint8_t)(want + byte_value(p, i, tag));
-            if (w->dest[i] != want) {
-                fprintf(stderr, "PE %d, thread %d, round %d: byte %zu of %zu is %u, not %u\n",
-                        me, w->index, round, i, w->bytes, w->dest[i], want);
-                w->failed = 1;
-            }
-        }
+    for (int round = 0; round < THREAD_ROUNDS && !w->failed; round++)
+        thread_sum(w, w->team, 1000 + 10 * w->index + round, round);
+    /* In turn on the shared copy: round r's reduction is thread r mod THREADS's
+     * on every PE, the others waiting at the barrier, so one call at a time
+     * on the team, as the specification asks, each from another thread. */
+    for (int round = 0; round < 2 * THREADS * THREAD_ROUNDS; round++) {
+        if (round % THREADS == w->index && !w->failed)
+            thread_sum(w, w->shared, 2000 + round, round);
+        pthread_barrier_wait(w->turns);
     }
     return NULL;
 }
@@ -428,8 +462,12 @@ static int threads(size_t bytes)
     npes = shmem_n_pes();
     struct thread_work work[THREADS];
     pthread_t thread[THREADS];
+    pthread_barrier_t turns;
+    CHECK_FATAL(pthread_barrier_init(&turns, NULL, THREADS) == 0);
+    shmem_team_t shared = SHMEM_TEAM_INVALID;
+    CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &shared) == 0);
     for (int t = 0; t < THREADS; t++) {
-        work[t] = (struct thread_work){ SHMEM_TEAM_INVALID, shmem_malloc(bytes),
+        work[t] = (struct thread_work){ SHMEM_TEAM_INVALID, shared, &turns, shmem_malloc(bytes),
                                         shmem_malloc(bytes), bytes, t, 0 };
         CHECK_FATAL(work[t].dest && work[t].source);
         CHECK_FATAL(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0,
@@ -445,6 +483,8 @@ static int threads(size_t bytes)
     shmem_barrier_all();
     for (int t = 0; t < THREADS; t++)
         shmem_team_destroy(work[t].team);
+    shmem_team_destroy(shared);
+    pthread_barrier_destroy(&turns);
     return 0;
 }
 
@@ -484,6 +524,7 @@ int main(int argc, char **argv)
         in_place(dest[1], large + 3);
         staggered(dest[2], source[2], large);
         back_to_back(copy, dest, source, large);
+        reuse(dest[3], source[3], large);
         shmem_barrier_all();
         shmem_team_destroy(copy);
     }

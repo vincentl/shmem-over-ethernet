@@ -5870,7 +5870,9 @@ off by name): ceil(log2 N) rounds a half for every node count, every lead
 sending N - 1 blocks a half - under two vectors on every lead's link, where a
 tree's interior lead sends k + 1 and the fold the step's brief first described
 put up to 3.5 on a fold lead's. Rule 1 holds through the lanes' rows, round k
-of either half into row k of the receiver's lane; rule 2 on the lead's thread,
+of either half into the k-th block of the receiver's lane - a block being as
+many of the lane's rows as the rounds leave a round, all of whose slots it
+keeps in flight, 16 pieces on four nodes; rule 2 on the lead's thread,
 which combines or copies every piece; rule 3 since each block is combined once,
 at its owner, in an order the schedule fixes, and copied to every lead. Its
 arithmetic is `collective-circulant.c`, its cost `osoe_shape_circulant_cost`,

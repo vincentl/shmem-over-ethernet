@@ -60,7 +60,9 @@ enum osoe_link_source {
 struct osoe_collective_shape {
     enum osoe_shape_algorithm algorithm;
     uint32_t fanout;            /* k: 2 to the ceiling; the ceiling for Träff's */
-    uint32_t window;            /* W: pieces in flight, 1 to the capacity */
+    uint32_t window;            /* W: pieces in flight, 1 to the capacity - or for
+                                 * Träff's, the capacity times the rows of a lane
+                                 * each of its rounds takes */
 };
 
 /*
@@ -102,7 +104,11 @@ uint64_t osoe_shape_circulant_cost(uint32_t nodes, uint32_t window, uint64_t byt
  * and where `circulant` allows it - the caller's word that it runs Träff's
  * reduction - a reduction whose rounds' rows, ceil(log2 nodes), fit a lane's
  * `ceiling` + 1 rows takes Träff's where it costs less than that tree, ties to
- * the tree. tools/modelcheck/shape_timing.py's choose_shape(), line for line.
+ * the tree. Its window is the slots a round can have: each round takes
+ * (`ceiling` + 1) / ceil(log2 nodes) of the lane's rows of `capacity` slots -
+ * 16 pieces on three or four nodes at the defaults, 12 on five to eight, 8 on
+ * nine to sixteen, and the capacity from 17 on.
+ * tools/modelcheck/shape_timing.py's choose_shape(), line for line.
  */
 struct osoe_collective_shape osoe_shape_choose(enum osoe_shape_operation operation,
                                                uint32_t nodes, uint64_t bytes,

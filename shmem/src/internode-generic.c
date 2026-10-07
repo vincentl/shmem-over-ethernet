@@ -190,16 +190,18 @@
  * through lanes, as a tree's large pieces do, and it counts on words of its own
  * (internal-region.h, the reduce-scatter's words); in_rounds is the model's
  * lead program:
- *   - **rows**: round k of either half moves its pieces into row k of the
- *     receiver's lane, piece j into the row's slot j mod the capacity, each a
- *     put of its header and bytes and then a fenced add on the receiver's
- *     arrival counter for the row, cumulative over the team's life and compared
- *     as at least. The receiver checks each piece's header, combines or copies
- *     what follows it into its accumulator at the piece's place on its own
- *     application thread - §5.8's rules 1 and 2: pieces land in scratch, and
- *     only the lead's thread writes `dest` - and clears it. A reduction takes
- *     ceil(log2 N) rows, so the chooser takes it only where they fit a lane's
- *     ceiling + 1 rows;
+ *   - **rows**: round k of either half moves its pieces into the k-th block
+ *     of the receiver's lane, a block being the call's window of slots - a
+ *     round takes as many of the lane's ceiling + 1 rows as the rounds leave
+ *     it, so that the window is 16 pieces on four nodes and the capacity from
+ *     17 - piece j into the block's slot j mod the window, each a put of its header
+ *     and bytes and then a fenced add on the receiver's arrival counter for the
+ *     row, cumulative over the team's life and compared as at least. The
+ *     receiver checks each piece's header, combines or copies what follows it
+ *     into its accumulator at the piece's place on its own application thread
+ *     - §5.8's rules 1 and 2: pieces land in scratch, and only the lead's
+ *     thread writes `dest` - and clears it. A reduction takes ceil(log2 N)
+ *     rows, so the chooser takes it only where they fit a lane's ceiling + 1;
  *   - **credits**: a round sends to one lead and receives from another, so no
  *     piece says how far its sender's receiver has got. The receiver adds a
  *     credit at the sender for each piece it takes, and the sender puts piece
@@ -1407,6 +1409,19 @@ struct round_flight {
     uint64_t arrival_base;
 };
 
+/*
+ * Where piece `index` of a round of row `row` goes in a lane: the lane's slots
+ * in order, row by row, cut into blocks of the call's window, round k's the
+ * k-th - a round takes as many of the lane's rows as its rounds leave it
+ * (osoe_shape_choose), and piece j its block's slot j mod the window, as the
+ * tree's pieces take their row's slot j mod the capacity.
+ */
+static uint64_t round_slot(uint32_t lane, uint32_t row, uint64_t window, uint64_t index)
+{
+    return lane_slot(lane, 0, 0) + ((uint64_t)row * window + index % window) *
+                                       OSOE_INTERNAL_SLOT_BYTES;
+}
+
 /* Piece `index`'s header, of `elements` elements. */
 static struct piece_header round_header(const struct round_flight *f, uint64_t index,
                                         uint64_t elements)
@@ -1509,7 +1524,7 @@ static void round_send(struct round_flight *f, uint32_t own)
                            circulant_senders(pieces->number) + (uint64_t)f->round.row * sizeof word,
                            &word, sizeof word, OSOE_TRANSPORT_MORE);
     }
-    uint64_t slot = lane_slot(f->to_lane, f->round.row, f->sent);
+    uint64_t slot = round_slot(f->to_lane, f->round.row, f->window, f->sent);
     osoe_transport_put(context, f->to, OSOE_REGION_INTERNAL, slot, &header, HEADER_BYTES,
                        OSOE_TRANSPORT_MORE);
     osoe_transport_put(context, f->to, OSOE_REGION_INTERNAL, slot + HEADER_BYTES,
@@ -1565,7 +1580,7 @@ static void round_take(struct round_flight *f, uint32_t own, uint32_t *sender_la
     interval_piece(f->round.receive_first, f->round.receive_end, f->per_piece, f->taken, &at,
                    &elements);
     struct piece_header header = round_header(f, f->taken, elements);
-    unsigned char *slot = internal(lane_slot(own, f->round.row, f->taken));
+    unsigned char *slot = internal(round_slot(own, f->round.row, f->window, f->taken));
     check_round_piece(slot, &header, f);
     unsigned char *place = pieces->buffer + at * pieces->width;
     if (f->round.combines)
@@ -1646,6 +1661,14 @@ static void in_rounds(struct generic_team *team_phase, const struct pieces *piec
     uint32_t nodes = team_phase->count, rows = osoe_circulant_rows(nodes);
     uint64_t count = pieces->bytes / pieces->width;
     uint64_t grants = team_phase->circulant_grant_base + rows;
+    /* Every node computes the same shape for the call, and the chooser's
+     * window leaves every round's block within a lane: a shape past it is a
+     * bug, named before any put. */
+    if ((uint64_t)rows * shape.window >
+        (uint64_t)(osoe.bootstrap.collective_fanout + 1) * osoe.bootstrap.collective_pipeline)
+        osoe_fatal("%s: Träff's %u rounds a half at a window of %u pieces outrun a lane of %u "
+                   "rows of %u slots", pieces->routine, rows, shape.window,
+                   osoe.bootstrap.collective_fanout + 1, osoe.bootstrap.collective_pipeline);
     uint32_t own = own_lane(), number = pieces->number;
     uint32_t granted[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
     uint32_t sender_lanes[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];

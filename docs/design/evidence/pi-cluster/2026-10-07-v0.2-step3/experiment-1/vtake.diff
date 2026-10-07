@@ -1,0 +1,26 @@
+--- a/shmem/src/internode-generic.c
++++ b/shmem/src/internode-generic.c
+@@ -1679,6 +1679,11 @@
+         f.receives = interval_pieces(f.round.receive_first, f.round.receive_end, f.per_piece);
+         f.arrival_base = team_phase->circulant_arrival_base[f.round.row];
+         while (f.sent < f.sends || f.taken < f.receives) {
++            if (round_may_take(&f)) {
++                round_take(&f, own, sender_lanes);
++                osoe_perturb();
++                continue;
++            }
+             if (round_may_send(&f)) {
+                 round_send(&f, own);
+                 uint64_t credits = osoe_transport_load(OSOE_REGION_INTERNAL,
+@@ -1689,11 +1694,6 @@
+                 osoe_perturb();
+                 continue;
+             }
+-            if (round_may_take(&f)) {
+-                round_take(&f, own, sender_lanes);
+-                osoe_perturb();
+-                continue;
+-            }
+             uint64_t first = circulant_arrival_counter(number, 0);
+             osoe_region_wait_condition(
+                 pieces->routine, OSOE_REGION_INTERNAL, first,

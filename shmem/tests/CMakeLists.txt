@@ -2351,7 +2351,11 @@ if(OSOE_INTERNODE)
   # and a lane shared by threads is a data race it reports). All but
   # class-split-hang, which ends by the deadlock detector: under tsan no job is
   # judged deadlocked, its own thread in every process being one the detector
-  # cannot see (shmem.deadlock.* below).
+  # cannot see (shmem.deadlock.* below). Under OSOE_COLLECTIVE_SHAPE=tree since
+  # v0.2 step 3: these are the trees' lanes and grants, whose counts and messages
+  # they pin, and a measured link can take a large reduction on two to four
+  # nodes into Träff's, whose lanes shmem.circulant.* tests (reuse and turns
+  # among them).
   add_executable(shmem_test_lanes test-lanes.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
   target_include_directories(shmem_test_lanes PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
   target_link_libraries(shmem_test_lanes PRIVATE osoe rt Threads::Threads)
@@ -2375,32 +2379,36 @@ if(OSOE_INTERNODE)
       endif()
     endforeach()
     add_test(NAME shmem.lanes.${label}
-      COMMAND ${CMAKE_COMMAND} -E env ${environment}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=tree ${environment}
               $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 90 --
               $<TARGET_FILE:shmem_test_lanes> ${which})
     set_tests_properties(shmem.lanes.${label} PROPERTIES LABELS "tier2" TIMEOUT 120)
     osoe_internode_label(shmem.lanes.${label})
   endforeach()
   add_test(NAME shmem.lanes.mismatch
-    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=tree
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
             mismatch)
   set_tests_properties(shmem.lanes.mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION
     "the grant from node 0's lead [(]PE 0[)] is for epoch [0-9]+'s sum of 8-byte signed integers, 4096 bytes, and this node's lead [(]PE 1[)] is in epoch [0-9]+'s maximum of 8-byte signed integers")
   add_test(NAME shmem.lanes.scan-mismatch
-    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=tree
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
             scan-mismatch)
   set_tests_properties(shmem.lanes.scan-mismatch PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION
     "the scan grant from PE 0 is for scan [0-9]+ of the team, an inclusive one of 8-byte signed integers, 4096 bytes, and PE 1 is in scan [0-9]+ of the team, an exclusive one of 8-byte signed integers")
   add_test(NAME shmem.lanes.class-split-named
-    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=tree
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
             class-split-named)
   set_tests_properties(shmem.lanes.class-split-named PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION
     "the lane word of node 1's lead [(]PE 1[)], this node's child at position 0, says epoch 0 and lane 0, and this node's lead [(]PE 0[)] is in epoch [0-9]+'s collective")
   add_test(NAME shmem.lanes.class-split-broadcast
-    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=tree
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
             class-split-broadcast)
   set_tests_properties(shmem.lanes.class-split-broadcast PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION
@@ -2409,7 +2417,7 @@ if(OSOE_INTERNODE)
     shmem.lanes.class-split-named shmem.lanes.class-split-broadcast)
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     add_test(NAME shmem.lanes.class-split-hang
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1 OSOE_COLLECTIVE_SHAPE=tree
               $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_lanes>
               class-split-hang)
     set_tests_properties(shmem.lanes.class-split-hang PROPERTIES LABELS "tier2" TIMEOUT 90
@@ -3032,8 +3040,10 @@ endif()
 # runs the trees; at the fewest team numbers and lanes, OSOE_MAX_TEAMS=4 and
 # OSOE_MAX_THREADS=1, where the lanes end the region and a slot past a lane's
 # rows runs off its end; and under OSOE_COLLECTIVE_SHAPE=tree, where no call may
-# take Träff's. The sanitizers run up to 16 nodes - sixty-four PEs under asan
-# outgrow the VM - and tsan one PE a node alone, as shmem.lanes.* does.
+# take Träff's. The sanitizers run the cases of up to 9 PEs - 12 and 16 under
+# asan, beside the suite's other tests, were killed by the VM's OOM killer
+# (asan's own memory, about 55 MB a PE; the Part 2 record) - and tsan one PE a
+# node alone, as shmem.lanes.* does.
 if(OSOE_INTERNODE)
   add_executable(shmem_test_circulant-reduce test-circulant-reduce.c
     ../src/collective-shape.c ../src/collective-circulant.c ../src/collective-tree.c
@@ -3063,7 +3073,8 @@ if(OSOE_INTERNODE)
     elseif(case MATCHES "tree")
       set(extra OSOE_COLLECTIVE_SHAPE=tree)
     endif()
-    if(nodes GREATER 16 AND CMAKE_C_FLAGS MATCHES "sanitize=")
+    math(EXPR pes "${nodes} * ${per_node}")
+    if(pes GREATER 9 AND CMAKE_C_FLAGS MATCHES "sanitize=")
       continue()
     endif()
     if(per_node GREATER 1 AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
@@ -3080,7 +3091,6 @@ if(OSOE_INTERNODE)
         endif()
       endforeach()
     endforeach()
-    math(EXPR pes "${nodes} * ${per_node}")
     set(timeout 300)
     if(nodes GREATER 16)
       set(timeout 900)

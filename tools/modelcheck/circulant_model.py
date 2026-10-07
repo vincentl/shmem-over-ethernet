@@ -278,7 +278,9 @@ def volume_table():
 #
 # Each lead's lane has a row per skip: round k of either half moves its pieces
 # into row k of the receiver's lane, piece j into slot j mod W, each a put and
-# then an add on the receiver's arrival counter for the row. A round sends to
+# then an add on the receiver's arrival counter for the row. (The C gives each
+# round a block of as many of the lane's rows as the rounds leave it, W its
+# slots; the model's row is that block.) A round sends to
 # one lead and receives from another, so there is no swap to clock a round by:
 # the receiver adds a credit at the sender for each piece it takes, and the
 # sender puts piece j only once it holds j - W + 1 of the round's credits.

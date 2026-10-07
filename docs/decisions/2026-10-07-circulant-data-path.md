@@ -33,8 +33,9 @@ meanwhile with the recommendation, which the model holds and checks.
   allgather once its own shows all ⌈log₂ N⌉.
 - **The rounds** (`in_rounds`, beside `in_pieces`): each of the 2⌈log₂ N⌉ rounds
   in order, its intervals cut into pieces of a lane's slot, each interval on its
-  own; piece j into row k of the receiver's lane at slot j mod the capacity, a
-  put of its header and bytes and a fenced add on the row's counter; a
+  own; piece j into round k's block of the receiver's lane at the block's slot j
+  mod the window (choice 6), a put of its header and bytes and a fenced add on
+  the round's counter; a
   reduce-scatter round's first piece preceded by the sender's lane word in the
   receiver's senders' lanes line, which the receiver reads, clears and checks as
   it takes that piece. The lead takes whichever is ready, its next piece out
@@ -84,6 +85,23 @@ Each is Claude's; the undo follows.
    whose blocks wrap past the vector's end takes at most one more piece than a
    cut across the wrap, and no piece is in two places. *Undo:* one cursor across
    both intervals.
+6. **Each round takes the lane's rows its rounds leave it, and keeps them all
+   in flight.** The design had round k in row k at the capacity's window, four
+   pieces; but a lane has the ceiling's nine rows and a reduction over N nodes
+   uses ⌈log₂ N⌉, two on four nodes. Built so, Träff's was 1.14 to 1.19 times
+   faster than step 2's trees at 1 MiB on the Pi, where the model said 1.34; a
+   window of eight (`OSOE_COLLECTIVE_PIPELINE=8`) took 9.4% off it, and taking
+   an arrived piece before sending the next took nothing (the Pi's evidence,
+   `experiment-1/`). So the chooser gives Träff's a window of the capacity
+   times (ceiling + 1) / ⌈log₂ N⌉ - 16 pieces on three or four nodes, 12 on five
+   to eight, 8 on nine to sixteen, the capacity from seventeen - and round k
+   takes the k-th block of that many of the lane's slots, which costs no memory:
+   at 1 MiB it is 1.35 to 1.42 times faster than the trees, 1.14 to 1.24 times
+   faster than built at the capacity from 256 KiB up, and unchanged below
+   (`experiment-2/`, three rotations). The protocol is the model's at a window W
+   of the block's size, the model's row being the block; the words, the grants
+   and the lane's layout are as accepted. *Undo:* `osoe_shape_choose`'s window
+   back to the capacity, which `round_slot` then maps to row k.
 
 ## Questions for the author
 
@@ -132,7 +150,50 @@ piece sent; (c) is the breakage.
 
 ## Tests, each with the mutation it catches
 
-<!-- filled in from the mutant run -->
+**`shmem.circulant.*`** (`test-circulant-reduce.c`), the link set to the Pi's so
+that the test asks the chooser itself what each call takes: on 2, 3, 4, 5, 6,
+7, 8, 9, 12, 16, 17, 33, 64 and 70 logical nodes of one PE, and 8 of two; and
+on 5 and 16 under `OSOE_TEST_PERTURB`, 5 under the AM stress settings, 4 at
+`OSOE_MAX_TEAMS=4` and `OSOE_MAX_THREADS=1`, 4 and 16 with two threads a PE
+reducing two teams at once, and 16 under `OSOE_COLLECTIVE_SHAPE=tree`. Its
+phases: a byte sum at 13 sizes from 1,025 bytes to 1 MiB and 13 bytes, either
+side of the crossover, each result checked and each call's published algorithm
+held to the chooser's - and for Träff's its rounds, no tree children, and at
+most the window in flight; every typed reduction of the specification, 142
+routines, at the smallest size Träff's takes, of values no order of combining
+can round; in place; two Träff's reductions with the PEs entering some
+milliseconds apart, in one order and then the other; and Träff's reductions
+back to back, no barrier between, with small sums, broadcasts and the trees'
+large sums on the world and on a copy of it whose leads are the world's; and
+a copy of the world made, given two Träff's reductions and destroyed, three
+times, each copy taking the number its last gave back, whose words every lead
+must have zeroed. With two threads it also takes one team's reductions in turn
+from each thread, so that the lane a lead lends changes from call to call. On
+two nodes the chooser takes Träff's only where a piece's rounding favours it -
+16,385 bytes of the ladder - and the test holds every call to it either way.
+**`shmem.shape.chosen.*`** now holds every
+reduction's algorithm to the grid's line with Träff's allowed, and
+**`shmem.shape.back-to-back.*`** counts the world calls that took Träff's and
+requires one at least (its 16 nodes take it from 8 KiB).
+
+**The model's breakages as C mutations** of `internode-generic.c`
+(`build/scratch/circulant-data/vm/mutate.py`), each against eleven of the tests
+- 3, 5, 7, 12 and 8 × 2 nodes, both perturbed cases, the threads on 4, the
+stress settings and both back-to-back maps:
+
+| mutation | caught | how |
+|---|---|---|
+| no credit: any piece of a round may go | 10 of 11 (not the threads on 4, whose rounds are a piece) | a header named piece 4 where piece 0 was due |
+| no reduce-scatter grant: no wait for it | 11 of 11 | the grant line "for nothing", or a field naming no lane |
+| a stale grant: any count stands for this one | 11 of 11 | a field naming no lane, from the second reduction on |
+| a row's allgather grant as its round starts | 11 of 11 | an allgather piece taken as the reduce-scatter's first, whose senders' lane field was not yet put |
+| the allgather's grants one a round, by count | 11 of 11 | the same |
+| the rows on the tree's arrival counters | 10 of 11 | a count the trees had left read as a piece, its senders' lane field empty |
+| the sender's lane after its first piece's add | 11 of 11 | a senders' lane field read before it was put |
+| every piece credited | 0 of 11 | no test can see it: its harm needs a credit still in flight as a team is destroyed and its number taken again; the model's QUIET is its evidence |
+
+Each is caught by the library's own checks - a header, a grant's words, a lane
+field - which end the job naming both leads, not by a wrong result.
 
 ## Verification
 
