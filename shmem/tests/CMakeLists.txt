@@ -585,6 +585,29 @@ if(OSOE_INTERNODE)
   osoe_internode_label(shmem.job.disagree.collective-shape shmem.job.disagree.link)
 endif()
 
+# The link the shapes are chosen from, as every PE's start-up line shows it
+# under SHMEM_DEBUG (link.sh; link-measure.h): measured by the root's lead and
+# the same on every PE, on two nodes and on three, where the root has two
+# children; as set by OSOE_LINK_*; and none at all where the shape is fixed or
+# the job is one node.
+foreach(case "measured;0,0,1,1" "measured;0,1,2" "set;0,0,1,1" "fixed;0,1" "none;0,0")
+  list(GET case 0 mode)
+  list(GET case 1 map)
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.link.${mode}.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/link.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_barrier> ${map} ${mode})
+  set_tests_properties(shmem.link.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "LINK OK")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.link.${mode}.${label})
+  endif()
+endforeach()
+
 if(OSOE_INTERNODE)
   # The node count is the value that shapes the waits: a lead expects children by
   # its own count, so one given too many waits for children that do not exist.

@@ -45,6 +45,15 @@ struct osoe_link {
     uint64_t bytes_per_second;  /* B: what a lead's link carries each way; never 0 */
 };
 
+/* Where a job's link in force came from (link-measure.h): none - a job of one
+ * node, or the shape `fixed`, where nothing chooses - the OSOE_LINK_* settings,
+ * or the root's measurement at the end of shmem_init. */
+enum osoe_link_source {
+    OSOE_LINK_NONE,
+    OSOE_LINK_SET,
+    OSOE_LINK_MEASURED,
+};
+
 struct osoe_collective_shape {
     enum osoe_shape_algorithm algorithm;
     uint32_t fanout;            /* k: 2 to the ceiling */

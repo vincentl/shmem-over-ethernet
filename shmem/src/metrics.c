@@ -370,6 +370,11 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("node.link.message_ns", link_message_ns, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     ND("node.link.bytes_per_second", link_bytes_per_second, OSOE_MTYPE_U64, OSOE_MKIND_STATE,
        ""),
+    ND("node.link.measured_hop_ns", measured_link_hop_ns, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
+    ND("node.link.measured_message_ns", measured_link_message_ns, OSOE_MTYPE_U64,
+       OSOE_MKIND_STATE, ""),
+    ND("node.link.measured_bytes_per_second", measured_link_bytes_per_second, OSOE_MTYPE_U64,
+       OSOE_MKIND_STATE, ""),
     /* The lead that made the segment: while no PE has joined, the segment is a
      * start under way as long as it lives, and a failed start's once it is
      * gone, which osoe-stat --gc removes (§3.14). */

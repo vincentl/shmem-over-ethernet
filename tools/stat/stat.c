@@ -364,13 +364,23 @@ static void shape_text(const struct osoe_segment *s, char *buf, size_t len)
     uint64_t shape = 0, hop = 0, message = 0, bandwidth = 0;
     if (s->dir->layout < 32 || !osoe_segment_read_name(s, "node.collective_shape", 0, &shape))
         return;
-    osoe_segment_read_name(s, "node.link.hop_ns", 0, &hop);
-    osoe_segment_read_name(s, "node.link.message_ns", 0, &message);
-    osoe_segment_read_name(s, "node.link.bytes_per_second", 0, &bandwidth);
+    /* The link as measured, once the node's lead has written it; else as set
+     * by OSOE_LINK_*; else none - a job of one node, a fixed shape, or a
+     * start not yet past the measurement. */
+    const char *how = "measured";
+    osoe_segment_read_name(s, "node.link.measured_hop_ns", 0, &hop);
+    osoe_segment_read_name(s, "node.link.measured_message_ns", 0, &message);
+    osoe_segment_read_name(s, "node.link.measured_bytes_per_second", 0, &bandwidth);
+    if (!bandwidth) {
+        how = "set";
+        osoe_segment_read_name(s, "node.link.hop_ns", 0, &hop);
+        osoe_segment_read_name(s, "node.link.message_ns", 0, &message);
+        osoe_segment_read_name(s, "node.link.bytes_per_second", 0, &bandwidth);
+    }
     if (bandwidth)
-        snprintf(buf, len, "collective shape %s; link set: a hop of %" PRIu64 " ns, a message "
+        snprintf(buf, len, "collective shape %s; link %s: a hop of %" PRIu64 " ns, a message "
                  "cost of %" PRIu64 " ns, %" PRIu64 " bytes a second", shape ? "fixed" : "link",
-                 hop, message, bandwidth);
+                 how, hop, message, bandwidth);
     else
         snprintf(buf, len, "collective shape %s; link not set", shape ? "fixed" : "link");
 }

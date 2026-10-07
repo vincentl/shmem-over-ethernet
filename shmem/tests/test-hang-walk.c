@@ -17,7 +17,8 @@
  * It reads the control segments through osoe-stat's reader, not the library's
  * headers, for the reason invariants.h gives; `osoe-stat --summary` prints the
  * same fields for a human, and the commit that added this carries that
- * transcript. The job ends when PE 0 leaves without finalizing, which its node
+ * transcript. Then every node's measured link, which the summary shows in its
+ * headers, the same in all eight (v0.2 step 2). The job ends when PE 0 leaves without finalizing, which its node
  * declares and the launcher finishes; the test is judged on what it printed.
  */
 #define _GNU_SOURCE
@@ -52,6 +53,25 @@ static int read_node(unsigned node, uint64_t *open, uint64_t *own, uint64_t *mis
              osoe_segment_read_name(&s, "team.world.tree.lowest_missing", 0, missing);
     if (ok && host)
         osoe_segment_read_str(&s, "node.hostname", 0, host, hostlen);
+    osoe_segment_close(&s);
+    return ok;
+}
+
+/* Node `node`'s measured link, as osoe-stat's summary shows it in the node's
+ * header (v0.2 step 2, link-measure.h): its hop and its bandwidth. */
+static int read_link(unsigned node, uint64_t *hop, uint64_t *bandwidth)
+{
+    const char *job = osoe_test_launcher("JOB_ID"), *step = osoe_test_launcher("STEP_ID");
+    char name[OSOE_SEGMENT_NAME_MAX], err[256];
+    snprintf(name, sizeof name, "/osoe.%s.%s.%u.0", job ? job : "0", step ? step : "0", node);
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, name, err, sizeof err) != 0) {
+        fprintf(stderr, "hang walk: %s\n", err);
+        return 0;
+    }
+    int ok = s.table_usable &&
+             osoe_segment_read_name(&s, "node.link.measured_hop_ns", 0, hop) &&
+             osoe_segment_read_name(&s, "node.link.measured_bytes_per_second", 0, bandwidth);
     osoe_segment_close(&s);
     return ok;
 }
@@ -127,6 +147,18 @@ int main(void)
     printf("hang walk found node %u in %u visits, of %u nodes\n", at, visits, NODES);
     CHECK(at == CULPRIT);
     CHECK(visits <= 4);                 /* log_2 8 + 1; never all eight */
+    /* And the link the shapes are chosen from, as the summary's header shows
+     * it: measured at the start, and the same in every node's segment. */
+    uint64_t hop0 = 0, bandwidth0 = 0;
+    CHECK(read_link(0, &hop0, &bandwidth0));
+    CHECK(hop0 > 0 && bandwidth0 > 0);
+    for (unsigned node = 1; node < NODES; node++) {
+        uint64_t hop = 0, bandwidth = 0;
+        CHECK(read_link(node, &hop, &bandwidth));
+        CHECK(hop == hop0 && bandwidth == bandwidth0);
+    }
+    printf("every node's segment shows the link measured: a hop of %llu ns, %llu bytes a second\n",
+           (unsigned long long)hop0, (unsigned long long)bandwidth0);
     fflush(stdout);
     return CHECK_DONE();
 }

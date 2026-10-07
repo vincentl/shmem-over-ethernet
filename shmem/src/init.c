@@ -31,6 +31,7 @@
 #include "fatal.h"
 #include "internode.h"
 #include "job.h"
+#include "link-measure.h"
 #include "liveness.h"
 #include "lock.h"
 #include "metrics.h"
@@ -414,6 +415,13 @@ static void session_start(void)
             sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         }
     }
+    /*
+     * The link the large collectives' shapes are chosen from (v0.2 step 2):
+     * measured now, through the data path with every agent running - the hop
+     * a collective pays - and handed to every PE before any collective can
+     * choose; or as set, or none (link-measure.h).
+     */
+    osoe_link_establish();
     init_pid = getpid();
     static bool exit_handler;
     if (!exit_handler) {
@@ -427,15 +435,37 @@ static void session_start(void)
      * (§3.14), and the heap base every PE agreed on (§4.1). This is the same
      * name §3.15 prints on an abort, said once at start-up instead.
      */
-    if (osoe.bootstrap.debug)
-        fprintf(stderr, "osoe: PE %u of %u (local %u of %u): segment /dev/shm%s, "
-                "heap %llu bytes at %#llx, node %u of %u%s\n",
-                osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
-                osoe.bootstrap.local_count, osoe.node.control_name,
-                (unsigned long long)osoe.node.heap_size,
-                (unsigned long long)(uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id],
-                osoe.job.node, osoe.job.node_count,
-                osoe.job.force_remote ? ", force-remote" : "");
+    if (osoe.bootstrap.debug) {
+        /* And the link, as the shapes will see it. One buffer, one write, as
+         * fatal.c's: every PE says this at once, and separate writes would
+         * interleave inside each other's lines. */
+        char link[192] = "", line[544];
+        const struct osoe_link *l = &osoe.job.link;
+        if (osoe.job.link_source != OSOE_LINK_NONE) {
+            int used = snprintf(link, sizeof link, "; link %s: a hop of %llu ns, a message cost "
+                                "of %llu ns, %llu bytes a second",
+                                osoe.job.link_source == OSOE_LINK_MEASURED ? "measured" : "set",
+                                (unsigned long long)l->hop_ns, (unsigned long long)l->message_ns,
+                                (unsigned long long)l->bytes_per_second);
+            if (osoe.job.link_source == OSOE_LINK_MEASURED && used > 0 &&
+                (size_t)used < sizeof link)
+                snprintf(link + used, sizeof link - (size_t)used, " (%llu us of this start)",
+                         (unsigned long long)(osoe.job.link_ns / 1000));
+        }
+        int n = snprintf(line, sizeof line, "osoe: PE %u of %u (local %u of %u): segment "
+                         "/dev/shm%s, heap %llu bytes at %#llx, node %u of %u%s%s\n",
+                         osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
+                         osoe.bootstrap.local_count, osoe.node.control_name,
+                         (unsigned long long)osoe.node.heap_size,
+                         (unsigned long long)(uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id],
+                         osoe.job.node, osoe.job.node_count,
+                         osoe.job.force_remote ? ", force-remote" : "", link);
+        if (n > 0) {
+            size_t len = (size_t)n < sizeof line ? (size_t)n : sizeof line - 1;
+            ssize_t ignored = write(STDERR_FILENO, line, len);
+            (void)ignored;
+        }
+    }
 }
 
 static void session_end(void)

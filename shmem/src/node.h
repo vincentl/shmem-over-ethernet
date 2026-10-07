@@ -805,11 +805,17 @@ struct osoe_node_header {
     /* Layout 32 (v0.2 step 2): the lead's OSOE_COLLECTIVE_SHAPE and the link
      * its large collectives' shapes are chosen from - OSOE_LINK_*'s, or 0
      * where they are not set - which open_control holds the node's PEs to,
-     * and osoe-stat shows (node.link.*). */
+     * and osoe-stat shows (node.link.*). Then the link as the root's lead
+     * measured it at the end of shmem_init, which the node's lead writes once
+     * every PE holds it (link-measure.h), 0 until then and where nothing is
+     * measured: osoe-stat's to show, read by nothing in the library. */
     uint32_t collective_shape;
     uint64_t link_hop_ns;
     uint64_t link_message_ns;
     uint64_t link_bytes_per_second;
+    _Atomic uint64_t measured_link_hop_ns;
+    _Atomic uint64_t measured_link_message_ns;
+    _Atomic uint64_t measured_link_bytes_per_second;
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)

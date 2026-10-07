@@ -62,6 +62,7 @@ add_library(osoe
   src/info.c
   src/init.c
   src/job.c
+  src/link-measure.c
   src/liveness.c
   src/lock.c
   src/malloc.c
