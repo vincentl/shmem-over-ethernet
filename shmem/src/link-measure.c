@@ -248,14 +248,14 @@ void osoe_link_establish(void)
     *in_force = (struct osoe_link){ words[0], words[1], words[2] };
     osoe.job.link_source = OSOE_LINK_MEASURED;
     osoe.job.link_ns = osoe_now_ns() - start;
-    /* Relaxed: three numbers for osoe-stat to show, which order nothing and
-     * which nothing in the library reads back. */
+    /* Release, as every store here names one (§3.16): three numbers for
+     * osoe-stat to show, which nothing in the library reads back. */
     if (osoe.bootstrap.local_id == 0) {
         struct osoe_node_header *h = osoe.node.hdr;
-        atomic_store_explicit(&h->measured_link_hop_ns, in_force->hop_ns, memory_order_relaxed);
+        atomic_store_explicit(&h->measured_link_hop_ns, in_force->hop_ns, memory_order_release);
         atomic_store_explicit(&h->measured_link_message_ns, in_force->message_ns,
-                              memory_order_relaxed);
+                              memory_order_release);
         atomic_store_explicit(&h->measured_link_bytes_per_second, in_force->bytes_per_second,
-                              memory_order_relaxed);
+                              memory_order_release);
     }
 }
