@@ -5862,6 +5862,35 @@ The intranode phase is unchanged: the lead combines local members' sources into
 its `dest` after they arrive (§5.5). The internode algorithm then runs between
 leads, and release and copy-out follow the §5.4 counters as before.
 
+*As built (v0.2 step 3; `2026-10-07-circulant.md`, `2026-10-07-circulant-data-path.md`):*
+a large reduction takes Träff's circulant reduce-scatter and allgather (arXiv
+2410.14234) where the chooser says it costs less than the best tree (`shape_of`
+in `internode-generic.c`, under `OSOE_COLLECTIVE_SHAPE=link`; `tree` turns it
+off by name): ceil(log2 N) rounds a half for every node count, every lead
+sending N - 1 blocks a half - under two vectors on every lead's link, where a
+tree's interior lead sends k + 1 and the fold the step's brief first described
+put up to 3.5 on a fold lead's. Rule 1 holds through the lanes' rows, round k
+of either half into the k-th block of the receiver's lane - a block being as
+many of the lane's rows as the rounds leave a round, all of whose slots it
+keeps in flight, 16 pieces on four nodes; rule 2 on the lead's thread,
+which combines or copies every piece; rule 3 since each block is combined once,
+at its owner, in an order the schedule fixes, and copied to every lead. Its
+arithmetic is `collective-circulant.c`, its cost `osoe_shape_circulant_cost`,
+its protocol `tools/modelcheck/circulant_model.py`'s: words of its own per team
+number - an arrival counter a row, a credit counter, the allgather's grant
+count, the reduce-scatter's grant line with a lane a round, and the senders'
+lanes - because its allgather ends with no step every lead waits for, so a
+finished lead's next collective could add to a tree's counters while another
+lead still waits on them; and credits for the pieces a sender's window waits on
+alone, so that nothing lands in a lead's words once it has returned. Each lead
+publishes the algorithm its last such call took and the rounds Träff's made in
+the team's tree state (`team.tree.algorithm`, `circulant_rounds`; layout 33),
+which `shmem.shape.chosen.*` and `shmem.circulant.*` hold call by call. Its
+crossover is the cost model's on the measured link: on the Pi's four nodes
+between 8 and 16 KiB, and it was faster than the trees at every size it took - 1.32 to 1.41
+times at 1 MiB - and the trees below it unchanged (`docs/pi-cluster-results.md`,
+v0.2 step 3).
+
 #### Prefix scans
 
 `shmem_sum_inscan` and `shmem_sum_exscan` (spec §9.10.10) give PE *i*, in team rank
@@ -8109,7 +8138,13 @@ which has two states per pair, so a third backend needs a selector of its own
 - **Reduction algorithm crossovers** (§5.8). The element counts at which a ring or
   Rabenseifner replaces the accumulator's internode tree are chosen from measurement
   on the §8.4 harness, not fixed in advance. The
-  lead's-`dest` accumulator does not cover them.
+  lead's-`dest` accumulator does not cover them. *Closed (v0.2 steps 2 and 3):*
+  each call chooses between the trees and Träff's circulant reduce-scatter and
+  allgather - Rabenseifner's halving with a fold modelled and set aside - by the
+  cost model's closed forms (`collective-shape.c`) on the link measured at the
+  end of `shmem_init`; on the Pi's four nodes Träff's from between 8 and 16 KiB, faster than
+  the trees at every size it takes, 1.32 to 1.41 times at 1 MiB, and the trees
+  below (`docs/pi-cluster-results.md`, v0.2 step 3).
 
 ### Review of 2026-09-16
 

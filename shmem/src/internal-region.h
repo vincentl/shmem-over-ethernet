@@ -77,8 +77,13 @@
  * it (internode-generic.c); READY[0]'s line also holds, past the counter, the
  * shape of the gather that lead entered, 24 bytes, put before the add. A team
  * over N nodes takes ceil(log2 N) steps, so every team number has room for
- * ceil(log2 N) steps of the job's N nodes, which every node agrees on - the
- * one part of the layout the node count sizes, by its logarithm.
+ * ceil(log2 N) steps of the job's N nodes, which every node agrees on - with
+ * the reduce-scatter's words, the parts of the layout the node count sizes, by
+ * its logarithm.
+ *
+ * Then **the reduce-scatter's words** (v0.2 step 3; below), sized the same way:
+ * per team number, a line for each of the ceil(log2 N) rows of Träff's
+ * reduce-scatter and allgather and four more.
  *
  * Then **the scans' area** (below), and last **the lanes**: one per thread
  * record of the PE (node.h), each `fanout + 1` rows of D slots, a piece's
@@ -268,6 +273,63 @@ static inline uint64_t osoe_internal_gather_offset(uint32_t fanout, uint32_t max
 }
 
 /*
+ * Then **the reduce-scatter's words** (v0.2 step 3; docs/decisions/
+ * 2026-10-07-circulant.md, which the author accepted on 2026-10-07): what
+ * Träff's circulant reduce-scatter and allgather among a team's node leads
+ * (collective-circulant.h; internode-generic.c, in_rounds) counts on, per team
+ * number, in this order, each counter alone on its line:
+ *   - an **arrival counter per row**, ceil(log2 N) of them: the pieces of the
+ *     round that takes the row of this lead's lane, in either half;
+ *   - the **credit counter**: one for each piece this lead's receivers have
+ *     taken that its window waits on;
+ *   - the **allgather's grant counter**: one for each of its allgather
+ *     receivers whose row its reduce-scatter has emptied;
+ *   - the **reduce-scatter's grant line**: its counter, one for each
+ *     reduce-scatter receiver that has entered, then the collective's epoch,
+ *     identity and bytes, and a field per round, where that round's receiver
+ *     puts the lane it lends;
+ *   - the **senders' lanes line**: a lane and an epoch per row, where each
+ *     reduce-scatter round's sender puts its own lane before its first piece's
+ *     add, for the allgather back.
+ * So every put lands outside the counters a lead watches - the grant's words
+ * past its counter, the senders' lanes on a line of their own. Its own, and
+ * no other collective's: the allgather ends with no step every lead waits
+ * for, so a lead that has left can start a small collective whose child adds
+ * to its parent's counters at once while another lead still waits on its last
+ * pieces (tools/modelcheck/circulant_model.py, shared_counters). Sized like
+ * the gather's by the job's node count, ceil(log2 N) + 4 lines, and no more
+ * rows than OSOE_INTERNAL_CIRCULANT_ROWS_MOST, which the senders' lanes line
+ * holds: a team of more than 65,536 nodes takes the trees.
+ */
+enum { OSOE_INTERNAL_CIRCULANT_ROWS_MOST = 16 };
+
+/* The rows of the reduce-scatter's words for a job of `nodes` nodes:
+ * ceil(log2 nodes), at most OSOE_INTERNAL_CIRCULANT_ROWS_MOST, 0 for one. */
+static inline uint32_t osoe_internal_circulant_rows(uint32_t nodes)
+{
+    uint32_t rows = osoe_internal_gather_steps(nodes);
+    return rows < OSOE_INTERNAL_CIRCULANT_ROWS_MOST ? rows : OSOE_INTERNAL_CIRCULANT_ROWS_MOST;
+}
+
+/* One team number's reduce-scatter words: a line for each row and four more,
+ * none on one node. */
+static inline uint64_t osoe_internal_team_circulant_bytes(uint32_t rows)
+{
+    return rows == 0 ? 0 : (uint64_t)(rows + 4) * OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* Where the reduce-scatter's words start: past every team number's allgather
+ * words. */
+static inline uint64_t osoe_internal_circulant_offset(uint32_t fanout, uint32_t max_teams,
+                                                      uint32_t small_collective_bytes,
+                                                      uint32_t nodes)
+{
+    return osoe_internal_gather_offset(fanout, max_teams, small_collective_bytes) +
+           (uint64_t)max_teams *
+               osoe_internal_team_gather_bytes(osoe_internal_gather_steps(nodes));
+}
+
+/*
  * Then **the scans' area** (spec §9.10.10; phase 1 step 10 slice 1,
  * docs/prompts/done/phase1-step10-slice1-prompt.md; the team redesign's step
  * E, E6): per team number, like everything else here, and on every member's
@@ -301,9 +363,9 @@ static inline uint64_t osoe_internal_scan_offset(uint32_t fanout, uint32_t max_t
                                                  uint32_t small_collective_bytes,
                                                  uint32_t nodes)
 {
-    return osoe_internal_gather_offset(fanout, max_teams, small_collective_bytes) +
+    return osoe_internal_circulant_offset(fanout, max_teams, small_collective_bytes, nodes) +
            (uint64_t)max_teams *
-               osoe_internal_team_gather_bytes(osoe_internal_gather_steps(nodes));
+               osoe_internal_team_circulant_bytes(osoe_internal_circulant_rows(nodes));
 }
 
 /* One team number's scan rows, and then their counters and the scans' grant
@@ -340,8 +402,8 @@ static inline uint64_t osoe_internal_lanes_offset(uint32_t fanout, uint32_t max_
 /* The region's size for `max_teams` team numbers and `lanes` lanes, a tree of
  * fan-out `fanout`, `pipeline` pieces in flight, small collectives of up to
  * `small_collective_bytes` and a job of `nodes` nodes, before page rounding:
- * the small rows, the words, the allgather's words, the scans' area, then the
- * lanes. */
+ * the small rows, the words, the allgather's words, the reduce-scatter's
+ * words, the scans' area, then the lanes. */
 static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipeline,
                                                   uint32_t max_teams,
                                                   uint32_t small_collective_bytes,

@@ -68,6 +68,19 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
             ${PROJECT_SOURCE_DIR}/shmem/tests/shape-grid.txt)
   set_tests_properties(model.shape_timing model.shape_timing.grid PROPERTIES
                        LABELS "tier1;model" TIMEOUT 600)
+  # Träff's circulant reduce-scatter and allgather (v0.2 step 3): the rounds'
+  # arithmetic for every node count from 2 to 70, against the fold the brief
+  # described (rabenseifner_model.py, kept as that comparison's evidence); the
+  # protocol through rows, credits and grants on two to five leads, and with a
+  # small tree collective before and after it; each breakage failing; and the
+  # digests collective-circulant.c's test reads.
+  add_test(NAME model.circulant
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/circulant_model.py check)
+  add_test(NAME model.circulant.digest
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/circulant_model.py
+            digest-compare ${PROJECT_SOURCE_DIR}/shmem/tests/circulant-digest.txt)
+  set_tests_properties(model.circulant PROPERTIES LABELS "model" TIMEOUT 1800)
+  set_tests_properties(model.circulant.digest PROPERTIES LABELS "tier1;model" TIMEOUT 300)
 elseif(NOT Python3_Interpreter_FOUND)
   message(STATUS "python3 not found: the concurrency models will not run as tests")
 endif()

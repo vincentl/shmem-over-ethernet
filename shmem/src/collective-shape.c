@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#include "collective-circulant.h"
 #include "collective-tree.h"
 
 /*
@@ -155,11 +156,63 @@ uint64_t osoe_shape_cost(enum osoe_shape_operation operation, uint32_t nodes, ui
     return fill + (pieces - 1) * period;
 }
 
+/* a + b, or UINT64_MAX where it overflows */
+static uint64_t add_saturating(uint64_t a, uint64_t b)
+{
+    return a > UINT64_MAX - b ? UINT64_MAX : a + b;
+}
+
+/* a b, or UINT64_MAX where it overflows */
+static uint64_t multiply_saturating(uint64_t a, uint64_t b)
+{
+    return b != 0 && a > UINT64_MAX / b ? UINT64_MAX : a * b;
+}
+
+uint64_t osoe_shape_circulant_cost(uint32_t nodes, uint32_t window, uint64_t bytes,
+                                   uint64_t piece_bytes, const struct osoe_link *link)
+{
+    if (nodes <= 1 || bytes == 0)
+        return 0;
+    if (window == 0 || piece_bytes == 0 || link->bytes_per_second == 0)
+        return UINT64_MAX;
+    uint64_t h = link->hop_ns, o = link->message_ns, rate = link->bytes_per_second;
+    uint32_t rows = osoe_circulant_rows(nodes);
+    /* the grants: one to each reduce-scatter sender, then a hop; and between
+     * the halves the last allgather grant's message and hop */
+    uint64_t total = add_saturating(multiply_saturating(rows, o), 2 * h + o);
+    /* the reduce-scatter's rounds, then the allgather's, the same bytes in
+     * reverse: (s' - s) blocks, at most ceil((s' - s) bytes / nodes) */
+    uint32_t outer = nodes, inner = nodes - nodes / 2;
+    for (uint32_t k = 0; k < rows; k++) {
+        uint64_t blocks = outer - inner;
+        uint64_t m = bytes / nodes * blocks + ((bytes % nodes) * blocks + nodes - 1) / nodes;
+        uint64_t pieces = m / piece_bytes + (m % piece_bytes != 0);
+        uint64_t one = m < piece_bytes ? m : piece_bytes;
+        uint64_t t = (one * 1000000000u + rate - 1) / rate;
+        uint64_t wire = m > UINT64_MAX / 1000000000u
+                            ? UINT64_MAX
+                            : (m * 1000000000u + rate - 1) / rate;
+        uint64_t credited = (t + 2 * h + o + window - 1) / window;
+        uint64_t paced = add_saturating(t, multiply_saturating(pieces - 1, 2 * o));
+        uint64_t flowed = add_saturating(
+            t, multiply_saturating(pieces > window ? pieces - window : 0, credited));
+        uint64_t round = wire;
+        if (paced > round)
+            round = paced;
+        if (flowed > round)
+            round = flowed;
+        total = add_saturating(total, multiply_saturating(2, add_saturating(h + o, round)));
+        outer = inner;
+        inner = inner - inner / 2;
+    }
+    return total;
+}
+
 struct osoe_collective_shape osoe_shape_choose(enum osoe_shape_operation operation,
                                                uint32_t nodes, uint64_t bytes,
                                                const struct osoe_link *link, uint32_t ceiling,
                                                uint32_t capacity, uint32_t small_bytes,
-                                               uint64_t piece_bytes)
+                                               uint64_t piece_bytes, bool circulant)
 {
     struct osoe_collective_shape shape = { OSOE_SHAPE_TREE, ceiling, 1 };
     if (nodes <= 1 || bytes <= small_bytes)
@@ -175,5 +228,14 @@ struct osoe_collective_shape osoe_shape_choose(enum osoe_shape_operation operati
         }
     }
     shape.window = capacity;
+    uint32_t rows = osoe_circulant_rows(nodes);
+    if (circulant && operation == OSOE_SHAPE_REDUCE && rows <= ceiling + 1) {
+        /* Träff's round takes as many of a lane's ceiling + 1 rows as its
+         * rounds leave it, the capacity's slots each, and keeps them all in
+         * flight. */
+        uint32_t window = capacity * ((ceiling + 1) / rows);
+        if (osoe_shape_circulant_cost(nodes, window, bytes, piece_bytes, link) < least)
+            shape = (struct osoe_collective_shape){ OSOE_SHAPE_CIRCULANT, ceiling, window };
+    }
     return shape;
 }

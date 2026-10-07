@@ -1,0 +1,40 @@
+--- a/shmem/src/internode-generic.c
++++ b/shmem/src/internode-generic.c
+@@ -1395,6 +1395,7 @@
+  */
+ struct round_flight {
+     const struct pieces *pieces;
++    uint32_t spread;                    /* the lane's rows a round takes */
+     struct osoe_circulant_round round;
+     uint32_t index;                     /* the round, 0 to twice the rows - 1 */
+     int to, from;                       /* the leads' ranks */
+@@ -1509,7 +1510,8 @@
+                            circulant_senders(pieces->number) + (uint64_t)f->round.row * sizeof word,
+                            &word, sizeof word, OSOE_TRANSPORT_MORE);
+     }
+-    uint64_t slot = lane_slot(f->to_lane, f->round.row, f->sent);
++    uint64_t slot = lane_slot(f->to_lane, f->round.row * f->spread, 0) +
++                    (f->sent % f->window) * OSOE_INTERNAL_SLOT_BYTES;
+     osoe_transport_put(context, f->to, OSOE_REGION_INTERNAL, slot, &header, HEADER_BYTES,
+                        OSOE_TRANSPORT_MORE);
+     osoe_transport_put(context, f->to, OSOE_REGION_INTERNAL, slot + HEADER_BYTES,
+@@ -1565,7 +1567,8 @@
+     interval_piece(f->round.receive_first, f->round.receive_end, f->per_piece, f->taken, &at,
+                    &elements);
+     struct piece_header header = round_header(f, f->taken, elements);
+-    unsigned char *slot = internal(lane_slot(own, f->round.row, f->taken));
++    unsigned char *slot = internal(lane_slot(own, f->round.row * f->spread, 0) +
++                                   (f->taken % f->window) * OSOE_INTERNAL_SLOT_BYTES);
+     check_round_piece(slot, &header, f);
+     unsigned char *place = pieces->buffer + at * pieces->width;
+     if (f->round.combines)
+@@ -1669,7 +1672,8 @@
+             .round = osoe_circulant_round(team_phase->index, nodes, index, count),
+             .index = index,
+             .per_piece = pieces->bytes_per_piece / pieces->width,
+-            .window = shape.window,
++            .spread = (osoe.bootstrap.collective_fanout + 1) / rows,
++            .window = (uint64_t)shape.window * ((osoe.bootstrap.collective_fanout + 1) / rows),
+             .credit_base = credit_base,
+         };
+         f.to = (int)lead_of(pieces->team, f.round.to, pieces->routine);

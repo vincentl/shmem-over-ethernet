@@ -821,3 +821,47 @@ outputs `docs/design/evidence/pi-cluster/2026-10-06-v0.2-step2/`.
   0.1.0's whole shape, as merged, every line of the probe - barrier,
   reductions, broadcasts and scans, both layouts - within the noise of `fixed`
   or faster, the large reductions and broadcasts as above.
+
+## v0.2 step 3: Träff's reduce-scatter and allgather (2026-10-07)
+
+The branch `circulant`, copied to `~/osoe` and built there as release with no
+warning; the records are `docs/decisions/2026-10-07-circulant.md` (Part 1: the
+model, the arithmetic, the cost) and `docs/decisions/2026-10-07-circulant-data-path.md`
+(Part 2: the data path, and these measurements), the raw outputs
+`docs/design/evidence/pi-cluster/2026-10-07-v0.2-step3/`. Each comparison is
+`OSOE_COLLECTIVE_SHAPE=link` - a large reduction takes Träff's where the cost
+model says it costs less than the best tree - against `tree`, step 2's trees
+alone, on the same build, alternating three times: the e-band probe at 4 × 4
+and 4 × 1, OSU's reduce to 1 MiB at both and to 4 MiB at 4 × 1, `osoe-bench`
+at 4 × 4; `analysis.txt` each line's median of three, its spread and the ratio.
+
+- **As merged** (`comparison/`, `5cbd47e`): every reduction size Träff's takes
+  faster than the trees, every size below unchanged. At 1 MiB 1.36 times at
+  4 × 1 (OSU, 16.6 against 22.6 ms; the probe 1.36) and 1.32 to 1.41 at 4 × 4
+  (OSU 18.4 against 24.3 ms; the probe 16.3 against 22.9); 1.43 and 1.46 at 2
+  and 4 MiB; 1.32 to 1.49 from 64 to 512 KiB at 4 × 1, 1.14 to 1.33 at 4 × 4 by
+  OSU and 1.58 by the probe at 64 KiB; at 16 and 32 KiB, the smallest Träff's
+  takes here, 1.04 to 1.05 and 1.05 to 1.26 by OSU, 1.24 and 1.31 to 1.49 by
+  the probe. To 8 KiB both run the same tree, within 1% of each other but for
+  OSU's smallest sizes at 4 × 4, which read 2 to 8% faster under `link` - the
+  same code. In `osoe-bench`'s loop at 4 × 4, reductions back to back with no
+  barrier between them, the 64 KiB median is the trees' (2.26 against
+  2.24 ms) and the fastest call 1.17 times faster. Broadcasts and scans, which
+  take the same shape under both, moved by up to 8% either way between
+  rotations: the noise of a three-rotation comparison here.
+- **At the capacity's window** (`comparison-window-4/`, `4b9767e`), as Part 2
+  first built it, each round in one row of a lane with four pieces in flight:
+  1.14 to 1.19 times faster at 1 MiB, against the model's 1.34. A window of
+  eight took 9.4% off its 1 MiB (`experiment-1/`), and taking an arrived piece
+  before sending the next nothing; each round taking the rows of the lane its
+  rounds leave it, 16 pieces in flight on four nodes, made it 1.35 to 1.42
+  (`experiment-2/`), as merged.
+- **The model** (`shape_timing.py`): the chooser's closed forms put Träff's at
+  1.34 times the trees' speed at 1 MiB on four nodes, and OSU measured 1.36 at
+  4 × 1 as merged - though both closed forms run 16 to 18% under the measured
+  times there, and neither saw the capacity's window hold Träff's back. The
+  event simulation's trees are within 10% of OSU's from 16 KiB; its Träff's
+  within 8% to 128 KiB and 11 to 22% optimistic from 256 KiB, so its 1.72 at
+  1 MiB is too high: it takes every lead's link carrying both ways at once at
+  the full rate, which the Pi's leads did not reach - one progress thread a
+  node moving both directions the likely reason, not measured.

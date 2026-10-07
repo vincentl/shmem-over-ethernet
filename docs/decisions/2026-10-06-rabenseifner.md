@@ -5,6 +5,14 @@ The first part of v0.2's third step, on `docs/prompts/v0.2-step3-rabenseifner-pr
 shape - waits on step 2's chooser; the author's prompt for the night said that
 Part 1 depends on nothing in step 2, and items 1 and 2 do not.
 
+*Superseded (2026-10-07):* the author chose to model Träff's circulant
+reduce-scatter, and to build it if the model held it (`2026-10-06.md`, items 6
+and 7); it held, and replaces the fold for every node count
+(`2026-10-07-circulant.md`). The fold's model stays as that comparison's
+evidence (`tools/modelcheck/rabenseifner_model.py`); its C, its test and its
+chooser's shape stay on the branch `rabenseifner` (rebased since, at `537d705`,
+`2665f8e` and `fab0560`), not carried over. Kept as written below.
+
 **Where it stands.** Part 1 built on the branch `rabenseifner`, itself on step
 2's `tree-shape`, not merged: the arithmetic, in the model and in C (`5beed12`);
 the protocol the second question below proposes, modelled (`5399266`); and the

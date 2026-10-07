@@ -21,6 +21,13 @@
  * tree of that fan-out rooted at the call's root gives this node - a lead that
  * published the chooser's shape and built another tree fails here, where every
  * tree all nodes agree on sums right.
+ *
+ * Since v0.2 step 3 a large reduction takes Träff's circulant reduce-scatter
+ * and allgather where the grid's line with Träff's allowed says so: then the
+ * lead publishes that algorithm (team.tree.algorithm), the rounds it made -
+ * twice ceil(log2 N), counted as they ran (team.tree.circulant_rounds) - no
+ * tree children, and the chooser's fan-out and window; a broadcast, and a
+ * reduction the grid gives a tree, publish the tree.
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -56,28 +63,44 @@ static uint64_t children_at(uint64_t nodes, uint64_t k, uint64_t index, uint64_t
     return nodes - first < k ? nodes - first : k;
 }
 
-/* The grid's shape for one call, or 0 if the grid has no line for it. */
+/* ceil(log2 nodes): Träff's rounds a half (collective-circulant.h). */
+static uint64_t circulant_rows(uint64_t nodes)
+{
+    uint64_t rows = 0;
+    while ((UINT64_C(1) << rows) < nodes)
+        rows++;
+    return rows;
+}
+
+/* The grid's shape for one call, or 0 if the grid has no line for it: a
+ * reduction's line with Träff's allowed, as the data path asks the chooser
+ * (internode-generic.c, shape_of), the algorithm 1 for Träff's; a broadcast's
+ * line, which the grid writes with Träff's not allowed alone, a broadcast
+ * having nothing to scatter. */
 static int grid_shape(const char *path, const char *op, uint64_t nodes, uint64_t bytes,
                       uint64_t hop, uint64_t message, uint64_t bandwidth, uint64_t ceiling,
-                      uint64_t capacity, uint64_t small, uint64_t *fanout, uint64_t *window)
+                      uint64_t capacity, uint64_t small, uint64_t *fanout, uint64_t *window,
+                      uint64_t *circulant)
 {
     FILE *f = fopen(path, "r");
     CHECK_FATAL(f != NULL);
     char line[256];
     int found = 0;
     while (!found && fgets(line, sizeof line, f)) {
-        char name[16];
-        unsigned long long v[11];
+        char name[16], algorithm[16];
+        unsigned long long v[12];
         if (line[0] == '#' ||
-            sscanf(line, "%15s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu", name,
-                   &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8], &v[9],
-                   &v[10]) != 12)
+            sscanf(line, "%15s %llu %llu %llu %llu %llu %llu %llu %llu %llu %15s %llu %llu %llu",
+                   name, &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8],
+                   algorithm, &v[9], &v[10], &v[11]) != 14)
             continue;
         if (strcmp(name, op) == 0 && v[0] == nodes && v[1] == bytes && v[2] == hop &&
             v[3] == message && v[4] == bandwidth && v[5] == ceiling && v[6] == capacity &&
-            v[7] == small) {
-            *fanout = v[8];
-            *window = v[9];
+            v[7] == small && v[8] == (uint64_t)(strcmp(op, "reduce") == 0)) {
+            CHECK(strcmp(algorithm, "tree") == 0 || strcmp(algorithm, "circulant") == 0);
+            *circulant = strcmp(algorithm, "circulant") == 0;
+            *fanout = v[9];
+            *window = v[10];
             found = 1;
         }
     }
@@ -132,15 +155,20 @@ int main(int argc, char **argv)
             }
             /* The node's lead published the call's shape before it released
              * its members (node.h), so it is there once the call returns. */
-            uint64_t fanout = 0, window = 0, children = 0, want_fanout = 0, want_window = 0;
+            uint64_t fanout = 0, window = 0, children = 0, algorithm = 0, rounds = 0;
+            uint64_t want_fanout = 0, want_window = 0, want_circulant = 0;
             CHECK(osoe_test_scoped_metric("team.tree.shape_fanout", OSOE_MSCOPE_TEAM, 0, &fanout));
             CHECK(osoe_test_scoped_metric("team.tree.shape_window", OSOE_MSCOPE_TEAM, 0, &window));
             CHECK(osoe_test_scoped_metric("team.tree.shape_children", OSOE_MSCOPE_TEAM, 0,
                                           &children));
+            CHECK(osoe_test_scoped_metric("team.tree.algorithm", OSOE_MSCOPE_TEAM, 0,
+                                          &algorithm));
+            CHECK(osoe_test_scoped_metric("team.tree.circulant_rounds", OSOE_MSCOPE_TEAM, 0,
+                                          &rounds));
             const char *name = op == 0 ? "reduce" : "broadcast";
             uint64_t bytes = (uint64_t)count;
             if (!grid_shape(argv[1], name, nodes, bytes, hop, message, bandwidth, ceiling,
-                            capacity, small, &want_fanout, &want_window)) {
+                            capacity, small, &want_fanout, &want_window, &want_circulant)) {
                 fprintf(stderr, "PE %d: the grid has no %s of %llu bytes on %llu nodes\n", me,
                         name, (unsigned long long)bytes, (unsigned long long)nodes);
                 CHECK(0);
@@ -154,10 +182,23 @@ int main(int argc, char **argv)
                         (unsigned long long)want_fanout, (unsigned long long)want_window);
                 CHECK(0);
             }
+            if (algorithm != want_circulant ||
+                (want_circulant && rounds != 2 * circulant_rows(nodes))) {
+                fprintf(stderr, "PE %d: a %s of %llu bytes on %llu nodes took algorithm %llu "
+                        "with %llu rounds, the chooser's %llu with %llu\n", me, name,
+                        (unsigned long long)bytes, (unsigned long long)nodes,
+                        (unsigned long long)algorithm, (unsigned long long)rounds,
+                        (unsigned long long)want_circulant,
+                        (unsigned long long)(2 * circulant_rows(nodes)));
+                CHECK(0);
+            }
             /* One PE a node, so this PE's node is its rank and the root's node
-             * the root's rank; a reduction's tree is rooted at node 0. */
+             * the root's rank; a reduction's tree is rooted at node 0, and
+             * Träff's has none. */
             uint64_t want_children =
-                children_at(nodes, want_fanout, (uint64_t)me, op == 0 ? 0 : (uint64_t)root);
+                want_circulant ? 0
+                               : children_at(nodes, want_fanout, (uint64_t)me,
+                                             op == 0 ? 0 : (uint64_t)root);
             if (children != want_children) {
                 fprintf(stderr, "PE %d: a %s of %llu bytes on %llu nodes built a tree with %llu "
                         "children here, where fan-out %llu gives %llu\n", me, name,
@@ -167,9 +208,10 @@ int main(int argc, char **argv)
                 CHECK(0);
             }
             if (me == 0)
-                printf("%s %llu bytes on %llu nodes: fan-out %llu, window %llu\n", name,
+                printf("%s %llu bytes on %llu nodes: %s, fan-out %llu, window %llu\n", name,
                        (unsigned long long)bytes, (unsigned long long)nodes,
-                       (unsigned long long)fanout, (unsigned long long)window);
+                       algorithm ? "Träff's" : "a tree", (unsigned long long)fanout,
+                       (unsigned long long)window);
             checked++;
         }
     }

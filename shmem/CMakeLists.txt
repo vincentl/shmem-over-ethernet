@@ -54,6 +54,7 @@ add_library(osoe
   src/barrier.c
   src/blocked.c
   src/bootstrap.c
+  src/collective-circulant.c
   src/collective-shape.c
   src/collective-tree.c
   src/deadlock.c

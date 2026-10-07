@@ -976,7 +976,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * leftover that osoe-stat --gc removes. The lead knows L and the heap size;
      * every PE has parsed the same size, or check_agreement fails them all. A
      * heap object is the heap and then its internal region (internal-region.h),
-     * about 15.5 MiB at the defaults - 256 team numbers of about 24 KiB each, a
+     * about 15.6 MiB at the defaults - 256 team numbers of about 24 KiB each, a
      * fan-out of 8, four pieces in flight (OSOE_COLLECTIVE_PIPELINE) and a lane
      * of 577 KiB for each of 17 thread records - which is counted here with the
      * heap it follows. Pages cost only once written, so the room above has taken
@@ -1174,8 +1174,8 @@ again:;
     if (h->collective_shape != b->collective_shape) {
         char msg[256];
         snprintf(msg, sizeof msg, "OSOE_COLLECTIVE_SHAPE differs between PEs: the local lead "
-                 "has %s, this PE has %s", h->collective_shape ? "fixed" : "link",
-                 b->collective_shape ? "fixed" : "link");
+                 "has %s, this PE has %s", osoe_collective_shape_name(h->collective_shape),
+                 osoe_collective_shape_name(b->collective_shape));
         fail_rendezvous(n, msg);
     }
     if (h->link_hop_ns != b->link_hop_ns || h->link_message_ns != b->link_message_ns ||
@@ -1350,6 +1350,11 @@ static void collective_state_reset(struct osoe_collective_state *c)
     atomic_store_explicit(&c->gather_shares, 0, memory_order_release);
     atomic_store_explicit(&c->collective_class, 0, memory_order_release);
     atomic_store_explicit(&c->lane, 0, memory_order_release);
+    atomic_store_explicit(&c->shape_fanout, 0, memory_order_release);
+    atomic_store_explicit(&c->shape_window, 0, memory_order_release);
+    atomic_store_explicit(&c->shape_children, 0, memory_order_release);
+    atomic_store_explicit(&c->algorithm, 0, memory_order_release);
+    atomic_store_explicit(&c->circulant_rounds, 0, memory_order_release);
 }
 
 /*

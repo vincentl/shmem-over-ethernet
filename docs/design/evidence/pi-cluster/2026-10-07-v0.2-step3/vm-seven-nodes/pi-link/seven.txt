@@ -1,0 +1,16 @@
+== link 1 08:53:48
+exit 0
+== tree 1 08:53:52
+exit 0
+== link 2 08:53:56
+exit 0
+== tree 2 08:54:01
+exit 0
+== link 3 08:54:06
+exit 0
+== tree 3 08:54:10
+exit 0
+a hop of 16229 ns, a message cost of 2516 ns, 4471501309 bytes a second (2805 us of this start)
+a hop of 36771 ns, a message cost of 9195 ns, 3753852028 bytes a second (6598 us of this start)
+a hop of 22417 ns, a message cost of 7930 ns, 3037402091 bytes a second (5878 us of this start)
+DONE 08:54:27

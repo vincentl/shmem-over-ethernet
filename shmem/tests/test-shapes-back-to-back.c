@@ -22,6 +22,12 @@
  * team's collective, which the next piece's header names, or finds nothing
  * where a piece should be; with a barrier before every call, as the shapes
  * test has, nothing comes early enough to show it.
+ *
+ * Since v0.2 step 3 the large reductions past the chooser's crossover take
+ * Träff's circulant reduce-scatter and allgather, so its calls run back to
+ * back with the trees' and the small ones: each PE counts the world's calls
+ * its node's lead says took it (team.tree.algorithm), and the job's line says
+ * how many - at least one, or the test fails.
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -31,11 +37,12 @@
 #include <shmem.h>
 
 #include "check.h"
+#include "invariants.h"
 
 static const size_t SIZES[] = { 40, 2048, 8192, 16384, 16385, 49152, 300000, 1048589, 1025, 4096 };
 enum { SIZE_COUNT = sizeof SIZES / sizeof SIZES[0], RING = 4 };
 
-static int me, npes, failures;
+static int me, npes, failures, circulant_calls;
 
 static uint8_t value(int pe, size_t i, int round)
 {
@@ -106,6 +113,11 @@ int main(int argc, char **argv)
         size_t m = SIZES[(round * 3 + 1) % SIZE_COUNT];
         one(SHMEM_TEAM_WORLD, npes, me, world_identity, round, round % 2, n, dst[b], src[b],
             "the world");
+        /* The world's block is the pool's first; its lead published the call's
+         * algorithm before releasing this PE. */
+        uint64_t algorithm = 0;
+        CHECK(osoe_test_scoped_metric("team.tree.algorithm", OSOE_MSCOPE_TEAM, 0, &algorithm));
+        circulant_calls += algorithm == 1;
         if (me % 2 == 0)
             one(evens, (npes + 1) / 2, me / 2, world_of_even, round, (round / 2) % 2, m, dst[b2],
                 src[b2], "the evens");
@@ -114,13 +126,16 @@ int main(int argc, char **argv)
                 src[b2], "the odds");
     }
     shmem_barrier_all();
-    int *all = shmem_malloc(sizeof *all), *mine = shmem_malloc(sizeof *mine);
+    int *all = shmem_malloc(2 * sizeof *all), *mine = shmem_malloc(2 * sizeof *mine);
     CHECK_FATAL(all && mine);
-    *mine = failures;
-    CHECK(shmem_int_sum_reduce(SHMEM_TEAM_WORLD, all, mine, 1) == 0);
-    CHECK(*all == 0);
-    if (me == 0 && *all == 0)
-        printf("SHAPES BACK TO BACK: %d rounds on %d PEs\n", rounds, npes);
+    mine[0] = failures;
+    mine[1] = circulant_calls;
+    CHECK(shmem_int_sum_reduce(SHMEM_TEAM_WORLD, all, mine, 2) == 0);
+    CHECK(all[0] == 0);
+    CHECK(all[1] > 0);
+    if (me == 0 && all[0] == 0)
+        printf("SHAPES BACK TO BACK: %d rounds on %d PEs, %d of their world calls through "
+               "Träff's\n", rounds, npes, all[1]);
     shmem_team_destroy(me % 2 == 0 ? evens : odds);
     shmem_finalize();
     return CHECK_DONE();

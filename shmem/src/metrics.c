@@ -258,6 +258,11 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     TEAM("team.tree.shape_fanout", BLOCK_TREE(shape_fanout)),
     TEAM("team.tree.shape_window", BLOCK_TREE(shape_window)),
     TEAM("team.tree.shape_children", BLOCK_TREE(shape_children)),
+    /* The algorithm of the lead's last data collective past the intranode
+     * phase, 0 a tree and 1 Träff's, and the rounds its last Träff's reduction
+     * made (v0.2 step 3; layout 33): which way it went, by counts. */
+    TEAM("team.tree.algorithm", BLOCK_TREE(algorithm)),
+    TEAM("team.tree.circulant_rounds", BLOCK_TREE(circulant_rounds)),
     TEAM("team.tree.lane", BLOCK_TREE(lane)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),

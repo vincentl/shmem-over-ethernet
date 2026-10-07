@@ -330,12 +330,18 @@ void osoe_segment_close(struct osoe_segment *s);
  *       the tree state's line had, the shape of the lead's last data
  *       collective, team.tree.shape_fanout, .shape_window and
  *       .shape_children (v0.2 step 2)
+ *   33  team.tree.algorithm and team.tree.circulant_rounds, which grow the
+ *       tree state to 128 bytes - a second line on x86-64 - the algorithm
+ *       of the lead's last data collective past the intranode phase and the
+ *       rounds of its last Träff's reduction (v0.2 step 3); and the internal
+ *       region's reduce-scatter words, which move the scans' area and the
+ *       lanes
  *
- * None of 5 to 32 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 33 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, and 23 gave each thread a word of its own.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               32
+#define OSOE_SEGMENT_NEWEST_LAYOUT               33
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 

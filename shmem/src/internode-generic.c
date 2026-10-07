@@ -176,6 +176,74 @@
  * (tools/modelcheck/grant_timing.py; the proposal's "What it costs" had only
  * the first). State: O(k) per team.
  *
+ * **A large reduction takes Träff's circulant reduce-scatter and allgather
+ * instead of the tree where the chooser says it costs less** (v0.2 step 3;
+ * shape_of): collective-circulant.h has the rounds, tools/modelcheck/
+ * circulant_model.py the protocol, docs/decisions/2026-10-07-circulant.md the
+ * design. A tree carries every node's whole vector up and the result down, k + 1
+ * vectors on an interior lead's link; Träff's carries under two on every lead's.
+ * Over the team's N leads, in ceil(log2 N) rounds a half, each lead sends to one
+ * lead and receives from another - in the reduce-scatter combining what it
+ * receives into its accumulator, until it holds its N-th of the result, and in
+ * the allgather copying the other N-ths in - who and what being functions of the
+ * lead's position, N and the round alone (osoe_circulant_round). Its pieces go
+ * through lanes, as a tree's large pieces do, and it counts on words of its own
+ * (internal-region.h, the reduce-scatter's words); in_rounds is the model's
+ * lead program:
+ *   - **rows**: round k of either half moves its pieces into the k-th block
+ *     of the receiver's lane, a block being the call's window of slots - a
+ *     round takes as many of the lane's ceiling + 1 rows as the rounds leave
+ *     it, so that the window is 16 pieces on four nodes and the capacity from
+ *     17 - piece j into the block's slot j mod the window, each a put of its header
+ *     and bytes and then a fenced add on the receiver's arrival counter for the
+ *     row, cumulative over the team's life and compared as at least. The
+ *     receiver checks each piece's header, combines or copies what follows it
+ *     into its accumulator at the piece's place on its own application thread
+ *     - §5.8's rules 1 and 2: pieces land in scratch, and only the lead's
+ *     thread writes `dest` - and clears it. A reduction takes ceil(log2 N)
+ *     rows, so the chooser takes it only where they fit a lane's ceiling + 1;
+ *   - **credits**: a round sends to one lead and receives from another, so no
+ *     piece says how far its sender's receiver has got. The receiver adds a
+ *     credit at the sender for each piece it takes, and the sender puts piece
+ *     j only once it holds j - W + 1 of the round's, W the call's window - one
+ *     counter a lead, cumulative. Only for the pieces the sender's window waits
+ *     on, the first P - W of a round of P: so the sender's last put of a round
+ *     waits for every credit of the round, and none lands once it has returned
+ *     (the model's QUIET, and credit_every_piece);
+ *   - **the reduce-scatter's grants**: a lead's reduce-scatter receivers are as
+ *     many leads as it has rounds, each lending its own lane, so each grant
+ *     carries a lane of its own - into the field for its round of the sender's
+ *     grant line, with the reduction's epoch, identity and bytes - and one
+ *     counter cannot say which has come. Every lead grants each of its senders
+ *     as it enters, before its node's members arrive
+ *     (osoe_internode_generic_reduce_enter), and starts its reduce-scatter
+ *     once its count shows all of its own;
+ *   - **the allgather's grants and lanes**: a lead's allgather round k comes
+ *     from the lead its reduce-scatter round k sent to, into the row that
+ *     round's pieces filled, so the lead grants that sender - a count - as its
+ *     own round k ends, and a lead starts its allgather once it holds all of
+ *     its own. Where its allgather round k goes it learned in the
+ *     reduce-scatter: the lead that sent it round k put its own lane into the
+ *     field for row k of the senders' lanes line before its first piece's add,
+ *     and the lead read it as it took that piece.
+ * Every write into a lead's words and lane is one the lead waits for before it
+ * returns, so they are quiet when the team gives its number back. They are its
+ * own and no other collective's because the allgather ends with no step every
+ * lead waits for: a lead whose last pieces have come leaves, and can start a
+ * small collective whose child adds to its parent's counters at once while
+ * another lead still waits on its last pieces. And the grant counters are safe
+ * from one Träff's reduction to the next on one fact the arithmetic shows:
+ * every lead's result needs every lead's reduce-scatter, so no lead enters the
+ * next before every lead has read this one's grants.
+ *
+ * Its pieces' headers carry, in place of a tree's piece number, the round in
+ * their top five bits and the piece's index in the round below, so that a
+ * piece of one round or half never passes for another's. Costs, with N nodes
+ * and n bytes: 2 ceil(log2 N) rounds, each a hop, a message cost and its pieces
+ * at the pace of the link or of the credits, N - 1 blocks of n / N each way a
+ * half on every lead's link; ceil(log2 N) + 4 lines of words a team number, and
+ * a lane's ceil(log2 N) rows a reduction.
+ *
  * **A gather is Bruck's allgather among the team's node leads** (§5.8, "An
  * allgather for fcollect"; phase 1 step 5 slice 6), tools/modelcheck/
  * allgather_model.py's lead program: the tree running an or, which it
@@ -261,6 +329,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "collective-circulant.h"
 #include "collective-shape.h"
 #include "collective-tree.h"
 #include "combine.h"
@@ -408,6 +477,63 @@ static uint64_t data_counter(uint32_t team, uint32_t step)
     return gather_word(team, osoe_internal_gather_steps(osoe.bootstrap.node_count) + step);
 }
 
+/*
+ * The reduce-scatter's words (internal-region.h): per team number, past every
+ * number's allgather words, an arrival counter for each row - as many rows as
+ * the job's node count takes, at most OSOE_INTERNAL_CIRCULANT_ROWS_MOST - then
+ * the credit counter, the allgather's grant counter, the reduce-scatter's
+ * grant line and the senders' lanes line, each on its own line.
+ */
+static uint32_t circulant_layout_rows(void)
+{
+    return osoe_internal_circulant_rows(osoe.bootstrap.node_count);
+}
+
+static uint64_t circulant_line(uint32_t number, uint32_t line)
+{
+    return osoe_internal_circulant_offset(osoe.bootstrap.collective_fanout,
+                                          osoe.bootstrap.max_teams,
+                                          osoe.bootstrap.small_collective_bytes,
+                                          osoe.bootstrap.node_count) +
+           (uint64_t)number * osoe_internal_team_circulant_bytes(circulant_layout_rows()) +
+           (uint64_t)line * OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* Row `row`'s arrival counter: the pieces of the rounds that take that row of
+ * this lead's lane. */
+static uint64_t circulant_arrival_counter(uint32_t number, uint32_t row)
+{
+    return circulant_line(number, row);
+}
+
+static uint64_t circulant_credit_counter(uint32_t number)
+{
+    return circulant_line(number, circulant_layout_rows());
+}
+
+static uint64_t circulant_allgather_grant_counter(uint32_t number)
+{
+    return circulant_line(number, circulant_layout_rows() + 1);
+}
+
+static uint64_t circulant_reduce_scatter_grant_counter(uint32_t number)
+{
+    return circulant_line(number, circulant_layout_rows() + 2);
+}
+
+/* The reduce-scatter grant's words, past its counter and so past every
+ * lead's watch. */
+static uint64_t circulant_reduce_scatter_grant_words(uint32_t number)
+{
+    return circulant_reduce_scatter_grant_counter(number) + 8;
+}
+
+/* The senders' lanes line: a lane word a row. */
+static uint64_t circulant_senders(uint32_t number)
+{
+    return circulant_line(number, circulant_layout_rows() + 3);
+}
+
 /* This PE's own internal region, at `offset`. */
 static unsigned char *internal(uint64_t offset)
 {
@@ -483,6 +609,12 @@ struct generic_team {
     uint64_t scan_pieces;
     uint32_t scans;
     uint64_t scan_grant_base;
+    /* Its Träff's reductions (in_rounds): the bases of their own counters -
+     * each row's arrivals, the credits, and the two grant counters, to each of
+     * which every one of them adds the team's rows. */
+    uint64_t circulant_arrival_base[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
+    uint64_t circulant_credit_base;
+    uint64_t circulant_grant_base;
 };
 
 static struct generic_team *teams;
@@ -611,7 +743,10 @@ static void find_lead_tree(const struct generic_team *g, uint32_t team, uint32_t
  * where the shape is `fixed` or there is no link to choose from. Both bound
  * what the chooser returns, and the layout is sized for them, so every shape
  * fits: its child positions within the ceiling's rows and counters, its
- * window within the capacity's slots.
+ * window within the capacity's slots. And Träff's reduction (v0.2 step 3),
+ * under `link` and not `tree`, where its rows fit both a lane, which the
+ * chooser checks, and the reduce-scatter's words, which hold
+ * OSOE_INTERNAL_CIRCULANT_ROWS_MOST: a team of up to 65,536 nodes.
  */
 static struct osoe_collective_shape shape_of(enum osoe_shape_operation operation,
                                              const struct generic_team *g, uint64_t bytes)
@@ -621,9 +756,11 @@ static struct osoe_collective_shape shape_of(enum osoe_shape_operation operation
         osoe.job.link_source == OSOE_LINK_NONE)
         return (struct osoe_collective_shape){ OSOE_SHAPE_TREE, b->collective_fanout,
                                                b->collective_pipeline };
+    bool circulant = b->collective_shape == OSOE_COLLECTIVE_SHAPE_LINK &&
+                     osoe_circulant_rows(g->count) <= circulant_layout_rows();
     return osoe_shape_choose(operation, g->count, bytes, &osoe.job.link, b->collective_fanout,
                              b->collective_pipeline, b->small_collective_bytes,
-                             OSOE_INTERNAL_PIECE_BYTES);
+                             OSOE_INTERNAL_PIECE_BYTES, circulant);
 }
 
 /*
@@ -662,6 +799,26 @@ struct lane_word {
 };
 _Static_assert(sizeof(struct lane_word) <= OSOE_INTERNAL_LANE_WORD_BYTES,
                "a lane word fits the room its row keeps for it");
+
+/*
+ * What a Träff's reduction's reduce-scatter grant carries past its counter (the
+ * file's comment): the epoch and the identity of the reduction, as a piece's
+ * header names them, and its bytes, which every receiver of a lead puts alike;
+ * then a field for each round, where that round's receiver puts the lane it
+ * lends - plus one, so that a field never written, or cleared, reads as none.
+ * The senders' lanes line beside it is a lane word a row.
+ */
+struct circulant_grant {
+    uint32_t epoch;
+    uint32_t collective;
+    uint64_t bytes;
+    uint32_t lane[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
+};
+_Static_assert(8 + sizeof(struct circulant_grant) <= OSOE_INTERNAL_LINE_BYTES,
+               "a reduce-scatter grant's words fit its line, past the counter");
+_Static_assert(OSOE_INTERNAL_CIRCULANT_ROWS_MOST * sizeof(struct lane_word) <=
+                   OSOE_INTERNAL_LINE_BYTES,
+               "the senders' lanes line holds a lane word for every row");
 
 /* No lane known yet. */
 #define NO_LANE UINT32_MAX
@@ -1187,8 +1344,443 @@ static void in_pieces(struct generic_team *team_phase, const struct pieces *piec
                           memory_order_release);
     atomic_store_explicit(&team_phase->published->shape_children, tree->children,
                           memory_order_release);
+    atomic_store_explicit(&team_phase->published->algorithm, (uint32_t)OSOE_SHAPE_TREE,
+                          memory_order_release);
     if (large)
         atomic_store_explicit(&team_phase->published->lane, lanes.own, memory_order_release);
+}
+
+/* ---- Träff's reduction (the file's comment) ------------------------------ */
+
+/*
+ * A Träff's piece's number in its header: its round in the top five bits and
+ * its index in the round below (the file's comment). Every lead cuts a round
+ * alike, so both sides of a round number its pieces alike, whatever an index
+ * past 2^27 wraps to.
+ */
+enum { ROUND_SHIFT = 27 };
+_Static_assert(2 * OSOE_INTERNAL_CIRCULANT_ROWS_MOST <= 1 << (32 - ROUND_SHIFT),
+               "a header's top bits hold every round");
+
+static uint32_t round_piece_number(uint32_t round, uint64_t index)
+{
+    return round << ROUND_SHIFT | (uint32_t)(index & ((UINT32_C(1) << ROUND_SHIFT) - 1));
+}
+
+/* How many pieces of `per_piece` elements the intervals take, each cut on its
+ * own: a round's sent intervals, or its received ones, which are the same
+ * elements on both sides of the round. */
+static uint64_t interval_pieces(const uint64_t first[2], const uint64_t end[2],
+                                uint64_t per_piece)
+{
+    return (end[0] - first[0] + per_piece - 1) / per_piece +
+           (end[1] - first[1] + per_piece - 1) / per_piece;
+}
+
+/* Piece `index` of those intervals: its first element and how many. */
+static void interval_piece(const uint64_t first[2], const uint64_t end[2], uint64_t per_piece,
+                           uint64_t index, uint64_t *at, uint64_t *elements)
+{
+    uint64_t in_first = (end[0] - first[0] + per_piece - 1) / per_piece;
+    int i = index < in_first ? 0 : 1;
+    *at = first[i] + (index - (i ? in_first : 0)) * per_piece;
+    uint64_t left = end[i] - *at;
+    *elements = left < per_piece ? left : per_piece;
+}
+
+/*
+ * One round of a Träff's reduction as its lead runs it (in_rounds): this
+ * lead's part in it, the leads it sends to and receives from and the lane its
+ * receiver lends, its pieces each way and how many have gone and come, and the
+ * bases its waits count from - the credits this lead held as the round began,
+ * by its own count, and its row's arrivals.
+ */
+struct round_flight {
+    const struct pieces *pieces;
+    struct osoe_circulant_round round;
+    uint32_t index;                     /* the round, 0 to twice the rows - 1 */
+    int to, from;                       /* the leads' ranks */
+    uint32_t to_lane;
+    uint64_t per_piece;                 /* elements */
+    uint64_t window;
+    uint64_t sends, receives;           /* pieces */
+    uint64_t sent, taken;
+    uint64_t credit_base;
+    uint64_t arrival_base;
+};
+
+/*
+ * Where piece `index` of a round of row `row` goes in a lane: the lane's slots
+ * in order, row by row, cut into blocks of the call's window, round k's the
+ * k-th - a round takes as many of the lane's rows as its rounds leave it
+ * (osoe_shape_choose), and piece j its block's slot j mod the window, as the
+ * tree's pieces take their row's slot j mod the capacity.
+ */
+static uint64_t round_slot(uint32_t lane, uint32_t row, uint64_t window, uint64_t index)
+{
+    return lane_slot(lane, 0, 0) + ((uint64_t)row * window + index % window) *
+                                       OSOE_INTERNAL_SLOT_BYTES;
+}
+
+/* Piece `index`'s header, of `elements` elements. */
+static struct piece_header round_header(const struct round_flight *f, uint64_t index,
+                                        uint64_t elements)
+{
+    return (struct piece_header){
+        .epoch = f->pieces->epoch,
+        .piece = round_piece_number(f->index, index),
+        .collective = f->pieces->collective,
+        .bytes = (uint32_t)(elements * f->pieces->width),
+    };
+}
+
+/* A Träff's header as a reader wants it: "round 3's piece 5 (16384 bytes) of
+ * epoch 7's sum of 4-byte signed integers". */
+static void describe_round_piece(const struct piece_header *h, char *out, size_t size)
+{
+    if (h->epoch == 0) {
+        snprintf(out, size, "nothing: no piece was put there");
+        return;
+    }
+    char collective[160];
+    describe_collective(h->epoch, h->collective, collective, sizeof collective);
+    snprintf(out, size, "round %u's piece %u (%u bytes) of %s", h->piece >> ROUND_SHIFT,
+             h->piece & ((UINT32_C(1) << ROUND_SHIFT) - 1), h->bytes, collective);
+}
+
+/* The slot at `slot` holds the piece `expected` says, or the job ends naming
+ * the round's sender. */
+static void check_round_piece(const unsigned char *slot, const struct piece_header *expected,
+                              const struct round_flight *f)
+{
+    struct piece_header got;
+    memcpy(&got, slot, sizeof got);
+    if (got.epoch == expected->epoch && got.piece == expected->piece &&
+        got.collective == expected->collective && got.bytes == expected->bytes)
+        return;
+    char want[256], found[256];
+    describe_round_piece(expected, want, sizeof want);
+    describe_round_piece(&got, found, sizeof found);
+    osoe_fatal("%s: a piece of the %s, from node %u's lead (PE %d), should be %s, and is %s: "
+               "PEs called different collectives, or the same one with different arguments",
+               f->pieces->routine, f->round.combines ? "reduce-scatter" : "allgather",
+               osoe_node_of(&osoe.job, (uint32_t)f->from), f->from, want, found);
+}
+
+/*
+ * Whether the window lets piece `sent` go: one of the round's first W, or the
+ * credit for the piece W before it is in - the credit counter against the
+ * round's base, as at least (the file's comment).
+ */
+static bool round_may_send(const struct round_flight *f)
+{
+    if (f->sent >= f->sends)
+        return false;
+    if (f->sent < f->window)
+        return true;
+    return osoe_transport_load(OSOE_REGION_INTERNAL, circulant_credit_counter(f->pieces->number),
+                               8) >= f->credit_base + f->sent - f->window + 1;
+}
+
+/* Whether piece `taken` is in: the row's arrival counter against its base, as
+ * at least. The load is acquire (transport.h), so the bytes its sender put
+ * before its fenced add are there to read. */
+static bool round_may_take(const struct round_flight *f)
+{
+    return f->taken < f->receives &&
+           osoe_transport_load(OSOE_REGION_INTERNAL,
+                               circulant_arrival_counter(f->pieces->number, f->round.row), 8) >=
+               f->arrival_base + f->taken + 1;
+}
+
+/* What a lead waits for when neither is ready: either. The reduce-scatter's
+ * counters are contiguous - an arrival counter a row, the credit counter and
+ * both grant counters - so one watch covers them, and no put writes inside
+ * it (internal-region.h). */
+static bool round_awaited_holds(const void *context)
+{
+    const struct round_flight *f = context;
+    return round_may_send(f) || round_may_take(f);
+}
+
+/*
+ * Piece `sent` of the round to its receiver: before a reduce-scatter round's
+ * first, this thread's lane into the field for the row of the receiver's
+ * senders' lanes line, for the allgather back; then the piece behind its
+ * header into the receiver's lane, in the row's slot for it, and one more on
+ * the receiver's arrival counter for the row, fenced, so that the add lands
+ * after the bytes (invariant 5).
+ */
+static void round_send(struct round_flight *f, uint32_t own)
+{
+    const struct pieces *pieces = f->pieces;
+    struct osoe_transport_context *context = osoe_transport_context_default();
+    uint64_t at, elements;
+    interval_piece(f->round.send_first, f->round.send_end, f->per_piece, f->sent, &at, &elements);
+    struct piece_header header = round_header(f, f->sent, elements);
+    if (f->round.combines && f->sent == 0) {
+        struct lane_word word = { pieces->epoch, own };
+        osoe_transport_put(context, f->to, OSOE_REGION_INTERNAL,
+                           circulant_senders(pieces->number) + (uint64_t)f->round.row * sizeof word,
+                           &word, sizeof word, OSOE_TRANSPORT_MORE);
+    }
+    uint64_t slot = round_slot(f->to_lane, f->round.row, f->window, f->sent);
+    osoe_transport_put(context, f->to, OSOE_REGION_INTERNAL, slot, &header, HEADER_BYTES,
+                       OSOE_TRANSPORT_MORE);
+    osoe_transport_put(context, f->to, OSOE_REGION_INTERNAL, slot + HEADER_BYTES,
+                       pieces->buffer + at * pieces->width, header.bytes, OSOE_TRANSPORT_MORE);
+    osoe_transport_rmw(context, f->to, OSOE_REGION_INTERNAL,
+                       circulant_arrival_counter(pieces->number, f->round.row), OSOE_RMW_ADD, 8,
+                       1, 0, OSOE_TRANSPORT_FENCED);
+    f->sent++;
+}
+
+/*
+ * The lane of the lead that sends this one a reduce-scatter round, from the
+ * field for its row of the senders' lanes line, read as this lead takes the
+ * round's first piece - the arrival that shows it written - and cleared; kept
+ * for the allgather's round back to that lead (the file's comment). It names
+ * the reduction's epoch, or the job ends.
+ */
+static void take_sender_lane(const struct round_flight *f, uint32_t *sender_lanes)
+{
+    const struct pieces *pieces = f->pieces;
+    struct lane_word word;
+    unsigned char *field =
+        internal(circulant_senders(pieces->number) + (uint64_t)f->round.row * sizeof word);
+    memcpy(&word, field, sizeof word);
+    cleared(field, sizeof word);
+    if (word.epoch != pieces->epoch || word.lane >= OSOE_MAX_THREADS_HIGHEST)
+        osoe_fatal("%s: the senders' lane field of row %u, which node %u's lead (PE %d) puts "
+                   "as it sends this node's lead (PE %u) a round of epoch %u's reduction, says "
+                   "epoch %u and lane %u: %s", pieces->routine, f->round.row,
+                   osoe_node_of(&osoe.job, (uint32_t)f->from), f->from, osoe.job.me,
+                   pieces->epoch, word.epoch, word.lane,
+                   word.epoch == 0 ? "no field was put, so the sender is in another collective"
+                                   : "PEs called different collectives");
+    sender_lanes[f->round.row] = word.lane;
+}
+
+/*
+ * Piece `taken` of the round from its sender, once round_may_take says it is
+ * in: with a reduce-scatter round's first, the sender's lane, for the
+ * allgather back; then its header checked, what follows it combined into the
+ * accumulator at the piece's place - or, in the allgather, copied there - on
+ * this lead's own thread, and the header cleared; and, for one of the round's
+ * first P - W pieces, its credit at the sender, which waits for it (the file's
+ * comment). A plain add: the credit announces no bytes, and this lead's reads
+ * of the slot come before it.
+ */
+static void round_take(struct round_flight *f, uint32_t own, uint32_t *sender_lanes)
+{
+    const struct pieces *pieces = f->pieces;
+    if (f->round.combines && f->taken == 0)
+        take_sender_lane(f, sender_lanes);
+    uint64_t at, elements;
+    interval_piece(f->round.receive_first, f->round.receive_end, f->per_piece, f->taken, &at,
+                   &elements);
+    struct piece_header header = round_header(f, f->taken, elements);
+    unsigned char *slot = internal(round_slot(own, f->round.row, f->window, f->taken));
+    check_round_piece(slot, &header, f);
+    unsigned char *place = pieces->buffer + at * pieces->width;
+    if (f->round.combines)
+        pieces->combine(place, slot + HEADER_BYTES, (size_t)elements);
+    else
+        memcpy(place, slot + HEADER_BYTES, header.bytes);
+    cleared(slot, HEADER_BYTES);
+    f->taken++;
+    if (f->receives > f->window && f->taken <= f->receives - f->window)
+        osoe_transport_rmw(osoe_transport_context_default(), f->from, OSOE_REGION_INTERNAL,
+                           circulant_credit_counter(pieces->number), OSOE_RMW_ADD, 8, 1, 0, 0);
+}
+
+/*
+ * This lead's reduce-scatter grants, once its grant counter shows every one
+ * of them (the file's comment): their words, put before the adds the acquire
+ * load saw, must name this reduction - its epoch, its identity and its bytes -
+ * and the field for each round the lane that round's receiver lends, or the
+ * job ends, a hop before a piece's header would. Read, then cleared.
+ */
+static void take_round_grants(const struct generic_team *team_phase, const struct pieces *pieces,
+                              uint32_t rows, uint32_t *granted)
+{
+    struct circulant_grant grant;
+    unsigned char *words = internal(circulant_reduce_scatter_grant_words(pieces->number));
+    memcpy(&grant, words, sizeof grant);
+    cleared(words, sizeof grant);
+    if (grant.epoch != pieces->epoch || grant.collective != pieces->collective ||
+        grant.bytes != pieces->bytes) {
+        char theirs[160], mine[160];
+        describe_collective(grant.epoch, grant.collective, theirs, sizeof theirs);
+        describe_collective(pieces->epoch, pieces->collective, mine, sizeof mine);
+        osoe_fatal("%s: the reduce-scatter grants this node's lead (PE %u) holds are for %s, "
+                   "%llu bytes, and it is in %s, %zu bytes: PEs called different collectives, "
+                   "or the same one with different arguments", pieces->routine, osoe.job.me,
+                   theirs, (unsigned long long)grant.bytes, mine, pieces->bytes);
+    }
+    for (uint32_t k = 0; k < rows; k++) {
+        if (grant.lane[k] == 0 || grant.lane[k] > OSOE_MAX_THREADS_HIGHEST) {
+            struct osoe_circulant_round round = osoe_circulant_round(
+                team_phase->index, team_phase->count, k, pieces->bytes / pieces->width);
+            uint32_t receiver = lead_of(pieces->team, round.to, pieces->routine);
+            osoe_fatal("%s: the reduce-scatter grant of node %u's lead (PE %u), which this "
+                       "node's lead (PE %u) sends round %u of epoch %u's reduction, names %s: "
+                       "PEs called different collectives", pieces->routine,
+                       osoe_node_of(&osoe.job, receiver), receiver, osoe.job.me, k,
+                       pieces->epoch, grant.lane[k] == 0 ? "no lane" : "a lane past any PE's");
+        }
+        granted[k] = grant.lane[k] - 1;
+    }
+}
+
+/*
+ * Träff's reduction among the team's leads, the call's window of pieces in
+ * flight a round: circulant_model.py's lead program (the file's comment). Once
+ * the grant counter shows every reduce-scatter grant of this lead's, its rounds
+ * in order, and the allgather's once the allgather's grant counter shows every
+ * one of its own. In each round the lead takes whichever is ready - its next
+ * piece out, when the window lets it go, or its next piece in, once it has
+ * arrived - the piece out first when both are, and waits for either when
+ * neither is; the round ends when every piece has gone and come, and a
+ * reduce-scatter round's end grants its receiver the row it emptied, for the
+ * allgather back. The lead's accumulator, `pieces->buffer`, is read for what it
+ * sends and combined or copied into for what it takes, on this thread alone:
+ * what a round sends and what it takes are different blocks, and a round's
+ * blocks are finished before it starts.
+ *
+ * At the end the bases advance by what this lead's counters received, and the
+ * tree state says what the call took (node.h): the algorithm, the rounds it
+ * made, counted, and the most pieces it had put in a round and not yet held
+ * the credit for - at most the window, a count a test pins - with the class,
+ * the lane and the shape, whose fan-out is the chooser's and whose children
+ * are none.
+ */
+static void in_rounds(struct generic_team *team_phase, const struct pieces *pieces,
+                      struct osoe_collective_shape shape)
+{
+    uint32_t nodes = team_phase->count, rows = osoe_circulant_rows(nodes);
+    uint64_t count = pieces->bytes / pieces->width;
+    uint64_t grants = team_phase->circulant_grant_base + rows;
+    /* Every node computes the same shape for the call, and the chooser's
+     * window leaves every round's block within a lane: a shape past it is a
+     * bug, named before any put. */
+    if ((uint64_t)rows * shape.window >
+        (uint64_t)(osoe.bootstrap.collective_fanout + 1) * osoe.bootstrap.collective_pipeline)
+        osoe_fatal("%s: Träff's %u rounds a half at a window of %u pieces outrun a lane of %u "
+                   "rows of %u slots", pieces->routine, rows, shape.window,
+                   osoe.bootstrap.collective_fanout + 1, osoe.bootstrap.collective_pipeline);
+    uint32_t own = own_lane(), number = pieces->number;
+    uint32_t granted[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
+    uint32_t sender_lanes[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
+    for (uint32_t k = 0; k < OSOE_INTERNAL_CIRCULANT_ROWS_MOST; k++)
+        sender_lanes[k] = NO_LANE;
+    osoe_region_wait(pieces->routine, OSOE_REGION_INTERNAL,
+                     circulant_reduce_scatter_grant_counter(number), 8, false,
+                     OSOE_COMPARISON_GREATER_OR_EQUAL, grants, OSOE_BLOCKED_DETAIL_EPOCH,
+                     pieces->epoch);
+    take_round_grants(team_phase, pieces, rows, granted);
+    uint64_t credit_base = team_phase->circulant_credit_base, most = 0;
+    uint32_t made = 0;
+    for (uint32_t index = 0; index < 2 * rows; index++) {
+        if (index == rows)
+            osoe_region_wait(pieces->routine, OSOE_REGION_INTERNAL,
+                             circulant_allgather_grant_counter(number), 8, false,
+                             OSOE_COMPARISON_GREATER_OR_EQUAL, grants, OSOE_BLOCKED_DETAIL_EPOCH,
+                             pieces->epoch);
+        struct round_flight f = {
+            .pieces = pieces,
+            .round = osoe_circulant_round(team_phase->index, nodes, index, count),
+            .index = index,
+            .per_piece = pieces->bytes_per_piece / pieces->width,
+            .window = shape.window,
+            .credit_base = credit_base,
+        };
+        f.to = (int)lead_of(pieces->team, f.round.to, pieces->routine);
+        f.from = (int)lead_of(pieces->team, f.round.from, pieces->routine);
+        f.to_lane = f.round.combines ? granted[f.round.row] : sender_lanes[f.round.row];
+        f.sends = interval_pieces(f.round.send_first, f.round.send_end, f.per_piece);
+        f.receives = interval_pieces(f.round.receive_first, f.round.receive_end, f.per_piece);
+        f.arrival_base = team_phase->circulant_arrival_base[f.round.row];
+        while (f.sent < f.sends || f.taken < f.receives) {
+            if (round_may_send(&f)) {
+                round_send(&f, own);
+                uint64_t credits = osoe_transport_load(OSOE_REGION_INTERNAL,
+                                                       circulant_credit_counter(number), 8) -
+                                   credit_base;
+                if (f.sent > credits && f.sent - credits > most)
+                    most = f.sent - credits;
+                osoe_perturb();
+                continue;
+            }
+            if (round_may_take(&f)) {
+                round_take(&f, own, sender_lanes);
+                osoe_perturb();
+                continue;
+            }
+            uint64_t first = circulant_arrival_counter(number, 0);
+            osoe_region_wait_condition(
+                pieces->routine, OSOE_REGION_INTERNAL, first,
+                (size_t)(circulant_reduce_scatter_grant_counter(number) + 8 - first),
+                round_awaited_holds, &f, OSOE_BLOCKED_DETAIL_EPOCH, pieces->epoch);
+        }
+        credit_base += f.sends > f.window ? f.sends - f.window : 0;
+        team_phase->circulant_arrival_base[f.round.row] += f.receives;
+        if (f.round.combines)
+            osoe_transport_rmw(osoe_transport_context_default(), f.to, OSOE_REGION_INTERNAL,
+                               circulant_allgather_grant_counter(number), OSOE_RMW_ADD, 8, 1, 0,
+                               0);
+        made++;
+    }
+    team_phase->circulant_credit_base = credit_base;
+    team_phase->circulant_grant_base = grants;
+    /* Single-writer publication for osoe-stat and the tests (§3.16), before the
+     * lead bumps the team's `released`, as in_pieces publishes its counts. */
+    atomic_store_explicit(&team_phase->published->most_pieces_in_flight, (uint32_t)most,
+                          memory_order_release);
+    atomic_store_explicit(&team_phase->published->collective_class,
+                          (uint32_t)OSOE_COLLECTIVE_LARGE, memory_order_release);
+    atomic_store_explicit(&team_phase->published->shape_fanout, shape.fanout,
+                          memory_order_release);
+    atomic_store_explicit(&team_phase->published->shape_window, shape.window,
+                          memory_order_release);
+    atomic_store_explicit(&team_phase->published->shape_children, 0, memory_order_release);
+    atomic_store_explicit(&team_phase->published->circulant_rounds, made, memory_order_release);
+    atomic_store_explicit(&team_phase->published->algorithm, (uint32_t)OSOE_SHAPE_CIRCULANT,
+                          memory_order_release);
+    atomic_store_explicit(&team_phase->published->lane, own, memory_order_release);
+}
+
+/*
+ * A Träff's reduction's grants (the file's comment), sent as its local lead
+ * enters it, before the intranode phase: this thread's lane is the reduction's
+ * from here to its return, and the sender of each of its reduce-scatter rounds
+ * - round k's, the lead s_k positions before it - is told so: the reduction's
+ * epoch, identity and bytes and, in the field for the round, the lane, put into
+ * the sender's grant line, then one more on its grant counter, fenced after
+ * them.
+ */
+static void circulant_grants(const struct generic_team *team_phase, uint32_t team,
+                             uint32_t epoch, uint32_t collective, uint64_t bytes, uint64_t count,
+                             const char *routine)
+{
+    uint32_t number = number_of(team), rows = osoe_circulant_rows(team_phase->count);
+    struct circulant_grant head = { epoch, collective, bytes, { 0 } };
+    uint32_t field = own_lane() + 1;
+    uint64_t words = circulant_reduce_scatter_grant_words(number);
+    struct osoe_transport_context *context = osoe_transport_context_default();
+    for (uint32_t k = 0; k < rows; k++) {
+        struct osoe_circulant_round round =
+            osoe_circulant_round(team_phase->index, team_phase->count, k, count);
+        int sender = (int)lead_of(team, round.from, routine);
+        osoe_transport_put(context, sender, OSOE_REGION_INTERNAL, words, &head,
+                           offsetof(struct circulant_grant, lane), OSOE_TRANSPORT_MORE);
+        osoe_transport_put(context, sender, OSOE_REGION_INTERNAL,
+                           words + offsetof(struct circulant_grant, lane) + k * sizeof field,
+                           &field, sizeof field, OSOE_TRANSPORT_MORE);
+        osoe_transport_rmw(context, sender, OSOE_REGION_INTERNAL,
+                           circulant_reduce_scatter_grant_counter(number), OSOE_RMW_ADD, 8, 1, 0,
+                           OSOE_TRANSPORT_FENCED | (k + 1 < rows ? OSOE_TRANSPORT_MORE : 0));
+    }
 }
 
 /*
@@ -1196,8 +1788,9 @@ static void in_pieces(struct generic_team *team_phase, const struct pieces *piec
  * enters it, before the intranode phase: this thread's lane is the
  * reduction's from here to its return, and each child of the reduction's tree
  * is told so - the grant's words put into its grant line for the team, then one
- * more on its grant counter, fenced after them. A small reduction needs none.
- * It waits for nothing of the collective's.
+ * more on its grant counter, fenced after them - or, where the call takes
+ * Träff's, each sender of its reduce-scatter (circulant_grants). A small
+ * reduction needs none. It waits for nothing of the collective's.
  */
 void osoe_internode_generic_reduce_enter(uint32_t team, uint32_t epoch, size_t count,
                                          enum osoe_reduction_operation operation,
@@ -1208,13 +1801,19 @@ void osoe_internode_generic_reduce_enter(uint32_t team, uint32_t epoch, size_t c
         OSOE_COLLECTIVE_SMALL)
         return;
     struct generic_team *team_phase = registered_team(team, routine);
-    /* The call's tree, which osoe_internode_generic_reduce builds again from
-     * the same arguments: the children granted here are the ones it waits for. */
-    struct lead_tree call_tree;
-    find_lead_tree(team_phase, team, 0, shape_of(OSOE_SHAPE_REDUCE, team_phase, bytes).fanout,
-                   &call_tree, routine);
-    const struct lead_tree *tree = &call_tree;
+    /* The call's shape and tree, which osoe_internode_generic_reduce finds
+     * again from the same arguments: the leads granted here are the ones it
+     * waits for. */
+    struct osoe_collective_shape shape = shape_of(OSOE_SHAPE_REDUCE, team_phase, bytes);
     team_phase->entered = epoch;
+    if (shape.algorithm == OSOE_SHAPE_CIRCULANT) {
+        circulant_grants(team_phase, team, epoch, reduction_identity(operation, element), bytes,
+                         count, routine);
+        return;
+    }
+    struct lead_tree call_tree;
+    find_lead_tree(team_phase, team, 0, shape.fanout, &call_tree, routine);
+    const struct lead_tree *tree = &call_tree;
     uint32_t number = number_of(team);
     struct grant grant = { epoch, reduction_identity(operation, element), bytes, own_lane(), 0 };
     struct osoe_transport_context *context = osoe_transport_context_default();
@@ -1248,6 +1847,10 @@ void osoe_internode_generic_reduce(uint32_t team, uint32_t epoch, void *buffer, 
                              class, buffer, bytes, bytes_per_piece(class, bytes, element.width),
                              element.width, combine, routine };
     struct osoe_collective_shape shape = shape_of(OSOE_SHAPE_REDUCE, team_phase, bytes);
+    if (shape.algorithm == OSOE_SHAPE_CIRCULANT) {
+        in_rounds(team_phase, &pieces, shape);
+        return;
+    }
     struct lead_tree tree;
     find_lead_tree(team_phase, team, 0, shape.fanout, &tree, routine);
     in_pieces(team_phase, &pieces, &tree, shape);
@@ -2231,7 +2834,9 @@ void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const
 
 /* Every counter of team number `number` in this PE's internal region
  * (internal-region.h): its arrivals, its release and its grant, the grant's
- * words, its gathers' READY and DATA, and its scans' rows and their grant. Atomic stores, as
+ * words, its gathers' READY and DATA, its scans' rows and their grant, and its
+ * reduce-scatter's words - the counters, the grant's words and the senders'
+ * lanes. Atomic stores, as
  * each counter is written by the transport's adds; the split's sync that
  * follows orders them before any. Zeroing the grant counter keeps the count
  * exact against the team that held the number before - a grant's epoch and
@@ -2258,4 +2863,13 @@ void osoe_internode_generic_number_taken(uint32_t number)
                                                            (uint64_t)line *
                                                                OSOE_INTERNAL_LINE_BYTES),
                               0, memory_order_release);
+    uint32_t rows = circulant_layout_rows();
+    for (uint32_t line = 0; rows > 0 && line < rows + 3; line++)
+        atomic_store_explicit((_Atomic uint64_t *)internal(circulant_line(number, line)), 0,
+                              memory_order_release);
+    if (rows > 0) {
+        memset(internal(circulant_reduce_scatter_grant_words(number)), 0,
+               sizeof(struct circulant_grant));
+        memset(internal(circulant_senders(number)), 0, OSOE_INTERNAL_LINE_BYTES);
+    }
 }
