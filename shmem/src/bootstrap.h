@@ -86,9 +86,9 @@ struct osoe_bootstrap {
  * OSOE_MAX_TEAMS (§5.7): its default, and the range it must lie in - the
  * numbers one PE may hold at once, room for at least one team beyond the three
  * predefined, and at most 1,024, where each PE's internal region comes to about
- * 35 MiB of address space at the other settings' defaults (internal-region.h:
- * since the team redesign's step E a number holds counters and small slots,
- * about 25 KiB, and the large slots are each thread's lane). 256 by default
+ * 36 MiB of address space at the other settings' defaults and 500 nodes
+ * (internal-region.h: since the team redesign's step E a number holds counters
+ * and small slots, about 27 KiB, and the large slots are each thread's lane). 256 by default
  * since step E made a number that cheap (the author, 2026-10-02: "256 max teams
  * is more than sufficient"); 64 before it.
  * A node's team blocks are OSOE_TEAM_BLOCKS's (below), since the team
@@ -151,8 +151,8 @@ struct osoe_bootstrap {
  * the largest data collective that moves through a team number's own small
  * slots, in one piece with no grant and no lane (internal-region.h); a larger
  * one goes through the lanes of the threads that lead it. Its default, and the
- * range it must lie in: at 1 KiB a team number costs a PE about 25 KiB, at 128
- * bytes about 9.5, and at 16 KiB - a lane's piece, past which nothing is small -
+ * range it must lie in: at 1 KiB a team number costs a PE about 27 KiB, at 128
+ * bytes about 11, and at 16 KiB - a lane's piece, past which nothing is small -
  * its small rows hold as much as a lane's row of one slot.
  */
 #define OSOE_SMALL_COLLECTIVE_BYTES_DEFAULT 1024u

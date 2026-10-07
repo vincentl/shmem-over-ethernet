@@ -976,7 +976,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * leftover that osoe-stat --gc removes. The lead knows L and the heap size;
      * every PE has parsed the same size, or check_agreement fails them all. A
      * heap object is the heap and then its internal region (internal-region.h),
-     * about 15.5 MiB at the defaults - 256 team numbers of about 24 KiB each, a
+     * about 15.6 MiB at the defaults - 256 team numbers of about 24 KiB each, a
      * fan-out of 8, four pieces in flight (OSOE_COLLECTIVE_PIPELINE) and a lane
      * of 577 KiB for each of 17 thread records - which is counted here with the
      * heap it follows. Pages cost only once written, so the room above has taken

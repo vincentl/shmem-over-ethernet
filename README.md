@@ -748,8 +748,8 @@ The `/dev/shm` capacity check counts the objects whole all the same.
 
 | What | Where | Grows with | 4 × 4 | 64 × 64 | 500 × 256 |
 |---|---|---|---|---|---|
-| A PE's heap object: the symmetric heap, then the library's internal region | in `/dev/shm`, one a PE, mapped by every PE of the node | `SHMEM_SYMMETRIC_SIZE`, then about 24 KiB a team number (`OSOE_MAX_TEAMS`) and a 577 KiB lane a thread place (`OSOE_MAX_THREADS` + 1) | 271 MiB, the region 15.45 | 272 MiB, 15.70 | 272 MiB, 15.88 |
-| What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.06 GiB | 17.0 GiB | 68.2 GiB |
+| A PE's heap object: the symmetric heap, then the library's internal region | in `/dev/shm`, one a PE, mapped by every PE of the node | `SHMEM_SYMMETRIC_SIZE`, then about 26 KiB a team number (`OSOE_MAX_TEAMS`) and a 577 KiB lane a thread place (`OSOE_MAX_THREADS` + 1) | 272 MiB, the region 15.63 | 272 MiB, 16.01 | 272 MiB, 16.29 |
+| What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.06 GiB | 17.0 GiB | 68.3 GiB |
 | The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 285 KiB a PE - 260 KiB of it the PE's landing zone for gets (`OSOE_GET_LANDING_BYTES`) - and 128 bytes a peer node | 2.1 MiB | 18.8 MiB | 72.3 MiB, 1.5 written at start |
 | The connection area | in `/dev/shm`, one a node | 256 KiB of buffers and 1.25 KiB of state a peer node | 0.75 MiB | 15.8 MiB | 125 MiB, 0.6 written at start |
 | The node lead's own | its private memory | about 0.8 MiB and 3.5 KB a peer node, most of it the reply pool, and 1 MiB of receive buffers as traffic comes | 1.8 MiB | 2.0 MiB | 3.5 MiB |
@@ -757,11 +757,11 @@ The `/dev/shm` capacity check counts the objects whole all the same.
 | The job object: the rank map and each node's address | in `/dev/shm`, one a node | 136 bytes a node, and 24 a run of the rank map - n of them under a block distribution, P under a cyclic one, and under a plane or an arbitrary one as many as the ranks fall in, up to one a rank: 32,000, 768 KB a node, at 500 nodes of 256 under `plane=4` | 1.1 KiB | 10.4 KiB | 79 KiB |
 | Sockets | the lead's | n - 1 a node, n(n - 1)/2 in the job | 3, 6 | 63, 2,016 | 499, 124,750 |
 
-A team number is 23.5 KiB a PE at 4 nodes and 25.3 at 500: its counters and
+A team number is 24.25 KiB a PE at 4 nodes and 26.9 at 500: its counters and
 small slots - one for each child position of the tree and one for releases, for
-its reductions and broadcasts and again for its scans - and its allgather's
-words, which grow with log₂ n. A team block is a kilobyte of the control
-segment on aarch64 (576 bytes on x86-64), about 760 bytes on the node's lead,
+its reductions and broadcasts and again for its scans - and its allgather's and
+reduce-scatter's words, which grow with log₂ n. A team block is a kilobyte of
+the control segment on aarch64 (640 bytes on x86-64), about 760 bytes on the node's lead,
 and about 500 bytes of address space on every PE.
 
 **What one more of each setting costs** - a PE's own; every PE of a node maps
@@ -770,11 +770,11 @@ times these:
 
 | Setting | Each one more |
 |---|---|
-| `OSOE_MAX_TEAMS` | every PE 23.5 KiB of address space at 4 nodes to 25.5 KiB at a thousand - the allgather's words grow with log₂ n - and 12 bytes of the control segment |
+| `OSOE_MAX_TEAMS` | every PE 24.25 KiB of address space at 4 nodes to 27.25 KiB at a thousand - the allgather's and reduce-scatter's words grow with log₂ n - and 12 bytes of the control segment |
 | `OSOE_TEAM_BLOCKS` | the node a kilobyte of `/dev/shm`, written at start; its lead about 760 bytes; every PE about 500 bytes of address space |
 | `OSOE_MAX_THREADS` | every PE a 577 KiB lane of address space and 768 bytes of the control segment |
 | `OSOE_MAX_CONTEXTS` | every PE 128 bytes of the control segment and about 180 bytes, and each context in use 21 bytes a peer node |
-| `OSOE_SMALL_COLLECTIVE_BYTES` | a team number eighteen bytes for each byte of the value, on about 7.25 KiB: 9.5 KiB at 128, 25.25 KiB at the default 1 KiB, 295 KiB at 16 KiB, a PE (at 500 nodes) |
+| `OSOE_SMALL_COLLECTIVE_BYTES` | a team number eighteen bytes for each byte of the value, on about 8.9 KiB: 11.1 KiB at 128, 26.9 KiB at the default 1 KiB, 297 KiB at 16 KiB, a PE (at 500 nodes) |
 | `OSOE_COLLECTIVE_FANOUT` | a team number 2.5 KiB and a lane 64 KiB, a PE; the tree is at most ⌈log_k n⌉ levels deep - 3 at 500 nodes at the default 8, 5 at 4, 2 at 32 |
 | `OSOE_COLLECTIVE_PIPELINE` | a lane 144 KiB, 2.4 MiB a PE across its 17 |
 | `OSOE_GET_LANDING_BYTES` | the control segment about that much a PE |
@@ -813,7 +813,7 @@ times these:
   and `gc_thresh2` with it.
 - **`/dev/shm`**: each PE makes a heap object, which every PE of its node maps,
   so the capacity check asks for P × (`SHMEM_SYMMETRIC_SIZE` + the program's
-  statics + 15.9 MiB) and the control segment - 68.0 GiB a node at 256 PEs and
+  statics + 16.3 MiB) and the control segment - 68.1 GiB a node at 256 PEs and
   the default heap, though pages cost only as written - and the connection area
   checks its own, 125 MiB at 500 nodes; lower the heap, or set
   `OSOE_SHM_CAPACITY_CHECK=0`. The landing zones are a little over
@@ -853,10 +853,11 @@ specification or takes a choice the specification leaves open.
   number free on every member a split returns nonzero on every PE of its parent
   team, as the specification allows for a split that cannot be made, and the
   parent's rank 0 says why, naming the variable. Each number costs every PE about
-  24 KiB of address space at the default `OSOE_SMALL_COLLECTIVE_BYTES` - its
+  26 KiB of address space at the default `OSOE_SMALL_COLLECTIVE_BYTES` - its
   counters and the slots of its small collectives and scans, and the
-  allgather's words, which grow with the node count's logarithm, to about 26
-  KiB at a thousand nodes - which the `/dev/shm` check counts.
+  allgather's and reduce-scatter's words, which grow with the node count's
+  logarithm, to about 27 KiB at a thousand nodes - which the `/dev/shm` check
+  counts.
 - **A node holds at most `OSOE_TEAM_BLOCKS` teams at once** (1,024 by default),
   the three predefined among them, a team of members on several nodes counting
   once on each, and a team of one PE counting too. A split that would make one
@@ -1316,7 +1317,7 @@ both are set the `SHMEM_` one controls.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_MAX_TEAMS` | `256` | Teams one PE may be in at once, the three predefined teams included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team gives its number back. Each number costs every PE about 24 KiB of address space at the other variables' defaults - counters and the slots of its small collectives, which only a team's leads touch, and the same for its scans, which every member of a team that scans does - and 25.5 KiB at a thousand nodes. *Checked*. |
+| `OSOE_MAX_TEAMS` | `256` | Teams one PE may be in at once, the three predefined teams included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team gives its number back. Each number costs every PE about 26 KiB of address space at the other variables' defaults - counters and the slots of its small collectives, which only a team's leads touch, and the same for its scans, which every member of a team that scans does - and 27.25 KiB at a thousand nodes. *Checked*. |
 | `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, a kilobyte each of `/dev/shm`, allocated at start, and about 760 bytes each of the memory of the node's first PE, from which a created team's local lead on each node takes one, and to which the last of its members there gives it back. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
 | `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
 | `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. Each place, and the agent's, has a lane for the large reductions and broadcasts its thread leads and the large scans it makes, 577 KiB of address space at the default fan-out and pipeline depth, which a thread that does neither never touches: 9.6 MiB a PE at the default - but for the link's measurement as a job starts (`OSOE_LINK_HOP_NS`), which writes 64 KiB of the first lane of node 1's first PE and a page of the first lane of each of the next nodes' up to the fan-out. *Checked* among a node's PEs. |
