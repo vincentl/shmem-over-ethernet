@@ -109,7 +109,7 @@ set_tests_properties(shmem.collective-tree PROPERTIES LABELS "tier1" TIMEOUT 60)
 # tools/modelcheck/shape_timing.py on a grid of inputs the model wrote
 # (shape-grid.txt; model.shape_timing.grid checks the model still writes it).
 add_executable(shmem_test_collective_shape test-collective-shape.c ../src/collective-shape.c
-  ../src/collective-tree.c)
+  ../src/collective-tree.c ../src/collective-circulant.c)
 target_include_directories(shmem_test_collective_shape PRIVATE ../src)
 osoe_warnings(shmem_test_collective_shape)
 add_test(NAME shmem.shape.choice COMMAND shmem_test_collective_shape choice)

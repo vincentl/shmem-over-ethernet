@@ -11,12 +11,17 @@
  * more, one level - wins at small sizes and k = 2 at 1 MiB, the two crossing
  * between 16 and 64 KiB; a loopback link, a hop five times shorter and
  * bandwidth thirty times higher, keeps the star far longer. And determinism:
- * the same inputs choose the same shape. grid reads the answers
+ * the same inputs choose the same shape. And Träff's reduction (v0.2 step 3)
+ * where the caller allows it: a 1 MiB reduction on four nodes of the Pi takes
+ * it, a 2 KiB one, a broadcast, a call that does not allow it and a node count
+ * whose rows a lane cannot hold do not. grid reads the answers
  * tools/modelcheck/shape_timing.py writes - op, nodes, bytes, the link, the
- * ceiling, the capacity, the small class's bytes, then the fan-out, window and
- * cost it chose - and requires the same of osoe_shape_choose and
- * osoe_shape_cost, whose arithmetic is the model's in integers.
+ * ceiling, the capacity, the small class's bytes and whether Träff's is
+ * allowed, then the algorithm, fan-out, window and cost it chose - and
+ * requires the same of osoe_shape_choose, osoe_shape_cost and
+ * osoe_shape_circulant_cost, whose arithmetic is the model's in integers.
  */
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +41,7 @@ static uint64_t crossover(enum osoe_shape_operation op, uint32_t nodes,
 {
     uint32_t star = nodes - 1 < 8 ? nodes - 1 : 8;
     for (uint64_t n = 2048; n <= (uint64_t)1 << 30; n *= 2)
-        if (osoe_shape_choose(op, nodes, n, link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES).fanout <
+        if (osoe_shape_choose(op, nodes, n, link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES, false).fanout <
             star)
             return n;
     return 0;
@@ -50,16 +55,16 @@ static int choice(void)
         struct osoe_collective_shape s;
 
         /* The small class, and a team of one node: the ceiling's tree. */
-        s = osoe_shape_choose(op, 4, 8, &pi_link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES);
+        s = osoe_shape_choose(op, 4, 8, &pi_link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES, false);
         CHECK(s.algorithm == OSOE_SHAPE_TREE && s.fanout == 8 && s.window == 1);
-        s = osoe_shape_choose(op, 1, 1 << 20, &pi_link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES);
+        s = osoe_shape_choose(op, 1, 1 << 20, &pi_link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES, false);
         CHECK(s.fanout == 8 && s.window == 1);
 
         /* Four nodes of the Pi: the star above the small class, k = 2 at
          * 1 MiB, the window at the capacity. */
-        s = osoe_shape_choose(op, 4, 2048, &pi_link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES);
+        s = osoe_shape_choose(op, 4, 2048, &pi_link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES, false);
         CHECK(s.fanout >= 3 && s.window == 4);
-        s = osoe_shape_choose(op, 4, 1 << 20, &pi_link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES);
+        s = osoe_shape_choose(op, 4, 1 << 20, &pi_link, 8, 4, 1024, OSOE_INTERNAL_PIECE_BYTES, false);
         CHECK(s.fanout == 2 && s.window == 4);
         uint64_t pi = crossover(op, 4, &pi_link);
         printf("%s: the Pi's crossover on four nodes at %llu bytes\n",
@@ -74,9 +79,9 @@ static int choice(void)
 
         /* The same inputs, the same shape. */
         struct osoe_collective_shape a =
-            osoe_shape_choose(op, 1000, 65536, &pi_link, 32, 8, 1024, OSOE_INTERNAL_PIECE_BYTES);
+            osoe_shape_choose(op, 1000, 65536, &pi_link, 32, 8, 1024, OSOE_INTERNAL_PIECE_BYTES, false);
         struct osoe_collective_shape b =
-            osoe_shape_choose(op, 1000, 65536, &pi_link, 32, 8, 1024, OSOE_INTERNAL_PIECE_BYTES);
+            osoe_shape_choose(op, 1000, 65536, &pi_link, 32, 8, 1024, OSOE_INTERNAL_PIECE_BYTES, false);
         CHECK(a.fanout == b.fanout && a.window == b.window && a.algorithm == b.algorithm);
         CHECK(a.fanout >= 2 && a.fanout <= 32 && a.window == 8);
 
@@ -84,6 +89,28 @@ static int choice(void)
         CHECK(osoe_shape_cost(op, 4096, 2, 1, UINT64_MAX / 2, OSOE_INTERNAL_PIECE_BYTES,
                               &pi_link) == UINT64_MAX);
     }
+
+    /* Träff's, where the caller allows it: a 1 MiB reduction on four nodes of
+     * the Pi, and nothing else. */
+    struct osoe_collective_shape s;
+    s = osoe_shape_choose(OSOE_SHAPE_REDUCE, 4, 1 << 20, &pi_link, 8, 4, 1024,
+                          OSOE_INTERNAL_PIECE_BYTES, true);
+    CHECK(s.algorithm == OSOE_SHAPE_CIRCULANT && s.window == 4);
+    s = osoe_shape_choose(OSOE_SHAPE_REDUCE, 4, 2048, &pi_link, 8, 4, 1024,
+                          OSOE_INTERNAL_PIECE_BYTES, true);
+    CHECK(s.algorithm == OSOE_SHAPE_TREE);
+    s = osoe_shape_choose(OSOE_SHAPE_BROADCAST, 4, 1 << 20, &pi_link, 8, 4, 1024,
+                          OSOE_INTERNAL_PIECE_BYTES, true);
+    CHECK(s.algorithm == OSOE_SHAPE_TREE);
+    s = osoe_shape_choose(OSOE_SHAPE_REDUCE, 4, 1 << 20, &pi_link, 8, 4, 1024,
+                          OSOE_INTERNAL_PIECE_BYTES, false);
+    CHECK(s.algorithm == OSOE_SHAPE_TREE);
+    /* sixteen nodes take four rows; a ceiling of 2 gives a lane three */
+    s = osoe_shape_choose(OSOE_SHAPE_REDUCE, 16, 1 << 20, &pi_link, 2, 4, 1024,
+                          OSOE_INTERNAL_PIECE_BYTES, true);
+    CHECK(s.algorithm == OSOE_SHAPE_TREE);
+    CHECK(osoe_shape_circulant_cost(4096, 1, UINT64_MAX / 2, OSOE_INTERNAL_PIECE_BYTES,
+                                    &pi_link) == UINT64_MAX);
     return CHECK_DONE();
 }
 
@@ -96,12 +123,12 @@ static int grid(const char *path)
     while (fgets(line, sizeof line, f)) {
         if (line[0] == '#' || line[0] == '\n')
             continue;
-        char op[16];
-        unsigned nodes, ceiling, capacity, small, fanout, window;
+        char op[16], algorithm[16];
+        unsigned nodes, ceiling, capacity, small, allowed, fanout, window;
         unsigned long long bytes, hop, message, bandwidth, cost;
-        if (sscanf(line, "%15s %u %llu %llu %llu %llu %u %u %u %u %u %llu", op, &nodes, &bytes,
-                   &hop, &message, &bandwidth, &ceiling, &capacity, &small, &fanout, &window,
-                   &cost) != 12) {
+        if (sscanf(line, "%15s %u %llu %llu %llu %llu %u %u %u %u %15s %u %u %llu", op, &nodes,
+                   &bytes, &hop, &message, &bandwidth, &ceiling, &capacity, &small, &allowed,
+                   algorithm, &fanout, &window, &cost) != 14) {
             fprintf(stderr, "%s: cannot read: %s", path, line);
             CHECK(0);
             continue;
@@ -109,16 +136,22 @@ static int grid(const char *path)
         enum osoe_shape_operation operation =
             strcmp(op, "reduce") == 0 ? OSOE_SHAPE_REDUCE : OSOE_SHAPE_BROADCAST;
         struct osoe_link link = { hop, message, bandwidth };
-        struct osoe_collective_shape s = osoe_shape_choose(
-            operation, nodes, bytes, &link, ceiling, capacity, small, OSOE_INTERNAL_PIECE_BYTES);
-        uint64_t c = bytes > small ? osoe_shape_cost(operation, nodes, s.fanout, s.window, bytes,
-                                                     OSOE_INTERNAL_PIECE_BYTES, &link)
-                                   : 0;
-        if (s.fanout != fanout || s.window != window || c != cost) {
+        struct osoe_collective_shape s =
+            osoe_shape_choose(operation, nodes, bytes, &link, ceiling, capacity, small,
+                              OSOE_INTERNAL_PIECE_BYTES, allowed != 0);
+        bool circulant = s.algorithm == OSOE_SHAPE_CIRCULANT;
+        uint64_t c = bytes <= small ? 0
+                     : circulant ? osoe_shape_circulant_cost(nodes, s.window, bytes,
+                                                             OSOE_INTERNAL_PIECE_BYTES, &link)
+                                 : osoe_shape_cost(operation, nodes, s.fanout, s.window, bytes,
+                                                   OSOE_INTERNAL_PIECE_BYTES, &link);
+        const char *name = circulant ? "circulant" : "tree";
+        if (strcmp(name, algorithm) != 0 || s.fanout != fanout || s.window != window ||
+            c != cost) {
             if (differ++ < 10)
-                fprintf(stderr, "%s: the model says k %u W %u %llu ns, the C k %u W %u %llu ns: %s",
-                        path, fanout, window, cost, s.fanout, s.window, (unsigned long long)c,
-                        line);
+                fprintf(stderr, "%s: the model says %s k %u W %u %llu ns, the C %s k %u W %u "
+                        "%llu ns: %s", path, algorithm, fanout, window, cost, name, s.fanout,
+                        s.window, (unsigned long long)c, line);
         }
         lines++;
     }

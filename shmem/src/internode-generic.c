@@ -621,9 +621,10 @@ static struct osoe_collective_shape shape_of(enum osoe_shape_operation operation
         osoe.job.link_source == OSOE_LINK_NONE)
         return (struct osoe_collective_shape){ OSOE_SHAPE_TREE, b->collective_fanout,
                                                b->collective_pipeline };
+    /* Träff's reduction is not on the data path yet (v0.2 step 3): trees alone. */
     return osoe_shape_choose(operation, g->count, bytes, &osoe.job.link, b->collective_fanout,
                              b->collective_pipeline, b->small_collective_bytes,
-                             OSOE_INTERNAL_PIECE_BYTES);
+                             OSOE_INTERNAL_PIECE_BYTES, false);
 }
 
 /*

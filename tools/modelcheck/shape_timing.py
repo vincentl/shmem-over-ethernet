@@ -80,46 +80,43 @@ def tree(nodes, k):
     return parent, children, depth
 
 
-def simulate(op, nodes, k, W, n, s, h, o, B, measure='osu', links='sender', count_links=None):
-    """One collective of n bytes in pieces of s; microseconds. measure 'osu':
-    the mean per-PE call time after a barrier whose release reaches depth d of
-    the tree d hops after the root, as OSU's latency tests report
-    (osu_oshm_reduce.c: a timer around the call, a barrier between iterations,
-    the per-PE means summed and divided by the PEs); 'completion': every lead
-    entering at once, the time the last one finishes. count_links, a dict,
-    gets the messages with bytes each lead's link out and in carried."""
-    parent, children, depth = tree(nodes, k)
-    pieces = max(1, -(-n // s))
-    last = n - (pieces - 1) * s if n > 0 else 0
+class Network:
+    """The events and the links both simulations run on. A message of no bytes
+    - a credit, an add - crosses at once and arrives h later; one with bytes
+    waits its turn and shares the links as `links` says, then h:
+      'sender'      each lead's link out carries one message at a time, in the
+                    order its one progress thread sent them; the senders into
+                    one lead share its link in fairly, as a switch's port
+                    merges them.
+      'connection'  each connection is a stream, its messages in order;
+                    connections share both links fairly, max-min.
+    count_links, a dict, gets the messages with bytes each link carried."""
 
-    def piece_bytes(j):
-        return s if j < pieces - 1 else last
+    def __init__(self, h, B, links='sender', count_links=None):
+        self.h, self.B, self.links, self.count_links = h, B, links, count_links
+        self.events, self.order = [], 0
+        self.flight, self.waiting = {}, {}      # queue -> [remaining, sender, receiver, (f, a)]
+        self.clock, self.generation = 0.0, 0
 
-    events, order = [], 0
+    def at(self, t, f, *a):
+        heapq.heappush(self.events, (t, self.order, f, a))
+        self.order += 1
 
-    def at(t, f, *a):
-        nonlocal order
-        heapq.heappush(events, (t, order, f, a))
-        order += 1
+    def run(self):
+        while self.events:
+            t, _, f, a = heapq.heappop(self.events)
+            f(*a, t)
 
-    # Transfers in flight, by the queue they wait in - the sender under
-    # 'sender', the connection under 'connection' - each [remaining bytes,
-    # sender, receiver, (f, a)]; one in flight a queue, the rest waiting.
-    flight, waiting = {}, {}
-    clock, generation = [0.0], [0]
+    def queue_of(self, u, v):
+        return u if self.links == 'sender' else (u, v)
 
-    def queue_of(u, v):
-        return u if links == 'sender' else (u, v)
-
-    def rates():
-        if links == 'sender':
-            # a sender's one transfer has its link out to itself; the
-            # transfers into one lead share its link in
+    def rates(self):
+        flight, B = self.flight, self.B
+        if self.links == 'sender':
             into = {}
             for x in flight.values():
                 into[x[2]] = into.get(x[2], 0) + 1
             return {q: B / into[x[2]] for q, x in flight.items()}
-        # connections: max-min fair over every link out and in
         load = {}
         for q, x in flight.items():
             load.setdefault(('out', x[1]), []).append(q)
@@ -137,51 +134,70 @@ def simulate(op, nodes, k, W, n, s, h, o, B, measure='osu', links='sender', coun
             frozen.update(load[link])
         return rate
 
-    def advance(now):
-        dt = now - clock[0]
-        if dt > 0 and flight:
-            r = rates()
-            for q, x in flight.items():
+    def advance(self, now):
+        dt = now - self.clock
+        if dt > 0 and self.flight:
+            r = self.rates()
+            for q, x in self.flight.items():
                 x[0] -= r[q] * dt
-        clock[0] = now
+        self.clock = now
 
-    def plan(now):
-        generation[0] += 1
-        if flight:
-            r = rates()
-            due, q = min((x[0] / r[q], q) for q, x in flight.items())
-            at(now + max(0.0, due), landed, generation[0], q)
+    def plan(self, now):
+        self.generation += 1
+        if self.flight:
+            r = self.rates()
+            due, q = min((x[0] / r[q], q) for q, x in self.flight.items())
+            self.at(now + max(0.0, due), self.landed, self.generation, q)
 
-    def landed(g, due, now):
-        if g != generation[0]:
+    def landed(self, g, due, now):
+        if g != self.generation:
             return
-        advance(now)
+        self.advance(now)
         # The transfer this event was planned for lands whatever is left of it:
         # far into a run, what is left can be a fraction of a byte too small
         # for the clock to tell from now, and planned again would never land.
-        flight[due][0] = 0.0
-        for q in [q for q, x in flight.items() if x[0] <= 1e-9]:
-            _, u, v, (f, a) = flight.pop(q)
-            at(now + h, f, *a)
-            if waiting.get(q):
-                flight[q] = waiting[q].pop(0)
-        plan(now)
+        self.flight[due][0] = 0.0
+        for q in [q for q, x in self.flight.items() if x[0] <= 1e-9]:
+            _, u, v, (f, a) = self.flight.pop(q)
+            self.at(now + self.h, f, *a)
+            if self.waiting.get(q):
+                self.flight[q] = self.waiting[q].pop(0)
+        self.plan(now)
 
-    def send(u, v, nbytes, now, f, *a):
-        if count_links is not None and nbytes:
-            count_links[('out', u)] = count_links.get(('out', u), 0) + 1
-            count_links[('in', v)] = count_links.get(('in', v), 0) + 1
+    def send(self, u, v, nbytes, now, f, *a):
+        if self.count_links is not None and nbytes:
+            for key in (('out', u), ('in', v)):
+                self.count_links[key] = self.count_links.get(key, 0) + 1
         if not nbytes:
-            at(now + h, f, *a)
+            self.at(now + self.h, f, *a)
             return
-        advance(now)
-        q = queue_of(u, v)
+        self.advance(now)
+        q = self.queue_of(u, v)
         transfer = [float(nbytes), u, v, (f, a)]
-        if q in flight:
-            waiting.setdefault(q, []).append(transfer)
+        if q in self.flight:
+            self.waiting.setdefault(q, []).append(transfer)
             return
-        flight[q] = transfer
-        plan(now)
+        self.flight[q] = transfer
+        self.plan(now)
+
+
+def simulate(op, nodes, k, W, n, s, h, o, B, measure='osu', links='sender', count_links=None):
+    """One collective of n bytes in pieces of s; microseconds. measure 'osu':
+    the mean per-PE call time after a barrier whose release reaches depth d of
+    the tree d hops after the root, as OSU's latency tests report
+    (osu_oshm_reduce.c: a timer around the call, a barrier between iterations,
+    the per-PE means summed and divided by the PEs); 'completion': every lead
+    entering at once, the time the last one finishes. count_links, a dict,
+    gets the messages with bytes each lead's link out and in carried."""
+    parent, children, depth = tree(nodes, k)
+    pieces = max(1, -(-n // s))
+    last = n - (pieces - 1) * s if n > 0 else 0
+
+    def piece_bytes(j):
+        return s if j < pieces - 1 else last
+
+    net = Network(h, B, links, count_links)
+    at, send = net.at, net.send
 
     entry = [depth[i] * h if measure == 'osu' else 0.0 for i in range(nodes)]
     arrived = [[0] * len(children[i]) for i in range(nodes)]
@@ -233,9 +249,7 @@ def simulate(op, nodes, k, W, n, s, h, o, B, measure='osu', links='sender', coun
 
     for i in range(nodes):
         at(entry[i], enter, i)
-    while events:
-        t, _, f, a = heapq.heappop(events)
-        f(*a, t)
+    net.run()
     if measure == 'completion':
         return max(done)
     return sum(done[i] - entry[i] for i in range(nodes)) / nodes
@@ -391,6 +405,182 @@ def choose(op, nodes, n, link, ceiling, capacity, small_bytes, s=PIECE):
         if best is None or c < best[0]:
             best = (c, k)
     return best[1], capacity
+
+
+def choose_shape(op, nodes, n, link, ceiling, capacity, small_bytes, s=PIECE, circulant=False):
+    """osoe_shape_choose with its algorithm: (algorithm, k, W). The tree that
+    choose() gives; and, where `circulant` allows it - the data path's word that
+    it runs Träff's reduce-scatter - for a reduction past the small class whose
+    rounds' rows, ceil(log2 nodes), fit a lane's ceiling + 1 rows, Träff's,
+    where its closed form costs less than that tree's, ties to the tree, at the
+    capacity's window."""
+    k, W = choose(op, nodes, n, link, ceiling, capacity, small_bytes, s)
+    if (circulant and op == 'reduce' and nodes > 1 and n > small_bytes and
+            len(circulant_skips(nodes)) <= ceiling + 1 and
+            circulant_cost(nodes, n, s, capacity, *link) < cost(op, nodes, k, W, n, s, *link)):
+        return 'circulant', ceiling, capacity
+    return 'tree', k, W
+
+
+def shape_cost(op, nodes, shape, n, link, s=PIECE):
+    """What a chosen shape costs, by its algorithm."""
+    algorithm, k, W = shape
+    if algorithm == 'circulant':
+        return circulant_cost(nodes, n, s, W, *link)
+    return cost(op, nodes, k, W, n, s, *link)
+
+
+# ---- Träff's circulant reduce-scatter and allgather (v0.2 step 3) ---------
+
+def circulant_skips(nodes):
+    """The rounds' (s', s): s halving the node count, rounding up, to 1
+    (circulant_model.py)."""
+    out, s = [], nodes
+    while s > 1:
+        out.append((s, (s + 1) // 2))
+        s = (s + 1) // 2
+    return out
+
+
+def circulant_bytes(nodes, n, first, a, b):
+    """The bytes of blocks (first + i) mod nodes for i in [a, b), block j
+    being bytes [j n / nodes, (j + 1) n / nodes)."""
+    total = 0
+    for i in range(a, b):
+        j = (first + i) % nodes
+        total += (j + 1) * n // nodes - j * n // nodes
+    return total
+
+
+def circulant_rounds(nodes, n):
+    """Each round's largest message, in bytes, in the order the rounds run:
+    the reduce-scatter's s' - s blocks, then the allgather's in reverse - at
+    most ceil((s' - s) n / nodes) bytes, as the C computes it."""
+    rs = [((sp - s) * n + nodes - 1) // nodes for sp, s in circulant_skips(nodes)]
+    return rs + rs[::-1]
+
+
+def circulant_cost(nodes, n, s, W, h_ns, o_ns, bytes_per_second):
+    """The closed form of Träff's reduction, nanoseconds, integers -
+    collective-shape.c's, line for line. Every lead grants its reduce-scatter
+    senders as it enters and starts once it holds all of its own grants: a
+    message cost a grant, then a hop. The rounds run one after another, each a
+    hop and a message cost, then its pieces at the pace of the link, of the
+    lead's own messages - a piece and a credit each - or of its credits: the
+    first W pieces go at once, and each W after them wait for a piece, two
+    hops and a message; at the link's pace the round's bytes over the link.
+    Between the halves the last allgather grant takes a message and a hop.
+    Saturates at 2**64 - 1."""
+    if nodes <= 1 or n == 0:
+        return 0
+    rounds = circulant_rounds(nodes, n)
+    q = len(rounds) // 2
+    total = q * o_ns + h_ns + o_ns + h_ns
+    for m in rounds:
+        pieces = m // s + (m % s != 0)
+        t = (min(m, s) * 1000000000 + bytes_per_second - 1) // bytes_per_second
+        wire = SATURATED if m > SATURATED // 1000000000 else \
+            (m * 1000000000 + bytes_per_second - 1) // bytes_per_second
+        credited = (t + 2 * h_ns + o_ns + W - 1) // W
+        total += h_ns + o_ns + max(wire, t + (pieces - 1) * 2 * o_ns,
+                                   t + max(0, pieces - W) * credited)
+    return min(SATURATED, total)
+
+
+def simulate_circulant(nodes, n, s, W, h, o, B, links='sender'):
+    """Träff's reduction, event by event, every lead entering at once: the
+    rounds of circulant_model.py, one after another on each lead, their pieces
+    through the links of Network with W credits a round, a message cost o for
+    every message a lead sends - pieces, credits and grants. A lead grants its
+    reduce-scatter senders as it enters and starts its reduce-scatter once it
+    holds every grant of its own; it grants the sender of its row k's
+    allgather as its reduce-scatter round k ends, and starts its allgather
+    once it holds every such grant. Microseconds, the time the last lead
+    finishes."""
+    skips = circulant_skips(nodes)
+    q = len(skips)
+    net = Network(h, B, links)
+    plan = []
+    for i in range(nodes):
+        lead = []
+        for half, order in ((0, skips), (1, skips[::-1])):
+            for sp, sk in order:
+                k = skips.index((sp, sk))
+                if half == 0:
+                    to, frm = (i + sk) % nodes, (i - sk) % nodes
+                    out = circulant_bytes(nodes, n, i, sk, sp)
+                    into = circulant_bytes(nodes, n, i, 0, sp - sk)
+                else:
+                    to, frm = (i - sk) % nodes, (i + sk) % nodes
+                    out = circulant_bytes(nodes, n, i, 0, sp - sk)
+                    into = circulant_bytes(nodes, n, i, sk, sp)
+                lead.append((half, k, to, frm, out, into))
+        plan.append(lead)
+    at, sent, taken = [0] * nodes, [0] * nodes, [0] * nodes
+    arrived, credits = {}, {}
+    rs_grants, ag_grants = [0] * nodes, [0] * nodes
+    busy, done = [0.0] * nodes, [None] * nodes
+
+    def pieces(m):
+        return (m + s - 1) // s
+
+    def run(i, now):
+        now = max(now, busy[i])
+        while at[i] < len(plan[i]):
+            half, k, to, frm, out, into = plan[i][at[i]]
+            if half == 0 and rs_grants[i] < q or half == 1 and ag_grants[i] < q:
+                break
+            if taken[i] < pieces(into) and arrived.get((i, half, k), 0) > taken[i]:
+                taken[i] += 1
+                now += o
+                net.send(i, frm, 0, now, credit_in, frm, half, k)
+                continue
+            if sent[i] < pieces(out):
+                j = sent[i]
+                if j < W or credits.get((i, half, k), 0) >= j - W + 1:
+                    now += o
+                    net.send(i, to, min(s, out - j * s), now, piece_in, to, half, k)
+                    sent[i] += 1
+                    continue
+            if sent[i] == pieces(out) and taken[i] == pieces(into):
+                if half == 0:
+                    now += o
+                    net.send(i, to, 0, now, ag_grant_in, to)
+                at[i] += 1
+                sent[i] = taken[i] = 0
+                continue
+            break
+        busy[i] = now
+        if at[i] == len(plan[i]) and done[i] is None:
+            done[i] = now
+
+    def piece_in(j, half, k, now):
+        arrived[(j, half, k)] = arrived.get((j, half, k), 0) + 1
+        run(j, now)
+
+    def credit_in(j, half, k, now):
+        credits[(j, half, k)] = credits.get((j, half, k), 0) + 1
+        run(j, now)
+
+    def rs_grant_in(j, now):
+        rs_grants[j] += 1
+        run(j, now)
+
+    def ag_grant_in(j, now):
+        ag_grants[j] += 1
+        run(j, now)
+
+    def enter(i, now):
+        for sp, sk in skips:
+            now += o
+            net.send(i, (i - sk) % nodes, 0, now, rs_grant_in, (i - sk) % nodes)
+        busy[i] = now
+        run(i, now)
+
+    for i in range(nodes):
+        net.at(0.0, enter, i)
+    net.run()
+    return max(done)
 
 
 # The links the tests pin: the Pi's, from the fit, and a loopback's.
@@ -563,6 +753,43 @@ def check_pins(failures):
         lc = crossover(op, 4, LOOPBACK_LINK)
         if c is not None and lc is not None and lc < 8 * c:
             failures.append(f'a loopback link\'s {op} crossover ({lc}) is not far above the Pi\'s ({c})')
+    # Träff's (v0.2 step 3): on four nodes of the Pi a 1 MiB reduction takes
+    # it where it is allowed, and nothing else does - not a 2 KiB reduction,
+    # not a broadcast, not a reduction where the data path does not allow it,
+    # not one whose rows a lane cannot hold.
+    if choose_shape('reduce', 4, 1 << 20, PI_LINK, 8, 4, 1024, circulant=True)[0] != 'circulant':
+        failures.append('a 1 MiB reduction on four nodes of the Pi does not take Träff\'s')
+    if choose_shape('reduce', 4, 2048, PI_LINK, 8, 4, 1024, circulant=True)[0] != 'tree':
+        failures.append('a 2 KiB reduction on four nodes of the Pi takes Träff\'s')
+    if choose_shape('broadcast', 4, 1 << 20, PI_LINK, 8, 4, 1024, circulant=True)[0] != 'tree':
+        failures.append('a broadcast takes Träff\'s')
+    if choose_shape('reduce', 4, 1 << 20, PI_LINK, 8, 4, 1024)[0] != 'tree':
+        failures.append('a reduction takes Träff\'s where the data path does not allow it')
+    if choose_shape('reduce', 16, 1 << 20, PI_LINK, 2, 4, 1024, circulant=True)[0] != 'tree':
+        failures.append('Träff\'s taken on 16 nodes with a ceiling of 2, whose lanes hold 3 rows')
+
+
+def check_circulant(failures):
+    """Träff's closed form against its simulation, and the choice between it
+    and the trees against each link model's best of them - within the bounds
+    the record states."""
+    grid = [(N, n) for N in (3, 4, 5, 7, 8, 16) for n in (16384, 65536, 1 << 20)]
+    for links, error_bound, regret_bound in (('sender', 0.12, 0.08), ('connection', 0.18, 0.08)):
+        errors, regrets = [], []
+        for N, n in grid:
+            sim_c = simulate_circulant(N, n, PIECE, 4, 86, 7, 116, links=links)
+            errors.append(abs(circulant_cost(N, n, PIECE, 4, *PI_LINK) / 1000 / sim_c - 1))
+            trees = {k: simulate('reduce', N, k, 4, n, PIECE, 86, 7, 116, measure='completion',
+                                 links=links) for k in range(2, 9)}
+            algorithm, k, W = choose_shape('reduce', N, n, PI_LINK, 8, 4, 1024, circulant=True)
+            picked = sim_c if algorithm == 'circulant' else trees[k]
+            regrets.append(picked / min(sim_c, min(trees.values())) - 1)
+        if max(errors) > error_bound:
+            failures.append(f'against {links} links Träff\'s closed form errs by up to '
+                            f'{max(errors):.3f}, beyond {error_bound}')
+        if max(regrets) > regret_bound:
+            failures.append(f'against {links} links the choice between the trees and Träff\'s '
+                            f'costs up to {max(regrets):.3f}, beyond {regret_bound}')
 
 
 def checks(rows, h, o, B, interior=1, count_runs=True, choices=True):
@@ -572,24 +799,31 @@ def checks(rows, h, o, B, interior=1, count_runs=True, choices=True):
     if choices:
         check_choices(failures)
         check_pins(failures)
+        check_circulant(failures)
     return failures
 
 
 # ---- The grid collective-shape.c's test reads -------------------------------
 
 def grid_lines():
+    """Every input of a grid, and the shape and cost the model gives it: a
+    reduction both with Träff's allowed and without, as the data path asks."""
     lines = ['# op nodes bytes hop_ns message_ns bytes_per_second ceiling capacity small'
-             ' -> fanout window cost_ns (tools/modelcheck/shape_timing.py grid)']
+             ' circulant -> algorithm fanout window cost_ns (tools/modelcheck/shape_timing.py'
+             ' grid)']
     links = [PI_LINK, LOOPBACK_LINK, (1000000, 50000, 12000000), (5000, 500, 25000000000)]
     for op in ('reduce', 'broadcast'):
         for link in links:
             for nodes in (1, 2, 3, 4, 5, 7, 8, 13, 16, 31, 64, 255, 1000, 4096):
                 for ceiling, capacity in ((4, 2), (8, 4), (32, 8)):
                     for n in (8, 1024, 1025, 4096, 16384, 16385, 65536, 1 << 20, 1 << 30):
-                        k, W = choose(op, nodes, n, link, ceiling, capacity, 1024)
-                        c = cost(op, nodes, k, W, n, PIECE, *link) if n > 1024 else 0
-                        lines.append(f'{op} {nodes} {n} {link[0]} {link[1]} {link[2]} {ceiling} '
-                                     f'{capacity} 1024 {k} {W} {c}')
+                        for allowed in ((0, 1) if op == 'reduce' else (0,)):
+                            shape = choose_shape(op, nodes, n, link, ceiling, capacity, 1024,
+                                                 circulant=bool(allowed))
+                            c = shape_cost(op, nodes, shape, n, link) if n > 1024 else 0
+                            lines.append(f'{op} {nodes} {n} {link[0]} {link[1]} {link[2]} '
+                                         f'{ceiling} {capacity} 1024 {allowed} {shape[0]} '
+                                         f'{shape[1]} {shape[2]} {c}')
     return lines
 
 

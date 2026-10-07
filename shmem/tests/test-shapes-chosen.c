@@ -56,7 +56,9 @@ static uint64_t children_at(uint64_t nodes, uint64_t k, uint64_t index, uint64_t
     return nodes - first < k ? nodes - first : k;
 }
 
-/* The grid's shape for one call, or 0 if the grid has no line for it. */
+/* The grid's shape for one call, or 0 if the grid has no line for it: its
+ * line with Träff's reduction not allowed, as the data path asks the chooser
+ * (internode-generic.c, shape_of). */
 static int grid_shape(const char *path, const char *op, uint64_t nodes, uint64_t bytes,
                       uint64_t hop, uint64_t message, uint64_t bandwidth, uint64_t ceiling,
                       uint64_t capacity, uint64_t small, uint64_t *fanout, uint64_t *window)
@@ -66,18 +68,19 @@ static int grid_shape(const char *path, const char *op, uint64_t nodes, uint64_t
     char line[256];
     int found = 0;
     while (!found && fgets(line, sizeof line, f)) {
-        char name[16];
-        unsigned long long v[11];
+        char name[16], algorithm[16];
+        unsigned long long v[12];
         if (line[0] == '#' ||
-            sscanf(line, "%15s %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu", name,
-                   &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8], &v[9],
-                   &v[10]) != 12)
+            sscanf(line, "%15s %llu %llu %llu %llu %llu %llu %llu %llu %llu %15s %llu %llu %llu",
+                   name, &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8],
+                   algorithm, &v[9], &v[10], &v[11]) != 14)
             continue;
         if (strcmp(name, op) == 0 && v[0] == nodes && v[1] == bytes && v[2] == hop &&
             v[3] == message && v[4] == bandwidth && v[5] == ceiling && v[6] == capacity &&
-            v[7] == small) {
-            *fanout = v[8];
-            *window = v[9];
+            v[7] == small && v[8] == 0) {
+            CHECK(strcmp(algorithm, "tree") == 0);
+            *fanout = v[9];
+            *window = v[10];
             found = 1;
         }
     }

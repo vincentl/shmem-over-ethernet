@@ -21,6 +21,7 @@
 #ifndef OSOE_COLLECTIVE_SHAPE_H
 #define OSOE_COLLECTIVE_SHAPE_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 enum osoe_shape_operation {
@@ -30,6 +31,8 @@ enum osoe_shape_operation {
 
 enum osoe_shape_algorithm {
     OSOE_SHAPE_TREE,            /* the k-ary tree of collective-tree.c, pipelined */
+    OSOE_SHAPE_CIRCULANT,       /* a reduction's reduce-scatter and allgather over the
+                                 * leads, Träff's (collective-circulant.h; v0.2 step 3) */
 };
 
 /*
@@ -56,7 +59,7 @@ enum osoe_link_source {
 
 struct osoe_collective_shape {
     enum osoe_shape_algorithm algorithm;
-    uint32_t fanout;            /* k: 2 to the ceiling */
+    uint32_t fanout;            /* k: 2 to the ceiling; the ceiling for Träff's */
     uint32_t window;            /* W: pieces in flight, 1 to the capacity */
 };
 
@@ -75,17 +78,36 @@ uint64_t osoe_shape_cost(enum osoe_shape_operation operation, uint32_t nodes, ui
                          const struct osoe_link *link);
 
 /*
+ * What Träff's reduction (collective-circulant.h) costs over `nodes` leads with
+ * `window` pieces in flight a round: every lead grants its reduce-scatter's
+ * senders as it enters and starts once it holds all of its own grants - a
+ * message cost each, then a hop; the rounds one after another, each a hop and a
+ * message cost, then its pieces at the pace of the link, of the lead's own
+ * messages - a piece and a credit each - or of its credits, the first `window`
+ * at once and each later one waiting for a piece, two hops and a message; and
+ * between the halves the last allgather grant, a message and a hop. A round's
+ * bytes are its blocks' at most, ceil((s' - s) bytes / nodes). Nanoseconds,
+ * UINT64_MAX where the sum overflows; 0 for one node or no bytes.
+ */
+uint64_t osoe_shape_circulant_cost(uint32_t nodes, uint32_t window, uint64_t bytes,
+                                   uint64_t piece_bytes, const struct osoe_link *link);
+
+/*
  * The shape of one call. A team of one node, and a collective of
  * `small_bytes` or fewer - the small class, one piece in the team's small
  * slots - keep the ceiling's tree as before: fan-out `ceiling`, window 1.
  * Otherwise the window is `capacity` - more pieces in flight never cost a
  * large collective time, and the closed form's window term is its least exact
- * - and the fan-out the least cost from 2 to `ceiling`, ties to the smaller.
+ * - and the fan-out the least cost from 2 to `ceiling`, ties to the smaller;
+ * and where `circulant` allows it - the caller's word that it runs Träff's
+ * reduction - a reduction whose rounds' rows, ceil(log2 nodes), fit a lane's
+ * `ceiling` + 1 rows takes Träff's where it costs less than that tree, ties to
+ * the tree. tools/modelcheck/shape_timing.py's choose_shape(), line for line.
  */
 struct osoe_collective_shape osoe_shape_choose(enum osoe_shape_operation operation,
                                                uint32_t nodes, uint64_t bytes,
                                                const struct osoe_link *link, uint32_t ceiling,
                                                uint32_t capacity, uint32_t small_bytes,
-                                               uint64_t piece_bytes);
+                                               uint64_t piece_bytes, bool circulant);
 
 #endif /* OSOE_COLLECTIVE_SHAPE_H */
