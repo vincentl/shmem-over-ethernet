@@ -16,7 +16,11 @@
  * this job's node count, link, ceiling and capacity. Every PE checks its own
  * node's lead's shape, so every node is checked: a node that chose otherwise
  * would have built another tree for the call, and the job would hang or sum
- * wrong first.
+ * wrong first. And that the data path built that shape: the children this
+ * node's lead had in the call's tree (team.tree.shape_children) are the ones a
+ * tree of that fan-out rooted at the call's root gives this node - a lead that
+ * published the chooser's shape and built another tree fails here, where every
+ * tree all nodes agree on sums right.
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -38,6 +42,18 @@ static uint64_t setting(const char *name, uint64_t fallback)
 {
     const char *value = getenv(name);
     return value ? strtoull(value, NULL, 10) : fallback;
+}
+
+/* The children of position `index` in the k-ary tree over `nodes` positions,
+ * rooted at position `root` (internode-generic.c, find_lead_tree): positions
+ * k j + 1 to k j + k of the rotated index j, those below `nodes`. */
+static uint64_t children_at(uint64_t nodes, uint64_t k, uint64_t index, uint64_t root)
+{
+    uint64_t j = (index + nodes - root) % nodes;
+    uint64_t first = k * j + 1;
+    if (first >= nodes)
+        return 0;
+    return nodes - first < k ? nodes - first : k;
 }
 
 /* The grid's shape for one call, or 0 if the grid has no line for it. */
@@ -116,9 +132,11 @@ int main(int argc, char **argv)
             }
             /* The node's lead published the call's shape before it released
              * its members (node.h), so it is there once the call returns. */
-            uint64_t fanout = 0, window = 0, want_fanout = 0, want_window = 0;
+            uint64_t fanout = 0, window = 0, children = 0, want_fanout = 0, want_window = 0;
             CHECK(osoe_test_scoped_metric("team.tree.shape_fanout", OSOE_MSCOPE_TEAM, 0, &fanout));
             CHECK(osoe_test_scoped_metric("team.tree.shape_window", OSOE_MSCOPE_TEAM, 0, &window));
+            CHECK(osoe_test_scoped_metric("team.tree.shape_children", OSOE_MSCOPE_TEAM, 0,
+                                          &children));
             const char *name = op == 0 ? "reduce" : "broadcast";
             uint64_t bytes = (uint64_t)count;
             if (!grid_shape(argv[1], name, nodes, bytes, hop, message, bandwidth, ceiling,
@@ -134,6 +152,18 @@ int main(int argc, char **argv)
                         (unsigned long long)bytes, (unsigned long long)nodes,
                         (unsigned long long)fanout, (unsigned long long)window,
                         (unsigned long long)want_fanout, (unsigned long long)want_window);
+                CHECK(0);
+            }
+            /* One PE a node, so this PE's node is its rank and the root's node
+             * the root's rank; a reduction's tree is rooted at node 0. */
+            uint64_t want_children =
+                children_at(nodes, want_fanout, (uint64_t)me, op == 0 ? 0 : (uint64_t)root);
+            if (children != want_children) {
+                fprintf(stderr, "PE %d: a %s of %llu bytes on %llu nodes built a tree with %llu "
+                        "children here, where fan-out %llu gives %llu\n", me, name,
+                        (unsigned long long)bytes, (unsigned long long)nodes,
+                        (unsigned long long)children, (unsigned long long)want_fanout,
+                        (unsigned long long)want_children);
                 CHECK(0);
             }
             if (me == 0)

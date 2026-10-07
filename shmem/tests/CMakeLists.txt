@@ -2976,6 +2976,27 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
       FAIL_REGULAR_EXPRESSION "CHECK[(]")
     osoe_internode_label(shmem.shape.chosen.${link}.${nodes})
   endforeach()
+
+  # And back to back, no barrier between calls whose fan-outs differ, on the
+  # world and two strided teams sharing its leads (test-shapes-back-to-back.c;
+  # the step's adversarial read, finding 2): a large reduction's grants go to
+  # this call's children. Sixteen nodes of one PE each, and eight of two, where
+  # the odds' lead is local id 1.
+  add_executable(shmem_test_shapes-back-to-back test-shapes-back-to-back.c)
+  target_link_libraries(shmem_test_shapes-back-to-back PRIVATE osoe)
+  osoe_warnings(shmem_test_shapes-back-to-back)
+  foreach(map "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15" "0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7")
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.shape.back-to-back.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
+              OSOE_LINK_BYTES_PER_SECOND=116000000 SHMEM_SYMMETRIC_SIZE=16m
+              $<TARGET_FILE:osoe-launch> -n 16 -m ${map} -t 240 --
+              $<TARGET_FILE:shmem_test_shapes-back-to-back> 40)
+    set_tests_properties(shmem.shape.back-to-back.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 300 PASS_REGULAR_EXPRESSION "SHAPES BACK TO BACK: 40 rounds on 16 PEs"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]")
+    osoe_internode_label(shmem.shape.back-to-back.${label})
+  endforeach()
 endif()
 
 # The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on
@@ -3004,17 +3025,21 @@ if(OSOE_INTERNODE)
       TIMEOUT 120)
     # Pieces in flight (2026-09-27): one at a time, as first built, and four on
     # the three-level tree, the leaves' counts pinned by the test; the most the
-    # agreement allows, eight, on four nodes.
+    # agreement allows, eight, on four nodes. Four and eight under
+    # OSOE_COLLECTIVE_SHAPE=fixed, where a scan keeps the capacity in flight -
+    # under link it keeps 0.1.0's two (v0.2 step 2) - and the scan's fixed path
+    # with them, which nothing else runs (the step's adversarial read).
     add_test(NAME shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
       COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=1 OSOE_COLLECTIVE_FANOUT=2
               $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
               $<TARGET_FILE:shmem_test_scan>)
     add_test(NAME shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=4 OSOE_COLLECTIVE_FANOUT=2
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_PIPELINE=4
+              OSOE_COLLECTIVE_FANOUT=2
               $<TARGET_FILE:osoe-launch> -n 10 -m 0,1,2,3,4,0,1,2,3,4 -t 90 --
               $<TARGET_FILE:shmem_test_scan>)
     add_test(NAME shmem.scan.pipeline-8.0-1-2-3
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_PIPELINE=8
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_PIPELINE=8
               $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 60 -- $<TARGET_FILE:shmem_test_scan>)
     set_tests_properties(shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
       shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4 PROPERTIES LABELS "tier2" TIMEOUT 120)

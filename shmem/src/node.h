@@ -575,11 +575,16 @@ struct osoe_collective_state {
     _Atomic uint32_t lane;
     /* Layout 32 (v0.2 step 2), in the same padding: the shape of that last
      * data collective through the tree, its fan-out and its window, as the
-     * chooser gave it (internode-generic.c, shape_of) - so that a test and
-     * osoe-stat read which shape a call took. */
+     * chooser gave it (internode-generic.c, shape_of), and the children this
+     * node had in the tree the call built - so that a test and osoe-stat read
+     * which shape a call took, and a test that the data path built it. */
     _Atomic uint32_t shape_fanout;
     _Atomic uint32_t shape_window;
+    _Atomic uint32_t shape_children;
 };
+_Static_assert(sizeof(struct osoe_collective_state) == OSOE_CACHELINE,
+               "the tree state is one line, its padding now spent: a field more grows "
+               "every team block");
 
 /*
  * A team's record on this node (layout 18; phase 1 step 7): what this node's

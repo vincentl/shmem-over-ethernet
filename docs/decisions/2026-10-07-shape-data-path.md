@@ -77,9 +77,10 @@ fcollect, `osoe-bench`.
 - **The band between 1 and 64 KiB**: on four nodes the chooser takes the star at
   every size to 16 KiB, which the sweep (below) measured fastest at each, and
   the fan-out of 2 from 16 KiB and a byte, where a call first takes two pieces -
-  within F2's crossover of 16 to 64 KiB - which at 32 KiB was 1.02 to 1.37
-  times faster than `fixed`'s star; no size there slower than `fixed` beyond the
-  noise in the final run.
+  within F2's crossover of 16 to 64 KiB - which at 32 KiB was as fast as
+  `fixed`'s star or faster, up to 1.37 times (OSU's 4 × 1 broadcast 2.6% slower,
+  inside its 6.4% noise); no size there slower than `fixed` beyond the noise in
+  the final run.
 - **Start-up**: Part 1's measurement, 27.1 to 27.6 ms a start; `fixed` measures
   nothing.
 - **The scans**, the one finding: question 1.
@@ -169,4 +170,35 @@ slower in - **and (a) as a step of its own**, its model first, which would take
 
 ## Verification
 
-*(Filled in when the merge verification reports.)*
+The step's merge verification, both parts on one tree, in three VMs at once,
+each under its own lock:
+
+- **`f7745a0`** (Part 2 before the scans' change): in `osoe`, the four presets
+  with the floor pins - debug 784 of 784, release 784, asan 781, tsan 545 -
+  `tier3` 113, `osoe-pacer collectives` at three values of
+  `OSOE_SMALL_COLLECTIVE_BYTES`, its teams and threads, and ten minutes of
+  `mix`, no failure; in `osoe-load`, the models whole, 32 of 32, the SOS suite
+  at 4 × 2 - 161 programs clean, the two C11 programs over `short *` not
+  building and `shmem_team_b2b_collectives` and `shmemalign` failing as the
+  runbook says - and the acceptance past 61 PEs, line for line the release
+  point's: `shmem_team_reuse_teams`, `shmem_team_max`, `shmem_team_split_2d`,
+  `reduce_active_set`, `broadcast_active_set` and `repeated_barriers` at 70 PEs
+  on one node and on ten logical nodes of seven, `collect_active_set`'s 32
+  sets at 32 PEs on one node and on four, the per-node split at 61, 62 and 64
+  nodes; in `osoe-rocky`, the single-node build's four presets - 391, 391, 388
+  and 383 - an install, `oshcc` from it at 8 and 32 PEs, and the refusal of a
+  job of two nodes.
+- **`7dbf522`** (the scans at 0.1.0's shape, and every document): in `osoe`,
+  debug 784, release 784, tsan 545, `tier3` 113, the pacer's collectives, teams
+  and threads and ten minutes of `mix`; asan 780 of 781 - 64 PEs of
+  `shmem.shape.chosen.loopback.64` outgrew the VM's 8 GiB, and the kernel
+  killed one (its log: out of memory, `shmem_test_shapes-chosen`, 55 MB of
+  private memory), where the first pass had passed. AddressSanitizer's own
+  memory, about 55 MB a PE, is what fills it, the heap being shared and written
+  only as used (the step's adversarial read reproduced it, the two 64-PE tests
+  at once leaving under 200 MiB free): `3ef3ba3` keeps the test's 64 nodes out
+  of the sanitizers, and gives it the 4 MiB of heap it needs; the shape tests
+  again in asan, 5 of 5, and release, 7 of 7.
+- **The models** changed after `f7745a0` in `shape_timing.py` alone, the sweep
+  in its table: its check and its grid, run on the host on the final tree.
+- **The Pi**: above; the scans' final shape, three rotations against `fixed`.

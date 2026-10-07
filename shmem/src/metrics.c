@@ -257,6 +257,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     TEAM("team.tree.collective_class", BLOCK_TREE(collective_class)),
     TEAM("team.tree.shape_fanout", BLOCK_TREE(shape_fanout)),
     TEAM("team.tree.shape_window", BLOCK_TREE(shape_window)),
+    TEAM("team.tree.shape_children", BLOCK_TREE(shape_children)),
     TEAM("team.tree.lane", BLOCK_TREE(lane)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),

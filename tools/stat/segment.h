@@ -326,7 +326,10 @@ void osoe_segment_close(struct osoe_segment *s);
  *   32  the header's OSOE_COLLECTIVE_SHAPE and link, node.collective_shape
  *       and node.link.hop_ns, .message_ns and .bytes_per_second, and the
  *       link as the root's lead measured it, node.link.measured_hop_ns,
- *       .measured_message_ns and .measured_bytes_per_second (v0.2 step 2)
+ *       .measured_message_ns and .measured_bytes_per_second; and in padding
+ *       the tree state's line had, the shape of the lead's last data
+ *       collective, team.tree.shape_fanout, .shape_window and
+ *       .shape_children (v0.2 step 2)
  *
  * None of 5 to 32 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, and 23 gave each thread a word of its own.
