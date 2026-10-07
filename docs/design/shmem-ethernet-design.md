@@ -5862,6 +5862,19 @@ The intranode phase is unchanged: the lead combines local members' sources into
 its `dest` after they arrive (§5.5). The internode algorithm then runs between
 leads, and release and copy-out follow the §5.4 counters as before.
 
+*Modelled, not yet on the data path (v0.2 step 3; `2026-10-07-circulant.md`):*
+Träff's circulant reduce-scatter and allgather (arXiv 2410.14234) in place of
+the brief's recursive halving with a fold, for every node count: ceil(log2 N)
+rounds a half, every lead sending N - 1 blocks a half, where the fold put up to
+3.5 vectors on a fold lead's link. Rule 1 holds through the lanes' rows, rule 2
+on the lead's thread, rule 3 since each block is combined once, at its owner,
+and copied. Its arithmetic is `collective-circulant.c`, its cost the chooser's
+(`osoe_shape_circulant_cost`), which the data path does not yet ask for. The
+protocol the model holds needs counters of its own - its allgather ends with no
+step every lead waits for, so a finished lead's next collective could add to
+the tree's while another lead still waits on them - and grants that carry a
+lane a round; the record's question 1 puts both to the author.
+
 #### Prefix scans
 
 `shmem_sum_inscan` and `shmem_sum_exscan` (spec §9.10.10) give PE *i*, in team rank
