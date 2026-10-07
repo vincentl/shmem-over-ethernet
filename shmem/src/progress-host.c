@@ -439,8 +439,8 @@ void osoe_progress_host_start(uint32_t session)
      * old team's still queued. Until step D's second part it
      * was OSOE_MAX_TEAMS, the teams that could exist job-wide, which a node
      * could not exceed while numbers were job-wide; a node may now hold more
-     * teams than any one PE's numbers. 5,120 descriptors at the defaults,
-     * about 240 KiB. The per-team state below is sized by the pool too, since
+     * teams than any one PE's numbers. 9,216 descriptors at the defaults,
+     * about 432 KiB. The per-team state below is sized by the pool too, since
      * it is indexed by block.
      */
     /*
