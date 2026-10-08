@@ -126,6 +126,8 @@ numbers in hand. *Undo:* reservations whole again, the patch's one call.
 
 ### 2. Cap the kernel's unsent queue - a rung the brief does not list
 
+*Answered: `2026-10-07.md`, item 11, (b).*
+
 Today a fetch-add, a get or a small put behind a put stream waits for some 2.6 MB
 the kernel has queued unsent, 14 to 22 ms at a gigabit, whatever the library's
 buffer: design §3.2's "two segments" bound is not what is built. The control
@@ -148,6 +150,8 @@ would rather not tie it to the link before a fast link has timed it. Design §3.
 rewritten either way. *Undo:* no cap, today's.
 
 ### 3. The default buffer, now that filling is in
+
+*Answered: `2026-10-07.md`, item 12, (a).*
 
 On top of filling, 256 KiB buffers carry a loopback stream 1.75 times further
 (about 10 GiB/s, 0.6 of the bare stream) and change nothing at a gigabit, where
