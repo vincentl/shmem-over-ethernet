@@ -546,6 +546,28 @@ What was done with each finding:
   per receive over a chunk - no committed seed is a recorded failure, so no
   regression case is lost.
 
+## Four more measurements
+
+The read's N3, on the final tree (`a779bac`) against the tip, alternating
+(`receive-in-place-extra-measurements.txt`, `rung-extra.sh`), with the
+receiving ring's counters over 5 s of each run:
+
+- **The 1 MiB stream, eight more pairs**: 9,989 to 10,427 MiB/s against 8,817 to
+  9,862 - faster in all eight, where the first three pairs had leaned 0.1 to 2%
+  the other way. Not slower, then; the tip's spread is the wider.
+- **The ring's counters**: parsing in place leaves the ring dry less often, not
+  more - at 64 KiB puts 29,000 to 30,000 `-ENOBUFS` in 5 s against 41,000 to
+  46,000 at the tip, about 550 a GiB against 960, and at 1 MiB puts 17,000 to
+  22,000 against 39,000 to 46,000. The read's mechanism - a buffer held through
+  its own apply returning later - is outweighed by passes twice as frequent
+  (132,000 to 144,000 in 5 s against 52,000 to 66,000).
+- **Small provided buffers** (`OSOE_WIRE_BYTES` 1 KiB x 1,024 and 4 KiB x 256,
+  1 MiB either way): both builds at about half the default's rate, 4,957 to
+  7,993 MiB/s, the two within each other's spread. A peek, a parse and a
+  consume a buffer cost nothing a completion a kilobyte does not already.
+- **A stream of 64-byte puts**: 959 to 1,004 MiB/s - 15.7 to 16.4 million
+  messages a second applied - against 857 to 1,138; no cost a message.
+
 ## Measured and not taken: the task-run flags, registered files, the provided buffers
 
 Each in an experiment build on the fourth rung's tree, its choice made by an
@@ -627,9 +649,16 @@ loopback is the largest gap the ladder has met that is the library's own
 protocol. (b) until then, the README saying so. *Undo:* the blocking get one
 piece at a time again.
 
+## The fourth rung's verification
+
+At `a779bac`, the read's fixes in: the four presets with the floor pins on -
+debug 828, release 828, asan 813, tsan 576, every test passing; tier 3, 113;
+`osoe-pacer` mailbox and collectives a minute each and mix ten minutes, no
+failure; the models whole, 34; the SOS suite at 4 x 2, 161 built and passing on
+every map, its two extensions failing as at the tag. Merged into `main`.
+
 ## What goes on now
 
-The fourth rung goes to its adversarial read and its verification, then to
-`main`. Then the ladder's last rung, the zero-copy send behind a setting off by
+The fourth rung is on `main`. Then the ladder's last rung, the zero-copy send behind a setting off by
 default (`2026-10-07.md` item 7), modelled first; then the ladder's result in
 the README, in place of "two thirds"; then Part 1.

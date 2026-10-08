@@ -1,0 +1,39 @@
+== (1) the 1 MiB stream, eight pairs
+round=1 build=tip put=1048576 buffers=16384x64 mib_per_s=9012 completions=2947869 receive_buffers=2903243 receive_enobufs=43918 receive_rearms=43918 passes=51806
+round=1 build=recv3 put=1048576 buffers=16384x64 mib_per_s=10054 completions=3314591 receive_buffers=3296485 receive_enobufs=17311 receive_rearms=17311 passes=144265
+round=2 build=tip put=1048576 buffers=16384x64 mib_per_s=9779 completions=3211932 receive_buffers=3166655 receive_enobufs=44508 receive_rearms=44508 passes=64520
+round=2 build=recv3 put=1048576 buffers=16384x64 mib_per_s=10094 completions=3322081 receive_buffers=3301946 receive_enobufs=19338 receive_rearms=19338 passes=138167
+round=3 build=tip put=1048576 buffers=16384x64 mib_per_s=9689 completions=3116140 receive_buffers=3073778 receive_enobufs=41616 receive_rearms=41616 passes=65267
+round=3 build=recv3 put=1048576 buffers=16384x64 mib_per_s=10114 completions=3286684 receive_buffers=3267725 receive_enobufs=18171 receive_rearms=18171 passes=139092
+round=4 build=tip put=1048576 buffers=16384x64 mib_per_s=9853 completions=3220085 receive_buffers=3175175 receive_enobufs=44139 receive_rearms=44139 passes=65703
+round=4 build=recv3 put=1048576 buffers=16384x64 mib_per_s=10094 completions=3321087 receive_buffers=3301249 receive_enobufs=19042 receive_rearms=19042 passes=138332
+round=5 build=tip put=1048576 buffers=16384x64 mib_per_s=9119 completions=2989175 receive_buffers=2943617 receive_enobufs=44841 receive_rearms=44841 passes=51498
+round=5 build=recv3 put=1048576 buffers=16384x64 mib_per_s=10229 completions=3358104 receive_buffers=3339332 receive_enobufs=17966 receive_rearms=17966 passes=144473
+round=6 build=tip put=1048576 buffers=16384x64 mib_per_s=9846 completions=3215242 receive_buffers=3169922 receive_enobufs=44550 receive_rearms=44550 passes=65177
+round=6 build=recv3 put=1048576 buffers=16384x64 mib_per_s=10184 completions=3331266 receive_buffers=3311041 receive_enobufs=19426 receive_rearms=19426 passes=136494
+round=7 build=tip put=1048576 buffers=16384x64 mib_per_s=8817 completions=2772780 receive_buffers=2732710 receive_enobufs=39404 receive_rearms=39404 passes=56691
+round=7 build=recv3 put=1048576 buffers=16384x64 mib_per_s=9989 completions=3280004 receive_buffers=3261721 receive_enobufs=17465 receive_rearms=17465 passes=141441
+round=8 build=tip put=1048576 buffers=16384x64 mib_per_s=9862 completions=3237685 receive_buffers=3191100 receive_enobufs=45810 receive_rearms=45810 passes=63393
+round=8 build=recv3 put=1048576 buffers=16384x64 mib_per_s=10427 completions=3407979 receive_buffers=3384862 receive_enobufs=22300 receive_rearms=22300 passes=132346
+== (2) the ring's counters at the defaults, 64 KiB puts
+round=1 build=tip put=65536 buffers=16384x64 mib_per_s=9818 completions=3174362 receive_buffers=3127540 receive_enobufs=46060 receive_rearms=46060 passes=59272
+round=1 build=recv3 put=65536 buffers=16384x64 mib_per_s=10748 completions=3530339 receive_buffers=3500687 receive_enobufs=28808 receive_rearms=28808 passes=115061
+round=2 build=tip put=65536 buffers=16384x64 mib_per_s=8660 completions=2788361 receive_buffers=2746555 receive_enobufs=41136 receive_rearms=41136 passes=50304
+round=2 build=recv3 put=65536 buffers=16384x64 mib_per_s=10873 completions=3548420 receive_buffers=3517322 receive_enobufs=30250 receive_rearms=30250 passes=113947
+== (3) the 64 KiB stream through small provided buffers
+round=1 build=tip put=65536 buffers=1024x1024 mib_per_s=5508 completions=28453640 receive_buffers=28425497 receive_enobufs=27710 receive_rearms=27710 passes=29838
+round=1 build=recv3 put=65536 buffers=1024x1024 mib_per_s=4957 completions=25175622 receive_buffers=25171462 receive_enobufs=3776 receive_rearms=3776 passes=81308
+round=1 build=tip put=65536 buffers=4096x256 mib_per_s=5385 completions=7034468 receive_buffers=7029925 receive_enobufs=4116 receive_rearms=4116 passes=111117
+round=1 build=recv3 put=65536 buffers=4096x256 mib_per_s=5710 completions=7334052 receive_buffers=7329931 receive_enobufs=3675 receive_rearms=3675 passes=121679
+round=2 build=tip put=65536 buffers=1024x1024 mib_per_s=5098 completions=26057009 receive_buffers=26042921 receive_enobufs=13692 receive_rearms=13692 passes=57437
+round=2 build=recv3 put=65536 buffers=1024x1024 mib_per_s=5737 completions=29365839 receive_buffers=29336841 receive_enobufs=28551 receive_rearms=28551 passes=30976
+round=2 build=tip put=65536 buffers=4096x256 mib_per_s=7993 completions=10725244 receive_buffers=10683956 receive_enobufs=40636 receive_rearms=40636 passes=47614
+round=2 build=recv3 put=65536 buffers=4096x256 mib_per_s=5710 completions=7470241 receive_buffers=7466559 receive_enobufs=3227 receive_rearms=3227 passes=124723
+== (4) a stream of 64-byte puts
+round=1 build=tip put=64 buffers=16384x64 mib_per_s=1138 completions=532950 receive_buffers=532862 receive_enobufs=0 receive_rearms=0 passes=138849
+round=1 build=recv3 put=64 buffers=16384x64 mib_per_s=959 completions=482195 receive_buffers=482117 receive_enobufs=0 receive_rearms=0 passes=163319
+round=2 build=tip put=64 buffers=16384x64 mib_per_s=857 completions=413217 receive_buffers=413139 receive_enobufs=12 receive_rearms=12 passes=252385
+round=2 build=recv3 put=64 buffers=16384x64 mib_per_s=1004 completions=497821 receive_buffers=497732 receive_enobufs=8 receive_rearms=8 passes=165336
+round=3 build=tip put=64 buffers=16384x64 mib_per_s=1119 completions=530258 receive_buffers=530170 receive_enobufs=0 receive_rearms=0 passes=130392
+round=3 build=recv3 put=64 buffers=16384x64 mib_per_s=988 completions=478072 receive_buffers=477995 receive_enobufs=0 receive_rearms=0 passes=166107
+DONE
