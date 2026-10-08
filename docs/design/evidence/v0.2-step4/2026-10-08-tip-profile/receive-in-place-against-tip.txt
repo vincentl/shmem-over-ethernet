@@ -1,0 +1,27 @@
+== the put stream, 65536-byte puts, 10 s
+round=1 build=tip putstream target=1 bytes=65536 seconds=10.0 mib_per_s=9893
+round=1 build=recv1 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10712
+round=2 build=tip putstream target=1 bytes=65536 seconds=10.0 mib_per_s=9709
+round=2 build=recv1 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10682
+round=3 build=tip putstream target=1 bytes=65536 seconds=10.0 mib_per_s=9927
+round=3 build=recv1 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10847
+== the put stream, 1048576-byte puts, 10 s
+round=1 build=tip putstream target=1 bytes=1048576 seconds=10.0 mib_per_s=9882
+round=1 build=recv1 putstream target=1 bytes=1048576 seconds=10.0 mib_per_s=9681
+round=2 build=tip putstream target=1 bytes=1048576 seconds=10.0 mib_per_s=9740
+round=2 build=recv1 putstream target=1 bytes=1048576 seconds=10.0 mib_per_s=9732
+round=3 build=tip putstream target=1 bytes=1048576 seconds=10.0 mib_per_s=9743
+round=3 build=recv1 putstream target=1 bytes=1048576 seconds=10.0 mib_per_s=9668
+== shmem.floor's stream ratio
+round=1 build=tip stream_mib_per_s floor=15282 library=8919 stream library/floor=0.598 (0.572-0.615)
+round=1 build=recv1 stream_mib_per_s floor=14257 library=11054 stream library/floor=0.752 (0.748-0.775)
+round=2 build=tip stream_mib_per_s floor=14490 library=10091 stream library/floor=0.688 (0.641-0.706)
+round=2 build=recv1 stream_mib_per_s floor=15357 library=11168 stream library/floor=0.731 (0.713-0.772)
+round=3 build=tip stream_mib_per_s floor=15206 library=8469 stream library/floor=0.589 (0.538-0.608)
+round=3 build=recv1 stream_mib_per_s floor=15056 library=10995 stream library/floor=0.732 (0.720-0.780)
+== the mailbox, 4 PEs on 2 nodes, 20 s
+round=1 build=tip summary mailbox rounds=171309 messages=2740944 seconds=19.9 messages_per_s=137721 mib_per_s=17.9 failures=0
+round=1 build=recv1 summary mailbox rounds=172272 messages=2756352 seconds=19.9 messages_per_s=138579 mib_per_s=18.0 failures=0
+round=2 build=tip summary mailbox rounds=170948 messages=2735168 seconds=19.9 messages_per_s=137505 mib_per_s=17.8 failures=0
+round=2 build=recv1 summary mailbox rounds=167352 messages=2677632 seconds=19.9 messages_per_s=134625 mib_per_s=17.5 failures=0
+DONE

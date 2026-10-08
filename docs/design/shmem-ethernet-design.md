@@ -411,8 +411,13 @@ naming the broken bound, not a retry.
 `OSOE_WIRE_BYTES` (default 64 × 16 KiB), so the memory a node holds for
 receiving does not grow with its peers; a multishot recv per wire selects from
 it. The reap queues each filled buffer on its wire, oldest first, and marks the
-wire readable; the pass then takes every byte of every readable wire through
-`osoe_wire_recv`, recycling each buffer the moment it is emptied. So a buffer is
+wire readable; the pass then parses every byte of every readable wire where the
+kernel put it - `osoe_wire_peek` shows the oldest buffer's unread bytes, and
+`osoe_wire_consume` gives them back - recycling each buffer the moment it is
+emptied. *(Until v0.2 step 4 the pass copied a wire's bytes into a chunk of
+scratch and parsed that: a quarter of the receiving agent's time once a put
+stream had made it the busiest thread, `docs/decisions/2026-10-07-one-thread-profile.md`.)*
+So a buffer is
 held from one reap to the end of that pass and never across the next reap, and
 the next reap **checks**: a buffer still queued is a fatal naming invariant 23,
 which is how "never hold a provided buffer" became assertable rather than

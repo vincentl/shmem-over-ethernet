@@ -1,0 +1,63 @@
+== clean put stream, 64 KiB, 20 s 07:31:43
+putstream target=1 bytes=65536 seconds=20.0 mib_per_s=10770
+== profiled put stream, 64 KiB, 30 s 07:32:03
+putstream target=1 bytes=65536 seconds=30.0 mib_per_s=10685
+== profiled put stream, 1 MiB, 30 s 07:32:34
+putstream target=1 bytes=1048576 seconds=30.0 mib_per_s=10324
+== profiled mailbox, 4 PEs on 2 nodes, 30 s 07:33:05
+mailbox t=0.0 round=1 messages=16 messages_per_s=123196 mib_per_s=16.6 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox t=0.0 round=9 messages=144 messages_per_s=130718 mib_per_s=18.1 send_s=0.001 wait_s=0.000 check_s=0.000 step_s=0.001 failures=0
+mailbox t=0.0 round=73 messages=1168 messages_per_s=137850 mib_per_s=18.1 send_s=0.007 wait_s=0.000 check_s=0.000 step_s=0.007 failures=0
+mailbox t=0.1 round=585 messages=9360 messages_per_s=125468 mib_per_s=16.3 send_s=0.062 wait_s=0.005 check_s=0.001 step_s=0.065 failures=0
+mailbox t=0.6 round=4681 messages=74896 messages_per_s=135001 mib_per_s=17.5 send_s=0.461 wait_s=0.020 check_s=0.011 step_s=0.485 failures=0
+mailbox t=4.4 round=37449 messages=599184 messages_per_s=137583 mib_per_s=17.8 send_s=3.622 wait_s=0.117 check_s=0.090 step_s=3.811 failures=0
+mailbox t=9.5 round=80443 messages=1287088 messages_per_s=135870 mib_per_s=17.6 send_s=4.815 wait_s=0.153 check_s=0.119 step_s=5.063 failures=0
+mailbox t=14.7 round=122902 messages=1966432 messages_per_s=131807 mib_per_s=17.1 send_s=4.847 wait_s=0.212 check_s=0.121 step_s=5.154 failures=0
+mailbox t=19.5 round=164091 messages=2625456 messages_per_s=137247 mib_per_s=17.8 send_s=4.484 wait_s=0.232 check_s=0.129 step_s=4.802 failures=0
+mailbox t=24.6 round=206980 messages=3311680 messages_per_s=134509 mib_per_s=17.4 send_s=4.769 wait_s=0.218 check_s=0.124 step_s=5.102 failures=0
+mailbox t=29.5 round=249014 messages=3984224 messages_per_s=137123 mib_per_s=17.8 send_s=4.660 wait_s=0.141 check_s=0.115 step_s=4.905 failures=0
+mailbox t=30.0 round=253078 messages=4049248 messages_per_s=137641 mib_per_s=17.8 send_s=0.454 wait_s=0.017 check_s=0.011 step_s=0.472 failures=0
+summary mailbox rounds=253078 messages=4049248 seconds=29.9 messages_per_s=135573 mib_per_s=17.6 failures=0
+osoe-pacer failures=0 seconds=30.0
+== profiled bare io_uring stream 07:33:35
+small stream_mib_per_s=10.0 mebibytes=1
+uring stream_mib_per_s=17751.5 mebibytes=400000
+DONE 07:33:59
+== configure 07:34:00
+BUILD OK 07:34:20
+round=1 taskrun=none putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10984
+round=1 taskrun=none summary mailbox rounds=156893 messages=2510288 seconds=20.0 messages_per_s=125676 mib_per_s=16.3 failures=0
+round=1 taskrun=none put+quiet target=1 where=remote bytes=8 median_us=54.9 get target=1 where=remote bytes=8 median_us=54.0 put+quiet target=1 where=remote bytes=1048576 median_us=158.5 get target=1 where=remote bytes=1048576 median_us=1135.4 median_us=54.3
+round=1 taskrun=coop putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10327
+round=1 taskrun=coop summary mailbox rounds=171048 messages=2736768 seconds=19.9 messages_per_s=137579 mib_per_s=17.8 failures=0
+round=1 taskrun=coop put+quiet target=1 where=remote bytes=8 median_us=54.6 get target=1 where=remote bytes=8 median_us=54.3 put+quiet target=1 where=remote bytes=1048576 median_us=156.5 get target=1 where=remote bytes=1048576 median_us=1136.1 median_us=54.3
+round=1 taskrun=defer putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10357
+round=1 taskrun=defer summary mailbox rounds=169349 messages=2709584 seconds=19.9 messages_per_s=135983 mib_per_s=17.6 failures=0
+round=1 taskrun=defer put+quiet target=1 where=remote bytes=8 median_us=54.2 get target=1 where=remote bytes=8 median_us=54.0 put+quiet target=1 where=remote bytes=1048576 median_us=154.9 get target=1 where=remote bytes=1048576 median_us=1124.7 median_us=54.2
+round=1 taskrun=defer-coop putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10409
+round=1 taskrun=defer-coop summary mailbox rounds=170776 messages=2732416 seconds=19.9 messages_per_s=137384 mib_per_s=17.8 failures=0
+round=1 taskrun=defer-coop put+quiet target=1 where=remote bytes=8 median_us=54.5 get target=1 where=remote bytes=8 median_us=54.0 put+quiet target=1 where=remote bytes=1048576 median_us=154.5 get target=1 where=remote bytes=1048576 median_us=1129.7 median_us=53.9
+round=2 taskrun=none putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10952
+round=2 taskrun=none summary mailbox rounds=170197 messages=2723152 seconds=19.9 messages_per_s=136845 mib_per_s=17.8 failures=0
+round=2 taskrun=none put+quiet target=1 where=remote bytes=8 median_us=54.7 get target=1 where=remote bytes=8 median_us=53.8 put+quiet target=1 where=remote bytes=1048576 median_us=158.3 get target=1 where=remote bytes=1048576 median_us=1128.3 median_us=53.9
+round=2 taskrun=coop putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10440
+round=2 taskrun=coop summary mailbox rounds=168759 messages=2700144 seconds=19.9 messages_per_s=135488 mib_per_s=17.6 failures=0
+round=2 taskrun=coop put+quiet target=1 where=remote bytes=8 median_us=54.7 get target=1 where=remote bytes=8 median_us=54.7 put+quiet target=1 where=remote bytes=1048576 median_us=155.8 get target=1 where=remote bytes=1048576 median_us=1128.1 median_us=54.4
+round=2 taskrun=defer putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10299
+round=2 taskrun=defer summary mailbox rounds=169171 messages=2706736 seconds=19.9 messages_per_s=136046 mib_per_s=17.6 failures=0
+round=2 taskrun=defer put+quiet target=1 where=remote bytes=8 median_us=55.0 get target=1 where=remote bytes=8 median_us=55.0 put+quiet target=1 where=remote bytes=1048576 median_us=153.5 get target=1 where=remote bytes=1048576 median_us=1128.2 median_us=53.9
+round=2 taskrun=defer-coop putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10478
+round=2 taskrun=defer-coop summary mailbox rounds=170993 messages=2735888 seconds=19.9 messages_per_s=137558 mib_per_s=17.8 failures=0
+round=2 taskrun=defer-coop put+quiet target=1 where=remote bytes=8 median_us=54.1 get target=1 where=remote bytes=8 median_us=54.0 put+quiet target=1 where=remote bytes=1048576 median_us=159.1 get target=1 where=remote bytes=1048576 median_us=1128.7 median_us=53.9
+round=3 taskrun=none putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10956
+round=3 taskrun=none summary mailbox rounds=168872 messages=2701952 seconds=19.9 messages_per_s=135855 mib_per_s=17.6 failures=0
+round=3 taskrun=none put+quiet target=1 where=remote bytes=8 median_us=54.7 get target=1 where=remote bytes=8 median_us=38.8 put+quiet target=1 where=remote bytes=1048576 median_us=156.6 get target=1 where=remote bytes=1048576 median_us=1140.0 median_us=54.5
+round=3 taskrun=coop putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10370
+round=3 taskrun=coop summary mailbox rounds=170722 messages=2731552 seconds=19.9 messages_per_s=137353 mib_per_s=17.8 failures=0
+round=3 taskrun=coop put+quiet target=1 where=remote bytes=8 median_us=55.0 get target=1 where=remote bytes=8 median_us=55.0 put+quiet target=1 where=remote bytes=1048576 median_us=156.7 get target=1 where=remote bytes=1048576 median_us=1136.2 median_us=54.6
+round=3 taskrun=defer putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10535
+round=3 taskrun=defer summary mailbox rounds=169639 messages=2714224 seconds=19.9 messages_per_s=136416 mib_per_s=17.7 failures=0
+round=3 taskrun=defer put+quiet target=1 where=remote bytes=8 median_us=55.9 get target=1 where=remote bytes=8 median_us=55.2 put+quiet target=1 where=remote bytes=1048576 median_us=158.2 get target=1 where=remote bytes=1048576 median_us=1157.5 median_us=55.6
+round=3 taskrun=defer-coop putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10326
+round=3 taskrun=defer-coop summary mailbox rounds=169174 messages=2706784 seconds=19.9 messages_per_s=136139 mib_per_s=17.7 failures=0
+round=3 taskrun=defer-coop put+quiet target=1 where=remote bytes=8 median_us=54.2 get target=1 where=remote bytes=8 median_us=53.9 put+quiet target=1 where=remote bytes=1048576 median_us=153.6 get target=1 where=remote bytes=1048576 median_us=1130.0 median_us=54.4

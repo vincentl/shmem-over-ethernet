@@ -1,0 +1,19 @@
+round=1 fixed=0 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10982
+round=1 fixed=0 summary mailbox rounds=170869 messages=2733904 seconds=19.9 messages_per_s=137500 mib_per_s=17.8 failures=0
+round=1 fixed=0 put+quiet target=1 where=remote bytes=8 median_us=55.2 get target=1 where=remote bytes=8 median_us=55.0 put+quiet target=1 where=remote bytes=1048576 median_us=160.7 get target=1 where=remote bytes=1048576 median_us=1152.4 median_us=55.3
+round=1 fixed=1 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10799
+round=1 fixed=1 summary mailbox rounds=170704 messages=2731264 seconds=19.9 messages_per_s=137280 mib_per_s=17.8 failures=0
+round=1 fixed=1 put+quiet target=1 where=remote bytes=8 median_us=54.8 get target=1 where=remote bytes=8 median_us=54.6 put+quiet target=1 where=remote bytes=1048576 median_us=159.4 get target=1 where=remote bytes=1048576 median_us=1129.8 median_us=55.9
+round=2 fixed=0 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10922
+round=2 fixed=0 summary mailbox rounds=169263 messages=2708208 seconds=19.9 messages_per_s=136146 mib_per_s=17.7 failures=0
+round=2 fixed=0 put+quiet target=1 where=remote bytes=8 median_us=55.3 get target=1 where=remote bytes=8 median_us=54.5 put+quiet target=1 where=remote bytes=1048576 median_us=156.9 get target=1 where=remote bytes=1048576 median_us=1133.4 median_us=54.1
+round=2 fixed=1 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=11000
+round=2 fixed=1 summary mailbox rounds=170915 messages=2734640 seconds=19.9 messages_per_s=137474 mib_per_s=17.8 failures=0
+round=2 fixed=1 put+quiet target=1 where=remote bytes=8 median_us=55.3 get target=1 where=remote bytes=8 median_us=54.7 put+quiet target=1 where=remote bytes=1048576 median_us=158.1 get target=1 where=remote bytes=1048576 median_us=1125.4 median_us=54.5
+round=3 fixed=0 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10919
+round=3 fixed=0 summary mailbox rounds=168245 messages=2691920 seconds=19.9 messages_per_s=135315 mib_per_s=17.6 failures=0
+round=3 fixed=0 put+quiet target=1 where=remote bytes=8 median_us=54.2 get target=1 where=remote bytes=8 median_us=53.8 put+quiet target=1 where=remote bytes=1048576 median_us=158.9 get target=1 where=remote bytes=1048576 median_us=1129.2 median_us=54.1
+round=3 fixed=1 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10952
+round=3 fixed=1 summary mailbox rounds=170160 messages=2722560 seconds=19.9 messages_per_s=136968 mib_per_s=17.8 failures=0
+round=3 fixed=1 put+quiet target=1 where=remote bytes=8 median_us=55.5 get target=1 where=remote bytes=8 median_us=54.6 put+quiet target=1 where=remote bytes=1048576 median_us=159.7 get target=1 where=remote bytes=1048576 median_us=1135.8 median_us=54.9
+DONE

@@ -1,0 +1,56 @@
+# classify.py over defer-taskrun's put64 samples: the sending lead's agent (tid 540945)
+kernel network    49.1%
+kernel copy       31.7%
+kernel other      12.4%
+user other         3.4%
+library            2.0%
+io_uring           1.4%
+
+== kernel network
+     9.0%  __pi_clear_page
+     2.3%  sock_def_readable
+     2.2%  __local_bh_enable_ip
+     2.2%  arch_counter_get_cntvct
+     1.8%  __rmqueue_pcplist
+     1.7%  __sk_mem_raise_allocated
+     1.5%  free_unref_page
+     1.2%  free_tail_page_prepare
+== kernel copy
+    31.6%  __arch_copy_from_user
+     0.1%  _copy_from_iter
+== kernel other
+     8.5%  try_to_wake_up
+     1.5%  el0_svc
+     0.5%  gup_fast_fallback
+     0.3%  invoke_syscall
+     0.3%  fget
+     0.2%  el0_svc_common.constprop.0
+     0.2%  futex_wake
+     0.2%  do_el0_svc
+== user other
+     2.2%  __kernel_clock_gettime [[vdso]]
+     0.4%  [unknown] [liburing.so.2.9]
+     0.4%  syscall [libc.so.6]
+     0.2%  finalize [inlined]
+     0.1%  publish_ring [inlined]
+     0.0%  clock_gettime [libc.so.6]
+     0.0%  conn_metrics [inlined]
+     0.0%  io_uring_cqe_get_data64 [inlined]
+== library
+     0.3%  flush (under flush)
+     0.3%  osoe_progress_host_poll (under osoe_progress_host_poll)
+     0.1%  osoe_internode_backend_agent_pass (under agent_main)
+     0.1%  drain_into (under drain_into)
+     0.1%  osoe_liveness_check (under agent_main)
+     0.1%  osoe_progress_poll (under osoe_progress_poll)
+     0.1%  osoe_connection_release (under flush)
+     0.1%  release_local (under osoe_progress_poll)
+== io_uring
+     0.4%  io_submit_sqes
+     0.3%  fget
+     0.1%  io_issue_sqe
+     0.1%  gup_fast_fallback
+     0.1%  arch_counter_get_cntvct
+     0.1%  io_send
+     0.0%  futex_hash
+     0.0%  io_sendmsg_prep

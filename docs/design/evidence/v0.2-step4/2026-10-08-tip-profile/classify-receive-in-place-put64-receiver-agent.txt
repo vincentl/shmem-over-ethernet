@@ -1,0 +1,60 @@
+# classify.py over receive-in-place's put64 samples: the receiving lead's agent (tid 535003)
+kernel copy       36.6%
+library copy      25.5%
+kernel network    19.5%
+kernel other      13.1%
+library            2.5%
+io_uring           2.2%
+user other         0.6%
+
+== kernel copy
+    35.9%  __arch_copy_to_user
+     0.6%  _copy_to_iter
+     0.1%  simple_copy_to_iter
+== library copy
+    25.4%  libc <- osoe_am_parse
+     0.1%  memcpy@plt <- osoe_am_parse
+== kernel network
+     4.0%  arch_counter_get_cntvct
+     1.5%  __skb_datagram_iter
+     1.1%  __local_bh_enable_ip
+     0.6%  mem_cgroup_uncharge_skmem
+     0.6%  queued_spin_lock_slowpath
+     0.6%  __sk_mem_reduce_allocated
+     0.5%  tcp_recvmsg_locked
+     0.5%  __check_object_size
+== kernel other
+    12.7%  do_signal
+     0.1%  el0_svc
+     0.1%  do_notify_resume
+     0.1%  hrtimer_start_range_ns
+     0.0%  el0_svc_common.constprop.0
+     0.0%  get_signal
+     0.0%  invoke_syscall
+== library
+     1.4%  osoe_am_parse (under osoe_am_parse)
+     0.2%  osoe_transport_notify (under osoe_am_parse)
+     0.2%  osoe_wire_consume (under osoe_wire_consume)
+     0.1%  osoe_ring_recycle (under receive)
+     0.1%  osoe_ring_reap (under osoe_progress_poll)
+     0.1%  resolve (under osoe_am_parse)
+     0.1%  osoe_progress_host_poll (under osoe_progress_host_poll)
+     0.1%  osoe_metrics_block (under osoe_am_parse)
+== io_uring
+     0.4%  io_recv
+     0.2%  xas_start
+     0.2%  io_fill_cqe_aux
+     0.2%  io_buffer_select
+     0.1%  tctx_task_work_run
+     0.1%  __io_put_kbufs
+     0.1%  io_req_post_cqe
+     0.1%  security_socket_recvmsg
+== user other
+     0.2%  __kernel_clock_gettime [[vdso]]
+     0.1%  accumulate [inlined]
+     0.1%  truncate_to [inlined]
+     0.1%  receive [inlined]
+     0.0%  clock_gettime [libc.so.6]
+     0.0%  mark [inlined]
+     0.0%  received [inlined]
+     0.0%  [unknown] [liburing.so.2.9]

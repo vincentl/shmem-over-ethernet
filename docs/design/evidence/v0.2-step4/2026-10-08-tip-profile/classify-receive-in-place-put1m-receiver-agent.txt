@@ -1,0 +1,59 @@
+# classify.py over receive-in-place's put1m samples: the receiving lead's agent (tid 535066)
+kernel copy       40.2%
+library copy      27.2%
+kernel network    19.1%
+kernel other       8.4%
+io_uring           2.4%
+library            1.6%
+user other         1.0%
+
+== kernel copy
+    39.7%  __arch_copy_to_user
+     0.5%  _copy_to_iter
+     0.0%  simple_copy_to_iter
+== library copy
+    27.1%  libc <- osoe_am_parse
+     0.1%  memcpy@plt <- osoe_am_parse
+== kernel network
+     4.0%  arch_counter_get_cntvct
+     1.1%  __skb_datagram_iter
+     0.9%  __local_bh_enable_ip
+     0.8%  tcp_recvmsg_locked
+     0.6%  mem_cgroup_uncharge_skmem
+     0.5%  memblock_is_map_memory
+     0.5%  __check_object_size
+     0.5%  queued_spin_lock_slowpath
+== kernel other
+     8.1%  do_signal
+     0.1%  fget
+     0.1%  el0_svc
+     0.1%  do_notify_resume
+     0.0%  invoke_syscall
+     0.0%  el0_svc_common.constprop.0
+== io_uring
+     0.4%  io_buffer_select
+     0.3%  io_recv
+     0.3%  xas_start
+     0.2%  io_fill_cqe_aux
+     0.2%  io_issue_sqe
+     0.2%  io_recv_finish
+     0.1%  io_req_post_cqe
+     0.1%  security_socket_recvmsg
+== library
+     0.7%  osoe_am_parse (under osoe_am_parse)
+     0.1%  osoe_wire_peek (under osoe_wire_peek)
+     0.1%  osoe_ring_wait (under agent_main)
+     0.1%  osoe_wire_consume (under osoe_wire_consume)
+     0.1%  osoe_transport_agent_pass (under agent_main)
+     0.1%  osoe_ring_reap (under osoe_progress_poll)
+     0.1%  complete (under osoe_am_parse)
+     0.1%  osoe_ring_submit (under osoe_progress_poll)
+== user other
+     0.2%  [unknown] [liburing.so.2.9]
+     0.1%  truncate_to [inlined]
+     0.1%  io_uring_buf_ring_add [inlined]
+     0.1%  received [inlined]
+     0.1%  accumulate [inlined]
+     0.1%  begin_message [inlined]
+     0.0%  busy [inlined]
+     0.0%  osoe_watch_covers [inlined]

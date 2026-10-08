@@ -1,0 +1,11 @@
+put64 start=07:32:09 pids=535001,535002 agents=535004,535003
+put64 segments=/osoe.534999.0.0.0 /osoe.534999.0.1.0
+put64 end=07:32:26
+put1m start=07:32:40 pids=535064,535065 agents=535067,535066
+put1m segments=/osoe.535062.0.0.0 /osoe.535062.0.1.0
+put1m end=07:32:57
+mailbox start=07:33:11 pids=535127,535128,535129,535130 agents=535131,535132
+mailbox segments=/osoe.535125.0.0.0 /osoe.535125.0.1.0
+mailbox end=07:33:28
+echo start=07:33:37 pids=535198,535200 agents=
+echo end=07:33:55

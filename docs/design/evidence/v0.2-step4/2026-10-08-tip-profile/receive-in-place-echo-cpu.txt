@@ -1,0 +1,8 @@
+
+ Performance counter stats for process id '535198,535200':
+
+      echo-uring-535198             4989.10 msec task-clock                       #    0.998 CPUs utilized             
+      echo-uring-535200             4560.43 msec task-clock                       #    0.912 CPUs utilized             
+
+       5.001224187 seconds time elapsed
+
