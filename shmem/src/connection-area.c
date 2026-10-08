@@ -25,10 +25,12 @@
 #include "shm-object.h"
 
 #define OSOE_CONNECTION_AREA_MAGIC UINT64_C(0x61657261656f736f)   /* "osoearea" */
-#define OSOE_CONNECTION_AREA_LAYOUT 4   /* 2: `opened`; 3: `lead_sleeping` and the
+#define OSOE_CONNECTION_AREA_LAYOUT 5   /* 2: `opened`; 3: `lead_sleeping` and the
                                          * dirty-connection bitmap; 4: each
                                          * connection's acknowledgement and
-                                         * turnover wait words */
+                                         * turnover wait words; 5: the flag and
+                                         * the bitmap an owner (owner-map.h),
+                                         * and a helper's wake word */
 
 /*
  * The frozen prefix, for the same reason the control segment has one (§3.14):
@@ -66,14 +68,31 @@ struct osoe_connection_area_header {
      * other end of a session.
      */
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t opened;
-    /* The lead's flag (connection-area.h), on a line of its own: every writer
-     * loads it after every operation, and the lead stores it twice per sleep. */
-    _Alignas(OSOE_CACHELINE) _Atomic uint32_t lead_sleeping;
-    /* Then the dirty bitmap, (nodes - 2) / 64 + 1 words from dirty_offset,
-     * before the connections. One line holds 512 connections' bits; the words
-     * share lines, since nothing yet measures contention between them (the
-     * brief's rule: a line per word only if measurement says so). */
-    uint64_t dirty_offset;
+    /*
+     * Layout 5, after the words above, where layout 3 put its own, so that
+     * `ready` and `opened` stay where a PE of another commit looks for them
+     * whatever the line's size: the node's progress helpers (owner-map.h),
+     * which shape what follows the header - helpers + 1 lines of struct
+     * owner_words from owners_offset, then each owner's dirty bitmap on lines
+     * of its own - and so must be every opener's too. A line of their own,
+     * since every opener adds to `opened`.
+     */
+    _Alignas(OSOE_CACHELINE) uint32_t helpers;
+    uint64_t owners_offset;
+};
+
+/*
+ * An owner's flag and wake word (connection-area.h), on a line of their own:
+ * every writer loads the flag after every operation, the owner stores it twice
+ * a sleep, and the writer that claims a sleep's wake bumps the word beside it.
+ * Each owner's dirty bitmap starts a line of its own too, since each is taken
+ * by another thread; within one, the words share lines, as nothing yet
+ * measures contention between them (step 2's rule: a line a word only if
+ * measurement says so). One line holds 512 connections' bits.
+ */
+struct owner_words {
+    _Alignas(OSOE_CACHELINE) _Atomic uint32_t sleeping;
+    _Atomic uint32_t wake;
 };
 
 /*
@@ -86,35 +105,58 @@ struct osoe_connection_area_header {
 _Static_assert(offsetof(struct osoe_connection_area_header, creator_pid) == 20,
                "osoe-stat --gc reads the creator's pid at byte 20 (tools/stat/segment.c)");
 
+/* And a PE of another commit, whatever the line's size, finds `ready` and
+ * `opened` where every layout since 3 has had them - the first two lines after
+ * the 64 bytes above - so that it waits for the one and is refused by the
+ * layout it then reads, rather than waiting on a field moved under it (the
+ * adversarial read of v0.2 step 4's Part 1, N1). */
+_Static_assert(offsetof(struct osoe_connection_area_header, ready) == OSOE_CACHELINE &&
+               offsetof(struct osoe_connection_area_header, opened) == 2 * OSOE_CACHELINE,
+               "a connection area's ready and opened words stay on its second and third "
+               "lines, where every layout since 3 has them");
+
 static uint64_t align_up(uint64_t n)
 {
     return (n + OSOE_CACHELINE - 1) / OSOE_CACHELINE * OSOE_CACHELINE;
 }
 
-/*
- * Peers are numbered compactly, skipping this node: with 4 nodes, node 1 holds
- * slots for peers 0, 2 and 3 as 0, 1 and 2. Leaving a hole for self would waste
- * two buffers - 512 KiB at the default - on every node for nothing.
- */
-static uint32_t peer_slot(uint32_t self, uint32_t peer)
+/* Peers are numbered compactly, skipping this node (osoe_peer_slot,
+ * owner-map.h): leaving a hole for self would waste two buffers - 512 KiB at
+ * the default - on every node for nothing. */
+
+/* Owner `owner`'s dirty bitmap: a bit a wire it holds. */
+static uint32_t dirty_words(uint32_t owner, uint32_t peers, uint32_t helpers)
 {
-    return peer < self ? peer : peer - 1;
+    return (osoe_owner_wires(owner, peers, helpers) + 63) / 64;
 }
 
-static uint64_t dirty_words(uint32_t nodes)
+/* Where the parts after the header start, for `nodes` nodes (two or more) and
+ * `helpers` helpers. */
+struct area_layout {
+    uint64_t owners;    /* helpers + 1 struct owner_words */
+    uint64_t dirty;     /* owner 0's bitmap, the others' after it, each on its own lines */
+    uint64_t conns;     /* nodes - 1 struct osoe_connection_shared */
+    uint64_t data;      /* nodes - 1 pairs of buffers */
+};
+
+static struct area_layout layout_of(uint32_t nodes, uint32_t helpers)
 {
-    return nodes < 2 ? 0 : (uint64_t)(nodes - 2) / 64 + 1;
+    uint32_t peers = nodes - 1;
+    struct area_layout l;
+    l.owners = align_up(sizeof(struct osoe_connection_area_header));
+    l.dirty = l.owners + (uint64_t)(helpers + 1) * sizeof(struct owner_words);
+    l.conns = l.dirty;
+    for (uint32_t o = 0; o <= helpers; o++)
+        l.conns += align_up((uint64_t)dirty_words(o, peers, helpers) * sizeof(uint64_t));
+    l.data = l.conns + align_up((uint64_t)peers * sizeof(struct osoe_connection_shared));
+    return l;
 }
 
-uint64_t osoe_am_area_bytes(uint32_t nodes, uint64_t buffer)
+uint64_t osoe_am_area_bytes(uint32_t nodes, uint32_t helpers, uint64_t buffer)
 {
     if (nodes < 2)
         return 0;
-    uint64_t peers = nodes - 1;
-    uint64_t conns = align_up(sizeof(struct osoe_connection_area_header)) +
-                     align_up(dirty_words(nodes) * sizeof(uint64_t)) +
-                     align_up(peers * sizeof(struct osoe_connection_shared));
-    return conns + peers * 2 * buffer;
+    return layout_of(nodes, helpers).data + (uint64_t)(nodes - 1) * 2 * buffer;
 }
 
 enum osoe_am_size_status osoe_am_choose_buffer(uint64_t chunk, uint64_t requested,
@@ -158,11 +200,13 @@ static bool made_by(int fd, int32_t lead_pid)
 }
 
 void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe_bootstrap *b,
-                        uint32_t nodes, uint32_t session, int32_t lead_pid)
+                               uint32_t nodes, uint32_t helpers, uint32_t session,
+                               int32_t lead_pid)
 {
     *a = (struct osoe_connection_area){ 0 };
     a->node = b->node;
     a->nodes = nodes;
+    a->helpers = helpers;
     if (nodes < 2)
         return;                          /* one node: no peers, nothing to map */
 
@@ -197,7 +241,7 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
 
     a->buffer_bytes = buffer;
     a->chunk_bytes = config.chunk;
-    a->bytes = osoe_am_area_bytes(nodes, buffer);
+    a->bytes = osoe_am_area_bytes(nodes, helpers, buffer);
     a->creator = b->local_id == 0;      /* the local lead (§6.2) */
     snprintf(a->name, sizeof a->name, "/osoe.%llu.%u.%u.conn.%u",
              (unsigned long long)b->job, b->step, b->node, session);
@@ -331,20 +375,26 @@ again:;
     a->map = p;
 
     struct osoe_connection_area_header *h = p;
-    uint64_t dirty_offset = align_up(sizeof *h);
-    uint64_t conns_offset = dirty_offset + align_up(dirty_words(nodes) * sizeof(uint64_t));
-    uint64_t data_offset = conns_offset +
-                           align_up((uint64_t)peers * sizeof(struct osoe_connection_shared));
+    struct area_layout l = layout_of(nodes, helpers);
 
-    a->dirty = (_Atomic uint64_t *)((char *)p + dirty_offset);
-    a->dirty_words = (uint32_t)dirty_words(nodes);
-    a->lead_sleeping = &h->lead_sleeping;
+    a->owner = calloc(helpers + 1, sizeof *a->owner);
     a->connection = calloc(peers, sizeof *a->connection);
-    if (!a->connection)
+    if (!a->owner || !a->connection)
         osoe_fatal("out of memory for %u connection handles", peers);
+    uint64_t dirty = l.dirty;
+    for (uint32_t o = 0; o <= helpers; o++) {
+        struct owner_words *w = (struct owner_words *)((char *)p + l.owners) + o;
+        a->owner[o] = (struct osoe_connection_area_owner){
+            .dirty = (_Atomic uint64_t *)((char *)p + dirty),
+            .dirty_words = dirty_words(o, peers, helpers),
+            .sleeping = &w->sleeping,
+            .wake = &w->wake,
+        };
+        dirty += align_up((uint64_t)a->owner[o].dirty_words * sizeof(uint64_t));
+    }
     for (uint32_t i = 0; i < peers; i++) {
-        a->connection[i].s = (struct osoe_connection_shared *)((char *)p + conns_offset) + i;
-        a->connection[i].data = (unsigned char *)p + data_offset + (uint64_t)i * 2 * buffer;
+        a->connection[i].s = (struct osoe_connection_shared *)((char *)p + l.conns) + i;
+        a->connection[i].data = (unsigned char *)p + l.data + (uint64_t)i * 2 * buffer;
         a->connection[i].capacity = (uint32_t)buffer;
     }
 
@@ -355,9 +405,10 @@ again:;
         h->nodes = nodes;
         h->buffer_bytes = buffer;
         h->chunk_bytes = config.chunk;
-        h->conns_offset = conns_offset;
-        h->dirty_offset = dirty_offset;
-        h->data_offset = data_offset;
+        h->conns_offset = l.conns;
+        h->data_offset = l.data;
+        h->helpers = helpers;
+        h->owners_offset = l.owners;
         h->area_bytes = a->bytes;
         h->creator_pid = (int32_t)getpid();
         /* Both buffers of every connection sealed, so nothing is reservable
@@ -380,7 +431,9 @@ again:;
                 munmap(p, a->bytes);
                 close(fd);
                 free(a->connection);
+                free(a->owner);
                 a->connection = NULL;
+                a->owner = NULL;
                 a->map = NULL;
                 goto again;
             }
@@ -430,19 +483,27 @@ again:;
             munmap(p, a->bytes);
             close(fd);
             free(a->connection);
+            free(a->owner);
             a->connection = NULL;
+            a->owner = NULL;
             a->map = NULL;
             goto again;
         }
-        if (h->magic != OSOE_CONNECTION_AREA_MAGIC || h->layout != OSOE_CONNECTION_AREA_LAYOUT ||
-            h->buffer_bytes != buffer || h->chunk_bytes != config.chunk ||
-            h->nodes != nodes)
+        if (h->magic != OSOE_CONNECTION_AREA_MAGIC || h->layout != OSOE_CONNECTION_AREA_LAYOUT)
+            osoe_fatal("connection area %s was laid out by a library of layout %u, and this "
+                       "PE's lays out %u: every PE of a node must run the same library",
+                       a->name, h->layout, OSOE_CONNECTION_AREA_LAYOUT);
+        if (h->buffer_bytes != buffer || h->chunk_bytes != config.chunk || h->nodes != nodes)
             osoe_fatal("connection area %s was created with different AM sizing "
                        "(buffer %llu chunk %llu nodes %u, not %llu/%llu/%u): every PE "
                        "of a job must set OSOE_AM_* the same", a->name,
                        (unsigned long long)h->buffer_bytes,
                        (unsigned long long)h->chunk_bytes, h->nodes,
                        (unsigned long long)buffer, (unsigned long long)config.chunk, nodes);
+        if (h->helpers != helpers)
+            osoe_fatal("connection area %s was laid out for %u progress helpers, and this PE "
+                       "runs %u: every PE of a node must run the same count", a->name,
+                       h->helpers, helpers);
     }
     close(fd);
     /* Every local PE opens the area; the last to have done so removes its name. */
@@ -454,6 +515,7 @@ again:;
 void osoe_connection_area_close(struct osoe_connection_area *a)
 {
     free(a->connection);
+    free(a->owner);
     if (a->map)
         munmap(a->map, a->bytes);       /* its name went when the last PE opened it */
     *a = (struct osoe_connection_area){ 0 };
@@ -463,5 +525,5 @@ struct osoe_connection *osoe_connection_to(struct osoe_connection_area *a, uint3
 {
     if (peer == a->node || peer >= a->nodes || !a->connection)
         return NULL;
-    return &a->connection[peer_slot(a->node, peer)];
+    return &a->connection[osoe_peer_slot(a->node, peer)];
 }

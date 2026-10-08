@@ -83,11 +83,11 @@ enum { HEAP = 8192, DESCRIPTORS = 32, PAYLOAD = 600 };
  * than a second condition of the test's own is the point - if the two ever
  * disagree, one of them is wrong.
  */
-static void drain(struct osoe_progress *p, const struct osoe_deadline *give_up)
+static void drain(struct osoe_progress_owner *o, const struct osoe_deadline *give_up)
 {
-    while (!osoe_progress_idle(p)) {
-        if (!osoe_progress_poll(p))
-            osoe_ring_wait(p->ring, UINT64_C(1000000));
+    while (!osoe_progress_idle(o)) {
+        if (!osoe_progress_poll(o))
+            osoe_ring_wait(o->ring, UINT64_C(1000000));
         if (osoe_deadline_expired(give_up))
             return;
     }
@@ -98,13 +98,14 @@ static void drain(struct osoe_progress *p, const struct osoe_deadline *give_up)
  * read until the peer's has ended - which is also what keeps this node reading
  * until the peer has taken everything it was owed.
  */
-static void close_connections(struct osoe_progress *p, const struct osoe_deadline *give_up)
+static void close_connections(struct osoe_progress_owner *o,
+                              const struct osoe_deadline *give_up)
 {
-    osoe_progress_close(p);
-    while (!osoe_progress_closed(p) && !osoe_deadline_expired(give_up))
-        if (!osoe_progress_poll(p))
-            osoe_ring_wait(p->ring, UINT64_C(1000000));
-    CHECK(osoe_progress_closed(p));
+    osoe_progress_close(o);
+    while (!osoe_progress_closed(o) && !osoe_deadline_expired(give_up))
+        if (!osoe_progress_poll(o))
+            osoe_ring_wait(o->ring, UINT64_C(1000000));
+    CHECK(osoe_progress_closed(o));
 }
 
 /*
@@ -280,7 +281,7 @@ int main(void)
     };
 
     struct osoe_connection_area area;
-    osoe_connection_area_open(&area, &b, 2, 0, OSOE_SHM_ANY_CREATOR);
+    osoe_connection_area_open(&area, &b, 2, 0, 0, OSOE_SHM_ANY_CREATOR);
 
     struct osoe_connection *c = osoe_connection_to(&area, peer);
     CHECK_FATAL(c != NULL);  /* a non-lead PE dereferences it below via post() */
@@ -330,7 +331,7 @@ int main(void)
      * (§6.2, ring.h). */
     static struct osoe_wire wire;
     static struct osoe_ring ring;
-    osoe_wires_open(&wire, &ring, &b, 0, NULL);
+    osoe_wires_open(&wire, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
     osoe_ring_enable(&ring);
 
     static struct osoe_reply descriptors[DESCRIPTORS];
@@ -338,9 +339,11 @@ int main(void)
     static uint64_t busy[1];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
                                        NULL, completed, NULL };
+    /* One owner, the lead's agent, holding the one wire (owner-map.h). */
     struct osoe_progress p;
-    osoe_progress_init(&p, &area, &wire, &ring, descriptors, DESCRIPTORS, &host);
-    osoe_progress_attach(&p, connections, busy);
+    static struct osoe_progress_owner owner;
+    osoe_progress_init(&p, &area, &owner, &host);
+    osoe_progress_attach(&p, 0, &ring, &wire, connections, busy, descriptors, DESCRIPTORS);
     /* Two nodes, so the tree is node 0 with node 1 as its only child. */
     static const uint32_t both[] = { 0, 1 };
     struct osoe_collective_tree tree;
@@ -391,13 +394,13 @@ int main(void)
                                          .total = 0xffffffffu,
                                          .token = bounds ? FORGED_TOKEN : 0xdeadbeef };
         while (!post(c, OSOE_AM_GET_REPLY, &lie, sizeof lie, forged, sizeof forged))
-            osoe_progress_poll(&p);
+            osoe_progress_poll(&owner);
     }
 
     /* A put larger than the wire's ring, so it crosses in pieces. */
     struct osoe_am_put put = { .target_pe = peer_lead, .region = 0, .offset = PUT_AT };
     while (!post(c, OSOE_AM_PUT, &put, sizeof put, mine, sizeof mine))
-        osoe_progress_poll(&p);
+        osoe_progress_poll(&owner);
 
     /* A get larger than one AM chunk, so its reply is drained over several
      * passes and the descriptor survives partial draining (§3.8). */
@@ -409,14 +412,14 @@ int main(void)
                                            .region = 0, .length = GET_BYTES,
                                            .offset = GET_AT, .token = 1 };
     while (!post(c, OSOE_AM_GET_REQUEST, &request, sizeof request, NULL, 0))
-        osoe_progress_poll(&p);
+        osoe_progress_poll(&owner);
 
     /*
      * One outstanding operation at a time, because that is what the slot is
      * for: SERIALIZED allows one (§4.6), so a PE has one landing slot.
      */
     while (atomic_load_explicit(&slot->ready, memory_order_acquire) == 0) {
-        osoe_progress_poll(&p);
+        osoe_progress_poll(&owner);
         if (osoe_deadline_expired(&give_up)) {
             fprintf(stderr, "PE %u: no get reply landed\n", my_pe);
             CHECK(false);
@@ -447,10 +450,10 @@ int main(void)
                                        .token = 2 | OSOE_LANDING_NO_EXTENT,
                                        .flags = OSOE_TRANSPORT_FETCH };
     while (!post(c, OSOE_AM_RMW_REQUEST, &rmw, sizeof rmw, NULL, 0))
-        osoe_progress_poll(&p);
+        osoe_progress_poll(&owner);
 
     while (atomic_load_explicit(&slot->ready, memory_order_acquire) == 0) {
-        osoe_progress_poll(&p);
+        osoe_progress_poll(&owner);
         if (osoe_deadline_expired(&give_up)) {
             fprintf(stderr, "PE %u: no rmw reply landed\n", my_pe);
             CHECK(false);
@@ -470,14 +473,14 @@ int main(void)
      * own side is fully sent, which is what makes the pair terminate.
      */
     while (arrivals_row()[my_pe + 1] == 0.0) {
-        osoe_progress_poll(&p);
+        osoe_progress_poll(&owner);
         if (osoe_deadline_expired(&give_up)) {
             fprintf(stderr, "PE %u: this node's other PE never posted\n", my_pe);
             CHECK(false);
             goto done;
         }
     }
-    drain(&p, &give_up);
+    drain(&owner, &give_up);
 
     /*
      * Now wait for what the peer node sent *here*: its lead's put, its
@@ -499,7 +502,7 @@ int main(void)
     unsigned char want_sibling = (unsigned char)(last_sibling + 0x30 + peer);
     uint64_t applied_rmw = 0;
     for (;;) {
-        osoe_progress_poll(&p);
+        osoe_progress_poll(&owner);
         memcpy(&applied_rmw, heap + RMW_AT, sizeof applied_rmw);
         if (heap[PUT_AT + last_lead] == want_lead &&
             heap[PEER_PUT_AT + last_sibling] == want_sibling && applied_rmw == 7)
@@ -558,7 +561,7 @@ int main(void)
      * releasing correctly differ at all.
      */
     while (releases == 0) {
-        osoe_progress_poll(&p);
+        osoe_progress_poll(&owner);
         if (osoe_deadline_expired(&give_up)) {
             fprintf(stderr, "PE %u: the barrier never released\n", my_pe);
             CHECK(false);
@@ -584,13 +587,13 @@ int main(void)
      * come back short at the wrong moment. drain() waits on the same predicate
      * the library's own teardown uses.
      */
-    drain(&p, &give_up);
-    close_connections(&p, &give_up);
+    drain(&owner, &give_up);
+    close_connections(&owner, &give_up);
 
     /* Every applied rmw notifies; a put notifies best effort (§4.10). */
     CHECK(notifies >= 3);
-    CHECK(atomic_load_explicit(&p.metrics->messages_applied, memory_order_acquire) >= 4);
-    CHECK(atomic_load_explicit(&p.metrics->segments_applied, memory_order_acquire) >= 1);
+    CHECK(atomic_load_explicit(&owner.metrics->messages_applied, memory_order_acquire) >= 4);
+    CHECK(atomic_load_explicit(&owner.metrics->segments_applied, memory_order_acquire) >= 1);
     /* Acknowledgements advance: §4.6 makes a peer's acknowledgement the
      * origin's evidence that its writes are in place. */
     CHECK(osoe_progress_acked(&p, peer) > 0);

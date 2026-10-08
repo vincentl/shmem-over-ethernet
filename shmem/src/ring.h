@@ -1,17 +1,20 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
- * The progress thread's io_uring (§3.3, §3.10, §3.12; phase 1 step 3).
+ * An owner's io_uring (§3.3, §3.10, §3.12; phase 1 step 3; owner-map.h).
  *
- * One ring per progress thread, and only that thread submits: the ring is
- * created with IORING_SETUP_SINGLE_ISSUER and IORING_SETUP_R_DISABLED, set up
- * on the thread that opens the job's connections, and enabled by the thread
- * that will drive it, which is then the only one the kernel lets submit
- * (invariant 19, enforced by the kernel rather than by convention).
+ * One ring per owner - a thread with the wires attached to it, the lead's
+ * agent being owner 0 - and only that thread submits: the ring is created with
+ * IORING_SETUP_SINGLE_ISSUER and IORING_SETUP_R_DISABLED, set up on the thread
+ * that opens the job's connections, and enabled by the thread that will drive
+ * it, which is then the only one the kernel lets submit (invariant 19,
+ * enforced by the kernel rather than by convention). With no helper threads
+ * there is one owner, and its ring carries every wire.
  *
- * It carries every wire's receive and send, and later the agent's futex wait:
+ * It carries its wires' receives and sends, and its owner's futex wait:
  *
  * - **Receive: one multishot recv per wire over one provided-buffer ring** that
- *   every wire shares, so the buffers a node holds do not grow with its peers.
+ *   the ring's wires share, so the buffers an owner holds do not grow with its
+ *   peers - a node's, with the owners it runs.
  *   A reap queues each filled buffer on the wire it arrived for, oldest first,
  *   and marks that wire readable; the engine's pass then parses every byte of
  *   it where the kernel put it (osoe_wire_peek and osoe_wire_consume),
@@ -54,7 +57,7 @@ struct osoe_ring {
     uint32_t buffer_bytes;
     uint32_t *next;                 /* per buffer: the next one queued on its wire */
     uint32_t *filled;               /* per buffer: the bytes the kernel put in it */
-    struct osoe_wire *wires;        /* by slot */
+    struct osoe_wire *wires;        /* by index (wire.h) */
     uint32_t wire_count;
     uint64_t *readable;             /* one bit per wire: something arrived */
     uint32_t held;                  /* buffers queued on wires, not yet emptied */
@@ -87,9 +90,9 @@ void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_
                     uint32_t buffer_count, uint32_t buffer_bytes,
                     uint32_t notifications_per_wire);
 
-/* A send's user data: its wire's slot, and the region it lends by reference -
- * or OSOE_WIRE_LENT_REGIONS for a send that copies (wire.h). */
-uint64_t osoe_ring_send_tag(uint32_t slot, uint32_t region);
+/* A send's user data: its wire's index on the ring, and the region it lends
+ * by reference - or OSOE_WIRE_LENT_REGIONS for a send that copies (wire.h). */
+uint64_t osoe_ring_send_tag(uint32_t index, uint32_t region);
 
 /* On the thread that will drive it, once: enable the ring, which makes this
  * thread its only submitter, and arm every wire's receive. */
@@ -126,8 +129,8 @@ void osoe_ring_recycle(struct osoe_ring *r, uint32_t buffer);
  * says there always is. */
 struct io_uring_sqe *osoe_ring_entry(struct osoe_ring *r);
 
-/* Arm wire `slot`'s multishot receive. */
-void osoe_ring_arm_receive(struct osoe_ring *r, uint32_t slot);
+/* Arm wire `index`'s multishot receive. */
+void osoe_ring_arm_receive(struct osoe_ring *r, uint32_t index);
 
 void osoe_ring_close(struct osoe_ring *r);
 

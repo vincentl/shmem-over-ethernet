@@ -1,0 +1,4 @@
+hol-many stream_mib_per_s=112
+hol-many pe=1 fetch_adds=2188 median_us=4426 p90_us=5524 p99_us=7743 max_us=11615
+hol-many pe=2 fetch_adds=2206 median_us=4425 p90_us=5238 p99_us=7207 max_us=11051
+hol-many pe=3 fetch_adds=2197 median_us=4426 p90_us=5511 p99_us=7753 max_us=11084

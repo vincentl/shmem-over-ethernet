@@ -40,6 +40,7 @@
 #include "am-configuration.h"
 #include "bootstrap.h"
 #include "connection.h"
+#include "owner-map.h"
 #include "shm-object.h"
 
 
@@ -67,9 +68,29 @@ enum osoe_am_size_status osoe_am_choose_buffer(uint64_t chunk, uint64_t requeste
                                                uint64_t budget, uint32_t nodes,
                                                uint64_t *chosen);
 
-/* Bytes the area occupies for `nodes` nodes at this buffer size. */
-uint64_t osoe_am_area_bytes(uint32_t nodes, uint64_t buffer);
+/* Bytes the area occupies for `nodes` nodes at this buffer size, on a node of
+ * `helpers` progress helpers (owner-map.h). */
+uint64_t osoe_am_area_bytes(uint32_t nodes, uint32_t helpers, uint64_t buffer);
 
+
+/*
+ * The send side's work discovery (§3.10, §3.12; phase 1 step 2 slice 3), one
+ * set a thread that owns wires (owner-map.h; the progress helpers proposal's
+ * §3.3): `dirty` is a bitmap over the owner's wires by index, 64 a word - a
+ * writer that commits into a connection sets its bit, and the owner takes each
+ * word with an exchange and visits only the connections whose bits it took,
+ * plus those it already knows are busy. `sleeping` is 1 while the owner is
+ * about to sleep or asleep, so that a writer calls futex_wake only then, and
+ * `wake` the word a helper sleeps on (owner 0, the lead's agent, sleeps on
+ * its PE slot's agent_wake, node.h, which stop and abort bump too). All in
+ * the area, so every local PE sees them; this is a process's handle on them.
+ */
+struct osoe_connection_area_owner {
+    _Atomic uint64_t *dirty;
+    uint32_t dirty_words;
+    _Atomic uint32_t *sleeping;
+    _Atomic uint32_t *wake;
+};
 
 /* Process-private handle on the area. */
 struct osoe_connection_area {
@@ -81,48 +102,59 @@ struct osoe_connection_area {
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
     uint32_t credits;       /* §3.8's C, so the pool can be sized by it */
-    struct osoe_connection *connection; /* nodes - 1 handles, indexed by peer_slot() */
+    struct osoe_connection *connection; /* nodes - 1 handles, by peer slot (osoe_peer_slot) */
     bool creator;           /* this PE is the node lead, so it made the object */
-    /*
-     * The send side's work discovery (§3.10, §3.12; phase 1 step 2 slice 3).
-     * `dirty` is a bitmap over peer slots, 64 per word: a writer that commits
-     * into a connection sets its bit, and the lead takes each word with an
-     * exchange and visits only the connections whose bits it took, plus those it
-     * already knows are busy. `lead_sleeping` is 1 while the lead is about to
-     * sleep or asleep, so a writer calls futex_wake only then. Both in the
-     * area's header, so every local PE sees them.
-     */
-    _Atomic uint64_t *dirty;
-    uint32_t dirty_words;
-    _Atomic uint32_t *lead_sleeping;
+    uint32_t helpers;       /* the node's progress helpers (owner-map.h) */
+    struct osoe_connection_area_owner *owner;   /* helpers + 1, by owner */
 };
 
 /*
  * Create (local lead) or open (everyone else) this node's area - the area
  * `lead_pid` made, the pid of the node's lead that created the control segment
  * this PE has joined, and no leftover a failed start by the same ids left ready
- * (shm-object.h, OSOE_SHM_ANY_CREATOR). Fatal on failure (§3.15). A job of one
- * node maps nothing and leaves the handle empty, so the caller need not
- * special-case it.
+ * (shm-object.h, OSOE_SHM_ANY_CREATOR) - for a node of `helpers` progress
+ * helpers, which every PE of the node must give alike, since it shapes the
+ * area. Fatal on failure (§3.15). A job of one node maps nothing and leaves
+ * the handle empty, so the caller need not special-case it.
  */
 void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe_bootstrap *b,
-                        uint32_t nodes, uint32_t session, int32_t lead_pid);
+                               uint32_t nodes, uint32_t helpers, uint32_t session,
+                               int32_t lead_pid);
 
 /* Unmap; the lead also removes the name. */
 void osoe_connection_area_close(struct osoe_connection_area *a);
 
 /*
+ * The owner of this node's connection toward `peer` (owner-map.h), and in
+ * `*index` the connection's index among that owner's wires: the one place a
+ * writer names the owner, for its mark below and for the wake after it
+ * (osoe_progress_host_wake). Named twice, the two could disagree, and a mark
+ * in one owner's bitmap with a wake of another loses the wake
+ * (lead_wake_model.py, `mark_wake_apart`).
+ */
+static inline uint32_t osoe_connection_area_owner(const struct osoe_connection_area *a,
+                                                  uint32_t peer, uint32_t *index)
+{
+    uint32_t slot = osoe_peer_slot(a->node, peer);
+    *index = osoe_owner_index(slot, a->helpers);
+    return osoe_owner_of(slot, a->helpers);
+}
+
+/*
  * A writer's half of work discovery: say that connection toward `peer` has
- * something for the lead - committed bytes, or an acknowledgement request.
+ * something for its owner - committed bytes, or an acknowledgement request -
+ * by the bit of the connection's index in its owner's bitmap (owner-map.h).
  * A seq_cst locked or, because it is the store side of a two-sided protocol
- * with the lead's flag (§3.16; lead_wake_model.py): the writer sets its bit and
- * then loads lead_sleeping, the lead stores lead_sleeping and then loads the
- * bits. Call it after the commit it announces, then osoe_progress_host_wake_lead.
+ * with the owner's flag (§3.16; lead_wake_model.py): the writer sets its bit
+ * and then loads the owner's `sleeping`, the owner stores `sleeping` and then
+ * loads the bits. Call it after the commit it announces, then
+ * osoe_progress_host_wake.
  */
 static inline void osoe_connection_area_mark(struct osoe_connection_area *a, uint32_t peer)
 {
-    uint32_t slot = peer < a->node ? peer : peer - 1;
-    atomic_fetch_or_explicit(&a->dirty[slot / 64], UINT64_C(1) << (slot % 64),
+    uint32_t index;
+    uint32_t owner = osoe_connection_area_owner(a, peer, &index);
+    atomic_fetch_or_explicit(&a->owner[owner].dirty[index / 64], UINT64_C(1) << (index % 64),
                              memory_order_seq_cst);
 }
 

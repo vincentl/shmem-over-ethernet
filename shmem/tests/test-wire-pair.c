@@ -90,7 +90,7 @@ int main(void)
      * connection a lead makes (§6.2: node 0 connects, node 1 accepts). */
     struct osoe_wire w;
     struct osoe_ring ring;
-    osoe_wires_open(&w, &ring, &b, 0, NULL);
+    osoe_wires_open(&w, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
     osoe_ring_enable(&ring);
 
     /* Keepalive is on, at its defaults, on every node-pair socket (wire.c,

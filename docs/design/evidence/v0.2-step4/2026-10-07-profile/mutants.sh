@@ -3,7 +3,7 @@
 # must catch it. usage: mutants.sh TAR OUT NAME... Takes the VM lock.
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1
 TAR=$1; OUT=$2; shift 2; mkdir -p $OUT; : > $OUT/mutants.txt
-S=/Users/vincent/shmem-over-ethernet/build/scratch/ladder/mutants
+S=<repo>/build/scratch/ladder/mutants
 for NAME in "$@"; do
   T=/tmp/ladder-mutant-$NAME; rm -rf $T; mkdir -p $T; tar -C $T -xf $TAR 2>/dev/null
   python3 $S/mutate.py $T $NAME >> $OUT/mutants.txt || { echo "$NAME: MUTATION DID NOT APPLY" >> $OUT/mutants.txt; continue; }

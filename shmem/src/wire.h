@@ -59,7 +59,7 @@
 struct osoe_wire {
     int fd;
     uint32_t peer;              /* the node at the other end */
-    uint32_t slot;              /* its place in the ring's wires */
+    uint32_t index;             /* its place among its ring's wires (owner-map.h) */
     struct osoe_ring *ring;
     /* Receiving: provided buffers the reap queued here, oldest first. */
     uint32_t first, last;       /* buffer numbers, or OSOE_RING_NONE */
@@ -106,15 +106,16 @@ struct osoe_mesh {
 
 /*
  * Establish this lead's node-pair connections, one per peer node, and open the
- * ring that carries them (disabled until the driving thread enables it). §6.2's
- * rule: the lower node index connects to the higher, so each pair has exactly
- * one stream. With a mesh, each connection goes to the port its peer advertised;
- * without one (NULL), each lead is found at its host-list address by the port
- * rule (listener.h), which is how the tests below the library meet.
- * `wires` has node_count - 1 entries, in peer-slot order. Fatal on failure
- * (§3.15).
+ * rings that carry them (disabled until each driving thread enables its own).
+ * §6.2's rule: the lower node index connects to the higher, so each pair has
+ * exactly one stream. With a mesh, each connection goes to the port its peer
+ * advertised; without one (NULL), each lead is found at its host-list address
+ * by the port rule (listener.h), which is how the tests below the library meet.
+ * `wires` has node_count - 1 entries, grouped by owner for a node of `helpers`
+ * progress helpers (owner-map.h), and `rings` helpers + 1: owner o's wires
+ * are attached to rings[o], as its wires 0 on. Fatal on failure (§3.15).
  */
-void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
+void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, uint32_t helpers,
                      const struct osoe_bootstrap *b, uint32_t session,
                      const struct osoe_mesh *mesh);
 
@@ -122,13 +123,13 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
  * The two halves of osoe_wires_open, for a caller that makes its own
  * connections - a test holding both ends of one in a single process. The ring
  * for `count` wires, sized from OSOE_WIRE_BYTES and OSOE_WIRE_BUFFERS and
- * disabled until enabled; and a connected socket made wire `slot` of it, toward
+ * disabled until enabled; and a connected socket made wire `index` of it, toward
  * node `peer`.
  */
 
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
                          const struct osoe_bootstrap *b);
-void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,
+void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, int fd,
                       uint32_t peer, const struct osoe_bootstrap *b);
 
 /*

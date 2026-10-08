@@ -187,6 +187,24 @@ if(OSOE_INTERNODE)
   set_tests_properties(shmem.am-size PROPERTIES LABELS "tier1" TIMEOUT 60)
   osoe_internode_label(shmem.am-size)
 
+  # The map from peer to owner (owner-map.h), both ways, at every helper count a
+  # node may run, and the connection area laid out by it: each writer's mark in
+  # its owner's bitmap alone, and no two owners' words on one line (tier 1, one
+  # process).
+  add_executable(shmem_test_owner_map test-owner-map.c ../src/connection-area.c
+    ../src/am-configuration.c ../src/connection.c ../src/shm-object.c)
+  target_include_directories(shmem_test_owner_map PRIVATE ../src)
+  target_link_libraries(shmem_test_owner_map PRIVATE osoe_base rt)
+  osoe_warnings(shmem_test_owner_map)
+  # Small buffers: the area of 300 nodes is opened too.
+  add_test(NAME shmem.owner-map
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            $<TARGET_FILE:shmem_test_owner_map>)
+  set_tests_properties(shmem.owner-map PROPERTIES LABELS "tier1" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "owner map: ok")
+  # internode: compiles connection-area.c
+  osoe_internode_label(shmem.owner-map)
+
   # The reservation protocol (tier 1): the real code under real threads, checking
   # the properties the models check. Writers are threads because that is what the
   # tsan preset can instrument; §8.2 says what that does and does not buy.
@@ -1065,6 +1083,35 @@ if(OSOE_INTERNODE)
     FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
   osoe_internode_label(shmem.progress shmem.progress.forged-get-reply
     shmem.progress.forged-get-reply-bounds)
+
+  # Owners at a helper count above none, every owner of a node turned by its
+  # one thread (test-owners.c): put, get and fetching AMO between every two of 5
+  # to 9 nodes at 2 and 3 helpers, where a wire's index and its peer slot
+  # differ, each checked to land where its sender wrote and counted in its own
+  # connection's record (the adversarial read of v0.2 step 4's Part 1, S1).
+  add_executable(shmem_test_owners test-owners.c
+    ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
+    ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
+    ../src/shm-object.c)
+  target_include_directories(shmem_test_owners PRIVATE ../src)
+  target_link_libraries(shmem_test_owners PRIVATE osoe_base rt PkgConfig::LIBURING)
+  osoe_warnings(shmem_test_owners)
+  foreach(case 2:0,1,2,3,4 3:0,1,2,3,4 2:0,1,2,3,4,5,6,7,8 3:0,1,2,3,4,5,6,7,8)
+    string(REPLACE ":" ";" parts "${case}")
+    list(GET parts 0 helpers)
+    list(GET parts 1 map)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    add_test(NAME shmem.owners.H${helpers}.N${count}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_HELPERS=${helpers}
+              OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20261008
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+              $<TARGET_FILE:shmem_test_owners>)
+    set_tests_properties(shmem.owners.H${helpers}.N${count} PROPERTIES LABELS "tier2"
+      TIMEOUT 90)
+    osoe_internode_label(shmem.owners.H${helpers}.N${count})
+  endforeach()
 
   # The connection area across the PEs of a node (tier 2). The local lead creates
   # it and the others open it, which is §3.12's arrangement. Not an

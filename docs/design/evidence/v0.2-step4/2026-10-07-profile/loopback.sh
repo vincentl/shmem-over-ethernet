@@ -3,7 +3,7 @@
 # buffers, and the floor pin's mutant. Builds are in /tmp/ladder. Takes the lock.
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1
 OUT=$1; mkdir -p $OUT; : > $OUT/loopback.txt
-S=/Users/vincent/shmem-over-ethernet/build/scratch/ladder
+S=<repo>/build/scratch/ladder
 run() {   # build, label, environment, bytes, seconds
   local B=/tmp/ladder/$1/build/release W=/tmp/ladder/$1/work
   mkdir -p $W; [ -x $W/putstream ] || $B/tools/wrapper/oshcc -O2 -o $W/putstream $S/putstream.c

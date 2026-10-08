@@ -11,7 +11,7 @@ cmake --preset release > /dev/null 2>&1 && cmake --build build/release -j4 > $D/
   { echo "build failed" >> $OUT; exit 1; }
 O=$T/build/release/tools/wrapper/oshcc
 L=$T/build/release/tools/launch/osoe-launch
-$O -O2 -o $T/e-band /Users/vincent/shmem-over-ethernet/docs/design/evidence/pi-cluster/2026-10-04-step-e/e-band.c || { echo "e-band build failed" >> $OUT; exit 1; }
+$O -O2 -o $T/e-band <repo>/docs/design/evidence/pi-cluster/2026-10-04-step-e/e-band.c || { echo "e-band build failed" >> $OUT; exit 1; }
 for i in 1 2 3; do
   for side in link tree; do
     echo "== $side $i $(date +%H:%M:%S)" >> $OUT

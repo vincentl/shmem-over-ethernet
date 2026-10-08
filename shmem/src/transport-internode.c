@@ -555,7 +555,7 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
          * it again. */
         osoe_wait_ends();
         osoe_connection_area_mark(&osoe_am.area, peer);
-        osoe_progress_host_wake_lead();
+        osoe_progress_host_wake(peer);
         slept_on = seen;
         swept = sleep_on(word, seen);
         am_wait_check(&w, turnover(connection));
@@ -650,26 +650,30 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
         len -= n;
     }
     /*
-     * §3.12: ask the lead for a wake. Once, after the whole operation, because
-     * one wake covers every segment it left behind.
+     * §3.12: ask the connection's owner for a wake (owner-map.h). Once, after
+     * the whole operation, because one wake covers every segment it left
+     * behind.
      *
      * **OSOE_TRANSPORT_MORE defers this wake, and nothing else** (§4.10). The
      * bytes are already copied and committed, so `src` is reusable and the
      * operation is as complete as a put ever is before its acknowledgement;
-     * what is held back is only the futex wake asking the lead to run. The
-     * next operation without the flag wakes it, and so does any fence, wait,
-     * get or fetching rmw - and if none of those ever comes, the lead's own
-     * sweep finds the committed bytes anyway, so the flag costs latency at
-     * worst and never correctness. §3.9's aggregation self-clocks off the send
-     * regardless, so this is a saving in syscalls rather than in segments.
+     * what is held back is only the futex wake asking the owner to run. The
+     * next wake this thread makes covers it - the next operation without the
+     * flag, any fence, wait, get or fetching rmw, whichever owner that one is
+     * for (osoe_progress_host_defer) - and if none of those ever comes, the
+     * owner's own sweep finds the committed bytes anyway, so the flag costs
+     * latency at worst and never correctness. §3.9's aggregation self-clocks
+     * off the send regardless, so this is a saving in syscalls rather than in
+     * segments.
      */
-    /* Each chunk set the dirty bit whatever the flag says: it is how the lead
+    /* Each chunk set the dirty bit whatever the flag says: it is how the owner
      * finds these bytes at all, even on the pass the sweep forces (§3.10). */
     if (flags & OSOE_TRANSPORT_MORE) {
         osoe_count(OSOE_C_AM_WAKES_DEFERRED, 1);
+        osoe_progress_host_defer(peer);
         return;
     }
-    osoe_progress_host_wake_lead();
+    osoe_progress_host_wake(peer);
 }
 
 /*
@@ -817,7 +821,7 @@ static uint32_t make_room(uint32_t count, const char *routine)
     osoe_count(OSOE_C_AM_LANDING_FULL, 1);
     struct osoe_wait_word *freed = &my_zone()->freed;
     osoe_wait_word_enter(freed);
-    osoe_progress_host_wake_lead();         /* what this PE held back may be what lands */
+    osoe_progress_host_wake_all();          /* what this PE held back may be what lands */
     struct am_wait w;
     bool waiting = false;
     for (;;) {
@@ -884,7 +888,7 @@ static void take_credit(struct osoe_connection *connection, uint32_t peer, int p
      * while one is awaited: a peer that replies to nothing serves nobody. A wait
      * submits whatever this PE has held back (OSOE_TRANSPORT_MORE, transport.h):
      * its own requests may be what the credits it waits for are out on. */
-    osoe_progress_host_wake_lead();
+    osoe_progress_host_wake(peer);
     struct am_wait w;
     am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_CREDIT, "the connection's reply credits",
                   peer, pe, osoe_credit_served_count(credit));
@@ -1022,7 +1026,7 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
                                          .token = token };
         send_message(connection, peer, pe, "shmem_get", OSOE_AM_GET_REQUEST, &m, (uint32_t)sizeof m,
                      NULL, 0);
-        osoe_progress_host_wake_lead();
+        osoe_progress_host_wake(peer);
         await_reply(slot, token, peer, pe, "shmem_get");
         uint32_t landed = atomic_load_explicit(&slot->length, memory_order_acquire);
         if (landed != n)
@@ -1090,7 +1094,7 @@ static void complete_gets(struct osoe_transport_context *c, const char *routine)
             /* Whatever this PE held back goes out before it waits (transport.h).
              * The gets may be toward any number of nodes, so the wait names
              * none: its record says how many bytes are still to come. */
-            osoe_progress_host_wake_lead();
+            osoe_progress_host_wake_all();
             am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
                                  issued - copied, "the bytes its nonblocking gets have landed",
                                  UINT32_MAX, -1, copied);
@@ -1154,7 +1158,7 @@ static void complete_pair(struct osoe_transport_context *c, unsigned pair, const
             break;
         }
         if (!waiting) {
-            osoe_progress_host_wake_lead();
+            osoe_progress_host_wake_all();
             am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
                                  issued - copied, "the bytes its nonblocking gets have landed",
                                  UINT32_MAX, -1, copied);
@@ -1283,10 +1287,12 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
         len -= n;
         /* More pieces, or more gets (OSOE_TRANSPORT_MORE), follow: hold the wake
          * for the last, as a put does. */
-        if (len > 0 || (flags & OSOE_TRANSPORT_MORE))
+        if (len > 0 || (flags & OSOE_TRANSPORT_MORE)) {
             osoe_count(OSOE_C_AM_WAKES_DEFERRED, 1);
-        else
-            osoe_progress_host_wake_lead();
+            osoe_progress_host_defer(peer);
+        } else {
+            osoe_progress_host_wake(peer);
+        }
     }
     if (issue_stamp) {
         uint64_t stamp = atomic_fetch_add_explicit(&issue_clock, 1, memory_order_seq_cst) + 1;
@@ -1336,7 +1342,7 @@ static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
                                      .token = token, .flags = flags };
     uint64_t seq = send_message(connection, peer, pe, "shmem_atomic", OSOE_AM_RMW_REQUEST, &m,
                                 (uint32_t)sizeof m, NULL, 0);
-    osoe_progress_host_wake_lead();
+    osoe_progress_host_wake(peer);
     if (!fetching) {
         /* §4.10: without FETCH an rmw completes as a put does, so it joins the
          * dirty set and a later quiet is what says it has been applied. */
@@ -1396,7 +1402,9 @@ static bool acknowledged(const struct osoe_transport_context *c, uint32_t slot)
 }
 
 /* Ask `slot`'s peer to acknowledge through the highest segment this context
- * wrote there, unless it already has: whether it asked. */
+ * wrote there, unless it already has: whether it asked. The wake of the
+ * connection's owner is held back for the caller's (osoe_progress_host_defer),
+ * so that asking several peers wakes each owner once. */
 static bool ask_acknowledgement(const struct osoe_transport_context *c, uint32_t slot)
 {
     if (acknowledged(c, slot))
@@ -1411,11 +1419,12 @@ static bool ask_acknowledgement(const struct osoe_transport_context *c, uint32_t
                         : c->internode->high_segment[slot];
     osoe_connection_request_ack(connection, high);
     osoe_connection_area_mark(&osoe_am.area, peer);
+    osoe_progress_host_defer(peer);
     return true;
 }
 
 /* Ask every dirty peer that has not already acknowledged this context's writes
- * to acknowledge through them (§3.4), and wake the lead if any was asked. A
+ * to acknowledge through them (§3.4), and wake each owner that was asked. A
  * peer that already has acknowledged is skipped: fence used to ask it again on
  * every call until the next quiet (second review, algorithmic-scaling 10).
  * Shared by fence and wait, which differ only in what they do afterwards. */
@@ -1437,7 +1446,7 @@ static void flush_dirty(struct osoe_transport_context *c)
             }
         }
         if (asked)
-            osoe_progress_host_wake_lead();
+            osoe_progress_host_wake_deferred();
         return;
     }
     for (uint32_t i = 0; i < c->internode->count; i++) {
@@ -1451,11 +1460,12 @@ static void flush_dirty(struct osoe_transport_context *c)
         if (connection) {
             osoe_connection_request_ack(connection, c->internode->high_segment[slot]);
             osoe_connection_area_mark(&osoe_am.area, peer);
+            osoe_progress_host_defer(peer);
             asked = true;
         }
     }
     if (asked)
-        osoe_progress_host_wake_lead();
+        osoe_progress_host_wake_deferred();
 }
 
 /*
@@ -1618,7 +1628,7 @@ static uint32_t wait_dirty_shared(struct osoe_transport_context *c, const bool *
                 atomic_load_explicit(&c->internode->shared_highest_segment[slot],
                                      memory_order_seq_cst);
             if (ask_acknowledgement(c, slot))
-                osoe_progress_host_wake_lead();
+                osoe_progress_host_wake_deferred();
             wait_acknowledged(slot, through, routine);
             osoe_perturb();
             atomic_fetch_and_explicit(&c->internode->dirty_bits[w], ~bit, memory_order_seq_cst);

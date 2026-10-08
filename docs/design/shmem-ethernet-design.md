@@ -380,7 +380,7 @@ application thread asks for it at the end of `shmem_init`, after step 2 has
 measured the link without it, so that the measurement sees the link as it is;
 the agent, which alone owns the sockets (invariant 19), sets it on its next
 pass - the request a word taken as a dirty bit is, at a pass and again after
-`lead_sleeping` is raised - and an aborting agent lifts it, so that its last
+the agent's `sleeping` flag is raised - and an aborting agent lifts it, so that its last
 bytes leave with the kernel even toward a peer that has stopped reading. A send
 the kernel cannot then take whole is a short write, offered again (invariant 2).
 
@@ -1129,6 +1129,33 @@ header, so every local PE sees them:
   put; without the claim it still made 93% of them, because every put landing
   during the lead's wake-up latency saw the flag raised.
 
+*As built since v0.2 step 4's owners* (`owner-map.h`; the progress helpers
+proposal's §3.2 and §3.3): the bitmap, the flag and the wake word are an
+**owner's** - a thread with a ring and the wires attached to it. The lead's agent
+is owner 0, and with no helper threads, which is all that is built, it holds
+every wire: one bitmap, one flag (`lead_sleeping` until then) and one word, as
+above. With H helpers, peer slot *s*'s wire would belong to owner 1 + (*s* mod
+*H*) as its (*s* div *H*)th, its *index*, which numbers the owner's bits, its
+ring's tags and its engine's state. The connection area (layout 5) records H,
+which every PE of a node must open it with; each owner's flag and wake word sit
+on a line of their own, and each owner's bitmap starts one, since each is
+another thread's. Owner 0 sleeps on its PE slot's `agent_wake` still, which
+stop, abort and the posted arrivals bump too. A writer marks the bit of its
+connection's index in that connection's owner's bitmap and claims that owner's
+wake (`osoe_progress_host_wake`), the owner named once, for both
+(`osoe_connection_area_owner`). A wake `OSOE_TRANSPORT_MORE` holds back is
+remembered by the thread, an owner a bit, and made with its next wake whichever
+owner that is for; a wait for what the PE held back toward any number of peers
+wakes every owner of a data wire, each only if it sleeps.
+`lead_wake_model.py` takes the owner as a parameter: its earlier cases are
+unchanged, cases with one and two helpers hold, and two breakages lose a wake -
+a writer whose map is wrong for its mark and its wake alike (`wrong_owner`),
+and one that marks its connection's owner and wakes another (`mark_wake_apart`,
+the adversarial read of Part 1's N2). `shmem.owners` runs the engine at two and
+three helpers, every owner of a node turned by one thread, since with none an
+owner's index of a wire is its peer slot and no other test could tell them
+apart.
+
 **Receiving polled every wire** in step 2: the shared-memory wire said nothing
 when bytes arrived, so the lead looked at all *N* − 1 on every pass, O(*N*) per
 pass. *Replaced in phase 1 step 3*: the ring's reap marks the wires something
@@ -1321,6 +1348,13 @@ node-pair socket, every provided buffer. It seals, submits, reaps, applies
 incoming operations to every local PE's heap (all local heaps are mapped in every
 process, §4.1), and drains the deferred reply queues. It is the sole issuer
 (§3.3).
+*As built since v0.2 step 4's owners:* that state is held an owner at a time
+(`struct osoe_progress_owner`, `progress.h`; §3.10's as-built note): a ring, the
+wires on it, their connections, busy bits, reply pool and counters, which only
+the owner's thread touches, while the control plane - the internode tree's
+state, the deadlock detector's messages - is owner 0's. With no helper threads,
+which is all that is built, the lead's agent is the one owner and the sentence
+above holds as written.
 
 **Non-lead agents never touch a ring or a socket.** Each sleeps on a futex word in
 the node segment and is woken only for work that must run in its own address
@@ -2490,7 +2524,7 @@ outcome C11 forbids, and with what.
 | Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count. |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere; among them the abort word, installed whole by one CAS, and `ending`, the claim on ending a process (phase 1 step 4) |
 | A queue in one word, then a wake word: a waiter's ticket and a giver's serve are RMWs on the same word; the giver then bumps a futex word; the waiter loads that word, then checks its ticket (slice 2 of step 3) | Not store buffering: two RMWs on one word are ordered by its modification order, so a give always sees every ticket taken before it. The waiter's check needs only to follow the giver's serve when it has seen the giver's bump — a release RMW read by an `acquire` load; a bump it has not seen is the futex compare's to catch | RMWs **`seq_cst`** (the row above); the waiter's loads of the wake word and of the state **`acquire`** | `osoe_credit_take`, `_give`, `_served` (`credit_wait_model.py`) |
-| Two-sided, with a claim: the writer's store is an RMW on a bitmap and the lead's a flag, and a writer that reads the flag raised takes it down with a CAS before waking (slice 3) | The store-buffering outcome - the lead's recheck misses the bit and the writer misses the flag - is forbidden only among `seq_cst` operations; the claim CAS is an RMW in *S*, and a writer that loses it read a later value of the flag, so the lead's recheck ordered after that value sees its bit | **`seq_cst`** `fetch_or`, flag store, flag load and CAS; `seq_cst` recheck loads | `osoe_connection_area_mark`, `osoe_progress_host_wake_lead`, `osoe_progress_host_poll` (`lead_wake_model.py`) |
+| Two-sided, with a claim: the writer's store is an RMW on a bitmap and the lead's a flag, and a writer that reads the flag raised takes it down with a CAS before waking (slice 3) | The store-buffering outcome - the lead's recheck misses the bit and the writer misses the flag - is forbidden only among `seq_cst` operations; the claim CAS is an RMW in *S*, and a writer that loses it read a later value of the flag, so the lead's recheck ordered after that value sees its bit | **`seq_cst`** `fetch_or`, flag store, flag load and CAS; `seq_cst` recheck loads | `osoe_connection_area_mark`, `osoe_progress_host_wake` (an owner's, `owner-map.h`), `osoe_progress_host_poll` (`lead_wake_model.py`) |
 | `shmem_fence` over plain stores (W→W) | Nothing, for a race-free program: its flag is an AMO, a `seq_cst` store and so a release. Table 14's plain stores are a data race C11 gives no meaning; the weakest construct ordering earlier stores before later ones is a release fence | **`atomic_thread_fence(release)`** | `osoe_transport_fence` |
 | `shmem_quiet`, `pe_quiet`, the barriers (W→R) | "Visible to all PEs" on return is the store-buffering shape again; C11 forbids its bad outcome with a `seq_cst` fence between each side's store and load | **`atomic_thread_fence(seq_cst)`** | `osoe_transport_wait` |
 
@@ -7986,10 +8020,11 @@ Assert what can be asserted. Instrument the rest.
     (§5.3) A waiter that does not pass the chain on strands those behind it; a
     wake without the parity can be absorbed by a member already waiting for the
     next epoch. Both lose wakes in `chained_wake_model.py`.
-34. **A writer sets its connection's dirty bit after every commit and before it
-    loads `lead_sleeping`; the lead raises the flag before it rechecks the bits;
-    all of it `seq_cst`; and the lead visits every connection it privately knows
-    is busy.** (§3.10) Each rule dropped loses the lead's attention for committed
+34. **A writer sets its connection's dirty bit, in its owner's bitmap, after every
+    commit and before it loads that owner's `sleeping` flag; the owner raises the
+    flag before it rechecks its bits; all of it `seq_cst`; and the owner visits
+    every connection it privately knows is busy.** (§3.10; the owner is the lead's
+    agent while a node runs no helper threads, and the flag was `lead_sleeping`.) Each rule dropped loses the lead's attention for committed
     bytes: a lost wake in `lead_wake_model.py`, or - the private half - a leaf's
     barrier arrival left unsealed, measured one run in eight.
 35. **A lead seals its goodbye only once the connection owes the peer nothing,

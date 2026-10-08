@@ -4,7 +4,7 @@
 # usage: mutant-pacer.sh TAR NAME OUT SECONDS. Takes the VM lock.
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1
 TAR=$1; NAME=$2; OUT=$3; SECS=$4; mkdir -p $OUT
-S=/Users/vincent/shmem-over-ethernet/build/scratch/ladder
+S=<repo>/build/scratch/ladder
 T=/tmp/ladder/$NAME; rm -rf $T; mkdir -p $T; tar -C $T -xf $TAR; cd $T
 cmake --preset release > $OUT/configure.txt 2>&1 && cmake --build build/release -j4 > $OUT/build.txt 2>&1 || { echo BUILD FAILED > $OUT/pacer.txt; exit 1; }
 L=$T/build/release/tools/launch/osoe-launch; P=$T/build/release/tools/pacer/osoe-pacer

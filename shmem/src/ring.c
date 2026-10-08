@@ -31,18 +31,18 @@
 #endif
 
 /* What a completion is for, in its user data's low four bits; a send's region
- * in the next four (wire.h); the wire's slot the rest (0 for the futex wait,
- * which is the ring's, not a wire's). */
+ * in the next four (wire.h); the wire's index on the ring the rest (0 for the
+ * futex wait, which is the ring's, not a wire's). */
 enum { RECEIVE = 1, SEND, FUTEX };
 
-static uint64_t tag(uint32_t slot, unsigned kind)
+static uint64_t tag(uint32_t index, unsigned kind)
 {
-    return ((uint64_t)slot << 8) | kind;
+    return ((uint64_t)index << 8) | kind;
 }
 
-uint64_t osoe_ring_send_tag(uint32_t slot, uint32_t region)
+uint64_t osoe_ring_send_tag(uint32_t index, uint32_t region)
 {
-    return tag(slot, SEND) | (uint64_t)region << 4;
+    return tag(index, SEND) | (uint64_t)region << 4;
 }
 
 static uint32_t next_power_of_two(uint32_t n)
@@ -111,14 +111,14 @@ struct io_uring_sqe *osoe_ring_entry(struct osoe_ring *r)
     return sqe;
 }
 
-void osoe_ring_arm_receive(struct osoe_ring *r, uint32_t slot)
+void osoe_ring_arm_receive(struct osoe_ring *r, uint32_t index)
 {
-    struct osoe_wire *w = &r->wires[slot];
+    struct osoe_wire *w = &r->wires[index];
     struct io_uring_sqe *sqe = osoe_ring_entry(r);
     io_uring_prep_recv_multishot(sqe, w->fd, NULL, 0, 0);
     sqe->flags |= IOSQE_BUFFER_SELECT;
     sqe->buf_group = 0;
-    io_uring_sqe_set_data64(sqe, tag(slot, RECEIVE));
+    io_uring_sqe_set_data64(sqe, tag(index, RECEIVE));
     w->receiving = true;
 }
 
@@ -128,8 +128,8 @@ void osoe_ring_enable(struct osoe_ring *r)
     if (e < 0)
         osoe_fatal("cannot enable the io_uring: %s", strerror(-e));
     r->enabled = true;
-    for (uint32_t slot = 0; slot < r->wire_count; slot++)
-        osoe_ring_arm_receive(r, slot);
+    for (uint32_t i = 0; i < r->wire_count; i++)
+        osoe_ring_arm_receive(r, i);
     osoe_ring_submit(r);
 }
 
@@ -150,9 +150,9 @@ void osoe_ring_recycle(struct osoe_ring *r, uint32_t buffer)
     r->held--;
 }
 
-static void mark(struct osoe_ring *r, uint32_t slot)
+static void mark(struct osoe_ring *r, uint32_t index)
 {
-    r->readable[slot / 64] |= UINT64_C(1) << (slot % 64);
+    r->readable[index / 64] |= UINT64_C(1) << (index % 64);
 }
 
 static void received(struct osoe_ring *r, struct osoe_wire *w, const struct io_uring_cqe *cqe)
@@ -170,15 +170,15 @@ static void received(struct osoe_ring *r, struct osoe_wire *w, const struct io_u
         w->queued += (uint32_t)cqe->res;
         r->held++;
         r->counts.receives++;
-        mark(r, w->slot);
+        mark(r, w->index);
     } else if (cqe->res == 0) {
         w->ended = true;                /* the peer's end of stream */
-        mark(r, w->slot);
+        mark(r, w->index);
     } else if (cqe->res == -ENOBUFS) {
         r->counts.enobufs++;            /* normal under load: re-armed below */
     } else if (cqe->res < 0) {
         w->error = cqe->res;
-        mark(r, w->slot);
+        mark(r, w->index);
     }
     if (!(cqe->flags & IORING_CQE_F_MORE)) {
         w->receiving = false;
@@ -186,7 +186,7 @@ static void received(struct osoe_ring *r, struct osoe_wire *w, const struct io_u
          * over. The entry is submitted at the end of the pass, after the pass
          * has emptied - and so recycled - what this reap queued. */
         if (!w->ended && !w->error) {
-            osoe_ring_arm_receive(r, w->slot);
+            osoe_ring_arm_receive(r, w->index);
             r->counts.rearms++;
         }
     }
@@ -211,10 +211,11 @@ void osoe_ring_reap(struct osoe_ring *r)
             r->futex_armed = false;
             continue;
         }
-        uint32_t slot = (uint32_t)(data >> 8);
-        if (slot >= r->wire_count)
-            osoe_fatal("an io_uring completion names connection %u of %u", slot, r->wire_count);
-        struct osoe_wire *w = &r->wires[slot];
+        uint32_t index = (uint32_t)(data >> 8);
+        if (index >= r->wire_count)
+            osoe_fatal("an io_uring completion names wire %u of the ring's %u", index,
+                       r->wire_count);
+        struct osoe_wire *w = &r->wires[index];
         uint32_t region = (uint32_t)(data >> 4) & 0xf;
         switch (data & 0xf) {
         case RECEIVE:
@@ -254,7 +255,7 @@ void osoe_ring_reap(struct osoe_ring *r)
                 else
                     w->error = cqe->res;
                 w->sent = 0;
-                mark(r, slot);
+                mark(r, index);
             } else {
                 w->sent = cqe->res;
                 if ((uint32_t)cqe->res < w->send_bytes)

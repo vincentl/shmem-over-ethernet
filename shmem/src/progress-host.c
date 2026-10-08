@@ -31,6 +31,7 @@
 #include "listener.h"
 #include "metrics.h"
 #include "node.h"
+#include "owner-map.h"
 #include "progress.h"
 #include "progress-host.h"
 #include "state.h"
@@ -308,68 +309,132 @@ static void abort_arrived(void *context, uint32_t pe, int32_t status, uint32_t d
 
 /* ---- waking the engine (§3.12) ------------------------------------------ */
 
+/* The word owner `owner` sleeps on: a helper's in the area, and the lead's
+ * agent's its PE slot's, which stop, abort and the posted arrivals bump too. */
+static _Atomic uint32_t *wake_word(uint32_t owner)
+{
+    return owner == 0 ? &osoe.node.slots[0].agent_wake : osoe_am.area.owner[owner].wake;
+}
+
 /*
- * Wake the lead only if it sleeps (§3.10; lead_wake_model.py). The caller has
- * already set its connection's dirty bit (osoe_connection_area_mark), a seq_cst
- * RMW; this load of the flag is the second half of the writer's side of a
- * two-sided protocol, so it is seq_cst too (§3.16). If it reads 0 - the lead has
- * not raised its flag, or another writer claimed this sleep's wake - the lead's
- * seq_cst load of the bits after raising it will see this writer's bit, or the
- * wake already claimed is on its way. If it wins the flag, the bump changes the
- * word the lead sleeps on, so a futex_wait that has not started yet returns at
- * once.
+ * Wake owner `owner` only if it sleeps (§3.10; lead_wake_model.py, the owner a
+ * parameter). The caller has already set its connection's dirty bit in the
+ * owner's bitmap (osoe_connection_area_mark), a seq_cst RMW; this load of the
+ * owner's flag is the second half of the writer's side of a two-sided
+ * protocol, so it is seq_cst too (§3.16). If it reads 0 - the owner has not
+ * raised its flag, or another writer claimed this sleep's wake - the owner's
+ * seq_cst load of its bits after raising it will see this writer's bit, or
+ * the wake already claimed is on its way. If it wins the flag, the bump
+ * changes the word the owner sleeps on, so a futex_wait that has not started
+ * yet returns at once.
  *
- * An awake lead costs a writer one load of a line it shares with every other
+ * An awake owner costs a writer one load of a line it shares with every other
  * writer, read-mostly, instead of a locked add on it and a futex_wake syscall.
  */
-void osoe_progress_host_wake_lead(void)
+static void wake_owner(uint32_t owner)
 {
-    if (!osoe_am.internode)
-        return;
+    _Atomic uint32_t *flag = osoe_am.area.owner[owner].sleeping;
     /*
      * Claim the wake: only the writer whose CAS takes the flag from 1 to 0
-     * makes the syscall; the rest see 0 and skip until the lead raises it
-     * again. Without the claim every writer during the lead's wake-up latency
+     * makes the syscall; the rest see 0 and skip until the owner raises it
+     * again. Without the claim every writer during the owner's wake-up latency
      * saw 1, and a burst of puts still woke the lead for 93% of them (the
-     * model's `every_writer`). The load first, so an awake lead's line stays
+     * model's `every_writer`). The load first, so an awake owner's line stays
      * shared rather than taken exclusive by every writer's CAS.
      */
     uint32_t sleeping = 1;
-    if (atomic_load_explicit(osoe_am.area.lead_sleeping, memory_order_seq_cst) == 0 ||
-        !atomic_compare_exchange_strong_explicit(osoe_am.area.lead_sleeping, &sleeping, 0,
-                                                 memory_order_seq_cst, memory_order_seq_cst)) {
+    if (atomic_load_explicit(flag, memory_order_seq_cst) == 0 ||
+        !atomic_compare_exchange_strong_explicit(flag, &sleeping, 0, memory_order_seq_cst,
+                                                 memory_order_seq_cst)) {
         osoe_count(OSOE_C_AM_WAKES_SKIPPED, 1);
         return;
     }
     osoe_count(OSOE_C_AM_WAKES_SENT, 1);
-    struct osoe_pe_slot *lead = &osoe.node.slots[0];
-    atomic_fetch_add_explicit(&lead->agent_wake, 1, memory_order_seq_cst);
-    osoe_futex_wake(&lead->agent_wake, 1, OSOE_FUTEX_SHARED);
+    _Atomic uint32_t *word = wake_word(owner);
+    atomic_fetch_add_explicit(word, 1, memory_order_seq_cst);
+    osoe_futex_wake(word, 1, OSOE_FUTEX_SHARED);
 }
 
-/* Whether this lead has raised lead_sleeping and not lowered it. Private to the
- * agent thread, so the flag is stored only when it changes. */
-static bool flag_raised;
+/*
+ * The owners this thread has held a wake back from (osoe_progress_host_defer),
+ * a bit each: owner 0's bit 0 when the node runs no helpers, and helper h's
+ * bit h - 1 otherwise, since then owner 0 holds no data wire. Masked by the
+ * owners the node has, as a session's leftover can name one this one lacks.
+ */
+static _Thread_local uint64_t deferred;
+
+static uint64_t owner_bit(uint32_t owner, uint32_t helpers)
+{
+    return helpers ? UINT64_C(1) << (owner - 1) : 1;
+}
+
+void osoe_progress_host_wake_deferred(void)
+{
+    if (!osoe_am.internode)
+        return;
+    uint32_t helpers = osoe_am.area.helpers;
+    uint64_t owners = helpers ? (helpers == 64 ? UINT64_MAX : (UINT64_C(1) << helpers) - 1) : 1;
+    uint64_t bits = deferred & owners;
+    deferred = 0;
+    for (; bits != 0; bits &= bits - 1) {
+        uint32_t bit = (uint32_t)__builtin_ctzll(bits);
+        wake_owner(helpers ? bit + 1 : 0);
+    }
+}
+
+/* The owner of the connection toward `peer`, named as the writer's mark names
+ * it (connection-area.h). */
+static uint32_t owner_of_peer(uint32_t peer)
+{
+    uint32_t index;
+    return osoe_connection_area_owner(&osoe_am.area, peer, &index);
+}
+
+void osoe_progress_host_wake(uint32_t peer)
+{
+    if (!osoe_am.internode)
+        return;
+    deferred |= owner_bit(owner_of_peer(peer), osoe_am.area.helpers);
+    osoe_progress_host_wake_deferred();
+}
+
+void osoe_progress_host_defer(uint32_t peer)
+{
+    if (osoe_am.internode)
+        deferred |= owner_bit(owner_of_peer(peer), osoe_am.area.helpers);
+}
+
+void osoe_progress_host_wake_all(void)
+{
+    if (!osoe_am.internode)
+        return;
+    uint32_t helpers = osoe_am.area.helpers;
+    deferred = 0;
+    for (uint32_t owner = helpers ? 1 : 0; owner <= helpers; owner++)
+        wake_owner(owner);
+}
 
 /*
  * The limit on the kernel's unsent bytes the application thread asks the agent
  * to set (osoe_progress_host_limit_unsent): the bytes plus one, 0 when nothing
  * is asked. Asked as a writer's dirty bit is - a seq_cst store, then the claimed
- * wake - and taken as the bits are, at a pass and again after the agent raises
- * lead_sleeping, so that a request never waits for a sweep
+ * wake of owner 0, the agent - and taken as the bits are, at a pass and again
+ * after the agent raises its `sleeping`, so that a request never waits for a sweep
  * (lead_wake_model.py's protocol, with the request as one more bit). The two
  * flags beside it are written before the store and read after the take.
  */
 static _Atomic uint64_t unsent_request;
 static bool unsent_by_hand, unsent_say;
 
-/* On the agent: the wires' limit, as asked, said once under SHMEM_DEBUG with
- * the wires it reached - which shmem.unsent.* counts. */
+/* On the agent: its wires' limit, as asked, said once under SHMEM_DEBUG with
+ * the wires it reached - which shmem.unsent.* counts. Owner 0's wires, which
+ * are every wire while the node runs no helpers. */
 static void limit_unsent(uint64_t asked)
 {
+    struct osoe_progress_owner *o = &osoe_am.progress.owner[0];
     uint32_t bytes = (uint32_t)(asked - 1), limited = 0;
-    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-        limited += osoe_wire_limit_unsent(&osoe_am.wire[slot], bytes);
+    for (uint32_t i = 0; i < o->count; i++)
+        limited += osoe_wire_limit_unsent(&o->wire[i], bytes);
     if (!unsent_say)
         return;
     if (bytes)
@@ -428,6 +493,20 @@ uint64_t osoe_progress_host_acked(uint32_t peer)
 
 /* ---- lifecycle --------------------------------------------------------- */
 
+/*
+ * The descriptors owner `owner`'s pool holds (§3.8; osoe_progress_host_start
+ * says why): C and the slack for each connection it holds, and, owner 0's, one
+ * a peer for the detector and the degree for each of `teams` team blocks.
+ */
+static uint32_t descriptors_of(uint32_t owner, uint32_t peers, uint32_t helpers, uint32_t teams)
+{
+    uint32_t n = osoe_owner_wires(owner, peers, helpers) *
+                 (osoe_am.area.credits + OSOE_REPLY_SLACK);
+    if (owner == 0)
+        n += peers + OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) * teams;
+    return n;
+}
+
 /* This lead's node-pair listener, from advertise to the mesh (osoe_wires_open
  * closes it). Outside osoe_am, which osoe_transport_init starts afresh after the
  * rendezvous that carried its port. */
@@ -448,12 +527,14 @@ void osoe_progress_host_start(uint32_t session)
      * osoe_am.lead before anything reads them. */
     /* Every local PE maps the area: its application threads reserve into these
      * buffers like any other writer (§3.5, §3.12). */
-    osoe_connection_area_open(&osoe_am.area, &osoe.bootstrap, osoe.job.node_count, session,
+    /* A node runs no helper threads (owner-map.h): every wire is owner 0's,
+     * the lead's agent. */
+    osoe_connection_area_open(&osoe_am.area, &osoe.bootstrap, osoe.job.node_count, 0, session,
                               osoe.node.hdr->creator_pid);
     if (!osoe_am.lead)
         return;
 
-    uint32_t peers = osoe.job.node_count - 1;
+    uint32_t peers = osoe.job.node_count - 1, helpers = osoe_am.area.helpers;
     /*
      * §3.8's two arguments. C per connection bounds the replies - the origin
      * takes a credit per get or fetching AMO and returns it when the reply
@@ -489,27 +570,42 @@ void osoe_progress_host_start(uint32_t session)
      * connection has at most one queued: the root asks each node once a
      * collection and a node answers once, each only after what came before
      * has been answered (deadlock.c).
+     *
+     * A pool an owner (owner-map.h): the replies' term over the connections it
+     * holds, and the forwards' and the detector's, the control plane's, owner
+     * 0's. With no helpers, owner 0's is the node-wide pool these arguments
+     * were made for.
      */
-    uint32_t teams = osoe.bootstrap.team_blocks;
-    uint32_t descriptors = peers * (osoe_am.area.credits + OSOE_REPLY_SLACK + 1) +
-                           OSOE_COLLECTIVE_DEGREE(osoe.bootstrap.collective_fanout) * teams;
+    uint32_t teams = osoe.bootstrap.team_blocks, owners = helpers + 1;
+    uint32_t descriptors = 0, busy_words = 0;
+    for (uint32_t o = 0; o < owners; o++) {
+        descriptors += descriptors_of(o, peers, helpers, teams);
+        busy_words += (osoe_owner_wires(o, peers, helpers) + 63) / 64;
+    }
+    osoe_am.owner = calloc(owners, sizeof *osoe_am.owner);
+    struct osoe_ring **rings = calloc(owners, sizeof *rings);
+    struct osoe_progress_owner *engine_owners = calloc(owners, sizeof *engine_owners);
     osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
-    osoe_am.busy = calloc((peers + 63) / 64, sizeof *osoe_am.busy);
+    osoe_am.busy = calloc(busy_words, sizeof *osoe_am.busy);
     osoe_am.descriptor = calloc(descriptors, sizeof *osoe_am.descriptor);
     osoe_am.team = calloc(teams, sizeof *osoe_am.team);
     osoe_am.pending = calloc(teams, sizeof *osoe_am.pending);
-    if (!osoe_am.wire || !osoe_am.connection || !osoe_am.busy || !osoe_am.descriptor ||
-        !osoe_am.team || !osoe_am.pending)
+    if (!osoe_am.owner || !rings || !engine_owners || !osoe_am.wire ||
+        !osoe_am.connection || !osoe_am.busy || !osoe_am.descriptor || !osoe_am.team ||
+        !osoe_am.pending)
         osoe_fatal("out of memory setting up the AM backend for %u peer nodes", peers);
+    for (uint32_t o = 0; o < owners; o++)
+        rings[o] = &osoe_am.owner[o].ring;
 
     /*
-     * The node-pair connections, one per peer in peer-slot order - node order
-     * with this node left out, as osoe_progress_slot computes it (§3.4) - and the
-     * ring that carries them, disabled until this lead's agent enables it on its
-     * first pass: the agent is its only submitter (ring.h). Each peer's address
-     * is the rendezvous's, and its port the one its blob advertised (§6.2).
-     * O(N) once, for the eager mesh.
+     * The node-pair connections, one per peer, grouped by owner (owner-map.h) -
+     * which with no helpers is peer-slot order, node order with this node left
+     * out, as osoe_progress_slot computes it (§3.4) - and the ring an owner that
+     * carries its own, disabled until the owner enables it on its first pass:
+     * each owner is its ring's only submitter (ring.h). Each peer's address is
+     * the rendezvous's, and its port the one its blob advertised (§6.2). O(N)
+     * once, for the eager mesh.
      */
     struct sockaddr_in *peers_address = calloc(osoe.job.node_count, sizeof *peers_address);
     if (!peers_address)
@@ -522,17 +618,29 @@ void osoe_progress_host_start(uint32_t session)
                                                  .sin_addr.s_addr = osoe_job_node_address(&osoe.job, n) };
     }
     struct osoe_mesh mesh = { &mesh_listener, peers_address };
-    osoe_wires_open(osoe_am.wire, &osoe_am.ring, &osoe.bootstrap, session, &mesh);
+    osoe_wires_open(osoe_am.wire, rings, helpers, &osoe.bootstrap, session, &mesh);
     free(peers_address);
+    free(rings);
 
     struct osoe_progress_host host = { resolve, notify, release, NULL, abort_arrived,
                                        landing_request, landed, completed, deadlock_arrived };
-    osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, &osoe_am.ring,
-                       osoe_am.descriptor, descriptors, &host);
+    osoe_progress_init(&osoe_am.progress, &osoe_am.area, engine_owners, &host);
+    uint32_t descriptors_before = 0, busy_before = 0;
+    for (uint32_t o = 0; o < owners; o++) {
+        uint32_t first = osoe_owner_first(o, peers, helpers);
+        uint32_t count = descriptors_of(o, peers, helpers, teams);
+        osoe_progress_attach(&osoe_am.progress, o, &osoe_am.owner[o].ring, &osoe_am.wire[first],
+                             &osoe_am.connection[first], &osoe_am.busy[busy_before],
+                             &osoe_am.descriptor[descriptors_before], count);
+        descriptors_before += count;
+        busy_before += (osoe_owner_wires(o, peers, helpers) + 63) / 64;
+        osoe_am.owner[o].flag_raised = false;
+    }
     osoe_progress_attach_teams(&osoe_am.progress, osoe_am.team, osoe_am.pending, teams,
                                team_of_record, team_by_name);
-    /* Count into the control segment, where osoe-stat and the tests read it. */
-    osoe_am.progress.metrics = &osoe.node.hdr->am;
+    /* Count into the control segment, where osoe-stat and the tests read it:
+     * owner 0's counters are the node's record. */
+    engine_owners[0].metrics = &osoe.node.hdr->am;
     /* §3.14's connection scope, in the same segment: the engine writes it,
      * osoe-stat and the tests read it. Each team's tree state goes to its own
      * block, which the engine learns with the team (team_of_record). */
@@ -540,9 +648,7 @@ void osoe_progress_host_start(uint32_t session)
     for (uint32_t c = 0; c < osoe.node.connection_count; c++)
         atomic_store_explicit(&osoe.node.connection_metrics[c].peer,
                               c < osoe.job.node ? c : c + 1, memory_order_release);
-    osoe_progress_attach(&osoe_am.progress, osoe_am.connection, osoe_am.busy);
     silent_check_start(&osoe.bootstrap);
-    flag_raised = false;
 }
 
 /*
@@ -566,10 +672,11 @@ void osoe_progress_host_start(uint32_t session)
  * cleanly; every other rank was killed at the launcher's timeout, which is the
  * signature to recognise it by.
  *
- * This is the agent's last turn, so it is the only thread touching the engine
- * and polls it directly (§3.12).
+ * This is the owner's last turn, so it is the only thread touching its part
+ * of the engine and polls it directly (§3.12): owner `o`'s wires, on its
+ * thread - every wire, on the lead's agent, while the node runs no helpers.
  */
-static void flush_before_close(void)
+static void flush_before_close(struct osoe_progress_owner *o)
 {
     /*
      * Not a bare spin: a pass that moved nothing sleeps a moment and sweeps, as
@@ -579,17 +686,17 @@ static void flush_before_close(void)
      * after the bootstrap timeout (second review, atomics F7).
      */
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, osoe_counter_word_read(&osoe_am.progress.metrics->segments_sent),
+    osoe_stall_watch_begin(&watch, osoe_counter_word_read(&o->metrics->segments_sent),
                            osoe.bootstrap.no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-    while (!osoe_progress_idle(&osoe_am.progress)) {
-        if (!osoe_progress_poll(&osoe_am.progress))
-            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
+    while (!osoe_progress_idle(o)) {
+        if (!osoe_progress_poll(o))
+            osoe_ring_wait(o->ring, OSOE_SWEEP_NS);
         if (!osoe_deadline_expired(&sweep))
             continue;
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_sweep_expired("shmem_finalize");
-        uint64_t sent = osoe_counter_word_read(&osoe_am.progress.metrics->segments_sent);
+        uint64_t sent = osoe_counter_word_read(&o->metrics->segments_sent);
         if (osoe_stall_watch_stalled(&watch, sent))
             osoe_fatal("shmem_finalize: no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT) "
                        "flushing this node's last messages - segments sent has stayed at "
@@ -607,36 +714,36 @@ static void flush_before_close(void)
  * still sends makes the kernel reset it, and the peer's send fails on a node
  * that did nothing wrong. The no-progress rule watches how many connections
  * have ended (§3.15); by default a peer that never finalizes is waited for.
+ * Owner `o`'s connections, on its thread, and then its ring.
  */
-static void close_connections(void)
+static void close_connections(struct osoe_progress_owner *o)
 {
-    uint32_t peers = osoe.job.node_count - 1;
-    osoe_progress_close(&osoe_am.progress);
+    osoe_progress_close(o);
     struct osoe_stall_watch watch;
     osoe_stall_watch_begin(&watch, 0, osoe.bootstrap.no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-    while (!osoe_progress_closed(&osoe_am.progress)) {
+    while (!osoe_progress_closed(o)) {
         /* A poll can take a peer's end of stream and say it moved nothing, so
          * the condition is asked again before the sleep, which would otherwise
          * last the whole sweep (the release fixes' review, conformance F1). */
-        if (!osoe_progress_poll(&osoe_am.progress) && !osoe_progress_closed(&osoe_am.progress))
-            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
+        if (!osoe_progress_poll(o) && !osoe_progress_closed(o))
+            osoe_ring_wait(o->ring, OSOE_SWEEP_NS);
         if (!osoe_deadline_expired(&sweep))
             continue;
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_sweep_expired("shmem_finalize");
         uint32_t ended = 0;
-        for (uint32_t slot = 0; slot < peers; slot++)
-            ended += osoe_wire_ended(&osoe_am.wire[slot]);
+        for (uint32_t i = 0; i < o->count; i++)
+            ended += osoe_wire_ended(&o->wire[i]);
         if (osoe_stall_watch_stalled(&watch, ended))
             osoe_fatal("shmem_finalize: no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT) "
                        "closing this node's connections - %u of %u peers have ended theirs; "
                        "the others have not finalized",
-                       (unsigned long long)osoe_stall_watch_seconds(&watch), ended, peers);
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), ended, o->count);
     }
-    for (uint32_t slot = 0; slot < peers; slot++)
-        osoe_wire_close(&osoe_am.wire[slot]);
-    osoe_ring_close(&osoe_am.ring);
+    for (uint32_t i = 0; i < o->count; i++)
+        osoe_wire_close(&o->wire[i]);
+    osoe_ring_close(o->ring);
 }
 
 /*
@@ -663,27 +770,28 @@ void osoe_progress_host_abort(void)
 {
     if (!osoe_am.lead)
         return;
+    /* Owner 0's wires, every wire while the node runs no helpers. */
+    struct osoe_progress_owner *o = &osoe_am.progress.owner[0];
     /* The kernel takes this node's last bytes whole, the abortive goodbye among
      * them, even toward a peer that has stopped reading: that peer then reads
      * the job's status rather than a stream cut short (the second adversarial
      * read of v0.2 step 4, N6). */
-    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-        osoe_wire_lift_unsent(&osoe_am.wire[slot]);
+    for (uint32_t i = 0; i < o->count; i++)
+        osoe_wire_lift_unsent(&o->wire[i]);
     uint32_t pe = 0;
     int status = EXIT_FAILURE;
     enum osoe_abort_disposition how = osoe_node_abort_read(&osoe.node, &pe, &status);
-    if (!osoe_am.ring.enabled)
-        osoe_ring_enable(&osoe_am.ring);
-    osoe_progress_abort(&osoe_am.progress, pe, status, (uint32_t)how,
-                        how == OSOE_ABORT_GLOBAL_EXIT);
+    if (!o->ring->enabled)
+        osoe_ring_enable(o->ring);
+    osoe_progress_abort(o, pe, status, (uint32_t)how, how == OSOE_ABORT_GLOBAL_EXIT);
     struct osoe_deadline grace = osoe_deadline_in(UINT64_C(1000000000) * OSOE_ABORT_GRACE_SECONDS);
     /* Each wait asks its condition again after a poll that moved nothing, as
      * close_connections does: an end of stream taken by the poll would
      * otherwise be seen a sweep late, which under srun -K1 is the window in
      * which the first node to end can have another node's PEs killed. */
-    while (!osoe_progress_aborted(&osoe_am.progress) && !osoe_deadline_expired(&grace))
-        if (!osoe_progress_poll(&osoe_am.progress) && !osoe_progress_aborted(&osoe_am.progress))
-            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
+    while (!osoe_progress_aborted(o) && !osoe_deadline_expired(&grace))
+        if (!osoe_progress_poll(o) && !osoe_progress_aborted(o))
+            osoe_ring_wait(o->ring, OSOE_SWEEP_NS);
     /*
      * A global exit called on this node: the PE carrying its status leaves
      * last (abort.h), so this lead outlasts every other node first. Each other
@@ -696,20 +804,20 @@ void osoe_progress_host_abort(void)
         return;
     struct osoe_deadline last = osoe_deadline_in(UINT64_C(1000000000) *
                                                  OSOE_ABORT_LEAD_WAIT_SECONDS);
-    while (!osoe_progress_peers_ended(&osoe_am.progress, pe) && !osoe_deadline_expired(&last))
-        if (!osoe_progress_poll(&osoe_am.progress) &&
-            !osoe_progress_peers_ended(&osoe_am.progress, pe))
-            osoe_ring_wait(&osoe_am.ring, OSOE_SWEEP_NS);
+    while (!osoe_progress_peers_ended(o, pe) && !osoe_deadline_expired(&last))
+        if (!osoe_progress_poll(o) && !osoe_progress_peers_ended(o, pe))
+            osoe_ring_wait(o->ring, OSOE_SWEEP_NS);
 }
 
 void osoe_progress_host_exit(void)
 {
     if (!osoe_am.lead)
         return;
-    if (!osoe_am.ring.enabled)          /* an agent stopped before its first pass */
-        osoe_ring_enable(&osoe_am.ring);
-    flush_before_close();
-    close_connections();
+    struct osoe_progress_owner *o = &osoe_am.progress.owner[0];
+    if (!o->ring->enabled)              /* an agent stopped before its first pass */
+        osoe_ring_enable(o->ring);
+    flush_before_close(o);
+    close_connections(o);
 }
 
 void osoe_progress_host_limit_unsent(uint32_t bytes, bool by_hand, bool say)
@@ -719,18 +827,22 @@ void osoe_progress_host_limit_unsent(uint32_t bytes, bool by_hand, bool say)
     unsent_by_hand = by_hand;
     unsent_say = say;
     atomic_store_explicit(&unsent_request, (uint64_t)bytes + 1, memory_order_seq_cst);
-    osoe_progress_host_wake_lead();
+    wake_owner(0);                      /* the lead's agent takes the request */
 }
 
 void osoe_progress_host_stop(void)
 {
     if (osoe_am.lead) {
+        free(osoe_am.owner);
+        free(osoe_am.progress.owner);
         free(osoe_am.wire);
         free(osoe_am.connection);
         free(osoe_am.busy);
         free(osoe_am.descriptor);
         free(osoe_am.team);
         free(osoe_am.pending);
+        osoe_am.owner = NULL;
+        osoe_am.progress.owner = NULL;
         osoe_am.wire = NULL;
         osoe_am.connection = NULL;
         osoe_am.busy = NULL;
@@ -743,61 +855,83 @@ void osoe_progress_host_stop(void)
 }
 
 /*
- * The agent's pass, and the lead's half of the sleep protocol (§3.10;
- * lead_wake_model.py). A pass that moved nothing is about to be followed by the
- * agent's wait on agent_wake - in the ring, at the value it loaded before the
- * pass. So raise lead_sleeping first - seq_cst, the store side of the two-sided
- * protocol - and then look at the dirty bits again with seq_cst loads: a writer
- * whose bit landed after this pass's exchange either shows here, and the agent
- * goes round again, or read the flag as 1 and bumps agent_wake and wakes it,
- * which completes the ring's armed wait. The flag comes down at the next pass,
- * which is after the wait.
+ * An owner's half of the sleep protocol (§3.10; lead_wake_model.py, the owner
+ * a parameter), on its thread. A pass that moved nothing is about to be
+ * followed by the owner's wait on its wake word - in its ring, at the value it
+ * loaded before the pass. So raise its `sleeping` first - seq_cst, the store
+ * side of the two-sided protocol - and then look at its dirty bits again with
+ * seq_cst loads: a writer whose bit landed after the pass's exchange either
+ * shows here, and the owner goes round again, or read the flag as 1 and bumps
+ * the wake word and wakes it, which completes the ring's armed wait. The flag
+ * comes down at the next pass, which is after the wait.
+ */
+static void lower_flag(uint32_t owner)
+{
+    struct osoe_am_owner *h = &osoe_am.owner[owner];
+    if (h->flag_raised) {
+        atomic_store_explicit(osoe_am.area.owner[owner].sleeping, 0, memory_order_seq_cst);
+        h->flag_raised = false;
+    }
+}
+
+/* Raise the flag, and say whether a writer's bit is set after all. */
+static bool raise_flag_and_look(uint32_t owner)
+{
+    const struct osoe_connection_area_owner *words = &osoe_am.area.owner[owner];
+    atomic_store_explicit(words->sleeping, 1, memory_order_seq_cst);
+    osoe_am.owner[owner].flag_raised = true;
+    for (uint32_t w = 0; w < words->dirty_words; w++)
+        if (atomic_load_explicit(&words->dirty[w], memory_order_seq_cst) != 0)
+            return true;
+    return false;
+}
+
+/*
+ * The agent's pass: owner 0's, with the lead's own work besides - the requests
+ * of its application thread, the silent-peer check and the arrivals posted for
+ * the internode tree, the control plane's - and its half of the sleep protocol.
+ * The unsent request is looked at again after the flag, as a writer's bit is.
  */
 bool osoe_progress_host_poll(void)
 {
     if (!osoe_am.lead)
         return false;
+    struct osoe_progress_owner *o = &osoe_am.progress.owner[0];
     /* The first pass is on the agent thread, which enabling makes the ring's only
      * submitter (ring.h). It is also where the engine first meets the teams
      * whose records the node's lead wrote before this thread started. */
-    if (!osoe_am.ring.enabled) {
-        osoe_ring_enable(&osoe_am.ring);
+    if (!o->ring->enabled) {
+        osoe_ring_enable(o->ring);
         osoe_progress_meet_teams(&osoe_am.progress, OSOE_PREDEFINED_TEAMS);
     }
-    struct osoe_connection_area *a = &osoe_am.area;
-    if (flag_raised) {
-        atomic_store_explicit(a->lead_sleeping, 0, memory_order_seq_cst);
-        flag_raised = false;
-    }
+    lower_flag(0);
     take_unsent_request();
     if (silent_budget_ms) {
         uint64_t now = osoe_now_ns();
         if (now >= next_silent_check_ns) {
             next_silent_check_ns = now + silent_interval_ns;
-            osoe_progress_check_silent(&osoe_am.progress, silent_budget_ms);
+            osoe_progress_check_silent(o, silent_budget_ms);
         }
     }
     bool moved = osoe_internode_am_take_arrivals();
-    if (osoe_progress_poll(&osoe_am.progress) || moved)
+    if (osoe_progress_poll(o) || moved)
         return true;
-    atomic_store_explicit(a->lead_sleeping, 1, memory_order_seq_cst);
-    flag_raised = true;
-    for (uint32_t w = 0; w < a->dirty_words; w++)
-        if (atomic_load_explicit(&a->dirty[w], memory_order_seq_cst) != 0)
-            return true;
+    if (raise_flag_and_look(0))
+        return true;
     if (atomic_load_explicit(&unsent_request, memory_order_seq_cst) != 0)
         return true;
     return false;
 }
 
+/* Owner 0's view, which is the node's while it runs no helpers. */
 bool osoe_progress_host_idle(uint64_t *applied)
 {
     if (!osoe_am.lead) {
         *applied = 0;
         return true;
     }
-    *applied = osoe_am.progress.application_applied;
-    return osoe_progress_idle(&osoe_am.progress);
+    *applied = osoe_am.progress.owner[0].application_applied;
+    return osoe_progress_idle(&osoe_am.progress.owner[0]);
 }
 
 bool osoe_progress_host_quiet(uint64_t *applied)
@@ -806,7 +940,7 @@ bool osoe_progress_host_quiet(uint64_t *applied)
         *applied = 0;
         return true;
     }
-    return osoe_progress_quiet(&osoe_am.progress, applied);
+    return osoe_progress_quiet(&osoe_am.progress.owner[0], applied);
 }
 
 void osoe_progress_host_deadlock_send(uint32_t node, const struct osoe_deadlock_message *m)
@@ -823,7 +957,7 @@ bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen)
      * (§3.10); every other agent of the job has only the word. Either way the
      * wait ends by a sweep interval at the latest (§4.10). */
     if (osoe_am.lead)
-        return osoe_ring_wait_wake(&osoe_am.ring, wake, seen, OSOE_SWEEP_NS);
+        return osoe_ring_wait_wake(&osoe_am.owner[0].ring, wake, seen, OSOE_SWEEP_NS);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     return osoe_futex_wait(wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0;
 }

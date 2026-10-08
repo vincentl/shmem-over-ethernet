@@ -21,7 +21,7 @@ only `kernel` is replaced. Usage: reservation_model_ooo.py [substring ...]
 import os
 import sys
 
-TREE = '/Users/vincent/shmem-over-ethernet/build/scratch/wt/zero-copy-send/tools/modelcheck'
+TREE = '<repo>/build/scratch/wt/zero-copy-send/tools/modelcheck'
 sys.path.insert(0, TREE)
 
 import reservation_model as rm                       # noqa: E402
