@@ -197,6 +197,17 @@ if(OSOE_INTERNODE)
   add_test(NAME shmem.connection COMMAND shmem_test_connection)
   set_tests_properties(shmem.connection PROPERTIES LABELS "tier1" TIMEOUT 120)
   osoe_internode_label(shmem.connection)
+
+  # Filling the room (v0.2 step 4's first rung): the reservation that takes as
+  # much of the open buffer as there is, a writer's messages sent in parts, under
+  # the same harness and the model's `fill` properties (reservation_model.py).
+  add_executable(shmem_test_connection_fill test-connection-fill.c ../src/connection.c)
+  target_include_directories(shmem_test_connection_fill PRIVATE ../src)
+  target_link_libraries(shmem_test_connection_fill PRIVATE osoe_base Threads::Threads)
+  osoe_warnings(shmem_test_connection_fill)
+  add_test(NAME shmem.connection.fill COMMAND shmem_test_connection_fill)
+  set_tests_properties(shmem.connection.fill PROPERTIES LABELS "tier1" TIMEOUT 120)
+  osoe_internode_label(shmem.connection.fill)
 endif()
 
 # The compressed rank map on its own (tier 1): progressions, runs, lookups against

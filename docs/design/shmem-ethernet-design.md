@@ -268,6 +268,12 @@ tracking. Header overhead is ~32 bytes per 64 KB.
 **SHMEM chunks above AM's advertised maximum payload; AM never fragments
 internally.** AM keeps one invariant: every message fits in a segment.
 
+*Since v0.2 step 4 a put's part may be shorter than a chunk:* it takes the room
+the open buffer has left, down to a sixteenth of the largest payload a put's
+message carries - 4,094 bytes at the default chunk - and the rest goes on in the
+next (§3.5, "A put's part takes the room there is"). Each part is still a
+self-contained AM landing at its own offset.
+
 ### 3.3 io_uring usage
 
 **Sole issuer.** One ring per progress thread, `IORING_SETUP_SINGLE_ISSUER`.
@@ -635,6 +641,25 @@ already moved `head` and must unwind, and the unwind must still account for
 itself in `filled` or the buffer never becomes sendable, while concurrent
 overflowing writers race to seal. The CAS makes a failed reservation a
 non-event.
+
+**A put's part takes the room there is** (v0.2 step 4,
+`docs/decisions/2026-10-07-one-thread-profile.md`). The loop above is
+`osoe_connection_reserve_up_to`'s whole case: given `most` and `least`, a writer
+takes as much of `most` as the room after the head it loaded holds, 8-byte
+aligned, and asks for a seal only when that is under `least`. The length is
+decided from the head the CAS then compares, never from another load, or a
+writer could reserve past the buffer's end. A put asks for its part whole and at
+least a sixteenth of its largest payload, cuts its message to what it got, and sends the
+rest as its next part - a successive message of the same writer, as a chunk
+always was, so fence, signal-after-payload and quiet hold unchanged; every other
+message asks for itself whole. Before it a buffer of twice the chunk carried one
+64 KiB message, the headers leaving no room for a second, so a stream waited for
+a turnover every 64 KiB; over loopback it moved a fifth of a bare stream with no
+thread of the job more than 56% busy, and filling the room took it to 0.44.
+`reservation_model.py`'s `fill` cases check it - messages of several units, a
+put's signal after its parts, the pre-open drain, x86-TSO - and three breakages
+fail: a stale head (OVERFLOW), a part that does not advance (ONCE), a floor not
+lowered for a short remainder (STUCK).
 
 **`filled` is a count, not a watermark.** Out-of-order completion means no
 prefix property holds. This is fine: the buffer is sendable when
@@ -1119,11 +1144,13 @@ third class, reply credits, is indivisible, and has the handoff below.
 - Buffer becomes `OPEN` (divisible: 192 KB free, 30 waiters needing 200 B each)
   → **wake many.** Waking one creates a serial chain with a scheduling delay per
   link; at 30 deep on a Pi that is milliseconds of pointless latency.
-  *As built the room is divisible for small messages only*: a buffer reopened at
-  the default sizes, twice `OSOE_AM_CHUNK` less its header, has room for one
-  64 KiB message, so writers of messages that large - a node's PEs putting to
-  one node at once, an alltoall's step - wake together and all but one sleep
-  again (the release fixes' review, S1). Measured in the VM: the wakes as
+  *As built until v0.2 step 4 the room was divisible for small messages only*: a
+  buffer reopened at the default sizes, twice `OSOE_AM_CHUNK` less its header,
+  had room for one 64 KiB message, so writers of messages that large - a node's
+  PEs putting to one node at once, an alltoall's step - woke together and all
+  but one slept again (the release fixes' review, S1). A put's part now takes
+  the room it finds (§3.5), so they each get some of it; a whole message larger
+  than the room left still sleeps again. Measured in the VM: the wakes as
   counted, a few microseconds of the agent's a reopening at 32 writers, no fall
   in the node's rate, and a bare wake-one 10-25% slower at 4 and 16 writers -
   this paragraph's own chain. The fix is a hand-on wake - a writer that reserves
@@ -7592,6 +7619,12 @@ Reported, not pinned: a get's median trip is 1.8–1.9× the floor's idle and
 beside the build, 1.3–1.9× under the busy loops (idle, 55 µs against 29 µs).
 The library's stream, 3.0 GiB/s idle against the floor's 14, is 0.21×. With
 a 1 MiB buffer it is 0.52–0.69×.
+
+*Since v0.2 step 4* a put fills the room a buffer has (§3.5), and the stream row
+reads: bound ≥ 0.15, measured 0.43–0.47 (0.39 at the lowest pair beside the
+suite), 0.083–0.085 with the poll - the pin raised from 0.10 so that the poll
+still fails it by more than half
+(`docs/decisions/2026-10-07-one-thread-profile.md`).
 
 *What the fastest trip can see, and what it cannot.* It is the length of a
 path, and between `echo-uring`'s two kinds — one path of the same length — it

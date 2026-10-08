@@ -1,0 +1,17 @@
+start 21:41:38
+fill built: 0
+many-fill: 0
+base built: 0
+many-base: 0
+spare built: 0
+many-spare: 0
+many-base-1: 0
+many-fill-1: 0
+many-spare-1: 0
+many-base-2: 0
+many-fill-2: 0
+many-spare-2: 0
+many-base-3: 0
+many-fill-3: 0
+many-spare-3: 0
+end 21:45:59

@@ -1,0 +1,6 @@
+round=1 build=base putstream target=1 bytes=65536 seconds=10.0 mib_per_s=2974
+round=1 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6183
+round=2 build=base putstream target=1 bytes=65536 seconds=10.0 mib_per_s=3014
+round=2 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6365
+round=3 build=base putstream target=1 bytes=65536 seconds=10.0 mib_per_s=2999
+round=3 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6363

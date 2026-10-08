@@ -502,20 +502,26 @@ static uint64_t turnover(const struct osoe_connection *connection)
  * with work (§3.10) - and waits on the connection's turnover word, which the
  * agent bumps when it opens a buffer and anyone is registered
  * (base/wait-word.h, §3.11). Every waiter is woken: room is divisible, and each
- * has its own reservation to retry - for small messages; a reopened buffer at
- * the default sizes holds one of OSOE_AM_CHUNK, so of writers that large one
- * gets in and the rest sleep again (the release fixes' review, S1). It asks
- * again before every sleep, since the buffer that just opened may have filled
- * before this writer got to it.
+ * has its own reservation to retry. A put's part takes the room it finds, so
+ * writers of large puts each get some of a reopened buffer, where before v0.2
+ * step 4 one 64 KiB message filled it and the rest slept again (the release
+ * fixes' review, S1); a whole message larger than the room left still sleeps
+ * again. It asks again before every sleep, since the buffer that just opened
+ * may have filled before this writer got to it.
  *
  * Step 2 slept 20 us and looked again instead, which on the ring held a stream
  * to 3% of the floor (§8.4). am.reserve_stalls counts every wait, so a buffer
  * that is often full is visible rather than assumed rare.
+ *
+ * It takes up to `len` and at least `least` (osoe_connection_reserve_up_to):
+ * a put's part takes the room there is, and every other message passes its
+ * whole length as both.
  */
 static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, int pe,
-                            const char *routine, uint32_t len, struct osoe_reservation *r)
+                            const char *routine, uint32_t len, uint32_t least,
+                            struct osoe_reservation *r)
 {
-    if (osoe_connection_reserve(connection, len, r) == OSOE_RESERVATION_OK)
+    if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK)
         return;
     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
     struct osoe_wait_word *word = osoe_connection_turnover_wait(connection);
@@ -527,7 +533,7 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
     bool swept = false;
     for (;;) {
         uint32_t seen = osoe_wait_word_load(word);
-        if (osoe_connection_reserve(connection, len, r) == OSOE_RESERVATION_OK) {
+        if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK) {
             if (swept)
                 count_if_lost(&word->word, slept_on, routine);
             break;
@@ -579,6 +585,12 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
 
     uint32_t limit = payload_limit(connection, peer, (uint32_t)sizeof(struct osoe_am_put));
+    uint32_t overhead = (uint32_t)(sizeof(struct osoe_message_header) + sizeof(struct osoe_am_put));
+    /* The least payload a part takes when it fills the room a buffer has left -
+     * a sixteenth of the largest, 4,094 bytes at the default chunk: below it the part
+     * waits for the next buffer, since each part pays a message's header and
+     * its parse at the peer, and a sliver of room is better left empty. */
+    uint32_t smallest_part = limit / 16 ? limit / 16 : 1;
     const unsigned char *at = src;
     /* A zero-length put is a no-op the spec still allows to be issued; it must
      * not become a message, or the peer applies an empty write and the loop
@@ -590,13 +602,32 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
         uint32_t body = (uint32_t)sizeof m + n;
         struct osoe_message_header h = { OSOE_AM_PUT, 0, body };
         struct osoe_reservation r;
-        reserve_waiting(connection, peer, pe, "shmem_put", osoe_message_padded(body), &r);
+        /*
+         * Fill the room (v0.2 step 4's first rung): this part takes as much of
+         * the open buffer as there is, down to smallest_part of payload, or the
+         * whole remainder if that is less - so a buffer carries what it holds,
+         * where a chunk at a time left a buffer of twice the chunk carrying
+         * one, and a stream waited for a turnover every chunk
+         * (docs/decisions/2026-10-07-one-thread-profile.md). The parts of a put
+         * are successive messages of this thread, as its chunks always were:
+         * they reach the peer in order, and a signal's fenced rmw after the
+         * last (reservation_model.py, the `fill` cases).
+         */
+        uint32_t least = osoe_message_padded((uint32_t)sizeof m +
+                                             (n < smallest_part ? n : smallest_part));
+        reserve_waiting(connection, peer, pe, "shmem_put", osoe_message_padded(body), least, &r);
+        if (r.len < osoe_message_padded(body)) {
+            /* A part: the reservation is 8-byte padded, so its payload is too. */
+            n = r.len - overhead;
+            body = (uint32_t)sizeof m + n;
+            h.len = body;
+        }
         unsigned char *to = osoe_reservation_bytes(connection, &r);
         memcpy(to, &h, sizeof h);
         memcpy(to + sizeof h, &m, sizeof m);
         memcpy(to + sizeof h + sizeof m, at, n);
         osoe_connection_commit(connection, &r);
-        /* After every commit, not once per put: the next chunk may have to
+        /* After every commit, not once per put: the next part may have to
          * wait for room, and the lead makes room only in a connection it
          * knows has bytes (§3.10). Marking once at the end hung every
          * multi-chunk put that filled a buffer. */
@@ -924,7 +955,8 @@ static uint64_t send_message(struct osoe_connection *connection, uint32_t peer, 
     uint32_t body = fixed_bytes + payload_bytes;
     struct osoe_message_header h = { kind, 0, body };
     struct osoe_reservation r;
-    reserve_waiting(connection, peer, pe, routine, osoe_message_padded(body), &r);
+    reserve_waiting(connection, peer, pe, routine, osoe_message_padded(body),
+                    osoe_message_padded(body), &r);
     unsigned char *to = osoe_reservation_bytes(connection, &r);
     memcpy(to, &h, sizeof h);
     memcpy(to + sizeof h, fixed, fixed_bytes);

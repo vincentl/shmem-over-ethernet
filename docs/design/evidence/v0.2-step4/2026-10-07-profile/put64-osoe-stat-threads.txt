@@ -1,0 +1,14 @@
+/osoe.4010422.0.0.0  layout 33  1 local PE of 2  (job 4010422 step 0 node 0 session 0)
+  1359872 bytes, 233 metrics (checksum 0x88e326ae), 17 blocks of 512 bytes
+  collective shape link; link measured: a hop of 15937 ns, a message cost of 0 ns, 4441613012 bytes a second
+
+block  PE      pid      tid          cpu    invol.csw  kind
+    0   0  4010424  4010428      6.860 s          529  agent
+    1   0  4010424  4010424      3.670 s           26  application
+/osoe.4010422.0.1.0  layout 33  1 local PE of 2  (job 4010422 step 0 node 1 session 0)
+  1359872 bytes, 233 metrics (checksum 0x88e326ae), 17 blocks of 512 bytes
+  collective shape link; link measured: a hop of 15937 ns, a message cost of 0 ns, 4441613012 bytes a second
+
+block  PE      pid      tid          cpu    invol.csw  kind
+    0   0  4010425  4010429      4.820 s          120  agent
+    1   0  4010425  4010425         0 ns            0  application

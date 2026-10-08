@@ -1,0 +1,235 @@
+[  1%] Built target shmem_test_allocator
+[  1%] Built target shmem_test_collective_tree
+[  4%] Built target shmem_test_collective_shape
+[  4%] Built target osoe_base
+[  5%] Built target shmem_test_watch_range
+[  5%] Built target shmem_test_circulant
+[  6%] Built target shmem_test_own-address
+[  6%] Built target shmem_test_rank-map
+[  7%] Built target shmem_test_bootstrap
+[  8%] Built target shmem_test_job
+[  9%] Built target slow-message
+[  9%] Built target shmem_test_listener
+[  9%] Built target shmem_test_connection_area
+[  9%] Built target slow-create
+[  9%] Building C object shmem/tests/CMakeFiles/shmem_test_progress.dir/__/src/wire.c.o
+[  9%] Built target deny-futex2
+[ 10%] Built target deny-io-uring
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_internal-region.dir/__/src/wire.c.o
+[ 10%] Building C object shmem/tests/CMakeFiles/shmem_test_team-storage.dir/__/src/wire.c.o
+[ 11%] Building C object shmem/tests/CMakeFiles/shmem_test_gather-misuse.dir/__/src/wire.c.o
+[ 11%] Linking C executable shmem_test_progress
+[ 11%] Linking C executable shmem_test_internal-region
+[ 11%] Linking C executable shmem_test_team-storage
+[ 13%] Built target shmem_test_progress
+[ 13%] Linking C executable shmem_test_gather-misuse
+[ 13%] Built target deny-pidfd
+[ 14%] Built target probe
+[ 14%] Built target echo-uring
+[ 23%] Built target shmem_test_internal-region
+[ 32%] Built target shmem_test_team-storage
+[ 32%] Built target osoe-launch
+[ 32%] Built target osoe-stat
+[ 32%] Built target osoe_segment_test
+[ 41%] Built target shmem_test_gather-misuse
+[ 41%] Built target osoe-pacer-shim
+[ 42%] Built target base_test_size
+[ 42%] Built target base_test_environment
+[ 42%] Built target base_test_futex
+[ 42%] Built target base_test_node-map
+[ 42%] Built target base_test_epoch
+[ 42%] Built target base_test_stall-watch
+[ 43%] Built target base_test_hostlist
+[ 43%] Built target base_test_siphash
+[ 43%] Built target base_test_serializing-fence
+[ 44%] Built target shmem_test_am
+[ 44%] Built target shmem_test_reply
+[ 45%] Building C object shmem/CMakeFiles/osoe.dir/src/wire.c.o
+[ 45%] Built target shmem_test_am_size
+[ 47%] Built target shmem_test_connection_fill
+[ 47%] Built target shmem_test_connection
+[ 47%] Building C object shmem/tests/CMakeFiles/shmem_test_wire.dir/__/src/wire.c.o
+[ 48%] Building C object shmem/tests/CMakeFiles/shmem_test_barrier_am.dir/__/src/wire.c.o
+[ 48%] Building C object shmem/tests/CMakeFiles/shmem_test_wire_pair.dir/__/src/wire.c.o
+[ 48%] Linking C shared library libosoe.so
+[ 48%] Linking C executable shmem_test_barrier_am
+[ 49%] Linking C executable shmem_test_wire
+[ 50%] Linking C executable shmem_test_wire_pair
+[ 50%] Built target shmem_test_wire
+[ 50%] Built target shmem_test_wire_pair
+[ 51%] Built target shmem_test_barrier_am
+[ 51%] Built target shmem_test_fatal-order
+[ 52%] Built target shmem_test_blocked-record
+[ 61%] Built target osoe
+[ 62%] Linking C executable shmem_test_info
+[ 62%] Linking C executable shmem_test_multinode
+[ 63%] Linking C executable shmem_test_header_surface
+[ 63%] Linking C executable shmem_test_floor
+[ 63%] Built target shmem_test_info
+[ 63%] Built target shmem_test_multinode
+[ 63%] Built target shmem_test_header_surface
+[ 64%] Built target shmem_test_floor
+[ 64%] Linking C executable shmem_test_work_discovery
+[ 64%] Linking C executable shmem_test_differential
+[ 64%] Linking C executable shmem_test_internode
+[ 64%] Linking C executable shmem_test_ack-echo
+[ 64%] Built target shmem_test_work_discovery
+[ 64%] Built target shmem_test_differential
+[ 65%] Built target shmem_test_internode
+[ 65%] Built target shmem_test_ack-echo
+[ 65%] Linking C executable shmem_test_reply-starvation
+[ 65%] Linking C executable shmem_test_unswept-wait
+[ 65%] Linking C executable shmem_test_hang-walk
+[ 65%] Linking C executable shmem_test_reply-pool
+[ 65%] Built target shmem_test_reply-starvation
+[ 65%] Built target shmem_test_hang-walk
+[ 65%] Built target shmem_test_unswept-wait
+[ 66%] Built target shmem_test_reply-pool
+[ 68%] Linking C executable shmem_test_stopped-bulk
+[ 68%] Linking C executable shmem_test_get-no-progress
+[ 68%] Linking C executable shmem_test_stopped-node
+[ 68%] Linking C executable shmem_test_fatal-start-pes
+[ 68%] Built target shmem_test_stopped-bulk
+[ 68%] Built target shmem_test_get-no-progress
+[ 68%] Built target shmem_test_stopped-node
+[ 68%] Built target shmem_test_fatal-start-pes
+[ 68%] Linking C executable shmem_test_exit-without-finalize
+[ 68%] Linking C executable shmem_test_kill-after-init
+[ 68%] Linking C executable shmem_test_sleeper
+[ 68%] Linking C executable shmem_test_stalled-start
+[ 68%] Built target shmem_test_kill-after-init
+[ 69%] Built target shmem_test_exit-without-finalize
+[ 69%] Built target shmem_test_stalled-start
+[ 69%] Built target shmem_test_sleeper
+[ 69%] Linking C executable shmem_test_core-exclusion
+[ 69%] Linking C executable shmem_test_heap-size
+[ 69%] Linking C executable shmem_test_init
+[ 69%] Linking C executable shmem_test_fork
+[ 69%] Built target shmem_test_core-exclusion
+[ 69%] Built target shmem_test_heap-size
+[ 69%] Built target shmem_test_init
+[ 69%] Built target shmem_test_fork
+[ 69%] Linking C executable shmem_test_barrier
+[ 70%] Linking C executable shmem_test_set-range
+[ 70%] Linking C executable shmem_test_malloc
+[ 70%] Linking C executable shmem_test_rma
+[ 70%] Built target shmem_test_set-range
+[ 70%] Built target shmem_test_barrier
+[ 71%] Built target shmem_test_malloc
+[ 72%] Built target shmem_test_rma
+[ 72%] Linking C executable shmem_test_amo
+[ 72%] Linking C executable shmem_test_wait
+[ 72%] Linking C executable shmem_test_quiet
+[ 72%] Linking C executable shmem_test_signal
+[ 73%] Built target shmem_test_wait
+[ 74%] Built target shmem_test_signal
+[ 74%] Built target shmem_test_amo
+[ 74%] Built target shmem_test_quiet
+[ 74%] Linking C executable shmem_test_heap
+[ 74%] Linking C executable shmem_test_landing
+[ 74%] Linking C executable shmem_test_amo-types
+[ 74%] Linking C executable shmem_test_amo-deprecated
+[ 74%] Built target shmem_test_heap
+[ 75%] Built target shmem_test_landing
+[ 75%] Built target shmem_test_amo-types
+[ 75%] Built target shmem_test_amo-deprecated
+[ 75%] Linking C executable shmem_test_amo-nbi
+[ 75%] Linking C executable shmem_test_get-nbi
+[ 75%] Linking C executable shmem_test_typed-rma
+[ 75%] Linking C executable shmem_test_reduce
+[ 76%] Built target shmem_test_amo-nbi
+[ 76%] Built target shmem_test_get-nbi
+[ 77%] Built target shmem_test_typed-rma
+[ 77%] Built target shmem_test_reduce
+[ 78%] Linking C executable shmem_test_broadcast
+[ 78%] Linking C executable shmem_test_active-set
+[ 78%] Linking C executable shmem_test_statics
+[ 78%] Linking C executable shmem_test_active-set-partial
+[ 78%] Built target shmem_test_broadcast
+[ 78%] Built target shmem_test_active-set
+[ 79%] Built target shmem_test_active-set-partial
+[ 79%] Built target shmem_test_statics
+[ 79%] Linking C executable shmem_test_lock
+[ 79%] Linking C executable shmem_test_statics-pie
+[ 79%] Linking C executable shmem_test_collect
+[ 79%] Linking C executable shmem_test_alltoall
+[ 79%] Built target shmem_test_lock
+[ 79%] Built target shmem_test_statics-pie
+[ 80%] Built target shmem_test_collect
+[ 80%] Linking C executable shmem_test_collective-divergence
+[ 80%] Linking C executable shmem_test_pipeline
+[ 80%] Built target shmem_test_alltoall
+[ 80%] Linking C executable shmem_test_lanes
+[ 81%] Linking C executable shmem_test_lanes_threads
+[ 81%] Built target shmem_test_collective-divergence
+[ 81%] Built target shmem_test_pipeline
+[ 81%] Linking C executable shmem_test_allgather
+[ 81%] Linking C executable shmem_test_team-split
+[ 81%] Built target shmem_test_lanes
+[ 81%] Built target shmem_test_lanes_threads
+[ 82%] Linking C executable shmem_test_multiple
+[ 83%] Linking C executable shmem_test_team-threads
+[ 84%] Built target shmem_test_team-split
+[ 84%] Built target shmem_test_allgather
+[ 84%] Linking C executable shmem_test_team-levels
+[ 84%] Linking C executable shmem_test_context-team-destroy
+[ 84%] Built target shmem_test_multiple
+[ 84%] Built target shmem_test_team-threads
+[ 84%] Linking C executable shmem_test_thread-places
+[ 84%] Linking C executable shmem_test_agent-slice
+[ 85%] Built target shmem_test_context-team-destroy
+[ 85%] Built target shmem_test_team-levels
+[ 85%] Built target shmem_test_thread-places
+[ 85%] Linking C executable shmem_test_agent-cpus
+[ 85%] Linking C executable shmem_test_deadlock
+[ 86%] Built target shmem_test_agent-slice
+[ 86%] Linking C executable shmem_test_shapes-chosen
+[ 86%] Linking C executable shmem_test_shapes-back-to-back
+[ 86%] Built target shmem_test_agent-cpus
+[ 87%] Built target shmem_test_deadlock
+[ 87%] Built target shmem_test_shapes-chosen
+[ 87%] Linking C executable shmem_test_circulant-reduce
+[ 87%] Linking C executable shmem_test_scan
+[ 87%] Built target shmem_test_shapes-back-to-back
+[ 87%] Linking C executable shmem_test_context
+[ 87%] Linking C executable shmem_test_surface
+[ 87%] Built target shmem_test_scan
+[ 88%] Built target shmem_test_circulant-reduce
+[ 88%] Linking C executable shmem_test_start-pes
+[ 88%] Linking C executable shmem_test_agent-wake
+[ 88%] Built target shmem_test_context
+[ 88%] Built target shmem_test_surface
+[ 88%] Linking C executable shmem_test_profile
+[ 89%] Linking C executable shmem_test_team
+[ 89%] Built target shmem_test_start-pes
+[ 89%] Built target shmem_test_agent-wake
+[ 89%] Linking C executable shmem_test_thread
+[ 89%] Linking C executable shmem_test_wait-many
+[ 90%] Built target shmem_test_profile
+[ 90%] Linking C executable shmem_test_stat
+[ 91%] Built target shmem_test_team
+[ 91%] Built target shmem_test_thread
+[ 91%] Built target shmem_test_wait-many
+[ 91%] Linking C executable shmem_test_global-exit
+[ 91%] Linking C executable shmem_test_dead-pe
+[ 91%] Linking C executable shmem_test_death-in-wait
+[ 91%] Built target shmem_test_stat
+[ 91%] Linking C executable shmem_test_bad_team
+[ 91%] Built target shmem_test_global-exit
+[ 91%] Built target shmem_test_dead-pe
+[ 91%] Built target shmem_test_death-in-wait
+[ 92%] Linking C executable shmem_test_bad_put
+[ 92%] Linking C executable shmem_test_uninitialized
+[ 92%] Linking C executable osoe-bench
+[ 92%] Built target shmem_test_bad_team
+[ 92%] Linking C executable osoe-pacer
+[ 92%] Built target shmem_test_uninitialized
+[ 92%] Built target shmem_test_bad_put
+[ 93%] Built target osoe-bench
+[ 93%] Linking C executable osoe-pacer-start-pes
+[ 94%] Linking C executable osoe-pacer-start-pes-counted
+[ 95%] Linking C executable osoe-pacer-counted
+[ 95%] Built target osoe-pacer-start-pes
+[ 98%] Built target osoe-pacer
+[ 98%] Built target osoe-pacer-start-pes-counted
+[100%] Built target osoe-pacer-counted

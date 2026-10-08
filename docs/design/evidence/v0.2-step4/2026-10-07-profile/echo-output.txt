@@ -1,0 +1,6 @@
+small enobufs=253 rearms=253
+small short_sends=17 (client)
+small stream_mib_per_s=5.2 mebibytes=1
+uring round_trip_ns min=72000 median=79959 p99=86709 rounds=10
+blocking round_trip_ns min=64209 median=70834 p99=82792 rounds=10
+uring stream_mib_per_s=17003.2 mebibytes=400000

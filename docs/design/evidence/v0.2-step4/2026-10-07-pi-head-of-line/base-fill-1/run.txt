@@ -1,0 +1,18 @@
+start 21:26:46
+fill built: 0
+hol-fill: 0
+base built: 0
+hol-base: 0
+base-lowat-0-1: 0
+fill-lowat-0-1: 0
+base-lowat-16384-1: 0
+fill-lowat-16384-1: 0
+base-lowat-0-2: 0
+fill-lowat-0-2: 0
+base-lowat-16384-2: 0
+fill-lowat-16384-2: 0
+base-lowat-0-3: 0
+fill-lowat-0-3: 0
+base-lowat-16384-3: 0
+fill-lowat-16384-3: 0
+end 21:30:44

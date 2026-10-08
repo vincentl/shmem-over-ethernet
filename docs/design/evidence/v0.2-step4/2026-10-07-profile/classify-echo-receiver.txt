@@ -1,0 +1,44 @@
+kernel copy       51.0%
+kernel network    43.3%
+io_uring           4.1%
+kernel other       1.1%
+user other         0.5%
+
+== kernel copy
+    50.3%  __arch_copy_to_user
+     0.6%  _copy_to_iter
+     0.1%  simple_copy_to_iter
+== kernel network
+     7.5%  arch_counter_get_cntvct
+     7.3%  queued_spin_lock_slowpath
+     2.3%  __skb_datagram_iter
+     1.7%  __local_bh_enable_ip
+     1.0%  handle_softirqs
+     0.8%  tcp_recvmsg_locked
+     0.8%  __check_object_size
+     0.7%  release_sock
+== io_uring
+     0.7%  io_recv
+     0.4%  io_recv_finish
+     0.3%  io_buffer_select
+     0.3%  io_req_post_cqe
+     0.2%  xa_load
+     0.2%  io_fill_cqe_aux
+     0.2%  xas_start
+     0.2%  __io_put_kbufs
+== kernel other
+     0.4%  do_signal
+     0.3%  el0_svc
+     0.1%  el0_svc_common.constprop.0
+     0.1%  __arm64_sys_io_uring_enter
+     0.1%  invoke_syscall
+     0.0%  blkcg_maybe_throttle_current
+     0.0%  fget
+     0.0%  fput
+== user other
+     0.2%  endpoint_pump [echo-uring]
+     0.2%  [unknown] [liburing.so.2.9]
+     0.1%  sink_arrived [echo-uring]
+     0.0%  serve [echo-uring]
+     0.0%  io_uring_prep_rw [inlined]
+     0.0%  io_uring_cq_advance [inlined]

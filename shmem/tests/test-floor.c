@@ -32,10 +32,13 @@
  *     under any load - measured 0.98-1.00x - and this is the pin a wait that
  *     polls fails: the poll measured 1.8-2.1x idle and up to 14x loaded;
  *   - the library's stream over the floor's, at least STREAM, at the default
- *     connection buffer. There a 64 KiB put fills half the buffer and every
- *     other one waits for a turnover (§8.4), so this is the pin a writer's wait
- *     that polls fails: measured 0.21-0.43x, and 0.037-0.055x with the poll.
- *     At 1 MiB a writer seldom waits, and the poll measured within the noise.
+ *     connection buffer. There a put fills each buffer to its end, so a writer
+ *     waits for a turnover every 128 KiB (§3.5, v0.2 step 4), and this is the
+ *     pin a writer's wait that polls fails: measured 0.43-0.47x, and
+ *     0.083-0.085x with the poll. Before v0.2 step 4 a 64 KiB put filled half a
+ *     buffer and every one waited for a turnover: 0.21-0.43x, and 0.037-0.055x
+ *     with the poll, against a pin of 0.10. At 1 MiB a writer seldom waits, and
+ *     the poll measured within the noise.
  * Reported and not pinned: each median trip over the floor's median. §8.4 found
  * those move with the load's mix, not with the library.
  *
@@ -48,9 +51,10 @@
  * project's own runs set through -DOSOE_TEST_PINS=ON (this directory's
  * CMakeLists.txt). The numbers are the project's regression guard, set from runs
  * on its own machines, and a ratio of one thread's work against the machine's
- * loopback memcpy is another machine's to differ in: the stream's has measured
- * 0.0999 against its pin of 0.10 beside a parallel test run in a fresh VM, and
- * 0.103 at its lowest idle. A stranger's first `cmake --workflow` must not go red
+ * loopback memcpy is another machine's to differ in: before v0.2 step 4 the
+ * stream's measured 0.0999 against its pin of 0.10 beside a parallel test run
+ * in a fresh VM, and 0.103 at its lowest idle; since, 0.39 at its lowest pair
+ * beside the suite, against 0.15. A stranger's first `cmake --workflow` must not go red
  * on a library that works. Unasked, the ratios are printed all the same, and the
  * report ends with a line that says no pin was checked and how to ask.
  *
@@ -92,7 +96,7 @@ enum { PAIRS = 7, WARMUP = 200, PIECE = 64 << 10, AREA = 1 << 20 };
 
 #define FASTEST 3.0
 #define INTERNAL 1.5
-#define STREAM 0.10
+#define STREAM 0.15
 
 /* The four round trips each pair times. */
 enum kind { FLOOR_TRIP, GET, PUT_QUIET, FETCH_ADD, KINDS };

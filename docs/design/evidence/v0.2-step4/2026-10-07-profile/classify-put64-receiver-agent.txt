@@ -1,0 +1,60 @@
+kernel copy       33.3%
+user other        29.3%
+kernel other      16.7%
+kernel network    12.6%
+library            4.6%
+io_uring           3.5%
+library copy       0.1%
+
+== kernel copy
+    32.8%  __arch_copy_to_user
+     0.3%  _copy_to_iter
+     0.2%  __arch_copy_from_user
+     0.1%  simple_copy_to_iter
+== user other
+    25.2%  [unknown] [libc.so.6]
+     1.8%  [unknown] [liburing.so.2.9]
+     1.5%  __kernel_clock_gettime [[vdso]]
+     0.2%  osoe_node_local_id [inlined]
+     0.1%  clock_gettime [libc.so.6]
+     0.1%  [unknown] [ld-linux-aarch64.so.1]
+     0.1%  osoe_counter_word_add [inlined]
+     0.1%  osoe_counter_add [inlined]
+== kernel other
+    11.2%  do_signal
+     2.3%  el0_svc
+     1.0%  fget
+     0.9%  invoke_syscall
+     0.2%  __arm64_sys_io_uring_enter
+     0.2%  get_signal
+     0.2%  memset
+     0.2%  el0_svc_common.constprop.0
+== kernel network
+     1.6%  arch_counter_get_cntvct
+     1.2%  queued_spin_lock_slowpath
+     1.0%  __skb_datagram_iter
+     1.0%  __check_object_size
+     0.8%  __local_bh_enable_ip
+     0.7%  mem_cgroup_uncharge_skmem
+     0.4%  tcp_recvmsg_locked
+     0.3%  __sk_mem_reduce_allocated
+== library
+     0.8%  osoe_wire_recv (under osoe_wire_recv)
+     0.7%  osoe_am_parse (under osoe_am_parse)
+     0.3%  osoe_progress_host_poll (under osoe_progress_host_poll)
+     0.3%  osoe_ring_take_readable (under osoe_progress_poll)
+     0.2%  osoe_internode_am_take_arrivals (under osoe_internode_am_take_arrivals)
+     0.2%  osoe_liveness_check (under agent_main)
+     0.2%  clock_gettime@plt (under agent_main)
+     0.2%  release_local (under osoe_progress_poll)
+== io_uring
+     0.3%  xa_load
+     0.3%  io_recv
+     0.3%  io_recv_finish
+     0.3%  __io_put_kbufs
+     0.3%  arch_counter_get_cntvct
+     0.2%  __io_submit_flush_completions
+     0.2%  io_poll_task_func
+     0.2%  io_handle_tw_list
+== library copy
+     0.1%  memcpy@plt <- osoe_am_parse

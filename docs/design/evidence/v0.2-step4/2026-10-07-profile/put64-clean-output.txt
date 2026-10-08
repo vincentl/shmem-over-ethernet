@@ -1,0 +1,10 @@
+t=2.0 mib_per_s=3065
+t=4.0 mib_per_s=2840
+t=6.0 mib_per_s=2910
+t=8.0 mib_per_s=2869
+t=10.0 mib_per_s=2907
+t=12.0 mib_per_s=2733
+t=14.0 mib_per_s=3071
+t=16.0 mib_per_s=3064
+t=18.0 mib_per_s=3036
+putstream target=1 bytes=65536 seconds=20.0 mib_per_s=2955

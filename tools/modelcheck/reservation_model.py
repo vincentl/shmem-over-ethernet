@@ -24,6 +24,8 @@ accounting alone:
   QUIET    when `acked` reaches the number a writer recorded, that writer's
            messages have been applied (transport-internode.c: acknowledged())
   SEGSEQ   segments leave in sequence order, without gaps
+  OVERFLOW a reservation ends inside its buffer, which was open when taken
+           (the `fill` cases)
   liveness no writer and no progress thread is left blocked (STUCK)
 
 What is mirrored from the C
@@ -82,6 +84,21 @@ Breakages (each must fail, or the property it guards is unchecked)
   drain_lifo        the pre-open drain takes the newest reply first: ORDER is
                     the first check to fail
 
+`fill` (v0.2 step 4's first rung, FILL_CASES): writers of messages of several
+units, each sent in parts that take as much of the open buffer's room as there
+is - at least `least` units, or the whole remainder - the length decided from the
+head the CAS compares (osoe_connection_reserve_up_to, remote_put); a message of
+one unit after a put is its signal's fenced rmw. `whole` is today's whole
+reservation with such messages. Their breakages, each of which must fail:
+  fill_stale       the length is taken from one load of the head and the CAS
+                   from another (OVERFLOW)
+  fill_no_advance  a part does not advance the writer's position, so the next
+                   copies the same units again (ONCE)
+  fill_floor       the floor is not lowered to a remainder shorter than it,
+                   which then never fits (STUCK)
+Some `fill` cases put a stream beside a writer of one-unit messages - a
+fetch-add, a get's request - which take whatever room the stream leaves.
+
 `current` is the tree before slice 2: no pre-open drain. It passes every
 safety check - starving a reply is a liveness property of the *policy*, and a
 reply reaches the wire in this model whenever the open buffer has room, which
@@ -98,6 +115,10 @@ from engine import DEL, assemble, explore, report, select
 
 H = 1
 SEALED = 64
+# A message's identity: 1 + writer * PER_WRITER + its index among the writer's
+# units; the progress thread's replies are writer 7.
+PER_WRITER = 16
+REPLY_BASE = 1 + 7 * PER_WRITER
 # Designs with slice 2's pre-open drain; `current` and the review's breakages
 # of the reservation protocol itself run without it, as the tree did.
 PREOPEN = ('design', 'open_resets', 'filled_short', 'drain_no_pop', 'drain_lifo')
@@ -167,7 +188,7 @@ def writer(w, msgs, cap, quiet):
     B = []
     for m in range(msgs):
         p = f'w{m}_'
-        ident = 1 + w * 8 + m
+        ident = 1 + w * PER_WRITER + m
         nxt = f'@w{m + 1}_S0' if m + 1 < msgs else '@Q0'
         B += reserve_blocks(p, ident, cap, None, nxt)
     if quiet:
@@ -175,9 +196,104 @@ def writer(w, msgs, cap, quiet):
         B += [('Q0', ('set', 'q', lambda L: DEL, '@Q1')),
               ('Q1', ('await', lambda M, L: M[ACKED] >= L['s'], '@Q2')),
               ('Q2', ('check', lambda M, L, w=w, n=msgs: None if all(
-                  M[('$applied', 1 + w * 8 + m)] == 1 for m in range(n)) else
+                  M[('$applied', 1 + w * PER_WRITER + m)] == 1 for m in range(n)) else
                   f"QUIET: acked reached {L['s']}, the number writer {w} recorded, "
                   f"but not all of its messages have been applied", '@WEND'))]
+    else:
+        B += [('Q0', ('set', 's', lambda L: DEL, '@WEND'))]
+    B += [('WEND', ('done',))]
+    return assemble(B)
+
+
+def part_blocks(p, w, cap, least, done, variant):
+    """One message of a filling writer (v0.2 step 4's first rung,
+    transport-internode.c's remote_put): each part reserves as much of the
+    message's remaining units as the open buffer has room for - at least
+    `least`, or the whole remainder when that is smaller - its length decided
+    from the head the CAS then compares (osoe_connection_reserve_up_to). `u` is
+    the writer's next unit, `rem` this message's units still to go; the parts of
+    one message are successive messages of its writer, as a put's chunks are.
+
+    variant 'whole': `least` is at least every message, so a message is
+    reserved whole - today's reservation, with messages of several units.
+    variant 'fill_stale': the length is taken from one load of the head and
+    the CAS from another, so they can disagree.
+    variant 'fill_no_advance': a part does not advance the writer's position,
+    so the next part copies the same units again.
+    variant 'fill_floor': the floor is not lowered to a remainder smaller than
+    it, which then never fits.
+    """
+    stale = variant == 'fill_stale'
+    B = [(p + 'S0', ('load', lambda L: HEAD(0), 'v', '@' + p + 'B0')),
+         (p + 'B0', ('br', lambda L: not (L['v'] & SEALED), '@' + p + 'K0', '@' + p + 'S1')),
+         (p + 'K0', ('set', 'k', lambda L: 0, '@' + p + 'KH')),
+         (p + 'S1', ('load', lambda L: HEAD(1), 'v', '@' + p + 'B1')),
+         (p + 'B1', ('br', lambda L: not (L['v'] & SEALED), '@' + p + 'K1', '@' + p + 'NW')),
+         (p + 'K1', ('set', 'k', lambda L: 1, '@' + p + 'KH')),
+         (p + 'KH', ('set', 'h', lambda L: L['v'], '@' + p + 'KV')),
+         (p + 'KV', ('set', 'v', lambda L: DEL, '@' + p + 'T')),
+         # The room after the head, and the part: as much of the remainder as fits.
+         (p + 'T', ('set', 't', lambda L, c=cap: max(0, min(L['rem'], H + c - L['h'])),
+                    '@' + p + 'CHK')),
+         (p + 'CHK', ('br', (lambda L, f=least: L['t'] < f) if variant == 'fill_floor' else
+                      (lambda L, f=least: L['t'] < min(L['rem'], f)), '@' + p + 'FW',
+                      '@' + p + ('RL' if stale else 'CAS')))]
+    if stale:
+        B += [(p + 'RL', ('load', lambda L: HEAD(L['k']), 'h', '@' + p + 'CAS'))]
+    B += [(p + 'CAS', ('cas', lambda L: HEAD(L['k']), lambda L: L['h'], lambda L: L['h'] + L['t'],
+                       'ok', '@' + p + 'OK')),
+          (p + 'OK', ('br', lambda L: L['ok'], '@' + p + 'OV', '@' + p + 'RT')),
+          (p + 'RT', ('set', 'ok', lambda L: DEL, '@' + p + 'FW2')),
+          # The reservation ends inside the buffer, which was open when taken.
+          (p + 'OV', ('check', lambda M, L, c=cap, w=w: None if (
+              not (L['h'] & SEALED) and L['h'] + L['t'] <= H + c) else
+              f"OVERFLOW: writer {w} reserved {L['t']} units at {L['h']} of a buffer of "
+              f"{c} after its header", '@' + p + 'OK2')),
+          (p + 'OK2', ('set', 'ok', lambda L: DEL, '@' + p + 'RS')),
+          (p + 'RS', ('load', lambda L: SEQ(L['k']), 's', '@' + p + 'CP')),
+          # The memcpy of the part's units: a step of its own, as in reserve_blocks.
+          (p + 'CP', ('ghost', lambda M, L, w=w: (
+              {('$slot', L['k'], L['h'] + j): 1 + w * PER_WRITER + L['u'] + j
+               for j in range(L['t'])}, {}), '@' + p + 'CM')),
+          (p + 'CM', ('add', lambda L: FILLED(L['k']), lambda L: L['t'], '_', '@' + p + 'CG')),
+          (p + 'CG', ('gpost', lambda M, L, w=w: (
+              {('$rseq', 1 + w * PER_WRITER + L['u'] + j): L['s'] for j in range(L['t'])}, {}),
+              '@' + p + 'AD')),
+          (p + 'AD', ('set', 'u', (lambda L: L['u']) if variant == 'fill_no_advance' else
+                      (lambda L: L['u'] + L['t']), '@' + p + 'AR')),
+          (p + 'AR', ('set', 'rem', lambda L: L['rem'] - L['t'], '@' + p + 'CL')),
+          (p + 'CL', ('set', 'h', lambda L: DEL, '@' + p + 'CL1')),
+          (p + 'CL1', ('set', 't', lambda L: DEL, '@' + p + 'CL2')),
+          (p + 'CL2', ('set', 'k', lambda L: DEL, '@' + p + 'NX')),
+          (p + 'NX', ('br', lambda L: L['rem'] > 0, '@' + p + 'S0', done)),
+          # No buffer open, or too little room: wait as reserve_waiting does.
+          (p + 'NW', ('set', 'v', lambda L: DEL, '@' + p + 'NW2')),
+          (p + 'NW2', ('await', lambda M, L: not (M[HEAD(0)] & SEALED) or not (M[HEAD(1)] & SEALED),
+                       '@' + p + 'S0')),
+          (p + 'FW', ('await', lambda M, L: M[HEAD(L['k'])] != L['h'], '@' + p + 'FW2')),
+          (p + 'FW2', ('set', 'h', lambda L: DEL, '@' + p + 'FW3')),
+          (p + 'FW3', ('set', 'k', lambda L: DEL, '@' + p + 'FW4')),
+          (p + 'FW4', ('set', 't', lambda L: DEL, '@' + p + 'S0'))]
+    return B
+
+
+def filling_writer(w, sizes, cap, least, quiet, variant):
+    """A writer of messages of `sizes` units - a put of several parts, then a
+    put-with-signal's fenced rmw of one - each sent as part_blocks says."""
+    B = [('U0', ('set', 'u', lambda L: 0, '@m0_M'))]
+    for m, size in enumerate(sizes):
+        p = f'm{m}_'
+        nxt = f'@m{m + 1}_M' if m + 1 < len(sizes) else '@Q0'
+        B += [(p + 'M', ('set', 'rem', lambda L, n=size: n, '@' + p + 'S0'))]
+        B += part_blocks(p, w, cap, least, nxt, variant)
+    units = sum(sizes)
+    if quiet:
+        B += [('Q0', ('set', 'rem', lambda L: DEL, '@Q1')),
+              ('Q1', ('await', lambda M, L: M[ACKED] >= L['s'], '@Q2')),
+              ('Q2', ('check', lambda M, L, w=w, n=units: None if all(
+                  M[('$applied', 1 + w * PER_WRITER + u)] == 1 for u in range(n)) else
+                  f"QUIET: acked reached {L['s']}, the number writer {w} recorded, "
+                  f"but not all of its units have been applied", '@WEND'))]
     else:
         B += [('Q0', ('set', 's', lambda L: DEL, '@WEND'))]
     B += [('WEND', ('done',))]
@@ -204,7 +320,7 @@ def deliver_check(M, L):
         if M[('$rseq', i)] != seq:
             return (f"SEQ: message {i} left in segment {seq} but its writer recorded "
                     f"{M[('$rseq', i)]}")
-        w, m = (i - 1) // 8, (i - 1) % 8
+        w, m = (i - 1) // PER_WRITER, (i - 1) % PER_WRITER
         want = nxt.get(w, M[('$next', w)])
         if m != want:
             return f'ORDER: writer {w} message {m} delivered before its message {want}'
@@ -219,7 +335,7 @@ def deliver_ghost(M, L):
     n = 0
     for off in range(H, used):
         i = M[('$slot', k, off)]
-        w = (i - 1) // 8
+        w = (i - 1) // PER_WRITER
         upd[('$applied', i)] = 1
         upd[('$next', w)] = upd.get(('$next', w), M[('$next', w)]) + 1
         upd[('$slot', k, off)] = 0
@@ -262,7 +378,7 @@ def progress(design, total, cap, replies):
     B += [('DR', ('br', lambda L: bool(L['rleft']), '@DRx', '@F0'))]
     for r in range(replies):
         p = f'd{r}_'
-        B += reserve_blocks(p, 1 + 7 * 8 + r, cap, '@F0', '@' + p + 'DN')
+        B += reserve_blocks(p, REPLY_BASE + r, cap, '@F0', '@' + p + 'DN')
         B += [(p + 'DN', ('set', 'rleft', lambda L: L['rleft'] - 1, '@' + p + 'DN2')),
               (p + 'DN2', ('set', 's', lambda L: DEL, '@F0'))]
     # which reply is next: replies are sent in order
@@ -345,7 +461,7 @@ def progress(design, total, cap, replies):
                 r = replies - 1 - j                     # newest first
             else:
                 r = replies - left + j                  # oldest first, as queued
-            ident = 1 + 7 * 8 + r
+            ident = REPLY_BASE + r
             upd[('$slot', k, H + j)] = ident
             upd[('$rseq', ident)] = L['nseq']
         taken = 0 if design == 'drain_no_pop' else n
@@ -387,6 +503,22 @@ def case(design, writers, msgs, cap, replies=0, quiet=True):
     return name, threads, mem
 
 
+def fill_case(variant, writers, sizes, cap, least, replies=0, quiet=True):
+    """`sizes` is every writer's messages, or with `writers` None a tuple of
+    each writer's own - a stream beside a writer of small messages."""
+    each = [sizes] * writers if writers is not None else list(sizes)
+    total = sum(sum(own) for own in each) + replies
+    threads = [filling_writer(w, own, cap, least, quiet, variant)
+               for w, own in enumerate(each)]
+    threads.append(progress('design', total, cap, replies))
+    mem = {HEAD(0): SEALED, HEAD(1): SEALED, FILLED(0): 0, FILLED(1): 0, SEQ(0): 0, SEQ(1): 0,
+           ACKED: 0}
+    shown = ' '.join(','.join(map(str, own)) for own in each)
+    name = (f"reservation/{variant} writers={len(each)} sizes={shown} "
+            f"cap={cap} least={least}{f' replies={replies}' if replies else ''}")
+    return name, threads, mem
+
+
 # (design, writers, msgs, cap, replies, tso, expect_ok)
 CASES = [
     ('design', 1, 2, 1, 0, False, True),
@@ -423,6 +555,34 @@ CASES = [
     ('drain_lifo', 0, 0, 4, 2, False, False),
 ]
 
+# v0.2 step 4's first rung, filling the room: a message takes the room the open
+# buffer has, down to `least` units. (variant, writers, sizes, cap, least,
+# replies, tso, expect_ok)
+FILL_CASES = [
+    ('fill', 1, (2, 2), 3, 1, 0, False, True),     # the second message splits across buffers
+    ('fill', 1, (3, 1), 2, 1, 0, False, True),     # a put in two parts, then its signal
+    ('fill', 2, (2,), 3, 1, 0, False, True),       # two writers' parts interleave
+    ('fill', 2, (3,), 2, 1, 0, False, True),       # every message splits
+    ('fill', 2, (2, 1), 2, 2, 0, False, True),     # a floor of two: a part of one only as a remainder
+    ('fill', 1, (3,), 2, 1, 1, False, True),       # beside the pre-open drain's reply
+    ('fill', 2, (2,), 2, 1, 1, False, True),
+    ('fill', 2, (2,), 3, 1, 0, True, True),        # x86-TSO
+    ('whole', 2, (2,), 3, 99, 0, False, True),     # today's whole reservation, messages of two units
+    ('fill', 3, (2,), 3, 1, 0, False, True),       # three writers
+    ('fill', 2, (2, 2), 3, 1, 0, False, True),
+    ('fill', 2, (3, 1), 3, 1, 1, False, True),     # puts and their signals beside a reply
+    ('fill', 2, (3,), 2, 1, 0, True, True),        # x86-TSO, every message split
+    # a stream beside a writer of one-unit messages - fetch-adds, get requests
+    ('fill', None, ((3, 3), (1, 1)), 3, 1, 0, False, True),
+    ('fill', None, ((3,), (1, 1)), 2, 1, 0, False, True),
+    ('fill', None, ((3, 1), (1,)), 3, 1, 1, False, True),   # the stream's signal; a reply
+    ('fill', None, ((2, 2), (1, 1)), 3, 1, 0, True, True),  # x86-TSO
+
+    ('fill_stale', 2, (2,), 3, 1, 0, False, False),
+    ('fill_no_advance', 1, (3,), 2, 1, 0, False, False),
+    ('fill_floor', 1, (2, 1), 2, 2, 0, False, False),
+]
+
 if __name__ == '__main__':
     keep = select(sys.argv)
     ok = True
@@ -431,5 +591,12 @@ if __name__ == '__main__':
         if not keep(name):
             continue
         res = explore(name, threads, mem0, tso=tso, max_seconds=240)
+        ok &= report(res, expect_ok=expect, tso=tso)
+    for variant, writers, sizes, cap, least, replies, tso, expect in FILL_CASES:
+        name, threads, mem0 = fill_case(variant, writers, sizes, cap, least, replies)
+        if not keep(name):
+            continue
+        res = explore(name, threads, mem0, tso=tso, max_seconds=600,
+                      liveness_max_states=3_000_000)
         ok &= report(res, expect_ok=expect, tso=tso)
     sys.exit(0 if ok else 1)

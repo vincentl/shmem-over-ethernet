@@ -1,0 +1,16 @@
+--- /Users/vincent/shmem-over-ethernet/build/scratch/wt/one-thread-ladder/shmem/src/wire.c	2026-10-07 19:58:02
++++ shmem/src/wire.c	2026-10-07 21:01:44
+@@ -71,6 +71,13 @@
+     int one = 1;
+     if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one) != 0)
+         osoe_fatal("cannot set TCP_NODELAY toward node %u: %s", peer, strerror(errno));
++    /* EXPERIMENT (ladder): cap the kernel's unsent queue. */
++    const char *lowat = getenv("OSOE_EXPERIMENT_NOTSENT_LOWAT");
++    if (lowat && atoi(lowat) > 0) {
++        int v = atoi(lowat);
++        if (setsockopt(fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, sizeof v) != 0)
++            osoe_fatal("cannot set TCP_NOTSENT_LOWAT toward node %u: %s", peer, strerror(errno));
++    }
+ 
+     /*
+      * TCP keepalive (§3.15). A peer host that vanishes without a FIN - power

@@ -1,0 +1,54 @@
+kernel network    41.0%
+kernel other      33.9%
+user other        10.0%
+library            8.0%
+io_uring           6.8%
+kernel copy        0.3%
+
+== kernel network
+    18.0%  sock_def_readable
+     2.1%  arch_counter_get_cntvct
+     1.5%  memset
+     1.2%  __local_bh_enable_ip
+     0.8%  loopback_xmit
+     0.8%  tcp_established_options
+     0.7%  __tcp_cleanup_rbuf
+     0.7%  __tcp_transmit_skb
+== kernel other
+    21.0%  try_to_wake_up
+     2.7%  el0_svc
+     1.5%  futex_wake_mark
+     1.2%  fget
+     0.8%  gup_fast_fallback
+     0.7%  invoke_syscall
+     0.7%  futex_wake
+     0.6%  hrtimer_start_range_ns
+== user other
+     4.4%  __kernel_clock_gettime [[vdso]]
+     3.4%  [unknown] [liburing.so.2.9]
+     0.6%  clock_gettime [libc.so.6]
+     0.4%  finalize [inlined]
+     0.4%  syscall [libc.so.6]
+     0.3%  publish_ring [inlined]
+     0.2%  [unknown] [libc.so.6]
+     0.1%  io_uring_submit [liburing.so.2.9]
+== library
+     1.2%  osoe_ring_wait (under agent_main)
+     0.7%  osoe_now_ns (under agent_main)
+     0.7%  agent_main (under agent_main)
+     0.6%  osoe_liveness_check (under agent_main)
+     0.6%  complete (under osoe_am_parse)
+     0.5%  osoe_ring_take_readable (under osoe_progress_poll)
+     0.4%  flush (under flush)
+     0.4%  io_uring_submit@plt (under osoe_progress_poll)
+== io_uring
+     0.9%  io_recv
+     0.8%  gup_fast_fallback
+     0.6%  io_submit_sqes
+     0.6%  __io_commit_cqring_flush
+     0.4%  __wake_up
+     0.3%  arch_counter_get_cntvct
+     0.3%  __io_put_kbufs
+     0.3%  __io_submit_flush_completions
+== kernel copy
+     0.3%  __arch_copy_from_user
