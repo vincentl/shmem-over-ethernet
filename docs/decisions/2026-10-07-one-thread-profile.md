@@ -334,6 +334,37 @@ On the author's answer (`2026-10-07.md` item 11):
   at the 99th percentile, three writers of them 4.43 and 6.6 to 7.2, the stream
   at 112 MiB/s - the experiment's figures.
 
+## What was built: the third rung, the default buffer, and the ladder's tip
+
+On the author's answer (`2026-10-07.md` item 12): `OSOE_AM_BUFFER`'s default four
+chunks (`OSOE_AM_DEFAULT_BUFFER_CHUNKS`, so that it stays above the floor
+whatever the chunk), the floor two; `OSOE_AM_BUFFER_BUDGET` 1 GiB. A sweep found
+the tests that assumed the default (`test-am-size`, two start-up refusals) and
+some twenty-five statements in the README and the design notes; the README now
+says 2,049 nodes at 256 KiB, halved to the floor from 2,050, 4,098 refused.
+
+The tip - filling the room, the kernel's queue capped by the link, 256 KiB
+buffers - measured:
+
+- **Over loopback** (`tip-against-first-rung.txt`, `floor-tip-pairs.txt`): the
+  64 KiB put stream 8,768 to 10,018 MiB/s against the first rung's 6,404 to
+  6,512 - 1.4 to 1.5 times, where the record's "1.75" was measured beside the
+  spare; `shmem.floor`'s ratio 0.58 to 0.67 by the median of each of six runs,
+  the library at 7.6 to 9.8 GiB/s and the bare stream at 9.1 to 15.0, the host
+  under ordinary desktop load; the mailbox 137,418 to 137,756 messages a second
+  against 137,087 to 137,112, unchanged. The poll the stream's pin guards
+  against measured 0.161 to 0.164, above the pin of 0.15: the pin is 0.3.
+- **On the Pi** (`2026-10-07-pi-head-of-line/compare-1/`): `osoe-bench` at 4 x 4
+  and 4 x 1, alternating with `3ee3357` three times - every line within the
+  noise of the tree before Part 0: puts at 112.1 MiB/s, the barrier 176 and
+  185 µs, a fetch-add's, a get's and a put and quiet's round trips, reduce,
+  broadcast, fcollect and alltoall. One thing moved: at 4 x 4 the pairs' sixteen
+  streams share the links more evenly, the leads' from 64 to 74 MiB/s down to
+  28 and the others' from 28 up to 32 to 39, the total 447 MiB/s either way. A
+  fetch-add behind a 1 MiB put stream 3.9 ms at the median and 6.65 to 6.92 at
+  the 99th percentile, three writers of them 4.43 and 7.2 to 7.8, the stream at
+  112 MiB/s.
+
 ## What goes on meanwhile
 
 The rungs that do not depend on the answer, each measured against the one below
