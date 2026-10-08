@@ -584,7 +584,7 @@ where to find what among the documents.
 | `docs/README.md` | where to find what in `docs/` |
 | `docs/pi-cluster.md`, `docs/pi-cluster-results.md` | the runbook for the four-node Raspberry Pi 5 cluster, and what its sessions measured |
 | `docs/release-checklist.md` | what a release needs, ticked where it is done |
-| `docs/design/` | the design notes, `shmem-ethernet-design.md`; three proposals and a note on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
+| `docs/design/` | the design notes, `shmem-ethernet-design.md`; four proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
 | `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |
 | `docs/prompts/` | the written briefs each working session was given; the finished ones are in `done/` |
 | `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds (`evidence/`) |
