@@ -499,24 +499,26 @@ static void print_connection_lines(const struct osoe_segment *s)
             b.detail_kind <= OSOE_SEGMENT_DETAIL_REPLY)
             waiting[asleep++] = (struct word_waiter){ b.detail, b.detail_kind };
     }
-    printf("\n%5s %10s %10s %10s %10s %7s %7s %10s %10s %10s\n",
-           "peer", "seg sent", "bytes", "seg appl", "bytes", "ctrlq", "bulkq",
+    printf("\n%5s %10s %10s %10s %10s %7s %7s %7s %10s %10s %10s\n",
+           "peer", "seg sent", "bytes", "seg appl", "bytes", "ctrlq", "valq", "bulkq",
            "sent thru", "acked", "wanted");
     for (uint32_t c = 0; c < s->connection_count; c++) {
-        uint64_t peer = 0, ss = 0, bs = 0, sa = 0, ba = 0, cq = 0, bq = 0, st = 0, ack = 0, want = 0;
+        uint64_t peer = 0, ss = 0, bs = 0, sa = 0, ba = 0, cq = 0, vq = 0, bq = 0, st = 0,
+                 ack = 0, want = 0;
         osoe_segment_read_name(s, "connection.peer", c, &peer);
         osoe_segment_read_name(s, "connection.segments_sent", c, &ss);
         osoe_segment_read_name(s, "connection.bytes_sent", c, &bs);
         osoe_segment_read_name(s, "connection.segments_applied", c, &sa);
         osoe_segment_read_name(s, "connection.bytes_applied", c, &ba);
         osoe_segment_read_name(s, "connection.control_queue_depth", c, &cq);
+        osoe_segment_read_name(s, "connection.value_queue_depth", c, &vq);
         osoe_segment_read_name(s, "connection.bulk_queue_depth", c, &bq);
         osoe_segment_read_name(s, "connection.sent_through", c, &st);
         osoe_segment_read_name(s, "connection.acked_through", c, &ack);
         osoe_segment_read_name(s, "connection.wanted_through", c, &want);
         printf("%5" PRIu64 " %10" PRIu64 " %10" PRIu64 " %10" PRIu64 " %10" PRIu64
-               " %7" PRIu64 " %7" PRIu64 " %10" PRIu64 " %10" PRIu64 " %10" PRIu64 "\n",
-               peer, ss, bs, sa, ba, cq, bq, st, ack, want);
+               " %7" PRIu64 " %7" PRIu64 " %7" PRIu64 " %10" PRIu64 " %10" PRIu64 " %10" PRIu64
+               "\n", peer, ss, bs, sa, ba, cq, vq, bq, st, ack, want);
     }
     for (uint32_t c = 0; asleep > 0 && c < s->connection_count; c++) {
         uint64_t peer = 0;

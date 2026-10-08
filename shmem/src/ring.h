@@ -83,11 +83,15 @@ struct osoe_ring {
 
 /*
  * Create the ring for `wire_count` wires with `buffer_count` provided buffers
- * of `buffer_bytes` each, disabled until osoe_ring_enable. Fatal if the kernel
- * gives smaller queues than the bounds above.
+ * of `buffer_bytes` each, disabled until osoe_ring_enable. Its first
+ * `lending_count` wires may send by reference and owe up to
+ * `notifications_per_wire` notifications each: an owner's data wires, which
+ * come before owner 0's control wires on its ring (owner-map.h), and a control
+ * wire never lends. Fatal if the kernel gives smaller queues than the bounds
+ * above.
  */
 void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_count,
-                    uint32_t buffer_count, uint32_t buffer_bytes,
+                    uint32_t lending_count, uint32_t buffer_count, uint32_t buffer_bytes,
                     uint32_t notifications_per_wire);
 
 /* A send's user data: its wire's index on the ring, and the region it lends
@@ -119,8 +123,11 @@ bool osoe_ring_wait(struct osoe_ring *r, uint64_t timeout_ns);
 bool osoe_ring_wait_wake(struct osoe_ring *r, _Atomic uint32_t *wake, uint32_t seen,
                          uint64_t timeout_ns);
 
-/* Take, and clear, the readable bits of wires 64*word .. 64*word+63. */
-uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t word);
+/* Take, and clear, the readable bits of the ring's wires `first` to
+ * `first` + `count` - 1, `count` 64 at most, as bits 0 on: a range of wires
+ * need not start a word, since owner 0's control wires follow its data wires on
+ * one ring (owner-map.h). */
+uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t first, uint32_t count);
 
 /* Give a provided buffer back to the kernel (wire.c, when a buffer is empty). */
 void osoe_ring_recycle(struct osoe_ring *r, uint32_t buffer);

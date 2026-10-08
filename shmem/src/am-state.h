@@ -46,8 +46,11 @@ struct osoe_am_state {
     bool lead;                      /* this PE is its node's lead */
     struct osoe_connection_area area;
     struct osoe_am_owner *owner;                 /* the area's helpers + 1, by owner */
-    struct osoe_wire *wire;                      /* nodes - 1, grouped by owner (owner-map.h) */
+    struct osoe_wire *wire;                      /* 2 x (nodes - 1), grouped by ring (owner-map.h):
+                                                  * the data wires, and owner 0's control wires */
     struct osoe_progress_connection *connection; /* nodes - 1, grouped by owner */
+    struct osoe_progress_control *control;       /* nodes - 1, owner 0's, by peer slot */
+    uint64_t *control_busy;                      /* their busy bitmap */
     uint64_t *busy;                              /* each owner's bitmap in turn */
     struct osoe_reply *descriptor;               /* each owner's pool in turn (§3.8) */
     struct osoe_progress_team *team;             /* OSOE_TEAM_BLOCKS: per-block tree state */

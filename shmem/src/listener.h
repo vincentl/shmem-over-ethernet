@@ -47,12 +47,18 @@
 
 #include "bootstrap.h"
 
-/* What a connection is for; a lead accepts one purpose at a time and tells a
- * caller wanting the other to come back. */
+/* What a connection is for; a lead accepts the purposes it is waiting for and
+ * tells a caller wanting another to come back. A node pair is joined by two
+ * connections, a control wire and a data wire (§3.1; the progress helpers
+ * proposal's §3.1), which the hello tells apart. */
 enum osoe_hello_purpose {
-    OSOE_HELLO_MESH = 1,        /* a node-pair connection (§3.1) */
+    OSOE_HELLO_DATA_WIRE = 1,   /* a node pair's data wire (§3.1) */
     OSOE_HELLO_RENDEZVOUS,      /* a child of the rendezvous tree (§6.2) */
+    OSOE_HELLO_CONTROL_WIRE,    /* a node pair's control wire */
 };
+
+/* A set of purposes, a bit each, for osoe_listener_accept. */
+#define OSOE_HELLO_PURPOSE(purpose) (UINT32_C(1) << (purpose))
 
 /* A caller part-way through the hello (listener.c). */
 struct osoe_listener_caller;
@@ -90,14 +96,15 @@ void osoe_listener_open_any_port(struct osoe_listener *l, const struct osoe_boot
 void osoe_listener_close(struct osoe_listener *l);
 
 /*
- * Accept the next connection from this job and session for `purpose`, and
- * return its socket, with the caller's node in `peer`. Answers every other
- * caller - another job, another node of this job looking for someone else, the
- * wrong purpose - and keeps waiting. `expecting` says whom it waits for, for
- * its notice: "node 5", "nodes 1 and 3 of the mesh".
+ * Accept the next connection from this job and session for one of `purposes`
+ * (OSOE_HELLO_PURPOSE), and return its socket, with the caller's node in
+ * `peer` and, unless NULL, its purpose in `purpose`. Answers every other
+ * caller - another job, another node of this job looking for someone else, a
+ * purpose not in the set - and keeps waiting. `expecting` says whom it waits
+ * for, for its notice: "node 5", "nodes 1 and 3 of the mesh".
  */
-int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpose,
-                         uint32_t *peer, const char *expecting);
+int osoe_listener_accept(struct osoe_listener *l, uint32_t purposes, uint32_t *peer,
+                         enum osoe_hello_purpose *purpose, const char *expecting);
 
 /*
  * Node `node`'s address from the host list: OSOE_STEP_NODELIST, which mirrors

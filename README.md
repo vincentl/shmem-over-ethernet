@@ -624,13 +624,13 @@ build tree.
   memory - but for the prefix scans, a tree over the team's ranks; alltoall, in
   which every PE has a block for every other; collect's lengths, a word a PE;
   and the deprecated active-set collectives, which run PE by PE - while the
-  connection mesh is linear in it, n - 1 connections a node ("Scaling with
-  nodes", below); within a node, linear or better in the PEs there - tested with
-  at most 15 PEs on a node, and timed with 4 on the Pi cluster and, for the
-  barrier alone, up to 32 on one four-core virtual machine (design §5.3): a
-  node's barrier arrival is one cache line that all its PEs add to, and in a
-  reduction the node's lead PE combines the node's vectors one after another on
-  its own thread, O(PEs × bytes).
+  connection mesh is linear in it, two connections to each of a node's n - 1
+  peers ("Scaling with nodes", below); within a node, linear or better in the
+  PEs there - tested with at most 15 PEs on a node, and timed with 4 on the Pi
+  cluster and, for the barrier alone, up to 32 on one four-core virtual machine
+  (design §5.3): a node's barrier arrival is one cache line that all its PEs add
+  to, and in a reduction the node's lead PE combines the node's vectors one
+  after another on its own thread, O(PEs × bytes).
 - **Cores are not assumed spare.** A node runs a PE on every core with the
   library's progress thread beside them, so oversubscription is the normal case:
   nothing spins. A waiting PE sleeps on a futex, and a start-up wait for an
@@ -661,11 +661,16 @@ build tree.
   a `memcpy` or a CPU atomic in the caller's own thread - no message, and no
   system call unless the target waits on what it changed, which takes one futex
   wake - and `shmem_ptr` hands out a plain pointer to a node-mate's object.
-- **One TCP connection per pair of nodes**, not per pair of PEs, carries every
-  PE's operations between those two nodes as active messages. Its one ordered
-  stream is what lets `shmem_fence` return without waiting: operations to a node
-  are applied in the order they were sent, so a fence only asks each node
-  written to since the last acknowledgement to acknowledge, and goes on.
+- **Two TCP connections per pair of nodes**, not per pair of PEs. The data
+  wire carries every PE's operations between those two nodes as active
+  messages; its one ordered stream is what lets `shmem_fence` return without
+  waiting: operations to a node are applied in the order they were sent, so a
+  fence only asks each node written to since the last acknowledgement to
+  acknowledge, and goes on. The control wire carries the barrier's arrivals and
+  releases, the deadlock detector's messages and its own goodbye, and nothing
+  else, so a barrier's messages never queue behind a put's bytes in a buffer or
+  a socket: they share the link, and the node's progress thread, which takes
+  the control wires first.
 - **One progress thread a node drives the network.** Every PE starts an agent
   thread; once the job has started, the node lead's is the only thread that
   touches a socket or an io_uring ring. It sends, receives, and applies arriving
@@ -706,7 +711,7 @@ in all), computed from the code; the times are measured where a record says so.
 | Operation | How | Cost, for n nodes of P PEs, N PEs in all, and a team of M members on S nodes |
 |---|---|---|
 | put, get, atomic to a node-mate | memcpy or CPU atomic on the shared heap | no system call, but a futex wake when the target waits on the word |
-| any of those across nodes | an active message on the node pair's one connection, applied by the target node's progress thread | the connections' state O(n) a node, not O(n × P); each PE's ordering state O(n) a context, 21 bytes a node |
+| any of those across nodes | an active message on the node pair's data wire, applied by the target node's progress thread | the connections' state O(n) a node, not O(n × P); each PE's ordering state O(n) a context, 21 bytes a node |
 | barrier, sync, and reductions and broadcasts of at most `OSOE_SMALL_COLLECTIVE_BYTES` (1 KiB by default) | the node's PEs meet in shared memory; the node leads meet in a k-ary tree (`OSOE_COLLECTIVE_FANOUT`, default 8), a reduction or broadcast in one piece through slots its team keeps | up a tree at most ⌈log_k n⌉ levels deep and back down, a hop a level each way |
 | larger reductions and broadcasts | pieces pipelined through a tree of the node leads whose fan-out - from 2 to `OSOE_COLLECTIVE_FANOUT` - each call takes for its size from the link, measured as the job starts or set (`OSOE_COLLECTIVE_SHAPE`), every node alike, four pieces in flight (`OSOE_COLLECTIVE_PIPELINE`), through slots the thread leading each node's part lends to the collective - its *lane* - which a reduction's leads name to their children as they enter. A reduction the link says it pays for instead takes Träff's circulant reduce-scatter and allgather among the leads (J. L. Träff, 2024): in each of ⌈log₂ n⌉ rounds a half, every lead sends part of its vector to one lead and receives another part from another, combining it in, until each holds its n-th of the result, and then the n-ths go round the other way - through the same lanes, each lead granting its senders its lane as it enters | O(P × bytes) for the lead's combine on a node, then the tree; a reduction's child waits for its parent's lane, once: up to a hop when the two enter together - nothing once the child's own node takes a hop - and up to a round trip, the grant down and the first piece back, when the parent enters after it. On the Pi cluster's four nodes, against 0.1.0's one tree (a fan-out of 4, two in flight), a 1 MiB broadcast took 1.43 to 1.47 times less time and a 1 MiB reduction 1.20 to 1.26, every size from 64 KiB up was faster, and no size slower beyond the run-to-run noise. Träff's: 2⌈log₂ n⌉ rounds, and every lead's link carries under two vectors where a tree's busiest carries k + 1. On the Pi cluster's four nodes, against those trees, a 1 MiB reduction took 1.32 to 1.41 times less time, 2 and 4 MiB 1.43 and 1.46, every size from 16 KiB was faster - 1.04 to 1.58 times by OSU's benchmark and the project's probe - and every size to 8 KiB took the trees, unchanged; the cost model, not a measurement, puts the 1 MiB gain at about 1.7 times on seven nodes and more, where a tree has interior nodes |
 | `fcollect` | Bruck's allgather among the node leads | ⌈log₂ n⌉ steps, each node receiving every other node's data once |
@@ -715,7 +720,7 @@ in all), computed from the code; the times are measured where a record says so.
 | `alltoall`, `alltoalls` | every block put directly, then a barrier | O(N) a PE - inherent: every PE has a block for every other - and so P(N - P) blocks into a node, all applied by its one progress thread, a message each up to a chunk (`OSOE_AM_CHUNK`) and, for an `alltoalls` with a stride, one an element: 32.7 million messages a call at 500 nodes of 256 |
 | a team | a number agreed by one reduction over the parent of every member's free numbers, the same on all of them, and a block from each member node's pool, given back at destroy | the reduction of `OSOE_MAX_TEAMS` / 64 + 1 words - about what one broadcast costs - and a second, of one word, when any PE of the parent has `SHMEM_THREAD_MULTIPLE`, then a sync of the parent: about a broadcast and a barrier, and a destroy a barrier of the team; O(P) a member, testing its node's PEs; on each node's lead, O(M log n) once to find the team's nodes from its members, a search of the rank map for each - O(M log M) more when they are not met in node order - and the S leads kept |
 | waiting | a futex word per resource a connection has, shared by the node's PEs; one per thread for its replies and watches, per PE for its agent and its landing zone, per context for its counters | O(1) a waiter - but room made in a connection's buffer wakes every writer waiting for it (Limits) |
-| start-up | the node leads' rendezvous tree, then their mesh; then, where the large collectives' link is measured, the root's lead timing round trips and streams to its first children's, and one reduction of three words handing every PE its numbers | ⌈log₈ n⌉ levels, then n - 1 connections a lead, made one after another; then the measurement, about 27 ms of the Pi cluster's start - its streams carry 1.9 MiB, so about 170 ms on a link of 100 Mbit/s - and the reduction's ⌈log_k n⌉ levels at the fan-out k |
+| start-up | the node leads' rendezvous tree, then their mesh; then, where the large collectives' link is measured, the root's lead timing round trips and streams to its first children's, and one reduction of three words handing every PE its numbers | ⌈log₈ n⌉ levels, then 2(n - 1) connections a lead - a control wire and a data wire a peer - made one after another; then the measurement, about 27 ms of the Pi cluster's start - its streams carry 1.9 MiB, so about 170 ms on a link of 100 Mbit/s - and the reduction's ⌈log_k n⌉ levels at the fan-out k |
 | `SHMEM_THREAD_MULTIPLE` | threads issue on a shared context without a lock; every wait that completes its operations - a quiet, `shmem_pe_quiet`, a strided get's end, and the quiet a barrier or `shmem_clear_lock` makes - takes the context's, and one shares a full quiet that began and ended while it waited for it | O(1) an operation |
 
 Where the design admits a limit of its own: a large broadcast, and a reduction
@@ -727,9 +732,9 @@ two send the same bytes, the cost model takes the tree for a size of whole
 takes 2⌈log₂ n⌉ rounds where a tree takes 2⌈log_k n⌉ levels, and a team of more
 than 65,536 nodes takes the tree at every size; a call's shape is chosen from
 one link's numbers, the root's lead's to its first children's, so a job whose
-links differ is shaped for that one; every pair of nodes connects at start-up,
-so the job holds n(n - 1)/2 connections, n - 1 a node; and one thread a node
-moves all of its internode messages (Limits, below).
+links differ is shaped for that one; every pair of nodes connects twice at
+start-up, so the job holds n(n - 1) connections, 2(n - 1) a node; and one
+thread a node moves all of its internode messages (Limits, below).
 
 Within a node, each collective's phase is O(P): its PEs arrive on one cache
 line, the release of a reduction or broadcast is one futex wake of every PE
@@ -754,10 +759,10 @@ The `/dev/shm` capacity check counts the objects whole all the same.
 | What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.06 GiB | 17.0 GiB | 68.4 GiB |
 | The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 285 KiB a PE - 260 KiB of it the PE's landing zone for gets (`OSOE_GET_LANDING_BYTES`) - and 128 bytes a peer node | 2.1 MiB | 18.8 MiB | 72.3 MiB, 1.5 written at start |
 | The connection area | in `/dev/shm`, one a node | 512 KiB of buffers and 1.25 KiB of state a peer node | 1.5 MiB | 31.6 MiB | 250 MiB, 0.6 written at start |
-| The node lead's own | its private memory | about 0.8 MiB and 3.5 KB a peer node, most of it the reply pool, and 1 MiB of receive buffers as traffic comes | 1.8 MiB | 2.0 MiB | 3.5 MiB |
+| The node lead's own | its private memory | about 0.8 MiB and 8.1 KB a peer node - the reply pool, and 4.6 KB of it the peer's control wire, 4 KiB its private send buffer - and 1 MiB of receive buffers as traffic comes | 1.8 MiB | 2.3 MiB | 5.7 MiB |
 | Every PE's own, for the other nodes | its private memory | 24 bytes a peer node, and 21 a peer node for each context in use | 135 bytes | 2.8 KB | 22.5 KB |
 | The job object: the rank map and each node's address | in `/dev/shm`, one a node | 136 bytes a node, and 24 a run of the rank map - n of them under a block distribution, P under a cyclic one, and under a plane or an arbitrary one as many as the ranks fall in, up to one a rank: 32,000, 768 KB a node, at 500 nodes of 256 under `plane=4` | 1.1 KiB | 10.4 KiB | 79 KiB |
-| Sockets | the lead's | n - 1 a node, n(n - 1)/2 in the job | 3, 6 | 63, 2,016 | 499, 124,750 |
+| Sockets | the lead's | 2(n - 1) a node, a control wire and a data wire to each other node; n(n - 1) in the job | 6, 12 | 126, 4,032 | 998, 249,500 |
 
 A team number is 24.25 KiB a PE at 4 nodes and 26.9 at 500: its counters and
 small slots - one for each child position of the tree and one for releases, for
@@ -802,10 +807,11 @@ times these:
 - **The deprecated active-set collectives** run PE by PE: a binomial tree over
   the set's ranks, log₂ of its size deep, its edges across nodes wherever its
   PEs are.
-- **The mesh**: every pair of nodes connects at start-up, each lead's n - 1
-  connections made one after another. A lead calls no higher node until every
-  lower one has called it, so the start-up is a chain of node-to-node
-  connections, the last lead connected after about n connection times, and a
+- **The mesh**: every pair of nodes connects twice at start-up, a control wire
+  and a data wire, each lead's 2(n - 1) connections made one after another. A
+  lead calls no higher node until every lower one has called it, so the start-up
+  is a chain of node-to-node connections, the last lead connected after about 2n
+  connection times - modelled at 1.7 ms for 4 nodes and 0.58 s for 1,024 - and a
   larger system may need it changed (`docs/design/mesh-schedule-proposal.md`
   proposes a schedule). On one subnet each node also needs an entry in the
   kernel's neighbour table, its record of a peer's Ethernet address, for each
@@ -971,9 +977,10 @@ specification or takes a choice the specification leaves open.
   rendezvous's port range. A heterogeneous Slurm job is refused at start-up.
 - **A host name that resolves only to IPv6 is refused.**
 - **At most 65,535 PEs a node**, and **descriptors for the network**: a lead
-  holds a socket for every other node and a descriptor for every other PE of its
-  node, beside the program's own, so the hard limit on open files (`ulimit -Hn`)
-  must leave room for them; `shmem_init` raises the soft limit to it.
+  holds two sockets for every other node - its control wire and its data wire -
+  and a descriptor for every other PE of its node, beside the program's own, so
+  the hard limit on open files (`ulimit -Hn`) must leave room for them;
+  `shmem_init` raises the soft limit to it.
 - **A program linked statically is refused**: `oshcc -static` says so, since the
   C library's own state would then be gathered with the program's symmetric
   statics.
@@ -1174,9 +1181,10 @@ that one could be added without touching the OpenSHMEM layer.
   registered memory region a node rather than a PE, its node's heaps laid out
   contiguously, so the key table stays 16 bytes a node; reliable connections of
   one of two kinds - XRC queue pairs, one per context and target node, matching
-  today's one connection a node pair, which that review recommended, with DC
-  behind a build-time switch, or DC (dynamically connected) transport alone,
-  which a later review of the seam recommended instead
+  today's data wire a node pair (the control wire a queue pair of the lead's
+  beside them), which that review recommended, with DC behind a build-time
+  switch, or DC (dynamically connected) transport alone, which a later review
+  of the seam recommended instead
   (`docs/reviews/archive/phase1-step2-slice1-roce-seam.md`, F12);
   quiet as reaping completions, with a zero-length read where a write's
   completion does not promise visibility; and a per-node polling thread in
@@ -1378,7 +1386,7 @@ moves every message of the node
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by all of a node's connections: the node holds their product, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
-| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting seconds for the peer's delayed TCP acknowledgement; and on a fast link a buffer is the kernel's until acknowledged, which holds one peer's stream to about 512 KiB a round trip. Not timed on a fast link: v0.2 step 4 decides its default there, and whether a connection needs more than two buffers. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,638 nodes is refused (io_uring's completion queue). `osoe-stat` counts the sends by reference, their notifications, and those the kernel did not send by reference after all. Each node's own. |
+| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting seconds for the peer's delayed TCP acknowledgement; and on a fast link a buffer is the kernel's until acknowledged, which holds one peer's stream to about 512 KiB a round trip. Not timed on a fast link: v0.2 step 4 decides its default there, and whether a connection needs more than two buffers. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused (io_uring's completion queue). `osoe-stat` counts the sends by reference, their notifications, and those the kernel did not send by reference after all. Each node's own. |
 
 **For testing**
 

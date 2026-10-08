@@ -1,0 +1,12 @@
+ 43/844 Test  #44: shmem.barrier-am.0-1-2 ...........................................***Failed   25.01 sec
+ 44/844 Test  #45: shmem.barrier-am.0-0-1-1-2-2 .....................................***Failed   25.01 sec
+osoe_fatal: node 1: node 0's stream ended in the middle of a segment: its lead has exited or died mid-send
+osoe_fatal: node 2: node 1's stream ended in the middle of a segment: its lead has exited or died mid-send
+ 67/844 Test  #46: shmem.barrier-am.0-0-0-1-2-2 .....................................***Failed   25.01 sec
+140/844 Test  #47: shmem.barrier-am.0-1-2-0-1-0 .....................................***Failed   25.01 sec
+155/844 Test #153: shmem.progress ...................................................***Failed   25.01 sec
+osoe_fatal: node 0: node 1 ended its connection without its goodbye: its lead has exited or died (§6.4)
+156/844 Test #156: shmem.owners.H2.N5 ...............................................***Failed   40.01 sec
+osoe_fatal: node 4: node 0's stream ended in the middle of a segment: its lead has exited or died mid-send
+160/844 Test #157: shmem.owners.H3.N5 ...............................................***Failed   40.01 sec
+162/844 Test #158: shmem.owners.H2.N9 ...............................................***Failed   40.01 sec

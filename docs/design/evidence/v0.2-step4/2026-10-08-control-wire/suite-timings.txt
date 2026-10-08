@@ -1,0 +1,40 @@
+# The debug suite's circulant and many-node shape tests, seconds, at -j4:
+# Part 1 at 5264aba (verify-1, beside the models in the other VM) and at
+# 95f3339 (verify-2); Part 2's first whole run (smoke-2), while Part 1's asan,
+# tsan and tier 3 ran in the other VM. F: failed - osoe-launch's 240 s.
+test                                                            verify-1  verify-2   smoke-2
+shmem.circulant.arithmetic                                           0.2       0.2       0.2
+shmem.shape.chosen.pi.4                                              0.2       0.2       0.2
+shmem.shape.chosen.pi.16                                             0.8       0.8       0.9
+shmem.shape.chosen.loopback.16                                       0.7       0.9       0.9
+shmem.shape.chosen.pi.64                                            10.5      12.4      19.8
+shmem.shape.chosen.loopback.64                                      13.0      15.2      23.7
+shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15      12.7      15.0      23.0
+shmem.shape.back-to-back.0-0-1-1-2-2-3-3-4-4-5-5-6-6-7-7            10.8      13.7      20.8
+shmem.circulant.3                                                    3.9       4.1       3.5
+shmem.circulant.4                                                    2.3       2.6       2.5
+shmem.circulant.5                                                    3.1       3.1       3.3
+shmem.circulant.6                                                    3.9       4.2       4.7
+shmem.circulant.2                                                    9.8      11.6      11.1
+shmem.circulant.7                                                    4.8       5.1       6.0
+shmem.circulant.8                                                    6.4       6.5       7.4
+shmem.circulant.9                                                    9.3       9.7       9.3
+shmem.circulant.12                                                  12.4      14.4      13.1
+shmem.circulant.16                                                  24.5      24.5      27.7
+shmem.circulant.17                                                  39.1      39.9      53.0
+shmem.circulant.33                                                  92.6      94.7     149.8
+shmem.circulant.64                                                 211.0     215.4     340.6
+shmem.circulant.70                                                 257.4     260.1     430.3
+shmem.circulant.4.threads                                            8.9       8.7      17.3
+shmem.circulant.4.max-teams-4                                        9.1       9.9      40.5
+shmem.circulant.5.stress                                            13.3      14.6      68.6
+shmem.circulant.7.lanes                                              2.9       2.5       1.3
+shmem.circulant.16.threads                                          21.6      20.8      55.5
+shmem.circulant.5.lanes                                              1.2       1.2       1.2
+shmem.circulant.16.perturb                                          82.6      78.3     172.5
+shmem.circulant.5.ceiling-2                                          5.9       5.1       6.4
+shmem.circulant.3.window-128                                         4.5       4.2       5.3
+shmem.circulant.4.diverge                                            0.1       0.1       0.1
+shmem.circulant.5.capacity-1                                         6.6       5.5       6.5
+shmem.circulant.16.tiny                                             11.5      10.1      11.9
+shmem.circulant.16.tree                                             65.3      58.1      54.5

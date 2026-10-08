@@ -254,6 +254,28 @@ order. This yields the central simplification:
 
 This property is destroyed by any second data socket. Do not add one.
 
+*As built since v0.2 step 4's Part 2* (`docs/design/progress-helpers-proposal.md`
+§3.1): **two connections a node pair, a control wire and a data wire** - and the
+second is not a data socket. The data wire is the stream this section is about:
+every put, get, atomic and reply, and every collective's data, which are puts
+and adds, on one ordered stream a pair, so fence keeps its property. The control
+wire carries the control plane alone: the internode tree's ARRIVE and RELEASE,
+the deadlock detector's messages, and each wire's goodbye or abortive goodbye -
+nothing with a payload, and nothing a data message's order depends on (a
+barrier's quiet has its acknowledgements before its arrival is posted; a
+release promises nothing about data; the detector needs every message it
+counts acknowledged, on whichever wire, not ordered against the others). Its
+segments are acknowledged as the data wire's are (§3.4, invariant 22): the
+tree's two messages are application work their receiver counts, and the
+detector's proof needs a node whose message is not yet applied to look busy
+(§3.15) - which, as first built, unacknowledged, it did not (the adversarial
+read of Part 2, F1). It is the lead's, sealed from a private buffer no PE
+writes, so a barrier's messages never queue behind a put's bytes in a buffer
+or a socket - they share the link, and the progress thread, whose pass takes
+the control wires first - and the control plane's structures have one owner
+however many threads move the data (§3.12). It costs a second socket a pair,
+and a mesh twice as long to make (§6.2).
+
 ### 3.2 Chunking
 
 Application-level fragmentation at ~64 KB. A 4 MB payload holds the stream for
@@ -425,10 +447,13 @@ on 6.12). Both bounds are computed and asserted at open: the SQ holds `2 × wire
 wires + 1` — one completion per provided buffer, because a buffer is refilled
 only after the pass that emptied it; a terminal completion per armed receive; a
 send per wire; the futex wait — and with the zero-copy send on (v0.2 step 4,
-below) 16 more a wire, the notifications a wire may owe: `buffers + 18 × wires
-+ 1`, which io_uring's 65,536 completions bound at 3,638 nodes with the default
-buffers, past which the setting is refused by name. A submission that finds the
-SQ full is a fatal naming the broken bound, not a retry.
+below) 16 more a data wire, the notifications a wire that lends may owe: `buffers
++ 2 × wires + 16 × data wires + 1`, on owner 0's ring at no helpers `buffers +
+20 × (n - 1) + 1` with the control wires (§3.1), which never lend - which
+io_uring's 65,536 completions bound at 3,274 nodes with the default buffers
+(3,638 on one wire a pair), past which the setting is refused by name. A
+submission that finds the SQ full is a fatal naming the broken bound, not a
+retry.
 
 **One provided-buffer ring for every wire**, `OSOE_WIRE_BUFFERS` of
 `OSOE_WIRE_BYTES` (default 64 × 16 KiB), so the memory a node holds for
@@ -873,6 +898,13 @@ construction.
 | Control | AMO results, collective forwards | Fully, first |
 | Bulk | Get reply chunks | Round-robin, remaining space |
 
+*As built since v0.2 step 4's Part 2:* the collective forwards and the
+detector's messages queue on the control wire toward their node (§3.1), which
+carries nothing else, so no get reply is ever ahead of them; a data connection
+keeps the AMO results, its *value* queue, drained fully first, and the bulk
+queue. `osoe-stat`'s connection table shows the three (`ctrlq`, `valq`,
+`bulkq`).
+
 Barrier latency gates the whole job; a barrier forward behind a 1 MB get reply
 stalls every PE. The control queue is small and drains to empty, so it cannot
 starve the bulk queue in practice. The reverse would happen constantly.
@@ -974,11 +1006,12 @@ the node can hold at once (§5.7): a number is each PE's own, so a node may hold
 more teams than any one PE's numbers. The bound a block needs the old team's
 forwards gone before the block is claimed again, and a team's members leave
 its block only after its local release - which `release_local` applies only
-once the team's RELEASEs have left the children's control queues. It drains
-and flushes each child's connection first, as it always did, and that empties
-them unless a connection has no room; then the local release waits a pass, or
-as many as the room takes (`transport.am.releases_held` counts the times it is
-held back, twice a pass). The
+once the team's RELEASEs have left the children's control queues. It flushes
+each child's control wire first (since v0.2 step 4's Part 2; until then it
+drained and flushed each child's connection), and that seals them unless a
+segment is still on the wire, the wire's one buffer; then the local release
+waits a pass, or as many as the send takes (`transport.am.releases_held`
+counts the times it is held back, twice a pass). The
 adversarial read of step D found the first build applied the release whatever
 the drain left, which made the bound hold only when the drain emptied the
 queues. 5,120 descriptors at the defaults,
@@ -999,7 +1032,11 @@ gives the target a smaller `OSOE_AM_CREDITS` than the origin.
 
 **The control queue is multi-producer** once a node runs more than one progress
 thread: a collective forward received on one shard's connection is enqueued
-toward a peer owned by another shard, with a wake to that shard. Pre-allocate at maximum. **Assert
+toward a peer owned by another shard, with a wake to that shard.
+*Not so since v0.2 step 4's Part 2:* a collective forward arrives on a control
+wire and is queued toward a control wire, both the lead's, so the control queue
+has one producer whatever the threads - the progress helpers proposal's reason
+for the control wire. Pre-allocate at maximum. **Assert
 hard on overflow** with peer identity and queue contents. Export the high-water
 mark so the counter history identifies which invariant broke.
 
@@ -6442,6 +6479,14 @@ phase 1 step 3 as a tree rooted at that lead - "The rendezvous as built", below.
   and key material).
 - **Node-pair connections:** the lower node index connects to the higher, so each
   pair opens exactly one stream (§3.1).
+  *As built since v0.2 step 4's Part 2:* two, the control wire first and then the
+  data wire (§3.1), which the hello tells apart by its purpose
+  (`OSOE_HELLO_CONTROL_WIRE`, `OSOE_HELLO_DATA_WIRE`), a lead accepting either
+  while it waits for its lower nodes. The chain of connection times is about 1.8
+  times as long - 1.7 ms at 4 nodes where it was 0.95, 583 ms at 1,024 where it
+  was 322 (`mesh_timing.py`'s two wires) - which `docs/design/mesh-schedule-proposal.md`
+  is the answer to either way. The control wires are owner 0's, on its ring
+  after its data wires (`owner-map.h`).
 
 *Node-pair connections as built* (phase 1 step 3 slice 1; `listener.[ch]`,
 `osoe_wires_open`). **Every lead listens, not only node 0's**, on the first free
@@ -6638,7 +6683,8 @@ must is an RDMA one.
   for (§3.15).
 - `shmem_init` raises the soft `RLIMIT_NOFILE` to the hard limit. Slurm propagates
   the submitting shell's limits, commonly a soft limit of 1,024, and a lead on a
-  500-node job holds one socket per peer node.
+  500-node job holds two sockets per peer node, its control wire and its data
+  wire (§3.1; one until v0.2 step 4).
 - **Bare `sbatch` launch.** If `SLURM_JOB_ID` is set but `SLURM_STEP_ID` is not,
   the program was started directly by a batch script rather than by `srun`.
   Fail at once with that message rather than waiting for peers that will never
@@ -6808,6 +6854,20 @@ Things to get right, each of which is a silent bug otherwise:
   one `OSOE_AM_ABORT`, sent without waiting for the drain, since the job's own
   traffic has stopped. A peer takes the end of stream after it for the job
   ending, not a death, and ends with the status it carried.
+  *As built since v0.2 step 4's Part 2:* **each of a pair's two wires closes on
+  its own** - its goodbye after its own last bytes, its end of stream after its
+  goodbye, its socket closed once the peer's end of stream has arrived on it -
+  and a reset is judged per wire, by that wire's goodbye and end of stream.
+  `close_model.py`'s two-wire cases check it on a pair of nodes, with liveness:
+  a goodbye on one wire alone makes the other's end of stream a death, and a
+  close on either wire's end resets the other. The abortive goodbye goes on
+  every wire that has someone to tell - none where the peer's own has arrived -
+  so two that cross can arrive on different wires: a peer's abort is the
+  peer's, not its wire's, and with no helpers, where one owner holds both of a
+  peer's wires, its abort read on either excuses the other's reset and, naming
+  another caller, stops a carrier waiting on either (Part 2's second
+  adversarial read, S1 and N1; `carrier_model.py`). With helpers the two wires
+  are two owners', and Part 3 carries the word between them.
 - **A child created by `fork()`** after init inherits the mappings but no agent
   threads (§3.12). It must not call OpenSHMEM, and teardown code compares the
   current pid with the initializing pid and does nothing in a child.
@@ -7910,8 +7970,8 @@ Each is independently breakable, and each failure appears far from its cause.
    single-node self-deadlock.
 2. **One in-flight send per connection.** (§3.3) Violating it silently reorders
    the stream and breaks fence, ordering, and signal-after-payload.
-3. **A single ordered stream per node pair.** (§3.1) A second data socket
-   destroys free fence.
+3. **A single ordered data stream per node pair.** (§3.1) A second data socket
+   destroys free fence; the control wire beside it carries no data (§3.1).
 4. **The progress thread never waits for `filled == head`.** (§3.5) Violating it
    hangs under oversubscription.
 5. **Signals land after every payload byte**, guaranteed by in-order application
@@ -7974,7 +8034,9 @@ Each is independently breakable, and each failure appears far from its cause.
     messages when broken.
 22. **Every applied segment is eventually acknowledged, with or without reverse
     traffic.** (§3.4) Without ack-only segments, `quiet` on one-way traffic never
-    returns.
+    returns. On a control wire too (§3.1): its acknowledgements are what the
+    deadlock detector's proof needs of the tree's messages (§3.15; the
+    adversarial read of v0.2 step 4's Part 2, F1).
 23. **A provided buffer is never held across reaps.** (§3.3) Holding one stalls a
     large segment and can deadlock two connections sharing a ring.
 24. **Every access to a shared protocol word is a `<stdatomic.h>` call naming an ISO
@@ -8029,9 +8091,10 @@ Assert what can be asserted. Instrument the rest.
     barrier arrival left unsealed, measured one run in eight.
 35. **A lead seals its goodbye only once the connection owes the peer nothing,
     ends its stream only after the goodbye has gone, and closes a socket only
-    after the peer's stream has ended.** (§6.4) Dropping each strands a child
-    waiting for its release, makes a finished peer look dead, or resets a
-    connection the peer is still sending on (`close_model.py`).
+    after the peer's stream has ended - each wire of a pair on its own.** (§6.4)
+    Dropping each strands a child waiting for its release, makes a finished
+    peer look dead, or resets a connection the peer is still sending on
+    (`close_model.py`).
 36. **A lead whose node aborts has its abortive goodbye acknowledged on every
     connection that still has someone to tell before its process ends; on a
     global exit, while its agent runs, nothing but the agent ends that process,

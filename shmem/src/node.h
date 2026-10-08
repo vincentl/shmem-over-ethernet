@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 34
+#define OSOE_NODE_LAYOUT 35
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -454,7 +454,10 @@ struct osoe_am_node_metrics {
     /* §3.8's fallible path, taken: a request found the descriptor pool empty. */
     _Atomic uint64_t reply_reservation_failures;
     /* The deepest any one connection's queue has been, and the most
-     * descriptors the node-wide pool has had out at once. */
+     * descriptors the node-wide pool has had out at once. The control queue
+     * is a control wire's since layout 35 (the progress helpers proposal's
+     * §3.1), the AMO results having a queue of their own on a data wire,
+     * value_queue_high_water below. */
     _Atomic uint64_t control_queue_high_water;
     _Atomic uint64_t bulk_queue_high_water;
     _Atomic uint64_t pool_high_water;
@@ -478,8 +481,9 @@ struct osoe_am_node_metrics {
     _Atomic uint64_t short_sends;
     /* Layout 30: the times a team's local release was held back because a
      * RELEASE it forwarded was still in a child's control queue (§3.8,
-     * progress.c, release_local, which a pass runs twice). Zero but when a
-     * connection is full at the release. */
+     * progress.c, release_local, which a pass runs twice). Zero but when the
+     * child's control wire still has a segment on it at the release (since
+     * layout 35; until then, when its connection was full). */
     _Atomic uint64_t releases_held;
     /* Layout 34: the zero-copy send (wire-settings.h) - sends by reference,
      * their notifications, and the ones that said the kernel copied after
@@ -487,6 +491,15 @@ struct osoe_am_node_metrics {
     _Atomic uint64_t zero_copy_sends;
     _Atomic uint64_t zero_copy_notifications;
     _Atomic uint64_t zero_copy_copied;
+    /* Layout 35: the deepest a data connection's value queue - its AMO
+     * results - has been, since the control queue is the control wire's; and
+     * the control wires' traffic, the control plane's (the progress helpers
+     * proposal's §3.1), apart from the counts above, which are the data
+     * plane's and which the connections' records divide among the peers. */
+    _Atomic uint64_t value_queue_high_water;
+    _Atomic uint64_t control_segments_sent;
+    _Atomic uint64_t control_segments_applied;
+    _Atomic uint64_t control_messages_applied;
 };
 
 /*
@@ -509,8 +522,10 @@ struct osoe_am_node_metrics {
 struct osoe_am_connection_metrics {
     _Alignas(OSOE_CACHELINE)
     _Atomic uint32_t peer;                  /* the peer node this is toward */
-    _Atomic uint32_t control_queue_depth;   /* replies queued now */
-    _Atomic uint32_t bulk_queue_depth;
+    /* Control messages queued now toward the peer, on the control wire since
+     * layout 35 - owner 0's to write. */
+    _Atomic uint32_t control_queue_depth;
+    _Atomic uint32_t bulk_queue_depth;  /* get replies queued now on the data wire */
     _Atomic uint32_t control_queue_high_water;
     _Atomic uint32_t bulk_queue_high_water;
     _Atomic uint64_t segments_sent;
@@ -522,6 +537,9 @@ struct osoe_am_connection_metrics {
     _Atomic uint64_t acked_through;         /* the peer has applied through this */
     _Atomic uint64_t wanted_through;        /* this node's writers want this acknowledged */
     _Atomic uint64_t sent_through;          /* the highest sequence this node has sent */
+    /* Layout 35: AMO results queued now on the data wire, and the most. */
+    _Atomic uint32_t value_queue_depth;
+    _Atomic uint32_t value_queue_high_water;
 };
 
 /*

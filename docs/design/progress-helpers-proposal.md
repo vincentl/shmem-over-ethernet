@@ -176,14 +176,23 @@ job handshake (§6.2's SipHash proof) runs on both; two keepalives; the "reset
 connection is judged only once the goodbye and end of stream have both
 arrived" rule holds per wire. The control wire's buffers are small: a page of
 send buffer and the ring's provided buffers, no connection-area slot, no
-dirty bit.
+dirty bit. (*Amended on 2026-10-08:* 4 KiB of send buffer, which is a page on
+x86-64 and a quarter of one on the Pi 5, in the lead's own memory rather than
+the connection area (Part 2's record).)
 
 **Ordering between the planes.** Nothing a control message says depends on a
 data message having been applied, and the protocols already make that so: a
 barrier implies a quiet, and the quiet waits for acknowledgements on the data
 wires before the arrival is posted; a bare `shmem_sync` orders no data; a
 release carries no data promise; the detector reasons about counters, not
-messages. Fence and quiet are entirely within the data plane. Collective
+messages. (*Amended on 2026-10-08:* the detector's counters are
+acknowledgements, and its proof needs every message its receiver counts as
+activity acknowledged before its sender can look quiet - the tree's ARRIVE and
+RELEASE among them - so a control wire's segments are acknowledged as a data
+wire's are; built first without, a barrier's message held in the network could
+have a job that would finish declared deadlocked (Part 2's adversarial read,
+F1). Not an ordering between the planes: each wire's acknowledgements are its
+own.) Fence and quiet are entirely within the data plane. Collective
 pieces, grants and releases of the data collectives are puts and adds on the
 data wires. The one message that must be ordered against data is the
 goodbye, and it is sent on every wire the sender owns, each after that wire's

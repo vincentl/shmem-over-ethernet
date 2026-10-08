@@ -1,0 +1,64 @@
+== osoe-bench 4 x 4 (remote lines; median of three runs, base -> tip, ratio)
+  latency put+quiet target=4 where=remote bytes=8                     169.5      169.6  1.001   base [169.5, 169.8, 169.5]  tip [169.4, 169.6, 169.9]
+  latency get target=4 where=remote bytes=8                           169.2      169.3  1.001   base [169.3, 169.2, 169.0]  tip [169.3, 169.3, 169.5]
+  latency put+quiet target=4 where=remote bytes=64                    170.4      170.5  1.001   base [170.4, 170.5, 170.3]  tip [170.5, 170.6, 170.5]
+  latency get target=4 where=remote bytes=64                          170.5      170.6  1.001   base [170.6, 170.5, 170.3]  tip [170.6, 170.6, 170.7]
+  latency put+quiet target=4 where=remote bytes=512                   178.4      178.6  1.001   base [178.4, 178.8, 178.4]  tip [178.6, 178.8, 178.5]
+  latency get target=4 where=remote bytes=512                         178.7      178.9  1.001   base [178.8, 178.7, 178.5]  tip [178.8, 178.9, 178.9]
+  latency put+quiet target=4 where=remote bytes=4096                  194.8      195.0  1.001   base [194.7, 195.2, 194.8]  tip [194.9, 195.3, 195.0]
+  latency get target=4 where=remote bytes=4096                        172.9      172.9  1.000   base [172.9, 173.8, 172.8]  tip [173.2, 172.7, 172.9]
+  latency put+quiet target=4 where=remote bytes=32768                 425.2      425.3  1.000   base [425.1, 425.9, 425.2]  tip [425.1, 425.6, 425.3]
+  latency get target=4 where=remote bytes=32768                       412.0      411.9  1.000   base [411.9, 412.0, 412.3]  tip [411.9, 412.0, 411.8]
+  latency put+quiet target=4 where=remote bytes=262144               2389.7     2386.7  0.999   base [2384.2, 2390.2, 2389.7]  tip [2386.5, 2390.2, 2386.7]
+  latency get target=4 where=remote bytes=262144                     3025.2     3025.4  1.000   base [3023.7, 3025.9, 3025.2]  tip [3023.1, 3027.9, 3025.4]
+  latency put+quiet target=4 where=remote bytes=1048576              9079.5     9081.0  1.000   base [9082.1, 9079.5, 9079.4]  tip [9081.2, 9081.0, 9075.3]
+  latency get target=4 where=remote bytes=1048576                   11563.0    11557.1  0.999   base [11564.8, 11560.2, 11563.0]  tip [11557.1, 11566.0, 11556.2]
+  bandwidth put target=4 where=remote bytes=4096                      111.5      111.5  1.000   base [111.5, 111.5, 111.5]  tip [111.5, 111.5, 111.5]
+  bandwidth put target=4 where=remote bytes=65536                     112.1      112.1  1.000   base [112.1, 112.1, 112.1]  tip [112.1, 112.1, 112.1]
+  bandwidth put target=4 where=remote bytes=262144                    112.1      112.1  1.000   base [112.1, 112.1, 112.1]  tip [112.1, 112.1, 112.1]
+  bandwidth put target=4 where=remote bytes=1048576                   112.1      112.1  1.000   base [112.1, 112.1, 112.1]  tip [112.1, 112.1, 112.1]
+  bandwidth put target=4 where=remote bytes=4194304                   112.1      112.1  1.000   base [112.1, 112.1, 112.1]  tip [112.1, 112.1, 112.1]
+  atomic fetch-add target=4 where=remote                              163.6      163.8  1.001   base [163.6, 164.0, 163.4]  tip [163.8, 163.6, 164.1]
+== osoe-bench 4 x 1 (remote lines; median of three runs, base -> tip, ratio)
+  latency put+quiet target=1 where=remote bytes=8                     169.1      169.3  1.001   base [159.4, 169.4, 169.1]  tip [159.4, 169.3, 169.5]
+  latency get target=1 where=remote bytes=8                           168.9      169.0  1.001   base [159.1, 169.0, 168.9]  tip [159.2, 169.0, 169.3]
+  latency put+quiet target=1 where=remote bytes=64                    170.0      170.3  1.002   base [160.4, 170.0, 170.1]  tip [160.5, 170.3, 170.4]
+  latency get target=1 where=remote bytes=64                          170.0      170.3  1.002   base [160.3, 170.1, 170.0]  tip [160.4, 170.3, 170.5]
+  latency put+quiet target=1 where=remote bytes=512                   178.2      178.4  1.001   base [168.5, 178.3, 178.2]  tip [168.5, 178.4, 178.7]
+  latency get target=1 where=remote bytes=512                         178.4      178.6  1.001   base [168.5, 178.4, 178.4]  tip [168.8, 178.6, 178.9]
+  latency put+quiet target=1 where=remote bytes=4096                  194.5      194.8  1.002   base [194.1, 194.5, 194.6]  tip [194.6, 194.8, 194.8]
+  latency get target=1 where=remote bytes=4096                        172.6      173.1  1.003   base [172.6, 172.6, 172.5]  tip [172.6, 173.2, 173.1]
+  latency put+quiet target=1 where=remote bytes=32768                 424.7      425.7  1.002   base [424.7, 424.8, 424.4]  tip [425.5, 425.7, 426.2]
+  latency get target=1 where=remote bytes=32768                       411.7      411.9  1.000   base [411.9, 411.7, 411.5]  tip [411.9, 411.5, 412.5]
+  latency put+quiet target=1 where=remote bytes=262144               2385.5     2389.8  1.002   base [2386.8, 2385.2, 2385.5]  tip [2387.9, 2389.8, 2389.9]
+  latency get target=1 where=remote bytes=262144                     3025.7     3025.0  1.000   base [3023.4, 3026.2, 3025.7]  tip [3025.0, 3025.0, 3025.0]
+  latency put+quiet target=1 where=remote bytes=1048576              9078.7     9079.0  1.000   base [9078.7, 9079.0, 9078.2]  tip [9078.8, 9079.0, 9082.3]
+  latency get target=1 where=remote bytes=1048576                   11563.3    11565.0  1.000   base [11558.5, 11565.7, 11563.3]  tip [11565.0, 11559.5, 11565.7]
+  bandwidth put target=1 where=remote bytes=4096                      111.5      111.5  1.000   base [111.5, 111.5, 111.5]  tip [111.5, 111.5, 111.5]
+  bandwidth put target=1 where=remote bytes=65536                     112.1      112.1  1.000   base [112.1, 112.1, 112.1]  tip [112.1, 112.1, 112.1]
+  bandwidth put target=1 where=remote bytes=262144                    112.1      112.1  1.000   base [112.1, 112.1, 112.1]  tip [112.1, 112.1, 112.1]
+  bandwidth put target=1 where=remote bytes=1048576                   112.1      112.1  1.000   base [112.1, 112.1, 112.1]  tip [112.1, 112.1, 112.1]
+  bandwidth put target=1 where=remote bytes=4194304                   112.1      112.1  1.000   base [112.1, 112.1, 112.1]  tip [112.1, 112.1, 112.1]
+  atomic fetch-add target=1 where=remote                              168.6      169.1  1.003   base [168.6, 168.8, 168.6]  tip [169.1, 168.9, 169.3]
+== a barrier of PEs 1 and 3 (one a node), alone and behind PE 0's 1 MiB put stream to PE 2 (barrier-behind.c, 2,000 syncs a phase; microseconds)
+  base 1: alone median 175 p90 177 p99 181 max 207; stream median 4415 p90 5289 p99 6388 max 7748 (stream 112 MiB/s)
+  base 2: alone median 175 p90 179 p99 187 max 217; stream median 4139 p90 5464 p99 6336 max 6966 (stream 112 MiB/s)
+  base 3: alone median 174 p90 179 p99 184 max 216; stream median 4406 p90 5004 p99 6089 max 7217 (stream 112 MiB/s)
+  tip 1: alone median 165 p90 167 p99 170 max 183; stream median 1664 p90 1692 p99 2216 max 2251 (stream 112 MiB/s)
+  tip 2: alone median 172 p90 177 p99 182 max 219; stream median 1663 p90 1704 p99 2224 max 2265 (stream 112 MiB/s)
+  tip 3: alone median 174 p90 175 p99 181 max 212; stream median 1665 p90 1701 p99 2221 max 2364 (stream 112 MiB/s)
+== the 1 MiB put stream with each agent's CPU, and a fetch-add behind it (hol.c)
+  base 1: stream 112.1 MiB/s, sender agent 0.293 cpu-s/GiB, receiver agent 1.51 s busy 0.07; fetch-add alone 173 us, behind the stream median 3888 p90 5517 p99 7203
+  base 2: stream 112.1 MiB/s, sender agent 0.289 cpu-s/GiB, receiver agent 1.54 s busy 0.07; fetch-add alone 174 us, behind the stream median 3853 p90 4986 p99 6079
+  base 3: stream 112.1 MiB/s, sender agent 0.298 cpu-s/GiB, receiver agent 1.54 s busy 0.07; fetch-add alone 172 us, behind the stream median 3885 p90 5042 p99 6617
+  tip 1: stream 112.1 MiB/s, sender agent 0.293 cpu-s/GiB, receiver agent 1.67 s busy 0.08; fetch-add alone 172 us, behind the stream median 3878 p90 5513 p99 6656
+  tip 2: stream 112.1 MiB/s, sender agent 0.284 cpu-s/GiB, receiver agent 1.70 s busy 0.08; fetch-add alone 174 us, behind the stream median 3883 p90 5518 p99 6668
+  tip 3: stream 112.1 MiB/s, sender agent 0.320 cpu-s/GiB, receiver agent 1.61 s busy 0.08; fetch-add alone 174 us, behind the stream median 3877 p90 5005 p99 6636
+== the mailbox (osoe-pacer, 4 x 2, 20 s): messages a second
+  base: [40623, 36836, 39426]
+  tip: [38471, 37873, 40703]
+== start-up: shmem_init, ms (startup.c; PE 0's and the slowest PE's)
+  4 x 1 base: ['78.0/95.6', '76.1/82.4', '83.2/83.2']
+  4 x 1 tip: ['81.8/85.1', '84.8/84.8', '88.9/88.9']
+  4 x 4 base: ['90.5/94.8', '84.1/89.3', '87.9/94.4']
+  4 x 4 tip: ['83.7/83.7', '84.1/96.1', '100.4/100.4']

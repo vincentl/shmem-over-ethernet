@@ -1,0 +1,28 @@
+== round 1 12:34:49
+copy exit 0
+copy exit 0
+copy exit 0
+copy exit 0
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+== round 2 12:35:05
+copy exit 0
+copy exit 0
+copy exit 0
+copy exit 0
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+== round 3 12:35:20
+copy exit 0
+copy exit 0
+copy exit 0
+copy exit 0
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+CIRCULANT REDUCE: every phase on 8 nodes, 16 PEs, Träff's from 8192 bytes, 2464 calls checked as Träff's
+DONE 12:35:39

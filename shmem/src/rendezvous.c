@@ -353,7 +353,8 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
         snprintf(expecting, sizeof expecting, "node%s %s, its child%s in the rendezvous tree,",
                  missing == 1 ? "" : "s", nodes, missing == 1 ? "" : "ren");
         uint32_t peer;
-        int fd = osoe_listener_accept(&l, OSOE_HELLO_RENDEZVOUS, &peer, expecting);
+        int fd = osoe_listener_accept(&l, OSOE_HELLO_PURPOSE(OSOE_HELLO_RENDEZVOUS), &peer,
+                                      NULL, expecting);
         /* The hello agreed on the node count, so only a second lead with one
          * node id can be a child this lead is not waiting for. */
         if (peer < first_child || peer >= first_child + children ||

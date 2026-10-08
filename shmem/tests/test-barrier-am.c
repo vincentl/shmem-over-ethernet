@@ -101,10 +101,12 @@ int main(void)
         return CHECK_DONE();
     }
 
-    /* This lead's connections to every other node, and the ring that carries
-     * them - the mesh a lead makes (§6.2). This thread drives the engine, so
-     * it enables the ring and is its only submitter (ring.h). */
-    static struct osoe_wire wires[MAX_NODES];
+    /* This lead's connections to every other node, two a peer - its data wires,
+     * then its control wires, on which the tree's messages go (owner-map.h) -
+     * and the ring that carries them: the mesh a lead makes (§6.2). This thread
+     * drives the engine, so it enables the ring and is its only submitter
+     * (ring.h). */
+    static struct osoe_wire wires[2 * MAX_NODES];
     static struct osoe_ring ring;
     uint32_t peers = b.node_count - 1;
     osoe_wires_open(wires, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
@@ -118,8 +120,11 @@ int main(void)
     /* One owner, the lead's agent, holding every wire (owner-map.h). */
     struct osoe_progress p;
     static struct osoe_progress_owner owner;
+    static struct osoe_progress_control controls[MAX_NODES];
+    static uint64_t control_busy[(MAX_NODES + 63) / 64];
     osoe_progress_init(&p, &area, &owner, &host);
     osoe_progress_attach(&p, 0, &ring, wires, connections, busy, descriptors, DESCRIPTORS);
+    osoe_progress_attach_control(&p, &wires[peers], controls, control_busy);
 
     /* The world team's tree: every node, at the fan-out the environment gives
      * (OSOE_COLLECTIVE_FANOUT, so the same binary runs every shape). */
@@ -151,9 +156,27 @@ int main(void)
     arrivals_row()[b.node] = arrivals_now();
     osoe_progress_arrive(&p, TEAM, 0, EPOCH);
 
+    /*
+     * And the deadlock detector's view of it (§3.15): a node whose ARRIVE has
+     * gone to the kernel but which its parent has not yet released is not
+     * quiet. The ARRIVE is application work the parent will count, and only the
+     * parent's acknowledgement makes it applied - which can come no sooner than
+     * the RELEASE it rides, since nothing else goes back before it. As first
+     * built nothing on a control wire was acknowledged, and such a node looked
+     * quiet (the adversarial read of v0.2 step 4's Part 2, F1). Asked the
+     * first time a pass leaves this node idle before its release, which a node
+     * that arrives before the last always sees.
+     */
+    bool looked = false;
     while (releases == 0) {
         if (!osoe_progress_poll(&owner))
             osoe_ring_wait(&ring, UINT64_C(1000000));
+        if (!looked && releases == 0 && tree.parent != OSOE_COLLECTIVE_TREE_NONE &&
+            osoe_progress_idle(&owner)) {
+            uint64_t applied;
+            CHECK(!osoe_progress_quiet(&owner, &applied));
+            looked = true;
+        }
         if (osoe_deadline_expired(&give_up)) {
             fprintf(stderr, "node %u: the barrier never released\n", b.node);
             CHECK(false);
@@ -191,6 +214,20 @@ int main(void)
     }
 
     /*
+     * Then quiet, as the detector asks it: every segment this node sent that
+     * carried application work - its ARRIVE, its RELEASEs - acknowledged. Here a
+     * child's goodbye may carry the acknowledgement the root waits for; the
+     * request and its answer, which a deadlocked job's detector needs since
+     * nothing else then moves, are shmem.deadlock's and control_ack_model.py's
+     * (the second adversarial read of Part 2, N3).
+     */
+    uint64_t applied;
+    while (!osoe_progress_quiet(&owner, &applied) && !osoe_deadline_expired(&give_up))
+        if (!osoe_progress_poll(&owner))
+            osoe_ring_wait(&ring, UINT64_C(1000000));
+    CHECK(osoe_progress_quiet(&owner, &applied));
+
+    /*
      * Then the close a lead makes (§6.4, close_model.py): goodbye, end of
      * stream, and read until every peer's has ended - which is also what keeps
      * this node reading until the nodes it releases have taken their release.
@@ -202,7 +239,7 @@ int main(void)
     CHECK(osoe_progress_closed(&owner));
 
 done:
-    for (uint32_t i = 0; i < peers; i++)
+    for (uint32_t i = 0; i < 2 * peers; i++)
         osoe_wire_close(&wires[i]);
     osoe_ring_close(&ring);
     osoe_connection_area_close(&area);

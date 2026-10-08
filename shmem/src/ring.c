@@ -54,7 +54,7 @@ static uint32_t next_power_of_two(uint32_t n)
 }
 
 void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_count,
-                    uint32_t buffer_count, uint32_t buffer_bytes,
+                    uint32_t lending_count, uint32_t buffer_count, uint32_t buffer_bytes,
                     uint32_t notifications_per_wire)
 {
     *r = (struct osoe_ring){ .wires = wires, .wire_count = wire_count,
@@ -64,10 +64,11 @@ void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_
      * a send per wire between two submits, and the one futex wait (§3.10).
      * Completion: every provided buffer filled once, a terminal completion per
      * armed receive, a send per wire, the futex wait - and the notifications
-     * each wire may owe, with the zero-copy send on.
+     * each wire that may lend may owe, with the zero-copy send on.
      */
     r->submission_bound = 2 * wire_count + 1;
-    r->completion_bound = buffer_count + (2 + notifications_per_wire) * wire_count + 1;
+    r->completion_bound = buffer_count + 2 * wire_count +
+                          notifications_per_wire * lending_count + 1;
     struct io_uring_params p = {
         .flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_R_DISABLED | IORING_SETUP_CQSIZE,
         .cq_entries = r->completion_bound,
@@ -318,11 +319,21 @@ bool osoe_ring_wait_wake(struct osoe_ring *r, _Atomic uint32_t *wake, uint32_t s
     return osoe_ring_wait(r, timeout_ns);
 }
 
-uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t word)
+uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t first, uint32_t count)
 {
-    uint64_t bits = r->readable[word];
-    r->readable[word] = 0;
-    return bits;
+    if (count == 0)
+        return 0;
+    uint64_t want = count >= 64 ? UINT64_MAX : (UINT64_C(1) << count) - 1;
+    uint32_t word = first / 64, shift = first % 64;
+    uint64_t taken = (r->readable[word] >> shift) & want;
+    r->readable[word] &= ~(taken << shift);
+    /* A range that does not start a word runs into the next. */
+    if (shift != 0 && count > 64 - shift) {
+        uint64_t high = r->readable[word + 1] & (want >> (64 - shift));
+        r->readable[word + 1] &= ~high;
+        taken |= high << (64 - shift);
+    }
+    return taken;
 }
 
 void osoe_ring_close(struct osoe_ring *r)

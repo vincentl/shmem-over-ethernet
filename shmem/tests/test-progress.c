@@ -327,11 +327,12 @@ int main(void)
         return CHECK_DONE();
     }
 
-    /* The lead's connection to the other node, and the ring it drives it with
+    /* The lead's two wires to the other node - its data wire, and its control
+     * wire after it on the ring (owner-map.h) - and the ring it drives them with
      * (§6.2, ring.h). */
-    static struct osoe_wire wire;
+    static struct osoe_wire wires[2];
     static struct osoe_ring ring;
-    osoe_wires_open(&wire, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
+    osoe_wires_open(wires, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
     osoe_ring_enable(&ring);
 
     static struct osoe_reply descriptors[DESCRIPTORS];
@@ -339,11 +340,14 @@ int main(void)
     static uint64_t busy[1];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
                                        NULL, completed, NULL };
-    /* One owner, the lead's agent, holding the one wire (owner-map.h). */
+    /* One owner, the lead's agent, holding both wires (owner-map.h). */
     struct osoe_progress p;
     static struct osoe_progress_owner owner;
+    static struct osoe_progress_control control[1];
+    static uint64_t control_busy[1];
     osoe_progress_init(&p, &area, &owner, &host);
-    osoe_progress_attach(&p, 0, &ring, &wire, connections, busy, descriptors, DESCRIPTORS);
+    osoe_progress_attach(&p, 0, &ring, &wires[0], connections, busy, descriptors, DESCRIPTORS);
+    osoe_progress_attach_control(&p, &wires[1], control, control_busy);
     /* Two nodes, so the tree is node 0 with node 1 as its only child. */
     static const uint32_t both[] = { 0, 1 };
     struct osoe_collective_tree tree;
@@ -385,6 +389,39 @@ int main(void)
      * reply is the first thing on the 0 -> 1 stream, so it arrives before any
      * reply this lead's own requests could get. */
     enum { FORGED_TOKEN = 0x77 };
+    /*
+     * OSOE_TEST_FORGE=barrier-on-data and get-reply-on-control: node 0's lead
+     * first sends one plane's message on the other's wire - a barrier arrival
+     * into its data connection, or a get reply in a segment of its own on its
+     * control wire - which node 1 must refuse by name (the progress helpers
+     * proposal's §3.1); the get reply before its landing is resolved, where it
+     * was first refused as a reply nobody asked for, its landing looked up as a
+     * data connection's (the adversarial read of Part 2).
+     */
+    if (forge && strcmp(forge, "barrier-on-data") == 0 && node == 0 && lead) {
+        struct osoe_am_barrier arrive = { .team = 0, .epoch = 1, .from_node = 0, .lead = 0 };
+        while (!post(c, OSOE_AM_BARRIER_ARRIVE, &arrive, sizeof arrive, NULL, 0))
+            osoe_progress_poll(&owner);
+    }
+    if (forge && strcmp(forge, "get-reply-on-control") == 0 && node == 0 && lead) {
+        enum { BYTES = 64 };
+        struct osoe_am_get_reply lie = { .origin_pe = peer_lead, .total = BYTES,
+                                         .token = 0xdeadbeef };
+        struct osoe_message_header h = { OSOE_AM_GET_REPLY, 0, (uint32_t)sizeof lie + BYTES };
+        uint32_t bytes = (uint32_t)sizeof(struct osoe_am_segment_header) +
+                         osoe_message_padded(h.len);
+        struct osoe_am_segment_header sh = { .seq = 1, .message_count = 1, .total_len = bytes };
+        static unsigned char segment[256];
+        CHECK_FATAL(bytes <= sizeof segment);
+        memcpy(segment, &sh, sizeof sh);
+        memcpy(segment + sizeof sh, &h, sizeof h);
+        memcpy(segment + sizeof sh + sizeof h, &lie, sizeof lie);
+        memset(segment + sizeof sh + sizeof h + sizeof lie, 0xEE, BYTES);
+        /* Short sends are the wire's rule here (OSOE_WIRE_SPLIT): offer the rest
+         * until it has all gone, the pass reaping each send. */
+        for (size_t sent = 0; sent < bytes; osoe_progress_poll(&owner))
+            sent += osoe_wire_send(&wires[1], segment + sent, bytes - sent);
+    }
     if (bounds && node == 1 && lead)
         arm_piece(FORGED_TOKEN, GET_BYTES);
     if (forge && (strcmp(forge, "get-reply") == 0 || bounds) && node == 0 && lead) {
@@ -609,7 +646,8 @@ done:
             check_fails++;
         }
     }
-    osoe_wire_close(&wire);
+    osoe_wire_close(&wires[0]);
+    osoe_wire_close(&wires[1]);
     osoe_ring_close(&ring);
     osoe_connection_area_close(&area);
     arrivals_close();

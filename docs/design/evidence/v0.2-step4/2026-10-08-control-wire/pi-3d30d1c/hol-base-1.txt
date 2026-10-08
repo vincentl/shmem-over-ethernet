@@ -1,0 +1,2 @@
+hol phase=alone fetch_adds=11489 median_us=174 p90_us=175 p99_us=179 max_us=616 stream_mib_per_s=0
+hol phase=stream fetch_adds=2396 median_us=3880 p90_us=5003 p99_us=6644 max_us=7755 stream_mib_per_s=112

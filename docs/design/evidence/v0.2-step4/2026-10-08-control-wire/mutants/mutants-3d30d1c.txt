@@ -1,0 +1,53 @@
+== control-range 14:09:02
+40% tests passed, 18 tests failed out of 30
+Test  #44: shmem.barrier-am.0-1-2 .....................***Failed    0.03 sec
+Test  #45: shmem.barrier-am.0-0-1-1-2-2 ...............***Failed    0.05 sec
+Test #153: shmem.progress .............................***Failed    0.01 sec
+Test  #47: shmem.barrier-am.0-1-2-0-1-0 ...............***Failed    0.03 sec
+Test  #46: shmem.barrier-am.0-0-0-1-2-2 ...............***Failed    0.07 sec
+Test #156: shmem.owners.H2.N5 .........................***Failed    0.02 sec
+Test #157: shmem.owners.H3.N5 .........................***Failed    0.01 sec
+Test #158: shmem.owners.H2.N9 .........................***Failed    0.02 sec
+Test #159: shmem.owners.H3.N9 .........................***Failed    0.02 sec
+Test #164: shmem.multinode.0-1-2 ......................***Failed    0.07 sec
+Test #414: shmem.pipeline.0-1-2-3-4.stress ............***Failed    0.07 sec
+Test #447: shmem.team-storage.0-1-2-0-1-0 .............***Failed    0.06 sec
+osoe_fatal: 1 receive buffers were held across a reap of the io_uring; the engine must empty every readable wire in the pass (§3.3)
+osoe_fatal: 1 receive buffers were held across a reap of the io_uring; the engine must empty every readable wire in the pass (§3.3)
+osoe_fatal: 1 receive buffers were held across a reap of the io_uring; the engine must empty every readable wire in the pass (§3.3)
+osoe_fatal: 1 receive buffers were held across a reap of the io_uring; the engine must empty every readable wire in the pass (§3.3)
+== self-only 14:09:10
+67% tests passed, 10 tests failed out of 30
+Test #446: shmem.team-storage.local-order .............***Failed    0.01 sec
+Test #447: shmem.team-storage.0-1-2-0-1-0 .............***Failed    0.37 sec
+Test #448: shmem.team-storage.0-0-1-1 .................***Failed    0.38 sec
+Test #449: shmem.team-storage.force-remote.0-0-1-1 ....***Failed    0.38 sec
+Test #450: shmem.team-storage.local-order.internode ...***Failed    0.37 sec
+Test #617: shmem.stat.L1 ..............................***Failed    0.00 sec
+Test #618: shmem.stat.L2 ..............................***Failed    0.36 sec
+Test #619: shmem.stat.L4 ..............................***Failed    0.36 sec
+Test #620: shmem.stat.link ............................***Failed    0.37 sec
+Test #223: shmem.unswept-wait .........................***Failed  Error regular expression found in output. Regex=[BLOCKED RECORD WRONG|QUIET RETURNED|QUIET DID NOT SWEEP]  3.78 sec
+/tmp/control-wire-mutant-self-only/shmem/tests/test-team-storage.c:491: CHECK(run_stat("-d", out, sizeof out) == 0) failed
+/tmp/control-wire-mutant-self-only/shmem/tests/test-team-storage.c:492: CHECK(says(out, "team.world.tree.epoch_open")) failed
+/tmp/control-wire-mutant-self-only/shmem/tests/test-team-storage.c:493: CHECK(says(out, "team.finalize.tree.epoch_open")) failed
+/tmp/control-wire-mutant-self-only/shmem/tests/test-team-storage.c:494: CHECK(says(out, "team world (number 0)")) failed
+== short-send-restart 14:09:22
+60% tests passed, 12 tests failed out of 30
+Test  #44: shmem.barrier-am.0-1-2 .....................***Failed    0.05 sec
+Test #153: shmem.progress .............................***Failed    0.01 sec
+Test  #46: shmem.barrier-am.0-0-0-1-2-2 ...............***Failed    0.09 sec
+Test  #45: shmem.barrier-am.0-0-1-1-2-2 ...............***Failed    0.09 sec
+Test #156: shmem.owners.H2.N5 .........................***Failed    0.01 sec
+Test  #47: shmem.barrier-am.0-1-2-0-1-0 ...............***Failed    0.06 sec
+Test #157: shmem.owners.H3.N5 .........................***Failed    0.02 sec
+Test #158: shmem.owners.H2.N9 .........................***Failed    0.02 sec
+Test #159: shmem.owners.H3.N9 .........................***Failed    0.02 sec
+Test #164: shmem.multinode.0-1-2 ......................***Failed    0.07 sec
+Test #414: shmem.pipeline.0-1-2-3-4.stress ............***Failed    0.06 sec
+Test #557: shmem.circulant.5.stress ...................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 5 nodes
+osoe_fatal: segment 2 claims 0 bytes, less than its own header
+osoe_fatal: node 2: node 1 ended its connection without its goodbye: its lead has exited or died (§6.4)osoe_fatal: node 0: node 1 ended its connection without its goodbye: its lead has exited or died (§6.4)
+osoe_fatal: segment 1 claims 0 bytes, less than its own header
+osoe_fatal: node 0: node 1 ended its connection without its goodbye: its lead has exited or died (§6.4)
+DONE 14:09:31

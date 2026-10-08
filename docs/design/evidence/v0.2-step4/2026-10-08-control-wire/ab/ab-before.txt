@@ -1,0 +1,37 @@
+== one-1 a 12:45:10
+Test #534: shmem.shape.chosen.pi.64 .........................................   Passed    2.91 sec
+Test #536: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ...   Passed    1.86 sec
+Test #548: shmem.circulant.17 ...............................................   Passed    3.61 sec
+Test #549: shmem.circulant.33 ...............................................   Passed   11.11 sec
+Test #550: shmem.circulant.64 ...............................................   Passed   48.33 sec
+== one-1 b 12:46:18
+Test #534: shmem.shape.chosen.pi.64 .........................................   Passed    4.93 sec
+Test #536: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ...   Passed    2.12 sec
+Test #548: shmem.circulant.17 ...............................................   Passed    4.29 sec
+Test #549: shmem.circulant.33 ...............................................   Passed   14.91 sec
+Test #550: shmem.circulant.64 ...............................................   Passed   68.78 sec
+== one-2 b 12:47:53
+Test #534: shmem.shape.chosen.pi.64 .........................................   Passed    5.10 sec
+Test #536: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ...   Passed    1.94 sec
+Test #548: shmem.circulant.17 ...............................................   Passed    4.14 sec
+Test #549: shmem.circulant.33 ...............................................   Passed   14.28 sec
+Test #550: shmem.circulant.64 ...............................................   Passed   70.19 sec
+== one-2 a 12:49:29
+Test #534: shmem.shape.chosen.pi.64 .........................................   Passed    3.03 sec
+Test #536: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ...   Passed    1.93 sec
+Test #548: shmem.circulant.17 ...............................................   Passed    3.79 sec
+Test #549: shmem.circulant.33 ...............................................   Passed   11.22 sec
+Test #550: shmem.circulant.64 ...............................................   Passed   45.66 sec
+== group a 12:50:34
+Test #549: shmem.circulant.33 ...............   Passed  128.19 sec
+Test #550: shmem.circulant.64 ...............   Passed  198.37 sec
+Test #552: shmem.circulant.8x2 ..............   Passed  209.43 sec
+Test #551: shmem.circulant.70 ...............   Passed  214.04 sec
+Test #553: shmem.circulant.5.perturb ........   Passed   86.05 sec
+== group b 12:54:09
+Test #552: shmem.circulant.8x2 ..............***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 8 nodes
+Test #549: shmem.circulant.33 ...............   Passed  256.44 sec
+Test #551: shmem.circulant.70 ...............   Passed  345.34 sec
+Test #550: shmem.circulant.64 ...............   Passed  361.87 sec
+Test #553: shmem.circulant.5.perturb ........   Passed  121.78 sec
+DONE 13:00:11

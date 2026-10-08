@@ -20,12 +20,17 @@
  * the memory saving above possible and what §4.6's deferred-sampling hazard is
  * about.
  *
- * **Two queues, drained control-first.** Barrier latency gates the whole job, so
- * a barrier forward stuck behind a 1 MiB get reply stalls every PE. The control
- * queue is small and drains to empty; the bulk queue then gets the remaining
- * space, round-robin, one chunk per descriptor per pass. Strict FIFO there would
- * let a 1 MiB get block roughly 8 ms of small replies behind it, and get replies
- * to different PEs have no mutual ordering requirement, so rotation is legal.
+ * **The control plane's messages on a wire of their own; a data connection's
+ * two queues drained values-first.** Barrier latency gates the whole job, so a
+ * barrier forward stuck behind a 1 MiB get reply stalls every PE: the forwards
+ * and the deadlock detector's messages queue on the control wire toward their
+ * node (the progress helpers proposal's §3.1, progress.h), which carries
+ * nothing else, so no reply is ever ahead of them. On a data connection the
+ * AMO results, a value each, drain to empty first; the bulk queue then gets the
+ * remaining space, round-robin, one chunk per descriptor per pass. Strict FIFO
+ * there would let a 1 MiB get block roughly 8 ms of small replies behind it,
+ * and get replies to different PEs have no mutual ordering requirement, so
+ * rotation is legal.
  *
  * **Bounded by a per-connection credit, not a per-PE count.** An earlier draft
  * sized each connection's queues as P x G - every PE on the peer node times a
@@ -89,9 +94,9 @@ enum osoe_reply_kind {
     OSOE_REPLY_GET,
     /*
      * A collective's release, forwarded by the root node to each participant
-     * (§5.3). It rides the control queue with the AMO results, for the reason
-     * §3.8 gives: barrier latency gates the whole job, so a forward must not
-     * queue behind a large get reply.
+     * (§5.3). It rides the control wire's queue, for the reason §3.8 gives:
+     * barrier latency gates the whole job, so a forward must not queue behind
+     * a large get reply.
      */
     OSOE_REPLY_RELEASE,
     /*
@@ -103,7 +108,7 @@ enum osoe_reply_kind {
      */
     OSOE_REPLY_ARRIVE,
     /*
-     * A deadlock detector message (§3.15, deadlock.h), on the control queue:
+     * A deadlock detector message (§3.15, deadlock.h), on the control wire's queue:
      * `value` carries the round, kind and phase, `token` the verdict. At most
      * one a connection is queued at a time - the root asks each node once a
      * collection, and a node answers once - so the pool holds one more
@@ -151,9 +156,9 @@ struct osoe_reply_queue {
     uint32_t depth, high_water;
 };
 
-/* Both queues of one connection. */
+/* Both queues of one data connection. */
 struct osoe_reply_queues {
-    struct osoe_reply_queue control;    /* AMO results, collective forwards */
+    struct osoe_reply_queue values;     /* AMO results, drained first */
     struct osoe_reply_queue bulk;       /* get reply chunks */
 };
 
@@ -185,6 +190,8 @@ static inline struct osoe_reply *osoe_reply_at(struct osoe_reply_pool *pool, uin
 
 /* ---- The queues ------------------------------------------------------ */
 
+/* An empty queue, and a data connection's two. */
+void osoe_reply_queue_init(struct osoe_reply_queue *q);
 void osoe_reply_queues_init(struct osoe_reply_queues *q);
 
 /* Enqueue at the tail. */

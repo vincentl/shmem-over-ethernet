@@ -105,15 +105,18 @@ struct osoe_mesh {
 };
 
 /*
- * Establish this lead's node-pair connections, one per peer node, and open the
+ * Establish this lead's node-pair connections, two per peer node - a control
+ * wire and a data wire (the progress helpers proposal's §3.1) - and open the
  * rings that carry them (disabled until each driving thread enables its own).
- * §6.2's rule: the lower node index connects to the higher, so each pair has
- * exactly one stream. With a mesh, each connection goes to the port its peer
- * advertised; without one (NULL), each lead is found at its host-list address
- * by the port rule (listener.h), which is how the tests below the library meet.
- * `wires` has node_count - 1 entries, grouped by owner for a node of `helpers`
- * progress helpers (owner-map.h), and `rings` helpers + 1: owner o's wires
- * are attached to rings[o], as its wires 0 on. Fatal on failure (§3.15).
+ * §6.2's rule: the lower node index connects to the higher, the control wire
+ * first, so each pair has exactly one stream of each. With a mesh, each
+ * connection goes to the port its peer advertised; without one (NULL), each
+ * lead is found at its host-list address by the port rule (listener.h), which
+ * is how the tests below the library meet. `wires` has 2 x (node_count - 1)
+ * entries, grouped by ring for a node of `helpers` progress helpers
+ * (owner-map.h), and `rings` helpers + 1: owner o's ring carries
+ * osoe_ring_wires(o) of them from osoe_ring_first(o) - owner 0's its data
+ * wires and then every control wire. Fatal on failure (§3.15).
  */
 void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, uint32_t helpers,
                      const struct osoe_bootstrap *b, uint32_t session,
@@ -122,13 +125,14 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
 /*
  * The two halves of osoe_wires_open, for a caller that makes its own
  * connections - a test holding both ends of one in a single process. The ring
- * for `count` wires, sized from OSOE_WIRE_BYTES and OSOE_WIRE_BUFFERS and
- * disabled until enabled; and a connected socket made wire `index` of it, toward
- * node `peer`.
+ * for `count` wires, the first `lending` of them data wires, which may send by
+ * reference (osoe_ring_open), sized from OSOE_WIRE_BYTES and OSOE_WIRE_BUFFERS
+ * and disabled until enabled; and a connected socket made wire `index` of it,
+ * toward node `peer`.
  */
 
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
-                         const struct osoe_bootstrap *b);
+                         uint32_t lending, const struct osoe_bootstrap *b);
 void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, int fd,
                       uint32_t peer, const struct osoe_bootstrap *b);
 

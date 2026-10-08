@@ -1,0 +1,37 @@
+== one-1 a 13:12:25
+Test #534: shmem.shape.chosen.pi.64 .........................................   Passed    0.86 sec
+Test #536: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ...   Passed    1.64 sec
+Test #548: shmem.circulant.17 ...............................................   Passed    1.86 sec
+Test #549: shmem.circulant.33 ...............................................   Passed    5.20 sec
+Test #550: shmem.circulant.64 ...............................................   Passed   16.65 sec
+== one-1 b 13:12:51
+Test #534: shmem.shape.chosen.pi.64 .........................................   Passed    0.88 sec
+Test #536: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ...   Passed    1.75 sec
+Test #548: shmem.circulant.17 ...............................................   Passed    1.93 sec
+Test #549: shmem.circulant.33 ...............................................   Passed    5.40 sec
+Test #550: shmem.circulant.64 ...............................................   Passed   17.71 sec
+== one-2 b 13:13:19
+Test #534: shmem.shape.chosen.pi.64 .........................................   Passed    0.94 sec
+Test #536: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ...   Passed    2.01 sec
+Test #548: shmem.circulant.17 ...............................................   Passed    2.06 sec
+Test #549: shmem.circulant.33 ...............................................   Passed    5.71 sec
+Test #550: shmem.circulant.64 ...............................................   Passed   17.84 sec
+== one-2 a 13:13:48
+Test #534: shmem.shape.chosen.pi.64 .........................................   Passed    0.89 sec
+Test #536: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ...   Passed    2.14 sec
+Test #548: shmem.circulant.17 ...............................................   Passed    2.08 sec
+Test #549: shmem.circulant.33 ...............................................   Passed    5.72 sec
+Test #550: shmem.circulant.64 ...............................................   Passed   17.87 sec
+== group a 13:14:16
+Test #552: shmem.circulant.8x2 ..............   Passed   24.03 sec
+Test #549: shmem.circulant.33 ...............   Passed   36.03 sec
+Test #553: shmem.circulant.5.perturb ........   Passed   15.97 sec
+Test #550: shmem.circulant.64 ...............   Passed   44.37 sec
+Test #551: shmem.circulant.70 ...............   Passed   45.28 sec
+== group b 13:15:02
+Test #552: shmem.circulant.8x2 ..............   Passed   25.41 sec
+Test #549: shmem.circulant.33 ...............   Passed   36.75 sec
+Test #553: shmem.circulant.5.perturb ........   Passed   15.82 sec
+Test #550: shmem.circulant.64 ...............   Passed   46.06 sec
+Test #551: shmem.circulant.70 ...............   Passed   46.84 sec
+DONE 13:15:49

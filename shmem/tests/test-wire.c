@@ -259,7 +259,7 @@ static int misuse(const char *what)
     pair(fd);
     static struct osoe_wire wires[2];
     struct osoe_ring ring;
-    osoe_wire_ring_open(&ring, wires, 2, &lo);
+    osoe_wire_ring_open(&ring, wires, 2, 2, &lo);
     osoe_wire_attach(&wires[0], &ring, 0, fd[0], 1, &lo);
     osoe_wire_attach(&wires[1], &ring, 1, fd[1], 0, &hi);
     osoe_ring_enable(&ring);
@@ -333,7 +333,7 @@ int main(int argc, char **argv)
     pair(fd);
     static struct osoe_wire wires[2];
     struct osoe_ring ring;
-    osoe_wire_ring_open(&ring, wires, 2, &lo);
+    osoe_wire_ring_open(&ring, wires, 2, 2, &lo);
     osoe_wire_attach(&wires[0], &ring, 0, fd[0], 1, &lo);  /* node 0's end */
     osoe_wire_attach(&wires[1], &ring, 1, fd[1], 0, &hi);  /* node 1's end */
     osoe_ring_enable(&ring);

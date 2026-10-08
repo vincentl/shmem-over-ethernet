@@ -1,0 +1,30 @@
+== never-asks 14:24:45
+85% tests passed, 4 tests failed out of 26
+Test #516: shmem.deadlock.waits.0-0-1-1 .................***Failed  Error regular expression found in output. Regex=[DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]] 30.01 sec
+Test #518: shmem.deadlock.reinit.0-0-1-1 ................***Failed  Error regular expression found in output. Regex=[DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]] 30.01 sec
+Test #520: shmem.deadlock.mismatch.0-0-1-1 ..............***Failed  Error regular expression found in output. Regex=[DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]] 30.01 sec
+Test #521: shmem.deadlock.mismatch.0-1-0-1 ..............***Failed  Error regular expression found in output. Regex=[DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]] 30.01 sec
+== no-refusal 14:25:38
+92% tests passed, 2 tests failed out of 26
+Test #156: shmem.progress.forged-barrier-on-data ........***Failed  Required regular expression not found. Regex=[osoe_fatal: node 1: a barrier arrival from node 0 arrived on its data wire
+Test #157: shmem.progress.forged-get-reply-on-control ...***Failed  Required regular expression not found. Regex=[osoe_fatal: node 1: a get reply from node 0 arrived on its control wire
+ 5/26 Test #156: shmem.progress.forged-barrier-on-data ........***Failed  Required regular expression not found. Regex=[osoe_fatal: node 1: a barrier arrival from node 0 arrived on its data wire
+osoe_fatal: node 1: team 0's arrival for epoch 1 came from node 0, which is not a child of this node in its tree (fan-out 2 over 2 nodes); the nodes disagree about the tree
+ 6/26 Test #157: shmem.progress.forged-get-reply-on-control ...***Failed  Required regular expression not found. Regex=[osoe_fatal: node 1: a get reply from node 0 arrived on its control wire
+osoe_fatal: a get reply from node 0 for PE 2 carries token 0xdeadbeef, which names no get of that PE's in flight
+== plane-late 14:26:05
+96% tests passed, 1 tests failed out of 26
+Test #157: shmem.progress.forged-get-reply-on-control ...***Failed  Required regular expression not found. Regex=[osoe_fatal: node 1: a get reply from node 0 arrived on its control wire
+ 6/26 Test #157: shmem.progress.forged-get-reply-on-control ...***Failed  Required regular expression not found. Regex=[osoe_fatal: node 1: a get reply from node 0 arrived on its control wire
+osoe_fatal: a get reply from node 0 for PE 2 carries token 0xdeadbeef, which names no get of that PE's in flight
+== quiet-data-only 14:26:32
+85% tests passed, 4 tests failed out of 26
+Test  #44: shmem.barrier-am.0-1-2 .......................***Failed    0.05 sec
+Test  #47: shmem.barrier-am.0-1-2-0-1-0 .................***Failed    0.05 sec
+Test  #46: shmem.barrier-am.0-0-0-1-2-2 .................***Failed    0.09 sec
+Test  #45: shmem.barrier-am.0-0-1-1-2-2 .................***Failed    0.09 sec
+/tmp/control-wire-mutant-quiet-data-only/shmem/tests/test-barrier-am.c:177: CHECK(!osoe_progress_quiet(&owner, &applied)) failed
+/tmp/control-wire-mutant-quiet-data-only/shmem/tests/test-barrier-am.c:177: CHECK(!osoe_progress_quiet(&owner, &applied)) failed
+/tmp/control-wire-mutant-quiet-data-only/shmem/tests/test-barrier-am.c:177: CHECK(!osoe_progress_quiet(&owner, &applied)) failed
+/tmp/control-wire-mutant-quiet-data-only/shmem/tests/test-barrier-am.c:177: CHECK(!osoe_progress_quiet(&owner, &applied)) failed
+DONE 14:26:58
