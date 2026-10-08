@@ -30,13 +30,19 @@
 #define ENGINE_OWNS(p, n) ((void)(p), (void)(n))
 #endif
 
-/* What a completion is for, in its user data's low byte; the wire's slot is
- * the rest (0 for the futex wait, which is the ring's, not a wire's). */
+/* What a completion is for, in its user data's low four bits; a send's region
+ * in the next four (wire.h); the wire's slot the rest (0 for the futex wait,
+ * which is the ring's, not a wire's). */
 enum { RECEIVE = 1, SEND, FUTEX };
 
 static uint64_t tag(uint32_t slot, unsigned kind)
 {
     return ((uint64_t)slot << 8) | kind;
+}
+
+uint64_t osoe_ring_send_tag(uint32_t slot, uint32_t region)
+{
+    return tag(slot, SEND) | (uint64_t)region << 4;
 }
 
 static uint32_t next_power_of_two(uint32_t n)
@@ -48,7 +54,8 @@ static uint32_t next_power_of_two(uint32_t n)
 }
 
 void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_count,
-                    uint32_t buffer_count, uint32_t buffer_bytes)
+                    uint32_t buffer_count, uint32_t buffer_bytes,
+                    uint32_t notifications_per_wire)
 {
     *r = (struct osoe_ring){ .wires = wires, .wire_count = wire_count,
                              .buffer_count = buffer_count, .buffer_bytes = buffer_bytes };
@@ -56,10 +63,11 @@ void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_
      * §3.3's two bounds, each "can never fill". Submission: a receive re-arm and
      * a send per wire between two submits, and the one futex wait (§3.10).
      * Completion: every provided buffer filled once, a terminal completion per
-     * armed receive, a send per wire, the futex wait.
+     * armed receive, a send per wire, the futex wait - and the notifications
+     * each wire may owe, with the zero-copy send on.
      */
     r->submission_bound = 2 * wire_count + 1;
-    r->completion_bound = buffer_count + 2 * wire_count + 1;
+    r->completion_bound = buffer_count + (2 + notifications_per_wire) * wire_count + 1;
     struct io_uring_params p = {
         .flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_R_DISABLED | IORING_SETUP_CQSIZE,
         .cq_entries = r->completion_bound,
@@ -196,7 +204,7 @@ void osoe_ring_reap(struct osoe_ring *r)
     io_uring_for_each_cqe(&r->uring, head, cqe) {
         seen++;
         uint64_t data = io_uring_cqe_get_data64(cqe);
-        if ((data & 0xff) == FUTEX) {
+        if ((data & 0xf) == FUTEX) {
             /* Woken, or refused at arming because the word had moved (-EAGAIN),
              * or cancelled: either way nothing is armed now, and the next idle
              * wait arms again (§3.10). */
@@ -207,11 +215,37 @@ void osoe_ring_reap(struct osoe_ring *r)
         if (slot >= r->wire_count)
             osoe_fatal("an io_uring completion names connection %u of %u", slot, r->wire_count);
         struct osoe_wire *w = &r->wires[slot];
-        switch (data & 0xff) {
+        uint32_t region = (uint32_t)(data >> 4) & 0xf;
+        switch (data & 0xf) {
         case RECEIVE:
             received(r, w, cqe);
             break;
         case SEND:
+            if (cqe->flags & IORING_CQE_F_NOTIF) {
+                /*
+                 * A send by reference: the kernel has let go of its bytes, and
+                 * says whether it copied them after all (wire.h). It comes after
+                 * that send's completion - io_uring posts it so, deferring it where
+                 * task work's order cannot be relied on (io_uring/net.c,
+                 * io_send_zc) - so one owed by nothing is a count gone wrong, and a
+                 * buffer that count released early: the job ends naming it.
+                 */
+                if (region >= OSOE_WIRE_LENT_REGIONS || w->owed[region] == 0)
+                    osoe_fatal("a zero-copy notification toward node %u for region %u, "
+                               "which owed none (wire.h)", w->peer, region);
+                w->owed[region]--;
+                r->counts.zero_copy_notifications++;
+                if ((uint32_t)cqe->res & IORING_NOTIF_USAGE_ZC_COPIED)
+                    r->counts.zero_copy_copied++;
+                break;
+            }
+            if (cqe->flags & IORING_CQE_F_MORE) {
+                /* ... and its notification is to follow. */
+                if (region >= OSOE_WIRE_LENT_REGIONS)
+                    osoe_fatal("a send that copies toward node %u said a notification "
+                               "would follow", w->peer);
+                w->owed[region]++;
+            }
             if (cqe->res < 0) {
                 /* The peer's reset (wire.h) - not a send after this side's
                  * own end of stream, which would be this node's mistake. */
@@ -228,7 +262,7 @@ void osoe_ring_reap(struct osoe_ring *r)
             }
             break;
         default:
-            osoe_fatal("an io_uring completion of unknown kind %u", (unsigned)(data & 0xff));
+            osoe_fatal("an io_uring completion of unknown kind %u", (unsigned)(data & 0xf));
         }
     }
     io_uring_cq_advance(&r->uring, seen);

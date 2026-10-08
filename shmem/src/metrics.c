@@ -433,6 +433,13 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("transport.am.short_sends", am.short_sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     /* Layout 30: a local release held for its forwards (node.h). */
     ND("transport.am.releases_held", am.releases_held, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    /* Layout 34: the zero-copy send (wire-settings.h). */
+    ND("transport.am.zero_copy_sends", am.zero_copy_sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+       ""),
+    ND("transport.am.zero_copy_notifications", am.zero_copy_notifications, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
+    ND("transport.am.zero_copy_copied", am.zero_copy_copied, OSOE_MTYPE_U64,
+       OSOE_MKIND_COUNTER, ""),
 };
 
 enum {

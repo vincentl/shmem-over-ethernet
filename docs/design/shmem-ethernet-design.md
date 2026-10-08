@@ -384,8 +384,8 @@ pass - the request a word taken as a dirty bit is, at a pass and again after
 bytes leave with the kernel even toward a peer that has stopped reading. A send
 the kernel cannot then take whole is a short write, offered again (invariant 2).
 
-**Not used:** `IORING_OP_SEND_ZC`. Two CQEs, buffer stability requirement, and
-only pays above ~10–16 KB. Revisit only on a fast NIC.
+**Off by default:** `IORING_OP_SEND_ZC`. Two CQEs, buffer stability requirement,
+and only pays above ~10–16 KB. Revisit only on a fast NIC.
 *The author, 2026-10-07: built in v0.2 step 4 behind a setting, off by
 default, for large segments, so that it is debugged before a fast NIC exists
 and its default decided on one (`docs/decisions/2026-10-07.md` item 7). Over
@@ -393,6 +393,18 @@ TCP the buffer is released by the notification once the peer has acknowledged
 its bytes, so with it on a connection's two buffers cap one peer's stream at
 about 512 KiB a round trip - some 100 Gb/s at 40 µs (256 KiB and some 50 Gb/s
 while the default buffer was 128 KiB; `docs/decisions/2026-10-07.md` item 12).*
+*As built (v0.2 step 4):* `OSOE_WIRE_ZERO_COPY=on` sends a connection buffer
+by reference wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`
+(16 KiB by default), with `IORING_SEND_ZC_REPORT_USAGE`; the completion frees the
+wire for the other buffer at once, and the buffer it sent is **lent** - each
+send's notification counted owed per buffer, a short send's remainder a send of
+its own - until the last notification has come, when it is released as a copied
+buffer is at its last completion. `reservation_model.py`'s `zero_copy` cases
+hold it, and a release at the last completion and one at the first of several
+notifications fail. A buffer about to be written with notifications still owed
+ends the job by name - checked where it is first written, not where it was
+released. A wire owes at most 16 notifications, past which a send copies, so
+that the completion queue keeps its bound: 16 more completions a wire.
 
 *As built* (phase 1 step 3 slice 1; `ring.[ch]`, `wire.[ch]`, `listener.[ch]`).
 One ring per progress thread, created `IORING_SETUP_SINGLE_ISSUER |

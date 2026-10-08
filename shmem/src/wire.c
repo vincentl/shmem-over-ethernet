@@ -42,7 +42,21 @@ void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t 
 {
     struct osoe_wire_settings s;
     osoe_wire_settings_read(&s, b, true);
-    osoe_ring_open(r, wires, count, s.buffer_count, s.buffer_bytes);
+    /* With the zero-copy send on, each wire's notifications still owed are
+     * completions the queue must have room for (§3.3, ring.h). */
+    osoe_ring_open(r, wires, count, s.buffer_count, s.buffer_bytes,
+                   s.zero_copy ? OSOE_WIRE_ZERO_COPY_OWED_MOST : 0);
+    if (!s.zero_copy)
+        return;
+    /* Asked for by name, so refused by name where the kernel, or a filter in
+     * front of it, has not the opcode (Linux 6.0; the full build needs 6.7). */
+    struct io_uring_probe *probe = io_uring_get_probe_ring(&r->uring);
+    bool supported = probe && io_uring_opcode_supported(probe, IORING_OP_SEND_ZC);
+    if (probe)
+        io_uring_free_probe(probe);
+    if (!supported)
+        osoe_fatal("OSOE_WIRE_ZERO_COPY=on: this kernel's io_uring offers no IORING_OP_SEND_ZC "
+                   "(Linux 6.0)");
 }
 
 void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,
@@ -56,7 +70,8 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, i
     *w = (struct osoe_wire){ .fd = fd, .peer = peer, .slot = slot, .ring = r,
                              .first = OSOE_RING_NONE, .last = OSOE_RING_NONE, .sent = -1,
                              .seed = osoe_wire_hash(s->seed ^ ((uint64_t)b->node << 32) ^ peer),
-                             .split = s->split };
+                             .split = s->split, .zero_copy = s->zero_copy,
+                             .zero_copy_bytes = s->zero_copy_bytes };
     /*
      * The application layer owns coalescing (§3.3, invariant 14). §3.9 is
      * already a coalescer, and a better-informed one: it knows message
@@ -166,7 +181,9 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
     osoe_wire_ring_open(ring, wires, peers, b);
 }
 
-size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len)
+/* osoe_wire_send and osoe_wire_send_lent: `lent` is the region the bytes are
+ * lent from, or OSOE_WIRE_LENT_REGIONS for a send that copies. */
+static size_t send_from(struct osoe_wire *w, const void *buffer, size_t len, uint32_t lent)
 {
     if (w->error)
         osoe_fatal("the connection to node %u failed: %s", w->peer, strerror(-w->error));
@@ -192,14 +209,44 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len)
     uint32_t n = (uint32_t)truncate_to(w, w->sends++ ^ UINT64_C(0x5e4d), len);
     struct io_uring_sqe *sqe = osoe_ring_entry(w->ring);
     /* MSG_NOSIGNAL: a peer that has gone is a completion with -EPIPE, not a signal. */
-    io_uring_prep_send(sqe, w->fd, buffer, n, MSG_NOSIGNAL);
-    io_uring_sqe_set_data64(sqe, ((uint64_t)w->slot << 8) | 2);
+    if (lent < OSOE_WIRE_LENT_REGIONS && w->zero_copy && n >= w->zero_copy_bytes &&
+        w->owed[0] + w->owed[1] < OSOE_WIRE_ZERO_COPY_OWED_MOST) {
+        /* By reference: the completion says how much the kernel took, and then a
+         * notification - IORING_CQE_F_NOTIF on the same tag - when it has let go of
+         * those pages, which over TCP is once the peer has acknowledged them. The
+         * notification says too whether the kernel copied after all (ring.c). */
+        io_uring_prep_send_zc(sqe, w->fd, buffer, n, MSG_NOSIGNAL, IORING_SEND_ZC_REPORT_USAGE);
+        io_uring_sqe_set_data64(sqe, osoe_ring_send_tag(w->slot, lent));
+        w->ring->counts.zero_copy_sends++;
+    } else {
+        io_uring_prep_send(sqe, w->fd, buffer, n, MSG_NOSIGNAL);
+        io_uring_sqe_set_data64(sqe, osoe_ring_send_tag(w->slot, OSOE_WIRE_LENT_REGIONS));
+    }
     w->send_at = buffer;
     w->send_bytes = n;
     w->sending = true;
     w->sent = -1;
     w->ring->counts.sends++;
     return 0;
+}
+
+size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len)
+{
+    return send_from(w, buffer, len, OSOE_WIRE_LENT_REGIONS);
+}
+
+size_t osoe_wire_send_lent(struct osoe_wire *w, const void *buffer, size_t len,
+                           uint32_t region)
+{
+    if (region >= OSOE_WIRE_LENT_REGIONS)
+        osoe_fatal("bytes toward node %u were lent from region %u of %u", w->peer, region,
+                   OSOE_WIRE_LENT_REGIONS);
+    return send_from(w, buffer, len, region);
+}
+
+uint32_t osoe_wire_owed(const struct osoe_wire *w, uint32_t region)
+{
+    return region < OSOE_WIRE_LENT_REGIONS ? w->owed[region] : 0;
 }
 
 bool osoe_wire_limit_unsent(struct osoe_wire *w, uint32_t bytes)
