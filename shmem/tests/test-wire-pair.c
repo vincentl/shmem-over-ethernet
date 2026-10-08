@@ -109,7 +109,7 @@ int main(void)
     CHECK(getsockopt(w.fd, IPPROTO_TCP, TCP_KEEPCNT, &count, &length) == 0 &&
           count == OSOE_DEFAULT_KEEPALIVE_COUNT);
 
-    unsigned char out[CHUNK], in[CHUNK];
+    unsigned char out[CHUNK];
     size_t sent = 0, got = 0, filled = SIZE_MAX;
     /*
      * A deadline, not a spin budget: an iteration count stands in for a clock
@@ -139,7 +139,8 @@ int main(void)
         osoe_ring_reap(&ring);
         /* Empty the wire before the next reap, as the engine does (§3.3). */
         for (;;) {
-            size_t n = osoe_wire_recv(&w, in, sizeof in);
+            const unsigned char *in;
+            size_t n = osoe_wire_peek(&w, &in);
             if (n == 0)
                 break;
             for (size_t i = 0; i < n; i++)
@@ -149,6 +150,7 @@ int main(void)
                             pattern(peer, got + i), peer);
                     CHECK_FATAL(false);
                 }
+            osoe_wire_consume(&w, n);
             got += n;
             moved = true;
         }
@@ -176,7 +178,8 @@ int main(void)
     struct osoe_deadline d = osoe_deadline_in(UINT64_C(10000000000));
     while (!osoe_wire_ended(&w) && !osoe_deadline_expired(&d)) {
         osoe_ring_reap(&ring);
-        CHECK(osoe_wire_recv(&w, in, sizeof in) == 0);
+        const unsigned char *in;
+        CHECK(osoe_wire_peek(&w, &in) == 0);
         osoe_ring_wait(&ring, UINT64_C(1000000));
     }
     CHECK(osoe_wire_ended(&w));

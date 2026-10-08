@@ -13,8 +13,9 @@
  * - **Receive: one multishot recv per wire over one provided-buffer ring** that
  *   every wire shares, so the buffers a node holds do not grow with its peers.
  *   A reap queues each filled buffer on the wire it arrived for, oldest first,
- *   and marks that wire readable; the engine's pass then takes every byte of it
- *   (osoe_wire_recv), recycling each buffer the moment it is emptied. **No
+ *   and marks that wire readable; the engine's pass then parses every byte of
+ *   it where the kernel put it (osoe_wire_peek and osoe_wire_consume),
+ *   recycling each buffer the moment it is emptied. **No
  *   buffer is held across reaps** (§3.3, invariant 23): a reap that finds one
  *   still queued ends the job, since that is the path to the deadlock §3.3
  *   describes. -ENOBUFS, and any other completion without IORING_CQE_F_MORE,

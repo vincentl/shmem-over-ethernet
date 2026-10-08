@@ -36,7 +36,6 @@ struct osoe_am_state {
     struct osoe_progress_connection *connection; /* nodes - 1, in peer-slot order */
     uint64_t *busy;                              /* (nodes - 1 + 63) / 64 words */
     struct osoe_reply *descriptor;               /* the node-wide pool (§3.8) */
-    unsigned char *scratch;                      /* receive staging, one AM chunk */
     struct osoe_progress_team *team;             /* OSOE_TEAM_BLOCKS: per-block tree state */
     uint32_t *pending;                           /* as many block indices (progress.h) */
     struct osoe_progress progress;

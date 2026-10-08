@@ -9,11 +9,12 @@
  * mean what they meant.
  *
  * **It is a byte stream, not a message queue.** osoe_wire_send accepts a prefix
- * of what it was offered and says how much; osoe_wire_recv delivers whatever has
- * arrived, which may be a fraction of a segment or several segments' worth.
- * §3.3's parser is written against exactly that - a parse cursor per connection,
- * headers accumulated in a small per-connection area, payload copied straight to
- * its destination as it arrives - and §8.2 warns that loopback "will never
+ * of what it was offered and says how much; osoe_wire_peek shows whatever has
+ * arrived, a provided buffer at a time, which may be a fraction of a segment or
+ * several segments' worth. §3.3's parser is written against exactly that - a
+ * parse cursor per connection, headers accumulated in a small per-connection
+ * area, payload copied straight from the provided buffer to its destination as
+ * it arrives - and §8.2 warns that loopback "will never
  * produce a short write or partial read", which is where the most common defect
  * in hand-rolled TCP framing lives. So this wire produces them on purpose:
  * OSOE_WIRE_SPLIT truncates sends and receives, deterministically (§3.14's
@@ -55,8 +56,8 @@ struct osoe_wire {
     struct osoe_ring *ring;
     /* Receiving: provided buffers the reap queued here, oldest first. */
     uint32_t first, last;       /* buffer numbers, or OSOE_RING_NONE */
-    uint32_t offset;            /* bytes of `first` already delivered */
-    uint64_t queued;            /* bytes in all of them, not yet delivered */
+    uint32_t offset;            /* bytes of `first` already consumed */
+    uint64_t queued;            /* bytes in all of them, not yet consumed */
     bool receiving;             /* its multishot recv is armed */
     bool ended;                 /* the peer's end of stream has arrived */
     int error;                  /* a receive failed, or a send for any reason but
@@ -136,8 +137,20 @@ bool osoe_wire_limit_unsent(struct osoe_wire *w, uint32_t bytes);
  * reading (progress-host.c). Best effort: the job is ending either way. */
 void osoe_wire_lift_unsent(struct osoe_wire *w);
 
-/* Read up to len bytes. Returns how many were delivered, which may be 0. */
-size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len);
+/*
+ * The bytes that have arrived, where the kernel put them: the unread part of
+ * the oldest provided buffer queued on this wire - all of it, or a prefix when
+ * OSOE_WIRE_SPLIT says so - with `*bytes` at its start. Returns how many, 0
+ * when nothing has arrived. The caller reads them in place, with no copy, and
+ * gives them back with osoe_wire_consume; until then the buffer is the
+ * caller's, and the kernel writes nothing into it. Peek and consume until a
+ * peek returns 0, before the next reap (§3.3, invariant 23).
+ */
+size_t osoe_wire_peek(struct osoe_wire *w, const unsigned char **bytes);
+
+/* The first `n` bytes of the last peek are read: a buffer they empty goes back
+ * to the kernel at once (§3.3). Fatal past what the peek returned. */
+void osoe_wire_consume(struct osoe_wire *w, size_t n);
 
 /* Send this side's end of stream, once it has nothing more to send. */
 void osoe_wire_shutdown(struct osoe_wire *w);

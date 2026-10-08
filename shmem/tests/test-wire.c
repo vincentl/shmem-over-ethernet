@@ -115,18 +115,20 @@ static void unsent_limit(struct osoe_wire *w, const struct osoe_bootstrap *b)
     CHECK(!osoe_wire_limit_unsent(&closed, 16384));   /* not open: not counted */
 }
 
-/* Take everything waiting on `rx`, checking every byte against where it falls
- * in the stream. The wire must be emptied before the next reap, as the engine
- * empties every readable wire in its pass (§3.3, invariant 23). */
+/* Take everything waiting on `rx`, checking every byte where it arrived against
+ * where it falls in the stream. The wire must be emptied before the next reap,
+ * as the engine empties every readable wire in its pass (§3.3, invariant 23).
+ * A short receive is a peek that showed less than its provided buffer holds. */
 static bool drain(struct osoe_wire *rx, size_t *got)
 {
-    unsigned char in[CHUNK];
     bool moved = false;
     for (;;) {
-        size_t n = osoe_wire_recv(rx, in, sizeof in);
+        const unsigned char *in;
+        size_t whole = rx->queued ? rx->ring->filled[rx->first] - rx->offset : 0;
+        size_t n = osoe_wire_peek(rx, &in);
         if (n == 0)
             return moved;
-        if (n < sizeof in && rx->queued > 0)
+        if (n < whole)
             short_recvs++;
         for (size_t i = 0; i < n; i++)
             if (in[i] != pattern(*got + i)) {
@@ -134,6 +136,7 @@ static bool drain(struct osoe_wire *rx, size_t *got)
                         pattern(*got + i));
                 CHECK_FATAL(false);
             }
+        osoe_wire_consume(rx, n);
         *got += n;
         moved = true;
     }
@@ -226,8 +229,13 @@ int main(void)
         if (sent < sizeof probe)
             sent += osoe_wire_send(&wires[0], probe + sent, sizeof probe - sent);
         osoe_ring_reap(&ring);
-        CHECK(osoe_wire_recv(&wires[0], back, sizeof back) == 0);   /* not at the sender */
-        got += osoe_wire_recv(&wires[1], back + got, sizeof back - got);
+        const unsigned char *bytes;
+        CHECK(osoe_wire_peek(&wires[0], &bytes) == 0);              /* not at the sender */
+        for (size_t n; (n = osoe_wire_peek(&wires[1], &bytes)) > 0; got += n) {
+            CHECK_FATAL(n <= sizeof back - got);
+            memcpy(back + got, bytes, n);
+            osoe_wire_consume(&wires[1], n);
+        }
         osoe_ring_wait(&ring, UINT64_C(1000000));
     }
     CHECK(got == sizeof probe && memcmp(probe, back, sizeof probe) == 0);
@@ -252,8 +260,9 @@ int main(void)
     while (!(osoe_wire_ended(&wires[0]) && osoe_wire_ended(&wires[1])) &&
            !osoe_deadline_expired(&give_up)) {
         osoe_ring_reap(&ring);
-        CHECK(osoe_wire_recv(&wires[0], back, sizeof back) == 0);
-        CHECK(osoe_wire_recv(&wires[1], back, sizeof back) == 0);
+        const unsigned char *bytes;
+        CHECK(osoe_wire_peek(&wires[0], &bytes) == 0);
+        CHECK(osoe_wire_peek(&wires[1], &bytes) == 0);
         osoe_ring_wait(&ring, UINT64_C(1000000));
     }
     CHECK(osoe_wire_ended(&wires[0]) && osoe_wire_ended(&wires[1]));

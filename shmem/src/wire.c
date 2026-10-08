@@ -229,30 +229,32 @@ void osoe_wire_lift_unsent(struct osoe_wire *w)
     (void)setsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, sizeof v);
 }
 
-size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len)
+size_t osoe_wire_peek(struct osoe_wire *w, const unsigned char **bytes)
+{
+    if (w->queued == 0)
+        return 0;
+    struct osoe_ring *r = w->ring;
+    uint32_t b = w->first;
+    *bytes = r->buffer_memory + (size_t)b * r->buffer_bytes + w->offset;
+    return truncate_to(w, w->recvs++, r->filled[b] - w->offset);
+}
+
+void osoe_wire_consume(struct osoe_wire *w, size_t n)
 {
     struct osoe_ring *r = w->ring;
-    uint64_t have = w->queued < len ? w->queued : len;
-    size_t n = truncate_to(w, w->recvs++, have);
-    for (size_t done = 0; done < n; ) {
-        uint32_t b = w->first;
-        size_t take = r->filled[b] - w->offset;
-        if (take > n - done)
-            take = n - done;
-        memcpy((unsigned char *)buffer + done,
-               r->buffer_memory + (size_t)b * r->buffer_bytes + w->offset, take);
-        done += take;
-        w->offset += (uint32_t)take;
-        if (w->offset == r->filled[b]) {        /* emptied: back to the kernel at once */
-            w->first = r->next[b];
-            if (w->first == OSOE_RING_NONE)
-                w->last = OSOE_RING_NONE;
-            w->offset = 0;
-            osoe_ring_recycle(r, b);
-        }
-    }
+    uint32_t b = w->first;
+    if (w->queued == 0 || n > r->filled[b] - w->offset)
+        osoe_fatal("%zu bytes from node %u were consumed past the provided buffer they were "
+                   "peeked from (wire.h)", n, w->peer);
+    w->offset += (uint32_t)n;
     w->queued -= n;
-    return n;
+    if (w->offset == r->filled[b]) {            /* emptied: back to the kernel at once */
+        w->first = r->next[b];
+        if (w->first == OSOE_RING_NONE)
+            w->last = OSOE_RING_NONE;
+        w->offset = 0;
+        osoe_ring_recycle(r, b);
+    }
 }
 
 void osoe_wire_shutdown(struct osoe_wire *w)
