@@ -279,15 +279,32 @@ struct osoe_progress_connection {
  * sealed into it a segment at a time, one send in flight (§3.3), and the next
  * is sealed once that one has gone whole, so that a burst aggregates behind a
  * send as §3.9's buffers do. Its stream is parsed as a data wire's, under the
- * same segment header; nothing on it asks for an acknowledgement, since nothing
- * waits for a control message to be applied (the proposal's "ordering between
- * the planes").
+ * same segment header, and acknowledged as a data wire's is (§3.4, invariant
+ * 22): the tree's two messages are application work their receiver counts in
+ * its activity, so the deadlock detector's proof needs a node whose message is
+ * not yet applied at its peer to look busy (§3.15). As first built nothing on
+ * a control wire was acknowledged, and a barrier's message delayed in the
+ * network past the detector's two collections could have a job that would
+ * finish declared deadlocked (the adversarial read of Part 2, F1;
+ * deadlock_model.py's control_wire). Only the detector asks; an
+ * acknowledgement rides whatever segment goes back, and a header-only one
+ * answers a request.
  */
 struct osoe_progress_control {
     struct osoe_reply_queue queue;  /* the control plane's messages toward the peer */
     uint32_t bytes;                 /* the sealed segment's length; 0 while none is */
     uint32_t sent;                  /* bytes of it the wire has taken */
     uint64_t next_seq;              /* the next segment's sequence */
+    /* Acknowledgements, as a data connection's (§3.4, asks_for_ack): the
+     * peer's segments applied here, this side's the peer has applied, this
+     * side's last that carried application work, what the detector wants
+     * acknowledged, the last of this side's that asked, and the peer's ask. */
+    uint64_t applied;
+    uint64_t acked;
+    uint64_t last_application_seq;
+    uint64_t detector_wanted;
+    uint64_t flagged;
+    bool owe_ack;
     enum osoe_goodbye goodbye;
     bool peer_goodbye;
     /* The abort, as a data connection's (osoe_progress_abort). */

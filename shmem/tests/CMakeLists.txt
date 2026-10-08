@@ -1083,6 +1083,27 @@ if(OSOE_INTERNODE)
     FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
   osoe_internode_label(shmem.progress shmem.progress.forged-get-reply
     shmem.progress.forged-get-reply-bounds)
+  # The planes kept apart (the progress helpers proposal's §3.1): node 0's lead
+  # sends a barrier arrival on its data wire, or a get reply on its control
+  # wire, and node 1 must refuse each by name - the get reply before its
+  # landing is looked up, which ended the job first as a reply nobody asked for
+  # until the adversarial read of Part 2.
+  foreach(forge barrier-on-data get-reply-on-control)
+    if(forge STREQUAL "barrier-on-data")
+      set(refusal "osoe_fatal: node 1: a barrier arrival from node 0 arrived on its data wire")
+    else()
+      set(refusal "osoe_fatal: node 1: a get reply from node 0 arrived on its control wire")
+    endif()
+    add_test(NAME shmem.progress.forged-${forge}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+              OSOE_TEST_FORGE=${forge}
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
+              $<TARGET_FILE:shmem_test_progress>)
+    set_tests_properties(shmem.progress.forged-${forge} PROPERTIES LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "${refusal}")
+    osoe_internode_label(shmem.progress.forged-${forge})
+  endforeach()
 
   # Owners at a helper count above none, every owner of a node turned by its
   # one thread (test-owners.c): put, get and fetching AMO between every two of 5

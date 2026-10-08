@@ -51,6 +51,9 @@ Checked
 
 Designs
   design              as above.
+  control_wire_acked  the barrier's arrival on a control wire of its own,
+                      its segments acknowledged as a data wire's (v0.2 step 4
+                      part 2; the progress helpers proposal's §3.1).
 Breakages
   waits_only          activity counts the PEs' waits but not the messages a
                       node applies: a get's request applied between the
@@ -68,6 +71,10 @@ Breakages
                       sampled before its post, which lands after its
                       target's second sample (SAFETY; barrier).
   one_collection      a round declares after its first collection (SAFETY).
+  control_wire        the same arrival unacknowledged, as first built: in
+                      flight through both of its receiver's samples, it goes
+                      unseen (SAFETY; barrier; the adversarial read of v0.2
+                      step 4 part 2, F1).
   no_blocked          quiet ignores whether the PE waits: a PE computing
                       through both samples, sending nothing (SAFETY).
 
@@ -96,8 +103,21 @@ PROBED = lambda i: ('probed', i)         # the collection node i is answering: 0
 DECLARED = ('declared',)
 VIOLATION = ('$violation',)
 
-APP_KINDS = ('put_wake', 'put_silent', 'get_request', 'get_reply')
+APP_KINDS = ('put_wake', 'put_silent', 'get_request', 'get_reply', 'arrive')
 CONTROL_KINDS = ('probe1', 'probe2', 'report_ok', 'report_bad')
+
+# The internode tree's ARRIVE on a control wire of its own (v0.2 step 4 part
+# 2; the progress helpers proposal's §3.1), counted like every application
+# message in its receiver's activity (progress.c, complete). As first built,
+# nothing on a control wire was acknowledged and quiet looked at the data wires
+# alone, so a node whose ARRIVE was still in flight looked quiet (control_wire,
+# the adversarial read's F1). control_wire_acked is the design: a control
+# wire's segments acknowledged as a data wire's are, and quiet waiting for them.
+UNACKED = ('control_wire',)
+
+
+def acked_kind(k, design):
+    return not (k == 'arrive' and design in UNACKED)
 
 
 def waiting(M, i, design):
@@ -168,8 +188,9 @@ def pe(i, script, design):
                 B.append((p + 'P', ('add', lambda L, j=j: POSTED(i, 'put_wake', j), lambda L: 1,
                                     '_', '@END')))
             else:
-                B.append((p, ('add', lambda L, j=j: POSTED(i, 'put_wake', j), lambda L: 1, '_',
-                              '@FINAL')))
+                kind = 'arrive' if design.startswith('control_wire') else 'put_wake'
+                B.append((p, ('add', lambda L, j=j, kind=kind: POSTED(i, kind, j), lambda L: 1,
+                              '_', '@FINAL')))
     B += [('FINAL', ('ghost', lambda M, L: ({BLOCKED(i): 2, WAITS(i): M[WAITS(i)] + 1}, {}),
                      '@END')),
           ('END', ('done',))]
@@ -220,17 +241,19 @@ def agent(i, design):
         for j in range(N):
             for k in APP_KINDS:
                 if M[OUT(i, k, j)]:
-                    alts.append(({OUT(i, k, j): M[OUT(i, k, j)] - 1,
-                                  CHAN(i, j, k): M[CHAN(i, j, k)] + 1,
-                                  SENT(i, j): M[SENT(i, j)] + 1}, {},
-                                 f'node {i} sends a {k} to node {j}'))
+                    upd = {OUT(i, k, j): M[OUT(i, k, j)] - 1,
+                           CHAN(i, j, k): M[CHAN(i, j, k)] + 1}
+                    if acked_kind(k, design):
+                        upd[SENT(i, j)] = M[SENT(i, j)] + 1
+                    alts.append((upd, {}, f'node {i} sends a {k} to node {j}'))
         # Apply one arrived message, which the sender will hear of.
         for j in range(N):
             for k in APP_KINDS:
                 if M[CHAN(j, i, k)]:
-                    upd = {CHAN(j, i, k): M[CHAN(j, i, k)] - 1, APPLIED(i): M[APPLIED(i)] + 1,
-                           ACKS(j, i): M[ACKS(j, i)] + 1}
-                    if k in ('put_wake', 'get_reply'):
+                    upd = {CHAN(j, i, k): M[CHAN(j, i, k)] - 1, APPLIED(i): M[APPLIED(i)] + 1}
+                    if acked_kind(k, design):
+                        upd[ACKS(j, i)] = M[ACKS(j, i)] + 1
+                    if k in ('put_wake', 'get_reply', 'arrive'):
                         upd[WOKEN(i)] = M[WOKEN(i)] + 1
                     if k == 'get_request':
                         upd[OUT(i, 'get_reply', j)] = M[OUT(i, 'get_reply', j)] + 1
@@ -374,6 +397,9 @@ CASES = [
     ('coarse_waits', 'barrier', False),
     ('one_collection', 'put_wakes', False),
     ('no_blocked', 'compute', False),
+    # The barrier's arrival on the control wire (v0.2 step 4 part 2).
+    ('control_wire_acked', 'barrier', True),
+    ('control_wire', 'barrier', False),
 ]
 
 

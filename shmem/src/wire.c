@@ -39,22 +39,23 @@ static size_t truncate_to(const struct osoe_wire *w, uint64_t site, uint64_t n)
 }
 
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
-                         const struct osoe_bootstrap *b)
+                         uint32_t lending, const struct osoe_bootstrap *b)
 {
     struct osoe_wire_settings s;
     osoe_wire_settings_read(&s, b, true);
-    /* With the zero-copy send on, each wire's notifications still owed are
+    /* With the zero-copy send on, each data wire's notifications still owed are
      * completions the queue must have room for (§3.3, ring.h) - refused by name
      * where that passes io_uring's own most, rather than failing to create a
-     * ring for a reason the setting does not name. */
-    uint64_t completions = (uint64_t)s.buffer_count +
-                           (2 + (uint64_t)OSOE_WIRE_ZERO_COPY_OWED_MOST) * count + 1;
+     * ring for a reason the setting does not name. A control wire never lends,
+     * so it owes none (the adversarial read of Part 2, S2). */
+    uint64_t completions = (uint64_t)s.buffer_count + 2 * (uint64_t)count +
+                           (uint64_t)OSOE_WIRE_ZERO_COPY_OWED_MOST * lending + 1;
     if (s.zero_copy && completions > OSOE_RING_COMPLETIONS_MOST)
-        osoe_fatal("OSOE_WIRE_ZERO_COPY=on: %u peer nodes and %u receive buffers need a "
-                   "completion queue of %llu, more than io_uring's %u; turn the zero-copy "
-                   "send off, or lower OSOE_WIRE_BUFFERS", count, s.buffer_count,
+        osoe_fatal("OSOE_WIRE_ZERO_COPY=on: %u peer nodes' data wires and %u receive buffers "
+                   "need a completion queue of %llu, more than io_uring's %u; turn the "
+                   "zero-copy send off, or lower OSOE_WIRE_BUFFERS", lending, s.buffer_count,
                    (unsigned long long)completions, OSOE_RING_COMPLETIONS_MOST);
-    osoe_ring_open(r, wires, count, s.buffer_count, s.buffer_bytes,
+    osoe_ring_open(r, wires, count, lending, s.buffer_count, s.buffer_bytes,
                    s.zero_copy ? OSOE_WIRE_ZERO_COPY_OWED_MOST : 0);
     if (!s.zero_copy)
         return;
@@ -151,6 +152,17 @@ static const char *wire_name(enum osoe_hello_purpose purpose)
     return purpose == OSOE_HELLO_CONTROL_WIRE ? "control" : "data";
 }
 
+/* osoe_wire_attach, and a control wire never sends by reference: its ring
+ * counts no notifications for it (osoe_ring_open). */
+static void attach_purpose(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, int fd,
+                           uint32_t peer, enum osoe_hello_purpose purpose,
+                           const struct osoe_bootstrap *b)
+{
+    osoe_wire_attach(w, r, index, fd, peer, b);
+    if (purpose == OSOE_HELLO_CONTROL_WIRE)
+        w->zero_copy = false;
+}
+
 void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, uint32_t helpers,
                      const struct osoe_bootstrap *b, uint32_t session,
                      const struct osoe_mesh *mesh)
@@ -211,7 +223,7 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
         if (w->fd >= 0)
             osoe_fatal("node %u was connected to twice by node %u for its %s wire", b->node,
                        peer, wire_name(purpose));
-        osoe_wire_attach(w, ring, ring_index, fd, peer, b);
+        attach_purpose(w, ring, ring_index, fd, peer, purpose, b);
     }
     osoe_listener_close(l);
     /* Without a rendezvous's mesh - the tests below the library - each peer is
@@ -234,11 +246,12 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
             uint32_t ring_index;
             struct osoe_wire *w = wire_of(wires, rings, peer - 1, purposes[k], peers, helpers,
                                           &ring, &ring_index);
-            osoe_wire_attach(w, ring, ring_index, fd, peer, b);
+            attach_purpose(w, ring, ring_index, fd, peer, purposes[k], b);
         }
     for (uint32_t o = 0; o <= helpers; o++)
         osoe_wire_ring_open(rings[o], &wires[osoe_ring_first(o, peers, helpers)],
-                            osoe_ring_wires(o, peers, helpers), b);
+                            osoe_ring_wires(o, peers, helpers),
+                            osoe_owner_wires(o, peers, helpers), b);
 }
 
 /* osoe_wire_send and osoe_wire_send_lent: `lent` is the region the bytes are

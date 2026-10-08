@@ -263,12 +263,17 @@ wire carries the control plane alone: the internode tree's ARRIVE and RELEASE,
 the deadlock detector's messages, and each wire's goodbye or abortive goodbye -
 nothing with a payload, and nothing a data message's order depends on (a
 barrier's quiet has its acknowledgements before its arrival is posted; a
-release promises nothing about data; the detector reasons about counters). It
-is the lead's, sealed from a private buffer no PE writes, so a barrier's
-messages never queue behind a put's bytes in a buffer or a socket - they share
-only the link - and the control plane's structures have one owner however many
-threads move the data (§3.12). It costs a second socket a pair, and a mesh
-twice as long to make (§6.2).
+release promises nothing about data; the detector reasons about counters). Its
+segments are acknowledged as the data wire's are (§3.4, invariant 22): the
+tree's two messages are application work their receiver counts, and the
+detector's proof needs a node whose message is not yet applied to look busy
+(§3.15) - which, as first built, unacknowledged, it did not (the adversarial
+read of Part 2, F1). It is the lead's, sealed from a private buffer no PE
+writes, so a barrier's messages never queue behind a put's bytes in a buffer
+or a socket - they share the link, and the progress thread, whose pass takes
+the control wires first - and the control plane's structures have one owner
+however many threads move the data (§3.12). It costs a second socket a pair,
+and a mesh twice as long to make (§6.2).
 
 ### 3.2 Chunking
 
@@ -441,10 +446,13 @@ on 6.12). Both bounds are computed and asserted at open: the SQ holds `2 × wire
 wires + 1` — one completion per provided buffer, because a buffer is refilled
 only after the pass that emptied it; a terminal completion per armed receive; a
 send per wire; the futex wait — and with the zero-copy send on (v0.2 step 4,
-below) 16 more a wire, the notifications a wire may owe: `buffers + 18 × wires
-+ 1`, which io_uring's 65,536 completions bound at 3,638 nodes with the default
-buffers, past which the setting is refused by name. A submission that finds the
-SQ full is a fatal naming the broken bound, not a retry.
+below) 16 more a data wire, the notifications a wire that lends may owe: `buffers
++ 2 × wires + 16 × data wires + 1`, on owner 0's ring at no helpers `buffers +
+20 × (n - 1) + 1` with the control wires (§3.1), which never lend - which
+io_uring's 65,536 completions bound at 3,274 nodes with the default buffers
+(3,638 on one wire a pair), past which the setting is refused by name. A
+submission that finds the SQ full is a fatal naming the broken bound, not a
+retry.
 
 **One provided-buffer ring for every wire**, `OSOE_WIRE_BUFFERS` of
 `OSOE_WIRE_BYTES` (default 64 × 16 KiB), so the memory a node holds for
@@ -997,11 +1005,12 @@ the node can hold at once (§5.7): a number is each PE's own, so a node may hold
 more teams than any one PE's numbers. The bound a block needs the old team's
 forwards gone before the block is claimed again, and a team's members leave
 its block only after its local release - which `release_local` applies only
-once the team's RELEASEs have left the children's control queues. It drains
-and flushes each child's connection first, as it always did, and that empties
-them unless a connection has no room; then the local release waits a pass, or
-as many as the room takes (`transport.am.releases_held` counts the times it is
-held back, twice a pass). The
+once the team's RELEASEs have left the children's control queues. It flushes
+each child's control wire first (since v0.2 step 4's Part 2; until then it
+drained and flushed each child's connection), and that seals them unless a
+segment is still on the wire, the wire's one buffer; then the local release
+waits a pass, or as many as the send takes (`transport.am.releases_held`
+counts the times it is held back, twice a pass). The
 adversarial read of step D found the first build applied the release whatever
 the drain left, which made the bound hold only when the drain emptied the
 queues. 5,120 descriptors at the defaults,
@@ -7954,8 +7963,8 @@ Each is independently breakable, and each failure appears far from its cause.
    single-node self-deadlock.
 2. **One in-flight send per connection.** (§3.3) Violating it silently reorders
    the stream and breaks fence, ordering, and signal-after-payload.
-3. **A single ordered stream per node pair.** (§3.1) A second data socket
-   destroys free fence.
+3. **A single ordered data stream per node pair.** (§3.1) A second data socket
+   destroys free fence; the control wire beside it carries no data (§3.1).
 4. **The progress thread never waits for `filled == head`.** (§3.5) Violating it
    hangs under oversubscription.
 5. **Signals land after every payload byte**, guaranteed by in-order application
@@ -8018,7 +8027,9 @@ Each is independently breakable, and each failure appears far from its cause.
     messages when broken.
 22. **Every applied segment is eventually acknowledged, with or without reverse
     traffic.** (§3.4) Without ack-only segments, `quiet` on one-way traffic never
-    returns.
+    returns. On a control wire too (§3.1): its acknowledgements are what the
+    deadlock detector's proof needs of the tree's messages (§3.15; the
+    adversarial read of v0.2 step 4's Part 2, F1).
 23. **A provided buffer is never held across reaps.** (§3.3) Holding one stalls a
     large segment and can deadlock two connections sharing a ring.
 24. **Every access to a shared protocol word is a `<stdatomic.h>` call naming an ISO
@@ -8073,9 +8084,10 @@ Assert what can be asserted. Instrument the rest.
     barrier arrival left unsealed, measured one run in eight.
 35. **A lead seals its goodbye only once the connection owes the peer nothing,
     ends its stream only after the goodbye has gone, and closes a socket only
-    after the peer's stream has ended - each wire of a pair on its own.** (§6.4) Dropping each strands a child
-    waiting for its release, makes a finished peer look dead, or resets a
-    connection the peer is still sending on (`close_model.py`).
+    after the peer's stream has ended - each wire of a pair on its own.** (§6.4)
+    Dropping each strands a child waiting for its release, makes a finished
+    peer look dead, or resets a connection the peer is still sending on
+    (`close_model.py`).
 36. **A lead whose node aborts has its abortive goodbye acknowledged on every
     connection that still has someone to tell before its process ends; on a
     global exit, while its agent runs, nothing but the agent ends that process,

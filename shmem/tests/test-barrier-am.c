@@ -156,9 +156,27 @@ int main(void)
     arrivals_row()[b.node] = arrivals_now();
     osoe_progress_arrive(&p, TEAM, 0, EPOCH);
 
+    /*
+     * And the deadlock detector's view of it (§3.15): a node whose ARRIVE has
+     * gone to the kernel but which its parent has not yet released is not
+     * quiet. The ARRIVE is application work the parent will count, and only the
+     * parent's acknowledgement makes it applied - which can come no sooner than
+     * the RELEASE it rides, since nothing else goes back before it. As first
+     * built nothing on a control wire was acknowledged, and such a node looked
+     * quiet (the adversarial read of v0.2 step 4's Part 2, F1). Asked the
+     * first time a pass leaves this node idle before its release, which a node
+     * that arrives before the last always sees.
+     */
+    bool looked = false;
     while (releases == 0) {
         if (!osoe_progress_poll(&owner))
             osoe_ring_wait(&ring, UINT64_C(1000000));
+        if (!looked && releases == 0 && tree.parent != OSOE_COLLECTIVE_TREE_NONE &&
+            osoe_progress_idle(&owner)) {
+            uint64_t applied;
+            CHECK(!osoe_progress_quiet(&owner, &applied));
+            looked = true;
+        }
         if (osoe_deadline_expired(&give_up)) {
             fprintf(stderr, "node %u: the barrier never released\n", b.node);
             CHECK(false);
@@ -194,6 +212,17 @@ int main(void)
         if (osoe_deadline_expired(&give_up))
             break;
     }
+
+    /*
+     * Then quiet, as the detector asks it: every segment this node sent that
+     * carried application work - its ARRIVE, its RELEASEs - acknowledged, the
+     * request carried and answered on a control wire as on a data wire (§3.4).
+     */
+    uint64_t applied;
+    while (!osoe_progress_quiet(&owner, &applied) && !osoe_deadline_expired(&give_up))
+        if (!osoe_progress_poll(&owner))
+            osoe_ring_wait(&ring, UINT64_C(1000000));
+    CHECK(osoe_progress_quiet(&owner, &applied));
 
     /*
      * Then the close a lead makes (§6.4, close_model.py): goodbye, end of

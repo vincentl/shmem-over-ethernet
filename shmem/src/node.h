@@ -523,9 +523,9 @@ struct osoe_am_connection_metrics {
     _Alignas(OSOE_CACHELINE)
     _Atomic uint32_t peer;                  /* the peer node this is toward */
     /* Control messages queued now toward the peer, on the control wire since
-     * layout 35 - owner 0's to write - and get replies on the data wire. */
+     * layout 35 - owner 0's to write. */
     _Atomic uint32_t control_queue_depth;
-    _Atomic uint32_t bulk_queue_depth;
+    _Atomic uint32_t bulk_queue_depth;  /* get replies queued now on the data wire */
     _Atomic uint32_t control_queue_high_water;
     _Atomic uint32_t bulk_queue_high_water;
     _Atomic uint64_t segments_sent;

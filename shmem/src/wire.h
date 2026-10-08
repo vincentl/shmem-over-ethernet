@@ -125,13 +125,14 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
 /*
  * The two halves of osoe_wires_open, for a caller that makes its own
  * connections - a test holding both ends of one in a single process. The ring
- * for `count` wires, sized from OSOE_WIRE_BYTES and OSOE_WIRE_BUFFERS and
- * disabled until enabled; and a connected socket made wire `index` of it, toward
- * node `peer`.
+ * for `count` wires, the first `lending` of them data wires, which may send by
+ * reference (osoe_ring_open), sized from OSOE_WIRE_BYTES and OSOE_WIRE_BUFFERS
+ * and disabled until enabled; and a connected socket made wire `index` of it,
+ * toward node `peer`.
  */
 
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
-                         const struct osoe_bootstrap *b);
+                         uint32_t lending, const struct osoe_bootstrap *b);
 void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, int fd,
                       uint32_t peer, const struct osoe_bootstrap *b);
 

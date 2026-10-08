@@ -83,11 +83,15 @@ struct osoe_ring {
 
 /*
  * Create the ring for `wire_count` wires with `buffer_count` provided buffers
- * of `buffer_bytes` each, disabled until osoe_ring_enable. Fatal if the kernel
- * gives smaller queues than the bounds above.
+ * of `buffer_bytes` each, disabled until osoe_ring_enable. Its first
+ * `lending_count` wires may send by reference and owe up to
+ * `notifications_per_wire` notifications each: an owner's data wires, which
+ * come before owner 0's control wires on its ring (owner-map.h), and a control
+ * wire never lends. Fatal if the kernel gives smaller queues than the bounds
+ * above.
  */
 void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_count,
-                    uint32_t buffer_count, uint32_t buffer_bytes,
+                    uint32_t lending_count, uint32_t buffer_count, uint32_t buffer_bytes,
                     uint32_t notifications_per_wire);
 
 /* A send's user data: its wire's index on the ring, and the region it lends
