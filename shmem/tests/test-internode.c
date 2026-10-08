@@ -306,27 +306,33 @@ int main(void)
      */
     uint64_t *signal = shmem_malloc(sizeof *signal);
     CHECK_FATAL(signal != NULL);  /* NULL would be dereferenced just below */
-    *signal = 0;
-    memset(inbox, 0, stride * (size_t)npes);
-    shmem_barrier_all();
     int partner = (me + 1) % npes;
-    for (size_t i = 0; i < SMALL; i++)
-        source[i] = pattern(me, partner, i);
-    shmem_putmem_signal(inbox + stride * (size_t)me, source, SMALL, signal, 1,
-                        SHMEM_SIGNAL_SET, partner);
-    shmem_quiet();
     int sender = (me + npes - 1) % npes;
-    shmem_uint64_wait_until(signal, SHMEM_CMP_NE, 0);
-    {
+    /* SMALL in one message, and CHUNKED in parts: a put that fills the room a
+     * buffer has left is cut there and goes on in the next (v0.2 step 4), and
+     * its signal must still follow its last byte. */
+    const size_t signalled[] = { SMALL, CHUNKED };
+    for (unsigned round = 0; round < sizeof signalled / sizeof *signalled; round++) {
+        size_t len = signalled[round];
+        *signal = 0;
+        memset(inbox, 0, stride * (size_t)npes);
+        shmem_barrier_all();
+        for (size_t i = 0; i < len; i++)
+            source[i] = pattern(me, partner, i);
+        shmem_putmem_signal(inbox + stride * (size_t)me, source, len, signal, 1,
+                            SHMEM_SIGNAL_SET, partner);
+        shmem_quiet();
+        shmem_uint64_wait_until(signal, SHMEM_CMP_NE, 0);
         const unsigned char *got_bytes = inbox + stride * (size_t)sender;
         int bad = -1;
-        for (size_t i = 0; i < SMALL && bad < 0; i++)
+        for (size_t i = 0; i < len && bad < 0; i++)
             if (got_bytes[i] != pattern(sender, me, i))
                 bad = (int)i;
         if (bad >= 0)
-            fprintf(stderr, "PE %d: signal arrived before byte %d from PE %d\n",
-                    me, bad, sender);
+            fprintf(stderr, "PE %d: signal arrived before byte %d of %zu from PE %d\n",
+                    me, bad, len, sender);
         CHECK(bad < 0);
+        shmem_barrier_all();
     }
     shmem_barrier_all();
 

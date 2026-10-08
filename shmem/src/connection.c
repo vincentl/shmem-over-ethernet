@@ -35,6 +35,13 @@ void osoe_connection_init(struct osoe_connection *c, uint32_t credits)
 enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c, uint32_t len,
                                         struct osoe_reservation *r)
 {
+    return osoe_connection_reserve_up_to(c, len, len, r);
+}
+
+enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connection *c,
+                                                           uint32_t most, uint32_t least,
+                                                           struct osoe_reservation *r)
+{
     struct osoe_connection_shared *s = c->s;
     for (;;) {
         /*
@@ -59,8 +66,17 @@ enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c, 
         if (k == OSOE_CONNECTION_NONE)
             return OSOE_RESERVATION_NONE;
 
-        if (h + len > c->capacity)
-            return OSOE_RESERVATION_FULL;      /* the caller asks for a seal, then retries */
+        /*
+         * As much of `most` as the room after this head holds, whole messages
+         * being 8-byte padded - and decided from the head the CAS below
+         * compares, never from another load of it, or a writer could reserve
+         * past the buffer's end (reservation_model.py, `fill_stale`). Less
+         * than `least` fits: the caller asks for a seal, then retries.
+         */
+        uint32_t room = h < c->capacity ? c->capacity - h : 0;
+        uint32_t len = most <= room ? most : room & ~(OSOE_MESSAGE_ALIGN - 1);
+        if (len < least)
+            return OSOE_RESERVATION_FULL;
 
         /*
          * A CAS, not a fetch_add: a writer that loses this race has changed

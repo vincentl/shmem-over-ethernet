@@ -265,6 +265,18 @@ void osoe_connection_init(struct osoe_connection *c, uint32_t credits);
 enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c, uint32_t len,
                                         struct osoe_reservation *r);
 
+/*
+ * Reserve as much of `most` bytes as the open buffer has room for, and at
+ * least `least` - both padded with osoe_message_padded, `least` no more than
+ * `most`; r->len says how much was taken. A put fills the room this way, its
+ * message cut to the length taken, so that a buffer carries what it can hold
+ * rather than one chunk and a gap (v0.2 step 4's first rung; §3.5).
+ * osoe_connection_reserve is the case `least` == `most`: a message whole.
+ */
+enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connection *c,
+                                                           uint32_t most, uint32_t least,
+                                                           struct osoe_reservation *r);
+
 /* Where a granted reservation's bytes go. */
 static inline void *osoe_reservation_bytes(const struct osoe_connection *c, const struct osoe_reservation *r)
 {
