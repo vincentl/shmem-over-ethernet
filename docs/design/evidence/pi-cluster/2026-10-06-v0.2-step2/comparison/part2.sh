@@ -13,8 +13,8 @@ mkdir -p $OUT; LOG=$OUT/run.txt; : > $LOG
 echo "start $(date +%H:%M:%S)" >> $LOG
 rsync -a --delete --exclude=/build --exclude=/.git "$TREE"/ pi-login:osoe/ || { echo "rsync failed" >> $LOG; exit 1; }
 ssh pi-login 'rm -rf osoe/build/v02s2 && mkdir -p osoe/build/v02s2' || exit 1
-scp -q /Users/vincent/shmem-over-ethernet/docs/design/evidence/pi-cluster/2026-10-04-step-e/e-band.c pi-login:osoe/build/v02s2/e-band.c || exit 1
-rsync -a /Users/vincent/shmem-over-ethernet/corpus/osu-omb/osu-micro-benchmarks-7.5.2/ pi-login:osoe/build/v02s2/osu/ || exit 1
+scp -q <repo>/docs/design/evidence/pi-cluster/2026-10-04-step-e/e-band.c pi-login:osoe/build/v02s2/e-band.c || exit 1
+rsync -a <repo>/corpus/osu-omb/osu-micro-benchmarks-7.5.2/ pi-login:osoe/build/v02s2/osu/ || exit 1
 ssh pi-login 'cd osoe && cmake --preset release > /dev/null 2>&1 && cmake --build build/release -j4 > build/v02s2/build.txt 2>&1; echo "built: $?"
   OSHCC=$HOME/osoe/build/release/tools/wrapper/oshcc
   $OSHCC -O2 -o build/v02s2/e-band build/v02s2/e-band.c; echo "e-band: $?"
@@ -24,7 +24,7 @@ ssh pi-login 'cd osoe && cmake --preset release > /dev/null 2>&1 && cmake --buil
   make -C c/openshmem -j4 > ../osu-build.txt 2>&1; echo "osu: $?"' >> $LOG
 # And the tag's own tree, v0.1.0, under build/v02s2/tag with its own e-band
 # and OSU, the merge point's comparison.
-scp -q /Users/vincent/shmem-over-ethernet/build/scratch/shape/pi/tag-v0.1.0.tar pi-login:osoe/build/v02s2/tag.tar || exit 1
+scp -q <repo>/build/scratch/shape/pi/tag-v0.1.0.tar pi-login:osoe/build/v02s2/tag.tar || exit 1
 ssh pi-login 'cd osoe/build/v02s2 && mkdir -p tag && tar -C tag -xf tag.tar && cd tag && cmake --preset release > /dev/null 2>&1 && cmake --build build/release -j4 > ../tag-build.txt 2>&1; echo "tag built: $?"
   OSHCC=$HOME/osoe/build/v02s2/tag/build/release/tools/wrapper/oshcc
   $OSHCC -O2 -o ../e-band-tag ../e-band.c; echo "tag e-band: $?"

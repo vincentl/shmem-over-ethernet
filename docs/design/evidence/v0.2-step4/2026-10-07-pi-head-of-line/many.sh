@@ -12,7 +12,7 @@ rsync -a --delete --exclude=/build --exclude=/.git "$FILL"/ pi-login:osoe/ || { 
 ssh pi-login 'rm -rf osoe/build/ladder osoe/build/base-src osoe/build/spare-src && mkdir -p osoe/build/ladder osoe/build/base-src osoe/build/spare-src' || exit 1
 rsync -a --exclude=/build --exclude=/.git "$BASE"/ pi-login:osoe/build/base-src/ || exit 1
 rsync -a --exclude=/build --exclude=/.git "$SPARE"/ pi-login:osoe/build/spare-src/ || exit 1
-scp -q /Users/vincent/shmem-over-ethernet/build/scratch/ladder/hol-many.c pi-login:osoe/build/ladder/hol-many.c || exit 1
+scp -q <repo>/build/scratch/ladder/hol-many.c pi-login:osoe/build/ladder/hol-many.c || exit 1
 ssh pi-login 'cd osoe && cmake --preset release > /dev/null 2>&1 && cmake --build build/release -j4 > build/ladder/build.txt 2>&1; echo "fill built: $?"
   build/release/tools/wrapper/oshcc -O2 -o build/ladder/many-fill build/ladder/hol-many.c; echo "many-fill: $?"
   for t in base spare; do (cd build/$t-src && cmake --preset release > /dev/null 2>&1 && cmake --build build/release -j4 > ../ladder/build-$t.txt 2>&1; echo "$t built: $?"
