@@ -383,7 +383,7 @@ static void limit_unsent(uint64_t asked)
 
 static void take_unsent_request(void)
 {
-    if (atomic_load_explicit(&unsent_request, memory_order_relaxed) == 0)
+    if (atomic_load_explicit(&unsent_request, memory_order_acquire) == 0)
         return;
     uint64_t asked = atomic_exchange_explicit(&unsent_request, 0, memory_order_seq_cst);
     if (asked)
