@@ -100,6 +100,10 @@ changes it.
 
 ### 1. The ladder's first rung: fill the room, deepen the buffer, or both
 
+*Answered: (c) - fill the room first, modelled for the order of delivery and
+verified, then a deeper default buffer measured on top of it; the author's
+words and the caveat in `2026-10-07.md`, items 9 and 10.*
+
 - (a) **Fill the room**: a put's message takes the room the open buffer has,
   down to a floor of 4 KiB, decided at the reservation's CAS (§3.5). 2.2 times
   at no memory; a change to a model-checked protocol, so the reservation model
