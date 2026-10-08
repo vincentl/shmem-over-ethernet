@@ -7663,10 +7663,14 @@ The library's stream, 3.0 GiB/s idle against the floor's 14, is 0.21×. With
 a 1 MiB buffer it is 0.52–0.69×.
 
 *Since v0.2 step 4* a put fills the room a buffer has (§3.5) and the default
-buffer is 256 KiB (§3.4), and the stream row reads: bound ≥ 0.3, measured
-0.58–0.67, 0.161–0.164 with the poll - the pin raised from 0.10, by way of 0.15
-at the first of the two, so that the poll still fails it by more than 1.8 times
-(`docs/decisions/2026-10-07-one-thread-profile.md`).
+buffer is 256 KiB (§3.4), and the stream row reads, under this section's
+protocol at that step's tree: bound ≥ 0.3, measured 0.72–0.77 idle, 0.43–0.54
+beside a `ctest -j4`, 0.43–0.65 under 16 busy loops; with the poll 0.145–0.148
+idle, and 0.53–0.62 under the loops, where the scheduler's delay to every woken
+waiter hides it - the pin raised from 0.10, by way of 0.15 at the first of the
+two, so that an idle poll fails it twice over and no healthy run came within
+1.4 times of it (`docs/decisions/2026-10-07-one-thread-profile.md`,
+`pin-protocol.txt`).
 
 *What the fastest trip can see, and what it cannot.* It is the length of a
 path, and between `echo-uring`'s two kinds — one path of the same length — it

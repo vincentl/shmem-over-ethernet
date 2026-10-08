@@ -34,8 +34,11 @@
  *   - the library's stream over the floor's, at least STREAM, at the default
  *     connection buffer. There a put fills each buffer to its end, so a writer
  *     waits for a turnover every 256 KiB (§3.5, §3.4; v0.2 step 4), and this is
- *     the pin a writer's wait that polls fails: measured 0.58-0.67x, and
- *     0.161-0.164x with the poll. Before v0.2 step 4 a 64 KiB put filled half a
+ *     the pin a writer's wait that polls fails, idle: measured under this
+ *     protocol at v0.2 step 4's tree, 0.72-0.77x idle, 0.43-0.54x beside a
+ *     ctest -j4 and 0.43-0.65x under 16 busy loops, and with the poll
+ *     0.145-0.148x idle - but 0.53-0.62x under the loops, where the scheduler's
+ *     delay to every woken waiter hides it, so only an idle run can tell. Before v0.2 step 4 a 64 KiB put filled half a
  *     buffer of 128 KiB and every one waited for a turnover: 0.21-0.43x, and
  *     0.037-0.055x with the poll, against a pin of 0.10; with the room filled
  *     and the buffer still 128 KiB, 0.43-0.47x and 0.083-0.085x, against 0.15.
@@ -54,7 +57,7 @@
  * on its own machines, and a ratio of one thread's work against the machine's
  * loopback memcpy is another machine's to differ in: before v0.2 step 4 the
  * stream's measured 0.0999 against its pin of 0.10 beside a parallel test run
- * in a fresh VM, and 0.103 at its lowest idle; since, 0.58 at its lowest
+ * in a fresh VM, and 0.103 at its lowest idle; since, 0.43 at its lowest
  * median, against 0.3. A stranger's first `cmake --workflow` must not go red
  * on a library that works. Unasked, the ratios are printed all the same, and the
  * report ends with a line that says no pin was checked and how to ask.

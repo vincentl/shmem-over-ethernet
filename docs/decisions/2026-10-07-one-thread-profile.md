@@ -371,6 +371,48 @@ buffers - measured:
   the 99th percentile, three writers of them 4.43 and 7.2 to 7.8, the stream at
   112 MiB/s.
 
+## The second adversarial read
+
+A fresh agent read the second and third rungs' code at `37c2ded` against seven
+properties - no hang, loss, reordering or fatal from the limit; every wire once
+a session, the same on every node; no data race and the ownership rule; the
+arithmetic; the single-node build and the boundary; the 256 KiB default; the
+floor's pin - and archived its report as
+`docs/reviews/archive/v0.2-step4-part0-second-adversarial-read.md`. Verdict:
+nothing fatal; the properties held but for the letter of one. What was done:
+
+- **S1, the application thread set an option on sockets the agent owns**
+  (should-fix: invariant 19, §3.12, wire.h's header, though no race). The
+  application thread now asks and the agent sets it, through a request word
+  taken as a dirty bit is - at a pass, and again after `lead_sleeping` is
+  raised, so that it never waits for a sweep - which is the form a helper owning
+  wires will need too.
+- **S2, `shmem.unsent.*` could not see a lead that limited nothing** (should-fix:
+  a launcher printing the lines and opening no socket passed all seven). The
+  agent counts the wires it reached and says so; `unsent.sh` requires every lead
+  to have reached nodes less one.
+- **S3, the floor pin's comment claimed a protocol not run** (should-fix: twelve
+  runs - idle, beside a `ctest -j4`, under 16 busy loops - where six idle runs
+  and three of the poll were taken). Run at the final tree (`pin-protocol.txt`,
+  medians of seven pairs, four runs each): 0.72 to 0.77 idle, 0.43 to 0.54
+  beside a `ctest -j4`, 0.43 to 0.65 under 16 busy loops; the poll 0.145 to
+  0.148 idle, and 0.53 to 0.62 under the loops - where the scheduler's delay to
+  every woken waiter hides it, so that only an idle run can tell. The pin stays
+  0.3: no healthy run came within 1.4 times of it, and an idle poll fails it
+  twice over; the comment now says what was run.
+- **N1**, a bandwidth set by hand was ignored under a `fixed` shape: it counts
+  now. **N3, N5, N7**: 0 leaves the system's own limit, which is none by
+  default; a value by hand is taken as given, however small; the kernel holds
+  "about" the limit, since it takes a send whole while it holds less. **N4**:
+  refusals for a bad `OSOE_WIRE_UNSENT_BYTES`. **N6**: an aborting agent lifts the
+  limit first, so that its abortive goodbye leaves with the kernel even toward a
+  peer stalled past the grace, which then reads the job's status rather than a
+  stream cut short. **N9**: `test-am-size` checks 2,049 itself; a static
+  assertion keeps the overflow argument; the names say "limit", where "cap" read
+  as the contraction `CLAUDE.md` names. **N2** (each node's own setting, as every
+  `OSOE_WIRE_*` is) and **N8** (the `/dev/shm` check asks twice as much for the
+  connection area, 250 MiB at 500 nodes, which the README states) stand.
+
 ## What goes on meanwhile
 
 The rungs that do not depend on the answer, each measured against the one below
