@@ -1120,13 +1120,17 @@ foreach(map 0,0,0,0 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
   if(nodes GREATER 1)
     osoe_internode_label(shmem.multinode.${label})
     # The zero-copy send (wire-settings.h) on every send of 64 bytes or more:
-    # each connection buffer lent to the kernel until its notifications have
-    # come. Over loopback the kernel copies anyway, but the notifications, the
-    # lent buffers and their release at the last one run as on a NIC.
+    # a connection buffer lent to the kernel until its notifications have come.
+    # Over loopback the kernel copies anyway, but the notifications, the lent
+    # buffers and their release at the last one run as they would on a NIC. The
+    # deadlock detector is off, so that a wait the engine strands is the
+    # launcher's timeout rather than a second's rescue by the detector's sweep
+    # (the fourth adversarial read of v0.2 step 4, F1), and the test fails if no
+    # send went by reference (S1).
     add_test(NAME shmem.multinode.zero-copy.${label}
       COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
               OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
-              OSOE_WIRE_ZERO_COPY=on OSOE_WIRE_ZERO_COPY_BYTES=64
+              OSOE_WIRE_ZERO_COPY=on OSOE_WIRE_ZERO_COPY_BYTES=64 OSOE_DEADLOCK_SECONDS=0
               $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
               $<TARGET_FILE:shmem_test_multinode>)
     set_tests_properties(shmem.multinode.zero-copy.${label} PROPERTIES LABELS "tier2"
@@ -1264,7 +1268,7 @@ foreach(map IN LISTS osoe_internode_maps)
       COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
               OSOE_AM_CREDITS=2
               OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
-              OSOE_WIRE_ZERO_COPY=on OSOE_WIRE_ZERO_COPY_BYTES=64
+              OSOE_WIRE_ZERO_COPY=on OSOE_WIRE_ZERO_COPY_BYTES=64 OSOE_DEADLOCK_SECONDS=0
               $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
               $<TARGET_FILE:shmem_test_internode>)
     set_tests_properties(shmem.internode.zero-copy.${label} PROPERTIES LABELS "tier2"

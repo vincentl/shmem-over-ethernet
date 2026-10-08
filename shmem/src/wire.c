@@ -43,7 +43,16 @@ void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t 
     struct osoe_wire_settings s;
     osoe_wire_settings_read(&s, b, true);
     /* With the zero-copy send on, each wire's notifications still owed are
-     * completions the queue must have room for (§3.3, ring.h). */
+     * completions the queue must have room for (§3.3, ring.h) - refused by name
+     * where that passes io_uring's own most, rather than failing to create a
+     * ring for a reason the setting does not name. */
+    uint64_t completions = (uint64_t)s.buffer_count +
+                           (2 + (uint64_t)OSOE_WIRE_ZERO_COPY_OWED_MOST) * count + 1;
+    if (s.zero_copy && completions > OSOE_RING_COMPLETIONS_MOST)
+        osoe_fatal("OSOE_WIRE_ZERO_COPY=on: %u peer nodes and %u receive buffers need a "
+                   "completion queue of %llu, more than io_uring's %u; turn the zero-copy "
+                   "send off, or lower OSOE_WIRE_BUFFERS", count, s.buffer_count,
+                   (unsigned long long)completions, OSOE_RING_COMPLETIONS_MOST);
     osoe_ring_open(r, wires, count, s.buffer_count, s.buffer_bytes,
                    s.zero_copy ? OSOE_WIRE_ZERO_COPY_OWED_MOST : 0);
     if (!s.zero_copy)
@@ -56,7 +65,7 @@ void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t 
         io_uring_free_probe(probe);
     if (!supported)
         osoe_fatal("OSOE_WIRE_ZERO_COPY=on: this kernel's io_uring offers no IORING_OP_SEND_ZC "
-                   "(Linux 6.0)");
+                   "(Linux 6.0, and 6.2 for the usage report it asks)");
 }
 
 void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,

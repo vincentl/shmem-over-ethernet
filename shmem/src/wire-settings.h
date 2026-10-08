@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
- * The wire's settings (§3.3, §3.14): OSOE_WIRE_BYTES, _BUFFERS, _SPLIT, _SEED
- * and _UNSENT_BYTES, read and checked as values.
+ * The wire's settings (§3.3, §3.14): OSOE_WIRE_BYTES, _BUFFERS, _SPLIT, _SEED,
+ * _UNSENT_BYTES, and _ZERO_COPY with _ZERO_COPY_BYTES, read and checked as
+ * values.
  *
  * In every build: every PE of every job checks them before its node joins
  * (osoe_transport_settings_check, through the internode backend's share), so

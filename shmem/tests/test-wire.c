@@ -346,7 +346,7 @@ int main(int argc, char **argv)
          * loopback, copied after all, which the notification says. */
         CHECK(ring.counts.zero_copy_sends > 0);
         CHECK(ring.counts.zero_copy_notifications > 0);
-        CHECK(ring.counts.zero_copy_notifications <= ring.counts.zero_copy_sends);
+        CHECK(ring.counts.zero_copy_notifications == ring.counts.zero_copy_sends);
         CHECK(ring.counts.zero_copy_copied <= ring.counts.zero_copy_notifications);
         fprintf(stderr, "zero copy: %llu sends by reference, %llu notifications, %llu copied\n",
                 (unsigned long long)ring.counts.zero_copy_sends,

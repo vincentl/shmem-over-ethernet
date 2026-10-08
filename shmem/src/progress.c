@@ -997,6 +997,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     uint64_t wanted = osoe_connection_ack_wanted(connection);
     if (c->detector_wanted > wanted)
         wanted = c->detector_wanted;            /* the deadlock detector asks too (§3.15) */
+    c->wanted = wanted;                         /* for busy(): a late request still to seal */
     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
     struct osoe_am_connection_metrics *cm = conn_metrics(p, slot);
     if (cm) {
@@ -1209,8 +1210,15 @@ void osoe_progress_attach(struct osoe_progress *p,
  * replies queued, an acknowledgement owed, or replies the pre-open drain put in
  * the open buffer. The last was missed at first: the pre-open drain runs after
  * the pass's chance to seal, and the first barrier of an 8-node job hung about
- * one run in eight with a leaf's ARRIVE sitting unsealed in its open buffer. Private state only: O(1), and no
- * shared line touched.
+ * one run in eight with a leaf's ARRIVE sitting unsealed in its open buffer.
+ * The rule since: **whatever wants a seal keeps the connection busy**, since the
+ * open step runs after the seal step. So too a buffer lent to the kernel (the
+ * zero-copy send), a late acknowledgement request not yet carried, and, closing,
+ * the goodbye not yet sealed: with buffers lent, both can come back in one visit,
+ * which then opens one after the seal step has passed, and a quiet waited for
+ * the deadlock detector's sweep to bring the connection back (the fourth
+ * adversarial read of v0.2 step 4, F1; visit_model.py). Private state only:
+ * O(1), and no shared line touched.
  */
 static bool busy(const struct osoe_progress *p, uint32_t slot)
 {
@@ -1220,7 +1228,9 @@ static bool busy(const struct osoe_progress *p, uint32_t slot)
     return c->open == OSOE_CONNECTION_NONE || c->sending != OSOE_CONNECTION_NONE ||
            c->sealed != OSOE_CONNECTION_NONE || c->owe_ack || c->carrying ||
            c->queues.control.depth != 0 || c->queues.bulk.depth != 0 ||
-           c->state[0] == OSOE_BUFFER_LENT || c->state[1] == OSOE_BUFFER_LENT;
+           c->state[0] == OSOE_BUFFER_LENT || c->state[1] == OSOE_BUFFER_LENT ||
+           (c->wanted > c->acked && c->flagged < c->wanted) ||
+           (p->closing && c->goodbye == OSOE_GOODBYE_NONE);
 }
 
 /* After a visit: keep the connection's bit while it is busy, clear it once not. */

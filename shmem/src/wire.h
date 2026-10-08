@@ -28,7 +28,9 @@
  * no copy - so they must stay unchanged until they are reported accepted, and
  * the caller offers the rest again from where the report ended, exactly as §3.3
  * says of a short send ("advance past a short send and resubmit the
- * remainder"). The first offer starts the send and returns 0; an offer after
+ * remainder"). With the zero-copy send on, bytes sent by reference stay the
+ * kernel's past the report too, until its notification (osoe_wire_send_lent,
+ * osoe_wire_owed). The first offer starts the send and returns 0; an offer after
  * the completion has been reaped returns what the kernel took. The engine
  * already behaved this way - a buffer is released only once every byte of it
  * has been accepted - so nothing above had to change; the wire checks it.
@@ -84,9 +86,9 @@ struct osoe_wire {
     uint32_t split;             /* truncations per myriad; 0 disables */
     uint64_t sends, recvs;      /* this wire's transfers, for the hash */
     /* The zero-copy send (wire-settings.h): on, the least bytes a send by
-     * reference carries, the region the send in flight lends, and per region
-     * the notifications the kernel still owes - each send by reference whose
-     * completion said one would follow, less the ones that have come. */
+     * reference carries, and per region the notifications the kernel still
+     * owes - each send by reference whose completion said one would follow,
+     * less the ones that have come; the region rides in the send's tag. */
     bool zero_copy;
     uint32_t zero_copy_bytes;
     uint32_t owed[OSOE_WIRE_LENT_REGIONS];

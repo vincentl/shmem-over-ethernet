@@ -424,8 +424,11 @@ on 6.12). Both bounds are computed and asserted at open: the SQ holds `2 × wire
 1`, a re-arm and a send per wire and the futex wait, and the CQ `buffers + 2 ×
 wires + 1` — one completion per provided buffer, because a buffer is refilled
 only after the pass that emptied it; a terminal completion per armed receive; a
-send per wire; the futex wait. A submission that finds the SQ full is a fatal
-naming the broken bound, not a retry.
+send per wire; the futex wait — and with the zero-copy send on (v0.2 step 4,
+below) 16 more a wire, the notifications a wire may owe: `buffers + 18 × wires
++ 1`, which io_uring's 65,536 completions bound at 3,638 nodes with the default
+buffers, past which the setting is refused by name. A submission that finds the
+SQ full is a fatal naming the broken bound, not a retry.
 
 **One provided-buffer ring for every wire**, `OSOE_WIRE_BUFFERS` of
 `OSOE_WIRE_BYTES` (default 64 × 16 KiB), so the memory a node holds for
@@ -1792,7 +1795,10 @@ pool (§3.8) have no effect a test can observe except these counts.
 totals written by the progress thread once a pass - `transport.am.completions`,
 `receive_buffers` (provided buffers filled), `receive_enobufs`,
 `receive_rearms` (every multishot end, `-ENOBUFS` or not), `sends` and
-`short_sends`. `-ENOBUFS` and short sends are normal under load; a rate far
+`short_sends`; since layout 34, the zero-copy send's `zero_copy_sends` (sends by
+reference), `zero_copy_notifications` and `zero_copy_copied` (notifications
+that said the bytes did not go by reference after all). `-ENOBUFS` and short
+sends are normal under load; a rate far
 above the traffic's is a provided-buffer ring too small for the peers sending
 at once (§3.3). Per peer they wait, as the rest of this list does. An
 `osoe-stat` from before layout 13 finds every metric by name through the
@@ -7898,7 +7904,9 @@ Each is independently breakable, and each failure appears far from its cause.
 12. **The completion queue is sized from the provided-buffer ring, not from the
     submission-queue bound, and each ring arms at most one futex wait.** (§3.3,
     §3.10) One multishot SQE yields many CQEs, and every extra armed wait adds one
-    more; either mistake reintroduces an overflow path under load only.
+    more; either mistake reintroduces an overflow path under load only. With the
+    zero-copy send on, the notifications a wire may owe count too, and a wire
+    copies past 16 of them.
 13. **A waiter publishes its watch slot before its first predicate check.**
     (§4.9) Reversing them loses a wake that lands in the window, and no test will
     show it.
@@ -8001,6 +8009,16 @@ Assert what can be asserted. Instrument the rest.
     sent but unacknowledged, it dies in the reset of a process that ends with
     input unread; and an `exit` on any other PE would wait for good on a main
     thread already inside one (glibc 2.41).
+37. **A connection buffer sent by reference is written again only once every
+    notification of its sends has come; at most one of a connection's two
+    buffers is lent at a time; and a connection that owes a seal stays busy.**
+    (§3.3; v0.2 step 4's zero-copy send) Writing it sooner changes bytes the
+    kernel may still transmit or retransmit (`reservation_model.py`'s
+    `zc_release_on_send`, `zc_first_notification`); lending both leaves an
+    acknowledgement no buffer until the peer's delayed TCP acknowledgement frees
+    one, seconds on the Pi (BOTH LENT); and an unmarked seal waits for whatever
+    next visits the connection, the deadlock detector's sweep or nothing
+    (`visit_model.py`).
 
 ## 10. Open Questions
 
