@@ -842,9 +842,13 @@ static bool receive_wire(struct osoe_progress_owner *o, struct osoe_wire *w,
      * too: its connection failing, or its stream ending without a goodbye. Nor
      * from one whose abortive goodbye has arrived, before this node's agent has
      * begun its own: that peer's exit may reset the connection behind the
-     * goodbye, and this node is about to end with the status it carried. On
-     * either of the peer's wires: its abort read on one excuses the other's
-     * reset, reaped in the same pass (the adversarial read of Part 2, N2). */
+     * goodbye, and this node is about to end with the status it carried. With
+     * no helpers, on either of the peer's wires (the adversarial read of Part
+     * 2, N2): its abort read on one excuses the other's reset - in one pass,
+     * its control wire's abort the data wire's reset, the pass taking the
+     * control wires first; the converse needs a control wire reset, and so its
+     * receive window full, which nothing that rides it can fill (the second
+     * read, N1). */
     bool aborted = *peer_aborted || (other_aborted && *other_aborted);
     if ((o->aborting || aborted) && (w->error || osoe_wire_ended(w))) {
         *abort_done = *abort_done || w->error || !*peer_goodbye;
@@ -1948,18 +1952,38 @@ bool osoe_progress_aborted(const struct osoe_progress_owner *o)
     return true;
 }
 
+/*
+ * Whether the peer of data wire `i`, or of control wire `i` (`control`), has
+ * said it ends carrying a caller other than `carrier`: on that wire, or with no
+ * helpers - where this owner holds both of a peer's wires, by the same number -
+ * on either. Then it is not waited for on either wire. Its abortive goodbye may
+ * come on one only: each side tells a peer nothing more on a wire where the
+ * peer's own has arrived, so two callers' goodbyes that cross arrive on
+ * different wires, and two carriers judging per wire waited each for the other
+ * to the bound (the second adversarial read of Part 2, S1; carrier_model.py).
+ */
+static bool peer_carries_another(const struct osoe_progress_owner *o, bool control, uint32_t i,
+                                 uint32_t carrier)
+{
+    bool both = o->engine->helpers == 0;
+    const struct osoe_progress_connection *on_data =
+        !control ? &o->connection[i] : both && i < o->count ? &o->connection[i] : NULL;
+    const struct osoe_progress_control *on_control =
+        control ? &o->control[i] : both && i < o->controls ? &o->control[i] : NULL;
+    return (on_data && on_data->peer_aborted && on_data->peer_abort_origin != carrier) ||
+           (on_control && on_control->peer_aborted && on_control->peer_abort_origin != carrier);
+}
+
 bool osoe_progress_peers_ended(const struct osoe_progress_owner *o, uint32_t carrier)
 {
     for (uint32_t i = 0; i < o->count; i++) {
-        const struct osoe_progress_connection *c = &o->connection[i];
-        if (c->peer_aborted && c->peer_abort_origin != carrier)
+        if (peer_carries_another(o, false, i, carrier))
             continue;
         if (!osoe_wire_ended(&o->wire[i]) && !o->wire[i].error)
             return false;
     }
     for (uint32_t slot = 0; slot < o->controls; slot++) {
-        const struct osoe_progress_control *c = &o->control[slot];
-        if (c->peer_aborted && c->peer_abort_origin != carrier)
+        if (peer_carries_another(o, true, slot, carrier))
             continue;
         if (!osoe_wire_ended(&o->control_wire[slot]) && !o->control_wire[slot].error)
             return false;

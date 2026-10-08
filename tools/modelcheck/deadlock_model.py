@@ -53,7 +53,9 @@ Designs
   design              as above.
   control_wire_acked  the barrier's arrival on a control wire of its own,
                       its segments acknowledged as a data wire's (v0.2 step 4
-                      part 2; the progress helpers proposal's §3.1).
+                      part 2; the progress helpers proposal's §3.1). This
+                      assumes the acknowledgement; control_ack_model.py checks
+                      the protocol that gives it.
 Breakages
   waits_only          activity counts the PEs' waits but not the messages a
                       node applies: a get's request applied between the

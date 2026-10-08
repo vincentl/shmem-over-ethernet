@@ -215,8 +215,11 @@ int main(void)
 
     /*
      * Then quiet, as the detector asks it: every segment this node sent that
-     * carried application work - its ARRIVE, its RELEASEs - acknowledged, the
-     * request carried and answered on a control wire as on a data wire (§3.4).
+     * carried application work - its ARRIVE, its RELEASEs - acknowledged. Here a
+     * child's goodbye may carry the acknowledgement the root waits for; the
+     * request and its answer, which a deadlocked job's detector needs since
+     * nothing else then moves, are shmem.deadlock's and control_ack_model.py's
+     * (the second adversarial read of Part 2, N3).
      */
     uint64_t applied;
     while (!osoe_progress_quiet(&owner, &applied) && !osoe_deadline_expired(&give_up))

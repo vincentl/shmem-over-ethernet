@@ -263,7 +263,8 @@ wire carries the control plane alone: the internode tree's ARRIVE and RELEASE,
 the deadlock detector's messages, and each wire's goodbye or abortive goodbye -
 nothing with a payload, and nothing a data message's order depends on (a
 barrier's quiet has its acknowledgements before its arrival is posted; a
-release promises nothing about data; the detector reasons about counters). Its
+release promises nothing about data; the detector needs every message it
+counts acknowledged, on whichever wire, not ordered against the others). Its
 segments are acknowledged as the data wire's are (§3.4, invariant 22): the
 tree's two messages are application work their receiver counts, and the
 detector's proof needs a node whose message is not yet applied to look busy
@@ -6860,7 +6861,13 @@ Things to get right, each of which is a silent bug otherwise:
   `close_model.py`'s two-wire cases check it on a pair of nodes, with liveness:
   a goodbye on one wire alone makes the other's end of stream a death, and a
   close on either wire's end resets the other. The abortive goodbye goes on
-  every wire that has someone to tell.
+  every wire that has someone to tell - none where the peer's own has arrived -
+  so two that cross can arrive on different wires: a peer's abort is the
+  peer's, not its wire's, and with no helpers, where one owner holds both of a
+  peer's wires, its abort read on either excuses the other's reset and, naming
+  another caller, stops a carrier waiting on either (Part 2's second
+  adversarial read, S1 and N1; `carrier_model.py`). With helpers the two wires
+  are two owners', and Part 3 carries the word between them.
 - **A child created by `fork()`** after init inherits the mappings but no agent
   threads (§3.12). It must not call OpenSHMEM, and teardown code compares the
   current pid with the initializing pid and does nothing in a child.
