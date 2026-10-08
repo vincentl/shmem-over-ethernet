@@ -546,6 +546,28 @@ What was done with each finding:
   per receive over a chunk - no committed seed is a recorded failure, so no
   regression case is lost.
 
+## Four more measurements
+
+The read's N3, on the final tree (`a779bac`) against the tip, alternating
+(`receive-in-place-extra-measurements.txt`, `rung-extra.sh`), with the
+receiving ring's counters over 5 s of each run:
+
+- **The 1 MiB stream, eight more pairs**: 9,989 to 10,427 MiB/s against 8,817 to
+  9,862 - faster in all eight, where the first three pairs had leaned 0.1 to 2%
+  the other way. Not slower, then; the tip's spread is the wider.
+- **The ring's counters**: parsing in place leaves the ring dry less often, not
+  more - at 64 KiB puts 29,000 to 30,000 `-ENOBUFS` in 5 s against 41,000 to
+  46,000 at the tip, about 550 a GiB against 960, and at 1 MiB puts 17,000 to
+  22,000 against 39,000 to 46,000. The read's mechanism - a buffer held through
+  its own apply returning later - is outweighed by passes twice as frequent
+  (132,000 to 144,000 in 5 s against 52,000 to 66,000).
+- **Small provided buffers** (`OSOE_WIRE_BYTES` 1 KiB x 1,024 and 4 KiB x 256,
+  1 MiB either way): both builds at about half the default's rate, 4,957 to
+  7,993 MiB/s, the two within each other's spread. A peek, a parse and a
+  consume a buffer cost nothing a completion a kilobyte does not already.
+- **A stream of 64-byte puts**: 959 to 1,004 MiB/s - 15.7 to 16.4 million
+  messages a second applied - against 857 to 1,138; no cost a message.
+
 ## Measured and not taken: the task-run flags, registered files, the provided buffers
 
 Each in an experiment build on the fourth rung's tree, its choice made by an
