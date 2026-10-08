@@ -60,6 +60,11 @@ void osoe_progress_host_abort(void);
  * thread has been joined, so nothing is polling any more. */
 void osoe_progress_host_stop(void);
 
+/* Cap the kernel's unsent bytes on every wire of this node at `bytes`, 0 for
+ * none (osoe_wire_cap_unsent): the lead, once the link is known; nothing on
+ * any other PE. */
+void osoe_progress_host_cap_unsent(uint32_t bytes);
+
 /*
  * One pass of the engine, plus the arrivals waiting to be forwarded. Called by
  * every agent each iteration and answered with false by all but the lead's.

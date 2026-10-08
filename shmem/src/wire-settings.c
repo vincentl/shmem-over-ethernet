@@ -46,6 +46,21 @@ void osoe_wire_settings_read(struct osoe_wire_settings *s, const struct osoe_boo
     default:
         osoe_fatal("OSOE_WIRE_SEED='%s' is not a decimal number", getenv("OSOE_WIRE_SEED"));
     }
+    s->unsent_set = false;
+    s->unsent_bytes = 0;
+    switch (osoe_environment_u32("OSOE_WIRE_UNSENT_BYTES", &s->unsent_bytes)) {
+    case OSOE_ENVIRONMENT_OK:
+        if (s->unsent_bytes > OSOE_WIRE_UNSENT_MAX)
+            osoe_fatal("OSOE_WIRE_UNSENT_BYTES='%s' is more than %u bytes",
+                       getenv("OSOE_WIRE_UNSENT_BYTES"), OSOE_WIRE_UNSENT_MAX);
+        s->unsent_set = true;
+        break;
+    case OSOE_ENVIRONMENT_UNSET:
+        break;
+    default:
+        osoe_fatal("OSOE_WIRE_UNSENT_BYTES='%s' is not a byte count: 0 for no cap, or up to %u",
+                   getenv("OSOE_WIRE_UNSENT_BYTES"), OSOE_WIRE_UNSENT_MAX);
+    }
     /* Said whenever injection is on, so a failure names what to reproduce it
      * with; off by default, so a normal run says nothing. */
     if (announce && s->split != 0)
@@ -57,5 +72,19 @@ void osoe_wire_settings_check(const struct osoe_bootstrap *b)
 {
     struct osoe_wire_settings s;
     osoe_wire_settings_read(&s, b, false);
+}
+
+uint32_t osoe_wire_unsent_bytes(const struct osoe_wire_settings *s, uint64_t bytes_per_second)
+{
+    if (s->unsent_set)
+        return s->unsent_bytes;
+    /* The link's highest bandwidth (bootstrap.h) times the interval fits in 64
+     * bits: 10^13 x 1.28 x 10^5. */
+    uint64_t bytes = bytes_per_second * OSOE_WIRE_UNSENT_NS / UINT64_C(1000000000);
+    if (bytes < OSOE_WIRE_UNSENT_FLOOR)
+        bytes = OSOE_WIRE_UNSENT_FLOOR;
+    if (bytes > OSOE_WIRE_UNSENT_MAX)
+        bytes = OSOE_WIRE_UNSENT_MAX;
+    return (uint32_t)bytes;
 }
 

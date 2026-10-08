@@ -201,6 +201,22 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len)
     return 0;
 }
 
+void osoe_wire_cap_unsent(struct osoe_wire *w, uint32_t bytes)
+{
+    /*
+     * With the kernel's unsent queue capped, a send it cannot take whole is a
+     * short write (§3.3), offered again when the queue drains, and the stream
+     * waits in the connection's own two buffers, where a small message behind
+     * it is a turnover away rather than megabytes (§3.2).
+     */
+    if (bytes == 0 || w->fd < 0)
+        return;
+    int v = (int)bytes;
+    if (setsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, sizeof v) != 0)
+        osoe_fatal("cannot cap the unsent bytes toward node %u at %u (TCP_NOTSENT_LOWAT): %s",
+                   w->peer, bytes, strerror(errno));
+}
+
 size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len)
 {
     struct osoe_ring *r = w->ring;

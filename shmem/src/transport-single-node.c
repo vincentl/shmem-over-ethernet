@@ -92,6 +92,12 @@ void osoe_internode_backend_stop(void)
     unreachable("osoe_internode_backend_stop");
 }
 
+void osoe_internode_backend_link(uint64_t bytes_per_second)
+{
+    (void)bytes_per_second;
+    unreachable("osoe_internode_backend_link");
+}
+
 /* ---- internode-backend.h: the agent thread ------------------------------- */
 
 bool osoe_internode_backend_agent_pass(void)

@@ -633,6 +633,29 @@ foreach(case "measured;0,0,1,1" "measured;0,1,2" "few-lanes;0,1" "set;0,0,1,1" "
   endif()
 endforeach()
 
+# The cap on each connection's unsent bytes (v0.2 step 4; wire-settings.h), as
+# each lead says it under SHMEM_DEBUG once the link is known (unsent.sh): from
+# the link measured, set by hand above and below the floor, fixed, the setting's
+# own and none, and nothing on a job of one node.
+foreach(case "measured;0,0,1,1" "set;0,1" "floor;0,1,2" "fixed;0,1" "by-hand;0,1" "none;0,1"
+             "one-node;0,0")
+  list(GET case 0 mode)
+  list(GET case 1 map)
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.unsent.${mode}.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/unsent.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_barrier> ${map} ${mode})
+  set_tests_properties(shmem.unsent.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "UNSENT OK")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.unsent.${mode}.${label})
+  endif()
+endforeach()
+
 if(OSOE_INTERNODE)
   # The node count is the value that shapes the waits: a lead expects children by
   # its own count, so one given too many waits for children that do not exist.

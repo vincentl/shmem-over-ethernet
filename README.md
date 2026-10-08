@@ -1380,6 +1380,7 @@ moves every message of the node
 | `OSOE_CHECK_QUIET` | `1`: every quiet on a context that threads share (`SHMEM_THREAD_MULTIPLE`) checks that it completed what it promises, and ends the job naming what it did not. |
 | `OSOE_TEST_PERTURB` | `1`: short sleeps and yields at the internal choice points of a context that threads share, to widen races. |
 | `OSOE_TEST_NOTICE_SECONDS` | Seconds before a start-up wait's first notice, `1` to `3600`, in place of 30, so that a test sees one without waiting. |
+| `OSOE_WIRE_UNSENT_BYTES` | The bytes the kernel may hold unsent on a connection: `0` for no cap, or up to `1073741824`. Unset, the link's bandwidth times 128 µs, at least 16 KiB - 16 KiB on a gigabit - set once the link is known at the end of `shmem_init`. Uncapped, a fetch-add behind a put stream on the Pi cluster waited 14 to 22 ms; at 16 KiB, 3.3 to 3.9 ms, the stream at line rate either way. |
 | `OSOE_WIRE_SPLIT`, `OSOE_WIRE_SEED` | A rate per 10,000 at which sends and receives are cut short, and the seed that makes a failing pattern repeat. |
 
 **The tools'**: `OSOE_CC` names the compiler `oshcc` runs; `OSOE_NODE_MAP` is

@@ -123,6 +123,15 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, i
  */
 size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len);
 
+/*
+ * Cap the bytes the kernel may hold unsent on this wire (TCP_NOTSENT_LOWAT;
+ * wire-settings.h, design §3.2); 0 leaves it uncapped. Once the link is known,
+ * at the end of shmem_init, on the lead's application thread while its agent
+ * runs: it reads only `fd`, which the mesh wrote once, and the kernel orders
+ * the option against the agent's sends on the same socket.
+ */
+void osoe_wire_cap_unsent(struct osoe_wire *w, uint32_t bytes);
+
 /* Read up to len bytes. Returns how many were delivered, which may be 0. */
 size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len);
 

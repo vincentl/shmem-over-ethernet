@@ -20,6 +20,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -34,6 +35,7 @@
 #include "check.h"
 #include "ring.h"
 #include "wire.h"
+#include "wire-settings.h"
 
 /* wire.c's error path, replaced here so a failure is a test failure. */
 _Noreturn void osoe_fatal(const char *fmt, ...);
@@ -73,6 +75,37 @@ static void pair(int fd[2])
     fd[1] = accept(listener, NULL, NULL);
     CHECK_FATAL(fd[1] >= 0);
     close(listener);
+}
+
+/*
+ * The cap on the kernel's unsent bytes (v0.2 step 4, wire-settings.h): the
+ * link's 128 µs, at least 16 KiB and at most 1 GiB, or as set; and the option
+ * on a real TCP socket, which a cap of 0 leaves alone.
+ */
+static void unsent_cap(struct osoe_wire *w, const struct osoe_bootstrap *b)
+{
+    struct osoe_wire_settings s;
+    osoe_wire_settings_read(&s, b, false);
+    CHECK(!s.unsent_set);
+    CHECK(osoe_wire_unsent_bytes(&s, 0) == 16384);                 /* no link: the floor */
+    CHECK(osoe_wire_unsent_bytes(&s, 116000000) == 16384);         /* the Pi: 14,848, the floor */
+    CHECK(osoe_wire_unsent_bytes(&s, 1000000000) == 128000);
+    CHECK(osoe_wire_unsent_bytes(&s, 4440000000u) == 568320);
+    CHECK(osoe_wire_unsent_bytes(&s, UINT64_C(10000000000000)) == UINT32_C(1) << 30);
+    setenv("OSOE_WIRE_UNSENT_BYTES", "65536", 1);
+    osoe_wire_settings_read(&s, b, false);
+    CHECK(s.unsent_set && osoe_wire_unsent_bytes(&s, 1000000000) == 65536);
+    setenv("OSOE_WIRE_UNSENT_BYTES", "0", 1);
+    osoe_wire_settings_read(&s, b, false);
+    CHECK(s.unsent_set && osoe_wire_unsent_bytes(&s, 1000000000) == 0);
+    unsetenv("OSOE_WIRE_UNSENT_BYTES");
+
+    osoe_wire_cap_unsent(w, 65536);
+    int v = 0;
+    socklen_t length = sizeof v;
+    CHECK(getsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, &length) == 0 && v == 65536);
+    osoe_wire_cap_unsent(w, 0);
+    CHECK(getsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, &length) == 0 && v == 65536);
 }
 
 /* Take everything waiting on `rx`, checking every byte against where it falls
@@ -169,6 +202,7 @@ int main(void)
     osoe_wire_attach(&wires[1], &ring, 1, fd[1], 0, &hi);  /* node 1's end */
     osoe_ring_enable(&ring);
 
+    unsent_cap(&wires[1], &hi);
     stream(&ring, &wires[0], &wires[1], PAYLOAD);
     stream(&ring, &wires[1], &wires[0], PAYLOAD);
 

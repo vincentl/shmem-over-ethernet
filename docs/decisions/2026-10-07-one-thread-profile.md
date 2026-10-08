@@ -306,7 +306,30 @@ measured on `f643837` with the spare; `ab-spare-zero.txt` shows the spare's own
   5,762 to 6,357; at 128 KiB 5,752 to 5,934 - the cap costs a loopback stream
   nothing.
 
-## What goes on meanwhile
+## What was built: the second rung, the kernel's unsent queue
+
+On the author's answer (`2026-10-07.md` item 11):
+
+- **The cap.** `osoe_wire_unsent_bytes` - the link's bandwidth times 128 µs, at
+  least 16 KiB, at most 1 GiB, or `OSOE_WIRE_UNSENT_BYTES` (0 for none) - and
+  `osoe_wire_cap_unsent`, `TCP_NOTSENT_LOWAT` on a wire. `shmem_init` hands the
+  established link to the transport (`osoe_transport_link`, a new call of
+  transport.h's, reaching AM through `osoe_internode_backend_link`), and each
+  lead caps its wires from its application thread while its agent runs: it
+  reads only each wire's `fd`, which the mesh wrote once, and the kernel orders
+  the option against the agent's sends. Start-up ran uncapped, so step 2
+  measured the link as it is; a link set by hand gives the bandwidth, a `fixed`
+  shape the floor, a job of one node nothing. Under `SHMEM_DEBUG` each lead
+  says the cap it set.
+- **The tests.** `shmem.wire` checks the arithmetic and the option on a real TCP
+  socket; `shmem.unsent.*` (`unsent.sh`) each lead's line, from a measured link,
+  one set by hand above and below the floor, `fixed`, the setting's own value and
+  0, and nothing on one node.
+- **On the Pi, as built** (`cap-1/`): the leads measured 116.5 MB/s and capped at
+  16,384; a fetch-add behind a 1 MiB put stream 3.3 to 3.9 ms at the median, 5.0
+  at the 99th percentile, three writers of them 4.43 and 6.6 to 7.2, the stream
+  at 112 MiB/s - the experiment's figures.
+
 ## What goes on meanwhile
 
 The rungs that do not depend on the answer, each measured against the one below

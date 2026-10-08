@@ -667,6 +667,14 @@ void osoe_progress_host_exit(void)
     close_connections();
 }
 
+void osoe_progress_host_cap_unsent(uint32_t bytes)
+{
+    if (!osoe_am.lead)
+        return;
+    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
+        osoe_wire_cap_unsent(&osoe_am.wire[slot], bytes);
+}
+
 void osoe_progress_host_stop(void)
 {
     if (osoe_am.lead) {

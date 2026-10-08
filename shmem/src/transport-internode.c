@@ -54,6 +54,7 @@
 #include "progress.h"
 #include "progress-host.h"
 #include "state.h"
+#include "wire-settings.h"
 #include "transport.h"
 #include "transport-context.h"
 
@@ -269,6 +270,25 @@ void osoe_internode_backend_start(uint32_t session, bool check)
             atomic_store_explicit(&issue_stamp[e], UNSTAMPED, memory_order_seq_cst);
     }
     osoe_progress_host_start(session);
+}
+
+/* internode-backend.h's link: the cap on each wire's unsent bytes, from the
+ * link (wire-settings.h), said once by each lead under SHMEM_DEBUG. */
+void osoe_internode_backend_link(uint64_t bytes_per_second)
+{
+    struct osoe_wire_settings settings;
+    osoe_wire_settings_read(&settings, &osoe.bootstrap, false);
+    uint32_t bytes = osoe_wire_unsent_bytes(&settings, bytes_per_second);
+    osoe_progress_host_cap_unsent(bytes);
+    if (osoe.bootstrap.debug && osoe_am.lead) {
+        if (bytes)
+            fprintf(stderr, "osoe: node %u caps each connection's unsent bytes at %u%s\n",
+                    osoe.bootstrap.node, bytes,
+                    settings.unsent_set ? " (OSOE_WIRE_UNSENT_BYTES)" : "");
+        else
+            fprintf(stderr, "osoe: node %u leaves its connections' unsent bytes uncapped "
+                            "(OSOE_WIRE_UNSENT_BYTES=0)\n", osoe.bootstrap.node);
+    }
 }
 
 /* After the agent has been joined: the engine drained what this node owed the

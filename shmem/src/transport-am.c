@@ -156,6 +156,14 @@ void osoe_transport_init(void)
                    osoe.job.node_count - 1);
 }
 
+/* transport.h: the link is known; only a job of more than one node has
+ * connections to size by it. */
+void osoe_transport_link(uint64_t bytes_per_second)
+{
+    if (internode)
+        osoe_internode_backend_link(bytes_per_second);
+}
+
 /* After the agent has been joined (transport.h). The internode backend
  * drained what this node owed the network and closed its connections on that
  * thread, in its agent exit; what is left is memory. */
