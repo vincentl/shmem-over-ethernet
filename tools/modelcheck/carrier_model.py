@@ -28,7 +28,18 @@ Variants
                   that cross arrive on different wires, and each carrier waits
                   for the other's stream to the bound (a breakage).
   either_wire     two, peers_ended skipping both of a peer's wires once its
-                  abort has arrived on either: the design.
+                  abort has arrived on either: the design with no helpers.
+  control_only    two, the design with helpers (v0.2 step 4, Part 3): the
+                  data wire is a helper's, whose sends the lead's process waits
+                  for - so a node waits once every wire's send or silence is
+                  done, as here - and the lead judges the peers by their
+                  control wires alone, the wires it holds: a peer's abort
+                  naming another caller on its control wire, or its control
+                  wire's end. A process's end ends all its streams at once, so
+                  a control wire's end says what a data wire's would; and of
+                  two carriers at least one tells the other on the control
+                  wire, the first to begin, so they never wait each for the
+                  other.
 """
 import sys
 from collections import deque
@@ -97,6 +108,8 @@ def run(variant):
             elif phase == 2:
                 if variant == 'either_wire' and any(pab):
                     done = True
+                elif variant == 'control_only':
+                    done = pab[0] or ended[0]
                 else:
                     done = all(pab[k] or ended[k] for k in range(W))
                 if done:
@@ -140,7 +153,8 @@ def run(variant):
 
 def main():
     ok = True
-    for variant, expect in (('one_wire', True), ('two_wires', False), ('either_wire', True)):
+    for variant, expect in (('one_wire', True), ('two_wires', False), ('either_wire', True),
+                            ('control_only', True)):
         held, states, tr = run(variant)
         print(f'carrier/{variant}: {"holds" if held else "FAILS: both carriers wait for each other"}'
               f' ({states} states)', flush=True)

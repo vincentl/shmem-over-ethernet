@@ -31,11 +31,24 @@ none of the flag's claim.
 
 **A stop is acknowledged, then done.** On a stop the helper answers at once
 (acknowledged), then closes its wires - a ring use the model counts - and then
-answers done and returns. The lead waits for the acknowledgement under a
-deadline, since a live helper answers within a pass and one that never does is
-a defect to end the job by name; and for done without one, since a close waits
-as long as its peers take to finalize (the no-progress rule bounds it, outside
-this model). Only after done does the lead free the helper's ring and join it.
+answers done and returns. Only after done does the lead free the helper's ring
+and join it. The done is waited for as long as the close takes, since a close
+waits as long as its peers take to finalize (the no-progress rule bounds it,
+outside this model).
+
+**A helper that never answers is found by its turns, not by a time.** The
+helper stores its count of turns at each turn's end, seq_cst; the lead reads
+the count after it posts the stop - its seq_cst store of the request, then a
+seq_cst load of the count - and nudges the helper, a bump of its wake word and
+a wake, once for each count it sees. A helper that has turned twice since,
+without acknowledging, has read the stop and ignored it: a defect, and the
+lead ends the job naming it. Two, because the turn in progress at the post may
+have loaded the request before it; the turn after loads it after its own store
+of the count, which the lead's load did not see, and so after the post - a
+store-buffering pair, which seq_cst on both sides forbids. A helper that does
+not turn at all is not judged here: in the C it is waited for, as every wait
+is, under the no-progress rule, and none of this asks for a time bound
+(§3.15).
 
 **A quiet answer is fresh**: it names the request it answers, so the lead takes
 no earlier answer for a later request; and its idle verdict reads the work
@@ -47,13 +60,14 @@ Checked
         helper sleeps with nothing to wake it (LOST WAKE / STUCK);
   RING     the helper never touches its ring after the lead freed it;
   FRESH    an answer of idle for q means everything committed before q taken;
+  FALSE DEAF  the lead never declares deaf a helper that answers its stop;
   and, by the engine, AG EF finished: the lead ends - after joining the helper,
-  or by the deadline, naming the helper that never answered.
+  or naming the helper that never answered.
 
 Designs
   design              as above: a quiet request, then a stop.
-  deaf_deadline       a helper that never answers a stop - the defect the
-                      deadline is for: the job ends by name.
+  deaf                a helper that never answers a stop - the defect the
+                      count is for: the job ends by name.
 Breakages
   request_first       the helper loads the request before its wake word: a
                       request stored and bumped between the two loads is slept
@@ -62,11 +76,19 @@ Breakages
                       wake that lands before the helper's wait is lost.
   done_early          the helper answers done before its close's last ring use:
                       the lead frees the ring under it (RING).
-  deaf_no_deadline    the deaf helper, the lead waiting for the acknowledgement
-                      with no deadline: the job never ends (STUCK).
+  deaf_unwatched      the deaf helper, the lead waiting for the acknowledgement
+                      alone, counting no turns: the job never ends (STUCK).
   stale_answer        the lead takes any answer as the one it asked for: an
                       answer of idle to an earlier request, computed before a
                       later commit, passes for the later request's (FRESH).
+  snapshot_first      the lead reads the count before it posts the stop: two
+                      turns that loaded the request before the post count, and
+                      a helper that would have answered is declared deaf (FALSE
+                      DEAF).
+  turns_plain         the helper's count a plain store: under TSO two turns'
+                      counts wait in its store buffer while their loads of the
+                      request read memory before the post (FALSE DEAF); under
+                      SC it holds, so the order is what the rule needs.
 
 Usage: helper_request_model.py [substring ...]   runs the cases whose names match
 """
@@ -87,7 +109,8 @@ TAKEN = ('$taken',)             # operations a pass has taken
 FREED = ('$freed',)
 BEFORE = lambda q: ('$before', q)   # operations committed when request q was posted
 FINISHED = ('$finished',)
-ENDED = ('ended',)             # the job ended by the deadline: the process, and the helper with it
+ENDED = ('ended',)             # the job ended naming the helper: the process, and the helper with it
+TURNS = ('turns',)             # the helper's turns, counted at each turn's end
 
 QUIET1, QUIET2, STOP = 1, 2, 3     # request sequences, in the order the lead posts them
 
@@ -146,19 +169,38 @@ def lead(design, quiets):
         else:
             B += [(f'Q{k}w', ('await', lambda M, L, q=q: M[ANSWER] >= q, f'@Q{k}c'))]
         B += [(f'Q{k}c', ('check', fresh(q), f'@Q{k + 1}' if k + 1 < quiets else '@S'))]
-    B += post(STOP, 'S', '@SA')
+    if design == 'snapshot_first':
+        B += [('S', ('load', lambda L: TURNS, 't0', '@Sp'))] + post(STOP, 'Sp', '@SW')
+    else:
+        B += post(STOP, 'S', '@S0') + [('S0', ('load', lambda L: TURNS, 't0', '@SW'))]
 
-    # The acknowledgement, under the deadline where the design has one.
-    def acknowledged(M, L):
-        out = []
+    # Wait for the acknowledgement: in the C, a futex wait on the answer word
+    # that a sweep ends; here, whichever of the three can happen next.
+    def look(M, L):
         if M[ACKED] >= STOP:
-            out.append(({}, {}, 'the stop acknowledged'))
-        if design == 'deaf_deadline':
-            out.append(({}, {'ended': 1}, 'the deadline: the job ends naming the helper'))
-        return out
+            return [({}, {'how': 1}, 'the stop acknowledged')]
+        if design == 'deaf_unwatched':
+            return []
+        if M[TURNS] - L['t0'] >= 2:
+            return [({}, {'how': 2}, 'the helper has turned twice since the stop')]
+        if M[TURNS] != L['nudged']:
+            return [({}, {'how': 3, 'nudged': M[TURNS]}, 'a nudge')]
+        return []
 
-    B += [('SA', ('nd', acknowledged, '@SB')),
-          ('SB', ('br', lambda L: L['ended'] == 1, '@X0', '@SD')),
+    def false_deaf(M, L):
+        if design == 'deaf':
+            return None
+        return 'FALSE DEAF: the lead declared deaf a helper that answers its stop'
+
+    B += [('SW', ('nd', look, '@SB')),
+          ('SB', ('br', lambda L: L['how'] == 1, '@SD', '@SC')),
+          ('SC', ('br', lambda L: L['how'] == 2, '@SV', '@SN')),
+          ('SN', ('add', lambda L: WAKE, lambda L: 1, '_', '@SN2')),
+          ('SN2', ('fwake', lambda L: WAKE, '@SW')),
+          # The verdict: the acknowledgement loaded once more, after the count.
+          ('SV', ('load', lambda L: ACKED, 'a', '@SV2')),
+          ('SV2', ('br', lambda L: L['a'] >= STOP, '@SD', '@DEAF')),
+          ('DEAF', ('check', false_deaf, '@X0')),
           # The job's end takes the process, and the helper with it: in the model,
           # a word the helper reads at the top of its loop, and a wake.
           ('X0', ('store', lambda L: ENDED, lambda L: 1, True, '@X1')),
@@ -194,16 +236,16 @@ def helper(design, deaf):
           ('P', ('ghost', take, '@PU')),
           ('PU', ('check', ring_use, '@R')),
           # A new request: answer it after the pass.
-          ('R', ('br', lambda L: (L['r'] or 0) > (L['seen'] or 0), '@RN', '@IDLE')),
+          ('R', ('br', lambda L: (L['r'] or 0) > (L['seen'] or 0), '@RN', '@T')),
           ('RN', ('set', 'seen', lambda L: L['r'], '@RK')),
           ('RK', ('br', lambda L: L['r'] == STOP, '@STOP', '@QA'))]
     # A quiet request: the verdict (idle: nothing committed untaken), then the
     # sequence it answers - a release store after its verdict.
     B += [('QA', ('load', lambda L: DATA, 'd', '@QA2')),
           ('QA2', ('store', lambda L: ANSWER_IDLE, lambda L: int(L['d'] == L['t']), True, '@QA3')),
-          ('QA3', ('store', lambda L: ANSWER, lambda L: L['r'], True, '@TOP'))]
+          ('QA3', ('store', lambda L: ANSWER, lambda L: L['r'], True, '@T'))]
     if deaf:
-        B += [('STOP', ('set', 'd', lambda L: DEL, '@IDLE'))]     # never answers
+        B += [('STOP', ('set', 'd', lambda L: DEL, '@T'))]     # never answers
     else:
         B += [('STOP', ('store', lambda L: ACKED, lambda L: STOP, True, '@C0'))]
         if design == 'done_early':
@@ -215,6 +257,11 @@ def helper(design, deaf):
             B += [('C0', ('check', ring_use, '@C1')),
                   ('C1', ('check', ring_use, '@C2')),
                   ('C2', ('store', lambda L: DONE, lambda L: STOP, True, '@HEND'))]
+    # The turn's end: its count, seq_cst (turns_plain: a plain store).
+    B += [('T', ('load', lambda L: TURNS, 'k', '@T2')),
+          ('T2', ('store', lambda L: TURNS, lambda L: L['k'] + 1, design != 'turns_plain',
+                  '@T3')),
+          ('T3', ('set', 'k', lambda L: DEL, '@IDLE'))]
     # Nothing new: raise the flag, look at the bitmap again, sleep on w.
     B += [('IDLE', ('br', lambda L: L['moved'] == 1, '@TOP', '@RAISE')),
           ('RAISE', ('store', lambda L: SLEEPING, lambda L: 1, True, '@LOOK')),
@@ -227,12 +274,12 @@ def helper(design, deaf):
 
 
 def case(design, quiets, ops):
-    deaf = design in ('deaf_deadline', 'deaf_no_deadline')
+    deaf = design in ('deaf', 'deaf_unwatched')
     threads = [lead(design, quiets), helper(design, deaf)]
     if ops:
         threads.append(writer(ops))
     mem = {REQUEST: 0, ANSWER: 0, ANSWER_IDLE: 0, ACKED: 0, DONE: 0, WAKE: 0, SLEEPING: 0,
-           DIRTY: 0, DATA: 0, TAKEN: 0, FREED: 0, FINISHED: 0, ENDED: 0}
+           DIRTY: 0, DATA: 0, TAKEN: 0, FREED: 0, FINISHED: 0, ENDED: 0, TURNS: 0}
     for q in (QUIET1, QUIET2, STOP):
         mem[BEFORE(q)] = 0
     name = f'helper_request/{design} quiets={quiets} writer_ops={ops}'
@@ -249,13 +296,16 @@ CASES = [
     ('design', 1, 1, False, True),
     ('design', 2, 1, False, True),
     ('design', 2, 1, True, True),
-    ('deaf_deadline', 1, 0, False, True),
-    ('deaf_deadline', 1, 1, True, True),
+    ('deaf', 1, 0, False, True),
+    ('deaf', 1, 1, True, True),
     ('request_first', 1, 0, False, False),
     ('no_bump', 1, 0, False, False),
     ('done_early', 1, 0, False, False),
-    ('deaf_no_deadline', 1, 0, False, False),
+    ('deaf_unwatched', 1, 0, False, False),
     ('stale_answer', 2, 1, False, False),
+    ('snapshot_first', 1, 0, False, False),
+    ('turns_plain', 1, 2, False, True),
+    ('turns_plain', 1, 2, True, False),
 ]
 
 if __name__ == '__main__':
