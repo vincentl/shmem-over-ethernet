@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
- * The wire's settings (§3.3, §3.14): OSOE_WIRE_BYTES, _BUFFERS, _SPLIT, _SEED
- * and _UNSENT_BYTES, read and checked as values.
+ * The wire's settings (§3.3, §3.14): OSOE_WIRE_BYTES, _BUFFERS, _SPLIT, _SEED,
+ * _UNSENT_BYTES, and _ZERO_COPY with _ZERO_COPY_BYTES, read and checked as
+ * values.
  *
  * In every build: every PE of every job checks them before its node joins
  * (osoe_transport_settings_check, through the internode backend's share), so
@@ -49,12 +50,37 @@
 _Static_assert(OSOE_LINK_BYTES_PER_SECOND_HIGHEST <= UINT64_MAX / OSOE_WIRE_UNSENT_NS,
                "the link's highest bandwidth times OSOE_WIRE_UNSENT_NS must fit 64 bits");
 
+/*
+ * The zero-copy send (v0.2 step 4, docs/decisions/2026-10-07.md item 7):
+ * OSOE_WIRE_ZERO_COPY `on` sends a sealed connection buffer by reference -
+ * IORING_OP_SEND_ZC - wherever a send carries at least
+ * OSOE_WIRE_ZERO_COPY_BYTES, and the buffer is lent to the kernel until every
+ * notification of its sends has come (reservation_model.py's zero_copy); `off`,
+ * the default, copies as the send always has. Off by default because it loses
+ * wherever the copy is cheap: over loopback the kernel copies anyway and posts a
+ * notification more a send; below about 10 KB, pinning the pages costs more than
+ * the copy it saves; and on a fast link a buffer stays the kernel's until the
+ * peer's TCP has acknowledged it, so a connection's two buffers cap one peer's
+ * stream at about 512 KiB a round trip. Part 4 decides its default on a fast link.
+ *
+ * Only one of a connection's two buffers is lent at a time - a send by
+ * reference waits for the other to owe nothing, and copies meanwhile - so that
+ * an acknowledgement or a reply always finds a buffer without waiting on the
+ * peer's TCP (wire.c). A wire owes at most OSOE_WIRE_ZERO_COPY_OWED_MOST
+ * notifications at once: past them a send copies, so that the completion queue
+ * keeps a bound (§3.3, ring.h).
+ */
+#define OSOE_WIRE_ZERO_COPY_DEFAULT_BYTES (UINT32_C(16) << 10)
+#define OSOE_WIRE_ZERO_COPY_OWED_MOST     UINT32_C(16)
+
 /* What the environment asks of the wire, checked. */
 struct osoe_wire_settings {
     uint32_t buffer_bytes, buffer_count, split;
     uint64_t seed;
     bool unsent_set;                /* OSOE_WIRE_UNSENT_BYTES gives the limit */
     uint32_t unsent_bytes;          /* that limit, 0 for the system's own */
+    bool zero_copy;                 /* OSOE_WIRE_ZERO_COPY on */
+    uint32_t zero_copy_bytes;       /* the least a send by reference carries */
 };
 
 /*
@@ -78,7 +104,8 @@ static inline uint64_t osoe_wire_hash(uint64_t x)
 void osoe_wire_settings_read(struct osoe_wire_settings *s, const struct osoe_bootstrap *b,
                              bool announce);
 
-/* Read and check OSOE_WIRE_BYTES, _BUFFERS, _SPLIT, _SEED and _UNSENT_BYTES,
+/* Read and check OSOE_WIRE_BYTES, _BUFFERS, _SPLIT, _SEED, _UNSENT_BYTES and
+ * _ZERO_COPY with _ZERO_COPY_BYTES,
  * fatal on a bad one: every PE at init (init.c), where only a lead read them,
  * and only on a job of several nodes, until the round-three review's settings
  * sweep. */

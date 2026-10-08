@@ -1,0 +1,4 @@
+== debug 09:43:55
+    Test #188: shmem.internode.zero-copy.0-0-1-1-2-2 ...***Failed   60.02 sec
+88% tests passed, 1 tests failed out of 8
+DONE 09:45:05

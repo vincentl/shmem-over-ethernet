@@ -384,8 +384,8 @@ pass - the request a word taken as a dirty bit is, at a pass and again after
 bytes leave with the kernel even toward a peer that has stopped reading. A send
 the kernel cannot then take whole is a short write, offered again (invariant 2).
 
-**Not used:** `IORING_OP_SEND_ZC`. Two CQEs, buffer stability requirement, and
-only pays above ~10–16 KB. Revisit only on a fast NIC.
+**Off by default:** `IORING_OP_SEND_ZC`. Two CQEs, buffer stability requirement,
+and only pays above ~10–16 KB. Revisit only on a fast NIC.
 *The author, 2026-10-07: built in v0.2 step 4 behind a setting, off by
 default, for large segments, so that it is debugged before a fast NIC exists
 and its default decided on one (`docs/decisions/2026-10-07.md` item 7). Over
@@ -393,6 +393,26 @@ TCP the buffer is released by the notification once the peer has acknowledged
 its bytes, so with it on a connection's two buffers cap one peer's stream at
 about 512 KiB a round trip - some 100 Gb/s at 40 µs (256 KiB and some 50 Gb/s
 while the default buffer was 128 KiB; `docs/decisions/2026-10-07.md` item 12).*
+*As built (v0.2 step 4):* `OSOE_WIRE_ZERO_COPY=on` sends a connection buffer
+by reference wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`
+(16 KiB by default), with `IORING_SEND_ZC_REPORT_USAGE`; the completion frees the
+wire for the other buffer at once, and the buffer it sent is **lent** - each
+send's notification counted owed per buffer, a short send's remainder a send of
+its own - until the last notification has come, when it is released as a copied
+buffer is at its last completion. `reservation_model.py`'s `zero_copy` cases
+hold it, and a release at the last completion and one at the first of several
+notifications fail. A buffer about to be written with notifications still owed
+ends the job by name - checked where it is first written, not where it was
+released. **Only one buffer of a connection is lent at a time**: a send goes by
+reference only while the other buffer owes nothing, and copies otherwise, so
+that an acknowledgement or a reply always finds a buffer a copied send away -
+with both lent, the Pi's `osoe-bench` stalled for seconds at 1 MiB, the
+acknowledgement a quiet waited for queued behind two buffers that waited for
+the peer's TCP acknowledgement, which the peer delays while it has nothing to
+send. `reservation_model.py` checks it (BOTH LENT), and the engine ends the job
+if both are ever lent. A wire owes at most 16 notifications, past which a send
+copies, so that the completion queue keeps its bound: 16 more completions a
+wire.
 
 *As built* (phase 1 step 3 slice 1; `ring.[ch]`, `wire.[ch]`, `listener.[ch]`).
 One ring per progress thread, created `IORING_SETUP_SINGLE_ISSUER |
@@ -404,8 +424,11 @@ on 6.12). Both bounds are computed and asserted at open: the SQ holds `2 × wire
 1`, a re-arm and a send per wire and the futex wait, and the CQ `buffers + 2 ×
 wires + 1` — one completion per provided buffer, because a buffer is refilled
 only after the pass that emptied it; a terminal completion per armed receive; a
-send per wire; the futex wait. A submission that finds the SQ full is a fatal
-naming the broken bound, not a retry.
+send per wire; the futex wait — and with the zero-copy send on (v0.2 step 4,
+below) 16 more a wire, the notifications a wire may owe: `buffers + 18 × wires
++ 1`, which io_uring's 65,536 completions bound at 3,638 nodes with the default
+buffers, past which the setting is refused by name. A submission that finds the
+SQ full is a fatal naming the broken bound, not a retry.
 
 **One provided-buffer ring for every wire**, `OSOE_WIRE_BUFFERS` of
 `OSOE_WIRE_BYTES` (default 64 × 16 KiB), so the memory a node holds for
@@ -1772,7 +1795,10 @@ pool (§3.8) have no effect a test can observe except these counts.
 totals written by the progress thread once a pass - `transport.am.completions`,
 `receive_buffers` (provided buffers filled), `receive_enobufs`,
 `receive_rearms` (every multishot end, `-ENOBUFS` or not), `sends` and
-`short_sends`. `-ENOBUFS` and short sends are normal under load; a rate far
+`short_sends`; since layout 34, the zero-copy send's `zero_copy_sends` (sends by
+reference), `zero_copy_notifications` and `zero_copy_copied` (notifications
+that said the bytes did not go by reference after all). `-ENOBUFS` and short
+sends are normal under load; a rate far
 above the traffic's is a provided-buffer ring too small for the peers sending
 at once (§3.3). Per peer they wait, as the rest of this list does. An
 `osoe-stat` from before layout 13 finds every metric by name through the
@@ -7878,7 +7904,9 @@ Each is independently breakable, and each failure appears far from its cause.
 12. **The completion queue is sized from the provided-buffer ring, not from the
     submission-queue bound, and each ring arms at most one futex wait.** (§3.3,
     §3.10) One multishot SQE yields many CQEs, and every extra armed wait adds one
-    more; either mistake reintroduces an overflow path under load only.
+    more; either mistake reintroduces an overflow path under load only. With the
+    zero-copy send on, the notifications a wire may owe count too, and a wire
+    copies past 16 of them.
 13. **A waiter publishes its watch slot before its first predicate check.**
     (§4.9) Reversing them loses a wake that lands in the window, and no test will
     show it.
@@ -7981,6 +8009,16 @@ Assert what can be asserted. Instrument the rest.
     sent but unacknowledged, it dies in the reset of a process that ends with
     input unread; and an `exit` on any other PE would wait for good on a main
     thread already inside one (glibc 2.41).
+37. **A connection buffer sent by reference is written again only once every
+    notification of its sends has come; at most one of a connection's two
+    buffers is lent at a time; and a connection that owes a seal stays busy.**
+    (§3.3; v0.2 step 4's zero-copy send) Writing it sooner changes bytes the
+    kernel may still transmit or retransmit (`reservation_model.py`'s
+    `zc_release_on_send`, `zc_first_notification`); lending both leaves an
+    acknowledgement no buffer until the peer's delayed TCP acknowledgement frees
+    one, seconds on the Pi (BOTH LENT); and an unmarked seal waits for whatever
+    next visits the connection, the deadlock detector's sweep or nothing
+    (`visit_model.py`).
 
 ## 10. Open Questions
 

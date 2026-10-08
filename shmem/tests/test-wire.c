@@ -184,6 +184,65 @@ static void stream(struct osoe_ring *ring, struct osoe_wire *tx, struct osoe_wir
 }
 
 /*
+ * The zero-copy send (wire.h): `total` bytes from `tx` to `rx` through the two
+ * regions a sender lends the kernel, sent alternately by reference, each
+ * refilled only once the kernel owes nothing for it - the rule the engine
+ * keeps for a connection's two buffers - and every byte checked where it lands.
+ * Then the wait for the last notifications, which every lent region must see.
+ */
+static void stream_lent(struct osoe_ring *ring, struct osoe_wire *tx, struct osoe_wire *rx,
+                        size_t total)
+{
+    static unsigned char region[OSOE_WIRE_LENT_REGIONS][CHUNK];
+    size_t length[OSOE_WIRE_LENT_REGIONS] = { 0 }, placed = 0, sent = 0, got = 0, offset = 0;
+    uint32_t k = 0;
+    struct osoe_deadline give_up = osoe_deadline_in(UINT64_C(20000000000));
+    /* Until the sender has been told of every byte too: the last send's
+     * completion is collected by offering its bytes once more (wire.h). */
+    while (sent < total || got < total) {
+        bool moved = false;
+        if (length[k] == 0 && placed < total && osoe_wire_owed(tx, k) == 0) {
+            length[k] = total - placed < CHUNK ? total - placed : CHUNK;
+            for (size_t i = 0; i < length[k]; i++)
+                region[k][i] = pattern(placed + i);
+            placed += length[k];
+            offset = 0;
+        }
+        if (length[k] != 0) {
+            size_t n = osoe_wire_send_lent(tx, region[k] + offset, length[k] - offset, k);
+            CHECK(n <= length[k] - offset);
+            if (n > 0 && n < length[k] - offset)
+                short_sends++;
+            offset += n;
+            sent += n;
+            moved |= n > 0;
+            if (offset == length[k]) {
+                length[k] = 0;          /* sent whole: lent until it owes nothing */
+                k ^= 1;
+            }
+        }
+        osoe_ring_reap(ring);
+        moved |= drain(rx, &got);
+        if (!moved) {
+            osoe_ring_wait(ring, UINT64_C(1000000));
+            if (osoe_deadline_expired(&give_up)) {
+                fprintf(stderr, "zero-copy stream stalled: %zu of %zu placed, %zu received, "
+                                "%u and %u notifications owed\n", placed, total, got,
+                        osoe_wire_owed(tx, 0), osoe_wire_owed(tx, 1));
+                CHECK_FATAL(false);
+            }
+        }
+    }
+    while ((osoe_wire_owed(tx, 0) || osoe_wire_owed(tx, 1)) && !osoe_deadline_expired(&give_up)) {
+        osoe_ring_reap(ring);
+        if (osoe_wire_owed(tx, 0) || osoe_wire_owed(tx, 1))
+            osoe_ring_wait(ring, UINT64_C(1000000));
+    }
+    CHECK(osoe_wire_owed(tx, 0) == 0 && osoe_wire_owed(tx, 1) == 0);
+    CHECK(placed == total && sent == total && got == total);
+}
+
+/*
  * The peek's misuses (wire.h), one a run, each expected to end in its message
  * (CMakeLists.txt): a consume past what the last peek showed, a second consume
  * of one peek, and - in the ASan preset, which poisons a provided buffer once it
@@ -241,10 +300,16 @@ static int misuse(const char *what)
 
 int main(int argc, char **argv)
 {
-    if (argc > 1) {
+    bool zero_copy = argc > 1 && strcmp(argv[1], "zero-copy") == 0;
+    if (argc > 1 && !zero_copy) {
         setenv("OSOE_WIRE_BYTES", "64", 1);
         setenv("OSOE_WIRE_SPLIT", "0", 1);
         return misuse(argv[1]);
+    }
+    if (zero_copy) {
+        /* Every send of 64 bytes or more by reference (wire-settings.h). */
+        setenv("OSOE_WIRE_ZERO_COPY", "on", 1);
+        setenv("OSOE_WIRE_ZERO_COPY_BYTES", "64", 1);
     }
     setenv("OSOE_WIRE_BYTES", "64", 1);     /* every transfer spans buffers */
     setenv("OSOE_WIRE_BUFFERS", "4", 1);    /* and the ring runs dry: -ENOBUFS, re-arm */
@@ -274,8 +339,23 @@ int main(int argc, char **argv)
     osoe_ring_enable(&ring);
 
     unsent_limit(&wires[1], &hi);
-    stream(&ring, &wires[0], &wires[1], PAYLOAD);
-    stream(&ring, &wires[1], &wires[0], PAYLOAD);
+    if (zero_copy) {
+        stream_lent(&ring, &wires[0], &wires[1], PAYLOAD);
+        stream_lent(&ring, &wires[1], &wires[0], PAYLOAD);
+        /* Sends by reference happened, and every one was given back - over
+         * loopback, copied after all, which the notification says. */
+        CHECK(ring.counts.zero_copy_sends > 0);
+        CHECK(ring.counts.zero_copy_notifications > 0);
+        CHECK(ring.counts.zero_copy_notifications == ring.counts.zero_copy_sends);
+        CHECK(ring.counts.zero_copy_copied <= ring.counts.zero_copy_notifications);
+        fprintf(stderr, "zero copy: %llu sends by reference, %llu notifications, %llu copied\n",
+                (unsigned long long)ring.counts.zero_copy_sends,
+                (unsigned long long)ring.counts.zero_copy_notifications,
+                (unsigned long long)ring.counts.zero_copy_copied);
+    } else {
+        stream(&ring, &wires[0], &wires[1], PAYLOAD);
+        stream(&ring, &wires[1], &wires[0], PAYLOAD);
+    }
 
     /*
      * The directions are separate: what node 0 wrote must not come back to it.

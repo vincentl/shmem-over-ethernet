@@ -997,6 +997,7 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     uint64_t wanted = osoe_connection_ack_wanted(connection);
     if (c->detector_wanted > wanted)
         wanted = c->detector_wanted;            /* the deadlock detector asks too (§3.15) */
+    c->wanted = wanted;                         /* for busy(): a late request still to seal */
     const uint32_t header = (uint32_t)sizeof(struct osoe_am_segment_header);
     struct osoe_am_connection_metrics *cm = conn_metrics(p, slot);
     if (cm) {
@@ -1010,18 +1011,43 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
         publish_queues(p, slot);
     }
 
+    /*
+     * Release a buffer lent to the kernel once it has let go of it: sent whole
+     * by reference, and every notification of its sends come (the zero-copy
+     * send, wire.h). The same release as a copied buffer's, at its last
+     * notification instead of its last send's completion - reservation_model.py's
+     * zero_copy, with the release at the completion a breakage that fails.
+     */
+    for (uint32_t k = 0; k < 2; k++)
+        if (c->state[k] == OSOE_BUFFER_LENT && osoe_wire_owed(&p->wire[slot], k) == 0) {
+            osoe_connection_release(connection, k);
+            c->state[k] = OSOE_BUFFER_FREE;
+            moved = true;
+        }
+
     /* Finish an in-flight send. A short write is the normal case (§3.3): keep
      * the remainder and offer it again. */
     if (c->sending != OSOE_CONNECTION_NONE) {
         unsigned char *base = connection->data + (size_t)c->sending * connection->capacity;
-        size_t n = osoe_wire_send(&p->wire[slot], base + c->sent,
-                                  c->sending_bytes - c->sent);
+        size_t n = osoe_wire_send_lent(&p->wire[slot], base + c->sent,
+                                       c->sending_bytes - c->sent, c->sending);
         c->sent += (uint32_t)n;
         if (n > 0)
             moved = true;
         if (c->sent == c->sending_bytes) {
-            osoe_connection_release(connection, c->sending);
-            c->state[c->sending] = OSOE_BUFFER_FREE;
+            /* The wire is free at once; the buffer only when the kernel owes
+             * nothing for it - at once, unless it went by reference. */
+            if (osoe_wire_owed(&p->wire[slot], c->sending) == 0) {
+                osoe_connection_release(connection, c->sending);
+                c->state[c->sending] = OSOE_BUFFER_FREE;
+            } else {
+                /* Never both: the wire sends by reference only while the other
+                 * buffer owes nothing (wire.h; reservation_model.py, BOTH LENT). */
+                if (c->state[c->sending ^ 1] == OSOE_BUFFER_LENT)
+                    osoe_fatal("node %u: both buffers toward node %u are lent to the "
+                               "kernel (wire.h)", p->node, peer_of(p, slot));
+                c->state[c->sending] = OSOE_BUFFER_LENT;
+            }
             c->sending = OSOE_CONNECTION_NONE;
             /* That was the goodbye (nothing is sealed after it): end the stream. */
             if (c->goodbye == OSOE_GOODBYE_SEALED && c->sealed == OSOE_CONNECTION_NONE) {
@@ -1096,6 +1122,15 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
     if (c->open == OSOE_CONNECTION_NONE && c->goodbye == OSOE_GOODBYE_NONE) {
         for (uint32_t k = 0; k < 2; k++)
             if (c->state[k] == OSOE_BUFFER_FREE && k != c->sealed && k != c->sending) {
+                /* Nothing writes a buffer the kernel may still read: a free one
+                 * owes no notification (the zero-copy send). Checked here, where
+                 * the buffer is first written, and not where it was released, so
+                 * that a release too early is caught by another hand. */
+                if (osoe_wire_owed(&p->wire[slot], k) != 0)
+                    osoe_fatal("node %u: buffer %u toward node %u would be written with %u "
+                               "zero-copy notifications still owed - the kernel may still "
+                               "be reading it (wire.h)", p->node, k, peer_of(p, slot),
+                               osoe_wire_owed(&p->wire[slot], k));
                 /* The pre-open drain (§3.8): replies first, while k is still
                  * sealed and no writer can reach it. */
                 c->state[k] = OSOE_BUFFER_DRAINING;
@@ -1175,8 +1210,15 @@ void osoe_progress_attach(struct osoe_progress *p,
  * replies queued, an acknowledgement owed, or replies the pre-open drain put in
  * the open buffer. The last was missed at first: the pre-open drain runs after
  * the pass's chance to seal, and the first barrier of an 8-node job hung about
- * one run in eight with a leaf's ARRIVE sitting unsealed in its open buffer. Private state only: O(1), and no
- * shared line touched.
+ * one run in eight with a leaf's ARRIVE sitting unsealed in its open buffer.
+ * The rule since: **whatever wants a seal keeps the connection busy**, since the
+ * open step runs after the seal step. So too a buffer lent to the kernel (the
+ * zero-copy send), a late acknowledgement request not yet carried, and, closing,
+ * the goodbye not yet sealed: with buffers lent, both can come back in one visit,
+ * which then opens one after the seal step has passed, and a quiet waited for
+ * the deadlock detector's sweep to bring the connection back (the fourth
+ * adversarial read of v0.2 step 4, F1; visit_model.py). Private state only:
+ * O(1), and no shared line touched.
  */
 static bool busy(const struct osoe_progress *p, uint32_t slot)
 {
@@ -1185,7 +1227,10 @@ static bool busy(const struct osoe_progress *p, uint32_t slot)
         return !c->abort_done;
     return c->open == OSOE_CONNECTION_NONE || c->sending != OSOE_CONNECTION_NONE ||
            c->sealed != OSOE_CONNECTION_NONE || c->owe_ack || c->carrying ||
-           c->queues.control.depth != 0 || c->queues.bulk.depth != 0;
+           c->queues.control.depth != 0 || c->queues.bulk.depth != 0 ||
+           c->state[0] == OSOE_BUFFER_LENT || c->state[1] == OSOE_BUFFER_LENT ||
+           (c->wanted > c->acked && c->flagged < c->wanted) ||
+           (p->closing && c->goodbye == OSOE_GOODBYE_NONE);
 }
 
 /* After a visit: keep the connection's bit while it is busy, clear it once not. */
@@ -1251,6 +1296,9 @@ static void publish_ring(struct osoe_progress *p)
     osoe_counter_word_add(&p->metrics->receive_rearms, k->rearms);
     osoe_counter_word_add(&p->metrics->sends, k->sends);
     osoe_counter_word_add(&p->metrics->short_sends, k->short_sends);
+    osoe_counter_word_add(&p->metrics->zero_copy_sends, k->zero_copy_sends);
+    osoe_counter_word_add(&p->metrics->zero_copy_notifications, k->zero_copy_notifications);
+    osoe_counter_word_add(&p->metrics->zero_copy_copied, k->zero_copy_copied);
     *k = (struct osoe_ring_counts){ 0 };
 }
 

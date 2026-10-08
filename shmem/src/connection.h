@@ -221,6 +221,10 @@ enum osoe_buffer_state {
     OSOE_BUFFER_OPEN,
     OSOE_BUFFER_SEALED_STATE,
     OSOE_BUFFER_SENDING,
+    /* Sent whole, by reference, and the kernel owes notifications for it: the
+     * wire is free for the other buffer, and this one is released at its last
+     * notification (the zero-copy send, wire.h; reservation_model.py). */
+    OSOE_BUFFER_LENT,
 };
 
 /* A granted reservation. */

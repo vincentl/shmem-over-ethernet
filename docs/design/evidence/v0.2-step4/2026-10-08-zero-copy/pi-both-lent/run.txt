@@ -1,0 +1,12 @@
+start 08:50:23
+built: 0
+putstream-cpu: 0
+stream-off-1: 0
+stream-on-1: 0
+stream-off-2: 0
+stream-on-2: 0
+stream-off-3: 0
+stream-on-3: 0
+bench-off-1: 0
+bench-on-1: 0
+bench-on-64-1: 143

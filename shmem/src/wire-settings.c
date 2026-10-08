@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "base/environment.h"
 #include "fatal.h"
@@ -61,6 +62,18 @@ void osoe_wire_settings_read(struct osoe_wire_settings *s, const struct osoe_boo
         osoe_fatal("OSOE_WIRE_UNSENT_BYTES='%s' is not a byte count: 0 to leave the system's "
                    "own, or up to %u", getenv("OSOE_WIRE_UNSENT_BYTES"), OSOE_WIRE_UNSENT_MAX);
     }
+    s->zero_copy = false;
+    const char *zero_copy = getenv("OSOE_WIRE_ZERO_COPY");
+    if (zero_copy && strcmp(zero_copy, "on") == 0)
+        s->zero_copy = true;
+    else if (zero_copy && strcmp(zero_copy, "off") != 0)
+        osoe_fatal("OSOE_WIRE_ZERO_COPY=%s: on, to send connection buffers by reference "
+                   "(IORING_OP_SEND_ZC), or off, to copy them", zero_copy);
+    s->zero_copy_bytes = OSOE_WIRE_ZERO_COPY_DEFAULT_BYTES;
+    if (osoe_environment_u32("OSOE_WIRE_ZERO_COPY_BYTES", &s->zero_copy_bytes) ==
+            OSOE_ENVIRONMENT_INVALID || s->zero_copy_bytes == 0)
+        osoe_fatal("OSOE_WIRE_ZERO_COPY_BYTES='%s' is not a byte count of at least 1",
+                   getenv("OSOE_WIRE_ZERO_COPY_BYTES"));
     /* Said whenever injection is on, so a failure names what to reproduce it
      * with; off by default, so a normal run says nothing. */
     if (announce && s->split != 0)
