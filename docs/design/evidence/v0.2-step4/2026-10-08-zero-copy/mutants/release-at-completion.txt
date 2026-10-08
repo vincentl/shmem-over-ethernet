@@ -1,0 +1,13 @@
+== debug 08:47:28
+ 3/31 Test  #39: shmem.wire.zero-copy .......................***Failed    0.01 sec
+ 6/31 Test #160: shmem.multinode.zero-copy.0-1-2 ............***Failed    0.05 sec
+ 7/31 Test #162: shmem.multinode.zero-copy.0-0-1-1-2-2 ......***Failed    0.05 sec
+10/31 Test #164: shmem.multinode.zero-copy.0-0-0-1-2-2 ......***Failed    0.06 sec
+11/31 Test #166: shmem.multinode.zero-copy.0-1-2-0-1-0 ......***Failed    0.05 sec
+18/31 Test #186: shmem.internode.zero-copy.0-1-2 ............***Failed    0.05 sec
+20/31 Test #188: shmem.internode.zero-copy.0-0-1-1-2-2 ......***Failed    0.06 sec
+24/31 Test #190: shmem.internode.zero-copy.0-0-0-1-2-2 ......***Failed    0.06 sec
+27/31 Test #192: shmem.internode.zero-copy.0-1-2-0-1-0 ......***Failed    0.05 sec
+71% tests passed, 9 tests failed out of 31
+DONE 08:47:37
+   8 would be written with 1 zero-copy notifications still owed

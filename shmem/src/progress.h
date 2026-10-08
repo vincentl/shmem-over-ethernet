@@ -205,10 +205,13 @@ struct osoe_progress_connection {
      * segment clears it. `flagged`: the highest sequence this node has sent
      * carrying ACK_REQUESTED, so a request made after its segment was already
      * finalized is asked once, on one header-only segment, and not every pass.
-     * What this node's writers want is in the connection (ack_wanted_through).
+     * What this node's writers want is in the connection (ack_wanted_through);
+     * `wanted` is it as flush last loaded it, the detector's want beside it, so
+     * that busy() can tell a request still to be sealed without a shared load.
      */
     bool owe_ack;
     uint64_t flagged;
+    uint64_t wanted;
     /*
      * The deadlock detector's (§3.15): the last segment this node sealed that
      * carried application work - any message but the detector's own - and how

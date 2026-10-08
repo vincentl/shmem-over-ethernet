@@ -38,7 +38,7 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   set(osoe_models wire credit arrival ack reservation blocked_record range_watch
                   chained_wake lead_wake rendezvous wait_word credit_wait tree_barrier close
                   abort abort_exit lock pipeline allgather scan scan_pipeline deadlock
-                  team_block split_numbers pool_dry posted_bitmap lane lane_scan)
+                  team_block split_numbers pool_dry posted_bitmap lane lane_scan visit)
   if(OSOE_MULTIPLE_MODELS)
     list(APPEND osoe_models dirty_set get_completion watch_list landing_extent copy_out_claim
                             pe_quiet)

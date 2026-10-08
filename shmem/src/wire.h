@@ -28,7 +28,9 @@
  * no copy - so they must stay unchanged until they are reported accepted, and
  * the caller offers the rest again from where the report ended, exactly as §3.3
  * says of a short send ("advance past a short send and resubmit the
- * remainder"). The first offer starts the send and returns 0; an offer after
+ * remainder"). With the zero-copy send on, bytes sent by reference stay the
+ * kernel's past the report too, until its notification (osoe_wire_send_lent,
+ * osoe_wire_owed). The first offer starts the send and returns 0; an offer after
  * the completion has been reaped returns what the kernel took. The engine
  * already behaved this way - a buffer is released only once every byte of it
  * has been accepted - so nothing above had to change; the wire checks it.
@@ -49,6 +51,10 @@
 #include "listener.h"
 #include "ring.h"
 #include "wire-settings.h"
+
+/* The regions a wire's sender lends the kernel by reference: a connection's
+ * two buffers (§3.5), by number. */
+#define OSOE_WIRE_LENT_REGIONS 2
 
 struct osoe_wire {
     int fd;
@@ -79,6 +85,13 @@ struct osoe_wire {
     uint64_t seed;
     uint32_t split;             /* truncations per myriad; 0 disables */
     uint64_t sends, recvs;      /* this wire's transfers, for the hash */
+    /* The zero-copy send (wire-settings.h): on, the least bytes a send by
+     * reference carries, and per region the notifications the kernel still
+     * owes - each send by reference whose completion said one would follow,
+     * less the ones that have come; the region rides in the send's tag. */
+    bool zero_copy;
+    uint32_t zero_copy_bytes;
+    uint32_t owed[OSOE_WIRE_LENT_REGIONS];
 };
 
 /*
@@ -125,6 +138,24 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, i
  * must stay put until then.
  */
 size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len);
+
+/*
+ * osoe_wire_send of bytes in `region`, which the caller lends the kernel: one of
+ * a connection's two buffers (§3.5). With OSOE_WIRE_ZERO_COPY on, a send of at
+ * least OSOE_WIRE_ZERO_COPY_BYTES goes by reference (IORING_OP_SEND_ZC) - unless
+ * the other region still owes a notification, or this one already owes
+ * OSOE_WIRE_ZERO_COPY_OWED_MOST - and then the region must stay as it is, even
+ * after the send has completed, until osoe_wire_owed says the kernel owes
+ * nothing for it. So at most one region is ever lent: the other is always a
+ * copied send away from free. Off, it is osoe_wire_send.
+ */
+size_t osoe_wire_send_lent(struct osoe_wire *w, const void *buffer, size_t len,
+                           uint32_t region);
+
+/* The notifications the kernel still owes for `region`'s sends by reference:
+ * 0 once it has let go of every byte of them, and always 0 with the zero-copy
+ * send off. */
+uint32_t osoe_wire_owed(const struct osoe_wire *w, uint32_t region);
 
 /*
  * Limit the bytes the kernel may hold unsent on this wire (TCP_NOTSENT_LOWAT;

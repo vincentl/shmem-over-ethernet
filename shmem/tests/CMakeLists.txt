@@ -231,6 +231,11 @@ if(OSOE_INTERNODE)
   add_test(NAME shmem.wire COMMAND shmem_test_wire)
   set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 120)
   osoe_internode_label(shmem.wire)
+  # The zero-copy send (wire.h): the same streams through two regions lent to
+  # the kernel by reference, each refilled only once it owes nothing for it.
+  add_test(NAME shmem.wire.zero-copy COMMAND shmem_test_wire zero-copy)
+  set_tests_properties(shmem.wire.zero-copy PROPERTIES LABELS "tier1" TIMEOUT 120)
+  osoe_internode_label(shmem.wire.zero-copy)
   # The peek's misuses (wire.h), each asserted by its message as the parser's
   # malformed segments are: a consume past the peek, a second consume of it, and
   # in the ASan preset alone, which poisons a provided buffer while it is the
@@ -831,7 +836,9 @@ foreach(case_expect
     "landing-bytes|OSOE_GET_LANDING_BYTES|abc|OSOE_GET_LANDING_BYTES='abc' is not a decimal byte count"
     "wire-bytes|OSOE_WIRE_BYTES|abc|OSOE_WIRE_BYTES='abc' is not a byte count between 64 and 1048576"
     "wire-unsent-bytes|OSOE_WIRE_UNSENT_BYTES|abc|OSOE_WIRE_UNSENT_BYTES='abc' is not a byte count: 0 to leave the system's own, or up to 1073741824"
-    "wire-unsent-bytes-large|OSOE_WIRE_UNSENT_BYTES|2000000000|OSOE_WIRE_UNSENT_BYTES='2000000000' is more than 1073741824 bytes")
+    "wire-unsent-bytes-large|OSOE_WIRE_UNSENT_BYTES|2000000000|OSOE_WIRE_UNSENT_BYTES='2000000000' is more than 1073741824 bytes"
+    "wire-zero-copy|OSOE_WIRE_ZERO_COPY|yes|OSOE_WIRE_ZERO_COPY=yes: on, to send connection buffers by reference"
+    "wire-zero-copy-bytes|OSOE_WIRE_ZERO_COPY_BYTES|0|OSOE_WIRE_ZERO_COPY_BYTES='0' is not a byte count of at least 1")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 label)
   list(GET parts 1 variable)
@@ -1112,6 +1119,23 @@ foreach(map 0,0,0,0 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
   set_tests_properties(shmem.multinode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
   if(nodes GREATER 1)
     osoe_internode_label(shmem.multinode.${label})
+    # The zero-copy send (wire-settings.h) on every send of 64 bytes or more:
+    # a connection buffer lent to the kernel until its notifications have come.
+    # Over loopback the kernel copies anyway, but the notifications, the lent
+    # buffers and their release at the last one run as they would on a NIC. The
+    # deadlock detector is off, so that a wait the engine strands is the
+    # launcher's timeout rather than a second's rescue by the detector's sweep
+    # (the fourth adversarial read of v0.2 step 4, F1), and the test fails if no
+    # send went by reference (S1).
+    add_test(NAME shmem.multinode.zero-copy.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+              OSOE_WIRE_ZERO_COPY=on OSOE_WIRE_ZERO_COPY_BYTES=64 OSOE_DEADLOCK_SECONDS=0
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+              $<TARGET_FILE:shmem_test_multinode>)
+    set_tests_properties(shmem.multinode.zero-copy.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 90)
+    osoe_internode_label(shmem.multinode.zero-copy.${label})
   endif()
 endforeach()
 
@@ -1239,6 +1263,17 @@ foreach(map IN LISTS osoe_internode_maps)
   set_tests_properties(shmem.internode.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
   if(nodes GREATER 1)
     osoe_internode_label(shmem.internode.${label})
+    # The zero-copy send, as shmem.multinode.zero-copy.* runs it.
+    add_test(NAME shmem.internode.zero-copy.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+              OSOE_AM_CREDITS=2
+              OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+              OSOE_WIRE_ZERO_COPY=on OSOE_WIRE_ZERO_COPY_BYTES=64 OSOE_DEADLOCK_SECONDS=0
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+              $<TARGET_FILE:shmem_test_internode>)
+    set_tests_properties(shmem.internode.zero-copy.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 90)
+    osoe_internode_label(shmem.internode.zero-copy.${label})
   endif()
 endforeach()
 # The same through the bootstrap's Slurm path (§6.1): osoe-launch -s names the

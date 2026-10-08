@@ -1,0 +1,18 @@
+osoe-bench pes=2 remote_target=1 local_target=-1
+latency put+quiet target=1 where=remote bytes=8 median_us=168.7 fastest_us=165.6
+latency get target=1 where=remote bytes=8 median_us=169.5 fastest_us=168.3
+latency put+quiet target=1 where=remote bytes=64 median_us=170.0 fastest_us=157.0
+latency get target=1 where=remote bytes=64 median_us=170.8 fastest_us=169.0
+latency put+quiet target=1 where=remote bytes=512 median_us=178.1 fastest_us=176.0
+latency get target=1 where=remote bytes=512 median_us=179.1 fastest_us=177.4
+latency put+quiet target=1 where=remote bytes=4096 median_us=194.8 fastest_us=188.6
+latency get target=1 where=remote bytes=4096 median_us=174.3 fastest_us=156.1
+latency put+quiet target=1 where=remote bytes=32768 median_us=416.0 fastest_us=389.8
+latency get target=1 where=remote bytes=32768 median_us=410.3 fastest_us=378.4
+latency put+quiet target=1 where=remote bytes=262144 median_us=2385.6 fastest_us=2365.2
+latency get target=1 where=remote bytes=262144 median_us=3010.9 fastest_us=2950.1
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd-pi-001: error: *** STEP 1035.0 ON pi-001 CANCELLED AT 2026-10-08T09:16:40 ***
+srun: error: pi-001: task 0: Terminated
+srun: Terminating StepId=1035.0
+srun: error: pi-002: task 1: Terminated

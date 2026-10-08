@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 33
+#define OSOE_NODE_LAYOUT 34
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -481,6 +481,12 @@ struct osoe_am_node_metrics {
      * progress.c, release_local, which a pass runs twice). Zero but when a
      * connection is full at the release. */
     _Atomic uint64_t releases_held;
+    /* Layout 34: the zero-copy send (wire-settings.h) - sends by reference,
+     * their notifications, and the ones that said the kernel copied after
+     * all, which over loopback is every one. */
+    _Atomic uint64_t zero_copy_sends;
+    _Atomic uint64_t zero_copy_notifications;
+    _Atomic uint64_t zero_copy_copied;
 };
 
 /*

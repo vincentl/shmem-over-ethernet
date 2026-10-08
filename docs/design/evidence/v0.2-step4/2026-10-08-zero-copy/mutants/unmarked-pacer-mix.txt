@@ -1,0 +1,4 @@
+run=1 exit=1 seconds=180 osoe-launch: rank 7 killed by signal 9
+run=2 exit=1 seconds=180 osoe-launch: rank 6 killed by signal 9
+run=3 exit=1 seconds=180 osoe-launch: rank 4 killed by signal 9
+DONE

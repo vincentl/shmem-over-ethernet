@@ -240,6 +240,16 @@ int main(void)
         }
     }
 
+    /* With the zero-copy send on (OSOE_WIRE_ZERO_COPY), the node's sends went
+     * by reference: the zero-copy suites fail where none did, rather than pass
+     * on the copying path (the fourth adversarial read of v0.2 step 4, S1). */
+    const char *zero_copy = getenv("OSOE_WIRE_ZERO_COPY");
+    if (zero_copy && strcmp(zero_copy, "on") == 0 && nodes > 1) {
+        uint64_t by_reference = 0;
+        CHECK(osoe_test_node_metric("transport.am.zero_copy_sends", &by_reference));
+        CHECK(by_reference > 0);
+    }
+
     CHECK_INVARIANTS();
 
     /* Every finalize is a barrier, the last one included (spec §9.1.4). */
