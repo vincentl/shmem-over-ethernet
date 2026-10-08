@@ -78,10 +78,19 @@ import sys
 
 from engine import assemble, explore, report, select
 
-NODES = (0, 1, 2)
-PARENT = {0: None, 1: 0, 2: 1}
-CHILDREN = {0: (1,), 1: (2,), 2: ()}
 CAPACITY = 2            # messages a channel holds; a sender waits while it is full
+
+# The tree, set for each case (use_topology): three nodes - node 1 interior,
+# forwarding the release it receives - for one wire a pair; for two, a pair of
+# nodes, root and child, since twelve channels at three nodes ran past the
+# half-hour bound even with one acknowledgement (9.1 million states). What two
+# wires add is each wire closing on its own, which a pair shows; an interior
+# node's forwarding during the close is the one-wire cases'.
+TOPOLOGIES = {
+    'three': ((0, 1, 2), {0: None, 1: 0, 2: 1}, {0: (1,), 1: (2,), 2: ()}),
+    'pair': ((0, 1), {0: None, 1: 0}, {0: (1,), 1: ()}),
+}
+NODES, PARENT, CHILDREN = TOPOLOGIES['three']
 
 ACK, ARRIVE, RELEASE, GOODBYE, FIN = 1, 2, 3, 4, 5
 NAME = {ACK: 'ack', ARRIVE: 'ARRIVE', RELEASE: 'RELEASE', GOODBYE: 'goodbye', FIN: 'FIN'}
@@ -249,16 +258,23 @@ def receive_step(M, x, y, w, variant):
 
 
 MESSAGES = []
-for x in NODES:
-    for y in NODES:
-        if x != y:
-            for w in (CONTROL, DATA):
-                on = f' on wire {w}'
-                MESSAGES += [
-                    f'NO_EARLY_EOF: node {x} received node {y}\'s FIN before its goodbye{on}, '
-                    f'and would end the job as if node {y} had died',
-                    f'NO_RESET: node {x} sent to node {y} after node {y} closed that socket{on}',
-                    f'NO_RESET: node {y} closed its socket{on} with node {x}\'s bytes unread']
+
+
+def use_topology(variant):
+    """Set the tree for `variant` (TOPOLOGIES), and the violations' messages."""
+    global NODES, PARENT, CHILDREN
+    NODES, PARENT, CHILDREN = TOPOLOGIES['pair' if len(wires_of(variant)) > 1 else 'three']
+    MESSAGES.clear()
+    for x in NODES:
+        for y in NODES:
+            if x != y:
+                for w in (CONTROL, DATA):
+                    on = f' on wire {w}'
+                    MESSAGES.extend([
+                        f'NO_EARLY_EOF: node {x} received node {y}\'s FIN before its goodbye{on}, '
+                        f'and would end the job as if node {y} had died',
+                        f'NO_RESET: node {x} sent to node {y} after node {y} closed that socket{on}',
+                        f'NO_RESET: node {y} closed its socket{on} with node {x}\'s bytes unread'])
 
 
 def violation_index(get):
@@ -278,6 +294,7 @@ def violation_index(get):
 
 
 def case(variant):
+    use_topology(variant)
     mem = {}
     for x in NODES:
         mem[OWN(x)] = mem[LEFT(x)] = mem[EXITING(x)] = 0
@@ -288,13 +305,7 @@ def case(variant):
             # before its goodbye: enough for each lead to have one in flight
             # toward a peer that may already be exiting. More only multiplies
             # interleavings; a goodbye and a FIN already cross every closing.
-            # With two wires, one alone - the leaf's toward the root, which
-            # exits first - since twelve channels with three ran past the
-            # half-hour bound, and its wire's close is every other's.
-            if len(wires_of(variant)) > 1:
-                mem[ACK_LEFT(x, y)] = 1 if (x, y) == (2, 0) else 0
-            else:
-                mem[ACK_LEFT(x, y)] = 1 if y == (x + 1) % len(NODES) else 0
+            mem[ACK_LEFT(x, y)] = 1 if y == (x + 1) % len(NODES) else 0
             for m in (ARRIVE, RELEASE):
                 mem[OWES(x, y, m)] = 0
             for w in (CONTROL, DATA):
