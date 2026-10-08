@@ -1,0 +1,33 @@
+# osoe-stat -c -j, the growth over the 5 s perf-stat window of the 64 KiB put stream
+put64 node 0 (/osoe.4010422.0.0.0)
+  counters.transport.put.calls[0] 199200
+  counters.transport.put.bytes[0] 13054705664
+  counters.transport.wait.calls[0] 194
+  counters.transport.wait.ns[0] 11902208
+  counters.transport.wait.dirty_peers[0] 194
+  counters.shmem.quiet.calls[0] 194
+  counters.agent.loops[0] 865007
+  counters.agent.wakeups[0] 321680
+  counters.am.reserve_stalls[0] 181518
+  counters.am.wakes_sent[0] 154023
+  counters.am.wakes_skipped[0] 226128
+put64 node 1 (/osoe.4010422.0.1.0)
+  counters.transport.notify.calls[0] 398392
+  counters.agent.loops[0] 326361
+  counters.agent.wakeups[0] 153002
+put1m node 0 (/osoe.4010487.0.0.0)
+  counters.transport.put.calls[0] 14525
+  counters.transport.put.bytes[0] 15230566400
+  counters.transport.wait.calls[0] 227
+  counters.transport.wait.ns[0] 13704462
+  counters.transport.wait.dirty_peers[0] 227
+  counters.shmem.quiet.calls[0] 227
+  counters.agent.loops[0] 876877
+  counters.agent.wakeups[0] 319121
+  counters.am.reserve_stalls[0] 189593
+  counters.am.wakes_sent[0] 140850
+  counters.am.wakes_skipped[0] 62691
+put1m node 1 (/osoe.4010487.0.1.0)
+  counters.transport.notify.calls[0] 246916
+  counters.agent.loops[0] 281622
+  counters.agent.wakeups[0] 136111

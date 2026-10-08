@@ -1,0 +1,4 @@
+      echo-uring-4010628            5002.42 msec task-clock                       #    1.000 CPUs utilized             
+      echo-uring-4010630            4297.41 msec task-clock                       #    0.859 CPUs utilized             
+       5.002744723 seconds time elapsed
+    51.96%  swapper        

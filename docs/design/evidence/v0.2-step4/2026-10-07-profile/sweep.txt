@@ -1,0 +1,12 @@
+round=1 buffer=131072 chunk=65536 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=2617
+round=1 buffer=131072 chunk=32768 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=3895
+round=1 buffer=131072 chunk=16384 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=4243
+round=1 buffer=262144 chunk=65536 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=8473
+round=1 buffer=524288 chunk=65536 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=8926
+round=1 buffer=1048576 chunk=65536 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10418
+round=2 buffer=131072 chunk=65536 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=2850
+round=2 buffer=131072 chunk=32768 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=3902
+round=2 buffer=131072 chunk=16384 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=4204
+round=2 buffer=262144 chunk=65536 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=8406
+round=2 buffer=524288 chunk=65536 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=8876
+round=2 buffer=1048576 chunk=65536 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10236

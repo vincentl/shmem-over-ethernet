@@ -1,0 +1,113 @@
+diff --git a/shmem/src/connection.c b/shmem/src/connection.c
+index ec68df7..2229395 100644
+--- a/shmem/src/connection.c
++++ b/shmem/src/connection.c
+@@ -87,6 +87,39 @@ enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c,
+     }
+ }
+ 
++enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connection *c,
++                                                           uint32_t most, uint32_t least,
++                                                           struct osoe_reservation *r)
++{
++    struct osoe_connection_shared *s = c->s;
++    for (;;) {
++        uint32_t k = OSOE_CONNECTION_NONE, h = 0;
++        for (uint32_t i = 0; i < 2; i++) {
++            uint32_t v = atomic_load_explicit(&s->buffer[i].head, memory_order_seq_cst);
++            if (!(v & OSOE_BUFFER_SEALED)) {
++                k = i;
++                h = v;
++                break;
++            }
++        }
++        if (k == OSOE_CONNECTION_NONE)
++            return OSOE_RESERVATION_NONE;
++        uint32_t room = h < c->capacity ? c->capacity - h : 0;
++        uint32_t take = most <= room ? most : room & ~(OSOE_MESSAGE_ALIGN - 1);
++        if (take < least)
++            return OSOE_RESERVATION_FULL;
++        if (atomic_compare_exchange_weak_explicit(&s->buffer[k].head, &h, h + take,
++                                                  memory_order_seq_cst,
++                                                  memory_order_acquire)) {
++            r->buffer = k;
++            r->off = h;
++            r->len = take;
++            r->seq = atomic_load_explicit(&s->buffer[k].seq, memory_order_acquire);
++            return OSOE_RESERVATION_OK;
++        }
++    }
++}
++
+ void osoe_connection_commit(struct osoe_connection *c, const struct osoe_reservation *r)
+ {
+     atomic_fetch_add_explicit(&c->s->buffer[r->buffer].filled, r->len, memory_order_seq_cst);
+diff --git a/shmem/src/connection.h b/shmem/src/connection.h
+index 52f878b..5023069 100644
+--- a/shmem/src/connection.h
++++ b/shmem/src/connection.h
+@@ -265,6 +265,12 @@ void osoe_connection_init(struct osoe_connection *c, uint32_t credits);
+ enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c, uint32_t len,
+                                         struct osoe_reservation *r);
+ 
++/* EXPERIMENT (ladder): as osoe_connection_reserve, of as much of `most` bytes as
++ * the open buffer has room for and at least `least`; r->len says how much. */
++enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connection *c,
++                                                           uint32_t most, uint32_t least,
++                                                           struct osoe_reservation *r);
++
+ /* Where a granted reservation's bytes go. */
+ static inline void *osoe_reservation_bytes(const struct osoe_connection *c, const struct osoe_reservation *r)
+ {
+diff --git a/shmem/src/transport-internode.c b/shmem/src/transport-internode.c
+index 69acb90..6b12ed3 100644
+--- a/shmem/src/transport-internode.c
++++ b/shmem/src/transport-internode.c
+@@ -513,9 +513,10 @@ static uint64_t turnover(const struct osoe_connection *connection)
+  * that is often full is visible rather than assumed rare.
+  */
+ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, int pe,
+-                            const char *routine, uint32_t len, struct osoe_reservation *r)
++                            const char *routine, uint32_t len, uint32_t least,
++                            struct osoe_reservation *r)
+ {
+-    if (osoe_connection_reserve(connection, len, r) == OSOE_RESERVATION_OK)
++    if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK)
+         return;
+     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
+     struct osoe_wait_word *word = osoe_connection_turnover_wait(connection);
+@@ -527,7 +528,7 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
+     bool swept = false;
+     for (;;) {
+         uint32_t seen = osoe_wait_word_load(word);
+-        if (osoe_connection_reserve(connection, len, r) == OSOE_RESERVATION_OK) {
++        if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK) {
+             if (swept)
+                 count_if_lost(&word->word, slept_on, routine);
+             break;
+@@ -590,7 +591,14 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
+         uint32_t body = (uint32_t)sizeof m + n;
+         struct osoe_message_header h = { OSOE_AM_PUT, 0, body };
+         struct osoe_reservation r;
+-        reserve_waiting(connection, peer, pe, "shmem_put", osoe_message_padded(body), &r);
++        /* EXPERIMENT (ladder): take the room the open buffer has, down to 4 KiB. */
++        uint32_t least = osoe_message_padded((uint32_t)sizeof m + (n < 4096 ? n : 4096));
++        reserve_waiting(connection, peer, pe, "shmem_put", osoe_message_padded(body), least, &r);
++        if (r.len < osoe_message_padded(body)) {
++            n = r.len - (uint32_t)(sizeof(struct osoe_message_header) + sizeof m);
++            body = (uint32_t)sizeof m + n;
++            h.len = body;
++        }
+         unsigned char *to = osoe_reservation_bytes(connection, &r);
+         memcpy(to, &h, sizeof h);
+         memcpy(to + sizeof h, &m, sizeof m);
+@@ -924,7 +932,8 @@ static uint64_t send_message(struct osoe_connection *connection, uint32_t peer,
+     uint32_t body = fixed_bytes + payload_bytes;
+     struct osoe_message_header h = { kind, 0, body };
+     struct osoe_reservation r;
+-    reserve_waiting(connection, peer, pe, routine, osoe_message_padded(body), &r);
++    reserve_waiting(connection, peer, pe, routine, osoe_message_padded(body),
++                    osoe_message_padded(body), &r);
+     unsigned char *to = osoe_reservation_bytes(connection, &r);
+     memcpy(to, &h, sizeof h);
+     memcpy(to + sizeof h, fixed, fixed_bytes);

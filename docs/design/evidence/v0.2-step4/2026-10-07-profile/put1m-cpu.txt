@@ -1,0 +1,6 @@
+       putstream-4010489            1203.36 msec task-clock                       #    0.241 CPUs utilized             
+      osoe-agent-4010492            2806.45 msec task-clock                       #    0.561 CPUs utilized             
+       putstream-4010490               0.14 msec task-clock                       #    0.000 CPUs utilized             
+      osoe-agent-4010491            2026.04 msec task-clock                       #    0.405 CPUs utilized             
+       5.000687635 seconds time elapsed
+    73.06%  swapper        

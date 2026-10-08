@@ -1,0 +1,10 @@
+      osoe-pacer-4010552             617.21 msec task-clock                       #    0.123 CPUs utilized             
+      osoe-agent-4010556            1697.14 msec task-clock                       #    0.339 CPUs utilized             
+      osoe-pacer-4010553             554.01 msec task-clock                       #    0.111 CPUs utilized             
+      osoe-agent-4010559               0.18 msec task-clock                       #    0.000 CPUs utilized             
+      osoe-pacer-4010554             572.16 msec task-clock                       #    0.114 CPUs utilized             
+      osoe-agent-4010557            1689.49 msec task-clock                       #    0.338 CPUs utilized             
+      osoe-pacer-4010555             569.55 msec task-clock                       #    0.114 CPUs utilized             
+      osoe-agent-4010558               0.25 msec task-clock                       #    0.000 CPUs utilized             
+       5.000658588 seconds time elapsed
+    69.78%  swapper        
