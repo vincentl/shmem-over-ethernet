@@ -1,0 +1,20 @@
+== the 64 KiB put stream
+round=1 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6512
+round=1 build=tip putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10018
+round=2 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6451
+round=2 build=tip putstream target=1 bytes=65536 seconds=10.0 mib_per_s=9682
+round=3 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6404
+round=3 build=tip putstream target=1 bytes=65536 seconds=10.0 mib_per_s=8768
+== the mailbox, 4 PEs on 2 nodes, 20 s
+round=1 build=fill2 summary mailbox rounds=170463 messages=2727408 seconds=19.9 messages_per_s=137112 mib_per_s=17.8 failures=0
+round=1 build=tip summary mailbox rounds=170807 messages=2732912 seconds=19.9 messages_per_s=137418 mib_per_s=17.8 failures=0
+round=2 build=fill2 summary mailbox rounds=170433 messages=2726928 seconds=19.9 messages_per_s=137087 mib_per_s=17.8 failures=0
+round=2 build=tip summary mailbox rounds=171300 messages=2740800 seconds=19.9 messages_per_s=137756 mib_per_s=17.9 failures=0
+== shmem.floor's stream ratio: the tip and its poll mutant
+round=1 build=tip stream_mib_per_s floor=14349 library=9456 stream library/floor=0.659 (0.653-0.671)
+round=1 build=poll-tip stream_mib_per_s floor=14667 library=2398 stream library/floor=0.162 (0.161-0.168)
+round=2 build=tip stream_mib_per_s floor=14489 library=9852 stream library/floor=0.666 (0.631-0.693)
+round=2 build=poll-tip stream_mib_per_s floor=14940 library=2397 stream library/floor=0.161 (0.160-0.167)
+round=3 build=tip stream_mib_per_s floor=14704 library=9590 stream library/floor=0.661 (0.634-0.691)
+round=3 build=poll-tip stream_mib_per_s floor=12994 library=2395 stream library/floor=0.164 (0.161-0.184)
+DONE

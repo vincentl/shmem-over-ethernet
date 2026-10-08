@@ -1,0 +1,24 @@
+pair 0 fastest_us floor=14.7 get=28.0 put_quiet=28.1 fetch_add=28.0 median_us floor=30.0 get=57.2 put_quiet=57.0 fetch_add=56.8 stream_mib_per_s floor=14874 library=8909
+pair 1 fastest_us floor=17.3 get=34.1 put_quiet=30.5 fetch_add=31.1 median_us floor=31.1 get=59.1 put_quiet=59.1 fetch_add=58.8 stream_mib_per_s floor=14208 library=8641
+pair 2 fastest_us floor=17.1 get=30.0 put_quiet=30.0 fetch_add=29.9 median_us floor=29.3 get=57.0 put_quiet=56.9 fetch_add=56.7 stream_mib_per_s floor=9340 library=8462
+pair 3 fastest_us floor=19.9 get=44.3 put_quiet=43.3 fetch_add=43.6 median_us floor=28.8 get=55.6 put_quiet=55.5 fetch_add=55.2 stream_mib_per_s floor=14755 library=9069
+pair 4 fastest_us floor=16.4 get=29.9 put_quiet=30.0 fetch_add=29.9 median_us floor=29.5 get=57.1 put_quiet=57.0 fetch_add=56.7 stream_mib_per_s floor=14792 library=8921
+pair 5 fastest_us floor=20.1 get=45.5 put_quiet=45.0 fetch_add=42.5 median_us floor=28.9 get=55.7 put_quiet=55.4 fetch_add=55.1 stream_mib_per_s floor=14415 library=8793
+pair 6 fastest_us floor=19.8 get=44.9 put_quiet=46.9 fetch_add=45.3 median_us floor=28.8 get=55.4 put_quiet=55.2 fetch_add=55.0 stream_mib_per_s floor=14852 library=9058
+  stream library/floor=0.610 (0.599-0.906)
+pair 0 fastest_us floor=15.5 get=29.2 put_quiet=29.3 fetch_add=29.3 median_us floor=28.6 get=55.1 put_quiet=55.2 fetch_add=54.8 stream_mib_per_s floor=14996 library=10068
+pair 1 fastest_us floor=17.9 get=42.0 put_quiet=40.4 fetch_add=42.9 median_us floor=28.7 get=55.5 put_quiet=55.6 fetch_add=55.2 stream_mib_per_s floor=14895 library=9895
+pair 2 fastest_us floor=18.5 get=44.0 put_quiet=43.0 fetch_add=44.8 median_us floor=28.6 get=55.5 put_quiet=55.6 fetch_add=55.1 stream_mib_per_s floor=15027 library=9499
+pair 3 fastest_us floor=18.6 get=43.2 put_quiet=41.8 fetch_add=39.9 median_us floor=28.6 get=55.7 put_quiet=55.7 fetch_add=55.1 stream_mib_per_s floor=14940 library=9623
+pair 4 fastest_us floor=15.5 get=28.9 put_quiet=28.7 fetch_add=28.8 median_us floor=28.3 get=55.8 put_quiet=55.9 fetch_add=55.3 stream_mib_per_s floor=15296 library=9596
+pair 5 fastest_us floor=20.9 get=47.2 put_quiet=45.5 fetch_add=44.5 median_us floor=28.8 get=55.6 put_quiet=55.8 fetch_add=55.3 stream_mib_per_s floor=14729 library=9556
+pair 6 fastest_us floor=19.6 get=46.6 put_quiet=45.9 fetch_add=44.8 median_us floor=28.6 get=55.8 put_quiet=56.0 fetch_add=55.5 stream_mib_per_s floor=14639 library=9808
+  stream library/floor=0.649 (0.627-0.671)
+pair 0 fastest_us floor=14.8 get=28.5 put_quiet=28.6 fetch_add=28.5 median_us floor=28.4 get=55.1 put_quiet=55.0 fetch_add=54.7 stream_mib_per_s floor=15118 library=8682
+pair 1 fastest_us floor=21.2 get=46.8 put_quiet=45.6 fetch_add=46.9 median_us floor=28.5 get=55.4 put_quiet=55.4 fetch_add=54.8 stream_mib_per_s floor=14577 library=7778
+pair 2 fastest_us floor=14.8 get=28.5 put_quiet=28.5 fetch_add=28.4 median_us floor=28.7 get=55.4 put_quiet=55.3 fetch_add=54.9 stream_mib_per_s floor=15366 library=7794
+pair 3 fastest_us floor=18.6 get=45.6 put_quiet=39.9 fetch_add=41.4 median_us floor=28.7 get=55.1 put_quiet=55.2 fetch_add=54.8 stream_mib_per_s floor=14677 library=8771
+pair 4 fastest_us floor=18.2 get=41.6 put_quiet=42.1 fetch_add=43.5 median_us floor=28.5 get=55.2 put_quiet=55.2 fetch_add=54.8 stream_mib_per_s floor=14595 library=8659
+pair 5 fastest_us floor=21.0 get=46.1 put_quiet=46.3 fetch_add=44.9 median_us floor=28.4 get=55.4 put_quiet=55.4 fetch_add=55.0 stream_mib_per_s floor=14648 library=8505
+pair 6 fastest_us floor=23.8 get=45.3 put_quiet=45.0 fetch_add=43.3 median_us floor=28.4 get=55.3 put_quiet=55.2 fetch_add=54.8 stream_mib_per_s floor=14464 library=8520
+  stream library/floor=0.581 (0.507-0.598)
